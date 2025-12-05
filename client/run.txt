@@ -1,0 +1,21 @@
+cd C:\_Proj\swimm-project\server\Swimm.API
+cd C:\_Proj\swimm-project\client
+
+npm run dev
+npm run build
+npm run preview
+
+Ctrl + ` - open terminal
+1--------------
+Найти что:
+\r?\n\s*
+
+Заменить на: пробел
+2--------------
+Найти что:
+},\s*{
+
+Заменить на:
+},\r\n{
+
+Нажми “Заменить всё”

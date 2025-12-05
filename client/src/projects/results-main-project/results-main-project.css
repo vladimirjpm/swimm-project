@@ -1,0 +1,71 @@
+.dolphine-training{color:red;}
+
+ .belive-effect {
+  margin: 0; padding: 0;
+  position:absolute;
+  top: 50%; left: 50%;
+  transform:translate(-50%,-50%);
+  font-size: 3.2em; color:transparent;
+  font-weight: bold;
+  text-transform:uppercase;
+  width: max-content;
+}
+
+@media (max-width: 767px){
+  .belive-effect{ font-size: 2em; width: unset;}
+}
+
+ .belive-effect span:nth-child(1){
+  position:absolute;
+  top:0; left:0; color: #000;
+  transition:0.5s;
+  clip-path: polygon(0 0, 100% 0, 100% 50%, 0 50%);
+  overflow:hidden;
+}
+ .belive-effect:hover span:nth-child(1){
+  transform:translateY(-18px); 
+}
+ .belive-effect span:nth-child(2){
+  position:absolute;
+  top:0; left:0; color: #000;
+  transition:0.5s;
+  clip-path: polygon(0 50%, 100% 50%, 100% 100%, 0 100%);
+  overflow:hidden;
+}
+ .belive-effect:hover span:nth-child(2){
+  transform:translateY(18px); 
+}
+ .belive-effect span:nth-child(3){
+  position:absolute;
+  top:50%; left: 0;
+  transform:translateY(-50%) scaleY(0);
+  width: 91%; color: #000;
+  background:#ff0;
+  font-size: 0.25em; font-weight: 500;
+  letter-spacing:0.7em;
+  text-align:center;
+  padding-left: 20px; margin-left: 5px;
+  transition:0.5s;
+}
+ .belive-effect:hover span:nth-child(3){
+  transform:translateY(-50%) scaleY(1);
+}
+
+
+@layer demo.support {
+  .effect-super-bold {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    text-transform: uppercase;
+    font-weight: 900;
+    letter-spacing: -.175ch;
+    line-height: 0.9;
+    color: white;
+    -webkit-text-stroke: 2px black;
+    text-shadow: 2px 2px black;
+  }
+
+  
+}

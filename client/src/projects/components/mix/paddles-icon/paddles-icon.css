@@ -1,0 +1,8 @@
+.dv-paddles-icon{color:goldenrod}
+
+.dv-paddles-icon svg {
+  transition: transform 0.2s ease;
+}
+.dv-paddles-icon:hover svg {
+  transform: scale(1.05);
+}

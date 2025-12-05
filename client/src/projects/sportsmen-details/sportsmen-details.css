@@ -1,0 +1,11 @@
+.sportsmen-details{color:green;}
+.sportsmen-details .table.table-pin-rows thead tr {
+        z-index: 1;
+        background-color: var(--color-base-100);
+        position: sticky;
+        top: 0
+    }
+
+.sportsmen-details .section-top {
+    background-color:  unset
+}

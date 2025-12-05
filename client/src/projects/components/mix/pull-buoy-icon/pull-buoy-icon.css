@@ -1,0 +1,8 @@
+.dv-pull-buoy-icon{color:goldenrod}
+
+.dv-pull-buoy-icon svg {
+  transition: transform 0.2s ease;
+}
+.dv-pull-buoy-icon:hover svg {
+  transform: scale(1.05);
+}

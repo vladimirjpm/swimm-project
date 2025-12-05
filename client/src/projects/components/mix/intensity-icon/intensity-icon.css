@@ -1,0 +1,38 @@
+.dv-intensity-icon{color:greenyellow}
+
+
+
+.dv-intensity-icon.intensity-v0 {
+  background-color: #ffffff;
+  color: #000000;
+}
+
+.dv-intensity-icon.intensity-v1 {
+  background-color: #fff200;
+  color: #000000;
+}
+
+.dv-intensity-icon.intensity-v2 {
+  background-color: #f9a825;
+  color: #000000;
+}
+
+.dv-intensity-icon.intensity-v3 {
+  background-color: #4caf50;
+  color: #ffffff;
+}
+
+.dv-intensity-icon.intensity-v4 {
+  background-color: #03a9f4;
+  color: #ffffff;
+}
+
+.dv-intensity-icon.intensity-v5 {
+  background-color: #f44336;
+  color: #ffffff;
+}
+
+.dv-intensity-icon.intensity-sprint {
+  background-color: #6a1b9a;
+  color: #ffffff;
+}

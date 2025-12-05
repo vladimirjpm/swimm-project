@@ -1,0 +1,7 @@
+.dolphine-training{color:green;}
+ .table.table-pin-rows thead tr {
+        z-index: 1;
+        background-color: var(--color-base-100);
+        position: sticky;
+        top: 0
+    }

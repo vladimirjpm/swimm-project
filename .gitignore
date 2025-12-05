@@ -1,0 +1,40 @@
+# =========================
+# Node.js / React (client)
+# =========================
+node_modules/
+dist/
+build/
+.env
+.env.local
+.env.*.local
+*.log
+npm-debug.log*
+.cache/
+
+# =========================
+# .NET (server)
+# =========================
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+*.dll
+*.exe
+*.pdb
+
+# =========================
+# IDE
+# =========================
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# =========================
+# OS
+# =========================
+.DS_Store
+Thumbs.db

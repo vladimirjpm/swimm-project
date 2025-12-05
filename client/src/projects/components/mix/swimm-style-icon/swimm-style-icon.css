@@ -1,0 +1,6 @@
+.dv-club-icon{color:goldenrod}
+.dv-club-icon .style-len{ margin-top: -10px;}
+
+@media (max-width: 767px){
+  .dv-club-icon .style-len{ margin-top: -1px;font-size: 13px;}
+}
