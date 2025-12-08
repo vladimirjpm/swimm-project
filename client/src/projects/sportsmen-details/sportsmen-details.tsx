@@ -31,7 +31,7 @@ function SportsmenDetails() {
           <div className='flex flex-row p-4 bg-gray-100'>
             <div className='flex flex-col justify-between items-center '>
               <FlagEmoji countryCode="il" size={'72x54'}  />
-              <UI_ClubIcon clubName={firstResult.club} iconWidth='25' styleType="icon-notext" className='px-3' />
+              <UI_ClubIcon clubName={firstResult.club} iconWidth='24' styleType="icon-notext" className='px-3' />
             </div>
             <UI_SwimmerIcon swimmerCode='' iconWidth='50' swimmerGender={firstResult.event_style_gender}  />
             <div className='flex flex-col justify-between items-center'>

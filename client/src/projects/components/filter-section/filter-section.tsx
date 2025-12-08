@@ -11,6 +11,7 @@ import UI_SwimmStyleIcon from '../mix/swimm-style-icon/swimm-style-icon';
 import Helper from '../../../utils/helpers/data-helper';
 import UI_MedalIcon from '../mix/medal-icon/medal-icon';
 import UI_ClubDetails from '../mix/club-details/club-details';
+import FilterDateTrainingCompetition from './filter-date-training-competition';
 
 // тот же тип, что и в FilterSection
 type FilterData = {
@@ -41,27 +42,30 @@ const FilterSection: React.FC = () => {
 
   const filter_data = getFilterData();
 
-  // если данных нет — можно показать заглушку или ничего
-  if (!filter_data) {
-    return (
-      <div className="dv-filter-training p-4 bg-gray-100 rounded-lg">
-        <h2 className="text-lg font-bold mb-2 text-black">Training Filters</h2>
-        <div className="text-sm text-red-600">
-          filter_data is not loaded (check script / path)
-        </div>
-      </div>
-    );
-  }
+  // Фильтруем результаты по training/competition
+  // ВАЖНО: все хуки должны быть ДО раннего return
+  const filteredByTypeResults = useMemo(() => {
+    const results = selectedSource?.results || [];
+    const filterType = filters.filter_date_training_competition || 'training';
+    
+    return results.filter((item) => {
+      const hasTraining = !!item?.training?.trainingId;
+      if (filterType === 'training') return hasTraining;
+      if (filterType === 'competition') return !hasTraining;
+      return true;
+    });
+  }, [selectedSource, filters.filter_date_training_competition]);
+
   const availableAges = useMemo(() => {
     const ageSet = new Set<string>();
-    selectedSource?.results?.forEach((item) => {
+    filteredByTypeResults.forEach((item) => {
       if (item.event_style_age) {
         ageSet.add(item.event_style_age.toString());
       }
     });
     const sorted = Array.from(ageSet).sort((a, b) => Number(a) - Number(b));
     return ['all', ...sorted];
-  }, [selectedSource]);
+  }, [filteredByTypeResults]);
 
   const updateFilter = (newFilter: Partial<typeof filters>) => {
     dispatch(
@@ -73,16 +77,16 @@ const FilterSection: React.FC = () => {
 
   const availableStyleNames = useMemo(() => {
     const set = new Set<string>();
-    selectedSource?.results?.forEach((r) => {
+    filteredByTypeResults.forEach((r) => {
       if (r.event_style_name) set.add(r.event_style_name);
     });
     return set;
-  }, [selectedSource]);
+  }, [filteredByTypeResults]);
 
   const availableLengths = useMemo(() => {
     const set = new Set<number>();
     if (filters.style_name) {
-      selectedSource?.results?.forEach((r) => {
+      filteredByTypeResults.forEach((r) => {
         if (
           r.event_style_name === filters.style_name &&
           r.event_style_len != null
@@ -92,11 +96,23 @@ const FilterSection: React.FC = () => {
       });
     }
     return set;
-  }, [selectedSource, filters.style_name]);
+  }, [filteredByTypeResults, filters.style_name]);
 
   const availableClubs = useMemo(() => {
-    return Helper.getClubsSummary(selectedSource?.results || []);
-  }, [selectedSource]);
+    return Helper.getClubsSummary(filteredByTypeResults);
+  }, [filteredByTypeResults]);
+
+  // если данных нет — можно показать заглушку или ничего
+  if (!filter_data) {
+    return (
+      <div className="dv-filter-training p-4 bg-gray-100 rounded-lg">
+        <h2 className="text-lg font-bold mb-2 text-black">Training Filters</h2>
+        <div className="text-sm text-red-600">
+          filter_data is not loaded (check script / path)
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dv-filter p-4 bg-gray-100 rounded-lg">
@@ -119,9 +135,9 @@ const FilterSection: React.FC = () => {
           </code>
         </div>
       )}
-
-      <FilterNameDropdown />
+<FilterDateTrainingCompetition />
       <FilterDateDropdown />
+      <FilterNameDropdown />
 
       {/* Pool Type */}
       <div className="flex flex-col">

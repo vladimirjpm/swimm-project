@@ -20,7 +20,14 @@ function TrainingTable() {
 
   // ФИЛЬТРАЦИЯ остаётся здесь, чтобы переиспользовать в любых режимах
   const filteredResults = selectedSource.results.filter((res: Result) => {
-    const { pool_type, gender, style_name, style_len, date, age, club } = filters;
+    const { pool_type, gender, style_name, style_len, date, age, club, filter_date_training_competition } = filters;
+    
+    // Фильтр по training/competition
+    const hasTraining = !!res.training?.trainingId;
+    const filterType = filter_date_training_competition || 'training';
+    if (filterType === 'training' && !hasTraining) return false;
+    if (filterType === 'competition' && hasTraining) return false;
+    
     return (
       (pool_type === 'all' || res.pool_type === pool_type) &&
       (gender === 'all' || res.event_style_gender === gender) &&

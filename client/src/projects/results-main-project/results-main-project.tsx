@@ -13,16 +13,20 @@ import DataSourceDDL from '../components/filter-data-source-ddl/filter-data-sour
 
 // === Вспомогательная функция ===
 function checkIsTraining(selectedSource: any, filters: any) {
+  // Используем filter_date_training_competition из фильтров как основной источник истины
+  const filterType = filters?.filter_date_training_competition || 'training';
+  const isTraining = filterType === 'training';
+
+  // Если нужен trainingId, ищем его в данных
   const all = selectedSource?.results ?? [];
-  if (!all.length) return { isTraining: false, trainingId: null };
+  if (!all.length) return { isTraining, trainingId: null };
 
   const currentDate = filters?.date;
   const firstForDate = currentDate
     ? all.find((r: any) => r.date === currentDate)
-    : all[0];
+    : all.find((r: any) => !!r?.training?.trainingId === isTraining); // ищем запись соответствующую режиму
 
   const trainingId = firstForDate?.training?.trainingId || null;
-  const isTraining = !!trainingId;
 
   return { isTraining, trainingId };
 }

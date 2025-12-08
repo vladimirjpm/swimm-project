@@ -18,6 +18,7 @@ export interface ResultWrap {
     pool_type: '25' | '50';
     /*individual data*/
     position: number | null;
+    position_age_group: number | null;
     heat: number;
     lane: number;
     last_name: string;

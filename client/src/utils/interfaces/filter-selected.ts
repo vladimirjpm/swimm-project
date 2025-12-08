@@ -1,4 +1,5 @@
 export type TrainingTableMode = 'groupByName' | 'groupBySet' | 'showTable';
+export type FilterDateTrainingCompetition = 'training' | 'competition';
 export interface FilterSelected {
   selected_name: string;
   date: string;
@@ -14,4 +15,6 @@ export interface FilterSelected {
   };
   // Optional rating mode used by the training filters (no/regular/masters)
   rating_mode?: 'no' |  'masters';
+  // Filter dates by training or competition
+  filter_date_training_competition?: FilterDateTrainingCompetition;
 }

@@ -44,6 +44,7 @@ const initialState: StateInterface = {
     style_len: 0,
     training_table:{ mode: 'showTable' },
     rating_mode: 'no',
+    filter_date_training_competition: 'training',
   },
 };
 
