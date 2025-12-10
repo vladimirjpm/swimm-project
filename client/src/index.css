@@ -3,29 +3,102 @@
 
 /* ========================================
    Цветовые темы: Training и Competition
-   Для изменения цветовой гаммы — меняйте значения здесь
+   
+   Использование:
+   - Автоматически: useTheme() переключает между training/competition
+   - В HTML: <html data-theme="training-nexaverse"> для конкретной темы
+   
+   Доступные темы:
+   - Training: training, training-dashboard, training-nexaverse, training-ocean
+   - Competition: competition, competition-emerald, competition-dark
+   
+   Кнопки Training/Competition:
+   - Всегда показывают цвет своей темы независимо от текущего режима
+   - Цвета определяются в :root как глобальные константы
    ======================================== */
 
+/* ----------------------------------------
+   ГЛОБАЛЬНЫЕ ЦВЕТА КНОПОК Training/Competition
+   Эти цвета НЕ меняются при переключении тем
+   ---------------------------------------- */
 :root {
-  /* === Training Theme (NexaVerse style) === */
-  --theme-primary: #1a5f7a;           /* teal-dark - основной цвет */
-  --theme-primary-hover: #0a2239;     /* dark navy - при наведении */
-  --theme-primary-light: #e0f4f5;     /* light teal - светлый акцент */
-  --theme-bg-section: #0a2239;        /* dark navy - фон секций */
-  --theme-bg-header: #132d46;         /* navy - фон заголовков */
-  --theme-bg-active: #1a5f7a;         /* teal-dark - активные кнопки */
-  --theme-bg-btn: #132d46;            /* navy - фон неактивных кнопок */
-  --theme-text-active: #ffffff;       /* белый текст на активных */
-  --theme-text-header: #ffffff;       /* белый - заголовки */
-  --theme-text-btn: #94a3b8;          /* slate-400 - текст кнопок */
-  --theme-text-muted: #94a3b8;        /* slate-400 - второстепенный текст */
-  --theme-border: #1e3a5f;            /* dark blue - границы */
-  --theme-border-active: #2dd4bf;     /* teal-400 - активная граница */
-  --theme-accent: #2dd4bf;            /* teal-400 - акцентный цвет */
+  /* Training кнопка - индиго (можно поменять здесь для всех тем) */
+  --btn-training-bg: #5b5fc7;
+  --btn-training-text: #ffffff;
+  
+  /* Competition кнопка - изумрудный (можно поменять здесь для всех тем) */
+  --btn-competition-bg: #10b981;
+  --btn-competition-text: #ffffff;
 }
 
-:root[data-theme="competition"] {
-  /* === Competition Theme === */
+/* ----------------------------------------
+   TRAINING ТЕМЫ
+   ---------------------------------------- */
+
+/* Training Theme: Dashboard (по умолчанию) */
+:root,
+:root[data-theme="training"],
+:root[data-theme="training-dashboard"] {
+  /*https://www.realtimecolors.com/dashboard?colors=0d0d0f-f4f4f9-4e5bc4-8f99eb-4a5df5&fonts=Inter-Inter*/
+  --theme-primary: #5b5fc7;           /* indigo/violet - основной цвет */
+  --theme-primary-hover: #4a4eb8;     /* darker indigo - при наведении */
+  --theme-primary-light: #e8e8fc;     /* light lavender - светлый акцент */
+  --theme-bg-section: #eef0f8;        /* light gray-lavender - фон секций */
+  --theme-bg-header: #dde0f0;         /* slightly darker lavender - фон заголовков */
+  --theme-bg-active: #5b5fc7;         /* indigo - активные кнопки */
+  --theme-bg-btn: #ffffff;            /* white - фон неактивных кнопок */
+  --theme-text-active: #ffffff;       /* белый текст на активных */
+  --theme-text-header: #1a1a2e;       /* dark navy - заголовки */
+  --theme-text-btn: #4a4a6a;          /* gray-purple - текст кнопок */
+  --theme-text-muted: #8888a8;        /* muted gray - второстепенный текст */
+  --theme-border: #d0d4e8;            /* light border - границы */
+  --theme-border-active: #5b5fc7;     /* indigo - активная граница */
+  --theme-accent: #5b5fc7;            /* indigo - акцентный цвет */
+}
+
+/* Training Theme: NexaVerse (тёмная) */
+:root[data-theme="training-nexaverse"] {
+  --theme-primary: #1a5f7a;
+  --theme-primary-hover: #0a2239;
+  --theme-primary-light: #e0f4f5;
+  --theme-bg-section: #0a2239;
+  --theme-bg-header: #132d46;
+  --theme-bg-active: #1a5f7a;
+  --theme-bg-btn: #132d46;
+  --theme-text-active: #ffffff;
+  --theme-text-header: #ffffff;
+  --theme-text-btn: #94a3b8;
+  --theme-text-muted: #94a3b8;
+  --theme-border: #1e3a5f;
+  --theme-border-active: #2dd4bf;
+  --theme-accent: #2dd4bf;
+}
+
+/* Training Theme: Ocean Blue */
+:root[data-theme="training-ocean"] {
+  --theme-primary: #0077b6;
+  --theme-primary-hover: #005f8a;
+  --theme-primary-light: #caf0f8;
+  --theme-bg-section: #e8f4f8;
+  --theme-bg-header: #d4e8f0;
+  --theme-bg-active: #0077b6;
+  --theme-bg-btn: #ffffff;
+  --theme-text-active: #ffffff;
+  --theme-text-header: #023e58;
+  --theme-text-btn: #456a7a;
+  --theme-text-muted: #6a8a9a;
+  --theme-border: #b8d4e0;
+  --theme-border-active: #0077b6;
+  --theme-accent: #00b4d8;
+}
+
+/* ----------------------------------------
+   COMPETITION ТЕМЫ
+   ---------------------------------------- */
+
+/* Competition Theme: Emerald (по умолчанию) */
+:root[data-theme="competition"],
+:root[data-theme="competition-emerald"] {
   --theme-primary: #10b981;           /* emerald-500 - основной цвет */
   --theme-primary-hover: #059669;     /* emerald-600 - при наведении */
   --theme-primary-light: #d1fae5;     /* emerald-100 - светлый акцент */
@@ -39,6 +112,25 @@
   --theme-text-muted: #047857;        /* emerald-700 - второстепенный текст */
   --theme-border: #6ee7b7;            /* emerald-300 - границы */
   --theme-border-active: #10b981;     /* emerald-500 - активная граница */
+  --theme-accent: #10b981;
+}
+
+/* Competition Theme: Dark */
+:root[data-theme="competition-dark"] {
+  --theme-primary: #34d399;
+  --theme-primary-hover: #10b981;
+  --theme-primary-light: #064e3b;
+  --theme-bg-section: #022c22;
+  --theme-bg-header: #064e3b;
+  --theme-bg-active: #10b981;
+  --theme-bg-btn: #064e3b;
+  --theme-text-active: #ffffff;
+  --theme-text-header: #ecfdf5;
+  --theme-text-btn: #a7f3d0;
+  --theme-text-muted: #6ee7b7;
+  --theme-border: #065f46;
+  --theme-border-active: #34d399;
+  --theme-accent: #34d399;
 }
 
 /* Утилитарные классы для тем */
@@ -73,6 +165,27 @@
 .theme-btn:hover {
   border-color: var(--theme-primary);
   color: var(--theme-primary);
+}
+
+/* Специальные кнопки Training/Competition - всегда в своём фирменном цвете */
+.btn-training {
+  background-color: var(--btn-training-bg);
+  color: var(--btn-training-text);
+  border-color: var(--btn-training-bg);
+}
+
+.btn-training:hover {
+  opacity: 0.9;
+}
+
+.btn-competition {
+  background-color: var(--btn-competition-bg);
+  color: var(--btn-competition-text);
+  border-color: var(--btn-competition-bg);
+}
+
+.btn-competition:hover {
+  opacity: 0.9;
 }
 
 .theme-btn-active {

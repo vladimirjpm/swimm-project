@@ -7,9 +7,13 @@ import { useAppSelector } from '../store/store';
  * 
  * Использование: вызвать один раз в корневом компоненте страницы.
  * 
- * Темы:
- * - 'training' (по умолчанию) — синяя цветовая гамма
- * - 'competition' — зелёная цветовая гамма
+ * Темы (задаются в index.css):
+ * - Training: training, training-dashboard, training-nexaverse, training-ocean
+ * - Competition: competition, competition-emerald, competition-dark
+ * 
+ * Кастомная тема для страницы:
+ * - Добавьте data-training-theme="nexaverse" или data-competition-theme="dark" на <body>
+ * - Хук автоматически применит полное имя темы (training-nexaverse, competition-dark)
  */
 export const useTheme = () => {
   const filterType = useAppSelector(
@@ -17,12 +21,36 @@ export const useTheme = () => {
   );
 
   useEffect(() => {
-    const theme = filterType || 'training';
-    document.documentElement.dataset.theme = theme;
+    const baseTheme = filterType || 'training';
     
-    // Cleanup: сбросить тему при размонтировании (опционально)
+    // Проверяем кастомную тему для страницы из body атрибутов
+    // Можно задать полное имя (training-nexaverse) или короткое (nexaverse)
+    let customTheme: string | null = null;
+    if (typeof document !== 'undefined') {
+      if (baseTheme === 'training') {
+        const trainingVariant = document.body.getAttribute('data-training-theme');
+        if (trainingVariant) {
+          // Поддержка полного имени (training-nexaverse) или короткого (nexaverse)
+          customTheme = trainingVariant.startsWith('training-') 
+            ? trainingVariant 
+            : `training-${trainingVariant}`;
+        }
+      } else if (baseTheme === 'competition') {
+        const competitionVariant = document.body.getAttribute('data-competition-theme');
+        if (competitionVariant) {
+          // Поддержка полного имени (competition-dark) или короткого (dark)
+          customTheme = competitionVariant.startsWith('competition-') 
+            ? competitionVariant 
+            : `competition-${competitionVariant}`;
+        }
+      }
+    }
+    
+    const finalTheme = customTheme || baseTheme;
+    document.documentElement.dataset.theme = finalTheme;
+    
     return () => {
-      // document.documentElement.dataset.theme = 'training';
+      // Cleanup при размонтировании
     };
   }, [filterType]);
 

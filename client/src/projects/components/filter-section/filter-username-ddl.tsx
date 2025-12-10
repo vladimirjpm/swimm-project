@@ -49,6 +49,7 @@ const FilterNameDropdown: React.FC = () => {
         value={selectedOption}
         onChange={handleChange}
         isClearable
+        classNamePrefix="fname"
       />
     </div>
   );
