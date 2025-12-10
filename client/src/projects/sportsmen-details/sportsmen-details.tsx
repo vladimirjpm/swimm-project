@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import './sportsmen-details.css';
 import { useAppSelector } from '../../store/store';
 import Helper from '../../utils/helpers/data-helper'
@@ -67,6 +67,78 @@ function SportsmenDetails() {
       {sortedBestResults.length > 0 && (
   <div className="mt-6">
     <h2 className="text-xl font-semibold mb-2">Top results by style</h2>
+    <TopResultsTabs sortedBestResults={sortedBestResults} />
+  </div>
+)}
+
+    </div>
+  );
+}
+
+// Компонент табов для Training/Competition
+function TopResultsTabs({ sortedBestResults }: { sortedBestResults: any[] }) {
+  const [activeTab, setActiveTab] = useState<'training' | 'competition'>('training');
+
+  // Проверяем, есть ли хотя бы один результат с is_masters
+  const hasMasters = useMemo(() => {
+    return sortedBestResults.some(r => r.is_masters);
+  }, [sortedBestResults]);
+
+  // Разделяем результаты на training и competition
+  const trainingResults = useMemo(() => {
+    return sortedBestResults.filter(r => !!r.training?.trainingId);
+  }, [sortedBestResults]);
+
+  const competitionResults = useMemo(() => {
+    return sortedBestResults.filter(r => !r.training?.trainingId);
+  }, [sortedBestResults]);
+
+  // Если нет masters — показываем все результаты без табов
+  if (!hasMasters) {
+    return <ResultsTable results={sortedBestResults} />;
+  }
+
+  const currentResults = activeTab === 'training' ? trainingResults : competitionResults;
+
+  return (
+    <div>
+      {/* Табы */}
+      <div className="flex">
+        <button
+          className={`px-4 py-2 rounded-t border-b-2 ${
+            activeTab === 'training'
+              ? 'bg-blue-500 text-white border-blue-500'
+              : 'bg-gray-100 text-gray-700 border-gray-300'
+          }`}
+          onClick={() => setActiveTab('training')}
+        >
+          Training ({trainingResults.length})
+        </button>
+        <button
+          className={`px-4 py-2 rounded-t border-b-2 ml-1 ${
+            activeTab === 'competition'
+              ? 'bg-blue-500 text-white border-blue-500'
+              : 'bg-gray-100 text-gray-700 border-gray-300'
+          }`}
+          onClick={() => setActiveTab('competition')}
+        >
+          Competition ({competitionResults.length})
+        </button>
+      </div>
+
+      {/* Таблица результатов */}
+      {currentResults.length > 0 ? (
+        <ResultsTable results={currentResults} />
+      ) : (
+        <div className="text-gray-500 italic p-4">No {activeTab} results</div>
+      )}
+    </div>
+  );
+}
+
+// Вынесенная таблица результатов
+function ResultsTable({ results }: { results: any[] }) {
+  return (
     <div className="border rounded shadow max-h-[50vh] overflow-y-auto">
       <table
         className="table table-auto table-pin-rows w-full border-separate"
@@ -82,7 +154,7 @@ function SportsmenDetails() {
           </tr>
         </thead>
         <tbody>
-          {sortedBestResults.map((res, index) => {
+          {results.map((res, index) => {
             const levelInfo = res.levelInfo;
             const progress = levelInfo?.progressToNextLevel ?? 0;
 
@@ -141,10 +213,6 @@ function SportsmenDetails() {
           })}
         </tbody>
       </table>
-    </div>
-  </div>
-)}
-
     </div>
   );
 }
