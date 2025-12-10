@@ -1,1 +1,4 @@
-.dv-filter-training{color:darkblue;}
+.dv-filter-training {
+  color: var(--theme-text-header);
+  background-color: var(--theme-bg-section);
+}

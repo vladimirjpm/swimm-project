@@ -28,10 +28,10 @@ const FilterDateTrainingCompetition: React.FC = () => {
         ].map((opt) => (
           <button
             key={opt.value}
-            className={`px-3 py-1 m-1 border rounded ${
+            className={`px-3 py-1 m-1 border rounded transition-colors ${
               (filters.filter_date_training_competition || 'training') === opt.value
-                ? 'bg-blue-500 text-white'
-                : 'bg-white text-black'
+                ? 'theme-btn-active'
+                : 'theme-btn'
             }`}
             onClick={() =>
               updateFilter({

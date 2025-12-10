@@ -115,8 +115,8 @@ const FilterSection: React.FC = () => {
   }
 
   return (
-    <div className="dv-filter p-4 bg-gray-100 rounded-lg">
-      <h2 className="text-lg font-bold mb-2 text-black">Filters</h2>
+    <div className="dv-filter p-4 rounded-lg theme-bg-section">
+      <h2 className="text-lg font-bold mb-2 theme-text-header">Filters</h2>
 
       {isDebug && (
         <div className="text-sm text-gray-700 mb-2">
@@ -146,10 +146,10 @@ const FilterSection: React.FC = () => {
           {filter_data.pool_type.map((type) => (
             <button
               key={type}
-              className={`px-3 py-1 m-1 border rounded ${
+              className={`px-3 py-1 m-1 border rounded transition-colors ${
                 filters.pool_type === type
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white'
+                  ? 'theme-btn-active'
+                  : 'theme-btn'
               }`}
               onClick={() => updateFilter({ pool_type: type })}
             >
@@ -166,8 +166,8 @@ const FilterSection: React.FC = () => {
           {filter_data.gender.map((gen) => (
             <button
               key={gen}
-              className={`px-3 py-1 m-1 border rounded ${
-                filters.gender === gen ? 'bg-blue-500 text-white' : 'bg-white'
+              className={`px-3 py-1 m-1 border rounded transition-colors ${
+                filters.gender === gen ? 'theme-btn-active' : 'theme-btn'
               }`}
               onClick={() => updateFilter({ gender: gen })}
             >
@@ -184,8 +184,8 @@ const FilterSection: React.FC = () => {
           {availableAges.map((age) => (
             <button
               key={age}
-              className={`px-2 py-1 m-1 border rounded ${
-                filters.age === age ? 'bg-blue-500 text-white' : 'bg-white'
+              className={`px-2 py-1 m-1 border rounded transition-colors ${
+                filters.age === age ? 'theme-btn-active' : 'theme-btn'
               }`}
               onClick={() => updateFilter({ age })}
             >
@@ -204,10 +204,10 @@ const FilterSection: React.FC = () => {
             <button
               key={style.style_name}
               disabled={disabled}
-              className={`px-3 py-1 m-1 border rounded flex items-center justify-between ${
+              className={`px-3 py-1 m-1 border rounded flex items-center justify-between transition-colors ${
                 filters.style_name === style.style_name
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white'
+                  ? 'theme-btn-active'
+                  : 'theme-btn'
               } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
               onClick={() =>
                 !disabled && updateFilter({ style_name: style.style_name })
@@ -234,10 +234,10 @@ const FilterSection: React.FC = () => {
                 <button
                   key={len}
                   disabled={disabled}
-                  className={`px-3 py-1 m-1 border rounded ${
+                  className={`px-3 py-1 m-1 border rounded transition-colors ${
                     filters.style_len === len
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-white'
+                      ? 'theme-btn-active'
+                      : 'theme-btn'
                   } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                   onClick={() =>
                     !disabled && updateFilter({ style_len: len })
@@ -256,10 +256,10 @@ const FilterSection: React.FC = () => {
         <div className="flex flex-col">
           <div>
             <button
-              className={`px-3 py-1 m-1 border rounded ${
+              className={`px-3 py-1 m-1 border rounded transition-colors ${
                 filters.club === 'all'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white'
+                  ? 'theme-btn-active'
+                  : 'theme-btn'
               }`}
               onClick={() => updateFilter({ club: 'all' })}
             >

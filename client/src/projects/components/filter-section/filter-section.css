@@ -1,1 +1,4 @@
-.dv-filter{color:red;}
+.dv-filter {
+  color: var(--theme-text-header);
+  background-color: var(--theme-bg-section);
+}

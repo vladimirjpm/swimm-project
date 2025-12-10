@@ -10,6 +10,7 @@ import Popup from '../components/popup/popup';
 import TrainingTable from '../training-table/training-table';
 import FilterTrainigSection from '../components/filter-trainig-section/filter-trainig-section';
 import DataSourceDDL from '../components/filter-data-source-ddl/filter-data-source-ddl';
+import { useTheme } from '../../hooks/useTheme';
 
 // === Вспомогательная функция ===
 function checkIsTraining(selectedSource: any, filters: any) {
@@ -153,6 +154,9 @@ function ResultsMain() {
   const popUpType = useAppSelector((state) => state.popUpType);
   const filters = useAppSelector((state) => state.filterSelected);
   const selectedSource = useAppSelector((state) => state.dataSourceSelected);
+
+  // Активируем тему на уровне главного компонента
+  useTheme();
 
   const { isTraining } = checkIsTraining(selectedSource, filters);
 

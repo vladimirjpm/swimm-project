@@ -100,7 +100,7 @@ const FilterTrainigSection: React.FC = () => {
   }, [selectedSource, filters.style_name]);
 
   return (
-    <div className="dv-filter-training p-4 bg-gray-100 rounded-lg">
+    <div className="dv-filter-training p-4 rounded-lg theme-bg-section">
 
       {isDebug && (
         <div className="text-sm text-gray-700 mb-2">
@@ -150,10 +150,10 @@ const FilterTrainigSection: React.FC = () => {
           ].map((opt) => (
             <button
               key={opt.value}
-              className={`px-3 py-1 m-1 border rounded ${
+              className={`px-3 py-1 m-1 border rounded transition-colors ${
                 filters.training_table.mode === opt.value
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-black'
+                  ? 'theme-btn-active'
+                  : 'theme-btn'
               }`}
               onClick={() =>
                 updateFilter({
@@ -180,10 +180,10 @@ const FilterTrainigSection: React.FC = () => {
           ].map((opt) => (
             <button
               key={opt.value}
-              className={`px-2 py-1 m-1 border rounded ${
+              className={`px-2 py-1 m-1 border rounded transition-colors ${
                 filters.rating_mode === opt.value
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-black'
+                  ? 'theme-btn-active'
+                  : 'theme-btn'
               }`}
               onClick={() => updateFilter({ rating_mode: opt.value as any })}
             >
@@ -202,10 +202,10 @@ const FilterTrainigSection: React.FC = () => {
             <button
               key={style.style_name}
               disabled={disabled}
-              className={`px-3 py-1 m-1 border rounded flex items-center justify-between ${
+              className={`px-3 py-1 m-1 border rounded flex items-center justify-between transition-colors ${
                 filters.style_name === style.style_name
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white'
+                  ? 'theme-btn-active'
+                  : 'theme-btn'
               } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
               onClick={() =>
                 !disabled && updateFilter({ style_name: style.style_name })
@@ -232,10 +232,10 @@ const FilterTrainigSection: React.FC = () => {
                 <button
                   key={len}
                   disabled={disabled}
-                  className={`px-3 py-1 m-1 border rounded ${
+                  className={`px-3 py-1 m-1 border rounded transition-colors ${
                     filters.style_len === len
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-white'
+                      ? 'theme-btn-active'
+                      : 'theme-btn'
                   } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                   onClick={() =>
                     !disabled && updateFilter({ style_len: len })

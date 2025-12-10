@@ -1,2 +1,82 @@
 
 @import "tailwindcss";
+
+/* ========================================
+   Цветовые темы: Training и Competition
+   Для изменения цветовой гаммы — меняйте значения здесь
+   ======================================== */
+
+:root {
+  /* === Training Theme (NexaVerse style) === */
+  --theme-primary: #1a5f7a;           /* teal-dark - основной цвет */
+  --theme-primary-hover: #0a2239;     /* dark navy - при наведении */
+  --theme-primary-light: #e0f4f5;     /* light teal - светлый акцент */
+  --theme-bg-section: #0a2239;        /* dark navy - фон секций */
+  --theme-bg-header: #132d46;         /* navy - фон заголовков */
+  --theme-bg-active: #1a5f7a;         /* teal-dark - активные кнопки */
+  --theme-bg-btn: #132d46;            /* navy - фон неактивных кнопок */
+  --theme-text-active: #ffffff;       /* белый текст на активных */
+  --theme-text-header: #ffffff;       /* белый - заголовки */
+  --theme-text-btn: #94a3b8;          /* slate-400 - текст кнопок */
+  --theme-text-muted: #94a3b8;        /* slate-400 - второстепенный текст */
+  --theme-border: #1e3a5f;            /* dark blue - границы */
+  --theme-border-active: #2dd4bf;     /* teal-400 - активная граница */
+  --theme-accent: #2dd4bf;            /* teal-400 - акцентный цвет */
+}
+
+:root[data-theme="competition"] {
+  /* === Competition Theme === */
+  --theme-primary: #10b981;           /* emerald-500 - основной цвет */
+  --theme-primary-hover: #059669;     /* emerald-600 - при наведении */
+  --theme-primary-light: #d1fae5;     /* emerald-100 - светлый акцент */
+  --theme-bg-section: #ecfdf5;        /* emerald-50 - фон секций */
+  --theme-bg-header: #a7f3d0;         /* emerald-200 - фон заголовков */
+  --theme-bg-active: #10b981;         /* emerald-500 - активные кнопки */
+  --theme-bg-btn: #ffffff;            /* белый - фон неактивных кнопок */
+  --theme-text-active: #ffffff;       /* белый текст на активных */
+  --theme-text-header: #065f46;       /* emerald-800 - заголовки */
+  --theme-text-btn: #065f46;          /* emerald-800 - текст кнопок */
+  --theme-text-muted: #047857;        /* emerald-700 - второстепенный текст */
+  --theme-border: #6ee7b7;            /* emerald-300 - границы */
+  --theme-border-active: #10b981;     /* emerald-500 - активная граница */
+}
+
+/* Утилитарные классы для тем */
+.theme-bg-section {
+  background-color: var(--theme-bg-section);
+}
+
+.theme-bg-active {
+  background-color: var(--theme-bg-active);
+}
+
+.theme-text-header {
+  color: var(--theme-text-header);
+}
+
+.theme-text-active {
+  color: var(--theme-text-active);
+}
+
+.theme-border {
+  border-color: var(--theme-border);
+}
+
+/* Кнопки с темой */
+.theme-btn {
+  border: 1px solid var(--theme-border);
+  background-color: var(--theme-bg-btn);
+  color: var(--theme-text-btn);
+  transition: all 0.2s ease;
+}
+
+.theme-btn:hover {
+  border-color: var(--theme-primary);
+  color: var(--theme-primary);
+}
+
+.theme-btn-active {
+  background-color: var(--theme-bg-active);
+  color: var(--theme-text-active);
+  border-color: var(--theme-border-active);
+}
