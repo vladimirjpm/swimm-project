@@ -10,25 +10,33 @@
    
    Доступные темы:
    - Training: training, training-dashboard, training-nexaverse, training-ocean
-   - Competition: competition, competition-emerald, competition-blue, competition-dark
+   - Competition: competition, competition-emerald, competition-blue, competition-warm, competition-dark
    
    Кнопки Training/Competition:
-   - Всегда показывают цвет своей темы независимо от текущего режима
-   - Цвета определяются в :root как глобальные константы
+   - Цвета кнопок определяются в каждой теме
+   - При смене темы меняются и цвета кнопок
    ======================================== */
 
 /* ----------------------------------------
-   ГЛОБАЛЬНЫЕ ЦВЕТА КНОПОК Training/Competition
-   Эти цвета НЕ меняются при переключении тем
+   ДЕФОЛТНЫЕ ЦВЕТА КНОПОК Training/Competition
+   Эти значения используются если тема не задаёт свои
    ---------------------------------------- */
 :root {
-  /* Training кнопка - индиго (можно поменять здесь для всех тем) */
+  /* Training кнопка - дефолт индиго */
   --btn-training-bg: #5b5fc7;
   --btn-training-text: #ffffff;
   
-  /* Competition кнопка - синий (можно поменять здесь для всех тем) */
+  /* Competition кнопка - дефолт синий */
   --btn-competition-bg: #0466c8;
   --btn-competition-text: #ffffff;
+  
+  /* Фиксированные цвета кнопок (устанавливаются через JS из data-*-theme) */
+  /* Кнопка Training всегда показывает цвет из data-training-theme */
+  /* Кнопка Competition всегда показывает цвет из data-competition-theme */
+  --btn-training-fixed-bg: #5b5fc7;
+  --btn-training-fixed-text: #ffffff;
+  --btn-competition-fixed-bg: #0466c8;
+  --btn-competition-fixed-text: #ffffff;
 }
 
 /* ----------------------------------------
@@ -54,6 +62,12 @@
   --theme-border: #d0d4e8;            /* light border - границы */
   --theme-border-active: #5b5fc7;     /* indigo - активная граница */
   --theme-accent: #5b5fc7;            /* indigo - акцентный цвет */
+  
+  /* Кнопки Training/Competition для этой темы */
+  --btn-training-bg: #5b5fc7;         /* indigo */
+  --btn-training-text: #ffffff;
+  --btn-competition-bg: #10b981;      /* emerald */
+  --btn-competition-text: #ffffff;
 }
 
 /* Training Theme: NexaVerse (тёмная) */
@@ -72,6 +86,12 @@
   --theme-border: #1e3a5f;
   --theme-border-active: #2dd4bf;
   --theme-accent: #2dd4bf;
+  
+  /* Кнопки Training/Competition для этой темы */
+  --btn-training-bg: #1a5f7a;         /* teal */
+  --btn-training-text: #ffffff;
+  --btn-competition-bg: #2dd4bf;      /* cyan accent */
+  --btn-competition-text: #0a2239;
 }
 
 /* Training Theme: Ocean Blue */
@@ -90,6 +110,12 @@
   --theme-border: #b8d4e0;
   --theme-border-active: #0077b6;
   --theme-accent: #00b4d8;
+  
+  /* Кнопки Training/Competition для этой темы */
+  --btn-training-bg: #0077b6;         /* ocean blue */
+  --btn-training-text: #ffffff;
+  --btn-competition-bg: #00b4d8;      /* cyan */
+  --btn-competition-text: #ffffff;
 }
 
 /* ----------------------------------------
@@ -113,6 +139,12 @@
   --theme-border: #6ee7b7;            /* emerald-300 - границы */
   --theme-border-active: #10b981;     /* emerald-500 - активная граница */
   --theme-accent: #10b981;
+  
+  /* Кнопки Training/Competition для этой темы */
+  --btn-training-bg: #5b5fc7;         /* indigo */
+  --btn-training-text: #ffffff;
+  --btn-competition-bg: #10b981;      /* emerald */
+  --btn-competition-text: #ffffff;
 }
 
 /* Competition Theme: Blue (coolors.co palette) */
@@ -132,6 +164,37 @@
   --theme-border: #7d8597;            /* gray - границы */
   --theme-border-active: #0466c8;     /* bright blue - активная граница */
   --theme-accent: #0466c8;
+  
+  /* Кнопки Training/Competition для этой темы */
+  --btn-training-bg: #33415c;         /* gray-blue */
+  --btn-training-text: #ffffff;
+  --btn-competition-bg: #0466c8;      /* bright blue */
+  --btn-competition-text: #ffffff;
+}
+
+/* Competition Theme: Warm (sage & coral palette) */
+/* https://coolors.co/visualizer/f2c57c-ddae7e-7fb685-426a5a-ef6f6c */
+:root[data-theme="competition-warm"] {
+  --theme-primary: #7fb685;           /* sage green - основной цвет */
+  --theme-primary-hover: #426a5a;     /* dark green - при наведении */
+  --theme-primary-light: #e8f5e9;     /* light green - светлый акцент */
+  --theme-bg-section: #fdf8f3;        /* warm cream - фон секций */
+  --theme-bg-header: #f2c57c;         /* golden - фон заголовков */
+  --theme-bg-active: #7fb685;         /* sage green - активные кнопки */
+  --theme-bg-btn: #ffffff;            /* белый - фон неактивных кнопок */
+  --theme-text-active: #ffffff;       /* белый текст на активных */
+  --theme-text-header: #426a5a;       /* dark green - заголовки */
+  --theme-text-btn: #426a5a;          /* dark green - текст кнопок */
+  --theme-text-muted: #6b8f71;        /* muted green - второстепенный текст */
+  --theme-border: #ddae7e;            /* caramel - границы */
+  --theme-border-active: #7fb685;     /* sage green - активная граница */
+  --theme-accent: #ef6f6c;            /* coral - акцентный цвет */
+  
+  /* Кнопки Training/Competition для этой темы */
+  --btn-training-bg: #ddae7e;         /* caramel */
+  --btn-training-text: #426a5a;
+  --btn-competition-bg: #7fb685;      /* sage green */
+  --btn-competition-text: #ffffff;
 }
 
 /* Competition Theme: Dark */
@@ -150,6 +213,12 @@
   --theme-border: #065f46;
   --theme-border-active: #34d399;
   --theme-accent: #34d399;
+  
+  /* Кнопки Training/Competition для этой темы */
+  --btn-training-bg: #065f46;         /* dark green */
+  --btn-training-text: #a7f3d0;
+  --btn-competition-bg: #34d399;      /* emerald light */
+  --btn-competition-text: #022c22;
 }
 
 /* Утилитарные классы для тем */
@@ -188,9 +257,9 @@
 
 /* Специальные кнопки Training/Competition - всегда в своём фирменном цвете */
 .btn-training {
-  background-color: var(--btn-training-bg);
-  color: var(--btn-training-text);
-  border-color: var(--btn-training-bg);
+  background-color: var(--btn-training-fixed-bg);
+  color: var(--btn-training-fixed-text);
+  border-color: var(--btn-training-fixed-bg);
 }
 
 .btn-training:hover {
@@ -198,9 +267,9 @@
 }
 
 .btn-competition {
-  background-color: var(--btn-competition-bg);
-  color: var(--btn-competition-text);
-  border-color: var(--btn-competition-bg);
+  background-color: var(--btn-competition-fixed-bg);
+  color: var(--btn-competition-fixed-text);
+  border-color: var(--btn-competition-fixed-bg);
 }
 
 .btn-competition:hover {
