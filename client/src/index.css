@@ -10,7 +10,7 @@
    
    Доступные темы:
    - Training: training, training-dashboard, training-nexaverse, training-ocean
-   - Competition: competition, competition-emerald, competition-dark
+   - Competition: competition, competition-emerald, competition-blue, competition-dark
    
    Кнопки Training/Competition:
    - Всегда показывают цвет своей темы независимо от текущего режима
@@ -26,8 +26,8 @@
   --btn-training-bg: #5b5fc7;
   --btn-training-text: #ffffff;
   
-  /* Competition кнопка - изумрудный (можно поменять здесь для всех тем) */
-  --btn-competition-bg: #10b981;
+  /* Competition кнопка - синий (можно поменять здесь для всех тем) */
+  --btn-competition-bg: #0466c8;
   --btn-competition-text: #ffffff;
 }
 
@@ -113,6 +113,25 @@
   --theme-border: #6ee7b7;            /* emerald-300 - границы */
   --theme-border-active: #10b981;     /* emerald-500 - активная граница */
   --theme-accent: #10b981;
+}
+
+/* Competition Theme: Blue (coolors.co palette) */
+/* https://coolors.co/0466c8-0353a4-023e7d-002855-001845-001233-33415c-5c677d-7d8597-979dac */
+:root[data-theme="competition-blue"] {
+  --theme-primary: #0466c8;           /* bright blue - основной цвет */
+  --theme-primary-hover: #0353a4;     /* darker blue - при наведении */
+  --theme-primary-light: #cce0f5;     /* light blue - светлый акцент */
+  --theme-bg-section: #e8f0fa;        /* светлый голубой - фон секций */
+  --theme-bg-header: #d0e0f0;         /* светло-голубой - фон заголовков */
+  --theme-bg-active: #0466c8;         /* bright blue - активные кнопки */
+  --theme-bg-btn: #ffffff;            /* белый - фон неактивных кнопок */
+  --theme-text-active: #ffffff;       /* белый текст на активных */
+  --theme-text-header: #001845;       /* dark navy - заголовки */
+  --theme-text-btn: #002855;          /* navy - текст кнопок */
+  --theme-text-muted: #33415c;        /* gray-blue - второстепенный текст */
+  --theme-border: #7d8597;            /* gray - границы */
+  --theme-border-active: #0466c8;     /* bright blue - активная граница */
+  --theme-accent: #0466c8;
 }
 
 /* Competition Theme: Dark */
