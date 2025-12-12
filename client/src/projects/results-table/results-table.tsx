@@ -44,11 +44,13 @@ function ResultsTable() {
   const uniqueStyleName = new Set(sortedResults.map(r => `${r.event_style_name}-${r.event_style_len}`));
   const uniqueDates = new Set(sortedResults.map(r => r.date));
   const uniqueAge = new Set(sortedResults.map(r => r.event_style_age));
+  const uniquePoolType = new Set(sortedResults.map(r => r.pool_type));
 
   const showClub = uniqueClubs.size > 1;
   const showEvent = uniqueStyleName.size > 1;
   const showDate = uniqueDates.size > 1;
   const showAge = uniqueAge.size > 1;
+  const showPoolType = uniquePoolType.size > 1;
 
   const hasInternationalPoints = sortedResults.some(r => 
   r.international_points !== undefined &&
@@ -98,6 +100,14 @@ function ResultsTable() {
           </div>
         )
       }
+      {
+        !showPoolType && firstResult?.pool_type && (
+          <div className='ml-4'>
+            <div className='text-6xl'>{firstResult?.pool_type}</div> 
+            <div className='text-4xl'>pool</div>
+          </div>
+        )
+      }
       {!showEvent && firstResult?.event && (
         <div className="w-fit mx-auto">
           <UI_SwimmStyleIcon styleName={firstResult.event_style_name}  styleLen={firstResult.event_style_len} styleType='icon-len' className='font-bold text-6xl w-64'/>
@@ -118,6 +128,7 @@ function ResultsTable() {
         <th className="px-2 py-1">Time</th>
          {hasInternationalPoints && <th className="px-2 py-1">Points</th>}
         {showEvent && <th className="px-2 py-1">Event</th>}
+        {showPoolType && <th className="px-2 py-1">Pool</th>}
         <th className="px-2 py-1">Level</th>
         <th className="px-2 py-1">Process</th>
         {showDate && <th className="px-2 py-1">Date</th>}
@@ -125,13 +136,15 @@ function ResultsTable() {
     </thead>
     <tbody>
       {sortedResults.map((res, index) => {
+        // Явная проверка для isMaster (без ошибок типов)
+        const isMaster = String(res.is_masters) === 'true' || String(res.is_masters) === '1';
         const levelInfo = Helper.getNormativeLevelInfo({
           gender: res.event_style_gender === 'male' ? 'male' : 'female',
-          poolType: res.pool_type === '25' ? '25m_pool' : '50m_pool',
+          poolType: res.pool_type?.toString().startsWith('25') ? '25m_pool' : '50m_pool',
           styleName: res.event_style_name,
           distance: `${res.event_style_len}m`,
           time: Helper.parseTimeToSeconds(res.time),
-          isMaster: !!res.is_masters,
+          isMaster,
           event_style_age: res.event_style_age,
         });
 
@@ -165,6 +178,11 @@ function ResultsTable() {
                 <UI_SwimmStyleIcon styleName={res.event_style_name}  styleLen={res.event_style_len} styleType='icon-len'  className='font-bold text-2xl'/>
               </td>
             }
+            {showPoolType && (
+              <td className="px-2 py-1 text-center font-bold">
+                {res.pool_type}
+              </td>
+            )}
             <td className="px-2 py-1">
               <UI_NormativeLevelIcon
                 levelName={levelInfo.currentLevel}

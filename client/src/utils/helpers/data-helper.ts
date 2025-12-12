@@ -257,7 +257,7 @@ export default class Helper {
     event_style_age?: string | null;
   }): NormativeLevelInfo {
     const source = isMaster && normsMasters ? normsMasters : normsDefault;
-    //console.log('source for normative:', source, isMaster);
+
     const poolData = source?.normatives[gender]?.[poolType];
     if (!poolData) {
       return defaultResult();

@@ -117,20 +117,23 @@ const PopupContentNormative: React.FC = () => {
   const { levelName = '', styleName = '', styleLen = '', poolLen = '', poolType: popUpPoolType, isMasters = false, normativeAgeGroup } =
     useAppSelector((state) => state.popUpObj);
 
-  console.log('PopupContentNormative :', levelName, styleName, styleLen, poolLen, popUpPoolType, isMasters, normativeAgeGroup);
+  // Приведение isMasters к булеву типу (строгое сравнение + строка/число)
+  const isMastersBool = isMasters === true || isMasters === 'true' || isMasters === 1;
+
+  console.log('PopupContentNormative :', levelName, styleName, styleLen, poolLen, popUpPoolType, isMasters, 'isMastersBool:', isMastersBool, normativeAgeGroup);
 
   const [poolType, setPoolType] = useState<PoolType>(derivePoolType(popUpPoolType ?? poolLen));
   const [stroke, setStroke] = useState<string>(deriveStroke(styleName));
-  const [selectedAgeGroup, setSelectedAgeGroup] = useState<string>(normativeAgeGroup ?? '25-29');
+  // selectedAgeGroup только если masters-режим, иначе пусто
+  const [selectedAgeGroup, setSelectedAgeGroup] = useState<string>(isMastersBool ? (normativeAgeGroup ?? '25-29') : '');
   const normalizedStyleLen = useMemo(
     () => normalizeDistance(styleLen),
     [styleLen],
   );
 
-  // Получаем список доступных возрастных групп из normatives-masters
+  // Получаем список доступных возрастных групп из normatives-masters (только если isMastersBool)
   const availableAgeGroups = useMemo(() => {
-    if (!isMasters || !normsMasters) return [];
-    // Берём ключи из первой дистанции первого стиля
+    if (!isMastersBool || !normsMasters) return [];
     const malePool = normsMasters.normatives?.male?.[poolType];
     if (!malePool) return [];
     const firstStroke = Object.keys(malePool)[0];
@@ -138,51 +141,53 @@ const PopupContentNormative: React.FC = () => {
     const firstDist = Object.keys(malePool[firstStroke])[0];
     if (!firstDist) return [];
     const ageGroups = Object.keys(malePool[firstStroke][firstDist]);
-    // Сортируем по первому числу
     return ageGroups.sort((a, b) => {
       const numA = parseInt(a.split('-')[0], 10);
       const numB = parseInt(b.split('-')[0], 10);
       return numA - numB;
     });
-  }, [isMasters, poolType]);
+  }, [isMastersBool, poolType]);
 
-  // Выбираем источник нормативов: masters или обычные
-  const source = isMasters && normsMasters ? normsMasters : norms;
-
-  const malePool = source.normatives.male[poolType] || {};
-  const femalePool = source.normatives.female[poolType] || {};
-
-  // Для masters структура может быть: stroke -> distance -> ageGroup -> levels
-  // Поэтому нужно "пробурить" до нужной возрастной группы
-  const resolveStyleData = (poolData: PoolMapLoose): DistancesMap => {
-    const styleData = poolData[stroke] ?? {};
-    if (!isMasters || !selectedAgeGroup) return styleData;
-    
-    // Проверяем, похожи ли ключи первой дистанции на возрастные группы (например "25-29")
-    const firstDistKey = Object.keys(styleData)[0];
-    if (!firstDistKey) return styleData;
-    
-    const firstDistData = styleData[firstDistKey];
-    if (!firstDistData || typeof firstDistData !== 'object') return styleData;
-    
-    const subKeys = Object.keys(firstDistData);
-    const looksLikeAgeGroups = subKeys.length > 0 && subKeys.every(k => /^\d{2}-\d{2}$/.test(k));
-    
-    if (!looksLikeAgeGroups) return styleData;
-    
-    // Преобразуем структуру: distance -> ageGroup -> levels => distance -> levels (для выбранной ageGroup)
-    const result: DistancesMap = {};
-    for (const dist of Object.keys(styleData)) {
-      const distData = styleData[dist];
-      if (distData && typeof distData === 'object' && distData[selectedAgeGroup]) {
-        result[dist] = distData[selectedAgeGroup] as unknown as LevelsMap;
+  // Выбираем источник нормативов и структуру только если isMastersBool
+  let maleStyle: DistancesMap = {};
+  let femaleStyle: DistancesMap = {};
+  if (isMastersBool && normsMasters) {
+    console.log('[PopupContentNormative] Используется masters-логика, isMasters:', isMasters);
+    const malePool = normsMasters.normatives.male[poolType] || {};
+    const femalePool = normsMasters.normatives.female[poolType] || {};
+    // Для masters структура: stroke -> distance -> ageGroup -> levels
+    const resolveStyleData = (poolData: PoolMapLoose): DistancesMap => {
+      const styleData = poolData[stroke] ?? {};
+      if (!selectedAgeGroup) return styleData;
+      const firstDistKey = Object.keys(styleData)[0];
+      if (!firstDistKey) return styleData;
+      const firstDistData = styleData[firstDistKey];
+      if (!firstDistData || typeof firstDistData !== 'object') return styleData;
+      const subKeys = Object.keys(firstDistData);
+      const looksLikeAgeGroups = subKeys.length > 0 && subKeys.every(k => /^\d{2}-\d{2}$/.test(k));
+      if (!looksLikeAgeGroups) return styleData;
+      const result: DistancesMap = {};
+      for (const dist of Object.keys(styleData)) {
+        const distData = styleData[dist];
+        if (distData && typeof distData === 'object' && distData[selectedAgeGroup]) {
+          result[dist] = distData[selectedAgeGroup] as unknown as LevelsMap;
+        }
       }
+      return result;
+    };
+    maleStyle = resolveStyleData(malePool);
+    femaleStyle = resolveStyleData(femalePool);
+  } else {
+    if (isMasters) {
+      // Если сюда попали, значит isMasters не строго true (например, строка/число)
+      console.warn('[PopupContentNormative] isMasters не строго true, используем обычные нормативы. Значение:', isMasters, typeof isMasters);
     }
-    return result;
-  };
-
-  const maleStyle: DistancesMap = resolveStyleData(malePool);
-  const femaleStyle: DistancesMap = resolveStyleData(femalePool);
+    // Обычные нормативы
+    const malePool = norms.normatives.male[poolType] || {};
+    const femalePool = norms.normatives.female[poolType] || {};
+    maleStyle = malePool[stroke] ?? {};
+    femaleStyle = femalePool[stroke] ?? {};
+  }
 
   const normToSeconds = (v: unknown): number => {
     if (typeof v === 'number' && isFinite(v)) return v;
@@ -241,11 +246,12 @@ const PopupContentNormative: React.FC = () => {
     return i >= 0 ? i : levelKeys.length;
   }, [levelKeys]);
 
+
   return (
     <div className="max-h-[70vh] overflow-auto">
       <h2 className="text-xl font-bold mb-2">
         Normative Info
-        {isMasters && selectedAgeGroup && (
+        {isMastersBool && selectedAgeGroup && (
           <span className="ml-2 text-base font-normal text-gray-600">
             for age group <span className="font-semibold">{selectedAgeGroup}</span>
           </span>
@@ -296,7 +302,7 @@ const PopupContentNormative: React.FC = () => {
       </div>
 
       {/* Фильтр возрастных групп для masters */}
-      {isMasters && availableAgeGroups.length > 0 && (
+      {isMastersBool && availableAgeGroups.length > 0 && (
         <div className="mb-4">
           <div className="text-sm text-gray-600 mb-2">Age Group:</div>
           <div className="flex gap-2 flex-wrap">

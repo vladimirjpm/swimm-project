@@ -48,6 +48,7 @@ window.filter_data = {
         {
             "style_name": "individual_medley",
             "style_len": [
+                100,
                 200,
                 400
             ]

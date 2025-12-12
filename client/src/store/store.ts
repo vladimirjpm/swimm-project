@@ -44,7 +44,7 @@ const initialState: StateInterface = {
     style_len: 0,
     training_table:{ mode: 'showTable' },
     rating_mode: 'no',
-    activity_type: 'training',
+    activity_type: 'competition',
   },
 };
 

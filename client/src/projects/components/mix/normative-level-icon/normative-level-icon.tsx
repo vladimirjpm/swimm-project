@@ -52,10 +52,8 @@ const UI_NormativeLevelIcon: React.FC<UI_NormativeLevelIconProps> = ({
   isMasters,
 }) => {
   const dispatch = useAppDispatch();
-
   const handleNormativeClick = () => {
-    console.log('handleNormativeClick :',levelName, styleName,styleLen,poolType, isMasters, normativeAgeGroup);
-    dispatch(
+        dispatch(
       rootActions.updateState({
           isPopup: true,
           popUpType: Enums.PopupType.normative,

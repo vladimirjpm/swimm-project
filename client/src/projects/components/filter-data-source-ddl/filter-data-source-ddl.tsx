@@ -35,6 +35,22 @@ const dataSources: DataSource[] = [
     },
   },
   {
+    name: 'Masters Weizgal Rehovot Dec 2025',
+    file: 'masters-weizgal-rehovot-12-99-dec-2025.json',
+    load: async () => {
+      const resp = await fetch(
+        makeUrl('masters-weizgal-rehovot-12-99-dec-2025.json'),
+      );
+      if (!resp.ok) {
+        throw new Error(
+          'Failed to load masters-weizgal-rehovot-12-99-dec-2025.json',
+        );
+      }
+      const data = (await resp.json()) as Result[];
+      return data;
+    },
+  },
+  {
     name: 'Dolphin Masters',
     file: 'dolphin_masters_data.json',
     load: async () => {
