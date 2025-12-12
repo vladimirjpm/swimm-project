@@ -18,13 +18,13 @@ function ResultsTable() {
   }
 
   const filteredResults = selectedSource.results.filter((res) => {
-    const { pool_type, gender, style_name, style_len, date, age, club, filter_date_training_competition } = filters;
+    const { pool_type, gender, style_name, style_len, date, age, club, activity_type } = filters;
     
     // Фильтр по training/competition
     const hasTraining = !!res.training?.trainingId;
-    const filterType = filter_date_training_competition || 'training';
-    if (filterType === 'training' && !hasTraining) return false;
-    if (filterType === 'competition' && hasTraining) return false;
+    const activityType = activity_type || 'training';
+    if (activityType === 'training' && !hasTraining) return false;
+    if (activityType === 'competition' && hasTraining) return false;
     
     return (
       (pool_type === 'all' || res.pool_type === pool_type) &&

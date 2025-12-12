@@ -17,7 +17,7 @@ const themeButtonColors: Record<string, { bg: string; text: string }> = {
 };
 
 /**
- * Хук для автоматического переключения темы на основе filter_date_training_competition.
+ * Хук для автоматического переключения темы на основе activity_type.
  * Устанавливает data-theme атрибут на <html> элемент.
  * 
  * Использование: вызвать один раз в корневом компоненте страницы.
@@ -35,12 +35,12 @@ const themeButtonColors: Record<string, { bg: string; text: string }> = {
  * - Кнопка Competition всегда берёт цвет из data-competition-theme
  */
 export const useTheme = () => {
-  const filterType = useAppSelector(
-    (state) => state.filterSelected.filter_date_training_competition
+  const activityType = useAppSelector(
+    (state) => state.filterSelected.activity_type
   );
 
   useEffect(() => {
-    const baseTheme = filterType || 'training';
+    const baseTheme = activityType || 'training';
     
     // Проверяем кастомную тему для страницы из body атрибутов
     // Можно задать полное имя (training-nexaverse) или короткое (nexaverse)
@@ -95,9 +95,9 @@ export const useTheme = () => {
     return () => {
       // Cleanup при размонтировании
     };
-  }, [filterType]);
+  }, [activityType]);
 
-  return filterType || 'training';
+  return activityType || 'training';
 };
 
 export default useTheme;

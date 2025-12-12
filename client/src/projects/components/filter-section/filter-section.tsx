@@ -11,7 +11,7 @@ import UI_SwimmStyleIcon from '../mix/swimm-style-icon/swimm-style-icon';
 import Helper from '../../../utils/helpers/data-helper';
 import UI_MedalIcon from '../mix/medal-icon/medal-icon';
 import UI_ClubDetails from '../mix/club-details/club-details';
-import FilterDateTrainingCompetition from './filter-date-training-competition';
+import FilterActivity from './filter-date-training-competition';
 
 // тот же тип, что и в FilterSection
 type FilterData = {
@@ -46,15 +46,15 @@ const FilterSection: React.FC = () => {
   // ВАЖНО: все хуки должны быть ДО раннего return
   const filteredByTypeResults = useMemo(() => {
     const results = selectedSource?.results || [];
-    const filterType = filters.filter_date_training_competition || 'training';
+    const activityType = filters.activity_type || 'training';
     
     return results.filter((item) => {
       const hasTraining = !!item?.training?.trainingId;
-      if (filterType === 'training') return hasTraining;
-      if (filterType === 'competition') return !hasTraining;
+      if (activityType === 'training') return hasTraining;
+      if (activityType === 'competition') return !hasTraining;
       return true;
     });
-  }, [selectedSource, filters.filter_date_training_competition]);
+  }, [selectedSource, filters.activity_type]);
 
   const availableAges = useMemo(() => {
     const ageSet = new Set<string>();
@@ -116,7 +116,7 @@ const FilterSection: React.FC = () => {
 
   return (
     <div className="dv-filter p-4 rounded-lg theme-bg-section">
-      <h2 className="text-lg font-bold mb-2 theme-text-header">Filters</h2>
+      {/* <h2 className="text-lg font-bold mb-2 theme-text-header">Filters</h2> */}
 
       {isDebug && (
         <div className="text-sm text-gray-700 mb-2">
@@ -135,7 +135,7 @@ const FilterSection: React.FC = () => {
           </code>
         </div>
       )}
-<FilterDateTrainingCompetition />
+<FilterActivity />
       <FilterDateDropdown />
       <FilterNameDropdown />
 

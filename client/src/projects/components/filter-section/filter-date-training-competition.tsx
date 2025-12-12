@@ -4,9 +4,9 @@ import {
   useAppDispatch,
   useAppSelector,
 } from '../../../store/store';
-import { FilterDateTrainingCompetition as FilterDateTrainingCompetitionType } from '../../../utils/interfaces/filter-selected';
+import { ActivityType } from '../../../utils/interfaces/filter-selected';
 
-const FilterDateTrainingCompetition: React.FC = () => {
+const FilterActivity: React.FC = () => {
   const dispatch = useAppDispatch();
   const filters = useAppSelector((state) => state.filterSelected);
 
@@ -20,13 +20,13 @@ const FilterDateTrainingCompetition: React.FC = () => {
 
   return (
     <div className="flex flex-col mb-2">
-      <h3 className="font-semibold mb-1">Date Filter</h3>
+      <h3 className="font-semibold mb-1">Activity</h3>
       <div className="flex flex-wrap">
         {[
-          { label: 'Training', value: 'training' as FilterDateTrainingCompetitionType, btnClass: 'btn-training' },
-          { label: 'Competition', value: 'competition' as FilterDateTrainingCompetitionType, btnClass: 'btn-competition' },
+          { label: 'Training', value: 'training' as ActivityType, btnClass: 'btn-training' },
+          { label: 'Competition', value: 'competition' as ActivityType, btnClass: 'btn-competition' },
         ].map((opt) => {
-          const isActive = (filters.filter_date_training_competition || 'training') === opt.value;
+          const isActive = (filters.activity_type || 'training') === opt.value;
           return (
             <button
               key={opt.value}
@@ -35,7 +35,7 @@ const FilterDateTrainingCompetition: React.FC = () => {
               }`}
               onClick={() =>
                 updateFilter({
-                  filter_date_training_competition: opt.value,
+                  activity_type: opt.value,
                 })
               }
             >
@@ -48,4 +48,4 @@ const FilterDateTrainingCompetition: React.FC = () => {
   );
 };
 
-export default FilterDateTrainingCompetition;
+export default FilterActivity;

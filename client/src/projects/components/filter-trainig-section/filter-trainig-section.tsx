@@ -7,7 +7,7 @@ import {
 } from '../../../store/store';
 import FilterDateDropdown from './../filter-section/filter-date-ddl';
 import FilterNameDropdown from './../filter-section/filter-username-ddl';
-import FilterDateTrainingCompetition from './../filter-section/filter-date-training-competition';
+import FilterActivity from './../filter-section/filter-date-training-competition';
 import UI_SwimmStyleIcon from '../mix/swimm-style-icon/swimm-style-icon';
 
 // тот же тип, что и в FilterSection
@@ -133,7 +133,7 @@ const FilterTrainigSection: React.FC = () => {
       )}
 
       {/* Data Type: Training / Competition */}
-      <FilterDateTrainingCompetition />
+      <FilterActivity />
 
       {/* Dropdowns: Name & Date */}
       <FilterDateDropdown />

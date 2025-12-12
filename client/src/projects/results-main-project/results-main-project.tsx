@@ -14,9 +14,9 @@ import { useTheme } from '../../hooks/useTheme';
 
 // === Вспомогательная функция ===
 function checkIsTraining(selectedSource: any, filters: any) {
-  // Используем filter_date_training_competition из фильтров как основной источник истины
-  const filterType = filters?.filter_date_training_competition || 'training';
-  const isTraining = filterType === 'training';
+  // Используем activity_type из фильтров как основной источник истины
+  const activityType = filters?.activity_type || 'training';
+  const isTraining = activityType === 'training';
 
   // Если нужен trainingId, ищем его в данных
   const all = selectedSource?.results ?? [];

@@ -15,13 +15,13 @@ const FilterDateDropdown: React.FC = () => {
 
   // useMemo ВСЕГДА вызывается безусловно
   const dates: string[] = React.useMemo(() => {
-    // Фильтруем результаты по filter_date_training_competition
+    // Фильтруем результаты по activity_type
     const filteredResults = dataResults.filter((item) => {
       const hasTraining = !!item?.training?.trainingId;
-      const filterType = filters.filter_date_training_competition || 'training';
+      const activityType = filters.activity_type || 'training';
       
-      if (filterType === 'training') return hasTraining;
-      if (filterType === 'competition') return !hasTraining;
+      if (activityType === 'training') return hasTraining;
+      if (activityType === 'competition') return !hasTraining;
       return true;
     });
 
@@ -38,18 +38,18 @@ const FilterDateDropdown: React.FC = () => {
       };
       return parse(b).getTime() - parse(a).getTime();
     });
-  }, [dataResults, filters.filter_date_training_competition]);
+  }, [dataResults, filters.activity_type]);
 
-  // Храним предыдущее значение filter_date_training_competition для отслеживания смены
-  const prevFilterType = React.useRef(filters.filter_date_training_competition);
+  // Храним предыдущее значение activity_type для отслеживания смены
+  const prevActivityType = React.useRef(filters.activity_type);
   const hasAutoSelectedRef = React.useRef(false);
 
-  // При смене filter_date_training_competition автоматически выбираем последнюю дату
+  // При смене activity_type автоматически выбираем последнюю дату
   React.useEffect(() => {
-    const filterTypeChanged = prevFilterType.current !== filters.filter_date_training_competition;
+    const activityTypeChanged = prevActivityType.current !== filters.activity_type;
     
-    if (filterTypeChanged) {
-      prevFilterType.current = filters.filter_date_training_competition;
+    if (activityTypeChanged) {
+      prevActivityType.current = filters.activity_type;
       hasAutoSelectedRef.current = false; // сбрасываем флаг при смене режима
     }
     
@@ -74,7 +74,7 @@ const FilterDateDropdown: React.FC = () => {
         hasAutoSelectedRef.current = true; // текущая дата валидна
       }
     }
-  }, [filters.filter_date_training_competition, dates, filters.date, dispatch]);
+  }, [filters.activity_type, dates, filters.date, dispatch]);
 
   // Если нет дат — не рендерим dropdown
   if (dates.length === 0) return null;
