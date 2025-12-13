@@ -116,7 +116,7 @@ function ResultsTable() {
        
         <div className="max-h-100- overflow-y-auto border rounded shadow">
   <table
-    className="table table-auto table-pin-rows w-full border-separate"
+    className="hidden md:table md:table-auto md:table-pin-rows w-full border-separate"
     style={{ borderSpacing: '0 0.5rem' }} // добавляет вертикальный отступ между строками
   >
     <thead className="bg-gray-100 sticky top-0 z-10">
@@ -224,6 +224,50 @@ function ResultsTable() {
       )}
     </tbody>
   </table>
+  {/* Mobile table */}
+  <div className="md:hidden">
+    <table className="table table-auto w-full border-separate" style={{ borderSpacing: '0 0.5rem' }}>
+      <thead className="bg-gray-100 sticky top-0 z-10">
+        <tr>
+          <th className="px-2 py-1" colSpan={10}>results</th>
+        </tr>
+      </thead>
+      <tbody>
+        {sortedResults.map((res, index) => (
+          <tr key={index} className="cursor-pointer border-t bg-blue-100">
+            <td className="px-2 py-3" colSpan={10}>
+              <div className="flex flex-col space-y-2">
+                {/* Первая строка: pos, name, time */}
+                <div className="flex items-center justify-between">
+                  <div className="font-bold flex-shrink-0">{res.position ? <UI_MedalIcon place={res.position.toString()} /> : `${index + 1}`}</div>
+                  <div className="flex-1 px-2">
+                    <div className="text-xl font-bold ">{res.first_name} {res.last_name ? ` ${res.last_name}` : ''}</div>
+                  </div>
+                  <div className="font-mono text-lg font-bold">{res.time}</div>
+                </div>
+                {/* Вторая строка: style и points */}
+                <div className="flex items-center justify-between w-full pl-10">
+                  <div className="text-xs text-center ">
+                    <span className="font-semibold">points:</span> {res.international_points ?? ''}
+                  </div>
+                  <div className="text-center">
+                    <UI_SwimmStyleIcon styleName={res.event_style_name} styleLen={res.event_style_len} styleType='icon-len' className='font-bold text-xl w-24' />
+                  </div>
+                </div>
+              </div>
+            </td>
+          </tr>
+        ))}
+        {sortedResults.length === 0 && (
+          <tr>
+            <td colSpan={7} className="text-center text-gray-500 py-4">
+              No results match the current filters.
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
 </div>
 
       </div>
