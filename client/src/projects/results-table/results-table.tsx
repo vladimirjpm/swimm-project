@@ -65,7 +65,7 @@ function ResultsTable() {
   };
 
   return (
-    <div className="results table">
+    <div className="results table w-full">
       <div className="mb-4">
 
         {selectedSource.title && (
@@ -103,8 +103,7 @@ function ResultsTable() {
       {
         !showPoolType && firstResult?.pool_type && (
           <div className='ml-4'>
-            <div className='text-6xl'>{firstResult?.pool_type}</div> 
-            <div className='text-4xl'>pool</div>
+            <div className='text-4xl'>{firstResult?.pool_type} pool</div> 
           </div>
         )
       }
@@ -126,11 +125,11 @@ function ResultsTable() {
         <th className="px-2 py-1">Name</th>
         {showClub && <th className="px-2 py-1">Club</th>}
         <th className="px-2 py-1">Time</th>
-         {hasInternationalPoints && <th className="px-2 py-1">Points</th>}
+        {hasInternationalPoints && <th className="px-2 py-1 hidden md:table-cell">Points</th>}
         {showEvent && <th className="px-2 py-1">Event</th>}
         {showPoolType && <th className="px-2 py-1">Pool</th>}
-        <th className="px-2 py-1">Level</th>
-        <th className="px-2 py-1">Process</th>
+        <th className="px-2 py-1 hidden md:table-cell">Level</th>
+        <th className="px-2 py-1 hidden md:table-cell">Process</th>
         {showDate && <th className="px-2 py-1">Date</th>}
       </tr>
     </thead>
@@ -168,11 +167,11 @@ function ResultsTable() {
             {showClub && <td className="px-2 py-1"><UI_ClubIcon clubName={res.club} className='text-xs text-center' iconWidth='10' styleType='icon-notext' /></td>}
             
             <td className="px-2 py-1">{res.time}</td>
-             {hasInternationalPoints && (
-                  <td className="px-2 py-1 text-center">
-                    {res.international_points ?? ''}
-                  </td>
-                )}
+            {hasInternationalPoints && (
+              <td className="px-2 py-1 text-center hidden md:table-cell">
+                {res.international_points ?? ''}
+              </td>
+            )}
             {showEvent && 
               <td className="px-2 py-1 w-28">
                 <UI_SwimmStyleIcon styleName={res.event_style_name}  styleLen={res.event_style_len} styleType='icon-len'  className='font-bold text-2xl'/>
@@ -183,7 +182,7 @@ function ResultsTable() {
                 {res.pool_type}
               </td>
             )}
-            <td className="px-2 py-1">
+            <td className="px-2 py-1 hidden md:table-cell">
               <UI_NormativeLevelIcon
                 levelName={levelInfo.currentLevel}
                 styleType="style-1"
@@ -195,7 +194,7 @@ function ResultsTable() {
                 normativeAgeGroup={levelInfo.normativeAgeGroup}
               />
             </td>
-            <td className="px-2 py-1 w-40">
+            <td className="px-2 py-1 w-40 hidden md:table-cell">
               <div>
                 <span className="text-lg font-bold">{res.time}</span> -&gt;{' '}
                 <span className="text-xs">{levelInfo.nextTime}</span>

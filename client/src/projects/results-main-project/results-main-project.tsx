@@ -135,7 +135,7 @@ function MobileFiltersDrawer({
           className="flex items-center justify-between px-4 py-2 border-b cursor-pointer"
           onClick={() => setOpen(false)}
         >
-          <div className="h-1.5 w-12 rounded-full bg-gray-300 mx-auto" />
+          Apply & Close<div className="h-2.5 w-12 rounded-full bg-gray-300 mx-auto" />Apply & Close
         </div>
         <div className="max-h-[85vh] overflow-y-auto p-3" onClick={(e) => e.stopPropagation()}>
           {children}
