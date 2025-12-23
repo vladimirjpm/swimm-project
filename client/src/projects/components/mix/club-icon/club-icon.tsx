@@ -34,7 +34,7 @@ const UI_ClubIcon: React.FC<UI_ClubIconProps> = ({
 
   if (styleType === 'icon-text-bottom') {
     return (
-      <div className={`dv-club-icon flex flex-col items-center space-y-1 text-gray-800 text-base w-${iconWidth} h-${iconWidth} ${className}`}>
+      <div className={`dv-club-icon flex flex-col items-center space-y-1 text-gray-800 text-base  ${className}`}>
         {img}
         <span>{clubName}</span>
       </div>

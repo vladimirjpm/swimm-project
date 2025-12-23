@@ -131,8 +131,9 @@ const FilterSection: React.FC = () => {
                   value !== undefined &&
                   value !== null,
               )
-              .map(([key, value]) => `${key}: ${value}`)}
+              .map(([key, value]) => `<div>${key}: ${value}</div>`)}
           </code>
+          
         </div>
       )}
 <FilterActivity />

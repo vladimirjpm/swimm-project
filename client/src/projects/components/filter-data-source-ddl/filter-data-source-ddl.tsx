@@ -106,8 +106,25 @@ const dataSources: DataSource[] = [
           'Failed to load competition-2025-summer-isr-championship-age_9-11.json',
         );
       }
-      const raw = await resp.json();
-      return HelperConvert.convertPDFResultsToResults(raw);
+      const data = (await resp.json()) as Result[];
+      return data;
+    },
+  }
+  ,
+  {
+    name: '2025 Liga3 Weisgel 9-13 ',
+    file: 'competition-2025-liga3-weisgel-rehovot-age_9-13.json',
+    load: async () => {
+      const resp = await fetch(
+        makeUrl('competition-2025-liga3-weisgel-rehovot-age_9-13.json'),
+      );
+      if (!resp.ok) {
+        throw new Error(
+          'Failed to load competition-2025-liga3-weisgel-rehovot-age_9-13.json',
+        );
+      }
+      const data = (await resp.json()) as Result[];
+      return data;
     },
   },
   {

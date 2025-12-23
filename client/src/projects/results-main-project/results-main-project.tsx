@@ -177,7 +177,7 @@ function ResultsMain() {
   );
 
   return (
-    <div className="dolphine-training p-4 pt-safe pb-safe">
+    <div className="dolphine-training md:p-4 pt-safe pb-safe">
       {/* Мобильная верхняя шторка (DDL источника) */}
       <MobileSourceDrawer rowsCount={rowsCount}>
         <DataSourceDDL />
@@ -211,18 +211,18 @@ function ResultsMain() {
 
             {/* Центральная колонка — результаты */}
             {!isTraining && (
-              <div className="results-table w-full lg:w-6/12 bg-white p-4 rounded shadow">
+              <div className="results-table w-full lg:w-6/12 theme-bg-section rounded shadow">
                 <ResultsTable />
               </div>
             )}
             {isTraining && (
-              <div className="w-full lg:w-6/12 bg-white p-0 md:p-4 rounded shadow">
+              <div className="w-full lg:w-6/12 theme-bg-section p-0 md:p-4 rounded shadow">
                 <TrainingTable />
               </div>
             )}
 
             {/* Правая колонка — детали спортсмена (только десктоп) */}
-            <section className="section-sportsmen-details hidden lg:block w-full lg:w-4/12 bg-white p-4 rounded shadow relative">
+            <section className="section-sportsmen-details hidden lg:block w-full lg:w-4/12 theme-bg-section rounded shadow relative">
               {filters?.selected_name && filters.selected_name !== 'all' && (
                 <SportsmenDetails />
               )}
@@ -273,7 +273,7 @@ function ResultsMain() {
               onClick={() => setOpen(false)}
             >
               <div
-                className="w-full max-h-[85vh] bg-white rounded-t-2xl shadow-xl overflow-auto p-4"
+                className="w-full max-h-[85vh] theme-bg-section rounded-t-2xl shadow-xl overflow-auto p-4"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex justify-between items-center mb-3">

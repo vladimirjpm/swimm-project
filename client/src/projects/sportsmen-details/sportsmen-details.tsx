@@ -81,7 +81,7 @@ function TopResultsTabs({ sortedBestResults }: { sortedBestResults: any[] }) {
 
   // Проверяем, есть ли хотя бы один результат с is_masters
   const hasMasters = useMemo(() => {
-    return sortedBestResults.some(r => r.is_masters);
+    return sortedBestResults.some(r => String(r.is_masters) === 'true' || String(r.is_masters) === '1');
   }, [sortedBestResults]);
 
   // Разделяем результаты на training и competition
@@ -95,15 +95,19 @@ function TopResultsTabs({ sortedBestResults }: { sortedBestResults: any[] }) {
 
   // Если нет masters — показываем все результаты без табов
   if (!hasMasters) {
-    return <ResultsTable results={sortedBestResults} />;
+    return (
+      <div className="max-h-[50vh] overflow-y-auto border rounded shadow">
+        <ResultsTable results={sortedBestResults} />
+      </div>
+    );
   }
 
   const currentResults = activeTab === 'training' ? trainingResults : competitionResults;
 
   return (
-    <div>
+    <div className="max-h-[40vh] overflow-y-auto border rounded shadow">
       {/* Табы */}
-      <div className="flex">
+      <div className="flex sticky top-0 z-10 bg-white">
         <button
           className={`px-4 py-2 rounded-t border-b-2 ${
             activeTab === 'training'
@@ -139,7 +143,7 @@ function TopResultsTabs({ sortedBestResults }: { sortedBestResults: any[] }) {
 // Вынесенная таблица результатов
 function ResultsTable({ results }: { results: any[] }) {
   return (
-    <div className="border rounded shadow max-h-[50vh] overflow-y-auto">
+    <div className="max-h-[40vh] overflow-y-auto border rounded shadow">
       <table
         className="table table-auto table-pin-rows w-full border-separate"
         style={{ borderSpacing: '0 0.5rem' }}

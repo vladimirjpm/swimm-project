@@ -15,7 +15,7 @@ export interface ResultWrap {
     event_style_len: string;
     event_style_gender: string;
     event_style_age: string;
-    pool_type: '25' | '50';
+    pool_type: '25' | '50' | '25m' | '50m';
     /*individual data*/
     position: number | null;
     position_age_group: number | null;
@@ -35,7 +35,28 @@ export interface ResultWrap {
 
     /* training-specific data */
     training?: TrainingInfo;
+
+     /* === ДОБАВЛЕНО ДЛЯ RELAY (опционально) === */
+
+    /** если true — это эстафета */
+    is_relay?: boolean;
+    
+    /** название команды / клуба */
+    relay_team_name?: string;
+    /** имена пловцов клуба */
+    relay_swimmers_name?: string;
+
+    /** состав команды */
+    relay_swimmers?: RelaySwimmer[];
   }
+  export interface RelaySwimmer {
+  order: number; // 1..4
+  last_name: string;
+  first_name: string;
+  birth_year?: number;
+  club?: string;
+  split_time?: string;
+}
 
   export interface TrainingInfo {
   trainingId: number;            // уникальный ID тренировки

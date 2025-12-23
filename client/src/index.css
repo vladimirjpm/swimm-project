@@ -37,7 +37,17 @@
   --btn-training-fixed-text: #ffffff;
   --btn-competition-fixed-bg: #0466c8;
   --btn-competition-fixed-text: #ffffff;
+
+  /* Настраиваемая затемняющая маска для фонового изображения */
+  --body-bg-overlay: rgba(0, 0, 0, 0.75);
 }
+
+/*body {
+  background-image: linear-gradient(var(--body-bg-overlay), var(--body-bg-overlay)), url('/images/mix/bg-2.jpg');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+}*/
 
 /* ----------------------------------------
    TRAINING ТЕМЫ
@@ -224,6 +234,10 @@
 /* Утилитарные классы для тем */
 .theme-bg-section {
   background-color: var(--theme-bg-section);
+}
+
+.theme-bg-header {
+  background-color: var(--theme-bg-header);
 }
 
 .theme-bg-active {

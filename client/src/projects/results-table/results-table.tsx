@@ -5,8 +5,12 @@ import Helper from '../../utils/helpers/data-helper'
 import UI_DateIcon from '../components/mix/date-icon/date-icon';
 import UI_ClubIcon from '../components/mix/club-icon/club-icon';
 import UI_SwimmStyleIcon from '../components/mix/swimm-style-icon/swimm-style-icon';
-import UI_NormativeLevelIcon from '../components/mix/normative-level-icon/normative-level-icon';
-import UI_MedalIcon from '../components/mix/medal-icon/medal-icon';
+import UI_PoolIcon from '../components/mix/pool-icon/pool-icon'
+import ResultsTableMobile from './components/results-table-mobile';
+import ResultsTableDesktop from './components/results-table-desktop';
+import ResultsTable2xl from './components/results-table-2xl';
+import ResultsHeader from './components/results-header';
+import ResultsFilteredInfo from './components/results-filtered-info';
 
 function ResultsTable() {
   const dispatch = useAppDispatch();
@@ -27,7 +31,7 @@ function ResultsTable() {
     if (activityType === 'competition' && hasTraining) return false;
     
     return (
-      (pool_type === 'all' || res.pool_type === pool_type) &&
+      (pool_type === 'all' || res.pool_type === pool_type || res.pool_type === pool_type + 'm') &&
       (gender === 'all' || res.event_style_gender === gender) &&
       (!style_name || res.event_style_name === style_name) &&
       (!style_len || res.event_style_len === style_len.toString()) &&
@@ -39,6 +43,7 @@ function ResultsTable() {
 
   //console.log('filteredResults: ',filteredResults)
   const sortedResults = Helper.sortByTime(filteredResults);
+  //console.log('sortedResults: ',sortedResults)
   // Определяем уникальные значения
   const uniqueClubs = new Set(sortedResults.map(r => r.club));
   const uniqueStyleName = new Set(sortedResults.map(r => `${r.event_style_name}-${r.event_style_len}`));
@@ -69,206 +74,106 @@ function ResultsTable() {
       <div className="mb-4">
 
         {selectedSource.title && (
-          <h2 className="text-xl font-bold mb-2">{selectedSource.title}</h2>
+          <h2 className="text-center text-xl font-bold mt-4 lg:mt-0 mb-2">
+            <div className='effect-super-bold py-4 theme-bg-header'>{selectedSource.title}</div>
+          </h2>
         )}
-        {/* Вынесенные значения */}
-       <div className="mb-2 text-sm text-gray-700 flex justify-between items-start">
-          {/* Левый столбик: Event и Дата */}
-          <div className="flex flex-col space-y-1">
-            
-            {!showDate && firstResult?.date && (
-              <div>            
-                <UI_DateIcon styleType="cube" date={firstResult.date} />
-              </div>
-            )}
-          </div>
-
-          {/* Правый блок: Club */}
-          {!showClub && firstResult?.club && (
-            <div className="pl-4 whitespace-nowrap">
-              <UI_ClubIcon clubName={firstResult.club} iconWidth='20' styleType="icon-text-bottom" />
+        <ResultsFilteredInfo
+          firstResult={firstResult}
+          showDate={showDate}
+          showClub={showClub}
+          showAge={showAge}
+          showPoolType={showPoolType}
+          showEvent={showEvent}
+        />      
+        <div className="max-h-[650px] overflow-y-auto border rounded shadow" >
+          {/* Unified header (single view for all sizes) */}
+          <div className="bg-gray-100 sticky top-0 z-10">
+            <div className="hidden lg:grid 2xl:hidden">
+              <ResultsHeader view="desktop" showClub={showClub} showEvent={showEvent} showDate={showDate} hasInternationalPoints={hasInternationalPoints} />
             </div>
-          )}
-        </div>
-
-      <div className='flex flex-wrap'>
-      {
-        !showAge && firstResult?.event_style_age && (
-          <div>
-            <div className='text-6xl'>{firstResult?.event_style_age}</div> 
-            <div className='text-4xl'>year</div>
+            <div className="hidden 2xl:grid">
+              <ResultsHeader view="2xl" showClub={showClub} showEvent={showEvent} showDate={showDate} hasInternationalPoints={hasInternationalPoints} />
+            </div>
+            <div className="lg:hidden">
+              <ResultsHeader view="mobile" showClub={showClub} showEvent={showEvent} showDate={showDate} hasInternationalPoints={hasInternationalPoints} />
+            </div>
           </div>
-        )
-      }
-      {
-        !showPoolType && firstResult?.pool_type && (
-          <div className='ml-4'>
-            <div className='text-4xl'>{firstResult?.pool_type} pool</div> 
-          </div>
-        )
-      }
-      {!showEvent && firstResult?.event && (
-        <div className="w-fit mx-auto">
-          <UI_SwimmStyleIcon styleName={firstResult.event_style_name}  styleLen={firstResult.event_style_len} styleType='icon-len' className='font-bold text-6xl w-64'/>
-        </div>
-      )}
-      </div>
-       
-        <div className="max-h-100- overflow-y-auto border rounded shadow">
-  <table
-    className="hidden md:table md:table-auto md:table-pin-rows w-full border-separate"
-    style={{ borderSpacing: '0 0.5rem' }} // добавляет вертикальный отступ между строками
-  >
-    <thead className="bg-gray-100 sticky top-0 z-10">
-      <tr>
-        <th className="px-4 py-1">Pos</th>
-        <th className="px-2 py-1">Name</th>
-        {showClub && <th className="px-2 py-1">Club</th>}
-        <th className="px-2 py-1">Time</th>
-        {hasInternationalPoints && <th className="px-2 py-1 hidden md:table-cell">Points</th>}
-        {showEvent && <th className="px-2 py-1">Event</th>}
-        {showPoolType && <th className="px-2 py-1">Pool</th>}
-        <th className="px-2 py-1 hidden md:table-cell">Level</th>
-        <th className="px-2 py-1 hidden md:table-cell">Process</th>
-        {showDate && <th className="px-2 py-1">Date</th>}
-      </tr>
-    </thead>
-    <tbody>
-      {sortedResults.map((res, index) => {
-        // Явная проверка для isMaster (без ошибок типов)
-        const isMaster = String(res.is_masters) === 'true' || String(res.is_masters) === '1';
-        const levelInfo = Helper.getNormativeLevelInfo({
-          gender: res.event_style_gender === 'male' ? 'male' : 'female',
-          poolType: res.pool_type?.toString().startsWith('25') ? '25m_pool' : '50m_pool',
-          styleName: res.event_style_name,
-          distance: `${res.event_style_len}m`,
-          time: Helper.parseTimeToSeconds(res.time),
-          isMaster,
-          event_style_age: res.event_style_age,
-        });
 
-        return (
-          <tr
-            key={index}
-            /* onClick={() => updateFilter({ selected_name: res.first_name})} */
-            
-            className={`cursor-pointer border-t ${
-              res.event_style_gender === 'female' ? 'bg-pink-100' : 'bg-blue-100'
-            }`}
-          >
-            <td className="px-4 py-1 relative">
-              {res.position ? <UI_MedalIcon place={res.position.toString()}   /> : `${index + 1}`}
-              {showAge && <div className='absolute right-0 bottom-0 font-bold'>{res.event_style_age}</div>}
-            </td>
-            <td className="px-2 py-1" onClick={() => updateFilter({ selected_name: `${res.first_name}${res.last_name ? ' ' + res.last_name : ''}` })}>
-               <div className='text-xl font-bold'>{res.first_name} {res.last_name ? ` - ${res.last_name}` : ''}</div>
-               <div className='text-xs'>{res.club}</div>
-            </td>
-            {showClub && <td className="px-2 py-1"><UI_ClubIcon clubName={res.club} className='text-xs text-center' iconWidth='10' styleType='icon-notext' /></td>}
-            
-            <td className="px-2 py-1">{res.time}</td>
-            {hasInternationalPoints && (
-              <td className="px-2 py-1 text-center hidden md:table-cell">
-                {res.international_points ?? ''}
-              </td>
-            )}
-            {showEvent && 
-              <td className="px-2 py-1 w-28">
-                <UI_SwimmStyleIcon styleName={res.event_style_name}  styleLen={res.event_style_len} styleType='icon-len'  className='font-bold text-2xl'/>
-              </td>
-            }
-            {showPoolType && (
-              <td className="px-2 py-1 text-center font-bold">
-                {res.pool_type}
-              </td>
-            )}
-            <td className="px-2 py-1 hidden md:table-cell">
-              <UI_NormativeLevelIcon
-                levelName={levelInfo.currentLevel}
-                styleType="style-1"
-                styleSize="size-2"
-                styleName={res.event_style_name}  
-                styleLen={res.event_style_len}
-                poolType={res.pool_type}
-                isMasters={res.is_masters}
-                normativeAgeGroup={levelInfo.normativeAgeGroup}
-              />
-            </td>
-            <td className="px-2 py-1 w-40 hidden md:table-cell">
-              <div>
-                <span className="text-lg font-bold">{res.time}</span> -&gt;{' '}
-                <span className="text-xs">{levelInfo.nextTime}</span>
-              </div>
-              <div>
-                <div className="w-full bg-gray-200 rounded-full dark:bg-gray-700 mt-1">
-                  <div
-                    className="bg-blue-600 text-xs font-medium text-blue-100 text-center p-0.5 leading-none rounded-full"
-                    style={{ width: `${levelInfo.progressToNextLevel}%` }}
+          <ul className="divide-y">
+            {sortedResults.map((res, index) => {
+              const isMaster = String(res.is_masters) === 'true' || String(res.is_masters) === '1';
+              const levelInfo = Helper.getNormativeLevelInfo({
+                gender: res.event_style_gender === 'male' ? 'male' : 'female',
+                poolType: res.pool_type?.toString().startsWith('25') ? '25m_pool' : '50m_pool',
+                styleName: res.event_style_name,
+                distance: `${res.event_style_len}m`,
+                time: Helper.parseTimeToSeconds(res.time),
+                isMaster,
+                event_style_age: res.event_style_age,
+              });
+
+              return (
+                <React.Fragment key={index}>
+                  <li
+                    className={`lg:hidden flex flex-col gap-2 px-3 py-2 rounded ${res.event_style_gender === 'female' ? 'bg-pink-100' : 'bg-blue-100'}`}
                   >
-                    {levelInfo.progressToNextLevel}%
-                  </div>
-                </div>
-              </div>
-            </td>
-            {showDate && <td className="px-2 py-1">{res.date}</td>}
-          </tr>
-        );
-      })}
+                    <ResultsTableMobile
+                      res={res}
+                      index={index}
+                      showAge={showAge}
+                      showClub={showClub}
+                      showEvent={showEvent}
+                      showPoolType={showPoolType}
+                      showDate={showDate}
+                      hasInternationalPoints={hasInternationalPoints}
+                      levelInfo={levelInfo}
+                      updateFilter={updateFilter}
+                    />
+                  </li>
 
-      {sortedResults.length === 0 && (
-        <tr>
-          <td colSpan={7} className="text-center text-gray-500 py-4">
-            No results match the current filters.
-          </td>
-        </tr>
-      )}
-    </tbody>
-  </table>
-  {/* Mobile table */}
-  <div className="md:hidden">
-    <table className="table table-auto w-full border-separate" style={{ borderSpacing: '0 0.5rem' }}>
-      <thead className="bg-gray-100 sticky top-0 z-10">
-        <tr>
-          <th className="px-2 py-1" colSpan={10}>results</th>
-        </tr>
-      </thead>
-      <tbody>
-        {sortedResults.map((res, index) => (
-          <tr key={index} className="cursor-pointer border-t bg-blue-100">
-            <td className="px-2 py-3" colSpan={10}>
-              <div className="flex flex-col space-y-2">
-                {/* Первая строка: pos, name, time */}
-                <div className="flex items-center justify-between">
-                  <div className="font-bold flex-shrink-0">{res.position ? <UI_MedalIcon place={res.position.toString()} /> : `${index + 1}`}</div>
-                  <div className="flex-1 px-2">
-                    <div className="text-xl font-bold ">{res.first_name} {res.last_name ? ` ${res.last_name}` : ''}</div>
-                  </div>
-                  <div className="font-mono text-lg font-bold">{res.time}</div>
-                </div>
-                {/* Вторая строка: style и points */}
-                <div className="flex items-center justify-between w-full pl-10">
-                  <div className="text-xs text-center ">
-                    <span className="font-semibold">points:</span> {res.international_points ?? ''}
-                  </div>
-                  <div className="text-center">
-                    <UI_SwimmStyleIcon styleName={res.event_style_name} styleLen={res.event_style_len} styleType='icon-len' className='font-bold text-xl w-24' />
-                  </div>
-                </div>
-              </div>
-            </td>
-          </tr>
-        ))}
-        {sortedResults.length === 0 && (
-          <tr>
-            <td colSpan={7} className="text-center text-gray-500 py-4">
-              No results match the current filters.
-            </td>
-          </tr>
-        )}
-      </tbody>
-    </table>
-  </div>
-</div>
+                  <li
+                    className={`hidden lg:grid 2xl:hidden ${res.event_style_gender === 'female' ? 'bg-pink-100' : 'bg-blue-100'}`}
+                  >
+                    <ResultsTableDesktop
+                      res={res}
+                      index={index}
+                      showAge={showAge}
+                      showClub={showClub}
+                      showEvent={showEvent}
+                      showPoolType={showPoolType}
+                      showDate={showDate}
+                      hasInternationalPoints={hasInternationalPoints}
+                      levelInfo={levelInfo}
+                      updateFilter={updateFilter}
+                    />
+                  </li>
+
+                  <li
+                    className={`hidden 2xl:grid grid-cols-12 gap-2 px-4 py-3 items-center ${res.event_style_gender === 'female' ? 'bg-pink-100' : 'bg-blue-100'}`}
+                  >
+                    <ResultsTable2xl
+                      res={res}
+                      index={index}
+                      showAge={showAge}
+                      showClub={showClub}
+                      showEvent={showEvent}
+                      showPoolType={showPoolType}
+                      showDate={showDate}
+                      hasInternationalPoints={hasInternationalPoints}
+                      levelInfo={levelInfo}
+                      updateFilter={updateFilter}
+                    />
+                  </li>
+                </React.Fragment>
+              );
+            })}
+
+            {sortedResults.length === 0 && (
+              <li className="text-center text-gray-500 py-4">No results match the current filters.</li>
+            )}
+          </ul>
+        </div>
 
       </div>
     </div>
@@ -276,7 +181,4 @@ function ResultsTable() {
 }
 
 export default ResultsTable;
-function dispatch(arg0: any) {
-  throw new Error('Function not implemented.');
-}
 

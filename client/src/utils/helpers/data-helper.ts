@@ -441,13 +441,14 @@ export default class Helper {
 
     const sortedBestResults = Array.from(groupedMap.values())
       .map((res) => {
+        const isMaster = String(res.is_masters) === 'true' || String(res.is_masters) === '1';
         const levelInfo = Helper.getNormativeLevelInfo({
           gender: res.event_style_gender === 'male' ? 'male' : 'female',
           poolType: res.pool_type === '25' ? '25m_pool' : '50m_pool',
           styleName: res.event_style_name,
           distance: `${res.event_style_len}m`,
           time: Helper.parseTimeToSeconds(res.time),
-          isMaster: !!res.is_masters,
+          isMaster,
           event_style_age: res.event_style_age,
         });
 

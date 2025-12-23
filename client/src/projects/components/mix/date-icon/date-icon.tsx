@@ -3,7 +3,7 @@ import { useAppDispatch } from '../../../../store/store';
 import React from 'react';
 
 interface UI_DateIconProps {
-  styleType?: 'cube' | 'row-style-1';
+  styleType?: 'cube'  | 'row-style-1' | 'row-style-2';
   date?: string; // формат: 'DD-MM-YYYY'
   paddingClass?: string;
   className?: string;
@@ -31,13 +31,31 @@ const UI_DateIcon: React.FC<UI_DateIconProps> = ({
 
   if (styleType === 'row-style-1') {
     return (
-      <div className={`dv-date-icon-row flex items-center space-x-1 text-gray-800 text-base ${className}`}>
+      <div className={`dv-date-icon-row flex items-center justify-center space-x-1 text-gray-800 text-base ${className}`}>
         <span className="">{day}</span>
         <span className="font-bold italic uppercase">{month}</span>
         <span className="font-bold">{year}</span>
       </div>
     );
   }
+if (styleType === 'row-style-2') {
+  return (
+    <div
+      className={`dv-date-icon-row flex flex-col items-center justify-center leading-none text-gray-800 ${className}`}
+    >
+      {/* day + month */}
+      <div className="flex items-baseline space-x-1 text-base">
+        <span>{day}</span>
+        <span className="font-bold italic uppercase">{month}</span>
+      </div>
+
+      {/* year */}
+      <div className="text-xs font-bold mt-0.5">
+        {year}
+      </div>
+    </div>
+  );
+}
 
   return (
     <div className={`dv-date-icon w-fit h-auto flex flex-col rounded-lg shadow overflow-hidden text-gray-900 ${className}`}>

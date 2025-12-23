@@ -45,7 +45,7 @@ try {
 
   if (styleType === 'icon-text') {
     return (
-      <div className={`dv-club-icon flex flex-col items-center space-y-1 text-gray-800 ${className}`}>
+      <div className={`dv-swimm-icon flex flex-col items-center space-y-1 text-gray-800 ${className}`}>
         {img}
         <span>{styleName}</span>
       </div>
@@ -54,7 +54,7 @@ try {
 
   if (styleType === 'icon-len') {
     return (
-      <div className={`dv-club-icon relative flex flex-col items-center space-y-1 text-gray-800 ${className}`}>
+      <div className={`dv-swimm-icon relative flex flex-col items-center space-y-1 text-gray-800 ${className}`}>
         {img}
         <div className="absolute right-0">
           <div className="style-len text-red-700">{styleLen}</div>
@@ -64,7 +64,7 @@ try {
   }
 
   return (
-    <div className={`dv-club-icon flex items-center justify-center shadow text-gray-900 ${className}`}>
+    <div className={`dv-swimm-icon flex items-center justify-center shadow text-gray-900 ${className}`}>
       {img}
     </div>
   );

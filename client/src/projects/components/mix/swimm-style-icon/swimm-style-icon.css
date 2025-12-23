@@ -1,6 +1,13 @@
-.dv-club-icon{color:goldenrod}
-.dv-club-icon .style-len{ margin-top: -10px;}
+.dv-swimm-icon{color:goldenrod}
+.dv-swimm-icon .style-len{ margin-top: -10px;}
 
 @media (max-width: 767px){
-  .dv-club-icon .style-len{ margin-top: -1px;font-size: 13px;}
+  .dv-swimm-icon .style-len{
+        margin-top: -5px;
+        font-size: 20px;
+        line-height: 20px;
+        background: rgba(255, 255, 255, 0.5);
+        border-radius: 30%;
+        padding: 0 2px;
+  }
 }

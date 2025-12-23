@@ -85,7 +85,7 @@ function TrainingTableByName({
                   styleName: res.event_style_name,
                   distance: `${res.event_style_len}m`,
                   time: Helper.parseTimeToSeconds(res.time),
-                  isMaster: !!res.is_masters,
+                  isMaster: String(res.is_masters) === 'true' || String(res.is_masters) === '1',
                   event_style_age: res.event_style_age,
                 });
 
