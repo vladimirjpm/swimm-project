@@ -11,6 +11,9 @@
 # production
 /build
 
+# generated manifests
+/public/data/club-icons-manifest.json
+
 # misc
 .DS_Store
 .env.local

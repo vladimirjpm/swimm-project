@@ -1,6 +1,28 @@
 import './club-icon.css';
 import { useAppDispatch } from '../../../../store/store';
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+
+type ClubIconsManifest = {
+  files?: string[];
+};
+
+let clubIconsManifestPromise: Promise<Set<string> | null> | null = null;
+
+const loadClubIconsManifest = (baseUrl: string) => {
+  if (clubIconsManifestPromise) return clubIconsManifestPromise;
+
+  const url = `${baseUrl}data/club-icons-manifest.json`;
+  clubIconsManifestPromise = fetch(url)
+    .then(async (res) => {
+      if (!res.ok) return null;
+      const json = (await res.json()) as ClubIconsManifest;
+      const files = Array.isArray(json?.files) ? json.files : [];
+      return new Set(files);
+    })
+    .catch(() => null);
+
+  return clubIconsManifestPromise;
+};
 
 interface UI_ClubIconProps {
   clubName: string;
@@ -28,15 +50,48 @@ const UI_ClubIcon: React.FC<UI_ClubIconProps> = ({
     .replaceAll('?', '-')
     .replaceAll('#', '-');
 
-  const iconFileName = fileBaseName ? `${encodeURIComponent(fileBaseName)}.png` : 'no-club.png';
   const fallbackSrc = `${base}images/club-icon/no-club.png`;
+  const rawFileName = fileBaseName ? `${fileBaseName}.png` : 'no-club.png';
+  const iconFileName = fileBaseName ? `${encodeURIComponent(fileBaseName)}.png` : 'no-club.png';
   const imageSrc = `${base}images/club-icon/${iconFileName}`;
+
+  const [resolvedSrc, setResolvedSrc] = useState<string>(imageSrc);
+
+  const resolvedTitle = useMemo(() => clubName, [clubName]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!fileBaseName) {
+      setResolvedSrc(fallbackSrc);
+      return;
+    }
+
+    loadClubIconsManifest(base).then((set) => {
+      if (cancelled) return;
+
+      if (!set) {
+        setResolvedSrc(imageSrc);
+        return;
+      }
+
+      if (set.has(rawFileName)) {
+        setResolvedSrc(imageSrc);
+      } else {
+        setResolvedSrc(fallbackSrc);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [base, fallbackSrc, fileBaseName, imageSrc, rawFileName]);
 //console.log('imageSrc: ',imageSrc);
   const img = (
     <img
-      src={imageSrc}
+      src={resolvedSrc}
       alt={clubName}
-      title={clubName}
+      title={resolvedTitle}
       className={`w-${iconWidth} h-${iconWidth} object-contain`}
       onError={(e) => {
         if (e.currentTarget.src !== fallbackSrc) {

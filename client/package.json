@@ -20,6 +20,8 @@
   "scripts": {
     "dev": "vite",
     "start": "vite",
+    "generate:club-icons-manifest": "node tools/generate-club-icons-manifest.mjs",
+    "prebuild": "node tools/generate-club-icons-manifest.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },
