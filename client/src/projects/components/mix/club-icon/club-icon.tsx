@@ -18,7 +18,19 @@ const UI_ClubIcon: React.FC<UI_ClubIconProps> = ({
   const dispatch = useAppDispatch();
 
   const base = import.meta.env.BASE_URL;
-  const imageSrc = `${base}images/club-icon/${clubName.replaceAll(' ', '-').replaceAll('"', '-')}.png`;
+  const safeClubName = (clubName ?? '').trim();
+  const fileBaseName = safeClubName
+    .replaceAll(' ', '-')
+    .replaceAll('"', '-')
+    .replaceAll("'", '-')
+    .replaceAll('/', '-')
+    .replaceAll('\\', '-')
+    .replaceAll('?', '-')
+    .replaceAll('#', '-');
+
+  const iconFileName = fileBaseName ? `${encodeURIComponent(fileBaseName)}.png` : 'no-club.png';
+  const fallbackSrc = `${base}images/club-icon/no-club.png`;
+  const imageSrc = `${base}images/club-icon/${iconFileName}`;
 //console.log('imageSrc: ',imageSrc);
   const img = (
     <img
@@ -27,7 +39,9 @@ const UI_ClubIcon: React.FC<UI_ClubIconProps> = ({
       title={clubName}
       className={`w-${iconWidth} h-${iconWidth} object-contain`}
       onError={(e) => {
-        e.currentTarget.src = `${base}images/club-icon/no-club.png`;
+        if (e.currentTarget.src !== fallbackSrc) {
+          e.currentTarget.src = fallbackSrc;
+        }
       }}
     />
   );
