@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
-  base: '/swimm-project/',
+  base: './',
   plugins: [react(), tailwindcss()],
   build: {
     outDir: 'dist',
