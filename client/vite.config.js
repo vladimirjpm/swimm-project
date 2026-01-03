@@ -6,9 +6,24 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-export default defineConfig({
-  base: './',
-  plugins: [react(), tailwindcss()],
+const swimmProjectPrefixRewrite = () => ({
+  name: 'swimm-project-prefix-rewrite',
+  configureServer(server) {
+    server.middlewares.use((req, _res, next) => {
+      const url = req.url;
+      if (typeof url === 'string' && url.startsWith('/swimm-project/')) {
+        req.url = url.replace('/swimm-project', '');
+      }
+      next();
+    });
+  },
+});
+
+export default defineConfig(({ command }) => ({
+  // In dev we serve at '/', but we also accept '/swimm-project/*' via middleware.
+  // In production builds we use relative paths so the same dist works on Azure and GH Pages.
+  base: command === 'serve' ? '/' : './',
+  plugins: [react(), tailwindcss(), swimmProjectPrefixRewrite()],
   build: {
     outDir: 'dist',
     rollupOptions: {
@@ -23,4 +38,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))
