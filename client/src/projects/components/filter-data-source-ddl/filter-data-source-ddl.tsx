@@ -16,12 +16,18 @@ type DataSource = {
   file?: string;
 };
 
+type SourceConfig = {
+  name: string;
+  file: string;
+};
+
 type Option = { value: string; label: string };
 
 const makeUrl = (file: string) =>
   `${import.meta.env.BASE_URL}data/${file}`;
 
-const dataSources: DataSource[] = [
+// All possible data sources (internal registry)
+const allDataSources: DataSource[] = [
   {
     name: 'Dolphin Training',
     file: 'dolphin_data.json',
@@ -109,8 +115,7 @@ const dataSources: DataSource[] = [
       const data = (await resp.json()) as Result[];
       return data;
     },
-  }
-  ,
+  },
   {
     name: '2025 Liga3 Weisgel 9-13',
     file: 'competition-2025-liga3-weisgel-rehovot-age_9-13.json',
@@ -159,22 +164,11 @@ const dataSources: DataSource[] = [
       return data;
     },
   },
-   {
-    name: 'Filter Data',
-    load: async () => window.filter_data,
-  },
-  {
-    name: 'Normative Records',
-    load: async () => window.normative_records,
-  },
-  {
-    name: 'Normative',
-    load: async () => window.normative,
-  },
 ];
 
-const byName: Record<string, DataSource> = Object.fromEntries(
-  dataSources.map((ds) => [ds.name, ds]),
+// Map by file for quick lookup
+const allDataSourcesByFile: Record<string, DataSource> = Object.fromEntries(
+  allDataSources.filter(ds => ds.file).map((ds) => [ds.file, ds]),
 );
 
 const parseToISO = (d: string) => {
@@ -202,9 +196,59 @@ const DataSourceDDL: React.FC = () => {
   const filters = useAppSelector((s) => s.filterSelected);
   const isDebug = useAppSelector((s) => s.isDebug);
 
+  // State for available sources loaded from config
+  const [dataSources, setDataSources] = React.useState<DataSource[]>([]);
+  const [configLoaded, setConfigLoaded] = React.useState(false);
+
+  // Load sources-config.json on mount
+  React.useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        // Check for custom config file from body attribute
+        const customConfigFile = typeof document !== 'undefined' 
+          ? document.body.getAttribute('data-sources-config') 
+          : null;
+        
+        const configFile = customConfigFile || 'sources-config.json';
+        const resp = await fetch(makeUrl(configFile));
+        
+        if (!resp.ok) {
+          // If no config found, use all sources
+          console.warn(`${configFile} not found, using all sources`);
+          setDataSources(allDataSources);
+          setConfigLoaded(true);
+          return;
+        }
+        const config = await resp.json() as { sources: SourceConfig[] };
+        
+        // Filter allDataSources by config
+        const allowedFiles = new Set(config.sources.map(s => s.file));
+        const filtered = allDataSources.filter(ds => ds.file && allowedFiles.has(ds.file));
+        
+        // Sort by config order
+        const fileOrder = config.sources.map(s => s.file);
+        filtered.sort((a, b) => fileOrder.indexOf(a.file!) - fileOrder.indexOf(b.file!));
+        
+        setDataSources(filtered);
+        setConfigLoaded(true);
+      } catch (e) {
+        console.error('Error loading sources config', e);
+        setDataSources(allDataSources);
+        setConfigLoaded(true);
+      }
+    };
+    loadConfig();
+  }, []);
+
+  // Map by name for selection lookup
+  const byName: Record<string, DataSource> = React.useMemo(
+    () => Object.fromEntries(dataSources.map((ds) => [ds.name, ds])),
+    [dataSources]
+  );
+
   const options: Option[] = React.useMemo(
     () => dataSources.map((ds) => ({ value: ds.name, label: ds.name })),
-    [],
+    [dataSources],
   );
 
   const selectedOptions: Option[] = React.useMemo(() => {
@@ -232,14 +276,17 @@ const DataSourceDDL: React.FC = () => {
 
   // On mount: check for `load-default-data` attribute on <body> and auto-load the corresponding file
   React.useEffect(() => {
+    // Wait for config to load before auto-loading
+    if (!configLoaded) return;
+    
     try {
       const singleFile = typeof document !== 'undefined' ? document.body.getAttribute('load-single-data') : null;
       if (singleFile) {
-        const picked = dataSources.filter((ds) => ds.file === singleFile);
-        if (picked.length) {
-          // hide DDL UI by dispatching selection or by setting store via loadPicked
+        // Use allDataSourcesByFile to allow loading any file, not just from config
+        const ds = allDataSourcesByFile[singleFile];
+        if (ds) {
           (async () => {
-            await loadPicked(picked);
+            await loadPicked([ds]);
           })();
           return;
         }
@@ -248,9 +295,18 @@ const DataSourceDDL: React.FC = () => {
       const defaultFile = typeof document !== 'undefined' ? document.body.getAttribute('load-default-data') : null;
       if (!defaultFile) return;
 
-      // find dataSources that match the filename
+      // find dataSources that match the filename (from config-filtered list)
       const picked = dataSources.filter((ds) => ds.file === defaultFile);
-      if (!picked.length) return;
+      if (!picked.length) {
+        // Fallback to all sources if not in config
+        const ds = allDataSourcesByFile[defaultFile];
+        if (ds) {
+          (async () => {
+            await loadPicked([ds]);
+          })();
+        }
+        return;
+      }
 
       // if store already has this selection, skip
       const title = selectedSource?.title || '';
@@ -264,7 +320,7 @@ const DataSourceDDL: React.FC = () => {
       // ignore in non-browser contexts
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [configLoaded, dataSources]);
 
   const handleChange = async (
     sel: MultiValue<Option> | SingleValue<Option>,
