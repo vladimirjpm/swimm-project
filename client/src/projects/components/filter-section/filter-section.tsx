@@ -137,6 +137,22 @@ const FilterSection: React.FC = () => {
         </div>
       )}
 <FilterActivity />
+      {/* Reset */}
+      <button
+        className="px-4 py-2 bg-red-500 text-white rounded mt-4"
+        onClick={() =>
+          updateFilter({
+            date_str: new Date().toISOString().split('T')[0],
+            pool_type: 'all',
+            gender: 'all',
+            style_name: '',
+            style_len: 0,
+            age: 'all',
+          })
+        }
+      >
+        Reset Filters
+      </button>
       <FilterDateDropdown />
       <FilterNameDropdown />
 
@@ -298,22 +314,7 @@ const FilterSection: React.FC = () => {
         </div>
       </div>
 
-      {/* Reset */}
-      <button
-        className="px-4 py-2 bg-red-500 text-white rounded mt-4"
-        onClick={() =>
-          updateFilter({
-            date_str: new Date().toISOString().split('T')[0],
-            pool_type: 'all',
-            gender: 'all',
-            style_name: '',
-            style_len: 0,
-            age: 'all',
-          })
-        }
-      >
-        Reset Filters
-      </button>
+
     </div>
   );
 };
