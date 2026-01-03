@@ -37,7 +37,7 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
         lastName={res.last_name}
         club={res.club}
         isRelay={res.is_relay}
-        relaySwimmersName={res.relay_swimmers_name}
+        relaySwimmersList={res.relay_swimmers }
         onClick={handleNameClick}
         className="col-span-3"
       />

@@ -1,11 +1,14 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Swimm.API.Services;
+using Swimm.API.Services.Models;
+using Swimm.API.Services.Parsers;
 
 namespace Swimm.API.Controllers
 {
@@ -13,12 +16,10 @@ namespace Swimm.API.Controllers
     [Route("api/[controller]")]
     public class PdfController : ControllerBase
     {
-        /// <summary>
-        /// Принимает PDF-файл ивритской версии (обязательно) и опционально PDF-файл английской версии,
-        /// парсит их и возвращает результаты в формате JSON.
-        /// Имя файлов должно быть вида: "<competition>_<country>_<lang>.pdf", например "Championship-israel-2050_IL_EN.pdf" и соответствующая HE.
-        /// Если englishFile не передан, англоязычные поля будут заполнены из ивритской версии.
-        /// </summary>
+        private static readonly Regex FileNamePattern = new(
+            @"_[A-Za-z]{2,}_(?<lang>HE|EN)\.pdf$", 
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         [HttpPost("upload")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UploadAsync(
@@ -27,44 +28,66 @@ namespace Swimm.API.Controllers
         {
             if (hebrewFile == null)
             {
-                return BadRequest("Необходимо загрузить Hebrew PDF-файл.");
+                return BadRequest(new { error = "Hebrew PDF required." });
+            }
+
+            var heVal = ValidateFileName(hebrewFile.FileName, "HE");
+            if (!heVal.IsValid)
+            {
+                return BadRequest(new { error = heVal.Error });
+            }
+
+            if (englishFile != null)
+            {
+                var enVal = ValidateFileName(englishFile.FileName, "EN");
+                if (!enVal.IsValid)
+                {
+                    return BadRequest(new { error = enVal.Error });
+                }
             }
 
             try
             {
-                // Открываем поток ивритского PDF
                 await using var heStream = hebrewFile.OpenReadStream();
                 List<Result> parsed;
 
                 if (englishFile != null)
                 {
-                    // Английский файл передан: парсим оба PDF
                     await using var enStream = englishFile.OpenReadStream();
-                    parsed = Parser.Parse(enStream, englishFile.FileName,
-                                          heStream, hebrewFile.FileName)
-                                  .ToList();
+                    parsed = Parser.Parse(enStream, englishFile.FileName, heStream, hebrewFile.FileName).ToList();
                 }
                 else
                 {
-                    // Английский файл не передан: используем только ивритский для обоих
                     heStream.Position = 0;
-                    parsed = Parser.Parse(null, null, heStream, hebrewFile.FileName)
-                                  .ToList();
+                    parsed = Parser.Parse(null, null, heStream, hebrewFile.FileName).ToList();
                 }
 
-                return Ok(parsed);
+                var debugLog = CompetitionParser.GetDebugLog();
+                return Ok(new { results = parsed, debugLog = debugLog });
             }
             catch (InvalidOperationException ex)
             {
-                // Ошибки синхронизации или формата
-                return BadRequest(new { error = ex.Message });
+                return BadRequest(new { error = ex.Message, stackTrace = ex.StackTrace, debugLog = CompetitionParser.GetDebugLog() });
             }
             catch (Exception ex)
             {
-                // Общие ошибки
-                return StatusCode(StatusCodes.Status500InternalServerError,
-                                  new { error = "Ошибка сервера при обработке PDF.", detail = ex.Message });
+                return StatusCode(500, new { error = "Server error", detail = ex.Message, debugLog = CompetitionParser.GetDebugLog() });
             }
+        }
+
+        private static (bool IsValid, string Error) ValidateFileName(string fileName, string expectedLang)
+        {
+            var match = FileNamePattern.Match(fileName);
+            if (!match.Success)
+            {
+                return (false, "Invalid filename format. Expected: name_country_lang.pdf");
+            }
+            var lang = match.Groups["lang"].Value.ToUpper();
+            if (lang != expectedLang)
+            {
+                return (false, "Wrong language: " + lang + ", expected: " + expectedLang);
+            }
+            return (true, string.Empty);
         }
     }
 }

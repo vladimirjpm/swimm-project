@@ -148,7 +148,11 @@ const FilterSection: React.FC = () => {
             <button
               key={type}
               className={`px-3 py-1 m-1 border rounded transition-colors ${
-                filters.pool_type === type
+                (type === 'all' && filters.pool_type === 'all') ||
+                (type !== 'all' &&
+                  filters.pool_type !== 'all' &&
+                  Helper.resolvePoolType(filters.pool_type) ===
+                    Helper.resolvePoolType(type))
                   ? 'theme-btn-active'
                   : 'theme-btn'
               }`}

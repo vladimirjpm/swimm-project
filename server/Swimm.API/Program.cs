@@ -18,5 +18,7 @@ if (app.Environment.IsDevelopment())
     app.UseCors("AllowReact");
 }
 
+app.UseStaticFiles(); // <-- Добавьте эту строку
+
 app.MapControllers();
 app.Run();

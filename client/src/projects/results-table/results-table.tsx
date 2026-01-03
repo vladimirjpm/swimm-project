@@ -23,6 +23,8 @@ function ResultsTable() {
 
   const filteredResults = selectedSource.results.filter((res) => {
     const { pool_type, gender, style_name, style_len, date, age, club, activity_type } = filters;
+    const resPoolType = Helper.resolvePoolType(res.pool_type);
+    const filterPoolType = pool_type === 'all' ? null : Helper.resolvePoolType(pool_type);
     
     // Фильтр по training/competition
     const hasTraining = !!res.training?.trainingId;
@@ -31,7 +33,7 @@ function ResultsTable() {
     if (activityType === 'competition' && hasTraining) return false;
     
     return (
-      (pool_type === 'all' || res.pool_type === pool_type || res.pool_type === pool_type + 'm') &&
+      (!filterPoolType || resPoolType === filterPoolType) &&
       (gender === 'all' || res.event_style_gender === gender) &&
       (!style_name || res.event_style_name === style_name) &&
       (!style_len || res.event_style_len === style_len.toString()) &&
@@ -49,7 +51,7 @@ function ResultsTable() {
   const uniqueStyleName = new Set(sortedResults.map(r => `${r.event_style_name}-${r.event_style_len}`));
   const uniqueDates = new Set(sortedResults.map(r => r.date));
   const uniqueAge = new Set(sortedResults.map(r => r.event_style_age));
-  const uniquePoolType = new Set(sortedResults.map(r => r.pool_type));
+  const uniquePoolType = new Set(sortedResults.map(r => Helper.resolvePoolType(r.pool_type)));
 
   const showClub = uniqueClubs.size > 1;
   const showEvent = uniqueStyleName.size > 1;
@@ -74,8 +76,8 @@ function ResultsTable() {
       <div className="mb-4">
 
         {selectedSource.title && (
-          <h2 className="text-center text-xl font-bold mt-4 lg:mt-0 mb-2">
-            <div className='effect-super-bold py-4 theme-bg-header'>{selectedSource.title}</div>
+          <h2 className="text-center text-2xl font-bold mt-4 lg:mt-0 mb-2">
+            <div className='effect-super-bold1 py-4 theme-bg-header'>{selectedSource.title}</div>
           </h2>
         )}
         <ResultsFilteredInfo
@@ -103,9 +105,10 @@ function ResultsTable() {
           <ul className="divide-y">
             {sortedResults.map((res, index) => {
               const isMaster = String(res.is_masters) === 'true' || String(res.is_masters) === '1';
+              const resolvedGender = Helper.resolveGender(res.event_style_gender);
               const levelInfo = Helper.getNormativeLevelInfo({
-                gender: res.event_style_gender === 'male' ? 'male' : 'female',
-                poolType: res.pool_type?.toString().startsWith('25') ? '25m_pool' : '50m_pool',
+                gender: resolvedGender === 'none' ? 'male' : resolvedGender,
+                poolType: Helper.resolvePoolType(res.pool_type),
                 styleName: res.event_style_name,
                 distance: `${res.event_style_len}m`,
                 time: Helper.parseTimeToSeconds(res.time),
@@ -116,7 +119,7 @@ function ResultsTable() {
               return (
                 <React.Fragment key={index}>
                   <li
-                    className={`lg:hidden flex flex-col gap-2 px-3 py-2 rounded ${res.event_style_gender === 'female' ? 'bg-pink-100' : 'bg-blue-100'}`}
+                    className={`lg:hidden flex flex-col gap-2 px-3 py-2 rounded ${Helper.getGenderBgClass(res.event_style_gender)}`}
                   >
                     <ResultsTableMobile
                       res={res}
@@ -133,7 +136,7 @@ function ResultsTable() {
                   </li>
 
                   <li
-                    className={`hidden lg:grid 2xl:hidden ${res.event_style_gender === 'female' ? 'bg-pink-100' : 'bg-blue-100'}`}
+                    className={`hidden lg:grid 2xl:hidden ${Helper.getGenderBgClass(res.event_style_gender)}`}
                   >
                     <ResultsTableDesktop
                       res={res}
@@ -150,7 +153,7 @@ function ResultsTable() {
                   </li>
 
                   <li
-                    className={`hidden 2xl:grid grid-cols-12 gap-2 px-4 py-3 items-center ${res.event_style_gender === 'female' ? 'bg-pink-100' : 'bg-blue-100'}`}
+                    className={`hidden 2xl:grid grid-cols-12 gap-2 px-4 py-3 items-center ${Helper.getGenderBgClass(res.event_style_gender)}`}
                   >
                     <ResultsTable2xl
                       res={res}

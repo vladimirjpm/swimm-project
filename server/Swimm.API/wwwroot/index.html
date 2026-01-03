@@ -1,0 +1,196 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Swimm Project</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1500px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="file"] { margin-bottom: 10px; }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover { background-color: #0056b3; }
+        #resultContainer { margin-top: 20px; }
+        #statusMessage { margin-bottom: 10px; font-weight: bold; }
+        #result {
+            padding: 10px;
+            border: 1px solid #ccc;
+            white-space: pre;
+            max-height: 400px;
+            overflow: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+        }
+        #debugLog {
+            padding: 10px;
+            border: 1px solid #ffa500;
+            white-space: pre;
+            max-height: 300px;
+            overflow: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            background-color: #2d2d2d;
+            color: #ffa500;
+            margin-top: 10px;
+        }
+        #copyBtn, #downloadBtn { display: none; margin-top: 10px; }
+        .error { color: red; }
+        .success { color: green; }
+        .info-box {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        .info-box code { background-color: #d0e8ff; padding: 2px 6px; border-radius: 3px; }
+        .section-header { margin-top: 20px; margin-bottom: 10px; font-weight: bold; }
+        .toggle-btn { background-color: #6c757d; font-size: 12px; padding: 5px 10px; }
+        .filter-input { padding: 5px; margin-left: 10px; width: 200px; }
+        .error-details { background-color: #ffe6e6; border: 1px solid #ff0000; padding: 15px; margin-top: 10px; border-radius: 5px; }
+        .error-details h4 { margin: 0 0 10px 0; color: #cc0000; }
+        .error-details pre { background-color: #fff; padding: 10px; overflow-x: auto; font-size: 11px; max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>Swimm Project - PDF Parser</h1>
+    <h2>Загрузка PDF-файлов</h2>
+    <div class="info-box">
+        <strong>Формат имени файла:</strong> <code>&lt;название&gt;_&lt;страна&gt;_&lt;язык&gt;.pdf</code><br>
+        <strong>Пример:</strong> <code>Competition-2025_IL_HE.pdf</code>
+    </div>
+    <form id="uploadForm" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="hebrewFile">Hebrew PDF (обязательно):</label>
+            <input type="file" id="hebrewFile" name="hebrewFile" accept="application/pdf" required />
+        </div>
+        <div class="form-group">
+            <label for="englishFile">English PDF (опционально):</label>
+            <input type="file" id="englishFile" name="englishFile" accept="application/pdf" />
+        </div>
+        <button type="submit">Загрузить PDF</button>
+    </form>
+    
+    <div id="resultContainer">
+        <div id="statusMessage"></div>
+        <div class="section-header">Результат JSON:</div>
+        <div id="result"></div>
+        <button id="copyBtn" onclick="copyToClipboard()">📋 Скопировать</button>
+        <button id="downloadBtn" onclick="downloadJson()">💾 Скачать JSON</button>
+        
+        <div class="section-header">
+            Debug Log: 
+            <button class="toggle-btn" onclick="toggleDebugLog()">Показать/Скрыть</button>
+            <input type="text" class="filter-input" id="logFilter" placeholder="Фильтр (Gender, MATCH...)" oninput="filterLog()">
+        </div>
+        <div id="debugLog" style="display:none;"></div>
+    </div>
+
+    <script>
+        let lastResults = [];
+        let lastDebugLog = '';
+
+        function toggleDebugLog() {
+            const el = document.getElementById('debugLog');
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function filterLog() {
+            const filter = document.getElementById('logFilter').value.toLowerCase();
+            const el = document.getElementById('debugLog');
+            if (!filter) { el.textContent = lastDebugLog; return; }
+            const lines = lastDebugLog.split('\n').filter(l => l.toLowerCase().includes(filter));
+            el.textContent = lines.join('\n') || 'Нет совпадений';
+        }
+
+        document.getElementById('uploadForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const formData = new FormData();
+            const hebrewFile = document.getElementById('hebrewFile').files[0];
+            const englishFile = document.getElementById('englishFile').files[0];
+            if (hebrewFile) formData.append('hebrewFile', hebrewFile);
+            if (englishFile) formData.append('englishFile', englishFile);
+
+            const statusMessage = document.getElementById('statusMessage');
+            const resultDiv = document.getElementById('result');
+            const debugLogDiv = document.getElementById('debugLog');
+            const copyBtn = document.getElementById('copyBtn');
+            const downloadBtn = document.getElementById('downloadBtn');
+            
+            statusMessage.className = '';
+            statusMessage.innerText = 'Загрузка...';
+            resultDiv.textContent = '';
+            debugLogDiv.textContent = '';
+            debugLogDiv.style.display = 'none';
+            copyBtn.style.display = 'none';
+            downloadBtn.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/pdf/upload', { method: 'POST', body: formData });
+                const data = await response.json();
+                
+                lastDebugLog = data.debugLog || '';
+                debugLogDiv.textContent = lastDebugLog;
+                debugLogDiv.style.display = 'block';
+
+                if (response.ok) {
+                    lastResults = data.results || [];
+                    // Форматируем JSON - каждый элемент на одной строке
+                    let json = '[\n' + lastResults.map(item => '  ' + JSON.stringify(item)).join(',\n') + '\n]';
+                    
+                    statusMessage.className = 'success';
+                    statusMessage.innerText = 'Успешно! Записей: ' + lastResults.length;
+                    resultDiv.textContent = json;
+                    copyBtn.style.display = 'inline-block';
+                    downloadBtn.style.display = 'inline-block';
+                } else {
+                    statusMessage.className = 'error';
+                    statusMessage.innerText = 'Ошибка: ' + (data.error || response.statusText);
+                    let html = '<div class="error-details"><h4>Ошибка:</h4>';
+                    if (data.detail) html += '<p>' + data.detail + '</p>';
+                    if (data.stackTrace) html += '<pre>' + data.stackTrace + '</pre>';
+                    if (!data.detail && !data.stackTrace) html += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                    html += '</div>';
+                    resultDiv.innerHTML = html;
+                }
+            } catch (err) {
+                statusMessage.className = 'error';
+                statusMessage.innerText = 'Ошибка сети: ' + err.message;
+            }
+        };
+
+        function copyToClipboard() {
+            let json = '[\n' + lastResults.map(item => '  ' + JSON.stringify(item)).join(',\n') + '\n]';
+            navigator.clipboard.writeText(json).then(() => {
+                const btn = document.getElementById('copyBtn');
+                btn.innerText = '✓ Скопировано!';
+                setTimeout(() => btn.innerText = '📋 Скопировать', 2000);
+            });
+        }
+
+        function downloadJson() {
+            let json = '[\n' + lastResults.map(item => '  ' + JSON.stringify(item)).join(',\n') + '\n]';
+            const blob = new Blob([json], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'results.json';
+            a.click();
+        }
+    </script>
+</body>
+</html>

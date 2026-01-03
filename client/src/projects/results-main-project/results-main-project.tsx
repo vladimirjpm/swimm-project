@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import '../../index.css'; // общий Tailwind + твои базовые стили
 import './results-main-project.css';
-import { useAppSelector } from '../../store/store';
+import { useAppSelector, useAppDispatch, rootActions } from '../../store/store';
 import FilterSection from '../components/filter-section/filter-section';
 import ResultsTable from '../results-table/results-table';
 import SportsmenDetails from '../sportsmen-details/sportsmen-details';
@@ -150,6 +150,7 @@ function MobileFiltersDrawer({
 
 
 function ResultsMain() {
+  const dispatch = useAppDispatch();
   const isPopup = useAppSelector((state) => state.isPopup);
   const popUpType = useAppSelector((state) => state.popUpType);
   const filters = useAppSelector((state) => state.filterSelected);
@@ -159,6 +160,13 @@ function ResultsMain() {
   useTheme();
 
   const { isTraining } = checkIsTraining(selectedSource, filters);
+
+  // Сброс selected_name при закрытии мобильного модала
+  const handleMobileModalClose = useCallback(() => {
+    dispatch(rootActions.updateState({
+      filterSelected: { ...filters, selected_name: 'all' },
+    }));
+  }, [dispatch, filters]);
 
   // === Проверка, выбран ли источник ===
   const hasSource =
@@ -238,7 +246,10 @@ function ResultsMain() {
           </MobileFiltersDrawer>
 
           {/* Мобильный модал с деталями спортсмена (показывается вместо правой колонки на моб/планшет) */}
-          <MobileSportsmenModal selectedName={filters?.selected_name && filters.selected_name !== 'all' ? filters.selected_name : null}>
+          <MobileSportsmenModal
+            selectedName={filters?.selected_name && filters.selected_name !== 'all' ? filters.selected_name : null}
+            onClose={handleMobileModalClose}
+          >
             {filters?.selected_name && filters.selected_name !== 'all' && <SportsmenDetails />}
           </MobileSportsmenModal>
         </>
@@ -251,9 +262,11 @@ function ResultsMain() {
   function MobileSportsmenModal({
     selectedName,
     children,
+    onClose,
   }: {
     selectedName?: string | null;
     children: React.ReactNode;
+    onClose?: () => void;
   }) {
     const [open, setOpen] = useState(false);
 
@@ -263,6 +276,11 @@ function ResultsMain() {
       else setOpen(false);
     }, [selectedName]);
 
+    const handleClose = () => {
+      setOpen(false);
+      onClose?.();
+    };
+
     const node = (
       <>
         {/* оверлей с содержимым (модал снизу) */}
@@ -270,7 +288,7 @@ function ResultsMain() {
           createPortal(
             <div
               className="fixed inset-0 z-[120] bg-black/50 flex items-end lg:hidden"
-              onClick={() => setOpen(false)}
+              onClick={handleClose}
             >
               <div
                 className="w-full max-h-[85vh] theme-bg-section rounded-t-2xl shadow-xl overflow-auto p-4"
@@ -278,7 +296,7 @@ function ResultsMain() {
               >
                 <div className="flex justify-between items-center mb-3">
                   <div className="h-1.5 w-12 rounded-full bg-gray-300 mx-auto" />
-                  <button onClick={() => setOpen(false)} className="text-xl">×</button>
+                  <button onClick={handleClose} className="text-xl">×</button>
                 </div>
                 {children}
               </div>

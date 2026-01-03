@@ -5,7 +5,7 @@ import { Result, TrainingGroup } from '../interfaces/results';
 // normative.js должен лежать в public и задавать:
 //   window.normative = { normatives: { ... } }
 type PoolType = '25m_pool' | '50m_pool';
-type Gender = 'male' | 'female';
+type Gender = 'male' | 'female' | 'none';
 type Normatives = {
   normatives: Record<
     Gender,
@@ -30,6 +30,25 @@ const normsMasters =
   null;
 //console.log('Loaded normative masters:', normsMasters);
 export default class Helper {
+  static resolvePoolType(poolType: unknown): PoolType {
+    const value =
+      poolType === null || poolType === undefined
+        ? ''
+        : String(poolType).trim().toLowerCase();
+
+    if (value === '25' || value === '25m' || value === '25m_pool') {
+      return '25m_pool';
+    }
+    if (value === '50' || value === '50m' || value === '50m_pool') {
+      return '50m_pool';
+    }
+
+    if (value.includes('25')) {
+      return '25m_pool';
+    }
+
+    return '50m_pool';
+  }
   // Универсальная сортировка по времени
   static sortByTime(arr: Result[]): Result[] {
     const parseTime = (timeStr: string): number => {
@@ -411,15 +430,35 @@ export default class Helper {
     };
 
     const filteredResults = results.filter((res) => {
+      const nameLower = selectedName.toLowerCase();
       const fullName = `${res.first_name}${res.last_name ?? ''}`.toLowerCase();
       const fullNameWithSpace = `${res.first_name} ${
         res.last_name ?? ''
       }`.toLowerCase();
-      return (
-        res.first_name.toLowerCase() === selectedName.toLowerCase() ||
-        fullName === selectedName.toLowerCase() ||
-        fullNameWithSpace === selectedName.toLowerCase()
-      );
+
+      // Проверка основного имени
+      const matchesMain =
+        res.first_name.toLowerCase() === nameLower ||
+        fullName === nameLower ||
+        fullNameWithSpace === nameLower;
+
+      if (matchesMain) return true;
+
+      // Для эстафеты проверяем участников в relay_swimmers
+      const isRelay = res.is_relay === true || String(res.is_relay) === 'true';
+      if (isRelay && res.relay_swimmers && res.relay_swimmers.length > 0) {
+        return res.relay_swimmers.some((swimmer) => {
+          const relayFullName = `${swimmer.first_name}${swimmer.last_name ?? ''}`.toLowerCase();
+          const relayFullNameWithSpace = `${swimmer.first_name} ${swimmer.last_name ?? ''}`.toLowerCase();
+          return (
+            swimmer.first_name?.toLowerCase() === nameLower ||
+            relayFullName === nameLower ||
+            relayFullNameWithSpace === nameLower
+          );
+        });
+      }
+
+      return false;
     });
 
     const sortedResults = Helper.sortByTime(filteredResults);
@@ -438,13 +477,13 @@ export default class Helper {
         groupedMap.set(key, res);
       }
     });
-
     const sortedBestResults = Array.from(groupedMap.values())
       .map((res) => {
         const isMaster = String(res.is_masters) === 'true' || String(res.is_masters) === '1';
+        const resolvedGender = Helper.resolveGender(res.event_style_gender);
         const levelInfo = Helper.getNormativeLevelInfo({
-          gender: res.event_style_gender === 'male' ? 'male' : 'female',
-          poolType: res.pool_type === '25' ? '25m_pool' : '50m_pool',
+          gender: resolvedGender,
+          poolType: Helper.resolvePoolType(res.pool_type),
           styleName: res.event_style_name,
           distance: `${res.event_style_len}m`,
           time: Helper.parseTimeToSeconds(res.time),
@@ -624,5 +663,31 @@ export default class Helper {
         bronze: data.bronze,
       }))
       .sort((a, b) => b.points - a.points);
+  }
+
+  /**
+   * Возвращает CSS класс фона в зависимости от пола
+   * @param gender - пол: 'male' | 'female' | 'none'
+   * @returns Tailwind CSS класс фона
+   */
+  static getGenderBgClass(gender: string): string {
+    if (gender === 'none') return 'bg-gray-100';
+    return gender === 'female' ? 'bg-pink-100' : 'bg-blue-100';
+  }
+
+  /**
+   * Нормализует значение пола к типу Gender
+   * @param gender - значение пола из данных
+   * @returns 'male' | 'female' | 'none'
+   */
+  static resolveGender(gender: unknown): Gender | 'none' {
+    const value = gender === null || gender === undefined
+      ? ''
+      : String(gender).trim().toLowerCase();
+    
+    if (value === 'female' || value === 'f' || value === 'w') return 'female';
+    if (value === 'male' || value === 'm') return 'male';
+    if (value === 'none' || value === '') return 'none';
+    return 'male';
   }
 }

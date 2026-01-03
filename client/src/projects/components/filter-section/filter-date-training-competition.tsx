@@ -9,6 +9,12 @@ import { ActivityType } from '../../../utils/interfaces/filter-selected';
 const FilterActivity: React.FC = () => {
   const dispatch = useAppDispatch();
   const filters = useAppSelector((state) => state.filterSelected);
+  const dataResults = useAppSelector((state) => state.dataSourceSelected?.results) || [];
+
+  // Проверяем, есть ли хотя бы одна запись с training
+  const hasAnyTraining = React.useMemo(() => {
+    return dataResults.some((item) => !!item?.training?.trainingId);
+  }, [dataResults]);
 
   const updateFilter = (newFilter: Partial<typeof filters>) => {
     dispatch(
@@ -17,6 +23,11 @@ const FilterActivity: React.FC = () => {
       }),
     );
   };
+
+  // Если нет training записей — не показываем фильтр
+  if (!hasAnyTraining) {
+    return null;
+  }
 
   return (
     <div className="flex flex-col mb-2">

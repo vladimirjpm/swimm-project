@@ -112,7 +112,7 @@ const dataSources: DataSource[] = [
   }
   ,
   {
-    name: '2025 Liga3 Weisgel 9-13 ',
+    name: '2025 Liga3 Weisgel 9-13',
     file: 'competition-2025-liga3-weisgel-rehovot-age_9-13.json',
     load: async () => {
       const resp = await fetch(
@@ -121,6 +121,22 @@ const dataSources: DataSource[] = [
       if (!resp.ok) {
         throw new Error(
           'Failed to load competition-2025-liga3-weisgel-rehovot-age_9-13.json',
+        );
+      }
+      const data = (await resp.json()) as Result[];
+      return data;
+    },
+  },
+  {
+    name: '2025 Horef Isr Champ 14-17',
+    file: 'competition-2025-horef-isr-championship-age_14-17.json',
+    load: async () => {
+      const resp = await fetch(
+        makeUrl('competition-2025-horef-isr-championship-age_14-17.json'),
+      );
+      if (!resp.ok) {
+        throw new Error(
+          'Failed to load competition-2025-horef-isr-championship-age_14-17.json',
         );
       }
       const data = (await resp.json()) as Result[];
@@ -198,7 +214,7 @@ const DataSourceDDL: React.FC = () => {
       .split(' + ')
       .map((s) => s.trim())
       .filter(Boolean);
-    return options.filter((o) => parts.includes(o.value));
+    return options.filter((o) => parts.includes(o.value.trim()));
   }, [selectedSource?.title, options]);
 
   // detect single-file mode (hide DDL and only load this file)
@@ -207,6 +223,12 @@ const DataSourceDDL: React.FC = () => {
     [],
   );
   const hideDDL = !!singleFileAttr;
+
+  // detect default-file attribute for debugging
+  const defaultFileAttr = React.useMemo(
+    () => (typeof document !== 'undefined' ? document.body.getAttribute('load-default-data') : null),
+    [],
+  );
 
   // On mount: check for `load-default-data` attribute on <body> and auto-load the corresponding file
   React.useEffect(() => {
@@ -321,6 +343,8 @@ const DataSourceDDL: React.FC = () => {
         <div className="mb-2">
           <pre className="bg-gray-200 p-2 text-xs">
             Debug: {selectedSource?.title} / {selectedSource?.results?.length}
+            {'\n'}defaultFile: {defaultFileAttr || '(not set)'}
+            {'\n'}singleFile: {singleFileAttr || '(not set)'}
           </pre>
         </div>
       )}

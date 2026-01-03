@@ -22,7 +22,7 @@ function SportsmenDetails() {
   const pointsSum = Helper.getInternationalPointsSumByName(selectedSource.results, filters.selected_name);
   const medalCounts =  Helper.getMedalCountsByName(selectedSource.results, filters.selected_name);
   const firstResult = sortedBestResults[0];
-  //console.log('firstResult:', firstResult);
+  //console.log('firstResult sportsmen:', firstResult);
 
   return (
     <div className="sportsmen-details sticky top-0">
@@ -59,8 +59,8 @@ function SportsmenDetails() {
              </div>
           </div>
           <div className='px-4 py-2 bg-gray-400'>
-          <div className='text-5xl font-bold text-right text-white'>{filters.selected_name}</div>
-          <div className='text-2xl font-bold text-right text-white'>{firstResult.event_style_age} year <span className='text-xl'>({firstResult.birth_year})</span></div>
+          <div className='text-3xl lg:text-5xl font-bold text-right text-white'>{filters.selected_name}</div>
+          <div className='text-xl lg:text-2xl font-bold text-right text-white'>{firstResult.event_style_age} year <span className='text-xl'>({firstResult.birth_year})</span></div>
           </div>
         </div>
       </div>

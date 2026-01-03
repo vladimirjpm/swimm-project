@@ -81,7 +81,7 @@ function TrainingTableByName({
           {group.items.map((res: Result, i: number) => {
                 const levelInfo = Helper.getNormativeLevelInfo({
                   gender: res.event_style_gender === 'female' ? 'female' : 'male',
-                  poolType: res.pool_type === '25' ? '25m_pool' : '50m_pool',
+                  poolType: Helper.resolvePoolType(res.pool_type),
                   styleName: res.event_style_name,
                   distance: `${res.event_style_len}m`,
                   time: Helper.parseTimeToSeconds(res.time),

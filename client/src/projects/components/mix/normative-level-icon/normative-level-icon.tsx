@@ -77,7 +77,7 @@ const UI_NormativeLevelIcon: React.FC<UI_NormativeLevelIconProps> = ({
 
   return (
     <div
-      className={`dv-normative-level-icon ${className}`}
+      className={`dv-normative-level-icon cursor-pointer ${className}`}
       onClick={handleNormativeClick}
     >
       <div className={`${medalClass} ${styleSize} level-${levelName.toLowerCase()}`}>{label}</div>

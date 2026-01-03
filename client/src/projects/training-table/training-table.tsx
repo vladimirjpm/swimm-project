@@ -8,6 +8,7 @@ import TrainingTableBySet from './training-table-by-set/training-table-by-set';
 import TrainingTableByName from './training-table-by-name/training-table-by-name';
 import TrainingShowFullTable from './training-show-full-table/training-show-full-table';
 import TrainingTableHeader from './training-table-header/training-table-header';
+import Helper from '../../utils/helpers/data-helper';
 
 function TrainingTable() {
   const dispatch = useAppDispatch();
@@ -21,6 +22,8 @@ function TrainingTable() {
   // ФИЛЬТРАЦИЯ остаётся здесь, чтобы переиспользовать в любых режимах
   const filteredResults = selectedSource.results.filter((res: Result) => {
     const { pool_type, gender, style_name, style_len, date, age, club, activity_type } = filters;
+    const resPoolType = Helper.resolvePoolType(res.pool_type);
+    const filterPoolType = pool_type === 'all' ? null : Helper.resolvePoolType(pool_type);
     
     // Фильтр по training/competition
     const hasTraining = !!res.training?.trainingId;
@@ -29,7 +32,7 @@ function TrainingTable() {
     if (activityType === 'competition' && hasTraining) return false;
     
     return (
-      (pool_type === 'all' || res.pool_type === pool_type) &&
+      (!filterPoolType || resPoolType === filterPoolType) &&
       (gender === 'all' || res.event_style_gender === gender) &&
       (!style_name || res.event_style_name === style_name) &&
       (!style_len || res.event_style_len === style_len.toString()) &&

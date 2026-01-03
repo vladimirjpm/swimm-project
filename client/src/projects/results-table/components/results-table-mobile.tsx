@@ -27,9 +27,9 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
   return (
     <>
       <div className="flex items-start gap-4">
-        <div className="relative shrink-0">
-          {res.position ? <UI_MedalIcon place={res.position.toString()} /> : `${index + 1}`}
-          {showAge && <div className="absolute right-0 bottom-0 font-bold">{res.event_style_age}</div>}
+        <div className="flex flex-col items-center shrink-0">
+          {res.position ? <UI_MedalIcon place={res.position.toString()} /> : <span className="text-lg font-bold">{index + 1}</span>}
+          {showAge && <div className="font-bold text-sm mt-1"><span className='font-normal text-xs'>age:</span> {res.event_style_age} </div>}
         </div>
 
         <div className="flex-1 flex flex-col gap-2">
@@ -42,12 +42,10 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
                 isRelay={res.is_relay}
                 relaySwimmersName={res.relay_swimmers_name}
                 onClick={handleNameClick}
-                firstLineClassName="text-lg font-bold truncate"
-                secondLineClassName="text-xs mt-0.5"
+                firstLineClassName="text-xl font-bold truncate"
+                secondLineClassName="text-sm mt-0.5"
+                showClubIcon={showClub}
               />
-              {showClub && (
-                <UI_ClubIcon clubName={res.club} className="text-xs inline-block mt-0.5" iconWidth="6" styleType="icon-notext" />
-              )}
             </div>
 
             <div className="flex flex-col items-center text-right gap-1 basis-1/3">
