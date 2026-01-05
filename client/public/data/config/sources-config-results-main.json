@@ -3,6 +3,7 @@
     { "name": "Masters Weizgal Rehovot Dec 2025", "file": "json/masters-weizgal-rehovot-12-99-dec-2025.json" },
     { "name": "2025 Isr 9-11 Champ 2 day", "file": "json/competition-2025-summer-isr-championship-age_9-11.json" },
     { "name": "2025 Liga3 Weisgel 9-13", "file": "json/competition-2025-liga3-weisgel-rehovot-age_9-13.json" },
-    { "name": "2025 Horef Isr Champ 14-17", "file": "json/competition-2025-horef-isr-championship-age_14-17.json" }
+    { "name": "2025 Horef Isr Champ 14-17", "file": "json/competition-2025-horef-isr-championship-age_14-17.json" },
+    { "name": "2025 Isr 11-13 Champ 4 day", "file": "json/competition-2025-summer-isr-championship-age_11-13.json" }
   ]
 }
