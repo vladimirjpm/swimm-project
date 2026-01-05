@@ -11,7 +11,7 @@ let clubIconsManifestPromise: Promise<Set<string> | null> | null = null;
 const loadClubIconsManifest = (baseUrl: string) => {
   if (clubIconsManifestPromise) return clubIconsManifestPromise;
 
-  const url = `${baseUrl}data/club-icons-manifest.json`;
+  const url = `${baseUrl}data/config/club-icons-manifest.json`;
   clubIconsManifestPromise = fetch(url)
     .then(async (res) => {
       if (!res.ok) return null;

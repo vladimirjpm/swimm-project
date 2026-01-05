@@ -205,11 +205,16 @@ const DataSourceDDL: React.FC = () => {
     const loadConfig = async () => {
       try {
         // Check for custom config file from body attribute
-        const customConfigFile = typeof document !== 'undefined' 
-          ? document.body.getAttribute('data-sources-config') 
+        const customConfigFile = typeof document !== 'undefined'
+          ? document.body.getAttribute('data-sources-config')
           : null;
-        
-        const configFile = customConfigFile || 'sources-config.json';
+
+        const normalizeConfigPath = (value: string) =>
+          value.includes('/') ? value : `config/${value}`;
+
+        const configFile = customConfigFile
+          ? normalizeConfigPath(customConfigFile)
+          : 'config/sources-config.json';
         const resp = await fetch(makeUrl(configFile));
         
         if (!resp.ok) {
