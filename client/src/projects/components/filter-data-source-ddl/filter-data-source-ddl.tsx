@@ -30,9 +30,9 @@ const makeUrl = (file: string) =>
 const allDataSources: DataSource[] = [
   {
     name: 'Dolphin Training',
-    file: 'dolphin_data.json',
+    file: 'json/dolphin_data.json',
     load: async () => {
-      const resp = await fetch(makeUrl('dolphin_data.json'));
+      const resp = await fetch(makeUrl('json/dolphin_data.json'));
       if (!resp.ok) {
         throw new Error('Failed to load dolphin_data.json');
       }
@@ -42,10 +42,10 @@ const allDataSources: DataSource[] = [
   },
   {
     name: 'Masters Weizgal Rehovot Dec 2025',
-    file: 'masters-weizgal-rehovot-12-99-dec-2025.json',
+    file: 'json/masters-weizgal-rehovot-12-99-dec-2025.json',
     load: async () => {
       const resp = await fetch(
-        makeUrl('masters-weizgal-rehovot-12-99-dec-2025.json'),
+        makeUrl('json/masters-weizgal-rehovot-12-99-dec-2025.json'),
       );
       if (!resp.ok) {
         throw new Error(
@@ -58,9 +58,9 @@ const allDataSources: DataSource[] = [
   },
   {
     name: 'Dolphin Masters',
-    file: 'dolphin_masters_data.json',
+    file: 'json/dolphin_masters_data.json',
     load: async () => {
-      const resp = await fetch(makeUrl('dolphin_masters_data.json'));
+      const resp = await fetch(makeUrl('json/dolphin_masters_data.json'));
       if (!resp.ok) {
         throw new Error('Failed to load dolphin_masters_data.json');
       }
@@ -70,10 +70,10 @@ const allDataSources: DataSource[] = [
   },
   {
     name: '2024 Isr Champ',
-    file: 'competition-2024-summer-isr-championship.json',
+    file: 'json/competition-2024-summer-isr-championship.json',
     load: async () => {
       const resp = await fetch(
-        makeUrl('competition-2024-summer-isr-championship.json'),
+        makeUrl('json/competition-2024-summer-isr-championship.json'),
       );
       if (!resp.ok) {
         throw new Error(
@@ -86,10 +86,10 @@ const allDataSources: DataSource[] = [
   },
   {
     name: '2025 Hapoel Young Champ',
-    file: 'competition-2025-hapoel-young-isr-championship.json',
+    file: 'json/competition-2025-hapoel-young-isr-championship.json',
     load: async () => {
       const resp = await fetch(
-        makeUrl('competition-2025-hapoel-young-isr-championship.json'),
+        makeUrl('json/competition-2025-hapoel-young-isr-championship.json'),
       );
       if (!resp.ok) {
         throw new Error(
@@ -102,10 +102,10 @@ const allDataSources: DataSource[] = [
   },
   {
     name: '2025 Isr 9-11 Champ 2 day',
-    file: 'competition-2025-summer-isr-championship-age_9-11.json',
+    file: 'json/competition-2025-summer-isr-championship-age_9-11.json',
     load: async () => {
       const resp = await fetch(
-        makeUrl('competition-2025-summer-isr-championship-age_9-11.json'),
+        makeUrl('json/competition-2025-summer-isr-championship-age_9-11.json'),
       );
       if (!resp.ok) {
         throw new Error(
@@ -118,10 +118,10 @@ const allDataSources: DataSource[] = [
   },
   {
     name: '2025 Liga3 Weisgel 9-13',
-    file: 'competition-2025-liga3-weisgel-rehovot-age_9-13.json',
+    file: 'json/competition-2025-liga3-weisgel-rehovot-age_9-13.json',
     load: async () => {
       const resp = await fetch(
-        makeUrl('competition-2025-liga3-weisgel-rehovot-age_9-13.json'),
+        makeUrl('json/competition-2025-liga3-weisgel-rehovot-age_9-13.json'),
       );
       if (!resp.ok) {
         throw new Error(
@@ -134,10 +134,10 @@ const allDataSources: DataSource[] = [
   },
   {
     name: '2025 Horef Isr Champ 14-17',
-    file: 'competition-2025-horef-isr-championship-age_14-17.json',
+    file: 'json/competition-2025-horef-isr-championship-age_14-17.json',
     load: async () => {
       const resp = await fetch(
-        makeUrl('competition-2025-horef-isr-championship-age_14-17.json'),
+        makeUrl('json/competition-2025-horef-isr-championship-age_14-17.json'),
       );
       if (!resp.ok) {
         throw new Error(
@@ -150,10 +150,10 @@ const allDataSources: DataSource[] = [
   },
   {
     name: '2025 Isr 11-13 Champ 4 day',
-    file: 'competition-2025-summer-isr-championship-age_11-13.json',
+    file: 'json/competition-2025-summer-isr-championship-age_11-13.json',
     load: async () => {
       const resp = await fetch(
-        makeUrl('competition-2025-summer-isr-championship-age_11-13.json'),
+        makeUrl('json/competition-2025-summer-isr-championship-age_11-13.json'),
       );
       if (!resp.ok) {
         throw new Error(

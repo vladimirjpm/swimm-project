@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import './filter-section.css';
 import {
   rootActions,
@@ -98,8 +98,34 @@ const FilterSection: React.FC = () => {
     return set;
   }, [filteredByTypeResults, filters.style_name]);
 
-  const availableClubs = useMemo(() => {
-    return Helper.getClubsSummary(filteredByTypeResults);
+  const [availableClubs, setAvailableClubs] = useState<
+    Array<{
+      club: string;
+      points: number;
+      swimmerCount: number;
+      successfulCount: number;
+      gold: number;
+      silver: number;
+      bronze: number;
+    }>
+  >([]);
+
+  // Обновляем клубы асинхронно при изменении результатов
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadClubs = async () => {
+      const clubs = await Helper.getClubsSummary(filteredByTypeResults);
+      if (!cancelled) {
+        setAvailableClubs(clubs);
+      }
+    };
+
+    loadClubs();
+
+    return () => {
+      cancelled = true;
+    };
   }, [filteredByTypeResults]);
 
   // если данных нет — можно показать заглушку или ничего

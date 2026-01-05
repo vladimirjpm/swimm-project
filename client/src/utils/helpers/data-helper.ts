@@ -1,6 +1,7 @@
 // import normative from '../../DATA/normative';
 import { NormativeLevelInfo } from '../interfaces/normative-level-info';
 import { Result, TrainingGroup } from '../interfaces/results';
+import ClubPointsHelper from './club-points-helper';
 
 // normative.js должен лежать в public и задавать:
 //   window.normative = { normatives: { ... } }
@@ -591,9 +592,9 @@ export default class Helper {
     }, 0);
   }
 
-  static getClubsSummary(
+  static async getClubsSummary(
     results: Result[],
-  ): {
+  ): Promise<{
     club: string;
     points: number;
     swimmerCount: number;
@@ -601,7 +602,7 @@ export default class Helper {
     gold: number;
     silver: number;
     bronze: number;
-  }[] {
+  }[]> {
     const map = new Map<
       string,
       {
@@ -614,7 +615,16 @@ export default class Helper {
       }
     >();
 
-    results.forEach((item) => {
+    // Сначала подсчитываем очки для всех результатов
+    const resultsWithPoints = await Promise.all(
+      results.map(async (item) => ({
+        item,
+        clubPoints: await ClubPointsHelper.getPointsForResult(item)
+      }))
+    );
+
+    // Теперь агрегируем по клубам
+    resultsWithPoints.forEach(({ item, clubPoints }) => {
       const club = item.club?.trim();
       if (!club) return;
 
@@ -629,15 +639,15 @@ export default class Helper {
           bronze: 0,
         };
 
-      if (item.international_points) {
-        entry.points += item.international_points;
-      }
+      // Используем вычисленные очки из системы начисления
+      entry.points += clubPoints;
 
       if (item.last_name) {
         entry.swimmerSet.add(item.last_name.trim());
       }
 
-      if (item.international_points && item.international_points > 0) {
+      // Считаем успешные результаты (те, за которые начислены очки)
+      if (clubPoints > 0) {
         entry.successfulCount += 1;
       }
 
