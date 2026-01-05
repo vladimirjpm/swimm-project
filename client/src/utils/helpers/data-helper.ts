@@ -625,7 +625,10 @@ export default class Helper {
 
     // Теперь агрегируем по клубам
     resultsWithPoints.forEach(({ item, clubPoints }) => {
-      const club = item.club?.trim();
+      const club =
+        item.club?.trim() ||
+        item.relay_team_name?.trim() ||
+        item.club_en?.trim();
       if (!club) return;
 
       const entry =
