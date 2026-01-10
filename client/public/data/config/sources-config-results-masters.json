@@ -1,0 +1,6 @@
+{
+  "sources": [
+    { "name": "Masters Weizgal Rehovot Dec 2025", "file": "json/masters-weizgal-rehovot-12-99-dec-2025.json" },
+    { "name": "Masters Arena Jan 2026", "file": "json/masters-arena-horef-21-99-jan-2026.json" }
+  ]
+}

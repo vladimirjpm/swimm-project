@@ -30,6 +30,7 @@ export default defineConfig(({ command }) => ({
       input: {
         home: resolve(__dirname, 'home.html'),
         results_main: resolve(__dirname, 'results_main.html'),
+        result_masters: resolve(__dirname, 'result-masters.html'),
         'dolphin-masters': resolve(__dirname, 'dolphin-masters.html'),
         about: resolve(__dirname, 'about.html'),
       },
