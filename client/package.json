@@ -23,6 +23,7 @@
     "generate:club-icons-manifest": "node tools/generate-club-icons-manifest.mjs",
     "prebuild": "node tools/generate-club-icons-manifest.mjs",
     "build": "vite build",
+    "build:azure": "vite build && node tools/remove-azure-videos.mjs",
     "preview": "vite preview"
   },
   "eslintConfig": {
