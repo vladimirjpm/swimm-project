@@ -198,7 +198,13 @@ export default class ClubPointsHelper {
    * @returns количество очков для клуба
    */
   static async getPointsForResult(result: Result): Promise<number> {
-    return this.getPoints(result.position, result.date);
+    const isRelay =
+      (result as any)?.is_relay === true ||
+      String((result as any)?.is_relay ?? '').toLowerCase() === 'true' ||
+      String((result as any)?.is_relay ?? '') === '1';
+
+    const basePoints = await this.getPoints(result.position, result.date);
+    return isRelay ? basePoints * 2 : basePoints;
   }
 
   /**

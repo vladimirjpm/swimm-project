@@ -29,7 +29,9 @@ export interface ResultWrap {
     club: string;
     club_en: string;
     time: string;
+    time_split: string;
     time_fail: boolean;
+    time_fail_note: string | null;
     international_points: number;
     note?:string;
 

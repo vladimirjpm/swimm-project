@@ -6,6 +6,7 @@ import UI_PoolIcon from '../../components/mix/pool-icon/pool-icon';
 import UI_LevelProgress from '../../components/mix/progress-level/level-progress';
 import UI_NormativeLevelIcon from '../../components/mix/normative-level-icon/normative-level-icon';
 import SwimmerNameCell from '../../components/mix/swimmer-name-cell/swimmer-name-cell';
+import UI_SwimmerVideoLink from '../../components/mix/swimmer-video-link/swimmer-video-link';
 import { ResultsTableRowProps } from './types';
 
 const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
@@ -45,6 +46,13 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
                 firstLineClassName="text-xl font-bold truncate"
                 secondLineClassName="text-sm mt-0.5"
                 showClubIcon={showClub}
+              />
+              <UI_SwimmerVideoLink
+                firstNameEn={res.first_name_en}
+                lastNameEn={res.last_name_en}
+                styleName={res.event_style_name}
+                styleLen={res.event_style_len}
+                competition={res.competition}
               />
             </div>
 

@@ -51,7 +51,8 @@ window.filter_data = {
             "style_len": [
                 "100",
                 "200",
-                "400"
+                "400",
+                "4X50"
             ]
         }
     ]

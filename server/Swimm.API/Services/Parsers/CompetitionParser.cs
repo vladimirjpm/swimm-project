@@ -19,6 +19,7 @@ public static class CompetitionParser
     private static Regex? _genderAgeLineRxHE;
     private static Regex? _fullResultRx;
     private static Regex? _relayHeaderRxHE;
+    private static Regex? _relayHeaderRxHE2;
     private static Regex? _relayTeamLineRxHE;
     private static Regex? _dateLineRx;
 
@@ -40,11 +41,21 @@ public static class CompetitionParser
     private const string GenderPatternReversed = 
         "\u05EA\u05D5\u05E0\u05D1|\u05DD\u05D9\u05E0\u05D1|\u05DD\u05D9\u05E9\u05E0|\u05DD\u05D9\u05E8\u05D1\u05D2";
 
+    // ???? = "mix" = mixed gender relay
+    // Original: \u05DE\u05D9\u05E7\u05E1
+    // Reversed: \u05E1\u05E7\u05D9\u05DE
+    private const string HebrewMix = "\u05DE\u05D9\u05E7\u05E1";
+    private const string HebrewMixReversed = "\u05E1\u05E7\u05D9\u05DE";
+
     // ???? = "klali" = open/general category (no specific gender/age)
     // Original: \u05DB\u05DC\u05DC\u05D9
     // Reversed: \u05D9\u05DC\u05DC\u05DB
     private const string HebrewKlali = "\u05DB\u05DC\u05DC\u05D9";
     private const string HebrewKlaliReversed = "\u05D9\u05DC\u05DC\u05DB";
+
+    // Extended gender pattern including ???? (mix)
+    private const string GenderPatternWithMix = 
+        GenderPatternOriginal + "|" + GenderPatternReversed + "|" + HebrewMix + "|" + HebrewMixReversed;
 
     // Format 1 (old): 400 ???????? (?????? ?? ??????) - ??????? 12-13
     private static Regex HeaderRxHE => _headerRxHE ??= new Regex(
@@ -65,6 +76,14 @@ public static class CompetitionParser
         @")\s+(?<age>\d+(-\d+)?)$",
         RegexOptions.Compiled);
 
+    // Masters category line (e.g. "?????? ? 21-29"), already normalized by NormalizeHebrewLine
+    // ? = male, ? = female
+    // ?????? = \u05DE\u05D0\u05E1\u05D8\u05E8\u05E1
+    private static Regex? _mastersAgeLineRxHE;
+    private static Regex MastersAgeLineRxHE => _mastersAgeLineRxHE ??= new Regex(
+        @"^\u05DE\u05D0\u05E1\u05D8\u05E8\u05E1\s+(?<gender>[\u05D0-\u05EA])\s+(?<age>\d+(?:-\d+)?)$",
+        RegexOptions.Compiled);
+
     private static Regex HeaderRxEN => _headerRxEN ??= new Regex(
         @"^(?<len>\d+m?)\s+(?<style>.+?)\s*-\s*(?<gender>female|male|girls|boys|women|men)\s+(?<age>\d+(-\d+)?)$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -73,16 +92,30 @@ public static class CompetitionParser
         @"^(-|\d+)\s+\d+\s+\d+.*(\d{2}:\d{2}\.\d{2}|NS|DQ)\s+\d+$",
         RegexOptions.Compiled);
 
+    // Relay Format 1: 4X50 ... ?????? ... - <gender> <age>
     private static Regex RelayHeaderRxHE => _relayHeaderRxHE ??= new Regex(
         @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)\s+(?<style>.+?)\s+" +
-        "\u05E9\u05DC\u05D9\u05D7(?:\u05D9\u05DD|\u05D5\u05EA)" +
-        @"\s*-\s*(?<gender>" +
-        "\u05E0|\u05D6|" + GenderPatternOriginal + "|" + GenderPatternReversed +
+        "\u05E9\u05DC\u05D9\u05D7(?:\u05D9\u05DD|\u05D5\u05EA)?\\s*" +
+        "(?:" + HebrewMix + "|" + HebrewMixReversed + ")?\\s*" +
+        @"-\s*(?<gender>" +
+        "\u05E0|\u05D6|" + GenderPatternWithMix +
+        @")\s+(?<age>\d+(?:-\d+)?)$",
+        RegexOptions.Compiled);
+
+    // Relay Format 2: 50X4 ... ?????? ... - <gender> <age> (length first, then legs)
+    // Example: 50X4 ????? ?????? ???? - ???? 11-12
+    // Example: 50X4 ????? ?????? ???? - ???? 11-12
+    private static Regex RelayHeaderRxHE2 => _relayHeaderRxHE2 ??= new Regex(
+        @"^(?<len>\d+)\s*[Xx]\s*(?<legs>\d+)\s+(?<style>.+?)\s+" +
+        "\u05E9\u05DC\u05D9\u05D7(?:\u05D9\u05DD|\u05D5\u05EA)?\\s*" +
+        "(?:" + HebrewMix + "|" + HebrewMixReversed + ")?\\s*" +
+        @"-\s*(?<gender>" +
+        "\u05E0|\u05D6|" + GenderPatternWithMix +
         @")\s+(?<age>\d+(?:-\d+)?)$",
         RegexOptions.Compiled);
 
     private static Regex RelayTeamLineRxHE => _relayTeamLineRxHE ??= new Regex(
-        @"^(?<heat>\d+)\s+(?<lane>\d+)\s+(?<team>.+?)\s+(?<time>\d{2}:\d{2}\.\d{2}|DQ|NS)\s+" +
+        @"^(?<heat>\d+)\s+(?<lane>\d+)\s+(?<team>.+?)\s+(?<time>\d{2}:\d{2}\.\d{1,2}|DQ|NS)\s+" +
         "\u05DE\u05D9\u05E7\u05D5\u05DD" +
         @"\s+(?<pos>\d+)\s*$",
         RegexOptions.Compiled);
@@ -189,8 +222,8 @@ public static class CompetitionParser
                 // Handle pending relay
                 if (pendingRelayResult != null && pendingSwimmers != null && current != null)
                 {
-                    bool isNewHeader = RelayHeaderRxHE.IsMatch(line) || headerRx.IsMatch(line) || 
-                                       (isHE && HeaderRxHESimple.IsMatch(line));
+                    bool isNewHeader = RelayHeaderRxHE.IsMatch(line) || RelayHeaderRxHE2.IsMatch(line) || 
+                                       headerRx.IsMatch(line) || (isHE && HeaderRxHESimple.IsMatch(line));
                     bool isNewTeam = RelayTeamLineRxHE.IsMatch(line);
 
                     if (!isNewHeader && !isNewTeam && pendingSwimmers.Count < currentRelayLegs)
@@ -225,45 +258,55 @@ public static class CompetitionParser
                 {
                     Log($"  -> Checking for gender/age (pending: len={pendingEventLen}, style={pendingEventStyle})");
                     var genderAgeMatch = GenderAgeLineRxHE.Match(line);
-                    if (genderAgeMatch.Success)
-                    {
-                        Log($"  -> MATCH GenderAge: gender={genderAgeMatch.Groups["gender"].Value}, age={genderAgeMatch.Groups["age"].Value}");
-                        
-                        if (current != null)
-                        {
-                            Log($"  -> Yielding previous event: {current.Event}");
-                            yield return current;
-                        }
+                    var mastersAgeMatch = MastersAgeLineRxHE.Match(line);
+                    if (genderAgeMatch.Success || mastersAgeMatch.Success)
+                     {
+                        var ageGroupVal = genderAgeMatch.Success
+                            ? genderAgeMatch.Groups["age"].Value
+                            : mastersAgeMatch.Groups["age"].Value;
+                        var genderRaw = genderAgeMatch.Success
+                            ? genderAgeMatch.Groups["gender"].Value
+                            : mastersAgeMatch.Groups["gender"].Value;
 
-                        var genderNorm = HebrewTextHelper.NormalizeGenderHE(genderAgeMatch.Groups["gender"].Value.Trim());
-                        var styleNorm = HebrewTextHelper.StyleMapHE.GetValueOrDefault(pendingEventStyle!, pendingEventStyle!);
+                        Log($"  -> MATCH GenderAge: gender={genderRaw}, age={ageGroupVal}");
+                         
+                         if (current != null)
+                         {
+                             Log($"  -> Yielding previous event: {current.Event}");
+                             yield return current;
+                         }
 
-                        current = new PDF_CompetitionResult(
-                            Competition: HebrewTextHelper.NormalizeHebrewLine(lines[0].Trim()),
-                            AgeGroup: genderAgeMatch.Groups["age"].Value,
-                            Date: dat_relay,
-                            Event: $"{pendingEventLen} {pendingEventStyle} - {genderAgeMatch.Groups["gender"].Value} {genderAgeMatch.Groups["age"].Value}",
-                            EventStyleName: styleNorm,
-                            EventStyleLen: pendingEventLen,
-                            EventStyleGender: genderNorm,
-                            EventStyleAge: genderAgeMatch.Groups["age"].Value,
-                            PoolType: "25m",
-                            Results: new List<PDF_Result>()
-                        );
+                        // Normalize gender (works for both regular and masters lines)
+                        var genderNorm = HebrewTextHelper.NormalizeGenderHE(genderRaw.Trim());
+                         var styleNorm = HebrewTextHelper.StyleMapHE.GetValueOrDefault(pendingEventStyle!, pendingEventStyle!);
+                         styleNorm = HebrewTextHelper.NormalizeStyleName(styleNorm);
 
-                        Log($"  -> NEW EVENT (Format2): {current.Event}");
-                        currentIsRelay = false;
-                        currentRelayLegs = 0;
-                        pendingEventLen = null;
-                        pendingEventStyle = null;
-                        pendingEventLine = null;
-                        continue;
-                    }
-                    else
-                    {
-                        Log($"  -> GenderAge NOT matched for line: '{line}'");
-                    }
-                }
+                         current = new PDF_CompetitionResult(
+                             Competition: HebrewTextHelper.NormalizeHebrewLine(lines[0].Trim()),
+                            AgeGroup: ageGroupVal,
+                             Date: dat_relay,
+                            Event: $"{pendingEventLen} {pendingEventStyle} - {genderRaw} {ageGroupVal}",
+                             EventStyleName: styleNorm,
+                             EventStyleLen: pendingEventLen,
+                             EventStyleGender: genderNorm,
+                             EventStyleAge: ageGroupVal,
+                             PoolType: "25m",
+                             Results: new List<PDF_Result>()
+                         );
+
+                         Log($"  -> NEW EVENT (Format2): {current.Event}, gender={genderNorm}");
+                         currentIsRelay = false;
+                         currentRelayLegs = 0;
+                         pendingEventLen = null;
+                         pendingEventStyle = null;
+                         pendingEventLine = null;
+                         continue;
+                     }
+                     else
+                     {
+                         Log($"  -> GenderAge NOT matched for line: '{line}'");
+                     }
+                 }
                 
                 // Check for standalone "????" line - switches gender to "none" until next gender/age line
                 if (isHE && current != null && pendingEventLen == null)
@@ -294,17 +337,24 @@ public static class CompetitionParser
                     }
                     
                     // Check for gender/age line that changes category (e.g. ???? 14 -> ???? 15)
+                    // Also check for masters category change (e.g. ?????? ? 21-29 -> ?????? ? 30-34)
                     var genderAgeMatch = GenderAgeLineRxHE.Match(line);
-                    if (genderAgeMatch.Success)
+                    var mastersAgeMatch = MastersAgeLineRxHE.Match(line);
+                    
+                    if (genderAgeMatch.Success || mastersAgeMatch.Success)
                     {
-                        var newAge = genderAgeMatch.Groups["age"].Value;
-                        var newGender = genderAgeMatch.Groups["gender"].Value.Trim();
+                        var newAge = genderAgeMatch.Success
+                            ? genderAgeMatch.Groups["age"].Value
+                            : mastersAgeMatch.Groups["age"].Value;
+                        var newGender = genderAgeMatch.Success
+                            ? genderAgeMatch.Groups["gender"].Value.Trim()
+                            : mastersAgeMatch.Groups["gender"].Value.Trim();
                         var newGenderNorm = HebrewTextHelper.NormalizeGenderHE(newGender);
                         
                         // Only create new event if age or gender changed
                         if (newAge != current.EventStyleAge || newGenderNorm != current.EventStyleGender)
                         {
-                            Log($"  -> MATCH GenderAge (category change): gender={newGender}, age={newAge}");
+                            Log($"  -> MATCH GenderAge (category change): gender={newGender}, age={newAge}, genderNorm={newGenderNorm}");
                             
                             yield return current;
 
@@ -335,16 +385,24 @@ public static class CompetitionParser
                     Log($"  -> DATE found: {dat_relay}");
                 }
 
-                // Relay header (HE)
+                // Relay header (HE) - try both formats
                 if (isHE)
                 {
+                    // Try Format 1: 4X50 (legs first)
                     var rm = RelayHeaderRxHE.Match(line);
-                    if (rm.Success)
+                    // Try Format 2: 50X4 (length first)
+                    var rm2 = RelayHeaderRxHE2.Match(line);
+                    
+                    if (rm.Success || rm2.Success)
                     {
-                        Log($"  -> MATCH RelayHeader: legs={rm.Groups["legs"].Value}, len={rm.Groups["len"].Value}");
+                        var match = rm.Success ? rm : rm2;
+                        int legs = int.Parse(match.Groups["legs"].Value);
+                        int legLen = int.Parse(match.Groups["len"].Value);
+                        
+                        Log($"  -> MATCH RelayHeader: legs={legs}, len={legLen}, format={(rm.Success ? "1 (legsXlen)" : "2 (lenXlegs)")}");
                         pendingEventLen = null;
                         currentIsRelay = true;
-                        currentRelayLegs = int.Parse(rm.Groups["legs"].Value);
+                        currentRelayLegs = legs;
 
                         if (current != null) yield return current;
 
@@ -357,26 +415,26 @@ public static class CompetitionParser
                             date = dat_relay;
                         }
 
-                        var genderNorm = HebrewTextHelper.NormalizeGenderHE(rm.Groups["gender"].Value.Trim());
-                        int legs = currentRelayLegs;
-                        int legLen = int.Parse(rm.Groups["len"].Value);
+                        var genderNorm = HebrewTextHelper.NormalizeGenderHE(match.Groups["gender"].Value.Trim());
                         string lenRelay = $"{legs}X{legLen}";
-                        var styleHe = rm.Groups["style"].Value.Trim();
+                        var styleHe = match.Groups["style"].Value.Trim();
                         var styleNorm = HebrewTextHelper.StyleMapHE.GetValueOrDefault(styleHe, styleHe);
+                        styleNorm = HebrewTextHelper.NormalizeStyleName(styleNorm);
+                        var ageGroup = match.Groups["age"].Value;
 
                         current = new PDF_CompetitionResult(
                             Competition: HebrewTextHelper.NormalizeHebrewLine(lines[0].Trim()),
-                            AgeGroup: "9-11",
+                            AgeGroup: ageGroup,
                             Date: date,
                             Event: line,
                             EventStyleName: styleNorm,
                             EventStyleLen: lenRelay,
                             EventStyleGender: genderNorm,
-                            EventStyleAge: "9-11",
+                            EventStyleAge: ageGroup,
                             PoolType: "25m",
                             Results: new List<PDF_Result>()
                         );
-                        Log($"  -> NEW RELAY EVENT: {current.Event}");
+                        Log($"  -> NEW RELAY EVENT: {current.Event}, gender={genderNorm}");
                         continue;
                     }
                 }
@@ -424,9 +482,10 @@ public static class CompetitionParser
                         AgeGroup: m.Groups["age"].Value,
                         Date: date,
                         Event: line,
-                        EventStyleName: isHE
-                            ? HebrewTextHelper.StyleMapHE.GetValueOrDefault(m.Groups["style"].Value, m.Groups["style"].Value)
-                            : m.Groups["style"].Value,
+                        EventStyleName: HebrewTextHelper.NormalizeStyleName(
+                            isHE
+                                ? HebrewTextHelper.StyleMapHE.GetValueOrDefault(m.Groups["style"].Value, m.Groups["style"].Value)
+                                : m.Groups["style"].Value),
                         EventStyleLen: len,
                         EventStyleGender: genderNorm,
                         EventStyleAge: m.Groups["age"].Value,
@@ -478,9 +537,20 @@ public static class CompetitionParser
 
                         string timeTok = tm.Groups["time"].Value.Trim();
                         string? time = null;
-                        if (Regex.IsMatch(timeTok, @"^\d{2}:\d{2}\.\d{2}$") && timeTok != "00:00.00")
+                        string? timeFailNote = null;
+                        
+                        // Accept both 00:00.0 and 00:00.00 (and any mm:ss.d[d])
+                        if (Regex.IsMatch(timeTok, @"^\d{2}:\d{2}\.\d{1,2}$"))
                         {
-                            time = timeTok;
+                            // ??? ???? ??? 00:00.x - ???? ?? ????
+                            if (timeTok != "00:00.00" && timeTok != "00:00.0")
+                            {
+                                time = timeTok;
+                            }
+                        }
+                        else if (timeTok == "DQ" || timeTok == "NS")
+                        {
+                            timeFailNote = timeTok;
                         }
 
                         var swimmers = new List<RelaySwimmer>();
@@ -515,6 +585,7 @@ public static class CompetitionParser
                                 BirthYear: 0,
                                 Club: team,
                                 Time: time,
+                                TimeFailNote: timeFailNote,
                                 InternationalPoints: 0,
                                 IsRelay: true,
                                 RelayTeamName: team,
@@ -535,6 +606,7 @@ public static class CompetitionParser
                                 BirthYear: 0,
                                 Club: team,
                                 Time: time,
+                                TimeFailNote: timeFailNote,
                                 InternationalPoints: 0,
                                 IsRelay: true,
                                 RelayTeamName: team,
@@ -603,6 +675,7 @@ public static class CompetitionParser
             BirthYear: pending.BirthYear,
             Club: pending.Club,
             Time: pending.Time,
+            TimeFailNote: pending.TimeFailNote,
             InternationalPoints: pending.InternationalPoints,
             IsRelay: true,
             RelayTeamName: pending.RelayTeamName,

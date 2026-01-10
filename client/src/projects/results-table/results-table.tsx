@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import './results-table.css';
 import { rootActions,useAppDispatch, useAppSelector } from '../../store/store';
 import Helper from '../../utils/helpers/data-helper'
+import ClubPointsHelper from '../../utils/helpers/club-points-helper';
 import UI_DateIcon from '../components/mix/date-icon/date-icon';
 import UI_ClubIcon from '../components/mix/club-icon/club-icon';
 import UI_SwimmStyleIcon from '../components/mix/swimm-style-icon/swimm-style-icon';
@@ -21,7 +22,7 @@ function ResultsTable() {
     return <div className="text-gray-500 italic">No data source selected.</div>;
   }
 
-  const filteredResults = selectedSource.results.filter((res) => {
+  const filteredResults = useMemo(() => (selectedSource.results ?? []).filter((res) => {
     const { pool_type, gender, style_name, style_len, date, age, club, activity_type } = filters;
     const resPoolType = Helper.resolvePoolType(res.pool_type);
     const filterPoolType = pool_type === 'all' ? null : Helper.resolvePoolType(pool_type);
@@ -41,10 +42,62 @@ function ResultsTable() {
       (age === 'all' || res.event_style_age?.toString() === age) &&
       (club === 'all' || res.club === club)
     );
-  });
+  }), [selectedSource, filters]);
 
   //console.log('filteredResults: ',filteredResults)
-  const sortedResults = Helper.sortByTime(filteredResults);
+  const sortedResults = useMemo(
+    () => Helper.sortByTime(filteredResults),
+    [filteredResults],
+  );
+
+  const getResultKey = (res: any) =>
+    [
+      res.date,
+      res.competition,
+      res.event,
+      res.event_style_name,
+      res.event_style_len,
+      res.pool_type,
+      res.first_name,
+      res.last_name,
+      res.time,
+      String(res.position ?? ''),
+      res.club,
+      res.relay_team_name,
+      String(res.is_relay ?? ''),
+    ]
+      .map((v) => (v === null || v === undefined ? '' : String(v)))
+      .join('||');
+
+  const [clubPointsByKey, setClubPointsByKey] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadClubPoints = async () => {
+      const entries = await Promise.all(
+        sortedResults.map(async (res) => {
+          const key = getResultKey(res);
+          const points = await ClubPointsHelper.getPointsForResult(res);
+          return [key, points] as const;
+        }),
+      );
+
+      if (cancelled) return;
+
+      const next: Record<string, number> = {};
+      for (const [key, points] of entries) {
+        next[key] = points;
+      }
+      setClubPointsByKey(next);
+    };
+
+    loadClubPoints();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sortedResults]);
   //console.log('sortedResults: ',sortedResults)
   // Определяем уникальные значения
   const uniqueClubs = new Set(sortedResults.map(r => r.club));
@@ -101,9 +154,9 @@ function ResultsTable() {
               <ResultsHeader view="mobile" showClub={showClub} showEvent={showEvent} showDate={showDate} hasInternationalPoints={hasInternationalPoints} />
             </div>
           </div>
-
           <ul className="divide-y">
             {sortedResults.map((res, index) => {
+              const clubPoints = clubPointsByKey[getResultKey(res)];
               const isMaster = String(res.is_masters) === 'true' || String(res.is_masters) === '1';
               const resolvedGender = Helper.resolveGender(res.event_style_gender);
               const levelInfo = Helper.getNormativeLevelInfo({
@@ -130,6 +183,7 @@ function ResultsTable() {
                       showPoolType={showPoolType}
                       showDate={showDate}
                       hasInternationalPoints={hasInternationalPoints}
+                      clubPoints={clubPoints}
                       levelInfo={levelInfo}
                       updateFilter={updateFilter}
                     />
@@ -147,6 +201,7 @@ function ResultsTable() {
                       showPoolType={showPoolType}
                       showDate={showDate}
                       hasInternationalPoints={hasInternationalPoints}
+                      clubPoints={clubPoints}
                       levelInfo={levelInfo}
                       updateFilter={updateFilter}
                     />
@@ -164,6 +219,7 @@ function ResultsTable() {
                       showPoolType={showPoolType}
                       showDate={showDate}
                       hasInternationalPoints={hasInternationalPoints}
+                      clubPoints={clubPoints}
                       levelInfo={levelInfo}
                       updateFilter={updateFilter}
                     />

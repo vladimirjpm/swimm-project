@@ -1,0 +1,31 @@
+{
+  "videos": [
+    {
+      "competition": "masters-weizgal-rehovot-12-99-dec-2025",
+      "name": "Masters Weisgel Rehovot Dec 2025",
+      "files": [
+        { "file": "video/competition/masters-weizgal-rehovot-12-99-dec-2025/maxim_shoustin-freestyle-50.mp4", "swimmer": "maxim_shoustin", "style": "freestyle", "distance": "50" },
+        { "file": "video/competition/masters-weizgal-rehovot-12-99-dec-2025/maxim_shoustin-breaststroke-50.mp4", "swimmer": "maxim_shoustin", "style": "breaststroke", "distance": "50" },
+        { "file": "video/competition/masters-weizgal-rehovot-12-99-dec-2025/peter_izvecov-butterfly-50.mp4", "swimmer": "peter_izvecov", "style": "butterfly", "distance": "50" },
+        { "file": "video/competition/masters-weizgal-rehovot-12-99-dec-2025/peter_izvecov-individual_medley-100.mp4", "swimmer": "peter_izvecov", "style": "individual_medley", "distance": "100" },
+        { "file": "video/competition/masters-weizgal-rehovot-12-99-dec-2025/vladimir_barantsev-breaststroke-100.mp4", "swimmer": "vladimir_barantsev", "style": "breaststroke", "distance": "100" }
+      ]
+    },
+    {
+      "competition": "masters-arena-horef-21-99-jan-2026",
+      "name": "Masters Arena Jan 2026",
+      "files": [
+        { "file": "video/competition/masters-arena-horef-21-99-jan-2026/anna-gold-100-backstroke.mp4", "swimmer": "anna", "style": "backstroke", "distance": "100" },
+        { "file": "video/competition/masters-arena-horef-21-99-jan-2026/maxim_shoustin-freestyle-50.mp4", "swimmer": "maxim_shoustin", "style": "freestyle", "distance": "50" },
+        { "file": "video/competition/masters-arena-horef-21-99-jan-2026/maxim_shoustin-breaststroke-50.mp4", "swimmer": "maxim_shoustin", "style": "breaststroke", "distance": "50" },
+        { "file": "video/competition/masters-arena-horef-21-99-jan-2026/maxim_shoustin-breaststroke-100.mp4", "swimmer": "maxim_shoustin", "style": "breaststroke", "distance": "100" },
+        { "file": "video/competition/masters-arena-horef-21-99-jan-2026/maxim_shoustin-individual_medley-100.mp4", "swimmer": "maxim_shoustin", "style": "individual_medley", "distance": "100" },
+        { "file": "video/competition/masters-arena-horef-21-99-jan-2026/peter_izvecov-freestyle-200.mp4", "swimmer": "peter_izvecov", "style": "freestyle", "distance": "200" },
+        { "file": "video/competition/masters-arena-horef-21-99-jan-2026/peter_izvecov-individual_medley-100.mp4", "swimmer": "peter_izvecov", "style": "individual_medley", "distance": "100" },
+        { "file": "video/competition/masters-arena-horef-21-99-jan-2026/vladimir_barantsev-breaststroke-50.mp4", "swimmer": "vladimir_barantsev", "style": "breaststroke", "distance": "50" },
+        { "file": "video/competition/masters-arena-horef-21-99-jan-2026/vladimir_barantsev-breaststroke-100.mp4", "swimmer": "vladimir_barantsev", "style": "breaststroke", "distance": "100" },
+        { "file": "video/competition/masters-arena-horef-21-99-jan-2026/vladimir_barantsev-family-relay.mp4", "swimmer": "vladimir_barantsev", "style": "relay", "distance": null }
+      ]
+    }
+  ]
+}

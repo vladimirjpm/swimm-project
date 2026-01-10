@@ -11,6 +11,7 @@ export interface ResultsTableRowProps {
   showAge: boolean;
   showPoolType: boolean;
   hasInternationalPoints: boolean;
+  clubPoints?: number;
   levelInfo: NormativeLevelInfo;
   updateFilter: (filter: Partial<FilterSelected>) => void;
 }

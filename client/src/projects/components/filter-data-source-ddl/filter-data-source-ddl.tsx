@@ -57,6 +57,22 @@ const allDataSources: DataSource[] = [
     },
   },
   {
+    name: 'Masters Arena Horef Jan 2026',
+    file: 'json/masters-arena-horef-21-99-jan-2026.json',
+    load: async () => {
+      const resp = await fetch(
+        makeUrl('json/masters-arena-horef-21-99-jan-2026.json'),
+      );
+      if (!resp.ok) {
+        throw new Error(
+          'Failed to load masters-arena-horef-21-99-jan-2026.json',
+        );
+      }
+      const data = (await resp.json()) as Result[];
+      return data;
+    },
+  },
+  {
     name: 'Dolphin Masters',
     file: 'json/dolphin_masters_data.json',
     load: async () => {

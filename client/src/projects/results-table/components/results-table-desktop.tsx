@@ -7,6 +7,7 @@ import UI_NormativeLevelIcon from '../../components/mix/normative-level-icon/nor
 import UI_DateIcon from '../../components/mix/date-icon/date-icon';
 import UI_LevelProgress from '../../components/mix/progress-level/level-progress';
 import SwimmerNameCell from '../../components/mix/swimmer-name-cell/swimmer-name-cell';
+import UI_SwimmerVideoLink from '../../components/mix/swimmer-video-link/swimmer-video-link';
 import { ResultsTableRowProps } from './types';
 
 const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
@@ -41,6 +42,13 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
             isRelay={res.is_relay}
             relaySwimmersName={res.relay_swimmers_name}
             onClick={handleNameClick}
+          />
+          <UI_SwimmerVideoLink
+            firstNameEn={res.first_name_en}
+            lastNameEn={res.last_name_en}
+            styleName={res.event_style_name}
+            styleLen={res.event_style_len}
+            competition={res.competition}
           />
 
           <div className="w-full flex flex-col items-start justify-center mt-2 mb-2">

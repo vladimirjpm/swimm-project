@@ -5,6 +5,8 @@ import UI_ClubIcon from '../club-icon/club-icon';
 interface SwimmerNameCellProps {
   firstName: string;
   lastName?: string;
+  firstNameEn?: string;
+  lastNameEn?: string;
   club?: string;
   isRelay?: boolean;
   relaySwimmersName?: string;
@@ -19,6 +21,8 @@ interface SwimmerNameCellProps {
 const SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
   firstName,
   lastName,
+  firstNameEn,
+  lastNameEn,
   club,
   isRelay,
   relaySwimmersName,
@@ -32,6 +36,10 @@ const SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
   const displayName = isRelay
     ? club || 'Relay Team'
     : `${firstName}${lastName ? ` ${lastName}` : ''}`;
+
+  const hasEnglishName =
+    Boolean(firstNameEn && firstNameEn.trim()) ||
+    Boolean(lastNameEn && lastNameEn.trim());
 
   // Формируем subText для эстафеты
   let subText: string | undefined;
@@ -55,7 +63,8 @@ const SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
   }
 
   return (
-    <div className={`${onClick ? 'cursor-pointer' : ''} ${className}`} onClick={onClick}>
+    <div className={`${className}`} onClick={onClick}>
+    <div className={`${onClick ? 'cursor-pointer' : ''}`}>
       <div className={firstLineClassName}>{displayName}</div>
       {relayList}
       {subText && <div className={`flex items-center ${secondLineClassName}`}>        
@@ -63,7 +72,7 @@ const SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
           <UI_ClubIcon clubName={club} className="pr-2 text-xs inline-block mt-0.5" iconWidth="10" styleType="icon-notext" />)}
         {subText}
       </div>}
-      
+    </div>
     </div>
   );
 };
