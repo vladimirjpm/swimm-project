@@ -74,6 +74,13 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
 
           <div className="w-full flex items-start gap-3 mb-2">
             <div className="flex flex-col items-start basis-2/3 pr-2">
+            {
+              res.time_split && (
+                <div className="text-sm mb-1">
+                  Time split: <span className="font-bold">{res.time_split}</span>
+                </div>
+              )
+            }
               {hasInternationalPoints && (
                 <div className="text-left text-sm">Points: {res.international_points ?? ''}</div>
               )}
