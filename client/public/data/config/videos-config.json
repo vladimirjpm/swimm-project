@@ -24,7 +24,9 @@
         { "file": "video/competition/masters-arena-horef-21-99-jan-2026/peter_izvecov-individual_medley-100.mp4", "swimmer": "peter_izvecov", "style": "individual_medley", "distance": "100" },
         { "file": "video/competition/masters-arena-horef-21-99-jan-2026/vladimir_barantsev-breaststroke-50.mp4", "swimmer": "vladimir_barantsev", "style": "breaststroke", "distance": "50" },
         { "file": "video/competition/masters-arena-horef-21-99-jan-2026/vladimir_barantsev-breaststroke-100.mp4", "swimmer": "vladimir_barantsev", "style": "breaststroke", "distance": "100" },
-        { "file": "video/competition/masters-arena-horef-21-99-jan-2026/vladimir_barantsev-family-relay.mp4", "swimmer": "vladimir_barantsev", "style": "relay", "distance": null }
+        { "file": "video/competition/masters-arena-horef-21-99-jan-2026/vladimir_barantsev-family-relay.mp4", "swimmer": "vladimir_barantsev", "style": "relay", "distance": null },
+        { "file": "video/competition/masters-arena-horef-21-99-jan-2026/anya-gostmalski-backstroke-100.mp4", "swimmer": "anya_gostmalski", "style": "backstroke", "distance": "100" },
+        { "file": "video/competition/masters-arena-horef-21-99-jan-2026/anya-gostmalski-butterfly-50.mp4", "swimmer": "anya_gostmalski", "style": "butterfly", "distance": "50" }
       ]
     }
   ]

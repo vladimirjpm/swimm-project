@@ -77,7 +77,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
             {
               res.time_split && (
                 <div className="text-sm mb-1">
-                  Time split: <span className="font-bold">{res.time_split}</span>
+                  Time split: <span className="text-xs font-bold theme-text-muted">{res.time_split}</span>
                 </div>
               )
             }

@@ -295,3 +295,10 @@
   color: var(--theme-text-active);
   border-color: var(--theme-border-active);
 }
+
+.theme-text-muted {
+  color: var(--theme-text-muted);
+}
+.theme-accent {
+  color: var(--theme-accent);
+}
