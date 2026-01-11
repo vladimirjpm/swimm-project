@@ -77,13 +77,6 @@ function SportsmenDetails() {
 
 // Компонент табов для Training/Competition
 function TopResultsTabs({ sortedBestResults }: { sortedBestResults: any[] }) {
-  const [activeTab, setActiveTab] = useState<'training' | 'competition'>('training');
-
-  // Проверяем, есть ли хотя бы один результат с is_masters
-  const hasMasters = useMemo(() => {
-    return sortedBestResults.some(r => String(r.is_masters) === 'true' || String(r.is_masters) === '1');
-  }, [sortedBestResults]);
-
   // Разделяем результаты на training и competition
   const trainingResults = useMemo(() => {
     return sortedBestResults.filter(r => !!r.training?.trainingId);
@@ -91,6 +84,15 @@ function TopResultsTabs({ sortedBestResults }: { sortedBestResults: any[] }) {
 
   const competitionResults = useMemo(() => {
     return sortedBestResults.filter(r => !r.training?.trainingId);
+  }, [sortedBestResults]);
+
+  // Определяем начальный таб: competition, если training пустой
+  const initialTab = trainingResults.length === 0 && competitionResults.length > 0 ? 'competition' : 'training';
+  const [activeTab, setActiveTab] = useState<'training' | 'competition'>(initialTab);
+
+  // Проверяем, есть ли хотя бы один результат с is_masters
+  const hasMasters = useMemo(() => {
+    return sortedBestResults.some(r => String(r.is_masters) === 'true' || String(r.is_masters) === '1');
   }, [sortedBestResults]);
 
   // Если нет masters — показываем все результаты без табов

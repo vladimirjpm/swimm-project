@@ -39,7 +39,7 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
         <div className={`text-red-500 ${secondLineClassName}`}>{time_fail_note}</div>
       )}
       {formattedTimeSplit && (
-        <div className={`text-red-500 flex ${secondLineClassName}`}>{formattedTimeSplit}</div>
+        <div className={`theme-text-muted flex whitespace-nowrap ${secondLineClassName}`}>{formattedTimeSplit}</div>
       )}
     </div>
   );
