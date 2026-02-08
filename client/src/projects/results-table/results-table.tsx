@@ -75,21 +75,13 @@ function ResultsTable() {
     let cancelled = false;
 
     const loadClubPoints = async () => {
-      const entries = await Promise.all(
-        sortedResults.map(async (res) => {
-          const key = getResultKey(res);
-          const points = await ClubPointsHelper.getPointsForResult(res);
-          return [key, points] as const;
-        }),
+      const pointsMap = await ClubPointsHelper.getPointsMapForResults(
+        sortedResults,
+        getResultKey
       );
 
       if (cancelled) return;
-
-      const next: Record<string, number> = {};
-      for (const [key, points] of entries) {
-        next[key] = points;
-      }
-      setClubPointsByKey(next);
+      setClubPointsByKey(pointsMap);
     };
 
     loadClubPoints();

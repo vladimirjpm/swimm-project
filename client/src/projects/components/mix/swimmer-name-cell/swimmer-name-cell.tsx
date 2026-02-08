@@ -63,9 +63,9 @@ const SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
   }
 
   return (
-    <div className={`${className}`} onClick={onClick}>
+    <div className={`${className} overflow-hidden`} onClick={onClick}>
     <div className={`${onClick ? 'cursor-pointer' : ''}`}>
-      <div className={firstLineClassName}>{displayName}</div>
+      <div className={`${firstLineClassName} overflow-hidden`}>{displayName}</div>
       {relayList}
       {subText && <div className={`flex items-center ${secondLineClassName}`}>        
           {showClubIcon && club && (

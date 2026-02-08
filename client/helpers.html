@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Helpers Documentation</title>
+  <style>
+    :root {
+      --bg-primary: #1a1a2e;
+      --bg-secondary: #16213e;
+      --bg-card: #0f3460;
+      --text-primary: #eaeaea;
+      --text-secondary: #a0a0a0;
+      --accent: #e94560;
+      --accent-light: #ff6b6b;
+      --code-bg: #0d1117;
+      --border: #30475e;
+    }
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+      padding: 2rem;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      text-align: center;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+      font-size: 2.5rem;
+    }
+    
+    .subtitle {
+      text-align: center;
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+    }
+    
+    .warning {
+      background: #4a3000;
+      border: 1px solid #ffa500;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 2rem;
+      text-align: center;
+    }
+    
+    .warning code {
+      background: var(--code-bg);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-family: 'Consolas', monospace;
+    }
+    
+    .structure {
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      border: 1px solid var(--border);
+    }
+    
+    .structure h2 {
+      color: var(--accent-light);
+      margin-bottom: 1rem;
+    }
+    
+    .tree {
+      font-family: 'Consolas', monospace;
+      background: var(--code-bg);
+      padding: 1rem;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+    
+    .tree-item {
+      color: #79c0ff;
+    }
+    
+    .tree-comment {
+      color: #8b949e;
+    }
+    
+    .helper-card {
+      background: var(--bg-card);
+      border-radius: 12px;
+      margin-bottom: 1.5rem;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    
+    .helper-header {
+      background: var(--bg-secondary);
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    
+    .helper-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+    
+    .helper-title {
+      flex: 1;
+    }
+    
+    .helper-title h3 {
+      color: var(--accent-light);
+      margin-bottom: 0.25rem;
+    }
+    
+    .helper-title p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+    
+    .helper-file {
+      font-family: 'Consolas', monospace;
+      background: var(--code-bg);
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      color: #79c0ff;
+    }
+    
+    .helper-content {
+      padding: 1.5rem;
+    }
+    
+    .method {
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-left: 3px solid var(--accent);
+    }
+    
+    .method:last-child {
+      margin-bottom: 0;
+    }
+    
+    .method-name {
+      font-family: 'Consolas', monospace;
+      color: #ffa657;
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .method-desc {
+      color: var(--text-secondary);
+      margin-bottom: 0.5rem;
+    }
+    
+    .method-signature {
+      font-family: 'Consolas', monospace;
+      background: var(--code-bg);
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      overflow-x: auto;
+      color: #c9d1d9;
+    }
+    
+    .method-example {
+      margin-top: 0.5rem;
+      font-family: 'Consolas', monospace;
+      background: var(--code-bg);
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      color: #7ee787;
+    }
+    
+    .usage-section {
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-top: 2rem;
+      border: 1px solid var(--border);
+    }
+    
+    .usage-section h2 {
+      color: var(--accent-light);
+      margin-bottom: 1rem;
+    }
+    
+    .code-block {
+      background: var(--code-bg);
+      padding: 1rem;
+      border-radius: 8px;
+      font-family: 'Consolas', monospace;
+      overflow-x: auto;
+      margin-bottom: 1rem;
+    }
+    
+    .code-block .comment {
+      color: #8b949e;
+    }
+    
+    .code-block .keyword {
+      color: #ff7b72;
+    }
+    
+    .code-block .string {
+      color: #a5d6ff;
+    }
+    
+    .code-block .class {
+      color: #ffa657;
+    }
+    
+    .tag {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      margin-left: 0.5rem;
+    }
+    
+    .tag-async {
+      background: #238636;
+      color: white;
+    }
+    
+    .tag-static {
+      background: #1f6feb;
+      color: white;
+    }
+    
+    footer {
+      text-align: center;
+      margin-top: 3rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🛠️ Helpers Documentation</h1>
+    <p class="subtitle">Документация по хелперам проекта Swimm</p>
+    
+    <div class="warning">
+      ⚠️ Этот файл только для разработки. Не включается в production build.<br>
+      Расположение: <code>src/utils/helpers/</code>
+    </div>
+    
+    <!-- Структура файлов -->
+    <div class="structure">
+      <h2>📁 Структура файлов</h2>
+      <div class="tree">
+<pre>
+helpers/
+├── <span class="tree-item">index.ts</span>              <span class="tree-comment"># Единая точка входа (реэкспорт всех хелперов)</span>
+├── <span class="tree-item">helper-time.ts</span>        <span class="tree-comment"># HelperTime — работа со временем</span>
+├── <span class="tree-item">helper-gender.ts</span>      <span class="tree-comment"># HelperGender — пол и CSS классы</span>
+├── <span class="tree-item">helper-normative.ts</span>   <span class="tree-comment"># HelperNormative — нормативы и уровни</span>
+├── <span class="tree-item">helper-results.ts</span>     <span class="tree-comment"># HelperResults — группировка/сортировка результатов</span>
+├── <span class="tree-item">helper-swimmer.ts</span>     <span class="tree-comment"># HelperSwimmer — статистика спортсмена</span>
+├── <span class="tree-item">helper-club.ts</span>        <span class="tree-comment"># HelperClub — статистика по клубам</span>
+├── <span class="tree-item">club-points-helper.ts</span> <span class="tree-comment"># ClubPointsHelper — расчёт очков клуба</span>
+└── <span class="tree-item">data-helper.ts</span>        <span class="tree-comment"># Helper — фасад для обратной совместимости (deprecated)</span>
+</pre>
+      </div>
+    </div>
+    
+    <!-- HelperTime -->
+    <div class="helper-card">
+      <div class="helper-header">
+        <div class="helper-icon" style="background: #2d5a27;">⏱️</div>
+        <div class="helper-title">
+          <h3>HelperTime</h3>
+          <p>Работа со временем: парсинг и форматирование</p>
+        </div>
+        <span class="helper-file">helper-time.ts</span>
+      </div>
+      <div class="helper-content">
+        <div class="method">
+          <div class="method-name">parseTimeToSeconds(time) <span class="tag tag-static">static</span></div>
+          <div class="method-desc">Парсит строку времени в секунды. Поддерживает форматы "MM:SS.ms" и "SS.ms"</div>
+          <div class="method-signature">static parseTimeToSeconds(time: string | number): number</div>
+          <div class="method-example">// "1:23.45" → 83.45</div>
+        </div>
+        
+        <div class="method">
+          <div class="method-name">formatSecondsToTimeString(totalSeconds) <span class="tag tag-static">static</span></div>
+          <div class="method-desc">Форматирует секунды в строку времени</div>
+          <div class="method-signature">static formatSecondsToTimeString(totalSeconds: number): string</div>
+          <div class="method-example">// 83.45 → "1:23.45"</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- HelperGender -->
+    <div class="helper-card">
+      <div class="helper-header">
+        <div class="helper-icon" style="background: #5a275a;">⚧️</div>
+        <div class="helper-title">
+          <h3>HelperGender</h3>
+          <p>Работа с полом: нормализация и CSS стили</p>
+        </div>
+        <span class="helper-file">helper-gender.ts</span>
+      </div>
+      <div class="helper-content">
+        <div class="method">
+          <div class="method-name">resolveGender(gender) <span class="tag tag-static">static</span></div>
+          <div class="method-desc">Нормализует значение пола из различных форматов</div>
+          <div class="method-signature">static resolveGender(gender: unknown): 'male' | 'female' | 'none'</div>
+          <div class="method-example">// "f", "female", "w" → "female"<br>// "m", "male" → "male"</div>
+        </div>
+        
+        <div class="method">
+          <div class="method-name">getGenderBgClass(gender) <span class="tag tag-static">static</span></div>
+          <div class="method-desc">Возвращает Tailwind CSS класс фона в зависимости от пола</div>
+          <div class="method-signature">static getGenderBgClass(gender: string): string</div>
+          <div class="method-example">// "female" → "bg-pink-100"<br>// "male" → "bg-blue-100"</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- HelperNormative -->
+    <div class="helper-card">
+      <div class="helper-header">
+        <div class="helper-icon" style="background: #27455a;">🏅</div>
+        <div class="helper-title">
+          <h3>HelperNormative</h3>
+          <p>Расчёт нормативов и уровней спортсменов</p>
+        </div>
+        <span class="helper-file">helper-normative.ts</span>
+      </div>
+      <div class="helper-content">
+        <div class="method">
+          <div class="method-name">resolvePoolType(poolType) <span class="tag tag-static">static</span></div>
+          <div class="method-desc">Нормализует тип бассейна</div>
+          <div class="method-signature">static resolvePoolType(poolType: unknown): '25m_pool' | '50m_pool'</div>
+          <div class="method-example">// "25", "25m" → "25m_pool"<br>// "50", "50m" → "50m_pool"</div>
+        </div>
+        
+        <div class="method">
+          <div class="method-name">getNormativeLevelInfo({...}) <span class="tag tag-static">static</span></div>
+          <div class="method-desc">Вычисляет уровень норматива для результата. Поддерживает обычные и мастерские нормативы.</div>
+          <div class="method-signature">static getNormativeLevelInfo({<br>  gender: Gender,<br>  poolType: PoolType,<br>  styleName: string,<br>  distance: string,<br>  time: number,<br>  isMaster?: boolean,<br>  event_style_age?: string | null<br>}): NormativeLevelInfo</div>
+          <div class="method-example">// Возвращает: { currentLevel, nextLevel, progressToNextLevel, ... }</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- HelperResults -->
+    <div class="helper-card">
+      <div class="helper-header">
+        <div class="helper-icon" style="background: #5a4527;">📊</div>
+        <div class="helper-title">
+          <h3>HelperResults</h3>
+          <p>Группировка и сортировка результатов соревнований</p>
+        </div>
+        <span class="helper-file">helper-results.ts</span>
+      </div>
+      <div class="helper-content">
+        <div class="method">
+          <div class="method-name">sortByTime(arr) <span class="tag tag-static">static</span></div>
+          <div class="method-desc">Сортирует массив результатов по времени (от лучшего к худшему)</div>
+          <div class="method-signature">static sortByTime(arr: Result[]): Result[]</div>
+        </div>
+        
+        <div class="method">
+          <div class="method-name">showTrainingTable(results) <span class="tag tag-static">static</span></div>
+          <div class="method-desc">Создаёт плоскую таблицу: одна группа со всеми элементами</div>
+          <div class="method-signature">static showTrainingTable(results: Result[]): TrainingGroup[]</div>
+        </div>
+        
+        <div class="method">
+          <div class="method-name">groupTrainingByName(results) <span class="tag tag-static">static</span></div>
+          <div class="method-desc">Группирует результаты по имени спортсмена + дате, сортирует по set/order</div>
+          <div class="method-signature">static groupTrainingByName(results: Result[]): TrainingGroup[]</div>
+        </div>
+        
+        <div class="method">
+          <div class="method-name">groupTrainingBySet(results) <span class="tag tag-static">static</span></div>
+          <div class="method-desc">Группирует результаты по номеру сета + дате, сортирует по order → time → name</div>
+          <div class="method-signature">static groupTrainingBySet(results: Result[]): TrainingGroup[]</div>
+        </div>
+        
+        <div class="method">
+          <div class="method-name">getDolphinDataByName(data, name) <span class="tag tag-static">static</span></div>
+          <div class="method-desc">Фильтрует данные по имени спортсмена</div>
+          <div class="method-signature">static getDolphinDataByName(data: Result[], name: string): Result[]</div>
+        </div>
+        
+        <div class="method">
+          <div class="method-name">getDolphinDataGroupedByDate(data) <span class="tag tag-static">static</span></div>
+          <div class="method-desc">Группирует данные по дате с сортировкой по времени внутри каждой группы</div>
+          <div class="method-signature">static getDolphinDataGroupedByDate(data: Result[]): Record&lt;string, Result[]&gt;</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- HelperSwimmer -->
+    <div class="helper-card">
+      <div class="helper-header">
+        <div class="helper-icon" style="background: #275a5a;">🏊</div>
+        <div class="helper-title">
+          <h3>HelperSwimmer</h3>
+          <p>Статистика спортсмена: медали, очки, лучшие результаты</p>
+        </div>
+        <span class="helper-file">helper-swimmer.ts</span>
+      </div>
+      <div class="helper-content">
+        <div class="method">
+          <div class="method-name">getBestResultsByStyle(results, selectedName) <span class="tag tag-static">static</span></div>
+          <div class="method-desc">Получает лучшие результаты спортсмена по каждому стилю плавания. Учитывает эстафеты.</div>
+          <div class="method-signature">static getBestResultsByStyle(results: Result[], selectedName: string): Array&lt;Result & { levelInfo: NormativeLevelInfo }&gt;</div>
+        </div>
+        
+        <div class="method">
+          <div class="method-name">getMedalCountsByName(results, selectedName) <span class="tag tag-static">static</span></div>
+          <div class="method-desc">Подсчитывает медали спортсмена (1, 2, 3 места)</div>
+          <div class="method-signature">static getMedalCountsByName(results: Result[], selectedName: string): { first: Result[], second: Result[], third: Result[] }</div>
+        </div>
+        
+        <div class="method">
+          <div class="method-name">getInternationalPointsSumByName(results, selectedName) <span class="tag tag-static">static</span></div>
+          <div class="method-desc">Суммирует международные очки спортсмена</div>
+          <div class="method-signature">static getInternationalPointsSumByName(results: Result[], selectedName: string): number</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- HelperClub -->
+    <div class="helper-card">
+      <div class="helper-header">
+        <div class="helper-icon" style="background: #5a2727;">🏢</div>
+        <div class="helper-title">
+          <h3>HelperClub</h3>
+          <p>Статистика по клубам</p>
+        </div>
+        <span class="helper-file">helper-club.ts</span>
+      </div>
+      <div class="helper-content">
+        <div class="method">
+          <div class="method-name">getClubsSummary(results) <span class="tag tag-static">static</span> <span class="tag tag-async">async</span></div>
+          <div class="method-desc">Получает сводку по всем клубам: очки, количество пловцов, медали</div>
+          <div class="method-signature">static async getClubsSummary(results: Result[]): Promise&lt;Array&lt;{ club, points, swimmerCount, successfulCount, gold, silver, bronze }&gt;&gt;</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- ClubPointsHelper -->
+    <div class="helper-card">
+      <div class="helper-header">
+        <div class="helper-icon" style="background: #3d5a27;">💰</div>
+        <div class="helper-title">
+          <h3>ClubPointsHelper</h3>
+          <p>Расчёт очков клуба по системе начисления</p>
+        </div>
+        <span class="helper-file">club-points-helper.ts</span>
+      </div>
+      <div class="helper-content">
+        <div class="method">
+          <div class="method-name">getPointsForResult(result) <span class="tag tag-static">static</span> <span class="tag tag-async">async</span></div>
+          <div class="method-desc">Вычисляет очки за конкретный результат по конфигурации начисления</div>
+          <div class="method-signature">static async getPointsForResult(result: Result): Promise&lt;number&gt;</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Использование -->
+    <div class="usage-section">
+      <h2>📖 Примеры использования</h2>
+      
+      <h3 style="margin: 1rem 0 0.5rem; color: var(--text-primary);">Новый способ (рекомендуется)</h3>
+      <div class="code-block">
+<span class="comment">// Импорт конкретных хелперов</span>
+<span class="keyword">import</span> { <span class="class">HelperTime</span>, <span class="class">HelperNormative</span>, <span class="class">HelperSwimmer</span> } <span class="keyword">from</span> <span class="string">'../utils/helpers'</span>;
+
+<span class="comment">// Использование</span>
+<span class="keyword">const</span> seconds = <span class="class">HelperTime</span>.parseTimeToSeconds(<span class="string">"1:23.45"</span>);
+<span class="keyword">const</span> levelInfo = <span class="class">HelperNormative</span>.getNormativeLevelInfo({ ... });
+<span class="keyword">const</span> bestResults = <span class="class">HelperSwimmer</span>.getBestResultsByStyle(results, name);
+      </div>
+      
+      <h3 style="margin: 1rem 0 0.5rem; color: var(--text-primary);">Старый способ (для обратной совместимости)</h3>
+      <div class="code-block">
+<span class="comment">// Импорт фасада (deprecated)</span>
+<span class="keyword">import</span> <span class="class">Helper</span> <span class="keyword">from</span> <span class="string">'../utils/helpers/data-helper'</span>;
+
+<span class="comment">// Использование (все методы доступны через фасад)</span>
+<span class="keyword">const</span> seconds = <span class="class">Helper</span>.parseTimeToSeconds(<span class="string">"1:23.45"</span>);
+<span class="keyword">const</span> levelInfo = <span class="class">Helper</span>.getNormativeLevelInfo({ ... });
+      </div>
+    </div>
+    
+    <footer>
+      <p>Swimm Project — Helpers Documentation</p>
+      <p style="margin-top: 0.5rem; font-size: 0.85rem;">
+        Файл: <code>helpers.html</code> | Обновлено: Январь 2026
+      </p>
+    </footer>
+  </div>
+</body>
+</html>

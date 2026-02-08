@@ -179,7 +179,24 @@ const allDataSources: DataSource[] = [
       const data = (await resp.json()) as Result[];
       return data;
     },
+    
   },
+  {
+    name: '2026 Liga2 Dolphin 8-11',
+    file: 'json/competition-feb-2026-Liga2-dolphin.json',
+    load: async () => {
+      const resp = await fetch(
+        makeUrl('json/competition-feb-2026-Liga2-dolphin.json'),
+      );
+      if (!resp.ok) {
+        throw new Error(
+          'Failed to load competition-feb-2026-Liga2-dolphin.json',
+        );
+      }
+      const data = (await resp.json()) as Result[];
+      return data;
+    },
+  }
 ];
 
 // Map by file for quick lookup

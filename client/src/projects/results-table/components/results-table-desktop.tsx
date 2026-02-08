@@ -34,7 +34,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
           {showAge && <div className="absolute right-0 bottom-0 font-bold">{res.event_style_age}</div>}
         </div>
 
-        <div className="col-span-4">
+        <div className={showDate ? 'col-span-3' : 'col-span-4'}>
           <SwimmerNameCell
             firstName={res.first_name}
             lastName={res.last_name}
@@ -53,11 +53,6 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
 
           <div className="w-full flex flex-col items-start justify-center mt-2 mb-2">
             {hasInternationalPoints && <div className="text-left text-sm pt-2">Points: {res.international_points ?? ''}</div>}
-             {showDate && (
-                <div className="text-left text-sm">
-                  Date: <span className="font-semibold">{res.date}</span>
-                </div>
-              )}
             <UI_LevelProgress
               styleType="text-only"
               currentTime={res.time}
@@ -96,6 +91,12 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
             normativeAgeGroup={levelInfo.normativeAgeGroup}
           />
         </div>
+
+        {showDate && (
+          <div className="col-span-1 self-start text-center">
+            <UI_DateIcon styleType="cube" date={res.date} paddingClass="px-0 py-1" className="min-w-[64px]" />
+          </div>
+        )}
 
       </div>
     </>

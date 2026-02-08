@@ -69,6 +69,7 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
           </div>
           {showPoolType && <UI_PoolIcon styleType="icon-text-center" label={res.pool_type} labelClassName="text-xl" />}
         </div>
+        
       )}
 
       <div className="col-span-1">

@@ -35,7 +35,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
 
         <div className="flex-1 flex flex-col gap-2">
           <div className="flex items-start">
-            <div className="basis-2/3 pr-2">
+            <div className="basis-2/3 pr-2 min-w-0">
               <SwimmerNameCell
                 firstName={res.first_name}
                 lastName={res.last_name}

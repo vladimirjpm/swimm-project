@@ -84,6 +84,15 @@ public static class CompetitionParser
         @"^\u05DE\u05D0\u05E1\u05D8\u05E8\u05E1\s+(?<gender>[\u05D0-\u05EA])\s+(?<age>\d+(?:-\d+)?)$",
         RegexOptions.Compiled);
 
+    // Masters relay age line (e.g. "?????? ?????? 120-159" or "?????? ?????? 100-119")
+    // Used for mixed relays where gender is not specified, age is combined age of swimmers
+    // ?????? = \u05E9\u05DC\u05D9\u05D7\u05D5\u05EA
+    // ?????? = \u05E9\u05DC\u05D9\u05D7\u05D9\u05DD
+    private static Regex? _mastersRelayAgeLineRxHE;
+    private static Regex MastersRelayAgeLineRxHE => _mastersRelayAgeLineRxHE ??= new Regex(
+        @"^\u05DE\u05D0\u05E1\u05D8\u05E8\u05E1\s+\u05E9\u05DC\u05D9\u05D7(?:\u05D5\u05EA|\u05D9\u05DD)?\s+(?<age>\d+(?:-\d+)?)$",
+        RegexOptions.Compiled);
+
     private static Regex HeaderRxEN => _headerRxEN ??= new Regex(
         @"^(?<len>\d+m?)\s+(?<style>.+?)\s*-\s*(?<gender>female|male|girls|boys|women|men)\s+(?<age>\d+(-\d+)?)$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -188,10 +197,15 @@ public static class CompetitionParser
         bool currentIsRelay = false;
         int currentRelayLegs = 0;
         string dat_relay = "";
-        
+
         string? pendingEventLen = null;
         string? pendingEventStyle = null;
         string? pendingEventLine = null;
+
+        // Pending relay header that is missing "- gender age" and expects a Masters age line next
+        string? pendingRelayStyleHe = null;
+        string? pendingRelayLen = null;
+        int pendingRelayLegs = 0;
 
         PDF_Result? pendingRelayResult = null;
         List<RelaySwimmer>? pendingSwimmers = null;
@@ -219,10 +233,67 @@ public static class CompetitionParser
                 // Log every line for debugging
                 Log($"L{i}: raw='{raw.Substring(0, Math.Min(60, raw.Length))}...' norm='{line.Substring(0, Math.Min(60, line.Length))}...'");
 
+                // If we have a pending relay header (without age) then a Masters age line can complete it
+                if (isHE && pendingRelayLen != null)
+                {
+                    var mastersAgeMatch = MastersAgeLineRxHE.Match(line);
+                    var mastersRelayAgeMatch = MastersRelayAgeLineRxHE.Match(line);
+                    
+                    if (mastersAgeMatch.Success || mastersRelayAgeMatch.Success)
+                    {
+                        string ageGroup;
+                        string genderNorm;
+                        
+                        if (mastersAgeMatch.Success)
+                        {
+                            ageGroup = mastersAgeMatch.Groups["age"].Value;
+                            var genderRaw = mastersAgeMatch.Groups["gender"].Value;
+                            genderNorm = HebrewTextHelper.NormalizeGenderHE(genderRaw.Trim());
+                            Log($"  -> MATCH MastersAge for pending relay: gender={genderRaw}, age={ageGroup}");
+                        }
+                        else
+                        {
+                            // Masters relay age line (e.g. "?????? ?????? 120-159") - mixed gender
+                            ageGroup = mastersRelayAgeMatch.Groups["age"].Value;
+                            genderNorm = "none"; // mixed relay, no specific gender
+                            Log($"  -> MATCH MastersRelayAge for pending relay: age={ageGroup}, gender=none (mixed)");
+                        }
+
+                        if (current != null) yield return current;
+
+                        var styleNorm = HebrewTextHelper.StyleMapHE.GetValueOrDefault(pendingRelayStyleHe!, pendingRelayStyleHe!);
+                        styleNorm = HebrewTextHelper.NormalizeStyleName(styleNorm);
+
+                        currentIsRelay = true;
+                        currentRelayLegs = pendingRelayLegs;
+
+                        current = new PDF_CompetitionResult(
+                            Competition: HebrewTextHelper.NormalizeHebrewLine(lines[0].Trim()),
+                            AgeGroup: ageGroup,
+                            Date: dat_relay,
+                            Event: pendingEventLine ?? string.Empty,
+                            EventStyleName: styleNorm,
+                            EventStyleLen: pendingRelayLen,
+                            EventStyleGender: genderNorm,
+                            EventStyleAge: ageGroup,
+                            PoolType: "25m",
+                            Results: new List<PDF_Result>()
+                        );
+
+                        Log($"  -> NEW RELAY EVENT (masters continuation): {current.Event}, gender={genderNorm}");
+
+                        pendingRelayStyleHe = null;
+                        pendingRelayLen = null;
+                        pendingRelayLegs = 0;
+                        pendingEventLine = null;
+                        continue;
+                    }
+                }
+
                 // Handle pending relay
                 if (pendingRelayResult != null && pendingSwimmers != null && current != null)
                 {
-                    bool isNewHeader = RelayHeaderRxHE.IsMatch(line) || RelayHeaderRxHE2.IsMatch(line) || 
+                    bool isNewHeader = RelayHeaderRxHE.IsMatch(line) || RelayHeaderRxHE2.IsMatch(line) ||
                                        headerRx.IsMatch(line) || (isHE && HeaderRxHESimple.IsMatch(line));
                     bool isNewTeam = RelayTeamLineRxHE.IsMatch(line);
 
@@ -435,6 +506,32 @@ public static class CompetitionParser
                             Results: new List<PDF_Result>()
                         );
                         Log($"  -> NEW RELAY EVENT: {current.Event}, gender={genderNorm}");
+                        continue;
+                    }
+
+                    // Masters relay header without "- gender age". Example (normalized): "4X50 ????? ??????"
+                    // The age category comes on the next line: "?????? ?????? 120-159"
+                    if (Regex.IsMatch(line, @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)\s+(?<style>.+?)\s+\u05E9\u05DC\u05D9\u05D7(?:\u05D9\u05DD|\u05D5\u05EA)?\s*$"))
+                    {
+                        var mm = Regex.Match(line, @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)\s+(?<style>.+?)\s+\u05E9\u05DC\u05D9\u05D7(?:\u05D9\u05DD|\u05D5\u05EA)?\s*$");
+                        int legs = int.Parse(mm.Groups["legs"].Value);
+                        int legLen = int.Parse(mm.Groups["len"].Value);
+                        var styleHe = mm.Groups["style"].Value.Trim();
+
+                        Log($"  -> MATCH RelayHeader (masters, no age): legs={legs}, len={legLen}, style={styleHe}");
+
+                        // finalize previous event
+                        if (current != null) yield return current;
+
+                        currentIsRelay = true;
+                        currentRelayLegs = legs;
+
+                        pendingRelayLegs = legs;
+                        pendingRelayLen = $"{legs}X{legLen}";
+                        pendingRelayStyleHe = styleHe;
+                        pendingEventLine = line;
+
+                        // Do not create event yet; wait for MastersAgeLineRxHE
                         continue;
                     }
                 }

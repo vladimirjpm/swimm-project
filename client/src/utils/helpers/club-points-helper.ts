@@ -13,6 +13,7 @@ interface PointsRule {
   version: string;
   effectiveFrom: string; // ISO date "YYYY-MM-DD"
   description?: string;
+  scope?: 'all' | 'masters' | 'non-masters';
   defaultPoints: number;
   maxScoringPlace?: number;
   pointsByPlace: Record<string, number>;
@@ -80,6 +81,7 @@ export default class ClubPointsHelper {
           version: 'fallback',
           effectiveFrom: '2000-01-01',
           description: 'Fallback points system',
+          scope: 'all',
           defaultPoints: 0,
           maxScoringPlace: 24,
           pointsByPlace: {
@@ -132,13 +134,35 @@ export default class ClubPointsHelper {
   /**
    * Выбирает правила, актуальные на указанную дату
    */
-  private static selectRule(config: PointsConfig, eventDate: Date): PointsRule {
-    // Сортируем правила по дате (от новых к старым)
-    const sorted = [...config.rules].sort((a, b) => {
-      const dateA = new Date(a.effectiveFrom).getTime();
-      const dateB = new Date(b.effectiveFrom).getTime();
-      return dateB - dateA;
-    });
+  private static selectRule(
+    config: PointsConfig,
+    eventDate: Date,
+    isMasters: boolean
+  ): PointsRule {
+    const scopeWeight = (scope?: PointsRule['scope']) => {
+      // Prefer more specific rules (masters/non-masters) over generic (all)
+      if (scope === 'masters' || scope === 'non-masters') return 1;
+      return 0;
+    };
+
+    const matchesScope = (rule: PointsRule) => {
+      const scope = rule.scope ?? 'all';
+      if (scope === 'all') return true;
+      if (scope === 'masters') return isMasters;
+      if (scope === 'non-masters') return !isMasters;
+      return true;
+    };
+
+    // Filter by scope first, then sort: newest effectiveFrom first,
+    // and when dates equal prefer scope-specific over 'all'.
+    const sorted = [...config.rules]
+      .filter(matchesScope)
+      .sort((a, b) => {
+        const dateA = new Date(a.effectiveFrom).getTime();
+        const dateB = new Date(b.effectiveFrom).getTime();
+        if (dateB !== dateA) return dateB - dateA;
+        return scopeWeight(b.scope) - scopeWeight(a.scope);
+      });
 
     // Находим первое правило, которое действует на дату события
     const rule = sorted.find(r => {
@@ -165,7 +189,8 @@ export default class ClubPointsHelper {
    */
   static async getPoints(
     position: number | null | undefined,
-    eventDate: string
+    eventDate: string,
+    isMasters: boolean
   ): Promise<number> {
     // Если место не указано или не валидно
     if (!position || position <= 0) {
@@ -175,7 +200,7 @@ export default class ClubPointsHelper {
     try {
       const config = await this.loadConfig();
       const parsedDate = this.parseDate(eventDate);
-      const rule = this.selectRule(config, parsedDate);
+      const rule = this.selectRule(config, parsedDate, isMasters);
 
       const points = rule.pointsByPlace[position.toString()];
       
@@ -195,20 +220,47 @@ export default class ClubPointsHelper {
    * Вычисляет очки для результата (удобная обёртка)
    * 
    * @param result - объект результата с полями position и date
+   * @param forceMastersScope - если true, использовать scope masters для всех
    * @returns количество очков для клуба
    */
-  static async getPointsForResult(result: Result): Promise<number> {
+  static async getPointsForResult(
+    result: Result,
+    forceMastersScope?: boolean
+  ): Promise<number> {
     const isRelay =
       (result as any)?.is_relay === true ||
       String((result as any)?.is_relay ?? '').toLowerCase() === 'true' ||
       String((result as any)?.is_relay ?? '') === '1';
 
-    const basePoints = await this.getPoints(result.position, result.date);
+    const isMasters =
+      forceMastersScope !== undefined
+        ? forceMastersScope
+        : (result as any)?.is_masters === true ||
+          String((result as any)?.is_masters ?? '').toLowerCase() === 'true' ||
+          String((result as any)?.is_masters ?? '') === '1';
+
+    const basePoints = await this.getPoints(result.position, result.date, isMasters);
     return isRelay ? basePoints * 2 : basePoints;
   }
 
   /**
+   * Проверяет, являются ли все результаты masters (по названию competition)
+   * Masters если в competition есть "masters" или "מאסטרס"
+   */
+  private static checkAllMasters(results: Result[]): boolean {
+    if (results.length === 0) return false;
+    
+    const mastersPattern = /masters|מאסטרס/i;
+    
+    return results.every((r) => {
+      const competition = (r as any)?.competition ?? '';
+      return mastersPattern.test(competition);
+    });
+  }
+
+  /**
    * Вычисляет очки для массива результатов
+   * Если ВСЕ результаты имеют is_masters=true, применяется scope masters ко всем
    * 
    * @param results - массив результатов
    * @returns массив объектов с результатом и начисленными очками
@@ -216,12 +268,43 @@ export default class ClubPointsHelper {
   static async getPointsForResults(
     results: Result[]
   ): Promise<Array<{ result: Result; points: number }>> {
+    const allMasters = this.checkAllMasters(results);
+
     const pointsPromises = results.map(async (result) => ({
       result,
-      points: await this.getPointsForResult(result)
+      points: await this.getPointsForResult(result, allMasters)
     }));
 
     return Promise.all(pointsPromises);
+  }
+
+  /**
+   * Вычисляет очки для массива результатов и возвращает Map по ключу
+   * Если ВСЕ результаты имеют is_masters=true, применяется scope masters ко всем
+   * 
+   * @param results - массив результатов
+   * @param getKey - функция для генерации ключа результата
+   * @returns Record<string, number> с очками по ключам
+   */
+  static async getPointsMapForResults(
+    results: Result[],
+    getKey: (r: Result) => string
+  ): Promise<Record<string, number>> {
+    const allMasters = this.checkAllMasters(results);
+
+    const entries = await Promise.all(
+      results.map(async (res) => {
+        const key = getKey(res);
+        const points = await this.getPointsForResult(res, allMasters);
+        return [key, points] as const;
+      })
+    );
+
+    const map: Record<string, number> = {};
+    for (const [key, points] of entries) {
+      map[key] = points;
+    }
+    return map;
   }
 
   /**

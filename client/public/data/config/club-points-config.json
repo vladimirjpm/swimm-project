@@ -4,6 +4,7 @@
       "version": "2025.01",
       "effectiveFrom": "2025-01-01",
       "description": "Israeli swimming club points system starting Jan 2025",
+      "scope": "all",
       "defaultPoints": 0,
       "maxScoringPlace": 24,
       "pointsByPlace": {
@@ -31,6 +32,28 @@
         "22": 3,
         "23": 2,
         "24": 1
+      }
+    },
+    {
+      "version": "2025.01-masters",
+      "effectiveFrom": "2025-01-01",
+      "description": "Masters club points system (places 1-12)",
+      "scope": "masters",
+      "defaultPoints": 0,
+      "maxScoringPlace": 12,
+      "pointsByPlace": {
+        "1": 12,
+        "2": 11,
+        "3": 10,
+        "4": 9,
+        "5": 8,
+        "6": 7,
+        "7": 6,
+        "8": 5,
+        "9": 4,
+        "10": 3,
+        "11": 2,
+        "12": 1
       }
     }
   ]
