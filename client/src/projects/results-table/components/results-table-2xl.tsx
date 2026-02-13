@@ -31,7 +31,7 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
   return (
     <>
       <div className="col-span-1 relative">
-        {res.position ? <UI_MedalIcon place={res.position.toString()} /> : `${index + 1}`}
+        {res.position ? <UI_MedalIcon place={res.position.toString()} styleType={String(res.is_award) === 'true' ? 'icon-place' : 'icon-noplace'} /> : `${index + 1}`}
         {showAge && <div className="absolute right-0 bottom-0 font-bold">{res.event_style_age}</div>}
       </div>
 

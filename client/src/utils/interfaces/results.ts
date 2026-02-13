@@ -8,6 +8,7 @@ export interface ResultWrap {
     country: string;
     competition: string;
     is_masters?:boolean;
+    is_award?:boolean;
     age_group: string;
     date: string;
     event: string;

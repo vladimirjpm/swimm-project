@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import './filter-section.css';
 import {
   rootActions,
@@ -226,19 +226,40 @@ const FilterSection: React.FC = () => {
 
       {/* Age */}
       <div className="flex flex-col">
-        <h3 className="font-semibold">Age</h3>
+        <h3 className="font-semibold">
+          Age
+          {filters.age_to && filters.age !== 'all' && (
+            <span className="ml-2 text-sm font-normal text-blue-600">
+              range: {filters.age}–{filters.age_to}
+            </span>
+          )}
+        </h3>
         <div className="flex flex-wrap">
-          {availableAges.map((age) => (
-            <button
-              key={age}
-              className={`px-2 py-1 m-1 border rounded transition-colors ${
-                filters.age === age ? 'theme-btn-active' : 'theme-btn'
-              }`}
-              onClick={() => updateFilter({ age })}
-            >
-              {age === 'all' ? 'all' : age}
-            </button>
-          ))}
+          {availableAges.map((age) => {
+            const isInRange =
+              filters.age !== 'all' &&
+              filters.age_to &&
+              age !== 'all' &&
+              Number(age) >= Number(filters.age) &&
+              Number(age) <= Number(filters.age_to);
+            const isActive = filters.age === age && !filters.age_to;
+            return (
+              <AgeButton
+                key={age}
+                age={age}
+                isActive={!!isActive}
+                isInRange={!!isInRange}
+                onClick={() => updateFilter({ age, age_to: undefined })}
+                onLongPress={() => {
+                  if (filters.age !== 'all' && age !== 'all' && filters.age !== age) {
+                    const from = Math.min(Number(filters.age), Number(age));
+                    const to = Math.max(Number(filters.age), Number(age));
+                    updateFilter({ age: String(from), age_to: String(to) });
+                  }
+                }}
+              />
+            );
+          })}
         </div>
       </div>
 
@@ -346,3 +367,67 @@ const FilterSection: React.FC = () => {
 };
 
 export default FilterSection;
+
+/** Age button with long-press support */
+function AgeButton({
+  age,
+  isActive,
+  isInRange,
+  onClick,
+  onLongPress,
+}: {
+  age: string;
+  isActive: boolean;
+  isInRange: boolean;
+  onClick: () => void;
+  onLongPress: () => void;
+}) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didLongPress = useRef(false);
+
+  const startPress = useCallback(() => {
+    didLongPress.current = false;
+    timerRef.current = setTimeout(() => {
+      didLongPress.current = true;
+      onLongPress();
+    }, 500);
+  }, [onLongPress]);
+
+  const endPress = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (!didLongPress.current) {
+      onClick();
+    }
+  }, [onClick]);
+
+  const cancelPress = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const cls = isActive
+    ? 'theme-btn-active'
+    : isInRange
+      ? 'theme-btn-active opacity-75'
+      : 'theme-btn';
+
+  return (
+    <button
+      className={`px-2 py-1 m-1 border rounded transition-colors ${cls}`}
+      onMouseDown={startPress}
+      onMouseUp={endPress}
+      onMouseLeave={cancelPress}
+      onTouchStart={startPress}
+      onTouchEnd={endPress}
+      onTouchCancel={cancelPress}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      {age === 'all' ? 'all' : age}
+    </button>
+  );
+}

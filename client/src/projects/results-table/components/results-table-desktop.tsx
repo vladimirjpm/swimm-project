@@ -30,7 +30,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
     <>
       <div className="grid grid-cols-12 gap-2 px-4 pt-3 items-center">
         <div className="col-span-1 relative self-start">
-          {res.position ? <UI_MedalIcon place={res.position.toString()} /> : `${index + 1}`}
+          {res.position ? <UI_MedalIcon place={res.position.toString()} styleType={String(res.is_award) === 'true' ? 'icon-place' : 'icon-noplace'} /> : `${index + 1}`}
           {showAge && <div className="absolute right-0 bottom-0 font-bold">{res.event_style_age}</div>}
         </div>
 

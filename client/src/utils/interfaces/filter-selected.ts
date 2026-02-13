@@ -6,6 +6,7 @@ export interface FilterSelected {
   date_str: string
   pool_type: string;
   age: string;
+  age_to?: string;
   club: string;
   gender: string;
   style_name: string;

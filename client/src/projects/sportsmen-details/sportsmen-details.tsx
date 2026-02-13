@@ -8,6 +8,8 @@ import UI_SwimmStyleIcon from '../components/mix/swimm-style-icon/swimm-style-ic
 import UI_NormativeLevelIcon from '../components/mix/normative-level-icon/normative-level-icon';
 import UI_MedalIcon from '../components/mix/medal-icon/medal-icon';
 import UI_SwimmerIcon from '../components/mix/swimmer-icon/swimmer-icon';
+import UI_PoolIcon from '../components/mix/pool-icon/pool-icon';
+import UI_LevelProgress from '../components/mix/progress-level/level-progress';
 import FlagEmoji from '../components/mix/flag-icon/flag-icon';
 
 function SportsmenDetails() {
@@ -144,44 +146,63 @@ function TopResultsTabs({ sortedBestResults }: { sortedBestResults: any[] }) {
 
 // Вынесенная таблица результатов
 function ResultsTable({ results }: { results: any[] }) {
+  const hasInternationalPoints = results.some(
+    (r) => r.international_points !== undefined && r.international_points !== null && !isNaN(Number(r.international_points))
+  );
+  const showDate = new Set(results.map((r) => r.date)).size > 1;
+
   return (
     <div className="max-h-[40vh] overflow-y-auto border rounded shadow">
-      <table
-        className="table table-auto table-pin-rows w-full border-separate"
-        style={{ borderSpacing: '0 0.5rem' }}
-      >
-        <thead className="bg-gray-100 sticky top-0 z-10">
-          <tr>
-            <th className="px-4 py-2">Style</th>
-            <th className="px-4 py-2">Time</th>
-            <th className="px-4 py-2">Level</th>
-            <th className="px-4 py-2">Progress</th>
-            <th className="px-4 py-2">Date</th>
-          </tr>
-        </thead>
-        <tbody>
-          {results.map((res, index) => {
-            const levelInfo = res.levelInfo;
-            const progress = levelInfo?.progressToNextLevel ?? 0;
+      <ul className="divide-y">
+        {results.map((res, index) => {
+          const levelInfo = res.levelInfo;
 
-            return (
-              <tr key={index} className="bg-gray-50 border-t">
-                <td className="px-4 py-2 whitespace-nowrap w-28">
+          return (
+            <li key={index} className="px-2 py-2">
+              {/* 4-column grid: Position/Age | Time/Style/Pool/Level | Details | Date */}
+              <div className="grid grid-cols-[1fr_3fr_4fr] gap-x-3 items-start">
+
+                {/* Column 1: Position + Age */}
+                <div className="flex flex-col items-center justify-start">
+                  {res.position ? (
+                    <UI_MedalIcon place={res.position.toString()} styleType={String(res.is_award) === 'true' ? 'icon-place' : 'icon-noplace'} />
+                  ) : (
+                    <span className="text-lg font-bold">{index + 1}</span>
+                  )}
+                  {res.event_style_age && (
+                    <div className="font-bold text-sm mt-1">
+                      <span className="font-normal text-xs">age:</span> {res.event_style_age}
+                    </div>
+                  )}
+                </div>
+
+                {/* Column 2: Time, Style, PoolIcon,  */}
+                <div className="flex flex-col items-center gap-1">
+                  <div className="text-xl font-bold">{res.time}</div>
                   <UI_SwimmStyleIcon
                     styleName={res.event_style_name}
                     styleLen={res.event_style_len}
                     styleType="icon-len"
+                    className="pt-2 font-bold text-base max-w-[96px]"
                   />
-                </td>
-                <td className="px-4 py-2 font-mono">
-                  {res.time}
-                </td>
-                <td className="px-4 py-2">
-                    {levelInfo?.currentLevel ? (
+                  <UI_PoolIcon
+                    styleType="icon-text-center"
+                    label={res.pool_type}
+                    iconWidth="28"
+                    labelClassName="text-xs"
+                  />
+                  
+                </div>
+
+                {/* Column 3: Level, Time split, Points, Date text, LevelProgress */}
+
+
+                <div className="flex flex-col items-start gap-0.5">
+                {levelInfo?.currentLevel ? (
                     <UI_NormativeLevelIcon
                       levelName={levelInfo.currentLevel}
                       styleType="style-1"
-                      styleSize="size-2"
+                      styleSize="size-1"
                       styleName={res.event_style_name}
                       styleLen={res.event_style_len}
                       poolType={res.pool_type}
@@ -191,34 +212,38 @@ function ResultsTable({ results }: { results: any[] }) {
                   ) : (
                     <span className="text-gray-400">—</span>
                   )}
-                </td>
-                <td className="px-4 py-2">
-                  <div>
-                    <span className="text-lg font-bold">
-                      {res.time}
-                    </span>{' '}
-                    →{' '}
-                    <span className="text-xs">
-                      {levelInfo?.nextTime ?? '–'}
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full mt-1">
-                    <div
-                      className="bg-blue-600 text-xs font-medium text-blue-100 text-center p-0.5 leading-none rounded-full"
-                      style={{ width: `${progress}%` }}
-                    >
-                      {progress}%
+                  {res.time_split && (
+                    <div className="text-sm mb-1">
+                      Time split: <span className="text-xs font-bold theme-text-muted">{res.time_split}</span>
                     </div>
-                  </div>
-                </td>
-                <td className="px-4 py-2">
-                  <UI_DateIcon styleType="cube" date={res.date} className='text-xs' paddingClass="px-1 py-1"/>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                  )}
+                  {hasInternationalPoints && (
+                    <div className="text-left text-sm">Points: {res.international_points ?? ''}</div>
+                  )}
+                  {showDate && (
+                    <div className="text-left text-sm">
+                      Date: <span className="font-semibold">{res.date}</span>
+                    </div>
+                  )}
+                  <UI_LevelProgress
+                    styleType="text-only"
+                    currentTime={res.time}
+                    nextTime={levelInfo?.nextTime}
+                    progressPercent={levelInfo?.progressToNextLevel}
+                    progressLabel='Progress:'
+                  />
+                </div>
+
+                {/* Column 4: Date icon */}
+                {/* <div className="flex flex-col items-center justify-start">
+                  <UI_DateIcon styleType="cube" date={res.date} className="text-xs" paddingClass="px-1 py-1" />
+                </div> */}
+
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

@@ -39,7 +39,11 @@ function ResultsTable() {
       (!style_name || res.event_style_name === style_name) &&
       (!style_len || res.event_style_len === style_len.toString()) &&
       (!date || res.date === date)&&
-      (age === 'all' || res.event_style_age?.toString() === age) &&
+      (age === 'all' || (
+        filters.age_to
+          ? Number(res.event_style_age) >= Number(age) && Number(res.event_style_age) <= Number(filters.age_to)
+          : res.event_style_age?.toString() === age
+      )) &&
       (club === 'all' || res.club === club)
     );
   }), [selectedSource, filters]);

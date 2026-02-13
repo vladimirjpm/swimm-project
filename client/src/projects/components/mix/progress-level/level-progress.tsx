@@ -10,6 +10,7 @@ interface UI_LevelProgressProps {
   styleType?: LevelProgressStyleType;
 
   /** TEXT ONLY fonts */
+  progressLabel?: string;            // Default: "Progress:"
   progressLabelClassName?: string;   // "Progress:"
   nextTimeClassName?: string;         // "to {nextTime}"
 }
@@ -21,6 +22,7 @@ const UI_LevelProgress: React.FC<UI_LevelProgressProps> = ({
   progressPercent,
   styleType = 'progress-bar',
 
+  progressLabel = 'Progress:',
   progressLabelClassName = 'text-sm',
   nextTimeClassName = 'text-xs text-gray-600',
 }) => {
@@ -72,7 +74,7 @@ const UI_LevelProgress: React.FC<UI_LevelProgressProps> = ({
     <div className={`col-span-2 ${className}`}>
       <div className="flex items-center space-x-2">
         <span className={progressLabelClassName}>
-          Progress:
+          {progressLabel}
         </span>
 
         {hasNextLevel && safeProgress !== null && (
