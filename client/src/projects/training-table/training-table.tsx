@@ -37,7 +37,11 @@ function TrainingTable() {
       (!style_name || res.event_style_name === style_name) &&
       (!style_len || res.event_style_len === style_len.toString()) &&
       (!date || res.date === date) &&
-      (age === 'all' || res.event_style_age?.toString() === age) &&
+      (age === 'all' || (
+        filters.age_to
+          ? Number(res.birth_year) >= Number(age) && Number(res.birth_year) <= Number(filters.age_to)
+          : res.birth_year?.toString() === age
+      )) &&
       (club === 'all' || res.club === club)
     );
   });

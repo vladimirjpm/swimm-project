@@ -196,6 +196,22 @@ const allDataSources: DataSource[] = [
       const data = (await resp.json()) as Result[];
       return data;
     },
+  },
+  {
+    name: '2026 Horef Isr Champ 8-11',
+    file: 'json/competition-2026-horef-isr-championship-age_8-11.json',
+    load: async () => {
+      const resp = await fetch(
+        makeUrl('json/competition-2026-horef-isr-championship-age_8-11.json'),
+      );
+      if (!resp.ok) {
+        throw new Error(
+          'Failed to load competition-2026-horef-isr-championship-age_8-11.json',
+        );
+      }
+      const data = (await resp.json()) as Result[];
+      return data;
+    },
   }
 ];
 

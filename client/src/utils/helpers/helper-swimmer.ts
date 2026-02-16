@@ -146,7 +146,7 @@ export default class HelperSwimmer {
     };
 
     filteredResults.forEach((res) => {
-      if (res.position !== null && res.position !== undefined) {
+      if (res.position !== null && res.position !== undefined && String(res.is_award) === 'true') {
         const pos = Number(res.position);
         const note = `${res.event_style_name} ${res.event_style_len}м`;
 

@@ -57,14 +57,30 @@ const FilterSection: React.FC = () => {
   }, [selectedSource, filters.activity_type]);
 
   const availableAges = useMemo(() => {
-    const ageSet = new Set<string>();
+    const birthYearSet = new Set<number>();
     filteredByTypeResults.forEach((item) => {
-      if (item.event_style_age) {
-        ageSet.add(item.event_style_age.toString());
+      if (item.birth_year) {
+        birthYearSet.add(Number(item.birth_year));
       }
     });
-    const sorted = Array.from(ageSet).sort((a, b) => Number(a) - Number(b));
-    return ['all', ...sorted];
+    const sorted = Array.from(birthYearSet).sort((a, b) => a - b);
+
+    // Collect unique competition years from dates to compute age range per birth year
+    const compYears = new Set<number>();
+    filteredByTypeResults.forEach((item) => {
+      if (item.date) {
+        // date format: DD/MM/YYYY or YYYY-MM-DD
+        const parts = item.date.includes('/') ? item.date.split('/') : item.date.split('-');
+        const year = item.date.includes('/') ? Number(parts[2]) : Number(parts[0]);
+        if (year > 1900) compYears.add(year);
+      }
+    });
+    const compYearsArr = Array.from(compYears).sort((a, b) => a - b);
+
+    return {
+      birthYears: ['all', ...sorted.map(String)],
+      compYears: compYearsArr,
+    };
   }, [filteredByTypeResults]);
 
   const updateFilter = (newFilter: Partial<typeof filters>) => {
@@ -224,36 +240,47 @@ const FilterSection: React.FC = () => {
         </div>
       </div>
 
-      {/* Age */}
+      {/* Age (by Birth Year) */}
       <div className="flex flex-col">
         <h3 className="font-semibold">
           Age
           {filters.age_to && filters.age !== 'all' && (
             <span className="ml-2 text-sm font-normal text-blue-600">
-              range: {filters.age}–{filters.age_to}
+              birth year: {filters.age}–{filters.age_to}
             </span>
           )}
         </h3>
         <div className="flex flex-wrap">
-          {availableAges.map((age) => {
+          {availableAges.birthYears.map((by) => {
             const isInRange =
               filters.age !== 'all' &&
               filters.age_to &&
-              age !== 'all' &&
-              Number(age) >= Number(filters.age) &&
-              Number(age) <= Number(filters.age_to);
-            const isActive = filters.age === age && !filters.age_to;
+              by !== 'all' &&
+              Number(by) >= Number(filters.age) &&
+              Number(by) <= Number(filters.age_to);
+            const isActive = filters.age === by && !filters.age_to;
+
+            // Compute age label from competition years
+            let ageLabel = '';
+            if (by !== 'all' && availableAges.compYears.length > 0) {
+              const ages = availableAges.compYears.map(cy => cy - Number(by));
+              const minAge = Math.min(...ages);
+              const maxAge = Math.max(...ages);
+              ageLabel = minAge === maxAge ? `${minAge}` : `${minAge}-${maxAge}`;
+            }
+
             return (
               <AgeButton
-                key={age}
-                age={age}
+                key={by}
+                age={by}
+                ageLabel={ageLabel}
                 isActive={!!isActive}
                 isInRange={!!isInRange}
-                onClick={() => updateFilter({ age, age_to: undefined })}
+                onClick={() => updateFilter({ age: by, age_to: undefined })}
                 onLongPress={() => {
-                  if (filters.age !== 'all' && age !== 'all' && filters.age !== age) {
-                    const from = Math.min(Number(filters.age), Number(age));
-                    const to = Math.max(Number(filters.age), Number(age));
+                  if (filters.age !== 'all' && by !== 'all' && filters.age !== by) {
+                    const from = Math.min(Number(filters.age), Number(by));
+                    const to = Math.max(Number(filters.age), Number(by));
                     updateFilter({ age: String(from), age_to: String(to) });
                   }
                 }}
@@ -371,12 +398,14 @@ export default FilterSection;
 /** Age button with long-press support */
 function AgeButton({
   age,
+  ageLabel,
   isActive,
   isInRange,
   onClick,
   onLongPress,
 }: {
   age: string;
+  ageLabel: string;
   isActive: boolean;
   isInRange: boolean;
   onClick: () => void;
@@ -427,7 +456,12 @@ function AgeButton({
       onTouchCancel={cancelPress}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {age === 'all' ? 'all' : age}
+      {age === 'all' ? 'all' : (
+        <span className='flex flex-col'>
+          {age}
+          {ageLabel && <span className="text-xs opacity-70 ml-0.5">({ageLabel})</span>}
+        </span>
+      )}
     </button>
   );
 }
