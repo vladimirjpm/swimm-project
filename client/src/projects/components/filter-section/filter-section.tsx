@@ -13,6 +13,7 @@ import FilterAge from './filter-age';
 import FilterSwimmingStyle from './filter-swimming-style';
 import FilterDistance from './filter-distance';
 import FilterClub from './filter-club';
+import FilterEventDate from './filter-event-date';
 import { getFilterData } from './filter-types';
 
 const FilterSection: React.FC = () => {
@@ -53,7 +54,8 @@ const FilterSection: React.FC = () => {
 
       <FilterActivity />
       <FilterResetButton />
-      <FilterDateDropdown />
+      <FilterEventDate />
+      {/* <FilterDateDropdown /> */}
       <FilterNameDropdown />
       <FilterPositionButtons />
       <FilterLevelButtons />

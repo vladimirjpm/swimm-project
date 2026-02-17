@@ -22,6 +22,7 @@ const FilterResetButton: React.FC = () => {
           age: 'all',
           position_filter: 'top',
           level_filter: 'all',
+          event_date: 'all',
         },
       }),
     );

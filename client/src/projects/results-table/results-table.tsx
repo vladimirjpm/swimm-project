@@ -26,9 +26,12 @@ function ResultsTable() {
 
   // Базовая фильтрация (все фильтры, КРОМЕ level_filter)
   const baseFilteredResults = useMemo(() => (selectedSource.results ?? []).filter((res) => {
-    const { pool_type, gender, style_name, style_len, date, age, club, activity_type, position_filter } = filters;
+    const { pool_type, gender, style_name, style_len, date, age, club, activity_type, position_filter, event_date } = filters;
     const resPoolType = Helper.resolvePoolType(res.pool_type);
     const filterPoolType = pool_type === 'all' ? null : Helper.resolvePoolType(pool_type);
+    
+    // Фильтр по дате события
+    if (event_date && event_date !== 'all' && res.date !== event_date) return false;
     
     // Фильтр по training/competition
     const hasTraining = !!res.training?.trainingId;
@@ -51,7 +54,6 @@ function ResultsTable() {
       (gender === 'all' || res.event_style_gender === gender) &&
       (!style_name || res.event_style_name === style_name) &&
       (!style_len || res.event_style_len === style_len.toString()) &&
-      (!date || res.date === date)&&
       (age === 'all' || (
         filters.age_to
           ? Number(res.birth_year) >= Number(age) && Number(res.birth_year) <= Number(filters.age_to)

@@ -22,4 +22,6 @@ export interface FilterSelected {
   position_filter?: 'all' | 'top' | 'podium';
   // Level filter: 'all' or a specific normative level name (e.g. 'I_youth', 'KMS')
   level_filter?: string;
+  // Event date filter: 'all' or a specific date string (e.g. '15/02/2026')
+  event_date?: string;
 }

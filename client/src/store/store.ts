@@ -57,6 +57,7 @@ const initialState: StateInterface = {
     activity_type: 'competition',
     position_filter: 'top',
     level_filter: 'all',
+    event_date: 'all',
   },
 };
 

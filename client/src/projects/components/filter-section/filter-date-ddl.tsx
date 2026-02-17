@@ -53,12 +53,14 @@ const FilterDateDropdown: React.FC = () => {
       hasAutoSelectedRef.current = false; // сбрасываем флаг при смене режима
     }
     
+    const currentEventDate = filters.event_date || 'all';
+
     // Автовыбор последней даты при смене режима, если ещё не выбрали
     if (!hasAutoSelectedRef.current && dates.length > 0) {
-      // Проверяем, есть ли текущая дата в списке доступных
-      const currentDateValid = filters.date && dates.includes(filters.date);
+      // Проверяем, есть ли текущая выбранная дата в списке доступных
+      const currentDateValid = currentEventDate !== 'all' && dates.includes(currentEventDate);
       
-      if (!currentDateValid) {
+      if (!currentDateValid && currentEventDate !== 'all') {
         hasAutoSelectedRef.current = true;
         const latestDate = dates[0]; // dates уже отсортированы по убыванию
         const [day, month, year] = latestDate.split("/");
@@ -68,13 +70,14 @@ const FilterDateDropdown: React.FC = () => {
             ...filters, 
             date_str: formattedDate,
             date: latestDate,
+            event_date: latestDate,
           } 
         }));
       } else {
-        hasAutoSelectedRef.current = true; // текущая дата валидна
+        hasAutoSelectedRef.current = true; // текущая дата валидна или стоит 'all'
       }
     }
-  }, [filters.activity_type, dates, filters.date, dispatch]);
+  }, [filters.activity_type, dates, filters.event_date, dispatch]);
 
   // Если нет дат — не рендерим dropdown
   if (dates.length === 0) return null;
@@ -87,11 +90,12 @@ const FilterDateDropdown: React.FC = () => {
         onChange={(e) => {
           const newDateStr = e.target.value;
           
-          // Если выбрана пустая опция "-- Select Date --"
-          if (!newDateStr) {
+          // Если выбрана опция "All"
+          if (newDateStr === 'all') {
             updateFilter({
               date_str: '',
               date: '',
+              event_date: 'all',
             });
             return;
           }
@@ -102,11 +106,12 @@ const FilterDateDropdown: React.FC = () => {
           updateFilter({
             date_str: formattedDate,
             date: newDateStr,
+            event_date: newDateStr,
           });
         }}
-        value={filters.date}
+        value={filters.event_date || 'all'}
       >
-        <option value="">-- Select Date --</option>
+        <option value="all">All</option>
         {dates.map(date => (
           <option key={date} value={date}>{date}</option>
         ))}
