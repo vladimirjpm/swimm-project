@@ -12,6 +12,8 @@ import ResultsTableDesktop from './components/results-table-desktop';
 import ResultsTable2xl from './components/results-table-2xl';
 import ResultsHeader from './components/results-header';
 import ResultsFilteredInfo from './components/results-filtered-info';
+import { TOP_N_POSITIONS } from '../../utils/constants/filter-constants';
+import HelperSwimmer from '../../utils/helpers/helper-swimmer';
 
 function ResultsTable() {
   const dispatch = useAppDispatch();
@@ -22,8 +24,9 @@ function ResultsTable() {
     return <div className="text-gray-500 italic">No data source selected.</div>;
   }
 
-  const filteredResults = useMemo(() => (selectedSource.results ?? []).filter((res) => {
-    const { pool_type, gender, style_name, style_len, date, age, club, activity_type } = filters;
+  // Базовая фильтрация (все фильтры, КРОМЕ level_filter)
+  const baseFilteredResults = useMemo(() => (selectedSource.results ?? []).filter((res) => {
+    const { pool_type, gender, style_name, style_len, date, age, club, activity_type, position_filter } = filters;
     const resPoolType = Helper.resolvePoolType(res.pool_type);
     const filterPoolType = pool_type === 'all' ? null : Helper.resolvePoolType(pool_type);
     
@@ -32,6 +35,16 @@ function ResultsTable() {
     const activityType = activity_type || 'training';
     if (activityType === 'training' && !hasTraining) return false;
     if (activityType === 'competition' && hasTraining) return false;
+
+    // Фильтр по позиции (месту)
+    const posFilter = position_filter || 'top';
+    if (posFilter === 'podium') {
+      const pos = Number(res.position);
+      if (!pos || pos > 3) return false;
+    } else if (posFilter === 'top') {
+      const pos = Number(res.position);
+      if (pos && pos > TOP_N_POSITIONS) return false;
+    }
     
     return (
       (!filterPoolType || resPoolType === filterPoolType) &&
@@ -47,6 +60,66 @@ function ResultsTable() {
       (club === 'all' || res.club === club)
     );
   }), [selectedSource, filters]);
+
+  // Вычисляем наивысший уровень из базовых результатов и пушим в store
+  useEffect(() => {
+    let highestPriority = 0;
+    let bestInfo: import('../../store/store').BestLevelInfo | null = null;
+
+    for (const res of baseFilteredResults) {
+      const isMaster = String(res.is_masters) === 'true' || String(res.is_masters) === '1';
+      const resolvedGender = Helper.resolveGender(res.event_style_gender);
+      const levelInfo = Helper.getNormativeLevelInfo({
+        gender: resolvedGender === 'none' ? 'male' : resolvedGender,
+        poolType: Helper.resolvePoolType(res.pool_type),
+        styleName: res.event_style_name,
+        distance: `${res.event_style_len}m`,
+        time: Helper.parseTimeToSeconds(res.time),
+        isMaster,
+        event_style_age: res.event_style_age,
+      });
+      const lvl = levelInfo?.currentLevel;
+      if (!lvl || lvl === '—' || lvl === '-') continue;
+      const priority = HelperSwimmer.levelPriority[lvl] ?? 0;
+      if (priority > highestPriority) {
+        highestPriority = priority;
+        bestInfo = {
+          levelName: lvl,
+          styleName: res.event_style_name,
+          styleLen: res.event_style_len,
+          poolType: res.pool_type,
+          isMasters: isMaster,
+        };
+      }
+    }
+
+    dispatch(rootActions.updateState({ bestLevelInfo: bestInfo }));
+  }, [baseFilteredResults]);
+
+  // Применяем level_filter поверх базовых результатов
+  const filteredResults = useMemo(() => {
+    const level_filter = filters.level_filter;
+    if (!level_filter || level_filter === 'all') return baseFilteredResults;
+
+    return baseFilteredResults.filter((res) => {
+      const isMaster = String(res.is_masters) === 'true' || String(res.is_masters) === '1';
+      const resolvedGender = Helper.resolveGender(res.event_style_gender);
+      const levelInfo = Helper.getNormativeLevelInfo({
+        gender: resolvedGender === 'none' ? 'male' : resolvedGender,
+        poolType: Helper.resolvePoolType(res.pool_type),
+        styleName: res.event_style_name,
+        distance: `${res.event_style_len}m`,
+        time: Helper.parseTimeToSeconds(res.time),
+        isMaster,
+        event_style_age: res.event_style_age,
+      });
+      const lvl = levelInfo?.currentLevel;
+      if (!lvl || lvl === '—' || lvl === '-') return false;
+      const resPriority = HelperSwimmer.levelPriority[lvl] ?? 0;
+      const filterPriority = HelperSwimmer.levelPriority[level_filter] ?? 0;
+      return resPriority >= filterPriority;
+    });
+  }, [baseFilteredResults, filters.level_filter]);
 
   //console.log('filteredResults: ',filteredResults)
   const sortedResults = useMemo(

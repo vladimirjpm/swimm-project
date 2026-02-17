@@ -18,4 +18,8 @@ export interface FilterSelected {
   rating_mode?: 'no' |  'masters';
   // Activity type: training or competition
   activity_type?: ActivityType;
+  // Position filter: 'all' | 'top' | 'podium'
+  position_filter?: 'all' | 'top' | 'podium';
+  // Level filter: 'all' or a specific normative level name (e.g. 'I_youth', 'KMS')
+  level_filter?: string;
 }

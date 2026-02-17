@@ -13,6 +13,7 @@ interface UI_NormativeLevelIconProps {
   poolType?: string;//swimm pool len
   normativeAgeGroup?: string | null;//masters age group key e.g. "25-29"
   isMasters?: boolean | null;//is masters normative
+  disableClick?: boolean;//disable onClick popup
 }
 
 const getMedalClassAndLabel = (levelName: string): { label: string; className: string } => {
@@ -50,9 +51,11 @@ const UI_NormativeLevelIcon: React.FC<UI_NormativeLevelIconProps> = ({
   poolType,
   normativeAgeGroup,
   isMasters,
+  disableClick = false,
 }) => {
   const dispatch = useAppDispatch();
   const handleNormativeClick = () => {
+    if (disableClick) return;
         dispatch(
       rootActions.updateState({
           isPopup: true,
@@ -77,7 +80,7 @@ const UI_NormativeLevelIcon: React.FC<UI_NormativeLevelIconProps> = ({
 
   return (
     <div
-      className={`dv-normative-level-icon cursor-pointer ${className}`}
+      className={`dv-normative-level-icon ${disableClick ? '' : 'cursor-pointer'} ${className}`}
       onClick={handleNormativeClick}
     >
       <div className={`${medalClass} ${styleSize} level-${levelName.toLowerCase()}`}>{label}</div>

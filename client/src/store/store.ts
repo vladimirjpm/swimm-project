@@ -10,6 +10,14 @@ export interface IIndexable {
 }
 
 // Интерфейс для состояния приложения
+export interface BestLevelInfo {
+  levelName: string;
+  styleName: string;
+  styleLen: string;
+  poolType: string;
+  isMasters: boolean;
+}
+
 export interface StateInterface extends IIndexable {
   isDebug:boolean;
   debigConfig:DebugConfig
@@ -20,6 +28,7 @@ export interface StateInterface extends IIndexable {
   popUpType: Enums.PopupType;
   popUpObj: any;
   filterSelected:FilterSelected;
+  bestLevelInfo?: BestLevelInfo | null;
 }
 
 // Начальное состояние (может быть заполнено динамически)
@@ -32,6 +41,7 @@ const initialState: StateInterface = {
   isPopup: false,
   popUpType: Enums.PopupType.none,
   popUpObj: null,
+  bestLevelInfo: null,
   filterSelected:{
     selected_name: "all", // спортсмен
     date: (new Date()).toString(), // Текущая дата
@@ -45,6 +55,8 @@ const initialState: StateInterface = {
     training_table:{ mode: 'showTable' },
     rating_mode: 'no',
     activity_type: 'competition',
+    position_filter: 'top',
+    level_filter: 'all',
   },
 };
 

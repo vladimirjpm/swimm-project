@@ -12,6 +12,8 @@ import Helper from '../../../utils/helpers/data-helper';
 import UI_MedalIcon from '../mix/medal-icon/medal-icon';
 import UI_ClubDetails from '../mix/club-details/club-details';
 import FilterActivity from './filter-date-training-competition';
+import FilterPositionButtons from './filter-position-buttons';
+import FilterLevelButtons from './filter-level-buttons';
 
 // тот же тип, что и в FilterSection
 type FilterData = {
@@ -190,6 +192,8 @@ const FilterSection: React.FC = () => {
             style_name: '',
             style_len: 0,
             age: 'all',
+            position_filter: 'top',
+            level_filter: 'all',
           })
         }
       >
@@ -197,6 +201,8 @@ const FilterSection: React.FC = () => {
       </button>
       <FilterDateDropdown />
       <FilterNameDropdown />
+      <FilterPositionButtons />
+      <FilterLevelButtons />
 
       {/* Pool Type */}
       <div className="flex flex-col">

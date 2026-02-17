@@ -132,11 +132,29 @@ export default class HelperSwimmer {
       const fullName = `${res.first_name}${res.last_name ?? ''}`.toLowerCase();
       const fullNameWithSpace = `${res.first_name} ${res.last_name ?? ''}`.toLowerCase();
 
-      return (
+      // Проверка основного имени
+      const matchesMain =
         res.first_name.toLowerCase() === nameLower ||
         fullName === nameLower ||
-        fullNameWithSpace === nameLower
-      );
+        fullNameWithSpace === nameLower;
+
+      if (matchesMain) return true;
+
+      // Для эстафеты проверяем участников в relay_swimmers
+      const isRelay = res.is_relay === true || String(res.is_relay) === 'true';
+      if (isRelay && res.relay_swimmers && res.relay_swimmers.length > 0) {
+        return res.relay_swimmers.some((swimmer) => {
+          const relayFullName = `${swimmer.first_name}${swimmer.last_name ?? ''}`.toLowerCase();
+          const relayFullNameWithSpace = `${swimmer.first_name} ${swimmer.last_name ?? ''}`.toLowerCase();
+          return (
+            swimmer.first_name?.toLowerCase() === nameLower ||
+            relayFullName === nameLower ||
+            relayFullNameWithSpace === nameLower
+          );
+        });
+      }
+
+      return false;
     });
 
     const grouped = {
