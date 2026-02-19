@@ -29,6 +29,21 @@ const UI_DateIcon: React.FC<UI_DateIconProps> = ({
   const year = usedDate.getFullYear().toString();
   const day = usedDate.getDate();
 
+  const currentYear = new Date().getFullYear();
+  const topBgClass = usedDate.getFullYear() === currentYear
+    ? 'bg-red-500'
+    : usedDate.getFullYear() === currentYear - 1
+      ? 'bg-orange-400'
+      : 'bg-gray-200';
+  const topTextClass = (usedDate.getFullYear() === currentYear || usedDate.getFullYear() === currentYear - 1)
+    ? 'text-white'
+    : 'text-gray-900';
+  const accentTextClass = usedDate.getFullYear() === currentYear
+    ? 'text-red-500'
+    : usedDate.getFullYear() === currentYear - 1
+      ? 'text-orange-400'
+      : 'text-gray-700';
+
   if (styleType === 'row-style-1') {
     return (
       <div className={`dv-date-icon-row flex items-center justify-center space-x-1 text-gray-800 text-base ${className}`}>
@@ -59,13 +74,13 @@ if (styleType === 'row-style-2') {
 
   return (
     <div className={`dv-date-icon w-fit h-auto flex flex-col rounded-lg shadow overflow-hidden text-gray-900 ${className}`}>
-      <div className={`bg-red-500 text-white text-center ${paddingClass} font-bold`}>
+      <div className={`${topBgClass} ${topTextClass} text-center ${paddingClass} font-bold`}>
         {year}
       </div>
       <div className={`bg-gray-100 ${paddingClass} flex flex-col items-center`}>
         <div className="flex flex-row items-center">
-          <div className="text-red-500">{day}</div>
-          <div className="font-bold uppercase pl-2 text-red-500">{month}</div>
+          <div className={accentTextClass}>{day}</div>
+          <div className={`font-bold uppercase pl-2 ${accentTextClass}`}>{month}</div>
         </div>
       </div>
     </div>

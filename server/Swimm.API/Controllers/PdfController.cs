@@ -24,7 +24,8 @@ namespace Swimm.API.Controllers
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UploadAsync(
             [FromForm] IFormFile? englishFile,
-            [FromForm] IFormFile hebrewFile)
+            [FromForm] IFormFile hebrewFile,
+            [FromForm] bool isAward = false)
         {
             if (hebrewFile == null)
             {
@@ -54,12 +55,12 @@ namespace Swimm.API.Controllers
                 if (englishFile != null)
                 {
                     await using var enStream = englishFile.OpenReadStream();
-                    parsed = Parser.Parse(enStream, englishFile.FileName, heStream, hebrewFile.FileName).ToList();
+                    parsed = Parser.Parse(enStream, englishFile.FileName, heStream, hebrewFile.FileName, isAward).ToList();
                 }
                 else
                 {
                     heStream.Position = 0;
-                    parsed = Parser.Parse(null, null, heStream, hebrewFile.FileName).ToList();
+                    parsed = Parser.Parse(null, null, heStream, hebrewFile.FileName, isAward).ToList();
                 }
 
                 var debugLog = CompetitionParser.GetDebugLog();

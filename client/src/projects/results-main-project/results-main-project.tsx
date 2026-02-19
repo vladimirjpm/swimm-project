@@ -102,16 +102,16 @@ function MobileFiltersDrawer({
 
   const node = (
     <>
-      {/* мобильная плавающая кнопка Filters (центрированная) */}
+      {/* мобильная плавающая кнопка Filters / Apply (центрированная, всегда на месте) */}
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        className="lg:hidden fixed bottom-4 left-1/2 z-[100] transform -translate-x-1/2 bg-blue-600 text-white px-5 py-2 rounded-full shadow-lg flex items-center gap-3"
+        className="lg:hidden fixed bottom-4 left-1/2 z-[110] transform -translate-x-1/2 bg-blue-600 text-white px-5 py-2 rounded-full shadow-lg flex items-center gap-3"
         aria-expanded={open}
         aria-controls="mobile-filters-sheet"
-        title="Filters"
+        title={open ? 'Apply' : 'Filters'}
       >
-        <span className="font-medium">Filters</span>
+        <span className="font-medium">{open ? 'Apply' : 'Filters'}</span>
         <span className="text-sm opacity-80">{open ? '▾' : '▴'}</span>
       </button>
 
@@ -119,27 +119,20 @@ function MobileFiltersDrawer({
       
       <div
         id="mobile-filters-sheet"
-        className={`fixed inset-0 z-[ ninety ] bg-black/20 transition-opacity ${
+        className={`fixed inset-0 z-[90] bg-black/20 transition-opacity ${
           open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         onClick={() => setOpen(false)}
       />
 
-      {/* сама панель */}
+      {/* сама панель — от самого верха до низа */}
       <div
-        className={`fixed bottom-0 left-0 right-0 z-[100] bg-white shadow-2xl rounded-t-2xl transition-transform duration-300 ease-out
-        ${open ? 'translate-y-0' : 'translate-y-[calc(100%_-_2px)]'}`}
+        className={`fixed inset-0 z-[100] bg-white shadow-2xl transition-transform duration-300 ease-out
+        ${open ? 'translate-y-0' : 'translate-y-full'}`}
         aria-hidden={!open}
       >
-        <div
-          className="flex items-center justify-between px-4 py-2 border-b cursor-pointer"
-          onClick={() => setOpen(false)}
-        >
-          Apply & Close<div className="h-2.5 w-12 rounded-full bg-gray-300 mx-auto" />Apply & Close
-        </div>
-        <div className="max-h-[85vh] overflow-y-auto p-3" onClick={(e) => e.stopPropagation()}>
+        <div className="h-full overflow-y-auto p-3 pb-24" onClick={(e) => e.stopPropagation()}>
           {children}
-          <div className="h-24" />
         </div>
       </div>
     </>

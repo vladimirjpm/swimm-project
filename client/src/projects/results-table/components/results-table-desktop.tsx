@@ -29,9 +29,9 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
   return (
     <>
       <div className="grid grid-cols-12 gap-2 px-4 pt-3 items-center">
-        <div className="col-span-1 relative self-start">
+        <div className="col-span-1 flex flex-col items-center self-start">
           {res.position ? <UI_MedalIcon place={res.position.toString()} styleType={String(res.is_award) === 'true' ? 'icon-place' : 'icon-noplace'} /> : `${index + 1}`}
-          {showAge && <div className="absolute right-0 bottom-0 font-bold">{res.event_style_age}</div>}
+          {showAge && <div className="font-bold text-sm mt-1"><span className='font-normal text-xs'>age:</span> {res.event_style_age}</div>}
         </div>
 
         <div className={showDate ? 'col-span-3' : 'col-span-4'}>

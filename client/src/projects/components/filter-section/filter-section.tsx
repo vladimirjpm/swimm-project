@@ -62,8 +62,10 @@ const FilterSection: React.FC = () => {
       <FilterPoolType />
       <FilterGender />
       <FilterAge />
-      <FilterSwimmingStyle />
-      <FilterDistance />
+      <div className="grid grid-cols-2 gap-2">
+        <FilterSwimmingStyle />
+        <FilterDistance />
+      </div>
       <FilterClub />
     </div>
   );

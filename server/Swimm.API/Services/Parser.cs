@@ -12,16 +12,17 @@ public static class Parser
 {
     public static IEnumerable<Result> Parse(
         Stream? englishPdfStream, string? englishFileName,
-        Stream hebrewPdfStream, string hebrewFileName)
+        Stream hebrewPdfStream, string hebrewFileName,
+        bool isAward = false)
     {
         // Если нет английской версии
         if (englishPdfStream == null || string.IsNullOrWhiteSpace(englishFileName))
         {
-            return ParseHebrewOnly(hebrewPdfStream, hebrewFileName);
+            return ParseHebrewOnly(hebrewPdfStream, hebrewFileName, isAward);
         }
 
         // Синхронизация EN + HE
-        return ParseBilingual(englishPdfStream, englishFileName, hebrewPdfStream, hebrewFileName);
+        return ParseBilingual(englishPdfStream, englishFileName, hebrewPdfStream, hebrewFileName, isAward);
     }
 
     /// <summary>
@@ -57,7 +58,7 @@ public static class Parser
         return 0;
     }
 
-    private static IEnumerable<Result> ParseHebrewOnly(Stream hebrewPdfStream, string hebrewFileName)
+    private static IEnumerable<Result> ParseHebrewOnly(Stream hebrewPdfStream, string hebrewFileName, bool isAward)
     {
         var heParts = Path.GetFileNameWithoutExtension(hebrewFileName)
                           .Split('_', StringSplitOptions.RemoveEmptyEntries);
@@ -76,7 +77,7 @@ public static class Parser
                 // Relay: создаём одну запись на команду
                 if (rHe.IsRelay == true && rHe.RelaySwimmers?.Count > 0)
                 {
-                    yield return CreateRelayResult(rHe, comp, country, eventYear, isMastersFile,
+                    yield return CreateRelayResult(rHe, comp, country, eventYear, isMastersFile, isAward,
                         lastNameEn: string.Empty, firstNameEn: string.Empty, clubEn: string.Empty);
                     continue;
                 }
@@ -89,6 +90,7 @@ public static class Parser
                     Country: country,
                     Competition: comp.Competition,
                     IsMasters: (isMastersFile && age >= 25) ? "true" : "false",
+                    IsAward: isAward,
                     AgeGroup: ageGroup,
                     Date: comp.Date,
                     Event: comp.Event,
@@ -123,7 +125,8 @@ public static class Parser
 
     private static IEnumerable<Result> ParseBilingual(
         Stream englishPdfStream, string englishFileName,
-        Stream hebrewPdfStream, string hebrewFileName)
+        Stream hebrewPdfStream, string hebrewFileName,
+        bool isAward)
     {
         var enParts = Path.GetFileNameWithoutExtension(englishFileName)
                           .Split('_', StringSplitOptions.RemoveEmptyEntries);
@@ -168,7 +171,7 @@ public static class Parser
 
                 if (isRelay && relaySwimmers?.Count > 0)
                 {
-                    yield return CreateRelayResultBilingual(rEn, rHe, compEn, compHe, countryEn, eventYear, isMastersFile, relaySwimmers);
+                    yield return CreateRelayResultBilingual(rEn, rHe, compEn, compHe, countryEn, eventYear, isMastersFile, isAward, relaySwimmers);
                     continue;
                 }
 
@@ -180,6 +183,7 @@ public static class Parser
                     Country: countryEn,
                     Competition: compHe.Competition,
                     IsMasters: (isMastersFile && age >= 25) ? "true" : "false",
+                    IsAward: isAward,
                     AgeGroup: ageGroup,
                     Date: compEn.Date,
                     Event: compEn.Event,
@@ -214,7 +218,7 @@ public static class Parser
 
     private static Result CreateRelayResult(
         PDF_Result rHe, PDF_CompetitionResult comp, string country,
-        int eventYear, bool isMastersFile,
+        int eventYear, bool isMastersFile, bool isAward,
         string lastNameEn, string firstNameEn, string clubEn)
     {
         var firstSwimmer = rHe.RelaySwimmers!.First();
@@ -228,6 +232,7 @@ public static class Parser
             Country: country,
             Competition: comp.Competition,
             IsMasters: (isMastersFile && swimmerAge >= 25) ? "true" : "false",
+            IsAward: isAward,
             AgeGroup: swimmerAgeGroup,
             Date: comp.Date,
             Event: comp.Event,
@@ -262,6 +267,7 @@ public static class Parser
         PDF_Result rEn, PDF_Result rHe,
         PDF_CompetitionResult compEn, PDF_CompetitionResult compHe,
         string country, int eventYear, bool isMastersFile,
+        bool isAward,
         List<RelaySwimmer> relaySwimmers)
     {
         var firstSwimmer = relaySwimmers.First();
@@ -275,6 +281,7 @@ public static class Parser
             Country: country,
             Competition: compHe.Competition,
             IsMasters: (isMastersFile && swimmerAge >= 25) ? "true" : "false",
+            IsAward: isAward,
             AgeGroup: swimmerAgeGroup,
             Date: compEn.Date,
             Event: compEn.Event,

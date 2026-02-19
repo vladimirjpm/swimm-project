@@ -38,6 +38,7 @@ public record Result(
     [property: JsonPropertyName("country")] string Country,
     [property: JsonPropertyName("competition")] string Competition,
     [property: JsonPropertyName("is_masters")] string IsMasters,
+    [property: JsonPropertyName("is_award")] bool IsAward,
     [property: JsonPropertyName("age_group")] string AgeGroup,
     [property: JsonPropertyName("date")] string Date,
     [property: JsonPropertyName("event")] string Event,
