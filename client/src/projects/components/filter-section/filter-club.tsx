@@ -54,7 +54,7 @@ const FilterClub: React.FC = () => {
     <div className="flex flex-col">
       <h3 className="font-semibold">Club</h3>
       <div className="flex flex-col">
-        <div>
+        <div className='flex flex-between'>
           <button
             className={`px-3 py-1 m-1 border rounded transition-colors ${
               filters.club === 'all' ? 'theme-btn-active' : 'theme-btn'
@@ -63,6 +63,7 @@ const FilterClub: React.FC = () => {
           >
             all
           </button>
+          <div className='pl-4 text-sm'>⭐- rating, 🏊‍♂️ swimmers, <br /> ✅ events count</div>
         </div>
         {availableClubs.map(
           ({
