@@ -49,6 +49,14 @@ public static class HebrewTextHelper
     public static string NormalizeHebrewLine(string input)
     {
         if (string.IsNullOrWhiteSpace(input)) return input;
+        
+        // Normalize apostrophe-like characters to Hebrew geresh (U+05F3)
+        // PDF may contain ASCII apostrophe ('), right single quote ('), left single quote ('), or backtick (`)
+        input = input.Replace('\'', '\u05F3')   // ASCII apostrophe U+0027
+                     .Replace('\u2019', '\u05F3') // right single quotation mark
+                     .Replace('\u2018', '\u05F3') // left single quotation mark
+                     .Replace('`', '\u05F3');      // backtick
+
         var tokens = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         Array.Reverse(tokens);
         for (int i = 0; i < tokens.Length; i++)

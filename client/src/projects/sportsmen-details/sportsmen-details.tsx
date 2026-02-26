@@ -11,6 +11,7 @@ import UI_SwimmerIcon from '../components/mix/swimmer-icon/swimmer-icon';
 import UI_PoolIcon from '../components/mix/pool-icon/pool-icon';
 import UI_LevelProgress from '../components/mix/progress-level/level-progress';
 import FlagEmoji from '../components/mix/flag-icon/flag-icon';
+import { recalculatePositions } from '../../utils/helpers/recalculate-positions';
 
 function SportsmenDetails() {
  const filters = useAppSelector((state) => state.filterSelected);
@@ -20,9 +21,22 @@ function SportsmenDetails() {
     return <div className="text-gray-500 italic">No data source selected.</div>;
   }
 
-  const sortedBestResults = Helper.getBestResultsByStyle(selectedSource.results, filters.selected_name);  
-  const pointsSum = Helper.getInternationalPointsSumByName(selectedSource.results, filters.selected_name);
-  const medalCounts =  Helper.getMedalCountsByName(selectedSource.results, filters.selected_name);
+  // Применяем recalculation если включён флаг
+  const isRecalculated = !!filters.is_recalculated;
+  const effectiveResults = useMemo(() => {
+    const raw = selectedSource.results ?? [];
+    if (!isRecalculated) return raw;
+    const recalced = recalculatePositions(raw);
+    return recalced.map(r => ({
+      ...r,
+      position_original: r.position,
+      position: r.position_recalc,
+    }));
+  }, [selectedSource, isRecalculated]);
+
+  const sortedBestResults = Helper.getBestResultsByStyle(effectiveResults, filters.selected_name);  
+  const pointsSum = Helper.getInternationalPointsSumByName(effectiveResults, filters.selected_name);
+  const medalCounts = Helper.getMedalCountsByName(effectiveResults, filters.selected_name);
   const firstResult = sortedBestResults[0];
   //console.log('firstResult sportsmen:', firstResult);
 

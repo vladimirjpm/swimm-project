@@ -1,52 +1,40 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Swimm.API.Services.Models;
 using Swimm.API.Services.Helpers;
-using Swimm.API.Services.Parsers;
 
-namespace Swimm.API.Services;
+namespace Swimm.API.Services.Parsers.IsrOrg;
 
-public static class Parser
+public class IsrOrgParser : IFormatParser
 {
-    public static IEnumerable<Result> Parse(
-        Stream? englishPdfStream, string? englishFileName,
-        Stream hebrewPdfStream, string hebrewFileName,
-        bool isAward = false)
+    public string FormatName => "IsrOrg";
+
+    public IEnumerable<Result> Parse(ParseRequest request)
     {
-        // Если нет английской версии
-        if (englishPdfStream == null || string.IsNullOrWhiteSpace(englishFileName))
+        if (request.SecondaryStream == null || string.IsNullOrWhiteSpace(request.SecondaryFileName))
         {
-            return ParseHebrewOnly(hebrewPdfStream, hebrewFileName, isAward);
+            return ParseHebrewOnly(request.PrimaryStream, request.PrimaryFileName, request.IsAward);
         }
 
-        // Синхронизация EN + HE
-        return ParseBilingual(englishPdfStream, englishFileName, hebrewPdfStream, hebrewFileName, isAward);
+        return ParseBilingual(
+            request.SecondaryStream, request.SecondaryFileName!,
+            request.PrimaryStream, request.PrimaryFileName,
+            request.IsAward);
     }
 
-    /// <summary>
-    /// Определяет возраст участника.
-    /// 
-    /// Логика 1 (приоритетная): Если есть год рождения (שנת לידה) - вычисляем возраст как (год события - год рождения).
-    /// Логика 2 (fallback): Если года рождения нет - берём возраст из заголовка события (например, "16" из "בנים 16").
-    /// </summary>
-    /// <param name="eventYear">Год проведения события</param>
-    /// <param name="birthYear">Год рождения участника (0 если неизвестен)</param>
-    /// <param name="eventStyleAge">Возраст из заголовка события (например, "16" или "12-13")</param>
-    /// <returns>Возраст участника</returns>
+    public string GetDebugLog() => IsrOrgCompetitionParser.GetDebugLog();
+
     private static int DetermineAge(int eventYear, int birthYear, string? eventStyleAge)
     {
-        // Логика 1: Если есть год рождения - вычисляем точный возраст
         if (birthYear > 0 && eventYear > 0)
         {
             return eventYear - birthYear;
         }
 
-        // Логика 2: Если года рождения нет - пытаемся извлечь из заголовка события
         if (!string.IsNullOrWhiteSpace(eventStyleAge))
         {
-            // Если формат "12-13", берём первое число
             var agePart = eventStyleAge.Split('-')[0];
             if (int.TryParse(agePart, out int parsedAge) && parsedAge > 0)
             {
@@ -54,7 +42,6 @@ public static class Parser
             }
         }
 
-        // Не удалось определить возраст
         return 0;
     }
 
@@ -68,13 +55,12 @@ public static class Parser
         var isMastersFile = Path.GetFileNameWithoutExtension(hebrewFileName)
                             .Contains("masters", StringComparison.OrdinalIgnoreCase);
 
-        foreach (var comp in CompetitionParser.ParseCompetitions(hebrewPdfStream, langHe))
+        foreach (var comp in IsrOrgCompetitionParser.ParseCompetitions(hebrewPdfStream, langHe))
         {
             foreach (var rHe in comp.Results)
             {
                 int eventYear = AgeGroupHelper.ExtractYearFromDateString(comp.Date);
 
-                // Relay: создаём одну запись на команду
                 if (rHe.IsRelay == true && rHe.RelaySwimmers?.Count > 0)
                 {
                     yield return CreateRelayResult(rHe, comp, country, eventYear, isMastersFile, isAward,
@@ -82,7 +68,6 @@ public static class Parser
                     continue;
                 }
 
-                // Определяем возраст по году рождения (приоритет) или по заголовку события (fallback)
                 var age = DetermineAge(eventYear, rHe.BirthYear, comp.EventStyleAge);
                 var ageGroup = AgeGroupHelper.GetAgeGroup(age);
 
@@ -140,8 +125,8 @@ public static class Parser
         var isMastersFile = Path.GetFileNameWithoutExtension(hebrewFileName)
                             .Contains("masters", StringComparison.OrdinalIgnoreCase);
 
-        var compsEn = CompetitionParser.ParseCompetitions(englishPdfStream, langEn).ToList();
-        var compsHe = CompetitionParser.ParseCompetitions(hebrewPdfStream, langHeSync).ToList();
+        var compsEn = IsrOrgCompetitionParser.ParseCompetitions(englishPdfStream, langEn).ToList();
+        var compsHe = IsrOrgCompetitionParser.ParseCompetitions(hebrewPdfStream, langHeSync).ToList();
 
         for (int i = 0; i < compsEn.Count; i++)
         {
@@ -165,7 +150,6 @@ public static class Parser
 
                 int eventYear = AgeGroupHelper.ExtractYearFromDateString(compEn.Date);
 
-                // Relay
                 bool isRelay = rHe.IsRelay == true || rEn.IsRelay == true;
                 var relaySwimmers = rHe.RelaySwimmers ?? rEn.RelaySwimmers;
 
@@ -175,7 +159,6 @@ public static class Parser
                     continue;
                 }
 
-                // Определяем возраст по году рождения (приоритет) или по заголовку события (fallback)
                 var age = DetermineAge(eventYear, rEn.BirthYear, compEn.EventStyleAge);
                 var ageGroup = AgeGroupHelper.GetAgeGroup(age);
 
@@ -217,13 +200,12 @@ public static class Parser
     }
 
     private static Result CreateRelayResult(
-        PDF_Result rHe, PDF_CompetitionResult comp, string country,
+        IsrOrgResult rHe, IsrOrgCompetitionResult comp, string country,
         int eventYear, bool isMastersFile, bool isAward,
         string lastNameEn, string firstNameEn, string clubEn)
     {
         var firstSwimmer = rHe.RelaySwimmers!.First();
-        
-        // Для эстафеты: возраст по году рождения первого участника или из заголовка
+
         var swimmerAge = DetermineAge(eventYear, firstSwimmer.BirthYear ?? 0, comp.EventStyleAge);
         var swimmerAgeGroup = AgeGroupHelper.GetAgeGroup(swimmerAge);
         var swimmerNames = string.Join(", ", rHe.RelaySwimmers!.Select(s => $"{s.FirstName} {s.LastName}".Trim()));
@@ -264,15 +246,14 @@ public static class Parser
     }
 
     private static Result CreateRelayResultBilingual(
-        PDF_Result rEn, PDF_Result rHe,
-        PDF_CompetitionResult compEn, PDF_CompetitionResult compHe,
+        IsrOrgResult rEn, IsrOrgResult rHe,
+        IsrOrgCompetitionResult compEn, IsrOrgCompetitionResult compHe,
         string country, int eventYear, bool isMastersFile,
         bool isAward,
         List<RelaySwimmer> relaySwimmers)
     {
         var firstSwimmer = relaySwimmers.First();
-        
-        // Для эстафеты: возраст по году рождения первого участника или из заголовка
+
         var swimmerAge = DetermineAge(eventYear, firstSwimmer.BirthYear ?? 0, compEn.EventStyleAge);
         var swimmerAgeGroup = AgeGroupHelper.GetAgeGroup(swimmerAge);
         var swimmerNames = string.Join(", ", relaySwimmers.Select(s => $"{s.FirstName} {s.LastName}".Trim()));

@@ -19,6 +19,7 @@ type DataSource = {
 type SourceConfig = {
   name: string;
   file: string;
+  showCombineAllResults?: boolean;
 };
 
 type Option = { value: string; label: string };
@@ -212,7 +213,23 @@ const allDataSources: DataSource[] = [
       const data = (await resp.json()) as Result[];
       return data;
     },
-  }
+  },
+  {
+    name: '2026 Horef Isr Champ 11-14',
+    file: 'json/competition-2026-horef-isr-championship-age_11-14.json',
+    load: async () => {
+      const resp = await fetch(
+        makeUrl('json/competition-2026-horef-isr-championship-age_11-14.json'),
+      );
+      if (!resp.ok) {
+        throw new Error(
+          'Failed to load competition-2026-horef-isr-championship-age_11-14.json',
+        );
+      }
+      const data = (await resp.json()) as Result[];
+      return data;
+    },
+  },
 ];
 
 // Map by file for quick lookup
@@ -248,6 +265,8 @@ const DataSourceDDL: React.FC = () => {
   // State for available sources loaded from config
   const [dataSources, setDataSources] = React.useState<DataSource[]>([]);
   const [configLoaded, setConfigLoaded] = React.useState(false);
+  // Map: source file -> showCombineAllResults flag from config (ref to avoid stale closures)
+  const combineAllResultsMapRef = React.useRef<Record<string, boolean>>({});
 
   // Load sources-config.json on mount
   React.useEffect(() => {
@@ -274,6 +293,13 @@ const DataSourceDDL: React.FC = () => {
           return;
         }
         const config = await resp.json() as { sources: SourceConfig[] };
+        
+        // Build per-source showCombineAllResults map
+        const combineMap: Record<string, boolean> = {};
+        for (const s of config.sources) {
+          combineMap[s.file] = !!s.showCombineAllResults;
+        }
+        combineAllResultsMapRef.current = combineMap;
         
         // Filter allDataSources by config
         const allowedFiles = new Set(config.sources.map(s => s.file));
@@ -385,10 +411,12 @@ const DataSourceDDL: React.FC = () => {
       dispatch(
         rootActions.updateState({
           dataSourceSelected: { results: [], title: '' },
+          showCombineAllResults: false,
           filterSelected: {
             ...filters,
             date: '',
             date_str: '',
+            is_recalculated: false,
           },
         }),
       );
@@ -408,6 +436,9 @@ const DataSourceDDL: React.FC = () => {
 
     const combinedName = picked.map((p) => p.name).join(' + ');
 
+    // Determine showCombineAllResults: true only if ALL selected sources have it enabled
+    const showCombine = picked.length > 0 && picked.every((p) => p.file && combineAllResultsMapRef.current[p.file]);
+
     let datasets: Result[][];
     try {
       datasets = await Promise.all(picked.map((p) => p.load()));
@@ -423,6 +454,7 @@ const DataSourceDDL: React.FC = () => {
       dispatch(
         rootActions.updateState({
           dataSourceSelected: { results: combinedData, title: combinedName },
+          showCombineAllResults: showCombine,
         }),
       );
       return;
@@ -441,6 +473,7 @@ const DataSourceDDL: React.FC = () => {
           date: maxDate,
           date_str: iso,
         },
+        showCombineAllResults: showCombine,
       }),
     );
   };

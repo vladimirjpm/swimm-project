@@ -1,6 +1,9 @@
 
 @import "tailwindcss";
 
+.table-caption{
+  display: table-caption;
+}
 /* ========================================
    Цветовые темы: Training и Competition
    

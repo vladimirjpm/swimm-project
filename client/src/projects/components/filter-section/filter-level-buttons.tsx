@@ -33,7 +33,7 @@ const FilterLevelButtons: React.FC = () => {
 
   return (
     <div className="flex flex-col">
-      <h3 className="font-semibold">Level</h3>
+      <h3 className="font-semibold">Best Level</h3>
       <div className="flex flex-wrap items-center">
         <button
           className={`px-3 py-1 m-1 border rounded transition-colors ${

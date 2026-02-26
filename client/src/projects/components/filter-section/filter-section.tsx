@@ -14,6 +14,7 @@ import FilterSwimmingStyle from './filter-swimming-style';
 import FilterDistance from './filter-distance';
 import FilterClub from './filter-club';
 import FilterEventDate from './filter-event-date';
+import FilterRecalculate from './filter-recalculate';
 import { getFilterData } from './filter-types';
 
 const FilterSection: React.FC = () => {
@@ -55,6 +56,7 @@ const FilterSection: React.FC = () => {
       <FilterActivity />
       <FilterResetButton />
       <FilterEventDate />
+      <FilterRecalculate />
       {/* <FilterDateDropdown /> */}
       <FilterNameDropdown />
       <FilterPositionButtons />

@@ -24,4 +24,6 @@ export interface FilterSelected {
   level_filter?: string;
   // Event date filter: 'all' or a specific date string (e.g. '15/02/2026')
   event_date?: string;
+  // Recalculate positions across all days (best time per swimmer per event)
+  is_recalculated?: boolean;
 }

@@ -29,6 +29,7 @@ export interface StateInterface extends IIndexable {
   popUpObj: any;
   filterSelected:FilterSelected;
   bestLevelInfo?: BestLevelInfo | null;
+  showCombineAllResults: boolean;
 }
 
 // Начальное состояние (может быть заполнено динамически)
@@ -42,6 +43,7 @@ const initialState: StateInterface = {
   popUpType: Enums.PopupType.none,
   popUpObj: null,
   bestLevelInfo: null,
+  showCombineAllResults: false,
   filterSelected:{
     selected_name: "all", // спортсмен
     date: (new Date()).toString(), // Текущая дата
@@ -58,6 +60,7 @@ const initialState: StateInterface = {
     position_filter: 'top',
     level_filter: 'all',
     event_date: 'all',
+    is_recalculated: false,
   },
 };
 

@@ -14,6 +14,8 @@ import ResultsHeader from './components/results-header';
 import ResultsFilteredInfo from './components/results-filtered-info';
 import { TOP_N_POSITIONS } from '../../utils/constants/filter-constants';
 import HelperSwimmer from '../../utils/helpers/helper-swimmer';
+import { recalculatePositions } from '../../utils/helpers/recalculate-positions';
+import NormativeAgeRecords from './components/normative-age-records';
 
 function ResultsTable() {
   const dispatch = useAppDispatch();
@@ -24,8 +26,22 @@ function ResultsTable() {
     return <div className="text-gray-500 italic">No data source selected.</div>;
   }
 
+  // Пересчёт позиций (если включён is_recalculated) — ДО фильтрации
+  const isRecalculated = !!filters.is_recalculated;
+  const sourceResults = useMemo(() => {
+    const raw = selectedSource.results ?? [];
+    if (!isRecalculated) return raw;
+    // Пересчитываем и подменяем position (оригинал → position_original)
+    const recalced = recalculatePositions(raw);
+    return recalced.map(r => ({
+      ...r,
+      position_original: r.position,      // сохраняем оригинал для отображения
+      position: r.position_recalc,         // подменяем position — все фильтры и club points будут работать с ним
+    }));
+  }, [selectedSource, isRecalculated]);
+
   // Базовая фильтрация (все фильтры, КРОМЕ level_filter)
-  const baseFilteredResults = useMemo(() => (selectedSource.results ?? []).filter((res) => {
+  const baseFilteredResults = useMemo(() => sourceResults.filter((res) => {
     const { pool_type, gender, style_name, style_len, date, age, club, activity_type, position_filter, event_date } = filters;
     const resPoolType = Helper.resolvePoolType(res.pool_type);
     const filterPoolType = pool_type === 'all' ? null : Helper.resolvePoolType(pool_type);
@@ -61,7 +77,7 @@ function ResultsTable() {
       )) &&
       (club === 'all' || res.club === club)
     );
-  }), [selectedSource, filters]);
+  }), [sourceResults, filters]);
 
   // Вычисляем наивысший уровень из базовых результатов и пушим в store
   useEffect(() => {
@@ -129,6 +145,9 @@ function ResultsTable() {
     [filteredResults],
   );
 
+  // displayResults = sortedResults (recalculation уже применён в sourceResults)
+  const displayResults = sortedResults;
+
   const getResultKey = (res: any) =>
     [
       res.date,
@@ -169,13 +188,13 @@ function ResultsTable() {
       cancelled = true;
     };
   }, [sortedResults]);
-  //console.log('sortedResults: ',sortedResults)
+
   // Определяем уникальные значения
-  const uniqueClubs = new Set(sortedResults.map(r => r.club));
-  const uniqueStyleName = new Set(sortedResults.map(r => `${r.event_style_name}-${r.event_style_len}`));
-  const uniqueDates = new Set(sortedResults.map(r => r.date));
-  const uniqueAge = new Set(sortedResults.map(r => r.event_style_age));
-  const uniquePoolType = new Set(sortedResults.map(r => Helper.resolvePoolType(r.pool_type)));
+  const uniqueClubs = new Set(displayResults.map(r => r.club));
+  const uniqueStyleName = new Set(displayResults.map(r => `${r.event_style_name}-${r.event_style_len}`));
+  const uniqueDates = new Set(displayResults.map(r => r.date));
+  const uniqueAge = new Set(displayResults.map(r => r.event_style_age));
+  const uniquePoolType = new Set(displayResults.map(r => Helper.resolvePoolType(r.pool_type)));
 
   const showClub = uniqueClubs.size > 1;
   const showEvent = uniqueStyleName.size > 1;
@@ -183,13 +202,13 @@ function ResultsTable() {
   const showAge = uniqueAge.size > 1;
   const showPoolType = uniquePoolType.size > 1;
 
-  const hasInternationalPoints = sortedResults.some(r => 
+  const hasInternationalPoints = displayResults.some(r => 
   r.international_points !== undefined &&
   r.international_points !== null &&
   !isNaN(Number(r.international_points))
 );
 
-  const firstResult = sortedResults[0];
+  const firstResult = displayResults[0];
 // Функция обновления фильтров
   const updateFilter = (newFilter: Partial<typeof filters>) => {
       dispatch(rootActions.updateState({ filterSelected: { ...filters, ...newFilter } }));
@@ -212,6 +231,14 @@ function ResultsTable() {
           showPoolType={showPoolType}
           showEvent={showEvent}
         />      
+        <NormativeAgeRecords
+          gender={filters.gender}
+          poolType={filters.pool_type}
+          styleName={filters.style_name}
+          styleLen={filters.style_len}
+          age={filters.age}
+        />
+        
         <div className="max-h-[650px] overflow-y-auto border rounded shadow" >
           {/* Unified header (single view for all sizes) */}
           <div className="bg-gray-100 sticky top-0 z-10">
@@ -226,7 +253,7 @@ function ResultsTable() {
             </div>
           </div>
           <ul className="divide-y">
-            {sortedResults.map((res, index) => {
+            {displayResults.map((res, index) => {
               const clubPoints = clubPointsByKey[getResultKey(res)];
               const isMaster = String(res.is_masters) === 'true' || String(res.is_masters) === '1';
               const resolvedGender = Helper.resolveGender(res.event_style_gender);
@@ -299,7 +326,7 @@ function ResultsTable() {
               );
             })}
 
-            {sortedResults.length === 0 && (
+            {displayResults.length === 0 && (
               <li className="text-center text-gray-500 py-4">No results match the current filters.</li>
             )}
           </ul>

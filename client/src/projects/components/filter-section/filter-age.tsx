@@ -51,7 +51,7 @@ const FilterAge: React.FC = () => {
   return (
     <div className="flex flex-col">
       <h3 className="font-semibold">
-        Age
+        Age (multi-select with long-press)
         {filters.age_to && filters.age !== 'all' && (
           <span className="ml-2 text-sm font-normal text-blue-600">
             birth year: {filters.age}–{filters.age_to}

@@ -30,6 +30,9 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
       <div className="flex items-start gap-4">
         <div className="flex flex-col items-center shrink-0">
           {res.position ? <UI_MedalIcon place={res.position.toString()} styleType={String(res.is_award) === 'true' ? 'icon-place' : 'icon-noplace'} /> : <span className="text-lg font-bold">{index + 1}</span>}
+          {(res as any).position_original != null && (res as any).position_original !== res.position && (
+            <div className="text-[10px] text-gray-400 mt-0.5 line-through"><UI_MedalIcon place={(res as any).position_original.toString()} styleSize='medal-16' styleType={String(res.is_award) === 'true' ? 'icon-place' : 'icon-noplace'} /></div>
+          )}
           {showAge && <div className="font-bold text-sm mt-1"><span className='font-normal text-xs'>age:</span> {res.event_style_age} </div>}
         </div>
 
