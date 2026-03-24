@@ -1,0 +1,390 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Swimm — DB Schema</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+            color: #e0e0e0;
+            min-height: 100vh;
+            font-size: 14px;
+        }
+
+        header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 1rem 2rem; background: rgba(0,0,0,.3);
+        }
+        header h1 { color: #ffa726; font-size: 1.4rem; }
+        header nav { display: flex; gap: 1.2rem; }
+        header a { color: #4fc3f7; text-decoration: none; font-size: .9rem; }
+        header a:hover { text-decoration: underline; }
+
+        .container { max-width: 1300px; margin: 0 auto; padding: 1.5rem; }
+
+        .db-name { color: #ffa726; font-size: 1.1rem; margin-bottom: 1.5rem; }
+
+        /* Sidebar + Content */
+        .layout { display: flex; gap: 1.5rem; }
+
+        .sidebar {
+            min-width: 220px; max-width: 250px;
+            background: rgba(0,0,0,.25); border-radius: 10px;
+            padding: 1rem; position: sticky; top: 1rem; align-self: flex-start;
+            max-height: calc(100vh - 2rem); overflow-y: auto;
+        }
+        .sidebar h3 { color: #4fc3f7; font-size: .85rem; text-transform: uppercase; margin-bottom: .5rem; margin-top: 1rem; }
+        .sidebar h3:first-child { margin-top: 0; }
+        .sidebar a {
+            display: flex; justify-content: space-between; align-items: center;
+            color: #b0bec5; text-decoration: none; padding: .3rem .5rem;
+            border-radius: 4px; font-size: .85rem; transition: background .15s;
+        }
+        .sidebar a:hover { background: rgba(79,195,247,.1); color: #fff; }
+        .sidebar a .count { color: #546e7a; font-size: .75rem; }
+
+        .content { flex: 1; min-width: 0; }
+
+        /* Sections */
+        .section {
+            background: rgba(255,255,255,.04); border-radius: 10px;
+            padding: 1.2rem; margin-bottom: 1.5rem;
+            border-left: 3px solid #4fc3f7;
+        }
+        .section h2 {
+            color: #4fc3f7; font-size: 1.1rem; margin-bottom: 1rem;
+            display: flex; align-items: center; gap: .5rem;
+        }
+        .section h2 .rows-badge {
+            font-size: .75rem; background: rgba(79,195,247,.15);
+            padding: .15rem .5rem; border-radius: 4px; color: #90a4ae; font-weight: 400;
+        }
+
+        /* Column table */
+        .col-table { width: 100%; border-collapse: collapse; margin-bottom: .8rem; }
+        .col-table th {
+            text-align: left; color: #78909c; font-size: .7rem;
+            text-transform: uppercase; padding: .3rem .5rem;
+            border-bottom: 1px solid rgba(255,255,255,.1);
+        }
+        .col-table td {
+            padding: .3rem .5rem; font-size: .82rem;
+            border-bottom: 1px solid rgba(255,255,255,.04);
+        }
+        .col-table tr:hover td { background: rgba(255,255,255,.03); }
+
+        .pk { color: #ffd54f; font-weight: 700; }
+        .fk { color: #81c784; }
+        .nullable { color: #ef9a9a; font-size: .75rem; }
+        .type-tag { color: #ce93d8; }
+        .identity-tag { color: #ffb74d; font-size: .7rem; margin-left: .3rem; }
+        .default-tag { color: #546e7a; font-size: .75rem; }
+
+        /* FK / Index / Check subsections */
+        .sub-section { margin-top: .8rem; }
+        .sub-section h4 { color: #90a4ae; font-size: .8rem; margin-bottom: .4rem; text-transform: uppercase; }
+        .sub-item {
+            font-size: .8rem; padding: .25rem .5rem; color: #b0bec5;
+            border-left: 2px solid #546e7a; margin-bottom: .3rem; margin-left: .5rem;
+        }
+        .sub-item code { color: #ce93d8; }
+        .sub-item .arrow { color: #4fc3f7; margin: 0 .3rem; }
+        .sub-item .on-delete { color: #ef9a9a; font-size: .7rem; }
+
+        /* SP / View blocks */
+        .obj-block {
+            background: rgba(255,255,255,.04); border-radius: 8px;
+            padding: 1rem; margin-bottom: 1rem;
+            border-left: 3px solid #ce93d8;
+        }
+        .obj-block.view-block { border-left-color: #81c784; }
+        .obj-block h3 { color: #ce93d8; font-size: 1rem; margin-bottom: .5rem; }
+        .obj-block.view-block h3 { color: #81c784; }
+        .obj-block .meta { color: #546e7a; font-size: .75rem; margin-bottom: .5rem; }
+        .obj-block pre {
+            background: rgba(0,0,0,.3); border-radius: 6px; padding: .8rem;
+            overflow-x: auto; font-size: .78rem; color: #b0bec5; line-height: 1.5;
+            max-height: 300px; overflow-y: auto;
+        }
+        .toggle-btn {
+            background: transparent; border: 1px solid #546e7a; color: #90a4ae;
+            border-radius: 4px; padding: .2rem .6rem; cursor: pointer;
+            font-size: .75rem; margin-left: .5rem;
+        }
+        .toggle-btn:hover { border-color: #4fc3f7; color: #4fc3f7; }
+
+        .empty-msg { color: #546e7a; font-style: italic; padding: 1rem; text-align: center; }
+
+        /* Dependency graph */
+        .dep-section { border-left-color: #ffa726; }
+        .dep-table { width: 100%; border-collapse: collapse; }
+        .dep-table th { text-align: left; color: #78909c; font-size: .7rem; text-transform: uppercase; padding: .4rem .5rem; border-bottom: 1px solid rgba(255,255,255,.1); }
+        .dep-table td { padding: .4rem .5rem; font-size: .82rem; border-bottom: 1px solid rgba(255,255,255,.04); }
+
+        @media (max-width: 900px) {
+            .layout { flex-direction: column; }
+            .sidebar { max-width: 100%; position: static; max-height: none; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🗄️ DB Schema Explorer</h1>
+    <nav>
+        <a href="/admin/">← Admin</a>
+        <a href="/">Home</a>
+    </nav>
+</header>
+
+<div class="container">
+    <div class="db-name" id="db-name">Loading...</div>
+
+    <div class="layout">
+        <aside class="sidebar" id="sidebar">
+            <h3>Loading...</h3>
+        </aside>
+
+        <div class="content" id="content">
+            <div class="empty-msg">Loading schema...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+(async function () {
+    const API = '/api/admin/db-schema';
+
+    async function loadSchema() {
+        const res = await fetch(API, { credentials: 'same-origin' });
+        if (!res.ok) throw new Error(`${res.status}`);
+        return res.json();
+    }
+
+    function esc(s) {
+        if (!s) return '';
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function formatType(col) {
+        let t = col.dataType;
+        if (col.maxLength) t += col.maxLength === -1 ? '(MAX)' : `(${col.maxLength})`;
+        return t;
+    }
+
+    function formatDate(iso) {
+        if (!iso) return '—';
+        return new Date(iso).toLocaleDateString('ru-RU') + ' ' + new Date(iso).toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'});
+    }
+
+    try {
+        const schema = await loadSchema();
+
+        // DB name
+        document.getElementById('db-name').textContent = `Database: ${schema.database}`;
+
+        // Row counts map
+        const rowMap = {};
+        (schema.rowCounts || []).forEach(r => rowMap[r.table] = r.rows);
+
+        // FK map by table
+        const fkByTable = {};
+        const fkColumns = new Set();
+        (schema.foreignKeys || []).forEach(fk => {
+            if (!fkByTable[fk.table]) fkByTable[fk.table] = [];
+            fkByTable[fk.table].push(fk);
+            fkColumns.add(fk.table + '.' + fk.column);
+        });
+
+        // Index map by table
+        const ixByTable = {};
+        (schema.indexes || []).forEach(ix => {
+            if (!ixByTable[ix.table]) ixByTable[ix.table] = [];
+            ixByTable[ix.table].push(ix);
+        });
+
+        // Check map by table
+        const ckByTable = {};
+        (schema.checkConstraints || []).forEach(ck => {
+            if (!ckByTable[ck.table]) ckByTable[ck.table] = [];
+            ckByTable[ck.table].push(ck);
+        });
+
+        // --- Sidebar ---
+        const sidebar = document.getElementById('sidebar');
+        let sideHtml = '<h3>Tables</h3>';
+        schema.tables.forEach(t => {
+            const rows = rowMap[t.name] !== undefined ? Number(rowMap[t.name]).toLocaleString() : '';
+            sideHtml += `<a href="#tbl-${esc(t.name)}">${esc(t.name)} <span class="count">${rows}</span></a>`;
+        });
+        if (schema.storedProcedures.length) {
+            sideHtml += '<h3>Procedures</h3>';
+            schema.storedProcedures.forEach(p => {
+                sideHtml += `<a href="#sp-${esc(p.name)}">${esc(p.name)}</a>`;
+            });
+        }
+        if (schema.views.length) {
+            sideHtml += '<h3>Views</h3>';
+            schema.views.forEach(v => {
+                sideHtml += `<a href="#vw-${esc(v.name)}">${esc(v.name)}</a>`;
+            });
+        }
+        sideHtml += '<h3>Other</h3>';
+        sideHtml += '<a href="#sec-deps">Dependencies</a>';
+        sidebar.innerHTML = sideHtml;
+
+        // --- Content ---
+        const content = document.getElementById('content');
+        let html = '';
+
+        // Tables
+        schema.tables.forEach(t => {
+            const rows = rowMap[t.name] !== undefined ? Number(rowMap[t.name]).toLocaleString() + ' rows' : '';
+            html += `<div class="section" id="tbl-${esc(t.name)}">`;
+            html += `<h2>📋 ${esc(t.name)} <span class="rows-badge">${rows}</span></h2>`;
+
+            // Columns
+            html += `<table class="col-table"><thead><tr>
+                <th>#</th><th>Column</th><th>Type</th><th>Nullable</th><th>Default</th>
+            </tr></thead><tbody>`;
+            t.columns.forEach(c => {
+                const isFk = fkColumns.has(t.name + '.' + c.column);
+                const nameClass = c.isPk ? 'pk' : isFk ? 'fk' : '';
+                const pkLabel = c.isPk ? ' 🔑' : '';
+                const fkLabel = isFk ? ' 🔗' : '';
+                const idLabel = c.isIdentity ? '<span class="identity-tag">IDENTITY</span>' : '';
+                const defVal = c.defaultValue ? `<span class="default-tag">${esc(c.defaultValue)}</span>` : '';
+                html += `<tr>
+                    <td>${c.position}</td>
+                    <td><span class="${nameClass}">${esc(c.column)}</span>${pkLabel}${fkLabel}${idLabel}</td>
+                    <td><span class="type-tag">${esc(formatType(c))}</span></td>
+                    <td>${c.nullable ? '<span class="nullable">YES</span>' : 'NO'}</td>
+                    <td>${defVal}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+
+            // FK for this table
+            const fks = fkByTable[t.name];
+            if (fks && fks.length) {
+                html += '<div class="sub-section"><h4>🔗 Foreign Keys</h4>';
+                fks.forEach(fk => {
+                    html += `<div class="sub-item">
+                        <code>${esc(fk.column)}</code>
+                        <span class="arrow">→</span>
+                        <code>${esc(fk.referencedTable)}.${esc(fk.referencedColumn)}</code>
+                        <span class="on-delete">ON DELETE ${esc(fk.onDelete)}</span>
+                        <span class="default-tag" style="margin-left:.5rem">${esc(fk.name)}</span>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+
+            // Indexes
+            const ixs = ixByTable[t.name];
+            if (ixs && ixs.length) {
+                html += '<div class="sub-section"><h4>📇 Indexes</h4>';
+                ixs.forEach(ix => {
+                    const uniq = ix.isUnique ? ' UNIQUE' : '';
+                    html += `<div class="sub-item">
+                        <code>${esc(ix.name)}</code>
+                        <span class="type-tag" style="margin-left:.5rem">${esc(ix.type)}${uniq}</span>
+                        <span style="margin-left:.5rem">( ${esc(ix.columns)} )</span>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+
+            // Check constraints
+            const cks = ckByTable[t.name];
+            if (cks && cks.length) {
+                html += '<div class="sub-section"><h4>✅ Check Constraints</h4>';
+                cks.forEach(ck => {
+                    html += `<div class="sub-item">
+                        <code>${esc(ck.name)}</code>
+                        <span style="margin-left:.5rem;color:#b0bec5">${esc(ck.definition)}</span>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+
+            html += '</div>';
+        });
+
+        // Stored Procedures
+        if (schema.storedProcedures.length) {
+            schema.storedProcedures.forEach((sp, i) => {
+                html += `<div class="obj-block" id="sp-${esc(sp.name)}">
+                    <h3>⚙️ ${esc(sp.name)}
+                        <button class="toggle-btn" onclick="toggleDef('sp-def-${i}')">Show SQL</button>
+                    </h3>
+                    <div class="meta">Created: ${formatDate(sp.createdAt)} &nbsp;|&nbsp; Modified: ${formatDate(sp.modifiedAt)}</div>
+                    <pre id="sp-def-${i}" style="display:none">${esc(sp.definition)}</pre>
+                </div>`;
+            });
+        }
+
+        // Views
+        if (schema.views.length) {
+            schema.views.forEach((vw, i) => {
+                html += `<div class="obj-block view-block" id="vw-${esc(vw.name)}">
+                    <h3>👁️ ${esc(vw.name)}
+                        <button class="toggle-btn" onclick="toggleDef('vw-def-${i}')">Show SQL</button>
+                    </h3>
+                    <div class="meta">Created: ${formatDate(vw.createdAt)} &nbsp;|&nbsp; Modified: ${formatDate(vw.modifiedAt)}</div>
+                    <pre id="vw-def-${i}" style="display:none">${esc(vw.definition)}</pre>
+                </div>`;
+            });
+        }
+
+        // Dependency summary
+        html += `<div class="section dep-section" id="sec-deps">`;
+        html += `<h2>🔀 Table Dependencies (FK Graph)</h2>`;
+        html += `<table class="dep-table"><thead><tr>
+            <th>Table</th><th>Depends On</th><th>Via</th><th>On Delete</th>
+        </tr></thead><tbody>`;
+        (schema.foreignKeys || []).forEach(fk => {
+            html += `<tr>
+                <td>${esc(fk.table)}</td>
+                <td>${esc(fk.referencedTable)}</td>
+                <td><code>${esc(fk.column)}</code> → <code>${esc(fk.referencedColumn)}</code></td>
+                <td><span class="on-delete">${esc(fk.onDelete)}</span></td>
+            </tr>`;
+        });
+        html += '</tbody></table></div>';
+
+        if (!schema.storedProcedures.length && !schema.views.length) {
+            // nothing extra
+        }
+
+        content.innerHTML = html;
+
+    } catch (e) {
+        console.error('DB schema load failed', e);
+        document.getElementById('content').innerHTML =
+            '<div class="empty-msg" style="color:#ef5350">Failed to load DB schema. Check Admin access.</div>';
+    }
+})();
+
+function toggleDef(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const btn = el.previousElementSibling?.querySelector('.toggle-btn')
+             || el.parentElement?.querySelector('.toggle-btn');
+    if (el.style.display === 'none') {
+        el.style.display = 'block';
+        if (btn) btn.textContent = 'Hide SQL';
+    } else {
+        el.style.display = 'none';
+        if (btn) btn.textContent = 'Show SQL';
+    }
+}
+</script>
+
+</body>
+</html>

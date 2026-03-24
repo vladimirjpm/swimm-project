@@ -1,0 +1,103 @@
+using System.Text.Json.Serialization;
+
+namespace Swimm.API.Models;
+
+/// <summary>
+/// DTO ?????????? ??? JSON API.
+/// ???????? ??? ????????????????? ?????? ??? ?????????????? JOIN.
+/// </summary>
+public class ResultDto
+{
+    [JsonPropertyName("id")]
+    public long Id { get; set; }
+
+    [JsonPropertyName("country")]
+    public string Country { get; set; } = string.Empty;
+
+    [JsonPropertyName("competition")]
+    public string CompetitionName { get; set; } = string.Empty;
+
+    [JsonPropertyName("is_masters")]
+    public bool IsMasters { get; set; }
+
+    [JsonPropertyName("is_award")]
+    public bool IsAward { get; set; }
+
+    [JsonPropertyName("age_group")]
+    public string AgeGroup { get; set; } = string.Empty;
+
+    [JsonPropertyName("date")]
+    public DateTime CompetitionDate { get; set; }
+
+    [JsonPropertyName("style_name")]
+    public string StyleName { get; set; } = string.Empty;
+
+    [JsonPropertyName("distance")]
+    public string Distance { get; set; } = string.Empty;
+
+    [JsonPropertyName("gender")]
+    public string Gender { get; set; } = string.Empty;
+
+    [JsonPropertyName("event_style_age")]
+    public string EventStyleAge { get; set; } = string.Empty;
+
+    [JsonPropertyName("pool_type")]
+    public string PoolType { get; set; } = string.Empty;
+
+    [JsonPropertyName("position")]
+    public int? Position { get; set; }
+
+    [JsonPropertyName("heat")]
+    public int Heat { get; set; }
+
+    [JsonPropertyName("lane")]
+    public int Lane { get; set; }
+
+    [JsonPropertyName("last_name")]
+    public string LastName { get; set; } = string.Empty;
+
+    [JsonPropertyName("first_name")]
+    public string FirstName { get; set; } = string.Empty;
+
+    [JsonPropertyName("last_name_en")]
+    public string LastNameEn { get; set; } = string.Empty;
+
+    [JsonPropertyName("first_name_en")]
+    public string FirstNameEn { get; set; } = string.Empty;
+
+    [JsonPropertyName("birth_year")]
+    public int BirthYear { get; set; }
+
+    [JsonPropertyName("club")]
+    public string ClubName { get; set; } = string.Empty;
+
+    [JsonPropertyName("club_en")]
+    public string ClubNameEn { get; set; } = string.Empty;
+
+    [JsonPropertyName("time_ms")]
+    public int? TimeMillisecond { get; set; }
+
+    [JsonPropertyName("time")]
+    public string TimeOriginal { get; set; } = string.Empty;
+
+    [JsonPropertyName("time_fail")]
+    public bool TimeFail { get; set; }
+
+    [JsonPropertyName("time_fail_note")]
+    public string? TimeFailNote { get; set; }
+
+    [JsonPropertyName("international_points")]
+    public int InternationalPoints { get; set; }
+
+    [JsonPropertyName("note")]
+    public string? Note { get; set; }
+
+    [JsonPropertyName("is_relay")]
+    public bool IsRelay { get; set; }
+
+    [JsonPropertyName("relay_team_name")]
+    public string? RelayTeamName { get; set; }
+
+    [JsonPropertyName("relay_swimmers_name")]
+    public string? RelaySwimmersName { get; set; }
+}

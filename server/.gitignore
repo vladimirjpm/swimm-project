@@ -1,0 +1,5 @@
+# Local SQL Server files
+/data/
+*.mdf
+*.ldf
+*.ndf
