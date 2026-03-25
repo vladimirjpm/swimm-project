@@ -1,0 +1,99 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Admin Panel</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f0f2f5;color:#333}
+        .topbar{background:#1a1a2e;color:#fff;padding:12px 24px;display:flex;align-items:center;justify-content:space-between}
+        .topbar h1{font-size:1.3rem}
+        .topbar nav a{color:rgba(255,255,255,.7);text-decoration:none;margin-left:20px;font-size:.9rem}
+        .topbar nav a:hover{color:#fff}
+        .container{max-width:1200px;margin:24px auto;padding:0 16px}
+        .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px}
+        .stat-card{background:#fff;border-radius:10px;padding:20px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+        .stat-card .value{font-size:2rem;font-weight:700;color:#4a6cf7}
+        .stat-card .label{font-size:.85rem;color:#888;margin-top:4px}
+        .card{background:#fff;border-radius:10px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:20px}
+        .card h2{margin-bottom:16px;font-size:1.2rem}
+        table{width:100%;border-collapse:collapse}
+        th,td{text-align:left;padding:10px 12px;border-bottom:1px solid #eee;font-size:.9rem}
+        th{background:#f8f9fa;font-weight:600}
+        .badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:.75rem;font-weight:600;margin-right:4px}
+        .badge-admin{background:#ffe0e0;color:#c0392b}
+        .badge-user{background:#d4efdf;color:#27ae60}
+        .btn-sm{padding:4px 12px;border:none;border-radius:6px;cursor:pointer;font-size:.8rem}
+        .btn-danger{background:#e74c3c;color:#fff}
+        .btn-success{background:#27ae60;color:#fff}
+        .btn-primary{background:#4a6cf7;color:#fff}
+        .toggle{position:relative;display:inline-block;width:40px;height:22px}
+        .toggle input{opacity:0;width:0;height:0}
+        .toggle .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#ccc;border-radius:22px;transition:.3s}
+        .toggle .slider:before{content:"";position:absolute;height:16px;width:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+        .toggle input:checked+.slider{background:#27ae60}
+        .toggle input:checked+.slider:before{transform:translateX(18px)}
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <h1>Admin Panel</h1>
+        <nav>
+            <a href="/admin/">Dashboard</a>
+            <a href="/admin/db.html">DB Schema</a>
+            <a href="/admin/settings.html">Settings</a>
+            <a href="/">Home</a>
+        </nav>
+    </div>
+    <div class="container">
+        <div class="stats-grid" id="stats"></div>
+        <div class="card">
+            <h2>Users</h2>
+            <table><thead><tr><th>Name</th><th>Email</th><th>Roles</th><th>Active</th><th>Last Login</th><th>Actions</th></tr></thead>
+            <tbody id="users-table"></tbody></table>
+        </div>
+    </div>
+<script>
+const API = "";
+async function loadStats(){
+    const r = await fetch(API+"/api/admin/stats",{credentials:"include"});
+    if(!r.ok)return;
+    const d = await r.json();
+    document.getElementById("stats").innerHTML = [
+        {v:d.totalUsers,l:"Users"},{v:d.activeUsers,l:"Active"},{v:d.totalResults,l:"Results"},
+        {v:d.totalCompetitions,l:"Competitions"},{v:d.totalSwimmers,l:"Swimmers"}
+    ].map(s=>`<div class="stat-card"><div class="value">${s.v}</div><div class="label">${s.l}</div></div>`).join("");
+}
+async function loadUsers(){
+    const r = await fetch(API+"/api/admin/users",{credentials:"include"});
+    if(!r.ok)return;
+    const users = await r.json();
+    document.getElementById("users-table").innerHTML = users.map(u=>`<tr>
+        <td>${u.displayName}</td><td>${u.email}</td>
+        <td>${u.roles.map(r=>`<span class="badge badge-${r.toLowerCase()}">${r}</span>`).join("")}
+            <button class="btn-sm btn-primary" onclick="addRole(${u.id})">+</button></td>
+        <td><label class="toggle"><input type="checkbox" ${u.isActive?"checked":""} onchange="toggleActive(${u.id},this.checked)"><span class="slider"></span></label></td>
+        <td>${u.lastLoginAt?new Date(u.lastLoginAt).toLocaleDateString():"-"}</td>
+        <td>${u.roles.includes("Admin")?"":`<button class="btn-sm btn-danger" onclick="removeRole(${u.id},'User')">Remove User</button>`}</td>
+    </tr>`).join("");
+}
+async function toggleActive(id,val){
+    await fetch(API+`/api/admin/users/${id}/active`,{method:"PUT",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({isActive:val})});
+    loadUsers();
+}
+async function addRole(id){
+    const role=prompt("Enter role name (Admin/User):");
+    if(!role)return;
+    await fetch(API+`/api/admin/users/${id}/roles/${role}`,{method:"POST",credentials:"include"});
+    loadUsers();
+}
+async function removeRole(id,role){
+    if(!confirm(`Remove role ${role}?`))return;
+    await fetch(API+`/api/admin/users/${id}/roles/${role}`,{method:"DELETE",credentials:"include"});
+    loadUsers();
+}
+loadStats();loadUsers();
+</script>
+</body>
+</html>

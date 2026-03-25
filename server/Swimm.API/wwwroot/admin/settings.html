@@ -1,0 +1,123 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Admin Settings</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f0f2f5;color:#333}
+        .topbar{background:#1a1a2e;color:#fff;padding:12px 24px;display:flex;align-items:center;justify-content:space-between}
+        .topbar h1{font-size:1.3rem}
+        .topbar nav a{color:rgba(255,255,255,.7);text-decoration:none;margin-left:20px;font-size:.9rem}
+        .topbar nav a:hover{color:#fff}
+        .container{max-width:900px;margin:24px auto;padding:0 16px}
+        .info-bar{background:#d4efdf;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:.85rem;color:#1e8449}
+        .tab-row{display:flex;gap:8px;margin-bottom:20px}
+        .tab{padding:6px 16px;border-radius:20px;border:1px solid #ddd;background:#fff;cursor:pointer;font-size:.85rem}
+        .tab.active{background:#4a6cf7;color:#fff;border-color:#4a6cf7}
+        .card{background:#fff;border-radius:10px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:16px}
+        .card.danger{border-left:4px solid #e74c3c}
+        .setting-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+        .setting-header h3{font-size:1rem}
+        .scope-badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:.7rem;font-weight:600}
+        .scope-admin{background:#ffe0e0;color:#c0392b}
+        .scope-livesite{background:#d4efdf;color:#27ae60}
+        .scope-both{background:#d6eaf8;color:#2980b9}
+        .desc{font-size:.85rem;color:#888;margin-bottom:12px}
+        .type-badge{font-size:.7rem;background:#f0f0f0;padding:2px 8px;border-radius:10px;color:#666;margin-left:8px}
+        .input-row{display:flex;gap:10px;align-items:center}
+        .input-row input[type=text],.input-row input[type=number]{flex:1;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:.9rem}
+        .btn{padding:8px 20px;border:none;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:600}
+        .btn-primary{background:#4a6cf7;color:#fff}
+        .btn-danger{background:#e74c3c;color:#fff}
+        .toggle{position:relative;display:inline-block;width:50px;height:26px}
+        .toggle input{opacity:0;width:0;height:0}
+        .toggle .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#ccc;border-radius:26px;transition:.3s}
+        .toggle .slider:before{content:"";position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+        .toggle input:checked+.slider{background:#27ae60}
+        .toggle.danger input:checked+.slider{background:#e74c3c}
+        .toggle input:checked+.slider:before{transform:translateX(24px)}
+        .status{font-size:.8rem;margin-top:8px;color:#27ae60}
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <h1>Settings</h1>
+        <nav>
+            <a href="/admin/">Dashboard</a>
+            <a href="/admin/db.html">DB Schema</a>
+            <a href="/admin/settings.html">Settings</a>
+            <a href="/">Home</a>
+        </nav>
+    </div>
+    <div class="container">
+        <div class="info-bar">
+            <strong>Scope:</strong>
+            <span class="scope-badge scope-admin">admin</span> = admin panel only |
+            <span class="scope-badge scope-livesite">livesite</span> = public site only |
+            <span class="scope-badge scope-both">both</span> = affects everything
+        </div>
+        <div class="tab-row">
+            <span class="tab active" data-scope="all">All</span>
+            <span class="tab" data-scope="admin">Admin</span>
+            <span class="tab" data-scope="livesite">LiveSite</span>
+            <span class="tab" data-scope="both">Both</span>
+        </div>
+        <div id="settings-list"></div>
+    </div>
+<script>
+let settings=[], activeScope="all";
+document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>{
+    document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+    t.classList.add("active"); activeScope=t.dataset.scope; render();
+}));
+async function load(){
+    const r=await fetch("/api/admin/settings",{credentials:"include"});
+    if(!r.ok)return;
+    settings=await r.json(); render();
+}
+function render(){
+    const filtered=activeScope==="all"?settings:settings.filter(s=>s.scope===activeScope);
+    document.getElementById("settings-list").innerHTML=filtered.map(s=>{
+        const isDanger=s.key==="MaintenanceMode";
+        const isBool=s.type==="bool";
+        return `<div class="card${isDanger?" danger":""}">
+            <div class="setting-header">
+                <h3>${s.key}<span class="type-badge">${s.type}</span></h3>
+                <span class="scope-badge scope-${s.scope}">${s.scope}</span>
+            </div>
+            <div class="desc">${s.description}</div>
+            ${isBool?`
+                <label class="toggle${isDanger?" danger":""}">
+                    <input type="checkbox" ${s.value==="true"?"checked":""} onchange="saveBool('${s.key}',this.checked)">
+                    <span class="slider"></span>
+                </label>
+            `:`
+                <div class="input-row">
+                    <input type="${s.type==="int"?"number":"text"}" id="val-${s.key}" value="${s.value}"/>
+                    <button class="btn btn-primary" onclick="saveVal('${s.key}')">Save</button>
+                </div>
+            `}
+            <div class="status" id="status-${s.key}"></div>
+        </div>`;
+    }).join("");
+}
+async function saveBool(key,val){
+    await save(key, val.toString());
+}
+async function saveVal(key){
+    const val=document.getElementById("val-"+key).value;
+    await save(key,val);
+}
+async function save(key,value){
+    const r=await fetch(`/api/admin/settings/${key}`,{method:"PUT",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({value})});
+    const el=document.getElementById("status-"+key);
+    if(r.ok){el.style.color="#27ae60";el.textContent="Saved!";load();}
+    else{const d=await r.json();el.style.color="#e74c3c";el.textContent=d.error||"Error";}
+    setTimeout(()=>el.textContent="",3000);
+}
+load();
+</script>
+</body>
+</html>
