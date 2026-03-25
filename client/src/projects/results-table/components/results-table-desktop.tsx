@@ -7,7 +7,7 @@ import UI_NormativeLevelIcon from '../../components/mix/normative-level-icon/nor
 import UI_DateIcon from '../../components/mix/date-icon/date-icon';
 import UI_LevelProgress from '../../components/mix/progress-level/level-progress';
 import SwimmerNameCell from '../../components/mix/swimmer-name-cell/swimmer-name-cell';
-import UI_SwimmerVideoLink from '../../components/mix/swimmer-video-link/swimmer-video-link';
+import UI_SwimmerGallery from '../../components/mix/swimmer-gallery/swimmer-gallery';
 import { ResultsTableRowProps } from './types';
 
 const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
@@ -43,16 +43,10 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
             lastName={res.last_name}
             club={res.club}
             isRelay={res.is_relay}
-            relaySwimmersName={res.relay_swimmers_name}
+            relaySwimmersList={res.relay_swimmers}
             onClick={handleNameClick}
           />
-          <UI_SwimmerVideoLink
-            firstNameEn={res.first_name_en}
-            lastNameEn={res.last_name_en}
-            styleName={res.event_style_name}
-            styleLen={res.event_style_len}
-            competition={res.competition}
-          />
+          <UI_SwimmerGallery gallery={res.gallery} />
 
           <div className="w-full flex flex-col items-start justify-center mt-2 mb-2">
             {hasInternationalPoints && <div className="text-left text-sm pt-2">Points: {res.international_points ?? ''}</div>}

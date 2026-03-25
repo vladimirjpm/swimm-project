@@ -51,6 +51,9 @@ export interface ResultWrap {
 
     /** состав команды */
     relay_swimmers?: RelaySwimmer[];
+
+    /* === ДОБАВЛЕНО ДЛЯ ГАЛЕРЕИ (опционально) === */
+    gallery?: GalleryItem[];
   }
   export interface RelaySwimmer {
   order: number; // 1..4
@@ -59,6 +62,13 @@ export interface ResultWrap {
   birth_year?: number;
   club?: string;
   split_time?: string;
+}
+export interface GalleryItem {
+  type: 'image' | 'video';
+
+  sourceType?: 'youtube' | 'vimeo' | 'other';
+  url?: string;
+  code?: string;  
 }
 
   export interface TrainingInfo {

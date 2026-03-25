@@ -8,7 +8,7 @@ import UI_LevelProgress from '../../components/mix/progress-level/level-progress
 import UI_DateIcon from '../../components/mix/date-icon/date-icon';
 import SwimmerNameCell from '../../components/mix/swimmer-name-cell/swimmer-name-cell';
 import UI_SwimmerTimeCell from '../../components/mix/swimmer-time-cell/swimmer-time-cell';
-import UI_SwimmerVideoLink from '../../components/mix/swimmer-video-link/swimmer-video-link';
+import UI_SwimmerGallery from '../../components/mix/swimmer-gallery/swimmer-gallery';
 import { ResultsTableRowProps } from './types';
 
 const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
@@ -50,13 +50,7 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
         onClick={handleNameClick}
         className=""
       />
-      <UI_SwimmerVideoLink
-        firstNameEn={res.first_name_en}
-        lastNameEn={res.last_name_en}
-        styleName={res.event_style_name}
-        styleLen={res.event_style_len}
-        competition={res.competition}
-      />
+      <UI_SwimmerGallery gallery={res.gallery} />
       </div>
 
       {showClub && (

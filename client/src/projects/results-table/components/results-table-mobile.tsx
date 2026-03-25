@@ -6,7 +6,7 @@ import UI_PoolIcon from '../../components/mix/pool-icon/pool-icon';
 import UI_LevelProgress from '../../components/mix/progress-level/level-progress';
 import UI_NormativeLevelIcon from '../../components/mix/normative-level-icon/normative-level-icon';
 import SwimmerNameCell from '../../components/mix/swimmer-name-cell/swimmer-name-cell';
-import UI_SwimmerVideoLink from '../../components/mix/swimmer-video-link/swimmer-video-link';
+import UI_SwimmerGallery from '../../components/mix/swimmer-gallery/swimmer-gallery';
 import { ResultsTableRowProps } from './types';
 
 const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
@@ -38,25 +38,19 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
 
         <div className="flex-1 flex flex-col gap-2">
           <div className="flex items-start">
-            <div className="basis-2/3 pr-2 min-w-0">
+            <div className="basis-2/3 gap-1 min-w-0">
               <SwimmerNameCell
                 firstName={res.first_name}
                 lastName={res.last_name}
                 club={res.club}
                 isRelay={res.is_relay}
-                relaySwimmersName={res.relay_swimmers_name}
+                relaySwimmersList={res.relay_swimmers}
                 onClick={handleNameClick}
-                firstLineClassName="text-xl font-bold truncate"
+                firstLineClassName="text-xl font-bold truncate1 min-w-0"
                 secondLineClassName="text-sm mt-0.5"
                 showClubIcon={showClub}
               />
-              <UI_SwimmerVideoLink
-                firstNameEn={res.first_name_en}
-                lastNameEn={res.last_name_en}
-                styleName={res.event_style_name}
-                styleLen={res.event_style_len}
-                competition={res.competition}
-              />
+              <UI_SwimmerGallery gallery={res.gallery} />
             </div>
 
             <div className="flex flex-col items-center text-right gap-1 basis-1/3">
@@ -76,7 +70,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
           </div>
 
           <div className="w-full flex items-start gap-3 mb-2">
-            <div className="flex flex-col items-start basis-2/3 pr-2">
+            <div className="flex flex-col items-start basis-2/3 gap-1 min-w-0">
             {
               res.time_split && (
                 <div className="text-sm mb-1">
