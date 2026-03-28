@@ -28,6 +28,7 @@ export default defineConfig(({ command }) => ({
     outDir: 'dist',
     rollupOptions: {
       input: {
+        index: resolve(__dirname, 'index.html'),
         home: resolve(__dirname, 'home.html'),
         results_main: resolve(__dirname, 'results_main.html'),
         'results-youth-team': resolve(__dirname, 'results-youth-team.html'),
