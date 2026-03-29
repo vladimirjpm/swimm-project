@@ -18,6 +18,8 @@ namespace Swimm.Parser.Controllers
         public async Task<IActionResult> UploadAsync(
             [FromForm] IFormFile file,
             [FromForm] IFormFile? secondaryFile = null,
+            [FromForm] IFormFile? thirdFile = null,
+            [FromForm] IFormFile? fourthFile = null,
             [FromForm] string format = "IsrOrg",
             [FromForm] bool isAward = false,
             [FromForm] string? poolType = null)
@@ -41,10 +43,16 @@ namespace Swimm.Parser.Controllers
                 });
             }
 
+            var extraStreams = new List<(Stream Stream, string FileName)>();
             try
             {
                 await using var primaryStream = file.OpenReadStream();
                 Stream? secondaryStream = secondaryFile?.OpenReadStream();
+
+                if (thirdFile != null)
+                    extraStreams.Add((thirdFile.OpenReadStream(), thirdFile.FileName));
+                if (fourthFile != null)
+                    extraStreams.Add((fourthFile.OpenReadStream(), fourthFile.FileName));
 
                 var request = new ParseRequest(
                     PrimaryStream: primaryStream,
@@ -52,7 +60,8 @@ namespace Swimm.Parser.Controllers
                     SecondaryStream: secondaryStream,
                     SecondaryFileName: secondaryFile?.FileName,
                     IsAward: isAward,
-                    PoolType: poolType
+                    PoolType: poolType,
+                    ExtraStreams: extraStreams.Count > 0 ? extraStreams : null
                 );
 
                 // Try normative format first (for age records)
@@ -62,6 +71,8 @@ namespace Swimm.Parser.Controllers
                     var debugLog = parser.GetDebugLog();
                     if (secondaryStream != null)
                         await secondaryStream.DisposeAsync();
+                    foreach (var (s, _) in extraStreams)
+                        await s.DisposeAsync();
                     return Ok(new { format, normative, debugLog });
                 }
 
@@ -69,21 +80,29 @@ namespace Swimm.Parser.Controllers
                 primaryStream.Position = 0;
                 if (secondaryStream != null)
                     secondaryStream.Position = 0;
+                foreach (var (s, _) in extraStreams)
+                    s.Position = 0;
 
                 var results = parser.Parse(request).ToList();
                 var debugLog2 = parser.GetDebugLog();
 
                 if (secondaryStream != null)
                     await secondaryStream.DisposeAsync();
+                foreach (var (s, _) in extraStreams)
+                    await s.DisposeAsync();
 
                 return Ok(new { format, results, debugLog = debugLog2 });
             }
             catch (InvalidOperationException ex)
             {
+                foreach (var (s, _) in extraStreams)
+                    await s.DisposeAsync();
                 return BadRequest(new { error = ex.Message, debugLog = parser.GetDebugLog() });
             }
             catch (Exception ex)
             {
+                foreach (var (s, _) in extraStreams)
+                    await s.DisposeAsync();
                 return StatusCode(500, new { error = "Server error", detail = ex.Message, debugLog = parser.GetDebugLog() });
             }
         }
