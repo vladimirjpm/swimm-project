@@ -234,8 +234,17 @@
                 <label for="worldRecordsFile4">🇮🇱 ISR LCM (50м) — рекорды Израиля, длинная вода (опционально):</label>
                 <input type="file" id="worldRecordsFile4" name="fourthFile" accept=".xlsx,.xls" />
             </div>
-            <button type="submit" class="submit-btn">Загрузить</button>
+            <button type="submit" class="submit-btn">Загрузить файлы</button>
         </form>
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 2px dashed #ffcc80;">
+            <strong>Или загрузить напрямую с API World Aquatics:</strong>
+            <div style="margin-top: 8px;">
+                <button type="button" class="submit-btn" onclick="fetchFromApi()">🌐 Загрузить с API (WR + ISR)</button>
+            </div>
+            <div style="font-size: 11px; margin-top: 5px; color: #bf360c;">
+                Автоматически скачает 4 файла: WR SCM, WR LCM, ISR SCM, ISR LCM
+            </div>
+        </div>
     </div>
 
     <div id="resultContainer">
@@ -433,6 +442,60 @@
                 } else {
                     statusMessage.className = 'error';
                     statusMessage.innerText = 'Ошибка: ' + (data.error || response.statusText);
+                    let html = '<div class="error-details"><h4>Ошибка:</h4>';
+                    if (data.detail) html += '<p>' + data.detail + '</p>';
+                    if (data.stackTrace) html += '<pre>' + data.stackTrace + '</pre>';
+                    if (!data.detail && !data.stackTrace) html += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                    html += '</div>';
+                    resultDiv.innerHTML = html;
+                }
+            } catch (err) {
+                statusMessage.className = 'error';
+                statusMessage.innerText = 'Ошибка сети: ' + err.message;
+            }
+        }
+
+        async function fetchFromApi() {
+            const statusMessage = document.getElementById('statusMessage');
+            const resultDiv = document.getElementById('result');
+            const debugLogDiv = document.getElementById('debugLog');
+            const copyBtn = document.getElementById('copyBtn');
+            const downloadBtn = document.getElementById('downloadBtn');
+
+            statusMessage.className = '';
+            statusMessage.innerText = '🌐 Загрузка с API World Aquatics...';
+            resultDiv.textContent = '';
+            debugLogDiv.textContent = '';
+            debugLogDiv.style.display = 'none';
+            copyBtn.style.display = 'none';
+            downloadBtn.style.display = 'none';
+            lastResults = [];
+            lastNormative = null;
+
+            try {
+                const response = await fetch('/api/pdf/fetch-world-records', { method: 'POST' });
+                const data = await response.json();
+
+                lastDebugLog = data.debugLog || '';
+                debugLogDiv.textContent = lastDebugLog;
+                debugLogDiv.style.display = 'block';
+
+                if (response.ok) {
+                    if (data.normative) {
+                        lastNormative = data.normative;
+                        statusMessage.className = 'success';
+                        statusMessage.innerText = '✅ Успешно загружено с API! (нормативный формат) Записей: ' + getResultCount();
+                    } else {
+                        lastResults = data.results || [];
+                        statusMessage.className = 'success';
+                        statusMessage.innerText = '✅ Успешно загружено с API! Записей: ' + lastResults.length;
+                    }
+                    resultDiv.textContent = getFormattedJson();
+                    copyBtn.style.display = 'inline-block';
+                    downloadBtn.style.display = 'inline-block';
+                } else {
+                    statusMessage.className = 'error';
+                    statusMessage.innerText = 'Ошибка API: ' + (data.error || response.statusText);
                     let html = '<div class="error-details"><h4>Ошибка:</h4>';
                     if (data.detail) html += '<p>' + data.detail + '</p>';
                     if (data.stackTrace) html += '<pre>' + data.stackTrace + '</pre>';
