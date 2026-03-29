@@ -1,3 +1,5 @@
+$path = "Swimm.API\Services\DbSchemaService.cs"
+$content = @'
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Swimm.API.Data;
@@ -5,8 +7,8 @@ using Swimm.API.Data;
 namespace Swimm.API.Services;
 
 /// <summary>
-/// ???????????? ?????? ? ?????????? ????? ?? (???????, FK, ???????, CHECK, SP, Views, row counts).
-/// ????????? ??????????? ? ?????????? ???????? ?? AdminSettingsService.
+/// Предоставляет полную информацию о структуре БД (таблицы, FK, индексы, CHECK, SP, Views, row counts).
+/// Результат кешируется с длительностью из AdminSettingsService.
 /// </summary>
 public class DbSchemaService
 {
@@ -25,12 +27,12 @@ public class DbSchemaService
 
     public async Task<object> GetSchemaAsync(bool forceRefresh = false)
     {
-        // ???????? ForceRefresh � ???? true, ??? ???????????? ??? ?????? ???????
+        // Настройка ForceRefresh — если true, кеш обновляется при каждом запросе
         var alwaysRefresh = _settings.GetValue("ForceRefresh", false);
         if (forceRefresh || alwaysRefresh)
             _cache.Remove(CacheKey);
 
-        // ???????? SchemaCacheTTL � ????? ????? ???? ? ???????
+        // Настройка SchemaCacheTTL — время жизни кеша в минутах
         var ttlMinutes = _settings.GetValue("SchemaCacheTTL", 10);
 
         return (await _cache.GetOrCreateAsync(CacheKey, async entry =>
@@ -46,9 +48,9 @@ public class DbSchemaService
         await conn.OpenAsync();
         var dbName = conn.Database;
 
-        // ???????? DefaultSchema � ????? SQL-????? ?????????? (dbo, staging, etc.)
+        // Настройка DefaultSchema — имя SQL-схемы по умолчанию (dbo, staging и т. д.)
         var schema = _settings.GetValue("DefaultSchema", "dbo");
-        // ???????? ShowSystemTables � ?????????? ?? ??????? ? is_ms_shipped = 1
+        // Настройка ShowSystemTables — показывать ли таблицы с is_ms_shipped = 1
         var showSystem = _settings.GetValue("ShowSystemTables", false);
 
         var tables = await LoadTablesAsync(conn, schema);
@@ -308,3 +310,6 @@ public class DbSchemaService
         return list;
     }
 }
+'@
+[System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($false))
+Write-Output "DbSchemaService.cs written successfully"

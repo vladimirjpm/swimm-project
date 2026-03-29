@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Swimm.API.Models;
 
 /// <summary>
-/// ?????????? ???????????.
+/// Справочник спортсменов.
 /// </summary>
 [Index(nameof(LastName), nameof(FirstName))]
 [Index(nameof(LastNameEn), nameof(FirstNameEn))]

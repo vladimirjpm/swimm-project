@@ -23,7 +23,7 @@ public class AdminController : ControllerBase
     }
 
     /// <summary>
-    /// ?????? ????????????? ? ??????.
+    /// Список пользователей и ролей.
     /// </summary>
     [HttpGet("users")]
     public async Task<IActionResult> GetUsers()
@@ -50,7 +50,7 @@ public class AdminController : ControllerBase
     }
 
     /// <summary>
-    /// ?????? ????????? ?????.
+    /// Список доступных ролей.
     /// </summary>
     [HttpGet("roles")]
     public async Task<IActionResult> GetRoles()
@@ -65,7 +65,7 @@ public class AdminController : ControllerBase
     }
 
     /// <summary>
-    /// ????????? ???? ????????????.
+    /// Назначить роль пользователю.
     /// </summary>
     [HttpPost("users/{userId}/roles/{roleId}")]
     public async Task<IActionResult> AddRole(int userId, int roleId)
@@ -86,7 +86,7 @@ public class AdminController : ControllerBase
     }
 
     /// <summary>
-    /// ????? ???? ? ????????????.
+    /// Снять роль с пользователя.
     /// </summary>
     [HttpDelete("users/{userId}/roles/{roleId}")]
     public async Task<IActionResult> RemoveRole(int userId, int roleId)
@@ -103,7 +103,7 @@ public class AdminController : ControllerBase
     }
 
     /// <summary>
-    /// ????????/????????? ????????????.
+    /// Активировать/деактивировать пользователя.
     /// </summary>
     [HttpPatch("users/{userId}/active")]
     public async Task<IActionResult> SetActive(int userId, [FromBody] SetActiveRequest request)
@@ -119,7 +119,7 @@ public class AdminController : ControllerBase
     }
 
     /// <summary>
-    /// ?????????? ??? ????????.
+    /// Статистика для дашборда.
     /// </summary>
     [HttpGet("stats")]
     public async Task<IActionResult> GetStats()
@@ -141,7 +141,7 @@ public class AdminController : ControllerBase
     }
 
     /// <summary>
-    /// ?????????? ????? ??: ???????, ???????, FK, ???????, CHECK, ?????????, ?????.
+    /// Структура схемы БД: таблицы, колонки, FK, индексы, CHECK, процедуры, вьюхи.
     /// </summary>
     [HttpGet("db-schema")]
     public async Task<IActionResult> GetDbSchema([FromQuery] bool refresh = false)
@@ -151,7 +151,7 @@ public class AdminController : ControllerBase
     }
 
     /// <summary>
-    /// ??? ????????? ???????.
+    /// Все настройки сервера.
     /// </summary>
     [HttpGet("settings")]
     public IActionResult GetSettings()
@@ -160,7 +160,7 @@ public class AdminController : ControllerBase
     }
 
     /// <summary>
-    /// ???????? ???????? ?????????.
+    /// Обновить значение настройки.
     /// </summary>
     [HttpPut("settings/{key}")]
     public IActionResult UpdateSetting(string key, [FromBody] UpdateSettingRequest request)

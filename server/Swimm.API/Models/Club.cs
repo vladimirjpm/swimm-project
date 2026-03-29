@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Swimm.API.Models;
 
 /// <summary>
-/// ?????????? ??????.
+/// Справочник клубов.
 /// </summary>
 [Index(nameof(Name))]
 public class Club
@@ -14,11 +14,11 @@ public class Club
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public int Id { get; set; }
 
-    /// <summary>???????? ????? (?????/????????)</summary>
+    /// <summary>Название клуба (иврит/кириллица)</summary>
     [MaxLength(200)]
     public string Name { get; set; } = string.Empty;
 
-    /// <summary>???????? ????? (????.)</summary>
+    /// <summary>Название клуба (англ.)</summary>
     [MaxLength(200)]
     public string NameEn { get; set; } = string.Empty;
 }

@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Swimm.API.Models;
 
 /// <summary>
-/// ??????? ?????? ????????????.
+/// История входов пользователя.
 /// </summary>
 public class UserLoginHistory
 {
@@ -17,11 +17,11 @@ public class UserLoginHistory
     [ForeignKey(nameof(UserId))]
     public AppUser User { get; set; } = null!;
 
-    /// <summary>?????????, ????? ??????? ???????? ????</summary>
+    /// <summary>Провайдер, через который выполнен вход</summary>
     [Required, MaxLength(50)]
     public string Provider { get; set; } = string.Empty;
 
-    /// <summary>IP-????? (???? ????????)</summary>
+    /// <summary>IP-адрес (если доступен)</summary>
     [MaxLength(45)]
     public string? IpAddress { get; set; }
 

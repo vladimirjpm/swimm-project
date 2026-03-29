@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Swimm.API.Models;
 
 /// <summary>
-/// ???? ???????????? (Admin, User ? ?. ?.).
+/// Роль пользователя (Admin, User и т. д.).
 /// </summary>
 public class AppRole
 {
@@ -12,7 +12,7 @@ public class AppRole
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public int Id { get; set; }
 
-    /// <summary>???????? ???? (??????????)</summary>
+    /// <summary>Название роли (уникальное)</summary>
     [Required, MaxLength(50)]
     public string Name { get; set; } = string.Empty;
 }

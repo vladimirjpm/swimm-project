@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Swimm.API.Models;
 
 /// <summary>
-/// ?????????? ????????????.
+/// Справочник соревнований.
 /// </summary>
 public class Competition
 {
@@ -12,19 +12,19 @@ public class Competition
   [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
   public int Id { get; set; }
 
-  /// <summary>???????? ????????????</summary>
+  /// <summary>Название соревнования</summary>
   [MaxLength(300)]
   public string Name { get; set; } = string.Empty;
 
-  /// <summary>?????? ?????????? (ISR ? ?. ?.)</summary>
+  /// <summary>Страна проведения (ISR и т. д.)</summary>
   [MaxLength(10)]
   public string Country { get; set; } = string.Empty;
 
-  /// <summary>???? ???????????? ? ??????? dd/MM/yyyy</summary>
+  /// <summary>Дата соревнования в формате dd/MM/yyyy</summary>
   [MaxLength(20)]
   public string Date { get; set; } = string.Empty;
 
-  /// <summary>??? ????????: 25m / 50m</summary>
+  /// <summary>Тип бассейна: 25m / 50m</summary>
   [MaxLength(5)]
   public string PoolType { get; set; } = string.Empty;
 

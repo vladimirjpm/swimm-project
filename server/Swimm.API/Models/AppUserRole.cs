@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Swimm.API.Models;
 
 /// <summary>
-/// ????? ???????????? ? ????? (many-to-many).
+/// Связь пользователя и роли (many-to-many).
 /// </summary>
 public class AppUserRole
 {

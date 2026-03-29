@@ -1,4 +1,4 @@
-# Copilot Instructions
+﻿# Copilot Instructions
 
 ## Project Guidelines
 - При добавлении новых моделей, DbSet или FK-свойств в EF Core проект — всегда автоматически создавать миграцию командой `dotnet ef migrations add` после внесения изменений в код, не дожидаясь отдельной просьбы пользователя.
