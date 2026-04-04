@@ -8,6 +8,7 @@ import UI_DateIcon from '../../components/mix/date-icon/date-icon';
 import UI_LevelProgress from '../../components/mix/progress-level/level-progress';
 import SwimmerNameCell from '../../components/mix/swimmer-name-cell/swimmer-name-cell';
 import UI_SwimmerGallery from '../../components/mix/swimmer-gallery/swimmer-gallery';
+import UI_SwimmerTimeCell from '../../components/mix/swimmer-time-cell/swimmer-time-cell';
 import { ResultsTableRowProps } from './types';
 
 const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
@@ -21,7 +22,12 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
   hasInternationalPoints,
   levelInfo,
   updateFilter,
+  isMastersResult,
+  isAwardSource,
+  isRecordHolder,
 }) => {
+  const genderBgClass = res.event_style_gender === 'female' ? 'bg-pink-100' : 'bg-blue-100';
+
   const handleNameClick = () => {
     updateFilter({ selected_name: `${res.first_name}${res.last_name ? ' ' + res.last_name : ''}` });
   };
@@ -30,9 +36,9 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
     <>
       <div className="grid grid-cols-12 gap-2 px-4 pt-3 items-center">
         <div className="col-span-1 flex flex-col items-center self-start">
-          {res.position ? <UI_MedalIcon place={res.position.toString()} styleType={String(res.is_award) === 'true' ? 'icon-place' : 'icon-noplace'} /> : <>{`${index + 1}`}</>}
+          {res.position ? <UI_MedalIcon place={res.position.toString()} styleType={isAwardSource ? 'icon-place' : 'icon-noplace'} /> : <>{`${index + 1}`}</>}
           {(res as any).position_original != null && (res as any).position_original !== res.position && (
-            <div className="text-[10px] text-gray-400 mt-0.5 line-through"><UI_MedalIcon place={(res as any).position_original.toString()} styleSize='medal-16' styleType={String(res.is_award) === 'true' ? 'icon-place' : 'icon-noplace'} /></div>
+            <div className="text-[10px] text-gray-400 mt-0.5 line-through"><UI_MedalIcon place={(res as any).position_original.toString()} styleSize='medal-16' styleType={isAwardSource ? 'icon-place' : 'icon-noplace'} /></div>
           )}
           {showAge && <div className="font-bold text-sm mt-1"><span className='font-normal text-xs'>age:</span> {res.event_style_age}</div>}
         </div>
@@ -45,6 +51,8 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
             isRelay={res.is_relay}
             relaySwimmersList={res.relay_swimmers}
             onClick={handleNameClick}
+            className={genderBgClass}
+            isRecordHolder={isRecordHolder}
           />
           <UI_SwimmerGallery gallery={res.gallery} />
 
@@ -74,17 +82,29 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
           {showPoolType && <UI_PoolIcon styleType="icon-text-center" label={res.pool_type} labelClassName="text-base" />}
         </div>
 
-        <div className="col-span-2 text-xl font-bold self-start">{res.time}</div>
+        <div className="col-span-2 self-start">
+          <UI_SwimmerTimeCell
+            time={res.time}
+            time_split={res.time_split}
+            time_fail={res.time_fail}
+            time_fail_note={res.time_fail_note}
+            firstLineClassName="text-xl font-bold"
+            secondLineClassName="text-xs"
+            className={genderBgClass}
+            isRecordHolder={isRecordHolder}
+          />
+        </div>
 
         <div className="col-span-2 2xl:col-span-1 self-start">
           <UI_NormativeLevelIcon
             levelName={levelInfo.currentLevel}
             styleType="style-1"
             styleSize="size-2"
+            className="text-xs"
             styleName={res.event_style_name}
             styleLen={res.event_style_len}
             poolType={res.pool_type}
-            isMasters={res.is_masters}
+            isMasters={isMastersResult}
             normativeAgeGroup={levelInfo.normativeAgeGroup}
           />
         </div>

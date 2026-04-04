@@ -25,6 +25,8 @@ export default class Helper {
   // === Normative ===
   static resolvePoolType = HelperNormative.resolvePoolType;
   static getNormativeLevelInfo = HelperNormative.getNormativeLevelInfo;
+  static isResultMasters = HelperNormative.isResultMasters;
+  static isRecordHolder = HelperNormative.isRecordHolder;
 
   // === Results ===
   static sortByTime = HelperResults.sortByTime;

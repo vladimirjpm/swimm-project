@@ -1,6 +1,8 @@
 export interface ResultWrap {
     title?:string;
     results?: Result[];
+    is_masters?: boolean;
+    is_award?: boolean;
   }
   
   export interface Result {

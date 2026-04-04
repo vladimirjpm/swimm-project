@@ -20,6 +20,8 @@ type SourceConfig = {
   name: string;
   file: string;
   showCombineAllResults?: boolean;
+  is_masters?: boolean;
+  is_award?: boolean;
 };
 
 type Option = { value: string; label: string };
@@ -267,6 +269,8 @@ const DataSourceDDL: React.FC = () => {
   const [configLoaded, setConfigLoaded] = React.useState(false);
   // Map: source file -> showCombineAllResults flag from config (ref to avoid stale closures)
   const combineAllResultsMapRef = React.useRef<Record<string, boolean>>({});
+  const mastersMapRef = React.useRef<Record<string, boolean>>({});
+  const awardMapRef = React.useRef<Record<string, boolean>>({});
 
   // Load sources-config.json on mount
   React.useEffect(() => {
@@ -294,12 +298,18 @@ const DataSourceDDL: React.FC = () => {
         }
         const config = await resp.json() as { sources: SourceConfig[] };
         
-        // Build per-source showCombineAllResults map
+        // Build per-source config maps
         const combineMap: Record<string, boolean> = {};
+        const mastersMap: Record<string, boolean> = {};
+        const awardMap: Record<string, boolean> = {};
         for (const s of config.sources) {
           combineMap[s.file] = !!s.showCombineAllResults;
+          mastersMap[s.file] = !!s.is_masters;
+          awardMap[s.file] = !!s.is_award;
         }
         combineAllResultsMapRef.current = combineMap;
+        mastersMapRef.current = mastersMap;
+        awardMapRef.current = awardMap;
         
         // Filter allDataSources by config
         const allowedFiles = new Set(config.sources.map(s => s.file));
@@ -439,6 +449,10 @@ const DataSourceDDL: React.FC = () => {
     // Determine showCombineAllResults: true only if ALL selected sources have it enabled
     const showCombine = picked.length > 0 && picked.every((p) => p.file && combineAllResultsMapRef.current[p.file]);
 
+    // Determine is_masters / is_award: true if ANY selected source has it enabled
+    const isMasters = picked.some((p) => p.file && mastersMapRef.current[p.file]);
+    const isAward = picked.some((p) => p.file && awardMapRef.current[p.file]);
+
     let datasets: Result[][];
     try {
       datasets = await Promise.all(picked.map((p) => p.load()));
@@ -453,7 +467,7 @@ const DataSourceDDL: React.FC = () => {
     if (!maxInfo) {
       dispatch(
         rootActions.updateState({
-          dataSourceSelected: { results: combinedData, title: combinedName },
+          dataSourceSelected: { results: combinedData, title: combinedName, is_masters: isMasters, is_award: isAward },
           showCombineAllResults: showCombine,
         }),
       );
@@ -467,6 +481,8 @@ const DataSourceDDL: React.FC = () => {
         dataSourceSelected: {
           results: combinedData,
           title: combinedName,
+          is_masters: isMasters,
+          is_award: isAward,
         },
         filterSelected: {
           ...filters,

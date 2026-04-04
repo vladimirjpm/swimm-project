@@ -79,7 +79,7 @@ function TrainingTableBySet({
                   styleName: res.event_style_name,
                   distance: `${res.event_style_len}m`,
                   time: Helper.parseTimeToSeconds(res.time),
-                  isMaster: String(res.is_masters) === 'true' || String(res.is_masters) === '1',
+                  isMaster: Helper.isResultMasters(!!selectedSource?.is_masters, res.event_style_age),
                   event_style_age: res.event_style_age,
                 });
 
@@ -158,7 +158,7 @@ function TrainingTableBySet({
                               styleName={res.event_style_name}
                               styleLen={res.event_style_len}
                               poolType={res.pool_type}
-                              isMasters={res.is_masters}
+                              isMasters={Helper.isResultMasters(!!selectedSource?.is_masters, res.event_style_age)}
                               normativeAgeGroup={levelInfo.normativeAgeGroup}
                             />
                           </div>

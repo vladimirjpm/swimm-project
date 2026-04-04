@@ -10,8 +10,27 @@ const FilterAge: React.FC = () => {
   const dispatch = useAppDispatch();
   const filters = useAppSelector((state) => state.filterSelected);
   const filteredByTypeResults = useFilteredByTypeResults();
+  const isMasters = useAppSelector((state) => !!state.dataSourceSelected?.is_masters);
 
   const availableAges = useMemo(() => {
+    if (isMasters) {
+      // Masters mode: collect unique age_group values ("25-29", "30-34", ...)
+      const ageGroupSet = new Set<string>();
+      filteredByTypeResults.forEach((item) => {
+        if (item.age_group) {
+          ageGroupSet.add(item.age_group);
+        }
+      });
+      const sorted = Array.from(ageGroupSet).sort(
+        (a, b) => Number(a.split('-')[0]) - Number(b.split('-')[0]),
+      );
+      return {
+        birthYears: ['all', ...sorted],
+        compYears: [] as number[],
+        isMastersMode: true,
+      };
+    }
+
     const birthYearSet = new Set<number>();
     filteredByTypeResults.forEach((item) => {
       if (item.birth_year) {
@@ -37,8 +56,9 @@ const FilterAge: React.FC = () => {
     return {
       birthYears: ['all', ...sorted.map(String)],
       compYears: compYearsArr,
+      isMastersMode: false,
     };
-  }, [filteredByTypeResults]);
+  }, [filteredByTypeResults, isMasters]);
 
   const updateFilter = (newFilter: Partial<typeof filters>) => {
     dispatch(
@@ -51,8 +71,8 @@ const FilterAge: React.FC = () => {
   return (
     <div className="flex flex-col">
       <h3 className="font-semibold">
-        Age (multi-select with long-press)
-        {filters.age_to && filters.age !== 'all' && (
+        {availableAges.isMastersMode ? 'Age Group' : 'Age (multi-select with long-press)'}
+        {!availableAges.isMastersMode && filters.age_to && filters.age !== 'all' && (
           <span className="ml-2 text-sm font-normal text-blue-600">
             birth year: {filters.age}–{filters.age_to}
           </span>
@@ -61,6 +81,7 @@ const FilterAge: React.FC = () => {
       <div className="flex flex-wrap">
         {availableAges.birthYears.map((by) => {
           const isInRange =
+            !availableAges.isMastersMode &&
             filters.age !== 'all' &&
             filters.age_to &&
             by !== 'all' &&
@@ -69,7 +90,7 @@ const FilterAge: React.FC = () => {
           const isActive = filters.age === by && !filters.age_to;
 
           let ageLabel = '';
-          if (by !== 'all' && availableAges.compYears.length > 0) {
+          if (!availableAges.isMastersMode && by !== 'all' && availableAges.compYears.length > 0) {
             const ages = availableAges.compYears.map(
               (cy) => cy - Number(by),
             );

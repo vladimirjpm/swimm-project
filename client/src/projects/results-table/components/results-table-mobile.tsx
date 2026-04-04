@@ -7,6 +7,7 @@ import UI_LevelProgress from '../../components/mix/progress-level/level-progress
 import UI_NormativeLevelIcon from '../../components/mix/normative-level-icon/normative-level-icon';
 import SwimmerNameCell from '../../components/mix/swimmer-name-cell/swimmer-name-cell';
 import UI_SwimmerGallery from '../../components/mix/swimmer-gallery/swimmer-gallery';
+import UI_SwimmerTimeCell from '../../components/mix/swimmer-time-cell/swimmer-time-cell';
 import { ResultsTableRowProps } from './types';
 
 const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
@@ -20,7 +21,12 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
   hasInternationalPoints,
   levelInfo,
   updateFilter,
+  isMastersResult,
+  isAwardSource,
+  isRecordHolder,
 }) => {
+  const genderBgClass = res.event_style_gender === 'female' ? 'bg-pink-100' : 'bg-blue-100';
+
   const handleNameClick = () => {
     updateFilter({ selected_name: `${res.first_name}${res.last_name ? ' ' + res.last_name : ''}` });
   };
@@ -29,9 +35,9 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
     <>
       <div className="flex items-start gap-4">
         <div className="flex flex-col items-center shrink-0">
-          {res.position ? <UI_MedalIcon place={res.position.toString()} styleType={String(res.is_award) === 'true' ? 'icon-place' : 'icon-noplace'} /> : <span className="text-lg font-bold">{index + 1}</span>}
+          {res.position ? <UI_MedalIcon place={res.position.toString()} styleType={isAwardSource ? 'icon-place' : 'icon-noplace'} /> : <span className="text-lg font-bold">{index + 1}</span>}
           {(res as any).position_original != null && (res as any).position_original !== res.position && (
-            <div className="text-[10px] text-gray-400 mt-0.5 line-through"><UI_MedalIcon place={(res as any).position_original.toString()} styleSize='medal-16' styleType={String(res.is_award) === 'true' ? 'icon-place' : 'icon-noplace'} /></div>
+            <div className="text-[10px] text-gray-400 mt-0.5 line-through"><UI_MedalIcon place={(res as any).position_original.toString()} styleSize='medal-16' styleType={isAwardSource ? 'icon-place' : 'icon-noplace'} /></div>
           )}
           {showAge && <div className="font-bold text-sm mt-1"><span className='font-normal text-xs'>age:</span> {res.event_style_age} </div>}
         </div>
@@ -48,13 +54,24 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
                 onClick={handleNameClick}
                 firstLineClassName="text-xl font-bold truncate1 min-w-0"
                 secondLineClassName="text-sm mt-0.5"
+                className={genderBgClass}
                 showClubIcon={showClub}
+                isRecordHolder={isRecordHolder}
               />
               <UI_SwimmerGallery gallery={res.gallery} />
             </div>
 
             <div className="flex flex-col items-center text-right gap-1 basis-1/3">
-              <div className="text-lg font-bold">{res.time}</div>
+              <UI_SwimmerTimeCell
+                time={res.time}
+                time_split={res.time_split}
+                time_fail={res.time_fail}
+                time_fail_note={res.time_fail_note}
+                firstLineClassName="text-lg font-bold"
+                secondLineClassName="text-xs"
+                className={`text-right ${genderBgClass}`}
+                isRecordHolder={isRecordHolder}
+              />
               {showEvent && (
                 <UI_SwimmStyleIcon
                   styleName={res.event_style_name}
@@ -71,13 +88,6 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
 
           <div className="w-full flex items-start gap-3 mb-2">
             <div className="flex flex-col items-start basis-2/3 gap-1 min-w-0">
-            {
-              res.time_split && (
-                <div className="text-sm mb-1">
-                  Time split: <span className="text-xs font-bold theme-text-muted">{res.time_split}</span>
-                </div>
-              )
-            }
               {hasInternationalPoints && (
                 <div className="text-left text-sm">Points: {res.international_points ?? ''}</div>
               )}
@@ -102,7 +112,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
                 styleName={res.event_style_name}
                 styleLen={res.event_style_len}
                 poolType={res.pool_type}
-                isMasters={res.is_masters}
+                isMasters={isMastersResult}
                 normativeAgeGroup={levelInfo.normativeAgeGroup}
               />
             </div>

@@ -102,6 +102,16 @@
             color: #fff;
             border-color: #fb8c00;
         }
+        .tab-mastersrecords {
+            background-color: #fce4ec;
+            color: #880e4f;
+            border-color: #f48fb1;
+        }
+        .tab-mastersrecords.active {
+            background-color: #d81b60;
+            color: #fff;
+            border-color: #d81b60;
+        }
 
         .tab-content {
             display: none;
@@ -122,6 +132,10 @@
             background-color: #fff3e0;
             border: 2px solid #ffcc80;
         }
+        .tab-content-mastersrecords {
+            background-color: #fce4ec;
+            border: 2px solid #f48fb1;
+        }
         .tab-content .info-hint {
             font-size: 13px;
             margin-bottom: 15px;
@@ -140,6 +154,10 @@
             background-color: #ffe0b2;
             color: #bf360c;
         }
+        .tab-content-mastersrecords .info-hint {
+            background-color: #f8bbd0;
+            color: #880e4f;
+        }
         .tab-content .submit-btn {
             padding: 10px 24px;
             color: white;
@@ -155,6 +173,8 @@
         .tab-content-agerecords .submit-btn:hover { background-color: #2e7d32; }
         .tab-content-worldrecords .submit-btn { background-color: #fb8c00; }
         .tab-content-worldrecords .submit-btn:hover { background-color: #e65100; }
+        .tab-content-mastersrecords .submit-btn { background-color: #d81b60; }
+        .tab-content-mastersrecords .submit-btn:hover { background-color: #880e4f; }
     </style>
 </head>
 <body>
@@ -165,6 +185,7 @@
     <div class="tabs">
         <div class="tab tab-isrorg active" onclick="switchTab('isrorg')">🏊 IsrOrg (соревнования)</div>
         <div class="tab tab-agerecords" onclick="switchTab('agerecords')">🏅 IsrOrgAgeRecords (рекорды)</div>
+        <div class="tab tab-mastersrecords" onclick="switchTab('mastersrecords')">🏆 IsrOrgMastersRecords (мастерс)</div>
         <div class="tab tab-worldrecords" onclick="switchTab('worldrecords')">🌍 WorldRecords (мировые рекорды)</div>
     </div>
 
@@ -211,7 +232,26 @@
         </form>
     </div>
 
-    <!-- Tab 3: WorldRecords -->
+    <!-- Tab 3: IsrOrgMastersRecords -->
+    <div id="tab-mastersrecords" class="tab-content tab-content-mastersrecords">
+        <div class="info-hint">
+            Загрузите PDF с рекордами мастерс Израиля. Результат — нормативный JSON (gender → pool → style → distance → age-group).
+            Возрастные группы выше 90-94 игнорируются (эстафеты).
+        </div>
+        <form id="uploadFormMastersRecords" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="mastersRecordsFile50">🏊 PDF — бассейн 50м (обязательно):</label>
+                <input type="file" id="mastersRecordsFile50" name="file" accept="application/pdf" required />
+            </div>
+            <div class="form-group">
+                <label for="mastersRecordsFile25">🌊 PDF — бассейн 25м (опционально):</label>
+                <input type="file" id="mastersRecordsFile25" name="secondaryFile" accept="application/pdf" />
+            </div>
+            <button type="submit" class="submit-btn">Загрузить</button>
+        </form>
+    </div>
+
+    <!-- Tab 4: WorldRecords -->
     <div id="tab-worldrecords" class="tab-content tab-content-worldrecords">
         <div class="info-hint">
             Загрузите XLSX с рекордами (WR + ISR). Результат — нормативный JSON (gender → pool → style → distance → ISR/WR).
@@ -295,6 +335,9 @@
                 // Collapse leaf record entries (time/name/country/record_date) into single lines
                 json = json.replace(/\{\n\s+"time": "([^"]*)",\n\s+"name": "([^"]*)",\n\s+"country": "([^"]*)",\n\s+"record_date": "([^"]*)"\n\s+\}/g,
                     '{"time": "$1", "name": "$2", "country": "$3", "record_date": "$4"}');
+                // Collapse leaf masters entries (time/name/club/record_date) into single lines
+                json = json.replace(/\{\n\s+"time": "([^"]*)",\n\s+"name": "([^"]*)",\n\s+"club": "([^"]*)",\n\s+"record_date": "([^"]*)"\n\s+\}/g,
+                    '{"time": "$1", "name": "$2", "club": "$3", "record_date": "$4"}');
                 return json;
             }
             return '[\n' + lastResults.map(item => '  ' + JSON.stringify(item)).join(',\n') + '\n]';
@@ -530,6 +573,18 @@
                 document.getElementById('ageRecordsFile50'),
                 null,
                 '25m'
+            );
+        };
+
+        // IsrOrgMastersRecords form
+        document.getElementById('uploadFormMastersRecords').onsubmit = function(e) {
+            e.preventDefault();
+            submitUpload(
+                'IsrOrgMastersRecords',
+                document.getElementById('mastersRecordsFile50'),
+                document.getElementById('mastersRecordsFile25'),
+                null,
+                '50m'
             );
         };
 

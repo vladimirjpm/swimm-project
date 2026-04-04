@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Swimm.Parser.Services.Parsers.IsrOrg;
 using Swimm.Parser.Services.Parsers.IsrOrgAgeRecords;
+using Swimm.Parser.Services.Parsers.IsrOrgMastersRecords;
 using Swimm.Parser.Services.Parsers.WorldRecords;
 
 namespace Swimm.Parser.Services.Parsers;
@@ -15,6 +16,7 @@ public static class ParserFactory
     {
         Register(new IsrOrgParser());
         Register(new IsrOrgAgeRecordsParser());
+        Register(new IsrOrgMastersRecordsParser());
         Register(new WorldRecordsParser());
     }
 

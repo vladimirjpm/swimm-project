@@ -16,6 +16,8 @@ import { recalculatePositions } from '../../utils/helpers/recalculate-positions'
 function SportsmenDetails() {
  const filters = useAppSelector((state) => state.filterSelected);
   const selectedSource = useAppSelector((state) => state.dataSourceSelected);
+  const isMastersSource = !!selectedSource?.is_masters;
+  const isAwardSource = !!selectedSource?.is_award;
 
   if (!selectedSource || !selectedSource.results?.length) {
     return <div className="text-gray-500 italic">No data source selected.</div>;
@@ -34,9 +36,9 @@ function SportsmenDetails() {
     }));
   }, [selectedSource, isRecalculated]);
 
-  const sortedBestResults = Helper.getBestResultsByStyle(effectiveResults, filters.selected_name);  
+  const sortedBestResults = Helper.getBestResultsByStyle(effectiveResults, filters.selected_name, isMastersSource);  
   const pointsSum = Helper.getInternationalPointsSumByName(effectiveResults, filters.selected_name);
-  const medalCounts = Helper.getMedalCountsByName(effectiveResults, filters.selected_name);
+  const medalCounts = Helper.getMedalCountsByName(effectiveResults, filters.selected_name, isAwardSource);
   const firstResult = sortedBestResults[0];
   //console.log('firstResult sportsmen:', firstResult);
 
@@ -58,7 +60,7 @@ function SportsmenDetails() {
                 styleName={firstResult.event_style_name}
                 styleLen={firstResult.event_style_len}
                 poolType={firstResult.pool_type}
-                isMasters={firstResult.is_masters}
+                isMasters={Helper.isResultMasters(isMastersSource, firstResult.event_style_age)}
                 normativeAgeGroup={firstResult.levelInfo.normativeAgeGroup}
               />
               <div className='flex flex-col'>
@@ -83,7 +85,7 @@ function SportsmenDetails() {
       {sortedBestResults.length > 0 && (
   <div className="mt-6">
     <h2 className="text-xl font-semibold mb-2">Top results by style</h2>
-    <TopResultsTabs sortedBestResults={sortedBestResults} />
+    <TopResultsTabs sortedBestResults={sortedBestResults} isMastersSource={isMastersSource} isAwardSource={isAwardSource} />
   </div>
 )}
 
@@ -92,7 +94,7 @@ function SportsmenDetails() {
 }
 
 // Компонент табов для Training/Competition
-function TopResultsTabs({ sortedBestResults }: { sortedBestResults: any[] }) {
+function TopResultsTabs({ sortedBestResults, isMastersSource, isAwardSource }: { sortedBestResults: any[]; isMastersSource: boolean; isAwardSource: boolean }) {
   // Разделяем результаты на training и competition
   const trainingResults = useMemo(() => {
     return sortedBestResults.filter(r => !!r.training?.trainingId);
@@ -107,15 +109,13 @@ function TopResultsTabs({ sortedBestResults }: { sortedBestResults: any[] }) {
   const [activeTab, setActiveTab] = useState<'training' | 'competition'>(initialTab);
 
   // Проверяем, есть ли хотя бы один результат с is_masters
-  const hasMasters = useMemo(() => {
-    return sortedBestResults.some(r => String(r.is_masters) === 'true' || String(r.is_masters) === '1');
-  }, [sortedBestResults]);
+  const hasMasters = isMastersSource;
 
   // Если нет masters — показываем все результаты без табов
   if (!hasMasters) {
     return (
       <div className="max-h-[50vh] overflow-y-auto border rounded shadow">
-        <ResultsTable results={sortedBestResults} />
+        <ResultsTable results={sortedBestResults} isMastersSource={isMastersSource} isAwardSource={isAwardSource} />
       </div>
     );
   }
@@ -150,7 +150,7 @@ function TopResultsTabs({ sortedBestResults }: { sortedBestResults: any[] }) {
 
       {/* Таблица результатов */}
       {currentResults.length > 0 ? (
-        <ResultsTable results={currentResults} />
+        <ResultsTable results={currentResults} isMastersSource={isMastersSource} isAwardSource={isAwardSource} />
       ) : (
         <div className="text-gray-500 italic p-4">No {activeTab} results</div>
       )}
@@ -159,7 +159,7 @@ function TopResultsTabs({ sortedBestResults }: { sortedBestResults: any[] }) {
 }
 
 // Вынесенная таблица результатов
-function ResultsTable({ results }: { results: any[] }) {
+function ResultsTable({ results, isMastersSource, isAwardSource }: { results: any[]; isMastersSource: boolean; isAwardSource: boolean }) {
   const hasInternationalPoints = results.some(
     (r) => r.international_points !== undefined && r.international_points !== null && !isNaN(Number(r.international_points))
   );
@@ -179,7 +179,7 @@ function ResultsTable({ results }: { results: any[] }) {
                 {/* Column 1: Position + Age */}
                 <div className="flex flex-col items-center justify-start">
                   {res.position ? (
-                    <UI_MedalIcon place={res.position.toString()} styleType={String(res.is_award) === 'true' ? 'icon-place' : 'icon-noplace'} />
+                    <UI_MedalIcon place={res.position.toString()} styleType={isAwardSource ? 'icon-place' : 'icon-noplace'} />
                   ) : (
                     <span className="text-lg font-bold">{index + 1}</span>
                   )}
@@ -220,7 +220,7 @@ function ResultsTable({ results }: { results: any[] }) {
                       styleName={res.event_style_name}
                       styleLen={res.event_style_len}
                       poolType={res.pool_type}
-                      isMasters={res.is_masters}
+                      isMasters={Helper.isResultMasters(isMastersSource, res.event_style_age)}
                       normativeAgeGroup={levelInfo.normativeAgeGroup}
                     />
                   ) : (

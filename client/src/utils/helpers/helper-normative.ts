@@ -30,6 +30,21 @@ const normsMasters =
   null;
 
 export default class HelperNormative {
+  /** Minimum age to qualify as masters */
+  static readonly MIN_MASTERS_AGE = 25;
+
+  /**
+   * Determines if a specific result qualifies as masters.
+   * Even if the source is masters, results with age below MIN_MASTERS_AGE are not masters.
+   */
+  static isResultMasters(isMastersSource: boolean, eventStyleAge?: string | number | null): boolean {
+    if (!isMastersSource) return false;
+    if (eventStyleAge == null || eventStyleAge === '') return false;
+    const age = Number(eventStyleAge);
+    if (isNaN(age)) return false;
+    return age >= HelperNormative.MIN_MASTERS_AGE;
+  }
+
   /**
    * Нормализует тип бассейна
    */
@@ -195,5 +210,73 @@ export default class HelperNormative {
         normativeAgeGroup: null,
       };
     }
+  }
+
+  /**
+   * Checks if the swimmer's name matches the record holder for their event.
+   * Works for both age records and masters records.
+   */
+  static isRecordHolder({
+    swimmerName,
+    gender,
+    poolType,
+    styleName,
+    distance,
+    age,
+    isMasters,
+  }: {
+    swimmerName: string;
+    gender: string;
+    poolType: string;
+    styleName: string;
+    distance: string;
+    age: string | number | null | undefined;
+    isMasters: boolean;
+  }): boolean {
+    if (!swimmerName || !styleName || !distance) return false;
+
+    const data = isMasters
+      ? (window as any).normative_masters_record
+      : (window as any).normative_age_record;
+    if (!data?.normatives) return false;
+
+    const resolvedPool = HelperNormative.resolvePoolType(poolType);
+    const distanceData = data.normatives?.[gender]?.[resolvedPool]?.[styleName]?.[distance];
+    if (!distanceData) return false;
+
+    const ageStr = age != null ? String(age).trim() : '';
+    if (!ageStr) return false;
+
+    // For masters: age key is age-group like "25-29", for non-masters: age key like "12"
+    let record = distanceData[ageStr];
+
+    // If no exact match for masters, try to find the age group range
+    if (!record && isMasters) {
+      const ageNum = parseInt(ageStr, 10);
+      if (!isNaN(ageNum)) {
+        for (const key of Object.keys(distanceData)) {
+          const m = key.match(/^(\d+)-(\d+)$/);
+          if (m && ageNum >= Number(m[1]) && ageNum <= Number(m[2])) {
+            record = distanceData[key];
+            break;
+          }
+        }
+      }
+    }
+
+    if (!record?.name) return false;
+
+    const nameA = swimmerName.trim();
+    const nameB = record.name.trim();
+    if (nameA === nameB) return true;
+
+    // Check reversed order: "First Last" vs "Last First"
+    const partsA = nameA.split(/\s+/);
+    if (partsA.length === 2) {
+      const reversed = `${partsA[1]} ${partsA[0]}`;
+      if (reversed === nameB) return true;
+    }
+
+    return false;
   }
 }

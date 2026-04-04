@@ -14,4 +14,7 @@ export interface ResultsTableRowProps {
   clubPoints?: number;
   levelInfo: NormativeLevelInfo;
   updateFilter: (filter: Partial<FilterSelected>) => void;
+  isMastersResult?: boolean;
+  isAwardSource?: boolean;
+  isRecordHolder?: boolean;
 }

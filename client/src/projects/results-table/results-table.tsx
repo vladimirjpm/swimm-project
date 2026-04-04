@@ -16,11 +16,15 @@ import { TOP_N_POSITIONS } from '../../utils/constants/filter-constants';
 import HelperSwimmer from '../../utils/helpers/helper-swimmer';
 import { recalculatePositions } from '../../utils/helpers/recalculate-positions';
 import NormativeAgeRecords from './components/normative-age-records';
+import NormativeMastersRecords from './components/normative-masters-records';
+import '../components/mix/text-effect/text-effect.css';
 
 function ResultsTable() {
   const dispatch = useAppDispatch();
   const selectedSource = useAppSelector((state) => state.dataSourceSelected);
   const filters = useAppSelector((state) => state.filterSelected);
+  const isMastersSource = !!selectedSource?.is_masters;
+  const isAwardSource = !!selectedSource?.is_award;
 
   if (!selectedSource || !selectedSource.results?.length) {
     return <div className="text-gray-500 italic">No data source selected.</div>;
@@ -71,9 +75,11 @@ function ResultsTable() {
       (!style_name || res.event_style_name === style_name) &&
       (!style_len || res.event_style_len === style_len.toString()) &&
       (age === 'all' || (
-        filters.age_to
-          ? Number(res.birth_year) >= Number(age) && Number(res.birth_year) <= Number(filters.age_to)
-          : res.birth_year?.toString() === age
+        /^\d+-\d+$/.test(age)
+          ? res.age_group === age
+          : filters.age_to
+            ? Number(res.birth_year) >= Number(age) && Number(res.birth_year) <= Number(filters.age_to)
+            : res.birth_year?.toString() === age
       )) &&
       (club === 'all' || res.club === club)
     );
@@ -85,7 +91,7 @@ function ResultsTable() {
     let bestInfo: import('../../store/store').BestLevelInfo | null = null;
 
     for (const res of baseFilteredResults) {
-      const isMaster = String(res.is_masters) === 'true' || String(res.is_masters) === '1';
+      const isMaster = Helper.isResultMasters(isMastersSource, res.event_style_age);
       const resolvedGender = Helper.resolveGender(res.event_style_gender);
       const levelInfo = Helper.getNormativeLevelInfo({
         gender: resolvedGender === 'none' ? 'male' : resolvedGender,
@@ -120,7 +126,7 @@ function ResultsTable() {
     if (!level_filter || level_filter === 'all') return baseFilteredResults;
 
     return baseFilteredResults.filter((res) => {
-      const isMaster = String(res.is_masters) === 'true' || String(res.is_masters) === '1';
+      const isMaster = Helper.isResultMasters(isMastersSource, res.event_style_age);
       const resolvedGender = Helper.resolveGender(res.event_style_gender);
       const levelInfo = Helper.getNormativeLevelInfo({
         gender: resolvedGender === 'none' ? 'male' : resolvedGender,
@@ -231,13 +237,24 @@ function ResultsTable() {
           showPoolType={showPoolType}
           showEvent={showEvent}
         />      
-        <NormativeAgeRecords
-          gender={filters.gender}
-          poolType={filters.pool_type}
-          styleName={filters.style_name}
-          styleLen={filters.style_len}
-          age={filters.age}
-        />
+        {!isMastersSource && (
+          <NormativeAgeRecords
+            gender={filters.gender}
+            poolType={filters.pool_type}
+            styleName={filters.style_name}
+            styleLen={filters.style_len}
+            age={filters.age}
+          />
+        )}
+        {isMastersSource && (
+          <NormativeMastersRecords
+            gender={filters.gender}
+            poolType={filters.pool_type}
+            styleName={filters.style_name}
+            styleLen={filters.style_len}
+            age={filters.age}
+          />
+        )}
         
         <div className="max-h-[650px] overflow-y-auto border rounded shadow" >
           {/* Unified header (single view for all sizes) */}
@@ -255,8 +272,19 @@ function ResultsTable() {
           <ul className="divide-y">
             {displayResults.map((res, index) => {
               const clubPoints = clubPointsByKey[getResultKey(res)];
-              const isMaster = String(res.is_masters) === 'true' || String(res.is_masters) === '1';
+              const isMaster = Helper.isResultMasters(isMastersSource, res.event_style_age);
               const resolvedGender = Helper.resolveGender(res.event_style_gender);
+              const swimmerName = `${res.first_name}${res.last_name ? ' ' + res.last_name : ''}`;
+              const genderForRecord = resolvedGender === 'none' ? 'male' : resolvedGender;
+              const isRecordHolder = Helper.isRecordHolder({
+                swimmerName,
+                gender: genderForRecord,
+                poolType: res.pool_type,
+                styleName: res.event_style_name,
+                distance: `${res.event_style_len}m`,
+                age: res.event_style_age,
+                isMasters: isMaster,
+              });
               const levelInfo = Helper.getNormativeLevelInfo({
                 gender: resolvedGender === 'none' ? 'male' : resolvedGender,
                 poolType: Helper.resolvePoolType(res.pool_type),
@@ -284,6 +312,9 @@ function ResultsTable() {
                       clubPoints={clubPoints}
                       levelInfo={levelInfo}
                       updateFilter={updateFilter}
+                      isMastersResult={isMaster}
+                      isAwardSource={isAwardSource}
+                      isRecordHolder={isRecordHolder}
                     />
                   </li>
 
@@ -302,6 +333,9 @@ function ResultsTable() {
                       clubPoints={clubPoints}
                       levelInfo={levelInfo}
                       updateFilter={updateFilter}
+                      isMastersResult={isMaster}
+                      isAwardSource={isAwardSource}
+                      isRecordHolder={isRecordHolder}
                     />
                   </li>
 
@@ -320,6 +354,9 @@ function ResultsTable() {
                       clubPoints={clubPoints}
                       levelInfo={levelInfo}
                       updateFilter={updateFilter}
+                      isMastersResult={isMaster}
+                      isAwardSource={isAwardSource}
+                      isRecordHolder={isRecordHolder}
                     />
                   </li>
                 </React.Fragment>

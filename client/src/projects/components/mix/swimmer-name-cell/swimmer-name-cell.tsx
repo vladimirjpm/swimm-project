@@ -1,6 +1,7 @@
 import React from 'react';
 import { RelaySwimmer } from '../../../../utils/interfaces/results';
 import UI_ClubIcon from '../club-icon/club-icon';
+import '../text-effect/text-effect.css';
 
 interface SwimmerNameCellProps {
   firstName: string;
@@ -16,6 +17,7 @@ interface SwimmerNameCellProps {
   secondLineClassName?: string;
   className?: string;
   showClubIcon?: boolean;
+  isRecordHolder?: boolean;
 }
 
 const SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
@@ -32,6 +34,7 @@ const SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
   secondLineClassName = 'text-xs',
   className = '',
   showClubIcon = false,
+  isRecordHolder = false,
 }) => {
   const displayName = isRelay
     ? club || 'Relay Team'
@@ -63,8 +66,9 @@ const SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
   }
 
   return (
-    <div className={`${className} overflow-hidden`} onClick={onClick}>
-    <div className={`${onClick ? 'cursor-pointer' : ''}`}>
+    <div className={`${isRecordHolder ? 'glow-div' : ''} ${onClick ? 'cursor-pointer' : ''}`} onClick={onClick}>
+     <div className={`${isRecordHolder ? `${className} px-2 rounded-lg` : className}`}>
+      {isRecordHolder && <div className="text-xs font-semibold">Record Holder</div>}
       <div className={`${firstLineClassName} overflow-hidden`}>{displayName}</div>
       {relayList}
       {subText && <div className={`flex items-center ${secondLineClassName}`}>        

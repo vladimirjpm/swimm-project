@@ -31,6 +31,7 @@ export default class HelperSwimmer {
   static getBestResultsByStyle(
     results: Result[],
     selectedName: string,
+    isMasters = false,
   ): Array<Result & { levelInfo: NormativeLevelInfo }> {
     const filteredResults = results.filter((res) => {
       const nameLower = selectedName.toLowerCase();
@@ -83,7 +84,7 @@ export default class HelperSwimmer {
 
     const sortedBestResults = Array.from(groupedMap.values())
       .map((res) => {
-        const isMaster = String(res.is_masters) === 'true' || String(res.is_masters) === '1';
+        const isMaster = HelperNormative.isResultMasters(isMasters, res.event_style_age);
         const resolvedGender = HelperGender.resolveGender(res.event_style_gender);
         const levelInfo = HelperNormative.getNormativeLevelInfo({
           gender: resolvedGender,
@@ -121,6 +122,7 @@ export default class HelperSwimmer {
   static getMedalCountsByName(
     results: Result[],
     selectedName: string,
+    isAward = false,
   ): {
     first: Result[];
     second: Result[];
@@ -164,7 +166,7 @@ export default class HelperSwimmer {
     };
 
     filteredResults.forEach((res) => {
-      if (res.position !== null && res.position !== undefined && String(res.is_award) === 'true') {
+      if (res.position !== null && res.position !== undefined && isAward) {
         const pos = Number(res.position);
         const note = `${res.event_style_name} ${res.event_style_len}м`;
 
