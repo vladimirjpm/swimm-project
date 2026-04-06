@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Swimm — API Reference</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/api.css" />
+</head>
+<body class="min-h-screen text-gray-300 text-sm">
+
+<header class="flex justify-between items-center px-8 py-4 bg-black/30">
+    <h1 class="text-[#ffa726] text-xl">📡 API Reference</h1>
+    <nav class="flex gap-5">
+        <a href="/" class="text-[#4fc3f7] no-underline text-sm hover:underline">← Home</a>
+        <a href="/admin/" class="text-[#4fc3f7] no-underline text-sm hover:underline">🔧 Admin</a>
+        <a href="/admin/db.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">🗄️ DB Schema</a>
+        <a href="/admin/settings.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">⚙️ Settings</a>
+        <a href="/auth/logout" class="text-[#4fc3f7] no-underline text-sm hover:underline">Logout</a>
+    </nav>
+</header>
+
+<div class="max-w-[1100px] mx-auto p-6">
+
+    <div class="bg-[rgba(79,195,247,0.08)] border-l-[3px] border-l-[#4fc3f7] rounded-md py-3 px-4 mb-6 text-sm text-[#90a4ae] leading-relaxed">
+        <strong>Swimm API Reference</strong> — список всех доступных эндпоинтов сервера.
+        Нажмите <strong>Run</strong> для выполнения запроса прямо из браузера.
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex gap-2 mb-6">
+        <button class="tab-btn active py-2 px-5 border border-[#4fc3f7] rounded-md bg-transparent text-[#4fc3f7] cursor-pointer text-sm font-[inherit] transition-colors hover:bg-[rgba(79,195,247,0.12)] disabled:opacity-45 disabled:cursor-not-allowed" data-tab="public">🌍 Public API</button>
+        <button class="tab-btn py-2 px-5 border border-[#4fc3f7] rounded-md bg-transparent text-[#4fc3f7] cursor-pointer text-sm font-[inherit] transition-colors hover:bg-[rgba(79,195,247,0.12)] disabled:opacity-45 disabled:cursor-not-allowed" data-tab="admin" id="admin-tab-btn" disabled>🔒 Admin API</button>
+    </div>
+
+    <!-- ======================== PUBLIC API ======================== -->
+    <div class="tab-content active" id="tab-public">
+
+        <!-- Auth -->
+        <div class="mb-8">
+            <h2>🔐 Auth</h2>
+
+            <div class="bg-white/[.05] rounded-lg px-5 py-4 mb-3">
+                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
+                    <span class="method-badge method-get">GET</span>
+                    <span class="path">/auth/login/google</span>
+                </div>
+                <div class="desc">Перенаправление на Google OAuth. После авторизации редирект на returnUrl.</div>
+                <table class="params-table">
+                    <thead><tr><th>Param</th><th>Type</th><th>In</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr><td class="param-name">returnUrl</td><td class="param-type">string</td><td class="param-loc">query</td><td>URL для редиректа после входа (по умолчанию "/")</td></tr>
+                    </tbody>
+                </table>
+                <div class="param-inputs">
+                    <label>returnUrl <input type="text" data-param="returnUrl" value="/" /></label>
+                    <button class="btn-run" onclick="runApi(this, 'GET', '/auth/login/google', {}, 'query')">Run</button>
+                </div>
+                <div class="response-area"><div class="response-status"></div><pre></pre></div>
+            </div>
+
+            <div class="bg-white/[.05] rounded-lg px-5 py-4 mb-3">
+                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
+                    <span class="method-badge method-get">GET</span>
+                    <span class="path">/auth/me</span>
+                </div>
+                <div class="desc">Текущий пользователь. Возвращает профиль или { isAuthenticated: false }.</div>
+                <div class="param-inputs">
+                    <button class="btn-run" onclick="runApi(this, 'GET', '/auth/me')">Run</button>
+                </div>
+                <div class="response-area"><div class="response-status"></div><pre></pre></div>
+            </div>
+
+            <div class="bg-white/[.05] rounded-lg px-5 py-4 mb-3">
+                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
+                    <span class="method-badge method-get">GET</span>
+                    <span class="path">/auth/logout</span>
+                    <span class="auth-badge">Auth</span>
+                </div>
+                <div class="desc">Выход из системы. Редирект на returnUrl.</div>
+                <table class="params-table">
+                    <thead><tr><th>Param</th><th>Type</th><th>In</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr><td class="param-name">returnUrl</td><td class="param-type">string</td><td class="param-loc">query</td><td>URL для редиректа после выхода (по умолчанию "/")</td></tr>
+                    </tbody>
+                </table>
+                <div class="param-inputs">
+                    <label>returnUrl <input type="text" data-param="returnUrl" value="/" /></label>
+                    <button class="btn-run" onclick="runApi(this, 'GET', '/auth/logout', {}, 'query')">Run</button>
+                </div>
+                <div class="response-area"><div class="response-status"></div><pre></pre></div>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="mb-8">
+            <h2>📊 Results</h2>
+
+            <div class="bg-white/[.05] rounded-lg px-5 py-4 mb-3">
+                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
+                    <span class="method-badge method-get">GET</span>
+                    <span class="path">/api/results</span>
+                </div>
+                <div class="desc">Получить результаты соревнований с фильтрацией и пагинацией.</div>
+                <table class="params-table">
+                    <thead><tr><th>Param</th><th>Type</th><th>In</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr><td class="param-name">competition</td><td class="param-type">string</td><td class="param-loc">query</td><td>Фильтр по названию соревнования (StartsWith)</td></tr>
+                        <tr><td class="param-name">name</td><td class="param-type">string</td><td class="param-loc">query</td><td>Фильтр по имени/фамилии пловца (StartsWith)</td></tr>
+                        <tr><td class="param-name">club</td><td class="param-type">string</td><td class="param-loc">query</td><td>Фильтр по клубу (StartsWith)</td></tr>
+                        <tr><td class="param-name">styleName</td><td class="param-type">string</td><td class="param-loc">query</td><td>Фильтр по стилю (exact match)</td></tr>
+                        <tr><td class="param-name">distance</td><td class="param-type">string</td><td class="param-loc">query</td><td>Фильтр по дистанции (exact match)</td></tr>
+                        <tr><td class="param-name">gender</td><td class="param-type">string</td><td class="param-loc">query</td><td>Фильтр по полу (exact match)</td></tr>
+                        <tr><td class="param-name">poolType</td><td class="param-type">string</td><td class="param-loc">query</td><td>Фильтр по типу бассейна (exact match)</td></tr>
+                        <tr><td class="param-name">dateFrom</td><td class="param-type">DateTime</td><td class="param-loc">query</td><td>Дата начала диапазона</td></tr>
+                        <tr><td class="param-name">dateTo</td><td class="param-type">DateTime</td><td class="param-loc">query</td><td>Дата конца диапазона</td></tr>
+                        <tr><td class="param-name">page</td><td class="param-type">int</td><td class="param-loc">query</td><td>Номер страницы (по умолчанию 1)</td></tr>
+                        <tr><td class="param-name">pageSize</td><td class="param-type">int</td><td class="param-loc">query</td><td>Размер страницы (по умолчанию 100, макс. 500)</td></tr>
+                    </tbody>
+                </table>
+                <div class="param-inputs">
+                    <label>page <input type="number" data-param="page" value="1" style="width:60px" /></label>
+                    <label>pageSize <input type="number" data-param="pageSize" value="20" style="width:70px" /></label>
+                    <label>competition <input type="text" data-param="competition" /></label>
+                    <label>name <input type="text" data-param="name" /></label>
+                    <label>club <input type="text" data-param="club" /></label>
+                    <label>styleName <input type="text" data-param="styleName" /></label>
+                    <label>distance <input type="text" data-param="distance" /></label>
+                    <label>gender <input type="text" data-param="gender" /></label>
+                    <label>poolType <input type="text" data-param="poolType" /></label>
+                    <label>dateFrom <input type="date" data-param="dateFrom" /></label>
+                    <label>dateTo <input type="date" data-param="dateTo" /></label>
+                    <button class="btn-run" onclick="runApi(this, 'GET', '/api/results', {}, 'query')">Run</button>
+                </div>
+                <div class="response-area"><div class="response-status"></div><pre></pre></div>
+            </div>
+
+            <div class="bg-white/[.05] rounded-lg px-5 py-4 mb-3">
+                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
+                    <span class="method-badge method-get">GET</span>
+                    <span class="path">/api/results/{id}</span>
+                </div>
+                <div class="desc">Получить один результат по ID.</div>
+                <table class="params-table">
+                    <thead><tr><th>Param</th><th>Type</th><th>In</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr><td class="param-name">id</td><td class="param-type">long</td><td class="param-loc">path</td><td>ID результата</td></tr>
+                    </tbody>
+                </table>
+                <div class="param-inputs">
+                    <label>id <input type="number" data-param="id" data-path="true" value="1" style="width:80px" /></label>
+                    <button class="btn-run" onclick="runApi(this, 'GET', '/api/results/{id}', {id:'path'})">Run</button>
+                </div>
+                <div class="response-area"><div class="response-status"></div><pre></pre></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ======================== ADMIN API ======================== -->
+    <div class="tab-content" id="tab-admin">
+
+        <div class="admin-note">
+            ⚠️ Эндпоинты ниже требуют роль <strong>Admin</strong>. Они не предназначены для общего доступа.
+        </div>
+
+        <div class="mb-8">
+            <h2>🔧 Admin</h2>
+
+            <div class="bg-white/[.05] rounded-lg px-5 py-4 mb-3">
+                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
+                    <span class="method-badge method-get">GET</span>
+                    <span class="path">/api/admin/users</span>
+                    <span class="auth-badge">Admin</span>
+                </div>
+                <div class="desc">Список пользователей и их ролей.</div>
+                <div class="param-inputs">
+                    <button class="btn-run" onclick="runApi(this, 'GET', '/api/admin/users')">Run</button>
+                </div>
+                <div class="response-area"><div class="response-status"></div><pre></pre></div>
+            </div>
+
+            <div class="bg-white/[.05] rounded-lg px-5 py-4 mb-3">
+                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
+                    <span class="method-badge method-get">GET</span>
+                    <span class="path">/api/admin/roles</span>
+                    <span class="auth-badge">Admin</span>
+                </div>
+                <div class="desc">Список доступных ролей.</div>
+                <div class="param-inputs">
+                    <button class="btn-run" onclick="runApi(this, 'GET', '/api/admin/roles')">Run</button>
+                </div>
+                <div class="response-area"><div class="response-status"></div><pre></pre></div>
+            </div>
+
+            <div class="bg-white/[.05] rounded-lg px-5 py-4 mb-3">
+                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
+                    <span class="method-badge method-post">POST</span>
+                    <span class="path">/api/admin/users/{userId}/roles/{roleId}</span>
+                    <span class="auth-badge">Admin</span>
+                </div>
+                <div class="desc">Назначить роль пользователю.</div>
+                <table class="params-table">
+                    <thead><tr><th>Param</th><th>Type</th><th>In</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr><td class="param-name">userId</td><td class="param-type">int</td><td class="param-loc">path</td><td>ID пользователя</td></tr>
+                        <tr><td class="param-name">roleId</td><td class="param-type">int</td><td class="param-loc">path</td><td>ID роли</td></tr>
+                    </tbody>
+                </table>
+                <div class="param-inputs">
+                    <label>userId <input type="number" data-param="userId" data-path="true" value="1" style="width:70px" /></label>
+                    <label>roleId <input type="number" data-param="roleId" data-path="true" value="1" style="width:70px" /></label>
+                    <button class="btn-run" onclick="runApi(this, 'POST', '/api/admin/users/{userId}/roles/{roleId}', {userId:'path',roleId:'path'})">Run</button>
+                </div>
+                <div class="response-area"><div class="response-status"></div><pre></pre></div>
+            </div>
+
+            <div class="bg-white/[.05] rounded-lg px-5 py-4 mb-3">
+                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
+                    <span class="method-badge method-delete">DELETE</span>
+                    <span class="path">/api/admin/users/{userId}/roles/{roleId}</span>
+                    <span class="auth-badge">Admin</span>
+                </div>
+                <div class="desc">Снять роль с пользователя.</div>
+                <table class="params-table">
+                    <thead><tr><th>Param</th><th>Type</th><th>In</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr><td class="param-name">userId</td><td class="param-type">int</td><td class="param-loc">path</td><td>ID пользователя</td></tr>
+                        <tr><td class="param-name">roleId</td><td class="param-type">int</td><td class="param-loc">path</td><td>ID роли</td></tr>
+                    </tbody>
+                </table>
+                <div class="param-inputs">
+                    <label>userId <input type="number" data-param="userId" data-path="true" value="1" style="width:70px" /></label>
+                    <label>roleId <input type="number" data-param="roleId" data-path="true" value="1" style="width:70px" /></label>
+                    <button class="btn-run" onclick="runApi(this, 'DELETE', '/api/admin/users/{userId}/roles/{roleId}', {userId:'path',roleId:'path'})">Run</button>
+                </div>
+                <div class="response-area"><div class="response-status"></div><pre></pre></div>
+            </div>
+
+            <div class="bg-white/[.05] rounded-lg px-5 py-4 mb-3">
+                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
+                    <span class="method-badge method-patch">PATCH</span>
+                    <span class="path">/api/admin/users/{userId}/active</span>
+                    <span class="auth-badge">Admin</span>
+                </div>
+                <div class="desc">Активировать/деактивировать пользователя.</div>
+                <table class="params-table">
+                    <thead><tr><th>Param</th><th>Type</th><th>In</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr><td class="param-name">userId</td><td class="param-type">int</td><td class="param-loc">path</td><td>ID пользователя</td></tr>
+                        <tr><td class="param-name">isActive</td><td class="param-type">bool</td><td class="param-loc">body</td><td>true — активировать, false — деактивировать</td></tr>
+                    </tbody>
+                </table>
+                <div class="param-inputs">
+                    <label>userId <input type="number" data-param="userId" data-path="true" value="1" style="width:70px" /></label>
+                    <label>isActive
+                        <select data-param="isActive" data-body="true">
+                            <option value="true">true</option>
+                            <option value="false">false</option>
+                        </select>
+                    </label>
+                    <button class="btn-run" onclick="runApi(this, 'PATCH', '/api/admin/users/{userId}/active', {userId:'path',isActive:'body'})">Run</button>
+                </div>
+                <div class="response-area"><div class="response-status"></div><pre></pre></div>
+            </div>
+
+            <div class="bg-white/[.05] rounded-lg px-5 py-4 mb-3">
+                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
+                    <span class="method-badge method-get">GET</span>
+                    <span class="path">/api/admin/stats</span>
+                    <span class="auth-badge">Admin</span>
+                </div>
+                <div class="desc">Статистика для дашборда: кол-во пользователей, результатов, соревнований, пловцов, клубов.</div>
+                <div class="param-inputs">
+                    <button class="btn-run" onclick="runApi(this, 'GET', '/api/admin/stats')">Run</button>
+                </div>
+                <div class="response-area"><div class="response-status"></div><pre></pre></div>
+            </div>
+
+            <div class="bg-white/[.05] rounded-lg px-5 py-4 mb-3">
+                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
+                    <span class="method-badge method-get">GET</span>
+                    <span class="path">/api/admin/db-schema</span>
+                    <span class="auth-badge">Admin</span>
+                </div>
+                <div class="desc">Структура схемы БД: таблицы, колонки, FK, индексы, CHECK, процедуры, вьюхи.</div>
+                <table class="params-table">
+                    <thead><tr><th>Param</th><th>Type</th><th>In</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr><td class="param-name">refresh</td><td class="param-type">bool</td><td class="param-loc">query</td><td>Пересчитать кэш схемы (по умолчанию false)</td></tr>
+                    </tbody>
+                </table>
+                <div class="param-inputs">
+                    <label>refresh
+                        <select data-param="refresh">
+                            <option value="false">false</option>
+                            <option value="true">true</option>
+                        </select>
+                    </label>
+                    <button class="btn-run" onclick="runApi(this, 'GET', '/api/admin/db-schema', {}, 'query')">Run</button>
+                </div>
+                <div class="response-area"><div class="response-status"></div><pre></pre></div>
+            </div>
+
+            <div class="bg-white/[.05] rounded-lg px-5 py-4 mb-3">
+                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
+                    <span class="method-badge method-get">GET</span>
+                    <span class="path">/api/admin/settings</span>
+                    <span class="auth-badge">Admin</span>
+                </div>
+                <div class="desc">Все настройки сервера.</div>
+                <div class="param-inputs">
+                    <button class="btn-run" onclick="runApi(this, 'GET', '/api/admin/settings')">Run</button>
+                </div>
+                <div class="response-area"><div class="response-status"></div><pre></pre></div>
+            </div>
+
+            <div class="bg-white/[.05] rounded-lg px-5 py-4 mb-3">
+                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
+                    <span class="method-badge method-put">PUT</span>
+                    <span class="path">/api/admin/settings/{key}</span>
+                    <span class="auth-badge">Admin</span>
+                </div>
+                <div class="desc">Обновить значение настройки.</div>
+                <table class="params-table">
+                    <thead><tr><th>Param</th><th>Type</th><th>In</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr><td class="param-name">key</td><td class="param-type">string</td><td class="param-loc">path</td><td>Ключ настройки</td></tr>
+                        <tr><td class="param-name">value</td><td class="param-type">string</td><td class="param-loc">body</td><td>Новое значение</td></tr>
+                    </tbody>
+                </table>
+                <div class="param-inputs">
+                    <label>key <input type="text" data-param="key" data-path="true" /></label>
+                    <label>value <input type="text" data-param="value" data-body="true" /></label>
+                    <button class="btn-run" onclick="runApi(this, 'PUT', '/api/admin/settings/{key}', {key:'path',value:'body'})">Run</button>
+                </div>
+                <div class="response-area"><div class="response-status"></div><pre></pre></div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(async function () {
+    const adminTabBtn = document.getElementById('admin-tab-btn');
+
+    // --- Tabs ---
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (btn.disabled) return;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        });
+    });
+
+    // --- Check admin role ---
+    try {
+        const res = await fetch('/auth/me', { credentials: 'same-origin' });
+        const data = await res.json();
+        if (data.isAuthenticated && (data.roles || []).includes('Admin')) {
+            adminTabBtn.disabled = false;
+        }
+    } catch (e) { /* ignore */ }
+})();
+
+function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+async function runApi(btn, method, urlTemplate, paramMap, defaultMode) {
+    const card = btn.closest('.api-card');
+    const inputs = card.querySelectorAll('[data-param]');
+    const responseArea = card.querySelector('.response-area');
+    const statusEl = card.querySelector('.response-status');
+    const preEl = card.querySelector('pre');
+
+    btn.disabled = true;
+    btn.textContent = '...';
+
+    let url = urlTemplate;
+    const queryParams = [];
+    const bodyObj = {};
+
+    inputs.forEach(input => {
+        const name = input.dataset.param;
+        const val = input.value.trim();
+        if (!val) return;
+
+        const isPath = input.dataset.path === 'true' || (paramMap && paramMap[name] === 'path');
+        const isBody = input.dataset.body === 'true' || (paramMap && paramMap[name] === 'body');
+
+        if (isPath) {
+            url = url.replace(`{${name}}`, encodeURIComponent(val));
+        } else if (isBody) {
+            if (val === 'true') bodyObj[name] = true;
+            else if (val === 'false') bodyObj[name] = false;
+            else bodyObj[name] = val;
+        } else {
+            queryParams.push(`${encodeURIComponent(name)}=${encodeURIComponent(val)}`);
+        }
+    });
+
+    if (queryParams.length > 0) {
+        url += '?' + queryParams.join('&');
+    }
+
+    try {
+        const opts = { method, credentials: 'same-origin' };
+        if (Object.keys(bodyObj).length > 0) {
+            opts.headers = { 'Content-Type': 'application/json' };
+            opts.body = JSON.stringify(bodyObj);
+        }
+
+        const res = await fetch(url, opts);
+        const contentType = res.headers.get('content-type') || '';
+        let text;
+        if (contentType.includes('application/json')) {
+            const json = await res.json();
+            text = JSON.stringify(json, null, 2);
+        } else {
+            text = await res.text();
+        }
+
+        statusEl.textContent = `${res.status} ${res.statusText}`;
+        statusEl.className = 'response-status ' + (res.ok ? 'status-ok' : 'status-err');
+        preEl.textContent = text;
+        responseArea.classList.add('visible');
+
+    } catch (e) {
+        statusEl.textContent = 'Error';
+        statusEl.className = 'response-status status-err';
+        preEl.textContent = e.message;
+        responseArea.classList.add('visible');
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Run';
+}
+</script>
+
+</body>
+</html>

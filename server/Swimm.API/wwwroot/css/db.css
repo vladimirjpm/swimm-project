@@ -1,0 +1,68 @@
+body {
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+}
+
+/* Sidebar */
+.sidebar h3 {
+    color: #4fc3f7;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+    margin-top: 1rem;
+}
+.sidebar h3:first-child { margin-top: 0; }
+.sidebar a {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #b0bec5;
+    text-decoration: none;
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    transition: background 0.15s;
+}
+.sidebar a:hover { background: rgba(79,195,247,0.1); color: #fff; }
+
+/* Column table */
+.col-table { width: 100%; border-collapse: collapse; margin-bottom: 0.8rem; }
+.col-table th {
+    text-align: left; color: #78909c; font-size: 0.7rem;
+    text-transform: uppercase; padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.col-table td {
+    padding: 0.3rem 0.5rem; font-size: 0.82rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.col-table tr:hover td { background: rgba(255,255,255,0.03); }
+
+/* Dependency table */
+.dep-table { width: 100%; border-collapse: collapse; }
+.dep-table th {
+    text-align: left; color: #78909c; font-size: 0.7rem;
+    text-transform: uppercase; padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.dep-table td {
+    padding: 0.4rem 0.5rem; font-size: 0.82rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+/* Obj-block headings */
+.obj-block h3 { color: #ce93d8; font-size: 1rem; margin-bottom: 0.5rem; }
+.obj-block.view-block h3 { color: #81c784; }
+
+/* Obj-block pre */
+.obj-block pre {
+    background: rgba(0,0,0,0.3);
+    border-radius: 6px;
+    padding: 0.8rem;
+    overflow-x: auto;
+    font-size: 0.78rem;
+    color: #b0bec5;
+    line-height: 1.5;
+    max-height: 300px;
+    overflow-y: auto;
+}

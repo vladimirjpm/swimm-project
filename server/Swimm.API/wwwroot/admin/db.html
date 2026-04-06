@@ -1,157 +1,34 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Swimm — DB Schema</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
-            color: #e0e0e0;
-            min-height: 100vh;
-            font-size: 14px;
-        }
-
-        header {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 1rem 2rem; background: rgba(0,0,0,.3);
-        }
-        header h1 { color: #ffa726; font-size: 1.4rem; }
-        header nav { display: flex; gap: 1.2rem; }
-        header a { color: #4fc3f7; text-decoration: none; font-size: .9rem; }
-        header a:hover { text-decoration: underline; }
-
-        .container { max-width: 1300px; margin: 0 auto; padding: 1.5rem; }
-
-        .db-name { color: #ffa726; font-size: 1.1rem; margin-bottom: 1.5rem; }
-
-        /* Sidebar + Content */
-        .layout { display: flex; gap: 1.5rem; }
-
-        .sidebar {
-            min-width: 220px; max-width: 250px;
-            background: rgba(0,0,0,.25); border-radius: 10px;
-            padding: 1rem; position: sticky; top: 1rem; align-self: flex-start;
-            max-height: calc(100vh - 2rem); overflow-y: auto;
-        }
-        .sidebar h3 { color: #4fc3f7; font-size: .85rem; text-transform: uppercase; margin-bottom: .5rem; margin-top: 1rem; }
-        .sidebar h3:first-child { margin-top: 0; }
-        .sidebar a {
-            display: flex; justify-content: space-between; align-items: center;
-            color: #b0bec5; text-decoration: none; padding: .3rem .5rem;
-            border-radius: 4px; font-size: .85rem; transition: background .15s;
-        }
-        .sidebar a:hover { background: rgba(79,195,247,.1); color: #fff; }
-        .sidebar a .count { color: #546e7a; font-size: .75rem; }
-
-        .content { flex: 1; min-width: 0; }
-
-        /* Sections */
-        .section {
-            background: rgba(255,255,255,.04); border-radius: 10px;
-            padding: 1.2rem; margin-bottom: 1.5rem;
-            border-left: 3px solid #4fc3f7;
-        }
-        .section h2 {
-            color: #4fc3f7; font-size: 1.1rem; margin-bottom: 1rem;
-            display: flex; align-items: center; gap: .5rem;
-        }
-        .section h2 .rows-badge {
-            font-size: .75rem; background: rgba(79,195,247,.15);
-            padding: .15rem .5rem; border-radius: 4px; color: #90a4ae; font-weight: 400;
-        }
-
-        /* Column table */
-        .col-table { width: 100%; border-collapse: collapse; margin-bottom: .8rem; }
-        .col-table th {
-            text-align: left; color: #78909c; font-size: .7rem;
-            text-transform: uppercase; padding: .3rem .5rem;
-            border-bottom: 1px solid rgba(255,255,255,.1);
-        }
-        .col-table td {
-            padding: .3rem .5rem; font-size: .82rem;
-            border-bottom: 1px solid rgba(255,255,255,.04);
-        }
-        .col-table tr:hover td { background: rgba(255,255,255,.03); }
-
-        .pk { color: #ffd54f; font-weight: 700; }
-        .fk { color: #81c784; }
-        .nullable { color: #ef9a9a; font-size: .75rem; }
-        .type-tag { color: #ce93d8; }
-        .identity-tag { color: #ffb74d; font-size: .7rem; margin-left: .3rem; }
-        .default-tag { color: #546e7a; font-size: .75rem; }
-
-        /* FK / Index / Check subsections */
-        .sub-section { margin-top: .8rem; }
-        .sub-section h4 { color: #90a4ae; font-size: .8rem; margin-bottom: .4rem; text-transform: uppercase; }
-        .sub-item {
-            font-size: .8rem; padding: .25rem .5rem; color: #b0bec5;
-            border-left: 2px solid #546e7a; margin-bottom: .3rem; margin-left: .5rem;
-        }
-        .sub-item code { color: #ce93d8; }
-        .sub-item .arrow { color: #4fc3f7; margin: 0 .3rem; }
-        .sub-item .on-delete { color: #ef9a9a; font-size: .7rem; }
-
-        /* SP / View blocks */
-        .obj-block {
-            background: rgba(255,255,255,.04); border-radius: 8px;
-            padding: 1rem; margin-bottom: 1rem;
-            border-left: 3px solid #ce93d8;
-        }
-        .obj-block.view-block { border-left-color: #81c784; }
-        .obj-block h3 { color: #ce93d8; font-size: 1rem; margin-bottom: .5rem; }
-        .obj-block.view-block h3 { color: #81c784; }
-        .obj-block .meta { color: #546e7a; font-size: .75rem; margin-bottom: .5rem; }
-        .obj-block pre {
-            background: rgba(0,0,0,.3); border-radius: 6px; padding: .8rem;
-            overflow-x: auto; font-size: .78rem; color: #b0bec5; line-height: 1.5;
-            max-height: 300px; overflow-y: auto;
-        }
-        .toggle-btn {
-            background: transparent; border: 1px solid #546e7a; color: #90a4ae;
-            border-radius: 4px; padding: .2rem .6rem; cursor: pointer;
-            font-size: .75rem; margin-left: .5rem;
-        }
-        .toggle-btn:hover { border-color: #4fc3f7; color: #4fc3f7; }
-
-        .empty-msg { color: #546e7a; font-style: italic; padding: 1rem; text-align: center; }
-
-        /* Dependency graph */
-        .dep-section { border-left-color: #ffa726; }
-        .dep-table { width: 100%; border-collapse: collapse; }
-        .dep-table th { text-align: left; color: #78909c; font-size: .7rem; text-transform: uppercase; padding: .4rem .5rem; border-bottom: 1px solid rgba(255,255,255,.1); }
-        .dep-table td { padding: .4rem .5rem; font-size: .82rem; border-bottom: 1px solid rgba(255,255,255,.04); }
-
-        @media (max-width: 900px) {
-            .layout { flex-direction: column; }
-            .sidebar { max-width: 100%; position: static; max-height: none; }
-        }
-    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/db.css" />
 </head>
-<body>
+<body class="min-h-screen text-gray-300 text-sm">
 
-<header>
-    <h1>🗄️ DB Schema Explorer</h1>
-    <nav>
-        <a href="/admin/">← Admin</a>
-        <a href="/">Home</a>
+<header class="flex justify-between items-center px-8 py-4 bg-black/30">
+    <h1 class="text-[#ffa726] text-xl">🗄️ DB Schema Explorer</h1>
+    <nav class="flex gap-5">
+        <a href="/admin/" class="text-[#4fc3f7] no-underline text-sm hover:underline">← Admin</a>
+        <a href="/admin/api.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📡 API Reference</a>
+        <a href="/" class="text-[#4fc3f7] no-underline text-sm hover:underline">Home</a>
     </nav>
 </header>
 
-<div class="container">
-    <div class="db-name" id="db-name">Loading...</div>
+<div class="max-w-[1300px] mx-auto p-6">
+    <div class="text-[#ffa726] text-lg mb-6" id="db-name">Loading...</div>
 
-    <div class="layout">
-        <aside class="sidebar" id="sidebar">
+    <div class="flex gap-6 max-[900px]:flex-col">
+        <aside class="sidebar min-w-[220px] max-w-[250px] bg-black/25 rounded-[10px] p-4 sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto max-[900px]:max-w-full max-[900px]:static max-[900px]:max-h-none" id="sidebar">
             <h3>Loading...</h3>
         </aside>
 
-        <div class="content" id="content">
-            <div class="empty-msg">Loading schema...</div>
+        <div class="flex-1 min-w-0" id="content">
+            <div class="text-[#546e7a] italic p-4 text-center">Loading schema...</div>
         </div>
     </div>
 </div>
@@ -246,7 +123,7 @@
         schema.tables.forEach(t => {
             const rows = rowMap[t.name] !== undefined ? Number(rowMap[t.name]).toLocaleString() + ' rows' : '';
             html += `<div class="section" id="tbl-${esc(t.name)}">`;
-            html += `<h2>📋 ${esc(t.name)} <span class="rows-badge">${rows}</span></h2>`;
+            html += `<h2 class="text-[#4fc3f7] text-lg mb-4 flex items-center gap-2">📋 ${esc(t.name)} <span class="rows-badge">${rows}</span></h2>`;
 
             // Columns
             html += `<table class="col-table"><thead><tr>
@@ -254,7 +131,7 @@
             </tr></thead><tbody>`;
             t.columns.forEach(c => {
                 const isFk = fkColumns.has(t.name + '.' + c.column);
-                const nameClass = c.isPk ? 'pk' : isFk ? 'fk' : '';
+                const nameClass = c.isPk ? 'text-[#ffd54f] font-bold' : isFk ? 'text-[#81c784]' : '';
                 const pkLabel = c.isPk ? ' 🔑' : '';
                 const fkLabel = isFk ? ' 🔗' : '';
                 const idLabel = c.isIdentity ? '<span class="identity-tag">IDENTITY</span>' : '';
@@ -272,7 +149,7 @@
             // FK for this table
             const fks = fkByTable[t.name];
             if (fks && fks.length) {
-                html += '<div class="sub-section"><h4>🔗 Foreign Keys</h4>';
+                html += '<div class="sub-section"><h4 class="text-[#90a4ae] text-[0.8rem] mb-1.5 uppercase">🔗 Foreign Keys</h4>';
                 fks.forEach(fk => {
                     html += `<div class="sub-item">
                         <code>${esc(fk.column)}</code>
@@ -288,7 +165,7 @@
             // Indexes
             const ixs = ixByTable[t.name];
             if (ixs && ixs.length) {
-                html += '<div class="sub-section"><h4>📇 Indexes</h4>';
+                html += '<div class="sub-section"><h4 class="text-[#90a4ae] text-[0.8rem] mb-1.5 uppercase">📇 Indexes</h4>';
                 ixs.forEach(ix => {
                     const uniq = ix.isUnique ? ' UNIQUE' : '';
                     html += `<div class="sub-item">
@@ -303,7 +180,7 @@
             // Check constraints
             const cks = ckByTable[t.name];
             if (cks && cks.length) {
-                html += '<div class="sub-section"><h4>✅ Check Constraints</h4>';
+                html += '<div class="sub-section"><h4 class="text-[#90a4ae] text-[0.8rem] mb-1.5 uppercase">✅ Check Constraints</h4>';
                 cks.forEach(ck => {
                     html += `<div class="sub-item">
                         <code>${esc(ck.name)}</code>
@@ -344,7 +221,7 @@
 
         // Dependency summary
         html += `<div class="section dep-section" id="sec-deps">`;
-        html += `<h2>🔀 Table Dependencies (FK Graph)</h2>`;
+        html += `<h2 class="text-[#4fc3f7] text-lg mb-4 flex items-center gap-2">🔀 Table Dependencies (FK Graph)</h2>`;
         html += `<table class="dep-table"><thead><tr>
             <th>Table</th><th>Depends On</th><th>Via</th><th>On Delete</th>
         </tr></thead><tbody>`;

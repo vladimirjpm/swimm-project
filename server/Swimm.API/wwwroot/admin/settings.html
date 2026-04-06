@@ -1,166 +1,50 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Swimm — Settings</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
-            color: #e0e0e0;
-            min-height: 100vh;
-            font-size: 14px;
-        }
-
-        header {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 1rem 2rem; background: rgba(0,0,0,.3);
-        }
-        header h1 { color: #ffa726; font-size: 1.4rem; }
-        header nav { display: flex; gap: 1.2rem; }
-        header a { color: #4fc3f7; text-decoration: none; font-size: .9rem; }
-        header a:hover { text-decoration: underline; }
-
-        .container { max-width: 1060px; margin: 0 auto; padding: 1.5rem; }
-
-        .info-bar {
-            background: rgba(79,195,247,.08); border-left: 3px solid #4fc3f7;
-            border-radius: 6px; padding: .8rem 1rem; margin-bottom: 1.5rem;
-            font-size: .85rem; color: #90a4ae; line-height: 1.6;
-        }
-        .info-bar strong { color: #e0e0e0; }
-
-        /* Scope filter tabs */
-        .scope-tabs {
-            display: flex; gap: .4rem; margin-bottom: 1.2rem; flex-wrap: wrap;
-        }
-        .scope-tab {
-            padding: .35rem .9rem; border-radius: 5px; border: 1px solid #546e7a;
-            background: transparent; color: #90a4ae; cursor: pointer; font-size: .8rem;
-            font-family: inherit; transition: all .15s;
-        }
-        .scope-tab:hover { border-color: #4fc3f7; color: #4fc3f7; }
-        .scope-tab.active { background: #4fc3f7; color: #0f3460; border-color: #4fc3f7; }
-
-        /* Table */
-        .settings-table { width: 100%; border-collapse: collapse; }
-        .settings-table th {
-            text-align: left; color: #78909c; font-size: .7rem;
-            text-transform: uppercase; padding: .5rem .6rem;
-            border-bottom: 1px solid rgba(255,255,255,.12);
-        }
-        .settings-table td {
-            padding: .6rem .6rem; font-size: .85rem;
-            border-bottom: 1px solid rgba(255,255,255,.05);
-            vertical-align: top;
-        }
-        .settings-table tr:hover td { background: rgba(255,255,255,.03); }
-
-        .key-name { color: #ffd54f; font-weight: 600; }
-        .desc-text { color: #90a4ae; font-size: .78rem; line-height: 1.4; }
-
-        .scope-badge {
-            font-size: .7rem; padding: .15rem .45rem; border-radius: 3px;
-            font-weight: 600; text-transform: uppercase; white-space: nowrap;
-        }
-        .scope-admin { background: rgba(79,195,247,.15); color: #4fc3f7; }
-        .scope-livesite { background: rgba(129,199,132,.15); color: #81c784; }
-        .scope-both { background: rgba(206,147,216,.15); color: #ce93d8; }
-
-        .type-badge { font-size: .7rem; color: #546e7a; font-style: italic; }
-
-        /* Input controls */
-        .val-cell { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
-
-        .val-input {
-            background: rgba(0,0,0,.3); border: 1px solid #546e7a; border-radius: 4px;
-            color: #e0e0e0; padding: .3rem .5rem; font-size: .82rem; width: 140px;
-            font-family: inherit; transition: border-color .15s;
-        }
-        .val-input:focus { outline: none; border-color: #4fc3f7; }
-        .val-input.wide { width: 200px; }
-
-        /* Toggle switch */
-        .toggle-switch { position: relative; display: inline-block; width: 42px; height: 22px; flex-shrink: 0; }
-        .toggle-switch input { opacity: 0; width: 0; height: 0; }
-        .toggle-slider {
-            position: absolute; cursor: pointer; inset: 0;
-            background: #546e7a; border-radius: 22px; transition: .2s;
-        }
-        .toggle-slider::before {
-            content: ''; position: absolute; height: 16px; width: 16px;
-            left: 3px; bottom: 3px; background: #e0e0e0; border-radius: 50%; transition: .2s;
-        }
-        .toggle-switch input:checked + .toggle-slider { background: #4fc3f7; }
-        .toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
-
-        /* Maintenance toggle — red when ON */
-        .toggle-switch.danger input:checked + .toggle-slider { background: #ef5350; }
-
-        .save-btn {
-            background: #66bb6a; border: none; color: #fff; padding: .3rem .7rem;
-            border-radius: 4px; cursor: pointer; font-size: .78rem; font-family: inherit;
-            transition: opacity .15s;
-        }
-        .save-btn:hover { opacity: .85; }
-
-        .saved-icon {
-            color: #66bb6a; font-size: .85rem;
-            opacity: 0; transition: opacity .3s;
-        }
-        .saved-icon.show { opacity: 1; }
-
-        .bool-label { font-size: .78rem; color: #90a4ae; margin-left: .2rem; }
-
-        .toast {
-            position: fixed; bottom: 1.5rem; right: 1.5rem;
-            background: #323232; color: #fff; padding: .7rem 1.2rem;
-            border-radius: 6px; font-size: .9rem; opacity: 0;
-            transition: opacity .3s; z-index: 1000;
-        }
-        .toast.show { opacity: 1; }
-    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/settings.css" />
 </head>
-<body>
+<body class="min-h-screen text-gray-300 text-sm">
 
-<header>
-    <h1>⚙️ Settings</h1>
-    <nav>
-        <a href="/admin/">← Admin</a>
-        <a href="/admin/db.html">🗄️ DB Schema</a>
-        <a href="/">Home</a>
+<header class="flex justify-between items-center px-8 py-4 bg-black/30">
+    <h1 class="text-[#ffa726] text-xl">⚙️ Settings</h1>
+    <nav class="flex gap-5">
+        <a href="/admin/" class="text-[#4fc3f7] no-underline text-sm hover:underline">← Admin</a>
+        <a href="/admin/api.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📡 API Reference</a>
+        <a href="/admin/db.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">🗄️ DB Schema</a>
+        <a href="/" class="text-[#4fc3f7] no-underline text-sm hover:underline">Home</a>
     </nav>
 </header>
 
-<div class="container">
-    <div class="info-bar">
-        Параметры хранятся <strong>в памяти</strong> и сбрасываются при перезапуске сервера.<br>
-        <strong>Scope</strong> показывает к чему относится параметр:
-        <span class="scope-badge scope-admin">admin</span> — только админ-панель,
-        <span class="scope-badge scope-livesite">livesite</span> — только публичная часть,
-        <span class="scope-badge scope-both">both</span> — и то и другое.<br>
-        Изменение параметров со scope <span class="scope-badge scope-admin">admin</span> автоматически сбрасывает кеш схемы БД.
+<div class="max-w-[1060px] mx-auto p-6">
+    <div class="bg-[rgba(79,195,247,0.08)] border-l-[3px] border-l-[#4fc3f7] rounded-md py-3 px-4 mb-6 text-[0.85rem] text-[#90a4ae] leading-relaxed">
+        Параметры хранятся <strong class="text-gray-300">в памяти</strong> и сбрасываются при перезапуске сервера.<br>
+        <strong class="text-gray-300">Scope</strong> показывает к чему относится параметр:
+        <span class="text-[0.7rem] py-0.5 px-1.5 rounded-sm font-semibold uppercase whitespace-nowrap bg-[rgba(79,195,247,0.15)] text-[#4fc3f7]">admin</span> — только админ-панель,
+        <span class="text-[0.7rem] py-0.5 px-1.5 rounded-sm font-semibold uppercase whitespace-nowrap bg-[rgba(129,199,132,0.15)] text-[#81c784]">livesite</span> — только публичная часть,
+        <span class="text-[0.7rem] py-0.5 px-1.5 rounded-sm font-semibold uppercase whitespace-nowrap bg-[rgba(206,147,216,0.15)] text-[#ce93d8]">both</span> — и то и другое.<br>
+        Изменение параметров со scope <span class="text-[0.7rem] py-0.5 px-1.5 rounded-sm font-semibold uppercase whitespace-nowrap bg-[rgba(79,195,247,0.15)] text-[#4fc3f7]">admin</span> автоматически сбрасывает кеш схемы БД.
     </div>
 
-    <div class="scope-tabs" id="scope-tabs">
-        <button class="scope-tab active" data-scope="all">All</button>
-        <button class="scope-tab" data-scope="admin">Admin</button>
-        <button class="scope-tab" data-scope="livesite">LiveSite</button>
-        <button class="scope-tab" data-scope="both">Both</button>
+    <div class="flex gap-1.5 mb-5 flex-wrap" id="scope-tabs">
+        <button class="scope-tab active py-1.5 px-4 rounded-[5px] border border-[#546e7a] bg-transparent text-[#90a4ae] cursor-pointer text-xs font-[inherit] transition-all hover:border-[#4fc3f7] hover:text-[#4fc3f7]" data-scope="all">All</button>
+        <button class="scope-tab py-1.5 px-4 rounded-[5px] border border-[#546e7a] bg-transparent text-[#90a4ae] cursor-pointer text-xs font-[inherit] transition-all hover:border-[#4fc3f7] hover:text-[#4fc3f7]" data-scope="admin">Admin</button>
+        <button class="scope-tab py-1.5 px-4 rounded-[5px] border border-[#546e7a] bg-transparent text-[#90a4ae] cursor-pointer text-xs font-[inherit] transition-all hover:border-[#4fc3f7] hover:text-[#4fc3f7]" data-scope="livesite">LiveSite</button>
+        <button class="scope-tab py-1.5 px-4 rounded-[5px] border border-[#546e7a] bg-transparent text-[#90a4ae] cursor-pointer text-xs font-[inherit] transition-all hover:border-[#4fc3f7] hover:text-[#4fc3f7]" data-scope="both">Both</button>
     </div>
 
-    <table class="settings-table">
+    <table class="w-full border-collapse">
         <thead>
             <tr>
-                <th>Parameter</th>
-                <th>Scope</th>
-                <th>Type</th>
-                <th>Value</th>
-                <th>Description</th>
+                <th class="text-left text-[#78909c] text-[0.7rem] uppercase py-2 px-2.5 border-b border-white/10">Parameter</th>
+                <th class="text-left text-[#78909c] text-[0.7rem] uppercase py-2 px-2.5 border-b border-white/10">Scope</th>
+                <th class="text-left text-[#78909c] text-[0.7rem] uppercase py-2 px-2.5 border-b border-white/10">Type</th>
+                <th class="text-left text-[#78909c] text-[0.7rem] uppercase py-2 px-2.5 border-b border-white/10">Value</th>
+                <th class="text-left text-[#78909c] text-[0.7rem] uppercase py-2 px-2.5 border-b border-white/10">Description</th>
             </tr>
         </thead>
         <tbody id="settings-body">
@@ -169,7 +53,7 @@
     </table>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="fixed bottom-6 right-6 bg-[#323232] text-white py-3 px-5 rounded-md text-sm opacity-0 transition-opacity duration-300 z-[1000] toast" id="toast"></div>
 
 <script>
 (async function () {
@@ -204,26 +88,32 @@
             const isDanger = s.key === 'MaintenanceMode';
             const cls = isDanger ? 'toggle-switch danger' : 'toggle-switch';
             const label = s.value.toLowerCase() === 'true'
-                ? (isDanger ? '<span class="bool-label" style="color:#ef5350">ON</span>' : '<span class="bool-label">ON</span>')
-                : '<span class="bool-label">OFF</span>';
-            return `<div class="val-cell">
+                ? (isDanger ? '<span class="text-[0.78rem] text-[#ef5350] ml-0.5">ON</span>' : '<span class="text-[0.78rem] text-[#90a4ae] ml-0.5">ON</span>')
+                : '<span class="text-[0.78rem] text-[#90a4ae] ml-0.5">OFF</span>';
+            return `<div class="flex items-center gap-1.5 flex-wrap">
                 <label class="${cls}">
                     <input type="checkbox" ${checked} onchange="saveBool('${esc(s.key)}', this.checked)">
                     <span class="toggle-slider"></span>
                 </label>
                 ${label}
-                <span class="saved-icon" id="${okId}">✓</span>
+                <span class="saved-icon text-[#66bb6a] text-[0.85rem] opacity-0 transition-opacity duration-300" id="${okId}">✓</span>
             </div>`;
         }
 
-        const cls = s.dataType === 'string' ? 'val-input wide' : 'val-input';
-        return `<div class="val-cell">
-            <input class="${cls}" id="${id}" value="${esc(s.value)}"
+        const widthCls = s.dataType === 'string' ? 'w-[200px]' : 'w-[140px]';
+        return `<div class="flex items-center gap-1.5 flex-wrap">
+            <input class="bg-black/30 border border-[#546e7a] rounded py-1 px-2 text-gray-300 text-[0.82rem] font-[inherit] ${widthCls} focus:outline-none focus:border-[#4fc3f7]" id="${id}" value="${esc(s.value)}"
                    onkeydown="if(event.key==='Enter')saveField('${esc(s.key)}')">
-            <button class="save-btn" onclick="saveField('${esc(s.key)}')">Save</button>
-            <span class="saved-icon" id="${okId}">✓</span>
+            <button class="bg-[#66bb6a] border-none text-white py-1 px-3 rounded cursor-pointer text-[0.78rem] font-[inherit] transition-opacity hover:opacity-85" onclick="saveField('${esc(s.key)}')">Save</button>
+            <span class="saved-icon text-[#66bb6a] text-[0.85rem] opacity-0 transition-opacity duration-300" id="${okId}">✓</span>
         </div>`;
     }
+
+    const scopeClasses = {
+        admin: 'bg-[rgba(79,195,247,0.15)] text-[#4fc3f7]',
+        livesite: 'bg-[rgba(129,199,132,0.15)] text-[#81c784]',
+        both: 'bg-[rgba(206,147,216,0.15)] text-[#ce93d8]'
+    };
 
     function render() {
         const tbody = document.getElementById('settings-body');
@@ -232,17 +122,17 @@
             : settings.filter(s => s.scope === activeScope);
 
         if (!filtered.length) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#546e7a;padding:2rem">No settings for this scope</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-[#546e7a] py-8">No settings for this scope</td></tr>';
             return;
         }
 
         tbody.innerHTML = filtered.map(s => `
-            <tr>
-                <td><span class="key-name">${esc(s.key)}</span></td>
-                <td><span class="scope-badge scope-${esc(s.scope)}">${esc(s.scope)}</span></td>
-                <td><span class="type-badge">${esc(s.dataType)}</span></td>
-                <td>${renderValueControl(s)}</td>
-                <td><span class="desc-text">${esc(s.description)}</span></td>
+            <tr class="hover:bg-white/[.03]">
+                <td class="py-2.5 px-2.5 text-[0.85rem] border-b border-white/[.05] align-top"><span class="text-[#ffd54f] font-semibold">${esc(s.key)}</span></td>
+                <td class="py-2.5 px-2.5 text-[0.85rem] border-b border-white/[.05] align-top"><span class="text-[0.7rem] py-0.5 px-1.5 rounded-sm font-semibold uppercase whitespace-nowrap ${scopeClasses[s.scope] || ''}">${esc(s.scope)}</span></td>
+                <td class="py-2.5 px-2.5 text-[0.85rem] border-b border-white/[.05] align-top"><span class="text-[0.7rem] text-[#546e7a] italic">${esc(s.dataType)}</span></td>
+                <td class="py-2.5 px-2.5 text-[0.85rem] border-b border-white/[.05] align-top">${renderValueControl(s)}</td>
+                <td class="py-2.5 px-2.5 text-[0.85rem] border-b border-white/[.05] align-top"><span class="text-[#90a4ae] text-[0.78rem] leading-snug">${esc(s.description)}</span></td>
             </tr>
         `).join('');
     }

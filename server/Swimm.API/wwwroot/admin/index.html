@@ -1,255 +1,46 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Swimm — Admin</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
-            color: #e0e0e0;
-            min-height: 100vh;
-        }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 2rem;
-            background: rgba(0,0,0,.3);
-        }
-
-            header h1 {
-                color: #ff6b6b;
-                font-size: 1.5rem;
-            }
-
-            header a {
-                color: #4fc3f7;
-                text-decoration: none;
-                font-size: .9rem;
-            }
-
-                header a:hover {
-                    text-decoration: underline;
-                }
-
-        .container {
-            max-width: 1100px;
-            margin: 0 auto;
-            padding: 1.5rem;
-        }
-
-        /* Stats cards */
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-
-        .stat-card {
-            background: rgba(255,255,255,.07);
-            border-radius: 10px;
-            padding: 1.2rem;
-            text-align: center;
-        }
-
-            .stat-card .value {
-                font-size: 2rem;
-                font-weight: 700;
-                color: #4fc3f7;
-            }
-
-            .stat-card .label {
-                font-size: .85rem;
-                color: #90a4ae;
-                margin-top: .3rem;
-            }
-
-        /* Tabs */
-        .tabs {
-            display: flex;
-            gap: .5rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .tab-btn {
-            padding: .5rem 1.2rem;
-            border: 1px solid #4fc3f7;
-            border-radius: 6px;
-            background: transparent;
-            color: #4fc3f7;
-            cursor: pointer;
-            font-size: .9rem;
-            transition: background .2s;
-        }
-
-            .tab-btn:hover {
-                background: rgba(79,195,247,.12);
-            }
-
-            .tab-btn.active {
-                background: #4fc3f7;
-                color: #0f3460;
-            }
-
-        .tab-content {
-            display: none;
-        }
-
-            .tab-content.active {
-                display: block;
-            }
-
-        /* Table */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th, td {
-            padding: .6rem .8rem;
-            text-align: left;
-            border-bottom: 1px solid rgba(255,255,255,.08);
-        }
-
-        th {
-            color: #90a4ae;
-            font-weight: 600;
-            font-size: .8rem;
-            text-transform: uppercase;
-        }
-
-        td {
-            font-size: .9rem;
-        }
-
-        .avatar-sm {
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            vertical-align: middle;
-            margin-right: .4rem;
-        }
-
-        .badge {
-            display: inline-block;
-            padding: .15rem .5rem;
-            border-radius: 4px;
-            font-size: .75rem;
-            font-weight: 600;
-        }
-
-        .badge-admin {
-            background: #ff6b6b;
-            color: #fff;
-        }
-
-        .badge-user {
-            background: #4fc3f7;
-            color: #0f3460;
-        }
-
-        .badge-inactive {
-            background: #546e7a;
-            color: #cfd8dc;
-        }
-
-        .btn-sm {
-            padding: .25rem .6rem;
-            border-radius: 4px;
-            border: none;
-            cursor: pointer;
-            font-size: .8rem;
-            color: #fff;
-            transition: opacity .2s;
-        }
-
-            .btn-sm:hover {
-                opacity: .8;
-            }
-
-        .btn-add {
-            background: #66bb6a;
-        }
-
-        .btn-remove {
-            background: #ef5350;
-        }
-
-        .btn-toggle {
-            background: #ffa726;
-        }
-
-        .actions {
-            display: flex;
-            gap: .3rem;
-            flex-wrap: wrap;
-        }
-
-        .toast {
-            position: fixed;
-            bottom: 1.5rem;
-            right: 1.5rem;
-            background: #323232;
-            color: #fff;
-            padding: .7rem 1.2rem;
-            border-radius: 6px;
-            font-size: .9rem;
-            opacity: 0;
-            transition: opacity .3s;
-            z-index: 1000;
-        }
-
-            .toast.show {
-                opacity: 1;
-            }
-    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/admin.css" />
 </head>
-<body>
+<body class="font-sans min-h-screen text-gray-300">
 
-<header>
-    <h1>🔧 Swimm Admin</h1>
-    <div>
-        <a href="/">← Home</a>
-        &nbsp;&nbsp;
-        <a href="/admin/db.html">🗄️ DB Schema</a>
-        &nbsp;&nbsp;
-        <a href="/admin/settings.html">⚙️ Settings</a>
-        &nbsp;&nbsp;
-        <a href="/auth/logout">Logout</a>
+<header class="flex justify-between items-center px-8 py-4 bg-black/30">
+    <h1 class="text-[#ff6b6b] text-2xl">🔧 Swimm Admin</h1>
+    <div class="flex gap-5">
+        <a href="/" class="text-[#4fc3f7] no-underline text-sm hover:underline">← Home</a>
+        <a href="/admin/api.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📡 API Reference</a>
+        <a href="/admin/db.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">🗄️ DB Schema</a>
+        <a href="/admin/settings.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">⚙️ Settings</a>
+        <a href="/auth/logout" class="text-[#4fc3f7] no-underline text-sm hover:underline">Logout</a>
     </div>
 </header>
 
-<div class="container">
+<div class="max-w-[1100px] mx-auto p-6">
     <!-- Stats -->
-    <div class="stats" id="stats-grid"></div>
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-4 mb-8" id="stats-grid"></div>
 
     <!-- Tabs -->
-    <div class="tabs">
-        <button class="tab-btn active" data-tab="users">👥 Users</button>
+    <div class="flex gap-2 mb-6">
+        <button class="tab-btn active py-2 px-5 border border-[#4fc3f7] rounded-md bg-transparent text-[#4fc3f7] cursor-pointer text-sm transition-colors hover:bg-[rgba(79,195,247,0.12)]" data-tab="users">👥 Users</button>
     </div>
 
     <!-- Users tab -->
     <div class="tab-content active" id="tab-users">
-        <table>
+        <table class="w-full border-collapse">
             <thead>
                 <tr>
-                    <th>User</th>
-                    <th>Email</th>
-                    <th>Roles</th>
-                    <th>Status</th>
-                    <th>Registered</th>
-                    <th>Actions</th>
+                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">User</th>
+                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Email</th>
+                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Roles</th>
+                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Status</th>
+                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Registered</th>
+                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Actions</th>
                 </tr>
             </thead>
             <tbody id="users-body"></tbody>
@@ -257,7 +48,7 @@
     </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="fixed bottom-6 right-6 bg-[#323232] text-white py-3 px-5 rounded-md text-sm opacity-0 transition-opacity duration-300 z-[1000] toast" id="toast"></div>
 
 <script>
 (async function () {
@@ -295,9 +86,9 @@
             { label: 'Clubs', value: s.clubs },
         ];
         grid.innerHTML = items.map(i => `
-            <div class="stat-card">
-                <div class="value">${i.value}</div>
-                <div class="label">${i.label}</div>
+            <div class="bg-white/[.07] rounded-[10px] p-5 text-center">
+                <div class="text-3xl font-bold text-[#4fc3f7]">${i.value}</div>
+                <div class="text-sm text-[#90a4ae] mt-1">${i.label}</div>
             </div>
         `).join('');
     }
@@ -309,39 +100,39 @@
 
         tbody.innerHTML = users.map(u => {
             const rolesHtml = u.roles.map(r =>
-                `<span class="badge ${r === 'Admin' ? 'badge-admin' : 'badge-user'}">${r}</span> `
+                `<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold ${r === 'Admin' ? 'bg-[#ff6b6b] text-white' : 'bg-[#4fc3f7] text-[#0f3460]'}">${r}</span> `
             ).join('');
 
             const statusHtml = u.isActive
                 ? '<span style="color:#66bb6a">Active</span>'
-                : '<span class="badge badge-inactive">Inactive</span>';
+                : '<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold bg-[#546e7a] text-[#cfd8dc]">Inactive</span>';
 
             const avatarHtml = u.avatarUrl
-                ? `<img class="avatar-sm" src="${u.avatarUrl}" alt="">`
+                ? `<img class="w-7 h-7 rounded-full align-middle mr-1.5" src="${u.avatarUrl}" alt="">`
                 : '';
 
             // Role toggle buttons
             const missingRoles = allRoles.filter(r => !u.roles.includes(r.name));
             const addBtns = missingRoles.map(r =>
-                `<button class="btn-sm btn-add" onclick="addRole(${u.id}, ${r.id})">+ ${r.name}</button>`
+                `<button class="py-1 px-2.5 rounded border-none cursor-pointer text-xs text-white transition-opacity hover:opacity-80 bg-[#66bb6a]" onclick="addRole(${u.id}, ${r.id})">+ ${r.name}</button>`
             ).join('');
 
             const removeBtns = u.roles.map(rName => {
                 const role = allRoles.find(r => r.name === rName);
                 return role
-                    ? `<button class="btn-sm btn-remove" onclick="removeRole(${u.id}, ${role.id})">&minus; ${rName}</button>`
+                    ? `<button class="py-1 px-2.5 rounded border-none cursor-pointer text-xs text-white transition-opacity hover:opacity-80 bg-[#ef5350]" onclick="removeRole(${u.id}, ${role.id})">&minus; ${rName}</button>`
                     : '';
             }).join('');
 
-            const toggleBtn = `<button class="btn-sm btn-toggle" onclick="toggleActive(${u.id}, ${!u.isActive})">${u.isActive ? 'Disable' : 'Enable'}</button>`;
+            const toggleBtn = `<button class="py-1 px-2.5 rounded border-none cursor-pointer text-xs text-white transition-opacity hover:opacity-80 bg-[#ffa726]" onclick="toggleActive(${u.id}, ${!u.isActive})">${u.isActive ? 'Disable' : 'Enable'}</button>`;
 
             return `<tr>
-                <td>${avatarHtml}${u.displayName}</td>
-                <td>${u.email}</td>
-                <td>${rolesHtml}</td>
-                <td>${statusHtml}</td>
-                <td>${formatDate(u.createdAt)}</td>
-                <td><div class="actions">${addBtns}${removeBtns}${toggleBtn}</div></td>
+                <td class="py-2.5 px-3 text-sm border-b border-white/[.08]">${avatarHtml}${u.displayName}</td>
+                <td class="py-2.5 px-3 text-sm border-b border-white/[.08]">${u.email}</td>
+                <td class="py-2.5 px-3 text-sm border-b border-white/[.08]">${rolesHtml}</td>
+                <td class="py-2.5 px-3 text-sm border-b border-white/[.08]">${statusHtml}</td>
+                <td class="py-2.5 px-3 text-sm border-b border-white/[.08]">${formatDate(u.createdAt)}</td>
+                <td class="py-2.5 px-3 text-sm border-b border-white/[.08]"><div class="flex gap-1 flex-wrap">${addBtns}${removeBtns}${toggleBtn}</div></td>
             </tr>`;
         }).join('');
     }
@@ -386,7 +177,7 @@
     } catch (e) {
         console.error('Admin init failed', e);
         document.querySelector('.container').innerHTML =
-            '<p style="color:#ef5350;text-align:center;padding:3rem;">Failed to load admin data. Make sure you have Admin role.</p>';
+            '<p class="text-[#ef5350] text-center p-12">Failed to load admin data. Make sure you have Admin role.</p>';
     }
 })();
 </script>
