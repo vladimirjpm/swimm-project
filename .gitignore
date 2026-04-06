@@ -16,6 +16,8 @@ npm-debug.log*
 # =========================
 bin/
 obj/
+*.mdf
+*.ldf
 *.user
 *.suo
 *.userosscache
