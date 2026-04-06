@@ -8,7 +8,7 @@ import { Result, TrainingGroup } from '../../../utils/interfaces/results';
 import UI_PullBuoyIcon from '../../components/mix/pull-buoy-icon/pull-buoy-icon';
 import UI_IntensityIcon from '../../components/mix/intensity-icon/intensity-icon';
 import TrainingSetHeader from '../training-set-header/training-set-header';
-import ExpectedTimeDiff from '../../components/mix/expected-time-diff/expected-time-diff';
+import UI_ExpectedTimeDiff from '../../components/mix/expected-time-diff/expected-time-diff';
 
 interface TrainingTableBySetProps {
   results: Result[];
@@ -144,7 +144,7 @@ function TrainingTableBySet({
                      
                       <div className="w-16 lg:w-24">
                         <div className="text-2xl font-bold">{res.time}</div>
-                        <ExpectedTimeDiff time={res.time} expected_time={res.training?.expected_time} />
+                        <UI_ExpectedTimeDiff time={res.time} expected_time={res.training?.expected_time} />
                       </div>
 
                       {/* Уровень (скрывать если Rating = None) */}

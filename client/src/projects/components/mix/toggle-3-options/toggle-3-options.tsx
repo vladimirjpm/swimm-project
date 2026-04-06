@@ -13,7 +13,7 @@ interface Toggle3OptionsProps {
   containerClass?: string;
 }
 
-const Toggle3Options: React.FC<Toggle3OptionsProps> = ({
+const UI_Toggle3Options: React.FC<Toggle3OptionsProps> = ({
   id = 'toggle3',
   value,
   onChange,
@@ -94,4 +94,4 @@ const Toggle3Options: React.FC<Toggle3OptionsProps> = ({
   );
 };
 
-export default Toggle3Options;
+export default UI_Toggle3Options;

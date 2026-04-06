@@ -27,6 +27,8 @@ export default class Helper {
   static getNormativeLevelInfo = HelperNormative.getNormativeLevelInfo;
   static isResultMasters = HelperNormative.isResultMasters;
   static isRecordHolder = HelperNormative.isRecordHolder;
+  static isRecordTime = HelperNormative.isRecordTime;
+  static getSwimmerRecords = HelperNormative.getSwimmerRecords;
 
   // === Results ===
   static sortByTime = HelperResults.sortByTime;

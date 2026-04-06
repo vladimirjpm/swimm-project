@@ -3,6 +3,8 @@ import { rootActions, useAppDispatch, useAppSelector } from '../../../store/stor
 import { Enums } from '../../../utils/interfaces/enums';
 import PopupContentNormative from './popup-content-normative';
 import PopupContentHtml from './popup-content-html';
+import PopupContentMastersRecords from './popup-content-masters-records';
+import PopupContentSwimmerRecords from './popup-content-swimmer-records';
 
 const Popup: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -14,6 +16,8 @@ const Popup: React.FC = () => {
     [Enums.PopupType.none]: null,
     [Enums.PopupType.normative]: <PopupContentNormative />,
     [Enums.PopupType.html]: <PopupContentHtml />,
+    [Enums.PopupType.mastersRecords]: <PopupContentMastersRecords />,
+    [Enums.PopupType.swimmerRecords]: <PopupContentSwimmerRecords />,
   };
 
   const close = React.useCallback(() => {
@@ -38,7 +42,7 @@ const Popup: React.FC = () => {
       onClick={close} // закрытие по фону
     >
       <div
-        className="bg-white rounded-2xl p-6 w-[min(92vw,1200px)] shadow-lg relative"
+        className="bg-white rounded-2xl p-6 w-[min(92vw,1200px)] max-h-[90vh] overflow-y-auto shadow-lg relative"
         onClick={(e) => e.stopPropagation()} // не закрывать при клике внутри
       >
         <button

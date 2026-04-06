@@ -17,4 +17,5 @@ export interface ResultsTableRowProps {
   isMastersResult?: boolean;
   isAwardSource?: boolean;
   isRecordHolder?: boolean;
+  isRecordTime?: boolean;
 }

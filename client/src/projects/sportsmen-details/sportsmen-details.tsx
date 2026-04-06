@@ -10,7 +10,8 @@ import UI_MedalIcon from '../components/mix/medal-icon/medal-icon';
 import UI_SwimmerIcon from '../components/mix/swimmer-icon/swimmer-icon';
 import UI_PoolIcon from '../components/mix/pool-icon/pool-icon';
 import UI_LevelProgress from '../components/mix/progress-level/level-progress';
-import FlagEmoji from '../components/mix/flag-icon/flag-icon';
+import UI_FlagEmoji from '../components/mix/flag-icon/flag-icon';
+import UI_RecordCount from '../components/mix/record-count/record-count';
 import { recalculatePositions } from '../../utils/helpers/recalculate-positions';
 
 function SportsmenDetails() {
@@ -47,31 +48,63 @@ function SportsmenDetails() {
       <div className="mb-4">
         <div className='section-top flex flex-col w-fit mx-auto'>
           <div className='flex flex-row p-4 bg-gray-100'>
-            <div className='flex flex-col justify-between items-center '>
-              <FlagEmoji countryCode="il" size={'72x54'}  />
-              <UI_ClubIcon clubName={firstResult.club} iconWidth='24' styleType="icon-notext" className='px-3' />
+            <div className='section-left flex flex-col justify-between items-between'>
+              <div className='lg:hidden'>
+               <UI_FlagEmoji countryCode="il" size={'40x30'}  />
+              </div>
+              <div className='hidden lg:block'>
+               <UI_FlagEmoji countryCode="il" size={'72x54'}  />
+              </div>
+              <div className='lg:hidden'>
+              <UI_ClubIcon clubName={firstResult.club} iconWidth='10' styleType="icon-notext" className='' />
+              </div>
+              <div className='hidden lg:block'>
+              <UI_ClubIcon clubName={firstResult.club} iconWidth='16' styleType="icon-notext" className='' />
+              </div>
             </div>
             <UI_SwimmerIcon swimmerCode='' iconWidth='50' swimmerGender={firstResult.event_style_gender}  />
-            <div className='flex flex-col justify-between items-center'>
-              <UI_NormativeLevelIcon
-                levelName={firstResult.levelInfo.currentLevel}
-                styleType="style-1"
-                styleSize="size-5"
-                styleName={firstResult.event_style_name}
-                styleLen={firstResult.event_style_len}
-                poolType={firstResult.pool_type}
-                isMasters={Helper.isResultMasters(isMastersSource, firstResult.event_style_age)}
-                normativeAgeGroup={firstResult.levelInfo.normativeAgeGroup}
-              />
+            <div className='section-right flex flex-col justify-between items-center'>
+              <div className='section-normative lg:hidden'>
+                <UI_NormativeLevelIcon
+                  levelName={firstResult.levelInfo.currentLevel}
+                  styleType="style-1"
+                  styleSize="size-2"
+                  styleName={firstResult.event_style_name}
+                  styleLen={firstResult.event_style_len}
+                  poolType={firstResult.pool_type}
+                  isMasters={Helper.isResultMasters(isMastersSource, firstResult.event_style_age)}
+                  normativeAgeGroup={firstResult.levelInfo.normativeAgeGroup}
+                />
+              </div>
+              <div className='section-normative hidden lg:block'>
+                <UI_NormativeLevelIcon
+                  levelName={firstResult.levelInfo.currentLevel}
+                  styleType="style-1"
+                  styleSize="size-4"
+                  styleName={firstResult.event_style_name}
+                  styleLen={firstResult.event_style_len}
+                  poolType={firstResult.pool_type}
+                  isMasters={Helper.isResultMasters(isMastersSource, firstResult.event_style_age)}
+                  normativeAgeGroup={firstResult.levelInfo.normativeAgeGroup}
+                />
+              </div>
+              <UI_RecordCount swimmerName={filters.selected_name} />
               <div className='flex flex-col'>
-                 <div className='pl-2 text-2xl font-bold w-full text-center'>
+                 <div className='pl-2 text-lg lg:text-2xl font-bold w-full text-center'>
                     {pointsSum}<sup className='text-base font-normal'>pt</sup>
                 </div>
               <div className='flex flex-row'>
-               
-                <UI_MedalIcon place='1' styleType='icon-place' placeReplace={medalCounts.first.length.toString()} title={medalCounts.first.map(m => m.note).join('\n')}/>
+               <div className='flex flex-row lg:hidden'>
+               <UI_MedalIcon place='1' styleType='icon-place' styleSize='medal-24' placeReplace={medalCounts.first.length.toString()} title={medalCounts.first.map(m => m.note).join('\n')}/>
+                <UI_MedalIcon place='2' styleType='icon-place' styleSize='medal-24' placeReplace={medalCounts.second.length.toString()} title={medalCounts.second.map(m => m.note).join('\n')} />
+                <UI_MedalIcon place='3' styleType='icon-place' styleSize='medal-24' placeReplace={medalCounts.third.length.toString()} title={medalCounts.third.map(m => m.note).join('\n')} />
+              </div>
+              <div className='flex flex-row hidden lg:flex'>
+               <UI_MedalIcon place='1' styleType='icon-place' placeReplace={medalCounts.first.length.toString()} title={medalCounts.first.map(m => m.note).join('\n')}/>
                 <UI_MedalIcon place='2' styleType='icon-place' placeReplace={medalCounts.second.length.toString()} title={medalCounts.second.map(m => m.note).join('\n')} />
                 <UI_MedalIcon place='3' styleType='icon-place' placeReplace={medalCounts.third.length.toString()} title={medalCounts.third.map(m => m.note).join('\n')} />
+              </div>
+                
               </div>
               </div>
              </div>

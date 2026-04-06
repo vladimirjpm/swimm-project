@@ -6,10 +6,11 @@ import UI_PoolIcon from '../../components/mix/pool-icon/pool-icon';
 import UI_NormativeLevelIcon from '../../components/mix/normative-level-icon/normative-level-icon';
 import UI_DateIcon from '../../components/mix/date-icon/date-icon';
 import UI_LevelProgress from '../../components/mix/progress-level/level-progress';
-import SwimmerNameCell from '../../components/mix/swimmer-name-cell/swimmer-name-cell';
+import UI_SwimmerNameCell from '../../components/mix/swimmer-name-cell/swimmer-name-cell';
 import UI_SwimmerGallery from '../../components/mix/swimmer-gallery/swimmer-gallery';
 import UI_SwimmerTimeCell from '../../components/mix/swimmer-time-cell/swimmer-time-cell';
 import { ResultsTableRowProps } from './types';
+import UI_AgeLabel from '../../components/mix/age-label/age-label';
 
 const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
   res,
@@ -25,6 +26,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
   isMastersResult,
   isAwardSource,
   isRecordHolder,
+  isRecordTime,
 }) => {
   const genderBgClass = res.event_style_gender === 'female' ? 'bg-pink-100' : 'bg-blue-100';
 
@@ -40,11 +42,11 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
           {(res as any).position_original != null && (res as any).position_original !== res.position && (
             <div className="text-[10px] text-gray-400 mt-0.5 line-through"><UI_MedalIcon place={(res as any).position_original.toString()} styleSize='medal-16' styleType={isAwardSource ? 'icon-place' : 'icon-noplace'} /></div>
           )}
-          {showAge && <div className="font-bold text-sm mt-1"><span className='font-normal text-xs'>age:</span> {res.event_style_age}</div>}
+           {showAge && <UI_AgeLabel age={res.event_style_age} isMasters={isMastersResult} ageGroup={res.age_group} />}
         </div>
 
         <div className={showDate ? 'col-span-3' : 'col-span-4'}>
-          <SwimmerNameCell
+          <UI_SwimmerNameCell
             firstName={res.first_name}
             lastName={res.last_name}
             club={res.club}
@@ -91,7 +93,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
             firstLineClassName="text-xl font-bold"
             secondLineClassName="text-xs"
             className={genderBgClass}
-            isRecordHolder={isRecordHolder}
+            isRecordHolder={isRecordTime}
           />
         </div>
 

@@ -5,9 +5,10 @@ import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style
 import UI_PoolIcon from '../../components/mix/pool-icon/pool-icon';
 import UI_LevelProgress from '../../components/mix/progress-level/level-progress';
 import UI_NormativeLevelIcon from '../../components/mix/normative-level-icon/normative-level-icon';
-import SwimmerNameCell from '../../components/mix/swimmer-name-cell/swimmer-name-cell';
+import UI_SwimmerNameCell from '../../components/mix/swimmer-name-cell/swimmer-name-cell';
 import UI_SwimmerGallery from '../../components/mix/swimmer-gallery/swimmer-gallery';
 import UI_SwimmerTimeCell from '../../components/mix/swimmer-time-cell/swimmer-time-cell';
+import UI_AgeLabel from '../../components/mix/age-label/age-label';
 import { ResultsTableRowProps } from './types';
 
 const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
@@ -24,6 +25,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
   isMastersResult,
   isAwardSource,
   isRecordHolder,
+  isRecordTime,
 }) => {
   const genderBgClass = res.event_style_gender === 'female' ? 'bg-pink-100' : 'bg-blue-100';
 
@@ -39,13 +41,13 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
           {(res as any).position_original != null && (res as any).position_original !== res.position && (
             <div className="text-[10px] text-gray-400 mt-0.5 line-through"><UI_MedalIcon place={(res as any).position_original.toString()} styleSize='medal-16' styleType={isAwardSource ? 'icon-place' : 'icon-noplace'} /></div>
           )}
-          {showAge && <div className="font-bold text-sm mt-1"><span className='font-normal text-xs'>age:</span> {res.event_style_age} </div>}
+          {showAge && <UI_AgeLabel age={res.event_style_age} isMasters={isMastersResult} ageGroup={res.age_group} />}
         </div>
 
         <div className="flex-1 flex flex-col gap-2">
           <div className="flex items-start">
             <div className="basis-2/3 gap-1 min-w-0">
-              <SwimmerNameCell
+              <UI_SwimmerNameCell
                 firstName={res.first_name}
                 lastName={res.last_name}
                 club={res.club}
@@ -70,7 +72,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
                 firstLineClassName="text-lg font-bold"
                 secondLineClassName="text-xs"
                 className={`text-right ${genderBgClass}`}
-                isRecordHolder={isRecordHolder}
+                isRecordHolder={isRecordTime}
               />
               {showEvent && (
                 <UI_SwimmStyleIcon

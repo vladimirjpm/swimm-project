@@ -216,6 +216,60 @@ export default class HelperNormative {
    * Checks if the swimmer's name matches the record holder for their event.
    * Works for both age records and masters records.
    */
+  /**
+   * Finds the record entry for a given event (gender/pool/style/distance/age).
+   * Shared lookup logic for isRecordHolder and isRecordTime.
+   */
+  private static findRecord({
+    gender,
+    poolType,
+    styleName,
+    distance,
+    age,
+    isMasters,
+  }: {
+    gender: string;
+    poolType: string;
+    styleName: string;
+    distance: string;
+    age: string | number | null | undefined;
+    isMasters: boolean;
+  }) {
+    if (!styleName || !distance) return null;
+
+    const data = isMasters
+      ? (window as any).normative_masters_record
+      : (window as any).normative_age_record;
+    if (!data?.normatives) return null;
+
+    const resolvedPool = HelperNormative.resolvePoolType(poolType);
+    const distanceData = data.normatives?.[gender]?.[resolvedPool]?.[styleName]?.[distance];
+    if (!distanceData) return null;
+
+    const ageStr = age != null ? String(age).trim() : '';
+    if (!ageStr) return null;
+
+    let record = distanceData[ageStr];
+
+    if (!record && isMasters) {
+      const ageNum = parseInt(ageStr, 10);
+      if (!isNaN(ageNum)) {
+        for (const key of Object.keys(distanceData)) {
+          const m = key.match(/^(\d+)-(\d+)$/);
+          if (m && ageNum >= Number(m[1]) && ageNum <= Number(m[2])) {
+            record = distanceData[key];
+            break;
+          }
+        }
+      }
+    }
+
+    return record ?? null;
+  }
+
+  /**
+   * Checks if the swimmer's name matches the record holder for their event.
+   */
   static isRecordHolder({
     swimmerName,
     gender,
@@ -233,44 +287,15 @@ export default class HelperNormative {
     age: string | number | null | undefined;
     isMasters: boolean;
   }): boolean {
-    if (!swimmerName || !styleName || !distance) return false;
+    if (!swimmerName) return false;
 
-    const data = isMasters
-      ? (window as any).normative_masters_record
-      : (window as any).normative_age_record;
-    if (!data?.normatives) return false;
-
-    const resolvedPool = HelperNormative.resolvePoolType(poolType);
-    const distanceData = data.normatives?.[gender]?.[resolvedPool]?.[styleName]?.[distance];
-    if (!distanceData) return false;
-
-    const ageStr = age != null ? String(age).trim() : '';
-    if (!ageStr) return false;
-
-    // For masters: age key is age-group like "25-29", for non-masters: age key like "12"
-    let record = distanceData[ageStr];
-
-    // If no exact match for masters, try to find the age group range
-    if (!record && isMasters) {
-      const ageNum = parseInt(ageStr, 10);
-      if (!isNaN(ageNum)) {
-        for (const key of Object.keys(distanceData)) {
-          const m = key.match(/^(\d+)-(\d+)$/);
-          if (m && ageNum >= Number(m[1]) && ageNum <= Number(m[2])) {
-            record = distanceData[key];
-            break;
-          }
-        }
-      }
-    }
-
+    const record = HelperNormative.findRecord({ gender, poolType, styleName, distance, age, isMasters });
     if (!record?.name) return false;
 
     const nameA = swimmerName.trim();
     const nameB = record.name.trim();
     if (nameA === nameB) return true;
 
-    // Check reversed order: "First Last" vs "Last First"
     const partsA = nameA.split(/\s+/);
     if (partsA.length === 2) {
       const reversed = `${partsA[1]} ${partsA[0]}`;
@@ -279,4 +304,108 @@ export default class HelperNormative {
 
     return false;
   }
+
+  /**
+   * Checks if the swimmer's time matches or beats the record time for their event.
+   */
+  static isRecordTime({
+    time,
+    gender,
+    poolType,
+    styleName,
+    distance,
+    age,
+    isMasters,
+  }: {
+    time: string;
+    gender: string;
+    poolType: string;
+    styleName: string;
+    distance: string;
+    age: string | number | null | undefined;
+    isMasters: boolean;
+  }): boolean {
+    if (!time) return false;
+
+    const record = HelperNormative.findRecord({ gender, poolType, styleName, distance, age, isMasters });
+    if (!record?.time) return false;
+
+    const swimmerTime = HelperTime.parseTimeToSeconds(time);
+    const recordTime = HelperTime.parseTimeToSeconds(record.time);
+
+    return isFinite(swimmerTime) && isFinite(recordTime) && swimmerTime <= recordTime;
+  }
+
+  /**
+   * Returns all records held by a swimmer across both age records and masters records.
+   */
+  static getSwimmerRecords(swimmerName: string): SwimmerRecord[] {
+    if (!swimmerName) return [];
+
+    const results: SwimmerRecord[] = [];
+    const nameA = swimmerName.trim();
+    const partsA = nameA.split(/\s+/);
+    const reversedA = partsA.length === 2 ? `${partsA[1]} ${partsA[0]}` : null;
+
+    const matchesName = (recordName: string) => {
+      const nameB = recordName.trim();
+      if (nameA === nameB) return true;
+      if (reversedA && reversedA === nameB) return true;
+      return false;
+    };
+
+    const scanData = (data: any, isMasters: boolean) => {
+      if (!data?.normatives) return;
+      for (const gender of Object.keys(data.normatives)) {
+        const pools = data.normatives[gender];
+        if (!pools) continue;
+        for (const pool of Object.keys(pools)) {
+          const styles = pools[pool];
+          if (!styles) continue;
+          for (const style of Object.keys(styles)) {
+            const distances = styles[style];
+            if (!distances) continue;
+            for (const distance of Object.keys(distances)) {
+              const ageKeys = distances[distance];
+              if (!ageKeys) continue;
+              for (const ageKey of Object.keys(ageKeys)) {
+                const record = ageKeys[ageKey];
+                if (!record?.name) continue;
+                if (matchesName(record.name)) {
+                  results.push({
+                    gender,
+                    pool,
+                    style,
+                    distance,
+                    ageKey,
+                    time: record.time,
+                    club: record.club,
+                    recordDate: record.record_date,
+                    isMasters,
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+    };
+
+    scanData((window as any).normative_age_record, false);
+    scanData((window as any).normative_masters_record, true);
+
+    return results;
+  }
+}
+
+export interface SwimmerRecord {
+  gender: string;
+  pool: string;
+  style: string;
+  distance: string;
+  ageKey: string;
+  time: string;
+  club: string;
+  recordDate: string;
+  isMasters: boolean;
 }

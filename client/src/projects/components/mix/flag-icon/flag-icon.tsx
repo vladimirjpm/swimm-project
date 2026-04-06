@@ -14,7 +14,7 @@ type FlagEmojiProps = {
   size?: FlagSize;
 };
 
-const FlagEmoji: React.FC<FlagEmojiProps> = ({
+const UI_FlagEmoji: React.FC<FlagEmojiProps> = ({
   countryCode,
   className = '',
   title,
@@ -39,4 +39,4 @@ const FlagEmoji: React.FC<FlagEmojiProps> = ({
   );
 };
 
-export default FlagEmoji;
+export default UI_FlagEmoji;

@@ -1,9 +1,12 @@
-.dv-normative-level-icon{color: brown}
+.dv-normative-level-icon {
+  color: brown;
+}
 
 .dv-normative-level-icon .normative-medal {
   position: relative;
   margin: 0;
-  font-size: 16px;
+  --medal-font-size: 16px;
+  font-size: var(--medal-font-size);
   font-weight: 500;
   width: 32px;
   height: 32px;
@@ -20,53 +23,66 @@
   text-shadow: 2px 2px 0 #98a6ad;
   background: linear-gradient(to bottom right, #d1d7da 50%, #c3cbcf 50%);
 }
-.dv-normative-level-icon .normative-medal.size-1{
+
+/* Sizes */
+.dv-normative-level-icon .normative-medal.size-1 {
   width: 32px;
   height: 32px;
-  font-size: 16px;
+  --medal-font-size: 19px;
 }
-/*----------------------------------------------------------------------------size-2*/
-.dv-normative-level-icon .normative-medal.size-2{
+
+.dv-normative-level-icon .normative-medal.size-2 {
   width: 42px;
   height: 42px;
-  font-size: 22px;
+  --medal-font-size: 24px;
 }
-.dv-normative-level-icon .normative-medal.size-2.level-ms,
-.dv-normative-level-icon .normative-medal.size-2.level-kms{
-    display: flex;
-    align-items: center;
-    justify-content: center;
+
+.dv-normative-level-icon .normative-medal.level-ms,
+.dv-normative-level-icon .normative-medal.level-kms {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
 .dv-normative-level-icon .normative-medal.size-2.level-msmk,
 .dv-normative-level-icon .normative-medal.size-2.level-ms,
-.dv-normative-level-icon .normative-medal.size-2.level-kms{
-    line-height: 17px;
-    font-size: 16px;
-    word-wrap: break-word;
+.dv-normative-level-icon .normative-medal.size-2.level-kms {
+  line-height: 17px;
+  word-wrap: break-word;
 }
 
-.dv-normative-level-icon .normative-medal.size-3{
+.dv-normative-level-icon .normative-medal.size-3 {
   width: 52px;
   height: 52px;
-  font-size: 32px;
+  --medal-font-size: 30px;
 }
-.dv-normative-level-icon .normative-medal.size-4{
+
+.dv-normative-level-icon .normative-medal.size-4 {
   width: 62px;
   height: 62px;
-  font-size: 36px;
+  --medal-font-size: 36px;
 }
-.dv-normative-level-icon .normative-medal.size-5{
+
+.dv-normative-level-icon .normative-medal.size-5 {
   width: 72px;
   height: 72px;
-  font-size: 42px;
+  --medal-font-size: 42px;
 }
-.dv-normative-level-icon .normative-medal.size-6{
+
+.dv-normative-level-icon .normative-medal.size-6 {
   width: 82px;
   height: 82px;
-  font-size: 52px;
+  --medal-font-size: 52px;
 }
 
-
+/* Level modifiers (scale from current size) */
+.dv-normative-level-icon .normative-medal.level-msmk,
+.dv-normative-level-icon .normative-medal.level-ms,
+.dv-normative-level-icon .normative-medal.level-kms {
+  line-height: 1.1;
+  word-wrap: break-word;
+  font-size: calc(var(--medal-font-size) * 0.65);
+}
 
 /* GOLD style */
 .dv-normative-level-icon .normative-medal.gold {
@@ -92,7 +108,7 @@
   background: linear-gradient(to bottom right, #df7e08 50%, #c67007 50%);
 }
 
-/* Ribbon styles */
+/* Ribbon */
 .dv-normative-level-icon .ribbon {
   content: "";
   display: block;

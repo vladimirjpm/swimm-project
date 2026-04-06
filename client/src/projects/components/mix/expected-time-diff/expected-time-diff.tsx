@@ -6,7 +6,7 @@ interface ExpectedTimeDiffProps {
   expected_time?: string;
 }
 
-const ExpectedTimeDiff: React.FC<ExpectedTimeDiffProps> = ({ time, expected_time }) => {
+const UI_ExpectedTimeDiff: React.FC<ExpectedTimeDiffProps> = ({ time, expected_time }) => {
   if (!expected_time) return null;
 
   const actualSec = Helper.parseTimeToSeconds(time);
@@ -40,4 +40,4 @@ const ExpectedTimeDiff: React.FC<ExpectedTimeDiffProps> = ({ time, expected_time
   );
 };
 
-export default ExpectedTimeDiff;
+export default UI_ExpectedTimeDiff;

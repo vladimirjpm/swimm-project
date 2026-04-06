@@ -23,8 +23,9 @@
 ## Project Conventions
 - **TypeScript**: Use strict typing; prefer interfaces from `src/types/` or `src/utils/interfaces/`.
 - **Component Structure**: Prefer function components. Co-locate CSS with components (e.g., `component-name.css`).
+- **UI Component Naming**: All reusable components in `src/projects/components/mix/` **must** use the `UI_` prefix (e.g., `UI_ClubIcon`, `UI_AgeLabel`, `UI_SwimmerNameCell`). Export name and const name must both start with `UI_`. This convention applies to every component in the `mix/` folder without exception.
 - **Data Loading**: Static data is loaded from `public/data/` JSON files. Use helpers in `src/utils/helpers/` for data transformation.
-- **Naming**: Use kebab-case for folders, camelCase for files and variables, PascalCase for components.
+- **Naming**: Use kebab-case for folders, camelCase for files and variables, PascalCase for components (with `UI_` prefix for mix/ components).
 - **No Eject**: Avoid `npm run eject` unless absolutely necessary.
 
 ## Integration Points

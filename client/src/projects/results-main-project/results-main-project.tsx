@@ -230,7 +230,7 @@ function ResultsMain() {
             </section>
 
             {/* POPUP */}
-            {isPopup && popUpType === 'normative' && <Popup />}
+            {isPopup && <Popup />}
           </div>
 
           {/* Мобильная нижняя шторка с фильтрами (во весь экран при раскрытии) */}

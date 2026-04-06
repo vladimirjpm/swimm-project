@@ -1,5 +1,7 @@
 import React from 'react';
 import Helper from '../../../utils/helpers/data-helper';
+import { rootActions, useAppDispatch } from '../../../store/store';
+import { Enums } from '../../../utils/interfaces/enums';
 
 interface MastersRecord {
   time: string;
@@ -101,42 +103,38 @@ function renderSingleAgeGroup(
   );
 }
 
-/** Render all age-groups compact row */
-function renderAllAgeGroups(
+/** Render all age-groups as a clickable label that opens a popup */
+function renderAllAgeGroupsLabel(
   genderKey: string,
   distanceData: Record<string, MastersRecord>,
   showGenderLabel: boolean,
+  poolType: string,
+  onClick: () => void,
 ) {
   const ageGroupKeys = Object.keys(distanceData)
-    .filter(k => /^\d+-\d+$/.test(k))
-    .sort((a, b) => Number(a.split('-')[0]) - Number(b.split('-')[0]));
+    .filter(k => /^\d+-\d+$/.test(k));
 
   if (ageGroupKeys.length === 0) return null;
 
   const s = getStyles(genderKey);
 
   return (
-    <div key={genderKey} className={`${s.bg} border ${s.border} rounded px-3 py-2 mb-2 text-sm overflow-x-auto`}>
+    <div
+      key={genderKey}
+      className={`${s.bg} border ${s.border} rounded px-3 py-2 mb-2 text-sm cursor-pointer hover:opacity-80`}
+      onClick={onClick}
+    >
       <span className={`font-semibold ${s.title}`}>
-        🏅 {showGenderLabel ? `${GENDER_LABELS[genderKey] || genderKey} ` : ''}ISR Masters Records:
+        🏅 {showGenderLabel ? `${GENDER_LABELS[genderKey] || genderKey} ` : ''}ISR Masters Records
       </span>{' '}
-      <span className="whitespace-nowrap">
-        {ageGroupKeys.map((ageKey, idx) => {
-          const rec = distanceData[ageKey];
-          return (
-            <React.Fragment key={ageKey}>
-              {idx > 0 && <span className="text-gray-400 mx-1">|</span>}
-              <span className={`${s.age} font-medium`}>{ageKey}:</span>{' '}
-              <span>{rec.time}</span>
-            </React.Fragment>
-          );
-        })}
-      </span>
+      <span className="text-gray-400 text-xs">▶</span>
     </div>
   );
 }
 
 function NormativeMastersRecords({ gender, poolType, styleName, styleLen, age }: NormativeMastersRecordsProps) {
+  const dispatch = useAppDispatch();
+
   if (!styleName || !styleLen) return null;
 
   const data = (window as any).normative_masters_record;
@@ -149,6 +147,14 @@ function NormativeMastersRecords({ gender, poolType, styleName, styleLen, age }:
   const isSingleAge = age && age !== 'all';
   const isAgeGroupKey = isSingleAge && /^\d+-\d+$/.test(age);
   const resolvedAge = isSingleAge && !isAgeGroupKey ? birthYearToAge(age) : null;
+
+  const openPopup = (popupItems: any[]) => {
+    dispatch(rootActions.updateState({
+      isPopup: true,
+      popUpType: Enums.PopupType.mastersRecords,
+      popUpObj: popupItems,
+    }));
+  };
 
   const rendered = genderKeys.map(gk => {
     const distanceData = getDistanceData(data, gk, poolType, styleName, distanceKey);
@@ -167,7 +173,11 @@ function NormativeMastersRecords({ gender, poolType, styleName, styleLen, age }:
       if (!record) return null;
       return renderSingleAgeGroup(gk, ageGroup, record, showGenderLabel);
     }
-    return renderAllAgeGroups(gk, distanceData, showGenderLabel);
+
+    // Multiple age groups — open popup for this specific gender
+    const popupItem = { genderKey: gk, distanceData, styleName, styleLen, poolType };
+
+    return renderAllAgeGroupsLabel(gk, distanceData, showGenderLabel, poolType, () => openPopup([popupItem]));
   }).filter(Boolean);
 
   if (rendered.length === 0) return null;

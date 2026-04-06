@@ -20,7 +20,7 @@ interface SwimmerNameCellProps {
   isRecordHolder?: boolean;
 }
 
-const SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
+const UI_SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
   firstName,
   lastName,
   firstNameEn,
@@ -81,4 +81,4 @@ const SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
   );
 };
 
-export default SwimmerNameCell;
+export default UI_SwimmerNameCell;

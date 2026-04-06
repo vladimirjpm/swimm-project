@@ -7,7 +7,7 @@ import UI_PullBuoyIcon from '../../components/mix/pull-buoy-icon/pull-buoy-icon'
 import Helper from '../../../utils/helpers/data-helper';
 import UI_IntensityIcon from '../../components/mix/intensity-icon/intensity-icon';
 import TrainingSetHeader from '../training-set-header/training-set-header';
-import ExpectedTimeDiff from '../../components/mix/expected-time-diff/expected-time-diff';
+import UI_ExpectedTimeDiff from '../../components/mix/expected-time-diff/expected-time-diff';
 
 // ===== Пивот-структура для таблицы =====
 export type PivotRow = {
@@ -329,7 +329,7 @@ function TrainingShowFullTable({
                         {cell ? (
                           <div className="flex flex-col leading-tight items-start gap-1">
                             <div className="text-xl font-semibold">{cell.time}</div>
-                            <ExpectedTimeDiff time={cell.time} expected_time={cell.expected_time} />
+                            <UI_ExpectedTimeDiff time={cell.time} expected_time={cell.expected_time} />
 
                             {!row.style && (
                               <div className="w-fit mx-auto">

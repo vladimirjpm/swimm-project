@@ -215,6 +215,7 @@ function ResultsTable() {
 );
 
   const firstResult = displayResults[0];
+  const poolTypeDisplay = showPoolType ? 'all' : (firstResult?.pool_type ?? filters.pool_type);
 // Функция обновления фильтров
   const updateFilter = (newFilter: Partial<typeof filters>) => {
       dispatch(rootActions.updateState({ filterSelected: { ...filters, ...newFilter } }));
@@ -249,7 +250,7 @@ function ResultsTable() {
         {isMastersSource && (
           <NormativeMastersRecords
             gender={filters.gender}
-            poolType={filters.pool_type}
+            poolType={poolTypeDisplay}
             styleName={filters.style_name}
             styleLen={filters.style_len}
             age={filters.age}
@@ -276,15 +277,16 @@ function ResultsTable() {
               const resolvedGender = Helper.resolveGender(res.event_style_gender);
               const swimmerName = `${res.first_name}${res.last_name ? ' ' + res.last_name : ''}`;
               const genderForRecord = resolvedGender === 'none' ? 'male' : resolvedGender;
-              const isRecordHolder = Helper.isRecordHolder({
-                swimmerName,
+              const recordParams = {
                 gender: genderForRecord,
                 poolType: res.pool_type,
                 styleName: res.event_style_name,
                 distance: `${res.event_style_len}m`,
                 age: res.event_style_age,
                 isMasters: isMaster,
-              });
+              };
+              const isRecordHolder = Helper.isRecordHolder({ swimmerName, ...recordParams });
+              const isRecordTime = Helper.isRecordTime({ time: res.time, ...recordParams });
               const levelInfo = Helper.getNormativeLevelInfo({
                 gender: resolvedGender === 'none' ? 'male' : resolvedGender,
                 poolType: Helper.resolvePoolType(res.pool_type),
@@ -315,6 +317,7 @@ function ResultsTable() {
                       isMastersResult={isMaster}
                       isAwardSource={isAwardSource}
                       isRecordHolder={isRecordHolder}
+                      isRecordTime={isRecordTime}
                     />
                   </li>
 
@@ -336,6 +339,7 @@ function ResultsTable() {
                       isMastersResult={isMaster}
                       isAwardSource={isAwardSource}
                       isRecordHolder={isRecordHolder}
+                      isRecordTime={isRecordTime}
                     />
                   </li>
 
@@ -357,6 +361,7 @@ function ResultsTable() {
                       isMastersResult={isMaster}
                       isAwardSource={isAwardSource}
                       isRecordHolder={isRecordHolder}
+                      isRecordTime={isRecordTime}
                     />
                   </li>
                 </React.Fragment>
