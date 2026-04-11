@@ -54,6 +54,11 @@ public class ResultRecord
     [ForeignKey(nameof(GalleryId))]
     public Gallery? Gallery { get; set; }
 
+    public int? CountryId { get; set; }
+
+    [ForeignKey(nameof(CountryId))]
+    public Country? Country { get; set; }
+
     /* === Inline-поля для быстрых выборок === */
 
     public DateTime CompetitionDate { get; set; }

@@ -1,0 +1,15 @@
+body {
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+}
+
+/* Toast */
+.toast.show {
+    opacity: 1;
+}
+
+/* Drag-and-drop zone active */
+.drop-zone.drag-over {
+    border-color: #4fc3f7;
+    background: rgba(79, 195, 247, 0.08);
+}

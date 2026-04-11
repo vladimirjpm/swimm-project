@@ -53,8 +53,6 @@ body {
 }
 
 /* Response area */
-.response-area { display: none; }
-.response-area.visible { display: block; }
 .response-area pre {
     font-size: 0.8rem;
     color: #c5e1a5;

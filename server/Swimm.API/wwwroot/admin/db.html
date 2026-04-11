@@ -15,6 +15,8 @@
     <nav class="flex gap-5">
         <a href="/admin/" class="text-[#4fc3f7] no-underline text-sm hover:underline">← Admin</a>
         <a href="/admin/api.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📡 API Reference</a>
+        <a href="/admin/import.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📥 Import</a>
+        <a href="/admin/import-history.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📋 Import History</a>
         <a href="/" class="text-[#4fc3f7] no-underline text-sm hover:underline">Home</a>
     </nav>
 </header>
@@ -97,7 +99,8 @@
         let sideHtml = '<h3>Tables</h3>';
         schema.tables.forEach(t => {
             const rows = rowMap[t.name] !== undefined ? Number(rowMap[t.name]).toLocaleString() : '';
-            sideHtml += `<a href="#tbl-${esc(t.name)}">${esc(t.name)} <span class="count">${rows}</span></a>`;
+            const sysBadge = t.name.startsWith('Sys_') ? ' 🛡️' : '';
+            sideHtml += `<a href="#tbl-${esc(t.name)}">${esc(t.name)}${sysBadge} <span class="count">${rows}</span></a>`;
         });
         if (schema.storedProcedures.length) {
             sideHtml += '<h3>Procedures</h3>';
@@ -122,8 +125,9 @@
         // Tables
         schema.tables.forEach(t => {
             const rows = rowMap[t.name] !== undefined ? Number(rowMap[t.name]).toLocaleString() + ' rows' : '';
+            const tableIcon = t.name.startsWith('Sys_') ? '🛡️' : '📋';
             html += `<div class="section" id="tbl-${esc(t.name)}">`;
-            html += `<h2 class="text-[#4fc3f7] text-lg mb-4 flex items-center gap-2">📋 ${esc(t.name)} <span class="rows-badge">${rows}</span></h2>`;
+            html += `<h2 class="text-[#4fc3f7] text-lg mb-4 flex items-center gap-2">${tableIcon} ${esc(t.name)} <span class="rows-badge">${rows}</span></h2>`;
 
             // Columns
             html += `<table class="col-table"><thead><tr>

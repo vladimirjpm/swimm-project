@@ -21,4 +21,10 @@ public class Club
     /// <summary>Название клуба (англ.)</summary>
     [MaxLength(200)]
     public string NameEn { get; set; } = string.Empty;
+
+    /// <summary>Ссылка на страну (опционально)</summary>
+    public int? CountryId { get; set; }
+
+    [ForeignKey(nameof(CountryId))]
+    public Country? Country { get; set; }
 }

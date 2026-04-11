@@ -164,9 +164,7 @@ public class AuthController : Controller
             displayName = user.DisplayName,
             avatarUrl = user.AvatarUrl,
             roles = user.UserRoles.Select(r => r.Role.Name).ToArray(),
-            swimmerId = user.SwimmerId,
-            swimmerOrgId = user.SwimmerOrgId,
-            clubId = user.ClubId
+            swimmerId = user.SwimmerId
         });
     }
 

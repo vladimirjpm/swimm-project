@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Swimm — Import History</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body class="min-h-screen text-gray-300 text-sm">
+
+<header class="flex justify-between items-center px-8 py-4 bg-black/30">
+    <h1 class="text-[#66bb6a] text-xl">📋 Import History</h1>
+    <nav class="flex gap-5">
+        <a href="/admin/" class="text-[#4fc3f7] no-underline text-sm hover:underline">← Admin</a>
+        <a href="/admin/api.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📡 API Reference</a>
+        <a href="/admin/db.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">🗄️ DB Schema</a>
+        <a href="/admin/import.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📥 Import</a>
+        <a href="/admin/settings.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">⚙️ Settings</a>
+        <a href="/" class="text-[#4fc3f7] no-underline text-sm hover:underline">Home</a>
+    </nav>
+</header>
+
+<div class="max-w-[1100px] mx-auto p-6">
+    <div class="bg-[rgba(79,195,247,0.08)] border-l-[3px] border-l-[#4fc3f7] rounded-md py-3 px-4 mb-6 text-[0.85rem] text-[#90a4ae] leading-relaxed">
+        История всех импортов данных. Каждый импорт создаётся со статусом <strong class="text-[#ef9a9a]">Не подтверждён</strong>.
+        После ручной проверки данных нажмите кнопку для подтверждения.
+    </div>
+
+    <!-- Stats -->
+    <div class="flex gap-4 mb-6" id="stats">
+        <div class="bg-white/[.07] rounded-[10px] py-3 px-5 text-center">
+            <div class="text-2xl font-bold text-[#4fc3f7]" id="stat-total">—</div>
+            <div class="text-xs text-[#90a4ae] mt-1">Всего</div>
+        </div>
+        <div class="bg-white/[.07] rounded-[10px] py-3 px-5 text-center">
+            <div class="text-2xl font-bold text-[#66bb6a]" id="stat-approved">—</div>
+            <div class="text-xs text-[#90a4ae] mt-1">Подтверждено</div>
+        </div>
+        <div class="bg-white/[.07] rounded-[10px] py-3 px-5 text-center">
+            <div class="text-2xl font-bold text-[#ef9a9a]" id="stat-pending">—</div>
+            <div class="text-xs text-[#90a4ae] mt-1">Ожидает</div>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="overflow-x-auto">
+        <table class="w-full border-collapse">
+            <thead>
+                <tr>
+                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">ID</th>
+                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Соревнование</th>
+                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Дата соревн.</th>
+                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Файл</th>
+                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Дата импорта</th>
+                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Статус</th>
+                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Действие</th>
+                </tr>
+            </thead>
+            <tbody id="history-body"></tbody>
+        </table>
+    </div>
+
+    <div id="empty-msg" class="hidden text-center text-[#546e7a] italic py-10">Нет записей об импорте.</div>
+</div>
+
+<div class="fixed bottom-6 right-6 bg-[#323232] text-white py-3 px-5 rounded-md text-sm opacity-0 transition-opacity duration-300 z-[1000] toast" id="toast"></div>
+
+<script>
+(async function () {
+    const API = '/api/admin/import-history';
+
+    async function api(url, opts = {}) {
+        const res = await fetch(url, { credentials: 'same-origin', ...opts });
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        return res.json();
+    }
+
+    function toast(msg) {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 2500);
+    }
+
+    function esc(s) {
+        if (!s) return '';
+        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function fmtDate(iso) {
+        if (!iso) return '—';
+        return new Date(iso).toLocaleString('ru-RU', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+        });
+    }
+
+    async function load() {
+        try {
+            const data = await api(API);
+            renderStats(data);
+            renderTable(data);
+        } catch (e) {
+            toast('Ошибка загрузки: ' + e.message);
+        }
+    }
+
+    function renderStats(data) {
+        const total = data.length;
+        const approved = data.filter(d => d.approved).length;
+        document.getElementById('stat-total').textContent = total;
+        document.getElementById('stat-approved').textContent = approved;
+        document.getElementById('stat-pending').textContent = total - approved;
+    }
+
+    function renderTable(data) {
+        const tbody = document.getElementById('history-body');
+        const emptyMsg = document.getElementById('empty-msg');
+
+        if (data.length === 0) {
+            tbody.innerHTML = '';
+            emptyMsg.classList.remove('hidden');
+            return;
+        }
+        emptyMsg.classList.add('hidden');
+
+        tbody.innerHTML = data.map(h => `
+            <tr class="border-b border-white/[.04] hover:bg-white/[.03]">
+                <td class="py-2.5 px-3 text-[#546e7a]">${h.id}</td>
+                <td class="py-2.5 px-3">${esc(h.competitionName)}</td>
+                <td class="py-2.5 px-3 text-[#90a4ae]">${esc(h.competitionDate)}</td>
+                <td class="py-2.5 px-3 text-[#4fc3f7] font-mono text-xs">${esc(h.importFileName)}</td>
+                <td class="py-2.5 px-3 text-[#90a4ae]">${fmtDate(h.importDate)}</td>
+                <td class="py-2.5 px-3">
+                    ${h.approved
+                        ? '<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold bg-[rgba(102,187,106,0.2)] text-[#66bb6a]">✓ Подтверждён</span>'
+                        : '<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold bg-[rgba(239,154,154,0.2)] text-[#ef9a9a]">✗ Ожидает</span>'
+                    }
+                </td>
+                <td class="py-2.5 px-3">
+                    <button onclick="toggleApprove(${h.id}, ${!h.approved})"
+                        class="py-1 px-3 rounded text-xs font-semibold cursor-pointer transition-colors
+                            ${h.approved
+                                ? 'bg-[rgba(239,154,154,0.15)] text-[#ef9a9a] hover:bg-[rgba(239,154,154,0.25)]'
+                                : 'bg-[rgba(102,187,106,0.15)] text-[#66bb6a] hover:bg-[rgba(102,187,106,0.25)]'
+                            }">
+                        ${h.approved ? 'Отменить' : 'Подтвердить'}
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    window.toggleApprove = async function (id, approved) {
+        try {
+            const result = await api(`${API}/${id}/approve`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ approved })
+            });
+            toast(result.message);
+            await load();
+        } catch (e) {
+            toast('Ошибка: ' + e.message);
+        }
+    };
+
+    await load();
+})();
+</script>
+</body>
+</html>

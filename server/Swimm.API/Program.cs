@@ -30,6 +30,7 @@ builder.Services.AddControllers();
 // Сервисы
 builder.Services.AddSingleton<AdminSettingsService>();
 builder.Services.AddScoped<DbSchemaService>();
+builder.Services.AddScoped<JsonImportService>();
 
 // Authentication: Cookie + Google
 builder.Services

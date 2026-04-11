@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Swimm.API.Data;
 
@@ -11,9 +12,11 @@ using Swimm.API.Data;
 namespace Swimm.API.Migrations
 {
     [DbContext(typeof(SwimmDbContext))]
-    partial class SwimmDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260407125513_MoveSwimmerOrgIdClubIdToSwimmer")]
+    partial class MoveSwimmerOrgIdClubIdToSwimmer
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -40,7 +43,7 @@ namespace Swimm.API.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Sys_AppRoles", (string)null);
+                    b.ToTable("AppRoles", (string)null);
 
                     b.HasData(
                         new
@@ -96,7 +99,7 @@ namespace Swimm.API.Migrations
 
                     b.HasIndex("SwimmerId");
 
-                    b.ToTable("Sys_AppUsers", (string)null);
+                    b.ToTable("AppUsers", (string)null);
                 });
 
             modelBuilder.Entity("Swimm.API.Models.AppUserRole", b =>
@@ -111,7 +114,7 @@ namespace Swimm.API.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("Sys_AppUserRoles", (string)null);
+                    b.ToTable("AppUserRoles", (string)null);
                 });
 
             modelBuilder.Entity("Swimm.API.Models.Club", b =>
@@ -121,9 +124,6 @@ namespace Swimm.API.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int?>("CountryId")
-                        .HasColumnType("int");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -136,8 +136,6 @@ namespace Swimm.API.Migrations
                         .HasColumnType("nvarchar(200)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("CountryId");
 
                     b.HasIndex("Name");
 
@@ -184,32 +182,6 @@ namespace Swimm.API.Migrations
                         .IsUnique();
 
                     b.ToTable("Competitions", (string)null);
-                });
-
-            modelBuilder.Entity("Swimm.API.Models.Country", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("CountryCode")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<string>("CountryName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CountryCode")
-                        .IsUnique();
-
-                    b.ToTable("Countries", (string)null);
                 });
 
             modelBuilder.Entity("Swimm.API.Models.Gallery", b =>
@@ -260,37 +232,6 @@ namespace Swimm.API.Migrations
                     b.ToTable("GalleryItems");
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.ImportHistory", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("Approved")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("CompetitionId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("ImportDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ImportFileName")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompetitionId");
-
-                    b.HasIndex("ImportDate");
-
-                    b.ToTable("Sys_ImportHistory", (string)null);
-                });
-
             modelBuilder.Entity("Swimm.API.Models.Relay", b =>
                 {
                     b.Property<int>("Id")
@@ -332,9 +273,6 @@ namespace Swimm.API.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<int>("CompetitionId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("CountryId")
                         .HasColumnType("int");
 
                     b.Property<string>("Distance")
@@ -410,8 +348,6 @@ namespace Swimm.API.Migrations
                     b.HasIndex("CompetitionDate");
 
                     b.HasIndex("CompetitionId");
-
-                    b.HasIndex("CountryId");
 
                     b.HasIndex("GalleryId");
 
@@ -517,9 +453,6 @@ namespace Swimm.API.Migrations
                     b.Property<int?>("ClubId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("CountryId")
-                        .HasColumnType("int");
-
                     b.Property<string>("FirstName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -551,8 +484,6 @@ namespace Swimm.API.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ClubId");
-
-                    b.HasIndex("CountryId");
 
                     b.HasIndex("LastName", "FirstName");
 
@@ -592,7 +523,7 @@ namespace Swimm.API.Migrations
                     b.HasIndex("Provider", "ProviderKey")
                         .IsUnique();
 
-                    b.ToTable("Sys_UserExternalLogins", (string)null);
+                    b.ToTable("UserExternalLogins", (string)null);
                 });
 
             modelBuilder.Entity("Swimm.API.Models.UserLoginHistory", b =>
@@ -624,7 +555,7 @@ namespace Swimm.API.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Sys_UserLoginHistory", (string)null);
+                    b.ToTable("UserLoginHistory", (string)null);
                 });
 
             modelBuilder.Entity("Swimm.API.Models.AppUser", b =>
@@ -656,16 +587,6 @@ namespace Swimm.API.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.Club", b =>
-                {
-                    b.HasOne("Swimm.API.Models.Country", "Country")
-                        .WithMany()
-                        .HasForeignKey("CountryId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Country");
-                });
-
             modelBuilder.Entity("Swimm.API.Models.GalleryItem", b =>
                 {
                     b.HasOne("Swimm.API.Models.Gallery", "Gallery")
@@ -675,17 +596,6 @@ namespace Swimm.API.Migrations
                         .IsRequired();
 
                     b.Navigation("Gallery");
-                });
-
-            modelBuilder.Entity("Swimm.API.Models.ImportHistory", b =>
-                {
-                    b.HasOne("Swimm.API.Models.Competition", "Competition")
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Competition");
                 });
 
             modelBuilder.Entity("Swimm.API.Models.ResultRecord", b =>
@@ -701,11 +611,6 @@ namespace Swimm.API.Migrations
                         .HasForeignKey("CompetitionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.HasOne("Swimm.API.Models.Country", "Country")
-                        .WithMany()
-                        .HasForeignKey("CountryId")
-                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Swimm.API.Models.Gallery", "Gallery")
                         .WithMany()
@@ -733,8 +638,6 @@ namespace Swimm.API.Migrations
 
                     b.Navigation("Competition");
 
-                    b.Navigation("Country");
-
                     b.Navigation("Gallery");
 
                     b.Navigation("Relay");
@@ -751,14 +654,7 @@ namespace Swimm.API.Migrations
                         .HasForeignKey("ClubId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("Swimm.API.Models.Country", "Country")
-                        .WithMany()
-                        .HasForeignKey("CountryId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.Navigation("Club");
-
-                    b.Navigation("Country");
                 });
 
             modelBuilder.Entity("Swimm.API.Models.UserExternalLogin", b =>

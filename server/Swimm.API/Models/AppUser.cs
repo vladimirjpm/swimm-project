@@ -30,16 +30,6 @@ public class AppUser
     [ForeignKey(nameof(SwimmerId))]
     public Swimmer? Swimmer { get; set; }
 
-    /// <summary>ID спортсмена в федерации (опционально)</summary>
-    [MaxLength(50)]
-    public string? SwimmerOrgId { get; set; }
-
-    /// <summary>Ссылка на клуб (опционально)</summary>
-    public int? ClubId { get; set; }
-
-    [ForeignKey(nameof(ClubId))]
-    public Club? Club { get; set; }
-
     public bool IsActive { get; set; } = true;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

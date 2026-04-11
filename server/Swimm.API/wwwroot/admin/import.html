@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Swimm — Import JSON</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/import.css" />
+</head>
+<body class="min-h-screen text-gray-300 text-sm">
+
+<header class="flex justify-between items-center px-8 py-4 bg-black/30">
+    <h1 class="text-[#66bb6a] text-xl">📥 Import JSON</h1>
+    <nav class="flex gap-5">
+        <a href="/admin/" class="text-[#4fc3f7] no-underline text-sm hover:underline">← Admin</a>
+        <a href="/admin/api.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📡 API Reference</a>
+        <a href="/admin/db.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">🗄️ DB Schema</a>
+        <a href="/admin/settings.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">⚙️ Settings</a>
+        <a href="/admin/import-history.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📋 Import History</a>
+        <a href="/" class="text-[#4fc3f7] no-underline text-sm hover:underline">Home</a>
+    </nav>
+</header>
+
+<div class="max-w-[800px] mx-auto p-6">
+    <!-- Info -->
+    <div class="bg-[rgba(79,195,247,0.08)] border-l-[3px] border-l-[#4fc3f7] rounded-md py-3 px-4 mb-6 text-[0.85rem] text-[#90a4ae] leading-relaxed">
+        Загрузите JSON-файл в формате <code class="text-[#4fc3f7]">ResultWrap</code> (с полями <code class="text-[#4fc3f7]">title</code>, <code class="text-[#4fc3f7]">results[]</code>)
+        или простой массив <code class="text-[#4fc3f7]">Result[]</code>.<br>
+        Сервис автоматически создаст записи в справочниках (Competitions, Clubs, Swimmers, Styles, Relays, Galleries) и заполнит таблицу Results.
+    </div>
+
+    <!-- Drop zone -->
+    <div id="drop-zone" class="drop-zone border-2 border-dashed border-[#546e7a] rounded-xl p-12 text-center cursor-pointer transition-colors duration-200 mb-6">
+        <div class="text-4xl mb-4">📄</div>
+        <div class="text-lg text-[#b0bec5] mb-2">Перетащите JSON-файл сюда</div>
+        <div class="text-[#546e7a] mb-4">или</div>
+        <label class="inline-flex items-center gap-2 bg-[#4fc3f7] text-[#0f3460] font-semibold py-2 px-5 rounded-md cursor-pointer hover:opacity-85 transition-opacity">
+            📁 Выбрать файл
+            <input type="file" id="file-input" accept=".json" class="hidden">
+        </label>
+        <div id="file-name" class="mt-4 text-[#90a4ae] text-sm hidden"></div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex gap-3 mb-6">
+        <button id="btn-upload" disabled
+            class="bg-[#66bb6a] text-white font-semibold py-2.5 px-6 rounded-md border-none cursor-pointer text-sm transition-opacity hover:opacity-85 disabled:opacity-40 disabled:cursor-not-allowed">
+            🚀 Загрузить и импортировать
+        </button>
+        <button id="btn-clear" class="bg-[#546e7a] text-white py-2.5 px-5 rounded-md border-none cursor-pointer text-sm transition-opacity hover:opacity-85 hidden">
+            ✕ Очистить
+        </button>
+    </div>
+
+    <!-- Progress -->
+    <div id="progress" class="hidden mb-6">
+        <div class="flex items-center gap-3 text-[#90a4ae]">
+            <div class="w-5 h-5 border-2 border-[#4fc3f7] border-t-transparent rounded-full animate-spin"></div>
+            <span>Импорт выполняется...</span>
+        </div>
+    </div>
+
+    <!-- Result -->
+    <div id="result" class="hidden">
+        <div id="result-card" class="bg-white/[.05] rounded-lg p-5 border-l-[3px]">
+            <h3 id="result-title" class="text-lg mb-4"></h3>
+            <div class="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 mb-4" id="result-stats"></div>
+            <div id="result-errors" class="hidden mt-4">
+                <h4 class="text-[#ef5350] text-sm mb-2">Ошибки:</h4>
+                <div id="error-list" class="bg-black/30 rounded-md p-3 max-h-[200px] overflow-y-auto text-xs text-[#ef9a9a] font-mono leading-relaxed"></div>
+            </div>
+            <div id="result-diag" class="hidden mt-4">
+                <h4 class="text-[#4fc3f7] text-sm mb-2">📋 Diagnostic Log:</h4>
+                <div id="diag-list" class="bg-black/30 rounded-md p-3 max-h-[200px] overflow-y-auto text-xs text-[#80cbc4] font-mono leading-relaxed"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview -->
+    <div id="preview" class="hidden mt-6">
+        <h3 class="text-[#4fc3f7] text-sm uppercase mb-2">Предпросмотр JSON</h3>
+        <div class="bg-black/30 rounded-lg p-4 max-h-[300px] overflow-auto">
+            <pre id="preview-content" class="text-xs text-[#b0bec5] whitespace-pre-wrap break-all leading-relaxed"></pre>
+        </div>
+    </div>
+</div>
+
+<!-- Clear Data Section -->
+<div class="max-w-[800px] mx-auto p-6 pt-0">
+    <hr class="border-[#37474f] mb-6">
+    <div class="bg-[rgba(239,83,80,0.06)] border-l-[3px] border-l-[#ef5350] rounded-md py-3 px-4 mb-4 text-[0.85rem] text-[#90a4ae] leading-relaxed">
+        ⚠️ <strong class="text-[#ef5350]">Опасная зона.</strong>
+        Полная очистка удалит все импортированные данные: <span id="danger-tables">загрузка...</span>.<br>
+        Справочник Styles и пользователи сохранятся.<br>
+        <span class="text-[#546e7a] text-xs">Список таблиц: <code class="text-[#4fc3f7]">JsonImportService.ClearableTables</code> · Метод: <code class="text-[#4fc3f7]">JsonImportService.ClearDataAsync()</code></span>
+    </div>
+    <button id="btn-clear-data"
+        class="bg-[#c62828] text-white font-semibold py-2.5 px-6 rounded-md border-none cursor-pointer text-sm transition-opacity hover:opacity-85">
+        🗑️ Очистить все данные
+    </button>
+    <div id="clear-result" class="hidden mt-4">
+        <div id="clear-result-card" class="bg-white/[.05] rounded-lg p-5 border-l-[3px] border-l-[#ef5350]">
+            <h3 class="text-[#ef5350] text-lg mb-3">Результат очистки</h3>
+            <div id="clear-stats" class="grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-3"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Modal -->
+<div id="confirm-modal" class="fixed inset-0 bg-black/60 z-[2000] hidden items-center justify-center" style="display:none;">
+    <div class="bg-[#1e293b] rounded-xl p-6 max-w-md w-full mx-4 border border-[#ef5350]/30 shadow-2xl">
+        <h3 class="text-[#ef5350] text-lg mb-3">⚠️ Подтверждение очистки</h3>
+        <p class="text-[#b0bec5] text-sm mb-5 leading-relaxed">
+            Будут удалены <strong>все</strong> записи из таблиц:<br>
+            <span id="confirm-tables">загрузка...</span>.<br><br>
+            Это действие <strong class="text-[#ef5350]">необратимо</strong>. Продолжить?
+        </p>
+        <div class="flex gap-3 justify-end">
+            <button id="confirm-cancel"
+                class="bg-[#546e7a] text-white py-2 px-5 rounded-md border-none cursor-pointer text-sm hover:opacity-85">
+                Отмена
+            </button>
+            <button id="confirm-ok"
+                class="bg-[#c62828] text-white font-semibold py-2 px-5 rounded-md border-none cursor-pointer text-sm hover:opacity-85">
+                🗑️ Да, очистить
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="fixed bottom-6 right-6 bg-[#323232] text-white py-3 px-5 rounded-md text-sm opacity-0 transition-opacity duration-300 z-[1000] toast" id="toast"></div>
+
+<script>
+(function () {
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const fileName = document.getElementById('file-name');
+    const btnUpload = document.getElementById('btn-upload');
+    const btnClear = document.getElementById('btn-clear');
+    const progress = document.getElementById('progress');
+    const resultDiv = document.getElementById('result');
+    const resultCard = document.getElementById('result-card');
+    const resultTitle = document.getElementById('result-title');
+    const resultStats = document.getElementById('result-stats');
+    const resultErrors = document.getElementById('result-errors');
+    const errorList = document.getElementById('error-list');
+    const preview = document.getElementById('preview');
+    const previewContent = document.getElementById('preview-content');
+    const resultDiag = document.getElementById('result-diag');
+    const diagList = document.getElementById('diag-list');
+
+    let selectedFile = null;
+
+    // Загружаем список таблиц из ClearableTables
+    fetch('/api/admin/clearable-tables', { credentials: 'same-origin' })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+            if (data?.tables) {
+                const list = data.tables.join(', ');
+                const el1 = document.getElementById('danger-tables');
+                const el2 = document.getElementById('confirm-tables');
+                if (el1) el1.textContent = list;
+                if (el2) el2.textContent = list;
+            }
+        })
+        .catch(() => {});
+
+    function toast(msg) {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 3000);
+    }
+
+    function setFile(file) {
+        if (!file) return;
+        if (!file.name.endsWith('.json')) {
+            toast('Только .json файлы');
+            return;
+        }
+        selectedFile = file;
+        fileName.textContent = `📎 ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+        fileName.classList.remove('hidden');
+        btnUpload.disabled = false;
+        btnClear.classList.remove('hidden');
+        resultDiv.classList.add('hidden');
+
+        // Preview
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const json = JSON.parse(e.target.result);
+                    const count = Array.isArray(json) ? json.length : (json.results ? json.results.length : 0);
+                const previewText = JSON.stringify(json, null, 2);
+                previewContent.textContent = previewText.substring(0, 3000) + (previewText.length > 3000 ? '\n...' : '');
+                preview.querySelector('h3').textContent = `Предпросмотр JSON (${count} results)`;
+                preview.classList.remove('hidden');
+            } catch {
+                previewContent.textContent = e.target.result.substring(0, 2000);
+                preview.classList.remove('hidden');
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function clearFile() {
+        selectedFile = null;
+        fileInput.value = '';
+        fileName.classList.add('hidden');
+        btnUpload.disabled = true;
+        btnClear.classList.add('hidden');
+        preview.classList.add('hidden');
+        resultDiv.classList.add('hidden');
+    }
+
+    // Drag & Drop
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('drag-over');
+    });
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file) setFile(file);
+    });
+    dropZone.addEventListener('click', (e) => {
+        // Не открывать диалог повторно если клик по label/input (они уже открывают его нативно)
+        if (e.target.closest('label') || e.target === fileInput) return;
+        fileInput.click();
+    });
+
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files[0]) setFile(fileInput.files[0]);
+    });
+
+    btnClear.addEventListener('click', clearFile);
+
+    // Upload
+    btnUpload.addEventListener('click', async () => {
+        if (!selectedFile) return;
+
+        btnUpload.disabled = true;
+        progress.classList.remove('hidden');
+        resultDiv.classList.add('hidden');
+
+        try {
+            const form = new FormData();
+            form.append('file', selectedFile);
+
+            const res = await fetch('/api/admin/import', {
+                method: 'POST',
+                credentials: 'same-origin',
+                body: form
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error || `HTTP ${res.status}`);
+            }
+
+            // Show result
+            const hasErrors = data.errors > 0;
+            resultDiag.classList.add('hidden');
+            resultCard.classList.remove('border-l-[#66bb6a]', 'border-l-[#ef5350]', 'border-l-[#ffa726]');
+            resultCard.classList.add(hasErrors ? 'border-l-[#ffa726]' : 'border-l-[#66bb6a]');
+
+            resultTitle.textContent = data.totalRows === 0 && hasErrors
+                ? '❌ Ошибка десериализации'
+                : hasErrors ? '⚠️ Импорт завершен с ошибками' : '✅ Импорт успешен';
+            resultTitle.className = `text-lg mb-4 ${data.totalRows === 0 && hasErrors ? 'text-[#ef5350]' : hasErrors ? 'text-[#ffa726]' : 'text-[#66bb6a]'}`;
+
+            resultStats.innerHTML = [
+                statCard('Total', data.totalRows, '#4fc3f7'),
+                statCard('Created', data.created, '#66bb6a'),
+                statCard('Skipped', data.skipped, '#ffa726'),
+                statCard('Errors', data.errors, data.errors ? '#ef5350' : '#546e7a')
+            ].join('');
+
+            if (data.errorMessages && data.errorMessages.length > 0) {
+                errorList.innerHTML = data.errorMessages.map(m => `<div class="mb-1">${esc(m)}</div>`).join('');
+                resultErrors.classList.remove('hidden');
+            } else {
+                resultErrors.classList.add('hidden');
+            }
+
+            // Diagnostic log
+            if (data.diagnosticLog && data.diagnosticLog.length > 0) {
+                diagList.innerHTML = data.diagnosticLog.map(m => `<div class="mb-0.5">${esc(m)}</div>`).join('');
+                resultDiag.classList.remove('hidden');
+            } else {
+                resultDiag.classList.add('hidden');
+            }
+
+            resultDiv.classList.remove('hidden');
+            toast(data.message || 'Import complete');
+        } catch (e) {
+            resultCard.classList.remove('border-l-[#66bb6a]', 'border-l-[#ffa726]');
+            resultCard.classList.add('border-l-[#ef5350]');
+            resultTitle.textContent = '❌ Ошибка импорта';
+            resultTitle.className = 'text-lg mb-4 text-[#ef5350]';
+            resultStats.innerHTML = `<div class="text-[#ef9a9a]">${esc(e.message)}</div>`;
+            resultErrors.classList.add('hidden');
+            resultDiag.classList.add('hidden');
+            resultDiv.classList.remove('hidden');
+            toast('Import failed');
+        } finally {
+            progress.classList.add('hidden');
+            btnUpload.disabled = false;
+        }
+    });
+
+    function statCard(label, value, color) {
+        return `<div class="bg-white/[.07] rounded-lg py-3 px-4 text-center">
+            <div class="text-2xl font-bold" style="color:${color}">${value ?? 0}</div>
+            <div class="text-xs text-[#90a4ae] mt-1">${label}</div>
+        </div>`;
+    }
+
+    function esc(s) {
+        if (!s) return '';
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // --- Clear Data ---
+    const btnClearData = document.getElementById('btn-clear-data');
+    const confirmModal = document.getElementById('confirm-modal');
+    const confirmCancel = document.getElementById('confirm-cancel');
+    const confirmOk = document.getElementById('confirm-ok');
+    const clearResultDiv = document.getElementById('clear-result');
+    const clearStats = document.getElementById('clear-stats');
+
+    btnClearData.addEventListener('click', () => {
+        confirmModal.style.display = 'flex';
+        confirmModal.classList.remove('hidden');
+    });
+
+    confirmCancel.addEventListener('click', () => {
+        confirmModal.style.display = 'none';
+        confirmModal.classList.add('hidden');
+    });
+
+    confirmModal.addEventListener('click', (e) => {
+        if (e.target === confirmModal) {
+            confirmModal.style.display = 'none';
+            confirmModal.classList.add('hidden');
+        }
+    });
+
+    confirmOk.addEventListener('click', async () => {
+        confirmModal.style.display = 'none';
+        confirmModal.classList.add('hidden');
+        btnClearData.disabled = true;
+        btnClearData.textContent = '⏳ Очистка...';
+
+        try {
+            const res = await fetch('/api/admin/import/clear', {
+                method: 'DELETE',
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+            const d = data.deleted;
+            clearStats.innerHTML = [
+                clearStatCard('Results', d.results, '#ef5350'),
+                clearStatCard('Competitions', d.competitions, '#ffa726'),
+                clearStatCard('Clubs', d.clubs, '#ffa726'),
+                clearStatCard('Swimmers', d.swimmers, '#ffa726'),
+                clearStatCard('Countries', d.countries, '#ffa726'),
+                clearStatCard('Relays', d.relays, '#546e7a'),
+                clearStatCard('Galleries', d.galleries, '#546e7a'),
+                clearStatCard('GalleryItems', d.galleryItems, '#546e7a'),
+                clearStatCard('Total', d.total, '#4fc3f7')
+            ].join('');
+            clearResultDiv.classList.remove('hidden');
+            toast(data.message || 'Cleared');
+        } catch (e) {
+            clearStats.innerHTML = `<div class="text-[#ef9a9a]">${esc(e.message)}</div>`;
+            clearResultDiv.classList.remove('hidden');
+            toast('Clear failed');
+        } finally {
+            btnClearData.disabled = false;
+            btnClearData.textContent = '🗑️ Очистить все данные';
+        }
+    });
+
+    function clearStatCard(label, value, color) {
+        return `<div class="bg-white/[.07] rounded-lg py-2.5 px-3 text-center">
+            <div class="text-xl font-bold" style="color:${color}">${value ?? 0}</div>
+            <div class="text-[10px] text-[#90a4ae] mt-1">${label}</div>
+        </div>`;
+    }
+})();
+</script>
+
+</body>
+</html>

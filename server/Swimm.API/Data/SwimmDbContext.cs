@@ -17,9 +17,13 @@ public class SwimmDbContext : DbContext
     public DbSet<Gallery> Galleries => Set<Gallery>();
     public DbSet<GalleryItem> GalleryItems => Set<GalleryItem>();
     public DbSet<Style> Styles => Set<Style>();
+    public DbSet<Country> Countries => Set<Country>();
 
     /* === Результаты === */
     public DbSet<ResultRecord> Results => Set<ResultRecord>();
+
+    /* === Импорт === */
+    public DbSet<ImportHistory> ImportHistory => Set<ImportHistory>();
 
     /* === Пользователи и доступ === */
     public DbSet<AppUser> AppUsers => Set<AppUser>();
@@ -43,11 +47,31 @@ public class SwimmDbContext : DbContext
         modelBuilder.Entity<Club>(entity =>
         {
             entity.ToTable("Clubs");
+
+            entity.HasOne(e => e.Country)
+                .WithMany()
+                .HasForeignKey(e => e.CountryId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<Swimmer>(entity =>
         {
             entity.ToTable("Swimmers");
+
+            entity.HasOne(e => e.Club)
+                .WithMany()
+                .HasForeignKey(e => e.ClubId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.Country)
+                .WithMany()
+                .HasForeignKey(e => e.CountryId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Country>(entity =>
+        {
+            entity.ToTable("Countries");
         });
 
         modelBuilder.Entity<Relay>(entity =>
@@ -105,6 +129,11 @@ public class SwimmDbContext : DbContext
                 .HasForeignKey(r => r.GalleryId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            entity.HasOne(r => r.Country)
+                .WithMany()
+                .HasForeignKey(r => r.CountryId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             entity.HasCheckConstraint("CK_Results_Heat_NonNegative", "[Heat] >= 0");
             entity.HasCheckConstraint("CK_Results_Lane_NonNegative", "[Lane] >= 0");
             entity.HasCheckConstraint("CK_Results_InternationalPoints_NonNegative", "[InternationalPoints] >= 0");
@@ -112,27 +141,36 @@ public class SwimmDbContext : DbContext
             entity.HasCheckConstraint("CK_Results_PositionAgeGroup_PositiveOrNull", "[PositionAgeGroup] IS NULL OR [PositionAgeGroup] > 0");
         });
 
+        // --- Импорт ---
+
+        modelBuilder.Entity<ImportHistory>(entity =>
+        {
+            entity.ToTable("Sys_ImportHistory");
+            entity.HasIndex(e => e.CompetitionId);
+            entity.HasIndex(e => e.ImportDate);
+
+            entity.HasOne(e => e.Competition)
+                .WithMany()
+                .HasForeignKey(e => e.CompetitionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // --- Пользователи и доступ ---
 
         modelBuilder.Entity<AppUser>(entity =>
         {
-            entity.ToTable("AppUsers");
+            entity.ToTable("Sys_AppUsers");
             entity.HasIndex(e => e.Email).IsUnique();
 
             entity.HasOne(e => e.Swimmer)
                 .WithMany()
                 .HasForeignKey(e => e.SwimmerId)
                 .OnDelete(DeleteBehavior.SetNull);
-
-            entity.HasOne(e => e.Club)
-                .WithMany()
-                .HasForeignKey(e => e.ClubId)
-                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<AppRole>(entity =>
         {
-            entity.ToTable("AppRoles");
+            entity.ToTable("Sys_AppRoles");
             entity.HasIndex(e => e.Name).IsUnique();
 
             entity.HasData(
@@ -143,7 +181,7 @@ public class SwimmDbContext : DbContext
 
         modelBuilder.Entity<AppUserRole>(entity =>
         {
-            entity.ToTable("AppUserRoles");
+            entity.ToTable("Sys_AppUserRoles");
             entity.HasKey(e => new { e.UserId, e.RoleId });
 
             entity.HasOne(e => e.User)
@@ -159,7 +197,7 @@ public class SwimmDbContext : DbContext
 
         modelBuilder.Entity<UserExternalLogin>(entity =>
         {
-            entity.ToTable("UserExternalLogins");
+            entity.ToTable("Sys_UserExternalLogins");
             entity.HasIndex(e => new { e.Provider, e.ProviderKey }).IsUnique();
 
             entity.HasOne(e => e.User)
@@ -170,7 +208,7 @@ public class SwimmDbContext : DbContext
 
         modelBuilder.Entity<UserLoginHistory>(entity =>
         {
-            entity.ToTable("UserLoginHistory");
+            entity.ToTable("Sys_UserLoginHistory");
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => e.LoginAt);
 
@@ -231,5 +269,49 @@ public class SwimmDbContext : DbContext
             ADD CONSTRAINT FK_Results_Relays_RelayId
                 FOREIGN KEY (RelayId) REFERENCES dbo.Relays(Id) ON DELETE SET NULL;
         END;
+
+        -- 6. View vw_Results (совместимость со старой схемой имен полей)
+        EXEC('CREATE OR ALTER VIEW [dbo].[vw_Results] AS
+        SELECT
+            r.Id,
+            c.Country,
+            c.Name AS Competition,
+            c.IsMasters,
+            c.IsAward,
+            r.AgeGroup,
+            c.[Date],
+            CONCAT(r.Distance, '' '', s.Name, '' '', r.Gender) AS [Event],
+            s.Name AS EventStyleName,
+            r.Distance AS EventStyleLen,
+            r.Gender AS EventStyleGender,
+            r.EventStyleAge,
+            c.PoolType,
+            r.Position,
+            r.PositionAgeGroup,
+            r.Heat,
+            r.Lane,
+            sw.LastName,
+            sw.FirstName,
+            sw.LastNameEn,
+            sw.FirstNameEn,
+            sw.BirthYear,
+            cl.Name AS Club,
+            cl.NameEn AS ClubEn,
+            r.TimeOriginal AS [Time],
+            r.TimeMillisecond,
+            r.TimeSplit,
+            r.TimeFail,
+            r.TimeFailNote,
+            r.InternationalPoints,
+            r.Note,
+            CASE WHEN r.RelayId IS NULL THEN CAST(0 AS bit) ELSE CAST(1 AS bit) END AS IsRelay,
+            rl.TeamName AS RelayTeamName,
+            rl.SwimmersName AS RelaySwimmersName
+        FROM dbo.Results r
+        INNER JOIN dbo.Competitions c ON r.CompetitionId = c.Id
+        INNER JOIN dbo.Styles s ON r.StyleId = s.Id
+        INNER JOIN dbo.Swimmers sw ON r.SwimmerId = sw.Id
+        INNER JOIN dbo.Clubs cl ON r.ClubId = cl.Id
+        LEFT JOIN dbo.Relays rl ON r.RelayId = rl.Id;');
     """;
 }

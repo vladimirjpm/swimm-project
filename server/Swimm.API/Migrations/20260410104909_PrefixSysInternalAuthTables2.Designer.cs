@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Swimm.API.Data;
 
@@ -11,9 +12,11 @@ using Swimm.API.Data;
 namespace Swimm.API.Migrations
 {
     [DbContext(typeof(SwimmDbContext))]
-    partial class SwimmDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260410104909_PrefixSysInternalAuthTables2")]
+    partial class PrefixSysInternalAuthTables2
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -40,7 +43,7 @@ namespace Swimm.API.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Sys_AppRoles", (string)null);
+                    b.ToTable("AppRoles", (string)null);
 
                     b.HasData(
                         new
@@ -96,7 +99,7 @@ namespace Swimm.API.Migrations
 
                     b.HasIndex("SwimmerId");
 
-                    b.ToTable("Sys_AppUsers", (string)null);
+                    b.ToTable("AppUsers", (string)null);
                 });
 
             modelBuilder.Entity("Swimm.API.Models.AppUserRole", b =>
@@ -258,37 +261,6 @@ namespace Swimm.API.Migrations
                     b.HasIndex("GalleryId");
 
                     b.ToTable("GalleryItems");
-                });
-
-            modelBuilder.Entity("Swimm.API.Models.ImportHistory", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("Approved")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("CompetitionId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("ImportDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ImportFileName")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompetitionId");
-
-                    b.HasIndex("ImportDate");
-
-                    b.ToTable("Sys_ImportHistory", (string)null);
                 });
 
             modelBuilder.Entity("Swimm.API.Models.Relay", b =>
@@ -675,17 +647,6 @@ namespace Swimm.API.Migrations
                         .IsRequired();
 
                     b.Navigation("Gallery");
-                });
-
-            modelBuilder.Entity("Swimm.API.Models.ImportHistory", b =>
-                {
-                    b.HasOne("Swimm.API.Models.Competition", "Competition")
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Competition");
                 });
 
             modelBuilder.Entity("Swimm.API.Models.ResultRecord", b =>

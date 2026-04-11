@@ -14,12 +14,14 @@ public class AdminController : ControllerBase
     private readonly SwimmDbContext _db;
     private readonly DbSchemaService _schemaService;
     private readonly AdminSettingsService _settings;
+    private readonly JsonImportService _import;
 
-    public AdminController(SwimmDbContext db, DbSchemaService schemaService, AdminSettingsService settings)
+    public AdminController(SwimmDbContext db, DbSchemaService schemaService, AdminSettingsService settings, JsonImportService import)
     {
         _db = db;
         _schemaService = schemaService;
         _settings = settings;
+        _import = import;
     }
 
     /// <summary>
@@ -41,7 +43,6 @@ public class AdminController : ControllerBase
                 u.IsActive,
                 u.CreatedAt,
                 u.SwimmerId,
-                u.ClubId,
                 roles = u.UserRoles.Select(r => r.Role.Name).ToArray()
             })
             .ToListAsync();
@@ -170,6 +171,130 @@ public class AdminController : ControllerBase
             return BadRequest(new { error = "Invalid key or value type mismatch" });
 
         return Ok(_settings.Get(key));
+    }
+
+    /// <summary>
+    /// Импорт результатов из JSON-файла.
+    /// Принимает multipart/form-data с полем file (JSON).
+    /// Заполняет справочники и таблицу Results.
+    /// </summary>
+    [HttpPost("import")]
+    [RequestSizeLimit(50 * 1024 * 1024)] // 50 MB
+    public async Task<IActionResult> ImportJson(IFormFile? file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(new { error = "No file uploaded" });
+
+        if (!file.FileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { error = "Only .json files are accepted" });
+
+        try
+        {
+            await using var stream = file.OpenReadStream();
+            var result = await _import.ImportAsync(stream, file.FileName);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Дополнение данных спортсменов (Gender, ClubId, CountryId) из таблицы Results.
+    /// Заполняет пустые поля на основе самого свежего результата каждого спортсмена.
+    /// Используется для обратного заполнения ранее импортированных данных.
+    /// </summary>
+    [HttpPost("swimmers/enrich")]
+    public async Task<IActionResult> EnrichSwimmers()
+    {
+        try
+        {
+            var updated = await _import.EnrichSwimmersFromResultsAsync();
+            return Ok(new { message = $"Обновлено спортсменов: {updated}", updated });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Список таблиц, которые будут очищены при вызове import/clear.
+    /// Источник: <see cref="JsonImportService.ClearableTables"/>.
+    /// </summary>
+    [HttpGet("clearable-tables")]
+    public IActionResult GetClearableTables()
+    {
+        return Ok(new { tables = JsonImportService.ClearableTables });
+    }
+
+    /// <summary>
+    /// Полная очистка импортированных данных.
+    /// Удаляет Results, Competitions, Clubs, Swimmers, Countries, Relays, Galleries, GalleryItems.
+    /// Справочник Styles и пользовательские таблицы сохраняются.
+    /// </summary>
+    [HttpDelete("import/clear")]
+    public async Task<IActionResult> ClearImportData()
+    {
+        try
+        {
+            var result = await _import.ClearDataAsync();
+            return Ok(new
+            {
+                message = $"Очистка завершена: удалено {result.Total} записей",
+                deleted = result
+            });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// История импортов с названиями соревнований.
+    /// </summary>
+    [HttpGet("import-history")]
+    public async Task<IActionResult> GetImportHistory()
+    {
+        var history = await _db.ImportHistory
+            .AsNoTracking()
+            .Include(h => h.Competition)
+            .OrderByDescending(h => h.ImportDate)
+            .Select(h => new
+            {
+                h.Id,
+                h.CompetitionId,
+                CompetitionName = h.Competition!.Name,
+                CompetitionDate = h.Competition.Date,
+                h.ImportFileName,
+                h.ImportDate,
+                h.Approved
+            })
+            .ToListAsync();
+
+        return Ok(history);
+    }
+
+    /// <summary>
+    /// Обновить статус подтверждения импорта.
+    /// </summary>
+    [HttpPatch("import-history/{id}/approve")]
+    public async Task<IActionResult> SetImportApproved(int id, [FromBody] SetApprovedRequest request)
+    {
+        var entry = await _db.ImportHistory.FindAsync(id);
+        if (entry == null) return NotFound(new { error = "Import history entry not found" });
+
+        entry.Approved = request.Approved;
+        await _db.SaveChangesAsync();
+
+        return Ok(new { message = entry.Approved ? "Import approved" : "Import unapproved", entry.Id, entry.Approved });
+    }
+
+    public class SetApprovedRequest
+    {
+        public bool Approved { get; set; }
     }
 
     public class SetActiveRequest
