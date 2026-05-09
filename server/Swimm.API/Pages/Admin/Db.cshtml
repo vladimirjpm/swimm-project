@@ -1,25 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Swimm — DB Schema</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/css/db.css" />
-</head>
-<body class="min-h-screen text-gray-300 text-sm">
-
-<header class="flex justify-between items-center px-8 py-4 bg-black/30">
-    <h1 class="text-[#ffa726] text-xl">🗄️ DB Schema Explorer</h1>
-    <nav class="flex gap-5">
-        <a href="/admin/" class="text-[#4fc3f7] no-underline text-sm hover:underline">← Admin</a>
-        <a href="/admin/api.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📡 API Reference</a>
-        <a href="/admin/import.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📥 Import</a>
-        <a href="/admin/import-history.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📋 Import History</a>
-        <a href="/" class="text-[#4fc3f7] no-underline text-sm hover:underline">Home</a>
-    </nav>
-</header>
+@page
+@model Swimm.API.Pages.Admin.DbModel
+@{
+    ViewData["Title"] = "DB Schema";
+    ViewData["HeaderTitle"] = "🗄️ DB Schema Explorer";
+    ViewData["TitleColor"] = "#ffa726";
+}
 
 <div class="max-w-[1300px] mx-auto p-6">
     <div class="text-[#ffa726] text-lg mb-6" id="db-name">Loading...</div>
@@ -35,6 +20,7 @@
     </div>
 </div>
 
+@section Scripts {
 <script>
 (async function () {
     const API = '/api/admin/db-schema';
@@ -43,11 +29,6 @@
         const res = await fetch(API, { credentials: 'same-origin' });
         if (!res.ok) throw new Error(`${res.status}`);
         return res.json();
-    }
-
-    function esc(s) {
-        if (!s) return '';
-        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
     function formatType(col) {
@@ -64,14 +45,11 @@
     try {
         const schema = await loadSchema();
 
-        // DB name
         document.getElementById('db-name').textContent = `Database: ${schema.database}`;
 
-        // Row counts map
         const rowMap = {};
         (schema.rowCounts || []).forEach(r => rowMap[r.table] = r.rows);
 
-        // FK map by table
         const fkByTable = {};
         const fkColumns = new Set();
         (schema.foreignKeys || []).forEach(fk => {
@@ -80,14 +58,12 @@
             fkColumns.add(fk.table + '.' + fk.column);
         });
 
-        // Index map by table
         const ixByTable = {};
         (schema.indexes || []).forEach(ix => {
             if (!ixByTable[ix.table]) ixByTable[ix.table] = [];
             ixByTable[ix.table].push(ix);
         });
 
-        // Check map by table
         const ckByTable = {};
         (schema.checkConstraints || []).forEach(ck => {
             if (!ckByTable[ck.table]) ckByTable[ck.table] = [];
@@ -122,14 +98,12 @@
         const content = document.getElementById('content');
         let html = '';
 
-        // Tables
         schema.tables.forEach(t => {
             const rows = rowMap[t.name] !== undefined ? Number(rowMap[t.name]).toLocaleString() + ' rows' : '';
             const tableIcon = t.name.startsWith('Sys_') ? '🛡️' : '📋';
             html += `<div class="section" id="tbl-${esc(t.name)}">`;
             html += `<h2 class="text-[#4fc3f7] text-lg mb-4 flex items-center gap-2">${tableIcon} ${esc(t.name)} <span class="rows-badge">${rows}</span></h2>`;
 
-            // Columns
             html += `<table class="col-table"><thead><tr>
                 <th>#</th><th>Column</th><th>Type</th><th>Nullable</th><th>Default</th>
             </tr></thead><tbody>`;
@@ -150,7 +124,6 @@
             });
             html += '</tbody></table>';
 
-            // FK for this table
             const fks = fkByTable[t.name];
             if (fks && fks.length) {
                 html += '<div class="sub-section"><h4 class="text-[#90a4ae] text-[0.8rem] mb-1.5 uppercase">🔗 Foreign Keys</h4>';
@@ -166,7 +139,6 @@
                 html += '</div>';
             }
 
-            // Indexes
             const ixs = ixByTable[t.name];
             if (ixs && ixs.length) {
                 html += '<div class="sub-section"><h4 class="text-[#90a4ae] text-[0.8rem] mb-1.5 uppercase">📇 Indexes</h4>';
@@ -181,7 +153,6 @@
                 html += '</div>';
             }
 
-            // Check constraints
             const cks = ckByTable[t.name];
             if (cks && cks.length) {
                 html += '<div class="sub-section"><h4 class="text-[#90a4ae] text-[0.8rem] mb-1.5 uppercase">✅ Check Constraints</h4>';
@@ -197,7 +168,6 @@
             html += '</div>';
         });
 
-        // Stored Procedures
         if (schema.storedProcedures.length) {
             schema.storedProcedures.forEach((sp, i) => {
                 html += `<div class="obj-block" id="sp-${esc(sp.name)}">
@@ -210,7 +180,6 @@
             });
         }
 
-        // Views
         if (schema.views.length) {
             schema.views.forEach((vw, i) => {
                 html += `<div class="obj-block view-block" id="vw-${esc(vw.name)}">
@@ -223,7 +192,6 @@
             });
         }
 
-        // Dependency summary
         html += `<div class="section dep-section" id="sec-deps">`;
         html += `<h2 class="text-[#4fc3f7] text-lg mb-4 flex items-center gap-2">🔀 Table Dependencies (FK Graph)</h2>`;
         html += `<table class="dep-table"><thead><tr>
@@ -238,10 +206,6 @@
             </tr>`;
         });
         html += '</tbody></table></div>';
-
-        if (!schema.storedProcedures.length && !schema.views.length) {
-            // nothing extra
-        }
 
         content.innerHTML = html;
 
@@ -266,6 +230,4 @@ function toggleDef(id) {
     }
 }
 </script>
-
-</body>
-</html>
+}

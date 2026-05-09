@@ -26,6 +26,7 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddControllers();
+builder.Services.AddRazorPages();
 
 // Сервисы
 builder.Services.AddSingleton<AdminSettingsService>();
@@ -160,5 +161,6 @@ app.UseStaticFiles(new StaticFileOptions
     }
 });
 
+app.MapRazorPages();
 app.MapControllers();
 app.Run();

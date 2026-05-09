@@ -1,26 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Swimm — Import JSON</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/css/import.css" />
-</head>
-<body class="min-h-screen text-gray-300 text-sm">
-
-<header class="flex justify-between items-center px-8 py-4 bg-black/30">
-    <h1 class="text-[#66bb6a] text-xl">📥 Import JSON</h1>
-    <nav class="flex gap-5">
-        <a href="/admin/" class="text-[#4fc3f7] no-underline text-sm hover:underline">← Admin</a>
-        <a href="/admin/api.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📡 API Reference</a>
-        <a href="/admin/db.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">🗄️ DB Schema</a>
-        <a href="/admin/settings.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">⚙️ Settings</a>
-        <a href="/admin/import-history.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📋 Import History</a>
-        <a href="/" class="text-[#4fc3f7] no-underline text-sm hover:underline">Home</a>
-    </nav>
-</header>
+@page
+@model Swimm.API.Pages.Admin.ImportModel
+@{
+    ViewData["Title"] = "Import JSON";
+    ViewData["HeaderTitle"] = "📥 Import JSON";
+    ViewData["TitleColor"] = "#66bb6a";
+}
 
 <div class="max-w-[800px] mx-auto p-6">
     <!-- Info -->
@@ -129,8 +113,7 @@
     </div>
 </div>
 
-<div class="fixed bottom-6 right-6 bg-[#323232] text-white py-3 px-5 rounded-md text-sm opacity-0 transition-opacity duration-300 z-[1000] toast" id="toast"></div>
-
+@section Scripts {
 <script>
 (function () {
     const dropZone = document.getElementById('drop-zone');
@@ -152,7 +135,6 @@
 
     let selectedFile = null;
 
-    // Загружаем список таблиц из ClearableTables
     fetch('/api/admin/clearable-tables', { credentials: 'same-origin' })
         .then(r => r.ok ? r.json() : null)
         .then(data => {
@@ -166,19 +148,9 @@
         })
         .catch(() => {});
 
-    function toast(msg) {
-        const el = document.getElementById('toast');
-        el.textContent = msg;
-        el.classList.add('show');
-        setTimeout(() => el.classList.remove('show'), 3000);
-    }
-
     function setFile(file) {
         if (!file) return;
-        if (!file.name.endsWith('.json')) {
-            toast('Только .json файлы');
-            return;
-        }
+        if (!file.name.endsWith('.json')) { toast('Только .json файлы'); return; }
         selectedFile = file;
         fileName.textContent = `📎 ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
         fileName.classList.remove('hidden');
@@ -186,12 +158,11 @@
         btnClear.classList.remove('hidden');
         resultDiv.classList.add('hidden');
 
-        // Preview
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
                 const json = JSON.parse(e.target.result);
-                    const count = Array.isArray(json) ? json.length : (json.results ? json.results.length : 0);
+                const count = Array.isArray(json) ? json.length : (json.results ? json.results.length : 0);
                 const previewText = JSON.stringify(json, null, 2);
                 previewContent.textContent = previewText.substring(0, 3000) + (previewText.length > 3000 ? '\n...' : '');
                 preview.querySelector('h3').textContent = `Предпросмотр JSON (${count} results)`;
@@ -214,36 +185,21 @@
         resultDiv.classList.add('hidden');
     }
 
-    // Drag & Drop
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('drag-over');
-    });
-    dropZone.addEventListener('dragleave', () => {
-        dropZone.classList.remove('drag-over');
-    });
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('drag-over'); });
     dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('drag-over');
-        const file = e.dataTransfer.files[0];
-        if (file) setFile(file);
+        e.preventDefault(); dropZone.classList.remove('drag-over');
+        if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
     });
     dropZone.addEventListener('click', (e) => {
-        // Не открывать диалог повторно если клик по label/input (они уже открывают его нативно)
         if (e.target.closest('label') || e.target === fileInput) return;
         fileInput.click();
     });
-
-    fileInput.addEventListener('change', () => {
-        if (fileInput.files[0]) setFile(fileInput.files[0]);
-    });
-
+    fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
     btnClear.addEventListener('click', clearFile);
 
-    // Upload
     btnUpload.addEventListener('click', async () => {
         if (!selectedFile) return;
-
         btnUpload.disabled = true;
         progress.classList.remove('hidden');
         resultDiv.classList.add('hidden');
@@ -251,20 +207,10 @@
         try {
             const form = new FormData();
             form.append('file', selectedFile);
-
-            const res = await fetch('/api/admin/import', {
-                method: 'POST',
-                credentials: 'same-origin',
-                body: form
-            });
-
+            const res = await fetch('/api/admin/import', { method: 'POST', credentials: 'same-origin', body: form });
             const data = await res.json();
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 
-            if (!res.ok) {
-                throw new Error(data.error || `HTTP ${res.status}`);
-            }
-
-            // Show result
             const hasErrors = data.errors > 0;
             resultDiag.classList.add('hidden');
             resultCard.classList.remove('border-l-[#66bb6a]', 'border-l-[#ef5350]', 'border-l-[#ffa726]');
@@ -285,20 +231,15 @@
             if (data.errorMessages && data.errorMessages.length > 0) {
                 errorList.innerHTML = data.errorMessages.map(m => `<div class="mb-1">${esc(m)}</div>`).join('');
                 resultErrors.classList.remove('hidden');
-            } else {
-                resultErrors.classList.add('hidden');
-            }
+            } else { resultErrors.classList.add('hidden'); }
 
-            // Diagnostic log
             if (data.diagnosticLog && data.diagnosticLog.length > 0) {
                 diagList.innerHTML = data.diagnosticLog.map(m => `<div class="mb-0.5">${esc(m)}</div>`).join('');
                 resultDiag.classList.remove('hidden');
-            } else {
-                resultDiag.classList.add('hidden');
-            }
+            } else { resultDiag.classList.add('hidden'); }
 
             resultDiv.classList.remove('hidden');
-            toast(data.message || 'Import complete');
+            toast(data.message || 'Import complete', 3000);
         } catch (e) {
             resultCard.classList.remove('border-l-[#66bb6a]', 'border-l-[#ffa726]');
             resultCard.classList.add('border-l-[#ef5350]');
@@ -308,7 +249,7 @@
             resultErrors.classList.add('hidden');
             resultDiag.classList.add('hidden');
             resultDiv.classList.remove('hidden');
-            toast('Import failed');
+            toast('Import failed', 3000);
         } finally {
             progress.classList.add('hidden');
             btnUpload.disabled = false;
@@ -322,11 +263,6 @@
         </div>`;
     }
 
-    function esc(s) {
-        if (!s) return '';
-        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-
     // --- Clear Data ---
     const btnClearData = document.getElementById('btn-clear-data');
     const confirmModal = document.getElementById('confirm-modal');
@@ -335,38 +271,17 @@
     const clearResultDiv = document.getElementById('clear-result');
     const clearStats = document.getElementById('clear-stats');
 
-    btnClearData.addEventListener('click', () => {
-        confirmModal.style.display = 'flex';
-        confirmModal.classList.remove('hidden');
-    });
-
-    confirmCancel.addEventListener('click', () => {
-        confirmModal.style.display = 'none';
-        confirmModal.classList.add('hidden');
-    });
-
-    confirmModal.addEventListener('click', (e) => {
-        if (e.target === confirmModal) {
-            confirmModal.style.display = 'none';
-            confirmModal.classList.add('hidden');
-        }
-    });
+    btnClearData.addEventListener('click', () => { confirmModal.style.display = 'flex'; confirmModal.classList.remove('hidden'); });
+    confirmCancel.addEventListener('click', () => { confirmModal.style.display = 'none'; confirmModal.classList.add('hidden'); });
+    confirmModal.addEventListener('click', (e) => { if (e.target === confirmModal) { confirmModal.style.display = 'none'; confirmModal.classList.add('hidden'); } });
 
     confirmOk.addEventListener('click', async () => {
-        confirmModal.style.display = 'none';
-        confirmModal.classList.add('hidden');
-        btnClearData.disabled = true;
-        btnClearData.textContent = '⏳ Очистка...';
-
+        confirmModal.style.display = 'none'; confirmModal.classList.add('hidden');
+        btnClearData.disabled = true; btnClearData.textContent = '⏳ Очистка...';
         try {
-            const res = await fetch('/api/admin/import/clear', {
-                method: 'DELETE',
-                credentials: 'same-origin'
-            });
+            const res = await fetch('/api/admin/import/clear', { method: 'DELETE', credentials: 'same-origin' });
             const data = await res.json();
-
             if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-
             const d = data.deleted;
             clearStats.innerHTML = [
                 clearStatCard('Results', d.results, '#ef5350'),
@@ -386,8 +301,7 @@
             clearResultDiv.classList.remove('hidden');
             toast('Clear failed');
         } finally {
-            btnClearData.disabled = false;
-            btnClearData.textContent = '🗑️ Очистить все данные';
+            btnClearData.disabled = false; btnClearData.textContent = '🗑️ Очистить все данные';
         }
     });
 
@@ -399,6 +313,4 @@
     }
 })();
 </script>
-
-</body>
-</html>
+}

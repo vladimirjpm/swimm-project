@@ -17,4 +17,8 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="8.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="wwwroot\admin\" />
+  </ItemGroup>
+
 </Project>

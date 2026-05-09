@@ -1,0 +1,202 @@
+/* ===================================================================
+   Admin Panel — consolidated styles (replaces per-page CSS files)
+   =================================================================== */
+
+body {
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+}
+
+/* --- Tabs --- */
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.tab-btn.active {
+    background-color: #4fc3f7;
+    color: #0f3460;
+    font-weight: 600;
+}
+
+/* --- Toast --- */
+.toast.show { opacity: 1; }
+
+/* --- Toggle switch (Settings) --- */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 42px;
+    height: 22px;
+    flex-shrink: 0;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: #546e7a;
+    border-radius: 22px;
+    transition: 0.2s;
+}
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background: #e0e0e0;
+    border-radius: 50%;
+    transition: 0.2s;
+}
+.toggle-switch input:checked + .toggle-slider { background: #4fc3f7; }
+.toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
+.toggle-switch.danger input:checked + .toggle-slider { background: #ef5350; }
+
+/* --- Scope tabs (Settings) --- */
+.scope-tab.active {
+    background-color: #4fc3f7;
+    color: #0f3460;
+    border-color: #4fc3f7;
+}
+.saved-icon.show { opacity: 1; }
+
+/* --- Drop zone (Import) --- */
+.drop-zone.drag-over {
+    border-color: #4fc3f7;
+    background: rgba(79, 195, 247, 0.08);
+}
+
+/* --- DB Schema sidebar --- */
+.sidebar h3 {
+    color: #4fc3f7;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+    margin-top: 1rem;
+}
+.sidebar h3:first-child { margin-top: 0; }
+.sidebar a {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #b0bec5;
+    text-decoration: none;
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    transition: background 0.15s;
+}
+.sidebar a:hover { background: rgba(79,195,247,0.1); color: #fff; }
+
+/* --- DB Schema tables --- */
+.col-table { width: 100%; border-collapse: collapse; margin-bottom: 0.8rem; }
+.col-table th {
+    text-align: left; color: #78909c; font-size: 0.7rem;
+    text-transform: uppercase; padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.col-table td {
+    padding: 0.3rem 0.5rem; font-size: 0.82rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.col-table tr:hover td { background: rgba(255,255,255,0.03); }
+
+.dep-table { width: 100%; border-collapse: collapse; }
+.dep-table th {
+    text-align: left; color: #78909c; font-size: 0.7rem;
+    text-transform: uppercase; padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.dep-table td {
+    padding: 0.4rem 0.5rem; font-size: 0.82rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+/* --- DB Schema object blocks --- */
+.obj-block h3 { color: #ce93d8; font-size: 1rem; margin-bottom: 0.5rem; }
+.obj-block.view-block h3 { color: #81c784; }
+.obj-block pre {
+    background: rgba(0,0,0,0.3);
+    border-radius: 6px;
+    padding: 0.8rem;
+    overflow-x: auto;
+    font-size: 0.78rem;
+    color: #b0bec5;
+    line-height: 1.5;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* --- API Reference --- */
+.params-table th {
+    text-align: left; font-size: 0.72rem; color: #546e7a;
+    text-transform: uppercase; padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.params-table td {
+    font-size: 0.82rem; padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.param-inputs {
+    display: flex; gap: 0.75rem;
+    align-items: flex-end; flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+.param-inputs label {
+    font-size: 0.75rem; color: #90a4ae;
+    display: flex; flex-direction: column; gap: 0.15rem;
+}
+.param-inputs input,
+.param-inputs select {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid #546e7a;
+    border-radius: 4px;
+    color: #e0e0e0;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.82rem;
+    font-family: inherit;
+    width: 140px;
+}
+.param-inputs input:focus,
+.param-inputs select:focus {
+    outline: none;
+    border-color: #4fc3f7;
+}
+
+.response-area pre {
+    font-size: 0.8rem; color: #c5e1a5;
+    white-space: pre-wrap; word-break: break-all;
+}
+.response-status { font-size: 0.75rem; margin-bottom: 0.3rem; }
+.status-ok { color: #66bb6a; }
+.status-err { color: #ef5350; }
+
+.method-badge {
+    display: inline-block; padding: 0.15rem 0.5rem;
+    border-radius: 4px; font-weight: bold;
+    font-size: 0.72rem; text-transform: uppercase; color: white;
+}
+.method-get  { background: #4fc3f7; color: #0f3460; }
+.method-post { background: #388e3c; }
+.method-put  { background: #ffa726; color: #1a1a2e; }
+.method-patch { background: #ce93d8; color: #1a1a2e; }
+.method-delete { background: #c62828; }
+
+.path { font-family: 'Cascadia Code', monospace; color: #e0e0e0; font-size: 0.9rem; }
+.desc { color: #b0bec5; font-size: 0.85rem; margin-bottom: 0.5rem; }
+
+.auth-badge {
+    display: inline-block; padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.7rem;
+    background: rgba(239,154,154,0.2); color: #ef9a9a; font-weight: 600;
+}
+
+.admin-note {
+    background: rgba(239,154,154,0.08);
+    border-left: 3px solid #ef5350;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.5rem;
+    color: #b0bec5;
+    font-size: 0.85rem;
+}

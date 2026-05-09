@@ -1,26 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Swimm — Settings</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/css/settings.css" />
-</head>
-<body class="min-h-screen text-gray-300 text-sm">
-
-<header class="flex justify-between items-center px-8 py-4 bg-black/30">
-    <h1 class="text-[#ffa726] text-xl">⚙️ Settings</h1>
-    <nav class="flex gap-5">
-        <a href="/admin/" class="text-[#4fc3f7] no-underline text-sm hover:underline">← Admin</a>
-        <a href="/admin/api.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📡 API Reference</a>
-        <a href="/admin/db.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">🗄️ DB Schema</a>
-        <a href="/admin/import.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📥 Import</a>
-        <a href="/admin/import-history.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📋 Import History</a>
-        <a href="/" class="text-[#4fc3f7] no-underline text-sm hover:underline">Home</a>
-    </nav>
-</header>
+@page
+@model Swimm.API.Pages.Admin.SettingsModel
+@{
+    ViewData["Title"] = "Settings";
+    ViewData["HeaderTitle"] = "⚙️ Settings";
+    ViewData["TitleColor"] = "#ffa726";
+}
 
 <div class="max-w-[1060px] mx-auto p-6">
     <div class="bg-[rgba(79,195,247,0.08)] border-l-[3px] border-l-[#4fc3f7] rounded-md py-3 px-4 mb-6 text-[0.85rem] text-[#90a4ae] leading-relaxed">
@@ -55,31 +39,12 @@
     </table>
 </div>
 
-<div class="fixed bottom-6 right-6 bg-[#323232] text-white py-3 px-5 rounded-md text-sm opacity-0 transition-opacity duration-300 z-[1000] toast" id="toast"></div>
-
+@section Scripts {
 <script>
 (async function () {
     const API = '/api/admin/settings';
     let settings = [];
     let activeScope = 'all';
-
-    async function api(url, opts = {}) {
-        const res = await fetch(url, { credentials: 'same-origin', ...opts });
-        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-        return res.json();
-    }
-
-    function toast(msg) {
-        const el = document.getElementById('toast');
-        el.textContent = msg;
-        el.classList.add('show');
-        setTimeout(() => el.classList.remove('show'), 2500);
-    }
-
-    function esc(s) {
-        if (!s) return '';
-        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
 
     function renderValueControl(s) {
         const id = `val-${s.key}`;
@@ -98,7 +63,7 @@
                     <span class="toggle-slider"></span>
                 </label>
                 ${label}
-                <span class="saved-icon text-[#66bb6a] text-[0.85rem] opacity-0 transition-opacity duration-300" id="${okId}">✓</span>
+                <span class="saved-icon text-[#66bb6a] text-[0.85rem] opacity-0 transition-opacity duration-300" id="${okId}">&#10003;</span>
             </div>`;
         }
 
@@ -107,7 +72,7 @@
             <input class="bg-black/30 border border-[#546e7a] rounded py-1 px-2 text-gray-300 text-[0.82rem] font-[inherit] ${widthCls} focus:outline-none focus:border-[#4fc3f7]" id="${id}" value="${esc(s.value)}"
                    onkeydown="if(event.key==='Enter')saveField('${esc(s.key)}')">
             <button class="bg-[#66bb6a] border-none text-white py-1 px-3 rounded cursor-pointer text-[0.78rem] font-[inherit] transition-opacity hover:opacity-85" onclick="saveField('${esc(s.key)}')">Save</button>
-            <span class="saved-icon text-[#66bb6a] text-[0.85rem] opacity-0 transition-opacity duration-300" id="${okId}">✓</span>
+            <span class="saved-icon text-[#66bb6a] text-[0.85rem] opacity-0 transition-opacity duration-300" id="${okId}">&#10003;</span>
         </div>`;
     }
 
@@ -183,7 +148,6 @@
         }
     };
 
-    // Scope filter tabs
     document.getElementById('scope-tabs').addEventListener('click', (e) => {
         const btn = e.target.closest('.scope-tab');
         if (!btn) return;
@@ -193,7 +157,6 @@
         render();
     });
 
-    // Init
     try {
         settings = await api(API);
         render();
@@ -204,6 +167,4 @@
     }
 })();
 </script>
-
-</body>
-</html>
+}

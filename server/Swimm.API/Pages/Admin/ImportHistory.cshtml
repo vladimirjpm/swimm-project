@@ -1,26 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Swimm — Import History</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/css/admin.css" />
-</head>
-<body class="min-h-screen text-gray-300 text-sm">
-
-<header class="flex justify-between items-center px-8 py-4 bg-black/30">
-    <h1 class="text-[#66bb6a] text-xl">📋 Import History</h1>
-    <nav class="flex gap-5">
-        <a href="/admin/" class="text-[#4fc3f7] no-underline text-sm hover:underline">← Admin</a>
-        <a href="/admin/api.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📡 API Reference</a>
-        <a href="/admin/db.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">🗄️ DB Schema</a>
-        <a href="/admin/import.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📥 Import</a>
-        <a href="/admin/settings.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">⚙️ Settings</a>
-        <a href="/" class="text-[#4fc3f7] no-underline text-sm hover:underline">Home</a>
-    </nav>
-</header>
+@page
+@model Swimm.API.Pages.Admin.ImportHistoryModel
+@{
+    ViewData["Title"] = "Import History";
+    ViewData["HeaderTitle"] = "📋 Import History";
+    ViewData["TitleColor"] = "#66bb6a";
+}
 
 <div class="max-w-[1100px] mx-auto p-6">
     <div class="bg-[rgba(79,195,247,0.08)] border-l-[3px] border-l-[#4fc3f7] rounded-md py-3 px-4 mb-6 text-[0.85rem] text-[#90a4ae] leading-relaxed">
@@ -65,29 +49,10 @@
     <div id="empty-msg" class="hidden text-center text-[#546e7a] italic py-10">Нет записей об импорте.</div>
 </div>
 
-<div class="fixed bottom-6 right-6 bg-[#323232] text-white py-3 px-5 rounded-md text-sm opacity-0 transition-opacity duration-300 z-[1000] toast" id="toast"></div>
-
+@section Scripts {
 <script>
 (async function () {
     const API = '/api/admin/import-history';
-
-    async function api(url, opts = {}) {
-        const res = await fetch(url, { credentials: 'same-origin', ...opts });
-        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-        return res.json();
-    }
-
-    function toast(msg) {
-        const el = document.getElementById('toast');
-        el.textContent = msg;
-        el.classList.add('show');
-        setTimeout(() => el.classList.remove('show'), 2500);
-    }
-
-    function esc(s) {
-        if (!s) return '';
-        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
 
     function fmtDate(iso) {
         if (!iso) return '—';
@@ -170,5 +135,4 @@
     await load();
 })();
 </script>
-</body>
-</html>
+}

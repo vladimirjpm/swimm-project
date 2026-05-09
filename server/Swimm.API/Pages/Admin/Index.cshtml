@@ -1,27 +1,11 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Swimm — Admin</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/css/admin.css" />
-</head>
-<body class="font-sans min-h-screen text-gray-300">
-
-<header class="flex justify-between items-center px-8 py-4 bg-black/30">
-    <h1 class="text-[#ff6b6b] text-2xl">🔧 Swimm Admin</h1>
-    <div class="flex gap-5">
-        <a href="/" class="text-[#4fc3f7] no-underline text-sm hover:underline">← Home</a>
-        <a href="/admin/api.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📡 API Reference</a>
-        <a href="/admin/db.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">🗄️ DB Schema</a>
-        <a href="/admin/settings.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">⚙️ Settings</a>
-        <a href="/admin/import.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📥 Import</a>
-        <a href="/admin/import-history.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📋 Import History</a>
-        <a href="/auth/logout" class="text-[#4fc3f7] no-underline text-sm hover:underline">Logout</a>
-    </div>
-</header>
+@page
+@model Swimm.API.Pages.Admin.IndexModel
+@{
+    ViewData["Title"] = "Admin";
+    ViewData["HeaderTitle"] = "🔧 Swimm Admin";
+    ViewData["TitleColor"] = "#ff6b6b";
+    ViewData["BodyClass"] = "font-sans min-h-screen text-gray-300";
+}
 
 <div class="max-w-[1100px] mx-auto p-6">
     <!-- Stats -->
@@ -50,33 +34,17 @@
     </div>
 </div>
 
-<div class="fixed bottom-6 right-6 bg-[#323232] text-white py-3 px-5 rounded-md text-sm opacity-0 transition-opacity duration-300 z-[1000] toast" id="toast"></div>
-
+@section Scripts {
 <script>
 (async function () {
     const API = '/api/admin';
     let allRoles = [];
-
-    // --- Helpers ---
-    async function api(url, opts = {}) {
-        const res = await fetch(url, { credentials: 'same-origin', ...opts });
-        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-        return res.json();
-    }
-
-    function toast(msg) {
-        const el = document.getElementById('toast');
-        el.textContent = msg;
-        el.classList.add('show');
-        setTimeout(() => el.classList.remove('show'), 2500);
-    }
 
     function formatDate(iso) {
         if (!iso) return '—';
         return new Date(iso).toLocaleDateString('ru-RU');
     }
 
-    // --- Stats ---
     async function loadStats() {
         const s = await api(`${API}/stats`);
         const grid = document.getElementById('stats-grid');
@@ -95,7 +63,6 @@
         `).join('');
     }
 
-    // --- Users ---
     async function loadUsers() {
         const users = await api(`${API}/users`);
         const tbody = document.getElementById('users-body');
@@ -113,7 +80,6 @@
                 ? `<img class="w-7 h-7 rounded-full align-middle mr-1.5" src="${u.avatarUrl}" alt="">`
                 : '';
 
-            // Role toggle buttons
             const missingRoles = allRoles.filter(r => !u.roles.includes(r.name));
             const addBtns = missingRoles.map(r =>
                 `<button class="py-1 px-2.5 rounded border-none cursor-pointer text-xs text-white transition-opacity hover:opacity-80 bg-[#66bb6a]" onclick="addRole(${u.id}, ${r.id})">+ ${r.name}</button>`
@@ -139,7 +105,6 @@
         }).join('');
     }
 
-    // --- Actions (global) ---
     window.addRole = async function (userId, roleId) {
         await api(`${API}/users/${userId}/roles/${roleId}`, { method: 'POST' });
         toast('Role added');
@@ -162,7 +127,6 @@
         loadUsers();
     };
 
-    // --- Tabs ---
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -172,17 +136,12 @@
         });
     });
 
-    // --- Init ---
     try {
         allRoles = await api(`${API}/roles`);
         await Promise.all([loadStats(), loadUsers()]);
     } catch (e) {
         console.error('Admin init failed', e);
-        document.querySelector('.container').innerHTML =
-            '<p class="text-[#ef5350] text-center p-12">Failed to load admin data. Make sure you have Admin role.</p>';
     }
 })();
 </script>
-
-</body>
-</html>
+}

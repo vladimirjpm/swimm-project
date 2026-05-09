@@ -1,27 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Swimm — API Reference</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/css/api.css" />
-</head>
-<body class="min-h-screen text-gray-300 text-sm">
-
-<header class="flex justify-between items-center px-8 py-4 bg-black/30">
-    <h1 class="text-[#ffa726] text-xl">📡 API Reference</h1>
-    <nav class="flex gap-5">
-        <a href="/" class="text-[#4fc3f7] no-underline text-sm hover:underline">← Home</a>
-        <a href="/admin/" class="text-[#4fc3f7] no-underline text-sm hover:underline">🔧 Admin</a>
-        <a href="/admin/db.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">🗄️ DB Schema</a>
-        <a href="/admin/settings.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">⚙️ Settings</a>
-        <a href="/admin/import.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📥 Import</a>
-        <a href="/admin/import-history.html" class="text-[#4fc3f7] no-underline text-sm hover:underline">📋 Import History</a>
-        <a href="/auth/logout" class="text-[#4fc3f7] no-underline text-sm hover:underline">Logout</a>
-    </nav>
-</header>
+@page
+@model Swimm.API.Pages.Admin.ApiModel
+@{
+    ViewData["Title"] = "API Reference";
+    ViewData["HeaderTitle"] = "📡 API Reference";
+    ViewData["TitleColor"] = "#ffa726";
+}
 
 <div class="max-w-[1100px] mx-auto p-6">
 
@@ -40,7 +23,6 @@
     <!-- ======================== PUBLIC API ======================== -->
     <div class="tab-content active" id="tab-public">
 
-        <!-- Auth -->
         <div class="mb-8">
             <h2>🔐 Auth</h2>
 
@@ -96,7 +78,6 @@
             </div>
         </div>
 
-        <!-- Results -->
         <div class="mb-8">
             <h2>📊 Results</h2>
 
@@ -366,7 +347,7 @@
                 <strong>Body:</strong> <code>multipart/form-data</code> с полем <code>file</code> (.json)<br>
                 <strong>Response:</strong> <code>{ totalRows, created, skipped, errors, errorMessages[], message }</code>
             </div>
-            <div class="text-[#546e7a] text-xs italic">Используйте страницу <a href="/admin/import.html" class="text-[#4fc3f7]">📥 Import</a> для загрузки файлов.</div>
+            <div class="text-[#546e7a] text-xs italic">Используйте страницу <a href="/Admin/Import" class="text-[#4fc3f7]">📥 Import</a> для загрузки файлов.</div>
         </div>
 
         <!-- DELETE /api/admin/import/clear -->
@@ -528,8 +509,7 @@
 
 </div>
 
-<div class="toast" id="toast"></div>
-
+@section Scripts {
 <script>
 (async function () {
     const adminTabBtn = document.getElementById('admin-tab-btn');
@@ -555,15 +535,8 @@
     } catch (e) { /* ignore */ }
 })();
 
-function toast(msg) {
-    const el = document.getElementById('toast');
-    el.textContent = msg;
-    el.classList.add('show');
-    setTimeout(() => el.classList.remove('show'), 2500);
-}
-
 async function runApi(btn, method, urlTemplate, paramMap, defaultMode) {
-    const card = btn.closest('.api-card');
+    const card = btn.closest('.api-card') || btn.closest('[class*="rounded-lg"]');
     const inputs = card.querySelectorAll('[data-param]');
     const responseArea = card.querySelector('.response-area');
     const statusEl = card.querySelector('.response-status');
@@ -727,12 +700,6 @@ async function runApi(btn, method, urlTemplate, paramMap, defaultMode) {
         }
     }
 
-    function esc(s) {
-        const el = document.createElement('span');
-        el.textContent = s;
-        return el.innerHTML;
-    }
-
     searchBtn.addEventListener('click', () => loadResults(1));
     prevBtn.addEventListener('click', () => { if (currentPage > 1) loadResults(currentPage - 1); });
     nextBtn.addEventListener('click', () => loadResults(currentPage + 1));
@@ -742,6 +709,4 @@ async function runApi(btn, method, urlTemplate, paramMap, defaultMode) {
     });
 })();
 </script>
-
-</body>
-</html>
+}

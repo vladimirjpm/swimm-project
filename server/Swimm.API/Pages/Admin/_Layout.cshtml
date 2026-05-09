@@ -1,0 +1,60 @@
+@{
+    var bodyClass = ViewData["BodyClass"] as string ?? "min-h-screen text-gray-300 text-sm";
+    var titleColor = ViewData["TitleColor"] as string ?? "#ff6b6b";
+    var headerTitle = ViewData["HeaderTitle"] as string ?? "🔧 Swimm Admin";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Swimm — @ViewData["Title"]</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/admin-all.css" />
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body class="@bodyClass">
+
+<header class="flex justify-between items-center px-8 py-4 bg-black/30">
+    <h1 class="text-xl" style="color: @titleColor">@headerTitle</h1>
+    <nav class="flex gap-5">
+        <a href="/" class="text-[#4fc3f7] no-underline text-sm hover:underline">← Home</a>
+        <a href="/Admin" class="text-[#4fc3f7] no-underline text-sm hover:underline">🔧 Admin</a>
+        <a href="/Admin/Api" class="text-[#4fc3f7] no-underline text-sm hover:underline">📡 API Reference</a>
+        <a href="/Admin/Db" class="text-[#4fc3f7] no-underline text-sm hover:underline">🗄️ DB Schema</a>
+        <a href="/Admin/Settings" class="text-[#4fc3f7] no-underline text-sm hover:underline">⚙️ Settings</a>
+        <a href="/Admin/Import" class="text-[#4fc3f7] no-underline text-sm hover:underline">📥 Import</a>
+        <a href="/Admin/ImportHistory" class="text-[#4fc3f7] no-underline text-sm hover:underline">📋 Import History</a>
+        <a href="/auth/logout" class="text-[#4fc3f7] no-underline text-sm hover:underline">Logout</a>
+    </nav>
+</header>
+
+@RenderBody()
+
+<div class="fixed bottom-6 right-6 bg-[#323232] text-white py-3 px-5 rounded-md text-sm opacity-0 transition-opacity duration-300 z-[1000] toast" id="toast"></div>
+
+<script>
+function toast(msg, duration) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), duration || 2500);
+}
+
+function esc(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function api(url, opts = {}) {
+    const res = await fetch(url, { credentials: 'same-origin', ...opts });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    return res.json();
+}
+</script>
+
+@await RenderSectionAsync("Scripts", required: false)
+
+</body>
+</html>
