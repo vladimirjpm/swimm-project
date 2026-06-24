@@ -1,26 +1,27 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Swimm.Application.Abstractions;
 using Swimm.Infrastructure.Data;
 
-namespace Swimm.API.Services;
+namespace Swimm.Infrastructure.Services;
 
 /// <summary>
 /// Предоставляет полную информацию о структуре БД (таблицы, FK, индексы, CHECK, функции, Views, row counts).
-/// Результат кешируется с длительностью из AdminSettingsService.
+/// Результат кешируется с длительностью из ISettingsService.
 ///
 /// Запросы используют системные каталоги PostgreSQL (information_schema + pg_catalog) —
 /// это единственное место в проекте с вендор-специфичным SQL. Оно изолировано и обслуживает
 /// только админ-вьювер схемы БД (страница db.html); на бизнес-логику не влияет.
 /// </summary>
-public class DbSchemaService
+public class DbSchemaService : ISchemaService
 {
     private readonly SwimmDbContext _db;
     private readonly IMemoryCache _cache;
-    private readonly AdminSettingsService _settings;
+    private readonly ISettingsService _settings;
 
     private const string CacheKey = "DbSchema";
 
-    public DbSchemaService(SwimmDbContext db, IMemoryCache cache, AdminSettingsService settings)
+    public DbSchemaService(SwimmDbContext db, IMemoryCache cache, ISettingsService settings)
     {
         _db = db;
         _cache = cache;
@@ -29,12 +30,10 @@ public class DbSchemaService
 
     public async Task<object> GetSchemaAsync(bool forceRefresh = false)
     {
-        // Настройка ForceRefresh — если true, кеш обновляется при каждом запросе
         var alwaysRefresh = _settings.GetValue("ForceRefresh", false);
         if (forceRefresh || alwaysRefresh)
             _cache.Remove(CacheKey);
 
-        // Настройка SchemaCacheTTL — время жизни кеша в минутах
         var ttlMinutes = _settings.GetValue("SchemaCacheTTL", 10);
 
         return (await _cache.GetOrCreateAsync(CacheKey, async entry =>
@@ -50,9 +49,7 @@ public class DbSchemaService
         await conn.OpenAsync();
         var dbName = conn.Database;
 
-        // Настройка DefaultSchema — имя SQL-схемы по умолчанию (в PostgreSQL обычно "public")
         var schema = _settings.GetValue("DefaultSchema", "public");
-        // Настройка ShowSystemTables — показывать ли системные объекты (pg_catalog/information_schema)
         var showSystem = _settings.GetValue("ShowSystemTables", false);
 
         var tables = await LoadTablesAsync(conn, schema, showSystem);
@@ -76,10 +73,6 @@ public class DbSchemaService
         };
     }
 
-    /// <summary>
-    /// Предикат фильтрации по схеме. Если ShowSystemTables = true — отдаём всё (включая
-    /// системные схемы), иначе ограничиваемся выбранной пользовательской схемой.
-    /// </summary>
     private static string SchemaPredicate(string column, string schema, bool showSystem)
         => showSystem ? "TRUE" : $"{column} = '{schema}'";
 

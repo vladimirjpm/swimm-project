@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Swimm.Application.Abstractions;
 using Swimm.Infrastructure.Data;
-using Swimm.API.Services;
 using Swimm.Domain.Entities;
 
 namespace Swimm.API.Controllers;
@@ -13,11 +13,11 @@ namespace Swimm.API.Controllers;
 public class AdminController : ControllerBase
 {
     private readonly SwimmDbContext _db;
-    private readonly DbSchemaService _schemaService;
-    private readonly AdminSettingsService _settings;
-    private readonly JsonImportService _import;
+    private readonly ISchemaService _schemaService;
+    private readonly ISettingsService _settings;
+    private readonly IImportService _import;
 
-    public AdminController(SwimmDbContext db, DbSchemaService schemaService, AdminSettingsService settings, JsonImportService import)
+    public AdminController(SwimmDbContext db, ISchemaService schemaService, ISettingsService settings, IImportService import)
     {
         _db = db;
         _schemaService = schemaService;
@@ -177,7 +177,6 @@ public class AdminController : ControllerBase
     /// <summary>
     /// Импорт результатов из JSON-файла.
     /// Принимает multipart/form-data с полем file (JSON).
-    /// Заполняет справочники и таблицу Results.
     /// </summary>
     [HttpPost("import")]
     [RequestSizeLimit(50 * 1024 * 1024)] // 50 MB
@@ -203,8 +202,6 @@ public class AdminController : ControllerBase
 
     /// <summary>
     /// Дополнение данных спортсменов (Gender, ClubId, CountryId) из таблицы Results.
-    /// Заполняет пустые поля на основе самого свежего результата каждого спортсмена.
-    /// Используется для обратного заполнения ранее импортированных данных.
     /// </summary>
     [HttpPost("swimmers/enrich")]
     public async Task<IActionResult> EnrichSwimmers()
@@ -222,18 +219,15 @@ public class AdminController : ControllerBase
 
     /// <summary>
     /// Список таблиц, которые будут очищены при вызове import/clear.
-    /// Источник: <see cref="JsonImportService.ClearableTables"/>.
     /// </summary>
     [HttpGet("clearable-tables")]
     public IActionResult GetClearableTables()
     {
-        return Ok(new { tables = JsonImportService.ClearableTables });
+        return Ok(new { tables = _import.GetClearableTables() });
     }
 
     /// <summary>
     /// Полная очистка импортированных данных.
-    /// Удаляет Results, Competitions, Clubs, Swimmers, Countries, Relays, Galleries, GalleryItems.
-    /// Справочник Styles и пользовательские таблицы сохраняются.
     /// </summary>
     [HttpDelete("import/clear")]
     public async Task<IActionResult> ClearImportData()

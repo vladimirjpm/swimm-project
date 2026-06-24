@@ -1,18 +1,18 @@
-﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.EntityFrameworkCore;
+using Swimm.Application.Abstractions;
+using Swimm.Infrastructure;
 using Swimm.Infrastructure.Data;
-using Swimm.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Кеш (доступен всему API)
+// Кеш (нужен ISettingsService и ISchemaService через AddInfrastructure)
 builder.Services.AddMemoryCache();
 
-// Database
-builder.Services.AddDbContext<SwimmDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+// Infrastructure: DbContext + сервисы
+builder.Services.AddInfrastructure(builder.Configuration);
 
 // CORS
 builder.Services.AddCors(options =>
@@ -28,15 +28,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddControllers();
 builder.Services.AddRazorPages();
 
-// Сервисы
-builder.Services.AddSingleton<AdminSettingsService>();
-builder.Services.AddScoped<DbSchemaService>();
-builder.Services.AddScoped<JsonImportService>();
-
 // Authentication: Cookie + (опционально) Google
-// Google регистрируется только если заданы ClientId и ClientSecret (секрет — в user-secrets/ENV).
-// Без них публичная часть сайта продолжает работать; вход через Google просто недоступен,
-// а не роняет приложение на каждом запросе.
 var googleSection = builder.Configuration.GetSection("Authentication:Google");
 var googleClientId = googleSection["ClientId"];
 var googleClientSecret = googleSection["ClientSecret"];
@@ -68,8 +60,6 @@ if (googleEnabled)
         options.ClientSecret = googleClientSecret!;
         options.CallbackPath = "/signin-google";
         options.SaveTokens = false;
-
-        // Запросить профиль и email
         options.Scope.Add("profile");
         options.Scope.Add("email");
     });
@@ -102,7 +92,7 @@ app.UseAuthorization();
 // Maintenance mode — если MaintenanceMode = true, пускаем только админов
 app.Use(async (context, next) =>
 {
-    var settings = context.RequestServices.GetRequiredService<AdminSettingsService>();
+    var settings = context.RequestServices.GetRequiredService<ISettingsService>();
     var maintenance = settings.GetValue("MaintenanceMode", false);
 
     if (maintenance

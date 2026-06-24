@@ -3,23 +3,30 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
-using Swimm.Infrastructure.Data;
+using Swimm.Application.Abstractions;
+using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
+using Swimm.Infrastructure.Data;
 
-namespace Swimm.API.Services;
+namespace Swimm.Infrastructure.Services;
 
 /// <summary>
 /// Импорт результатов из JSON (формат CommonModels / ResultWrap).
 /// Заполняет справочники (Competition, Club, Swimmer, Style, Relay, Gallery) и таблицу Results.
 /// </summary>
-public class JsonImportService
+public class JsonImportService : IImportService
 {
     private readonly SwimmDbContext _db;
+
+    private static readonly string[] ClearableTables =
+        ["Results", "GalleryItems", "Galleries", "Relays", "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "Sys_ImportHistory"];
 
     public JsonImportService(SwimmDbContext db)
     {
         _db = db;
     }
+
+    public string[] GetClearableTables() => ClearableTables;
 
     /// <summary>
     /// Импортирует JSON-файл и возвращает статистику.
@@ -314,7 +321,7 @@ public class JsonImportService
     }
 
     /// <summary>
-    /// Дополняет данные спортсмена полями, которые хранятся в результатах, а не в справочнике:
+    /// Дополняет данные спортсмена полями из результатов:
     /// Gender (из event_style_gender), ClubId (FK на клуб) и CountryId (FK на страну).
     /// Обновляет только пустые поля — не перезаписывает уже заполненные.
     /// </summary>
@@ -334,14 +341,11 @@ public class JsonImportService
     /// Пакетное дополнение спортсменов данными из таблицы Results.
     /// Заполняет Gender, ClubId и CountryId для записей, где эти поля ещё пусты,
     /// на основе самого свежего результата каждого спортсмена.
-    /// Вызывается отдельно (например, из админ-контроллера) для обратного заполнения
-    /// ранее импортированных данных.
     /// </summary>
     public async Task<int> EnrichSwimmersFromResultsAsync()
     {
         var updated = 0;
 
-        // Спортсмены, у которых не заполнен Gender, ClubId или CountryId
         var swimmers = await _db.Swimmers
             .Where(s => s.Gender == null || s.ClubId == null || s.CountryId == null)
             .ToListAsync();
@@ -351,7 +355,6 @@ public class JsonImportService
 
         var swimmerIds = swimmers.Select(s => s.Id).ToHashSet();
 
-        // Последний результат каждого спортсмена (по дате) — источник Gender, ClubId и CountryId
         var latestResults = await _db.Results
             .Where(r => swimmerIds.Contains(r.SwimmerId))
             .GroupBy(r => r.SwimmerId)
@@ -397,52 +400,31 @@ public class JsonImportService
     }
 
     /// <summary>
-    /// Список таблиц, очищаемых при вызове <see cref="ClearDataAsync"/>.
-    /// Порядок учитывает FK-зависимости: сначала дочерние таблицы.
-    /// </summary>
-    public static readonly string[] ClearableTables =
-        ["Results", "GalleryItems", "Galleries", "Relays", "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "Sys_ImportHistory"];
-
-    /// <summary>
-    /// Очищает все таблицы с импортированными данными (см. <see cref="ClearableTables"/>).
+    /// Очищает все таблицы с импортированными данными.
     /// Сохраняет справочник Styles (seed-данные), AppUsers, AppRoles и пр.
-    /// Возвращает количество удаленных записей по каждой таблице.
     /// </summary>
     public async Task<ClearResult> ClearDataAsync()
     {
         var result = new ClearResult();
 
         // Порядок удаления — учитываем FK-зависимости: сначала дочерние таблицы
-        if(ClearableTables.Contains("Results"))
-            result.Results = await _db.Results.ExecuteDeleteAsync();
-        if(ClearableTables.Contains("GalleryItems"))
-            result.GalleryItems = await _db.GalleryItems.ExecuteDeleteAsync();
-        if(ClearableTables.Contains("Galleries"))
-            result.Galleries = await _db.Galleries.ExecuteDeleteAsync();
-        if(ClearableTables.Contains("Relays"))
-            result.Relays = await _db.Relays.ExecuteDeleteAsync();
-        if(ClearableTables.Contains("Swimmers"))
-            result.Swimmers = await _db.Swimmers.ExecuteDeleteAsync();
-        if(ClearableTables.Contains("Clubs"))
-            result.Clubs = await _db.Clubs.ExecuteDeleteAsync();
-        if(ClearableTables.Contains("Sys_ImportHistory"))
-            result.ImportHistory = await _db.ImportHistory.ExecuteDeleteAsync();
-        if(ClearableTables.Contains("Competitions"))
-            result.Competitions = await _db.Competitions.ExecuteDeleteAsync();
-        if(ClearableTables.Contains("Countries"))
-            result.Countries = await _db.Countries.ExecuteDeleteAsync();
+        result.Results = await _db.Results.ExecuteDeleteAsync();
+        result.GalleryItems = await _db.GalleryItems.ExecuteDeleteAsync();
+        result.Galleries = await _db.Galleries.ExecuteDeleteAsync();
+        result.Relays = await _db.Relays.ExecuteDeleteAsync();
+        result.Swimmers = await _db.Swimmers.ExecuteDeleteAsync();
+        result.Clubs = await _db.Clubs.ExecuteDeleteAsync();
+        result.ImportHistory = await _db.ImportHistory.ExecuteDeleteAsync();
+        result.Competitions = await _db.Competitions.ExecuteDeleteAsync();
+        result.Countries = await _db.Countries.ExecuteDeleteAsync();
 
         result.Total = result.Results + result.GalleryItems + result.Galleries
             + result.Relays + result.Swimmers + result.Clubs + result.ImportHistory + result.Competitions + result.Countries;
 
-        // Сброс identity-счётчиков, чтобы Id начинались заново (PostgreSQL).
+        // Сброс identity-счётчиков (только метаданные, на FK не влияет).
         //
-        // Примечание: TRUNCATE ... RESTART IDENTITY CASCADE здесь применять НЕЛЬЗЯ.
-        // Таблица Swimmers связана с сохраняемой Sys_AppUsers (FK SwimmerId, ON DELETE SET NULL),
-        // а Clubs/Countries — со Swimmers. CASCADE прошёл бы по цепочке до Sys_AppUsers и удалил
-        // пользователей и админов. Поэтому данные удалены выше через DELETE (с корректным SET NULL),
-        // а здесь у опустевших таблиц лишь перезапускаем identity-счётчики — это только метаданные,
-        // на FK не влияет.
+        // TRUNCATE ... RESTART IDENTITY CASCADE здесь применять нельзя: Swimmers связана с
+        // Sys_AppUsers (FK SwimmerId, ON DELETE SET NULL), CASCADE прошёл бы до AppUsers.
         var clearedTables = new[]
         {
             "Results", "GalleryItems", "Galleries", "Relays",
@@ -456,9 +438,6 @@ public class JsonImportService
         return result;
     }
 
-    /// <summary>
-    /// Анализирует сырой JSON через JsonDocument и возвращает диагностику типов полей.
-    /// </summary>
     private static async Task<List<string>> DiagnoseJsonFieldsAsync(Stream stream)
     {
         var log = new List<string>();
@@ -535,7 +514,6 @@ public class JsonImportService
     {
         if (string.IsNullOrEmpty(date)) return DateTime.MinValue;
 
-        // Поддерживаемые форматы
         string[] formats = [
             ParserConstants.DateFormat,
             "yyyy-MM-dd",
@@ -562,7 +540,6 @@ public class JsonImportService
 
         time = time.Trim().Replace(',', '.');
 
-        // mm:ss.ff  или  h:mm:ss.ff
         var match = Regex.Match(time, @"^(?:(\d+):)?(\d+)\.(\d+)$");
         if (!match.Success) return null;
 
@@ -570,7 +547,6 @@ public class JsonImportService
         int seconds = int.Parse(match.Groups[2].Value);
         string frac = match.Groups[3].Value;
 
-        // Нормализуем дробную часть до 3 знаков (мс)
         frac = frac.Length switch
         {
             1 => frac + "00",
@@ -583,9 +559,6 @@ public class JsonImportService
         return (minutes * 60 + seconds) * 1000 + ms;
     }
 
-    /// <summary>
-    /// Конвертер bool, допускающий строки ("true"/"false"/"1"/"0") и числа (0/1).
-    /// </summary>
     private class LenientBoolConverter : JsonConverter<bool>
     {
         public override bool Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -605,9 +578,6 @@ public class JsonImportService
             => writer.WriteBooleanValue(value);
     }
 
-    /// <summary>
-    /// Конвертер bool?, допускающий строки и числа.
-    /// </summary>
     private class LenientNullableBoolConverter : JsonConverter<bool?>
     {
         public override bool? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -632,47 +602,15 @@ public class JsonImportService
 }
 
 /// <summary>
-/// Константы, общие для парсера и API.
+/// Константы формата дат, общие для парсера и импорта.
 /// </summary>
 public static class ParserConstants
 {
     public const string DateFormat = "dd/MM/yyyy";
 }
 
-/// <summary>
-/// Результат импорта.
-/// </summary>
-public class ImportResult
-{
-    public int TotalRows { get; set; }
-    public int Created { get; set; }
-    public int Skipped { get; set; }
-    public int Errors { get; set; }
-    public List<string> ErrorMessages { get; set; } = [];
-    public List<string> DiagnosticLog { get; set; } = [];
-    public string Message { get; set; } = string.Empty;
-}
+// ─── Internal JSON DTOs (десериализация входных данных) ───────────────────────
 
-/// <summary>
-/// Результат очистки данных.
-/// </summary>
-public class ClearResult
-{
-    public int Total { get; set; }
-    public int Results { get; set; }
-    public int Competitions { get; set; }
-    public int Clubs { get; set; }
-    public int Swimmers { get; set; }
-    public int Relays { get; set; }
-    public int Galleries { get; set; }
-    public int GalleryItems { get; set; }
-    public int Countries { get; set; }
-    public int ImportHistory { get; set; }
-}
-
-/// <summary>
-/// DTO для десериализации JSON-обертки.
-/// </summary>
 public class ResultWrap
 {
     [JsonPropertyName("title")]
@@ -688,9 +626,6 @@ public class ResultWrap
     public bool? IsAward { get; set; }
 }
 
-/// <summary>
-/// DTO одной строки результата из JSON.
-/// </summary>
 public class ResultJsonItem
 {
     [JsonPropertyName("country")]

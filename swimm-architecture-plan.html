@@ -118,7 +118,7 @@
     <span style="color:#475569">·</span>
     <span style="color:#cbd5e1">Migrated SQL Server → PostgreSQL</span>
     <span style="color:#475569">·</span>
-    <span style="color:#fbbf24">Clean Architecture — IN PROGRESS (3/5)</span>
+    <span style="color:#fbbf24">Clean Architecture — IN PROGRESS · Шаг 4b ✓ (4c осталось)</span>
     <span style="flex:1"></span>
     <a href="https://github.com/vladimirjpm/swimm-project" target="_blank" rel="noopener" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;text-decoration:none;padding:0.35rem 0.8rem;border-radius:6px;font-size:0.82rem;font-weight:500">📦 Repo</a>
   </div>
@@ -417,9 +417,9 @@
         <h3>Infrastructure + тонкие контроллеры <span style="font-size:0.75rem;font-weight:600;color:#fbbf24;margin-left:0.5rem">NEXT · самый объёмный</span></h3>
         <p>EF и сервисы в Infrastructure, контроллеры на интерфейсах. Делим на под-шаги для безопасности.</p>
         <div class="stage-tasks">
-          <div class="task key">4a — SwimmDbContext + миграции + EF-конфиг (IEntityTypeConfiguration) → Infrastructure</div>
-          <div class="task key">4b — JsonImport / DbSchema / AdminSettings → Infrastructure + интерфейсы в Application</div>
-          <div class="task key">4c — контроллеры на интерфейсах вместо DbContext; DI: AddInfrastructure + AddApplication; тонкий Program.cs</div>
+          <div class="task done">4a — SwimmDbContext + миграции + EF-конфиг (IEntityTypeConfiguration) → Infrastructure</div>
+          <div class="task done">4b — JsonImport / DbSchema / AdminSettings → Infrastructure; IImportService / ISchemaService / ISettingsService в Application; AddInfrastructure(); контроллеры на интерфейсах</div>
+          <div class="task key">4c — контроллеры без SwimmDbContext (IResultRepository / IAdminRepository); AddApplication(); тонкий Program.cs</div>
         </div>
       </div>
     </div>
