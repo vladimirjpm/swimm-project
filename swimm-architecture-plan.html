@@ -118,7 +118,7 @@
     <span style="color:#475569">·</span>
     <span style="color:#cbd5e1">Migrated SQL Server → PostgreSQL</span>
     <span style="color:#475569">·</span>
-    <span style="color:#fbbf24">Clean Architecture — NEXT</span>
+    <span style="color:#fbbf24">Clean Architecture — IN PROGRESS (3/5)</span>
     <span style="flex:1"></span>
     <a href="https://github.com/vladimirjpm/swimm-project" target="_blank" rel="noopener" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;text-decoration:none;padding:0.35rem 0.8rem;border-radius:6px;font-size:0.82rem;font-weight:500">📦 Repo</a>
   </div>
@@ -365,46 +365,48 @@
   <div class="phase-header p2">
     <div class="phase-num">→</div>
     <div>
-      <div class="phase-title">Clean Architecture <span style="font-size:0.75rem;font-weight:600;color:#fbbf24;margin-left:0.5rem">NEXT</span></div>
+      <div class="phase-title">Clean Architecture <span style="font-size:0.75rem;font-weight:600;color:#fbbf24;margin-left:0.5rem">IN PROGRESS · 3/5</span></div>
       <div class="phase-sub">Расслоить серверную часть: Domain / Application / Infrastructure / API. Контроллеры — тонкие. Парсер и клиент не трогаем.</div>
     </div>
   </div>
 
   <div class="stages">
-    <div class="stage phase2">
-      <div class="stage-badge">1</div>
+    <div class="stage" style="border-color:#166534;background:#052e16">
+      <div class="stage-badge" style="background:#166534;color:#4ade80">✓</div>
       <div class="stage-info">
-        <h3>Проекты &amp; ссылки</h3>
-        <p>Создать слои и настроить зависимости строго внутрь.</p>
+        <h3 style="color:#4ade80">Проекты &amp; ссылки <span style="font-size:0.75rem;font-weight:400;color:#4ade80;margin-left:0.5rem">DONE</span></h3>
+        <p>Слои созданы, зависимости направлены строго внутрь.</p>
         <div class="stage-tasks">
-          <div class="task key">Swimm.Domain · Swimm.Application · Swimm.Infrastructure (classlib)</div>
-          <div class="task key">ProjectReference: API → Application → Domain; Infrastructure → Application/Domain</div>
-          <div class="task">Добавить все проекты в Swimm.sln</div>
+          <div class="task done">Swimm.Domain · Swimm.Application · Swimm.Infrastructure (classlib, net10.0)</div>
+          <div class="task done">ProjectReference: API → Application + Infrastructure; Application → Domain; Infrastructure → Application</div>
+          <div class="task done">Все проекты в Swimm.sln · решение собирается</div>
         </div>
       </div>
     </div>
 
-    <div class="stage phase2">
-      <div class="stage-badge">2</div>
+    <div class="stage" style="border-color:#166534;background:#052e16">
+      <div class="stage-badge" style="background:#166534;color:#4ade80">✓</div>
       <div class="stage-info">
-        <h3>Домен как POCO</h3>
-        <p>Перенести 15 сущностей, EF-конфигурацию вынести из домена.</p>
+        <h3 style="color:#4ade80">Сущности в Domain <span style="font-size:0.75rem;font-weight:400;color:#4ade80;margin-left:0.5rem">DONE</span></h3>
+        <p>15 сущностей перенесены через git mv (история сохранена), модель совпадает со схемой.</p>
         <div class="stage-tasks">
-          <div class="task key">Models/ → Swimm.Domain/Entities/ как чистые POCO (без data-аннотаций)</div>
-          <div class="task key">EF-маппинг → IEntityTypeConfiguration&lt;T&gt; в Infrastructure (по классу на сущность)</div>
+          <div class="task done">Models/ → Swimm.Domain/Entities/ (namespace Swimm.Domain.Entities)</div>
+          <div class="task done">EF Core Abstractions в Domain — только ради атрибута [Index]</div>
+          <div class="task">Вычистка data-аннотаций → IEntityTypeConfiguration отложена на Шаг 4 (Infrastructure)</div>
         </div>
       </div>
     </div>
 
-    <div class="stage phase2">
-      <div class="stage-badge">3</div>
+    <div class="stage" style="border-color:#166534;background:#052e16">
+      <div class="stage-badge" style="background:#166534;color:#4ade80">✓</div>
       <div class="stage-info">
-        <h3>Application-слой</h3>
-        <p>DTO, интерфейсы, use-cases. Устранить дублирование маппинга.</p>
+        <h3 style="color:#4ade80">Application: DTO + маппер <span style="font-size:0.75rem;font-weight:400;color:#4ade80;margin-left:0.5rem">DONE</span></h3>
+        <p>DTO переехал в Application, дублирование проекции устранено.</p>
         <div class="stage-tasks">
-          <div class="task key">DTO (ResultDto и пр.) + интерфейсы: IResultRepository, IImportService, ISchemaService</div>
-          <div class="task key">Один маппер ResultRecord → ResultDto (сейчас скопирован дважды в ResultsController)</div>
-          <div class="task key">Логику создания пользователя/ролей из AuthController → IUserService</div>
+          <div class="task done">ResultDto → Swimm.Application/Dtos</div>
+          <div class="task done">ResultMapping.ToDto — единый Expression (EF транслирует в SQL)</div>
+          <div class="task done">ResultsController: две дублированные проекции → один .Select(ToDto)</div>
+          <div class="task">Интерфейсы (IResultRepository / IImportService / IUserService) — на Шаге 4</div>
         </div>
       </div>
     </div>
@@ -412,12 +414,12 @@
     <div class="stage phase2">
       <div class="stage-badge">4</div>
       <div class="stage-info">
-        <h3>Infrastructure + тонкие контроллеры</h3>
-        <p>EF и сервисы в Infrastructure, контроллеры на интерфейсах.</p>
+        <h3>Infrastructure + тонкие контроллеры <span style="font-size:0.75rem;font-weight:600;color:#fbbf24;margin-left:0.5rem">NEXT · самый объёмный</span></h3>
+        <p>EF и сервисы в Infrastructure, контроллеры на интерфейсах. Делим на под-шаги для безопасности.</p>
         <div class="stage-tasks">
-          <div class="task key">SwimmDbContext, миграции, JsonImport / DbSchema / AdminSettings → Infrastructure</div>
-          <div class="task key">Контроллеры: инъекция интерфейсов вместо SwimmDbContext (валидация → use-case → возврат)</div>
-          <div class="task key">DI: AddInfrastructure(...) + AddApplication(...); Program.cs тонкий</div>
+          <div class="task key">4a — SwimmDbContext + миграции + EF-конфиг (IEntityTypeConfiguration) → Infrastructure</div>
+          <div class="task key">4b — JsonImport / DbSchema / AdminSettings → Infrastructure + интерфейсы в Application</div>
+          <div class="task key">4c — контроллеры на интерфейсах вместо DbContext; DI: AddInfrastructure + AddApplication; тонкий Program.cs</div>
         </div>
       </div>
     </div>
@@ -464,6 +466,104 @@
       Поэтому переезд на <strong>Azure / Neon / Supabase / Railway / любой VPS</strong> — это
       простая замена <code>connection string</code>, без изменений кода. Это одна из причин,
       почему переход на PostgreSQL сейчас — хорошее решение.
+    </div>
+  </div>
+
+  <!-- AI EXTENSION POINTS -->
+  <h2 class="section">AI Extension Points (future)</h2>
+  <div class="note" style="background:#1c1a08;border-color:#854d0e;color:#fbbf24">
+    <strong>Цель:</strong> заложить seam-ы так, чтобы и простой LLM сейчас, и Microsoft Agent Framework 1.0 потом
+    внедрялись за один и тот же интерфейс — сменой реализации в Infrastructure, без правок контроллеров и домена.
+    <strong>Реализация — после Clean Architecture (Шаг 4).</strong>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Seam-интерфейсы (Application)</h2>
+      <div class="layer"><span class="layer-name">ISwimmerProgressAnalyzer</span><span class="layer-desc">Детерминированная аналитика прогресса (без LLM). Она же — инструмент для агента.</span></div>
+      <div class="layer"><span class="layer-name">ITrainingPlanGenerator</span><span class="layer-desc">Генерация плана тренировок — один structured LLM-вызов.</span></div>
+      <div class="layer parser"><span class="layer-name">IVirtualCoach</span><span class="layer-desc">Разговорный сценарий. Контроллер зависит ТОЛЬКО от него — контракт не меняется при SDK→MAF.</span></div>
+      <div class="layer"><span class="layer-name">ICoachConversationStore</span><span class="layer-desc">Состояние диалога: in-memory сейчас → durable при MAF.</span></div>
+    </div>
+
+    <div class="card">
+      <h2>Coach tools — обычные C#-методы</h2>
+      <p style="font-size:0.82rem;color:#94a3b8;line-height:1.5;margin-bottom:0.6rem">
+        Детерминированные функции над данными заплывов. В режиме прямого SDK подключаются как
+        function-calling tools; в MAF — как agent tools / MCP. Методы одни и те же — инвестиция не пропадает.
+      </p>
+      <div class="schema-field"><span class="field-name">GetRecentResults(swimmerId)</span><span class="field-type">последние соревнования</span></div>
+      <div class="schema-field"><span class="field-name">GetProgression(swimmerId, style, dist)</span><span class="field-type">тренд времени</span></div>
+      <div class="schema-field"><span class="field-name">CompareSwimmers(a, b, period)</span><span class="field-type">кто прогрессировал лучше</span></div>
+      <div class="schema-field"><span class="field-name">SuggestTrainingFocus(swimmerId)</span><span class="field-type">слабые дистанции/стили</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Virtual Coach — поток диалога</h2>
+    <div class="flow">
+      <div class="flow-box blue">«Посмотрим последние соревнования»</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box amber">IVirtualCoach</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box purple">LLM решает, что вызвать</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box green">tools: GetRecentResults / CompareSwimmers / GetProgression</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box amber">LLM</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box blue">ответ тренера</div>
+    </div>
+    <p class="flow-label">
+      <strong style="color:#cbd5e1">Сейчас:</strong> прямой SDK — tool-loop вручную, один провайдер за интерфейсом.
+      <strong style="color:#fbbf24">Потом (MAF 1.0):</strong> те же tools регистрируются как agent tools/MCP, добавляются
+      память (threads) и multi-agent (DataAgent → CoachAgent → Critic). <code>IVirtualCoach</code> не меняется.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Каталог агентов — расширяемый (агентов может быть много)</h2>
+    <p style="font-size:0.82rem;color:#94a3b8;line-height:1.5;margin-bottom:0.75rem">
+      Контроллер зависит от <strong style="color:#cbd5e1">роутера/каталога</strong>, а не от конкретных агентов.
+      Новый агент = реализовать <code style="color:#93c5fd">IAgent</code> + зарегистрировать в DI. Контроллеры и домен
+      не трогаются. В MAF это раскрывается в multi-agent с handoff/маршрутизацией.
+    </p>
+    <div class="layer"><span class="layer-name">IAgent</span><span class="layer-desc">Общий контракт: Name · Description · CanHandle(context) · HandleAsync(message, context). Каждый агент — отдельная реализация.</span></div>
+    <div class="layer"><span class="layer-name">IAgentCatalog</span><span class="layer-desc">Реестр всех агентов (discovery). Регистрация через DI — добавил класс, агент доступен.</span></div>
+    <div class="layer parser"><span class="layer-name">IAgentRouter</span><span class="layer-desc">Выбирает агента под запрос (или отдаёт оркестрацию/handoff в MAF). Точка входа для контроллера.</span></div>
+
+    <div class="flow" style="margin-top:1rem">
+      <div class="flow-box blue">запрос пользователя</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box amber">IAgentRouter</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box purple">выбранный IAgent</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box green">coach tools (общие)</div>
+    </div>
+
+    <p style="font-size:0.78rem;color:#64748b;margin:0.75rem 0 0.4rem">Примеры агентов (список открытый, дополняется):</p>
+    <div>
+      <span class="chip future"><span class="dot"></span>VirtualCoach</span>
+      <span class="chip future"><span class="dot"></span>ProgressAnalyst</span>
+      <span class="chip future"><span class="dot"></span>TrainingPlanner</span>
+      <span class="chip future"><span class="dot"></span>InjuryRiskMonitor</span>
+      <span class="chip future"><span class="dot"></span>RecordsWatcher</span>
+      <span class="chip future"><span class="dot"></span>CompetitionScout</span>
+      <span class="chip future"><span class="dot"></span>TechniqueReviewer</span>
+      <span class="chip future"><span class="dot"></span>NutritionAdvisor</span>
+      <span class="chip future"><span class="dot"></span>TeamRanker</span>
+      <span class="chip future"><span class="dot"></span>…</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Когда переключаться SDK → MAF 1.0</h2>
+    <div class="stage-tasks" style="margin-top:0">
+      <div class="task key">Агент сам вызывает инструменты в цикле (tool-loop) — не один вопрос/ответ</div>
+      <div class="task key">Несколько специализированных агентов координируются (data / coach / critic)</div>
+      <div class="task key">Память между сессиями, durable workflow (ночные батчи по всему клубу)</div>
+      <div class="task">Провайдер/модель (Azure OpenAI · Anthropic Claude · OpenAI) — за интерфейсом, выбор конфигом</div>
     </div>
   </div>
 
@@ -522,10 +622,10 @@
   <!-- STATUS -->
   <h2 class="section">Status</h2>
   <div>
-    <span class="chip ok"><span class="dot"></span>Migrated to PostgreSQL</span>
-    <span class="chip ok"><span class="dot"></span>Clean migration on empty DB</span>
-    <span class="chip ok"><span class="dot"></span>Endpoints verified</span>
-    <span class="chip warn"><span class="dot"></span>Clean Architecture — next</span>
+    <span class="chip ok"><span class="dot"></span>Migrated to PostgreSQL · .NET 10</span>
+    <span class="chip ok"><span class="dot"></span>Layers + entities in Domain</span>
+    <span class="chip ok"><span class="dot"></span>Application: DTO + single mapper</span>
+    <span class="chip warn"><span class="dot"></span>Clean Architecture — 3/5 (step 4 next)</span>
     <span class="chip future"><span class="dot"></span>Neon — later</span>
     <span class="chip future"><span class="dot"></span>Azure App Service — later</span>
     <span class="chip future"><span class="dot"></span>client ↔ API — later</span>
