@@ -1,20 +1,15 @@
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
-using Microsoft.EntityFrameworkCore;
+using Swimm.Application;
 using Swimm.Application.Abstractions;
 using Swimm.Infrastructure;
-using Swimm.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Кеш (нужен ISettingsService и ISchemaService через AddInfrastructure)
 builder.Services.AddMemoryCache();
-
-// Infrastructure: DbContext + сервисы
+builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReact",
@@ -69,22 +64,15 @@ var app = builder.Build();
 
 // Автоматическое применение миграций при старте
 using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<SwimmDbContext>();
-    db.Database.Migrate();
-}
+    scope.ServiceProvider.GetRequiredService<IDbMigrator>().Migrate();
 
 if (!app.Environment.IsDevelopment())
-{
     app.UseHttpsRedirection();
-}
 
 app.UseRouting();
 
 if (app.Environment.IsDevelopment())
-{
     app.UseCors("AllowReact");
-}
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -93,19 +81,13 @@ app.UseAuthorization();
 app.Use(async (context, next) =>
 {
     var settings = context.RequestServices.GetRequiredService<ISettingsService>();
-    var maintenance = settings.GetValue("MaintenanceMode", false);
-
-    if (maintenance
+    if (settings.GetValue("MaintenanceMode", false)
         && !context.Request.Path.StartsWithSegments("/admin")
         && !context.Request.Path.StartsWithSegments("/api/admin")
         && !context.Request.Path.StartsWithSegments("/auth")
         && !context.Request.Path.StartsWithSegments("/signin-google"))
     {
-        if (context.User.IsInRole("Admin"))
-        {
-            await next();
-            return;
-        }
+        if (context.User.IsInRole("Admin")) { await next(); return; }
 
         context.Response.StatusCode = 503;
         context.Response.ContentType = "text/html; charset=utf-8";
@@ -118,7 +100,6 @@ app.Use(async (context, next) =>
             """);
         return;
     }
-
     await next();
 });
 
@@ -132,7 +113,6 @@ app.Use(async (context, next) =>
             context.Response.Redirect("/auth/login/google?returnUrl=" + Uri.EscapeDataString(context.Request.Path));
             return;
         }
-
         if (!context.User.IsInRole("Admin"))
         {
             context.Response.StatusCode = 403;
@@ -141,7 +121,6 @@ app.Use(async (context, next) =>
             return;
         }
     }
-
     await next();
 });
 
@@ -155,9 +134,7 @@ app.UseStaticFiles(new StaticFileOptions
     {
         var path = ctx.File.PhysicalPath;
         if (!string.IsNullOrEmpty(path) && path.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
-        {
             ctx.Context.Response.ContentType = "text/html; charset=utf-8";
-        }
     }
 });
 

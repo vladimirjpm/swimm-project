@@ -1,9 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
-using Swimm.Infrastructure.Data;
-using Swimm.Domain.Entities;
+using Swimm.Application.Dtos;
 
 namespace Swimm.API.Controllers;
 
@@ -12,174 +10,92 @@ namespace Swimm.API.Controllers;
 [Authorize(Roles = "Admin")]
 public class AdminController : ControllerBase
 {
-    private readonly SwimmDbContext _db;
-    private readonly ISchemaService _schemaService;
+    private readonly IAdminRepository _admin;
+    private readonly ISchemaService _schema;
     private readonly ISettingsService _settings;
     private readonly IImportService _import;
 
-    public AdminController(SwimmDbContext db, ISchemaService schemaService, ISettingsService settings, IImportService import)
+    public AdminController(
+        IAdminRepository admin,
+        ISchemaService schema,
+        ISettingsService settings,
+        IImportService import)
     {
-        _db = db;
-        _schemaService = schemaService;
+        _admin = admin;
+        _schema = schema;
         _settings = settings;
         _import = import;
     }
 
-    /// <summary>
-    /// Список пользователей и ролей.
-    /// </summary>
+    // ── Users ────────────────────────────────────────────────────────────────
+
     [HttpGet("users")]
     public async Task<IActionResult> GetUsers()
-    {
-        var users = await _db.AppUsers
-            .AsNoTracking()
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
-            .OrderByDescending(u => u.CreatedAt)
-            .Select(u => new
-            {
-                u.Id,
-                u.Email,
-                u.DisplayName,
-                u.AvatarUrl,
-                u.IsActive,
-                u.CreatedAt,
-                u.SwimmerId,
-                roles = u.UserRoles.Select(r => r.Role.Name).ToArray()
-            })
-            .ToListAsync();
+        => Ok(await _admin.GetUsersAsync());
 
-        return Ok(users);
-    }
-
-    /// <summary>
-    /// Список доступных ролей.
-    /// </summary>
     [HttpGet("roles")]
     public async Task<IActionResult> GetRoles()
-    {
-        var roles = await _db.AppRoles
-            .AsNoTracking()
-            .OrderBy(r => r.Id)
-            .Select(r => new { r.Id, r.Name })
-            .ToListAsync();
+        => Ok(await _admin.GetRolesAsync());
 
-        return Ok(roles);
-    }
-
-    /// <summary>
-    /// Назначить роль пользователю.
-    /// </summary>
     [HttpPost("users/{userId}/roles/{roleId}")]
     public async Task<IActionResult> AddRole(int userId, int roleId)
     {
-        var userExists = await _db.AppUsers.AnyAsync(u => u.Id == userId);
-        if (!userExists) return NotFound(new { error = "User not found" });
-
-        var roleExists = await _db.AppRoles.AnyAsync(r => r.Id == roleId);
-        if (!roleExists) return NotFound(new { error = "Role not found" });
-
-        var already = await _db.AppUserRoles.AnyAsync(ur => ur.UserId == userId && ur.RoleId == roleId);
-        if (already) return Ok(new { message = "Role already assigned" });
-
-        _db.AppUserRoles.Add(new AppUserRole { UserId = userId, RoleId = roleId });
-        await _db.SaveChangesAsync();
-
-        return Ok(new { message = "Role added" });
+        var result = await _admin.AddRoleAsync(userId, roleId);
+        return result switch
+        {
+            RoleOperationResult.Ok => Ok(new { message = "Role added" }),
+            RoleOperationResult.UserNotFound => NotFound(new { error = "User not found" }),
+            RoleOperationResult.RoleNotFound => NotFound(new { error = "Role not found" }),
+            RoleOperationResult.AlreadyAssigned => Ok(new { message = "Role already assigned" }),
+            _ => BadRequest()
+        };
     }
 
-    /// <summary>
-    /// Снять роль с пользователя.
-    /// </summary>
     [HttpDelete("users/{userId}/roles/{roleId}")]
     public async Task<IActionResult> RemoveRole(int userId, int roleId)
     {
-        var link = await _db.AppUserRoles
-            .FirstOrDefaultAsync(ur => ur.UserId == userId && ur.RoleId == roleId);
-
-        if (link == null) return NotFound(new { error = "Role assignment not found" });
-
-        _db.AppUserRoles.Remove(link);
-        await _db.SaveChangesAsync();
-
-        return Ok(new { message = "Role removed" });
+        var ok = await _admin.RemoveRoleAsync(userId, roleId);
+        return ok ? Ok(new { message = "Role removed" }) : NotFound(new { error = "Role assignment not found" });
     }
 
-    /// <summary>
-    /// Активировать/деактивировать пользователя.
-    /// </summary>
     [HttpPatch("users/{userId}/active")]
     public async Task<IActionResult> SetActive(int userId, [FromBody] SetActiveRequest request)
     {
-        var user = await _db.AppUsers.FindAsync(userId);
-        if (user == null) return NotFound(new { error = "User not found" });
-
-        user.IsActive = request.IsActive;
-        user.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
-
-        return Ok(new { message = user.IsActive ? "User activated" : "User deactivated" });
+        var ok = await _admin.SetUserActiveAsync(userId, request.IsActive);
+        if (!ok) return NotFound(new { error = "User not found" });
+        return Ok(new { message = request.IsActive ? "User activated" : "User deactivated" });
     }
 
-    /// <summary>
-    /// Статистика для дашборда.
-    /// </summary>
+    // ── Dashboard ────────────────────────────────────────────────────────────
+
     [HttpGet("stats")]
     public async Task<IActionResult> GetStats()
-    {
-        var usersCount = await _db.AppUsers.CountAsync();
-        var resultsCount = await _db.Results.CountAsync();
-        var competitionsCount = await _db.Competitions.CountAsync();
-        var swimmersCount = await _db.Swimmers.CountAsync();
-        var clubsCount = await _db.Clubs.CountAsync();
+        => Ok(await _admin.GetStatsAsync());
 
-        return Ok(new
-        {
-            users = usersCount,
-            results = resultsCount,
-            competitions = competitionsCount,
-            swimmers = swimmersCount,
-            clubs = clubsCount
-        });
-    }
+    // ── DB Schema ────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Структура схемы БД: таблицы, колонки, FK, индексы, CHECK, процедуры, вьюхи.
-    /// </summary>
     [HttpGet("db-schema")]
     public async Task<IActionResult> GetDbSchema([FromQuery] bool refresh = false)
-    {
-        var schema = await _schemaService.GetSchemaAsync(refresh);
-        return Ok(schema);
-    }
+        => Ok(await _schema.GetSchemaAsync(refresh));
 
-    /// <summary>
-    /// Все настройки сервера.
-    /// </summary>
+    // ── Settings ─────────────────────────────────────────────────────────────
+
     [HttpGet("settings")]
     public IActionResult GetSettings()
-    {
-        return Ok(_settings.GetAll());
-    }
+        => Ok(_settings.GetAll());
 
-    /// <summary>
-    /// Обновить значение настройки.
-    /// </summary>
     [HttpPut("settings/{key}")]
     public IActionResult UpdateSetting(string key, [FromBody] UpdateSettingRequest request)
     {
-        var updated = _settings.Update(key, request.Value);
-        if (!updated)
+        if (!_settings.Update(key, request.Value))
             return BadRequest(new { error = "Invalid key or value type mismatch" });
-
         return Ok(_settings.Get(key));
     }
 
-    /// <summary>
-    /// Импорт результатов из JSON-файла.
-    /// Принимает multipart/form-data с полем file (JSON).
-    /// </summary>
+    // ── Import ───────────────────────────────────────────────────────────────
+
     [HttpPost("import")]
-    [RequestSizeLimit(50 * 1024 * 1024)] // 50 MB
+    [RequestSizeLimit(50 * 1024 * 1024)]
     public async Task<IActionResult> ImportJson(IFormFile? file)
     {
         if (file == null || file.Length == 0)
@@ -191,8 +107,7 @@ public class AdminController : ControllerBase
         try
         {
             await using var stream = file.OpenReadStream();
-            var result = await _import.ImportAsync(stream, file.FileName);
-            return Ok(result);
+            return Ok(await _import.ImportAsync(stream, file.FileName));
         }
         catch (Exception ex)
         {
@@ -200,9 +115,6 @@ public class AdminController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Дополнение данных спортсменов (Gender, ClubId, CountryId) из таблицы Results.
-    /// </summary>
     [HttpPost("swimmers/enrich")]
     public async Task<IActionResult> EnrichSwimmers()
     {
@@ -217,29 +129,17 @@ public class AdminController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Список таблиц, которые будут очищены при вызове import/clear.
-    /// </summary>
     [HttpGet("clearable-tables")]
     public IActionResult GetClearableTables()
-    {
-        return Ok(new { tables = _import.GetClearableTables() });
-    }
+        => Ok(new { tables = _import.GetClearableTables() });
 
-    /// <summary>
-    /// Полная очистка импортированных данных.
-    /// </summary>
     [HttpDelete("import/clear")]
     public async Task<IActionResult> ClearImportData()
     {
         try
         {
             var result = await _import.ClearDataAsync();
-            return Ok(new
-            {
-                message = $"Очистка завершена: удалено {result.Total} записей",
-                deleted = result
-            });
+            return Ok(new { message = $"Очистка завершена: удалено {result.Total} записей", deleted = result });
         }
         catch (Exception ex)
         {
@@ -247,58 +147,23 @@ public class AdminController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// История импортов с названиями соревнований.
-    /// </summary>
+    // ── Import history ───────────────────────────────────────────────────────
+
     [HttpGet("import-history")]
     public async Task<IActionResult> GetImportHistory()
-    {
-        var history = await _db.ImportHistory
-            .AsNoTracking()
-            .Include(h => h.Competition)
-            .OrderByDescending(h => h.ImportDate)
-            .Select(h => new
-            {
-                h.Id,
-                h.CompetitionId,
-                CompetitionName = h.Competition!.Name,
-                CompetitionDate = h.Competition.Date,
-                h.ImportFileName,
-                h.ImportDate,
-                h.Approved
-            })
-            .ToListAsync();
+        => Ok(await _admin.GetImportHistoryAsync());
 
-        return Ok(history);
-    }
-
-    /// <summary>
-    /// Обновить статус подтверждения импорта.
-    /// </summary>
     [HttpPatch("import-history/{id}/approve")]
     public async Task<IActionResult> SetImportApproved(int id, [FromBody] SetApprovedRequest request)
     {
-        var entry = await _db.ImportHistory.FindAsync(id);
-        if (entry == null) return NotFound(new { error = "Import history entry not found" });
-
-        entry.Approved = request.Approved;
-        await _db.SaveChangesAsync();
-
-        return Ok(new { message = entry.Approved ? "Import approved" : "Import unapproved", entry.Id, entry.Approved });
+        var ok = await _admin.SetImportApprovedAsync(id, request.Approved);
+        if (!ok) return NotFound(new { error = "Import history entry not found" });
+        return Ok(new { message = request.Approved ? "Import approved" : "Import unapproved", id, request.Approved });
     }
 
-    public class SetApprovedRequest
-    {
-        public bool Approved { get; set; }
-    }
+    // ── Request types ────────────────────────────────────────────────────────
 
-    public class SetActiveRequest
-    {
-        public bool IsActive { get; set; }
-    }
-
-    public class UpdateSettingRequest
-    {
-        public string Value { get; set; } = "";
-    }
+    public record SetApprovedRequest(bool Approved);
+    public record SetActiveRequest(bool IsActive);
+    public record UpdateSettingRequest(string Value);
 }

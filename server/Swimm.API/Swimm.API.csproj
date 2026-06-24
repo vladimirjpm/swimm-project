@@ -13,8 +13,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.2" />
+    <!-- EF Design/Tools нужны в startup-проекте для команд dotnet ef migrations -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.2">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
