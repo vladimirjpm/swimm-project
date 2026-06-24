@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Swimm.API.Data;
-using Swimm.API.Models;
+using Swimm.Domain.Entities;
 
 namespace Swimm.API.Services;
 

@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Swimm.API.Data;
-using Swimm.API.Models;
+using Swimm.Domain.Entities;
 
 namespace Swimm.API.Controllers;
 

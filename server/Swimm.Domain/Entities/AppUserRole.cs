@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Swimm.API.Models;
+namespace Swimm.Domain.Entities;
 
 /// <summary>
 /// Связь пользователя и роли (many-to-many).

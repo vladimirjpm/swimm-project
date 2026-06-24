@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Swimm.API.Data;
 using Swimm.API.Services;
+using Swimm.Domain.Entities;
 
 namespace Swimm.API.Controllers;
 
@@ -80,7 +81,7 @@ public class AdminController : ControllerBase
         var already = await _db.AppUserRoles.AnyAsync(ur => ur.UserId == userId && ur.RoleId == roleId);
         if (already) return Ok(new { message = "Role already assigned" });
 
-        _db.AppUserRoles.Add(new Models.AppUserRole { UserId = userId, RoleId = roleId });
+        _db.AppUserRoles.Add(new AppUserRole { UserId = userId, RoleId = roleId });
         await _db.SaveChangesAsync();
 
         return Ok(new { message = "Role added" });

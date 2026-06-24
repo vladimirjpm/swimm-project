@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Swimm.API.Models;
+using Swimm.Domain.Entities;
 
 namespace Swimm.API.Data;
 

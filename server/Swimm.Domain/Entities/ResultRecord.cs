@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
-namespace Swimm.API.Models;
+namespace Swimm.Domain.Entities;
 
 /// <summary>
 /// Денормализованная запись результата.

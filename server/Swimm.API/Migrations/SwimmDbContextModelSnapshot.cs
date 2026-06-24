@@ -22,7 +22,7 @@ namespace Swimm.API.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Swimm.API.Models.AppRole", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.AppRole", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -55,7 +55,7 @@ namespace Swimm.API.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.AppUser", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.AppUser", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -99,7 +99,7 @@ namespace Swimm.API.Migrations
                     b.ToTable("Sys_AppUsers", (string)null);
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.AppUserRole", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.AppUserRole", b =>
                 {
                     b.Property<int>("UserId")
                         .HasColumnType("integer");
@@ -114,7 +114,7 @@ namespace Swimm.API.Migrations
                     b.ToTable("Sys_AppUserRoles", (string)null);
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.Club", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.Club", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -144,7 +144,7 @@ namespace Swimm.API.Migrations
                     b.ToTable("Clubs", (string)null);
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.Competition", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.Competition", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -186,7 +186,7 @@ namespace Swimm.API.Migrations
                     b.ToTable("Competitions", (string)null);
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.Country", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.Country", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -212,7 +212,7 @@ namespace Swimm.API.Migrations
                     b.ToTable("Countries", (string)null);
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.Gallery", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.Gallery", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -225,7 +225,7 @@ namespace Swimm.API.Migrations
                     b.ToTable("Galleries");
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.GalleryItem", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.GalleryItem", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -260,7 +260,7 @@ namespace Swimm.API.Migrations
                     b.ToTable("GalleryItems");
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.ImportHistory", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.ImportHistory", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -291,7 +291,7 @@ namespace Swimm.API.Migrations
                     b.ToTable("Sys_ImportHistory", (string)null);
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.Relay", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.Relay", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -312,7 +312,7 @@ namespace Swimm.API.Migrations
                     b.ToTable("Relays", (string)null);
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.ResultRecord", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.ResultRecord", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -441,7 +441,7 @@ namespace Swimm.API.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.Style", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.Style", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -499,7 +499,7 @@ namespace Swimm.API.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.Swimmer", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.Swimmer", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -561,7 +561,7 @@ namespace Swimm.API.Migrations
                     b.ToTable("Swimmers", (string)null);
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.UserExternalLogin", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.UserExternalLogin", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -595,7 +595,7 @@ namespace Swimm.API.Migrations
                     b.ToTable("Sys_UserExternalLogins", (string)null);
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.UserLoginHistory", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.UserLoginHistory", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -627,9 +627,9 @@ namespace Swimm.API.Migrations
                     b.ToTable("Sys_UserLoginHistory", (string)null);
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.AppUser", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.AppUser", b =>
                 {
-                    b.HasOne("Swimm.API.Models.Swimmer", "Swimmer")
+                    b.HasOne("Swimm.Domain.Entities.Swimmer", "Swimmer")
                         .WithMany()
                         .HasForeignKey("SwimmerId")
                         .OnDelete(DeleteBehavior.SetNull);
@@ -637,15 +637,15 @@ namespace Swimm.API.Migrations
                     b.Navigation("Swimmer");
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.AppUserRole", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.AppUserRole", b =>
                 {
-                    b.HasOne("Swimm.API.Models.AppRole", "Role")
+                    b.HasOne("Swimm.Domain.Entities.AppRole", "Role")
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Swimm.API.Models.AppUser", "User")
+                    b.HasOne("Swimm.Domain.Entities.AppUser", "User")
                         .WithMany("UserRoles")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -656,9 +656,9 @@ namespace Swimm.API.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.Club", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.Club", b =>
                 {
-                    b.HasOne("Swimm.API.Models.Country", "Country")
+                    b.HasOne("Swimm.Domain.Entities.Country", "Country")
                         .WithMany()
                         .HasForeignKey("CountryId")
                         .OnDelete(DeleteBehavior.SetNull);
@@ -666,9 +666,9 @@ namespace Swimm.API.Migrations
                     b.Navigation("Country");
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.GalleryItem", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.GalleryItem", b =>
                 {
-                    b.HasOne("Swimm.API.Models.Gallery", "Gallery")
+                    b.HasOne("Swimm.Domain.Entities.Gallery", "Gallery")
                         .WithMany("Items")
                         .HasForeignKey("GalleryId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -677,9 +677,9 @@ namespace Swimm.API.Migrations
                     b.Navigation("Gallery");
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.ImportHistory", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.ImportHistory", b =>
                 {
-                    b.HasOne("Swimm.API.Models.Competition", "Competition")
+                    b.HasOne("Swimm.Domain.Entities.Competition", "Competition")
                         .WithMany()
                         .HasForeignKey("CompetitionId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -688,42 +688,42 @@ namespace Swimm.API.Migrations
                     b.Navigation("Competition");
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.ResultRecord", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.ResultRecord", b =>
                 {
-                    b.HasOne("Swimm.API.Models.Club", "Club")
+                    b.HasOne("Swimm.Domain.Entities.Club", "Club")
                         .WithMany()
                         .HasForeignKey("ClubId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Swimm.API.Models.Competition", "Competition")
+                    b.HasOne("Swimm.Domain.Entities.Competition", "Competition")
                         .WithMany()
                         .HasForeignKey("CompetitionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Swimm.API.Models.Country", "Country")
+                    b.HasOne("Swimm.Domain.Entities.Country", "Country")
                         .WithMany()
                         .HasForeignKey("CountryId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("Swimm.API.Models.Gallery", "Gallery")
+                    b.HasOne("Swimm.Domain.Entities.Gallery", "Gallery")
                         .WithMany()
                         .HasForeignKey("GalleryId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("Swimm.API.Models.Relay", "Relay")
+                    b.HasOne("Swimm.Domain.Entities.Relay", "Relay")
                         .WithMany()
                         .HasForeignKey("RelayId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("Swimm.API.Models.Style", "Style")
+                    b.HasOne("Swimm.Domain.Entities.Style", "Style")
                         .WithMany()
                         .HasForeignKey("StyleId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Swimm.API.Models.Swimmer", "Swimmer")
+                    b.HasOne("Swimm.Domain.Entities.Swimmer", "Swimmer")
                         .WithMany()
                         .HasForeignKey("SwimmerId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -744,14 +744,14 @@ namespace Swimm.API.Migrations
                     b.Navigation("Swimmer");
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.Swimmer", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.Swimmer", b =>
                 {
-                    b.HasOne("Swimm.API.Models.Club", "Club")
+                    b.HasOne("Swimm.Domain.Entities.Club", "Club")
                         .WithMany()
                         .HasForeignKey("ClubId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("Swimm.API.Models.Country", "Country")
+                    b.HasOne("Swimm.Domain.Entities.Country", "Country")
                         .WithMany()
                         .HasForeignKey("CountryId")
                         .OnDelete(DeleteBehavior.SetNull);
@@ -761,9 +761,9 @@ namespace Swimm.API.Migrations
                     b.Navigation("Country");
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.UserExternalLogin", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.UserExternalLogin", b =>
                 {
-                    b.HasOne("Swimm.API.Models.AppUser", "User")
+                    b.HasOne("Swimm.Domain.Entities.AppUser", "User")
                         .WithMany("ExternalLogins")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -772,9 +772,9 @@ namespace Swimm.API.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.UserLoginHistory", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.UserLoginHistory", b =>
                 {
-                    b.HasOne("Swimm.API.Models.AppUser", "User")
+                    b.HasOne("Swimm.Domain.Entities.AppUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -783,14 +783,14 @@ namespace Swimm.API.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.AppUser", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.AppUser", b =>
                 {
                     b.Navigation("ExternalLogins");
 
                     b.Navigation("UserRoles");
                 });
 
-            modelBuilder.Entity("Swimm.API.Models.Gallery", b =>
+            modelBuilder.Entity("Swimm.Domain.Entities.Gallery", b =>
                 {
                     b.Navigation("Items");
                 });

@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Swimm.API.Models;
+namespace Swimm.Domain.Entities;
 
 /// <summary>
 /// Пользователь приложения.
