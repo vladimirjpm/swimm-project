@@ -3,3 +3,6 @@
 *.mdf
 *.ldf
 *.ndf
+
+# Локальные настройки разработки с секретами (Google ClientSecret и т.п.) — не коммитить
+Swimm.API/appsettings.Development.json

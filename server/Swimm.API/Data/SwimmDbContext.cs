@@ -99,6 +99,12 @@ public class SwimmDbContext : DbContext
         {
             entity.ToTable("Results");
 
+            // CompetitionDate — календарная дата соревнования, а не момент времени с таймзоной.
+            // Маппим в timestamp without time zone: значения приходят из парсинга с Kind=Unspecified,
+            // и timestamptz (требующий Kind=Utc) на них падал бы при записи/фильтрации.
+            entity.Property(r => r.CompetitionDate)
+                .HasColumnType("timestamp without time zone");
+
             entity.HasOne(r => r.Competition)
                 .WithMany()
                 .HasForeignKey(r => r.CompetitionId)
@@ -134,11 +140,11 @@ public class SwimmDbContext : DbContext
                 .HasForeignKey(r => r.CountryId)
                 .OnDelete(DeleteBehavior.SetNull);
 
-            entity.HasCheckConstraint("CK_Results_Heat_NonNegative", "[Heat] >= 0");
-            entity.HasCheckConstraint("CK_Results_Lane_NonNegative", "[Lane] >= 0");
-            entity.HasCheckConstraint("CK_Results_InternationalPoints_NonNegative", "[InternationalPoints] >= 0");
-            entity.HasCheckConstraint("CK_Results_Position_PositiveOrNull", "[Position] IS NULL OR [Position] > 0");
-            entity.HasCheckConstraint("CK_Results_PositionAgeGroup_PositiveOrNull", "[PositionAgeGroup] IS NULL OR [PositionAgeGroup] > 0");
+            entity.HasCheckConstraint("CK_Results_Heat_NonNegative", "\"Heat\" >= 0");
+            entity.HasCheckConstraint("CK_Results_Lane_NonNegative", "\"Lane\" >= 0");
+            entity.HasCheckConstraint("CK_Results_InternationalPoints_NonNegative", "\"InternationalPoints\" >= 0");
+            entity.HasCheckConstraint("CK_Results_Position_PositiveOrNull", "\"Position\" IS NULL OR \"Position\" > 0");
+            entity.HasCheckConstraint("CK_Results_PositionAgeGroup_PositiveOrNull", "\"PositionAgeGroup\" IS NULL OR \"PositionAgeGroup\" > 0");
         });
 
         // --- Импорт ---
@@ -218,100 +224,4 @@ public class SwimmDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }
-
-    /// <summary>
-    /// Идемпотентный SQL-скрипт для нормализации схемы и денормализованных данных.
-    /// Выполняется при каждом старте для поддержания целостности структуры.
-    /// </summary>
-    public const string NormalizeResultsSql = """
-        -- 1. Relay: создать таблицу если её нет
-        IF OBJECT_ID('dbo.Relays', 'U') IS NULL
-        BEGIN
-            CREATE TABLE [dbo].[Relays]
-            (
-                [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                [TeamName] NVARCHAR(200) NULL,
-                [SwimmersName] NVARCHAR(500) NULL
-            );
-        END;
-
-        -- 2. Добавить RelayId если его нет
-        IF COL_LENGTH('dbo.Results', 'RelayId') IS NULL
-            ALTER TABLE [dbo].[Results] ADD [RelayId] INT NULL;
-
-        -- 3. Добавить TimeMillisecond если его нет
-        IF COL_LENGTH('dbo.Results', 'TimeMillisecond') IS NULL
-            ALTER TABLE [dbo].[Results] ADD [TimeMillisecond] INT NULL;
-
-        -- 4. Backfill TimeMillisecond из TimeOriginal
-        IF COL_LENGTH('dbo.Results', 'TimeOriginal') IS NOT NULL
-        BEGIN
-            UPDATE r
-            SET TimeMillisecond =
-                CASE
-                    WHEN r.[TimeOriginal] IS NULL OR LTRIM(RTRIM(r.[TimeOriginal])) = '' THEN NULL
-                    WHEN PATINDEX('%[^0-9:.,]%', r.[TimeOriginal]) > 0 THEN NULL
-                    WHEN CHARINDEX(':', r.[TimeOriginal]) > 0 THEN
-                        TRY_CAST(
-                            TRY_CAST(LEFT(r.[TimeOriginal], CHARINDEX(':', r.[TimeOriginal]) - 1) AS INT) * 60000
-                            + TRY_CONVERT(DECIMAL(10,3), REPLACE(SUBSTRING(r.[TimeOriginal], CHARINDEX(':', r.[TimeOriginal]) + 1, 32), ',', '.')) * 1000
-                        AS INT)
-                    ELSE TRY_CAST(TRY_CONVERT(DECIMAL(10,3), REPLACE(r.[TimeOriginal], ',', '.')) * 1000 AS INT)
-                END
-            FROM dbo.Results r
-            WHERE r.TimeMillisecond IS NULL AND r.[TimeOriginal] IS NOT NULL AND r.[TimeOriginal] <> '';
-        END;
-
-        -- 5. FK Relay (идемпотентно)
-        IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Results_Relays_RelayId')
-        BEGIN
-            ALTER TABLE dbo.Results WITH CHECK
-            ADD CONSTRAINT FK_Results_Relays_RelayId
-                FOREIGN KEY (RelayId) REFERENCES dbo.Relays(Id) ON DELETE SET NULL;
-        END;
-
-        -- 6. View vw_Results (совместимость со старой схемой имен полей)
-        EXEC('CREATE OR ALTER VIEW [dbo].[vw_Results] AS
-        SELECT
-            r.Id,
-            c.Country,
-            c.Name AS Competition,
-            c.IsMasters,
-            c.IsAward,
-            r.AgeGroup,
-            c.[Date],
-            CONCAT(r.Distance, '' '', s.Name, '' '', r.Gender) AS [Event],
-            s.Name AS EventStyleName,
-            r.Distance AS EventStyleLen,
-            r.Gender AS EventStyleGender,
-            r.EventStyleAge,
-            c.PoolType,
-            r.Position,
-            r.PositionAgeGroup,
-            r.Heat,
-            r.Lane,
-            sw.LastName,
-            sw.FirstName,
-            sw.LastNameEn,
-            sw.FirstNameEn,
-            sw.BirthYear,
-            cl.Name AS Club,
-            cl.NameEn AS ClubEn,
-            r.TimeOriginal AS [Time],
-            r.TimeMillisecond,
-            r.TimeSplit,
-            r.TimeFail,
-            r.TimeFailNote,
-            r.InternationalPoints,
-            r.Note,
-            CASE WHEN r.RelayId IS NULL THEN CAST(0 AS bit) ELSE CAST(1 AS bit) END AS IsRelay,
-            rl.TeamName AS RelayTeamName,
-            rl.SwimmersName AS RelaySwimmersName
-        FROM dbo.Results r
-        INNER JOIN dbo.Competitions c ON r.CompetitionId = c.Id
-        INNER JOIN dbo.Styles s ON r.StyleId = s.Id
-        INNER JOIN dbo.Swimmers sw ON r.SwimmerId = sw.Id
-        INNER JOIN dbo.Clubs cl ON r.ClubId = cl.Id
-        LEFT JOIN dbo.Relays rl ON r.RelayId = rl.Id;');
-    """;
 }

@@ -435,28 +435,23 @@ public class JsonImportService
         result.Total = result.Results + result.GalleryItems + result.Galleries
             + result.Relays + result.Swimmers + result.Clubs + result.ImportHistory + result.Competitions + result.Countries;
 
-        // Сброс IDENTITY-счётчиков, чтобы Id начинались заново.
-        // DBCC CHECKIDENT RESEED 0 только для таблиц, в которых были данные —
-        // иначе для таблицы без истории вставок первый Id будет 0, а не 1.
-        var deletedPerTable = new Dictionary<string, int>
+        // Сброс identity-счётчиков, чтобы Id начинались заново (PostgreSQL).
+        //
+        // Примечание: TRUNCATE ... RESTART IDENTITY CASCADE здесь применять НЕЛЬЗЯ.
+        // Таблица Swimmers связана с сохраняемой Sys_AppUsers (FK SwimmerId, ON DELETE SET NULL),
+        // а Clubs/Countries — со Swimmers. CASCADE прошёл бы по цепочке до Sys_AppUsers и удалил
+        // пользователей и админов. Поэтому данные удалены выше через DELETE (с корректным SET NULL),
+        // а здесь у опустевших таблиц лишь перезапускаем identity-счётчики — это только метаданные,
+        // на FK не влияет.
+        var clearedTables = new[]
         {
-            ["Results"] = result.Results,
-            ["GalleryItems"] = result.GalleryItems,
-            ["Galleries"] = result.Galleries,
-            ["Relays"] = result.Relays,
-            ["Swimmers"] = result.Swimmers,
-            ["Clubs"] = result.Clubs,
-            ["Sys_ImportHistory"] = result.ImportHistory,
-            ["Competitions"] = result.Competitions,
-            ["Countries"] = result.Countries
+            "Results", "GalleryItems", "Galleries", "Relays",
+            "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "Countries"
         };
 
-        foreach (var (table, count) in deletedPerTable)
-        {
-            if (count > 0)
-                await _db.Database.ExecuteSqlRawAsync(
-                    $"DBCC CHECKIDENT ('{table}', RESEED, 0)");
-        }
+        foreach (var table in clearedTables)
+            await _db.Database.ExecuteSqlRawAsync(
+                $"ALTER TABLE \"{table}\" ALTER COLUMN \"Id\" RESTART WITH 1;");
 
         return result;
     }

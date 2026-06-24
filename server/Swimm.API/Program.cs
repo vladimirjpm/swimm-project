@@ -12,7 +12,7 @@ builder.Services.AddMemoryCache();
 
 // Database
 builder.Services.AddDbContext<SwimmDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // CORS
 builder.Services.AddCors(options =>
@@ -33,12 +33,22 @@ builder.Services.AddSingleton<AdminSettingsService>();
 builder.Services.AddScoped<DbSchemaService>();
 builder.Services.AddScoped<JsonImportService>();
 
-// Authentication: Cookie + Google
-builder.Services
+// Authentication: Cookie + (опционально) Google
+// Google регистрируется только если заданы ClientId и ClientSecret (секрет — в user-secrets/ENV).
+// Без них публичная часть сайта продолжает работать; вход через Google просто недоступен,
+// а не роняет приложение на каждом запросе.
+var googleSection = builder.Configuration.GetSection("Authentication:Google");
+var googleClientId = googleSection["ClientId"];
+var googleClientSecret = googleSection["ClientSecret"];
+var googleEnabled = !string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret);
+
+var authBuilder = builder.Services
     .AddAuthentication(options =>
     {
         options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = GoogleDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = googleEnabled
+            ? GoogleDefaults.AuthenticationScheme
+            : CookieAuthenticationDefaults.AuthenticationScheme;
     })
     .AddCookie(options =>
     {
@@ -48,12 +58,14 @@ builder.Services
         options.LoginPath = "/auth/login";
         options.LogoutPath = "/auth/logout";
         options.ExpireTimeSpan = TimeSpan.FromDays(30);
-    })
-    .AddGoogle(options =>
+    });
+
+if (googleEnabled)
+{
+    authBuilder.AddGoogle(options =>
     {
-        var googleSection = builder.Configuration.GetSection("Authentication:Google");
-        options.ClientId = googleSection["ClientId"]!;
-        options.ClientSecret = googleSection["ClientSecret"]!;
+        options.ClientId = googleClientId!;
+        options.ClientSecret = googleClientSecret!;
         options.CallbackPath = "/signin-google";
         options.SaveTokens = false;
 
@@ -61,6 +73,7 @@ builder.Services
         options.Scope.Add("profile");
         options.Scope.Add("email");
     });
+}
 
 var app = builder.Build();
 
@@ -69,9 +82,6 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<SwimmDbContext>();
     db.Database.Migrate();
-
-    // Нормализация схемы и данных (идемпотентно)
-    db.Database.ExecuteSqlRaw(SwimmDbContext.NormalizeResultsSql);
 }
 
 if (!app.Environment.IsDevelopment())
