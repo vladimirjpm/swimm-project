@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Swimm.API.Data;
-using Swimm.API.Models;
+using Swimm.Application.Mapping;
 
 namespace Swimm.API.Controllers;
 
@@ -78,40 +78,7 @@ public class ResultsController : ControllerBase
             .ThenBy(r => r.Position)
             .Skip((page - 1) * pageSize)
             .Take(pageSize + 1)
-            .Select(r => new ResultDto
-            {
-                Id = r.Id,
-                Country = r.Competition.Country,
-                CompetitionName = r.Competition.Name,
-                IsMasters = r.Competition.IsMasters,
-                IsAward = r.Competition.IsAward,
-                AgeGroup = r.AgeGroup,
-                CompetitionDate = r.CompetitionDate,
-                StyleName = r.Style.Name,
-                Distance = r.Distance,
-                Gender = r.Gender,
-                EventStyleAge = r.EventStyleAge,
-                PoolType = r.Competition.PoolType,
-                Position = r.Position,
-                Heat = r.Heat,
-                Lane = r.Lane,
-                LastName = r.Swimmer.LastName,
-                FirstName = r.Swimmer.FirstName,
-                LastNameEn = r.Swimmer.LastNameEn,
-                FirstNameEn = r.Swimmer.FirstNameEn,
-                BirthYear = r.Swimmer.BirthYear,
-                ClubName = r.Club.Name,
-                ClubNameEn = r.Club.NameEn,
-                TimeMillisecond = r.TimeMillisecond,
-                TimeOriginal = r.TimeOriginal,
-                TimeFail = r.TimeFail,
-                TimeFailNote = r.TimeFailNote,
-                InternationalPoints = r.InternationalPoints,
-                Note = r.Note,
-                IsRelay = r.RelayId != null,
-                RelayTeamName = r.Relay != null ? r.Relay.TeamName : null,
-                RelaySwimmersName = r.Relay != null ? r.Relay.SwimmersName : null
-            })
+            .Select(ResultMapping.ToDto)
             .ToListAsync();
 
         var hasMore = results.Count > pageSize;
@@ -135,40 +102,7 @@ public class ResultsController : ControllerBase
     {
         var r = await _db.Results.AsNoTracking()
             .Where(r => r.Id == id)
-            .Select(r => new ResultDto
-            {
-                Id = r.Id,
-                Country = r.Competition.Country,
-                CompetitionName = r.Competition.Name,
-                IsMasters = r.Competition.IsMasters,
-                IsAward = r.Competition.IsAward,
-                AgeGroup = r.AgeGroup,
-                CompetitionDate = r.CompetitionDate,
-                StyleName = r.Style.Name,
-                Distance = r.Distance,
-                Gender = r.Gender,
-                EventStyleAge = r.EventStyleAge,
-                PoolType = r.Competition.PoolType,
-                Position = r.Position,
-                Heat = r.Heat,
-                Lane = r.Lane,
-                LastName = r.Swimmer.LastName,
-                FirstName = r.Swimmer.FirstName,
-                LastNameEn = r.Swimmer.LastNameEn,
-                FirstNameEn = r.Swimmer.FirstNameEn,
-                BirthYear = r.Swimmer.BirthYear,
-                ClubName = r.Club.Name,
-                ClubNameEn = r.Club.NameEn,
-                TimeMillisecond = r.TimeMillisecond,
-                TimeOriginal = r.TimeOriginal,
-                TimeFail = r.TimeFail,
-                TimeFailNote = r.TimeFailNote,
-                InternationalPoints = r.InternationalPoints,
-                Note = r.Note,
-                IsRelay = r.RelayId != null,
-                RelayTeamName = r.Relay != null ? r.Relay.TeamName : null,
-                RelaySwimmersName = r.Relay != null ? r.Relay.SwimmersName : null
-            })
+            .Select(ResultMapping.ToDto)
             .FirstOrDefaultAsync();
 
         if (r == null) return NotFound();

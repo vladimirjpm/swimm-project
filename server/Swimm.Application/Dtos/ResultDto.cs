@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Swimm.API.Models;
+namespace Swimm.Application.Dtos;
 
 /// <summary>
 /// DTO результата для JSON API.
