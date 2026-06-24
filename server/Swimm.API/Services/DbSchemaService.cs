@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using Swimm.API.Data;
+using Swimm.Infrastructure.Data;
 
 namespace Swimm.API.Services;
 

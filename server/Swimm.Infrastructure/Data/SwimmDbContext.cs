@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Swimm.Domain.Entities;
 
-namespace Swimm.API.Data;
+namespace Swimm.Infrastructure.Data;
 
 public class SwimmDbContext : DbContext
 {

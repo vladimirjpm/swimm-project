@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Swimm.API.Data;
+using Swimm.Infrastructure.Data;
 using Swimm.API.Services;
 using Swimm.Domain.Entities;
 

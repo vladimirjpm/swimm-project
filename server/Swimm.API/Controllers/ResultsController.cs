@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Swimm.API.Data;
+using Swimm.Infrastructure.Data;
 using Swimm.Application.Mapping;
 
 namespace Swimm.API.Controllers;

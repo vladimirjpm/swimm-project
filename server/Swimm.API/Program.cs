@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.EntityFrameworkCore;
-using Swimm.API.Data;
+using Swimm.Infrastructure.Data;
 using Swimm.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);

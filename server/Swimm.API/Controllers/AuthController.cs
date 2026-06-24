@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Swimm.API.Data;
+using Swimm.Infrastructure.Data;
 using Swimm.Domain.Entities;
 
 namespace Swimm.API.Controllers;

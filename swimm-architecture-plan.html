@@ -578,7 +578,7 @@
       <div style="color:#475569;font-size:0.78rem">→ PostgreSQL :5432 (postgres:16, db=swimm)</div>
       <br/>
       <div class="cmd-comment"># Apply EF Core migrations</div>
-      <div class="cmd-text">dotnet ef database update --project Swimm.API</div>
+      <div class="cmd-text">dotnet ef database update --project Swimm.Infrastructure --startup-project Swimm.API</div>
       <br/>
       <div class="cmd-comment"># Google OAuth secret — в user-secrets (не коммитить)</div>
       <div class="cmd-text">dotnet user-secrets set "Authentication:Google:ClientSecret" "..." --project Swimm.API</div>
