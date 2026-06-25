@@ -142,6 +142,62 @@ public class AdminRepository : IAdminRepository
         return true;
     }
 
+    public async Task<UserDetailDto?> GetUserDetailsAsync(int userId)
+    {
+        var user = await _db.AppUsers
+            .AsNoTracking()
+            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .Include(u => u.ExternalLogins)
+            .Include(u => u.LocalCredential)
+            .Include(u => u.Swimmer)
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (user == null) return null;
+
+        var loginHistory = await _db.UserLoginHistory
+            .AsNoTracking()
+            .Where(h => h.UserId == userId)
+            .OrderByDescending(h => h.LoginAt)
+            .Take(20)
+            .ToListAsync();
+
+        return new UserDetailDto
+        {
+            Id = user.Id,
+            Email = user.Email,
+            DisplayName = user.DisplayName,
+            AvatarUrl = user.AvatarUrl,
+            IsActive = user.IsActive,
+            CreatedAt = user.CreatedAt,
+            UpdatedAt = user.UpdatedAt,
+            SwimmerId = user.SwimmerId,
+            LinkedSwimmerName = user.Swimmer != null
+                ? $"{user.Swimmer.LastName} {user.Swimmer.FirstName}".Trim()
+                : null,
+            Roles = user.UserRoles.Select(r => r.Role.Name).ToArray(),
+            HasLocalPassword = user.LocalCredential?.PasswordHash != null,
+            LocalEmailConfirmed = user.LocalCredential?.EmailConfirmed ?? false,
+            LocalFailedLoginCount = user.LocalCredential?.FailedLoginCount ?? 0,
+            LocalLockoutEnd = user.LocalCredential?.LockoutEnd,
+            ExternalLogins = user.ExternalLogins
+                .OrderBy(e => e.Provider)
+                .Select(e => new ExternalLoginDto
+                {
+                    Provider = e.Provider,
+                    Email = e.Email,
+                    EmailVerified = e.EmailVerified,
+                    CreatedAt = e.CreatedAt
+                }).ToList(),
+            LoginHistory = loginHistory
+                .Select(h => new LoginHistoryItemDto
+                {
+                    Provider = h.Provider,
+                    IpAddress = h.IpAddress,
+                    LoginAt = h.LoginAt
+                }).ToList()
+        };
+    }
+
     public async Task<List<CompetitionAdminDto>> GetCompetitionsAsync()
     {
         return await _db.Competitions

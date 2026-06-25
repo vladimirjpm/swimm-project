@@ -51,6 +51,41 @@ public class CompetitionAdminDto
     public bool HasImportHistory { get; set; }
 }
 
+public class UserDetailDto
+{
+    public int Id { get; set; }
+    public string Email { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string? AvatarUrl { get; set; }
+    public bool IsActive { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public int? SwimmerId { get; set; }
+    public string? LinkedSwimmerName { get; set; }
+    public string[] Roles { get; set; } = [];
+    public bool HasLocalPassword { get; set; }
+    public bool LocalEmailConfirmed { get; set; }
+    public int LocalFailedLoginCount { get; set; }
+    public DateTime? LocalLockoutEnd { get; set; }
+    public List<ExternalLoginDto> ExternalLogins { get; set; } = [];
+    public List<LoginHistoryItemDto> LoginHistory { get; set; } = [];
+}
+
+public class ExternalLoginDto
+{
+    public string Provider { get; set; } = "";
+    public string? Email { get; set; }
+    public bool EmailVerified { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+public class LoginHistoryItemDto
+{
+    public string Provider { get; set; } = "";
+    public string? IpAddress { get; set; }
+    public DateTime LoginAt { get; set; }
+}
+
 public enum RoleOperationResult
 {
     Ok,

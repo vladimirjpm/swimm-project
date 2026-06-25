@@ -438,23 +438,38 @@
             <div class="flex flex-wrap gap-3 items-end" id="results-filters">
                 <label class="text-xs text-[#90a4ae] flex flex-col gap-0.5">
                     Имя / Фамилия
-                    <input type="text" id="rf-name" class="bg-black/30 border border-[#546e7a] rounded text-[#e0e0e0] px-2 py-1 text-sm font-[inherit] w-36 focus:outline-none focus:border-[#4fc3f7]" />
+                    <input type="text" id="rf-name" list="dl-name" autocomplete="off"
+                           class="bg-black/30 border border-[#546e7a] rounded text-[#e0e0e0] px-2 py-1 text-sm font-[inherit] w-36 focus:outline-none focus:border-[#4fc3f7]"
+                           placeholder="Фамилия…" />
+                    <datalist id="dl-name"></datalist>
                 </label>
                 <label class="text-xs text-[#90a4ae] flex flex-col gap-0.5">
                     Соревнование
-                    <input type="text" id="rf-competition" class="bg-black/30 border border-[#546e7a] rounded text-[#e0e0e0] px-2 py-1 text-sm font-[inherit] w-40 focus:outline-none focus:border-[#4fc3f7]" />
+                    <input type="text" id="rf-competition" list="dl-competition" autocomplete="off"
+                           class="bg-black/30 border border-[#546e7a] rounded text-[#e0e0e0] px-2 py-1 text-sm font-[inherit] w-40 focus:outline-none focus:border-[#4fc3f7]"
+                           placeholder="Название…" />
+                    <datalist id="dl-competition"></datalist>
                 </label>
                 <label class="text-xs text-[#90a4ae] flex flex-col gap-0.5">
                     Клуб
-                    <input type="text" id="rf-club" class="bg-black/30 border border-[#546e7a] rounded text-[#e0e0e0] px-2 py-1 text-sm font-[inherit] w-32 focus:outline-none focus:border-[#4fc3f7]" />
+                    <input type="text" id="rf-club" list="dl-club" autocomplete="off"
+                           class="bg-black/30 border border-[#546e7a] rounded text-[#e0e0e0] px-2 py-1 text-sm font-[inherit] w-32 focus:outline-none focus:border-[#4fc3f7]"
+                           placeholder="Клуб…" />
+                    <datalist id="dl-club"></datalist>
                 </label>
                 <label class="text-xs text-[#90a4ae] flex flex-col gap-0.5">
                     Стиль
-                    <input type="text" id="rf-style" class="bg-black/30 border border-[#546e7a] rounded text-[#e0e0e0] px-2 py-1 text-sm font-[inherit] w-28 focus:outline-none focus:border-[#4fc3f7]" />
+                    <input type="text" id="rf-style" list="dl-style" autocomplete="off"
+                           class="bg-black/30 border border-[#546e7a] rounded text-[#e0e0e0] px-2 py-1 text-sm font-[inherit] w-28 focus:outline-none focus:border-[#4fc3f7]"
+                           placeholder="freestyle…" />
+                    <datalist id="dl-style"></datalist>
                 </label>
                 <label class="text-xs text-[#90a4ae] flex flex-col gap-0.5">
                     Дистанция
-                    <input type="text" id="rf-distance" class="bg-black/30 border border-[#546e7a] rounded text-[#e0e0e0] px-2 py-1 text-sm font-[inherit] w-20 focus:outline-none focus:border-[#4fc3f7]" />
+                    <input type="text" id="rf-distance" list="dl-distance" autocomplete="off"
+                           class="bg-black/30 border border-[#546e7a] rounded text-[#e0e0e0] px-2 py-1 text-sm font-[inherit] w-20 focus:outline-none focus:border-[#4fc3f7]"
+                           placeholder="50…" />
+                    <datalist id="dl-distance"></datalist>
                 </label>
                 <label class="text-xs text-[#90a4ae] flex flex-col gap-0.5">
                     Пол
@@ -533,6 +548,59 @@
             adminTabBtn.disabled = false;
         }
     } catch (e) { /* ignore */ }
+})();
+
+// ======================== FILTER HINTS (Results tab) ========================
+async function fetchFilterHints(field, q, limit = 20) {
+    try {
+        const p = new URLSearchParams({ field, limit });
+        if (q) p.set('q', q);
+        const r = await fetch('/api/admin/results/filter-hints?' + p, { credentials: 'same-origin' });
+        return r.ok ? await r.json() : [];
+    } catch { return []; }
+}
+
+function fillDatalist(id, values) {
+    const dl = document.getElementById(id);
+    if (!dl) return;
+    dl.innerHTML = values.map(v => `<option value="${esc(v)}"></option>`).join('');
+}
+
+// loadOnFocus=true: при фокусе/очистке подгружает список с q='';
+// для name оставляем false — подсказки только при вводе.
+(function () {
+    function setupHints(inputId, datalistId, field, loadOnFocus) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        let timer;
+
+        async function loadFor(q) {
+            fillDatalist(datalistId, await fetchFilterHints(field, q));
+        }
+
+        if (loadOnFocus) {
+            input.addEventListener('focus', () => {
+                if (input.value.trim() === '') loadFor('');
+            });
+        }
+
+        input.addEventListener('input', () => {
+            clearTimeout(timer);
+            const q = input.value.trim();
+            if (q.length < 1) {
+                if (loadOnFocus) timer = setTimeout(() => loadFor(''), 150);
+                else document.getElementById(datalistId).innerHTML = '';
+                return;
+            }
+            timer = setTimeout(() => loadFor(q), 250);
+        });
+    }
+
+    setupHints('rf-name',        'dl-name',        'name',        false);
+    setupHints('rf-competition',  'dl-competition', 'competition', true);
+    setupHints('rf-club',         'dl-club',        'club',        true);
+    setupHints('rf-style',        'dl-style',       'style',       true);
+    setupHints('rf-distance',     'dl-distance',    'distance',    true);
 })();
 
 async function runApi(btn, method, urlTemplate, paramMap, defaultMode) {

@@ -6,4 +6,5 @@ public interface IResultRepository
 {
     Task<(List<ResultDto> Items, bool HasMore)> GetPagedAsync(ResultFilter filter, int page, int pageSize);
     Task<ResultDto?> GetByIdAsync(long id);
+    Task<string[]> GetFilterHintsAsync(string field, string? q, int limit);
 }

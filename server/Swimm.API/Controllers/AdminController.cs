@@ -16,19 +16,22 @@ public class AdminController : ControllerBase
     private readonly ISettingsService _settings;
     private readonly IImportService _import;
     private readonly IImportJobQueue _jobs;
+    private readonly IResultRepository _results;
 
     public AdminController(
         IAdminRepository admin,
         ISchemaService schema,
         ISettingsService settings,
         IImportService import,
-        IImportJobQueue jobs)
+        IImportJobQueue jobs,
+        IResultRepository results)
     {
         _admin = admin;
         _schema = schema;
         _settings = settings;
         _import = import;
         _jobs = jobs;
+        _results = results;
     }
 
     // ── Users ────────────────────────────────────────────────────────────────
@@ -68,6 +71,14 @@ public class AdminController : ControllerBase
         var ok = await _admin.SetUserActiveAsync(userId, request.IsActive);
         if (!ok) return NotFound(new { error = "User not found" });
         return Ok(new { message = request.IsActive ? "User activated" : "User deactivated" });
+    }
+
+    [HttpGet("users/{userId}/details")]
+    public async Task<IActionResult> GetUserDetails(int userId)
+    {
+        var detail = await _admin.GetUserDetailsAsync(userId);
+        if (detail == null) return NotFound(new { error = "User not found" });
+        return Ok(detail);
     }
 
     // ── Dashboard ────────────────────────────────────────────────────────────
@@ -225,6 +236,23 @@ public class AdminController : ControllerBase
         var ok = await _admin.SetImportApprovedAsync(id, request.Approved);
         if (!ok) return NotFound(new { error = "Import history entry not found" });
         return Ok(new { message = request.Approved ? "Import approved" : "Import unapproved", id, request.Approved });
+    }
+
+    // ── Results filter hints ─────────────────────────────────────────────────
+
+    private static readonly HashSet<string> _allowedHintFields =
+        new(["style", "distance", "club", "competition", "name"]);
+
+    [HttpGet("results/filter-hints")]
+    public async Task<IActionResult> GetResultFilterHints(
+        [FromQuery] string field,
+        [FromQuery] string? q,
+        [FromQuery] int limit = 20)
+    {
+        if (!_allowedHintFields.Contains(field))
+            return BadRequest(new { error = "Invalid field" });
+
+        return Ok(await _results.GetFilterHintsAsync(field, q, limit));
     }
 
     // ── Request types ────────────────────────────────────────────────────────

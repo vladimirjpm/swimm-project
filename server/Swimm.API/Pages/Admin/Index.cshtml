@@ -7,30 +7,69 @@
     ViewData["BodyClass"] = "font-sans min-h-screen text-gray-300";
 }
 
-<div class="max-w-[1100px] mx-auto p-6">
+<div class="max-w-[1200px] mx-auto p-6">
+
     <!-- Stats -->
-    <div class="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-4 mb-8" id="stats-grid"></div>
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-4 mb-6" id="stats-grid"></div>
 
     <!-- Tabs -->
-    <div class="flex gap-2 mb-6">
+    <div class="flex gap-2 mb-4">
         <button class="tab-btn active py-2 px-5 border border-[#4fc3f7] rounded-md bg-transparent text-[#4fc3f7] cursor-pointer text-sm transition-colors hover:bg-[rgba(79,195,247,0.12)]" data-tab="users">👥 Users</button>
     </div>
 
     <!-- Users tab -->
     <div class="tab-content active" id="tab-users">
-        <table class="w-full border-collapse">
-            <thead>
-                <tr>
-                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">User</th>
-                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Email</th>
-                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Roles</th>
-                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Status</th>
-                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Registered</th>
-                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Actions</th>
-                </tr>
-            </thead>
-            <tbody id="users-body"></tbody>
-        </table>
+
+        <!-- Filter bar -->
+        <div class="bg-white/[.05] rounded-lg px-4 py-3 mb-4 flex gap-3 items-end flex-wrap">
+            <label class="text-xs text-[#90a4ae] flex flex-col gap-0.5">
+                Поиск
+                <input id="uf-search" type="text" list="dl-users" autocomplete="off"
+                       class="bg-black/30 border border-[#546e7a] rounded text-[#e0e0e0] px-2 py-1 text-sm font-[inherit] w-48 focus:outline-none focus:border-[#4fc3f7]"
+                       placeholder="Имя или email…">
+                <datalist id="dl-users"></datalist>
+            </label>
+            <label class="text-xs text-[#90a4ae] flex flex-col gap-0.5">
+                Роль
+                <select id="uf-role" class="bg-black/30 border border-[#546e7a] rounded text-[#e0e0e0] px-2 py-1 text-sm font-[inherit] w-32 focus:outline-none focus:border-[#4fc3f7]">
+                    <option value="">Все роли</option>
+                </select>
+            </label>
+            <label class="text-xs text-[#90a4ae] flex flex-col gap-0.5">
+                Статус
+                <select id="uf-status" class="bg-black/30 border border-[#546e7a] rounded text-[#e0e0e0] px-2 py-1 text-sm font-[inherit] w-28 focus:outline-none focus:border-[#4fc3f7]">
+                    <option value="">Все</option>
+                    <option value="1">Active</option>
+                    <option value="0">Inactive</option>
+                </select>
+            </label>
+            <span id="uf-count" class="text-xs text-[#546e7a] self-end pb-1"></span>
+        </div>
+
+        <!-- Table + Detail panel side-by-side -->
+        <div class="flex gap-5 items-start">
+
+            <!-- Table -->
+            <div class="flex-1 min-w-0">
+                <table class="w-full border-collapse">
+                    <thead>
+                        <tr>
+                            <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">User</th>
+                            <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Email</th>
+                            <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Roles</th>
+                            <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Status</th>
+                            <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Registered</th>
+                            <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-body"></tbody>
+                </table>
+            </div>
+
+            <!-- Detail panel (hidden by default) -->
+            <div id="user-detail-panel" class="w-[300px] flex-shrink-0 hidden sticky top-4"></div>
+
+        </div>
     </div>
 </div>
 
@@ -38,85 +77,138 @@
 <script>
 (async function () {
     const API = '/api/admin';
+    let allUsers = [];
     let allRoles = [];
+    let selectedUserId = null;
 
-    function formatDate(iso) {
+    // --- Helpers ---
+    function fmtDate(iso) {
         if (!iso) return '—';
         return new Date(iso).toLocaleDateString('ru-RU');
     }
+    function fmtDateTime(iso) {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        return d.toLocaleDateString('ru-RU') + ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    }
+    function roleBadge(r) {
+        const cls = r === 'Admin' ? 'bg-[#ff6b6b] text-white' : 'bg-[#4fc3f7] text-[#0f3460]';
+        return `<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold ${cls}">${esc(r)}</span>`;
+    }
 
+    // --- Stats ---
     async function loadStats() {
         const s = await api(`${API}/stats`);
-        const grid = document.getElementById('stats-grid');
         const items = [
-            { label: 'Users', value: s.users },
-            { label: 'Results', value: s.results.toLocaleString() },
+            { label: 'Users',        value: s.users },
+            { label: 'Results',      value: s.results.toLocaleString() },
             { label: 'Competitions', value: s.competitions },
-            { label: 'Swimmers', value: s.swimmers.toLocaleString() },
-            { label: 'Clubs', value: s.clubs },
+            { label: 'Swimmers',     value: s.swimmers.toLocaleString() },
+            { label: 'Clubs',        value: s.clubs },
         ];
-        grid.innerHTML = items.map(i => `
+        document.getElementById('stats-grid').innerHTML = items.map(i => `
             <div class="bg-white/[.07] rounded-[10px] p-5 text-center">
                 <div class="text-3xl font-bold text-[#4fc3f7]">${i.value}</div>
                 <div class="text-sm text-[#90a4ae] mt-1">${i.label}</div>
-            </div>
-        `).join('');
+            </div>`).join('');
     }
 
-    async function loadUsers() {
-        const users = await api(`${API}/users`);
-        const tbody = document.getElementById('users-body');
+    // --- Filters ---
+    function getFiltered() {
+        const q     = document.getElementById('uf-search').value.toLowerCase().trim();
+        const role  = document.getElementById('uf-role').value;
+        const stat  = document.getElementById('uf-status').value;
+        return allUsers.filter(u => {
+            if (q && !u.displayName.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) return false;
+            if (role && !u.roles.includes(role)) return false;
+            if (stat === '1' && !u.isActive) return false;
+            if (stat === '0' && u.isActive)  return false;
+            return true;
+        });
+    }
 
-        tbody.innerHTML = users.map(u => {
-            const rolesHtml = u.roles.map(r =>
-                `<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold ${r === 'Admin' ? 'bg-[#ff6b6b] text-white' : 'bg-[#4fc3f7] text-[#0f3460]'}">${r}</span> `
-            ).join('');
+    function applyFilters() {
+        const filtered = getFiltered();
+        const cnt = document.getElementById('uf-count');
+        cnt.textContent = filtered.length !== allUsers.length
+            ? `${filtered.length} из ${allUsers.length}`
+            : `${allUsers.length} польз.`;
+        renderTable(filtered);
+    }
 
+    function populateRoleFilter() {
+        const sel = document.getElementById('uf-role');
+        // remove old dynamic options
+        while (sel.options.length > 1) sel.remove(1);
+        allRoles.forEach(r => {
+            const opt = document.createElement('option');
+            opt.value = r.name; opt.textContent = r.name;
+            sel.appendChild(opt);
+        });
+    }
+
+    function populateUserDatalist() {
+        const dl = document.getElementById('dl-users');
+        const vals = [...new Set([
+            ...allUsers.map(u => u.displayName),
+            ...allUsers.map(u => u.email)
+        ])].sort();
+        dl.innerHTML = vals.map(v => `<option value="${esc(v)}"></option>`).join('');
+    }
+
+    // --- Table ---
+    function renderTable(users) {
+        document.getElementById('users-body').innerHTML = users.map(u => {
+            const sel = u.id === selectedUserId;
+            const rolesHtml = u.roles.map(roleBadge).join(' ') || '<span class="text-[#546e7a] text-xs">—</span>';
             const statusHtml = u.isActive
-                ? '<span style="color:#66bb6a">Active</span>'
+                ? '<span class="text-[#66bb6a] text-xs font-semibold">Active</span>'
                 : '<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold bg-[#546e7a] text-[#cfd8dc]">Inactive</span>';
-
             const avatarHtml = u.avatarUrl
-                ? `<img class="w-7 h-7 rounded-full align-middle mr-1.5" src="${u.avatarUrl}" alt="">`
+                ? `<img class="w-6 h-6 rounded-full align-middle mr-1.5 inline-block" src="${esc(u.avatarUrl)}" alt="">`
                 : '';
 
             const missingRoles = allRoles.filter(r => !u.roles.includes(r.name));
             const addBtns = missingRoles.map(r =>
-                `<button class="py-1 px-2.5 rounded border-none cursor-pointer text-xs text-white transition-opacity hover:opacity-80 bg-[#66bb6a]" onclick="addRole(${u.id}, ${r.id})">+ ${r.name}</button>`
+                `<button class="py-0.5 px-2 rounded text-xs text-white bg-[#66bb6a] hover:opacity-80 transition-opacity"
+                    onclick="event.stopPropagation();addRole(${u.id},${r.id})">+ ${esc(r.name)}</button>`
             ).join('');
-
             const removeBtns = u.roles.map(rName => {
                 const role = allRoles.find(r => r.name === rName);
                 return role
-                    ? `<button class="py-1 px-2.5 rounded border-none cursor-pointer text-xs text-white transition-opacity hover:opacity-80 bg-[#ef5350]" onclick="removeRole(${u.id}, ${role.id})">&minus; ${rName}</button>`
+                    ? `<button class="py-0.5 px-2 rounded text-xs text-white bg-[#ef5350] hover:opacity-80 transition-opacity"
+                           onclick="event.stopPropagation();removeRole(${u.id},${role.id})">&minus; ${esc(rName)}</button>`
                     : '';
             }).join('');
+            const toggleBtn = `<button class="py-0.5 px-2 rounded text-xs text-white bg-[#ffa726] hover:opacity-80 transition-opacity"
+                onclick="event.stopPropagation();toggleActive(${u.id},${!u.isActive})">${u.isActive ? 'Disable' : 'Enable'}</button>`;
 
-            const toggleBtn = `<button class="py-1 px-2.5 rounded border-none cursor-pointer text-xs text-white transition-opacity hover:opacity-80 bg-[#ffa726]" onclick="toggleActive(${u.id}, ${!u.isActive})">${u.isActive ? 'Disable' : 'Enable'}</button>`;
+            const rowCls = sel
+                ? 'border-b border-white/[.08] cursor-pointer bg-[#4fc3f7]/10'
+                : 'border-b border-white/[.08] cursor-pointer hover:bg-white/[.04] transition-colors';
 
-            return `<tr>
-                <td class="py-2.5 px-3 text-sm border-b border-white/[.08]">${avatarHtml}${u.displayName}</td>
-                <td class="py-2.5 px-3 text-sm border-b border-white/[.08]">${u.email}</td>
-                <td class="py-2.5 px-3 text-sm border-b border-white/[.08]">${rolesHtml}</td>
-                <td class="py-2.5 px-3 text-sm border-b border-white/[.08]">${statusHtml}</td>
-                <td class="py-2.5 px-3 text-sm border-b border-white/[.08]">${formatDate(u.createdAt)}</td>
-                <td class="py-2.5 px-3 text-sm border-b border-white/[.08]"><div class="flex gap-1 flex-wrap">${addBtns}${removeBtns}${toggleBtn}</div></td>
+            return `<tr class="${rowCls}" data-uid="${u.id}" onclick="openDetail(${u.id})">
+                <td class="py-2.5 px-3 text-sm">${avatarHtml}${esc(u.displayName)}</td>
+                <td class="py-2.5 px-3 text-sm text-[#90a4ae]">${esc(u.email)}</td>
+                <td class="py-2.5 px-3 text-sm">${rolesHtml}</td>
+                <td class="py-2.5 px-3 text-sm">${statusHtml}</td>
+                <td class="py-2.5 px-3 text-sm text-[#546e7a]">${fmtDate(u.createdAt)}</td>
+                <td class="py-2.5 px-3 text-sm"><div class="flex gap-1 flex-wrap">${addBtns}${removeBtns}${toggleBtn}</div></td>
             </tr>`;
         }).join('');
     }
 
+    // --- Actions ---
     window.addRole = async function (userId, roleId) {
         await api(`${API}/users/${userId}/roles/${roleId}`, { method: 'POST' });
         toast('Role added');
-        loadUsers();
+        await refreshUsers();
     };
-
     window.removeRole = async function (userId, roleId) {
         await api(`${API}/users/${userId}/roles/${roleId}`, { method: 'DELETE' });
         toast('Role removed');
-        loadUsers();
+        await refreshUsers();
     };
-
     window.toggleActive = async function (userId, isActive) {
         await api(`${API}/users/${userId}/active`, {
             method: 'PATCH',
@@ -124,9 +216,166 @@
             body: JSON.stringify({ isActive })
         });
         toast(isActive ? 'User activated' : 'User deactivated');
-        loadUsers();
+        await refreshUsers();
     };
 
+    async function refreshUsers() {
+        allUsers = await api(`${API}/users`);
+        populateUserDatalist();
+        applyFilters();
+        if (selectedUserId !== null) openDetail(selectedUserId);
+    }
+
+    // --- Detail panel ---
+    window.openDetail = async function (userId) {
+        selectedUserId = userId;
+        // Re-render table to update highlight (filters keep current selection)
+        const filtered = getFiltered();
+        renderTable(filtered);
+
+        const panel = document.getElementById('user-detail-panel');
+        panel.classList.remove('hidden');
+        panel.innerHTML = `<div class="bg-white/[.05] rounded-lg p-6 text-center text-[#90a4ae] text-sm">Загрузка…</div>`;
+
+        try {
+            const d = await api(`${API}/users/${userId}/details`);
+            renderDetail(d);
+        } catch (e) {
+            panel.innerHTML = `<div class="bg-white/[.05] rounded-lg p-4 text-[#ef5350] text-sm">Ошибка: ${esc(e.message)}</div>`;
+        }
+    };
+
+    window.closeDetail = function () {
+        selectedUserId = null;
+        document.getElementById('user-detail-panel').classList.add('hidden');
+        applyFilters(); // re-render to remove highlight
+    };
+
+    function renderDetail(d) {
+        const missingRoles = allRoles.filter(r => !d.roles.includes(r.name));
+        const addBtns = missingRoles.map(r =>
+            `<button class="py-0.5 px-2 rounded text-xs text-white bg-[#66bb6a] hover:opacity-80 transition-opacity"
+                onclick="addRole(${d.id},${r.id})">+ ${esc(r.name)}</button>`
+        ).join('');
+        const removeBtns = d.roles.map(rName => {
+            const role = allRoles.find(r => r.name === rName);
+            return role
+                ? `<button class="py-0.5 px-2 rounded text-xs text-white bg-[#ef5350] hover:opacity-80 transition-opacity"
+                       onclick="removeRole(${d.id},${role.id})">&minus; ${esc(rName)}</button>`
+                : '';
+        }).join('');
+
+        // Auth methods
+        let authLines = '';
+        d.externalLogins.forEach(e => {
+            const verified = e.emailVerified
+                ? '<span class="text-[#66bb6a] ml-1">✓</span>'
+                : '<span class="text-[#ffa726] ml-1">?</span>';
+            authLines += `<div class="flex items-center gap-2 text-xs py-1 border-b border-white/5">
+                <span class="text-[#4fc3f7] font-semibold w-14 flex-shrink-0">${esc(e.provider)}</span>
+                <span class="text-[#90a4ae] flex-1 truncate" title="${esc(e.email||'')}">${esc(e.email || '—')}</span>
+                ${verified}
+            </div>`;
+        });
+        if (d.hasLocalPassword) {
+            const emailStatus = d.localEmailConfirmed
+                ? '<span class="text-[#66bb6a]">подтверждён</span>'
+                : '<span class="text-[#ffa726]">не подтверждён</span>';
+            const failBadge = d.localFailedLoginCount > 0
+                ? `<span class="text-[#ef5350] ml-1">${d.localFailedLoginCount}✗</span>` : '';
+            const lockout = d.localLockoutEnd && new Date(d.localLockoutEnd) > new Date()
+                ? `<div class="text-xs text-[#ef5350] mt-0.5">🔒 до ${fmtDateTime(d.localLockoutEnd)}</div>` : '';
+            authLines += `<div class="text-xs py-1 border-b border-white/5">
+                <span class="text-[#ce93d8] font-semibold">Local</span>
+                <span class="text-[#90a4ae] ml-2">email: ${emailStatus}${failBadge}</span>
+                ${lockout}
+            </div>`;
+        }
+        if (!authLines) authLines = '<div class="text-xs text-[#546e7a]">Нет привязок</div>';
+
+        // Login history
+        let historyHtml = '';
+        if (d.loginHistory.length > 0) {
+            historyHtml = d.loginHistory.map(h => `
+                <div class="flex items-center gap-2 text-xs py-0.5 border-b border-white/5">
+                    <span class="text-[#4fc3f7] w-14 flex-shrink-0">${esc(h.provider)}</span>
+                    <span class="text-[#546e7a] flex-1 truncate" title="${esc(h.ipAddress||'')}">${esc(h.ipAddress || '—')}</span>
+                    <span class="text-[#90a4ae] whitespace-nowrap">${fmtDateTime(h.loginAt)}</span>
+                </div>`).join('');
+        } else {
+            historyHtml = '<div class="text-xs text-[#546e7a]">История пуста</div>';
+        }
+
+        const avatarHtml = d.avatarUrl
+            ? `<img src="${esc(d.avatarUrl)}" class="w-10 h-10 rounded-full flex-shrink-0" alt="">`
+            : `<div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-lg flex-shrink-0">👤</div>`;
+
+        document.getElementById('user-detail-panel').innerHTML = `
+        <div class="bg-white/[.05] rounded-lg p-4 text-sm">
+
+            <!-- Header -->
+            <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    ${avatarHtml}
+                    <div class="min-w-0">
+                        <div class="font-semibold leading-tight truncate">${esc(d.displayName)}</div>
+                        <div class="text-xs text-[#90a4ae] truncate">${esc(d.email)}</div>
+                    </div>
+                </div>
+                <button onclick="closeDetail()" class="text-[#546e7a] hover:text-white text-base leading-none flex-shrink-0 ml-2 mt-0.5" title="Закрыть">✕</button>
+            </div>
+
+            <!-- Meta -->
+            <div class="flex gap-x-3 gap-y-0.5 items-center mb-4 text-xs flex-wrap">
+                ${d.isActive
+                    ? '<span class="text-[#66bb6a] font-semibold">● Active</span>'
+                    : '<span class="text-[#ef5350] font-semibold">● Inactive</span>'}
+                <span class="text-[#546e7a]">с ${fmtDate(d.createdAt)}</span>
+                ${d.updatedAt ? `<span class="text-[#546e7a]">· обн. ${fmtDate(d.updatedAt)}</span>` : ''}
+                ${d.swimmerId ? `<span class="text-[#90a4ae]">· 🏊 #${d.swimmerId}</span>` : ''}
+            </div>
+
+            <!-- Roles -->
+            <div class="mb-4">
+                <div class="text-xs uppercase text-[#546e7a] font-semibold mb-1.5 tracking-wide">Роли</div>
+                <div class="flex gap-1 flex-wrap mb-1.5">
+                    ${d.roles.map(roleBadge).join(' ') || '<span class="text-[#546e7a] text-xs">Нет</span>'}
+                </div>
+                <div class="flex gap-1 flex-wrap">${addBtns}${removeBtns}</div>
+            </div>
+
+            <!-- Auth -->
+            <div class="mb-4">
+                <div class="text-xs uppercase text-[#546e7a] font-semibold mb-1.5 tracking-wide">Auth</div>
+                ${authLines}
+            </div>
+
+            ${d.linkedSwimmerName ? `
+            <div class="mb-4">
+                <div class="text-xs uppercase text-[#546e7a] font-semibold mb-1.5 tracking-wide">Спортсмен</div>
+                <div class="text-sm">${esc(d.linkedSwimmerName)}</div>
+            </div>` : ''}
+
+            <!-- Login history -->
+            <div class="mb-4">
+                <div class="text-xs uppercase text-[#546e7a] font-semibold mb-1.5 tracking-wide">
+                    История входов
+                    ${d.loginHistory.length > 0 ? `<span class="text-[#546e7a] normal-case font-normal">(${d.loginHistory.length})</span>` : ''}
+                </div>
+                ${historyHtml}
+            </div>
+
+            <!-- Actions -->
+            <div class="border-t border-white/10 pt-3">
+                <button onclick="toggleActive(${d.id},${!d.isActive})"
+                    class="py-1 px-3 rounded text-xs text-white cursor-pointer border-none transition-opacity hover:opacity-80 ${d.isActive ? 'bg-[#ef5350]' : 'bg-[#66bb6a]'}">
+                    ${d.isActive ? 'Деактивировать' : 'Активировать'}
+                </button>
+            </div>
+        </div>`;
+    }
+
+    // --- Tabs ---
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -136,9 +385,18 @@
         });
     });
 
+    // --- Filter listeners ---
+    ['uf-search', 'uf-role', 'uf-status'].forEach(id =>
+        document.getElementById(id).addEventListener('input', applyFilters)
+    );
+
+    // --- Init ---
     try {
-        allRoles = await api(`${API}/roles`);
-        await Promise.all([loadStats(), loadUsers()]);
+        [allRoles] = await Promise.all([api(`${API}/roles`), loadStats()]);
+        populateRoleFilter();
+        allUsers = await api(`${API}/users`);
+        populateUserDatalist();
+        applyFilters();
     } catch (e) {
         console.error('Admin init failed', e);
     }

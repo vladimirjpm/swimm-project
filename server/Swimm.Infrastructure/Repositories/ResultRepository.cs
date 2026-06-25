@@ -76,4 +76,54 @@ public class ResultRepository : IResultRepository
             .Select(ResultMapping.ToDto)
             .FirstOrDefaultAsync();
     }
+
+    public async Task<string[]> GetFilterHintsAsync(string field, string? q, int limit)
+    {
+        limit = Math.Min(limit, 50);
+        var prefix = (q ?? "").Trim();
+
+        return field switch
+        {
+            "style" => await _db.Styles
+                .OrderBy(s => s.Name)
+                .Select(s => s.Name)
+                .ToArrayAsync(),
+
+            "distance" => await _db.Results
+                .Select(r => r.Distance)
+                .Distinct()
+                .OrderBy(d => d.Length)
+                .ThenBy(d => d)
+                .ToArrayAsync(),
+
+            "club" => await _db.Clubs
+                .Where(c => prefix.Length == 0 || c.Name.StartsWith(prefix) || c.NameEn.StartsWith(prefix))
+                .Select(c => c.Name)
+                .Where(n => n.Length > 0)
+                .Distinct()
+                .OrderBy(n => n)
+                .Take(limit)
+                .ToArrayAsync(),
+
+            "competition" => await _db.Competitions
+                .Where(c => prefix.Length == 0 || c.Name.StartsWith(prefix))
+                .Select(c => c.Name)
+                .Where(n => n.Length > 0)
+                .Distinct()
+                .OrderBy(n => n)
+                .Take(limit)
+                .ToArrayAsync(),
+
+            "name" when prefix.Length > 0 => await _db.Swimmers
+                .Where(s => s.LastName.StartsWith(prefix))
+                .Select(s => s.LastName)
+                .Union(_db.Swimmers.Where(s => s.FirstName.StartsWith(prefix)).Select(s => s.FirstName))
+                .Where(n => n.Length > 0)
+                .OrderBy(n => n)
+                .Take(limit)
+                .ToArrayAsync(),
+
+            _ => []
+        };
+    }
 }
