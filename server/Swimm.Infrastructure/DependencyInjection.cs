@@ -49,6 +49,7 @@ public static class DependencyInjection
         services.AddScoped<IResultRepository, ResultRepository>();
         services.AddScoped<IAdminRepository, AdminRepository>();
         services.AddScoped<IUserFavoriteRepository, UserFavoriteRepository>();
+        services.AddScoped<IClubPointsRepository, ClubPointsRepository>();
 
         // Локальный вход (email + пароль)
         services.AddSingleton<IPasswordHasher, Argon2PasswordHasher>();

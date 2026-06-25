@@ -66,5 +66,12 @@ GRANT SELECT ON
     "GalleryItems",
     "Styles",
     "Countries",
-    "Results"
+    "Results",
+    "ClubPointsRules",
+    "ClubPointsRuleEntries"
 TO swimm_ro;
+
+-- NOTE: Sys_UserFavorites и Sys_UserMedia намеренно НЕ добавлены в этот грант.
+-- Фавориты и медиа — данные конкретного залогиненного пользователя; они ходят ТОЛЬКО
+-- через SwimmDbContext (роль swimm_rw, authenticated path). RO-путь (swimm_ro) —
+-- публичный анонимный read; давать ему доступ к Sys_* таблицам нельзя.
