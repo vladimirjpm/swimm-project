@@ -201,6 +201,22 @@ const allDataSources: DataSource[] = [
     },
   },
   {
+    name: '2026 June Hedera',
+    file: 'json/competition-june-2026-hedera.json',
+    load: async () => {
+      const resp = await fetch(
+        makeUrl('json/competition-june-2026-hedera.json'),
+      );
+      if (!resp.ok) {
+        throw new Error(
+          'Failed to load competition-june-2026-hedera.json',
+        );
+      }
+      const data = (await resp.json()) as Result[];
+      return data;
+    },
+  },
+  {
     name: '2026 Horef Isr Champ 8-11',
     file: 'json/competition-2026-horef-isr-championship-age_8-11.json',
     load: async () => {

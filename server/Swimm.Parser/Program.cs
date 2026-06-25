@@ -19,7 +19,8 @@ if (app.Environment.IsDevelopment())
     app.UseCors("AllowReact");
 }
 
-app.UseStaticFiles(); // <-- Добавьте эту строку
+app.UseDefaultFiles(); // / → index.html
+app.UseStaticFiles();
 
 app.MapControllers();
 app.Run();

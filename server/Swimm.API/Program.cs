@@ -1,25 +1,24 @@
-﻿using Microsoft.AspNetCore.Authentication;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
-using Microsoft.EntityFrameworkCore;
-using Swimm.API.Data;
-using Swimm.API.Services;
+using Microsoft.AspNetCore.RateLimiting;
+using Swimm.API.BackgroundServices;
+using Swimm.API.Security;
+using Swimm.Application;
+using Swimm.Application.Abstractions;
+using Swimm.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Кеш (доступен всему API)
 builder.Services.AddMemoryCache();
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
 
-// Database
-builder.Services.AddDbContext<SwimmDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-// CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReact",
         policy => policy
-            .WithOrigins("http://localhost:5173")
+            .WithOrigins("http://localhost:5173", "http://localhost:5203")
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials());
@@ -27,18 +26,40 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddRazorPages();
+builder.Services.AddHostedService<ImportBackgroundService>();
 
-// Сервисы
-builder.Services.AddSingleton<AdminSettingsService>();
-builder.Services.AddScoped<DbSchemaService>();
-builder.Services.AddScoped<JsonImportService>();
+// Rate limiting для чувствительных к перебору auth-эндпоинтов (login/register/forgot/reset).
+// Фиксированное окно по IP: 10 запросов в минуту, лишнее — 429.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("auth", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+});
+// Antiforgery: header-based (double-submit) для защиты admin-мутаций.
+// Клиент читает токен из JS-переменной, генерируемой в _Layout.cshtml, и посылает в этом заголовке.
+builder.Services.AddAntiforgery(options => options.HeaderName = "X-XSRF-TOKEN");
 
-// Authentication: Cookie + Google
-builder.Services
+// Authentication: Cookie + (опционально) Google
+var googleSection = builder.Configuration.GetSection("Authentication:Google");
+var googleClientId = googleSection["ClientId"];
+var googleClientSecret = googleSection["ClientSecret"];
+var googleEnabled = !string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret);
+
+var authBuilder = builder.Services
     .AddAuthentication(options =>
     {
         options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = GoogleDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = googleEnabled
+            ? GoogleDefaults.AuthenticationScheme
+            : CookieAuthenticationDefaults.AuthenticationScheme;
     })
     .AddCookie(options =>
     {
@@ -47,44 +68,57 @@ builder.Services
         options.Cookie.Name = "Swimm.Auth";
         options.LoginPath = "/auth/login";
         options.LogoutPath = "/auth/logout";
-        options.ExpireTimeSpan = TimeSpan.FromDays(30);
+        options.ExpireTimeSpan = TimeSpan.FromDays(7);
+        options.SlidingExpiration = true;
+        // Ре-валидация сессии: отзыв доступа (IsActive), смена ролей и «выйти со всех»
+        // через сверку SecurityStamp. Поход в БД троттлится интервалом внутри валидатора.
+        options.Events.OnValidatePrincipal = CookieSecurityStampValidator.ValidateAsync;
     })
-    .AddGoogle(options =>
+    // Транзитная схема для OAuth-рукопожатия. Google пишет промежуточные claims сюда,
+    // а не в основную куку → OnValidatePrincipal их не трогает. Короткоживущая.
+    .AddCookie(AuthSchemes.External, options =>
     {
-        var googleSection = builder.Configuration.GetSection("Authentication:Google");
-        options.ClientId = googleSection["ClientId"]!;
-        options.ClientSecret = googleSection["ClientSecret"]!;
-        options.CallbackPath = "/signin-google";
-        options.SaveTokens = false;
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.Name = "Swimm.External";
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
+    });
 
-        // Запросить профиль и email
+if (googleEnabled)
+{
+    authBuilder.AddGoogle(options =>
+    {
+        options.ClientId = googleClientId!;
+        options.ClientSecret = googleClientSecret!;
+        options.CallbackPath = "/signin-google";
+        // Промежуточный вход — в транзитную схему, а не в основную куку.
+        options.SignInScheme = AuthSchemes.External;
         options.Scope.Add("profile");
         options.Scope.Add("email");
     });
+}
 
 var app = builder.Build();
 
-// Автоматическое применение миграций при старте
-using (var scope = app.Services.CreateScope())
+// Миграции применяются явно — либо через `dotnet ef database update`, либо передав флаг
+// `--migrate` при запуске приложения. Авто-миграция при старте отключена: runtime-процесс
+// не должен иметь DDL-прав (подготовка к least-privilege DB role, Phase 3).
+if (args.Contains("--migrate"))
 {
-    var db = scope.ServiceProvider.GetRequiredService<SwimmDbContext>();
-    db.Database.Migrate();
-
-    // Нормализация схемы и данных (идемпотентно)
-    db.Database.ExecuteSqlRaw(SwimmDbContext.NormalizeResultsSql);
+    using var scope = app.Services.CreateScope();
+    scope.ServiceProvider.GetRequiredService<IDbMigrator>().Migrate();
+    return;
 }
 
 if (!app.Environment.IsDevelopment())
-{
     app.UseHttpsRedirection();
-}
 
 app.UseRouting();
 
+app.UseRateLimiter();
+
 if (app.Environment.IsDevelopment())
-{
     app.UseCors("AllowReact");
-}
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -92,20 +126,14 @@ app.UseAuthorization();
 // Maintenance mode — если MaintenanceMode = true, пускаем только админов
 app.Use(async (context, next) =>
 {
-    var settings = context.RequestServices.GetRequiredService<AdminSettingsService>();
-    var maintenance = settings.GetValue("MaintenanceMode", false);
-
-    if (maintenance
+    var settings = context.RequestServices.GetRequiredService<ISettingsService>();
+    if (settings.GetValue("MaintenanceMode", false)
         && !context.Request.Path.StartsWithSegments("/admin")
         && !context.Request.Path.StartsWithSegments("/api/admin")
         && !context.Request.Path.StartsWithSegments("/auth")
         && !context.Request.Path.StartsWithSegments("/signin-google"))
     {
-        if (context.User.IsInRole("Admin"))
-        {
-            await next();
-            return;
-        }
+        if (context.User.IsInRole("Admin")) { await next(); return; }
 
         context.Response.StatusCode = 503;
         context.Response.ContentType = "text/html; charset=utf-8";
@@ -118,7 +146,6 @@ app.Use(async (context, next) =>
             """);
         return;
     }
-
     await next();
 });
 
@@ -132,7 +159,6 @@ app.Use(async (context, next) =>
             context.Response.Redirect("/auth/login/google?returnUrl=" + Uri.EscapeDataString(context.Request.Path));
             return;
         }
-
         if (!context.User.IsInRole("Admin"))
         {
             context.Response.StatusCode = 403;
@@ -141,7 +167,6 @@ app.Use(async (context, next) =>
             return;
         }
     }
-
     await next();
 });
 
@@ -155,9 +180,7 @@ app.UseStaticFiles(new StaticFileOptions
     {
         var path = ctx.File.PhysicalPath;
         if (!string.IsNullOrEmpty(path) && path.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
-        {
             ctx.Context.Response.ContentType = "text/html; charset=utf-8";
-        }
     }
 });
 
