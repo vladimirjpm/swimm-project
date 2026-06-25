@@ -8,15 +8,18 @@ namespace Swimm.Infrastructure.Repositories;
 
 public class ResultRepository : IResultRepository
 {
-    private readonly SwimmDbContext _db;
+    // Read-only контекст (swimm_ro, SELECT-only роль) — публичный read-путь не имеет
+    // привилегий записи на уровне БД.
+    private readonly SwimmReadDbContext _db;
 
-    public ResultRepository(SwimmDbContext db)
+    public ResultRepository(SwimmReadDbContext db)
     {
         _db = db;
     }
 
     public async Task<(List<ResultDto> Items, bool HasMore)> GetPagedAsync(ResultFilter filter, int page, int pageSize)
     {
+        pageSize = Math.Min(pageSize, 500);
         var query = _db.Results.AsNoTracking().AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(filter.StyleName))

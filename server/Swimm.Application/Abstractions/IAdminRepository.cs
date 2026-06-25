@@ -12,4 +12,5 @@ public interface IAdminRepository
     Task<AdminStatsDto> GetStatsAsync();
     Task<List<ImportHistoryDto>> GetImportHistoryAsync();
     Task<bool> SetImportApprovedAsync(int id, bool approved);
+    Task<List<CompetitionAdminDto>> GetCompetitionsAsync();
 }

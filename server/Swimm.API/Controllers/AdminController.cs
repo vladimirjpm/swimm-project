@@ -8,23 +8,27 @@ namespace Swimm.API.Controllers;
 [ApiController]
 [Route("api/admin")]
 [Authorize(Roles = "Admin")]
+[AutoValidateAntiforgeryToken]
 public class AdminController : ControllerBase
 {
     private readonly IAdminRepository _admin;
     private readonly ISchemaService _schema;
     private readonly ISettingsService _settings;
     private readonly IImportService _import;
+    private readonly IImportJobQueue _jobs;
 
     public AdminController(
         IAdminRepository admin,
         ISchemaService schema,
         ISettingsService settings,
-        IImportService import)
+        IImportService import,
+        IImportJobQueue jobs)
     {
         _admin = admin;
         _schema = schema;
         _settings = settings;
         _import = import;
+        _jobs = jobs;
     }
 
     // ── Users ────────────────────────────────────────────────────────────────
@@ -104,15 +108,50 @@ public class AdminController : ControllerBase
         if (!file.FileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
             return BadRequest(new { error = "Only .json files are accepted" });
 
-        try
+        // Читаем файл в память один раз; это позволяет валидировать контент до постановки в очередь.
+        using var ms = new MemoryStream((int)file.Length);
+        await file.OpenReadStream().CopyToAsync(ms);
+        var data = ms.ToArray();
+
+        // Валидируем: файл должен начинаться с JSON-токена { или [ (игнорируя BOM и пробелы).
+        if (!IsJsonContent(data))
+            return BadRequest(new { error = "File content is not valid JSON (must start with '{' or '[')." });
+
+        var jobId = _jobs.Enqueue(data, file.FileName);
+        return Accepted(new { jobId });
+    }
+
+    [HttpGet("import/status/{jobId:guid}")]
+    public IActionResult GetImportJobStatus(Guid jobId)
+    {
+        var status = _jobs.GetStatus(jobId);
+        if (status == null)
+            return NotFound(new { error = "Job not found" });
+
+        return Ok(new
         {
-            await using var stream = file.OpenReadStream();
-            return Ok(await _import.ImportAsync(stream, file.FileName));
-        }
-        catch (Exception ex)
+            jobId = status.JobId,
+            state = status.State.ToString().ToLowerInvariant(),
+            queuedAt = status.QueuedAt,
+            completedAt = status.CompletedAt,
+            result = status.Result,
+            error = status.Error
+        });
+    }
+
+    private static bool IsJsonContent(byte[] data)
+    {
+        // Пропускаем UTF-8 BOM (EF BB BF) и leading whitespace, ищем { или [.
+        var start = 0;
+        if (data.Length >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF)
+            start = 3;
+        for (var i = start; i < Math.Min(data.Length, 512); i++)
         {
-            return BadRequest(new { error = ex.Message });
+            var b = data[i];
+            if (b is (byte)' ' or (byte)'\t' or (byte)'\r' or (byte)'\n') continue;
+            return b is (byte)'{' or (byte)'[';
         }
+        return false;
     }
 
     [HttpPost("swimmers/enrich")]
@@ -146,6 +185,33 @@ public class AdminController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
+
+    [HttpDelete("import/competition/{id:int}")]
+    public async Task<IActionResult> DeleteCompetition(int id)
+    {
+        try
+        {
+            var result = await _import.DeleteCompetitionAsync(id);
+            if (result == null)
+                return NotFound(new { error = $"Competition {id} not found" });
+
+            return Ok(new
+            {
+                message = $"Соревнование «{result.CompetitionName}» удалено: {result.Results} результатов, {result.Relays} эстафет, {result.Galleries} галерей",
+                deleted = result
+            });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    // ── Competitions ─────────────────────────────────────────────────────────
+
+    [HttpGet("competitions")]
+    public async Task<IActionResult> GetCompetitions()
+        => Ok(await _admin.GetCompetitionsAsync());
 
     // ── Import history ───────────────────────────────────────────────────────
 

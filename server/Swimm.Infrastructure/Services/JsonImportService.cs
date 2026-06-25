@@ -98,16 +98,44 @@ public class JsonImportService : IImportService
         if (items.Count == 0)
             return new ImportResult { Message = "JSON contains no results", DiagnosticLog = diagnosticLog };
 
-        // Кеши справочников для предотвращения повторных запросов
+        // === Pre-load all reference caches to avoid per-row DB queries ===
+        // Styles: tracked (seed data, rarely new)
+        var styleCache = await _db.Styles.ToDictionaryAsync(s => s.Name);
+
+        // Countries: AsNoTracking — we only read their IDs, don't modify them
+        var countryCache = new Dictionary<string, Country>(StringComparer.OrdinalIgnoreCase);
+        foreach (var c in await _db.Countries.AsNoTracking().ToListAsync())
+            countryCache.TryAdd(c.CountryCode, c);
+
+        // Competitions: AsNoTracking — we read IDs and check for duplicates
         var competitionCache = new Dictionary<string, Competition>();
+        foreach (var c in await _db.Competitions.AsNoTracking().ToListAsync())
+            competitionCache.TryAdd($"{c.Name}|{c.Date}|{c.PoolType}", c);
+
+        // Clubs: AsNoTracking — we only read their IDs
         var clubCache = new Dictionary<string, Club>();
+        foreach (var c in await _db.Clubs.AsNoTracking().ToListAsync())
+            clubCache.TryAdd($"{c.Name}|{c.NameEn}", c);
+
+        // Swimmers: tracked — EnrichSwimmerFromResult modifies them, changes saved in batch
         var swimmerCache = new Dictionary<string, Swimmer>();
-        var countryCache = new Dictionary<string, Country>();
-        var styleCache = await _db.Styles.ToDictionaryAsync(s => s.Name, s => s);
+        foreach (var s in await _db.Swimmers.ToListAsync())
+            swimmerCache.TryAdd($"{s.LastName}|{s.FirstName}|{s.BirthYear}", s);
+
+        // Competition IDs we've verified as having no existing results in this session
+        var verifiedNewCompetitions = new HashSet<int>();
+        // Ordered list of competition keys touched in this import (for ImportHistory)
+        var touchedCompetitionKeys = new List<string>();
 
         int created = 0, skipped = 0, errors = 0;
         var errorMessages = new List<string>();
+        // Batch of ResultRecords to insert at once at the end
+        var resultBatch = new List<ResultRecord>(items.Count);
 
+        // Весь импорт выполняется в одной транзакции — при любой ошибке откатываем целиком.
+        await using var tx = await _db.Database.BeginTransactionAsync();
+        try
+        {
         foreach (var (item, idx) in items.Select((r, i) => (r, i)))
         {
             try
@@ -118,7 +146,7 @@ public class JsonImportService : IImportService
                 {
                     style = new Style { Name = styleName };
                     _db.Styles.Add(style);
-                    await _db.SaveChangesAsync();
+                    await _db.SaveChangesAsync(); // need ID immediately for ResultRecord.StyleId
                     styleCache[styleName] = style;
                 }
 
@@ -144,24 +172,41 @@ public class JsonImportService : IImportService
                 var compKey = $"{item.Competition}|{item.Date}|{item.PoolType}";
                 if (!competitionCache.TryGetValue(compKey, out var competition))
                 {
-                    competition = await _db.Competitions.FirstOrDefaultAsync(c =>
-                        c.Name == item.Competition && c.Date == item.Date && c.PoolType == NormalizePoolType(item.PoolType));
-
-                    if (competition == null)
+                    competition = new Competition
                     {
-                        competition = new Competition
-                        {
-                            Name = item.Competition ?? string.Empty,
-                            Country = item.Country ?? string.Empty,
-                            Date = item.Date ?? string.Empty,
-                            PoolType = NormalizePoolType(item.PoolType),
-                            IsMasters = isMasters || (item.IsMasters ?? false),
-                            IsAward = isAward || (item.IsAward ?? false)
-                        };
-                        _db.Competitions.Add(competition);
-                        await _db.SaveChangesAsync();
-                    }
+                        Name = item.Competition ?? string.Empty,
+                        Country = item.Country ?? string.Empty,
+                        Date = item.Date ?? string.Empty,
+                        PoolType = NormalizePoolType(item.PoolType),
+                        IsMasters = isMasters || (item.IsMasters ?? false),
+                        IsAward = isAward || (item.IsAward ?? false)
+                    };
+                    _db.Competitions.Add(competition);
+                    await _db.SaveChangesAsync();
                     competitionCache[compKey] = competition;
+                    verifiedNewCompetitions.Add(competition.Id);
+                    touchedCompetitionKeys.Add(compKey);
+                }
+                else
+                {
+                    if (!touchedCompetitionKeys.Contains(compKey))
+                        touchedCompetitionKeys.Add(compKey);
+
+                    if (!verifiedNewCompetitions.Contains(competition.Id))
+                    {
+                        var hasResults = await _db.Results.AnyAsync(r => r.CompetitionId == competition.Id);
+                        if (hasResults)
+                        {
+                            await tx.RollbackAsync();
+                            return new ImportResult
+                            {
+                                Message = $"Дубль: соревнование «{competition.Name}» ({competition.Date}) уже содержит результаты в БД. Удалите его через Admin → История импортов, затем импортируйте снова.",
+                                ErrorMessages = [$"Competition ID {competition.Id} already has results"],
+                                DiagnosticLog = diagnosticLog
+                            };
+                        }
+                        verifiedNewCompetitions.Add(competition.Id);
+                    }
                 }
 
                 // 4. Club
@@ -184,6 +229,7 @@ public class JsonImportService : IImportService
                 var swimmerKey = $"{item.LastName}|{item.FirstName}|{item.BirthYear}";
                 if (!swimmerCache.TryGetValue(swimmerKey, out var swimmer))
                 {
+                    // Not in pre-loaded cache — may still exist if duplicate key collision was silenced
                     swimmer = await _db.Swimmers.FirstOrDefaultAsync(s =>
                         s.LastName == (item.LastName ?? "") &&
                         s.FirstName == (item.FirstName ?? "") &&
@@ -203,13 +249,13 @@ public class JsonImportService : IImportService
                         await _db.SaveChangesAsync();
                     }
 
-                    // Дополнение данных спортсмена из результата (Gender, ClubId, CountryId)
-                    EnrichSwimmerFromResult(swimmer, item.EventStyleGender, club, country);
-
                     swimmerCache[swimmerKey] = swimmer;
                 }
 
-                // 6. Relay
+                // Дополнение данных спортсмена из результата (Gender, ClubId, CountryId)
+                EnrichSwimmerFromResult(swimmer, item.EventStyleGender, club, country);
+
+                // 6. Relay — created but NOT saved yet; will be inserted via ResultRecord.Relay navigation
                 Relay? relay = null;
                 if (item.IsRelay == true)
                 {
@@ -218,42 +264,35 @@ public class JsonImportService : IImportService
                         TeamName = item.RelayTeamName,
                         SwimmersName = item.RelaySwimmersName
                     };
-                    _db.Relays.Add(relay);
-                    await _db.SaveChangesAsync();
                 }
 
-                // 7. Gallery
+                // 7. Gallery — created but NOT saved yet; will be inserted via ResultRecord.Gallery navigation
                 Gallery? gallery = null;
                 if (item.Gallery != null && item.Gallery.Count > 0)
                 {
                     gallery = new Gallery();
-                    _db.Galleries.Add(gallery);
-                    await _db.SaveChangesAsync();
-
                     foreach (var gi in item.Gallery)
                     {
-                        _db.GalleryItems.Add(new GalleryItem
+                        gallery.Items.Add(new GalleryItem
                         {
-                            GalleryId = gallery.Id,
                             Type = gi.Type ?? "image",
                             SourceType = gi.SourceType,
                             Url = gi.Url,
                             Code = gi.Code
                         });
                     }
-                    await _db.SaveChangesAsync();
                 }
 
-                // 8. ResultRecord
+                // 8. ResultRecord — added to batch; Relay and Gallery inserted via navigation on batch save
                 var record = new ResultRecord
                 {
                     CompetitionId = competition.Id,
                     SwimmerId = swimmer.Id,
                     ClubId = club.Id,
                     StyleId = style.Id,
-                    RelayId = relay?.Id,
-                    GalleryId = gallery?.Id,
                     CountryId = country?.Id,
+                    Relay = relay,      // EF Core inserts Relay and sets RelayId
+                    Gallery = gallery,  // EF Core inserts Gallery + GalleryItems and sets GalleryId
                     CompetitionDate = ParseDate(item.Date),
                     Distance = item.EventStyleLen ?? string.Empty,
                     Gender = item.EventStyleGender ?? string.Empty,
@@ -272,8 +311,7 @@ public class JsonImportService : IImportService
                     Note = item.Note
                 };
 
-                _db.Results.Add(record);
-                await _db.SaveChangesAsync();
+                resultBatch.Add(record);
                 created++;
             }
             catch (Exception ex)
@@ -289,24 +327,43 @@ public class JsonImportService : IImportService
             }
         }
 
-        // Сохраняем обновлённые данные спортсменов (Gender, ClubId)
-        if (_db.ChangeTracker.HasChanges())
-            await _db.SaveChangesAsync();
+        // При наличии ошибок — откатываем всё соревнование целиком.
+        if (errors > 0)
+        {
+            await tx.RollbackAsync();
+            return new ImportResult
+            {
+                TotalRows = items.Count,
+                Created = 0,
+                Skipped = skipped,
+                Errors = errors,
+                ErrorMessages = errorMessages,
+                DiagnosticLog = diagnosticLog,
+                Message = $"Import rolled back: {errors} errors out of {items.Count} rows — no data was saved"
+            };
+        }
+
+        // Batch insert: saves modified Swimmers + Relays + Galleries + GalleryItems + Results in one round trip
+        if (resultBatch.Count > 0)
+            _db.Results.AddRange(resultBatch);
+
+        await _db.SaveChangesAsync();
 
         // Запись в историю импортов — одна запись на весь импорт файла
-        if (created > 0 && competitionCache.Count > 0)
+        if (created > 0 && touchedCompetitionKeys.Count > 0)
         {
-            var importFileName = fileName ?? "unknown.json";
-            var firstComp = competitionCache.Values.First();
+            var firstComp = competitionCache[touchedCompetitionKeys[0]];
             _db.ImportHistory.Add(new ImportHistory
             {
                 CompetitionId = firstComp.Id,
-                ImportFileName = importFileName,
+                ImportFileName = fileName ?? "unknown.json",
                 ImportDate = DateTime.UtcNow,
                 Approved = false
             });
             await _db.SaveChangesAsync();
         }
+
+        await tx.CommitAsync();
 
         return new ImportResult
         {
@@ -318,6 +375,20 @@ public class JsonImportService : IImportService
             DiagnosticLog = diagnosticLog,
             Message = $"Import complete: {created} created, {skipped} skipped, {errors} errors"
         };
+        }
+        catch (Exception ex)
+        {
+            await tx.RollbackAsync();
+            return new ImportResult
+            {
+                TotalRows = items.Count,
+                Created = 0,
+                Errors = 1,
+                ErrorMessages = [$"Unexpected error, import rolled back: {ex.Message}"],
+                DiagnosticLog = diagnosticLog,
+                Message = "Import failed and was rolled back"
+            };
+        }
     }
 
     /// <summary>
@@ -436,6 +507,64 @@ public class JsonImportService : IImportService
                 $"ALTER TABLE \"{table}\" ALTER COLUMN \"Id\" RESTART WITH 1;");
 
         return result;
+    }
+
+    /// <summary>
+    /// Удаляет одно соревнование и все связанные с ним Results, Relays, Galleries, GalleryItems, ImportHistory.
+    /// Swimmers, Clubs, Countries не трогает — они общие для всех соревнований.
+    /// Порядок удаления учитывает FK Restrict на Results → Competition.
+    /// </summary>
+    public async Task<DeleteCompetitionResult?> DeleteCompetitionAsync(int competitionId)
+    {
+        var competition = await _db.Competitions.FindAsync(competitionId);
+        if (competition == null) return null;
+
+        // Собираем ID связанных Relays и Galleries до удаления Results
+        var relayIds = await _db.Results
+            .Where(r => r.CompetitionId == competitionId && r.RelayId != null)
+            .Select(r => r.RelayId!.Value)
+            .Distinct()
+            .ToListAsync();
+
+        var galleryIds = await _db.Results
+            .Where(r => r.CompetitionId == competitionId && r.GalleryId != null)
+            .Select(r => r.GalleryId!.Value)
+            .Distinct()
+            .ToListAsync();
+
+        var deletedGalleryItems = galleryIds.Count > 0
+            ? await _db.GalleryItems.Where(gi => galleryIds.Contains(gi.GalleryId)).ExecuteDeleteAsync()
+            : 0;
+
+        // Results: FK Restrict → Competition, поэтому удаляем до Competition
+        var deletedResults = await _db.Results
+            .Where(r => r.CompetitionId == competitionId)
+            .ExecuteDeleteAsync();
+
+        var deletedRelays = relayIds.Count > 0
+            ? await _db.Relays.Where(r => relayIds.Contains(r.Id)).ExecuteDeleteAsync()
+            : 0;
+
+        var deletedGalleries = galleryIds.Count > 0
+            ? await _db.Galleries.Where(g => galleryIds.Contains(g.Id)).ExecuteDeleteAsync()
+            : 0;
+
+        // ImportHistory → Competition: Cascade — удалится вместе с Competition, считаем заранее
+        var deletedImportHistory = await _db.ImportHistory.CountAsync(h => h.CompetitionId == competitionId);
+
+        _db.Competitions.Remove(competition);
+        await _db.SaveChangesAsync();
+
+        return new DeleteCompetitionResult
+        {
+            CompetitionId = competitionId,
+            CompetitionName = competition.Name,
+            Results = deletedResults,
+            Relays = deletedRelays,
+            GalleryItems = deletedGalleryItems,
+            Galleries = deletedGalleries,
+            ImportHistory = deletedImportHistory
+        };
     }
 
     private static async Task<List<string>> DiagnoseJsonFieldsAsync(Stream stream)

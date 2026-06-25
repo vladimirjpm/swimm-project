@@ -46,7 +46,8 @@ public class AdminRepository : IAdminRepository
 
     public async Task<RoleOperationResult> AddRoleAsync(int userId, int roleId)
     {
-        if (!await _db.AppUsers.AnyAsync(u => u.Id == userId))
+        var user = await _db.AppUsers.FindAsync(userId);
+        if (user == null)
             return RoleOperationResult.UserNotFound;
 
         if (!await _db.AppRoles.AnyAsync(r => r.Id == roleId))
@@ -56,6 +57,8 @@ public class AdminRepository : IAdminRepository
             return RoleOperationResult.AlreadyAssigned;
 
         _db.AppUserRoles.Add(new AppUserRole { UserId = userId, RoleId = roleId });
+        // Смена ролей → инвалидируем активные сессии (форс ре-логин с новыми ролями).
+        BumpSecurityStamp(user);
         await _db.SaveChangesAsync();
 
         return RoleOperationResult.Ok;
@@ -69,6 +72,11 @@ public class AdminRepository : IAdminRepository
         if (link == null) return false;
 
         _db.AppUserRoles.Remove(link);
+
+        // Смена ролей → инвалидируем активные сессии (форс ре-логин с новыми ролями).
+        var user = await _db.AppUsers.FindAsync(userId);
+        if (user != null) BumpSecurityStamp(user);
+
         await _db.SaveChangesAsync();
         return true;
     }
@@ -79,9 +87,18 @@ public class AdminRepository : IAdminRepository
         if (user == null) return false;
 
         user.IsActive = isActive;
+        // Деактивация → отзыв активных сессий. Бампаем и при реактивации (безвредно).
+        BumpSecurityStamp(user);
         user.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
         return true;
+    }
+
+    /// <summary>Сменить штамп безопасности — инвалидирует все активные cookie-сессии пользователя.</summary>
+    private static void BumpSecurityStamp(AppUser user)
+    {
+        user.SecurityStamp = Guid.NewGuid().ToString("N");
+        user.UpdatedAt = DateTime.UtcNow;
     }
 
     public async Task<AdminStatsDto> GetStatsAsync()
@@ -123,5 +140,26 @@ public class AdminRepository : IAdminRepository
         entry.Approved = approved;
         await _db.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<List<CompetitionAdminDto>> GetCompetitionsAsync()
+    {
+        return await _db.Competitions
+            .AsNoTracking()
+            .OrderByDescending(c => c.Date)
+            .ThenBy(c => c.Name)
+            .Select(c => new CompetitionAdminDto
+            {
+                Id = c.Id,
+                Name = c.Name,
+                Date = c.Date,
+                PoolType = c.PoolType,
+                Country = c.Country,
+                IsMasters = c.IsMasters,
+                IsAward = c.IsAward,
+                ResultCount = _db.Results.Count(r => r.CompetitionId == c.Id),
+                HasImportHistory = _db.ImportHistory.Any(h => h.CompetitionId == c.Id)
+            })
+            .ToListAsync();
     }
 }

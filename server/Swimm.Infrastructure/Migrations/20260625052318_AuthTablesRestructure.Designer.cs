@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Swimm.Infrastructure.Data;
@@ -11,9 +12,11 @@ using Swimm.Infrastructure.Data;
 namespace Swimm.Infrastructure.Migrations
 {
     [DbContext(typeof(SwimmDbContext))]
-    partial class SwimmDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260625052318_AuthTablesRestructure")]
+    partial class AuthTablesRestructure
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -82,11 +85,6 @@ namespace Swimm.Infrastructure.Migrations
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
-
-                    b.Property<string>("SecurityStamp")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
 
                     b.Property<int?>("SwimmerId")
                         .HasColumnType("integer");
@@ -215,6 +213,45 @@ namespace Swimm.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Countries", (string)null);
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.ExternalLoginToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AccessTokenProtected")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ExternalLoginId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RefreshTokenProtected")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Scopes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("TokenType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExternalLoginId")
+                        .IsUnique();
+
+                    b.ToTable("Sys_ExternalLoginTokens", (string)null);
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.Gallery", b =>
@@ -638,6 +675,11 @@ namespace Swimm.Infrastructure.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<string>("SecurityStamp")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -678,43 +720,6 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("Sys_UserLoginHistory", (string)null);
                 });
 
-            modelBuilder.Entity("Swimm.Domain.Entities.UserSecurityToken", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime?>("ConsumedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("Purpose")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TokenHash");
-
-                    b.HasIndex("UserId", "Purpose");
-
-                    b.ToTable("Sys_UserSecurityTokens", (string)null);
-                });
-
             modelBuilder.Entity("Swimm.Domain.Entities.AppUser", b =>
                 {
                     b.HasOne("Swimm.Domain.Entities.Swimmer", "Swimmer")
@@ -752,6 +757,17 @@ namespace Swimm.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Country");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.ExternalLoginToken", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.UserExternalLogin", "ExternalLogin")
+                        .WithOne("Token")
+                        .HasForeignKey("Swimm.Domain.Entities.ExternalLoginToken", "ExternalLoginId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ExternalLogin");
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.GalleryItem", b =>
@@ -882,17 +898,6 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Swimm.Domain.Entities.UserSecurityToken", b =>
-                {
-                    b.HasOne("Swimm.Domain.Entities.AppUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("Swimm.Domain.Entities.AppUser", b =>
                 {
                     b.Navigation("ExternalLogins");
@@ -905,6 +910,11 @@ namespace Swimm.Infrastructure.Migrations
             modelBuilder.Entity("Swimm.Domain.Entities.Gallery", b =>
                 {
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.UserExternalLogin", b =>
+                {
+                    b.Navigation("Token");
                 });
 #pragma warning restore 612, 618
         }

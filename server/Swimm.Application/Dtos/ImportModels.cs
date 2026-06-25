@@ -24,3 +24,14 @@ public class ClearResult
     public int Countries { get; set; }
     public int ImportHistory { get; set; }
 }
+
+public class DeleteCompetitionResult
+{
+    public int CompetitionId { get; set; }
+    public string CompetitionName { get; set; } = string.Empty;
+    public int Results { get; set; }
+    public int Relays { get; set; }
+    public int GalleryItems { get; set; }
+    public int Galleries { get; set; }
+    public int ImportHistory { get; set; }
+}

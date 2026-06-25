@@ -7,5 +7,6 @@ public interface IImportService
     Task<ImportResult> ImportAsync(Stream jsonStream, string? fileName = null);
     Task<int> EnrichSwimmersFromResultsAsync();
     Task<ClearResult> ClearDataAsync();
+    Task<DeleteCompetitionResult?> DeleteCompetitionAsync(int competitionId);
     string[] GetClearableTables();
 }

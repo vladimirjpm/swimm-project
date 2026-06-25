@@ -47,7 +47,13 @@
             color: #ffa500;
             margin-top: 10px;
         }
-        #copyBtn, #downloadBtn { display: none; margin-top: 10px; }
+        #copyBtn, #downloadBtn, #saveToDbBtn { display: none; margin-top: 10px; }
+        #saveToDbBtn { background-color: #28a745; }
+        #saveToDbBtn:hover { background-color: #1e7e34; }
+        #saveToDbBtn:disabled { background-color: #6c757d; cursor: not-allowed; }
+        #importResult { margin-top: 10px; font-weight: bold; }
+        .api-url-row { margin-top: 12px; font-size: 13px; color: #555; }
+        .api-url-row input { padding: 3px 6px; width: 220px; font-size: 13px; border: 1px solid #ccc; border-radius: 3px; }
         .error { color: red; }
         .success { color: green; }
         .info-box code { background-color: #d0e8ff; padding: 2px 6px; border-radius: 3px; }
@@ -293,6 +299,11 @@
         <div id="result"></div>
         <button id="copyBtn" onclick="copyToClipboard()">📋 Скопировать</button>
         <button id="downloadBtn" onclick="downloadJson()">💾 Скачать JSON</button>
+        <button id="saveToDbBtn" onclick="saveToDb()">🗄️ Сохранить в БД</button>
+        <div class="api-url-row">
+            API URL: <input type="text" id="apiUrl" value="http://localhost:5078" />
+        </div>
+        <div id="importResult"></div>
         
         <div class="section-header">
             Debug Log: 
@@ -395,13 +406,15 @@
             debugLogDiv.style.display = 'none';
             copyBtn.style.display = 'none';
             downloadBtn.style.display = 'none';
+            document.getElementById('saveToDbBtn').style.display = 'none';
+            document.getElementById('importResult').innerHTML = '';
             lastResults = [];
             lastNormative = null;
 
             try {
                 const response = await fetch('/api/pdf/upload', { method: 'POST', body: formData });
                 const data = await response.json();
-                
+
                 lastDebugLog = data.debugLog || '';
                 debugLogDiv.textContent = lastDebugLog;
                 debugLogDiv.style.display = 'block';
@@ -415,6 +428,7 @@
                         lastResults = data.results || [];
                         statusMessage.className = 'success';
                         statusMessage.innerText = 'Успешно! Записей: ' + lastResults.length;
+                        document.getElementById('saveToDbBtn').style.display = 'inline-block';
                     }
                     resultDiv.textContent = getFormattedJson();
                     copyBtn.style.display = 'inline-block';
@@ -458,6 +472,8 @@
             debugLogDiv.style.display = 'none';
             copyBtn.style.display = 'none';
             downloadBtn.style.display = 'none';
+            document.getElementById('saveToDbBtn').style.display = 'none';
+            document.getElementById('importResult').innerHTML = '';
             lastResults = [];
             lastNormative = null;
 
@@ -478,6 +494,7 @@
                         lastResults = data.results || [];
                         statusMessage.className = 'success';
                         statusMessage.innerText = 'Успешно! Записей: ' + lastResults.length;
+                        document.getElementById('saveToDbBtn').style.display = 'inline-block';
                     }
                     resultDiv.textContent = getFormattedJson();
                     copyBtn.style.display = 'inline-block';
@@ -512,6 +529,8 @@
             debugLogDiv.style.display = 'none';
             copyBtn.style.display = 'none';
             downloadBtn.style.display = 'none';
+            document.getElementById('saveToDbBtn').style.display = 'none';
+            document.getElementById('importResult').innerHTML = '';
             lastResults = [];
             lastNormative = null;
 
@@ -599,6 +618,45 @@
                 document.getElementById('worldRecordsFile4')
             );
         };
+
+        async function saveToDb() {
+            if (!lastResults.length) return;
+            const btn = document.getElementById('saveToDbBtn');
+            const importResult = document.getElementById('importResult');
+            const apiUrl = document.getElementById('apiUrl').value.replace(/\/$/, '');
+
+            btn.disabled = true;
+            btn.innerText = '⏳ Сохранение...';
+            importResult.innerHTML = '';
+
+            try {
+                const wrap = { results: lastResults };
+                const json = JSON.stringify(wrap);
+                const blob = new Blob([json], { type: 'application/json' });
+                const formData = new FormData();
+                formData.append('file', blob, 'parser-export.json');
+
+                const response = await fetch(apiUrl + '/api/admin/import', {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'include'
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    importResult.innerHTML = `<span class="success">✅ ${data.message}</span>`;
+                } else if (response.status === 401 || response.status === 403) {
+                    importResult.innerHTML = `<span class="error">🔒 Нет доступа — войдите в систему как Admin на ${apiUrl}/admin</span>`;
+                } else {
+                    importResult.innerHTML = `<span class="error">❌ Ошибка: ${data.error || response.statusText}</span>`;
+                }
+            } catch (err) {
+                importResult.innerHTML = `<span class="error">❌ Сетевая ошибка: ${err.message}</span>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerText = '🗄️ Сохранить в БД';
+            }
+        }
 
         function copyToClipboard() {
             const json = getFormattedJson();

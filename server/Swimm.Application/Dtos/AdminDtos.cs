@@ -38,6 +38,19 @@ public class ImportHistoryDto
     public bool Approved { get; set; }
 }
 
+public class CompetitionAdminDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public string Date { get; set; } = "";
+    public string PoolType { get; set; } = "";
+    public string Country { get; set; } = "";
+    public bool IsMasters { get; set; }
+    public bool IsAward { get; set; }
+    public int ResultCount { get; set; }
+    public bool HasImportHistory { get; set; }
+}
+
 public enum RoleOperationResult
 {
     Ok,

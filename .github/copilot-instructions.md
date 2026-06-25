@@ -1,5 +1,9 @@
 # Copilot Instructions
 
+> Architecture & coding conventions (the detailed reference). For a human quick-start see
+> [`README.md`](../README.md); for the agent operating guide (build/run/migrate/test, footguns)
+> see [`CLAUDE.md`](../CLAUDE.md).
+
 ## Project Overview
 
 Mono-repo: React + TypeScript client (`client/`) и .NET 10 Web API сервер (`server/`).
@@ -47,16 +51,34 @@ Swimm.API            ← тонкие контроллеры, DI, middleware, Ra
 
 ### EF Core Migrations
 
+Есть **два** `DbContext` (`SwimmDbContext` — read-write + миграции; `SwimmReadDbContext` —
+read-only публичный путь), поэтому EF-инструментам нужен `--context SwimmDbContext`.
+
 После изменения сущностей или DbContext — добавить миграцию:
 
 ```
-dotnet ef migrations add <Name> --project server/Swimm.Infrastructure --startup-project server/Swimm.API
+dotnet ef migrations add <Name> --project server/Swimm.Infrastructure --startup-project server/Swimm.API --context SwimmDbContext
 ```
 
-Применить вручную (в проде применяется автоматически через `IDbMigrator` при старте):
+Применить миграции (авто-применения при старте больше нет — это отдельный шаг):
 ```
-dotnet ef database update --project server/Swimm.Infrastructure --startup-project server/Swimm.API
+# вариант A — через EF-инструменты (design-time factory подключается под owner-ролью):
+dotnet ef database update --project server/Swimm.Infrastructure --startup-project server/Swimm.API --context SwimmDbContext
+
+# вариант B — запустить приложение с флагом (применит и выйдет):
+dotnet run --project server/Swimm.API -- --migrate
 ```
+
+### DB-роли (least-privilege)
+
+Рантайм работает под ограниченными ролями, миграции — под owner. См. `server/db/setup-roles.sql`
+(запустить один раз на БД). Connection strings в appsettings:
+- `MigrationConnection` (owner `swimm`) — DDL, только миграции;
+- `AdminConnection` (`swimm_rw`) — DML рантайма (auth, admin, импорт), без DDL;
+- `ReadConnection` (`swimm_ro`) — SELECT только на публичные бизнес-таблицы (browsing результатов).
+
+Все три при отсутствии откатываются на `DefaultConnection`. **Read-репозитории публичного пути**
+инжектируют `SwimmReadDbContext`; всё, что пишет или читает `Sys_*` таблицы — `SwimmDbContext`.
 
 ### Conventions
 

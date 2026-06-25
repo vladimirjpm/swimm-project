@@ -1,7 +1,9 @@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
     var bodyClass = ViewData["BodyClass"] as string ?? "min-h-screen text-gray-300 text-sm";
     var titleColor = ViewData["TitleColor"] as string ?? "#ff6b6b";
     var headerTitle = ViewData["HeaderTitle"] as string ?? "🔧 Swimm Admin";
+    var csrfToken = Antiforgery.GetAndStoreTokens(Context).RequestToken!;
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -35,6 +37,8 @@
 <div class="fixed bottom-6 right-6 bg-[#323232] text-white py-3 px-5 rounded-md text-sm opacity-0 transition-opacity duration-300 z-[1000] toast" id="toast"></div>
 
 <script>
+const _csrfToken = '@csrfToken';
+
 function toast(msg, duration) {
     const el = document.getElementById('toast');
     el.textContent = msg;
@@ -48,6 +52,7 @@ function esc(s) {
 }
 
 async function api(url, opts = {}) {
+    opts.headers = { 'X-XSRF-TOKEN': _csrfToken, ...(opts.headers ?? {}) };
     const res = await fetch(url, { credentials: 'same-origin', ...opts });
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     return res.json();

@@ -1,5 +1,9 @@
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.RateLimiting;
+using Swimm.API.BackgroundServices;
+using Swimm.API.Security;
 using Swimm.Application;
 using Swimm.Application.Abstractions;
 using Swimm.Infrastructure;
@@ -14,7 +18,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReact",
         policy => policy
-            .WithOrigins("http://localhost:5173")
+            .WithOrigins("http://localhost:5173", "http://localhost:5203")
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials());
@@ -22,6 +26,26 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddRazorPages();
+builder.Services.AddHostedService<ImportBackgroundService>();
+
+// Rate limiting для чувствительных к перебору auth-эндпоинтов (login/register/forgot/reset).
+// Фиксированное окно по IP: 10 запросов в минуту, лишнее — 429.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("auth", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+});
+// Antiforgery: header-based (double-submit) для защиты admin-мутаций.
+// Клиент читает токен из JS-переменной, генерируемой в _Layout.cshtml, и посылает в этом заголовке.
+builder.Services.AddAntiforgery(options => options.HeaderName = "X-XSRF-TOKEN");
 
 // Authentication: Cookie + (опционально) Google
 var googleSection = builder.Configuration.GetSection("Authentication:Google");
@@ -44,7 +68,20 @@ var authBuilder = builder.Services
         options.Cookie.Name = "Swimm.Auth";
         options.LoginPath = "/auth/login";
         options.LogoutPath = "/auth/logout";
-        options.ExpireTimeSpan = TimeSpan.FromDays(30);
+        options.ExpireTimeSpan = TimeSpan.FromDays(7);
+        options.SlidingExpiration = true;
+        // Ре-валидация сессии: отзыв доступа (IsActive), смена ролей и «выйти со всех»
+        // через сверку SecurityStamp. Поход в БД троттлится интервалом внутри валидатора.
+        options.Events.OnValidatePrincipal = CookieSecurityStampValidator.ValidateAsync;
+    })
+    // Транзитная схема для OAuth-рукопожатия. Google пишет промежуточные claims сюда,
+    // а не в основную куку → OnValidatePrincipal их не трогает. Короткоживущая.
+    .AddCookie(AuthSchemes.External, options =>
+    {
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.Name = "Swimm.External";
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
     });
 
 if (googleEnabled)
@@ -54,7 +91,8 @@ if (googleEnabled)
         options.ClientId = googleClientId!;
         options.ClientSecret = googleClientSecret!;
         options.CallbackPath = "/signin-google";
-        options.SaveTokens = false;
+        // Промежуточный вход — в транзитную схему, а не в основную куку.
+        options.SignInScheme = AuthSchemes.External;
         options.Scope.Add("profile");
         options.Scope.Add("email");
     });
@@ -62,14 +100,22 @@ if (googleEnabled)
 
 var app = builder.Build();
 
-// Автоматическое применение миграций при старте
-using (var scope = app.Services.CreateScope())
+// Миграции применяются явно — либо через `dotnet ef database update`, либо передав флаг
+// `--migrate` при запуске приложения. Авто-миграция при старте отключена: runtime-процесс
+// не должен иметь DDL-прав (подготовка к least-privilege DB role, Phase 3).
+if (args.Contains("--migrate"))
+{
+    using var scope = app.Services.CreateScope();
     scope.ServiceProvider.GetRequiredService<IDbMigrator>().Migrate();
+    return;
+}
 
 if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 
 app.UseRouting();
+
+app.UseRateLimiter();
 
 if (app.Environment.IsDevelopment())
     app.UseCors("AllowReact");

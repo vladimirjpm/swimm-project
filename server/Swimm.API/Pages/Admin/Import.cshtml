@@ -205,56 +205,86 @@
         resultDiv.classList.add('hidden');
 
         try {
+            // 1. Отправляем файл — сервер ставит задачу в очередь и сразу возвращает jobId.
             const form = new FormData();
             form.append('file', selectedFile);
-            const res = await fetch('/api/admin/import', { method: 'POST', credentials: 'same-origin', body: form });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+            const res = await fetch('/api/admin/import', { method: 'POST', credentials: 'same-origin', headers: { 'X-XSRF-TOKEN': _csrfToken }, body: form });
+            const queued = await res.json();
+            if (!res.ok) throw new Error(queued.error || `HTTP ${res.status}`);
 
-            const hasErrors = data.errors > 0;
-            resultDiag.classList.add('hidden');
-            resultCard.classList.remove('border-l-[#66bb6a]', 'border-l-[#ef5350]', 'border-l-[#ffa726]');
-            resultCard.classList.add(hasErrors ? 'border-l-[#ffa726]' : 'border-l-[#66bb6a]');
+            const jobId = queued.jobId;
+            toast('Импорт поставлен в очередь, обработка...');
 
-            resultTitle.textContent = data.totalRows === 0 && hasErrors
-                ? '❌ Ошибка десериализации'
-                : hasErrors ? '⚠️ Импорт завершен с ошибками' : '✅ Импорт успешен';
-            resultTitle.className = `text-lg mb-4 ${data.totalRows === 0 && hasErrors ? 'text-[#ef5350]' : hasErrors ? 'text-[#ffa726]' : 'text-[#66bb6a]'}`;
-
-            resultStats.innerHTML = [
-                statCard('Total', data.totalRows, '#4fc3f7'),
-                statCard('Created', data.created, '#66bb6a'),
-                statCard('Skipped', data.skipped, '#ffa726'),
-                statCard('Errors', data.errors, data.errors ? '#ef5350' : '#546e7a')
-            ].join('');
-
-            if (data.errorMessages && data.errorMessages.length > 0) {
-                errorList.innerHTML = data.errorMessages.map(m => `<div class="mb-1">${esc(m)}</div>`).join('');
-                resultErrors.classList.remove('hidden');
-            } else { resultErrors.classList.add('hidden'); }
-
-            if (data.diagnosticLog && data.diagnosticLog.length > 0) {
-                diagList.innerHTML = data.diagnosticLog.map(m => `<div class="mb-0.5">${esc(m)}</div>`).join('');
-                resultDiag.classList.remove('hidden');
-            } else { resultDiag.classList.add('hidden'); }
-
-            resultDiv.classList.remove('hidden');
-            toast(data.message || 'Import complete', 3000);
+            // 2. Поллим статус до завершения.
+            const data = await pollJobStatus(jobId);
+            showImportResult(data);
         } catch (e) {
-            resultCard.classList.remove('border-l-[#66bb6a]', 'border-l-[#ffa726]');
-            resultCard.classList.add('border-l-[#ef5350]');
-            resultTitle.textContent = '❌ Ошибка импорта';
-            resultTitle.className = 'text-lg mb-4 text-[#ef5350]';
-            resultStats.innerHTML = `<div class="text-[#ef9a9a]">${esc(e.message)}</div>`;
-            resultErrors.classList.add('hidden');
-            resultDiag.classList.add('hidden');
-            resultDiv.classList.remove('hidden');
-            toast('Import failed', 3000);
+            showImportError(e.message);
         } finally {
             progress.classList.add('hidden');
             btnUpload.disabled = false;
         }
     });
+
+    async function pollJobStatus(jobId) {
+        const INTERVAL_MS = 1500;
+        const TIMEOUT_MS = 10 * 60 * 1000; // 10 мин макс
+        const deadline = Date.now() + TIMEOUT_MS;
+        while (Date.now() < deadline) {
+            await new Promise(r => setTimeout(r, INTERVAL_MS));
+            const res = await fetch(`/api/admin/import/status/${jobId}`, { credentials: 'same-origin' });
+            if (!res.ok) throw new Error(`Status check failed: HTTP ${res.status}`);
+            const status = await res.json();
+            if (status.state === 'completed') return status.result;
+            if (status.state === 'failed') throw new Error(status.error || 'Import job failed');
+            // queued / running — продолжаем ждать
+        }
+        throw new Error('Import timed out after 10 minutes');
+    }
+
+    function showImportResult(data) {
+        const hasErrors = data.errors > 0;
+        resultDiag.classList.add('hidden');
+        resultCard.classList.remove('border-l-[#66bb6a]', 'border-l-[#ef5350]', 'border-l-[#ffa726]');
+        resultCard.classList.add(hasErrors ? 'border-l-[#ffa726]' : 'border-l-[#66bb6a]');
+
+        resultTitle.textContent = data.totalRows === 0 && hasErrors
+            ? '❌ Ошибка десериализации'
+            : hasErrors ? '⚠️ Импорт завершен с ошибками' : '✅ Импорт успешен';
+        resultTitle.className = `text-lg mb-4 ${data.totalRows === 0 && hasErrors ? 'text-[#ef5350]' : hasErrors ? 'text-[#ffa726]' : 'text-[#66bb6a]'}`;
+
+        resultStats.innerHTML = [
+            statCard('Total', data.totalRows, '#4fc3f7'),
+            statCard('Created', data.created, '#66bb6a'),
+            statCard('Skipped', data.skipped, '#ffa726'),
+            statCard('Errors', data.errors, data.errors ? '#ef5350' : '#546e7a')
+        ].join('');
+
+        if (data.errorMessages && data.errorMessages.length > 0) {
+            errorList.innerHTML = data.errorMessages.map(m => `<div class="mb-1">${esc(m)}</div>`).join('');
+            resultErrors.classList.remove('hidden');
+        } else { resultErrors.classList.add('hidden'); }
+
+        if (data.diagnosticLog && data.diagnosticLog.length > 0) {
+            diagList.innerHTML = data.diagnosticLog.map(m => `<div class="mb-0.5">${esc(m)}</div>`).join('');
+            resultDiag.classList.remove('hidden');
+        } else { resultDiag.classList.add('hidden'); }
+
+        resultDiv.classList.remove('hidden');
+        toast(data.message || 'Import complete', 3000);
+    }
+
+    function showImportError(msg) {
+        resultCard.classList.remove('border-l-[#66bb6a]', 'border-l-[#ffa726]');
+        resultCard.classList.add('border-l-[#ef5350]');
+        resultTitle.textContent = '❌ Ошибка импорта';
+        resultTitle.className = 'text-lg mb-4 text-[#ef5350]';
+        resultStats.innerHTML = `<div class="text-[#ef9a9a]">${esc(msg)}</div>`;
+        resultErrors.classList.add('hidden');
+        resultDiag.classList.add('hidden');
+        resultDiv.classList.remove('hidden');
+        toast('Import failed', 3000);
+    }
 
     function statCard(label, value, color) {
         return `<div class="bg-white/[.07] rounded-lg py-3 px-4 text-center">
@@ -279,7 +309,7 @@
         confirmModal.style.display = 'none'; confirmModal.classList.add('hidden');
         btnClearData.disabled = true; btnClearData.textContent = '⏳ Очистка...';
         try {
-            const res = await fetch('/api/admin/import/clear', { method: 'DELETE', credentials: 'same-origin' });
+            const res = await fetch('/api/admin/import/clear', { method: 'DELETE', credentials: 'same-origin', headers: { 'X-XSRF-TOKEN': _csrfToken } });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
             const d = data.deleted;

@@ -9,6 +9,14 @@ public class SwimmDbContext : DbContext
     {
     }
 
+    /// <summary>
+    /// Для наследников (напр. <see cref="SwimmReadDbContext"/>), которым нужна та же модель,
+    /// но собственный тип DbContextOptions и отдельная строка подключения (другая DB-роль).
+    /// </summary>
+    protected SwimmDbContext(DbContextOptions options) : base(options)
+    {
+    }
+
     /* === Справочники === */
     public DbSet<Competition> Competitions => Set<Competition>();
     public DbSet<Club> Clubs => Set<Club>();
@@ -31,6 +39,8 @@ public class SwimmDbContext : DbContext
     public DbSet<AppUserRole> AppUserRoles => Set<AppUserRole>();
     public DbSet<UserExternalLogin> UserExternalLogins => Set<UserExternalLogin>();
     public DbSet<UserLoginHistory> UserLoginHistory => Set<UserLoginHistory>();
+    public DbSet<UserLocalCredential> UserLocalCredentials => Set<UserLocalCredential>();
+    public DbSet<UserSecurityToken> UserSecurityTokens => Set<UserSecurityToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -210,6 +220,20 @@ public class SwimmDbContext : DbContext
                 .WithMany(u => u.ExternalLogins)
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+        // Локальные учётные данные (email+пароль) — связь 1:1 с AppUser по общему PK.
+        // Таблица заведена заранее; логика локального входа пока не реализована.
+        modelBuilder.Entity<UserLocalCredential>(entity =>
+        {
+            entity.ToTable("Sys_UserLocalCredentials");
+            entity.HasKey(e => e.UserId);
+
+            entity.HasOne(e => e.User)
+                .WithOne(u => u.LocalCredential)
+                .HasForeignKey<UserLocalCredential>(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<UserLoginHistory>(entity =>
@@ -217,6 +241,19 @@ public class SwimmDbContext : DbContext
             entity.ToTable("Sys_UserLoginHistory");
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => e.LoginAt);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Одноразовые токены (email-verify / password-reset). Храним только хеш токена.
+        modelBuilder.Entity<UserSecurityToken>(entity =>
+        {
+            entity.ToTable("Sys_UserSecurityTokens");
+            entity.HasIndex(e => e.TokenHash);
+            entity.HasIndex(e => new { e.UserId, e.Purpose });
 
             entity.HasOne(e => e.User)
                 .WithMany()
