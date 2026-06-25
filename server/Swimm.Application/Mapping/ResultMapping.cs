@@ -19,15 +19,18 @@ public static class ResultMapping
         IsMasters = r.Competition.IsMasters,
         IsAward = r.Competition.IsAward,
         AgeGroup = r.AgeGroup,
-        CompetitionDate = r.CompetitionDate,
+        Date = r.Competition.Date,
+        // Event ОТЛОЖЕН: в БД не хранится — остаётся пустым (см. ResultDto.Event).
         StyleName = r.Style.Name,
         Distance = r.Distance,
         Gender = r.Gender,
         EventStyleAge = r.EventStyleAge,
         PoolType = r.Competition.PoolType,
         Position = r.Position,
+        PositionAgeGroup = r.PositionAgeGroup,
         Heat = r.Heat,
         Lane = r.Lane,
+        SwimmerId = r.SwimmerId,
         LastName = r.Swimmer.LastName,
         FirstName = r.Swimmer.FirstName,
         LastNameEn = r.Swimmer.LastNameEn,
@@ -37,12 +40,22 @@ public static class ResultMapping
         ClubNameEn = r.Club.NameEn,
         TimeMillisecond = r.TimeMillisecond,
         TimeOriginal = r.TimeOriginal,
+        TimeSplit = r.TimeSplit,
         TimeFail = r.TimeFail,
         TimeFailNote = r.TimeFailNote,
         InternationalPoints = r.InternationalPoints,
         Note = r.Note,
         IsRelay = r.RelayId != null,
         RelayTeamName = r.Relay != null ? r.Relay.TeamName : null,
-        RelaySwimmersName = r.Relay != null ? r.Relay.SwimmersName : null
+        RelaySwimmersName = r.Relay != null ? r.Relay.SwimmersName : null,
+        Gallery = r.Gallery != null
+            ? r.Gallery.Items.Select(i => new GalleryItemDto
+            {
+                Type = i.Type,
+                SourceType = i.SourceType,
+                Url = i.Url,
+                Code = i.Code
+            }).ToList()
+            : null
     };
 }

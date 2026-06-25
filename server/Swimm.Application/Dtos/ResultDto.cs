@@ -26,16 +26,24 @@ public class ResultDto
     [JsonPropertyName("age_group")]
     public string AgeGroup { get; set; } = string.Empty;
 
+    /// <summary>Дата в формате dd/MM/yyyy (берётся из Competition.Date как есть).</summary>
     [JsonPropertyName("date")]
-    public DateTime CompetitionDate { get; set; }
+    public string Date { get; set; } = string.Empty;
 
-    [JsonPropertyName("style_name")]
+    /// <summary>
+    /// Отображаемое название события (напр. "200 חופשי - בנות 12").
+    /// ОТЛОЖЕНО: в БД не хранится (импорт его теряет) — пока отдаётся пустым.
+    /// </summary>
+    [JsonPropertyName("event")]
+    public string Event { get; set; } = string.Empty;
+
+    [JsonPropertyName("event_style_name")]
     public string StyleName { get; set; } = string.Empty;
 
-    [JsonPropertyName("distance")]
+    [JsonPropertyName("event_style_len")]
     public string Distance { get; set; } = string.Empty;
 
-    [JsonPropertyName("gender")]
+    [JsonPropertyName("event_style_gender")]
     public string Gender { get; set; } = string.Empty;
 
     [JsonPropertyName("event_style_age")]
@@ -47,11 +55,17 @@ public class ResultDto
     [JsonPropertyName("position")]
     public int? Position { get; set; }
 
+    [JsonPropertyName("position_age_group")]
+    public int? PositionAgeGroup { get; set; }
+
     [JsonPropertyName("heat")]
     public int Heat { get; set; }
 
     [JsonPropertyName("lane")]
     public int Lane { get; set; }
+
+    [JsonPropertyName("swimmer_id")]
+    public int SwimmerId { get; set; }
 
     [JsonPropertyName("last_name")]
     public string LastName { get; set; } = string.Empty;
@@ -80,6 +94,9 @@ public class ResultDto
     [JsonPropertyName("time")]
     public string TimeOriginal { get; set; } = string.Empty;
 
+    [JsonPropertyName("time_split")]
+    public string TimeSplit { get; set; } = string.Empty;
+
     [JsonPropertyName("time_fail")]
     public bool TimeFail { get; set; }
 
@@ -100,4 +117,26 @@ public class ResultDto
 
     [JsonPropertyName("relay_swimmers_name")]
     public string? RelaySwimmersName { get; set; }
+
+    // relay_swimmers[] (структурный состав) ОТЛОЖЕН: в БД хранится только Relay.SwimmersName
+    // (строка), структурированного массива нет — восстановить нельзя.
+
+    [JsonPropertyName("gallery")]
+    public List<GalleryItemDto>? Gallery { get; set; }
+}
+
+/// <summary>Элемент галереи для JSON API (совпадает с клиентским GalleryItem).</summary>
+public class GalleryItemDto
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = string.Empty;
+
+    [JsonPropertyName("sourceType")]
+    public string? SourceType { get; set; }
+
+    [JsonPropertyName("url")]
+    public string? Url { get; set; }
+
+    [JsonPropertyName("code")]
+    public string? Code { get; set; }
 }
