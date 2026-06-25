@@ -27,6 +27,10 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
   isAwardSource,
   isRecordHolder,
   isRecordTime,
+  isPrimaryFavorite,
+  isFavorite,
+  onToggleFavorite,
+  onTogglePrimary,
 }) => {
   const genderBgClass = res.event_style_gender === 'female' ? 'bg-pink-100' : 'bg-blue-100';
 
@@ -46,16 +50,38 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
         </div>
 
         <div className={showDate ? 'col-span-3' : 'col-span-4'}>
-          <UI_SwimmerNameCell
-            firstName={res.first_name}
-            lastName={res.last_name}
-            club={res.club}
-            isRelay={res.is_relay}
-            relaySwimmersList={res.relay_swimmers}
-            onClick={handleNameClick}
-            className={genderBgClass}
-            isRecordHolder={isRecordHolder}
-          />
+          <div className="flex items-start gap-1">
+            <UI_SwimmerNameCell
+              firstName={res.first_name}
+              lastName={res.last_name}
+              club={res.club}
+              isRelay={res.is_relay}
+              relaySwimmersList={res.relay_swimmers}
+              onClick={handleNameClick}
+              className={genderBgClass}
+              isRecordHolder={isRecordHolder}
+            />
+            {onToggleFavorite && (
+              <div className="flex flex-col items-center gap-0.5 ml-1 shrink-0">
+                <button
+                  title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                  onClick={() => onToggleFavorite(res.swimmer_id!)}
+                  className="text-lg leading-none hover:scale-110 transition-transform"
+                >
+                  {isFavorite ? '❤️' : '🤍'}
+                </button>
+                {isFavorite && onTogglePrimary && (
+                  <button
+                    title={isPrimaryFavorite ? 'Primary favorite' : 'Set as primary'}
+                    onClick={() => onTogglePrimary(res.swimmer_id!)}
+                    className="text-sm leading-none hover:scale-110 transition-transform"
+                  >
+                    {isPrimaryFavorite ? '⭐' : '☆'}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           <UI_SwimmerGallery gallery={res.gallery} />
 
           <div className="w-full flex flex-col items-start justify-center mt-2 mb-2">

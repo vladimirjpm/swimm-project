@@ -1,4 +1,5 @@
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.RateLimiting;
@@ -186,4 +187,13 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.MapRazorPages();
 app.MapControllers();
+
+// SPA не получает antiforgery-токен из Razor-разметки (_Layout.cshtml), поэтому
+// выставляем отдельный эндпоинт. Токен нужен для всех мутаций FavoritesController.
+app.MapGet("/api/antiforgery/token", (IAntiforgery af, HttpContext ctx) =>
+{
+    var tokens = af.GetAndStoreTokens(ctx);
+    return Results.Ok(new { token = tokens.RequestToken });
+}).RequireAuthorization();
+
 app.Run();

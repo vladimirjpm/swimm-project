@@ -20,6 +20,7 @@ export interface ResultWrap {
     event_style_age: string;
     pool_type: '25' | '50' | '25m' | '50m';
     /*individual data*/
+    swimmer_id?: number;
     position: number | null;
     position_age_group: number | null;
     heat: number;

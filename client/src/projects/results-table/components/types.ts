@@ -18,4 +18,11 @@ export interface ResultsTableRowProps {
   isAwardSource?: boolean;
   isRecordHolder?: boolean;
   isRecordTime?: boolean;
+  /** Пловец является primary-фаворитом текущего пользователя */
+  isPrimaryFavorite?: boolean;
+  /** Пловец в избранном (не обязательно primary) */
+  isFavorite?: boolean;
+  /** Колбэк для переключения избранного/primary */
+  onToggleFavorite?: (swimmerId: number) => void;
+  onTogglePrimary?: (swimmerId: number) => void;
 }

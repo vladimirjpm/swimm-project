@@ -33,6 +33,10 @@ public class SwimmDbContext : DbContext
     /* === Импорт === */
     public DbSet<ImportHistory> ImportHistory => Set<ImportHistory>();
 
+    /* === Фавориты и медиа пользователей === */
+    public DbSet<UserFavorite> UserFavorites => Set<UserFavorite>();
+    public DbSet<UserMedia> UserMedia => Set<UserMedia>();
+
     /* === Пользователи и доступ === */
     public DbSet<AppUser> AppUsers => Set<AppUser>();
     public DbSet<AppRole> AppRoles => Set<AppRole>();
@@ -259,6 +263,72 @@ public class SwimmDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // --- Фавориты пользователей ---
+
+        modelBuilder.Entity<UserFavorite>(entity =>
+        {
+            entity.ToTable("Sys_UserFavorites");
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Swimmer)
+                .WithMany()
+                .HasForeignKey(e => e.SwimmerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Club)
+                .WithMany()
+                .HasForeignKey(e => e.ClubId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Дискриминатор: swimmer → SwimmerId NOT NULL, ClubId NULL; club → обратно.
+            entity.HasCheckConstraint(
+                "CK_UserFav_TargetType",
+                @"(""TargetType"" = 'swimmer' AND ""SwimmerId"" IS NOT NULL AND ""ClubId"" IS NULL) OR " +
+                @"(""TargetType"" = 'club'    AND ""ClubId""    IS NOT NULL AND ""SwimmerId"" IS NULL)");
+
+            // Partial unique indexes создаются вручную в миграции через migrationBuilder.Sql
+            // (UX_UserFav_OnePrimary, UX_UserFav_Swimmer, UX_UserFav_Club).
+        });
+
+        // --- Медиа пользователей (Phase 2; таблица создана в Phase 1, эндпоинты — нет) ---
+
+        modelBuilder.Entity<UserMedia>(entity =>
+        {
+            entity.ToTable("Sys_UserMedia");
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Swimmer)
+                .WithMany()
+                .HasForeignKey(e => e.SwimmerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.ResultRecord)
+                .WithMany()
+                .HasForeignKey(e => e.ResultId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Competition)
+                .WithMany()
+                .HasForeignKey(e => e.CompetitionId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasCheckConstraint(
+                "CK_UserMedia_Level",
+                @"""Level"" IN ('swimmer', 'competition', 'result')");
+
+            entity.HasCheckConstraint(
+                "CK_UserMedia_Visibility",
+                @"""Visibility"" IN ('private', 'public')");
         });
     }
 }

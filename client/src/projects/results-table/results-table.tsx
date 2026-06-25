@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './results-table.css';
 import { rootActions,useAppDispatch, useAppSelector } from '../../store/store';
+import { useFavorites } from '../../hooks/useFavorites';
 import Helper from '../../utils/helpers/data-helper'
 import ClubPointsHelper from '../../utils/helpers/club-points-helper';
 import UI_DateIcon from '../components/mix/date-icon/date-icon';
@@ -25,6 +26,14 @@ function ResultsTable() {
   const filters = useAppSelector((state) => state.filterSelected);
   const isMastersSource = !!selectedSource?.is_masters;
   const isAwardSource = !!selectedSource?.is_award;
+
+  const {
+    isAuthenticated,
+    favoriteSwimmerIds,
+    primarySwimmerId,
+    toggleFavoriteSwimmer,
+    togglePrimarySwimmer,
+  } = useFavorites();
 
   if (!selectedSource || !selectedSource.results?.length) {
     return <div className="text-gray-500 italic">No data source selected.</div>;
@@ -297,10 +306,24 @@ function ResultsTable() {
                 event_style_age: res.event_style_age,
               });
 
+              const swimmerId = res.swimmer_id;
+              const isFav = isAuthenticated && swimmerId != null && favoriteSwimmerIds.has(swimmerId);
+              const isPrimary = isAuthenticated && swimmerId != null && swimmerId === primarySwimmerId;
+              const favoriteProps = {
+                isFavorite: isFav,
+                isPrimaryFavorite: isPrimary,
+                onToggleFavorite: isAuthenticated && swimmerId != null && !res.is_relay
+                  ? () => toggleFavoriteSwimmer(swimmerId)
+                  : undefined,
+                onTogglePrimary: isFav && swimmerId != null && !res.is_relay
+                  ? () => togglePrimarySwimmer(swimmerId)
+                  : undefined,
+              };
+
               return (
                 <React.Fragment key={index}>
                   <li
-                    className={`lg:hidden flex flex-col gap-2 px-3 py-2 rounded ${Helper.getGenderBgClass(res.event_style_gender)}`}
+                    className={`lg:hidden flex flex-col gap-2 px-3 py-2 rounded ${Helper.getGenderBgClass(res.event_style_gender)}${isPrimary ? ' ring-2 ring-yellow-400' : ''}`}
                   >
                     <ResultsTableMobile
                       res={res}
@@ -318,11 +341,12 @@ function ResultsTable() {
                       isAwardSource={isAwardSource}
                       isRecordHolder={isRecordHolder}
                       isRecordTime={isRecordTime}
+                      {...favoriteProps}
                     />
                   </li>
 
                   <li
-                    className={`hidden lg:grid 2xl:hidden ${Helper.getGenderBgClass(res.event_style_gender)}`}
+                    className={`hidden lg:grid 2xl:hidden ${Helper.getGenderBgClass(res.event_style_gender)}${isPrimary ? ' ring-2 ring-yellow-400' : ''}`}
                   >
                     <ResultsTableDesktop
                       res={res}
@@ -340,11 +364,12 @@ function ResultsTable() {
                       isAwardSource={isAwardSource}
                       isRecordHolder={isRecordHolder}
                       isRecordTime={isRecordTime}
+                      {...favoriteProps}
                     />
                   </li>
 
                   <li
-                    className={`hidden 2xl:grid grid-cols-12 gap-2 px-4 py-3 items-center ${Helper.getGenderBgClass(res.event_style_gender)}`}
+                    className={`hidden 2xl:grid grid-cols-12 gap-2 px-4 py-3 items-center ${Helper.getGenderBgClass(res.event_style_gender)}${isPrimary ? ' ring-2 ring-yellow-400' : ''}`}
                   >
                     <ResultsTable2xl
                       res={res}
@@ -362,6 +387,7 @@ function ResultsTable() {
                       isAwardSource={isAwardSource}
                       isRecordHolder={isRecordHolder}
                       isRecordTime={isRecordTime}
+                      {...favoriteProps}
                     />
                   </li>
                 </React.Fragment>

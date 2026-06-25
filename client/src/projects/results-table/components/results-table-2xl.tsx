@@ -28,6 +28,10 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
   isAwardSource,
   isRecordHolder,
   isRecordTime,
+  isPrimaryFavorite,
+  isFavorite,
+  onToggleFavorite,
+  onTogglePrimary,
 }) => {
   const genderBgClass = res.event_style_gender === 'female' ? 'bg-pink-100' : 'bg-blue-100';
 
@@ -46,19 +50,41 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
       </div>
 
       <div className='flex flex-col col-span-3'>
-      <UI_SwimmerNameCell
-        firstName={res.first_name}
-        lastName={res.last_name}
-        firstNameEn={res.first_name_en}
-        lastNameEn={res.last_name_en}
-        club={res.club}
-        isRelay={res.is_relay}
-        relaySwimmersList={res.relay_swimmers }
-        onClick={handleNameClick}
-        className={genderBgClass}
-        isRecordHolder={isRecordHolder}
-      />
-      <UI_SwimmerGallery gallery={res.gallery} />
+        <div className="flex items-start gap-1">
+          <UI_SwimmerNameCell
+            firstName={res.first_name}
+            lastName={res.last_name}
+            firstNameEn={res.first_name_en}
+            lastNameEn={res.last_name_en}
+            club={res.club}
+            isRelay={res.is_relay}
+            relaySwimmersList={res.relay_swimmers}
+            onClick={handleNameClick}
+            className={genderBgClass}
+            isRecordHolder={isRecordHolder}
+          />
+          {onToggleFavorite && (
+            <div className="flex flex-col items-center gap-0.5 shrink-0 ml-1">
+              <button
+                title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                onClick={() => onToggleFavorite(res.swimmer_id!)}
+                className="text-lg leading-none hover:scale-110 transition-transform"
+              >
+                {isFavorite ? '❤️' : '🤍'}
+              </button>
+              {isFavorite && onTogglePrimary && (
+                <button
+                  title={isPrimaryFavorite ? 'Primary favorite' : 'Set as primary'}
+                  onClick={() => onTogglePrimary(res.swimmer_id!)}
+                  className="text-sm leading-none hover:scale-110 transition-transform"
+                >
+                  {isPrimaryFavorite ? '⭐' : '☆'}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+        <UI_SwimmerGallery gallery={res.gallery} />
       </div>
 
       {showClub && (

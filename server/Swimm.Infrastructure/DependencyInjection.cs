@@ -29,6 +29,11 @@ public static class DependencyInjection
             .UseNpgsql(readCs)
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking));
 
+        // Кэш — IMemoryCache для одного инстанса; для Redis заменить MemoryCacheService
+        // на RedisCacheService (IDistributedCache + JSON) без изменений в потребителях.
+        services.AddMemoryCache();
+        services.AddSingleton<ICacheService, MemoryCacheService>();
+
         // Settings (singleton — in-memory store)
         services.AddSingleton<ISettingsService, AdminSettingsService>();
 
@@ -43,6 +48,7 @@ public static class DependencyInjection
         // Repositories
         services.AddScoped<IResultRepository, ResultRepository>();
         services.AddScoped<IAdminRepository, AdminRepository>();
+        services.AddScoped<IUserFavoriteRepository, UserFavoriteRepository>();
 
         // Локальный вход (email + пароль)
         services.AddSingleton<IPasswordHasher, Argon2PasswordHasher>();

@@ -11,15 +11,27 @@ public class ResultRepository : IResultRepository
     // Read-only контекст (swimm_ro, SELECT-only роль) — публичный read-путь не имеет
     // привилегий записи на уровне БД.
     private readonly SwimmReadDbContext _db;
+    private readonly ICacheService _cache;
 
-    public ResultRepository(SwimmReadDbContext db)
+    private static readonly TimeSpan StaticHintsTtl  = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan DynamicHintsTtl = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan ResultsTtl       = TimeSpan.FromMinutes(2);
+
+    public ResultRepository(SwimmReadDbContext db, ICacheService cache)
     {
-        _db = db;
+        _db    = db;
+        _cache = cache;
     }
 
     public async Task<(List<ResultDto> Items, bool HasMore)> GetPagedAsync(ResultFilter filter, int page, int pageSize)
     {
         pageSize = Math.Min(pageSize, 500);
+        var key = ResultsCacheKey(filter, page, pageSize);
+
+        var cached = await _cache.GetAsync<(List<ResultDto>, bool)>(key);
+        if (cached != default)
+            return cached;
+
         var query = _db.Results.AsNoTracking().AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(filter.StyleName))
@@ -66,7 +78,9 @@ public class ResultRepository : IResultRepository
         if (hasMore)
             items.RemoveAt(items.Count - 1);
 
-        return (items, hasMore);
+        var result = (items, hasMore);
+        await _cache.SetAsync(key, result, ResultsTtl);
+        return result;
     }
 
     public async Task<ResultDto?> GetByIdAsync(long id)
@@ -81,8 +95,15 @@ public class ResultRepository : IResultRepository
     {
         limit = Math.Min(limit, 50);
         var prefix = (q ?? "").Trim();
+        var key = $"hints:{field}:{prefix}";
 
-        return field switch
+        var cached = await _cache.GetAsync<string[]>(key);
+        if (cached is not null)
+            return cached;
+
+        var ttl = field is "style" or "distance" ? StaticHintsTtl : DynamicHintsTtl;
+
+        var hints = field switch
         {
             "style" => await _db.Styles
                 .OrderBy(s => s.Name)
@@ -125,5 +146,15 @@ public class ResultRepository : IResultRepository
 
             _ => []
         };
+
+        if (hints.Length > 0)
+            await _cache.SetAsync(key, hints, ttl);
+
+        return hints;
     }
+
+    private static string ResultsCacheKey(ResultFilter f, int page, int pageSize) =>
+        $"results:{f.StyleName}:{f.Distance}:{f.Gender}:{f.PoolType}" +
+        $":{f.DateFrom:yyyyMMdd}:{f.DateTo:yyyyMMdd}:{f.Competition}:{f.Name}:{f.Club}" +
+        $":{page}:{pageSize}";
 }
