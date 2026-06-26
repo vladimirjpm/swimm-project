@@ -80,6 +80,26 @@ dotnet run --project server/Swimm.API -- --migrate
 Все три при отсутствии откатываются на `DefaultConnection`. **Read-репозитории публичного пути**
 инжектируют `SwimmReadDbContext`; всё, что пишет или читает `Sys_*` таблицы — `SwimmDbContext`.
 
+### Публичный read-API (миграция клиента со статики на БД)
+
+Клиент исторически читал статические JSON из `client/public/data/`; идёт перевод на серверный API
+(детальный план — в auto-memory агента, `data-source-server-migration`). Готовые read-эндпоинты
+(через `SwimmReadDbContext` + кэш `ICacheService`; JSON-форма совпадает с клиентскими интерфейсами):
+- `GET /api/results` — результаты, фильтры + пагинация (`{page,pageSize,hasMore,data}`); `data` =
+  клиентский `Result`.
+- `GET /api/club-points` — правила очков (`{rules:[...]}`), заменяет `club-points-config.json`.
+- `GET /api/categories`, `GET /api/categories/{key}` — категории и их соревнования; заменяют
+  `sources-config*.json`.
+
+Модель данных под это:
+- `Category` + `CategoryCompetition` (M:N) — какие соревнования в какой категории. Membership
+  пишется НА ИМПОРТЕ (`ResultWrap.categories` — массив ключей категорий) и правится вручную.
+- Флаги `IsMasters` / `IsAward` / `ShowCombineAllResults` — на `Competition` (ставятся импортом).
+- `ClubPointsRule` + `ClubPointsRuleEntry` — система очков клубов.
+
+Дев-связка client↔server: Vite-proxy в `client/vite.config.js` (`/api`, `/auth` →
+`http://localhost:5078`) — относительные запросы клиента идут на API как same-origin.
+
 ### Conventions
 
 - **Новый сервис** → интерфейс в `Swimm.Application/Abstractions/`, реализация в `Swimm.Infrastructure/Services/`, регистрация в `AddInfrastructure()`.

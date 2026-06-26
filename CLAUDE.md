@@ -11,6 +11,14 @@ Keep this file the single source of agent guidance; other agents are pointed her
 This file covers only what those don't: how to build, run, migrate, and test **in practice here**,
 plus repo-specific footguns.
 
+**Nested guides (auto-loaded when you work in those dirs):**
+- [`client/CLAUDE.md`](client/CLAUDE.md) — frontend stack, `src/` map, feature pattern, footguns.
+- [`server/Swimm.Application/CLAUDE.md`](server/Swimm.Application/CLAUDE.md) — Clean Architecture
+  boundary rules for the Application layer.
+
+**Skills for recurring multi-step ops:** `/db-migrate` (EF migrations with the two-context flag),
+`/smoke-test-api` (build → run → poll → curl → stop, handles the build-lock).
+
 ---
 
 ## Golden rules
