@@ -17,13 +17,15 @@ namespace Swimm.Infrastructure.Services;
 public class JsonImportService : IImportService
 {
     private readonly SwimmDbContext _db;
+    private readonly ICacheService _cache;
 
     private static readonly string[] ClearableTables =
         ["Results", "GalleryItems", "Galleries", "Relays", "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "Sys_ImportHistory"];
 
-    public JsonImportService(SwimmDbContext db)
+    public JsonImportService(SwimmDbContext db, ICacheService cache)
     {
-        _db = db;
+        _db    = db;
+        _cache = cache;
     }
 
     public string[] GetClearableTables() => ClearableTables;
@@ -49,7 +51,8 @@ public class JsonImportService : IImportService
         ms.Position = 0;
 
         List<ResultJsonItem> items;
-        bool isMasters = false, isAward = false;
+        bool isMasters = false, isAward = false, showCombine = false;
+        List<string> categoryKeys = [];
         var diagnosticLog = new List<string>();
 
         // Пробуем ResultWrap { results: [...] }, затем простой массив
@@ -61,6 +64,8 @@ public class JsonImportService : IImportService
                 items = wrap.Results;
                 isMasters = wrap.IsMasters ?? false;
                 isAward = wrap.IsAward ?? false;
+                showCombine = wrap.ShowCombineAllResults ?? false;
+                categoryKeys = wrap.Categories ?? [];
                 diagnosticLog.Add("Format: ResultWrap");
             }
             else
@@ -122,6 +127,17 @@ public class JsonImportService : IImportService
         foreach (var s in await _db.Swimmers.ToListAsync())
             swimmerCache.TryAdd($"{s.LastName}|{s.FirstName}|{s.BirthYear}", s);
 
+        // Categories: Key → Category (для привязки соревнований к категориям на импорте).
+        var categoryCache = new Dictionary<string, Category>(StringComparer.OrdinalIgnoreCase);
+        foreach (var c in await _db.Categories.AsNoTracking().ToListAsync())
+            categoryCache.TryAdd(c.Key, c);
+
+        // Следующий DisplayOrder в каждой категории (новые членства дописываем в конец).
+        var categoryNextOrder = await _db.CategoryCompetitions
+            .GroupBy(cc => cc.CategoryId)
+            .Select(g => new { CategoryId = g.Key, Max = g.Max(x => x.DisplayOrder) })
+            .ToDictionaryAsync(x => x.CategoryId, x => x.Max + 1);
+
         // Competition IDs we've verified as having no existing results in this session
         var verifiedNewCompetitions = new HashSet<int>();
         // Ordered list of competition keys touched in this import (for ImportHistory)
@@ -179,13 +195,33 @@ public class JsonImportService : IImportService
                         Date = item.Date ?? string.Empty,
                         PoolType = NormalizePoolType(item.PoolType),
                         IsMasters = isMasters || (item.IsMasters ?? false),
-                        IsAward = isAward || (item.IsAward ?? false)
+                        IsAward = isAward || (item.IsAward ?? false),
+                        ShowCombineAllResults = showCombine
                     };
                     _db.Competitions.Add(competition);
                     await _db.SaveChangesAsync();
                     competitionCache[compKey] = competition;
                     verifiedNewCompetitions.Add(competition.Id);
                     touchedCompetitionKeys.Add(compKey);
+
+                    // Привязка нового соревнования к категориям (membership) из файла.
+                    // Дубли ключей игнорируем; неизвестные ключи пропускаем с заметкой в лог.
+                    foreach (var key in categoryKeys.Distinct(StringComparer.OrdinalIgnoreCase))
+                    {
+                        if (!categoryCache.TryGetValue(key, out var cat))
+                        {
+                            diagnosticLog.Add($"Category key not found, skipped: {key}");
+                            continue;
+                        }
+                        var order = categoryNextOrder.TryGetValue(cat.Id, out var o) ? o : 0;
+                        _db.CategoryCompetitions.Add(new CategoryCompetition
+                        {
+                            CategoryId = cat.Id,
+                            CompetitionId = competition.Id,
+                            DisplayOrder = order
+                        });
+                        categoryNextOrder[cat.Id] = order + 1;
+                    }
                 }
                 else
                 {
@@ -364,6 +400,7 @@ public class JsonImportService : IImportService
         }
 
         await tx.CommitAsync();
+        await _cache.InvalidateAllAsync();
 
         return new ImportResult
         {
@@ -506,6 +543,7 @@ public class JsonImportService : IImportService
             await _db.Database.ExecuteSqlRawAsync(
                 $"ALTER TABLE \"{table}\" ALTER COLUMN \"Id\" RESTART WITH 1;");
 
+        await _cache.InvalidateAllAsync();
         return result;
     }
 
@@ -554,6 +592,7 @@ public class JsonImportService : IImportService
 
         _db.Competitions.Remove(competition);
         await _db.SaveChangesAsync();
+        await _cache.InvalidateAllAsync();
 
         return new DeleteCompetitionResult
         {
@@ -753,6 +792,17 @@ public class ResultWrap
 
     [JsonPropertyName("is_award")]
     public bool? IsAward { get; set; }
+
+    [JsonPropertyName("show_combine_all_results")]
+    public bool? ShowCombineAllResults { get; set; }
+
+    /// <summary>
+    /// Ключи категорий, к которым относится соревнование(я) этого файла
+    /// (напр. ["results-main", "results-youth-team"]). Membership пишется на импорте;
+    /// потом правится вручную через админку.
+    /// </summary>
+    [JsonPropertyName("categories")]
+    public List<string>? Categories { get; set; }
 }
 
 public class ResultJsonItem
