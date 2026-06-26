@@ -13,6 +13,11 @@ export interface ResultWrap {
     is_award?:boolean;
     age_group: string;
     date: string;
+    /* многодневные соревнования (с серверного /api/results; на статике отсутствуют) */
+    event_id?: number | null;
+    event_name?: string | null;
+    day_number?: number | null;
+    sub_name?: string | null;
     event: string;
     event_style_name: string;
     event_style_len: string;

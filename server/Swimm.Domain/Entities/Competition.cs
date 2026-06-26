@@ -36,4 +36,25 @@ public class Competition
   /// Признак: отображать объединённую таблицу всех результатов (без разбивки по полу/возрасту).
   /// </summary>
   public bool ShowCombineAllResults { get; set; }
+
+  // ── Многодневные соревнования ──────────────────────────────────────────────
+
+  /// <summary>
+  /// Ссылка на событие, если этот день — часть многодневного соревнования.
+  /// null — обычное однодневное соревнование.
+  /// </summary>
+  public int? EventId { get; set; }
+
+  [ForeignKey(nameof(EventId))]
+  public CompetitionEvent? Event { get; set; }
+
+  /// <summary>Порядковый номер дня внутри события (1..N). null для однодневных.</summary>
+  public int? DayNumber { get; set; }
+
+  /// <summary>
+  /// Оригинальный заголовок соревнования из файла этого дня.
+  /// Для дней события <see cref="Name"/> = общее имя события, а специфичный заголовок дня тут.
+  /// </summary>
+  [MaxLength(300)]
+  public string? SubName { get; set; }
 }

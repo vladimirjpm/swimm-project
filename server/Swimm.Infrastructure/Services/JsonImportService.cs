@@ -20,7 +20,7 @@ public class JsonImportService : IImportService
     private readonly ICacheService _cache;
 
     private static readonly string[] ClearableTables =
-        ["Results", "GalleryItems", "Galleries", "Relays", "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "Sys_ImportHistory"];
+        ["Results", "GalleryItems", "Galleries", "Relays", "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "CompetitionEvents", "Countries"];
 
     public JsonImportService(SwimmDbContext db, ICacheService cache)
     {
@@ -34,7 +34,7 @@ public class JsonImportService : IImportService
     /// Импортирует JSON-файл и возвращает статистику.
     /// Поддерживает два формата: ResultWrap { results: [...] } и простой массив Result[].
     /// </summary>
-    public async Task<ImportResult> ImportAsync(Stream jsonStream, string? fileName = null)
+    public async Task<ImportResult> ImportAsync(Stream jsonStream, string? fileName = null, IReadOnlyCollection<string>? categoryKeys = null, ImportEventOptions? eventOptions = null)
     {
         var options = new JsonSerializerOptions
         {
@@ -44,6 +44,8 @@ public class JsonImportService : IImportService
         };
         options.Converters.Add(new LenientBoolConverter());
         options.Converters.Add(new LenientNullableBoolConverter());
+        options.Converters.Add(new LenientNullableIntConverter());
+        options.Converters.Add(new LenientStringConverter());
 
         // Читаем весь поток в память для возможности двойной десериализации
         using var ms = new MemoryStream();
@@ -52,7 +54,7 @@ public class JsonImportService : IImportService
 
         List<ResultJsonItem> items;
         bool isMasters = false, isAward = false, showCombine = false;
-        List<string> categoryKeys = [];
+        List<string> wrapCategoryKeys = [];
         var diagnosticLog = new List<string>();
 
         // Пробуем ResultWrap { results: [...] }, затем простой массив
@@ -65,7 +67,7 @@ public class JsonImportService : IImportService
                 isMasters = wrap.IsMasters ?? false;
                 isAward = wrap.IsAward ?? false;
                 showCombine = wrap.ShowCombineAllResults ?? false;
-                categoryKeys = wrap.Categories ?? [];
+                wrapCategoryKeys = wrap.Categories ?? [];
                 diagnosticLog.Add("Format: ResultWrap");
             }
             else
@@ -98,7 +100,10 @@ public class JsonImportService : IImportService
             }
         }
 
-        diagnosticLog.Add($"Items: {items.Count}, IsMasters(wrap): {isMasters}, IsAward(wrap): {isAward}");
+        // Категории из UI имеют приоритет над JSON-обёрткой; применяются ко всем соревнованиям файла.
+        var effectiveCategoryKeys = categoryKeys is { Count: > 0 } ? categoryKeys.ToList() : wrapCategoryKeys;
+
+        diagnosticLog.Add($"Items: {items.Count}, IsMasters(wrap): {isMasters}, IsAward(wrap): {isAward}, Categories: [{string.Join(", ", effectiveCategoryKeys)}]");
 
         if (items.Count == 0)
             return new ImportResult { Message = "JSON contains no results", DiagnosticLog = diagnosticLog };
@@ -152,10 +157,40 @@ public class JsonImportService : IImportService
         await using var tx = await _db.Database.BeginTransactionAsync();
         try
         {
+        // === Привязка к многодневному событию (создать новое / дописать к существующему) ===
+        // targetEvent != null → все дни-соревнования этого импорта цепляются к событию:
+        // Competition.Name = event.Name (общее имя), SubName = заголовок файла, DayNumber растёт.
+        CompetitionEvent? targetEvent = null;
+        var nextDayNumber = 1;
+        if (eventOptions?.EventId is int existingEventId)
+        {
+            targetEvent = await _db.CompetitionEvents.FindAsync(existingEventId);
+            if (targetEvent == null)
+                throw new InvalidOperationException($"Событие {existingEventId} не найдено");
+
+            var maxDay = await _db.Competitions
+                .Where(c => c.EventId == targetEvent.Id)
+                .MaxAsync(c => (int?)c.DayNumber) ?? 0;
+            nextDayNumber = maxDay + 1;
+            diagnosticLog.Add($"Event: attach to #{targetEvent.Id} \"{targetEvent.Name}\", starting day {nextDayNumber}");
+        }
+        else if (!string.IsNullOrWhiteSpace(eventOptions?.NewEventName))
+        {
+            targetEvent = new CompetitionEvent { Name = eventOptions.NewEventName.Trim() };
+            _db.CompetitionEvents.Add(targetEvent);
+            await _db.SaveChangesAsync(); // нужен Id для привязки дней
+            diagnosticLog.Add($"Event: created new #{targetEvent.Id} \"{targetEvent.Name}\"");
+        }
+
         foreach (var (item, idx) in items.Select((r, i) => (r, i)))
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(item.EventStyleName))
+                    throw new InvalidOperationException("Обязательное поле event_style_name отсутствует или пустое");
+                if (string.IsNullOrWhiteSpace(item.EventStyleLen))
+                    throw new InvalidOperationException("Обязательное поле event_style_len отсутствует или пустое");
+
                 // 1. Style
                 var styleName = NormalizeStyleName(item.EventStyleName);
                 if (!styleCache.TryGetValue(styleName, out var style))
@@ -185,18 +220,25 @@ public class JsonImportService : IImportService
                 }
 
                 // 3. Competition
-                var compKey = $"{item.Competition}|{item.Date}|{item.PoolType}";
+                // При привязке к событию дедуп и хранимое имя идут по ИМЕНИ СОБЫТИЯ (общее имя),
+                // чтобы дни одного события не плодили дубликаты и совпадали с unique-индексом
+                // (Name, Date, PoolType). Оригинальный заголовок файла уходит в SubName.
+                var displayName = targetEvent != null ? targetEvent.Name : (item.Competition ?? string.Empty);
+                var compKey = $"{displayName}|{item.Date}|{item.PoolType}";
                 if (!competitionCache.TryGetValue(compKey, out var competition))
                 {
                     competition = new Competition
                     {
-                        Name = item.Competition ?? string.Empty,
+                        Name = displayName,
                         Country = item.Country ?? string.Empty,
                         Date = item.Date ?? string.Empty,
                         PoolType = NormalizePoolType(item.PoolType),
                         IsMasters = isMasters || (item.IsMasters ?? false),
                         IsAward = isAward || (item.IsAward ?? false),
-                        ShowCombineAllResults = showCombine
+                        ShowCombineAllResults = showCombine,
+                        EventId = targetEvent?.Id,
+                        SubName = targetEvent != null ? (item.Competition ?? string.Empty) : null,
+                        DayNumber = targetEvent != null ? nextDayNumber++ : null
                     };
                     _db.Competitions.Add(competition);
                     await _db.SaveChangesAsync();
@@ -206,7 +248,7 @@ public class JsonImportService : IImportService
 
                     // Привязка нового соревнования к категориям (membership) из файла.
                     // Дубли ключей игнорируем; неизвестные ключи пропускаем с заметкой в лог.
-                    foreach (var key in categoryKeys.Distinct(StringComparer.OrdinalIgnoreCase))
+                    foreach (var key in effectiveCategoryKeys.Distinct(StringComparer.OrdinalIgnoreCase))
                     {
                         if (!categoryCache.TryGetValue(key, out var cat))
                         {
@@ -269,7 +311,7 @@ public class JsonImportService : IImportService
                     swimmer = await _db.Swimmers.FirstOrDefaultAsync(s =>
                         s.LastName == (item.LastName ?? "") &&
                         s.FirstName == (item.FirstName ?? "") &&
-                        s.BirthYear == item.BirthYear);
+                        s.BirthYear == (item.BirthYear ?? 0));
 
                     if (swimmer == null)
                     {
@@ -279,7 +321,7 @@ public class JsonImportService : IImportService
                             FirstName = item.FirstName ?? string.Empty,
                             LastNameEn = item.LastNameEn ?? string.Empty,
                             FirstNameEn = item.FirstNameEn ?? string.Empty,
-                            BirthYear = item.BirthYear
+                            BirthYear = item.BirthYear ?? 0
                         };
                         _db.Swimmers.Add(swimmer);
                         await _db.SaveChangesAsync();
@@ -336,14 +378,14 @@ public class JsonImportService : IImportService
                     EventStyleAge = item.EventStyleAge ?? string.Empty,
                     Position = item.Position,
                     PositionAgeGroup = item.PositionAgeGroup,
-                    Heat = item.Heat,
-                    Lane = item.Lane,
+                    Heat = item.Heat ?? 0,
+                    Lane = item.Lane ?? 0,
                     TimeMillisecond = ParseTimeToMs(item.Time),
                     TimeOriginal = item.Time ?? string.Empty,
                     TimeSplit = item.TimeSplit ?? string.Empty,
                     TimeFail = item.TimeFail,
                     TimeFailNote = item.TimeFailNote,
-                    InternationalPoints = item.InternationalPoints,
+                    InternationalPoints = item.InternationalPoints ?? 0,
                     Note = item.Note
                 };
 
@@ -384,6 +426,28 @@ public class JsonImportService : IImportService
             _db.Results.AddRange(resultBatch);
 
         await _db.SaveChangesAsync();
+
+        // Пересчёт диапазона дат события по всем его дням (min/max distinct дат).
+        if (targetEvent != null)
+        {
+            var dayDates = await _db.Competitions
+                .Where(c => c.EventId == targetEvent.Id)
+                .Select(c => c.Date)
+                .ToListAsync();
+
+            var parsed = dayDates
+                .Select(ParseDate)
+                .Where(d => d != DateTime.MinValue)
+                .Select(DateOnly.FromDateTime)
+                .ToList();
+
+            if (parsed.Count > 0)
+            {
+                targetEvent.StartDate = parsed.Min();
+                targetEvent.EndDate = parsed.Max();
+                await _db.SaveChangesAsync();
+            }
+        }
 
         // Запись в историю импортов — одна запись на весь импорт файла
         if (created > 0 && touchedCompetitionKeys.Count > 0)
@@ -524,10 +588,12 @@ public class JsonImportService : IImportService
         result.Clubs = await _db.Clubs.ExecuteDeleteAsync();
         result.ImportHistory = await _db.ImportHistory.ExecuteDeleteAsync();
         result.Competitions = await _db.Competitions.ExecuteDeleteAsync();
+        result.CompetitionEvents = await _db.CompetitionEvents.ExecuteDeleteAsync();
         result.Countries = await _db.Countries.ExecuteDeleteAsync();
 
         result.Total = result.Results + result.GalleryItems + result.Galleries
-            + result.Relays + result.Swimmers + result.Clubs + result.ImportHistory + result.Competitions + result.Countries;
+            + result.Relays + result.Swimmers + result.Clubs + result.ImportHistory
+            + result.Competitions + result.CompetitionEvents + result.Countries;
 
         // Сброс identity-счётчиков (только метаданные, на FK не влияет).
         //
@@ -536,7 +602,7 @@ public class JsonImportService : IImportService
         var clearedTables = new[]
         {
             "Results", "GalleryItems", "Galleries", "Relays",
-            "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "Countries"
+            "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "CompetitionEvents", "Countries"
         };
 
         foreach (var table in clearedTables)
@@ -767,6 +833,53 @@ public class JsonImportService : IImportService
             else writer.WriteNullValue();
         }
     }
+
+    private class LenientNullableIntConverter : JsonConverter<int?>
+    {
+        public override int? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            return reader.TokenType switch
+            {
+                JsonTokenType.Null => null,
+                JsonTokenType.Number => reader.TryGetInt32(out var n) ? n : (int)reader.GetDouble(),
+                JsonTokenType.String => int.TryParse(reader.GetString(), System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture, out var s) ? s : null,
+                _ => throw new JsonException($"Cannot convert {reader.TokenType} to int?")
+            };
+        }
+
+        public override void Write(Utf8JsonWriter writer, int? value, JsonSerializerOptions options)
+        {
+            if (value.HasValue) writer.WriteNumberValue(value.Value);
+            else writer.WriteNullValue();
+        }
+    }
+
+    /// <summary>
+    /// Терпимый конвертер строк: входные данные неоднородны — числовые поля
+    /// (event_style_age, age_group, position_age_group, event_style_len) приходят то строкой
+    /// ("44"), то числом (44). Приводим число/bool к строке, чтобы импорт не падал.
+    /// </summary>
+    private class LenientStringConverter : JsonConverter<string>
+    {
+        public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            return reader.TokenType switch
+            {
+                JsonTokenType.String => reader.GetString(),
+                JsonTokenType.Null => null,
+                JsonTokenType.True => "true",
+                JsonTokenType.False => "false",
+                JsonTokenType.Number => reader.TryGetInt64(out var n)
+                    ? n.ToString(CultureInfo.InvariantCulture)
+                    : reader.GetDecimal().ToString(CultureInfo.InvariantCulture),
+                _ => throw new JsonException($"Cannot convert {reader.TokenType} to string")
+            };
+        }
+
+        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+            => writer.WriteStringValue(value);
+    }
 }
 
 /// <summary>
@@ -850,10 +963,10 @@ public class ResultJsonItem
     public int? PositionAgeGroup { get; set; }
 
     [JsonPropertyName("heat")]
-    public int Heat { get; set; }
+    public int? Heat { get; set; }
 
     [JsonPropertyName("lane")]
-    public int Lane { get; set; }
+    public int? Lane { get; set; }
 
     [JsonPropertyName("last_name")]
     public string? LastName { get; set; }
@@ -868,7 +981,7 @@ public class ResultJsonItem
     public string? FirstNameEn { get; set; }
 
     [JsonPropertyName("birth_year")]
-    public int BirthYear { get; set; }
+    public int? BirthYear { get; set; }
 
     [JsonPropertyName("club")]
     public string? Club { get; set; }
@@ -889,7 +1002,7 @@ public class ResultJsonItem
     public string? TimeFailNote { get; set; }
 
     [JsonPropertyName("international_points")]
-    public int InternationalPoints { get; set; }
+    public int? InternationalPoints { get; set; }
 
     [JsonPropertyName("note")]
     public string? Note { get; set; }
@@ -913,7 +1026,7 @@ public class ResultJsonItem
 public class RelaySwimmerJson
 {
     [JsonPropertyName("order")]
-    public int Order { get; set; }
+    public int? Order { get; set; }
 
     [JsonPropertyName("last_name")]
     public string? LastName { get; set; }

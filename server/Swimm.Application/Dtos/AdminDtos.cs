@@ -47,8 +47,28 @@ public class CompetitionAdminDto
     public string Country { get; set; } = "";
     public bool IsMasters { get; set; }
     public bool IsAward { get; set; }
+    public bool ShowCombineAllResults { get; set; }
     public int ResultCount { get; set; }
     public bool HasImportHistory { get; set; }
+    /// <summary>Дата последнего импорта этого соревнования (null — импортов нет).</summary>
+    public DateTime? ImportDate { get; set; }
+    /// <summary>Статус подтверждения последнего импорта.</summary>
+    public bool Approved { get; set; }
+    // ── Многодневные соревнования ──
+    public int? EventId { get; set; }
+    public string? EventName { get; set; }
+    public int? DayNumber { get; set; }
+    public string? SubName { get; set; }
+}
+
+public class CompetitionEventDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public DateOnly? StartDate { get; set; }
+    public DateOnly? EndDate { get; set; }
+    public int DayCount { get; set; }
+    public int ResultCount { get; set; }
 }
 
 public class UserDetailDto

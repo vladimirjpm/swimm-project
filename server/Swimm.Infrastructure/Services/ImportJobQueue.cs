@@ -12,7 +12,7 @@ namespace Swimm.Infrastructure.Services;
 /// </summary>
 public sealed class ImportJobQueue : IImportJobQueue
 {
-    internal record ImportJobItem(Guid JobId, byte[] Data, string FileName);
+    internal record ImportJobItem(Guid JobId, byte[] Data, string FileName, IReadOnlyList<string> CategoryKeys, ImportEventOptions? EventOptions);
 
     private readonly Channel<ImportJobItem> _channel =
         Channel.CreateBounded<ImportJobItem>(new BoundedChannelOptions(20)
@@ -23,7 +23,7 @@ public sealed class ImportJobQueue : IImportJobQueue
 
     private readonly ConcurrentDictionary<Guid, ImportJobStatus> _statuses = new();
 
-    public Guid Enqueue(byte[] data, string fileName)
+    public Guid Enqueue(byte[] data, string fileName, IReadOnlyList<string>? categoryKeys = null, ImportEventOptions? eventOptions = null)
     {
         var jobId = Guid.NewGuid();
         var status = new ImportJobStatus
@@ -35,7 +35,7 @@ public sealed class ImportJobQueue : IImportJobQueue
         _statuses[jobId] = status;
         // TryWrite всегда успешен при BoundedChannelFullMode.Wait + sync caller,
         // но если канал полон — возвращаем статус Queued, фоновый процесс заберёт позже.
-        _channel.Writer.TryWrite(new ImportJobItem(jobId, data, fileName));
+        _channel.Writer.TryWrite(new ImportJobItem(jobId, data, fileName, categoryKeys ?? [], eventOptions));
         return jobId;
     }
 
@@ -44,11 +44,11 @@ public sealed class ImportJobQueue : IImportJobQueue
 
     // Вызывается только из ImportBackgroundService:
 
-    public async IAsyncEnumerable<(Guid JobId, byte[] Data, string FileName)> ConsumeAsync(
+    public async IAsyncEnumerable<(Guid JobId, byte[] Data, string FileName, IReadOnlyList<string> CategoryKeys, ImportEventOptions? EventOptions)> ConsumeAsync(
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
         await foreach (var item in _channel.Reader.ReadAllAsync(ct))
-            yield return (item.JobId, item.Data, item.FileName);
+            yield return (item.JobId, item.Data, item.FileName, item.CategoryKeys, item.EventOptions);
     }
 
     public void SetRunning(Guid jobId)

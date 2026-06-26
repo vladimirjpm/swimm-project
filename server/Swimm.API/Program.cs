@@ -11,6 +11,10 @@ using Swimm.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// appsettings.Local.json — gitignored, для локального переключения на другую БД.
+// Перекрывает appsettings.json и appsettings.{Environment}.json.
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
+
 builder.Services.AddMemoryCache();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);

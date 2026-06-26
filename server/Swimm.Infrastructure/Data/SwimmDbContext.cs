@@ -19,6 +19,7 @@ public class SwimmDbContext : DbContext
 
     /* === Справочники === */
     public DbSet<Competition> Competitions => Set<Competition>();
+    public DbSet<CompetitionEvent> CompetitionEvents => Set<CompetitionEvent>();
     public DbSet<Club> Clubs => Set<Club>();
     public DbSet<Swimmer> Swimmers => Set<Swimmer>();
     public DbSet<Relay> Relays => Set<Relay>();
@@ -64,6 +65,17 @@ public class SwimmDbContext : DbContext
         {
             entity.ToTable("Competitions");
             entity.HasIndex(e => new { e.Name, e.Date, e.PoolType }).IsUnique();
+
+            // Многодневные соревнования: день → событие. SetNull — удаление события не трогает дни.
+            entity.HasOne(e => e.Event)
+                .WithMany(ev => ev.Days)
+                .HasForeignKey(e => e.EventId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<CompetitionEvent>(entity =>
+        {
+            entity.ToTable("CompetitionEvents");
         });
 
         modelBuilder.Entity<Club>(entity =>

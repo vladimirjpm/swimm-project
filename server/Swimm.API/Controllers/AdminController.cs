@@ -111,7 +111,11 @@ public class AdminController : ControllerBase
 
     [HttpPost("import")]
     [RequestSizeLimit(50 * 1024 * 1024)]
-    public async Task<IActionResult> ImportJson(IFormFile? file)
+    public async Task<IActionResult> ImportJson(
+        IFormFile? file,
+        [FromForm] string[]? categories,
+        [FromForm] int? eventId,
+        [FromForm] string? newEventName)
     {
         if (file == null || file.Length == 0)
             return BadRequest(new { error = "No file uploaded" });
@@ -128,7 +132,12 @@ public class AdminController : ControllerBase
         if (!IsJsonContent(data))
             return BadRequest(new { error = "File content is not valid JSON (must start with '{' or '[')." });
 
-        var jobId = _jobs.Enqueue(data, file.FileName);
+        // Привязка к многодневному событию (опционально): existing eventId XOR newEventName.
+        ImportEventOptions? eventOptions = null;
+        if (eventId.HasValue || !string.IsNullOrWhiteSpace(newEventName))
+            eventOptions = new ImportEventOptions(eventId, newEventName);
+
+        var jobId = _jobs.Enqueue(data, file.FileName, categories, eventOptions);
         return Accepted(new { jobId });
     }
 
@@ -224,6 +233,18 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> GetCompetitions()
         => Ok(await _admin.GetCompetitionsAsync());
 
+    [HttpPatch("competitions/{id:int}")]
+    public async Task<IActionResult> UpdateCompetitionFlags(int id, [FromBody] UpdateCompetitionFlagsRequest request)
+    {
+        var ok = await _admin.UpdateCompetitionFlagsAsync(id, request.IsMasters, request.IsAward, request.ShowCombineAllResults);
+        if (!ok) return NotFound(new { error = $"Competition {id} not found" });
+        return Ok(new { message = "Обновлено", id });
+    }
+
+    [HttpGet("competition-events")]
+    public async Task<IActionResult> GetCompetitionEvents()
+        => Ok(await _admin.GetCompetitionEventsAsync());
+
     // ── Import history ───────────────────────────────────────────────────────
 
     [HttpGet("import-history")]
@@ -260,4 +281,5 @@ public class AdminController : ControllerBase
     public record SetApprovedRequest(bool Approved);
     public record SetActiveRequest(bool IsActive);
     public record UpdateSettingRequest(string Value);
+    public record UpdateCompetitionFlagsRequest(bool IsMasters, bool IsAward, bool ShowCombineAllResults);
 }

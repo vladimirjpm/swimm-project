@@ -200,9 +200,15 @@ public class AdminRepository : IAdminRepository
 
     public async Task<List<CompetitionAdminDto>> GetCompetitionsAsync()
     {
+        // Дни одного события держим рядом: сначала по событию, потом по номеру дня;
+        // обычные (без события) — по убыванию даты.
         return await _db.Competitions
             .AsNoTracking()
-            .OrderByDescending(c => c.Date)
+            .OrderBy(c => c.EventId == null ? 1 : 0)
+            .ThenByDescending(c => c.Event != null ? c.Event.StartDate : null)
+            .ThenBy(c => c.EventId)
+            .ThenBy(c => c.DayNumber)
+            .ThenByDescending(c => c.Date)
             .ThenBy(c => c.Name)
             .Select(c => new CompetitionAdminDto
             {
@@ -213,8 +219,53 @@ public class AdminRepository : IAdminRepository
                 Country = c.Country,
                 IsMasters = c.IsMasters,
                 IsAward = c.IsAward,
+                ShowCombineAllResults = c.ShowCombineAllResults,
                 ResultCount = _db.Results.Count(r => r.CompetitionId == c.Id),
-                HasImportHistory = _db.ImportHistory.Any(h => h.CompetitionId == c.Id)
+                HasImportHistory = _db.ImportHistory.Any(h => h.CompetitionId == c.Id),
+                ImportDate = _db.ImportHistory
+                    .Where(h => h.CompetitionId == c.Id)
+                    .OrderByDescending(h => h.ImportDate)
+                    .Select(h => (DateTime?)h.ImportDate)
+                    .FirstOrDefault(),
+                Approved = _db.ImportHistory
+                    .Where(h => h.CompetitionId == c.Id)
+                    .OrderByDescending(h => h.ImportDate)
+                    .Select(h => h.Approved)
+                    .FirstOrDefault(),
+                EventId = c.EventId,
+                EventName = c.Event != null ? c.Event.Name : null,
+                DayNumber = c.DayNumber,
+                SubName = c.SubName
+            })
+            .ToListAsync();
+    }
+
+    public async Task<bool> UpdateCompetitionFlagsAsync(int id, bool isMasters, bool isAward, bool showCombineAllResults)
+    {
+        var comp = await _db.Competitions.FindAsync(id);
+        if (comp == null) return false;
+
+        comp.IsMasters = isMasters;
+        comp.IsAward = isAward;
+        comp.ShowCombineAllResults = showCombineAllResults;
+        await _db.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<List<CompetitionEventDto>> GetCompetitionEventsAsync()
+    {
+        return await _db.CompetitionEvents
+            .AsNoTracking()
+            .OrderByDescending(e => e.StartDate)
+            .ThenBy(e => e.Name)
+            .Select(e => new CompetitionEventDto
+            {
+                Id = e.Id,
+                Name = e.Name,
+                StartDate = e.StartDate,
+                EndDate = e.EndDate,
+                DayCount = _db.Competitions.Count(c => c.EventId == e.Id),
+                ResultCount = _db.Results.Count(r => r.Competition.EventId == e.Id)
             })
             .ToListAsync();
     }

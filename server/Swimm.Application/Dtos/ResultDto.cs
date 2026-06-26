@@ -30,6 +30,24 @@ public class ResultDto
     [JsonPropertyName("date")]
     public string Date { get; set; } = string.Empty;
 
+    // ── Многодневные соревнования ──
+    // Для дней события CompetitionName уже = общее имя события; sub_name несёт заголовок дня.
+    /// <summary>Id события, если соревнование — день многодневного. null для однодневных.</summary>
+    [JsonPropertyName("event_id")]
+    public int? EventId { get; set; }
+
+    /// <summary>Общее имя события (для дней многодневного). null для однодневных.</summary>
+    [JsonPropertyName("event_name")]
+    public string? EventName { get; set; }
+
+    /// <summary>Номер дня внутри события (1..N). null для однодневных.</summary>
+    [JsonPropertyName("day_number")]
+    public int? DayNumber { get; set; }
+
+    /// <summary>Оригинальный заголовок соревнования этого дня. null для однодневных.</summary>
+    [JsonPropertyName("sub_name")]
+    public string? SubName { get; set; }
+
     /// <summary>
     /// Отображаемое название события (напр. "200 חופשי - בנות 12").
     /// ОТЛОЖЕНО: в БД не хранится (импорт его теряет) — пока отдаётся пустым.

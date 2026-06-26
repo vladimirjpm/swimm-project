@@ -1,0 +1,9 @@
+{
+  "_comment": "Скопируй в appsettings.Local.json и заполни. В git не попадёт.",
+  "ConnectionStrings": {
+    "DefaultConnection":   "Host=PROD_HOST;Port=5432;Database=swimm;Username=swimm;Password=...",
+    "MigrationConnection": "Host=PROD_HOST;Port=5432;Database=swimm;Username=swimm;Password=...",
+    "AdminConnection":     "Host=PROD_HOST;Port=5432;Database=swimm;Username=swimm_rw;Password=...",
+    "ReadConnection":      "Host=PROD_HOST;Port=5432;Database=swimm;Username=swimm_ro;Password=..."
+  }
+}

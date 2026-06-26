@@ -1,5 +1,13 @@
 namespace Swimm.Application.Dtos;
 
+/// <summary>
+/// Привязка импортируемого файла к многодневному событию.
+/// EventId задан → дописываем день к существующему событию.
+/// NewEventName задан (без EventId) → создаём новое событие с этим именем.
+/// Оба null → обычное однодневное соревнование (поведение по умолчанию).
+/// </summary>
+public sealed record ImportEventOptions(int? EventId, string? NewEventName);
+
 public class ImportResult
 {
     public int TotalRows { get; set; }
@@ -16,6 +24,7 @@ public class ClearResult
     public int Total { get; set; }
     public int Results { get; set; }
     public int Competitions { get; set; }
+    public int CompetitionEvents { get; set; }
     public int Clubs { get; set; }
     public int Swimmers { get; set; }
     public int Relays { get; set; }

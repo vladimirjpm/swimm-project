@@ -26,6 +26,31 @@
         <div id="file-name" class="mt-4 text-[#90a4ae] text-sm hidden"></div>
     </div>
 
+    <!-- Categories -->
+    <div id="cat-section" class="mb-6">
+        <div class="text-sm text-[#b0bec5] mb-2">
+            Категории для этого импорта
+            <span class="text-[#546e7a] text-xs">(перекрывают <code class="text-[#4fc3f7]">categories</code> из JSON; применяются ко всем соревнованиям файла)</span>
+        </div>
+        <div id="cat-list" class="flex flex-wrap gap-2 text-sm text-[#90a4ae]">загрузка...</div>
+    </div>
+
+    <!-- Multi-day event -->
+    <div id="event-section" class="mb-6">
+        <div class="text-sm text-[#b0bec5] mb-2">
+            Многодневное соревнование
+            <span class="text-[#546e7a] text-xs">(привязать этот файл-день к событию; имя дня уйдёт в SubName, общее имя — у события)</span>
+        </div>
+        <div class="flex flex-wrap gap-3 items-center">
+            <select id="event-select"
+                class="bg-black/30 border border-[#546e7a] rounded text-[#e0e0e0] px-3 py-1.5 text-sm font-[inherit] min-w-[280px] focus:outline-none focus:border-[#66bb6a]">
+                <option value="">— Без события (обычное соревнование) —</option>
+                <option value="__new__">➕ Создать новое событие…</option>
+            </select>
+            <input type="text" id="event-new-name" placeholder="Имя нового события" class="hidden bg-black/30 border border-[#66bb6a] rounded text-[#e0e0e0] px-3 py-1.5 text-sm font-[inherit] min-w-[280px] focus:outline-none focus:border-[#81c784]" />
+        </div>
+    </div>
+
     <!-- Actions -->
     <div class="flex gap-3 mb-6">
         <button id="btn-upload" disabled
@@ -135,6 +160,57 @@
 
     let selectedFile = null;
 
+    // Категории для привязки на импорте (мультиселект).
+    const catList = document.getElementById('cat-list');
+    fetch('/api/categories', { credentials: 'same-origin' })
+        .then(r => r.ok ? r.json() : [])
+        .then(cats => {
+            if (!Array.isArray(cats) || cats.length === 0) { catList.textContent = 'нет категорий'; return; }
+            catList.innerHTML = cats.map(c =>
+                `<label class="inline-flex items-center gap-1.5 bg-white/[.05] hover:bg-white/[.09] rounded-md py-1.5 px-3 cursor-pointer">
+                    <input type="checkbox" class="cat-cb" value="${esc(c.key)}"> ${esc(c.name)}
+                </label>`).join('');
+        })
+        .catch(() => { catList.textContent = 'ошибка загрузки категорий'; });
+
+    // Список многодневных событий для привязки дня.
+    const eventSelect = document.getElementById('event-select');
+    const eventNewName = document.getElementById('event-new-name');
+
+    function fmtEventRange(e) {
+        if (!e.startDate) return '';
+        const s = e.startDate, en = e.endDate;
+        return en && en !== s ? ` (${s} – ${en})` : ` (${s})`;
+    }
+
+    function loadEvents() {
+        fetch('/api/admin/competition-events', { credentials: 'same-origin' })
+            .then(r => r.ok ? r.json() : [])
+            .then(events => {
+                // Сносим старые option'ы событий, оставляя два служебных.
+                [...eventSelect.querySelectorAll('option[data-event]')].forEach(o => o.remove());
+                if (!Array.isArray(events)) return;
+                events.forEach(e => {
+                    const opt = document.createElement('option');
+                    opt.value = String(e.id);
+                    opt.dataset.event = '1';
+                    opt.textContent = `${e.name}${fmtEventRange(e)} · дней: ${e.dayCount}`;
+                    eventSelect.appendChild(opt);
+                });
+            })
+            .catch(() => {});
+    }
+    loadEvents();
+
+    eventSelect.addEventListener('change', () => {
+        if (eventSelect.value === '__new__') {
+            eventNewName.classList.remove('hidden');
+            eventNewName.focus();
+        } else {
+            eventNewName.classList.add('hidden');
+        }
+    });
+
     fetch('/api/admin/clearable-tables', { credentials: 'same-origin' })
         .then(r => r.ok ? r.json() : null)
         .then(data => {
@@ -208,6 +284,16 @@
             // 1. Отправляем файл — сервер ставит задачу в очередь и сразу возвращает jobId.
             const form = new FormData();
             form.append('file', selectedFile);
+            document.querySelectorAll('.cat-cb:checked').forEach(cb => form.append('categories', cb.value));
+
+            // Привязка к событию: либо id существующего, либо имя нового.
+            const evVal = eventSelect.value;
+            if (evVal === '__new__') {
+                const name = eventNewName.value.trim();
+                if (name) form.append('newEventName', name);
+            } else if (evVal) {
+                form.append('eventId', evVal);
+            }
             const res = await fetch('/api/admin/import', { method: 'POST', credentials: 'same-origin', headers: { 'X-XSRF-TOKEN': _csrfToken }, body: form });
             const queued = await res.json();
             if (!res.ok) throw new Error(queued.error || `HTTP ${res.status}`);
@@ -218,6 +304,14 @@
             // 2. Поллим статус до завершения.
             const data = await pollJobStatus(jobId);
             showImportResult(data);
+            // Обновляем список событий (могло появиться новое / вырасти число дней)
+            // и сбрасываем выбор «создать новое», чтобы следующий день можно было привязать к нему.
+            loadEvents();
+            if (eventSelect.value === '__new__') {
+                eventNewName.value = '';
+                eventNewName.classList.add('hidden');
+                eventSelect.value = '';
+            }
         } catch (e) {
             showImportError(e.message);
         } finally {
@@ -316,6 +410,7 @@
             clearStats.innerHTML = [
                 clearStatCard('Results', d.results, '#ef5350'),
                 clearStatCard('Competitions', d.competitions, '#ffa726'),
+                clearStatCard('Events', d.competitionEvents, '#ffa726'),
                 clearStatCard('Clubs', d.clubs, '#ffa726'),
                 clearStatCard('Swimmers', d.swimmers, '#ffa726'),
                 clearStatCard('Countries', d.countries, '#ffa726'),

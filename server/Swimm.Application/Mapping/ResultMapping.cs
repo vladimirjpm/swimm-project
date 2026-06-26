@@ -20,6 +20,10 @@ public static class ResultMapping
         IsAward = r.Competition.IsAward,
         AgeGroup = r.AgeGroup,
         Date = r.Competition.Date,
+        EventId = r.Competition.EventId,
+        EventName = r.Competition.Event != null ? r.Competition.Event.Name : null,
+        DayNumber = r.Competition.DayNumber,
+        SubName = r.Competition.SubName,
         // Event ОТЛОЖЕН: в БД не хранится — остаётся пустым (см. ResultDto.Event).
         StyleName = r.Style.Name,
         Distance = r.Distance,
