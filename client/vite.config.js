@@ -24,6 +24,15 @@ export default defineConfig(({ command }) => ({
   // In production builds we use relative paths so the same dist works on Azure and GH Pages.
   base: command === 'serve' ? '/' : './',
   plugins: [react(), tailwindcss(), swimmProjectPrefixRewrite()],
+  // Dev-прокси на API (Swimm.API, http://localhost:5078): относительные запросы клиента
+  // (/api/*, /auth/*) уходят на бэкенд как same-origin — куки и antiforgery работают без CORS.
+  // В проде клиент раздаётся самим API (wwwroot), поэтому те же относительные пути валидны.
+  server: {
+    proxy: {
+      '/api': { target: 'http://localhost:5078', changeOrigin: true },
+      '/auth': { target: 'http://localhost:5078', changeOrigin: true },
+    },
+  },
   build: {
     outDir: 'dist',
     rollupOptions: {

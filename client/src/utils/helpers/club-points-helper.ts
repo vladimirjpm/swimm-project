@@ -42,10 +42,11 @@ export default class ClubPointsHelper {
 
     this.configPromise = (async () => {
       try {
-        const baseUrl = import.meta.env.BASE_URL || '/';
-        const url = `${baseUrl}data/config/club-points-config.json`;
+        // Источник правил очков — сервер (БД), а не статический JSON.
+        // В деве идёт через Vite-прокси /api → http://localhost:5078; в проде — same-origin.
+        const url = `/api/club-points`;
         const response = await fetch(url);
-        
+
         if (!response.ok) {
           throw new Error(`Failed to load club points config: ${response.status}`);
         }
