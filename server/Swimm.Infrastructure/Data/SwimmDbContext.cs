@@ -27,6 +27,10 @@ public class SwimmDbContext : DbContext
     public DbSet<Style> Styles => Set<Style>();
     public DbSet<Country> Countries => Set<Country>();
 
+    /* === Категории соревнований === */
+    public DbSet<Category> Categories => Set<Category>();
+    public DbSet<CategoryCompetition> CategoryCompetitions => Set<CategoryCompetition>();
+
     /* === Клубные очки === */
     public DbSet<ClubPointsRule> ClubPointsRules => Set<ClubPointsRule>();
     public DbSet<ClubPointsRuleEntry> ClubPointsRuleEntries => Set<ClubPointsRuleEntry>();
@@ -109,6 +113,36 @@ public class SwimmDbContext : DbContext
                 new Style { Id = 6, Name = "medley_relay" },
                 new Style { Id = 7, Name = "free_relay" }
             );
+        });
+
+        // --- Категории соревнований ---
+
+        modelBuilder.Entity<Category>(entity =>
+        {
+            entity.ToTable("Categories");
+            entity.HasIndex(e => e.Key).IsUnique();
+
+            entity.HasData(
+                new Category { Id = 1, Key = "results-main",       Name = "Main Results", DisplayOrder = 1 },
+                new Category { Id = 2, Key = "results-masters",    Name = "Masters",      DisplayOrder = 2 },
+                new Category { Id = 3, Key = "results-youth-team", Name = "Youth Team",   DisplayOrder = 3 }
+            );
+        });
+
+        modelBuilder.Entity<CategoryCompetition>(entity =>
+        {
+            entity.ToTable("CategoryCompetitions");
+            entity.HasIndex(e => new { e.CategoryId, e.CompetitionId }).IsUnique();
+
+            entity.HasOne(e => e.Category)
+                .WithMany(c => c.Competitions)
+                .HasForeignKey(e => e.CategoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Competition)
+                .WithMany()
+                .HasForeignKey(e => e.CompetitionId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // --- Правила клубных очков ---

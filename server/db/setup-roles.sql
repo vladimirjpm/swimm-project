@@ -68,7 +68,9 @@ GRANT SELECT ON
     "Countries",
     "Results",
     "ClubPointsRules",
-    "ClubPointsRuleEntries"
+    "ClubPointsRuleEntries",
+    "Categories",
+    "CategoryCompetitions"
 TO swimm_ro;
 
 -- NOTE: Sys_UserFavorites и Sys_UserMedia намеренно НЕ добавлены в этот грант.

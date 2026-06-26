@@ -31,4 +31,9 @@ public class Competition
   public bool IsMasters { get; set; }
 
   public bool IsAward { get; set; }
+
+  /// <summary>
+  /// Признак: отображать объединённую таблицу всех результатов (без разбивки по полу/возрасту).
+  /// </summary>
+  public bool ShowCombineAllResults { get; set; }
 }
