@@ -137,7 +137,8 @@ public class SwimmDbContext : DbContext
             entity.HasData(
                 new Category { Id = 1, Key = "results-main",       Name = "Main Results", DisplayOrder = 1 },
                 new Category { Id = 2, Key = "results-masters",    Name = "Masters",      DisplayOrder = 2 },
-                new Category { Id = 3, Key = "results-youth-team", Name = "Youth Team",   DisplayOrder = 3 }
+                new Category { Id = 3, Key = "results-youth-team",    Name = "Youth Results",  DisplayOrder = 3 },
+                new Category { Id = 4, Key = "results-junior-results", Name = "Junior Results", DisplayOrder = 4 }
             );
         });
 
