@@ -21,6 +21,8 @@ public class ResultsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetResults(
         [FromQuery] string? competition,
+        [FromQuery] int? eventId,
+        [FromQuery] int? competitionId,
         [FromQuery] string? name,
         [FromQuery] string? club,
         [FromQuery] string? styleName,
@@ -37,6 +39,8 @@ public class ResultsController : ControllerBase
         var filter = new ResultFilter
         {
             Competition = competition,
+            EventId = eventId,
+            CompetitionId = competitionId,
             Name = name,
             Club = club,
             StyleName = styleName,
@@ -62,4 +66,12 @@ public class ResultsController : ControllerBase
         if (result == null) return NotFound();
         return Ok(result);
     }
+
+    /// <summary>
+    /// Список источников для клиентского DDL: многодневные события (свёрнуты в одну запись) +
+    /// однодневные соревнования. Грузить результаты источника: /api/results?eventId= или ?competitionId=.
+    /// </summary>
+    [HttpGet("/api/competitions")]
+    public async Task<IActionResult> GetSources()
+        => Ok(await _results.GetSourcesAsync());
 }

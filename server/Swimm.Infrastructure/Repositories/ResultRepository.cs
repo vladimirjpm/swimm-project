@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -51,6 +52,12 @@ public class ResultRepository : IResultRepository
 
         if (filter.DateTo.HasValue)
             query = query.Where(r => r.CompetitionDate <= filter.DateTo.Value);
+
+        if (filter.EventId.HasValue)
+            query = query.Where(r => r.Competition.EventId == filter.EventId.Value);
+
+        if (filter.CompetitionId.HasValue)
+            query = query.Where(r => r.CompetitionId == filter.CompetitionId.Value);
 
         if (!string.IsNullOrWhiteSpace(filter.Competition))
             query = query.Where(r => r.Competition.Name.StartsWith(filter.Competition));
@@ -155,6 +162,101 @@ public class ResultRepository : IResultRepository
 
     private static string ResultsCacheKey(ResultFilter f, int page, int pageSize) =>
         $"results:{f.StyleName}:{f.Distance}:{f.Gender}:{f.PoolType}" +
-        $":{f.DateFrom:yyyyMMdd}:{f.DateTo:yyyyMMdd}:{f.Competition}:{f.Name}:{f.Club}" +
+        $":{f.DateFrom:yyyyMMdd}:{f.DateTo:yyyyMMdd}:{f.Competition}:{f.EventId}:{f.CompetitionId}:{f.Name}:{f.Club}" +
         $":{page}:{pageSize}";
+
+    public async Task<IReadOnlyList<CompetitionSourceDto>> GetSourcesAsync()
+    {
+        const string key = "competition-sources:all";
+        var cached = await _cache.GetAsync<IReadOnlyList<CompetitionSourceDto>>(key);
+        if (cached is not null)
+            return cached;
+
+        // Многодневные события — сворачиваем в одну запись, агрегируя по дням.
+        // Флаги по дням: masters/award — у ЛЮБОГО дня; show_combine — у ВСЕХ дней
+        // (как !Any(!combine), чтобы EF надёжно транслировал в SQL). Пустые события пропускаем.
+        var events = await _db.CompetitionEvents
+            .AsNoTracking()
+            .Where(e => _db.Competitions.Any(c => c.EventId == e.Id))
+            .Select(e => new
+            {
+                e.Id,
+                e.Name,
+                e.StartDate,
+                e.EndDate,
+                DayCount = _db.Competitions.Count(c => c.EventId == e.Id),
+                PoolType = _db.Competitions.Where(c => c.EventId == e.Id).Select(c => c.PoolType).FirstOrDefault(),
+                IsMasters = _db.Competitions.Any(c => c.EventId == e.Id && c.IsMasters),
+                IsAward = _db.Competitions.Any(c => c.EventId == e.Id && c.IsAward),
+                ShowCombine = !_db.Competitions.Any(c => c.EventId == e.Id && !c.ShowCombineAllResults),
+                ResultCount = _db.Results.Count(r => r.Competition.EventId == e.Id)
+            })
+            .ToListAsync();
+
+        // Однодневные соревнования (без события).
+        var singles = await _db.Competitions
+            .AsNoTracking()
+            .Where(c => c.EventId == null)
+            .Select(c => new
+            {
+                c.Id,
+                c.Name,
+                c.Date,
+                c.PoolType,
+                c.IsMasters,
+                c.IsAward,
+                c.ShowCombineAllResults,
+                ResultCount = _db.Results.Count(r => r.CompetitionId == c.Id)
+            })
+            .ToListAsync();
+
+        static string Fmt(DateOnly? d) => d?.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) ?? "";
+
+        var items = new List<(DateOnly Sort, CompetitionSourceDto Dto)>(events.Count + singles.Count);
+
+        foreach (var e in events)
+        {
+            items.Add((e.StartDate ?? DateOnly.MinValue, new CompetitionSourceDto
+            {
+                Kind = "event",
+                Id = e.Id,
+                Name = e.Name,
+                Date = Fmt(e.StartDate),
+                DateEnd = e.EndDate != e.StartDate ? Fmt(e.EndDate) : null,
+                PoolType = e.PoolType ?? "",
+                IsMasters = e.IsMasters,
+                IsAward = e.IsAward,
+                ShowCombineAllResults = e.ShowCombine,
+                DayCount = e.DayCount,
+                ResultCount = e.ResultCount
+            }));
+        }
+
+        foreach (var c in singles)
+        {
+            DateOnly.TryParseExact(c.Date, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d);
+            items.Add((d, new CompetitionSourceDto
+            {
+                Kind = "competition",
+                Id = c.Id,
+                Name = c.Name,
+                Date = c.Date,
+                PoolType = c.PoolType,
+                IsMasters = c.IsMasters,
+                IsAward = c.IsAward,
+                ShowCombineAllResults = c.ShowCombineAllResults,
+                DayCount = 1,
+                ResultCount = c.ResultCount
+            }));
+        }
+
+        var ordered = items
+            .OrderByDescending(x => x.Sort)
+            .ThenBy(x => x.Dto.Name)
+            .Select(x => x.Dto)
+            .ToList();
+
+        await _cache.SetAsync(key, (IReadOnlyList<CompetitionSourceDto>)ordered, TimeSpan.FromMinutes(5));
+        return ordered;
+    }
 }

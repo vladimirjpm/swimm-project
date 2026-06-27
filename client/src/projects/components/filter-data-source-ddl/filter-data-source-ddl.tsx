@@ -29,6 +29,75 @@ type Option = { value: string; label: string };
 const makeUrl = (file: string) =>
   `${import.meta.env.BASE_URL}data/${file}`;
 
+// Постраничная выгрузка результатов с серверного API (/api/results).
+// Поля ResultDto совпадают с клиентским Result — конвертация не нужна.
+// В dev работает через Vite-прокси /api → http://localhost:5078.
+const loadFromApi = async (
+  params: Record<string, string> = {},
+): Promise<Result[]> => {
+  const all: Result[] = [];
+  let page = 1;
+  const pageSize = 500; // максимум, отдаваемый сервером
+  for (;;) {
+    const qs = new URLSearchParams({
+      ...params,
+      page: String(page),
+      pageSize: String(pageSize),
+    });
+    const resp = await fetch(`/api/results?${qs}`, { credentials: 'same-origin' });
+    if (!resp.ok) throw new Error(`API /api/results вернул ${resp.status}`);
+    const json = await resp.json();
+    all.push(...((json.data ?? []) as Result[]));
+    if (!json.hasMore) break;
+    page += 1;
+  }
+  return all;
+};
+
+// Серверный источник — всегда доступен в дропдауне (мимо sources-config),
+// грузит все результаты из БД через API.
+const apiDataSource: DataSource = {
+  name: '🌐 Server (все результаты)',
+  file: 'api:all',
+  load: () => loadFromApi(),
+};
+
+// Элемент списка /api/competitions: событие (свёрнуто в одну запись) или однодневное соревнование.
+type CompetitionSource = {
+  kind: 'event' | 'competition';
+  id: number;
+  name: string;
+  date: string;
+  date_end?: string | null;
+  day_count: number;
+  result_count: number;
+};
+
+// Динамические источники из API: каждое многодневное событие = ОДНА строка в DDL.
+// Загрузка идёт по eventId (все дни) или competitionId (однодневное) — устойчиво к именам.
+const fetchApiSources = async (): Promise<DataSource[]> => {
+  try {
+    const resp = await fetch('/api/competitions', { credentials: 'same-origin' });
+    if (!resp.ok) return [];
+    const items = (await resp.json()) as CompetitionSource[];
+    return items.map((it) => {
+      const days = it.day_count > 1 ? ` (${it.day_count} дн.)` : '';
+      return {
+        name: `🌐 ${it.name}${days}`,
+        file: `api:${it.kind}:${it.id}`,
+        load: () =>
+          loadFromApi(
+            it.kind === 'event'
+              ? { eventId: String(it.id) }
+              : { competitionId: String(it.id) },
+          ),
+      };
+    });
+  } catch {
+    return [];
+  }
+};
+
 // All possible data sources (internal registry)
 const allDataSources: DataSource[] = [
   {
@@ -308,7 +377,8 @@ const DataSourceDDL: React.FC = () => {
         if (!resp.ok) {
           // If no config found, use all sources
           console.warn(`${configFile} not found, using all sources`);
-          setDataSources(allDataSources);
+          const apiSources = await fetchApiSources();
+          setDataSources([apiDataSource, ...apiSources, ...allDataSources]);
           setConfigLoaded(true);
           return;
         }
@@ -334,12 +404,16 @@ const DataSourceDDL: React.FC = () => {
         // Sort by config order
         const fileOrder = config.sources.map(s => s.file);
         filtered.sort((a, b) => fileOrder.indexOf(a.file!) - fileOrder.indexOf(b.file!));
-        
-        setDataSources(filtered);
+
+        // Серверные источники держим первыми, мимо config-фильтра:
+        // «все результаты» + по одной строке на событие/соревнование из /api/competitions.
+        const apiSources = await fetchApiSources();
+        setDataSources([apiDataSource, ...apiSources, ...filtered]);
         setConfigLoaded(true);
       } catch (e) {
         console.error('Error loading sources config', e);
-        setDataSources(allDataSources);
+        const apiSources = await fetchApiSources();
+        setDataSources([apiDataSource, ...apiSources, ...allDataSources]);
         setConfigLoaded(true);
       }
     };
@@ -462,13 +536,6 @@ const DataSourceDDL: React.FC = () => {
 
     const combinedName = picked.map((p) => p.name).join(' + ');
 
-    // Determine showCombineAllResults: true only if ALL selected sources have it enabled
-    const showCombine = picked.length > 0 && picked.every((p) => p.file && combineAllResultsMapRef.current[p.file]);
-
-    // Determine is_masters / is_award: true if ANY selected source has it enabled
-    const isMasters = picked.some((p) => p.file && mastersMapRef.current[p.file]);
-    const isAward = picked.some((p) => p.file && awardMapRef.current[p.file]);
-
     let datasets: Result[][];
     try {
       datasets = await Promise.all(picked.map((p) => p.load()));
@@ -478,6 +545,24 @@ const DataSourceDDL: React.FC = () => {
     }
 
     const combinedData: Result[] = datasets.flat();
+
+    // Флаги датасета. Для статики — из sources-config (per-file). Для API-источников
+    // конфиг-записи нет, поэтому берём флаги из самих результатов: ResultDto несёт
+    // is_masters / is_award / show_combine_all_results (per-competition, денормализовано).
+    const isApiPick = picked.some((p) => p.file?.startsWith('api:'));
+
+    // showCombineAllResults: статика — у ВСЕХ источников включён; API — у ВСЕХ результатов.
+    const showCombine = isApiPick
+      ? combinedData.length > 0 && combinedData.every((r) => r.show_combine_all_results === true)
+      : picked.length > 0 && picked.every((p) => p.file && combineAllResultsMapRef.current[p.file]);
+
+    // is_masters / is_award: статика — у ЛЮБОГО источника; API — у ЛЮБОГО результата.
+    const isMasters = isApiPick
+      ? combinedData.some((r) => r.is_masters === true)
+      : picked.some((p) => p.file && mastersMapRef.current[p.file]);
+    const isAward = isApiPick
+      ? combinedData.some((r) => r.is_award === true)
+      : picked.some((p) => p.file && awardMapRef.current[p.file]);
 
     const maxInfo = getMaxDateAndIso(combinedData);
     if (!maxInfo) {

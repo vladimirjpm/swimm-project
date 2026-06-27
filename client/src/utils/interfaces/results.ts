@@ -11,6 +11,8 @@ export interface ResultWrap {
     competition: string;
     is_masters?:boolean;
     is_award?:boolean;
+    /** per-competition: показывать объединённую таблицу (с серверного /api/results) */
+    show_combine_all_results?: boolean;
     age_group: string;
     date: string;
     /* многодневные соревнования (с серверного /api/results; на статике отсутствуют) */

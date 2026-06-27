@@ -23,6 +23,10 @@ public class ResultDto
     [JsonPropertyName("is_award")]
     public bool IsAward { get; set; }
 
+    /// <summary>Per-competition: показывать объединённую таблицу всех результатов.</summary>
+    [JsonPropertyName("show_combine_all_results")]
+    public bool ShowCombineAllResults { get; set; }
+
     [JsonPropertyName("age_group")]
     public string AgeGroup { get; set; } = string.Empty;
 
