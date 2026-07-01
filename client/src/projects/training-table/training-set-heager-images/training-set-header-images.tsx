@@ -59,7 +59,7 @@ const TrainingSetHeaderImages: React.FC<Props> = ({ trainingId, thumbClass }) =>
           <div className="relative max-w-[90%] max-h-[90%]">
             <button
               type="button"
-              className="absolute top-2 right-2 z-20 bg-white rounded-full p-1 shadow"
+              className="absolute top-2 right-2 z-20 bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] rounded-full p-1 shadow"
               onClick={() => setModalSrc(null)}
               aria-label="Close image"
             >

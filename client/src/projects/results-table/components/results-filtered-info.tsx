@@ -27,7 +27,7 @@ function ResultsFilteredInfo({
       <ul className="grid grid-cols-6 gap-2 mb-4 max-w-3xl mx-auto items-start">
         {/* Date */}
         <li className="flex flex-col items-center h-full">
-          <span className="text-xs text-gray-500 uppercase mb-1">Date</span>
+          <span className="text-xs text-[var(--theme-mode-text-muted)] uppercase mb-1">Date</span>
           <div className="flex-1 flex items-center justify-center">
             {showDate ? (
               <span className="text-lg font-semibold">All</span>
@@ -39,7 +39,7 @@ function ResultsFilteredInfo({
 
         {/* Club */}
         <li className="flex flex-col items-center h-full">
-          <span className="text-xs text-gray-500 uppercase mb-1">Club</span>
+          <span className="text-xs text-[var(--theme-mode-text-muted)] uppercase mb-1">Club</span>
           <div className="flex-1 flex items-center justify-center">
             {showClub ? (
               <span className="text-lg font-semibold">All</span>
@@ -51,12 +51,12 @@ function ResultsFilteredInfo({
 
         {/* Event - занимает 2 колонки, по центру */}
         <li className="col-span-2 flex flex-col items-center h-full">
-          <span className="text-xs text-gray-500 uppercase mb-1">Event</span>
+          <span className="text-xs text-[var(--theme-mode-text-muted)] uppercase mb-1">Event</span>
           <div className="flex-1 flex items-center justify-center max-w-[100px]">
             {showEvent ? (
               <span className="text-lg font-semibold">All</span>
             ) : (
-              firstResult?.event && (
+              firstResult?.event_style_name && (
                 <UI_SwimmStyleIcon
                   styleName={firstResult.event_style_name}
                   styleLen={firstResult.event_style_len}
@@ -70,7 +70,7 @@ function ResultsFilteredInfo({
 
         {/* Age */}
         <li className="flex flex-col items-center h-full">
-          <span className="text-xs text-gray-500 uppercase mb-1">Age</span>
+          <span className="text-xs text-[var(--theme-mode-text-muted)] uppercase mb-1">Age</span>
           <div className="flex-1 flex items-center justify-center">
             {showAge ? (
               <span className="text-lg font-semibold">All</span>
@@ -84,7 +84,7 @@ function ResultsFilteredInfo({
 
         {/* Pool */}
         <li className="flex flex-col items-center h-full">
-          <span className="text-xs text-gray-500 uppercase mb-1">Pool</span>
+          <span className="text-xs text-[var(--theme-mode-text-muted)] uppercase mb-1">Pool</span>
           <div className="flex-1 flex items-center justify-center">
             {showPoolType ? (
               <span className="text-lg font-semibold">All</span>

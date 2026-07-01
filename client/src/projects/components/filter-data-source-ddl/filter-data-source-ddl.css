@@ -1,1 +1,61 @@
-.dv-data-source{color:purple;}
+.dv-data-source {
+  color: var(--theme-mode-text);
+}
+
+/* Data-source DDL (react-select, classNamePrefix="ds") — mode-aware поверхности */
+.ds__control {
+  background-color: var(--theme-mode-surface) !important;
+  border-color: var(--theme-mode-border-input) !important;
+}
+
+.ds__control:hover {
+  border-color: var(--theme-accent) !important;
+}
+
+.ds__single-value,
+.ds__input-container,
+.ds__input {
+  color: var(--theme-mode-text) !important;
+}
+
+.ds__placeholder {
+  color: var(--theme-mode-text-muted) !important;
+}
+
+.ds__multi-value {
+  background-color: var(--theme-mode-input-bg) !important;
+}
+
+.ds__multi-value__label {
+  color: var(--theme-mode-text) !important;
+}
+
+.ds__menu {
+  background-color: var(--theme-mode-surface) !important;
+  border: 1px solid var(--theme-mode-border) !important;
+}
+
+.ds__option {
+  background-color: var(--theme-mode-surface) !important;
+  color: var(--theme-mode-text) !important;
+}
+
+.ds__option:hover,
+.ds__option--is-focused {
+  background-color: var(--theme-bg-active) !important;
+  color: var(--theme-text-active) !important;
+}
+
+.ds__option--is-selected {
+  background-color: var(--theme-primary) !important;
+  color: var(--theme-text-active) !important;
+}
+
+.ds__indicator-separator {
+  background-color: var(--theme-mode-border) !important;
+}
+
+.ds__dropdown-indicator,
+.ds__clear-indicator {
+  color: var(--theme-mode-text-muted) !important;
+}

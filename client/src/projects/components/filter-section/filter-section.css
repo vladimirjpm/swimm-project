@@ -1,12 +1,13 @@
 .dv-filter {
-  color: var(--theme-text-header);
-  background-color: var(--theme-bg-section);
+  color: var(--theme-mode-text);
+  background-color: var(--theme-mode-drawer-bg);
+  border: 1px solid var(--theme-mode-border-drawer);
 }
 
 /* Name DDL (react-select) - прозрачный фон как у Date DDL */
 .fname__control {
   background-color: transparent !important;
-  border-color: var(--theme-text-header) !important;
+  border-color: var(--theme-mode-border-input) !important;
 }
 
 .fname__control:hover {
@@ -14,26 +15,26 @@
 }
 
 .fname__single-value {
-  color: var(--theme-text-header) !important;
+  color: var(--theme-mode-text) !important;
 }
 
 .fname__placeholder {
-  color: var(--theme-text-muted) !important;
+  color: var(--theme-mode-text-muted) !important;
 }
 
 .fname__input-container,
 .fname__input {
-  color: var(--theme-text-header) !important;
+  color: var(--theme-mode-text) !important;
 }
 
 .fname__menu {
-  background-color: var(--theme-bg-btn) !important;
-  border: 1px solid var(--theme-border) !important;
+  background-color: var(--theme-mode-surface) !important;
+  border: 1px solid var(--theme-mode-border) !important;
 }
 
 .fname__option {
-  background-color: var(--theme-bg-btn) !important;
-  color: var(--theme-text-header) !important;
+  background-color: var(--theme-mode-surface) !important;
+  color: var(--theme-mode-text) !important;
 }
 
 .fname__option:hover,
@@ -48,15 +49,15 @@
 }
 
 .fname__indicator-separator {
-  background-color: var(--theme-border) !important;
+  background-color: var(--theme-mode-border) !important;
 }
 
 .fname__dropdown-indicator,
 .fname__clear-indicator {
-  color: var(--theme-text-muted) !important;
+  color: var(--theme-mode-text-muted) !important;
 }
 
 .fname__dropdown-indicator:hover,
 .fname__clear-indicator:hover {
-  color: var(--theme-text-header) !important;
+  color: var(--theme-mode-text) !important;
 }

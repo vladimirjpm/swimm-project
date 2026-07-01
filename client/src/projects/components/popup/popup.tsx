@@ -42,12 +42,12 @@ const Popup: React.FC = () => {
       onClick={close} // закрытие по фону
     >
       <div
-        className="bg-white rounded-2xl p-6 w-[min(92vw,1200px)] max-h-[90vh] overflow-y-auto shadow-lg relative"
+        className="bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] rounded-2xl p-6 w-[min(92vw,1200px)] max-h-[90vh] overflow-y-auto shadow-lg relative"
         onClick={(e) => e.stopPropagation()} // не закрывать при клике внутри
       >
         <button
           onClick={close}
-          className="absolute top-3 right-3 text-gray-500 hover:text-black"
+          className="absolute top-3 right-3 text-[var(--theme-mode-text-muted)] hover:text-[var(--theme-mode-text)]"
           aria-label="Close"
         >
           ✕

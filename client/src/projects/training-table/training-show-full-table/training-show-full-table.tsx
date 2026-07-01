@@ -203,7 +203,7 @@ function TrainingShowFullTable({
   header, // заголовок/шапку рендерит родитель
 }: TrainingShowFullTableProps) {
   if (!results?.length) {
-    return <div className="text-gray-500 italic">No data source selected.</div>;
+    return <div className="text-[var(--theme-mode-text-muted)] italic">No data source selected.</div>;
   }
 
   // Построить пивот-таблицы по trainingId
@@ -283,7 +283,7 @@ function TrainingShowFullTable({
               <tr>
                 {/* sticky первая ячейка шапки */}
                 <th
-                  className="px-2 py-1 border text-left bg-white sticky z-30"
+                  className="px-2 py-1 border text-left bg-[var(--theme-mode-surface-alt)] sticky z-30"
                   style={{ left: 0, width: '13rem' }} // ~ w-52
                 >
                   Set • Rep • Style • V
@@ -291,7 +291,7 @@ function TrainingShowFullTable({
                 {b.swimmers.map((name) => (
                   <th
                     key={name}
-                    className="px-2 py-1 border text-left cursor-pointer duration-150 hover:bg-blue-100 hover:text-blue-700 bg-white"
+                    className="px-2 py-1 border text-left cursor-pointer duration-150 bg-[var(--theme-mode-surface-alt)] hover:bg-[var(--theme-bg-active)] hover:text-[var(--theme-text-active)]"
                     onClick={() =>
                       updateFilter({ selected_name: b.nameMap?.[name] || name })
                     }
@@ -307,7 +307,7 @@ function TrainingShowFullTable({
                 <tr key={`${row.set}-${row.order}`}>
                   {/* sticky первая колонка */}
                   <td
-                    className="px-2 py-1 border text-left bg-white sticky z-20"
+                    className="px-2 py-1 border text-left bg-[var(--theme-mode-surface-alt)] sticky z-20"
                     style={{ left: 0, width: '13rem' }} // ~ w-52
                   >
                     {fmtRowLabel(
@@ -325,7 +325,7 @@ function TrainingShowFullTable({
                   {b.swimmers.map((name) => {
                     const cell = row.cells[name];
                     return (
-                      <td key={name} className="align-top px-2 py-1 border bg-white">
+                      <td key={name} className="align-top px-2 py-1 border bg-[var(--theme-mode-surface)]">
                         {cell ? (
                           <div className="flex flex-col leading-tight items-start gap-1">
                             <div className="text-xl font-semibold">{cell.time}</div>
@@ -351,7 +351,7 @@ function TrainingShowFullTable({
                             )}
                           </div>
                         ) : (
-                          <span className="text-gray-300">—</span>
+                          <span className="text-[var(--theme-mode-text-muted)]">—</span>
                         )}
                       </td>
                     );
@@ -365,7 +365,7 @@ function TrainingShowFullTable({
     ))}
 
     {!blocks.length && (
-      <div className="text-gray-500 italic">Нет результатов по текущим фильтрам.</div>
+      <div className="text-[var(--theme-mode-text-muted)] italic">Нет результатов по текущим фильтрам.</div>
     )}
   </div>
 );

@@ -25,7 +25,7 @@ export default class HelperGender {
    * @returns Tailwind CSS класс фона
    */
   static getGenderBgClass(gender: string): string {
-    if (gender === 'none') return 'bg-gray-100';
-    return gender === 'female' ? 'bg-pink-100' : 'bg-blue-100';
+    if (gender === 'none') return 'bg-[var(--theme-mode-surface-alt)]';
+    return gender === 'female' ? 'bg-[var(--theme-mode-row-female)]' : 'bg-[var(--theme-mode-row-male)]';
   }
 }

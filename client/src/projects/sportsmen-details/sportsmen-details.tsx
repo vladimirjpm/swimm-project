@@ -21,7 +21,7 @@ function SportsmenDetails() {
   const isAwardSource = !!selectedSource?.is_award;
 
   if (!selectedSource || !selectedSource.results?.length) {
-    return <div className="text-gray-500 italic">No data source selected.</div>;
+    return <div className="text-[var(--theme-mode-text-muted)] italic">No data source selected.</div>;
   }
 
   // Применяем recalculation если включён флаг
@@ -47,7 +47,7 @@ function SportsmenDetails() {
     <div className="sportsmen-details sticky top-0">
       <div className="mb-4">
         <div className='section-top flex flex-col w-fit mx-auto'>
-          <div className='flex flex-row p-4 bg-gray-100'>
+          <div className='flex flex-row p-4' style={{ background: 'var(--theme-mode-hero-grad)' }}>
             <div className='section-left flex flex-col justify-between items-between'>
               <div className='lg:hidden'>
                <UI_FlagEmoji countryCode="il" size={'40x30'}  />
@@ -109,7 +109,7 @@ function SportsmenDetails() {
               </div>
              </div>
           </div>
-          <div className='px-4 py-2 bg-gray-400'>
+          <div className='px-4 py-2 bg-[var(--theme-mode-name-bar-bg)]'>
           <div className='text-3xl lg:text-5xl font-bold text-right text-white'>{filters.selected_name}</div>
           <div className='text-xl lg:text-2xl font-bold text-right text-white'>{firstResult.event_style_age} year <span className='text-xl'>({firstResult.birth_year})</span></div>
           </div>
@@ -158,12 +158,12 @@ function TopResultsTabs({ sortedBestResults, isMastersSource, isAwardSource }: {
   return (
     <div className="max-h-[40vh] overflow-y-auto border rounded shadow">
       {/* Табы */}
-      <div className="flex sticky top-0 z-10 bg-white">
+      <div className="flex sticky top-0 z-10 bg-[var(--theme-mode-surface)]">
         <button
           className={`px-4 py-2 rounded-t border-b-2 ${
             activeTab === 'training'
               ? 'bg-blue-500 text-white border-blue-500'
-              : 'bg-gray-100 text-gray-700 border-gray-300'
+              : 'bg-[var(--theme-mode-surface-alt)] text-[var(--theme-mode-text-secondary)] border-[var(--theme-mode-border)]'
           }`}
           onClick={() => setActiveTab('training')}
         >
@@ -173,7 +173,7 @@ function TopResultsTabs({ sortedBestResults, isMastersSource, isAwardSource }: {
           className={`px-4 py-2 rounded-t border-b-2 ml-1 ${
             activeTab === 'competition'
               ? 'bg-blue-500 text-white border-blue-500'
-              : 'bg-gray-100 text-gray-700 border-gray-300'
+              : 'bg-[var(--theme-mode-surface-alt)] text-[var(--theme-mode-text-secondary)] border-[var(--theme-mode-border)]'
           }`}
           onClick={() => setActiveTab('competition')}
         >
@@ -185,7 +185,7 @@ function TopResultsTabs({ sortedBestResults, isMastersSource, isAwardSource }: {
       {currentResults.length > 0 ? (
         <ResultsTable results={currentResults} isMastersSource={isMastersSource} isAwardSource={isAwardSource} />
       ) : (
-        <div className="text-gray-500 italic p-4">No {activeTab} results</div>
+        <div className="text-[var(--theme-mode-text-muted)] italic p-4">No {activeTab} results</div>
       )}
     </div>
   );
@@ -257,7 +257,7 @@ function ResultsTable({ results, isMastersSource, isAwardSource }: { results: an
                       normativeAgeGroup={levelInfo.normativeAgeGroup}
                     />
                   ) : (
-                    <span className="text-gray-400">—</span>
+                    <span className="text-[var(--theme-mode-text-muted)]">—</span>
                   )}
                   {res.time_split && (
                     <div className="text-sm mb-1">

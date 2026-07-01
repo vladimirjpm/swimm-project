@@ -103,7 +103,7 @@ const UI_ClubIcon: React.FC<UI_ClubIconProps> = ({
 
   if (styleType === 'icon-text-bottom') {
     return (
-      <div className={`dv-club-icon flex flex-col items-center space-y-1 text-gray-800 text-base  ${className}`}>
+      <div className={`dv-club-icon flex flex-col items-center space-y-1 text-[var(--theme-mode-text)] text-base  ${className}`}>
         {img}
         <span className="w-fit text-2xl truncate overflow-hidden">{clubName}</span>
       </div>
@@ -112,7 +112,7 @@ const UI_ClubIcon: React.FC<UI_ClubIconProps> = ({
 
   if (styleType === 'icon-text-right') {
     return (
-      <div className={`dv-club-icon flex flex-row items-center gap-2 text-gray-800 text-base w-${iconWidth} h-${iconWidth} ${className}`}>
+      <div className={`dv-club-icon flex flex-row items-center gap-2 text-[var(--theme-mode-text)] text-base w-${iconWidth} h-${iconWidth} ${className}`}>
         {img}
         <span className="w-fit text-2xl truncate overflow-hidden">{clubName}</span>
       </div>
@@ -120,7 +120,7 @@ const UI_ClubIcon: React.FC<UI_ClubIconProps> = ({
   }
 
   return (
-    <div className={`dv-club-icon h-auto flex items-center justify-center text-gray-900 w-${iconWidth} h-${iconWidth} ${className}`}>
+    <div className={`dv-club-icon h-auto flex items-center justify-center text-[var(--theme-mode-text)] w-${iconWidth} h-${iconWidth} ${className}`}>
       {img}
     </div>
   );

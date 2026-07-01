@@ -24,7 +24,7 @@ const UI_LevelProgress: React.FC<UI_LevelProgressProps> = ({
 
   progressLabel = 'Progress:',
   progressLabelClassName = 'text-sm',
-  nextTimeClassName = 'text-xs text-gray-600',
+  nextTimeClassName = 'text-xs text-[var(--theme-mode-text-secondary)]',
 }) => {
   const hasNextLevel =
     typeof nextTime === 'string' && nextTime.trim().length > 0;
@@ -48,7 +48,7 @@ const UI_LevelProgress: React.FC<UI_LevelProgressProps> = ({
         </div>
 
         {hasNextLevel && safeProgress !== null ? (
-          <div className="w-full bg-gray-200 rounded-full dark:bg-gray-700 mt-1">
+          <div className="w-full bg-[var(--theme-mode-border)] rounded-full mt-1">
             <div
               className="bg-blue-600 text-xs font-medium text-blue-100 text-center p-0.5 leading-none rounded-full"
               style={{ width: `${safeProgress}%` }}
@@ -61,7 +61,7 @@ const UI_LevelProgress: React.FC<UI_LevelProgressProps> = ({
             </div>
           </div>
         ) : (
-          <div className="text-xs text-gray-500 mt-1">
+          <div className="text-xs text-[var(--theme-mode-text-muted)] mt-1">
             Max level reached
           </div>
         )}
@@ -82,7 +82,7 @@ const UI_LevelProgress: React.FC<UI_LevelProgressProps> = ({
             <span
               className="inline-flex items-center justify-center
                          rounded-full
-                         bg-gray-100 text-blue-700
+                         bg-[var(--theme-mode-input-bg)] text-[var(--theme-mode-text)]
                          text-xs font-semibold
                          px-3 py-1
                          leading-none"
@@ -97,7 +97,7 @@ const UI_LevelProgress: React.FC<UI_LevelProgressProps> = ({
         )}
 
         {!hasNextLevel && (
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-[var(--theme-mode-text-muted)]">
             Max level
           </span>
         )}

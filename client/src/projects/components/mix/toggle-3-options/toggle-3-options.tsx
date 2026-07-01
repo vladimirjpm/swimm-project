@@ -37,7 +37,7 @@ const UI_Toggle3Options: React.FC<Toggle3OptionsProps> = ({
 
   return (
     <div className={`${containerClass} inline-block`}> 
-      <div className="relative rounded-full bg-gray-200 h-6 overflow-hidden">
+      <div className="relative rounded-full bg-[var(--theme-mode-input-bg)] h-6 overflow-hidden">
         {/* Hidden inputs for accessibility */}
         <input
           id={`${id}-no`}

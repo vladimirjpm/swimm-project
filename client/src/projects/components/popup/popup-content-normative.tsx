@@ -252,7 +252,7 @@ const PopupContentNormative: React.FC = () => {
       <h2 className="text-xl font-bold mb-2">
         Normative Info
         {isMastersBool && selectedAgeGroup && (
-          <span className="ml-2 text-base font-normal text-gray-600">
+          <span className="ml-2 text-base font-normal text-[var(--theme-mode-text-secondary)]">
             for age group <span className="font-semibold">{selectedAgeGroup}</span>
           </span>
         )}
@@ -267,7 +267,7 @@ const PopupContentNormative: React.FC = () => {
             className={`px-3 py-1 rounded border text-sm ${
               poolType === pt
                 ? 'bg-black text-white border-black'
-                : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50'
+                : 'bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] border-[var(--theme-mode-border)] hover:brightness-95'
             }`}
             aria-pressed={poolType === pt}
             title={pt === '25m_pool' ? '25m' : '50m'}
@@ -286,7 +286,7 @@ const PopupContentNormative: React.FC = () => {
             className={`flex items-center justify-center rounded-xl border p-1 transition shadow-sm ${
               stroke === s
                 ? 'ring-2 ring-blue-500 border-blue-500 bg-blue-50'
-                : 'border-gray-300 hover:bg-gray-50'
+                : 'border-[var(--theme-mode-border)] hover:brightness-95'
             }`}
             aria-pressed={stroke === s}
             title={strokeLabel[s]}
@@ -304,7 +304,7 @@ const PopupContentNormative: React.FC = () => {
       {/* Фильтр возрастных групп для masters */}
       {isMastersBool && availableAgeGroups.length > 0 && (
         <div className="mb-4">
-          <div className="text-sm text-gray-600 mb-2">Age Group:</div>
+          <div className="text-sm text-[var(--theme-mode-text-secondary)] mb-2">Age Group:</div>
           <div className="flex gap-2 flex-wrap">
             {availableAgeGroups.map((ag) => (
               <button
@@ -313,7 +313,7 @@ const PopupContentNormative: React.FC = () => {
                 className={`px-3 py-1 rounded border text-sm ${
                   selectedAgeGroup === ag
                     ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50'
+                    : 'bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] border-[var(--theme-mode-border)] hover:brightness-95'
                 }`}
                 aria-pressed={selectedAgeGroup === ag}
               >
@@ -324,7 +324,7 @@ const PopupContentNormative: React.FC = () => {
         </div>
       )}
 
-      <p className="mb-4 text-sm text-gray-600">
+      <p className="mb-4 text-sm text-[var(--theme-mode-text-secondary)]">
         In each cell: <span className="font-semibold">top</span> —
         <span className="inline-block ml-1 rounded px-2 py-0.5 bg-blue-100 text-blue-900 font-semibold">Men</span>
         <span className="mx-2">(blue),</span>
@@ -333,8 +333,8 @@ const PopupContentNormative: React.FC = () => {
         <span className="mx-2">(pink).</span>
       </p>
 
-      <table className="min-w-full border border-gray-300 text-sm">
-        <thead className="bg-gray-100">
+      <table className="min-w-full border border-[var(--theme-mode-border)] text-sm">
+        <thead className="bg-[var(--theme-mode-surface-alt)]">
           <tr>
             <th className="border p-2 text-left">Distance</th>
 

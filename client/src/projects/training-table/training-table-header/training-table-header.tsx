@@ -24,7 +24,7 @@ export default function TrainingTableHeader({
     <div className={`${className ?? 'my-4 px-2'} `}>
 
       {/* Дата / Клуб */}
-      <div className="mb-2 text-sm text-gray-700 flex justify-between items-top relative">
+      <div className="mb-2 text-sm text-[var(--theme-mode-text-secondary)] flex justify-between items-top relative">
         <div className="flex flex-col space-y-1">
           {!showDate && firstResult?.date && (
             <div>

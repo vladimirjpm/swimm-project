@@ -11,6 +11,8 @@ import TrainingTable from '../training-table/training-table';
 import FilterTrainigSection from '../components/filter-trainig-section/filter-trainig-section';
 import DataSourceDDL from '../components/filter-data-source-ddl/filter-data-source-ddl';
 import { useTheme } from '../../hooks/useTheme';
+import { useMode } from '../../hooks/useMode';
+import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 
 // === Вспомогательная функция ===
 function checkIsTraining(selectedSource: any, filters: any) {
@@ -67,7 +69,7 @@ function MobileSourceDrawer({
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center justify-between border-b bg-white/95 backdrop-blur px-3 py-1 text-xs font-medium text-gray-700"
+        className="w-full flex items-center justify-between border-b border-[var(--theme-mode-border)] bg-[var(--theme-mode-surface)] backdrop-blur px-3 py-1 text-xs font-medium text-[var(--theme-mode-text-secondary)]"
         style={{ minHeight: 'var(--mobile-topbar-h)' }}
         aria-expanded={open}
         aria-controls="mobile-source-panel"
@@ -78,7 +80,7 @@ function MobileSourceDrawer({
 
       <div
         id="mobile-source-panel"
-        className={`overflow-hidden1 transition-all duration-300 ease-out bg-white border-b shadow-sm ${
+        className={`overflow-hidden1 transition-all duration-300 ease-out bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] border-b border-[var(--theme-mode-border)] shadow-sm ${
           open ? 'max-h-[70vh] p-3' : 'max-h-0 p-0'
         }`}
       >
@@ -127,7 +129,7 @@ function MobileFiltersDrawer({
 
       {/* сама панель — от самого верха до низа */}
       <div
-        className={`fixed inset-0 z-[100] bg-white shadow-2xl transition-transform duration-300 ease-out
+        className={`fixed inset-0 z-[100] bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] shadow-2xl transition-transform duration-300 ease-out
         ${open ? 'translate-y-0' : 'translate-y-full'}`}
         aria-hidden={!open}
       >
@@ -151,6 +153,8 @@ function ResultsMain() {
 
   // Активируем тему на уровне главного компонента
   useTheme();
+  // Активируем ось режима Light/Dark (data-mode на <html>)
+  useMode();
 
   const { isTraining } = checkIsTraining(selectedSource, filters);
 
@@ -178,7 +182,10 @@ function ResultsMain() {
   );
 
   return (
-    <div className="dolphine-training md:p-4 pt-safe pb-safe">
+    <div className="dolphine-training md:p-4 pt-safe pb-safe min-h-screen bg-[var(--theme-mode-page-bg)]">
+      {/* Переключатель Light/Dark (fixed внизу-справа) */}
+      <UI_ModeToggle />
+
       {/* Мобильная верхняя шторка (DDL источника) */}
       <MobileSourceDrawer rowsCount={rowsCount}>
         <DataSourceDDL />
@@ -212,18 +219,18 @@ function ResultsMain() {
 
             {/* Центральная колонка — результаты */}
             {!isTraining && (
-              <div className="results-table w-full lg:w-6/12 theme-bg-section rounded shadow">
+              <div className="results-table w-full lg:w-6/12 bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] rounded shadow">
                 <ResultsTable />
               </div>
             )}
             {isTraining && (
-              <div className="w-full lg:w-6/12 theme-bg-section p-0 md:p-4 rounded shadow">
+              <div className="w-full lg:w-6/12 bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] p-0 md:p-4 rounded shadow">
                 <TrainingTable />
               </div>
             )}
 
             {/* Правая колонка — детали спортсмена (только десктоп) */}
-            <section className="section-sportsmen-details hidden lg:block w-full lg:w-4/12 theme-bg-section rounded shadow relative">
+            <section className="section-sportsmen-details hidden lg:block w-full lg:w-4/12 bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] rounded shadow relative">
               {filters?.selected_name && filters.selected_name !== 'all' && (
                 <SportsmenDetails />
               )}

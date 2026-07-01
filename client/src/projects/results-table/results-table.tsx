@@ -36,7 +36,7 @@ function ResultsTable() {
   } = useFavorites();
 
   if (!selectedSource || !selectedSource.results?.length) {
-    return <div className="text-gray-500 italic">No data source selected.</div>;
+    return <div className="text-[var(--theme-mode-text-muted)] italic">No data source selected.</div>;
   }
 
   // Пересчёт позиций (если включён is_recalculated) — ДО фильтрации
@@ -266,9 +266,9 @@ function ResultsTable() {
           />
         )}
         
-        <div className="max-h-[650px] overflow-y-auto border rounded shadow" >
+        <div className="max-h-[650px] overflow-y-auto border border-[var(--theme-mode-border)] rounded shadow" >
           {/* Unified header (single view for all sizes) */}
-          <div className="bg-gray-100 sticky top-0 z-10">
+          <div className="bg-[var(--theme-mode-surface-alt)] sticky top-0 z-10">
             <div className="hidden lg:grid 2xl:hidden">
               <ResultsHeader view="desktop" showClub={showClub} showEvent={showEvent} showDate={showDate} hasInternationalPoints={hasInternationalPoints} />
             </div>
@@ -395,7 +395,7 @@ function ResultsTable() {
             })}
 
             {displayResults.length === 0 && (
-              <li className="text-center text-gray-500 py-4">No results match the current filters.</li>
+              <li className="text-center text-[var(--theme-mode-text-muted)] py-4">No results match the current filters.</li>
             )}
           </ul>
         </div>

@@ -24,8 +24,8 @@ const FilterSection: React.FC = () => {
 
   if (!filterData) {
     return (
-      <div className="dv-filter-training p-4 bg-gray-100 rounded-lg">
-        <h2 className="text-lg font-bold mb-2 text-black">Training Filters</h2>
+      <div className="dv-filter-training p-4 bg-[var(--theme-mode-surface-alt)] rounded-lg">
+        <h2 className="text-lg font-bold mb-2 text-[var(--theme-mode-text)]">Training Filters</h2>
         <div className="text-sm text-red-600">
           filter_data is not loaded (check script / path)
         </div>
@@ -34,9 +34,9 @@ const FilterSection: React.FC = () => {
   }
 
   return (
-    <div className="dv-filter p-4 rounded-lg theme-bg-section">
+    <div className="dv-filter p-4 rounded-lg">
       {isDebug && (
-        <div className="text-sm text-gray-700 mb-2">
+        <div className="text-sm text-[var(--theme-mode-text-secondary)] mb-2">
           <strong>Active Filters: </strong>
           <code>
             {Object.entries(filters)

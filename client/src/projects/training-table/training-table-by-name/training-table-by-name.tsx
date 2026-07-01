@@ -26,7 +26,7 @@ function TrainingTableByName({
   header,
 }: TrainingTableByNameProps) {
   if (!results?.length) {
-    return <div className="text-gray-500 italic">No data source selected.</div>;
+    return <div className="text-[var(--theme-mode-text-muted)] italic">No data source selected.</div>;
   }
 
   // Группировка по имени
@@ -41,7 +41,7 @@ function TrainingTableByName({
     let lastDate: string | null = null;
     for (let gi = 0; gi < groupedResults.length; gi++) {
       const group = groupedResults[gi];
-      const altBg = gi % 2 === 0 ? 'bg-white' : 'bg-gray-100';
+      const altBg = gi % 2 === 0 ? 'bg-[var(--theme-mode-surface)]' : 'bg-[var(--theme-mode-surface-alt)]';
       const groupTrainingName = group?.items[0]?.training?.trainingName;
       const showHeader = !!group.date && group.date !== lastDate;
       if (showHeader) lastDate = group.date || null;
@@ -69,7 +69,7 @@ function TrainingTableByName({
               <span>
                 {group.title}&nbsp;
                 {group.items[0]?.event_style_age && (
-                  <span className="text-xs font-semibold text-gray-600">
+                  <span className="text-xs font-semibold text-[var(--theme-mode-text-secondary)]">
                     {group.items[0].event_style_age}
                   </span>
                 )}
@@ -143,7 +143,7 @@ function TrainingTableByName({
                       <span className="text-sm font-bold">{res.time}</span> →{' '}
                       <span className="text-xs">{levelInfo.nextTime}</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full mt-1">
+                    <div className="w-full bg-[var(--theme-mode-border)] rounded-full mt-1">
                       <div
                         className="bg-blue-600 text-xs font-medium text-blue-100 text-center p-0.5 leading-none rounded-full"
                         style={{ width: `${levelInfo.progressToNextLevel}%` }}
@@ -171,7 +171,7 @@ function TrainingTableByName({
       {/* ===== РЕНДЕР ГРУПП КАК <ul> ===== */}
       <div className="max-h-100- overflow-y-auto border1 rounded shadow">
         {groupedResults.length === 0 && (
-          <div className="text-center text-gray-500 py-4">No results match the current filters.</div>
+          <div className="text-center text-[var(--theme-mode-text-muted)] py-4">No results match the current filters.</div>
         )}
 
         {renderedGroups}

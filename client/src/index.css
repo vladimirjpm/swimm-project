@@ -1,6 +1,11 @@
 
 @import "tailwindcss";
 
+/* Tailwind v4: dark-вариант завязан на НАШ атрибут data-mode="dark" на <html>
+   (а не на системную prefers-color-scheme). Позволяет dark:*-утилитам слушать
+   ручной переключатель режима. См. useMode.ts / mode-toggle. */
+@custom-variant dark (&:where([data-mode="dark"], [data-mode="dark"] *));
+
 .table-caption{
   display: table-caption;
 }
@@ -43,6 +48,55 @@
 
   /* Настраиваемая затемняющая маска для фонового изображения */
   --body-bg-overlay: rgba(0, 0, 0, 0.75);
+}
+
+/* ========================================
+   ОСЬ РЕЖИМА: Light / Dark (data-mode на <html>)
+   Независима от data-theme (Training/Competition). data-mode меняет только
+   ПОВЕРХНОСТИ (фон, карточки, границы, текст); акцент по-прежнему из data-theme.
+   Значения — из design_handoff_theme_modes/README.md (таблица "New MODE variables").
+   Дефолт (:root) = light; :root[data-mode="dark"] переопределяет на тёмные.
+   ======================================== */
+:root {
+  --theme-mode-page-bg: #f5f5f7;        /* фон страницы */
+  --theme-mode-surface: #ffffff;        /* карточки, таблица, попапы */
+  --theme-mode-surface-alt: #fafbfd;    /* строка-заголовок таблицы */
+  --theme-mode-border: #eef1f6;         /* тонкие разделители */
+  --theme-mode-border-row: #f3f5f9;     /* разделители строк таблицы */
+  --theme-mode-border-drawer: #e0e8e3;  /* границы карточек фильтра */
+  --theme-mode-border-input: #d6e0da;   /* селекты, сегментные кнопки */
+  --theme-mode-text: #1a1a1a;           /* основной текст */
+  --theme-mode-text-secondary: #5b6470; /* вторичный текст (клубы, лейблы) */
+  --theme-mode-text-muted: #aab0bd;     /* приглушённые лейблы, шевроны */
+  --theme-mode-drawer-bg: #f0f5f2;      /* фон drawer/попапа фильтра */
+  --theme-mode-input-bg: #f7faf8;       /* селект-боксы, строки клубов */
+  --theme-mode-name-bar-bg: #8a93a3;    /* name-bar в деталях спортсмена */
+  --theme-mode-me-highlight: #fffdf6;   /* заливка "это я" (рамка золотая — отдельно) */
+  --theme-mode-hero-grad: linear-gradient(160deg, #dcebf7, #c4def0); /* hero-карточка деталей */
+  --theme-mode-avatar-bg: #bfe0f5;      /* фон кружка аватара */
+  --theme-mode-row-male: #dbeafe;       /* строка результата: муж. (≈ blue-100) */
+  --theme-mode-row-female: #fce7f3;     /* строка результата: жен. (≈ pink-100) */
+}
+
+:root[data-mode="dark"] {
+  --theme-mode-page-bg: #0f1319;
+  --theme-mode-surface: #1a1f28;
+  --theme-mode-surface-alt: #20262f;
+  --theme-mode-border: #2a313c;
+  --theme-mode-border-row: #242b35;
+  --theme-mode-border-drawer: #2a313c;
+  --theme-mode-border-input: #333c48;
+  --theme-mode-text: #eef1f6;
+  --theme-mode-text-secondary: #9aa4b2;
+  --theme-mode-text-muted: #6b7686;
+  --theme-mode-drawer-bg: #14181f;
+  --theme-mode-input-bg: #232a34;
+  --theme-mode-name-bar-bg: #242e3b;
+  --theme-mode-me-highlight: #241f16;
+  --theme-mode-hero-grad: linear-gradient(160deg, #223243 0%, #151d28 100%);
+  --theme-mode-avatar-bg: #2c3d52;
+  --theme-mode-row-male: #1a2634;       /* муж.: тёмный приглушённый синий */
+  --theme-mode-row-female: #2c1f2a;     /* жен.: тёмный приглушённый розовый */
 }
 
 /*body {
@@ -232,6 +286,24 @@
   --btn-training-text: #a7f3d0;
   --btn-competition-bg: #34d399;      /* emerald light */
   --btn-competition-text: #022c22;
+}
+
+/* ========================================
+   DARK × ACCENT: в тёмном режиме accent-ПОВЕРХНОСТИ (header/section/btn/границы/
+   текст) переводим на тёмные mode-значения — единообразно для всех data-theme,
+   чтобы не рисовать тёмный вариант каждой именованной темы. POP-акценты
+   (--theme-primary, --theme-bg-active, --theme-accent, --theme-text-active) НЕ
+   трогаем: активные кнопки и выделение остаются фирменного цвета.
+   Размещён ПОСЛЕ блоков тем — при равной специфичности выигрывает по порядку.
+   ======================================== */
+:root[data-mode="dark"] {
+  --theme-bg-header: var(--theme-mode-surface-alt);
+  --theme-bg-section: var(--theme-mode-surface);
+  --theme-bg-btn: var(--theme-mode-surface);
+  --theme-text-header: var(--theme-mode-text);
+  --theme-text-btn: var(--theme-mode-text);
+  --theme-text-muted: var(--theme-mode-text-muted);
+  --theme-border: var(--theme-mode-border);
 }
 
 /* Утилитарные классы для тем */

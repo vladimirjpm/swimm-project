@@ -31,7 +31,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
   onToggleFavorite,
   onTogglePrimary,
 }) => {
-  const genderBgClass = res.event_style_gender === 'female' ? 'bg-pink-100' : 'bg-blue-100';
+  const genderBgClass = res.event_style_gender === 'female' ? 'bg-[var(--theme-mode-row-female)]' : 'bg-[var(--theme-mode-row-male)]';
 
   const handleNameClick = () => {
     updateFilter({ selected_name: `${res.first_name}${res.last_name ? ' ' + res.last_name : ''}` });
@@ -43,7 +43,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
         <div className="flex flex-col items-center shrink-0">
           {res.position ? <UI_MedalIcon place={res.position.toString()} styleType={isAwardSource ? 'icon-place' : 'icon-noplace'} /> : <span className="text-lg font-bold">{index + 1}</span>}
           {(res as any).position_original != null && (res as any).position_original !== res.position && (
-            <div className="text-[10px] text-gray-400 mt-0.5 line-through"><UI_MedalIcon place={(res as any).position_original.toString()} styleSize='medal-16' styleType={isAwardSource ? 'icon-place' : 'icon-noplace'} /></div>
+            <div className="text-[10px] text-[var(--theme-mode-text-muted)] mt-0.5 line-through"><UI_MedalIcon place={(res as any).position_original.toString()} styleSize='medal-16' styleType={isAwardSource ? 'icon-place' : 'icon-noplace'} /></div>
           )}
           {showAge && <UI_AgeLabel age={res.event_style_age} isMasters={isMastersResult} ageGroup={res.age_group} />}
         </div>
@@ -58,6 +58,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
                   club={res.club}
                   isRelay={res.is_relay}
                   relaySwimmersList={res.relay_swimmers}
+                  relaySwimmersName={res.relay_swimmers_name}
                   onClick={handleNameClick}
                   firstLineClassName="text-xl font-bold truncate1 min-w-0"
                   secondLineClassName="text-sm mt-0.5"

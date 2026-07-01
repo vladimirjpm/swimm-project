@@ -16,7 +16,7 @@ function TrainingTable() {
   const filters = useAppSelector((state) => state.filterSelected);
 
   if (!selectedSource || !selectedSource.results?.length) {
-    return <div className="text-gray-500 italic">No data source selected.</div>;
+    return <div className="text-[var(--theme-mode-text-muted)] italic">No data source selected.</div>;
   }
 
   // ФИЛЬТРАЦИЯ остаётся здесь, чтобы переиспользовать в любых режимах

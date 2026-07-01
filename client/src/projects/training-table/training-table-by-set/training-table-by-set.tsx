@@ -26,7 +26,7 @@ function TrainingTableBySet({
   header,
 }: TrainingTableBySetProps) {
   if (!results?.length) {
-    return <div className="text-gray-500 italic">No data source selected.</div>;
+    return <div className="text-[var(--theme-mode-text-muted)] italic">No data source selected.</div>;
   }
 
   // Группировка по сетам
@@ -41,11 +41,11 @@ function TrainingTableBySet({
 
       <div className="max-h-100- overflow-y-auto border1 rounded shadow">
         {groupedResults.length === 0 && (
-          <div className="text-center text-gray-500 py-4">No results match the current filters.</div>
+          <div className="text-center text-[var(--theme-mode-text-muted)] py-4">No results match the current filters.</div>
         )}
 
         {groupedResults.map((group, gi) => {
-          const altBg = gi % 2 === 0 ? 'bg-white' : 'bg-gray-100';
+          const altBg = gi % 2 === 0 ? 'bg-[var(--theme-mode-surface)]' : 'bg-[var(--theme-mode-surface-alt)]';
           const groupSet = group?.items[0]?.training?.set;
           const groupOrder = group?.items[0]?.training?.order;
           const groupTrainingName = group?.items[0]?.training?.trainingName;
@@ -96,8 +96,8 @@ function TrainingTableBySet({
                         key={`divider-${i}`}
                         className="relative flex items-center justify-start my-2"
                       >
-                        <div className="w-full border-t border-gray-400 absolute top-1/2"></div>
-                        <span className="relative z-10 bg-white px-3 text-lg font-semibold">
+                        <div className="w-full border-t border-[var(--theme-mode-border)] absolute top-1/2"></div>
+                        <span className="relative z-10 bg-[var(--theme-mode-surface)] px-3 text-lg font-semibold">
                           Set {res.training?.set ?? '-'}.{res.training?.order ?? '-'}
                         </span>
                       </li>
@@ -169,7 +169,7 @@ function TrainingTableBySet({
                               <span className="text-sm font-bold">{res.time}</span> →{' '}
                               <span className="text-xs">{levelInfo.nextTime}</span>
                             </div>
-                            <div className="w-full bg-gray-200 rounded-full mt-1">
+                            <div className="w-full bg-[var(--theme-mode-border)] rounded-full mt-1">
                               <div
                                 className="bg-blue-600 text-xs font-medium text-blue-100 text-center p-0.5 leading-none rounded-full"
                                 style={{ width: `${levelInfo.progressToNextLevel}%` }}

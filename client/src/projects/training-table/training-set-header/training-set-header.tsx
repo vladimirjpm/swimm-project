@@ -33,7 +33,7 @@ export default function TrainingSetHeader({
   return (
     <div className={`${className ?? ''}`}>
       {/* ===== Шапка блока ===== */}
-      <div className="p-2 md:p-4 flex flex-col items-center justify-between mb-2 text-sm text-gray-700 bg-gray-400">
+      <div className="p-2 md:p-4 flex flex-col items-center justify-between mb-2 text-sm text-[var(--theme-mode-text)] bg-[var(--theme-mode-name-bar-bg)]">
         <div className='flex items-center justify-between w-full'>
         <div className="mb-4 text-3xl md:text-5xl effect-super-bold text-center">{trainingName}</div>
         <div className="flex items-center gap-2">
