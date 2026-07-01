@@ -26,3 +26,29 @@ export interface ResultsTableRowProps {
   onToggleFavorite?: (swimmerId: number) => void;
   onTogglePrimary?: (swimmerId: number) => void;
 }
+
+/** Флаги видимости колонок таблицы результатов. */
+export interface ResultsGridFlags {
+  showClub: boolean;
+  showEvent: boolean;
+  showPoolType: boolean;
+  showDate: boolean;
+  hasInternationalPoints: boolean;
+}
+
+/**
+ * Единый gridTemplateColumns для хедера И строк результатов — чтобы колонки
+ * (условные: club/style/date/pts) всегда были выровнены. Порядок:
+ * POS · SWIMMER · [CLUB] · [STYLE] · TIME · LEVEL · [DATE] · [PTS].
+ * Хедер и строки ОБЯЗАНЫ рендерить ячейки в этом же порядке с теми же условиями.
+ */
+export function buildResultsGridTemplate(f: ResultsGridFlags): string {
+  const cols: string[] = ['56px', 'minmax(0,1fr)']; // POS, SWIMMER
+  if (f.showClub) cols.push('auto');                 // CLUB
+  if (f.showEvent || f.showPoolType) cols.push('minmax(90px,auto)'); // STYLE
+  cols.push('auto');                                 // TIME
+  cols.push('88px');                                 // LEVEL (gauge)
+  if (f.showDate) cols.push('auto');                 // DATE
+  if (f.hasInternationalPoints) cols.push('62px');   // PTS
+  return cols.join(' ');
+}

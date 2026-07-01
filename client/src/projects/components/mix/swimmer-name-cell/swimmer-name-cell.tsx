@@ -58,25 +58,39 @@ const UI_SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
           ))}
         </div>
       );
-    } else {
-      subText = relaySwimmersName;
+    } else if (relaySwimmersName) {
+      relayList = (
+        <div className={secondLineClassName}>
+          {relaySwimmersName.split(',').map((name, i) => (
+            <div key={i}>{name.trim()}</div>
+          ))}
+        </div>
+      );
     }
   } else {
     subText = club;
   }
 
   return (
-    <div className={`${isRecordHolder ? 'glow-div' : ''} ${onClick ? 'cursor-pointer' : ''}`} onClick={onClick}>
-     <div className={`${isRecordHolder ? `${className} px-2 rounded-lg` : className}`}>
-      {isRecordHolder && <div className="text-xs font-semibold">Record Holder</div>}
-      <div className={`${firstLineClassName} overflow-hidden`}>{displayName}</div>
+    <div className={`${className} ${onClick ? 'cursor-pointer' : ''}`} onClick={onClick}>
+      <div className="flex items-center gap-2">
+        <div className={`${firstLineClassName} overflow-hidden`}>{displayName}</div>
+        {isRecordHolder && (
+          <span
+            title="Holds the record for this event"
+            className="flex-shrink-0 whitespace-nowrap rounded-lg border px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide"
+            style={{ color: '#b07d0a', borderColor: '#e8c66a', background: 'var(--theme-mode-surface)' }}
+          >
+            👑 RECORD
+          </span>
+        )}
+      </div>
       {relayList}
-      {subText && <div className={`flex items-center ${secondLineClassName}`}>        
+      {subText && <div className={`flex items-center ${secondLineClassName}`}>
           {showClubIcon && club && (
           <UI_ClubIcon clubName={club} className="pr-2 text-xs inline-block mt-0.5" iconWidth="10" styleType="icon-notext" />)}
         {subText}
       </div>}
-    </div>
     </div>
   );
 };

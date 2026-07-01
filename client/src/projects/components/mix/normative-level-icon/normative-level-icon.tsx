@@ -14,7 +14,20 @@ interface UI_NormativeLevelIconProps {
   normativeAgeGroup?: string | null;//masters age group key e.g. "25-29"
   isMasters?: boolean | null;//is masters normative
   disableClick?: boolean;//disable onClick popup
+  progressPercent?: number | null;//gauge fill: % to next level
+  nextTime?: string | null;//gauge tooltip: target time of next level
 }
+
+// Категория уровня → цвет дуги/метки (youth/adult/pro). Статус-цвета, фиксированы
+// в обоих режимах (как медали); трек дуги берёт mode-переменную.
+const CAT_COLORS = { youth: '#1b8a4b', adult: '#4f46e5', pro: '#ea580c', none: '#9aa4b2' } as const;
+const getLevelCategoryColor = (levelName: string): string => {
+  const n = (levelName || '').toLowerCase();
+  if (n.includes('youth')) return CAT_COLORS.youth;
+  if (n.includes('adult')) return CAT_COLORS.adult;
+  if (n === 'kms' || n === 'ms' || n === 'msmk') return CAT_COLORS.pro;
+  return CAT_COLORS.none;
+};
 
 const getMedalClassAndLabel = (levelName: string): { label: string; className: string } => {
   switch (levelName) {
@@ -52,6 +65,8 @@ const UI_NormativeLevelIcon: React.FC<UI_NormativeLevelIconProps> = ({
   normativeAgeGroup,
   isMasters,
   disableClick = false,
+  progressPercent,
+  nextTime,
 }) => {
   const dispatch = useAppDispatch();
   const handleNormativeClick = () => {
@@ -64,6 +79,66 @@ const UI_NormativeLevelIcon: React.FC<UI_NormativeLevelIconProps> = ({
       })
     );
   };
+
+  if (styleType === 'gauge') {
+    const { label } = getMedalClassAndLabel(levelName);
+    const color = getLevelCategoryColor(levelName);
+    const ARC = 87.96; // длина полудуги r=28 (как в прототипе)
+    const pct =
+      typeof progressPercent === 'number' && Number.isFinite(progressPercent)
+        ? Math.min(100, Math.max(0, progressPercent))
+        : null;
+    // Заполнение: по проценту; если след. уровня нет (max) — дуга полная.
+    const offset = pct !== null ? ARC * (1 - pct / 100) : 0;
+
+    return (
+      <div
+        className={`dv-normative-level-icon group relative flex flex-col items-center ${disableClick ? '' : 'cursor-pointer'} ${className}`}
+        onClick={handleNormativeClick}
+      >
+        {pct !== null && nextTime && (
+          <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 hidden -translate-x-1/2 flex-col items-center gap-0.5 whitespace-nowrap rounded-lg bg-[#1f2733] px-2.5 py-1.5 shadow-lg group-hover:flex">
+            <span className="text-[13px] font-extrabold" style={{ color }}>
+              {Math.round(pct)}% to next
+            </span>
+            <span className="text-[11px] font-semibold text-[#c4cbd6] tabular-nums">
+              → next: {nextTime}
+            </span>
+          </div>
+        )}
+        <div className="relative w-[72px] h-[41px]">
+          <svg width="72" height="41" viewBox="0 0 72 41" className="block">
+            <path
+              d="M 8 38 A 28 28 0 0 1 64 38"
+              fill="none"
+              stroke="var(--theme-mode-border)"
+              strokeWidth="3.5"
+              strokeLinecap="round"
+            />
+            <path
+              d="M 8 38 A 28 28 0 0 1 64 38"
+              fill="none"
+              stroke={color}
+              strokeWidth="3.5"
+              strokeLinecap="round"
+              strokeDasharray={ARC}
+              strokeDashoffset={offset}
+            />
+          </svg>
+          <div className="absolute inset-x-0 bottom-px text-center">
+            <span className="text-[15px] font-extrabold" style={{ color }}>
+              {label}
+            </span>
+          </div>
+        </div>
+        {normativeAgeGroup && (
+          <div className="normative-age-group font-semibold text-[10px]" style={{ color }}>
+            {normativeAgeGroup}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (styleType === '') {
     return (

@@ -4,7 +4,6 @@ import UI_ClubIcon from '../../components/mix/club-icon/club-icon';
 import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
 import UI_PoolIcon from '../../components/mix/pool-icon/pool-icon';
 import UI_NormativeLevelIcon from '../../components/mix/normative-level-icon/normative-level-icon';
-import UI_LevelProgress from '../../components/mix/progress-level/level-progress';
 import UI_DateIcon from '../../components/mix/date-icon/date-icon';
 import UI_SwimmerNameCell from '../../components/mix/swimmer-name-cell/swimmer-name-cell';
 import UI_SwimmerTimeCell from '../../components/mix/swimmer-time-cell/swimmer-time-cell';
@@ -122,25 +121,18 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
         </div>
       )}
 
-      <div className="col-span-1">
+      <div className="col-span-1 flex justify-center">
         <UI_NormativeLevelIcon
           levelName={levelInfo.currentLevel}
-          styleType="style-1"
+          styleType="gauge"
           styleSize="size-2"
           styleName={res.event_style_name}
           styleLen={res.event_style_len}
           poolType={res.pool_type}
           isMasters={isMastersResult}
           normativeAgeGroup={levelInfo.normativeAgeGroup}
-        />
-      </div>
-
-      <div className="col-span-1">
-        <UI_LevelProgress
-          styleType="progress-bar"
-          currentTime={res.time}
-          nextTime={levelInfo.nextTime}
           progressPercent={levelInfo.progressToNextLevel}
+          nextTime={levelInfo.nextTime}
         />
       </div>
 

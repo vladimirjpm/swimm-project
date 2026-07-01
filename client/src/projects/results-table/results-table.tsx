@@ -270,13 +270,13 @@ function ResultsTable() {
           {/* Unified header (single view for all sizes) */}
           <div className="bg-[var(--theme-mode-surface-alt)] sticky top-0 z-10">
             <div className="hidden lg:grid 2xl:hidden">
-              <ResultsHeader view="desktop" showClub={showClub} showEvent={showEvent} showDate={showDate} hasInternationalPoints={hasInternationalPoints} />
+              <ResultsHeader view="desktop" showClub={showClub} showEvent={showEvent} showPoolType={showPoolType} showDate={showDate} hasInternationalPoints={hasInternationalPoints} />
             </div>
             <div className="hidden 2xl:grid">
-              <ResultsHeader view="2xl" showClub={showClub} showEvent={showEvent} showDate={showDate} hasInternationalPoints={hasInternationalPoints} />
+              <ResultsHeader view="2xl" showClub={showClub} showEvent={showEvent} showPoolType={showPoolType} showDate={showDate} hasInternationalPoints={hasInternationalPoints} />
             </div>
             <div className="lg:hidden">
-              <ResultsHeader view="mobile" showClub={showClub} showEvent={showEvent} showDate={showDate} hasInternationalPoints={hasInternationalPoints} />
+              <ResultsHeader view="mobile" showClub={showClub} showEvent={showEvent} showPoolType={showPoolType} showDate={showDate} hasInternationalPoints={hasInternationalPoints} />
             </div>
           </div>
           <ul className="divide-y">

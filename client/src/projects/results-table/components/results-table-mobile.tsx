@@ -3,7 +3,6 @@ import UI_MedalIcon from '../../components/mix/medal-icon/medal-icon';
 import UI_ClubIcon from '../../components/mix/club-icon/club-icon';
 import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
 import UI_PoolIcon from '../../components/mix/pool-icon/pool-icon';
-import UI_LevelProgress from '../../components/mix/progress-level/level-progress';
 import UI_NormativeLevelIcon from '../../components/mix/normative-level-icon/normative-level-icon';
 import UI_SwimmerNameCell from '../../components/mix/swimmer-name-cell/swimmer-name-cell';
 import UI_SwimmerGallery from '../../components/mix/swimmer-gallery/swimmer-gallery';
@@ -118,31 +117,30 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
           <div className="w-full flex items-start gap-3 mb-2">
             <div className="flex flex-col items-start basis-2/3 gap-1 min-w-0">
               {hasInternationalPoints && (
-                <div className="text-left text-sm">Points: {res.international_points ?? ''}</div>
+                <div className="text-left text-sm">
+                  <span className="font-extrabold">{res.international_points ?? ''}</span>
+                  <span className="text-[9px] font-bold tracking-wide text-[var(--theme-mode-text-muted)] ml-1">PTS</span>
+                </div>
               )}
               {showDate && (
                 <div className="text-left text-sm">
                   Date: <span className="font-semibold">{res.date}</span>
                 </div>
               )}
-              <UI_LevelProgress
-                styleType="text-only"
-                currentTime={res.time}
-                nextTime={levelInfo.nextTime}
-                progressPercent={levelInfo.progressToNextLevel}
-              />
             </div>
 
             <div className="flex justify-center basis-1/3">
               <UI_NormativeLevelIcon
                 levelName={levelInfo.currentLevel}
-                styleType="style-1"
+                styleType="gauge"
                 styleSize="size-1"
                 styleName={res.event_style_name}
                 styleLen={res.event_style_len}
                 poolType={res.pool_type}
                 isMasters={isMastersResult}
                 normativeAgeGroup={levelInfo.normativeAgeGroup}
+                progressPercent={levelInfo.progressToNextLevel}
+                nextTime={levelInfo.nextTime}
               />
             </div>
           </div>
