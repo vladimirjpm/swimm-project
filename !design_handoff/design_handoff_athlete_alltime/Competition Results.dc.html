@@ -138,7 +138,7 @@
             <!-- SWIMMER -->
             <div style="min-width: 0;">
               <div style="display: flex; align-items: center; gap: 8px;">
-                <span onClick="{{ result.onOpen }}" style="font-weight: 700; font-size: 15px; color: {{ textPrimary }}; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" style-hover="color: {{ themeMain }};">{{ result.name }}</span>
+                <span onClick="{{ result.onOpen }}" style="font-weight: 700; font-size: 15px; color: {{ result.nameColor }}; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" style-hover="color: {{ themeMain }};">{{ result.name }}</span>
                 <sc-if value="{{ result.isMe }}" hint-placeholder-val="{{ false }}">
                   <span style="flex-shrink: 0; font-size: 9px; font-weight: 800; letter-spacing: 0.5px; color: #b8860b; background: #fdf3d6; padding: 2px 7px; border-radius: 8px;">★ ME</span>
                 </sc-if>
@@ -226,7 +226,7 @@
         <!-- Main info -->
         <div style="flex: 1; min-width: 0;">
           <div style="display: flex; align-items: center; gap: 8px; margin: 0 0 3px 0;">
-            <h3 onClick="{{ result.onOpen }}" style="font-size: 17px; font-weight: 700; color: {{ textPrimary }}; margin: 0; cursor: pointer;" style-hover="color: {{ themeMain }};">{{ result.name }}</h3>
+            <h3 onClick="{{ result.onOpen }}" style="font-size: 17px; font-weight: 700; color: {{ result.nameColor }}; margin: 0; cursor: pointer;" style-hover="color: {{ themeMain }};">{{ result.name }}</h3>
             <sc-if value="{{ result.isMe }}" hint-placeholder-val="{{ false }}">
               <span style="flex-shrink: 0; display: inline-flex; align-items: center; gap: 3px; font-size: 9px; font-weight: 800; letter-spacing: 0.5px; color: #b8860b; background: #fdf3d6; padding: 2px 7px; border-radius: 8px;">★ ME</span>
             </sc-if>
@@ -536,7 +536,45 @@
           </div>
         </div>
 
-        <!-- results section -->
+        <!-- scope switcher: this competition / all-time -->
+        <div style="padding: 14px 16px 0;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: {{ surface }}; border: 1px solid {{ borderDrawer }}; border-radius: 12px; padding: 4px;">
+            <sc-for list="{{ athleteScopes }}" as="sc" hint-placeholder-count="2">
+              <div onClick="{{ sc.onClick }}" style="text-align: center; padding: 7px 6px; border-radius: 9px; cursor: pointer; background: {{ sc.bg }}; transition: background 0.15s;">
+                <div style="font-size: 13px; font-weight: 800; color: {{ sc.color }};">{{ sc.label }}</div>
+                <div style="font-size: 10px; font-weight: 600; color: {{ sc.subColor }}; margin-top: 1px;">{{ sc.sub }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- scope banner -->
+        <div style="margin: 12px 16px 0; background: {{ scopeBannerGrad }}; border-radius: 14px; padding: 13px 16px; display: flex; justify-content: space-between; align-items: center;">
+          <sc-if value="{{ scopeComp }}" hint-placeholder-val="{{ true }}">
+            <div>
+              <div style="font-size: 24px; font-weight: 800; color: white; line-height: 1;">{{ scopePoints }}<span style="font-size: 12px; vertical-align: super;">pt</span></div>
+              <div style="font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.8); margin-top: 3px;">{{ scopeSub }}</div>
+            </div>
+            <div style="display: flex; gap: 5px;">
+              <div style="width: 28px; height: 28px; border-radius: 50%; background: radial-gradient(circle at 35% 30%,#ffe27a,#e0a615); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #6b4e00;">{{ scopeGold }}</div>
+              <div style="width: 28px; height: 28px; border-radius: 50%; background: radial-gradient(circle at 35% 30%,#f2f4f7,#b9c0cc); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #555;">{{ scopeSilver }}</div>
+              <div style="width: 28px; height: 28px; border-radius: 50%; background: radial-gradient(circle at 35% 30%,#f0c79a,#c1814a); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #5a3210;">{{ scopeBronze }}</div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ scopeAll }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <div style="font-size: 24px; font-weight: 800; color: white; line-height: 1;">{{ careerMeets }}</div>
+              <div style="font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.8); margin-top: 3px;">competitions</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 24px; font-weight: 800; color: white; line-height: 1;">{{ careerRaces }}</div>
+              <div style="font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.8); margin-top: 3px;">races</div>
+            </div>
+          </sc-if>
+        </div>
+
+        <!-- results section (this competition) -->
+        <sc-if value="{{ scopeComp }}" hint-placeholder-val="{{ true }}">
         <div style="padding: 16px 16px 20px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <div style="font-size: 15px; font-weight: 800; color: {{ themeMain }};">Top results by style</div>
@@ -571,6 +609,30 @@
             </div>
           </sc-for>
         </div>
+        </sc-if>
+
+        <!-- all-time section: best times by style -->
+        <sc-if value="{{ scopeAll }}" hint-placeholder-val="{{ false }}">
+        <div style="padding: 16px 16px 20px;">
+          <div style="font-size: 15px; font-weight: 800; color: {{ themeMain }}; margin-bottom: 12px;">Best times by style</div>
+          <sc-for list="{{ careerBests }}" as="b" hint-placeholder-count="4">
+            <div style="background: {{ surface }}; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; display: flex; gap: 12px; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+              <div style="width: 44px; height: 44px; border-radius: 12px; background: {{ themeLight }}; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;">
+                <div style="font-size: 14px; font-weight: 800; color: {{ themeMain }}; line-height: 1;">{{ b.distance }}</div>
+                <div style="font-size: 9px; font-weight: 700; color: {{ themeMain }}; opacity: 0.75; margin-top: 2px;">{{ b.strokeShort }}</div>
+              </div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 18px; font-weight: 800; color: {{ textPrimary }}; font-variant-numeric: tabular-nums;">{{ b.time }}</div>
+                <div style="font-size: 11px; font-weight: 600; color: {{ themeMain }}; margin-top: 2px;">{{ b.distance }}m {{ b.stroke }} · {{ b.pool }} pool</div>
+              </div>
+              <div style="text-align: right; flex-shrink: 0;">
+                <div style="font-size: 11px; color: {{ textSecondary }};">Points: <strong style="color: {{ textPrimary }};">{{ b.points }}</strong></div>
+                <div style="font-size: 10px; color: {{ textMuted }}; margin-top: 4px; max-width: 130px;">{{ b.competition }} · {{ b.date }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        </sc-if>
       </div>
     </div>
   </sc-if>
@@ -598,6 +660,14 @@
             </sc-for>
           </div>
         </div>
+        <div style="display: flex; flex-direction: column; gap: 7px;">
+          <div style="font-size: 10px; font-weight: 800; letter-spacing: 0.08em; color: #7d8794; text-transform: uppercase;">Gender <span style="font-weight: 600; text-transform: none; letter-spacing: 0; color: #5d6675;">· M / W indication</span></div>
+          <div style="display: flex; gap: 6px;">
+            <sc-for list="{{ genderIndOptions }}" as="g" hint-placeholder-count="3">
+              <div onClick="{{ g.onClick }}" style="{{ g.btnStyle }}">{{ g.label }}</div>
+            </sc-for>
+          </div>
+        </div>
         <div style="font-size: 10.5px; color: #5d6675; padding-top: 2px; line-height: 1.4;">Mode sets light/dark surfaces; context only tints the accent. Exploration only — the real switcher will live in Settings.</div>
       </div>
     </sc-if>
@@ -619,6 +689,7 @@ class Component extends DCLogic {
     compHost: 'Hapoel Dolphin Netanya',
     mode: 'light',        // light | dark  → base surfaces
     context: 'training',  // training | competition → accent tint
+    genderInd: 'name',    // off | name | row  → M/W indication
     themePickerOpen: false,
     // Filter values — "All" means not selected
     filterClub: 'All',
@@ -641,13 +712,15 @@ class Component extends DCLogic {
     primaryName: null,
     openSplits: {},
     athleteTab: 'training',
+    athleteScope: 'comp',
+    careers: null,
     isWide: (typeof window !== 'undefined' && window.innerWidth >= 900),
     results: [
-      { position: 1, name: 'Ernest Lutsenko', club: 'Maccabi Ocean Hadera', age: '16', time: '00:28.41', points: '343', percentage: 29, target: '26.85', distance: '50', stroke: 'Free', badgeColor: '#F5B800', timeSplit: '13.20;15.21' },
-      { position: 1, name: 'Daniel Cohen', club: 'Maccabi Netanya', age: '12', time: '00:31.65', points: '248', percentage: 57, target: '29.05', distance: '50', stroke: 'Free', badgeColor: '#F5B800' },
-      { position: 1, name: 'Noa Levi', club: 'Hapoel Galil', age: '12', time: '00:32.71', points: '339', percentage: 98, target: '32.55', distance: '50', stroke: 'Free', badgeColor: '#F5B800' },
-      { position: 2, name: 'Ben Shumi', club: 'SEALS Rishon', age: '11', time: '00:33.00', points: '219', percentage: 34, target: '29.05', distance: '50', stroke: 'Free', badgeColor: '#B8BCc4', timeSplit: '15.10;17.90' },
-      { position: 3, name: 'Sami Porat', club: 'Hapoel Bat Yam', age: '11', time: '00:33.08', points: '217', percentage: 33, target: '29.05', distance: '50', stroke: 'Free', badgeColor: '#CD7F32' }
+      { position: 1, name: 'Ernest Lutsenko', gender: 'M', club: 'Maccabi Ocean Hadera', age: '16', time: '00:28.41', points: '343', percentage: 29, target: '26.85', distance: '50', stroke: 'Free', badgeColor: '#F5B800', timeSplit: '13.20;15.21' },
+      { position: 1, name: 'Daniel Cohen', gender: 'M', club: 'Maccabi Netanya', age: '12', time: '00:31.65', points: '248', percentage: 57, target: '29.05', distance: '50', stroke: 'Free', badgeColor: '#F5B800' },
+      { position: 1, name: 'Noa Levi', gender: 'W', club: 'Hapoel Galil', age: '12', time: '00:32.71', points: '339', percentage: 98, target: '32.55', distance: '50', stroke: 'Free', badgeColor: '#F5B800' },
+      { position: 2, name: 'Ben Shumi', gender: 'M', club: 'SEALS Rishon', age: '11', time: '00:33.00', points: '219', percentage: 34, target: '29.05', distance: '50', stroke: 'Free', badgeColor: '#B8BCc4', timeSplit: '15.10;17.90' },
+      { position: 3, name: 'Sami Porat', gender: 'M', club: 'Hapoel Bat Yam', age: '11', time: '00:33.08', points: '217', percentage: 33, target: '29.05', distance: '50', stroke: 'Free', badgeColor: '#CD7F32' }
     ],
     // Athlete profile data, keyed by name
     athletes: {
@@ -677,6 +750,27 @@ class Component extends DCLogic {
     this._onResize();
     window.addEventListener('resize', this._onResize);
     this.loadResults();
+    this.loadCareers();
+  }
+
+  loadCareers() {
+    const apiUrl = 'http://localhost:5078/api/athletes/career-summary';
+    const fallbackUrl = './data/athlete-career-sample.json';
+    const apply = (data) => {
+      if (!data || typeof data !== 'object') return false;
+      this.setState({ careers: data });
+      return true;
+    };
+    fetch(apiUrl)
+      .then(r => r.json())
+      .then(data => { if (!apply(data)) throw new Error('empty'); })
+      .catch(() => {
+        // API not reachable — load bundled JSON copy
+        fetch(fallbackUrl)
+          .then(r => r.json())
+          .then(apply)
+          .catch(err => console.warn('No career data source:', err.message));
+      });
   }
 
   loadResults() {
@@ -717,7 +811,18 @@ class Component extends DCLogic {
     const sName = (d.event_style_name || '').toString().toLowerCase();
     const stroke = strokeMap[sName] || (sName ? sName.charAt(0).toUpperCase() + sName.slice(1) : '');
     const time = d.time_fail ? (d.time_fail_note || 'DNS') : (d.time || '—');
+    // derive gender: explicit field, else parse the event label (Hebrew בנות=girls/W, בנים=boys/M)
+    let gender = '';
+    const gsrc = (d.gender || d.sex || '').toString().toLowerCase();
+    if (['w', 'f', 'female', 'girl', 'girls'].includes(gsrc)) gender = 'W';
+    else if (['m', 'male', 'boy', 'boys'].includes(gsrc)) gender = 'M';
+    else {
+      const ev = (d.event || d.event_name || '').toString();
+      if (/בנות|נערות|נשים|בוגרות/.test(ev) || /\bgirls?\b|\bwomen\b/i.test(ev)) gender = 'W';
+      else if (/בנים|נערים|גברים|בוגרים/.test(ev) || /\bboys?\b|\bmen\b/i.test(ev)) gender = 'M';
+    }
     return {
+      gender,
       position: (d.position != null) ? d.position : '–',
       name,
       club,
@@ -765,17 +870,21 @@ class Component extends DCLogic {
   get palette() {
     const lightBase = {
       page: '#f5f5f7', surface: '#ffffff', surfaceAlt: '#fafbfd',
-      border: '#eef1f6', borderRow: '#f3f5f9', borderDrawer: '#e0e8e3', borderInput: '#d6e0da',
+      border: '#eef1f6', borderRow: '#f1f3f6', borderDrawer: '#e0e8e3', borderInput: '#d6e0da',
       text: '#1a1a1a', textSecondary: '#5b6470', textMuted: '#aab0bd',
       drawerBg: '#f0f5f2', inputBg: '#f7faf8', nameBarBg: '#8a93a3', meHighlight: '#fffdf6',
-      heroGrad: 'linear-gradient(160deg,#dcebf7,#c4def0)', avatarBg: '#bfe0f5'
+      heroGrad: 'linear-gradient(160deg,#dcebf7,#c4def0)', avatarBg: '#bfe0f5',
+      maleName: '#1d4ed8', femaleName: '#be185d',
+      maleRow: 'rgba(29,78,216,0.06)', femaleRow: 'rgba(190,24,93,0.06)'
     };
     const darkBase = {
       page: '#0f1319', surface: '#1a1f28', surfaceAlt: '#20262f',
-      border: '#2a313c', borderRow: '#242b35', borderDrawer: '#2a313c', borderInput: '#333c48',
+      border: '#2a313c', borderRow: '#2c343f', borderDrawer: '#2a313c', borderInput: '#333c48',
       text: '#eef1f6', textSecondary: '#9aa4b2', textMuted: '#6b7686',
       drawerBg: '#14181f', inputBg: '#232a34', nameBarBg: '#242e3b', meHighlight: '#241f16',
-      heroGrad: 'linear-gradient(160deg,#223243 0%,#151d28 100%)', avatarBg: '#2c3d52'
+      heroGrad: 'linear-gradient(160deg,#223243 0%,#151d28 100%)', avatarBg: '#2c3d52',
+      maleName: '#7cabff', femaleName: '#f483b4',
+      maleRow: 'rgba(124,171,255,0.10)', femaleRow: 'rgba(244,131,180,0.10)'
     };
     const accents = {
       training: {
@@ -822,7 +931,7 @@ class Component extends DCLogic {
     const a = this.state.athletes[r.name] || this.defaultAthlete(r);
     // pick first non-empty tab
     const tab = (a.training && a.training.length) ? 'training' : 'competition';
-    this.setState({ athleteOpen: true, athlete: a, athleteTab: tab });
+    this.setState({ athleteOpen: true, athlete: a, athleteTab: tab, athleteScope: 'comp' });
   };
 
   // ---- Filters ----
@@ -889,10 +998,10 @@ class Component extends DCLogic {
         toggleMe: (e) => { e.stopPropagation(); this.setState(s => ({ primaryName: s.primaryName === r.name ? null : r.name })); },
         progressTitle: (r.target && Number(r.percentage)) ? ('Level ' + (this.levelInfoByPoints(r.points).level) + '  ·  ' + r.percentage + '% to next level  ·  next: ' + r.target) : ('Level ' + this.levelInfoByPoints(r.points).level),
         rowStyle: 'display: grid; grid-template-columns: 26px 66px minmax(0,1fr) 150px 120px 96px 62px; gap: 14px; align-items: center; padding: 13px 24px; border-bottom: 1px solid ' + this.palette.borderRow + ';'
-          + (isMe ? ' border-left: 4px solid #f5b800; background: ' + this.palette.meHighlight + ';' : ' border-left: 4px solid transparent;'),
+          + (isMe ? ' border-left: 4px solid #f5b800; background: ' + this.palette.meHighlight + ';' : ' border-left: 4px solid transparent; background: ' + ((this.state.genderInd === 'row' && r.gender === 'M') ? this.palette.maleRow : (this.state.genderInd === 'row' && r.gender === 'W') ? this.palette.femaleRow : 'transparent') + ';'),
         cardStyle: isMe
           ? 'background: ' + this.palette.meHighlight + '; border-radius: 14px; padding: 18px 20px 18px 17px; margin-bottom: 14px; display: flex; gap: 16px; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.06); width: 100%; border-left: 4px solid #f5b800;'
-          : 'background: ' + this.palette.surface + '; border-radius: 14px; padding: 18px 20px; margin-bottom: 14px; display: flex; gap: 16px; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.06); width: 100%;',
+          : 'background: ' + ((this.state.genderInd === 'row' && r.gender === 'M') ? this.palette.maleRow : (this.state.genderInd === 'row' && r.gender === 'W') ? this.palette.femaleRow : this.palette.surface) + '; border-radius: 14px; padding: 18px 20px; margin-bottom: 14px; display: flex; gap: 16px; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.06); width: 100%;',
         onOpen: () => this.openAthlete(r),
         hasProgress: !!(r.target && Number(r.percentage)),
         levelArcLen: 87.96,
@@ -900,6 +1009,12 @@ class Component extends DCLogic {
         isRecordHolder,
         isRecordTime,
         timeColor: isRecordTime ? '#c8860a' : this.palette.text,
+        nameColor: (this.state.genderInd !== 'off' && r.gender === 'W') ? this.palette.femaleName
+          : (this.state.genderInd !== 'off' && r.gender === 'M') ? this.palette.maleName
+          : this.palette.text,
+        genderRowBg: (this.state.genderInd === 'row' && r.gender === 'M') ? this.palette.maleRow
+          : (this.state.genderInd === 'row' && r.gender === 'W') ? this.palette.femaleRow
+          : 'transparent',
         hasSplit: !!fmtSplit,
         fmtSplit,
         splitOpen: !!openSplits[i],
@@ -909,10 +1024,15 @@ class Component extends DCLogic {
     });
 
     const a = this.state.athlete || null;
+    const careers = this.state.careers || {};
+    const career = a ? (careers[a.name] || careers['_default'] || null) : null;
+    // hero (avatar/level/points/medals) always shows career totals
+    const heroOverride = career ? { points: String(career.totalPoints), gold: career.gold, silver: career.silver, bronze: career.bronze } : {};
     const aFav = a ? !!favorites[a.name] : false;
     const aMe = a ? primaryName === a.name : false;
     const athleteEnriched = a ? {
       ...a,
+      ...heroOverride,
       isFav: aFav,
       isMe: aMe,
       favFill: aFav ? '#e23b5a' : 'none',
@@ -939,6 +1059,32 @@ class Component extends DCLogic {
     }));
 
     const athleteResults = a ? (activeTab === 'training' ? a.training : a.competition) : [];
+
+    // ---- Athlete scope: this competition / all-time ----
+    const scope = this.state.athleteScope || 'comp';
+    const scopeAll = scope === 'all';
+    const athleteScopes = [
+      { key: 'comp', label: 'Hedera Meet', sub: 'Jun 2026' },
+      { key: 'all', label: 'All-time', sub: 'career stats' }
+    ].map(s => ({
+      ...s,
+      bg: s.key === scope ? this.palette.main : 'transparent',
+      color: s.key === scope ? '#fff' : this.palette.textSecondary,
+      subColor: s.key === scope ? 'rgba(255,255,255,0.8)' : this.palette.textMuted,
+      onClick: () => this.setState({ athleteScope: s.key })
+    }));
+    const scopePoints = (scopeAll && career) ? String(career.totalPoints) : (a ? String(a.points) : '—');
+    const scopeGold = (scopeAll && career) ? career.gold : (a ? a.gold : 0);
+    const scopeSilver = (scopeAll && career) ? career.silver : (a ? a.silver : 0);
+    const scopeBronze = (scopeAll && career) ? career.bronze : (a ? a.bronze : 0);
+    const scopeSub = scopeAll
+      ? (career ? ('total points · ' + career.competitions + ' meets · since ' + (career.since || '')) : 'career stats')
+      : 'this competition · Hedera · Jun 2026';
+    const strokeShortMap = { Free: 'FR', Back: 'BK', Breast: 'BR', Fly: 'FLY', Medley: 'IM' };
+    const careerBests = (career && career.bestByStyle) ? career.bestByStyle.map(b => ({
+      ...b,
+      strokeShort: strokeShortMap[b.stroke] || String(b.stroke).slice(0, 2).toUpperCase()
+    })) : [];
 
     // ---- Filter UI ----
     const st = this.state;
@@ -1018,6 +1164,14 @@ class Component extends DCLogic {
       { key: 'dark', label: 'Dark' }
     ].map(m => ({ ...m, active: curMode === m.key, onClick: () => this.setState({ mode: m.key }),
       btnStyle: btnStyle(curMode === m.key) }));
+    // Axis 3: GENDER indication (off / name / row).
+    const curGInd = ['off', 'name', 'row'].includes(st.genderInd) ? st.genderInd : 'name';
+    const genderIndOptions = [
+      { key: 'off', label: 'Off' },
+      { key: 'name', label: 'Name' },
+      { key: 'row', label: 'Row' }
+    ].map(g => ({ ...g, active: curGInd === g.key, onClick: () => this.setState({ genderInd: g.key }),
+      btnStyle: btnStyle(curGInd === g.key) }));
     // Axis 2: CONTEXT (training / competition) — only tints the accent.
     const curCtx = st.context === 'competition' ? 'competition' : 'training';
     const ctxAccent = { training: (curMode === 'dark' ? '#3ecb7f' : '#1b8a4b'), competition: (curMode === 'dark' ? '#4da3ff' : '#1565c0') };
@@ -1128,12 +1282,25 @@ class Component extends DCLogic {
       athlete: athleteEnriched,
       athleteTabs,
       athleteResults,
+      scopeComp: !scopeAll,
+      scopeAll,
+      athleteScopes,
+      scopeBannerGrad: this.palette.grad,
+      scopePoints,
+      scopeSub,
+      scopeGold,
+      scopeSilver,
+      scopeBronze,
+      careerBests,
+      careerMeets: career ? career.competitions : '—',
+      careerRaces: career ? (career.races ?? '—') : '—',
       closeAthlete: () => this.setState({ athleteOpen: false }),
       stopProp: (e) => e.stopPropagation(),
       themePickerOpen: st.themePickerOpen,
       toggleThemePicker: () => this.setState(s => ({ themePickerOpen: !s.themePickerOpen })),
       modeOptions,
-      contextOptions
+      contextOptions,
+      genderIndOptions
     };
   }
 }

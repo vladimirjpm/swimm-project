@@ -5,6 +5,7 @@ import {
   useAppSelector,
 } from '../../../store/store';
 import { TOP_N_POSITIONS } from '../../../utils/constants/filter-constants';
+import FilterCard from './filter-card';
 
 type PositionFilterValue = 'all' | 'top' | 'podium';
 
@@ -32,23 +33,27 @@ const FilterPositionButtons: React.FC = () => {
     );
   };
 
+  const currentLabel =
+    POSITION_OPTIONS.find((opt) => opt.value === current)?.label || 'All';
+
   return (
-    <div className="flex flex-col">
-      <h3 className="font-semibold">Position</h3>
-      <div className="flex flex-wrap">
+    <FilterCard
+      title="Position"
+      summary={currentLabel}
+      isActive={current !== 'all'}
+    >
+      <div className="flex flex-wrap gap-2">
         {POSITION_OPTIONS.map((opt) => (
           <button
             key={opt.value}
-            className={`px-2 py-1 m-1 border rounded transition-colors ${
-              current === opt.value ? 'theme-btn-active' : 'theme-btn'
-            }`}
+            className={`fseg ${current === opt.value ? 'fseg-active' : ''}`}
             onClick={() => updateFilter(opt.value)}
           >
             {opt.label}
           </button>
         ))}
       </div>
-    </div>
+    </FilterCard>
   );
 };
 

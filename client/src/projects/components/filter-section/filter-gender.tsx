@@ -5,6 +5,7 @@ import {
   useAppSelector,
 } from '../../../store/store';
 import { getFilterData } from './filter-types';
+import FilterCard from './filter-card';
 
 const FilterGender: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -21,23 +22,27 @@ const FilterGender: React.FC = () => {
     );
   };
 
+  const genderLabel = (gen: string) =>
+    gen === 'male' ? 'M' : gen === 'female' ? 'W' : 'All';
+
   return (
-    <div className="flex flex-col">
-      <h3 className="font-semibold">Gender</h3>
-      <div className="flex flex-wrap">
+    <FilterCard
+      title="Gender"
+      summary={genderLabel(filters.gender)}
+      isActive={filters.gender !== 'all'}
+    >
+      <div className="flex flex-wrap gap-2">
         {filterData.gender.map((gen) => (
           <button
             key={gen}
-            className={`px-3 py-1 m-1 border rounded transition-colors ${
-              filters.gender === gen ? 'theme-btn-active' : 'theme-btn'
-            }`}
+            className={`fseg ${filters.gender === gen ? 'fseg-active' : ''}`}
             onClick={() => updateFilter(gen)}
           >
-            {gen === 'male' ? 'M' : gen === 'female' ? 'W' : 'all'}
+            {genderLabel(gen)}
           </button>
         ))}
       </div>
-    </div>
+    </FilterCard>
   );
 };
 

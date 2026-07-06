@@ -38,11 +38,17 @@ const Popup: React.FC = () => {
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex justify-center items-center z-50"
+      className="fixed inset-0 flex justify-center items-center z-[130]"
+      style={{
+        background: 'var(--theme-mode-overlay)',
+        backdropFilter: 'blur(3px)',
+        WebkitBackdropFilter: 'blur(3px)',
+      }}
       onClick={close} // закрытие по фону
     >
       <div
-        className="bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] rounded-2xl p-6 w-[min(92vw,1200px)] max-h-[90vh] overflow-y-auto shadow-lg relative"
+        className="bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] rounded-2xl p-6 w-[min(92vw,1200px)] max-h-[90vh] overflow-y-auto relative border border-[var(--theme-mode-modal-border)]"
+        style={{ boxShadow: 'var(--theme-mode-modal-shadow)' }}
         onClick={(e) => e.stopPropagation()} // не закрывать при клике внутри
       >
         <button

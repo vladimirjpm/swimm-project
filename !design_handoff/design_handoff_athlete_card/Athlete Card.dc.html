@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  </style>
+</helmet>
+
+<div ref="{{ rootRef }}" style="min-height: 100vh; background: var(--c-page, #0f1319); display: flex; justify-content: center; align-items: flex-start; padding: 32px 16px; --c-page: #0f1319; --c-card: #161d29; --c-panel: #232b3a; --c-hero: linear-gradient(160deg, #1e2836, #161d29); --c-text: #ffffff; --c-text2: #d7dce4; --c-muted: #8a93a3; --c-line: #2c3546; --c-track: rgba(55,65,82,0.5); --c-accent: #2fbf71; --c-accent2: #1f9e5c; --c-shadow: rgba(0,0,0,0.35);">
+
+  <div style="width: 350px; background: var(--c-card, #161d29); border-radius: 22px; overflow: hidden; box-shadow: 0 16px 40px var(--c-shadow, rgba(0,0,0,0.35));" data-screen-label="Athlete card">
+
+    <!-- identity bar -->
+    <div style="position: relative; padding: 16px 18px 14px; display: flex; gap: 14px; align-items: center; background: var(--c-hero);">
+      <div style="position: relative; flex-shrink: 0;">
+        <img src="assets/athlete-photo.png" alt="athlete" style="width: 76px; height: 76px; border-radius: 50%; object-fit: cover; display: block; border: 3px solid var(--c-accent, #2fbf71);"/>
+        <img src="assets/flag-il.png" alt="Israel" style="position: absolute; bottom: -6px; right: -4px; height: 20px; border-radius: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.5);"/>
+      </div>
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
+        <div dir="rtl" style="font-size: 20px; font-weight: 800; color: var(--c-text, #ffffff); line-height: 1.1;">סבינה ברנצב</div>
+        <div style="font-size: 11px; font-weight: 600; color: var(--c-muted, #8a93a3);">9 year (2017)</div>
+        <div dir="rtl" style="display: flex; align-items: center; gap: 8px; background: var(--c-panel, #232b3a); border-radius: 999px; padding: 4px 5px 4px 14px;">
+          <span style="width: 32px; height: 32px; border-radius: 50%; background: #ffffff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(47,191,113,0.4);">
+            <img src="assets/club-logo.png" alt="club" style="width: 28px; height: 28px; border-radius: 50%; display: block;"/>
+          </span>
+          <span style="font-size: 12px; font-weight: 700; color: var(--c-text2, #d7dce4);">הפועל דולפין נתניה</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- stat tiles -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; padding: 0 14px;">
+      <div style="background: var(--c-panel, #232b3a); border-radius: 12px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;">
+        <div style="font-size: 20px; font-weight: 800; color: var(--c-accent, #2fbf71);">1307</div>
+        <div style="font-size: 9px; font-weight: 700; color: var(--c-muted, #8a93a3); text-transform: uppercase; letter-spacing: 0.05em;">Points</div>
+      </div>
+      <div style="background: var(--c-panel, #232b3a); border-radius: 12px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;">
+        <div style="display: flex; gap: 4px; justify-content: center;">
+          <div style="width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle at 35% 30%,#ffe27a,#e0a615); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #6b4e00;">2</div>
+          <div style="width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle at 35% 30%,#f2f4f7,#b9c0cc); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #555;">3</div>
+          <div style="width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle at 35% 30%,#e8e8e8,#9aa2ad); opacity: 0.4; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #555;">0</div>
+        </div>
+        <div style="font-size: 9px; font-weight: 700; color: var(--c-muted, #8a93a3); text-transform: uppercase; letter-spacing: 0.05em;">Medals</div>
+      </div>
+      <div style="background: var(--c-panel, #232b3a); border-radius: 12px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;">
+        <svg width="62" height="38" viewBox="0 0 46 30" style="display: block; margin: 0 auto;">
+          <path d="M 6 27 A 17 17 0 1 1 40 27" fill="none" style="stroke: var(--c-track, rgba(55,65,82,0.5));" stroke-width="4" stroke-linecap="round"></path>
+          <path d="M 6 27 A 17 17 0 1 1 40 27" fill="none" style="stroke: var(--c-accent, #2fbf71);" stroke-width="4" stroke-linecap="round" stroke-dasharray="16 70"></path>
+          <text x="23" y="23" text-anchor="middle" font-size="12" font-weight="800" style="fill: var(--c-accent, #2fbf71);">1y</text>
+        </svg>
+        <div style="font-size: 9px; font-weight: 700; color: var(--c-muted, #8a93a3); text-transform: uppercase; letter-spacing: 0.05em;">Level</div>
+      </div>
+    </div>
+
+    <!-- switcher -->
+    <div style="padding: 12px 14px 0;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--c-panel, #232b3a); border-radius: 12px; padding: 4px;">
+        <div style="text-align: center; padding: 7px; border-radius: 9px; background: var(--c-accent, #2fbf71); cursor: pointer;">
+          <div dir="rtl" style="font-size: 12px; font-weight: 800; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">ארנה · חורף 2026</div>
+          <div style="font-size: 9px; font-weight: 600; color: rgba(255,255,255,0.8);">Feb 2026</div>
+        </div>
+        <div style="text-align: center; padding: 7px; border-radius: 9px; cursor: pointer;">
+          <div style="font-size: 12px; font-weight: 800; color: var(--c-muted, #8a93a3);">All-time</div>
+          <div style="font-size: 9px; font-weight: 600; color: var(--c-muted, #8a93a3); opacity: 0.7;">career stats</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- competition block -->
+    <div style="margin: 12px 14px 0; background: linear-gradient(135deg, var(--c-accent, #2fbf71), var(--c-accent2, #1f9e5c)); border-radius: 14px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <div style="font-size: 24px; font-weight: 800; color: white; line-height: 1;">303<span style="font-size: 11px; vertical-align: super;">pt</span></div>
+        <div style="font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.85); margin-top: 3px;">this competition · Feb 2026</div>
+      </div>
+      <div style="display: flex; gap: 4px;">
+        <div style="width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle at 35% 30%,#ffe27a,#e0a615); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #6b4e00;">1</div>
+        <div style="width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle at 35% 30%,#f2f4f7,#b9c0cc); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #555;">2</div>
+        <div style="width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle at 35% 30%,#e8e8e8,#9aa2ad); opacity: 0.4; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #555;">0</div>
+      </div>
+    </div>
+
+    <!-- results -->
+    <div style="padding: 14px 14px 18px;">
+      <div style="font-size: 13px; font-weight: 800; color: var(--c-accent, #2fbf71); margin-bottom: 10px;">All results</div>
+
+      <!-- row 1 · with time split -->
+      <div style="background: var(--c-panel, #232b3a); border-radius: 14px; padding: 12px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 9px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0;">
+            <div style="width: 34px; height: 34px; border-radius: 50%; background: radial-gradient(circle at 35% 30%,#ffe27a,#e0a615); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; color: #6b4e00;">1</div>
+            <div style="font-size: 10px; color: var(--c-muted, #8a93a3);">age: <strong style="color: var(--c-text, #ffffff);">9</strong></div>
+          </div>
+          <div style="position: relative; width: 86px; flex-shrink: 0;">
+            <img src="assets/style-freestyle.png" alt="freestyle" style="width: 86px; border-radius: 7px; display: block; background: #ffffff; padding: 4px;"/>
+            <span style="position: absolute; top: -7px; right: -5px; font-size: 15px; font-weight: 900; color: #e53935; text-shadow: 0 1px 2px rgba(255,255,255,0.7);">50</span>
+          </div>
+          <div style="flex: 1;"></div>
+          <div style="font-size: 20px; font-weight: 800; color: var(--c-text, #ffffff); font-variant-numeric: tabular-nums;">00:51.97</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--c-line, #2c3546); padding-top: 8px; padding-left: 46px;">
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 10px; color: var(--c-muted, #8a93a3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Time split: 23.12;28.85;</div>
+            <div style="font-size: 11px; color: var(--c-text2, #d7dce4); margin-top: 1px;">Points: <strong style="color: var(--c-text, #ffffff);">162</strong></div>
+            <div style="font-size: 10px; color: var(--c-muted, #8a93a3); margin-top: 1px;">8 Feb 2026</div>
+          </div>
+          <svg width="62" height="40" viewBox="0 0 46 30" style="display: block; flex-shrink: 0;">
+            <path d="M 6 27 A 17 17 0 1 1 40 27" fill="none" style="stroke: var(--c-track, rgba(55,65,82,0.5));" stroke-width="4" stroke-linecap="round"></path>
+            <path d="M 6 27 A 17 17 0 1 1 40 27" fill="none" style="stroke: var(--c-accent, #2fbf71);" stroke-width="4" stroke-linecap="round" stroke-dasharray="48 70"></path>
+            <text x="23" y="23" text-anchor="middle" font-size="12" font-weight="800" style="fill: var(--c-accent, #2fbf71);">2y</text>
+          </svg>
+        </div>
+      </div>
+
+      <!-- row 2 · no time split -->
+      <div style="background: var(--c-panel, #232b3a); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 9px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0;">
+            <div style="width: 34px; height: 34px; border-radius: 50%; background: radial-gradient(circle at 35% 30%,#f2f4f7,#b9c0cc); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; color: #555;">2</div>
+            <div style="font-size: 10px; color: var(--c-muted, #8a93a3);">age: <strong style="color: var(--c-text, #ffffff);">9</strong></div>
+          </div>
+          <div style="position: relative; width: 86px; flex-shrink: 0;">
+            <img src="assets/style-medley.png" alt="medley" style="width: 86px; border-radius: 7px; display: block; background: #ffffff; padding: 4px;"/>
+            <span style="position: absolute; top: -7px; right: -5px; font-size: 15px; font-weight: 900; color: #e53935; text-shadow: 0 1px 2px rgba(255,255,255,0.7);">100</span>
+          </div>
+          <div style="flex: 1;"></div>
+          <div style="font-size: 20px; font-weight: 800; color: var(--c-text, #ffffff); font-variant-numeric: tabular-nums;">01:45.88</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--c-line, #2c3546); padding-top: 8px; padding-left: 46px;">
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 11px; color: var(--c-text2, #d7dce4);">Points: <strong style="color: var(--c-text, #ffffff);">141</strong></div>
+            <div style="font-size: 10px; color: var(--c-muted, #8a93a3); margin-top: 1px;">9 Feb 2026</div>
+          </div>
+          <svg width="62" height="40" viewBox="0 0 46 30" style="display: block; flex-shrink: 0;">
+            <path d="M 6 27 A 17 17 0 1 1 40 27" fill="none" style="stroke: var(--c-track, rgba(55,65,82,0.5));" stroke-width="4" stroke-linecap="round"></path>
+            <path d="M 6 27 A 17 17 0 1 1 40 27" fill="none" style="stroke: var(--c-accent, #2fbf71);" stroke-width="4" stroke-linecap="round" stroke-dasharray="16 70"></path>
+            <text x="23" y="23" text-anchor="middle" font-size="12" font-weight="800" style="fill: var(--c-accent, #2fbf71);">1y</text>
+          </svg>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: { &quot;width&quot;: 420, &quot;height&quot;: 900 },
+  &quot;theme&quot;: {
+    &quot;editor&quot;: &quot;enum&quot;,
+    &quot;options&quot;: [&quot;dark&quot;, &quot;light&quot;],
+    &quot;default&quot;: &quot;dark&quot;,
+    &quot;tsType&quot;: &quot;'dark' | 'light'&quot;,
+    &quot;section&quot;: &quot;Theme&quot;
+  }
+}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.rootRef = React.createRef();
+  }
+
+  // Токены из design_handoff_theme_modes/README.md
+  themes() {
+    return {
+      dark: {
+        '--c-page': '#0f1319',
+        '--c-card': '#161d29',
+        '--c-panel': '#232b3a',
+        '--c-hero': 'linear-gradient(160deg, #1e2836, #161d29)',
+        '--c-text': '#eef1f6',
+        '--c-text2': '#d7dce4',
+        '--c-muted': '#8a93a3',
+        '--c-line': '#2c3546',
+        '--c-track': 'rgba(55,65,82,0.5)',
+        '--c-accent': '#2fbf71',
+        '--c-accent2': '#1f9e5c',
+        '--c-shadow': 'rgba(0,0,0,0.35)'
+      },
+      light: {
+        '--c-page': '#f5f5f7',
+        '--c-card': '#ffffff',
+        '--c-panel': '#f0f3f7',
+        '--c-hero': 'linear-gradient(160deg, #dcebf7, #c4def0)',
+        '--c-text': '#1a1a1a',
+        '--c-text2': '#3a4350',
+        '--c-muted': '#5b6470',
+        '--c-line': '#e2e7ee',
+        '--c-track': 'rgba(214,224,218,0.9)',
+        '--c-accent': '#1b8a4b',
+        '--c-accent2': '#15764a',
+        '--c-shadow': 'rgba(30,40,60,0.14)'
+      }
+    };
+  }
+
+  applyTheme() {
+    const el = this.rootRef.current;
+    if (!el) return;
+    const mode = this.props.theme === 'light' ? 'light' : 'dark';
+    const tokens = this.themes()[mode];
+    for (const k in tokens) el.style.setProperty(k, tokens[k]);
+  }
+
+  componentDidMount() { this.applyTheme(); }
+  componentDidUpdate() { this.applyTheme(); }
+
+  renderVals() {
+    return { rootRef: this.rootRef };
+  }
+}
+</script>
+</body>
+</html>

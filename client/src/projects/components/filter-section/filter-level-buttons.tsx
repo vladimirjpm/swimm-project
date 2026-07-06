@@ -5,6 +5,7 @@ import {
   useAppSelector,
 } from '../../../store/store';
 import UI_NormativeLevelIcon from '../mix/normative-level-icon/normative-level-icon';
+import FilterCard from './filter-card';
 
 /**
  * Фильтр по уровню норматива.
@@ -32,20 +33,21 @@ const FilterLevelButtons: React.FC = () => {
   if (!bestLevel) return null;
 
   return (
-    <div className="flex flex-col">
-      <h3 className="font-semibold">Best Level</h3>
-      <div className="flex flex-wrap items-center">
+    <FilterCard
+      title="Best Level"
+      summary={current === 'all' ? 'All' : current}
+      isActive={current !== 'all'}
+    >
+      <div className="flex flex-wrap items-center gap-2">
         <button
-          className={`px-3 py-1 m-1 border rounded transition-colors ${
-            current === 'all' ? 'theme-btn-active' : 'theme-btn'
-          }`}
+          className={`fseg ${current === 'all' ? 'fseg-active' : ''}`}
           onClick={() => updateFilter('all')}
         >
           All
         </button>
         <button
-          className={`px-3 py-1 m-1 border rounded transition-colors flex items-center gap-1 ${
-            current === bestLevel.levelName ? 'theme-btn-active' : 'theme-btn'
+          className={`fseg flex items-center gap-1 ${
+            current === bestLevel.levelName ? 'fseg-active' : ''
           }`}
           onClick={() => updateFilter(bestLevel.levelName)}
         >
@@ -61,7 +63,7 @@ const FilterLevelButtons: React.FC = () => {
           />
         </button>
       </div>
-    </div>
+    </FilterCard>
   );
 };
 

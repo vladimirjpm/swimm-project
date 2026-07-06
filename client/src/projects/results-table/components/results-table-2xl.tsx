@@ -1,5 +1,4 @@
 import React from 'react';
-import UI_MedalIcon from '../../components/mix/medal-icon/medal-icon';
 import UI_ClubIcon from '../../components/mix/club-icon/club-icon';
 import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
 import UI_PoolIcon from '../../components/mix/pool-icon/pool-icon';
@@ -10,6 +9,8 @@ import UI_SwimmerTimeCell from '../../components/mix/swimmer-time-cell/swimmer-t
 import UI_SwimmerGallery from '../../components/mix/swimmer-gallery/swimmer-gallery';
 import { ResultsTableRowProps } from './types';
 import UI_AgeLabel from '../../components/mix/age-label/age-label';
+import UI_FavoriteControls from '../../components/mix/favorite-controls/favorite-controls';
+import UI_PositionBadge from '../../components/mix/position-badge/position-badge';
 
 const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
   res,
@@ -32,19 +33,30 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
   onToggleFavorite,
   onTogglePrimary,
 }) => {
-  const genderBgClass = res.event_style_gender === 'female' ? 'bg-[var(--theme-mode-row-female)]' : 'bg-[var(--theme-mode-row-male)]';
-
   const handleNameClick = () => {
     updateFilter({ selected_name: `${res.first_name}${res.last_name ? ' ' + res.last_name : ''}` });
   };
 
+  // Медаль красится только если ЭТОТ заплыв award-eligible (res.is_award — денормализовано
+  // с API; для статических источников используем общий флаг источника isAwardSource).
+  const rowIsAward = res.is_award ?? isAwardSource ?? false;
+
   return (
     <>
       <div className="col-span-1 flex flex-col items-center">
-        {res.position ? <UI_MedalIcon place={res.position.toString()} styleType={isAwardSource ? 'icon-place' : 'icon-noplace'} /> : <>{`${index + 1}`}</>}
-        {(res as any).position_original != null && (res as any).position_original !== res.position && (
-          <div className="text-[10px] text-[var(--theme-mode-text-muted)] mt-0.5 line-through"><UI_MedalIcon place={(res as any).position_original.toString()} styleSize='medal-16' styleType={isAwardSource ? 'icon-place' : 'icon-noplace'} /></div>
-        )}
+        {/* При пересчёте (Combine All Results): большой badge — новое место,
+            маленький внахлёст снизу — оригинальное место. */}
+        <div className="relative">
+          <UI_PositionBadge position={res.position} fallbackIndex={index} isAward={rowIsAward} />
+          {(res as any).position_original != null && (res as any).position_original !== res.position && (
+            <UI_PositionBadge
+              position={(res as any).position_original}
+              size={18}
+              className="absolute -bottom-1 -right-1.5 border-2 border-[var(--theme-mode-surface)]"
+              isAward={rowIsAward}
+            />
+          )}
+        </div>
         {showAge && <UI_AgeLabel age={res.event_style_age} isMasters={isMastersResult} ageGroup={res.age_group} />}
       </div>
 
@@ -60,29 +72,17 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
             relaySwimmersList={res.relay_swimmers}
             relaySwimmersName={res.relay_swimmers_name}
             onClick={handleNameClick}
-            className={genderBgClass}
+            firstLineClassName="text-xl font-bold text-[var(--theme-mode-text)]"
             isRecordHolder={isRecordHolder}
           />
-          {onToggleFavorite && (
-            <div className="flex flex-col items-center gap-0.5 shrink-0 ml-1">
-              <button
-                title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                onClick={() => onToggleFavorite(res.swimmer_id!)}
-                className="text-lg leading-none hover:scale-110 transition-transform"
-              >
-                {isFavorite ? '❤️' : '🤍'}
-              </button>
-              {isFavorite && onTogglePrimary && (
-                <button
-                  title={isPrimaryFavorite ? 'Primary favorite' : 'Set as primary'}
-                  onClick={() => onTogglePrimary(res.swimmer_id!)}
-                  className="text-sm leading-none hover:scale-110 transition-transform"
-                >
-                  {isPrimaryFavorite ? '⭐' : '☆'}
-                </button>
-              )}
-            </div>
-          )}
+          <UI_FavoriteControls
+            className="ml-1"
+            swimmerId={res.swimmer_id}
+            isFavorite={isFavorite}
+            isPrimaryFavorite={isPrimaryFavorite}
+            onToggleFavorite={onToggleFavorite}
+            onTogglePrimary={onTogglePrimary}
+          />
         </div>
         <UI_SwimmerGallery gallery={res.gallery} />
       </div>
@@ -109,7 +109,7 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
           time_split={res.time_split}
           time_fail={res.time_fail}
           time_fail_note={res.time_fail_note}
-          className={genderBgClass}
+          firstLineClassName="text-xl font-bold tabular-nums"
           isRecordHolder={isRecordTime}
         />
       </div>

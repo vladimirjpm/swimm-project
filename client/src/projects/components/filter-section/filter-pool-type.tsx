@@ -6,6 +6,7 @@ import {
 } from '../../../store/store';
 import Helper from '../../../utils/helpers/data-helper';
 import { getFilterData } from './filter-types';
+import FilterCard from './filter-card';
 
 const FilterPoolType: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -22,21 +23,26 @@ const FilterPoolType: React.FC = () => {
     );
   };
 
+  const isActive = filters.pool_type !== 'all';
+
   return (
-    <div className="flex flex-col">
-      <h3 className="font-semibold">Pool Type</h3>
-      <div className="flex flex-wrap">
+    <FilterCard
+      title="Pool Type"
+      summary={isActive ? filters.pool_type : 'All'}
+      isActive={isActive}
+    >
+      <div className="flex flex-wrap gap-2">
         {filterData.pool_type.map((type) => (
           <button
             key={type}
-            className={`px-3 py-1 m-1 border rounded transition-colors ${
+            className={`fseg ${
               (type === 'all' && filters.pool_type === 'all') ||
               (type !== 'all' &&
                 filters.pool_type !== 'all' &&
                 Helper.resolvePoolType(filters.pool_type) ===
                   Helper.resolvePoolType(type))
-                ? 'theme-btn-active'
-                : 'theme-btn'
+                ? 'fseg-active'
+                : ''
             }`}
             onClick={() => updateFilter(type)}
           >
@@ -44,7 +50,7 @@ const FilterPoolType: React.FC = () => {
           </button>
         ))}
       </div>
-    </div>
+    </FilterCard>
   );
 };
 

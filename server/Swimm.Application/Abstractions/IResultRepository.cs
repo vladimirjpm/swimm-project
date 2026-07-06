@@ -9,4 +9,6 @@ public interface IResultRepository
     Task<string[]> GetFilterHintsAsync(string field, string? q, int limit);
     /// <summary>Список источников для DDL: события (свёрнуты в одну запись) + однодневные соревнования.</summary>
     Task<IReadOnlyList<CompetitionSourceDto>> GetSourcesAsync();
+    /// <summary>Карьерные (all-time) данные спортсмена по полному имени; null — пловец не найден.</summary>
+    Task<AthleteCareerDto?> GetAthleteCareerAsync(string name);
 }

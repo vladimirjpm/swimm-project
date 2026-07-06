@@ -22,7 +22,7 @@ public class ResultsController : ControllerBase
     public async Task<IActionResult> GetResults(
         [FromQuery] string? competition,
         [FromQuery] int? eventId,
-        [FromQuery] int? competitionId,
+        [FromQuery] string? competitionId,
         [FromQuery] string? name,
         [FromQuery] string? club,
         [FromQuery] string? styleName,
@@ -36,11 +36,25 @@ public class ResultsController : ControllerBase
     {
         if (pageSize > 500) pageSize = 500;
 
+        // competitionId: число или "last" (последнее по дате соревнование/событие)
+        int? competitionIdValue = null;
+        var latest = false;
+        if (!string.IsNullOrWhiteSpace(competitionId))
+        {
+            if (string.Equals(competitionId, "last", StringComparison.OrdinalIgnoreCase))
+                latest = true;
+            else if (int.TryParse(competitionId, out var parsed))
+                competitionIdValue = parsed;
+            else
+                return BadRequest("competitionId must be a number or 'last'");
+        }
+
         var filter = new ResultFilter
         {
             Competition = competition,
             EventId = eventId,
-            CompetitionId = competitionId,
+            CompetitionId = competitionIdValue,
+            Latest = latest,
             Name = name,
             Club = club,
             StyleName = styleName,
@@ -74,4 +88,16 @@ public class ResultsController : ControllerBase
     [HttpGet("/api/competitions")]
     public async Task<IActionResult> GetSources()
         => Ok(await _results.GetSourcesAsync());
+
+    /// <summary>
+    /// Карьерные (all-time) данные спортсмена для карточки: соревнования, заплывы,
+    /// сумма очков, медали, лучшие времена по стилям. Пловец не найден → нулевой DTO.
+    /// </summary>
+    [HttpGet("/api/athletes/career")]
+    public async Task<IActionResult> GetAthleteCareer([FromQuery] string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return BadRequest("name is required");
+        var career = await _results.GetAthleteCareerAsync(name);
+        return Ok(career ?? new AthleteCareerDto());
+    }
 }

@@ -13,7 +13,7 @@ public interface IAdminRepository
     Task<List<ImportHistoryDto>> GetImportHistoryAsync();
     Task<bool> SetImportApprovedAsync(int id, bool approved);
     Task<List<CompetitionAdminDto>> GetCompetitionsAsync();
-    Task<bool> UpdateCompetitionFlagsAsync(int id, bool isMasters, bool isAward, bool showCombineAllResults);
+    Task<bool> UpdateCompetitionAsync(int id, bool isAward, bool showCombineAllResults, IReadOnlyCollection<string> categoryKeys);
     Task<List<CompetitionEventDto>> GetCompetitionEventsAsync();
     Task<UserDetailDto?> GetUserDetailsAsync(int userId);
 }

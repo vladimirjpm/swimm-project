@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="design_doc_mode" content="canvas"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,600;0,700;0,800;0,900;1,800;1,900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    body { margin: 0; background: #14181f; font-family: 'Inter', sans-serif; }
+    @keyframes tick { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+    @keyframes shimmer { 0% { background-position: -150% 0; } 100% { background-position: 250% 0; } }
+    @keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+    @keyframes menuIn { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: none; } }
+  </style>
+</helmet>
+
+<section style="padding: 60px; display: flex; flex-direction: column; gap: 28px;">
+  <div style="display: flex; align-items: baseline; gap: 16px;">
+    <div style="font-size: 13px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: #8fa3bd;">Turn 2 — Детали для <a href="#1a" style="color:#7dd3fc;">1a</a>: мобильная версия · состояния</div>
+  </div>
+
+  <div style="display: flex; gap: 60px; align-items: flex-start; flex-wrap: wrap;">
+
+    <!-- ═══════════ 2a · MOBILE ═══════════ -->
+    <div id="2a" style="flex-shrink: 0;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+        <a href="#2a" style="text-decoration: none; background: #0ea5e9; color: #fff; font-size: 12px; font-weight: 900; padding: 4px 10px; border-radius: 8px;">2a</a>
+        <div style="color: #cbd5e1; font-size: 14px; font-weight: 700;">Мобильная версия (390px)</div>
+      </div>
+
+      <div style="width: 390px; position: relative; overflow: hidden; border-radius: 24px; background: linear-gradient(165deg, rgba(4,16,34,.78) 0%, rgba(6,20,42,.62) 45%, rgba(2,10,24,.94) 100%), url('assets/bg-2.jpg') center 25%/cover no-repeat; color: #f3f8fd; padding-bottom: 66px;">
+        <!-- top bar -->
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 18px 20px;">
+          <div style="display: flex; align-items: center; gap: 9px;">
+            <div style="width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(140deg,#38bdf8,#0369a1); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 14px; color: #06263f;">S</div>
+            <div style="font-weight: 900; letter-spacing: .2em; font-size: 12px;">SWIM<span style="color:#7dd3fc;">HUB</span></div>
+          </div>
+          <div onClick="{{ toggleMenu }}" style="width: 44px; height: 44px; display: flex; flex-direction: column; gap: 5px; align-items: flex-end; justify-content: center; cursor: pointer; user-select: none;">
+            <sc-if value="{{ menuClosed }}" hint-placeholder-val="{{ true }}">
+              <div style="width: 22px; height: 2.5px; border-radius: 2px; background: #cfe6f6;"></div>
+              <div style="width: 15px; height: 2.5px; border-radius: 2px; background: #cfe6f6;"></div>
+            </sc-if>
+            <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size: 20px; font-weight: 700; color: #cfe6f6; line-height: 1;">✕</div>
+            </sc-if>
+          </div>
+        </div>
+
+        <!-- dropdown menu -->
+        <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position: absolute; top: 66px; left: 12px; right: 12px; z-index: 20; border-radius: 20px; background: rgba(4,16,32,.92); border: 1px solid rgba(125,211,252,.35); backdrop-filter: blur(18px); box-shadow: 0 28px 60px rgba(2,10,24,.7); padding: 10px; animation: menuIn .22s ease-out both;">
+            <a href="#2a" onClick="{{ toggleMenu }}" style="display: flex; align-items: center; justify-content: space-between; text-decoration: none; color: #f3f8fd; padding: 15px 16px; border-radius: 13px; font-size: 17px; font-weight: 800;" style-hover="background: rgba(56,189,248,.12);">Competitions <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800; color: #38ef8f;">● LIVE</span></a>
+            <a href="#2a" onClick="{{ toggleMenu }}" style="display: flex; align-items: center; justify-content: space-between; text-decoration: none; color: #f3f8fd; padding: 15px 16px; border-radius: 13px; font-size: 17px; font-weight: 800;" style-hover="background: rgba(56,189,248,.12);">Normatives <span style="color:#7dd3fc;">→</span></a>
+            <a href="#2a" onClick="{{ toggleMenu }}" style="display: flex; align-items: center; justify-content: space-between; text-decoration: none; color: #f3f8fd; padding: 15px 16px; border-radius: 13px; font-size: 17px; font-weight: 800;" style-hover="background: rgba(56,189,248,.12);">Records <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800; color: #fbbf24;">★ 3 NEW</span></a>
+            <a href="#2a" onClick="{{ toggleMenu }}" style="display: flex; align-items: center; justify-content: space-between; text-decoration: none; color: #f3f8fd; padding: 15px 16px; border-radius: 13px; font-size: 17px; font-weight: 800;" style-hover="background: rgba(56,189,248,.12);">About <span style="color:#7dd3fc;">→</span></a>
+            <div style="margin: 8px 6px 6px; padding-top: 12px; border-top: 1px solid rgba(125,211,252,.18); display: flex; align-items: center; justify-content: space-between;">
+              <span style="font-size: 11px; font-weight: 700; color: rgba(203,224,240,.55);">Countries — coming 2026</span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800; color: #94a3b8; border: 1px solid rgba(148,163,184,.4); padding: 2px 7px; border-radius: 6px;">SOON</span>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- hero -->
+        <div style="padding: 26px 20px 0;">
+          <div style="font-size: 11px; font-weight: 800; letter-spacing: .28em; text-transform: uppercase; color: #7dd3fc; margin-bottom: 12px;">2026 Season · Israel</div>
+          <div style="font-size: 52px; font-weight: 900; line-height: .92; letter-spacing: -.04em;">Every hundredth <span style="font-style: italic; background: linear-gradient(92deg,#7dd3fc,#e0f2fe 70%); -webkit-background-clip: text; background-clip: text; color: transparent;">counts.</span></div>
+          <div style="margin-top: 14px; font-size: 14.5px; line-height: 1.55; color: rgba(226,240,252,.82);">Results, records and normatives — live from the pool.</div>
+        </div>
+
+        <!-- cards stacked -->
+        <div style="display: flex; flex-direction: column; gap: 12px; padding: 26px 16px 0;">
+          <a href="#2a" style="text-decoration: none; color: inherit; border-radius: 18px; padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 12px; background: linear-gradient(180deg, rgba(56,189,248,.16), rgba(8,25,48,.8)); border: 1px solid rgba(125,211,252,.35); backdrop-filter: blur(12px);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="font-size: 21px; font-weight: 900;">Competitions</div>
+              <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800; color: #38ef8f; display: flex; align-items: center; gap: 5px;"><span style="width: 6px; height: 6px; border-radius: 50%; background: #38ef8f; animation: blink 1.4s ease infinite;"></span>LIVE</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="font-size: 12px; color: rgba(203,224,240,.75);">4 events · Masters, Youth, Junior</div>
+              <div style="font-size: 13px; font-weight: 800; color: #7dd3fc;">→</div>
+            </div>
+          </a>
+          <a href="#2a" style="text-decoration: none; color: inherit; border-radius: 18px; padding: 18px 18px 16px; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(180deg, rgba(56,189,248,.08), rgba(8,25,48,.8)); border: 1px solid rgba(125,211,252,.22); backdrop-filter: blur(12px);">
+            <div>
+              <div style="font-size: 21px; font-weight: 900;">Normatives</div>
+              <div style="margin-top: 4px; font-size: 12px; color: rgba(203,224,240,.75);">Youth-3 → MSMK grids</div>
+            </div>
+            <div style="font-size: 13px; font-weight: 800; color: #7dd3fc;">→</div>
+          </a>
+          <a href="#2a" style="text-decoration: none; color: inherit; border-radius: 18px; padding: 18px 18px 16px; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(180deg, rgba(56,189,248,.08), rgba(8,25,48,.8)); border: 1px solid rgba(125,211,252,.22); backdrop-filter: blur(12px);">
+            <div>
+              <div style="font-size: 21px; font-weight: 900;">Records</div>
+              <div style="margin-top: 4px; font-size: 12px; color: rgba(203,224,240,.75);">Age records · all-time bests</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800; color: #fbbf24;">★ 3 NEW</div>
+              <div style="font-size: 13px; font-weight: 800; color: #7dd3fc;">→</div>
+            </div>
+          </a>
+          <div style="border-radius: 18px; padding: 18px 18px 16px; display: flex; justify-content: space-between; align-items: center; background: rgba(8,25,48,.6); border: 1px dashed rgba(148,163,184,.35); color: rgba(226,240,252,.65);">
+            <div>
+              <div style="font-size: 21px; font-weight: 900;">Countries</div>
+              <div style="margin-top: 4px; font-size: 12px; color: rgba(203,224,240,.5);">Compare national teams</div>
+            </div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800; color: #94a3b8; border: 1px solid rgba(148,163,184,.4); padding: 3px 7px; border-radius: 6px;">SOON</div>
+          </div>
+        </div>
+
+        <!-- ticker -->
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; background: rgba(2,10,24,.86); border-top: 1px solid rgba(125,211,252,.25); backdrop-filter: blur(10px); overflow: hidden; padding: 12px 0;">
+          <div style="display: flex; gap: 44px; width: max-content; animation: tick 22s linear infinite; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; font-weight: 700; color: #bfe3f7; white-space: nowrap;">
+            <span><span style="color:#facc15;">NEW RECORD</span> · 50m Free · <span style="color:#7dd3fc;">00:23.41</span></span>
+            <span>100m Fly · <span style="color:#7dd3fc;">01:02.87</span></span>
+            <span><span style="color:#38ef8f;">LIVE</span> · Horef Masters · Day 2</span>
+            <span><span style="color:#facc15;">NEW RECORD</span> · 50m Free · <span style="color:#7dd3fc;">00:23.41</span></span>
+            <span>100m Fly · <span style="color:#7dd3fc;">01:02.87</span></span>
+            <span><span style="color:#38ef8f;">LIVE</span> · Horef Masters · Day 2</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ 2b · STATES ═══════════ -->
+    <div id="2b" style="flex-shrink: 0;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+        <a href="#2b" style="text-decoration: none; background: #0ea5e9; color: #fff; font-size: 12px; font-weight: 900; padding: 4px 10px; border-radius: 8px;">2b</a>
+        <div style="color: #cbd5e1; font-size: 14px; font-weight: 700;">Состояния: hover / focus · нет live-соревнований</div>
+      </div>
+
+      <div style="width: 900px; border-radius: 18px; background: #0b1524; padding: 34px; display: flex; flex-direction: column; gap: 34px; color: #f3f8fd;">
+
+        <!-- hover/focus row -->
+        <div>
+          <div style="font-size: 12px; font-weight: 800; letter-spacing: .2em; text-transform: uppercase; color: #6f8ba3; margin-bottom: 16px;">Card states</div>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;">
+            <div>
+              <div style="min-height: 170px; border-radius: 24px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(180deg, rgba(56,189,248,.08), rgba(8,25,48,.78)); border: 1px solid rgba(125,211,252,.22);">
+                <div style="font-size: 22px; font-weight: 900;">Records</div>
+                <div style="font-size: 13px; font-weight: 800; color: #7dd3fc;">Explore →</div>
+              </div>
+              <div style="margin-top: 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6f8ba3;">DEFAULT · border 22%</div>
+            </div>
+            <div>
+              <div style="min-height: 170px; border-radius: 24px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(180deg, rgba(56,189,248,.14), rgba(10,30,56,.85)); border: 1px solid rgba(125,211,252,.8); transform: translateY(-8px); box-shadow: 0 28px 60px rgba(2,10,24,.65);">
+                <div style="font-size: 22px; font-weight: 900;">Records</div>
+                <div style="font-size: 13px; font-weight: 800; color: #7dd3fc;">Explore →</div>
+              </div>
+              <div style="margin-top: 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6f8ba3;">HOVER · lift -8px · border 80% · 180ms ease-out</div>
+            </div>
+            <div>
+              <div style="min-height: 170px; border-radius: 24px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(180deg, rgba(56,189,248,.14), rgba(10,30,56,.85)); border: 1px solid rgba(125,211,252,.8); outline: 3px solid #7dd3fc; outline-offset: 3px;">
+                <div style="font-size: 22px; font-weight: 900;">Records</div>
+                <div style="font-size: 13px; font-weight: 800; color: #7dd3fc;">Explore →</div>
+              </div>
+              <div style="margin-top: 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6f8ba3;">FOCUS-VISIBLE · outline 3px, offset 3px</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- no-live row -->
+        <div>
+          <div style="font-size: 12px; font-weight: 800; letter-spacing: .2em; text-transform: uppercase; color: #6f8ba3; margin-bottom: 16px;">Когда нет live-соревнований</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px;">
+            <div>
+              <div style="min-height: 170px; border-radius: 24px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(180deg, rgba(56,189,248,.16), rgba(8,25,48,.78)); border: 1px solid rgba(125,211,252,.35);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                  <div style="font-size: 22px; font-weight: 900;">Competitions</div>
+                  <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800; color: #7dd3fc; border: 1px solid rgba(125,211,252,.4); padding: 3px 8px; border-radius: 7px; white-space: nowrap;">NEXT · MAR 14</div>
+                </div>
+                <div>
+                  <div style="font-size: 12.5px; color: rgba(203,224,240,.75);">Last: 2026 Horef Isr Champ — results ready</div>
+                  <div style="margin-top: 10px; font-size: 13px; font-weight: 800; color: #7dd3fc;">View results →</div>
+                </div>
+              </div>
+              <div style="margin-top: 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6f8ba3;">Бейдж LIVE → NEXT + дата · ссылка ведёт на последние результаты</div>
+            </div>
+            <div>
+              <div style="min-height: 170px; border-radius: 24px; overflow: hidden; background: rgba(2,10,24,.85); border: 1px solid rgba(125,211,252,.25); display: flex; flex-direction: column; justify-content: center;">
+                <div style="overflow: hidden; padding: 13px 0; border-top: 1px solid rgba(125,211,252,.2); border-bottom: 1px solid rgba(125,211,252,.2);">
+                  <div style="display: flex; gap: 52px; width: max-content; animation: tick 24s linear infinite; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; font-weight: 700; color: #bfe3f7; white-space: nowrap;">
+                    <span><span style="color:#7dd3fc;">NEXT MEET IN 11D 06H</span> · Spring Cup 2026</span>
+                    <span>SEASON BESTS · 50m Free <span style="color:#7dd3fc;">00:23.41</span></span>
+                    <span><span style="color:#facc15;">RECORD OF THE MONTH</span> · 100m Fly · <span style="color:#7dd3fc;">01:02.87</span></span>
+                    <span><span style="color:#7dd3fc;">NEXT MEET IN 11D 06H</span> · Spring Cup 2026</span>
+                    <span>SEASON BESTS · 50m Free <span style="color:#7dd3fc;">00:23.41</span></span>
+                    <span><span style="color:#facc15;">RECORD OF THE MONTH</span> · 100m Fly · <span style="color:#7dd3fc;">01:02.87</span></span>
+                  </div>
+                </div>
+              </div>
+              <div style="margin-top: 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6f8ba3;">Тикер без live: countdown до следующего старта + лучшие результаты сезона</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section style="padding: 60px; display: flex; flex-direction: column; gap: 28px;">
+  <div style="display: flex; align-items: baseline; gap: 16px;">
+    <div style="font-size: 13px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: #8fa3bd;">Turn 1 — Homepage concepts</div>
+    <div style="font-size: 12px; color: #5c6b80;">3 направления · клик по бейджу-ссылке: <a href="#1a" style="color:#7dd3fc;">1a</a> <a href="#1b" style="color:#7dd3fc;">1b</a> <a href="#1c" style="color:#7dd3fc;">1c</a></div>
+  </div>
+
+  <div style="display: flex; gap: 60px; align-items: flex-start; flex-wrap: wrap;">
+
+    <!-- ═══════════════════════ 1a · CINEMATIC DIVE ═══════════════════════ -->
+    <div id="1a" style="flex-shrink: 0;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+        <a href="#1a" style="text-decoration: none; background: #0ea5e9; color: #fff; font-size: 12px; font-weight: 900; padding: 4px 10px; border-radius: 8px;">1a</a>
+        <div style="color: #cbd5e1; font-size: 14px; font-weight: 700;">Cinematic Dive — полноэкранное фото, гигантская типографика, лента рекордов</div>
+      </div>
+
+      <div style="width: 1440px; height: 1000px; position: relative; overflow: hidden; border-radius: 18px; background: linear-gradient(160deg, rgba(4,16,34,.72) 0%, rgba(6,20,42,.55) 45%, rgba(2,10,24,.92) 100%), url('assets/bg-2.jpg') center 30%/cover no-repeat; color: #f3f8fd;">
+        <!-- caustic light sweep -->
+        <div style="position: absolute; inset: 0; background: linear-gradient(105deg, transparent 40%, rgba(125,211,252,.10) 50%, transparent 60%); background-size: 300% 100%; animation: shimmer 9s linear infinite; pointer-events: none;"></div>
+
+        <!-- top nav -->
+        <div style="position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; padding: 34px 64px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 36px; height: 36px; border-radius: 11px; background: linear-gradient(140deg,#38bdf8,#0369a1); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 17px; color: #06263f;">S</div>
+            <div style="font-weight: 900; letter-spacing: .22em; font-size: 14px;">SWIM<span style="color:#7dd3fc;">HUB</span></div>
+          </div>
+          <div style="display: flex; gap: 34px; font-size: 14px; font-weight: 700; color: #c9dcee;">
+            <span style="color: #7dd3fc;">Home</span><span>Competitions</span><span>Normatives</span><span>Records</span><span>About</span>
+          </div>
+        </div>
+
+        <!-- hero -->
+        <div style="position: relative; z-index: 2; padding: 46px 64px 0;">
+          <div style="font-size: 15px; font-weight: 800; letter-spacing: .3em; text-transform: uppercase; color: #7dd3fc; margin-bottom: 18px;">2026 Season · Israel</div>
+          <div style="font-size: 148px; font-weight: 900; line-height: .88; letter-spacing: -.045em;">Every hundredth<br/><span style="font-style: italic; background: linear-gradient(92deg,#7dd3fc,#e0f2fe 70%); -webkit-background-clip: text; background-clip: text; color: transparent;">counts.</span></div>
+          <div style="max-width: 560px; margin-top: 26px; font-size: 18px; line-height: 1.6; color: rgba(226,240,252,.82);">Results, records and normatives of the swimming season — live from the pool. Pick a destination below and dive in.</div>
+        </div>
+
+        <!-- destination cards -->
+        <div style="position: relative; z-index: 2; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; padding: 56px 64px 0;">
+          <a href="#1a" style="text-decoration: none; color: inherit; min-height: 190px; border-radius: 24px; padding: 26px; display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(180deg, rgba(56,189,248,.16), rgba(8,25,48,.78)); border: 1px solid rgba(125,211,252,.35); backdrop-filter: blur(14px); box-shadow: 0 24px 60px rgba(2,10,24,.5);" style-hover="transform: translateY(-8px); border-color: rgba(125,211,252,.8);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div style="font-size: 26px; font-weight: 900; letter-spacing: -.02em;">Competitions</div>
+              <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 800; color: #38ef8f; display: flex; align-items: center; gap: 6px;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #38ef8f; animation: blink 1.4s ease infinite;"></span>LIVE</div>
+            </div>
+            <div>
+              <div style="font-size: 13px; color: rgba(203,224,240,.75); line-height: 1.5;">Dolphin & All Masters, Youth 8–11, Junior 11–15</div>
+              <div style="margin-top: 12px; font-size: 14px; font-weight: 800; color: #7dd3fc;">4 events →</div>
+            </div>
+          </a>
+          <a href="#1a" style="text-decoration: none; color: inherit; min-height: 190px; border-radius: 24px; padding: 26px; display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(180deg, rgba(56,189,248,.08), rgba(8,25,48,.78)); border: 1px solid rgba(125,211,252,.22); backdrop-filter: blur(14px); box-shadow: 0 24px 60px rgba(2,10,24,.5);" style-hover="transform: translateY(-8px); border-color: rgba(125,211,252,.8);">
+            <div style="font-size: 26px; font-weight: 900; letter-spacing: -.02em;">Normatives</div>
+            <div>
+              <div style="font-size: 13px; color: rgba(203,224,240,.75); line-height: 1.5;">Youth-3 to MSMK grids for every stroke & distance</div>
+              <div style="margin-top: 12px; font-size: 14px; font-weight: 800; color: #7dd3fc;">Open grid →</div>
+            </div>
+          </a>
+          <a href="#1a" style="text-decoration: none; color: inherit; min-height: 190px; border-radius: 24px; padding: 26px; display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(180deg, rgba(56,189,248,.08), rgba(8,25,48,.78)); border: 1px solid rgba(125,211,252,.22); backdrop-filter: blur(14px); box-shadow: 0 24px 60px rgba(2,10,24,.5);" style-hover="transform: translateY(-8px); border-color: rgba(125,211,252,.8);">
+            <div style="font-size: 26px; font-weight: 900; letter-spacing: -.02em;">Records</div>
+            <div>
+              <div style="font-size: 13px; color: rgba(203,224,240,.75); line-height: 1.5;">Age records, all-time bests, world & national marks</div>
+              <div style="margin-top: 12px; font-size: 14px; font-weight: 800; color: #7dd3fc;">Explore →</div>
+            </div>
+          </a>
+          <a href="#1a" style="text-decoration: none; color: inherit; min-height: 190px; border-radius: 24px; padding: 26px; display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(180deg, rgba(148,163,184,.06), rgba(8,25,48,.72)); border: 1px dashed rgba(148,163,184,.35); backdrop-filter: blur(14px);" style-hover="transform: translateY(-8px);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div style="font-size: 26px; font-weight: 900; letter-spacing: -.02em; color: rgba(226,240,252,.7);">Countries</div>
+              <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 800; color: #94a3b8; border: 1px solid rgba(148,163,184,.4); padding: 3px 8px; border-radius: 7px;">SOON</div>
+            </div>
+            <div>
+              <div style="font-size: 13px; color: rgba(203,224,240,.55); line-height: 1.5;">Compare national teams side by side</div>
+              <div style="margin-top: 12px; font-size: 14px; font-weight: 800; color: rgba(125,211,252,.5);">Coming 2026</div>
+            </div>
+          </a>
+        </div>
+
+        <!-- record ticker -->
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; background: rgba(2,10,24,.82); border-top: 1px solid rgba(125,211,252,.25); backdrop-filter: blur(10px); overflow: hidden; padding: 16px 0;">
+          <div style="display: flex; gap: 56px; width: max-content; animation: tick 26s linear infinite; font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; color: #bfe3f7; white-space: nowrap;">
+            <span><span style="color:#facc15;">NEW RECORD</span> · 50m Free · Ben Adam · <span style="color:#7dd3fc;">00:23.41</span></span>
+            <span>100m Fly · Maya Levi · <span style="color:#7dd3fc;">01:02.87</span></span>
+            <span><span style="color:#38ef8f;">LIVE</span> · 2026 Horef Masters Arena · Day 2</span>
+            <span>200m Back · Daniel K. · <span style="color:#7dd3fc;">02:11.05</span></span>
+            <span><span style="color:#facc15;">NEW RECORD</span> · 50m Free · Ben Adam · <span style="color:#7dd3fc;">00:23.41</span></span>
+            <span>100m Fly · Maya Levi · <span style="color:#7dd3fc;">01:02.87</span></span>
+            <span><span style="color:#38ef8f;">LIVE</span> · 2026 Horef Masters Arena · Day 2</span>
+            <span>200m Back · Daniel K. · <span style="color:#7dd3fc;">02:11.05</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════ 1b · SWIM LANES ═══════════════════════ -->
+    <div id="1b" style="flex-shrink: 0;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+        <a href="#1b" style="text-decoration: none; background: #0ea5e9; color: #fff; font-size: 12px; font-weight: 900; padding: 4px 10px; border-radius: 8px;">1b</a>
+        <div style="color: #cbd5e1; font-size: 14px; font-weight: 700;">Swim Lanes — светлая палуба, навигация = дорожки бассейна</div>
+      </div>
+
+      <div style="width: 1440px; height: 1000px; overflow: hidden; border-radius: 18px; background: #eaf4f9; color: #0b2436; display: flex; flex-direction: column;">
+        <!-- photo hero band -->
+        <div style="position: relative; height: 340px; background: linear-gradient(180deg, rgba(3,15,32,.35), rgba(3,15,32,.55)), url('assets/bg-2.jpg') center 42%/cover no-repeat; color: #fff; display: flex; flex-direction: column; justify-content: space-between; padding: 30px 60px 34px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="font-weight: 900; letter-spacing: .22em; font-size: 13px;">SWIMM&nbsp;PROJECT</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; color: #cfe9f8;">2026 · SEASON DASHBOARD</div>
+          </div>
+          <div>
+            <div style="font-size: 92px; font-weight: 900; letter-spacing: -.04em; line-height: .95;">Take your lane<span style="color:#7dd3fc;">.</span></div>
+            <div style="margin-top: 10px; font-size: 17px; color: rgba(226,242,252,.85); max-width: 540px;">Every destination has its own lane. Hover to dive in.</div>
+          </div>
+        </div>
+
+        <!-- lanes -->
+        <div style="flex: 1; display: flex; flex-direction: column;">
+          <!-- lane 1 -->
+          <a href="#1b" style="text-decoration: none; color: inherit; flex: 1; display: flex; align-items: center; gap: 34px; padding: 0 60px; background: #ffffff; border-bottom: 4px dotted #f0655a; position: relative;" style-hover="background: linear-gradient(90deg,#dff2fb,#ffffff);">
+            <div style="width: 74px; height: 74px; border-radius: 16px; background: #0b2436; color: #7dd3fc; font-family: 'JetBrains Mono', monospace; font-size: 34px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">1</div>
+            <div style="flex: 1;">
+              <div style="font-size: 34px; font-weight: 900; letter-spacing: -.02em;">Competitions</div>
+              <div style="display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap;">
+                <span style="font-size: 12.5px; font-weight: 800; padding: 5px 12px; border-radius: 20px; background: #e3f2fc; color: #0369a1;">Dolphin Masters</span>
+                <span style="font-size: 12.5px; font-weight: 800; padding: 5px 12px; border-radius: 20px; background: #e3f2fc; color: #0369a1;">All Masters</span>
+                <span style="font-size: 12.5px; font-weight: 800; padding: 5px 12px; border-radius: 20px; background: #e3f2fc; color: #0369a1;">Youth 8–11</span>
+                <span style="font-size: 12.5px; font-weight: 800; padding: 5px 12px; border-radius: 20px; background: #e3f2fc; color: #0369a1;">Junior 11–15</span>
+              </div>
+            </div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 800; color: #16a34a;">● LIVE NOW</div>
+            <div style="font-size: 42px; color: #0ea5e9; font-weight: 900;">→</div>
+          </a>
+          <!-- lane 2 -->
+          <a href="#1b" style="text-decoration: none; color: inherit; flex: 1; display: flex; align-items: center; gap: 34px; padding: 0 60px; background: #f4fafd; border-bottom: 4px dotted #f0655a;" style-hover="background: linear-gradient(90deg,#dff2fb,#f4fafd);">
+            <div style="width: 74px; height: 74px; border-radius: 16px; background: #0b2436; color: #7dd3fc; font-family: 'JetBrains Mono', monospace; font-size: 34px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">2</div>
+            <div style="flex: 1;">
+              <div style="font-size: 34px; font-weight: 900; letter-spacing: -.02em;">Normatives</div>
+              <div style="margin-top: 6px; font-size: 15px; color: #4a6478;">Qualification grids — Youth-3 to MSMK, all strokes & distances</div>
+            </div>
+            <div style="font-size: 42px; color: #0ea5e9; font-weight: 900;">→</div>
+          </a>
+          <!-- lane 3 -->
+          <a href="#1b" style="text-decoration: none; color: inherit; flex: 1; display: flex; align-items: center; gap: 34px; padding: 0 60px; background: #ffffff; border-bottom: 4px dotted #f0655a;" style-hover="background: linear-gradient(90deg,#dff2fb,#ffffff);">
+            <div style="width: 74px; height: 74px; border-radius: 16px; background: #0b2436; color: #7dd3fc; font-family: 'JetBrains Mono', monospace; font-size: 34px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">3</div>
+            <div style="flex: 1;">
+              <div style="font-size: 34px; font-weight: 900; letter-spacing: -.02em;">Records</div>
+              <div style="margin-top: 6px; font-size: 15px; color: #4a6478;">Age records & all-time bests, updated after every meet</div>
+            </div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 800; color: #d97706;">★ 3 NEW</div>
+            <div style="font-size: 42px; color: #0ea5e9; font-weight: 900;">→</div>
+          </a>
+          <!-- lane 4 -->
+          <a href="#1b" style="text-decoration: none; color: inherit; flex: 1; display: flex; align-items: center; gap: 34px; padding: 0 60px; background: #f4fafd; border-bottom: 4px dotted #f0655a;" style-hover="background: linear-gradient(90deg,#dff2fb,#f4fafd);">
+            <div style="width: 74px; height: 74px; border-radius: 16px; background: #0b2436; color: #7dd3fc; font-family: 'JetBrains Mono', monospace; font-size: 34px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">4</div>
+            <div style="flex: 1;">
+              <div style="font-size: 34px; font-weight: 900; letter-spacing: -.02em;">Latest results</div>
+              <div style="margin-top: 6px; font-size: 15px; color: #4a6478;">2026 Horef Isr Champ — protocols, splits, leaderboards</div>
+            </div>
+            <div style="font-size: 42px; color: #0ea5e9; font-weight: 900;">→</div>
+          </a>
+          <!-- lane 5 -->
+          <div style="flex: 1; display: flex; align-items: center; gap: 34px; padding: 0 60px; background: repeating-linear-gradient(135deg, #eef5f9 0 18px, #e6eff5 18px 36px); color: #7a90a2;">
+            <div style="width: 74px; height: 74px; border-radius: 16px; background: #c3d4df; color: #ffffff; font-family: 'JetBrains Mono', monospace; font-size: 34px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">5</div>
+            <div style="flex: 1;">
+              <div style="font-size: 34px; font-weight: 900; letter-spacing: -.02em;">Countries</div>
+              <div style="margin-top: 6px; font-size: 15px;">Compare national teams — opening 2026</div>
+            </div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 800; border: 2px solid #b6c8d4; padding: 6px 14px; border-radius: 10px;">LANE CLOSED · SOON</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════ 1c · SCOREBOARD ═══════════════════════ -->
+    <div id="1c" style="flex-shrink: 0;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+        <a href="#1c" style="text-decoration: none; background: #0ea5e9; color: #fff; font-size: 12px; font-weight: 900; padding: 4px 10px; border-radius: 8px;">1c</a>
+        <div style="color: #cbd5e1; font-size: 14px; font-weight: 700;">Official Timing — табло арены, моноширинные секунды, LED-акценты</div>
+      </div>
+
+      <div style="width: 1440px; height: 1000px; overflow: hidden; border-radius: 18px; position: relative; background: linear-gradient(180deg, rgba(3,8,18,.93), rgba(3,8,18,.97)), url('assets/bg-2.jpg') center/cover no-repeat; color: #e8f3fb; font-family: 'JetBrains Mono', monospace;">
+        <!-- top status bar -->
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 22px 54px; border-bottom: 1px solid rgba(125,211,252,.18); font-size: 13px; font-weight: 700; letter-spacing: .12em;">
+          <div style="color: #7dd3fc;">SWIMM PROJECT — OFFICIAL TIMING</div>
+          <div style="display: flex; gap: 30px; color: #6f8ba3;">
+            <span>POOL 50M</span>
+            <span>WATER 26.4°C</span>
+            <span style="color: #38ef8f;"><span style="animation: blink 1.4s ease infinite;">●</span> SESSION LIVE</span>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 470px 1fr; height: 100%;">
+          <!-- left: giant clock -->
+          <div style="border-right: 1px solid rgba(125,211,252,.18); padding: 56px 46px; display: flex; flex-direction: column; justify-content: space-between; padding-bottom: 140px;">
+            <div>
+              <div style="font-size: 13px; letter-spacing: .3em; color: #6f8ba3; font-weight: 700;">RACE CLOCK</div>
+              <div style="margin-top: 18px; font-size: 96px; font-weight: 800; letter-spacing: -.03em; color: #fbbf24; text-shadow: 0 0 34px rgba(251,191,36,.35); line-height: 1;">26<span style="color:#f59e0b;">:</span>94</div>
+              <div style="margin-top: 12px; font-size: 14px; color: #6f8ba3;">50M FREESTYLE · HEAT 4</div>
+            </div>
+            <div style="font-family: 'Inter', sans-serif;">
+              <div style="font-size: 58px; font-weight: 900; letter-spacing: -.03em; line-height: 1.02; color: #f3f9fd;">The board never lies.</div>
+              <div style="margin-top: 16px; font-size: 15px; line-height: 1.6; color: #9db4c8;">Results, records and normatives — straight from the timing system to your screen.</div>
+            </div>
+          </div>
+
+          <!-- right: scoreboard rows -->
+          <div style="padding: 40px 54px 0; display: flex; flex-direction: column; gap: 14px;">
+            <div style="font-size: 12px; letter-spacing: .3em; color: #6f8ba3; font-weight: 700; margin-bottom: 4px;">SELECT DESTINATION</div>
+
+            <a href="#1c" style="text-decoration: none; color: inherit; display: grid; grid-template-columns: 64px 1fr auto auto; align-items: center; gap: 24px; padding: 24px 26px; border-radius: 14px; background: rgba(13,30,52,.75); border: 1px solid rgba(125,211,252,.3);" style-hover="border-color: #7dd3fc; background: rgba(17,40,68,.9);">
+              <div style="font-size: 30px; font-weight: 800; color: #38bdf8;">01</div>
+              <div>
+                <div style="font-family: 'Inter', sans-serif; font-size: 27px; font-weight: 900; letter-spacing: -.01em;">COMPETITIONS</div>
+                <div style="margin-top: 4px; font-size: 12px; color: #7e97ad;">MASTERS · YOUTH 8-11 · JUNIOR 11-15</div>
+              </div>
+              <div style="font-size: 12px; font-weight: 800; color: #38ef8f;"><span style="animation: blink 1.4s ease infinite;">●</span> LIVE</div>
+              <div style="font-size: 26px; color: #38bdf8; font-weight: 800;">→</div>
+            </a>
+
+            <a href="#1c" style="text-decoration: none; color: inherit; display: grid; grid-template-columns: 64px 1fr auto auto; align-items: center; gap: 24px; padding: 24px 26px; border-radius: 14px; background: rgba(13,30,52,.55); border: 1px solid rgba(125,211,252,.16);" style-hover="border-color: #7dd3fc; background: rgba(17,40,68,.9);">
+              <div style="font-size: 30px; font-weight: 800; color: #38bdf8;">02</div>
+              <div>
+                <div style="font-family: 'Inter', sans-serif; font-size: 27px; font-weight: 900; letter-spacing: -.01em;">NORMATIVES</div>
+                <div style="margin-top: 4px; font-size: 12px; color: #7e97ad;">YOUTH-3 → MSMK · ALL STROKES</div>
+              </div>
+              <div style="font-size: 12px; font-weight: 800; color: #6f8ba3;">GRID</div>
+              <div style="font-size: 26px; color: #38bdf8; font-weight: 800;">→</div>
+            </a>
+
+            <a href="#1c" style="text-decoration: none; color: inherit; display: grid; grid-template-columns: 64px 1fr auto auto; align-items: center; gap: 24px; padding: 24px 26px; border-radius: 14px; background: rgba(13,30,52,.55); border: 1px solid rgba(125,211,252,.16);" style-hover="border-color: #7dd3fc; background: rgba(17,40,68,.9);">
+              <div style="font-size: 30px; font-weight: 800; color: #38bdf8;">03</div>
+              <div>
+                <div style="font-family: 'Inter', sans-serif; font-size: 27px; font-weight: 900; letter-spacing: -.01em;">RECORDS</div>
+                <div style="margin-top: 4px; font-size: 12px; color: #7e97ad;">AGE RECORDS · ALL-TIME BESTS</div>
+              </div>
+              <div style="font-size: 12px; font-weight: 800; color: #fbbf24;">★ 3 NEW</div>
+              <div style="font-size: 26px; color: #38bdf8; font-weight: 800;">→</div>
+            </a>
+
+            <a href="#1c" style="text-decoration: none; color: inherit; display: grid; grid-template-columns: 64px 1fr auto auto; align-items: center; gap: 24px; padding: 24px 26px; border-radius: 14px; background: rgba(13,30,52,.55); border: 1px solid rgba(125,211,252,.16);" style-hover="border-color: #7dd3fc; background: rgba(17,40,68,.9);">
+              <div style="font-size: 30px; font-weight: 800; color: #38bdf8;">04</div>
+              <div>
+                <div style="font-family: 'Inter', sans-serif; font-size: 27px; font-weight: 900; letter-spacing: -.01em;">LATEST RESULTS</div>
+                <div style="margin-top: 4px; font-size: 12px; color: #7e97ad;">2026 HOREF ISR CHAMP · PROTOCOLS & SPLITS</div>
+              </div>
+              <div style="font-size: 12px; font-weight: 800; color: #6f8ba3;">UPDATED 2H AGO</div>
+              <div style="font-size: 26px; color: #38bdf8; font-weight: 800;">→</div>
+            </a>
+
+            <div style="display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 24px; padding: 24px 26px; border-radius: 14px; background: rgba(13,30,52,.3); border: 1px dashed rgba(111,139,163,.4); color: #6f8ba3;">
+              <div style="font-size: 30px; font-weight: 800;">05</div>
+              <div>
+                <div style="font-family: 'Inter', sans-serif; font-size: 27px; font-weight: 900; letter-spacing: -.01em;">COUNTRIES</div>
+                <div style="margin-top: 4px; font-size: 12px;">NATIONAL TEAM COMPARISON</div>
+              </div>
+              <div style="font-size: 12px; font-weight: 800; border: 1px solid rgba(111,139,163,.5); padding: 5px 12px; border-radius: 8px;">SOON</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- bottom ticker -->
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; border-top: 1px solid rgba(125,211,252,.18); background: rgba(2,6,14,.9); overflow: hidden; padding: 14px 0;">
+          <div style="display: flex; gap: 64px; width: max-content; animation: tick 30s linear infinite; font-size: 13px; font-weight: 700; color: #8fb4cf; white-space: nowrap;">
+            <span>LANE 4 · BEN ADAM · <span style="color:#fbbf24;">00:23.41</span> · NATIONAL RECORD</span>
+            <span>LANE 2 · MAYA LEVI · <span style="color:#7dd3fc;">01:02.87</span></span>
+            <span>NEXT EVENT: 100M BACKSTROKE · 18:40</span>
+            <span>LANE 6 · DANIEL K. · <span style="color:#7dd3fc;">02:11.05</span></span>
+            <span>LANE 4 · BEN ADAM · <span style="color:#fbbf24;">00:23.41</span> · NATIONAL RECORD</span>
+            <span>LANE 2 · MAYA LEVI · <span style="color:#7dd3fc;">01:02.87</span></span>
+            <span>NEXT EVENT: 100M BACKSTROKE · 18:40</span>
+            <span>LANE 6 · DANIEL K. · <span style="color:#7dd3fc;">02:11.05</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { menuOpen: false };
+  renderVals() {
+    return {
+      menuOpen: this.state.menuOpen,
+      menuClosed: !this.state.menuOpen,
+      toggleMenu: () => this.setState(s => ({ menuOpen: !s.menuOpen })),
+    };
+  }
+}
+</script>
+</body>
+</html>

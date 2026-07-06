@@ -234,9 +234,11 @@ public class AdminController : ControllerBase
         => Ok(await _admin.GetCompetitionsAsync());
 
     [HttpPatch("competitions/{id:int}")]
-    public async Task<IActionResult> UpdateCompetitionFlags(int id, [FromBody] UpdateCompetitionFlagsRequest request)
+    public async Task<IActionResult> UpdateCompetition(int id, [FromBody] UpdateCompetitionRequest request)
     {
-        var ok = await _admin.UpdateCompetitionFlagsAsync(id, request.IsMasters, request.IsAward, request.ShowCombineAllResults);
+        var ok = await _admin.UpdateCompetitionAsync(
+            id, request.IsAward, request.ShowCombineAllResults,
+            request.Categories ?? []);
         if (!ok) return NotFound(new { error = $"Competition {id} not found" });
         return Ok(new { message = "Обновлено", id });
     }
@@ -281,5 +283,5 @@ public class AdminController : ControllerBase
     public record SetApprovedRequest(bool Approved);
     public record SetActiveRequest(bool IsActive);
     public record UpdateSettingRequest(string Value);
-    public record UpdateCompetitionFlagsRequest(bool IsMasters, bool IsAward, bool ShowCombineAllResults);
+    public record UpdateCompetitionRequest(bool IsAward, bool ShowCombineAllResults, string[]? Categories);
 }

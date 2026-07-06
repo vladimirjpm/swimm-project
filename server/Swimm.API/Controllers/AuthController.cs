@@ -6,7 +6,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using Npgsql;
 using Swimm.API.Security;
+using Swimm.API.Services;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Infrastructure.Data;
@@ -21,11 +24,13 @@ public class AuthController : Controller
 
     private readonly SwimmDbContext _db;
     private readonly ILocalAuthService _localAuth;
+    private readonly DbStatusService _dbStatus;
 
-    public AuthController(SwimmDbContext db, ILocalAuthService localAuth)
+    public AuthController(SwimmDbContext db, ILocalAuthService localAuth, DbStatusService dbStatus)
     {
         _db = db;
         _localAuth = localAuth;
+        _dbStatus = dbStatus;
     }
 
     /// <summary>
@@ -212,10 +217,25 @@ public class AuthController : Controller
         if (string.IsNullOrEmpty(email))
             return Ok(new { isAuthenticated = false });
 
-        var user = await _db.AppUsers
-            .AsNoTracking()
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
-            .FirstOrDefaultAsync(u => u.Email == email);
+        // Быстрый выход: не тратим время на 3 повтора, если БД уже известна как недоступная.
+        if (!_dbStatus.IsAvailable)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = "Service temporarily unavailable." });
+
+        AppUser? user;
+        try
+        {
+            user = await _db.AppUsers
+                .AsNoTracking()
+                .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => u.Email == email);
+
+            _dbStatus.MarkAvailable();
+        }
+        catch (Exception ex) when (ex is NpgsqlException or RetryLimitExceededException)
+        {
+            _dbStatus.MarkUnavailable();
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = "Service temporarily unavailable." });
+        }
 
         if (user == null)
             return Ok(new { isAuthenticated = false });

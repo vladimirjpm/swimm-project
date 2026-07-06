@@ -29,8 +29,8 @@ const FilterRecalculate: React.FC = () => {
       <button
         type="button"
         onClick={toggle}
-        className={`px-3 py-1.5 m-1 border rounded transition-colors text-sm font-semibold flex items-center gap-2 ${
-          isActive ? 'theme-btn-active ring-2 ring-blue-500' : 'theme-btn'
+        className={`fseg flex items-center gap-2 self-start ${
+          isActive ? 'fseg-active' : ''
         }`}
         title="Пересчитать позиции по лучшему результату за все дни"
       >

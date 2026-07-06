@@ -7,6 +7,7 @@ import {
 import Helper from '../../../utils/helpers/data-helper';
 import UI_ClubDetails from '../mix/club-details/club-details';
 import { useFilteredByTypeResults } from './use-filtered-results';
+import FilterCard from './filter-card';
 
 const FilterClub: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -50,21 +51,24 @@ const FilterClub: React.FC = () => {
     );
   };
 
+  const isActive = filters.club !== 'all';
+
   return (
-    <div className="flex flex-col">
-      <h3 className="font-semibold">Club</h3>
-      <div className="flex flex-col">
-        <div className='flex flex-between'>
-          <button
-            className={`px-3 py-1 m-1 border rounded transition-colors ${
-              filters.club === 'all' ? 'theme-btn-active' : 'theme-btn'
-            }`}
-            onClick={() => updateFilter('all')}
-          >
-            all
-          </button>
-          <div className='pl-4 text-sm'>⭐- rating, 🏊‍♂️ swimmers, <br /> ✅ events count</div>
+    <FilterCard
+      title="Club"
+      summary={isActive ? filters.club : 'All'}
+      isActive={isActive}
+    >
+      <div className="flex flex-col gap-2">
+        <div className="text-[11px] text-[var(--theme-mode-text-muted)]">
+          ⭐ rating · 🏊 swimmers · ✅ events
         </div>
+        <button
+          className={`fseg self-start ${filters.club === 'all' ? 'fseg-active' : ''}`}
+          onClick={() => updateFilter('all')}
+        >
+          all
+        </button>
         {availableClubs.map(
           ({
             club,
@@ -90,7 +94,7 @@ const FilterClub: React.FC = () => {
           ),
         )}
       </div>
-    </div>
+    </FilterCard>
   );
 };
 

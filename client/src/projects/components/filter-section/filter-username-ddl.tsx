@@ -2,6 +2,7 @@ import React from 'react';
 import Select from 'react-select';
 import './filter-section.css';
 import { rootActions, useAppDispatch, useAppSelector } from '../../../store/store';
+import FilterCard from './filter-card';
 
 const FilterNameDropdown: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -41,9 +42,14 @@ const FilterNameDropdown: React.FC = () => {
 
   if (nameOptions.length <= 1) return null;
 
+  const isActive = !!filters.selected_name && filters.selected_name !== 'all';
+
   return (
-    <div className='w-full'>
-      <h3 className="font-semibold mb-1">Name</h3>
+    <FilterCard
+      title="Name"
+      summary={isActive ? filters.selected_name : 'All'}
+      isActive={isActive}
+    >
       <Select
         options={nameOptions}
         value={selectedOption}
@@ -51,7 +57,7 @@ const FilterNameDropdown: React.FC = () => {
         isClearable
         classNamePrefix="fname"
       />
-    </div>
+    </FilterCard>
   );
 };
 

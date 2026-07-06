@@ -9,6 +9,9 @@ namespace Swimm.Domain.Entities;
 /// </summary>
 public class Category
 {
+    /// <summary>Ключ категории Masters: членство в ней определяет Competition.IsMasters.</summary>
+    public const string MastersKey = "results-masters";
+
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public int Id { get; set; }

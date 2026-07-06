@@ -18,6 +18,8 @@ interface SwimmerNameCellProps {
   className?: string;
   showClubIcon?: boolean;
   isRecordHolder?: boolean;
+  /** primary-избранное («это я») — бейдж ★ ME рядом с именем */
+  isMe?: boolean;
 }
 
 const UI_SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
@@ -35,6 +37,7 @@ const UI_SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
   className = '',
   showClubIcon = false,
   isRecordHolder = false,
+  isMe = false,
 }) => {
   const displayName = isRelay
     ? club || 'Relay Team'
@@ -72,16 +75,30 @@ const UI_SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
   }
 
   return (
-    <div className={`${className} ${onClick ? 'cursor-pointer' : ''}`} onClick={onClick}>
-      <div className="flex items-center gap-2">
-        <div className={`${firstLineClassName} overflow-hidden`}>{displayName}</div>
-        {isRecordHolder && (
+    <div
+      className={`${className} ${onClick ? 'cursor-pointer' : ''}`}
+      onClick={onClick ? (e) => { e.stopPropagation(); onClick(); } : undefined}
+    >
+      {isRecordHolder && (
+        <div className="mb-1 flex">
           <span
             title="Holds the record for this event"
             className="flex-shrink-0 whitespace-nowrap rounded-lg border px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide"
             style={{ color: '#b07d0a', borderColor: '#e8c66a', background: 'var(--theme-mode-surface)' }}
           >
             👑 RECORD
+          </span>
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <div className={`${firstLineClassName} overflow-hidden`}>{displayName}</div>
+        {isMe && (
+          <span
+            title="This is me"
+            className="flex-shrink-0 whitespace-nowrap rounded-lg px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide"
+            style={{ color: '#b8860b', background: '#fdf3d6' }}
+          >
+            ★ ME
           </span>
         )}
       </div>

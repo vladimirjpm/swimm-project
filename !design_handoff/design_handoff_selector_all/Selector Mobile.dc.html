@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+    @keyframes sheetIn { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+  </style>
+</helmet>
+
+<div ref="{{ rootRef }}" style="min-height: 100vh; padding: 28px 20px 60px; background: var(--sel-page, #f5f5f7);">
+  <div style="max-width: 430px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
+
+    <!-- preview controls (design-review only, do not ship) -->
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <div style="font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--sel-muted, #aab0bd);">Preview: Mode × Context × State</div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <div style="display: flex; border-radius: 10px; overflow: hidden; border: 1px solid var(--sel-border-input, #d6e0da);">
+          <div onClick="{{ setLight }}" style="padding: 7px 12px; font-size: 12px; font-weight: 700; cursor: pointer; user-select: none; background: var(--sel-btn-light-bg, #1565c0); color: var(--sel-btn-light-c, #fff);">Light</div>
+          <div onClick="{{ setDark }}" style="padding: 7px 12px; font-size: 12px; font-weight: 700; cursor: pointer; user-select: none; background: var(--sel-btn-dark-bg, #fff); color: var(--sel-btn-dark-c, #5b6470);">Dark</div>
+        </div>
+        <div style="display: flex; border-radius: 10px; overflow: hidden; border: 1px solid var(--sel-border-input, #d6e0da);">
+          <div onClick="{{ setTraining }}" style="padding: 7px 12px; font-size: 12px; font-weight: 700; cursor: pointer; user-select: none; background: var(--sel-btn-train-bg, #fff); color: var(--sel-btn-train-c, #5b6470);">Training</div>
+          <div onClick="{{ setCompetition }}" style="padding: 7px 12px; font-size: 12px; font-weight: 700; cursor: pointer; user-select: none; background: var(--sel-btn-comp-bg, #1565c0); color: var(--sel-btn-comp-c, #fff);">Competition</div>
+        </div>
+        <div style="display: flex; border-radius: 10px; overflow: hidden; border: 1px solid var(--sel-border-input, #d6e0da);">
+          <div onClick="{{ setSelected }}" style="padding: 7px 12px; font-size: 12px; font-weight: 700; cursor: pointer; user-select: none; background: var(--sel-btn-sel-bg, #1565c0); color: var(--sel-btn-sel-c, #fff); white-space: nowrap;">Selected</div>
+          <div onClick="{{ setDeepLink }}" style="padding: 7px 12px; font-size: 12px; font-weight: 700; cursor: pointer; user-select: none; background: var(--sel-btn-deep-bg, #fff); color: var(--sel-btn-deep-c, #5b6470); white-space: nowrap;">?category=…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- phone viewport -->
+    <div style="width: 390px; height: 760px; margin: 0 auto; border-radius: 28px; background: var(--sel-page, #f5f5f7); border: 1px solid var(--sel-row-border, #e4e8ee); box-shadow: var(--sel-card-shadow, 0 1px 3px rgba(0,0,0,0.06)); position: relative; overflow: hidden; display: flex; flex-direction: column;">
+
+      <!-- top bar -->
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 10px;">
+        <div style="font-size: 13px; font-weight: 900; letter-spacing: .18em; color: var(--sel-text, #1a1a1a);">SWIM<span style="color: var(--sel-accent, #1565c0);">HUB</span></div>
+        <div style="width: 40px; height: 40px; border-radius: 12px; background: var(--sel-surface, #fff); border: 1px solid var(--sel-row-border, #e4e8ee); display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 4px; padding-right: 10px;">
+          <span style="width: 18px; height: 2.5px; border-radius: 2px; background: var(--sel-text2, #5b6470);"></span>
+          <span style="width: 12px; height: 2.5px; border-radius: 2px; background: var(--sel-text2, #5b6470);"></span>
+        </div>
+      </div>
+
+      <!-- SELECTED: competition header -->
+      <sc-if value="{{ hasSelection }}" hint-placeholder-val="{{ true }}">
+        <div style="margin: 2px 12px 0; border-radius: 16px; background: var(--sel-accent, #1565c0); color: var(--sel-accent-text, #fff); padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 9px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <div style="font-size: 17px; font-weight: 800; direction: rtl; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;">{{ selName }}</div>
+            <div onClick="{{ toggleSheet }}" style="flex-shrink: 0; display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 12px; background: rgba(127,127,127,.18); border: 1px solid var(--sel-header-btn-border, rgba(255,255,255,.4)); font-size: 13px; font-weight: 800; cursor: pointer; user-select: none; white-space: nowrap;">⇄ Change</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 600; opacity: .85;">{{ selMeta }}</div>
+        </div>
+
+        <!-- filter chips -->
+        <div style="display: flex; gap: 8px; padding: 12px 12px 0; overflow: hidden;">
+          <div style="display: flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 999px; background: var(--sel-text, #1a1a1a); color: var(--sel-page, #fff); font-size: 12.5px; font-weight: 800; white-space: nowrap;">Filters · 2</div>
+          <div style="display: flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 999px; background: var(--sel-surface, #fff); border: 1px solid var(--sel-border-input, #d6e0da); font-size: 12.5px; font-weight: 700; color: var(--sel-text2, #5b6470); white-space: nowrap;">Name: All ▾</div>
+          <div style="display: flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 999px; background: var(--sel-surface, #fff); border: 1px solid var(--sel-border-input, #d6e0da); font-size: 12.5px; font-weight: 700; color: var(--sel-text2, #5b6470); white-space: nowrap;">Event: All ▾</div>
+        </div>
+      </sc-if>
+
+      <!-- DEEP LINK: inline selector -->
+      <sc-if value="{{ noSelection }}" hint-placeholder-val="{{ false }}">
+        <div style="padding: 0 12px 10px;"><span style="font-family: ui-monospace, Menlo, monospace; font-size: 10.5px; color: var(--sel-muted, #aab0bd); padding: 4px 10px; border-radius: 8px; background: var(--sel-surface, #fff); border: 1px solid var(--sel-row-border, #e4e8ee);">{{ urlReadout }}</span></div>
+        <div style="margin: 0 12px; border-radius: 16px; background: var(--sel-surface, #fff); border: 1px solid var(--sel-card-border, #edf0f5); box-shadow: var(--sel-card-shadow, 0 1px 3px rgba(0,0,0,0.06)); padding: 14px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto;">
+          <div style="font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--sel-muted, #aab0bd);">{{ panelTitle }}</div>
+          <div style="display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none;">
+            <sc-for list="{{ tabs }}" as="tab" hint-placeholder-count="4">
+              <sc-if value="{{ tab.active }}" hint-placeholder-val="{{ false }}">
+                <div onClick="{{ tab.onClick }}" style="flex-shrink: 0; display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 15px; border-radius: 999px; font-size: 13px; font-weight: 800; cursor: pointer; user-select: none; color: var(--sel-accent-text, #fff); background: var(--sel-accent, #1565c0); white-space: nowrap;">{{ tab.label }} <span style="font-weight: 600; opacity: .75;">{{ tab.count }}</span></div>
+              </sc-if>
+              <sc-if value="{{ tab.inactive }}" hint-placeholder-val="{{ true }}">
+                <div onClick="{{ tab.onClick }}" style="flex-shrink: 0; display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 15px; border-radius: 999px; font-size: 13px; font-weight: 700; cursor: pointer; user-select: none; color: var(--sel-text2, #5b6470); background: var(--sel-input-bg, #f7faf8); border: 1px solid var(--sel-border-input, #d6e0da); white-space: nowrap;">{{ tab.label }} <span style="font-weight: 600; opacity: .6;">{{ tab.count }}</span></div>
+              </sc-if>
+            </sc-for>
+          </div>
+          <div style="display: flex; align-items: center; gap: 9px; min-height: 44px; padding: 0 14px; border-radius: 12px; background: var(--sel-input-bg, #f7faf8); border: 1px solid var(--sel-border-input, #d6e0da);">
+            <span style="color: var(--sel-muted, #aab0bd); font-size: 15px;">⌕</span>
+            <span style="font-size: 14px; color: var(--sel-muted, #aab0bd);">{{ searchPlaceholder }}</span>
+          </div>
+          <sc-if value="{{ hasNow }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size: 10.5px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--sel-live, #148253);">Live · Upcoming</div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <sc-for list="{{ nowItems }}" as="item" hint-placeholder-count="1">
+                <dc-import name="Row" item="{{ item }}" hint-size="100%,52px"></dc-import>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-for list="{{ monthGroups }}" as="group" hint-placeholder-count="2">
+            <div style="font-size: 10.5px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--sel-muted, #aab0bd);">{{ group.label }}</div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <sc-for list="{{ group.items }}" as="item" hint-placeholder-count="2">
+                <dc-import name="Row" item="{{ item }}" hint-size="100%,52px"></dc-import>
+              </sc-for>
+            </div>
+          </sc-for>
+          <sc-if value="{{ hasArchive }}" hint-placeholder-val="{{ true }}">
+            <div onClick="{{ toggleArchive }}" style="display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border-radius: 12px; border: 1px dashed var(--sel-border-input, #d6e0da); font-size: 13px; font-weight: 700; color: var(--sel-text2, #5b6470); cursor: pointer; user-select: none; background: var(--sel-surface, #fff);">{{ archiveLabel }} <span style="font-size: 10px;">{{ archiveChevron }}</span></div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <!-- results / hint area -->
+      <div style="flex: 1; margin: 12px 12px 16px; border-radius: 14px; border: 1px dashed var(--sel-border-input, #d6e0da); background: var(--sel-surface, #fff); display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 30px; font-size: 13px; font-weight: 600; color: var(--sel-muted, #aab0bd); opacity: {{ contentOpacity }};">{{ contentHint }}</div>
+
+      <!-- bottom sheet -->
+      <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ closeSheet }}" style="position: absolute; inset: 0; z-index: 30; background: rgba(10,14,20,.5); display: flex; align-items: flex-end;">
+          <div onClick="{{ stop }}" style="width: 100%; max-height: 88%; border-radius: 22px 22px 0 0; background: var(--sel-surface, #fff); box-shadow: 0 -18px 50px rgba(0,0,0,.3); display: flex; flex-direction: column; animation: sheetIn .22s ease;">
+            <div style="display: flex; justify-content: center; padding: 10px 0 2px;"><span style="width: 40px; height: 4px; border-radius: 3px; background: var(--sel-border-input, #d6e0da);"></span></div>
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 16px 10px;">
+              <div style="font-size: 16px; font-weight: 800; color: var(--sel-text, #1a1a1a);">{{ panelTitle }}</div>
+              <div onClick="{{ closeSheet }}" style="width: 44px; height: 44px; border-radius: 12px; background: var(--sel-input-bg, #f7faf8); display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--sel-text2, #5b6470); cursor: pointer; user-select: none;">✕</div>
+            </div>
+            <div style="display: flex; gap: 8px; padding: 0 16px 12px; overflow-x: auto; scrollbar-width: none;">
+              <sc-for list="{{ tabs }}" as="tab" hint-placeholder-count="4">
+                <sc-if value="{{ tab.active }}" hint-placeholder-val="{{ false }}">
+                  <div onClick="{{ tab.onClick }}" style="flex-shrink: 0; display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 15px; border-radius: 999px; font-size: 13px; font-weight: 800; cursor: pointer; user-select: none; color: var(--sel-accent-text, #fff); background: var(--sel-accent, #1565c0); white-space: nowrap;">{{ tab.label }} <span style="font-weight: 600; opacity: .75;">{{ tab.count }}</span></div>
+                </sc-if>
+                <sc-if value="{{ tab.inactive }}" hint-placeholder-val="{{ true }}">
+                  <div onClick="{{ tab.onClick }}" style="flex-shrink: 0; display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 15px; border-radius: 999px; font-size: 13px; font-weight: 700; cursor: pointer; user-select: none; color: var(--sel-text2, #5b6470); background: var(--sel-input-bg, #f7faf8); border: 1px solid var(--sel-border-input, #d6e0da); white-space: nowrap;">{{ tab.label }} <span style="font-weight: 600; opacity: .6;">{{ tab.count }}</span></div>
+                </sc-if>
+              </sc-for>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; padding: 0 16px 12px;">
+              <div style="display: flex; align-items: center; gap: 9px; min-height: 44px; padding: 0 14px; border-radius: 12px; background: var(--sel-input-bg, #f7faf8); border: 1px solid var(--sel-border-input, #d6e0da);">
+                <span style="color: var(--sel-muted, #aab0bd); font-size: 15px;">⌕</span>
+                <span style="font-size: 14px; color: var(--sel-muted, #aab0bd);">{{ searchPlaceholder }}</span>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 0 14px; border-radius: 12px; background: var(--sel-input-bg, #f7faf8); border: 1px solid var(--sel-border-input, #d6e0da); font-size: 13px; font-weight: 700; color: var(--sel-text, #1a1a1a);">Season 2026 <span style="font-size: 10px; color: var(--sel-muted, #aab0bd);">▾</span></div>
+            </div>
+            <div style="overflow-y: auto; padding: 0 16px 20px; display: flex; flex-direction: column; gap: 8px;">
+              <sc-if value="{{ hasNow }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size: 10.5px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--sel-live, #148253);">Live · Upcoming</div>
+                <sc-for list="{{ nowItems }}" as="item" hint-placeholder-count="1">
+                  <dc-import name="Row" item="{{ item }}" hint-size="100%,52px"></dc-import>
+                </sc-for>
+              </sc-if>
+              <sc-for list="{{ monthGroups }}" as="group" hint-placeholder-count="2">
+                <div style="font-size: 10.5px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--sel-muted, #aab0bd);">{{ group.label }}</div>
+                <sc-for list="{{ group.items }}" as="item" hint-placeholder-count="2">
+                  <dc-import name="Row" item="{{ item }}" hint-size="100%,52px"></dc-import>
+                </sc-for>
+              </sc-for>
+              <sc-if value="{{ hasArchive }}" hint-placeholder-val="{{ true }}">
+                <div onClick="{{ toggleArchive }}" style="display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border-radius: 12px; border: 1px dashed var(--sel-border-input, #d6e0da); font-size: 13px; font-weight: 700; color: var(--sel-text2, #5b6470); cursor: pointer; user-select: none; background: var(--sel-surface, #fff);">{{ archiveLabel }} <span style="font-size: 10px;">{{ archiveChevron }}</span></div>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="font-size: 12px; color: var(--sel-muted, #aab0bd); line-height: 1.6;">Selected → шапка (--theme-primary) + «Change» открывает bottom sheet. ?category=… без выбора → селектор инлайн, контент приглушён. Тап по строке закрывает sheet и обновляет URL: <span style="font-family: ui-monospace, Menlo, monospace;">{{ urlReadout }}</span>. Все цвета — токены (mode × context), LIVE — статусный цвет. См. README.md.</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 470, &quot;height&quot;: 940}}">
+class Component extends DCLogic {
+  state = {
+    mode: 'light',
+    context: 'competition',
+    cat: 'junior',
+    archiveOpen: false,
+    selectedId: null,
+    selectedKind: null,
+    sheetOpen: false,
+    comps: []
+  };
+
+  componentDidMount() {
+    fetch('./competitions-by-category.json')
+      .then(r => r.json())
+      .then(comps => {
+        const first = comps.find(c => c.category === 'junior' && c.status !== 'live') || comps[0];
+        this.setState({ comps, selectedId: first ? first.id : null, selectedKind: first ? first.kind : null });
+      })
+      .catch(err => console.error('Ошибка загрузки:', err));
+  }
+
+  componentDidUpdate() {
+    if (this.rootEl) this.applyVars(this.rootEl);
+  }
+
+  /* Same token model as design_handoff_theme_modes / design_handoff_category_selector. */
+  get palette() {
+    const lightBase = {
+      page: '#f5f5f7', surface: '#ffffff',
+      borderInput: '#d6e0da', inputBg: '#f7faf8',
+      text: '#1a1a1a', text2: '#5b6470', muted: '#aab0bd',
+      cardBorder: '#edf0f5', cardShadow: '0 1px 3px rgba(0,0,0,0.06)',
+      rowBorder: '#e4e8ee', live: '#148253', liveBg: 'rgba(20,130,83,0.09)', liveBorder: 'rgba(20,130,83,0.4)'
+    };
+    const darkBase = {
+      page: '#0f1319', surface: '#212836',
+      borderInput: '#3a4453', inputBg: '#232a34',
+      text: '#eef1f6', text2: '#9aa4b2', muted: '#6b7686',
+      cardBorder: 'rgba(255,255,255,0.09)', cardShadow: '0 6px 20px rgba(0,0,0,0.5)',
+      rowBorder: '#333c49', live: '#3ddc97', liveBg: 'rgba(61,220,151,0.10)', liveBorder: 'rgba(61,220,151,0.45)'
+    };
+    const accents = {
+      training: {
+        light: { accent: '#1b8a4b', accentTint: '#e4f5ec' },
+        dark:  { accent: '#3ecb7f', accentTint: 'rgba(62,203,127,0.14)' }
+      },
+      competition: {
+        light: { accent: '#1565c0', accentTint: '#e3f0fb' },
+        dark:  { accent: '#4da3ff', accentTint: 'rgba(77,163,255,0.14)' }
+      }
+    };
+    const mode = this.state.mode === 'dark' ? 'dark' : 'light';
+    const ctx = this.state.context === 'competition' ? 'competition' : 'training';
+    const base = mode === 'dark' ? darkBase : lightBase;
+    return { ...base, ...accents[ctx][mode], mode };
+  }
+
+  applyVars(el) {
+    const p = this.palette;
+    const st = this.state;
+    const accentText = p.mode === 'dark' ? '#0f1319' : '#ffffff';
+    const btn = (active) => active
+      ? { bg: p.accent, c: accentText }
+      : { bg: p.surface, c: p.text2 };
+    const bL = btn(st.mode === 'light'), bD = btn(st.mode === 'dark');
+    const bT = btn(st.context === 'training'), bC = btn(st.context === 'competition');
+    const bS = btn(!!st.selectedId), bDe = btn(!st.selectedId);
+    const vars = {
+      'page': p.page, 'surface': p.surface,
+      'card-border': p.cardBorder, 'card-shadow': p.cardShadow,
+      'input-bg': p.inputBg, 'border-input': p.borderInput,
+      'text': p.text, 'text2': p.text2, 'muted': p.muted,
+      'accent': p.accent, 'accent-text': accentText, 'accent-tint': p.accentTint,
+      'live': p.live, 'live-bg': p.liveBg, 'live-border': p.liveBorder,
+      'row-border': p.rowBorder,
+      'header-btn-border': p.mode === 'dark' ? 'rgba(15,19,25,.35)' : 'rgba(255,255,255,.4)',
+      'btn-light-bg': bL.bg, 'btn-light-c': bL.c,
+      'btn-dark-bg': bD.bg, 'btn-dark-c': bD.c,
+      'btn-train-bg': bT.bg, 'btn-train-c': bT.c,
+      'btn-comp-bg': bC.bg, 'btn-comp-c': bC.c,
+      'btn-sel-bg': bS.bg, 'btn-sel-c': bS.c,
+      'btn-deep-bg': bDe.bg, 'btn-deep-c': bDe.c
+    };
+    Object.entries(vars).forEach(([k, v]) => el.style.setProperty('--sel-' + k, v));
+  }
+
+  static CATS = [
+    { key: 'all', label: 'All' },
+    { key: 'young8_11', label: 'Young 8–11' },
+    { key: 'junior', label: 'Junior' },
+    { key: 'masters', label: 'Masters' }
+  ];
+
+  renderVals() {
+    const st = this.state;
+    const comps = st.comps || [];
+
+    const inCat = (c) => st.cat === 'all' || c.category === st.cat;
+    const visible = comps.filter(inCat);
+    const nowList = visible.filter(c => c.status === 'live' || c.status === 'upcoming');
+    const rest = visible.filter(c => c.status === 'done');
+    const shown = st.archiveOpen ? rest : rest.filter(c => !c.archived);
+    const archived = rest.filter(c => c.archived);
+
+    const mkItem = (c) => {
+      const isLive = c.status === 'live';
+      const isSelected = !isLive && st.selectedId === c.id;
+      return {
+        name: c.name,
+        isLive, isSelected,
+        isPlain: !isLive && !isSelected,
+        meta: isLive ? (c.statusNote || 'LIVE') : c.dateLabel,
+        onClick: () => this.setState({ selectedId: c.id, selectedKind: c.kind, sheetOpen: false })
+      };
+    };
+
+    const groups = [];
+    shown.forEach(c => {
+      let g = groups.find(x => x.label === c.month);
+      if (!g) { g = { label: c.month, items: [] }; groups.push(g); }
+      g.items.push(mkItem(c));
+    });
+
+    const tabs = Component.CATS.map(cat => {
+      const active = st.cat === cat.key;
+      return {
+        label: cat.label,
+        count: cat.key === 'all' ? comps.length : comps.filter(c => c.category === cat.key).length,
+        active,
+        inactive: !active,
+        onClick: () => this.setState({ cat: cat.key, archiveOpen: false })
+      };
+    });
+
+    const catLabel = (Component.CATS.find(c => c.key === st.cat) || {}).label || '';
+    const selected = comps.find(c => c.id === st.selectedId) || null;
+    const hasSelection = !!selected;
+    let url = '/competitions?category=' + st.cat + '&season=2026';
+    if (selected) url = '/competitions?' + (st.selectedKind === 'event' ? 'eventId' : 'competitionId') + '=' + selected.id;
+
+    return {
+      rootRef: (el) => { this.rootEl = el; if (el) this.applyVars(el); },
+      setLight: () => this.setState({ mode: 'light' }),
+      setDark: () => this.setState({ mode: 'dark' }),
+      setTraining: () => this.setState({ context: 'training' }),
+      setCompetition: () => this.setState({ context: 'competition' }),
+      setSelected: () => {
+        const first = comps.find(c => inCat(c) && c.status !== 'live') || comps[0];
+        this.setState({ selectedId: first ? first.id : null, selectedKind: first ? first.kind : null, sheetOpen: false });
+      },
+      setDeepLink: () => this.setState({ selectedId: null, selectedKind: null, sheetOpen: false }),
+      hasSelection,
+      noSelection: !hasSelection,
+      selName: selected ? selected.name : '',
+      selMeta: selected ? (selected.dateLabel + ' · ' + (selected.month || '') + ' · Season 2026') : '',
+      toggleSheet: () => this.setState(s => ({ sheetOpen: !s.sheetOpen })),
+      closeSheet: () => this.setState({ sheetOpen: false }),
+      stop: (e) => e.stopPropagation(),
+      sheetOpen: st.sheetOpen,
+      panelTitle: 'Select competition — ' + catLabel,
+      tabs,
+      searchPlaceholder: 'Search in ' + catLabel + '…',
+      hasNow: nowList.length > 0,
+      nowItems: nowList.map(mkItem),
+      monthGroups: groups,
+      hasArchive: archived.length > 0,
+      toggleArchive: () => this.setState(s => ({ archiveOpen: !s.archiveOpen })),
+      archiveLabel: st.archiveOpen ? 'Hide earlier competitions' : ('Show ' + archived.length + ' earlier competitions'),
+      archiveChevron: st.archiveOpen ? '▴' : '▾',
+      contentOpacity: hasSelection ? 1 : 0.55,
+      contentHint: hasSelection ? 'results list' : 'Select a competition above to see results',
+      urlReadout: url
+    };
+  }
+}
+</script>
+</body>
+</html>

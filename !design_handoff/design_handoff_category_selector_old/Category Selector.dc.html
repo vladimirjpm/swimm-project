@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+  </style>
+</helmet>
+
+<div ref="{{ rootRef }}" style="min-height: 100vh; padding: 28px 20px 60px; background: var(--sel-page, #f5f5f7);">
+  <div style="max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px;">
+
+    <!-- preview controls (design-review only, do not ship) -->
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+      <div style="font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--sel-muted, #aab0bd);">Preview: Mode × Context</div>
+      <div style="display: flex; gap: 10px;">
+        <div style="display: flex; border-radius: 10px; overflow: hidden; border: 1px solid var(--sel-border-input, #d6e0da);">
+          <div onClick="{{ setLight }}" style="padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: pointer; user-select: none; background: var(--sel-btn-light-bg, #1565c0); color: var(--sel-btn-light-c, #fff);">Light</div>
+          <div onClick="{{ setDark }}" style="padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: pointer; user-select: none; background: var(--sel-btn-dark-bg, #fff); color: var(--sel-btn-dark-c, #5b6470);">Dark</div>
+        </div>
+        <div style="display: flex; border-radius: 10px; overflow: hidden; border: 1px solid var(--sel-border-input, #d6e0da);">
+          <div onClick="{{ setTraining }}" style="padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: pointer; user-select: none; background: var(--sel-btn-train-bg, #fff); color: var(--sel-btn-train-c, #5b6470);">Training</div>
+          <div onClick="{{ setCompetition }}" style="padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: pointer; user-select: none; background: var(--sel-btn-comp-bg, #1565c0); color: var(--sel-btn-comp-c, #fff);">Competition</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- the selector -->
+    <div style="border-radius: 18px; background: var(--sel-surface, #fff); border: 1px solid var(--sel-card-border, #edf0f5); box-shadow: var(--sel-card-shadow, 0 1px 3px rgba(0,0,0,0.06)); padding: 20px 22px;">
+      <div style="font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--sel-muted, #aab0bd); margin-bottom: 14px;">Select competition</div>
+
+      <!-- category tabs -->
+      <div style="display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap;">
+        <sc-for list="{{ tabs }}" as="tab" hint-placeholder-count="4">
+          <sc-if value="{{ tab.active }}" hint-placeholder-val="{{ false }}">
+            <div onClick="{{ tab.onClick }}" style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 800; cursor: pointer; user-select: none; color: var(--sel-accent-text, #fff); background: var(--sel-accent, #1565c0); border: 1px solid var(--sel-accent, #1565c0);">{{ tab.label }} <span style="font-weight: 600; opacity: .75;">{{ tab.count }}</span></div>
+          </sc-if>
+          <sc-if value="{{ tab.inactive }}" hint-placeholder-val="{{ true }}">
+            <div onClick="{{ tab.onClick }}" style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 700; cursor: pointer; user-select: none; color: var(--sel-text2, #5b6470); background: var(--sel-surface, #fff); border: 1px solid var(--sel-row-border, #e4e8ee);">{{ tab.label }} <span style="font-weight: 600; opacity: .6;">{{ tab.count }}</span></div>
+          </sc-if>
+        </sc-for>
+      </div>
+
+      <!-- search + season -->
+      <div style="display: flex; gap: 10px; margin-bottom: 18px;">
+        <div style="flex: 1; display: flex; align-items: center; gap: 9px; padding: 10px 14px; border-radius: 12px; background: var(--sel-input-bg, #f7faf8); border: 1px solid var(--sel-border-input, #d6e0da);">
+          <span style="color: var(--sel-muted, #aab0bd); font-size: 14px;">⌕</span>
+          <span style="font-size: 13.5px; color: var(--sel-muted, #aab0bd);">{{ searchPlaceholder }}</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 7px; padding: 10px 14px; border-radius: 12px; background: var(--sel-input-bg, #f7faf8); border: 1px solid var(--sel-border-input, #d6e0da); font-size: 13px; font-weight: 700; color: var(--sel-text, #1a1a1a); cursor: pointer; white-space: nowrap;">
+          Season 2026 <span style="font-size: 10px; color: var(--sel-muted, #aab0bd);">▾</span>
+        </div>
+      </div>
+
+      <!-- live / upcoming -->
+      <sc-if value="{{ hasNow }}" hint-placeholder-val="{{ true }}">
+        <div style="font-size: 10.5px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--sel-live, #148253); margin-bottom: 8px;">Live · Upcoming</div>
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+          <sc-for list="{{ nowItems }}" as="item" hint-placeholder-count="2">
+            <sc-if value="{{ item.isLive }}" hint-placeholder-val="{{ false }}">
+              <div onClick="{{ item.onClick }}" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 12px; cursor: pointer; background: var(--sel-live-bg, rgba(20,130,83,0.09)); border: 1px solid var(--sel-live-border, rgba(20,130,83,0.4));">
+                <div style="font-size: 14px; font-weight: 700; color: var(--sel-text, #1a1a1a); direction: rtl; text-align: left;">{{ item.name }}</div>
+                <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
+                  <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--sel-live, #148253); animation: blink 1.4s ease infinite;"></span>
+                  <span style="font-family: ui-monospace, Menlo, monospace; font-size: 10px; font-weight: 800; color: var(--sel-live, #148253); white-space: nowrap;">{{ item.meta }}</span>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ item.isSelected }}" hint-placeholder-val="{{ false }}">
+              <div onClick="{{ item.onClick }}" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 12px; cursor: pointer; background: var(--sel-accent-tint, #e3f0fb); border: 1px solid var(--sel-accent, #1565c0);">
+                <div style="font-size: 14px; font-weight: 700; color: var(--sel-text, #1a1a1a); direction: rtl; text-align: left;">{{ item.name }}</div>
+                <span style="font-size: 12px; font-weight: 700; color: var(--sel-accent, #1565c0); white-space: nowrap;">{{ item.meta }}</span>
+              </div>
+            </sc-if>
+            <sc-if value="{{ item.isPlain }}" hint-placeholder-val="{{ true }}">
+              <div onClick="{{ item.onClick }}" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 12px; cursor: pointer; background: var(--sel-surface, #fff); border: 1px solid var(--sel-row-border, #e4e8ee);">
+                <div style="font-size: 14px; font-weight: 600; color: var(--sel-text2, #5b6470); direction: rtl; text-align: left;">{{ item.name }}</div>
+                <span style="font-size: 12px; font-weight: 700; color: var(--sel-accent, #1565c0); white-space: nowrap;">{{ item.meta }}</span>
+              </div>
+            </sc-if>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <!-- month groups -->
+      <sc-for list="{{ monthGroups }}" as="group" hint-placeholder-count="2">
+        <div style="font-size: 10.5px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--sel-muted, #aab0bd); margin-bottom: 8px;">{{ group.label }}</div>
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;">
+          <sc-for list="{{ group.items }}" as="item" hint-placeholder-count="2">
+            <sc-if value="{{ item.isSelected }}" hint-placeholder-val="{{ false }}">
+              <div onClick="{{ item.onClick }}" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 12px; cursor: pointer; background: var(--sel-accent-tint, #e3f0fb); border: 1px solid var(--sel-accent, #1565c0);">
+                <div style="font-size: 14px; font-weight: 700; color: var(--sel-text, #1a1a1a); direction: rtl; text-align: left;">{{ item.name }}</div>
+                <span style="font-size: 12px; font-weight: 700; color: var(--sel-accent, #1565c0); white-space: nowrap;">{{ item.meta }}</span>
+              </div>
+            </sc-if>
+            <sc-if value="{{ item.isPlain }}" hint-placeholder-val="{{ true }}">
+              <div onClick="{{ item.onClick }}" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 12px; cursor: pointer; background: var(--sel-surface, #fff); border: 1px solid var(--sel-row-border, #e4e8ee);">
+                <div style="font-size: 14px; font-weight: 600; color: var(--sel-text2, #5b6470); direction: rtl; text-align: left;">{{ item.name }}</div>
+                <span style="font-size: 12px; color: var(--sel-muted, #aab0bd); white-space: nowrap;">{{ item.meta }}</span>
+              </div>
+            </sc-if>
+          </sc-for>
+        </div>
+      </sc-for>
+
+      <!-- archive toggle -->
+      <sc-if value="{{ hasArchive }}" hint-placeholder-val="{{ true }}">
+        <div onClick="{{ toggleArchive }}" style="display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; border-radius: 12px; border: 1px dashed var(--sel-border-input, #d6e0da); font-size: 13px; font-weight: 700; color: var(--sel-text2, #5b6470); cursor: pointer; background: var(--sel-surface, #fff); user-select: none;">{{ archiveLabel }} <span style="font-size: 10px;">{{ archiveChevron }}</span></div>
+      </sc-if>
+
+      <!-- URL contract readout -->
+      <div style="margin-top: 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <span style="font-size: 11px; font-weight: 700; color: var(--sel-muted, #aab0bd);">URL:</span>
+        <span style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; background: var(--sel-input-bg, #f7faf8); border: 1px solid var(--sel-border-input, #d6e0da); padding: 4px 10px; border-radius: 8px; color: var(--sel-accent, #1565c0);">{{ urlReadout }}</span>
+      </div>
+    </div>
+
+    <div style="font-size: 12px; color: var(--sel-muted, #aab0bd); line-height: 1.6;">Клик по соревнованию → ?competitionId= / ?eventId= · таб категории → ?category= · все цвета — CSS-переменные (mode × context), LIVE — статусный цвет, не зависит от контекста. См. README.md.</div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 820, &quot;height&quot;: 900}}">
+class Component extends DCLogic {
+  state = {
+    mode: 'light',
+    context: 'competition',
+    cat: 'junior',
+    archiveOpen: false,
+    selectedId: null,
+    selectedKind: null,
+    comps: []
+  };
+
+  componentDidMount() {
+    fetch('./competitions-by-category.json')
+      .then(r => r.json())
+      .then(comps => this.setState({ comps }))
+      .catch(err => console.error('Ошибка загрузки:', err));
+  }
+
+  componentDidUpdate() {
+    if (this.rootEl) this.applyVars(this.rootEl);
+  }
+
+  /* Same token model as design_handoff_theme_modes.
+   * LIVE is a STATUS colour pair (mode-dependent, context-independent). */
+  get palette() {
+    const lightBase = {
+      page: '#f5f5f7', surface: '#ffffff',
+      borderInput: '#d6e0da', inputBg: '#f7faf8',
+      text: '#1a1a1a', text2: '#5b6470', muted: '#aab0bd',
+      cardBorder: '#edf0f5', cardShadow: '0 1px 3px rgba(0,0,0,0.06)',
+      rowBorder: '#e4e8ee', live: '#148253', liveBg: 'rgba(20,130,83,0.09)', liveBorder: 'rgba(20,130,83,0.4)'
+    };
+    const darkBase = {
+      page: '#0f1319', surface: '#212836',
+      borderInput: '#3a4453', inputBg: '#232a34',
+      text: '#eef1f6', text2: '#9aa4b2', muted: '#6b7686',
+      cardBorder: 'rgba(255,255,255,0.09)', cardShadow: '0 6px 20px rgba(0,0,0,0.5)',
+      rowBorder: '#333c49', live: '#3ddc97', liveBg: 'rgba(61,220,151,0.10)', liveBorder: 'rgba(61,220,151,0.45)'
+    };
+    const accents = {
+      training: {
+        light: { accent: '#1b8a4b', accentTint: '#e4f5ec' },
+        dark:  { accent: '#3ecb7f', accentTint: 'rgba(62,203,127,0.14)' }
+      },
+      competition: {
+        light: { accent: '#1565c0', accentTint: '#e3f0fb' },
+        dark:  { accent: '#4da3ff', accentTint: 'rgba(77,163,255,0.14)' }
+      }
+    };
+    const mode = this.state.mode === 'dark' ? 'dark' : 'light';
+    const ctx = this.state.context === 'competition' ? 'competition' : 'training';
+    const base = mode === 'dark' ? darkBase : lightBase;
+    return { ...base, ...accents[ctx][mode], mode };
+  }
+
+  applyVars(el) {
+    const p = this.palette;
+    const st = this.state;
+    const accentText = p.mode === 'dark' ? '#0f1319' : '#ffffff';
+    const btn = (active) => active
+      ? { bg: p.accent, c: accentText }
+      : { bg: p.surface, c: p.text2 };
+    const bL = btn(st.mode === 'light'), bD = btn(st.mode === 'dark');
+    const bT = btn(st.context === 'training'), bC = btn(st.context === 'competition');
+    const vars = {
+      'page': p.page, 'surface': p.surface,
+      'card-border': p.cardBorder, 'card-shadow': p.cardShadow,
+      'input-bg': p.inputBg, 'border-input': p.borderInput,
+      'text': p.text, 'text2': p.text2, 'muted': p.muted,
+      'accent': p.accent, 'accent-text': accentText, 'accent-tint': p.accentTint,
+      'live': p.live, 'live-bg': p.liveBg, 'live-border': p.liveBorder,
+      'row-border': p.rowBorder,
+      'btn-light-bg': bL.bg, 'btn-light-c': bL.c,
+      'btn-dark-bg': bD.bg, 'btn-dark-c': bD.c,
+      'btn-train-bg': bT.bg, 'btn-train-c': bT.c,
+      'btn-comp-bg': bC.bg, 'btn-comp-c': bC.c
+    };
+    Object.entries(vars).forEach(([k, v]) => el.style.setProperty('--sel-' + k, v));
+  }
+
+  static CATS = [
+    { key: 'all', label: 'All' },
+    { key: 'young8_11', label: 'Young 8–11' },
+    { key: 'junior', label: 'Junior' },
+    { key: 'masters', label: 'Masters' }
+  ];
+
+  renderVals() {
+    const st = this.state;
+    const comps = st.comps || [];
+
+    const inCat = (c) => st.cat === 'all' || c.category === st.cat;
+    const visible = comps.filter(inCat);
+    const nowList = visible.filter(c => c.status === 'live' || c.status === 'upcoming');
+    const rest = visible.filter(c => c.status === 'done');
+    const shown = st.archiveOpen ? rest : rest.filter(c => !c.archived);
+    const archived = rest.filter(c => c.archived);
+
+    const mkItem = (c) => {
+      const isLive = c.status === 'live';
+      const isSelected = !isLive && st.selectedId === c.id;
+      return {
+        name: c.name,
+        isLive,
+        isSelected,
+        isPlain: !isLive && !isSelected,
+        meta: isLive ? (c.statusNote || 'LIVE') : c.dateLabel,
+        onClick: () => this.setState({ selectedId: c.id, selectedKind: c.kind })
+      };
+    };
+
+    const groups = [];
+    shown.forEach(c => {
+      let g = groups.find(x => x.label === c.month);
+      if (!g) { g = { label: c.month, items: [] }; groups.push(g); }
+      g.items.push(mkItem(c));
+    });
+
+    const tabs = Component.CATS.map(cat => {
+      const active = st.cat === cat.key;
+      return {
+        label: cat.label,
+        count: cat.key === 'all' ? comps.length : comps.filter(c => c.category === cat.key).length,
+        active,
+        inactive: !active,
+        onClick: () => this.setState({ cat: cat.key, selectedId: null, selectedKind: null, archiveOpen: false })
+      };
+    });
+
+    const catLabel = (Component.CATS.find(c => c.key === st.cat) || {}).label || '';
+    let url = '/competitions?category=' + st.cat + '&season=2026';
+    if (st.selectedId) url = '/competitions?' + (st.selectedKind === 'event' ? 'eventId' : 'competitionId') + '=' + st.selectedId;
+
+    return {
+      rootRef: (el) => { this.rootEl = el; if (el) this.applyVars(el); },
+      setLight: () => this.setState({ mode: 'light' }),
+      setDark: () => this.setState({ mode: 'dark' }),
+      setTraining: () => this.setState({ context: 'training' }),
+      setCompetition: () => this.setState({ context: 'competition' }),
+      tabs,
+      searchPlaceholder: 'Search in ' + catLabel + ' — «דולפין», «וייסגל»…',
+      hasNow: nowList.length > 0,
+      nowItems: nowList.map(mkItem),
+      monthGroups: groups,
+      hasArchive: archived.length > 0,
+      toggleArchive: () => this.setState(s => ({ archiveOpen: !s.archiveOpen })),
+      archiveLabel: st.archiveOpen
+        ? 'Hide earlier competitions'
+        : ('Show ' + archived.length + ' earlier competitions'),
+      archiveChevron: st.archiveOpen ? '▴' : '▾',
+      urlReadout: url
+    };
+  }
+}
+
+</script>
+</body>
+</html>

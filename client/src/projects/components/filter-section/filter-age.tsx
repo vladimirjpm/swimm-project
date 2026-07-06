@@ -5,6 +5,7 @@ import {
   useAppSelector,
 } from '../../../store/store';
 import { useFilteredByTypeResults } from './use-filtered-results';
+import FilterCard from './filter-card';
 
 const FilterAge: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -68,17 +69,31 @@ const FilterAge: React.FC = () => {
     );
   };
 
+  const isRange = !availableAges.isMastersMode && !!filters.age_to && filters.age !== 'all';
+  const summary =
+    filters.age === 'all'
+      ? 'All'
+      : isRange
+        ? `${filters.age}–${filters.age_to}`
+        : String(filters.age);
+
   return (
-    <div className="flex flex-col">
-      <h3 className="font-semibold">
-        {availableAges.isMastersMode ? 'Age Group' : 'Age (multi-select with long-press)'}
-        {!availableAges.isMastersMode && filters.age_to && filters.age !== 'all' && (
-          <span className="ml-2 text-sm font-normal text-blue-600">
-            birth year: {filters.age}–{filters.age_to}
-          </span>
-        )}
-      </h3>
-      <div className="flex flex-wrap">
+    <FilterCard
+      title={availableAges.isMastersMode ? 'Age Group' : 'Age'}
+      summary={summary}
+      isActive={filters.age !== 'all'}
+    >
+      {!availableAges.isMastersMode && (
+        <div className="text-[11px] text-[var(--theme-mode-text-muted)] mb-2">
+          multi-select with long-press
+          {isRange && (
+            <span className="ml-2 font-semibold text-[var(--theme-primary)]">
+              birth year: {filters.age}–{filters.age_to}
+            </span>
+          )}
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2">
         {availableAges.birthYears.map((by) => {
           const isInRange =
             !availableAges.isMastersMode &&
@@ -134,7 +149,7 @@ const FilterAge: React.FC = () => {
           );
         })}
       </div>
-    </div>
+    </FilterCard>
   );
 };
 
@@ -186,14 +201,14 @@ function AgeButton({
   }, []);
 
   const cls = isActive
-    ? 'theme-btn-active'
+    ? 'fseg-active'
     : isInRange
-      ? 'theme-btn-active opacity-75'
-      : 'theme-btn';
+      ? 'fseg-active opacity-75'
+      : '';
 
   return (
     <button
-      className={`px-2 py-1 m-1 border rounded transition-colors ${cls}`}
+      className={`fseg ${cls}`}
       onMouseDown={startPress}
       onMouseUp={endPress}
       onMouseLeave={cancelPress}

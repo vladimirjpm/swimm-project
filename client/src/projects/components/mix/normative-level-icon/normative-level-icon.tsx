@@ -16,6 +16,7 @@ interface UI_NormativeLevelIconProps {
   disableClick?: boolean;//disable onClick popup
   progressPercent?: number | null;//gauge fill: % to next level
   nextTime?: string | null;//gauge tooltip: target time of next level
+  showProgress?: boolean;//gauge: show/hide progress arc (label always shown)
 }
 
 // Категория уровня → цвет дуги/метки (youth/adult/pro). Статус-цвета, фиксированы
@@ -67,6 +68,7 @@ const UI_NormativeLevelIcon: React.FC<UI_NormativeLevelIconProps> = ({
   disableClick = false,
   progressPercent,
   nextTime,
+  showProgress = true,
 }) => {
   const dispatch = useAppDispatch();
   const handleNormativeClick = () => {
@@ -90,6 +92,25 @@ const UI_NormativeLevelIcon: React.FC<UI_NormativeLevelIconProps> = ({
         : null;
     // Заполнение: по проценту; если след. уровня нет (max) — дуга полная.
     const offset = pct !== null ? ARC * (1 - pct / 100) : 0;
+
+    if (!showProgress) {
+      return (
+        <div
+          className={`dv-normative-level-icon flex items-center gap-1 ${disableClick ? '' : 'cursor-pointer'} ${className}`}
+          onClick={handleNormativeClick}
+        >
+          <span className="text-sm font-semibold text-[var(--theme-mode-text-muted)]">Level:</span>
+          <span className="text-[15px] font-extrabold" style={{ color }}>
+            {label}
+          </span>
+          {normativeAgeGroup && (
+            <span className="normative-age-group font-semibold text-[10px]" style={{ color }}>
+              {normativeAgeGroup}
+            </span>
+          )}
+        </div>
+      );
+    }
 
     return (
       <div

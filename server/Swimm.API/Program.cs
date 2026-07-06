@@ -9,6 +9,9 @@ using Swimm.Application;
 using Swimm.Application.Abstractions;
 using Swimm.Infrastructure;
 
+using Swimm.API.BackgroundServices;
+using Swimm.API.Services;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // appsettings.Local.json — gitignored, для локального переключения на другую БД.
@@ -102,6 +105,9 @@ if (googleEnabled)
         options.Scope.Add("email");
     });
 }
+
+builder.Services.AddSingleton<DbStatusService>();
+builder.Services.AddHostedService<DbPingBackgroundService>();
 
 var app = builder.Build();
 
@@ -199,5 +205,9 @@ app.MapGet("/api/antiforgery/token", (IAntiforgery af, HttpContext ctx) =>
     var tokens = af.GetAndStoreTokens(ctx);
     return Results.Ok(new { token = tokens.RequestToken });
 }).RequireAuthorization();
+
+app.MapGet("/api/db-status",
+    (DbStatusService s) => Results.Ok(new { available = s.IsAvailable }))
+    .AllowAnonymous();
 
 app.Run();

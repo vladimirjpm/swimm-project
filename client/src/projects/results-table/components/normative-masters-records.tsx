@@ -57,22 +57,47 @@ function getDistanceData(
   return null;
 }
 
-/** Resolve which gender keys to display */
+/** Resolve which gender keys to display (♀ слева, ♂ справа) */
 function resolveGenderKeys(gender: string): string[] {
   const resolved = Helper.resolveGender(gender);
-  if (gender === 'all' || resolved === 'none') return ['male', 'female'];
+  if (gender === 'all' || resolved === 'none') return ['female', 'male'];
   return [resolved];
 }
 
 const GENDER_LABELS: Record<string, string> = {
-  male: '♂',
-  female: '♀',
+  male: '♂ Man',
+  female: '♀ Woman',
 };
 
-const GENDER_STYLES: Record<string, { bg: string; border: string; title: string; bold: string; age: string }> = {
-  male: { bg: 'bg-blue-50', border: 'border-blue-200', title: 'text-blue-700', bold: 'text-blue-900', age: 'text-blue-800' },
-  female: { bg: 'bg-pink-50', border: 'border-pink-200', title: 'text-pink-700', bold: 'text-pink-900', age: 'text-pink-800' },
+/**
+ * Гендерные токены дизайна (design_handoff_age_records/README.md, свет+тьма) —
+ * те же, что у ISR Age Records, для визуальной согласованности обеих карточек рекордов.
+ */
+const GENDER_STYLES: Record<string, {
+  accent: string;
+  accentBg: string;
+  deep: string;
+  soft: string;
+  border: string;
+}> = {
+  male: {
+    accent: 'text-[#1e6fd6] dark:text-[#5aa2f5]',
+    accentBg: 'bg-[#1e6fd6] dark:bg-[#5aa2f5]',
+    deep: 'text-[#123a70] dark:text-[#dbe8fb]',
+    soft: 'bg-[#eaf2fd] dark:bg-[rgba(90,162,245,0.16)]',
+    border: 'border-[#d3e3f8] dark:border-[#28344a]',
+  },
+  female: {
+    accent: 'text-[#d6417f] dark:text-[#f072a6]',
+    accentBg: 'bg-[#d6417f] dark:bg-[#f072a6]',
+    deep: 'text-[#7a1f4b] dark:text-[#fbdcec]',
+    soft: 'bg-[#fdeff5] dark:bg-[rgba(240,114,166,0.16)]',
+    border: 'border-[#f6d3e3] dark:border-[#412234]',
+  },
 };
+
+const CARD_SURFACE = 'bg-white dark:bg-[#161b24]';
+const CARD_SHADOW = { boxShadow: '0 1px 3px rgba(20,28,45,0.05)' };
 
 function getStyles(genderKey: string) {
   return GENDER_STYLES[genderKey] ?? GENDER_STYLES.male;
@@ -88,22 +113,25 @@ function renderSingleAgeGroup(
   const s = getStyles(genderKey);
 
   return (
-    <div key={genderKey} className={`${s.bg} border ${s.border} rounded px-3 py-2 mb-2 text-sm`}>
-      <span className={`font-semibold ${s.title}`}>
-        🏅 {showGenderLabel ? `${GENDER_LABELS[genderKey] || genderKey} ` : ''}ISR Masters Record ({ageGroup}):
-      </span>{' '}
-      <span className={`font-bold ${s.bold}`}>{record.time}</span>
-      <span className="mx-1">—</span>
-      <span>{record.name}</span>
-      <span className="mx-1">|</span>
-      <span className="text-gray-600">{record.club}</span>
-      <span className="mx-1">|</span>
-      <span className="text-gray-500">{record.record_date}</span>
+    <div
+      key={genderKey}
+      className={`relative overflow-hidden ${CARD_SURFACE} border ${s.border} rounded-[18px] pl-[26px] pr-[22px] py-4 mb-4 flex items-center gap-3 flex-wrap`}
+      style={CARD_SHADOW}
+    >
+      <div className={`absolute left-0 top-0 bottom-0 w-[5px] ${s.accentBg}`} />
+      <div className={`w-[30px] h-[30px] rounded-[9px] ${s.soft} flex items-center justify-center text-base shrink-0`}>🏅</div>
+      <span className={`text-[15px] font-extrabold ${s.deep} tracking-[-0.2px]`}>
+        {showGenderLabel ? `${GENDER_LABELS[genderKey] || genderKey} · ` : ''}ISR Masters Record ({ageGroup})
+      </span>
+      <span className={`text-[19px] font-extrabold ${s.deep} tabular-nums tracking-[-0.5px]`}>{record.time}</span>
+      <span className="text-[13px] text-[#6b7280]" dir="rtl">{record.name}</span>
+      <span className="text-[13px] text-[#9098a4]" dir="rtl">{record.club}</span>
+      <span className="text-[11px] text-[#9098a4] tabular-nums ml-auto">{record.record_date}</span>
     </div>
   );
 }
 
-/** Render all age-groups as a clickable label that opens a popup */
+/** Render all age-groups as a clickable card that opens a popup with details */
 function renderAllAgeGroupsLabel(
   genderKey: string,
   distanceData: Record<string, MastersRecord>,
@@ -121,13 +149,20 @@ function renderAllAgeGroupsLabel(
   return (
     <div
       key={genderKey}
-      className={`${s.bg} border ${s.border} rounded px-3 py-2 mb-2 text-sm cursor-pointer hover:opacity-80`}
+      className={`${CARD_SURFACE} border ${s.border} rounded-2xl px-[18px] py-4 mb-4 cursor-pointer transition-transform duration-[120ms] ease-out hover:-translate-y-[1px]`}
+      style={CARD_SHADOW}
       onClick={onClick}
     >
-      <span className={`font-semibold ${s.title}`}>
-        🏅 {showGenderLabel ? `${GENDER_LABELS[genderKey] || genderKey} ` : ''}ISR Masters Records
-      </span>{' '}
-      <span className="text-gray-400 text-xs">▶</span>
+      <div className="flex items-center gap-2.5">
+        <div className={`w-[30px] h-[30px] rounded-[9px] ${s.soft} flex items-center justify-center text-base shrink-0`}>🏅</div>
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <span className={`text-[15px] font-extrabold ${s.deep} tracking-[-0.2px]`}>ISR Masters Records</span>
+          {showGenderLabel && (
+            <span className={`text-[11px] font-bold ${s.accent} ${s.soft} px-[9px] py-[3px] rounded-full`}>{GENDER_LABELS[genderKey]}</span>
+          )}
+        </div>
+        <span className={`text-xs font-bold ${s.accent} shrink-0`}>▶</span>
+      </div>
     </div>
   );
 }
@@ -182,7 +217,13 @@ function NormativeMastersRecords({ gender, poolType, styleName, styleLen, age }:
 
   if (rendered.length === 0) return null;
 
-  return <>{rendered}</>;
+  // Та же ширина/центровка, что у таблицы результатов.
+  // Оба пола — в одну строку (♀ слева, ♂ справа); один — во всю ширину.
+  return (
+    <div className={`lg:max-w-[1180px] lg:mx-auto ${rendered.length > 1 ? 'grid gap-x-4 sm:grid-cols-2' : ''}`}>
+      {rendered}
+    </div>
+  );
 }
 
 export default NormativeMastersRecords;

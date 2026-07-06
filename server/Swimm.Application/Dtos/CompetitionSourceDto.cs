@@ -39,6 +39,15 @@ public sealed class CompetitionSourceDto
     [JsonPropertyName("show_combine_all_results")]
     public bool ShowCombineAllResults { get; init; }
 
+    /// <summary>Категория для селектора: "young8_11" | "junior" | "masters".
+    /// Выводится: is_masters → masters; макс. возраст результатов ≤ 11 → young8_11; иначе junior.</summary>
+    [JsonPropertyName("category")]
+    public string Category { get; init; } = "junior";
+
+    /// <summary>Статус по датам: "live" (идёт сегодня) | "upcoming" (в будущем) | "done".</summary>
+    [JsonPropertyName("status")]
+    public string Status { get; init; } = "done";
+
     [JsonPropertyName("day_count")]
     public int DayCount { get; init; }
 

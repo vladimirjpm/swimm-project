@@ -103,6 +103,9 @@ public class JsonImportService : IImportService
         // Категории из UI имеют приоритет над JSON-обёрткой; применяются ко всем соревнованиям файла.
         var effectiveCategoryKeys = categoryKeys is { Count: > 0 } ? categoryKeys.ToList() : wrapCategoryKeys;
 
+        // Флаг Masters производен от категории: выбрана категория Masters ⇒ соревнование мастерское.
+        isMasters = isMasters || effectiveCategoryKeys.Contains(Category.MastersKey);
+
         diagnosticLog.Add($"Items: {items.Count}, IsMasters(wrap): {isMasters}, IsAward(wrap): {isAward}, Categories: [{string.Join(", ", effectiveCategoryKeys)}]");
 
         if (items.Count == 0)
@@ -154,6 +157,12 @@ public class JsonImportService : IImportService
         var resultBatch = new List<ResultRecord>(items.Count);
 
         // Весь импорт выполняется в одной транзакции — при любой ошибке откатываем целиком.
+        // BeginTransactionAsync нельзя вызывать напрямую при включённом EnableRetryOnFailure —
+        // ручной транзакцией должна управлять execution strategy, иначе EF бросает исключение
+        // на каждой операции внутри транзакции.
+        var strategy = _db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
         await using var tx = await _db.Database.BeginTransactionAsync();
         try
         {
@@ -490,6 +499,7 @@ public class JsonImportService : IImportService
                 Message = "Import failed and was rolled back"
             };
         }
+        });
     }
 
     /// <summary>

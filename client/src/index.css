@@ -62,7 +62,7 @@
   --theme-mode-surface: #ffffff;        /* карточки, таблица, попапы */
   --theme-mode-surface-alt: #fafbfd;    /* строка-заголовок таблицы */
   --theme-mode-border: #eef1f6;         /* тонкие разделители */
-  --theme-mode-border-row: #f3f5f9;     /* разделители строк таблицы */
+  --theme-mode-border-row: #e8eaee;     /* разделители строк таблицы */
   --theme-mode-border-drawer: #e0e8e3;  /* границы карточек фильтра */
   --theme-mode-border-input: #d6e0da;   /* селекты, сегментные кнопки */
   --theme-mode-text: #1a1a1a;           /* основной текст */
@@ -74,16 +74,28 @@
   --theme-mode-me-highlight: #fffdf6;   /* заливка "это я" (рамка золотая — отдельно) */
   --theme-mode-hero-grad: linear-gradient(160deg, #dcebf7, #c4def0); /* hero-карточка деталей */
   --theme-mode-avatar-bg: #bfe0f5;      /* фон кружка аватара */
-  --theme-mode-row-male: #dbeafe;       /* строка результата: муж. (≈ blue-100) */
-  --theme-mode-row-female: #fce7f3;     /* строка результата: жен. (≈ pink-100) */
+  --theme-mode-row-male: rgba(29, 78, 216, 0.06);   /* мягкая заливка строки: муж. */
+  --theme-mode-row-female: rgba(190, 24, 93, 0.06); /* мягкая заливка строки: жен. */
+  --theme-mode-overlay: rgba(20, 22, 30, 0.55);     /* подложка модалок */
+  --theme-mode-modal-border: transparent;           /* рамка контейнера модалки */
+  --theme-mode-modal-shadow: 0 20px 60px rgba(0, 0, 0, 0.35); /* тень модалки */
+  --theme-mode-card-border: transparent;            /* рамка карточек в списках/модалке */
+  --theme-mode-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);    /* тень карточек */
+  --theme-mode-accent-text: #ffffff;                /* текст на акцентном фоне (активный таб) */
+  --theme-mode-header-btn-border: rgba(255, 255, 255, 0.4); /* рамка кнопки Change в акцентной шапке */
+  /* Статусный цвет LIVE: зависит от режима, НЕ от контекста Training/Competition
+     (см. design_handoff_category_selector/README.md) */
+  --status-live: #148253;
+  --status-live-bg: rgba(20, 130, 83, 0.09);
+  --status-live-border: rgba(20, 130, 83, 0.4);
 }
 
 :root[data-mode="dark"] {
   --theme-mode-page-bg: #0f1319;
-  --theme-mode-surface: #1a1f28;
+  --theme-mode-surface: #212836; /* поднят с #1a1f28: тёмные карточки сливались с оверлеем */
   --theme-mode-surface-alt: #20262f;
   --theme-mode-border: #2a313c;
-  --theme-mode-border-row: #242b35;
+  --theme-mode-border-row: #2c343f;
   --theme-mode-border-drawer: #2a313c;
   --theme-mode-border-input: #333c48;
   --theme-mode-text: #eef1f6;
@@ -95,8 +107,20 @@
   --theme-mode-me-highlight: #241f16;
   --theme-mode-hero-grad: linear-gradient(160deg, #223243 0%, #151d28 100%);
   --theme-mode-avatar-bg: #2c3d52;
-  --theme-mode-row-male: #1a2634;       /* муж.: тёмный приглушённый синий */
-  --theme-mode-row-female: #2c1f2a;     /* жен.: тёмный приглушённый розовый */
+  --theme-mode-row-male: rgba(124, 171, 255, 0.10);  /* мягкая заливка строки: муж. (dark) */
+  --theme-mode-row-female: rgba(244, 131, 180, 0.10);/* мягкая заливка строки: жен. (dark) */
+  /* Модалки/карточки в dark: светлая подложка + светлая рамка + глубокая тень —
+     чёрные тени на тёмном фоне не видны, границы читаются рамкой. */
+  --theme-mode-overlay: rgba(228, 234, 244, 0.20);
+  --theme-mode-modal-border: rgba(255, 255, 255, 0.09);
+  --theme-mode-modal-shadow: 0 24px 70px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --theme-mode-card-border: rgba(255, 255, 255, 0.09);
+  --theme-mode-card-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  --theme-mode-accent-text: #0f1319; /* акценты в dark яркие → текст тёмный */
+  --theme-mode-header-btn-border: rgba(15, 19, 25, 0.35);
+  --status-live: #3ddc97;
+  --status-live-bg: rgba(61, 220, 151, 0.10);
+  --status-live-border: rgba(61, 220, 151, 0.45);
 }
 
 /*body {

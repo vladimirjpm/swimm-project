@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta charset="utf-8"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <script src="./data/normative.js"></script>
+  <script src="./data/normative-records.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', -apple-system, sans-serif; background: #e9ebef; }
+    @keyframes tgpulse { 0%,100% { box-shadow: 0 0 0 2px var(--gc), 0 0 16px -3px var(--gc); } 50% { box-shadow: 0 0 0 2px var(--gc), 0 0 30px 1px var(--gc); } }
+    @keyframes levelGlow { 0%,100% { box-shadow: 0 0 0 1.5px var(--gc), 0 0 9px -1px var(--gc); } 50% { box-shadow: 0 0 0 1.5px var(--gc), 0 0 22px 3px var(--gc); } }
+    @keyframes colGlow { 0%,100% { box-shadow: inset 2px 0 0 var(--gc), inset -2px 0 0 var(--gc), 0 0 10px -3px var(--gc); } 50% { box-shadow: inset 2px 0 0 var(--gc), inset -2px 0 0 var(--gc), 0 0 20px 0px var(--gc); } }
+    @keyframes cellGlow { 0%,100% { box-shadow: inset 0 0 0 2px var(--gc), 0 0 10px -3px var(--gc); } 50% { box-shadow: inset 0 0 0 2px var(--gc), 0 0 22px 1px var(--gc); } }
+    @keyframes nmR { from { transform: translateX(40px); opacity: .45; } to { transform: none; opacity: 1; } }
+    @keyframes nmR2 { from { transform: translateX(40px); opacity: .45; } to { transform: none; opacity: 1; } }
+    @keyframes nmL { from { transform: translateX(-40px); opacity: .45; } to { transform: none; opacity: 1; } }
+    @keyframes nmL2 { from { transform: translateX(-40px); opacity: .45; } to { transform: none; opacity: 1; } }
+    @keyframes flagShimmer { 0% { background-position: -120% 0; } 100% { background-position: 220% 0; } }
+    @keyframes popIn { from { transform: translateY(10px) scale(.98); } to { transform: none; } }
+    .ncell { transition: background .25s ease, box-shadow .25s ease, transform .2s ease; }
+    .pager-btn { transition: transform .15s ease, background .2s ease; }
+    .pager-btn:active { transform: scale(.9); }
+    .nmed { transition: all .25s ease; }
+    .rowhi { animation: popIn .4s ease both; }
+    ::-webkit-scrollbar { height: 9px; width: 9px; }
+    ::-webkit-scrollbar-thumb { background: rgba(120,130,150,.35); border-radius: 9px; }
+  </style>
+</helmet>
+
+<div style="background: {{ pageBg }}; min-height: 100vh; padding: 26px 18px 60px; transition: background .3s ease;">
+
+  <!-- demo control bar -->
+  <div style="max-width: 1120px; margin: 0 auto 18px;">
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+      <span style="font-size: 10px; font-weight: 800; letter-spacing: .1em; color: {{ labelColor }}; text-transform: uppercase;">Preview</span>
+      <sc-for list="{{ topSegs }}" as="s" hint-placeholder-count="6"><div onClick="{{ s.onClick }}" style="{{ s.style }}">{{ s.label }}</div></sc-for>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px;">
+      <span style="font-size: 10px; font-weight: 800; letter-spacing: .1em; color: {{ labelColor }}; text-transform: uppercase;">Swimmer</span>
+      <sc-for list="{{ demoSegs }}" as="s" hint-placeholder-count="6"><div onClick="{{ s.onClick }}" style="{{ s.style }}">{{ s.label }}</div></sc-for>
+    </div>
+  </div>
+
+  <!-- ===================== POPUP ===================== -->
+  <div style="max-width: {{ popupMax }}; margin: 0 auto; background: {{ cardBg }}; border: 1px solid {{ cardBorder }}; border-radius: 22px; box-shadow: {{ cardShadow }}; overflow: hidden; transition: background .3s ease, border-color .3s ease;">
+
+    <!-- header -->
+    <div style="display: flex; align-items: flex-start; justify-content: space-between; padding: 20px 22px 14px;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 34px; height: 34px; border-radius: 10px; background: {{ headIconBg }}; display: flex; align-items: center; justify-content: center; font-size: 18px;">📊</div>
+          <div>
+            <div style="font-size: 20px; font-weight: 900; color: {{ textPrimary }}; letter-spacing: -0.5px; line-height: 1;">Normative Info</div>
+            <div style="font-size: 12px; font-weight: 600; color: {{ labelColor }}; margin-top: 3px;">{{ strokeLabel }}</div>
+          </div>
+        </div>
+      </div>
+      <div style="width: 32px; height: 32px; border-radius: 9px; background: {{ subtleBg }}; display: flex; align-items: center; justify-content: center; cursor: pointer; color: {{ labelColor }}; font-size: 17px; flex-shrink: 0;" style-hover="filter: brightness(.94);">✕</div>
+    </div>
+
+    <!-- controls: pool + stroke -->
+    <div style="padding: 0 22px 12px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+      <div style="display: inline-flex; background: {{ subtleBg }}; border-radius: 11px; padding: 3px;">
+        <sc-for list="{{ poolSegs }}" as="s" hint-placeholder-count="2"><div onClick="{{ s.onClick }}" style="{{ s.style }}">{{ s.label }}</div></sc-for>
+      </div>
+      <div style="position: relative;">
+        <div onClick="{{ toggleStyleDD }}" style="display: inline-flex; align-items: center; gap: 12px; cursor: pointer; padding: 11px 18px; border-radius: 13px; background: {{ subtleBg }}; user-select: none;">
+          <span style="font-size: 16px; font-weight: 800; color: {{ textPrimary }};">Swimming Style</span>
+          <span style="{{ ddHeadIconStyle }}"></span>
+          <span style="font-size: 16px; font-weight: 800; color: {{ ddAccent }};">· {{ ddHeadDist }}</span>
+          <span style="font-size: 12px; color: {{ ddAccent }}; transform: {{ ddChevron }}; transition: transform .2s ease;">▲</span>
+        </div>
+        <sc-if value="{{ styleOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position: absolute; top: calc(100% + 8px); left: 0; z-index: 30; background: {{ cardBg }}; border: 1px solid {{ cardBorder }}; border-radius: 16px; box-shadow: {{ cardShadow }}; padding: 14px; display: flex; gap: 14px; align-items: flex-start;">
+            <div style="display: flex; flex-direction: column; gap: 8px; padding-right: 14px; border-right: 1px dashed {{ gridLine }};">
+              <sc-for list="{{ ddStrokes }}" as="s" hint-placeholder-count="5">
+                <div onClick="{{ s.onClick }}" title="{{ s.label }}" style="{{ s.boxStyle }}"></div>
+              </sc-for>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <sc-for list="{{ ddDists }}" as="d" hint-placeholder-count="3">
+                <div onClick="{{ d.onClick }}" style="{{ d.style }}">{{ d.label }}</div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+
+    <!-- ============ DESKTOP MATRIX ============ -->
+    <sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ true }}">
+      <div style="overflow-x: auto; padding: 0 14px 20px;">
+        <table style="border-collapse: separate; border-spacing: 0; width: 100%; min-width: 900px;">
+          <thead>
+            <tr>
+              <th style="position: sticky; left: 0; z-index: 3; background: {{ headStickyBg }}; text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 800; letter-spacing: .06em; color: {{ labelColor }}; text-transform: uppercase; border-bottom: 1px solid {{ gridLine }};">Distance</th>
+              <sc-for list="{{ recordCols }}" as="rc" hint-placeholder-count="2">
+                <th style="padding: 8px 8px 10px; border-bottom: 1px solid {{ gridLine }}; vertical-align: bottom;">
+                  <div style="{{ rc.medStyle }}">{{ rc.label }}</div>
+                  <div style="font-size: 9px; font-weight: 700; color: {{ labelColor }}; margin-top: 4px; text-align: center; letter-spacing: .04em;">{{ rc.cap }}</div>
+                </th>
+              </sc-for>
+              <sc-for list="{{ levels }}" as="lv" hint-placeholder-count="9">
+                <th style="{{ lv.colHeadStyle }}">
+                  <div style="height: 15px; display: flex; align-items: center; justify-content: center; margin-bottom: 5px;">
+                    <sc-if value="{{ lv.badge }}" hint-placeholder-val="{{ false }}"><span style="{{ lv.badgeStyle }}">{{ lv.badge }}</span></sc-if>
+                  </div>
+                  <div class="nmed" style="{{ lv.headStyle }}">{{ lv.label }}</div>
+                </th>
+              </sc-for>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+              <tr class="{{ r.rowClass }}">
+                <td style="{{ r.distStyle }}">
+                  <div style="font-size: 15px; font-weight: 800;">{{ r.dist }}</div>
+                  <sc-if value="{{ r.isYou }}" hint-placeholder-val="{{ false }}"><div style="font-size: 9px; font-weight: 800; letter-spacing: .05em; color: {{ youAccent }}; text-transform: uppercase; margin-top: 2px;">your event</div></sc-if>
+                </td>
+                <sc-for list="{{ r.records }}" as="c" hint-placeholder-count="2">
+                  <td style="{{ c.tdStyle }}">
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                      <div style="{{ menCell }}">{{ c.men }}</div>
+                      <div style="{{ womenCell }}">{{ c.women }}</div>
+                    </div>
+                  </td>
+                </sc-for>
+                <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="9">
+                  <td class="ncell" style="{{ c.tdStyle }}">
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                      <div style="{{ c.menStyle }}">{{ c.men }}</div>
+                      <div style="{{ c.womenStyle }}">{{ c.women }}</div>
+                    </div>
+                  </td>
+                </sc-for>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+      <!-- legend (moved below table) -->
+      <div style="padding: 12px 22px 18px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: {{ labelColor }}; font-weight: 600;">
+        In each cell:
+        <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 22px; height: 14px; border-radius: 4px; background: {{ menPillBg }};"></span> top = <b style="color: {{ menText }};">Men</b></span>
+        <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 22px; height: 14px; border-radius: 4px; background: {{ womenPillBg }};"></span> bottom = <b style="color: {{ womenText }};">Women</b></span>
+      </div>
+    </sc-if>
+
+    <!-- ============ MOBILE COMPARE ============ -->
+    <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}">
+      <div style="padding: 0 16px 22px;">
+
+        <!-- pager -->
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+          <div class="pager-btn" onClick="{{ mob.onPrev }}" style="{{ mob.prevStyle }}">‹</div>
+          <div style="flex: 1; text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .08em; color: {{ labelColor }}; text-transform: uppercase;">Level → faster</div>
+          <div class="pager-btn" onClick="{{ mob.onNext }}" style="{{ mob.nextStyle }}">›</div>
+        </div>
+
+        <!-- two columns -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; animation: {{ mob.slideAnim }};">
+          <sc-for list="{{ mob.cols }}" as="col" hint-placeholder-count="2">
+            <div style="{{ col.cardStyle }}">
+              <span style="{{ col.tagStyle }}">{{ col.tag }}</span>
+              <div class="nmed" style="{{ col.medStyle }}">{{ col.label }}</div>
+              <div style="width: 100%; margin-top: 12px; display: flex; flex-direction: column; gap: 7px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; background: {{ menPillBg }}; border-radius: 9px; padding: 7px 11px;">
+                  <span style="font-size: 10px; font-weight: 800; color: {{ menText }};">♂</span>
+                  <div style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; line-height: 1.02; min-height: 30px;">
+                    <span style="font-size: 17px; font-weight: 800; color: {{ menText }}; font-variant-numeric: tabular-nums;">{{ col.men }}</span>
+                    <sc-if value="{{ col.menDelta }}" hint-placeholder-val="{{ false }}"><span style="font-size: 10px; font-weight: 700; color: {{ menText }}; opacity: .68; font-variant-numeric: tabular-nums;">−{{ col.menDelta }}</span></sc-if>
+                  </div>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; background: {{ womenPillBg }}; border-radius: 9px; padding: 7px 11px;">
+                  <span style="font-size: 10px; font-weight: 800; color: {{ womenText }};">♀</span>
+                  <div style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; line-height: 1.02; min-height: 30px;">
+                    <span style="font-size: 17px; font-weight: 800; color: {{ womenText }}; font-variant-numeric: tabular-nums;">{{ col.women }}</span>
+                    <sc-if value="{{ col.womenDelta }}" hint-placeholder-val="{{ false }}"><span style="font-size: 10px; font-weight: 700; color: {{ womenText }}; opacity: .68; font-variant-numeric: tabular-nums;">−{{ col.womenDelta }}</span></sc-if>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <!-- other distances -->
+        <div onClick="{{ mob.toggleOthers }}" style="margin-top: 14px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; padding: 12px 14px; background: {{ subtleBg }}; border-radius: 13px;">
+          <span style="font-size: 13px; font-weight: 800; color: {{ textPrimary }};">Other distances</span>
+          <span style="font-size: 11px; color: {{ labelColor }}; transform: {{ mob.othersChevron }}; transition: transform .2s ease;">▼</span>
+        </div>
+        <sc-if value="{{ mob.othersOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 8px;">
+            <sc-for list="{{ mob.others }}" as="o" hint-placeholder-count="4">
+              <div style="background: {{ cardBg }}; border: 1px solid {{ cardBorder }}; border-radius: 12px; padding: 10px 12px;">
+                <div style="font-size: 13px; font-weight: 800; color: {{ textPrimary }}; margin-bottom: 7px;">{{ o.dist }}</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                  <sc-for list="{{ o.cols }}" as="oc" hint-placeholder-count="2">
+                    <div style="border: 1px solid {{ oc.border }}; border-radius: 9px; padding: 7px 9px;">
+                      <div style="font-size: 9px; font-weight: 800; letter-spacing: .04em; color: {{ oc.accent }}; text-transform: uppercase; margin-bottom: 5px;">{{ oc.label }}</div>
+                      <div style="display: flex; gap: 8px;">
+                        <span style="font-size: 13px; font-weight: 700; color: {{ menText }}; font-variant-numeric: tabular-nums;">{{ oc.men }}</span>
+                        <span style="font-size: 13px; font-weight: 700; color: {{ womenText }}; font-variant-numeric: tabular-nums;">{{ oc.women }}</span>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    variant: 'A', device: 'desktop', theme: 'light',
+    pool: '25m_pool', stroke: 'freestyle',
+    myLevel: 'III_adult', myDist: '50m',
+    pairIdx: null, othersOpen: false, data: null, rec: null,
+    styleOpen: false, mobAccent: 'v1',
+    navDir: 'next', navTick: 0
+  };
+
+  LADDER = [
+    { key: 'MSMK', label: 'MSMK', cat: 'pro' },
+    { key: 'MS', label: 'MS', cat: 'pro' },
+    { key: 'KMS', label: 'KMS', cat: 'pro' },
+    { key: 'I_adult', label: 'I', cat: 'adult' },
+    { key: 'II_adult', label: 'II', cat: 'adult' },
+    { key: 'III_adult', label: 'III', cat: 'adult' },
+    { key: 'I_youth', label: '1y', cat: 'youth' },
+    { key: 'II_youth', label: '2y', cat: 'youth' },
+    { key: 'III_youth', label: '3y', cat: 'youth' }
+  ];
+  STROKES = [
+    ['freestyle', 'Freestyle'], ['backstroke', 'Backstroke'], ['breaststroke', 'Breaststroke'],
+    ['butterfly', 'Butterfly'], ['individual_medley', 'Medley']
+  ];
+
+  componentDidMount() {
+    const grab = () => {
+      const d = window.normative, r = window.normative_record;
+      if (d && d.normatives) { this.setState({ data: d, rec: r || null }); return true; }
+      return false;
+    };
+    if (!grab()) { let n = 0; const t = setInterval(() => { if (grab() || ++n > 40) clearInterval(t); }, 50); }
+    if (typeof window !== 'undefined' && window.innerWidth < 760 && this.state.device === 'desktop') {
+      this.setState({ device: 'mobile' });
+    }
+  }
+
+  cat(theme) {
+    const L = {
+      youth: { accent: '#16a34a', deep: '#14532d', soft: '#e7f6ed', border: '#c2ebd1' },
+      adult: { accent: '#4f46e5', deep: '#312e81', soft: '#eeecfe', border: '#d6d1fb' },
+      pro:   { accent: '#ea580c', deep: '#7c2d12', soft: '#fff0e6', border: '#fcd5bb' },
+      rec:   { accent: '#475569', deep: '#0f172a', soft: '#eef1f6', border: '#d7dde6' }
+    };
+    const D = {
+      youth: { accent: '#3ecb7f', deep: '#c7f0d8', soft: 'rgba(62,203,127,.15)', border: '#245038' },
+      adult: { accent: '#8b83ff', deep: '#dcd8ff', soft: 'rgba(139,131,255,.17)', border: '#332f5c' },
+      pro:   { accent: '#ff8a4c', deep: '#ffd9c2', soft: 'rgba(255,138,76,.16)', border: '#5a3320' },
+      rec:   { accent: '#94a3b8', deep: '#e2e8f0', soft: 'rgba(148,163,184,.14)', border: '#2b3442' }
+    };
+    return theme === 'dark' ? D : L;
+  }
+
+  get ui() {
+    const dark = this.state.theme === 'dark';
+    return dark
+      ? { page: '#0d1017', card: '#151a22', cardBorder: '#232b36', cardShadow: '0 20px 60px rgba(0,0,0,.5)', subtle: '#1c232e', sticky: '#151a22', headSticky: '#151a22', grid: '#232b36', text: '#eef2f7', label: '#8794a4',
+          menPill: 'rgba(90,162,245,.16)', menText: '#9cc4fb', womenPill: 'rgba(240,114,166,.16)', womenText: '#f6a9cd',
+          headIcon: '#1c232e', deltaBg: '#1c232e', deltaBorder: '#2c3542', segBg: '#151a22', segBorder: '#2a323f', segText: '#aab2bd', segActive: '#e8ebf0', segActiveTx: '#151a22' }
+      : { page: '#e9ebef', card: '#ffffff', cardBorder: '#e6e9ee', cardShadow: '0 20px 60px rgba(20,28,45,.14)', subtle: '#f1f3f7', sticky: '#ffffff', headSticky: '#ffffff', grid: '#eceff4', text: '#141824', label: '#8a93a2',
+          menPill: '#e6f0fd', menText: '#1d4ed8', womenPill: '#fdeaf2', womenText: '#be185d',
+          headIcon: '#f1f3f7', deltaBg: '#f7f9fc', deltaBorder: '#d9e0ea', segBg: '#ffffff', segBorder: '#d8dce2', segText: '#5b6470', segActive: '#2b3648', segActiveTx: '#ffffff' };
+  }
+
+  seg(label, active, onClick, small) {
+    const u = this.ui;
+    return { label, onClick,
+      style: 'font-size: ' + (small ? '11.5px' : '12.5px') + '; font-weight: 700; padding: ' + (small ? '6px 11px' : '7px 13px') + '; border-radius: 9px; cursor: pointer; white-space: nowrap; border: 1px solid '
+        + (active ? u.segActive : u.segBorder) + '; background: ' + (active ? u.segActive : u.segBg)
+        + '; color: ' + (active ? u.segActiveTx : u.segText) + '; transition: all .18s ease;' };
+  }
+  // pill-in-group (pool/stroke inside popup)
+  pill(label, active, onClick, icon) {
+    const u = this.ui, C = this.cat(this.state.theme).adult;
+    return { label, onClick, icon: icon || '',
+      style: 'display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; padding: 6px 13px; border-radius: 8px; cursor: pointer; white-space: nowrap; transition: all .18s ease; '
+        + (active ? ('background: ' + C.accent + '; color: #fff;') : ('background: transparent; color: ' + u.label + ';')),
+      iconStyle: 'height: 18px; width: auto; display: block;' + (active ? ' filter: brightness(0) invert(1);' : '') };
+  }
+
+  parseT(v) {
+    if (v == null) return NaN;
+    if (typeof v === 'number') return v;
+    const s = String(v).trim();
+    if (!s || s === '—') return NaN;
+    const p = s.split(':').map(Number);
+    if (p.some(isNaN)) return NaN;
+    if (p.length === 3) return p[0] * 3600 + p[1] * 60 + p[2];
+    if (p.length === 2) return p[0] * 60 + p[1];
+    return p[0];
+  }
+  fmtT(sec) {
+    if (!Number.isFinite(sec)) return '—';
+    const m = Math.floor(sec / 60), s = sec - m * 60;
+    return m > 0 ? (m + ':' + s.toFixed(2).padStart(5, '0')) : s.toFixed(2);
+  }
+
+  styleNode() {
+    const d = this.state.data;
+    if (!d) return { male: {}, female: {} };
+    const p = this.state.pool, st = this.state.stroke;
+    return {
+      male: d.normatives?.male?.[p]?.[st] || {},
+      female: d.normatives?.female?.[p]?.[st] || {}
+    };
+  }
+  recNode() {
+    const r = this.state.rec; if (!r) return null;
+    const p = this.state.pool, st = this.state.stroke;
+    return {
+      male: r.normatives?.male?.[p]?.[st] || r.normatives?.male?.['50m_pool']?.[st] || {},
+      female: r.normatives?.female?.[p]?.[st] || r.normatives?.female?.['50m_pool']?.[st] || {}
+    };
+  }
+  distList() {
+    const n = this.styleNode();
+    const keys = new Set([...Object.keys(n.male), ...Object.keys(n.female)]);
+    return [...keys].filter(k => /^\d+m$/.test(k)).sort((a, b) => parseInt(a) - parseInt(b));
+  }
+
+  headMed(C, isTarget, isYou, variant) {
+    const V = variant === 'B';
+    let bg, color, border;
+    if (V) { bg = C.accent; color = '#fff'; border = C.accent; }
+    else { bg = C.soft; color = C.deep; border = C.border; }
+    let s = 'display: inline-flex; align-items: center; justify-content: center; min-width: 46px; height: 36px; padding: 0 12px; border-radius: 11px; font-weight: 900; font-size: 14px; letter-spacing: .01em; background: ' + bg + '; color: ' + color + '; border: 1.5px solid ' + border + ';';
+    return s;
+  }
+
+  renderVals() {
+    const st = this.state, u = this.ui, C = this.cat(st.theme), V = st.variant === 'B';
+    const dark = st.theme === 'dark';
+
+    // ---- top demo controls ----
+    const topSegs = [
+      this.seg('Variant A', st.variant === 'A', () => this.setState({ variant: 'A' })),
+      this.seg('Variant B', st.variant === 'B', () => this.setState({ variant: 'B' })),
+      this.seg('🖥 Desktop', st.device === 'desktop', () => this.setState({ device: 'desktop' })),
+      this.seg('📱 Mobile', st.device === 'mobile', () => this.setState({ device: 'mobile' })),
+      this.seg(dark ? '☀ Light' : '☾ Dark', false, () => this.setState({ theme: dark ? 'light' : 'dark' }))
+    ];
+    const dl = this.distList();
+    const demoSegs = [
+      ...this.LADDER.map(l => this.seg(l.label, st.myLevel === l.key, () => this.setState({ myLevel: l.key, pairIdx: null }), true)),
+    ];
+    // distance demo chips
+    dl.forEach(dv => demoSegs.push(this.seg(dv, st.myDist === dv, () => this.setState({ myDist: dv, othersOpen: false }), true)));
+
+    // ---- popup pool + stroke ----
+    const poolSegs = [
+      this.pill('25m', st.pool === '25m_pool', () => this.setState({ pool: '25m_pool' })),
+      this.pill('50m', st.pool === '50m_pool', () => this.setState({ pool: '50m_pool' }))
+    ];
+    const strokeSegs = this.STROKES.map(([k, lab]) => this.pill(lab, st.stroke === k, () => this.setState({ stroke: k }), 'assets/style-' + k.replace('individual_medley','medley') + '.png'));
+    const strokeLabel = (this.STROKES.find(s => s[0] === st.stroke) || [, 'Freestyle'])[1];
+    const poolLabel = st.pool === '50m_pool' ? '50m' : '25m';
+
+    // ---- style + distance dropdown (site-style filter) ----
+    const ddAccent = C.adult.accent;
+    const ddStrokes = this.STROKES.map(([k, lab]) => {
+      const active = st.stroke === k;
+      return {
+        label: lab,
+        icon: 'assets/style-' + k.replace('individual_medley','medley') + '.png',
+        boxStyle: 'width: 118px; height: 52px; border-radius: 13px; cursor: pointer; transition: all .15s ease; background-image: url("assets/style-' + k.replace('individual_medley','medley') + '.png"); background-repeat: no-repeat; background-position: center; background-size: auto 36px; border: 1.5px solid '
+          + (active ? ddAccent : u.cardBorder) + '; background-color: ' + (active ? C.adult.soft : u.subtle) + ';'
+          + (active ? ' box-shadow: 0 0 0 2px ' + ddAccent + '33;' : ''),
+        onClick: () => this.setState({ stroke: k }, () => {
+          const nd = this.distList();
+          if (!nd.includes(this.state.myDist)) this.setState({ myDist: nd[0] || '50m', pairIdx: null });
+        })
+      };
+    });
+    const ddDists = dl.map(dv => {
+      const active = st.myDist === dv;
+      return {
+        label: dv,
+        style: 'text-align: center; padding: 9px 18px; border-radius: 11px; cursor: pointer; font-size: 13px; font-weight: 800; transition: all .15s ease; border: 1.5px solid '
+          + (active ? ddAccent : u.cardBorder) + '; background: ' + (active ? ddAccent : u.subtle) + '; color: ' + (active ? '#fff' : u.text) + ';',
+        onClick: () => this.setState({ myDist: dv, othersOpen: false, pairIdx: null })
+      };
+    });
+    const ddHeadDist = st.myDist;
+    const ddHeadIconStyle = 'display: inline-block; width: 72px; height: 36px; background-image: url("assets/style-' + st.stroke.replace('individual_medley','medley') + '.png"); background-repeat: no-repeat; background-position: center; background-size: contain;';
+
+    // ---- level columns (strong -> weak) ----
+    const myIdx = this.LADDER.findIndex(l => l.key === st.myLevel);
+    const targetIdx = myIdx > 0 ? myIdx - 1 : -1; // faster/stronger neighbour
+    const levels = this.LADDER.map((l, i) => {
+      const cc = C[l.cat];
+      const isYou = i === myIdx, isTarget = i === targetIdx;
+      let badge = '', badgeStyle = '';
+      if (isYou) { badge = 'YOU'; badgeStyle = 'font-size: 8px; font-weight: 900; letter-spacing: .08em; color: ' + cc.accent + '; background: ' + cc.soft + '; padding: 2px 6px; border-radius: 5px; border: 1px solid ' + cc.border + ';'; }
+      const colHeadStyle = 'padding: 8px 6px 10px; border-bottom: 1px solid ' + this.ui.grid + '; vertical-align: bottom;';
+      return { ...l, cc, isYou, isTarget, badge, badgeStyle, colHeadStyle,
+        headStyle: this.headMed(cc, isTarget, isYou, st.variant) };
+    });
+
+    // ---- record columns header ----
+    const recCat = C.rec;
+    const recordCols = [
+      { key: 'WR', label: 'WR', cap: 'World', medStyle: this.headMed(recCat, false, false, st.variant) },
+      { key: 'ISR', label: 'ISR', cap: 'Israel', medStyle: this.headMed(recCat, false, false, st.variant) }
+    ];
+
+    // ---- rows (desktop) ----
+    const node = this.styleNode(), rnode = this.recNode();
+    const menCellBase = 'border-radius: 8px; padding: 5px 4px; text-align: center; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; background: ' + u.menPill + '; color: ' + u.menText + ';';
+    const womenCellBase = 'border-radius: 8px; padding: 5px 4px; text-align: center; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; background: ' + u.womenPill + '; color: ' + u.womenText + ';';
+
+    const rec = (g, dist, kind) => {
+      const cell = rnode && rnode[g] && rnode[g][dist] && rnode[g][dist][kind];
+      return cell ? this.parseT(cell.time) : NaN;
+    };
+
+    const rows = dl.map((dist) => {
+      const isYou = dist === st.myDist;
+      const distStyle = 'position: sticky; left: 0; z-index: 2; padding: 11px 14px; border-bottom: 1px solid ' + u.grid + '; color: ' + u.text + '; background: ' + (isYou ? (dark ? 'rgba(245,184,0,.10)' : '#fffbeb') : u.sticky) + ';' + (isYou ? ' border-left: 3px solid ' + this.cat(st.theme).adult.accent + ';' : '');
+      // record cells
+      const records = [
+        { men: this.fmtT(rec('male', dist, 'WR')), women: this.fmtT(rec('female', dist, 'WR')), tdStyle: 'padding: 7px 7px; border-bottom: 1px solid ' + u.grid + '; background: ' + (isYou ? (dark ? 'rgba(245,184,0,.05)' : '#fffdf5') : 'transparent') + ';' },
+        { men: this.fmtT(rec('male', dist, 'ISR')), women: this.fmtT(rec('female', dist, 'ISR')), tdStyle: 'padding: 7px 7px; border-bottom: 1px solid ' + u.grid + '; background: ' + (isYou ? (dark ? 'rgba(245,184,0,.05)' : '#fffdf5') : 'transparent') + ';' }
+      ];
+      const cells = levels.map((lv) => {
+        const cc = lv.cc;
+        const isTarget = lv.isTarget, isYouCol = lv.isYou;
+        const cross = isYou && isYouCol;
+        let td = 'padding: 7px 6px; border-bottom: 1px solid ' + u.grid + ';';
+        if (isYou) td += ' background: ' + (dark ? 'rgba(245,184,0,.05)' : '#fffdf5') + ';';
+        if (cross) td += ' background: ' + cc.soft + '; --gc: ' + cc.accent + '; border-radius: 9px; animation: cellGlow 2.2s ease-in-out infinite;';
+        return {
+          men: this.fmtT(this.parseT(node.male?.[dist]?.[lv.key])),
+          women: this.fmtT(this.parseT(node.female?.[dist]?.[lv.key])),
+          tdStyle: td,
+          menStyle: menCellBase + (cross ? ' font-weight: 900;' : ''),
+          womenStyle: womenCellBase + (cross ? ' font-weight: 900;' : '')
+        };
+      });
+      return { dist, isYou, rowClass: '', distStyle, records, cells };
+    });
+
+    // ---- mobile compare ----
+    let pairIdx = st.pairIdx;
+    if (pairIdx == null) pairIdx = myIdx > 0 ? myIdx : 1;
+    pairIdx = Math.max(1, Math.min(this.LADDER.length - 1, pairIdx));
+    const leftL = this.LADDER[pairIdx], rightL = this.LADDER[pairIdx - 1]; // right = faster/target
+    const mkCol = (l, isRight) => {
+      const cc = C[l.cat];
+      const isYou = l.key === st.myLevel;
+      const emph = !isRight;               // accent on CURRENT level
+      const v2 = false; // Accent v1 chosen
+      const tag = isRight ? 'NEXT →' : (isYou ? 'YOU' : 'CURRENT');
+      const tagStyle = 'align-self: flex-start; font-size: 9px; font-weight: 900; letter-spacing: .07em; padding: 3px 8px; border-radius: 6px; margin-bottom: 10px; '
+        + (emph ? ('color: #fff; background: ' + cc.accent + ';')
+                : ('color: ' + u.label + '; background: ' + u.subtle + '; border: 1px solid ' + u.cardBorder + ';'));
+      const cardBase = 'display: flex; flex-direction: column; align-items: center; padding: 14px 12px 16px; border-radius: 16px; ';
+      let cardStyle;
+      if (v2) {
+        // v2: soft tinted current, ghost dashed next
+        cardStyle = cardBase + (emph
+          ? ('background: ' + cc.soft + '; border: 2px solid ' + cc.accent + ';')
+          : ('background: ' + u.card + '; border: 2px dashed ' + u.cardBorder + ';'));
+      } else {
+        // v1: glowing accent border on current, plain next
+        cardStyle = cardBase + 'background: ' + u.card + '; border: 2px solid ' + (emph ? cc.accent : u.cardBorder) + ';'
+          + (emph ? ' --gc: ' + cc.accent + '; box-shadow: 0 0 0 1px ' + cc.accent + ', 0 8px 26px -8px ' + cc.accent + ';' : '');
+      }
+      return {
+        label: l.label, tag, tagStyle, cardStyle,
+        medStyle: this.headMed(cc, emph, isYou && emph, st.variant) + ' min-width: 60px; height: 44px; font-size: 18px;' + (isRight ? ' opacity: .85;' : ''),
+        men: this.fmtT(this.parseT(node.male?.[st.myDist]?.[l.key])),
+        women: this.fmtT(this.parseT(node.female?.[st.myDist]?.[l.key]))
+      };
+    };
+    const cols = [mkCol(leftL, false), mkCol(rightL, true)];
+    const dLeftM = this.parseT(node.male?.[st.myDist]?.[leftL.key]);
+    const dRightM = this.parseT(node.male?.[st.myDist]?.[rightL.key]);
+    const dLeftW = this.parseT(node.female?.[st.myDist]?.[leftL.key]);
+    const dRightW = this.parseT(node.female?.[st.myDist]?.[rightL.key]);
+    const deltaMen = Number.isFinite(dLeftM) && Number.isFinite(dRightM) ? (dLeftM - dRightM).toFixed(2) : '';
+    const deltaWomen = Number.isFinite(dLeftW) && Number.isFinite(dRightW) ? (dLeftW - dRightW).toFixed(2) : '';
+    // show the gap-to-reach under the faster (right) column's times
+    cols[1].menDelta = deltaMen;
+    cols[1].womenDelta = deltaWomen;
+
+    const others = dl.filter(d => d !== st.myDist).map(d => ({
+      dist: d,
+      cols: [leftL, rightL].map((l, i) => {
+        const cc = C[l.cat];
+        return { label: l.label + (i === 1 ? ' →' : ''), accent: cc.accent, border: cc.border,
+          men: this.fmtT(this.parseT(node.male?.[d]?.[l.key])),
+          women: this.fmtT(this.parseT(node.female?.[d]?.[l.key])) };
+      })
+    }));
+
+    const pagerBtn = (enabled) => 'width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; cursor: ' + (enabled ? 'pointer' : 'default') + '; background: ' + u.subtle + '; color: ' + (enabled ? u.text : u.label) + '; opacity: ' + (enabled ? '1' : '.4') + ';';
+    const canNext = pairIdx > 1;              // move toward faster
+    const canPrev = pairIdx < this.LADDER.length - 1; // move toward slower
+    const mob = {
+      dist: st.myDist, targetLabel: rightL.label, cols,
+      hasDelta: deltaMen !== '—' || deltaWomen !== '—', deltaMen, deltaWomen,
+      onPrev: () => canPrev && this.setState(s => ({ pairIdx: pairIdx + 1, navDir: 'prev', navTick: s.navTick + 1 })),
+      onNext: () => canNext && this.setState(s => ({ pairIdx: pairIdx - 1, navDir: 'next', navTick: s.navTick + 1 })),
+      slideAnim: st.navTick === 0 ? 'none' : ((st.navDir === 'next' ? 'nmR' : 'nmL') + (st.navTick % 2 ? '2' : '') + ' .44s cubic-bezier(.4,0,.2,1) both'),
+      prevStyle: pagerBtn(canPrev), nextStyle: pagerBtn(canNext),
+      othersOpen: st.othersOpen, othersChevron: st.othersOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+      toggleOthers: () => this.setState(s => ({ othersOpen: !s.othersOpen })), others
+    };
+
+    return {
+      pageBg: u.page, cardBg: u.card, cardBorder: u.cardBorder, cardShadow: u.cardShadow,
+      subtleBg: u.subtle, headStickyBg: u.headSticky, sticky: u.sticky, gridLine: u.grid,
+      textPrimary: u.text, labelColor: u.label, headIconBg: u.headIcon,
+      menPillBg: u.menPill, menText: u.menText, womenPillBg: u.womenPill, womenText: u.womenText,
+      deltaBg: u.deltaBg, deltaBorder: u.deltaBorder,
+      menCell: menCellBase, womenCell: womenCellBase,
+      youAccent: this.cat(st.theme).adult.accent,
+      topSegs, demoSegs, poolSegs, strokeSegs, strokeLabel, poolLabel,
+      styleOpen: st.styleOpen,
+      toggleStyleDD: () => this.setState(s => ({ styleOpen: !s.styleOpen })),
+      ddAccent, ddStrokes, ddDists, ddHeadDist, ddHeadIconStyle,
+      ddChevron: st.styleOpen ? 'rotate(0deg)' : 'rotate(180deg)',
+      popupMax: st.device === 'mobile' ? '420px' : '1120px',
+      isDesktop: st.device === 'desktop', isMobile: st.device === 'mobile',
+      levels, recordCols, rows, mob
+    };
+  }
+}
+</script>
+</body>
+</html>

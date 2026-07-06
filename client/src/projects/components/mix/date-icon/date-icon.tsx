@@ -7,6 +7,7 @@ interface UI_DateIconProps {
   date?: string; // формат: 'DD-MM-YYYY'
   paddingClass?: string;
   className?: string;
+  fontClassName?: string; // переопределяет текстовый стиль (size/weight/color) для row-style-1
 }
 
 const parseCustomDate = (dateStr?: string): Date => {
@@ -21,6 +22,7 @@ const UI_DateIcon: React.FC<UI_DateIconProps> = ({
   date,
   className = '',
   paddingClass = 'px-1 md:px-4 py-1 md:py-3',
+  fontClassName,
 }) => {
   const dispatch = useAppDispatch();
 
@@ -46,10 +48,10 @@ const UI_DateIcon: React.FC<UI_DateIconProps> = ({
 
   if (styleType === 'row-style-1') {
     return (
-      <div className={`dv-date-icon-row flex items-center justify-center space-x-1 text-gray-800 text-base ${className}`}>
+      <div className={`dv-date-icon-row flex items-center justify-center space-x-1 ${fontClassName ?? 'text-gray-800 text-base'} ${className}`}>
         <span className="">{day}</span>
-        <span className="font-bold italic uppercase">{month}</span>
-        <span className="font-bold">{year}</span>
+        <span className="italic uppercase">{month}</span>
+        <span className="">{year}</span>
       </div>
     );
   }

@@ -23,10 +23,13 @@ public static class DependencyInjection
         var adminCs = configuration.GetConnectionString("AdminConnection") ?? defaultCs;
         var readCs = configuration.GetConnectionString("ReadConnection") ?? defaultCs;
 
-        services.AddDbContext<SwimmDbContext>(options => options.UseNpgsql(adminCs));
+        services.AddDbContext<SwimmDbContext>(options =>
+            options.UseNpgsql(adminCs, npgsql =>
+                npgsql.EnableRetryOnFailure(maxRetryCount: 3)));
 
         services.AddDbContext<SwimmReadDbContext>(options => options
-            .UseNpgsql(readCs)
+            .UseNpgsql(readCs, npgsql =>
+                npgsql.EnableRetryOnFailure(maxRetryCount: 3))
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking));
 
         // Кэш — IMemoryCache для одного инстанса; для Redis заменить MemoryCacheService

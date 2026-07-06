@@ -13,6 +13,7 @@ import DataSourceDDL from '../components/filter-data-source-ddl/filter-data-sour
 import { useTheme } from '../../hooks/useTheme';
 import { useMode } from '../../hooks/useMode';
 import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
+import UI_ThemeDevTool from '../components/mix/theme-dev-tool/theme-dev-tool';
 
 // === Вспомогательная функция ===
 function checkIsTraining(selectedSource: any, filters: any) {
@@ -53,45 +54,6 @@ function summarizeFilters(filters: any, isTraining: boolean) {
   return parts.length ? parts.join(' • ') : 'All results';
 }
 
-/** ВЕРХНЯЯ шторка (DDL источника) — ВСЕГДА фиксирована сверху и через портал */
-function MobileSourceDrawer({
-  rowsCount,
-  children,
-}: {
-  rowsCount: number;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-
-  // Содержимое, которое уйдёт в <body> через портал
-  const node = (
-    <div className="lg:hidden fixed top-0 left-0 right-0 z-[100]">
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center justify-between border-b border-[var(--theme-mode-border)] bg-[var(--theme-mode-surface)] backdrop-blur px-3 py-1 text-xs font-medium text-[var(--theme-mode-text-secondary)]"
-        style={{ minHeight: 'var(--mobile-topbar-h)' }}
-        aria-expanded={open}
-        aria-controls="mobile-source-panel"
-      >
-        <span className="truncate">{rowsCount.toLocaleString()} rows</span>
-        <span className="ml-2 inline-block leading-none">{open ? '▴' : '▾'}</span>
-      </button>
-
-      <div
-        id="mobile-source-panel"
-        className={`overflow-hidden1 transition-all duration-300 ease-out bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] border-b border-[var(--theme-mode-border)] shadow-sm ${
-          open ? 'max-h-[70vh] p-3' : 'max-h-0 p-0'
-        }`}
-      >
-        {open && <div className="w-full">{children}</div>}
-      </div>
-    </div>
-  );
-
-  return <>{createPortal(node, document.body)}</>;
-}
-
 /** НИЖНЯЯ шторка (фильтры) — ВСЕГДА фиксирована снизу и через портал */
 function MobileFiltersDrawer({
   summary,
@@ -108,7 +70,7 @@ function MobileFiltersDrawer({
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        className="lg:hidden fixed bottom-4 left-1/2 z-[110] transform -translate-x-1/2 bg-blue-600 text-white px-5 py-2 rounded-full shadow-lg flex items-center gap-3"
+        className="lg:hidden fixed bottom-4 left-1/2 z-[110] transform -translate-x-1/2 bg-[var(--theme-primary)] hover:bg-[var(--theme-primary-hover)] text-white px-5 py-2 rounded-full shadow-lg flex items-center gap-3 transition-colors"
         aria-expanded={open}
         aria-controls="mobile-filters-sheet"
         title={open ? 'Apply' : 'Filters'}
@@ -171,11 +133,6 @@ function ResultsMain() {
     selectedSource.results &&
     selectedSource.results.length > 0;
 
-  const rowsCount = useMemo(
-    () => (selectedSource?.results?.length ?? 0),
-    [selectedSource]
-  );
-
   const filtersSummary = useMemo(
     () => summarizeFilters(filters, isTraining),
     [filters, isTraining]
@@ -185,21 +142,28 @@ function ResultsMain() {
     <div className="dolphine-training md:p-4 pt-safe pb-safe min-h-screen bg-[var(--theme-mode-page-bg)]">
       {/* Переключатель Light/Dark (fixed внизу-справа) */}
       <UI_ModeToggle />
+      {/* Dev-инструмент тем (виден только при ?themes в URL) */}
+      <UI_ThemeDevTool />
 
-      {/* Мобильная верхняя шторка (DDL источника) */}
-      <MobileSourceDrawer rowsCount={rowsCount}>
-        <DataSourceDDL />
-      </MobileSourceDrawer>
-
-      {/* Десктопный верхний блок с DDL (как было), скрыт на мобильных */}
-      <div className="w-full z-40 hidden lg:block">
+      {/* Селектор соревнований: шапка/панель, единый для всех брейкпоинтов
+          (mobile — bottom sheet из «Change», design_handoff_selector_all) */}
+      <div className="w-full z-40 max-lg:px-2 max-lg:pt-2">
         <DataSourceDDL />
       </div>
 
-      {/* Если источник не выбран */}
+      {/* Источник не выбран (deep-link ?category=): селектор выше открыт inline,
+          область контента приглушена с подсказкой (CHANGES.md, frame 7a) */}
       {!hasSource ? (
-        <div className="mt-6 p-6 bg-yellow-100 border border-yellow-300 rounded text-center text-gray-700 font-medium">
-          ⚠️ Источник данных не выбран. Пожалуйста, выберите источник из списка выше.
+        <div
+          className="mt-4 flex min-h-[140px] items-center justify-center rounded-[14px] text-[13px] font-semibold opacity-45"
+          style={{
+            border: '1px dashed var(--theme-mode-border-input)',
+            background: 'var(--theme-mode-surface)',
+            color: 'var(--theme-mode-text-muted)',
+            pointerEvents: 'none',
+          }}
+        >
+          Select a competition above to see results
         </div>
       ) : (
         <>
@@ -217,24 +181,17 @@ function ResultsMain() {
               </div>
             )}
 
-            {/* Центральная колонка — результаты */}
+            {/* Центральная колонка — результаты (детали теперь попапом, поэтому полная ширина) */}
             {!isTraining && (
-              <div className="results-table w-full lg:w-6/12 bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] rounded shadow">
+              <div className="results-table w-full lg:w-10/12 bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] rounded shadow">
                 <ResultsTable />
               </div>
             )}
             {isTraining && (
-              <div className="w-full lg:w-6/12 bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] p-0 md:p-4 rounded shadow">
+              <div className="w-full lg:w-10/12 bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] p-0 md:p-4 rounded shadow">
                 <TrainingTable />
               </div>
             )}
-
-            {/* Правая колонка — детали спортсмена (только десктоп) */}
-            <section className="section-sportsmen-details hidden lg:block w-full lg:w-4/12 bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] rounded shadow relative">
-              {filters?.selected_name && filters.selected_name !== 'all' && (
-                <SportsmenDetails />
-              )}
-            </section>
 
             {/* POPUP */}
             {isPopup && <Popup />}
@@ -283,20 +240,32 @@ function ResultsMain() {
 
     const node = (
       <>
-        {/* оверлей с содержимым (модал снизу) */}
+        {/* Оверлей: сама карточка деталей И ЕСТЬ модал (без белого враппера вокруг).
+            Тёмная подложка + скролл, карточка отрисовывает всё оформление сама. */}
         {open &&
           createPortal(
             <div
-              className="fixed inset-0 z-[120] bg-black/50 flex items-end lg:hidden"
+              className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto p-4"
+              style={{
+                background: 'var(--theme-mode-overlay)',
+                backdropFilter: 'blur(3px)',
+                WebkitBackdropFilter: 'blur(3px)',
+              }}
               onClick={handleClose}
             >
               <div
-                className="w-full max-h-[85vh] theme-bg-section rounded-t-2xl shadow-xl overflow-auto p-4"
+                className="relative w-full max-w-[460px]"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="flex justify-between items-center mb-3">
-                  <div className="h-1.5 w-12 rounded-full bg-gray-300 mx-auto" />
-                  <button onClick={handleClose} className="text-xl">×</button>
+                {/* Кнопка закрытия — над карточкой, на тёмной подложке */}
+                <div className="flex justify-end mb-2">
+                  <button
+                    onClick={handleClose}
+                    className="w-8 h-8 rounded-full bg-white/90 text-gray-700 shadow flex items-center justify-center text-xl leading-none hover:bg-white"
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
                 </div>
                 {children}
               </div>

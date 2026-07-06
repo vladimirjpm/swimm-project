@@ -5,6 +5,7 @@
     var headerTitle = ViewData["HeaderTitle"] as string ?? "🔧 Swimm Admin";
     var csrfToken = Antiforgery.GetAndStoreTokens(Context).RequestToken!;
 }
+@inject Swimm.API.Services.DbStatusService DbStatus
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -15,6 +16,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/css/admin-all.css" />
     @await RenderSectionAsync("Styles", required: false)
+    <link rel="stylesheet" href="/css/db-banner.css" />
 </head>
 <body class="@bodyClass">
 
@@ -32,6 +34,10 @@
     </nav>
 </header>
 
+@if (!DbStatus.IsAvailable)
+{
+    <div class="db-unavailable-banner">База данных временно недоступна — некоторые функции могут не работать</div>
+}
 @RenderBody()
 
 <div class="fixed bottom-6 right-6 bg-[#323232] text-white py-3 px-5 rounded-md text-sm opacity-0 transition-opacity duration-300 z-[1000] toast" id="toast"></div>

@@ -11,7 +11,6 @@ import FilterPoolType from './filter-pool-type';
 import FilterGender from './filter-gender';
 import FilterAge from './filter-age';
 import FilterSwimmingStyle from './filter-swimming-style';
-import FilterDistance from './filter-distance';
 import FilterClub from './filter-club';
 import FilterEventDate from './filter-event-date';
 import FilterRecalculate from './filter-recalculate';
@@ -55,6 +54,7 @@ const FilterSection: React.FC = () => {
 
       <FilterActivity />
       <FilterResetButton />
+      <FilterSwimmingStyle />
       <FilterEventDate />
       <FilterRecalculate />
       {/* <FilterDateDropdown /> */}
@@ -64,10 +64,6 @@ const FilterSection: React.FC = () => {
       <FilterPoolType />
       <FilterGender />
       <FilterAge />
-      <div className="grid grid-cols-2 gap-2">
-        <FilterSwimmingStyle />
-        <FilterDistance />
-      </div>
       <FilterClub />
     </div>
   );

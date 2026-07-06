@@ -59,6 +59,8 @@ public class CompetitionAdminDto
     public string? EventName { get; set; }
     public int? DayNumber { get; set; }
     public string? SubName { get; set; }
+    /// <summary>Ключи категорий, к которым привязано соревнование.</summary>
+    public List<string> Categories { get; set; } = [];
 }
 
 public class CompetitionEventDto

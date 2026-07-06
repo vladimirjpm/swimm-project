@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './results-table.css';
 import { rootActions,useAppDispatch, useAppSelector } from '../../store/store';
-import { useFavorites } from '../../hooks/useFavorites';
+import { useFavoritesContext } from '../../hooks/favorites-context';
 import Helper from '../../utils/helpers/data-helper'
 import ClubPointsHelper from '../../utils/helpers/club-points-helper';
 import UI_DateIcon from '../components/mix/date-icon/date-icon';
@@ -10,7 +10,6 @@ import UI_SwimmStyleIcon from '../components/mix/swimm-style-icon/swimm-style-ic
 import UI_PoolIcon from '../components/mix/pool-icon/pool-icon'
 import ResultsTableMobile from './components/results-table-mobile';
 import ResultsTableDesktop from './components/results-table-desktop';
-import ResultsTable2xl from './components/results-table-2xl';
 import ResultsHeader from './components/results-header';
 import ResultsFilteredInfo from './components/results-filtered-info';
 import { TOP_N_POSITIONS } from '../../utils/constants/filter-constants';
@@ -33,7 +32,7 @@ function ResultsTable() {
     primarySwimmerId,
     toggleFavoriteSwimmer,
     togglePrimarySwimmer,
-  } = useFavorites();
+  } = useFavoritesContext();
 
   if (!selectedSource || !selectedSource.results?.length) {
     return <div className="text-[var(--theme-mode-text-muted)] italic">No data source selected.</div>;
@@ -182,6 +181,19 @@ function ResultsTable() {
       .map((v) => (v === null || v === undefined ? '' : String(v)))
       .join('||');
 
+  // Мобильный вид: раскрытие нижней строки (level/pts/date). Дефолт — все закрыты.
+  const [showAllOpen, setShowAllOpen] = useState(true);
+  const [expandedOverrides, setExpandedOverrides] = useState<Record<string, boolean>>({});
+
+  const handleToggleShowAllOpen = () => {
+    setShowAllOpen((prev) => !prev);
+    setExpandedOverrides({});
+  };
+
+  const handleToggleRowExpand = (key: string, currentlyExpanded: boolean) => {
+    setExpandedOverrides((prev) => ({ ...prev, [key]: !currentlyExpanded }));
+  };
+
   const [clubPointsByKey, setClubPointsByKey] = useState<Record<string, number>>({});
 
   useEffect(() => {
@@ -234,11 +246,8 @@ function ResultsTable() {
     <div className="results table w-full">
       <div className="mb-4">
 
-        {selectedSource.title && (
-          <h2 className="text-center text-2xl font-bold mt-4 lg:mt-0 mb-2">
-            <div className='effect-super-bold1 py-4 theme-bg-header'>{selectedSource.title}</div>
-          </h2>
-        )}
+        {/* Зелёный баннер соревнования удалён: его заменила шапка селектора
+            (компактный header с кнопкой «Change», см. design_handoff_category_selector/CHANGES.md) */}
         <ResultsFilteredInfo
           firstResult={firstResult}
           showDate={showDate}
@@ -266,26 +275,35 @@ function ResultsTable() {
           />
         )}
         
-        <div className="max-h-[650px] overflow-y-auto border border-[var(--theme-mode-border)] rounded shadow" >
+        <div className="max-h-[650px] overflow-y-auto border border-[var(--theme-mode-border)] rounded-2xl shadow-sm lg:max-w-[1180px] lg:mx-auto" >
           {/* Unified header (single view for all sizes) */}
           <div className="bg-[var(--theme-mode-surface-alt)] sticky top-0 z-10">
-            <div className="hidden lg:grid 2xl:hidden">
+            <div className="hidden lg:block">
               <ResultsHeader view="desktop" showClub={showClub} showEvent={showEvent} showPoolType={showPoolType} showDate={showDate} hasInternationalPoints={hasInternationalPoints} />
             </div>
-            <div className="hidden 2xl:grid">
-              <ResultsHeader view="2xl" showClub={showClub} showEvent={showEvent} showPoolType={showPoolType} showDate={showDate} hasInternationalPoints={hasInternationalPoints} />
-            </div>
             <div className="lg:hidden">
-              <ResultsHeader view="mobile" showClub={showClub} showEvent={showEvent} showPoolType={showPoolType} showDate={showDate} hasInternationalPoints={hasInternationalPoints} />
+              <ResultsHeader
+                view="mobile"
+                showClub={showClub}
+                showEvent={showEvent}
+                showPoolType={showPoolType}
+                showDate={showDate}
+                hasInternationalPoints={hasInternationalPoints}
+                showAllOpen={showAllOpen}
+                onToggleShowAllOpen={handleToggleShowAllOpen}
+              />
             </div>
           </div>
-          <ul className="divide-y">
+          <ul>
             {displayResults.map((res, index) => {
               const clubPoints = clubPointsByKey[getResultKey(res)];
               const isMaster = Helper.isResultMasters(isMastersSource, res.event_style_age);
               const resolvedGender = Helper.resolveGender(res.event_style_gender);
+              // Пол для мягкой заливки строки — из названия события (поля gender в данных нет)
+              const rowGender = Helper.resolveGenderFromEvent(res.event_name || res.event, res.event_style_gender);
               const swimmerName = `${res.first_name}${res.last_name ? ' ' + res.last_name : ''}`;
-              const genderForRecord = resolvedGender === 'none' ? 'male' : resolvedGender;
+              // Пол для рекордов/нормативов: явное поле → из названия события → 'male'
+              const genderForRecord = resolvedGender !== 'none' ? resolvedGender : (rowGender !== 'none' ? rowGender : 'male');
               const recordParams = {
                 gender: genderForRecord,
                 poolType: res.pool_type,
@@ -297,7 +315,7 @@ function ResultsTable() {
               const isRecordHolder = Helper.isRecordHolder({ swimmerName, ...recordParams });
               const isRecordTime = Helper.isRecordTime({ time: res.time, ...recordParams });
               const levelInfo = Helper.getNormativeLevelInfo({
-                gender: resolvedGender === 'none' ? 'male' : resolvedGender,
+                gender: genderForRecord,
                 poolType: Helper.resolvePoolType(res.pool_type),
                 styleName: res.event_style_name,
                 distance: `${res.event_style_len}m`,
@@ -310,7 +328,8 @@ function ResultsTable() {
               const isFav = isAuthenticated && swimmerId != null && favoriteSwimmerIds.has(swimmerId);
               const isPrimary = isAuthenticated && swimmerId != null && swimmerId === primarySwimmerId;
               const favoriteProps = {
-                isFavorite: isFav,
+                // "звезда отменяет сердечко": у primary (me) сердечко в таблице не горит
+                isFavorite: isFav && !isPrimary,
                 isPrimaryFavorite: isPrimary,
                 onToggleFavorite: isAuthenticated && swimmerId != null && !res.is_relay
                   ? () => toggleFavoriteSwimmer(swimmerId)
@@ -320,10 +339,13 @@ function ResultsTable() {
                   : undefined,
               };
 
+              const resultKey = getResultKey(res);
+              const isRowExpanded = expandedOverrides[resultKey] ?? showAllOpen;
+
               return (
                 <React.Fragment key={index}>
                   <li
-                    className={`lg:hidden flex flex-col gap-2 px-3 py-2 rounded ${Helper.getGenderBgClass(res.event_style_gender)}${isPrimary ? ' ring-2 ring-yellow-400' : ''}`}
+                    className={`lg:hidden flex flex-col gap-2 px-3 py-2 rounded border-l-4 border-b border-b-[var(--theme-mode-border-row)] ${isPrimary ? 'border-l-[#f5b800] bg-[var(--theme-mode-me-highlight)]' : `border-l-transparent ${Helper.getGenderBgClass(rowGender)}`}`}
                   >
                     <ResultsTableMobile
                       res={res}
@@ -341,12 +363,14 @@ function ResultsTable() {
                       isAwardSource={isAwardSource}
                       isRecordHolder={isRecordHolder}
                       isRecordTime={isRecordTime}
+                      isExpanded={isRowExpanded}
+                      onToggleExpand={() => handleToggleRowExpand(resultKey, isRowExpanded)}
                       {...favoriteProps}
                     />
                   </li>
 
                   <li
-                    className={`hidden lg:grid 2xl:hidden ${Helper.getGenderBgClass(res.event_style_gender)}${isPrimary ? ' ring-2 ring-yellow-400' : ''}`}
+                    className={`hidden lg:grid ${isPrimary ? '' : Helper.getGenderBgClass(rowGender)}`}
                   >
                     <ResultsTableDesktop
                       res={res}
@@ -368,28 +392,6 @@ function ResultsTable() {
                     />
                   </li>
 
-                  <li
-                    className={`hidden 2xl:grid grid-cols-12 gap-2 px-4 py-3 items-center ${Helper.getGenderBgClass(res.event_style_gender)}${isPrimary ? ' ring-2 ring-yellow-400' : ''}`}
-                  >
-                    <ResultsTable2xl
-                      res={res}
-                      index={index}
-                      showAge={showAge}
-                      showClub={showClub}
-                      showEvent={showEvent}
-                      showPoolType={showPoolType}
-                      showDate={showDate}
-                      hasInternationalPoints={hasInternationalPoints}
-                      clubPoints={clubPoints}
-                      levelInfo={levelInfo}
-                      updateFilter={updateFilter}
-                      isMastersResult={isMaster}
-                      isAwardSource={isAwardSource}
-                      isRecordHolder={isRecordHolder}
-                      isRecordTime={isRecordTime}
-                      {...favoriteProps}
-                    />
-                  </li>
                 </React.Fragment>
               );
             })}

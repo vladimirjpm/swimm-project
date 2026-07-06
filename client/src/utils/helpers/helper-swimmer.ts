@@ -7,6 +7,57 @@ import HelperTime from './helper-time';
 import HelperGender from './helper-gender';
 import { NormativeLevelInfo } from '../interfaces/normative-level-info';
 
+/** "DD/MM/YYYY" → timestamp (невалидная дата → 0, чтобы не ломать сортировку). */
+const parseDateDMY = (d?: string): number => {
+  if (!d) return 0;
+  const [day, month, year] = d.split('/').map(Number);
+  const t = new Date(year, (month || 1) - 1, day || 1).getTime();
+  return isNaN(t) ? 0 : t;
+};
+
+/**
+ * Спортсмен участвовал в результате: как основной пловец ИЛИ как участник эстафеты.
+ * Эстафета матчится сперва по структурному `relay_swimmers[]` (static-JSON источники),
+ * иначе по строке `relay_swimmers_name` — для API-источника структурного массива нет,
+ * в БД эстафета хранится ОДНОЙ строкой Result на "первого" пловца команды
+ * (см. [[favorites-media-feature]] / server ResultDto: relay_swimmers[] отложен).
+ */
+const matchesSwimmerName = (res: Result, nameLower: string): boolean => {
+  const fullName = `${res.first_name}${res.last_name ?? ''}`.toLowerCase();
+  const fullNameWithSpace = `${res.first_name} ${res.last_name ?? ''}`.toLowerCase();
+
+  if (
+    res.first_name.toLowerCase() === nameLower ||
+    fullName === nameLower ||
+    fullNameWithSpace === nameLower
+  ) {
+    return true;
+  }
+
+  const isRelay = res.is_relay === true || String(res.is_relay) === 'true';
+  if (!isRelay) return false;
+
+  if (res.relay_swimmers && res.relay_swimmers.length > 0) {
+    return res.relay_swimmers.some((swimmer) => {
+      const relayFullName = `${swimmer.first_name}${swimmer.last_name ?? ''}`.toLowerCase();
+      const relayFullNameWithSpace = `${swimmer.first_name} ${swimmer.last_name ?? ''}`.toLowerCase();
+      return (
+        swimmer.first_name?.toLowerCase() === nameLower ||
+        relayFullName === nameLower ||
+        relayFullNameWithSpace === nameLower
+      );
+    });
+  }
+
+  if (res.relay_swimmers_name) {
+    return res.relay_swimmers_name
+      .split(',')
+      .some((segment) => segment.trim().toLowerCase() === nameLower);
+  }
+
+  return false;
+};
+
 export default class HelperSwimmer {
   /**
    * Приоритет уровней для сортировки
@@ -26,6 +77,48 @@ export default class HelperSwimmer {
   };
 
   /**
+   * Все результаты спортсмена по имени (включая эстафеты, где он участник).
+   */
+  static filterResultsByName(results: Result[], selectedName: string): Result[] {
+    const nameLower = selectedName.toLowerCase();
+    return results.filter((res) => matchesSwimmerName(res, nameLower));
+  }
+
+  /**
+   * ВСЕ заплывы спортсмена (без группировки по стилям) с levelInfo,
+   * отсортированные по дате, затем по времени — для карточки в режиме «соревнование».
+   */
+  static getAllResultsByName(
+    results: Result[],
+    selectedName: string,
+    isMasters = false,
+  ): Array<Result & { levelInfo: NormativeLevelInfo }> {
+    return HelperSwimmer.filterResultsByName(results, selectedName)
+      .map((res) => {
+        const isMaster = HelperNormative.isResultMasters(isMasters, res.event_style_age);
+        const resolvedGender = HelperGender.resolveGender(res.event_style_gender);
+        const levelInfo = HelperNormative.getNormativeLevelInfo({
+          gender: resolvedGender,
+          poolType: HelperNormative.resolvePoolType(res.pool_type),
+          styleName: res.event_style_name,
+          distance: `${res.event_style_len}m`,
+          time: HelperTime.parseTimeToSeconds(res.time),
+          isMaster,
+          event_style_age: res.event_style_age,
+        });
+        return levelInfo ? { ...res, levelInfo } : null;
+      })
+      .filter(
+        (res): res is Result & { levelInfo: NormativeLevelInfo } => res !== null,
+      )
+      .sort((a, b) => {
+        const dateDiff = parseDateDMY(a.date) - parseDateDMY(b.date);
+        if (dateDiff !== 0) return dateDiff;
+        return HelperTime.parseTimeToSeconds(a.time) - HelperTime.parseTimeToSeconds(b.time);
+      });
+  }
+
+  /**
    * Получает лучшие результаты спортсмена по каждому стилю
    */
   static getBestResultsByStyle(
@@ -33,35 +126,7 @@ export default class HelperSwimmer {
     selectedName: string,
     isMasters = false,
   ): Array<Result & { levelInfo: NormativeLevelInfo }> {
-    const filteredResults = results.filter((res) => {
-      const nameLower = selectedName.toLowerCase();
-      const fullName = `${res.first_name}${res.last_name ?? ''}`.toLowerCase();
-      const fullNameWithSpace = `${res.first_name} ${res.last_name ?? ''}`.toLowerCase();
-
-      // Проверка основного имени
-      const matchesMain =
-        res.first_name.toLowerCase() === nameLower ||
-        fullName === nameLower ||
-        fullNameWithSpace === nameLower;
-
-      if (matchesMain) return true;
-
-      // Для эстафеты проверяем участников в relay_swimmers
-      const isRelay = res.is_relay === true || String(res.is_relay) === 'true';
-      if (isRelay && res.relay_swimmers && res.relay_swimmers.length > 0) {
-        return res.relay_swimmers.some((swimmer) => {
-          const relayFullName = `${swimmer.first_name}${swimmer.last_name ?? ''}`.toLowerCase();
-          const relayFullNameWithSpace = `${swimmer.first_name} ${swimmer.last_name ?? ''}`.toLowerCase();
-          return (
-            swimmer.first_name?.toLowerCase() === nameLower ||
-            relayFullName === nameLower ||
-            relayFullNameWithSpace === nameLower
-          );
-        });
-      }
-
-      return false;
-    });
+    const filteredResults = HelperSwimmer.filterResultsByName(results, selectedName);
 
     // Сортировка по времени
     const sortedResults = [...filteredResults].sort(
@@ -130,34 +195,7 @@ export default class HelperSwimmer {
   } {
     const nameLower = selectedName.toLowerCase();
 
-    const filteredResults = results.filter((res) => {
-      const fullName = `${res.first_name}${res.last_name ?? ''}`.toLowerCase();
-      const fullNameWithSpace = `${res.first_name} ${res.last_name ?? ''}`.toLowerCase();
-
-      // Проверка основного имени
-      const matchesMain =
-        res.first_name.toLowerCase() === nameLower ||
-        fullName === nameLower ||
-        fullNameWithSpace === nameLower;
-
-      if (matchesMain) return true;
-
-      // Для эстафеты проверяем участников в relay_swimmers
-      const isRelay = res.is_relay === true || String(res.is_relay) === 'true';
-      if (isRelay && res.relay_swimmers && res.relay_swimmers.length > 0) {
-        return res.relay_swimmers.some((swimmer) => {
-          const relayFullName = `${swimmer.first_name}${swimmer.last_name ?? ''}`.toLowerCase();
-          const relayFullNameWithSpace = `${swimmer.first_name} ${swimmer.last_name ?? ''}`.toLowerCase();
-          return (
-            swimmer.first_name?.toLowerCase() === nameLower ||
-            relayFullName === nameLower ||
-            relayFullNameWithSpace === nameLower
-          );
-        });
-      }
-
-      return false;
-    });
+    const filteredResults = results.filter((res) => matchesSwimmerName(res, nameLower));
 
     const grouped = {
       first: [] as Result[],

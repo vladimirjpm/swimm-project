@@ -9,10 +9,12 @@ namespace Swimm.Infrastructure.Repositories;
 public class AdminRepository : IAdminRepository
 {
     private readonly SwimmDbContext _db;
+    private readonly ICacheService _cache;
 
-    public AdminRepository(SwimmDbContext db)
+    public AdminRepository(SwimmDbContext db, ICacheService cache)
     {
         _db = db;
+        _cache = cache;
     }
 
     public async Task<List<UserDto>> GetUsersAsync()
@@ -235,20 +237,60 @@ public class AdminRepository : IAdminRepository
                 EventId = c.EventId,
                 EventName = c.Event != null ? c.Event.Name : null,
                 DayNumber = c.DayNumber,
-                SubName = c.SubName
+                SubName = c.SubName,
+                Categories = _db.CategoryCompetitions
+                    .Where(cc => cc.CompetitionId == c.Id)
+                    .Select(cc => cc.Category.Key)
+                    .ToList()
             })
             .ToListAsync();
     }
 
-    public async Task<bool> UpdateCompetitionFlagsAsync(int id, bool isMasters, bool isAward, bool showCombineAllResults)
+    public async Task<bool> UpdateCompetitionAsync(int id, bool isAward, bool showCombineAllResults, IReadOnlyCollection<string> categoryKeys)
     {
         var comp = await _db.Competitions.FindAsync(id);
         if (comp == null) return false;
 
-        comp.IsMasters = isMasters;
+        // Флаг Masters производен от членства в категории Masters.
+        comp.IsMasters = categoryKeys.Contains(Category.MastersKey);
         comp.IsAward = isAward;
         comp.ShowCombineAllResults = showCombineAllResults;
+
+        // Синк членства в категориях: добавляем недостающие, удаляем лишние.
+        var wanted = await _db.Categories
+            .Where(cat => categoryKeys.Contains(cat.Key))
+            .Select(cat => cat.Id)
+            .ToListAsync();
+
+        var existing = await _db.CategoryCompetitions
+            .Where(cc => cc.CompetitionId == id)
+            .ToListAsync();
+
+        var existingIds = existing.Select(cc => cc.CategoryId).ToHashSet();
+
+        // Удаляем те, что больше не выбраны.
+        foreach (var cc in existing.Where(cc => !wanted.Contains(cc.CategoryId)))
+            _db.CategoryCompetitions.Remove(cc);
+
+        // Добавляем новые (в конец по DisplayOrder внутри категории).
+        foreach (var catId in wanted.Where(w => !existingIds.Contains(w)))
+        {
+            var nextOrder = await _db.CategoryCompetitions
+                .Where(cc => cc.CategoryId == catId)
+                .Select(cc => (int?)cc.DisplayOrder)
+                .MaxAsync() ?? 0;
+            _db.CategoryCompetitions.Add(new CategoryCompetition
+            {
+                CategoryId = catId,
+                CompetitionId = id,
+                DisplayOrder = nextOrder + 1
+            });
+        }
+
         await _db.SaveChangesAsync();
+        // Публичный read-путь кэширует /api/results, /api/competitions, /api/categories —
+        // сбрасываем, иначе клиент видит старые флаги/категории до истечения TTL.
+        await _cache.InvalidateAllAsync();
         return true;
     }
 

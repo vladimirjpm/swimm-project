@@ -14,6 +14,13 @@ interface ResultsFilteredInfoProps {
   showEvent: boolean;
 }
 
+// Стили под дизайн-прототип (filter bar)
+const LABEL =
+  'text-[11px] font-bold uppercase tracking-[0.8px] text-[var(--theme-mode-text-muted)]';
+const ALL_VAL = 'text-[20px] font-semibold text-[var(--theme-primary)] leading-none';
+const COL = 'flex-1 flex flex-col items-center gap-2 px-2 min-w-0';
+const DIV = 'border-r border-[var(--theme-mode-border)]';
+
 function ResultsFilteredInfo({
   firstResult,
   showDate,
@@ -23,77 +30,78 @@ function ResultsFilteredInfo({
   showEvent,
 }: ResultsFilteredInfoProps) {
   return (
-    <div className="show-filtered-data">
-      <ul className="grid grid-cols-6 gap-2 mb-4 max-w-3xl mx-auto items-start">
+    <div className="show-filtered-data mb-4 lg:max-w-[1180px] lg:mx-auto">
+      <div className="flex items-stretch bg-[var(--theme-mode-surface)] rounded-[14px] shadow-sm px-2 py-4">
         {/* Date */}
-        <li className="flex flex-col items-center h-full">
-          <span className="text-xs text-[var(--theme-mode-text-muted)] uppercase mb-1">Date</span>
-          <div className="flex-1 flex items-center justify-center">
-            {showDate ? (
-              <span className="text-lg font-semibold">All</span>
-            ) : (
-              firstResult?.date && <UI_DateIcon paddingClass='px-1 py-1' className='text-xs' styleType="cube" date={firstResult.date} />
-            )}
-          </div>
-        </li>
+        <div className={`${COL} ${DIV}`}>
+          <span className={LABEL}>Date</span>
+          {showDate ? (
+            <span className={ALL_VAL}>All</span>
+          ) : (
+            firstResult?.date && (
+              <UI_DateIcon paddingClass="px-1 py-1" className="text-xs" styleType="cube" date={firstResult.date} />
+            )
+          )}
+        </div>
 
         {/* Club */}
-        <li className="flex flex-col items-center h-full">
-          <span className="text-xs text-[var(--theme-mode-text-muted)] uppercase mb-1">Club</span>
-          <div className="flex-1 flex items-center justify-center">
-            {showClub ? (
-              <span className="text-lg font-semibold">All</span>
-            ) : (
-              firstResult?.club && <UI_ClubIcon clubName={firstResult.club} className='text-xs' iconWidth="10" styleType="icon-text-bottom" />
-            )}
-          </div>
-        </li>
+        <div className={`${COL} ${DIV}`}>
+          <span className={LABEL}>Club</span>
+          {showClub ? (
+            <span className={ALL_VAL}>All</span>
+          ) : (
+            firstResult?.club && (
+              <UI_ClubIcon clubName={firstResult.club} className="text-xs" iconWidth="10" styleType="icon-text-bottom" />
+            )
+          )}
+        </div>
 
-        {/* Event - занимает 2 колонки, по центру */}
-        <li className="col-span-2 flex flex-col items-center h-full">
-          <span className="text-xs text-[var(--theme-mode-text-muted)] uppercase mb-1">Event</span>
-          <div className="flex-1 flex items-center justify-center max-w-[100px]">
-            {showEvent ? (
-              <span className="text-lg font-semibold">All</span>
-            ) : (
-              firstResult?.event_style_name && (
+        {/* Event */}
+        <div className={`${COL} ${DIV}`}>
+          <span className={LABEL}>Event</span>
+          {showEvent ? (
+            <span className={ALL_VAL}>All</span>
+          ) : (
+            firstResult?.event_style_name && (
+              <div className="w-[72px] [&_img]:w-full [&_img]:h-auto">
                 <UI_SwimmStyleIcon
                   styleName={firstResult.event_style_name}
                   styleLen={firstResult.event_style_len}
                   styleType="icon-len"
-                  className="font-bold text-2xl"
+                  className="font-bold text-base"
                 />
-              )
-            )}
-          </div>
-        </li>
+              </div>
+            )
+          )}
+        </div>
 
         {/* Age */}
-        <li className="flex flex-col items-center h-full">
-          <span className="text-xs text-[var(--theme-mode-text-muted)] uppercase mb-1">Age</span>
-          <div className="flex-1 flex items-center justify-center">
-            {showAge ? (
-              <span className="text-lg font-semibold">All</span>
-            ) : (
-              firstResult?.event_style_age && (
-                <span className="text-2xl font-bold">{firstResult.event_style_age}</span>
-              )
-            )}
-          </div>
-        </li>
+        <div className={`${COL} ${DIV}`}>
+          <span className={LABEL}>Age</span>
+          {showAge ? (
+            <span className={ALL_VAL}>All</span>
+          ) : (
+            firstResult?.event_style_age && (
+              <span className="text-2xl font-bold text-[var(--theme-mode-text)] leading-none">{firstResult.event_style_age}</span>
+            )
+          )}
+        </div>
 
         {/* Pool */}
-        <li className="flex flex-col items-center h-full">
-          <span className="text-xs text-[var(--theme-mode-text-muted)] uppercase mb-1">Pool</span>
-          <div className="flex-1 flex items-center justify-center">
-            {showPoolType ? (
-              <span className="text-lg font-semibold">All</span>
-            ) : (
-              firstResult?.pool_type && <UI_PoolIcon styleType="icon-text-top" label={firstResult.pool_type} iconWidth="40" labelClassName="text-sm" />
-            )}
-          </div>
-        </li>
-      </ul>
+        <div className={COL}>
+          <span className={LABEL}>Pool</span>
+          {showPoolType ? (
+            <>
+              <span className="text-[18px] font-bold text-[var(--theme-mode-text)] leading-none">All</span>
+              <span className="text-base text-[var(--theme-primary)] leading-none">〰️</span>
+            </>
+          ) : (
+            firstResult?.pool_type && (
+              <UI_PoolIcon styleType="icon-text-top" label={firstResult.pool_type} iconWidth="40" labelClassName="text-sm" />
+            )
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -8,6 +8,9 @@ interface ResultsHeaderProps {
   showPoolType: boolean;
   showDate: boolean;
   hasInternationalPoints: boolean;
+  /** Мобильный вид: развёрнуты ли все строки по умолчанию (level/pts/date) */
+  showAllOpen?: boolean;
+  onToggleShowAllOpen?: () => void;
 }
 
 const ResultsHeader: React.FC<ResultsHeaderProps> = ({
@@ -17,25 +20,42 @@ const ResultsHeader: React.FC<ResultsHeaderProps> = ({
   showPoolType,
   showDate,
   hasInternationalPoints,
+  showAllOpen,
+  onToggleShowAllOpen,
 }) => {
   if (view === 'mobile') {
     return (
-      <div className="w-full text-center text-xl font-bold">Results</div>
+      <div className="w-full flex items-center justify-center gap-3 relative px-3 py-2">
+        <div className="text-xl font-bold">Results</div>
+        {/* Скрыто по просьбе — может понадобиться снова, не удалять.
+        {onToggleShowAllOpen && (
+          <label className="absolute right-3 flex items-center gap-1.5 text-xs font-semibold text-[var(--theme-mode-text-muted)] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!showAllOpen}
+              onChange={onToggleShowAllOpen}
+              className="w-3.5 h-3.5"
+            />
+            Show all open
+          </label>
+        )}
+        */}
+      </div>
     );
   }
 
   if (view === 'desktop') {
     const gridTemplate = buildResultsGridTemplate({ showClub, showEvent, showPoolType, showDate, hasInternationalPoints });
-    const lbl = 'text-[10px] font-extrabold uppercase tracking-wider text-[var(--theme-mode-text-muted)]';
+    const lbl = 'text-[10px] font-extrabold uppercase tracking-[0.08em] text-[var(--theme-mode-text-muted)]';
     return (
-      <div className="grid gap-3 px-6 py-3 items-center" style={{ gridTemplateColumns: gridTemplate }}>
+      <div className="grid gap-[14px] px-6 py-[13px] items-center bg-[var(--theme-mode-surface-alt)] border-b border-[var(--theme-mode-border)] border-l-4 border-l-transparent" style={{ gridTemplateColumns: gridTemplate }}>
+        <div aria-hidden />
         <div className={`${lbl} text-center`}>Pos</div>
         <div className={lbl}>Swimmer</div>
-        {showClub && <div className={lbl}>Club</div>}
+        {showClub && <div className={`${lbl} text-center`}>Club</div>}
         {(showEvent || showPoolType) && <div className={lbl}>Style</div>}
         <div className={`${lbl} text-right`}>Time</div>
         <div className={`${lbl} text-center`}>Level</div>
-        {showDate && <div className={`${lbl} text-center`}>Date</div>}
         {hasInternationalPoints && <div className={`${lbl} text-right`}>Pts</div>}
       </div>
     );

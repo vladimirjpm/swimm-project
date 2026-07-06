@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<sc-if value="{{ item.isLive }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ item.onClick }}" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 52px; padding: 8px 14px; border-radius: 12px; cursor: pointer; background: var(--sel-live-bg, rgba(20,130,83,0.09)); border: 1px solid var(--sel-live-border, rgba(20,130,83,0.4));">
+    <div style="font-size: 14px; font-weight: 700; color: var(--sel-text, #1a1a1a); direction: rtl; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;">{{ item.name }}</div>
+    <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
+      <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--sel-live, #148253); animation: blink 1.4s ease infinite;"></span>
+      <span style="font-family: ui-monospace, Menlo, monospace; font-size: 10px; font-weight: 800; color: var(--sel-live, #148253); white-space: nowrap;">{{ item.meta }}</span>
+    </div>
+  </div>
+</sc-if>
+<sc-if value="{{ item.isSelected }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ item.onClick }}" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 52px; padding: 8px 14px; border-radius: 12px; cursor: pointer; background: var(--sel-accent-tint, #e3f0fb); border: 1px solid var(--sel-accent, #1565c0);">
+    <div style="display: flex; align-items: center; gap: 9px; min-width: 0;">
+      <span style="color: var(--sel-accent, #1565c0); font-weight: 900; font-size: 14px;">✓</span>
+      <span style="font-size: 14px; font-weight: 700; color: var(--sel-text, #1a1a1a); direction: rtl; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ item.name }}</span>
+    </div>
+    <span style="flex-shrink: 0; font-size: 11.5px; font-weight: 700; color: var(--sel-accent, #1565c0); white-space: nowrap;">{{ item.meta }}</span>
+  </div>
+</sc-if>
+<sc-if value="{{ item.isPlain }}" hint-placeholder-val="{{ true }}">
+  <div onClick="{{ item.onClick }}" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 52px; padding: 8px 14px; border-radius: 12px; cursor: pointer; background: var(--sel-surface, #fff); border: 1px solid var(--sel-row-border, #e4e8ee);">
+    <div style="font-size: 14px; font-weight: 600; color: var(--sel-text2, #5b6470); direction: rtl; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;">{{ item.name }}</div>
+    <span style="flex-shrink: 0; font-size: 11.5px; color: var(--sel-muted, #aab0bd); white-space: nowrap;">{{ item.meta }}</span>
+  </div>
+</sc-if>
+</x-dc>
+</body>
+</html>

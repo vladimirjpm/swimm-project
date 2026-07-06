@@ -106,9 +106,9 @@ export function useFavorites() {
 
   // ── Mutations ───────────────────────────────────────────────────────────────
 
-  const addFavoriteSwimmer = useCallback(async (swimmerId: number): Promise<boolean> => {
+  const addFavoriteSwimmer = useCallback(async (swimmerId: number): Promise<FavoriteDto | null> => {
     const token = await fetchAntiforgeryToken();
-    if (!token) return false;
+    if (!token) return null;
 
     try {
       const r = await fetch('/api/me/favorites', {
@@ -118,8 +118,8 @@ export function useFavorites() {
         body: JSON.stringify({ target_type: 'swimmer', swimmer_id: swimmerId }),
       });
 
-      if (r.status === 409) return false; // уже в избранном
-      if (!r.ok) { invalidateTokenCache(); return false; }
+      if (r.status === 409) return null; // уже в избранном
+      if (!r.ok) { invalidateTokenCache(); return null; }
 
       const fav: FavoriteDto = await r.json();
       if (mountedRef.current) {
@@ -130,10 +130,10 @@ export function useFavorites() {
           return { ...prev, favorites: next, favoriteSwimmerIds: ids };
         });
       }
-      return true;
+      return fav;
     } catch {
       invalidateTokenCache();
-      return false;
+      return null;
     }
   }, []);
 
@@ -254,10 +254,34 @@ export function useFavorites() {
     }
   }, [state.isAuthenticated, state.favorites, unsetPrimary, setPrimary]);
 
+  /**
+   * Звезда "это я" (из попапа деталей): toggle primary для пловца.
+   * Если пловца ещё нет в избранном — сначала добавляем, потом делаем primary
+   * (backend требует, чтобы primary был среди избранного). Уже primary → снять.
+   */
+  const setMeBySwimmer = useCallback(async (swimmerId: number): Promise<void> => {
+    if (!state.isAuthenticated) return;
+
+    const existing = state.favorites.find(
+      f => f.target_type === 'swimmer' && f.swimmer_id === swimmerId
+    );
+    if (existing) {
+      if (existing.is_primary) {
+        await unsetPrimary(existing.id);
+      } else {
+        await setPrimary(existing.id);
+      }
+      return;
+    }
+    const fav = await addFavoriteSwimmer(swimmerId);
+    if (fav) await setPrimary(fav.id);
+  }, [state.isAuthenticated, state.favorites, addFavoriteSwimmer, setPrimary, unsetPrimary]);
+
   return {
     ...state,
     toggleFavoriteSwimmer,
     togglePrimarySwimmer,
+    setMeBySwimmer,
     setPrimary,
     unsetPrimary,
     removeFavorite,

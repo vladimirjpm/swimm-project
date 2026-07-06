@@ -3,19 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Results Main</title>
+    <title>Results</title>
     <script src="/data/filter-data.js"></script>
     <script src="/data/normative-records.js"></script>
     <script src="/data/normative.js"></script>
     <script src="/data/normative-masters.js"></script>
     <script src="/data/normative-age-records.js"></script>
+    <script src="/data/normative-masters-records.js"></script>
     <!-- Линки на CSS вручную НЕ нужны, Vite добавит их сам благодаря import в TSX -->
   </head>
-  <body class="min-h-screen bg-gray-50"  
-    load-default-data="json/competition-2026-horef-isr-championship-age_11-14.json"  
-    _load-single-data1="json/competition-2025-liga3-weisgel-rehovot-age_9-13.json" 
-    data-sources-config="config/sources-config-results-main.json"
-    data-competition-theme="competition-emerald">
+  <!-- Единая страница результатов. Категория/соревнование — URL-параметрами:
+       ?cat=<key> (см. src/utils/constants/results-categories.ts),
+       ?competitionId=<id|last> / ?eventId=<id> — автозагрузка источника.
+       data-атрибуты тем ставит applyResultsCategory до рендера. -->
+  <body class="min-h-screen bg-gray-50" data-competition-theme="competition-emerald">
     <div id="root"></div>
     <script type="module" src="/src/pages/results-main-page.tsx"></script>
   </body>

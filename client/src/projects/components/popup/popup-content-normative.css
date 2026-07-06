@@ -1,0 +1,34 @@
+/* Normative Info popup — редизайн (design_handoff_normative_info).
+   Цвета задаются inline через CSS-переменную --gc (glow color); здесь только
+   keyframes и интерактивные мелочи, которые неудобны на Tailwind. */
+
+/* Пульсирующее кольцо на ячейке-пересечении (дистанция × текущий уровень) */
+@keyframes nrm-cell-glow {
+  0%, 100% { box-shadow: inset 0 0 0 2px var(--gc), 0 0 10px -3px var(--gc); }
+  50%      { box-shadow: inset 0 0 0 2px var(--gc), 0 0 22px 1px var(--gc); }
+}
+.nrm-glow-cell {
+  border-radius: 9px;
+  animation: nrm-cell-glow 2.2s ease-in-out infinite;
+}
+
+/* Направленный слайд пары уровней в мобильном compare-виде
+   (замена nmR/nmL из прототипа; replay — через remount по key) */
+@keyframes nrm-slide-r {
+  from { transform: translateX(40px); opacity: .45; }
+  to   { transform: none; opacity: 1; }
+}
+@keyframes nrm-slide-l {
+  from { transform: translateX(-40px); opacity: .45; }
+  to   { transform: none; opacity: 1; }
+}
+.nrm-slide-next { animation: nrm-slide-r .44s cubic-bezier(.4, 0, .2, 1) both; }
+.nrm-slide-prev { animation: nrm-slide-l .44s cubic-bezier(.4, 0, .2, 1) both; }
+
+/* Кнопки пейджера ‹ › */
+.nrm-pager-btn { transition: transform .15s ease, background .2s ease; }
+.nrm-pager-btn:active { transform: scale(.9); }
+
+/* Плавность на ячейках/медальонах */
+.nrm-cell { transition: background .25s ease, box-shadow .25s ease; }
+.nrm-med { transition: all .25s ease; }

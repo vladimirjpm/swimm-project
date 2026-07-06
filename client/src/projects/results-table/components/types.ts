@@ -25,6 +25,10 @@ export interface ResultsTableRowProps {
   /** Колбэк для переключения избранного/primary */
   onToggleFavorite?: (swimmerId: number) => void;
   onTogglePrimary?: (swimmerId: number) => void;
+  /** Мобильный вид: развёрнута ли нижняя строка (level/pts/date) */
+  isExpanded?: boolean;
+  /** Мобильный вид: переключить развёрнутость нижней строки */
+  onToggleExpand?: () => void;
 }
 
 /** Флаги видимости колонок таблицы результатов. */
@@ -37,18 +41,21 @@ export interface ResultsGridFlags {
 }
 
 /**
- * Единый gridTemplateColumns для хедера И строк результатов — чтобы колонки
- * (условные: club/style/date/pts) всегда были выровнены. Порядок:
- * POS · SWIMMER · [CLUB] · [STYLE] · TIME · LEVEL · [DATE] · [PTS].
- * Хедер и строки ОБЯЗАНЫ рендерить ячейки в этом же порядке с теми же условиями.
+ * Единый gridTemplateColumns для хедера И строк результатов (как в прототипе).
+ * Порядок: FAV · POS · SWIMMER · [CLUB] · [STYLE] · TIME · LEVEL · [PTS].
+ * Иконка клуба — отдельной колонкой после имени; название клуба остаётся текстом
+ * под именем. FAV — ведущая колонка сердечка/звезды (всегда зарезервирована для
+ * выравнивания, пустая для неавторизованных). Хедер и строки ОБЯЗАНЫ рендерить
+ * ячейки в этом же порядке с теми же условиями.
  */
 export function buildResultsGridTemplate(f: ResultsGridFlags): string {
-  const cols: string[] = ['56px', 'minmax(0,1fr)']; // POS, SWIMMER
-  if (f.showClub) cols.push('auto');                 // CLUB
-  if (f.showEvent || f.showPoolType) cols.push('minmax(90px,auto)'); // STYLE
-  cols.push('auto');                                 // TIME
-  cols.push('88px');                                 // LEVEL (gauge)
-  if (f.showDate) cols.push('auto');                 // DATE
-  if (f.hasInternationalPoints) cols.push('62px');   // PTS
+  // Детали теперь попапом → таблица во всю ширину, поэтому фикс-ширины (как в
+  // прототипе). Порядок: FAV · POS · SWIMMER · [CLUB] · [STYLE] · TIME · LEVEL · [PTS].
+  const cols: string[] = ['28px', '60px', 'minmax(0,1fr)'];        // FAV, POS, SWIMMER
+  if (f.showClub) cols.push('44px');                               // CLUB (иконка)
+  if (f.showEvent || f.showPoolType) cols.push('96px');            // STYLE (иконка)
+  cols.push('112px');                                              // TIME
+  cols.push('96px');                                               // LEVEL (gauge)
+  if (f.hasInternationalPoints) cols.push('64px');                 // PTS
   return cols.join(' ');
 }

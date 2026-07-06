@@ -3,6 +3,10 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Logging;
+using Swimm.API.Services;
+using Npgsql;
 using Swimm.Infrastructure.Data;
 
 namespace Swimm.API.Security;
@@ -55,16 +59,45 @@ public static class CookieSecurityStampValidator
             return;
         }
 
-        var db = context.HttpContext.RequestServices.GetRequiredService<SwimmDbContext>();
-        var snapshot = await db.AppUsers
-            .AsNoTracking()
-            .Where(u => u.Id == userId)
-            .Select(u => new { u.IsActive, u.SecurityStamp })
-            .FirstOrDefaultAsync();
+        var db       = context.HttpContext.RequestServices.GetRequiredService<SwimmDbContext>();
+        var dbStatus = context.HttpContext.RequestServices.GetRequiredService<DbStatusService>();
 
-        if (snapshot == null || !snapshot.IsActive || snapshot.SecurityStamp != cookieStamp)
+        // Быстрый выход: если БД уже известна как недоступная — пропускаем проверку штампа,
+        // не тратим ~5 сек на 3 повторные попытки подключения.
+        if (!dbStatus.IsAvailable)
         {
-            await RejectAsync(context);
+            var logger2 = context.HttpContext.RequestServices
+                .GetRequiredService<ILoggerFactory>()
+                .CreateLogger(nameof(CookieSecurityStampValidator));
+            logger2.LogDebug("Security stamp check skipped — DB status cached as unavailable (userId={UserId}).", userId);
+            return;
+        }
+
+        try
+        {
+            var snapshot = await db.AppUsers
+                .AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => new { u.IsActive, u.SecurityStamp })
+                .FirstOrDefaultAsync();
+
+            dbStatus.MarkAvailable(); // БД ответила
+
+            if (snapshot == null || !snapshot.IsActive || snapshot.SecurityStamp != cookieStamp)
+            {
+                await RejectAsync(context);
+                return;
+            }
+        }
+        catch (Exception ex) when (ex is NpgsqlException or InvalidOperationException or RetryLimitExceededException)
+        {
+            // БД недоступна (transient failure) — пропускаем проверку штампа для этого запроса,
+            // сессию не отзываем. Следующий запрос после истечения ValidateInterval повторит попытку.
+            dbStatus.MarkUnavailable(); // немедленно обновляем флаг, не дожидаясь пинга
+            var logger = context.HttpContext.RequestServices
+                .GetRequiredService<ILoggerFactory>()
+                .CreateLogger(nameof(CookieSecurityStampValidator));
+            logger.LogWarning(ex, "Security stamp check skipped — DB unreachable (userId={UserId}).", userId);
             return;
         }
 

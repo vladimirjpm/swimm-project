@@ -44,23 +44,22 @@ const FilterDistance: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col">
-      <h3 className="font-semibold">Distance</h3>
-      {styleLens.map((len) => {
-        const disabled = !availableLengths.has(Number(len));
-        return (
-          <button
-            key={len}
-            disabled={disabled}
-            className={`px-3 py-1 m-1 border rounded transition-colors ${
-              filters.style_len === len ? 'theme-btn-active' : 'theme-btn'
-            } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-            onClick={() => !disabled && updateFilter(len)}
-          >
-            {len}m
-          </button>
-        );
-      })}
+    <div className="pl-3 border-l border-dashed border-[var(--theme-mode-border-input)]">
+      <div className="flex flex-col gap-2">
+        {styleLens.map((len) => {
+          const disabled = !availableLengths.has(Number(len));
+          return (
+            <button
+              key={len}
+              disabled={disabled}
+              className={`fseg ${filters.style_len === len ? 'fseg-active' : ''}`}
+              onClick={() => !disabled && updateFilter(len)}
+            >
+              {len}m
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 };

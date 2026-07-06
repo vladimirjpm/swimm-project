@@ -2,6 +2,42 @@
   color: var(--theme-mode-text);
   background-color: var(--theme-mode-drawer-bg);
   border: 1px solid var(--theme-mode-border-drawer);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Сегментные кнопки фильтра (по прототипу drawer'а из design_handoff_theme_modes) */
+.fseg {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid var(--theme-mode-border-input);
+  background-color: var(--theme-mode-input-bg);
+  color: var(--theme-mode-text);
+}
+
+.fseg:hover:not(:disabled) {
+  border-color: var(--theme-primary);
+  color: var(--theme-primary);
+}
+
+.fseg-active {
+  border-color: var(--theme-border-active);
+  background-color: var(--theme-bg-active);
+  color: var(--theme-text-active);
+}
+
+.fseg-active:hover:not(:disabled) {
+  color: var(--theme-text-active);
+}
+
+.fseg:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Name DDL (react-select) - прозрачный фон как у Date DDL */

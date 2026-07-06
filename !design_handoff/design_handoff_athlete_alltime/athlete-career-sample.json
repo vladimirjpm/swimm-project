@@ -1,0 +1,32 @@
+{
+  "Ernest Lutsenko": {
+    "competitions": 9,
+    "races": 34,
+    "since": 2022,
+    "totalPoints": 2846,
+    "gold": 4,
+    "silver": 6,
+    "bronze": 3,
+    "bestByStyle": [
+      { "stroke": "Free", "distance": "50", "time": "00:27.90", "points": 361, "pool": "50m", "competition": "Israel Winter Cup", "date": "Dec 2025" },
+      { "stroke": "Free", "distance": "100", "time": "01:02.45", "points": 348, "pool": "25m", "competition": "Tel Aviv Open", "date": "Mar 2026" },
+      { "stroke": "Fly", "distance": "100", "time": "01:04.11", "points": 342, "pool": "50m", "competition": "Hedera Meet", "date": "Jun 2026" },
+      { "stroke": "Back", "distance": "50", "time": "00:33.80", "points": 301, "pool": "25m", "competition": "Netanya Sprint", "date": "Oct 2025" },
+      { "stroke": "Breast", "distance": "50", "time": "00:37.25", "points": 288, "pool": "50m", "competition": "National Juniors", "date": "Aug 2025" }
+    ]
+  },
+  "_default": {
+    "competitions": 5,
+    "races": 17,
+    "since": 2023,
+    "totalPoints": 1420,
+    "gold": 1,
+    "silver": 2,
+    "bronze": 1,
+    "bestByStyle": [
+      { "stroke": "Free", "distance": "50", "time": "00:31.14", "points": 296, "pool": "50m", "competition": "Israel Winter Cup", "date": "Dec 2025" },
+      { "stroke": "Back", "distance": "100", "time": "01:14.60", "points": 264, "pool": "25m", "competition": "Tel Aviv Open", "date": "Mar 2026" },
+      { "stroke": "Fly", "distance": "50", "time": "00:34.02", "points": 251, "pool": "50m", "competition": "National Juniors", "date": "Aug 2025" }
+    ]
+  }
+}

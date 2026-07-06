@@ -35,6 +35,25 @@ public class ResultRepository : IResultRepository
 
         var query = _db.Results.AsNoTracking().AsQueryable();
 
+        // "Последнее" соревнование: берём соревнование самого свежего результата;
+        // если это день многодневного события — фильтруем по всему событию.
+        if (filter.Latest)
+        {
+            var latest = await _db.Results.AsNoTracking()
+                .OrderByDescending(r => r.CompetitionDate)
+                .ThenByDescending(r => r.CompetitionId)
+                .Select(r => new { r.CompetitionId, r.Competition.EventId })
+                .FirstOrDefaultAsync();
+
+            if (latest is null)
+                return ([], false);
+
+            if (latest.EventId.HasValue)
+                query = query.Where(r => r.Competition.EventId == latest.EventId.Value);
+            else
+                query = query.Where(r => r.CompetitionId == latest.CompetitionId);
+        }
+
         if (!string.IsNullOrWhiteSpace(filter.StyleName))
             query = query.Where(r => r.Style.Name == filter.StyleName);
 
@@ -162,7 +181,7 @@ public class ResultRepository : IResultRepository
 
     private static string ResultsCacheKey(ResultFilter f, int page, int pageSize) =>
         $"results:{f.StyleName}:{f.Distance}:{f.Gender}:{f.PoolType}" +
-        $":{f.DateFrom:yyyyMMdd}:{f.DateTo:yyyyMMdd}:{f.Competition}:{f.EventId}:{f.CompetitionId}:{f.Name}:{f.Club}" +
+        $":{f.DateFrom:yyyyMMdd}:{f.DateTo:yyyyMMdd}:{f.Competition}:{f.EventId}:{f.CompetitionId}:{f.Latest}:{f.Name}:{f.Club}" +
         $":{page}:{pageSize}";
 
     public async Task<IReadOnlyList<CompetitionSourceDto>> GetSourcesAsync()
@@ -210,6 +229,44 @@ public class ResultRepository : IResultRepository
             })
             .ToListAsync();
 
+        // Категория для селектора — из РЕАЛЬНОГО членства (CategoryCompetitions, те же
+        // чекбоксы, что в админке), а не эвристики по возрасту: соревнование может быть
+        // одновременно в Youth Results и Junior Results, поэтому приоритет
+        // masters > youth-team (young8_11) > junior-results/main (junior).
+        var categoryKeysByCompetition = await _db.CategoryCompetitions.AsNoTracking()
+            .Select(cc => new { cc.CompetitionId, cc.Category.Key })
+            .ToListAsync();
+
+        var categoryKeysMap = categoryKeysByCompetition
+            .GroupBy(cc => cc.CompetitionId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Key).ToHashSet());
+
+        // День → событие, чтобы агрегировать членство по всем дням события.
+        var dayToEvent = await _db.Competitions.AsNoTracking()
+            .Where(c => c.EventId != null)
+            .Select(c => new { c.Id, EventId = c.EventId!.Value })
+            .ToListAsync();
+
+        var categoryKeysByEvent = dayToEvent
+            .Where(d => categoryKeysMap.ContainsKey(d.Id))
+            .GroupBy(d => d.EventId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.SelectMany(d => categoryKeysMap[d.Id]).ToHashSet());
+
+        static string CategoryFor(bool isMasters, HashSet<string>? keys) =>
+            isMasters ? "masters"
+            : keys?.Contains("results-youth-team") == true ? "young8_11"
+            : "junior";
+
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        static string StatusFor(DateOnly? start, DateOnly? end, DateOnly today)
+        {
+            if (start is null) return "done";
+            if (start.Value > today) return "upcoming";
+            return (end ?? start.Value) >= today ? "live" : "done";
+        }
+
         static string Fmt(DateOnly? d) => d?.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) ?? "";
 
         var items = new List<(DateOnly Sort, CompetitionSourceDto Dto)>(events.Count + singles.Count);
@@ -227,6 +284,8 @@ public class ResultRepository : IResultRepository
                 IsMasters = e.IsMasters,
                 IsAward = e.IsAward,
                 ShowCombineAllResults = e.ShowCombine,
+                Category = CategoryFor(e.IsMasters, categoryKeysByEvent.GetValueOrDefault(e.Id)),
+                Status = StatusFor(e.StartDate, e.EndDate, today),
                 DayCount = e.DayCount,
                 ResultCount = e.ResultCount
             }));
@@ -245,6 +304,8 @@ public class ResultRepository : IResultRepository
                 IsMasters = c.IsMasters,
                 IsAward = c.IsAward,
                 ShowCombineAllResults = c.ShowCombineAllResults,
+                Category = CategoryFor(c.IsMasters, categoryKeysMap.GetValueOrDefault(c.Id)),
+                Status = StatusFor(d == default ? null : d, null, today),
                 DayCount = 1,
                 ResultCount = c.ResultCount
             }));
@@ -258,5 +319,149 @@ public class ResultRepository : IResultRepository
 
         await _cache.SetAsync(key, (IReadOnlyList<CompetitionSourceDto>)ordered, TimeSpan.FromMinutes(5));
         return ordered;
+    }
+
+    public async Task<AthleteCareerDto?> GetAthleteCareerAsync(string name)
+    {
+        name = name.Trim();
+        if (name.Length == 0) return null;
+
+        var key = $"athlete-career:{name.ToLowerInvariant()}";
+        var cached = await _cache.GetAsync<AthleteCareerDto>(key);
+        if (cached is not null)
+            return cached;
+
+        // Клиент передаёт полное имя ("First Last"); матчим оба порядка + EN-вариант.
+        var rows = await _db.Results.AsNoTracking()
+            .Where(r => r.RelayId == null && (
+                r.Swimmer.FirstName + " " + r.Swimmer.LastName == name ||
+                r.Swimmer.LastName + " " + r.Swimmer.FirstName == name ||
+                r.Swimmer.FirstNameEn + " " + r.Swimmer.LastNameEn == name ||
+                r.Swimmer.LastNameEn + " " + r.Swimmer.FirstNameEn == name))
+            .Select(r => new
+            {
+                r.CompetitionId,
+                r.CompetitionDate,
+                r.Position,
+                r.InternationalPoints,
+                r.TimeMillisecond,
+                r.TimeOriginal,
+                r.TimeFail,
+                StyleName = r.Style.Name,
+                r.Distance,
+                Pool = r.Competition.PoolType,
+                CompetitionName = r.Competition.Name,
+                DateRaw = r.Competition.Date,
+                r.Gender,
+                r.EventStyleAge,
+                r.AgeGroup,
+                IsMasters = r.Competition.IsMasters,
+                IsAward = r.Competition.IsAward
+            })
+            .ToListAsync();
+
+        // Эстафеты: в БД одна строка Result на команду, привязана к ОДНОМУ "первому" пловцу
+        // (SwimmerId), остальные участники — только строкой Relay.SwimmersName ("Имя Фамилия, …").
+        // Поэтому медаль за эстафету не находится обычным матчем по Swimmer — ищем спортсмена
+        // в SwimmersName у ЛЮБОЙ эстафеты (не только "своей" по SwimmerId).
+        // Грубая SQL-фильтрация по вхождению имени, точная проверка — посегментно в C#.
+        var nameTokens = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var relayCandidates = nameTokens.Length == 0
+            ? []
+            : await _db.Results.AsNoTracking()
+                .Where(r => r.RelayId != null &&
+                    nameTokens.Any(t => r.Relay!.SwimmersName != null && r.Relay.SwimmersName.Contains(t)))
+                .Select(r => new
+                {
+                    r.CompetitionId,
+                    r.Position,
+                    r.Relay!.SwimmersName,
+                    StyleName = r.Style.Name,
+                    r.Distance,
+                    CompetitionName = r.Competition.Name,
+                    DateRaw = r.Competition.Date
+                })
+                .ToListAsync();
+
+        static bool SegmentMatchesName(string segment, string name)
+        {
+            segment = segment.Trim();
+            if (segment == name) return true;
+            var parts = segment.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            return parts.Length == 2 && $"{parts[1]} {parts[0]}" == name;
+        }
+
+        var relayMedals = relayCandidates
+            .Where(r => (r.SwimmersName ?? "").Split(',').Any(seg => SegmentMatchesName(seg, name)))
+            .ToList();
+
+        if (rows.Count == 0 && relayMedals.Count == 0) return null;
+
+        // Лучшее время на (стиль × дистанция) — только валидные времена.
+        var bestByStyle = rows
+            .Where(r => r.TimeMillisecond != null && !r.TimeFail)
+            .GroupBy(r => new { r.StyleName, r.Distance })
+            .Select(g => g.OrderBy(r => r.TimeMillisecond).First())
+            .OrderByDescending(r => r.InternationalPoints)
+            .Select(r => new CareerBestDto
+            {
+                Stroke = r.StyleName,
+                Distance = r.Distance,
+                Time = r.TimeOriginal,
+                Points = r.InternationalPoints,
+                Pool = r.Pool,
+                Competition = r.CompetitionName,
+                Date = r.DateRaw,
+                Position = r.Position,
+                Gender = r.Gender,
+                EventStyleAge = r.EventStyleAge,
+                AgeGroup = r.AgeGroup,
+                IsMasters = r.IsMasters,
+                IsAward = r.IsAward
+            })
+            .ToList();
+
+        // Разбивка медалей по конкретным заплывам — для тултипа "за что" на карточке.
+        var medals = rows
+            .Where(r => r.Position is 1 or 2 or 3)
+            .Select(r => new MedalDetailDto
+            {
+                Position = r.Position!.Value,
+                Note = $"{r.StyleName} {r.Distance}м",
+                Competition = r.CompetitionName,
+                Date = r.DateRaw
+            })
+            .Concat(relayMedals
+                .Where(r => r.Position is 1 or 2 or 3)
+                .Select(r => new MedalDetailDto
+                {
+                    Position = r.Position!.Value,
+                    Note = $"{r.StyleName} {r.Distance}м · relay",
+                    Competition = r.CompetitionName,
+                    Date = r.DateRaw
+                }))
+            .OrderBy(m => m.Position)
+            .ToList();
+
+        var dto = new AthleteCareerDto
+        {
+            Competitions = rows.Select(r => r.CompetitionId)
+                .Concat(relayMedals.Select(r => r.CompetitionId))
+                .Distinct()
+                .Count(),
+            Races = rows.Count,
+            Since = rows.Count > 0 ? rows.Min(r => r.CompetitionDate).Year : DateTime.Now.Year,
+            TotalPoints = rows.Sum(r => r.InternationalPoints),
+            // Медали за эстафету (relayMedals) считаются к общему итогу — командная награда
+            // так же личная, как индивидуальная (see [[athlete-alltime-card]]).
+            Gold = rows.Count(r => r.Position == 1) + relayMedals.Count(r => r.Position == 1),
+            Silver = rows.Count(r => r.Position == 2) + relayMedals.Count(r => r.Position == 2),
+            Bronze = rows.Count(r => r.Position == 3) + relayMedals.Count(r => r.Position == 3),
+            BestByStyle = bestByStyle,
+            Medals = medals
+        };
+
+        await _cache.SetAsync(key, dto, TimeSpan.FromMinutes(5));
+        return dto;
     }
 }

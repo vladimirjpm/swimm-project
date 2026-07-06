@@ -105,30 +105,33 @@ public class UserFavoriteRepository : IUserFavoriteRepository
 
         if (target == null) return false;
 
-        // Транзакция: clear → set. Гонка → нарушение partial unique index → no-op, не 500.
-        // Загружаем все текущие primary (максимум одна запись благодаря partial unique index).
-        await using var tx = await _db.Database.BeginTransactionAsync();
-        try
-        {
-            var currentPrimaries = await _db.UserFavorites
-                .Where(f => f.UserId == userId && f.IsPrimary && f.TargetType == "swimmer")
-                .ToListAsync();
+        // Clear СНАЧАЛА своим SaveChangesAsync, потом set — раздельно, а не одним вызовом.
+        // Partial unique index UX_UserFav_OnePrimary проверяется immediately (не deferred):
+        // если бы EF отправил UPDATE "target → true" раньше UPDATE "old → false" в одном
+        // SaveChanges (порядок операторов внутри одного SaveChanges не гарантирован), это
+        // временно давало бы два primary одновременно → нарушение индекса. Раздельные вызовы
+        // убирают эту гонку с самим собой полностью (не просто глушат исключение).
+        var currentPrimaries = await _db.UserFavorites
+            .Where(f => f.UserId == userId && f.IsPrimary && f.TargetType == "swimmer" && f.Id != favoriteId)
+            .ToListAsync();
 
+        if (currentPrimaries.Count > 0)
+        {
             foreach (var f in currentPrimaries)
                 f.IsPrimary = false;
-
-            target.IsPrimary = true;
             await _db.SaveChangesAsync();
+        }
 
-            await tx.CommitAsync();
-            return true;
+        target.IsPrimary = true;
+        try
+        {
+            await _db.SaveChangesAsync();
         }
         catch (DbUpdateException)
         {
-            // Гонка: другой запрос занял слот partial unique index → no-op.
-            await tx.RollbackAsync();
-            return true;
+            // Гонка с ДРУГИМ конкурентным запросом (не с самим собой, та убрана выше) → no-op, не 500.
         }
+        return true;
     }
 
     public async Task<bool> UnsetPrimaryAsync(int userId, int favoriteId)

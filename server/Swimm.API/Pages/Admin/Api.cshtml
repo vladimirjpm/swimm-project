@@ -460,26 +460,7 @@
             <span id="comp-status" class="text-xs text-[#90a4ae]"></span>
         </div>
 
-        <div class="overflow-x-auto">
-            <table class="w-full border-collapse text-xs" id="comp-table">
-                <thead>
-                    <tr class="text-left text-[#546e7a] uppercase text-[0.7rem]">
-                        <th class="py-2 px-2 border-b border-white/10">ID</th>
-                        <th class="py-2 px-2 border-b border-white/10">Соревнование</th>
-                        <th class="py-2 px-2 border-b border-white/10">Дни / №</th>
-                        <th class="py-2 px-2 border-b border-white/10">Дата соревн.</th>
-                        <th class="py-2 px-2 border-b border-white/10">Дата импорта</th>
-                        <th class="py-2 px-2 border-b border-white/10 text-right">Строк</th>
-                        <th class="py-2 px-2 border-b border-white/10">Статус</th>
-                        <th class="py-2 px-2 border-b border-white/10 text-center">Masters</th>
-                        <th class="py-2 px-2 border-b border-white/10 text-center">Awards</th>
-                        <th class="py-2 px-2 border-b border-white/10 text-center">Combine</th>
-                        <th class="py-2 px-2 border-b border-white/10">Действие</th>
-                    </tr>
-                </thead>
-                <tbody id="comp-body" class="text-gray-300"></tbody>
-            </table>
-        </div>
+        <div id="comp-list" class="flex flex-col gap-2"></div>
         <div id="comp-empty" class="hidden text-center text-[#546e7a] italic py-10">Нет соревнований.</div>
 
     </div>
@@ -838,9 +819,11 @@ async function runApi(btn, method, urlTemplate, paramMap, defaultMode) {
 
 // ======================== COMPETITIONS TAB ========================
 (function () {
-    const tbody = document.getElementById('comp-body');
+    const list = document.getElementById('comp-list');
     const emptyMsg = document.getElementById('comp-empty');
     const statusEl = document.getElementById('comp-status');
+
+    let allCategories = []; // [{ key, name, display_order }]
 
     function fmtDate(iso) {
         if (!iso) return '—';
@@ -850,30 +833,32 @@ async function runApi(btn, method, urlTemplate, paramMap, defaultMode) {
         });
     }
 
-    function fmtCompDate(s) {
-        return s || '—';
+    function fmtCompDate(s) { return s || '—'; }
+
+    function parseDmy(s) {
+        const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s || '');
+        if (!m) return null;
+        return new Date(+m[3], +m[2] - 1, +m[1]);
+    }
+
+    async function ensureCategories() {
+        if (allCategories.length) return;
+        try {
+            const cats = await api('/api/categories');
+            allCategories = Array.isArray(cats) ? cats : [];
+        } catch { allCategories = []; }
     }
 
     async function loadCompetitions() {
         statusEl.textContent = 'Загрузка...';
         try {
+            await ensureCategories();
             const data = await api('/api/admin/competitions');
-            renderTable(data);
+            renderList(data);
             statusEl.textContent = `Всего: ${data.length}`;
         } catch (e) {
             statusEl.textContent = 'Ошибка: ' + e.message;
         }
-    }
-
-    function chk(id, val) {
-        return `<input type="checkbox" id="${id}" class="w-4 h-4 cursor-pointer" ${val ? 'checked' : ''}>`;
-    }
-
-    // Парсинг даты дня "dd/MM/yyyy" → Date|null (для диапазона события).
-    function parseDmy(s) {
-        const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s || '');
-        if (!m) return null;
-        return new Date(+m[3], +m[2] - 1, +m[1]);
     }
 
     function statusBadge(c) {
@@ -883,39 +868,65 @@ async function runApi(btn, method, urlTemplate, paramMap, defaultMode) {
             : '<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold bg-[rgba(239,154,154,0.2)] text-[#ef9a9a]">✗ Ожидает</span>';
     }
 
-    function actionCell(c, label) {
+    // Чекбокс с подписью.
+    function chkLabel(id, val, label, color) {
+        return `<label class="inline-flex items-center gap-1 text-xs ${color} cursor-pointer select-none whitespace-nowrap">`
+            + `<input type="checkbox" id="${id}" class="w-3.5 h-3.5 cursor-pointer" ${val ? 'checked' : ''}>${esc(label)}</label>`;
+    }
+
+    function flagChecks(c) {
+        // Masters-флага здесь нет: он производен от категории Masters (сервер выставляет сам).
+        return chkLabel(`chk-award-${c.id}`,    c.isAward,                'Awards',  'text-[#ffd180]')
+             + chkLabel(`chk-combine-${c.id}`,  c.showCombineAllResults,  'Combine', 'text-[#ffd180]');
+    }
+
+    function categoryChecks(c) {
+        const have = new Set(c.categories || []);
+        if (!allCategories.length) return '<span class="text-[#546e7a] text-xs italic">нет категорий</span>';
+        return allCategories.map(cat =>
+            chkLabel(`cat-${cat.key}-${c.id}`, have.has(cat.key), cat.name, 'text-[#90caf9]')
+        ).join('');
+    }
+
+    function actions(c, label) {
         return `<div class="flex gap-1.5">
             <button onclick="saveCompetition(${c.id})"
-                class="py-0.5 px-2.5 rounded text-xs font-semibold cursor-pointer transition-colors bg-[rgba(79,195,247,0.15)] text-[#4fc3f7] hover:bg-[rgba(79,195,247,0.25)]">
-                Сохранить
-            </button>
+                class="py-1 px-3 rounded text-xs font-semibold cursor-pointer transition-colors bg-[rgba(79,195,247,0.15)] text-[#4fc3f7] hover:bg-[rgba(79,195,247,0.25)]">Сохранить</button>
             <button onclick="deleteCompetition(${c.id}, '${esc(label)}')"
-                class="py-0.5 px-2.5 rounded text-xs font-semibold cursor-pointer transition-colors bg-[rgba(239,154,154,0.15)] text-[#ef9a9a] hover:bg-[rgba(239,154,154,0.25)]">
-                Удалить
-            </button>
+                class="py-1 px-3 rounded text-xs font-semibold cursor-pointer transition-colors bg-[rgba(239,154,154,0.15)] text-[#ef9a9a] hover:bg-[rgba(239,154,154,0.25)]">Удалить</button>
         </div>`;
     }
 
-    // Обычное (однодневное) соревнование — одиночная строка.
-    function singleRow(c) {
+    // Карточка соревнования (2 яруса). opts.isDay — день внутри события.
+    function compCard(c, opts) {
+        const isDay = !!(opts && opts.isDay);
+        const title = isDay ? (c.subName || '(без названия)') : c.name;
+        const label = isDay ? (c.subName || c.name) : c.name;
+        const dayBadge = isDay
+            ? `<span class="inline-block py-0.5 px-1.5 rounded text-[10px] font-semibold bg-[rgba(102,187,106,0.18)] text-[#66bb6a]">День ${c.dayNumber ?? '?'}</span>`
+            : '';
         return `
-            <tr class="border-b border-white/[.04] hover:bg-white/[.03]" data-comp-id="${c.id}">
-                <td class="py-2 px-2 text-[#546e7a]">${c.id}</td>
-                <td class="py-2 px-2 max-w-[240px] truncate" title="${esc(c.name)}">${esc(c.name)}</td>
-                <td class="py-2 px-2"><span class="text-[#546e7a] italic text-xs">—</span></td>
-                <td class="py-2 px-2 text-[#90a4ae] whitespace-nowrap">${fmtCompDate(c.date)}</td>
-                <td class="py-2 px-2 text-[#90a4ae] whitespace-nowrap">${fmtDate(c.importDate)}</td>
-                <td class="py-2 px-2 text-right text-[#90a4ae]">${c.resultCount ?? 0}</td>
-                <td class="py-2 px-2">${statusBadge(c)}</td>
-                <td class="py-2 px-2 text-center">${chk(`chk-masters-${c.id}`, c.isMasters)}</td>
-                <td class="py-2 px-2 text-center">${chk(`chk-award-${c.id}`, c.isAward)}</td>
-                <td class="py-2 px-2 text-center">${chk(`chk-combine-${c.id}`, c.showCombineAllResults)}</td>
-                <td class="py-2 px-2">${actionCell(c, c.name)}</td>
-            </tr>`;
+        <div class="rounded-lg border border-white/10 ${isDay ? 'bg-black/20' : 'bg-white/[.04]'} px-3 py-2" data-comp-id="${c.id}">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mb-2">
+                <span class="text-[#546e7a] text-xs">#${c.id}</span>
+                ${dayBadge}
+                <span class="font-semibold ${isDay ? 'text-[#b0bec5]' : 'text-[#e0e0e0]'} max-w-[340px] truncate" title="${esc(title)}">${esc(title)}</span>
+                <span class="text-[#90a4ae] text-xs whitespace-nowrap">📅 ${fmtCompDate(c.date)}</span>
+                <span class="text-[#90a4ae] text-xs whitespace-nowrap">⬇ ${fmtDate(c.importDate)}</span>
+                <span class="text-[#90a4ae] text-xs whitespace-nowrap">${c.resultCount ?? 0} строк</span>
+                ${statusBadge(c)}
+            </div>
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <div class="flex items-center gap-x-3">${flagChecks(c)}</div>
+                <span class="w-px h-4 bg-white/15"></span>
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1">${categoryChecks(c)}</div>
+                <div class="ml-auto">${actions(c, label)}</div>
+            </div>
+        </div>`;
     }
 
-    // Свёрнутая строка-событие (summary): общее имя, диапазон дат, агрегаты, шеврон.
-    function eventSummaryRow(eventId, eventName, days) {
+    // Свёрнутая карточка-событие (1 ярус, кликабельна).
+    function eventSummary(eventId, eventName, days) {
         const dates = days.map(d => parseDmy(d.date)).filter(Boolean).sort((a, b) => a - b);
         let range = '—';
         if (dates.length) {
@@ -932,92 +943,73 @@ async function runApi(btn, method, urlTemplate, paramMap, defaultMode) {
             : `<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold ${statusOk ? 'bg-[rgba(102,187,106,0.2)] text-[#66bb6a]' : 'bg-[rgba(255,167,38,0.2)] text-[#ffa726]'}">✓ ${approved}/${withHistory}</span>`;
 
         return `
-            <tr class="border-b border-white/10 bg-[rgba(102,187,106,0.06)] hover:bg-[rgba(102,187,106,0.1)] cursor-pointer"
-                onclick="toggleEvent(${eventId})" data-event-summary="${eventId}">
-                <td class="py-2 px-2 text-[#66bb6a]"><span class="chevron inline-block w-3 transition-transform">▸</span></td>
-                <td class="py-2 px-2 font-semibold text-[#e0e0e0] max-w-[240px] truncate" title="${esc(eventName)}">${esc(eventName)}</td>
-                <td class="py-2 px-2 text-[#90a4ae] whitespace-nowrap">${days.length} дн.</td>
-                <td class="py-2 px-2 text-[#90a4ae] whitespace-nowrap">${range}</td>
-                <td class="py-2 px-2"></td>
-                <td class="py-2 px-2 text-right font-semibold text-[#e0e0e0]">${totalResults}</td>
-                <td class="py-2 px-2">${statusHtml}</td>
-                <td class="py-2 px-2" colspan="3"></td>
-                <td class="py-2 px-2 text-[#546e7a] text-xs">раскрыть</td>
-            </tr>`;
+        <div class="rounded-lg border border-[#66bb6a]/30 bg-[rgba(102,187,106,0.08)] hover:bg-[rgba(102,187,106,0.13)] cursor-pointer px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1"
+             onclick="toggleEvent(${eventId})" data-event-summary="${eventId}">
+            <span class="chevron text-[#66bb6a] w-3 inline-block">▸</span>
+            <span class="font-semibold text-[#e0e0e0] max-w-[340px] truncate" title="${esc(eventName)}">${esc(eventName)}</span>
+            <span class="text-[#90a4ae] text-xs whitespace-nowrap">${days.length} дн.</span>
+            <span class="text-[#90a4ae] text-xs whitespace-nowrap">📅 ${range}</span>
+            <span class="text-[#90a4ae] text-xs whitespace-nowrap">${totalResults} строк</span>
+            ${statusHtml}
+            <span class="ml-auto text-[#546e7a] text-xs">раскрыть</span>
+        </div>`;
     }
 
-    // Строка-день внутри события (скрыта до раскрытия).
-    function dayRow(eventId, c) {
-        return `
-            <tr class="ev-${eventId} hidden border-b border-white/[.03] bg-black/10 hover:bg-white/[.03]" data-comp-id="${c.id}">
-                <td class="py-2 px-2 pl-5 text-[#546e7a]">${c.id}</td>
-                <td class="py-2 px-2 pl-5 max-w-[240px] truncate text-[#b0bec5]" title="${esc(c.subName || '')}">↳ ${esc(c.subName || '(без названия)')}</td>
-                <td class="py-2 px-2"><span class="inline-block py-0.5 px-1.5 rounded text-[10px] font-semibold bg-[rgba(102,187,106,0.18)] text-[#66bb6a]">День ${c.dayNumber ?? '?'}</span></td>
-                <td class="py-2 px-2 text-[#90a4ae] whitespace-nowrap">${fmtCompDate(c.date)}</td>
-                <td class="py-2 px-2 text-[#90a4ae] whitespace-nowrap">${fmtDate(c.importDate)}</td>
-                <td class="py-2 px-2 text-right text-[#90a4ae]">${c.resultCount ?? 0}</td>
-                <td class="py-2 px-2">${statusBadge(c)}</td>
-                <td class="py-2 px-2 text-center">${chk(`chk-masters-${c.id}`, c.isMasters)}</td>
-                <td class="py-2 px-2 text-center">${chk(`chk-award-${c.id}`, c.isAward)}</td>
-                <td class="py-2 px-2 text-center">${chk(`chk-combine-${c.id}`, c.showCombineAllResults)}</td>
-                <td class="py-2 px-2">${actionCell(c, c.subName || c.name)}</td>
-            </tr>`;
-    }
-
-    function renderTable(data) {
-        if (data.length === 0) {
-            tbody.innerHTML = '';
+    function renderList(data) {
+        if (!data.length) {
+            list.innerHTML = '';
             emptyMsg.classList.remove('hidden');
             return;
         }
         emptyMsg.classList.add('hidden');
 
         // Группируем дни по событию, сохраняя порядок прихода с сервера.
-        const groups = [];          // { eventId, eventName, days: [] }
-        const groupIndex = new Map();
-        const html = [];
-
+        const groups = [];
+        const idx = new Map();
+        const items = [];
         data.forEach(c => {
             if (c.eventId == null) {
-                html.push({ type: 'single', comp: c });
-            } else if (groupIndex.has(c.eventId)) {
-                groups[groupIndex.get(c.eventId)].days.push(c);
+                items.push({ type: 'single', comp: c });
+            } else if (idx.has(c.eventId)) {
+                groups[idx.get(c.eventId)].days.push(c);
             } else {
-                groupIndex.set(c.eventId, groups.length);
+                idx.set(c.eventId, groups.length);
                 const g = { eventId: c.eventId, eventName: c.eventName || c.name, days: [c] };
                 groups.push(g);
-                html.push({ type: 'event', group: g });
+                items.push({ type: 'event', group: g });
             }
         });
 
-        tbody.innerHTML = html.map(item => {
-            if (item.type === 'single') return singleRow(item.comp);
-            const g = item.group;
-            return eventSummaryRow(g.eventId, g.eventName, g.days)
-                 + g.days.map(d => dayRow(g.eventId, d)).join('');
+        list.innerHTML = items.map(it => {
+            if (it.type === 'single') return compCard(it.comp, {});
+            const g = it.group;
+            const dayCards = g.days.map(d => compCard(d, { isDay: true })).join('');
+            return eventSummary(g.eventId, g.eventName, g.days)
+                 + `<div class="ev-${g.eventId} hidden flex flex-col gap-2 pl-5">${dayCards}</div>`;
         }).join('');
     }
 
     window.toggleEvent = function (eventId) {
-        const rows = document.querySelectorAll(`.ev-${eventId}`);
+        const box = document.querySelector(`.ev-${eventId}`);
         const summary = document.querySelector(`[data-event-summary="${eventId}"]`);
-        const chevron = summary?.querySelector('.chevron');
-        const willShow = rows.length > 0 && rows[0].classList.contains('hidden');
-        rows.forEach(r => r.classList.toggle('hidden', !willShow));
-        if (chevron) {
-            chevron.textContent = willShow ? '▾' : '▸';
-        }
+        const chevron = summary ? summary.querySelector('.chevron') : null;
+        if (!box) return;
+        const willShow = box.classList.contains('hidden');
+        box.classList.toggle('hidden', !willShow);
+        if (chevron) chevron.textContent = willShow ? '▾' : '▸';
     };
 
     window.saveCompetition = async function (id) {
-        const isMasters = document.getElementById(`chk-masters-${id}`)?.checked ?? false;
         const isAward = document.getElementById(`chk-award-${id}`)?.checked ?? false;
         const showCombineAllResults = document.getElementById(`chk-combine-${id}`)?.checked ?? false;
+        const categories = allCategories
+            .filter(cat => document.getElementById(`cat-${cat.key}-${id}`)?.checked)
+            .map(cat => cat.key);
         try {
             await api(`/api/admin/competitions/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ isMasters, isAward, showCombineAllResults })
+                body: JSON.stringify({ isAward, showCombineAllResults, categories })
             });
             toast('Сохранено');
         } catch (e) {
@@ -1037,8 +1029,6 @@ async function runApi(btn, method, urlTemplate, paramMap, defaultMode) {
     };
 
     document.getElementById('comp-refresh').addEventListener('click', loadCompetitions);
-
-    // Загружаем при переключении на таб (всегда — данные могли измениться)
     document.querySelector('[data-tab="competitions"]').addEventListener('click', loadCompetitions);
 })();
 </script>

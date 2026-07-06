@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta charset="utf-8"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Heebo:wght@500;700&display=swap" rel="stylesheet"/>
+  <script src="./data/normative-age-records.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', -apple-system, sans-serif; background: #e9ebef; }
+    .heb { font-family: 'Heebo', sans-serif; direction: rtl; unicode-bidi: isolate; }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; padding: 40px; display: flex; gap: 40px; flex-wrap: wrap; align-items: flex-start; justify-content: center;">
+
+  <!-- ═══ Много рекордов · 2e закрытый, клик открывает ═══ -->
+  <div style="display: flex; flex-direction: column; gap: 12px;">
+    <div style="font-size: 13px; font-weight: 800; color: #5b6470;">Много рекордов · закрыто, клик открывает (2e)</div>
+    <div style="width: 380px; background: #f5f5f7; border-radius: 20px; padding: 12px; box-shadow: 0 12px 30px rgba(0,0,0,0.12);" data-screen-label="Много рекордов">
+      <div style="background: #ffffff; border-radius: 14px; overflow: hidden;">
+        <!-- clickable header -->
+        <div onClick="{{ toggleOpen }}" style="padding: 13px 14px; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+          <span style="font-size: 15px;">🏅</span>
+          <span style="font-size: 13.5px; font-weight: 800; color: #1a1a1a; flex: 1;">ISR Age Records</span>
+          <span style="font-size: 10px; font-weight: 800; color: #1e6fd6; background: #eaf2fd; padding: 2px 8px; border-radius: 999px;">♂</span>
+          <span style="font-size: 10px; font-weight: 800; color: #d6417f; background: #fdeff5; padding: 2px 8px; border-radius: 999px;">♀</span>
+          <span style="font-size: 10px; color: #aab0bd; font-weight: 700;">10–18y</span>
+          <span style="color: #8a93a3; font-size: 11px; transition: transform .15s ease; transform: {{ chevronTransform }};">▾</span>
+        </div>
+        <!-- expanded table -->
+        <sc-if value="{{ isOpen }}" hint-placeholder-val="{{ true }}">
+          <div style="border-top: 1px solid #eef1f6; padding: 12px 14px 12px;">
+            <div style="display: grid; grid-template-columns: 1fr 52px 1fr; gap: 4px 8px; align-items: center;">
+              <div style="font-size: 10px; font-weight: 800; color: #1e6fd6; text-align: right;">♂ MAN</div>
+              <div style="font-size: 10px; font-weight: 800; color: #9098a4; text-align: center;">AGE</div>
+              <div style="font-size: 10px; font-weight: 800; color: #d6417f;">♀ WOMAN</div>
+              <sc-for list="{{ rows }}" as="r" hint-placeholder-count="9">
+                <div style="font-size: 15px; font-weight: 800; color: #123a70; font-variant-numeric: tabular-nums; text-align: right; background: #f6faff; border-radius: 8px; padding: 5px 10px;">{{ r.mTime }}</div>
+                <div style="font-size: 11px; font-weight: 800; color: #5b6470; text-align: center;">{{ r.age }}y</div>
+                <div style="font-size: 15px; font-weight: 800; color: #7a1f4b; font-variant-numeric: tabular-nums; background: #fff7fb; border-radius: 8px; padding: 5px 10px;">{{ r.fTime }}</div>
+              </sc-for>
+            </div>
+            <div style="font-size: 10px; color: #aab0bd; margin-top: 10px;">ⓘ Тап по заголовку — свернуть</div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Два рекорда · 2b одна карточка ═══ -->
+  <div style="display: flex; flex-direction: column; gap: 12px;">
+    <div style="font-size: 13px; font-weight: 800; color: #5b6470;">Два рекорда · общий заголовок (2b)</div>
+    <div style="width: 380px; background: #f5f5f7; border-radius: 20px; padding: 12px; box-shadow: 0 12px 30px rgba(0,0,0,0.12);" data-screen-label="Два рекорда">
+      <div style="background: #ffffff; border-radius: 14px; padding: 14px;">
+        <div style="display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 12px;">
+          <span style="font-size: 14px;">🏅</span>
+          <span style="font-size: 10px; font-weight: 800; letter-spacing: 0.09em; color: #9098a4; text-transform: uppercase;">National Record · {{ pairAge }}y</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1px 1fr; gap: 12px; align-items: stretch;">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 5px; text-align: center;">
+            <span style="font-size: 10px; font-weight: 800; color: #1e6fd6; background: #eaf2fd; padding: 2px 8px; border-radius: 999px;">♂ Man</span>
+            <div style="font-size: 28px; font-weight: 800; color: #123a70; font-variant-numeric: tabular-nums; letter-spacing: -1px; line-height: 1;">{{ pairM.time }}</div>
+            <div class="heb" style="font-size: 12.5px; font-weight: 700; color: #1a1a1a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;">{{ pairM.name }}</div>
+            <div style="font-size: 10px; color: #aab0bd; font-variant-numeric: tabular-nums;">{{ pairM.date }}</div>
+          </div>
+          <div style="background: #e9edf3;"></div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 5px; text-align: center;">
+            <span style="font-size: 10px; font-weight: 800; color: #d6417f; background: #fdeff5; padding: 2px 8px; border-radius: 999px;">♀ Woman</span>
+            <div style="font-size: 28px; font-weight: 800; color: #7a1f4b; font-variant-numeric: tabular-nums; letter-spacing: -1px; line-height: 1;">{{ pairF.time }}</div>
+            <div class="heb" style="font-size: 12.5px; font-weight: 700; color: #1a1a1a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;">{{ pairF.name }}</div>
+            <div style="font-size: 10px; color: #aab0bd; font-variant-numeric: tabular-nums;">{{ pairF.date }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Один рекорд · 2f лента ═══ -->
+  <div style="display: flex; flex-direction: column; gap: 12px;">
+    <div style="font-size: 13px; font-weight: 800; color: #5b6470;">Один рекорд · горизонтальная лента (2f)</div>
+    <div style="width: 380px; background: #f5f5f7; border-radius: 20px; padding: 12px; box-shadow: 0 12px 30px rgba(0,0,0,0.12);" data-screen-label="Один рекорд">
+      <div style="position: relative; overflow: hidden; background: #ffffff; border-radius: 14px; padding: 12px 14px 12px 18px; display: flex; align-items: center; gap: 14px;">
+        <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: {{ single.accent }};"></div>
+        <div style="flex-shrink: 0;">
+          <div style="font-size: 9px; font-weight: 800; letter-spacing: 0.08em; color: #9098a4; text-transform: uppercase; margin-bottom: 2px;">Nat. Record</div>
+          <div style="font-size: 30px; font-weight: 800; color: {{ single.deep }}; font-variant-numeric: tabular-nums; letter-spacing: -1px; line-height: 1;">{{ single.time }}</div>
+        </div>
+        <div style="width: 1px; align-self: stretch; background: #e9edf3;"></div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 10px; font-weight: 800; color: {{ single.accent }}; background: {{ single.soft }}; padding: 2px 8px; border-radius: 999px; flex-shrink: 0;">{{ single.chip }}</span>
+            <div class="heb" style="flex: 1; min-width: 0; font-size: 13px; font-weight: 700; color: #1a1a1a; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ single.name }}</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+            <div class="heb" style="flex: 1; min-width: 0; font-size: 11px; color: #8a93a3; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ single.club }}</div>
+            <span style="font-size: 10px; color: #aab0bd; font-variant-numeric: tabular-nums; flex-shrink: 0;">{{ single.date }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;pairAge&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;10&quot;,&quot;11&quot;,&quot;12&quot;,&quot;13&quot;,&quot;14&quot;,&quot;15&quot;,&quot;16&quot;,&quot;17&quot;,&quot;18&quot;], &quot;default&quot;: &quot;10&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Data&quot; },
+  &quot;singleGender&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;male&quot;,&quot;female&quot;], &quot;default&quot;: &quot;male&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Data&quot; },
+  &quot;openByDefault&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Behavior&quot; }
+}">
+class Component extends DCLogic {
+  state = { open: null, data: null };
+
+  componentDidMount() {
+    const grab = () => {
+      const d = (typeof window !== 'undefined') && window.normative_age_record;
+      if (d && d.normatives) { this.setState({ data: d }); return true; }
+      return false;
+    };
+    if (!grab()) {
+      let n = 0;
+      const t = setInterval(() => { if (grab() || ++n > 40) clearInterval(t); }, 50);
+    }
+  }
+
+  recs(gk) {
+    const d = this.state.data;
+    return (d && d.normatives?.[gk]?.['25m_pool']?.['freestyle']?.['50m']) || {};
+  }
+
+  renderVals() {
+    const openDefault = this.props.openByDefault ?? false;
+    const isOpen = this.state.open ?? openDefault;
+    const m = this.recs('male'), f = this.recs('female');
+    const ages = Object.keys(m).filter(k => /^\d+$/.test(k)).sort((a, b) => +a - +b);
+    const fallback = { time: '—', name: '', club: '', record_date: '—' };
+
+    const rows = (ages.length ? ages : ['10','11','12','13','14','15','16','17','18']).map(a => ({
+      age: a,
+      mTime: (m[a] || fallback).time,
+      fTime: (f[a] || fallback).time
+    }));
+
+    const pairAge = String(this.props.pairAge ?? '10');
+    const pm = m[pairAge] || fallback, pf = f[pairAge] || fallback;
+
+    const sGender = this.props.singleGender ?? 'male';
+    const sr = (sGender === 'male' ? m : f)[pairAge] || fallback;
+    const single = sGender === 'male'
+      ? { time: sr.time, name: sr.name, club: sr.club, date: sr.record_date || '—', chip: '♂ ' + pairAge + 'y', accent: '#1e6fd6', deep: '#123a70', soft: '#eaf2fd' }
+      : { time: sr.time, name: sr.name, club: sr.club, date: sr.record_date || '—', chip: '♀ ' + pairAge + 'y', accent: '#d6417f', deep: '#7a1f4b', soft: '#fdeff5' };
+
+    return {
+      isOpen,
+      chevronTransform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+      toggleOpen: () => this.setState({ open: !isOpen }),
+      rows,
+      pairAge,
+      pairM: { time: pm.time, name: pm.name, date: pm.record_date || '—' },
+      pairF: { time: pf.time, name: pf.name, date: pf.record_date || '—' },
+      single
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -42,7 +42,7 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
   return (
     <div className={className}>
       {isRecordHolder && (
-        <div className="mb-1 flex">
+        <div className="mb-1 flex justify-start">
           <span
             className="inline-flex items-center gap-1 rounded-[7px] px-1.5 py-0.5 text-[8.5px] font-extrabold tracking-wide text-white"
             style={{ background: 'linear-gradient(135deg,#f0b429,#c8860a)', boxShadow: '0 2px 8px rgba(200,134,10,0.45)' }}
@@ -61,7 +61,7 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
           <span
             className={`theme-text-muted transition-transform duration-200 ${splitOpen ? 'rotate-180' : ''}`}
             style={{ fontSize: '10px', lineHeight: 1 }}
-          >▾</span>
+          >➗</span>
         </div>
       ) : (
         <div className={firstLineClassName}>

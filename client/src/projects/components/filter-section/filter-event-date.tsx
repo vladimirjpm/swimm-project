@@ -6,6 +6,7 @@ import {
 } from '../../../store/store';
 import UI_DateIcon from '../mix/date-icon/date-icon';
 import { useFilteredByTypeResults } from './use-filtered-results';
+import FilterCard from './filter-card';
 
 /**
  * Парсит дату формата DD/MM/YYYY в объект Date для сортировки.
@@ -58,13 +59,15 @@ const FilterEventDate: React.FC = () => {
   if (uniqueDates.length <= 1) return null;
 
   return (
-    <div className="flex flex-col">
-      <h3 className="font-semibold">Date</h3>
-      <div className="flex flex-wrap items-center gap-1">
+    <FilterCard
+      title="Date"
+      summary={current === 'all' ? 'All' : current}
+      isActive={current !== 'all'}
+      defaultOpen
+    >
+      <div className="flex flex-wrap items-center gap-2">
         <button
-          className={`px-3 py-1 m-1 border rounded transition-colors ${
-            current === 'all' ? 'theme-btn-active' : 'theme-btn'
-          }`}
+          className={`fseg ${current === 'all' ? 'fseg-active' : ''}`}
           onClick={() => updateFilter('all')}
         >
           All
@@ -73,8 +76,8 @@ const FilterEventDate: React.FC = () => {
         {uniqueDates.map((date) => (
           <button
             key={date}
-            className={`p-0 m-1 border rounded transition-colors overflow-hidden ${
-              current === date ? 'theme-btn-active ring-2 ring-blue-500' : 'theme-btn'
+            className={`fseg !p-0 overflow-hidden ${
+              current === date ? 'fseg-active' : ''
             }`}
             onClick={() => updateFilter(date)}
           >
@@ -87,7 +90,7 @@ const FilterEventDate: React.FC = () => {
           </button>
         ))}
       </div>
-    </div>
+    </FilterCard>
   );
 };
 

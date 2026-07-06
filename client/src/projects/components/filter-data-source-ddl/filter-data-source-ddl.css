@@ -1,61 +1,87 @@
+/* Категорийный селектор соревнований (design_handoff_category_selector).
+   Цвета — через CSS-переменные mode × context; здесь только то, что неудобно в Tailwind. */
 .dv-data-source {
   color: var(--theme-mode-text);
 }
 
-/* Data-source DDL (react-select, classNamePrefix="ds") — mode-aware поверхности */
-.ds__control {
-  background-color: var(--theme-mode-surface) !important;
-  border-color: var(--theme-mode-border-input) !important;
+.dv-sel-live-dot {
+  animation: dv-sel-blink 1.4s ease infinite;
 }
 
-.ds__control:hover {
-  border-color: var(--theme-accent) !important;
+@keyframes dv-sel-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
 }
 
-.ds__single-value,
-.ds__input-container,
-.ds__input {
-  color: var(--theme-mode-text) !important;
+@media (prefers-reduced-motion: reduce) {
+  .dv-sel-live-dot {
+    animation: none;
+  }
 }
 
-.ds__placeholder {
-  color: var(--theme-mode-text-muted) !important;
+.dv-sel-search::placeholder {
+  color: var(--theme-mode-text-muted);
 }
 
-.ds__multi-value {
-  background-color: var(--theme-mode-input-bg) !important;
+/* Дропдаун-панель из шапки «Change»: fade/slide ~180ms (CHANGES.md) */
+.dv-sel-panel-drop {
+  animation: dv-sel-panel-in 180ms ease-out;
 }
 
-.ds__multi-value__label {
-  color: var(--theme-mode-text) !important;
+@keyframes dv-sel-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.ds__menu {
-  background-color: var(--theme-mode-surface) !important;
-  border: 1px solid var(--theme-mode-border) !important;
+@media (prefers-reduced-motion: reduce) {
+  .dv-sel-panel-drop {
+    animation: none;
+  }
 }
 
-.ds__option {
-  background-color: var(--theme-mode-surface) !important;
-  color: var(--theme-mode-text) !important;
+/* Мобильный top sheet: плавно выезжает сверху целиком (как шторка),
+   без opacity-скачка; фон затемняется отдельным fade. */
+.dv-sel-sheet {
+  animation: dv-sel-sheet-in 280ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  will-change: transform;
 }
 
-.ds__option:hover,
-.ds__option--is-focused {
-  background-color: var(--theme-bg-active) !important;
-  color: var(--theme-text-active) !important;
+@keyframes dv-sel-sheet-in {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(0);
+  }
 }
 
-.ds__option--is-selected {
-  background-color: var(--theme-primary) !important;
-  color: var(--theme-text-active) !important;
+.dv-sel-sheet-backdrop {
+  animation: dv-sel-backdrop-in 200ms ease;
 }
 
-.ds__indicator-separator {
-  background-color: var(--theme-mode-border) !important;
+@keyframes dv-sel-backdrop-in {
+  from {
+    background: rgba(10, 14, 20, 0);
+  }
+  to {
+    background: rgba(10, 14, 20, 0.5);
+  }
 }
 
-.ds__dropdown-indicator,
-.ds__clear-indicator {
-  color: var(--theme-mode-text-muted) !important;
+@media (prefers-reduced-motion: reduce) {
+  .dv-sel-sheet,
+  .dv-sel-sheet-backdrop {
+    animation: none;
+  }
 }

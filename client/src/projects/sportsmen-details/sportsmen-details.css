@@ -1,4 +1,4 @@
-.sportsmen-details{color:green;}
+.sportsmen-details{color:var(--theme-mode-text);}
 .sportsmen-details .table.table-pin-rows thead tr {
         z-index: 1;
         background-color: var(--color-base-100);

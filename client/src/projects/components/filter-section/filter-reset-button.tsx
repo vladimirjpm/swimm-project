@@ -30,7 +30,7 @@ const FilterResetButton: React.FC = () => {
 
   return (
     <button
-      className="px-4 py-2 bg-red-500 text-white rounded mt-4"
+      className="self-start px-4 py-[9px] rounded-[10px] text-[13px] font-bold text-white bg-[#e63946] hover:bg-[#d12d3a] transition-colors"
       onClick={handleReset}
     >
       Reset Filters

@@ -7,6 +7,8 @@ public class ResultFilter
     public int? EventId { get; set; }
     /// <summary>Фильтр по конкретному соревнованию (одному дню/однодневному).</summary>
     public int? CompetitionId { get; set; }
+    /// <summary>Последнее по дате соревнование (?competitionId=last); если оно — день события, берутся все дни.</summary>
+    public bool Latest { get; set; }
     public string? Name { get; set; }
     public string? Club { get; set; }
     public string? StyleName { get; set; }

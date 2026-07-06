@@ -12,6 +12,7 @@ import HelperNormative, { PoolType } from './helper-normative';
 import HelperResults from './helper-results';
 import HelperSwimmer from './helper-swimmer';
 import HelperClub from './helper-club';
+import HelperMedal from './helper-medal';
 
 export default class Helper {
   // === Time ===
@@ -21,6 +22,7 @@ export default class Helper {
   // === Gender ===
   static resolveGender = HelperGender.resolveGender;
   static getGenderBgClass = HelperGender.getGenderBgClass;
+  static resolveGenderFromEvent = HelperGender.resolveGenderFromEvent;
 
   // === Normative ===
   static resolvePoolType = HelperNormative.resolvePoolType;
@@ -40,9 +42,13 @@ export default class Helper {
 
   // === Swimmer ===
   static getBestResultsByStyle = HelperSwimmer.getBestResultsByStyle;
+  static getAllResultsByName = HelperSwimmer.getAllResultsByName;
   static getMedalCountsByName = HelperSwimmer.getMedalCountsByName;
   static getInternationalPointsSumByName = HelperSwimmer.getInternationalPointsSumByName;
 
   // === Club ===
   static getClubsSummary = HelperClub.getClubsSummary;
+
+  // === Medal ===
+  static getMedalTier = HelperMedal.getMedalTier;
 }
