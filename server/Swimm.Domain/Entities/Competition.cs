@@ -57,4 +57,14 @@ public class Competition
   /// </summary>
   [MaxLength(300)]
   public string? SubName { get; set; }
+
+  // ── Внешний ID соревнования у организатора (loglig.com и т.п.) ─────────────
+
+  /// <summary>
+  /// ID соревнования во внешней системе организатора (например loglig.com competitionId).
+  /// null — у старых/ручных соревнований этого ID пока нет.
+  /// Связь с <see cref="CompetitionResultUrl"/> идёт по этому полю (не по <see cref="Id"/>);
+  /// FK-констрейнт создан raw SQL в миграции — не смоделирован в EF (alternate key требует NOT NULL).
+  /// </summary>
+  public int? OrgCompId { get; set; }
 }

@@ -20,6 +20,7 @@ public class SwimmDbContext : DbContext
     /* === Справочники === */
     public DbSet<Competition> Competitions => Set<Competition>();
     public DbSet<CompetitionEvent> CompetitionEvents => Set<CompetitionEvent>();
+    public DbSet<CompetitionResultUrl> CompetitionResultUrls => Set<CompetitionResultUrl>();
     public DbSet<Club> Clubs => Set<Club>();
     public DbSet<Swimmer> Swimmers => Set<Swimmer>();
     public DbSet<Relay> Relays => Set<Relay>();
@@ -66,6 +67,10 @@ public class SwimmDbContext : DbContext
             entity.ToTable("Competitions");
             entity.HasIndex(e => new { e.Name, e.Date, e.PoolType }).IsUnique();
 
+            // Уникальность OrgCompId обеспечена реальным UNIQUE constraint'ом (raw SQL в миграции),
+            // а не EF alternate key — тот требует NOT NULL, а OrgCompId должен быть nullable
+            // (у старых соревнований его пока нет). См. CompetitionResultUrl.
+
             // Многодневные соревнования: день → событие. SetNull — удаление события не трогает дни.
             entity.HasOne(e => e.Event)
                 .WithMany(ev => ev.Days)
@@ -76,6 +81,15 @@ public class SwimmDbContext : DbContext
         modelBuilder.Entity<CompetitionEvent>(entity =>
         {
             entity.ToTable("CompetitionEvents");
+        });
+
+        modelBuilder.Entity<CompetitionResultUrl>(entity =>
+        {
+            entity.ToTable("CompetitionResultUrls");
+            entity.HasIndex(e => new { e.OrgCompId, e.Culture }).IsUnique();
+
+            // Связь с Competition идёт по OrgCompId, не Id — намеренно не смоделирована как EF
+            // relationship (см. комментарий у Competition.OrgCompId). FK создан raw SQL в миграции.
         });
 
         modelBuilder.Entity<Club>(entity =>
