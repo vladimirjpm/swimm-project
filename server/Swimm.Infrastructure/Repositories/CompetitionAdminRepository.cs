@@ -127,12 +127,12 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             var cats = await _db.CategoryCompetitions.AsNoTracking()
                 .Where(cc => itemIds.Contains(cc.CompetitionId))
                 .Join(_db.Categories, cc => cc.CategoryId, cat => cat.Id,
-                    (cc, cat) => new { cc.CompetitionId, cat.Key, cat.Name, cat.DisplayOrder })
+                    (cc, cat) => new { cc.CompetitionId, cat.Key, cat.Name, cat.Badge, cat.DisplayOrder })
                 .OrderBy(x => x.DisplayOrder)
                 .ToListAsync();
             var byComp = cats
                 .GroupBy(x => x.CompetitionId)
-                .ToDictionary(g => g.Key, g => g.Select(x => new CategoryTagDto { Key = x.Key, Name = x.Name }).ToList());
+                .ToDictionary(g => g.Key, g => g.Select(x => new CategoryTagDto { Key = x.Key, Name = x.Name, Badge = x.Badge }).ToList());
             foreach (var it in allItems)
                 if (byComp.TryGetValue(it.Id, out var list)) it.Categories = list;
         }
@@ -151,7 +151,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
     public async Task<IReadOnlyList<CategoryTagDto>> GetAllCategoriesAsync() =>
         await _db.Categories.AsNoTracking()
             .OrderBy(c => c.DisplayOrder)
-            .Select(c => new CategoryTagDto { Key = c.Key, Name = c.Name })
+            .Select(c => new CategoryTagDto { Key = c.Key, Name = c.Name, Badge = c.Badge })
             .ToListAsync();
 
     public async Task<IReadOnlyList<int>> GetAvailableYearsAsync()

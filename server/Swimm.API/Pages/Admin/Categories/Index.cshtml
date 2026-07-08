@@ -1,0 +1,76 @@
+@page
+@model Swimm.API.Pages.Admin.Categories.IndexModel
+@{
+    ViewData["Title"] = "Categories";
+    ViewData["PageSubtitle"] = "Категории соревнований — бейджи, участвуют в фильтре /Admin/Competitions";
+
+    var flash = TempData["Flash"] as string;
+}
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}
+
+<div class="mb-4 flex items-center justify-end">
+    <a href="@Url.Page("Edit")" class="admin-btn admin-btn-primary">+ Новая категория</a>
+</div>
+
+<div class="overflow-x-auto">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Бейдж</th>
+                <th>Key</th>
+                <th>Название</th>
+                <th class="text-right">Порядок</th>
+                <th class="text-right">Соревнований</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var c in Model.Categories)
+            {
+                <tr>
+                    <td>
+                        @if (!string.IsNullOrEmpty(c.Badge))
+                        {
+                            <span class="admin-badge border-admin-border bg-admin-surface-hover text-admin-text">@c.Badge</span>
+                        }
+                        else
+                        {
+                            <span class="text-admin-text-muted">—</span>
+                        }
+                    </td>
+                    <td class="font-mono text-xs text-admin-text-muted">
+                        @c.Key
+                        @if (c.IsReserved)
+                        {
+                            <span class="ml-1.5 admin-badge border-admin-warning/30 bg-admin-warning/15 text-admin-warning" title="Ключ зашит в код сервера/клиента — переименовать или удалить нельзя">system</span>
+                        }
+                    </td>
+                    <td>
+                        <a href="@Url.Page("Edit", new { id = c.Id })" class="text-admin-accent hover:underline font-medium">@c.Name</a>
+                    </td>
+                    <td class="text-right tabular-nums">@c.DisplayOrder</td>
+                    <td class="text-right tabular-nums">
+                        @if (c.CompetitionCount > 0)
+                        {
+                            <a href="@Url.Page("/Admin/Competitions/Index", new { cat = c.Key })" class="text-admin-accent hover:underline">@c.CompetitionCount</a>
+                        }
+                        else
+                        {
+                            <span class="text-admin-text-muted">0</span>
+                        }
+                    </td>
+                    <td class="text-right whitespace-nowrap">
+                        <a href="@Url.Page("/Admin/Competitions/Index", new { cat = c.Key })" class="admin-btn admin-btn-ghost py-1 px-2.5">Соревнования</a>
+                        <a href="@Url.Page("Edit", new { id = c.Id })" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

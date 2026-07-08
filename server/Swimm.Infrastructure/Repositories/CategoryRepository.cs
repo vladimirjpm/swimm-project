@@ -33,6 +33,7 @@ public class CategoryRepository : ICategoryRepository
             {
                 Key          = c.Key,
                 Name         = c.Name,
+                Badge        = c.Badge,
                 DisplayOrder = c.DisplayOrder
             })
             .ToListAsync();
@@ -83,6 +84,7 @@ public class CategoryRepository : ICategoryRepository
         {
             Key          = category.Key,
             Name         = category.Name,
+            Badge        = category.Badge,
             DisplayOrder = category.DisplayOrder,
             Competitions = competitions
         };

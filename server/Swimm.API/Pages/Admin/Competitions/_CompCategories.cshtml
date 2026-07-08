@@ -9,7 +9,13 @@
             var cls = cat.Key == "results-masters"
                 ? "border-admin-accent/30 bg-admin-accent/15 text-admin-accent"
                 : "border-admin-border bg-admin-surface-hover text-admin-text-muted";
-            <span class="admin-badge @cls">@cat.Name</span>
+            <span class="admin-badge @cls">
+                @if (!string.IsNullOrEmpty(cat.Badge))
+                {
+                    <text>@cat.Badge </text>
+                }
+                @cat.Name
+            </span>
         }
     </span>
 }

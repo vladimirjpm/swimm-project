@@ -1,0 +1,108 @@
+@page
+@model Swimm.API.Pages.Admin.Categories.EditModel
+@{
+    ViewData["Title"] = Model.IsNew ? "Новая категория" : "Редактирование категории";
+    ViewData["PageSubtitle"] = Model.IsNew ? null : $"#{Model.Id} · {Model.Existing?.Name}";
+    var flash = TempData["Flash"] as string;
+    var keyLocked = Model.Existing?.IsReserved == true;
+}
+
+<div class="max-w-[560px] mx-auto">
+
+    <div class="mb-4 flex items-center gap-3">
+        <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">← К списку</a>
+        @if (!Model.IsNew && Model.Existing != null)
+        {
+            <a href="@Url.Page("/Admin/Competitions/Index", new { cat = Model.Existing.Key })" class="admin-btn admin-btn-ghost">
+                Соревнования этой категории (@Model.Existing.CompetitionCount)
+            </a>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5 py-3 px-4 mb-4 text-sm text-admin-danger">
+            @Model.Error
+        </div>
+    }
+
+    @if (keyLocked)
+    {
+        <div class="admin-card border-l-[3px] border-l-admin-warning bg-admin-warning/5 py-3 px-4 mb-4 text-xs text-admin-text-muted leading-relaxed">
+            Key этой категории зашит в код сервера и клиента (флаг IsMasters, выбор раздела сайта,
+            legacy-ссылки <code class="text-admin-text">?cat=…</code>) — переименовать или удалить нельзя.
+            Название, бейдж и порядок менять можно свободно.
+        </div>
+    }
+
+    <form method="post" asp-page-handler="Save" class="admin-card mb-5">
+        <input type="hidden" asp-for="Id" />
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Key <span class="text-admin-danger">*</span></span>
+                <input asp-for="Input.Key" class="admin-input @(keyLocked ? "opacity-60 cursor-not-allowed" : "")"
+                       autocomplete="off" placeholder="results-junior-results" required readonly="@keyLocked" />
+            </label>
+
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Название <span class="text-admin-danger">*</span></span>
+                <input asp-for="Input.Name" class="admin-input" autocomplete="off" required />
+            </label>
+
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Бейдж (буква/эмодзи, до 8 симв.)</span>
+                <input asp-for="Input.Badge" class="admin-input" autocomplete="off" maxlength="8" placeholder="J" />
+            </label>
+
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Порядок отображения</span>
+                <input asp-for="Input.DisplayOrder" type="number" class="admin-input" autocomplete="off" />
+            </label>
+        </div>
+
+        <div class="mt-5 flex gap-3">
+            <button type="submit" class="admin-btn admin-btn-primary">
+                @(Model.IsNew ? "Создать" : "Сохранить")
+            </button>
+            <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">Отмена</a>
+        </div>
+    </form>
+
+    @if (!Model.IsNew && Model.Existing != null)
+    {
+        <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5">
+            <h2 class="text-sm font-semibold text-admin-danger mb-1">Опасная зона — удаление</h2>
+            @if (keyLocked)
+            {
+                <p class="text-xs text-admin-text-muted leading-relaxed">
+                    Эта категория зарезервирована в коде — удаление недоступно.
+                </p>
+            }
+            else if (Model.Existing.CompetitionCount > 0)
+            {
+                <p class="text-xs text-admin-text-muted leading-relaxed">
+                    В категории ещё <strong class="text-admin-text">@Model.Existing.CompetitionCount</strong> соревнований —
+                    сначала снимите категорию у всех соревнований (вкладка Competitions), потом удаляйте.
+                </p>
+            }
+            else
+            {
+                <p class="text-xs text-admin-text-muted leading-relaxed mb-4">
+                    Категория не используется ни одним соревнованием. <strong class="text-admin-danger">Действие необратимо.</strong>
+                </p>
+                <form method="post" asp-page-handler="Delete">
+                    <input type="hidden" asp-for="Id" />
+                    <button type="submit" class="admin-btn admin-btn-danger">Удалить безвозвратно</button>
+                </form>
+            }
+        </div>
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}

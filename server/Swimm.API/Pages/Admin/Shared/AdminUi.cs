@@ -16,6 +16,7 @@ public static class AdminNav
         new("Dashboard", "gauge", "/Admin", ExactMatch: true),
 
         new("Competitions", "trophy", "/Admin/Competitions", "Data"),
+        new("Categories", "tag", "/Admin/Categories", "Data"),
         new("Import", "download", "/Admin/Import", "Data"),
         new("Import History", "history", "/Admin/ImportHistory", "Data"),
 

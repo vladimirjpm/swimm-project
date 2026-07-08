@@ -76,7 +76,13 @@
                         <input type="checkbox" name="Input.CategoryKeys" value="@cat.Key"
                                class="w-4 h-4 cursor-pointer"
                                checked="@(Model.Input.CategoryKeys?.Contains(cat.Key) == true)" />
-                        <span class="text-admin-text">@cat.Name</span>
+                        <span class="text-admin-text">
+                            @if (!string.IsNullOrEmpty(cat.Badge))
+                            {
+                                <text>@cat.Badge </text>
+                            }
+                            @cat.Name
+                        </span>
                     </label>
                 }
             </div>

@@ -43,6 +43,7 @@ public sealed class CategoryTagDto
 {
     public string Key { get; set; } = "";
     public string Name { get; set; } = "";
+    public string? Badge { get; set; }
 }
 
 /// <summary>

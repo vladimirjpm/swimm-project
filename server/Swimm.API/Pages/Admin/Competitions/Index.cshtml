@@ -41,7 +41,7 @@
             <option value="">Все</option>
             @foreach (var cat in Model.Categories)
             {
-                <option value="@cat.Key" selected="@(cat.Key == Model.CategoryKey)">@cat.Name</option>
+                <option value="@cat.Key" selected="@(cat.Key == Model.CategoryKey)">@(!string.IsNullOrEmpty(cat.Badge) ? cat.Badge + " " : "")@cat.Name</option>
             }
         </select>
     </label>
@@ -74,7 +74,8 @@
         }
         @if (!string.IsNullOrEmpty(Model.CategoryKey))
         {
-            <text> · категория «@(Model.Categories.FirstOrDefault(c => c.Key == Model.CategoryKey)?.Name ?? Model.CategoryKey)»</text>
+            var selectedCat = Model.Categories.FirstOrDefault(c => c.Key == Model.CategoryKey);
+            <text> · категория «@(!string.IsNullOrEmpty(selectedCat?.Badge) ? selectedCat.Badge + " " : "")@(selectedCat?.Name ?? Model.CategoryKey)»</text>
         }
         @if (Model.Year != null)
         {
