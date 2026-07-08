@@ -88,8 +88,10 @@ dotnet run --project server/Swimm.API -- --migrate
 - `GET /api/results` — результаты, фильтры + пагинация (`{page,pageSize,hasMore,data}`); `data` =
   клиентский `Result`.
 - `GET /api/club-points` — правила очков (`{rules:[...]}`), заменяет `club-points-config.json`.
-- `GET /api/categories`, `GET /api/categories/{key}` — категории и их соревнования; заменяют
-  `sources-config*.json`.
+- `GET /api/categories`, `GET /api/categories/{key}` — категории и их соревнования (заменили
+  `sources-config*.json`, файл удалён). Клиент читает через `CategoryHelper` только для отображения
+  (name/badge); канонические ключи категорий (`all`/`young8_11`/`junior`/`masters`) и URL-контракт
+  остаются client-only в `results-categories.ts` — в БД их нет (`all` синтетический).
 
 Модель данных под это:
 - `Category` + `CategoryCompetition` (M:N) — какие соревнования в какой категории. Membership

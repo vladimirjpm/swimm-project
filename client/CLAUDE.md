@@ -55,10 +55,12 @@ npm --prefix client run build      # prebuild авто-генерит club-icons
 
 **Идёт перевод данных со статики на серверный API** (бэкенд в `server/`). Уже на API:
 - очки клубов — `club-points-helper.ts` → `GET /api/club-points` (вместо `config/club-points-config.json`).
-
-Готовы на сервере, клиент ещё не переключён: `GET /api/results` (форма = `Result`),
-`GET /api/categories(/{key})` (заменят `sources-config*.json`; переключать
-`projects/components/filter-data-source-ddl/filter-data-source-ddl.tsx`).
+- список/результаты соревнований — `filter-data-source-ddl.tsx` → `GET /api/competitions` + постранично
+  `GET /api/results` (`sources-config*.json` удалён, был мёртвым кодом).
+- name/badge категорий — `category-helper.ts` (`CategoryHelper`) → `GET /api/categories` (кэш + fallback,
+  по образцу `ClubPointsHelper`). Сами канонические ключи категорий (`all`/`young8_11`/`junior`/`masters`,
+  URL-контракт, темы оформления) остаются **client-only** в `results-categories.ts` — в БД их нет
+  (`all` синтетический), маппинг канонический↔Category.Key живёт внутри `CategoryHelper`.
 
 **Дев-связка с API:** в [`vite.config.js`](vite.config.js) есть proxy `/api`,`/auth` →
 `http://localhost:5078`, поэтому относительные `fetch('/api/...')` работают как same-origin

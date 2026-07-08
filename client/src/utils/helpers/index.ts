@@ -8,4 +8,5 @@ export { default as HelperResults } from './helper-results';
 export { default as HelperSwimmer } from './helper-swimmer';
 export { default as HelperClub } from './helper-club';
 export { default as ClubPointsHelper } from './club-points-helper';
+export { default as CategoryHelper, type CategoryDisplay } from './category-helper';
 export { default as HelperMedal, type MedalTier } from './helper-medal';

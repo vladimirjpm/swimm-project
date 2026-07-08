@@ -10,7 +10,9 @@ import { Result } from '../../../utils/interfaces/results';
 import {
   RESULTS_CATEGORIES,
   resolveCategoryKey,
+  ResultsCategory,
 } from '../../../utils/constants/results-categories';
+import CategoryHelper, { CategoryDisplay } from '../../../utils/helpers/category-helper';
 
 // ── Категорийный селектор соревнований ──────────────────────────────────────
 // База: design_handoff_category_selector (табы + поиск + сезон + live/upcoming +
@@ -155,8 +157,51 @@ const DataSourceDDL: React.FC = () => {
   const [panelOpen, setPanelOpen] = React.useState(false);
   // Мобильное меню категорий (вариант 9b: строка «Category: … ▾» вместо табов)
   const [catMenuOpen, setCatMenuOpen] = React.useState(false);
+  // name/badge категорий из /api/categories (БД) — ключ здесь канонический ('young8_11' и т.п.),
+  // не Category.Key в БД (маппинг внутри CategoryHelper). Пусто до первой загрузки — тогда
+  // используется статичный RESULTS_CATEGORIES.label (см. categoryLabel ниже).
+  const [liveCategoryLabels, setLiveCategoryLabels] = React.useState<Record<string, CategoryDisplay>>({});
   const wrapRef = React.useRef<HTMLDivElement>(null);
   const touchStartY = React.useRef<number | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    CategoryHelper.getCanonicalMap().then((map) => {
+      if (!cancelled) setLiveCategoryLabels(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Живой name+badge из БД (Admin/Categories), пока не загружен — статичный label.
+  const categoryLabel = (c: ResultsCategory): string => {
+    const live = liveCategoryLabels[c.key];
+    if (!live) return c.label;
+    return live.badge ? `${live.badge} ${live.name}` : live.name;
+  };
+
+  // Бейдж-кружок (буква из БД) + название — для табов/строк селектора категорий.
+  // Кружок не завязан на active/неактивный вариант пилюли отдельными цветами (у tabsRow
+  // активная пилюля залита --theme-primary, у categoryRow активная строка — лишь лёгкий
+  // --theme-primary-light тон; единой пары «фон+текст», контрастной сразу везде, в теме нет).
+  // Вместо этого — обводка currentColor: кружок наследует уже правильно посчитанный цвет
+  // текста родителя в каждом состоянии и остаётся читаемым без доп. параметров.
+  const categoryLabelNode = (c: ResultsCategory): React.ReactNode => {
+    const live = liveCategoryLabels[c.key];
+    if (!live?.badge) return categoryLabel(c);
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <span
+          className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold leading-none"
+          style={{ border: '1.5px solid currentColor' }}
+        >
+          {live.badge}
+        </span>
+        {live.name}
+      </span>
+    );
+  };
 
   // Закрытие по Esc (всегда) и по клику вне (только desktop-дропдаун —
   // у мобильного sheet эту роль играет backdrop).
@@ -354,8 +399,8 @@ const DataSourceDDL: React.FC = () => {
     g.items.push(s);
   });
 
-  const activeCatLabel =
-    RESULTS_CATEGORIES.find((c) => c.key === cat)?.label ?? 'All';
+  const activeCategory = RESULTS_CATEGORIES.find((c) => c.key === cat);
+  const activeCatLabel = activeCategory ? categoryLabel(activeCategory) : 'All';
   const isSelected = (s: CompetitionSource) =>
     !!selectedTitle && selectedTitle === s.name;
 
@@ -473,7 +518,7 @@ const DataSourceDDL: React.FC = () => {
                   }
             }
           >
-            {c.label}{' '}
+            {categoryLabelNode(c)}{' '}
             <span style={{ fontWeight: 600, opacity: active ? 0.75 : 0.6 }}>{catCount(c.key)}</span>
           </button>
         );
@@ -496,7 +541,9 @@ const DataSourceDDL: React.FC = () => {
       >
         <span style={{ color: 'var(--theme-mode-text-secondary)', fontWeight: 700 }}>
           Category:{' '}
-          <span style={{ color: 'var(--theme-mode-text)', fontWeight: 800 }}>{activeCatLabel}</span>{' '}
+          <span style={{ color: 'var(--theme-mode-text)', fontWeight: 800 }}>
+            {activeCategory ? categoryLabelNode(activeCategory) : 'All'}
+          </span>{' '}
           · {catCount(cat)}
         </span>
         <span className="text-[10px]" style={{ color: 'var(--theme-mode-text-muted)' }}>
@@ -526,7 +573,7 @@ const DataSourceDDL: React.FC = () => {
                 }}
               >
                 <span>
-                  {c.label}{' '}
+                  {categoryLabelNode(c)}{' '}
                   <span style={{ color: 'var(--theme-mode-text-muted)', fontWeight: 600 }}>
                     · {catCount(c.key)}
                   </span>
@@ -781,6 +828,10 @@ const DataSourceDDL: React.FC = () => {
   ]
     .filter(Boolean)
     .join(' · ');
+  // Бейдж категории соревнования в шапке — «выбит» в акцентном фоне (--theme-mode-accent-text),
+  // а не currentColor-обводка, как в табах: тут фон всегда сплошной --theme-primary,
+  // так что можно уверенно закрасить кружок, а не только обвести.
+  const headerCategoryBadge = liveCategoryLabels[selectedSourceObj.category]?.badge;
 
   return (
     <div ref={wrapRef} className="relative">
@@ -793,15 +844,25 @@ const DataSourceDDL: React.FC = () => {
           boxShadow: 'var(--theme-mode-card-shadow)',
         }}
       >
-        <div className="flex min-w-0 flex-col gap-[5px]">
-          <div
-            dir="rtl"
-            className="overflow-hidden text-ellipsis whitespace-nowrap text-[19px] font-extrabold"
-            style={{ textAlign: 'left' }}
-          >
-            {headerName}
+        <div className="flex min-w-0 items-center gap-3.5">
+          {headerCategoryBadge && (
+            <span
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg font-extrabold leading-none"
+              style={{ background: 'var(--theme-mode-accent-text)', color: 'var(--theme-primary)' }}
+            >
+              {headerCategoryBadge}
+            </span>
+          )}
+          <div className="flex min-w-0 flex-col gap-[5px]">
+            <div
+              dir="rtl"
+              className="overflow-hidden text-ellipsis whitespace-nowrap text-[19px] font-extrabold"
+              style={{ textAlign: 'left' }}
+            >
+              {headerName}
+            </div>
+            <div className="text-[12.5px] font-semibold opacity-85">{headerMeta}</div>
           </div>
-          <div className="text-[12.5px] font-semibold opacity-85">{headerMeta}</div>
         </div>
         <button
           type="button"
@@ -827,12 +888,22 @@ const DataSourceDDL: React.FC = () => {
         }}
       >
         <div className="flex items-center justify-between gap-3">
-          <div
-            dir="rtl"
-            className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[17px] font-extrabold"
-            style={{ textAlign: 'left' }}
-          >
-            {headerName}
+          <div className="flex min-w-0 items-center gap-2.5">
+            {headerCategoryBadge && (
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base font-extrabold leading-none"
+                style={{ background: 'var(--theme-mode-accent-text)', color: 'var(--theme-primary)' }}
+              >
+                {headerCategoryBadge}
+              </span>
+            )}
+            <div
+              dir="rtl"
+              className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[17px] font-extrabold"
+              style={{ textAlign: 'left' }}
+            >
+              {headerName}
+            </div>
           </div>
           <button
             type="button"
