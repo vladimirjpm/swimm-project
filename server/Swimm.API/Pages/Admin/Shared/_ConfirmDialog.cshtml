@@ -1,0 +1,83 @@
+@*
+    Диалог подтверждения (один экземпляр на layout). JS-API:
+
+      const ok = await adminConfirm({
+          title: 'Удалить соревнование?',
+          message: 'Будет удалено 124 результата.',
+          confirmText: 'Удалить',        // подпись кнопки (по умолчанию «Подтвердить»)
+          danger: true,                  // красная кнопка подтверждения
+          requireText: 'Кубок Израиля',  // если задано — кнопка активна только после точного ввода
+      });
+
+    Возвращает Promise<boolean>. Закрытие по Esc/бэкдропу/Отмене = false.
+*@
+<dialog id="admin-confirm"
+        class="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-lg border border-admin-border bg-admin-surface p-0 text-admin-text shadow-xl shadow-black/50">
+    <form method="dialog" class="p-5">
+        <div class="flex items-start gap-3">
+            <span id="admin-confirm-icon" class="mt-0.5 hidden text-admin-danger">
+                <partial name="/Pages/Admin/Shared/_Icon.cshtml" model='"alert-triangle"' />
+            </span>
+            <div class="min-w-0 flex-1">
+                <h2 id="admin-confirm-title" class="text-base font-semibold text-white"></h2>
+                <p id="admin-confirm-message" class="mt-1.5 text-sm whitespace-pre-line text-admin-text-muted"></p>
+                <div id="admin-confirm-require" class="mt-3 hidden">
+                    <label class="mb-1 block text-xs text-admin-text-muted">
+                        Для подтверждения введите: <strong id="admin-confirm-require-word" class="text-admin-text"></strong>
+                    </label>
+                    <input id="admin-confirm-input" type="text" class="admin-input" autocomplete="off" />
+                </div>
+            </div>
+        </div>
+        <div class="mt-5 flex justify-end gap-2">
+            <button type="button" id="admin-confirm-cancel" class="admin-btn admin-btn-ghost">Отмена</button>
+            <button type="button" id="admin-confirm-ok" class="admin-btn admin-btn-primary"></button>
+        </div>
+    </form>
+</dialog>
+
+<script>
+function adminConfirm({ title, message = '', confirmText = 'Подтвердить', danger = false, requireText = null } = {}) {
+    const dlg = document.getElementById('admin-confirm');
+    const okBtn = document.getElementById('admin-confirm-ok');
+    const input = document.getElementById('admin-confirm-input');
+    const requireBox = document.getElementById('admin-confirm-require');
+
+    document.getElementById('admin-confirm-title').textContent = title ?? '';
+    document.getElementById('admin-confirm-message').textContent = message;
+    document.getElementById('admin-confirm-icon').classList.toggle('hidden', !danger);
+    okBtn.textContent = confirmText;
+    okBtn.classList.toggle('admin-btn-danger', danger);
+    okBtn.classList.toggle('admin-btn-primary', !danger);
+
+    requireBox.classList.toggle('hidden', !requireText);
+    input.value = '';
+    if (requireText) {
+        document.getElementById('admin-confirm-require-word').textContent = requireText;
+        okBtn.disabled = true;
+        input.oninput = () => { okBtn.disabled = input.value.trim() !== requireText; };
+    } else {
+        okBtn.disabled = false;
+        input.oninput = null;
+    }
+
+    // Резолвим напрямую с кнопок, не полагаясь на событие 'close' —
+    // в некоторых движках оно не срабатывает, и Promise зависает.
+    return new Promise(resolve => {
+        let settled = false;
+        const settle = val => {
+            if (settled) return;
+            settled = true;
+            if (dlg.open) dlg.close();
+            resolve(val);
+        };
+        okBtn.onclick = () => settle(true);
+        document.getElementById('admin-confirm-cancel').onclick = () => settle(false);
+        dlg.onclose = () => settle(false);                                   // Esc (где событие работает)
+        dlg.onkeydown = e => { if (e.key === 'Escape') settle(false); };     // Esc (fallback)
+        dlg.onclick = e => { if (e.target === dlg) settle(false); };         // клик по бэкдропу
+        dlg.showModal();
+        if (requireText) input.focus();
+    });
+}
+</script>

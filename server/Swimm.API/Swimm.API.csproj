@@ -34,4 +34,10 @@
     <ProjectReference Include="..\Swimm.Infrastructure\Swimm.Infrastructure.csproj" />
   </ItemGroup>
 
+  <!-- Пересобирает Tailwind-бандл админки перед билдом, если Node установлен (node_modules есть).
+       Без Node билд не падает: собранный wwwroot/css/admin.min.css коммитится в репо. -->
+  <Target Name="BuildAdminCss" BeforeTargets="Build" Condition="Exists('$(MSBuildProjectDirectory)\node_modules')">
+    <Exec Command="npm run css:build" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
 </Project>

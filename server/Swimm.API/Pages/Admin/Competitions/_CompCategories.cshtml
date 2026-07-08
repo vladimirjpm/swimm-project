@@ -1,0 +1,15 @@
+@model List<Swimm.Application.Dtos.CategoryTagDto>
+@* Бейджи категорий соревнования (под названием). Masters выделен акцентом, остальные — нейтральные. *@
+@if (Model.Count > 0)
+{
+    <span class="flex flex-wrap gap-1 mt-1">
+        @foreach (var cat in Model)
+        {
+            // "results-masters" = Category.MastersKey — категория Masters управляет флагом IsMasters.
+            var cls = cat.Key == "results-masters"
+                ? "border-admin-accent/30 bg-admin-accent/15 text-admin-accent"
+                : "border-admin-border bg-admin-surface-hover text-admin-text-muted";
+            <span class="admin-badge @cls">@cat.Name</span>
+        }
+    </span>
+}

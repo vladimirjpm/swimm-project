@@ -1,0 +1,403 @@
+using System.Linq.Expressions;
+using Microsoft.EntityFrameworkCore;
+using Swimm.Application.Abstractions;
+using Swimm.Application.Dtos;
+using Swimm.Domain.Entities;
+using Swimm.Infrastructure.Data;
+
+namespace Swimm.Infrastructure.Repositories;
+
+/// <summary>
+/// Эталонная реализация админского CRUD (см. <see cref="ICompetitionAdminRepository"/>).
+/// Пишет через owner-контекст <see cref="SwimmDbContext"/>; после мутаций сбрасывает публичный кэш.
+/// </summary>
+public class CompetitionAdminRepository : ICompetitionAdminRepository
+{
+    private readonly SwimmDbContext _db;
+    private readonly ICacheService _cache;
+
+    public CompetitionAdminRepository(SwimmDbContext db, ICacheService cache)
+    {
+        _db = db;
+        _cache = cache;
+    }
+
+    public async Task<PagedResult<CompetitionRowDto>> GetPagedAsync(string? search, int page, int pageSize)
+    {
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 20;
+
+        // Единица списка = одиночное соревнование ИЛИ многодневное событие (свёрнуто в одну строку).
+        // «Голова» единицы: соревнование без события, либо день события с минимальным DayNumber
+        // (min, а не ==1, чтобы событие не пропало из списка, если день 1 удалили).
+        var heads = _db.Competitions.AsNoTracking().Where(c =>
+            c.EventId == null ||
+            c.DayNumber == _db.Competitions.Where(x => x.EventId == c.EventId).Min(x => x.DayNumber));
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            // Экранируем LIKE-метасимволы (\ % _), иначе поиск по литералу «100%» или «a_b»
+            // трактует их как wildcard'ы и матчит лишнее / не находит нужное.
+            var s = search.Trim()
+                .Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+            // По имени/подзаголовку головы. У события имя общее на всех днях — поиск по названию
+            // события работает; по подзаголовку конкретного дня внутри события — нет (приемлемо).
+            heads = heads.Where(c =>
+                EF.Functions.ILike(c.Name, $"%{s}%", "\\") ||
+                (c.SubName != null && EF.Functions.ILike(c.SubName, $"%{s}%", "\\")));
+        }
+
+        var total = await heads.CountAsync();
+
+        var headItems = await heads
+            .OrderByDescending(c => c.Date)
+            .ThenBy(c => c.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(ProjectListItem)
+            .ToListAsync();
+
+        // Дни событий, попавших на страницу, — одним запросом.
+        var eventIds = headItems.Where(h => h.EventId != null).Select(h => h.EventId!.Value).ToList();
+        var daysByEvent = new Dictionary<int, List<CompetitionListItemDto>>();
+        if (eventIds.Count > 0)
+        {
+            var days = await _db.Competitions.AsNoTracking()
+                .Where(c => c.EventId != null && eventIds.Contains(c.EventId!.Value))
+                .OrderBy(c => c.DayNumber)
+                .Select(ProjectListItem)
+                .ToListAsync();
+            daysByEvent = days
+                .GroupBy(d => d.EventId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+        }
+
+        var rows = headItems.Select(h =>
+        {
+            // Событие показываем свёрнутым только если реально ≥2 дней (иначе — обычная строка).
+            if (h.EventId is int evId && daysByEvent.TryGetValue(evId, out var days) && days.Count >= 2)
+            {
+                return new CompetitionRowDto
+                {
+                    EventId = evId,
+                    EventName = h.EventName ?? h.Name,
+                    Days = days,
+                    DayCount = days.Count,
+                    TotalResultCount = days.Sum(d => d.ResultCount),
+                    DateRange = FormatDateRange(days),
+                    PoolType = days[0].PoolType,
+                    Country = days[0].Country,
+                    // Флаг на шапке — только если он у всех дней (обычно так и есть).
+                    IsMasters = days.All(d => d.IsMasters),
+                    IsAward = days.All(d => d.IsAward),
+                    ShowCombineAllResults = days.All(d => d.ShowCombineAllResults),
+                };
+            }
+            return new CompetitionRowDto { Single = h };
+        }).ToList();
+
+        // Категории для всех соревнований на странице (одиночные + дни) — одним запросом (бейджи в списке).
+        var allItems = rows.SelectMany(r => r.Single != null ? new[] { r.Single } : r.Days.ToArray()).ToList();
+        var itemIds = allItems.Select(i => i.Id).ToList();
+        if (itemIds.Count > 0)
+        {
+            var cats = await _db.CategoryCompetitions.AsNoTracking()
+                .Where(cc => itemIds.Contains(cc.CompetitionId))
+                .Join(_db.Categories, cc => cc.CategoryId, cat => cat.Id,
+                    (cc, cat) => new { cc.CompetitionId, cat.Key, cat.Name, cat.DisplayOrder })
+                .OrderBy(x => x.DisplayOrder)
+                .ToListAsync();
+            var byComp = cats
+                .GroupBy(x => x.CompetitionId)
+                .ToDictionary(g => g.Key, g => g.Select(x => new CategoryTagDto { Key = x.Key, Name = x.Name }).ToList());
+            foreach (var it in allItems)
+                if (byComp.TryGetValue(it.Id, out var list)) it.Categories = list;
+        }
+
+        // У шапки события — категории, общие для всех дней (обычно одинаковые).
+        foreach (var r in rows.Where(r => r.IsEvent && r.Days.Count > 0))
+        {
+            r.Categories = r.Days[0].Categories
+                .Where(c => r.Days.All(d => d.Categories.Any(x => x.Key == c.Key)))
+                .ToList();
+        }
+
+        return new PagedResult<CompetitionRowDto>(rows, total, page, pageSize);
+    }
+
+    public async Task<IReadOnlyList<CategoryTagDto>> GetAllCategoriesAsync() =>
+        await _db.Categories.AsNoTracking()
+            .OrderBy(c => c.DisplayOrder)
+            .Select(c => new CategoryTagDto { Key = c.Key, Name = c.Name })
+            .ToListAsync();
+
+    /// <summary>Проекция Competition → строка списка. Общая для «голов» и для дней события.</summary>
+    private Expression<Func<Competition, CompetitionListItemDto>> ProjectListItem => c => new CompetitionListItemDto
+    {
+        Id = c.Id,
+        Name = c.Name,
+        SubName = c.SubName,
+        Date = c.Date,
+        PoolType = c.PoolType,
+        Country = c.Country,
+        OrgCompId = c.OrgCompId,
+        IsMasters = c.IsMasters,
+        IsAward = c.IsAward,
+        ShowCombineAllResults = c.ShowCombineAllResults,
+        EventId = c.EventId,
+        EventName = c.Event != null ? c.Event.Name : null,
+        DayNumber = c.DayNumber,
+        ResultCount = _db.Results.Count(r => r.CompetitionId == c.Id),
+        ResultUrlCount = c.OrgCompId != null
+            ? _db.CompetitionResultUrls.Count(u => u.OrgCompId == c.OrgCompId)
+            : 0
+    };
+
+    /// <summary>«дд/ММ/гггг – дд/ММ/гггг» по дням события (или один день, если даты совпали).</summary>
+    private static string FormatDateRange(IReadOnlyList<CompetitionListItemDto> days)
+    {
+        var first = days[0].Date;
+        var last = days[^1].Date;
+        return string.IsNullOrEmpty(last) || last == first ? first : $"{first} – {last}";
+    }
+
+    public async Task<CompetitionEditDto?> GetByIdAsync(int id)
+    {
+        var c = await _db.Competitions
+            .AsNoTracking()
+            .Include(x => x.Event)
+            .FirstOrDefaultAsync(x => x.Id == id);
+
+        if (c == null) return null;
+
+        var dto = new CompetitionEditDto
+        {
+            Id = c.Id,
+            Name = c.Name,
+            SubName = c.SubName,
+            Date = c.Date,
+            PoolType = c.PoolType,
+            Country = c.Country,
+            OrgCompId = c.OrgCompId,
+            IsMasters = c.IsMasters,
+            IsAward = c.IsAward,
+            ShowCombineAllResults = c.ShowCombineAllResults,
+            EventId = c.EventId,
+            EventName = c.Event?.Name,
+            DayNumber = c.DayNumber,
+            ResultCount = await _db.Results.CountAsync(r => r.CompetitionId == c.Id),
+            CategoryKeys = await _db.CategoryCompetitions
+                .AsNoTracking()
+                .Where(cc => cc.CompetitionId == c.Id)
+                .Join(_db.Categories, cc => cc.CategoryId, cat => cat.Id, (cc, cat) => cat.Key)
+                .ToListAsync()
+        };
+
+        if (c.OrgCompId != null)
+        {
+            dto.ResultUrls = await _db.CompetitionResultUrls
+                .AsNoTracking()
+                .Where(u => u.OrgCompId == c.OrgCompId)
+                .OrderBy(u => u.Culture)
+                .Select(u => new CompetitionResultUrlDto
+                {
+                    Id = u.Id,
+                    OrgCompId = u.OrgCompId,
+                    Culture = u.Culture,
+                    Url = u.Url
+                })
+                .ToListAsync();
+        }
+
+        return dto;
+    }
+
+    public async Task<CompetitionSaveResult> CreateAsync(CompetitionInputDto input)
+    {
+        var error = await ValidateAsync(input, excludeId: null);
+        if (error != null) return CompetitionSaveResult.Fail(error);
+
+        var comp = new Competition();
+        Apply(comp, input);
+        _db.Competitions.Add(comp);
+        var save = await SaveAsync(comp);
+        if (save.Success) await SyncCategoriesAsync(comp.Id, input.CategoryKeys);
+        return save;
+    }
+
+    public async Task<CompetitionSaveResult> UpdateAsync(int id, CompetitionInputDto input)
+    {
+        var comp = await _db.Competitions.FindAsync(id);
+        if (comp == null) return CompetitionSaveResult.Fail($"Соревнование #{id} не найдено");
+
+        var error = await ValidateAsync(input, excludeId: id);
+        if (error != null) return CompetitionSaveResult.Fail(error);
+
+        // Смена/очистка OrgCompId, к которому привязаны URL результатов, порвёт FK
+        // (CompetitionResultUrls.OrgCompId → Competitions.OrgCompId, только ON DELETE CASCADE,
+        // без ON UPDATE). Блокируем с понятным текстом вместо DbUpdateException/500.
+        if (comp.OrgCompId != input.OrgCompId && comp.OrgCompId is int oldOrg)
+        {
+            var urlCount = await _db.CompetitionResultUrls.CountAsync(u => u.OrgCompId == oldOrg);
+            if (urlCount > 0)
+                return CompetitionSaveResult.Fail(
+                    $"К текущему OrgCompId={oldOrg} привязано URL результатов: {urlCount}. " +
+                    "Удалите их перед сменой или очисткой OrgCompId.");
+        }
+
+        Apply(comp, input);
+        var save = await SaveAsync(comp);
+        if (save.Success) await SyncCategoriesAsync(comp.Id, input.CategoryKeys);
+        return save;
+    }
+
+    /// <summary>SaveChanges + инвалидация кэша с перехватом гонки уникальности (проверка
+    /// в <see cref="ValidateAsync"/> не атомарна с записью — параллельный сабмит мог вставить дубль).</summary>
+    private async Task<CompetitionSaveResult> SaveAsync(Competition comp)
+    {
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            return CompetitionSaveResult.Fail(
+                "Не удалось сохранить: нарушено ограничение уникальности " +
+                "(название+дата+бассейн или OrgCompId уже заняты).");
+        }
+        await _cache.InvalidateAllAsync();
+        return CompetitionSaveResult.Ok(comp.Id);
+    }
+
+    public async Task<CompetitionSaveResult> AddResultUrlAsync(int orgCompId, string culture, string url)
+    {
+        culture = culture.Trim();
+        url = url.Trim();
+
+        if (string.IsNullOrEmpty(culture)) return CompetitionSaveResult.Fail("Culture обязателен");
+        if (string.IsNullOrEmpty(url)) return CompetitionSaveResult.Fail("URL обязателен");
+
+        // OrgCompId должен существовать у какого-то соревнования — иначе URL «висит» без связи.
+        if (!await _db.Competitions.AnyAsync(c => c.OrgCompId == orgCompId))
+            return CompetitionSaveResult.Fail($"Нет соревнования с OrgCompId={orgCompId}");
+
+        if (await _db.CompetitionResultUrls.AnyAsync(u => u.OrgCompId == orgCompId && u.Culture == culture))
+            return CompetitionSaveResult.Fail($"URL для culture «{culture}» уже есть");
+
+        _db.CompetitionResultUrls.Add(new CompetitionResultUrl
+        {
+            OrgCompId = orgCompId,
+            Culture = culture,
+            Url = url
+        });
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            // Гонка с параллельным добавлением того же (OrgCompId, Culture) — есть UNIQUE-индекс.
+            return CompetitionSaveResult.Fail($"URL для culture «{culture}» уже есть");
+        }
+        await _cache.InvalidateAllAsync();
+        return CompetitionSaveResult.Ok(orgCompId);
+    }
+
+    public async Task<bool> RemoveResultUrlAsync(int urlId, int orgCompId)
+    {
+        // Привязка к orgCompId — чтобы со страницы одного соревнования нельзя было удалить
+        // URL другого по подделанному urlId.
+        var entity = await _db.CompetitionResultUrls
+            .FirstOrDefaultAsync(u => u.Id == urlId && u.OrgCompId == orgCompId);
+        if (entity == null) return false;
+
+        _db.CompetitionResultUrls.Remove(entity);
+        await _db.SaveChangesAsync();
+        await _cache.InvalidateAllAsync();
+        return true;
+    }
+
+    // ── helpers ────────────────────────────────────────────────────────────────
+
+    private static void Apply(Competition comp, CompetitionInputDto input)
+    {
+        comp.Name = input.Name.Trim();
+        comp.SubName = string.IsNullOrWhiteSpace(input.SubName) ? null : input.SubName.Trim();
+        comp.Date = (input.Date ?? "").Trim();
+        comp.PoolType = (input.PoolType ?? "").Trim();
+        comp.Country = (input.Country ?? "").Trim();
+        comp.OrgCompId = input.OrgCompId;
+        // IsMasters — производный от членства в категории Masters (галочки в форме нет).
+        comp.IsMasters = input.CategoryKeys.Contains(Category.MastersKey);
+        comp.IsAward = input.IsAward;
+        comp.ShowCombineAllResults = input.ShowCombineAllResults;
+    }
+
+    /// <summary>Приводит членство соревнования в категориях к заданному набору ключей (add/remove).</summary>
+    private async Task SyncCategoriesAsync(int competitionId, IReadOnlyCollection<string> keys)
+    {
+        var wantedIds = await _db.Categories.AsNoTracking()
+            .Where(c => keys.Contains(c.Key))
+            .Select(c => c.Id)
+            .ToListAsync();
+
+        var existing = await _db.CategoryCompetitions
+            .Where(cc => cc.CompetitionId == competitionId)
+            .ToListAsync();
+
+        var existingIds = existing.Select(cc => cc.CategoryId).ToHashSet();
+        var toRemove = existing.Where(cc => !wantedIds.Contains(cc.CategoryId)).ToList();
+        var toAdd = wantedIds.Where(catId => !existingIds.Contains(catId)).ToList();
+
+        if (toRemove.Count == 0 && toAdd.Count == 0) return;
+
+        if (toRemove.Count > 0)
+            _db.CategoryCompetitions.RemoveRange(toRemove);
+
+        foreach (var catId in toAdd)
+        {
+            var nextOrder = (await _db.CategoryCompetitions
+                .Where(cc => cc.CategoryId == catId)
+                .MaxAsync(cc => (int?)cc.DisplayOrder) ?? 0) + 1;
+            _db.CategoryCompetitions.Add(new CategoryCompetition
+            {
+                CategoryId = catId,
+                CompetitionId = competitionId,
+                DisplayOrder = nextOrder
+            });
+        }
+
+        await _db.SaveChangesAsync();
+        await _cache.InvalidateAllAsync();
+    }
+
+    /// <summary>Проверка уникальности до записи (дружелюбный текст вместо DbUpdateException).</summary>
+    private async Task<string?> ValidateAsync(CompetitionInputDto input, int? excludeId)
+    {
+        if (string.IsNullOrWhiteSpace(input.Name))
+            return "Название обязательно";
+
+        var name = input.Name.Trim();
+        // Пустое текстовое поле формы биндится в null (не ""), поэтому Date/PoolType/Country
+        // (не обязательные, без required-проверки) нормализуем через ?? "" перед Trim().
+        var date = (input.Date ?? "").Trim();
+        var pool = (input.PoolType ?? "").Trim();
+
+        // UNIQUE (Name, Date, PoolType)
+        var dupKey = await _db.Competitions.AnyAsync(c =>
+            c.Id != excludeId &&
+            c.Name == name && c.Date == date && c.PoolType == pool);
+        if (dupKey)
+            return $"Соревнование с таким названием, датой и бассейном уже есть ({name} / {date} / {pool})";
+
+        // UNIQUE OrgCompId (nullable — null не конфликтует)
+        if (input.OrgCompId is int org)
+        {
+            var dupOrg = await _db.Competitions.AnyAsync(c => c.Id != excludeId && c.OrgCompId == org);
+            if (dupOrg)
+                return $"OrgCompId={org} уже занят другим соревнованием";
+        }
+
+        return null;
+    }
+}

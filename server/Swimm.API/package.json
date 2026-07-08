@@ -1,0 +1,13 @@
+{
+  "name": "swimm-admin-css",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "css:build": "tailwindcss -i Styles/admin.css -o wwwroot/css/admin.min.css --minify",
+    "css:watch": "tailwindcss -i Styles/admin.css -o wwwroot/css/admin.min.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.17",
+    "tailwindcss": "^4.1.17"
+  }
+}

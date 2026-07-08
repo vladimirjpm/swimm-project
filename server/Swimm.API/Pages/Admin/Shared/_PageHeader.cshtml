@@ -1,0 +1,13 @@
+@using Swimm.API.Pages.Admin.Shared
+@model PageHeaderModel
+@*
+    Заголовок страницы. Рендерится из _Layout по ViewData["Title"] / ViewData["PageSubtitle"];
+    страницам достаточно выставить эти значения — самим partial звать не нужно.
+*@
+<header class="mb-6">
+    <h1 class="text-xl font-semibold text-white">@Model.Title</h1>
+    @if (!string.IsNullOrEmpty(Model.Subtitle))
+    {
+        <p class="mt-1 text-sm text-admin-text-muted">@Model.Subtitle</p>
+    }
+</header>

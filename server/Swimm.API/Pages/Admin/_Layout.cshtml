@@ -1,55 +1,60 @@
+@using Swimm.API.Pages.Admin.Shared
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
-    var bodyClass = ViewData["BodyClass"] as string ?? "min-h-screen text-gray-300 text-sm";
-    var titleColor = ViewData["TitleColor"] as string ?? "#ff6b6b";
-    var headerTitle = ViewData["HeaderTitle"] as string ?? "🔧 Swimm Admin";
+    var pageTitle = ViewData["Title"] as string ?? "Admin";
+    var pageSubtitle = ViewData["PageSubtitle"] as string;
     var csrfToken = Antiforgery.GetAndStoreTokens(Context).RequestToken!;
 }
-@inject Swimm.API.Services.DbStatusService DbStatus
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="utf-8" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Swimm — @ViewData["Title"]</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/css/admin-all.css" />
+    <title>Swimm — @pageTitle</title>
+    <link rel="stylesheet" href="/css/admin.min.css" />
     @await RenderSectionAsync("Styles", required: false)
-    <link rel="stylesheet" href="/css/db-banner.css" />
 </head>
-<body class="@bodyClass">
+<body class="min-h-screen bg-admin-bg font-sans text-sm text-admin-text antialiased">
 
-<header class="flex justify-between items-center px-8 py-4 bg-black/30">
-    <h1 class="text-xl" style="color: @titleColor">@headerTitle</h1>
-    <nav class="flex gap-5">
-        <a href="/" class="text-[#4fc3f7] no-underline text-sm hover:underline">← Home</a>
-        <a href="/Admin" class="text-[#4fc3f7] no-underline text-sm hover:underline">🔧 Admin</a>
-        <a href="/Admin/Api" class="text-[#4fc3f7] no-underline text-sm hover:underline">📡 API Reference</a>
-        <a href="/Admin/Db" class="text-[#4fc3f7] no-underline text-sm hover:underline">🗄️ DB Schema</a>
-        <a href="/Admin/Settings" class="text-[#4fc3f7] no-underline text-sm hover:underline">⚙️ Settings</a>
-        <a href="/Admin/Import" class="text-[#4fc3f7] no-underline text-sm hover:underline">📥 Import</a>
-        <a href="/Admin/ImportHistory" class="text-[#4fc3f7] no-underline text-sm hover:underline">📋 Import History</a>
-        <a href="/auth/logout" class="text-[#4fc3f7] no-underline text-sm hover:underline">Logout</a>
-    </nav>
-</header>
+<partial name="/Pages/Admin/Shared/_Sidebar.cshtml" />
 
-@if (!DbStatus.IsAvailable)
-{
-    <div class="db-unavailable-banner">База данных временно недоступна — некоторые функции могут не работать</div>
-}
-@RenderBody()
+<div class="flex min-h-screen flex-col lg:ml-60">
 
-<div class="fixed bottom-6 right-6 bg-[#323232] text-white py-3 px-5 rounded-md text-sm opacity-0 transition-opacity duration-300 z-[1000] toast" id="toast"></div>
+    @* Мобильный топбар: гамбургер + заголовок текущей страницы *@
+    <div class="flex items-center gap-3 border-b border-admin-border bg-admin-surface px-4 py-3 lg:hidden">
+        <button type="button" class="cursor-pointer text-admin-text-muted hover:text-admin-text"
+                onclick="toggleSidebar(true)" aria-label="Открыть меню">
+            <partial name="/Pages/Admin/Shared/_Icon.cshtml" model='"menu"' />
+        </button>
+        <span class="text-sm font-semibold">@pageTitle</span>
+    </div>
+
+    <partial name="/Pages/Admin/Shared/_DbBanner.cshtml" />
+
+    <main class="mx-auto w-full max-w-[1200px] flex-1 px-4 py-6 lg:px-8">
+        <partial name="/Pages/Admin/Shared/_PageHeader.cshtml" model="new PageHeaderModel(pageTitle, pageSubtitle)" />
+        @RenderBody()
+    </main>
+</div>
+
+<partial name="/Pages/Admin/Shared/_Toast.cshtml" />
+<partial name="/Pages/Admin/Shared/_ConfirmDialog.cshtml" />
 
 <script>
 const _csrfToken = '@csrfToken';
 
+function toggleSidebar(open) {
+    const sb = document.getElementById('admin-sidebar');
+    const bd = document.getElementById('sidebar-backdrop');
+    sb.classList.toggle('-translate-x-full', !open);
+    bd.classList.toggle('hidden', !open);
+}
+
 function toast(msg, duration) {
     const el = document.getElementById('toast');
     el.textContent = msg;
-    el.classList.add('show');
-    setTimeout(() => el.classList.remove('show'), duration || 2500);
+    el.classList.add('opacity-100');
+    setTimeout(() => el.classList.remove('opacity-100'), duration || 2500);
 }
 
 function esc(s) {

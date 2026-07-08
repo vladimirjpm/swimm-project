@@ -2,21 +2,18 @@
 @model Swimm.API.Pages.Admin.DbModel
 @{
     ViewData["Title"] = "DB Schema";
-    ViewData["HeaderTitle"] = "🗄️ DB Schema Explorer";
-    ViewData["TitleColor"] = "#ffa726";
+    ViewData["PageSubtitle"] = "Таблицы, процедуры, представления, зависимости";
 }
 
-<div class="max-w-[1300px] mx-auto p-6">
-    <div class="text-[#ffa726] text-lg mb-6" id="db-name">Loading...</div>
+<div class="text-admin-warning text-lg mb-6" id="db-name">Loading...</div>
 
-    <div class="flex gap-6 max-[900px]:flex-col">
-        <aside class="sidebar min-w-[220px] max-w-[250px] bg-black/25 rounded-[10px] p-4 sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto max-[900px]:max-w-full max-[900px]:static max-[900px]:max-h-none" id="sidebar">
-            <h3>Loading...</h3>
-        </aside>
+<div class="flex gap-6 max-[900px]:flex-col">
+    <aside class="sidebar min-w-[220px] max-w-[250px] bg-black/25 rounded-[10px] p-4 sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto max-[900px]:max-w-full max-[900px]:static max-[900px]:max-h-none" id="sidebar">
+        <h3>Loading...</h3>
+    </aside>
 
-        <div class="flex-1 min-w-0" id="content">
-            <div class="text-[#546e7a] italic p-4 text-center">Loading schema...</div>
-        </div>
+    <div class="flex-1 min-w-0" id="content">
+        <div class="text-admin-text-muted italic p-4 text-center">Loading schema...</div>
     </div>
 </div>
 

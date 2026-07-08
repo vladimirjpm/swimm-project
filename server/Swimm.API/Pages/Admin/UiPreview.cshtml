@@ -1,0 +1,83 @@
+@page
+@using Swimm.API.Pages.Admin.Shared
+@model Swimm.API.Pages.Admin.UiPreviewModel
+@{
+    ViewData["Title"] = "UI Preview";
+    ViewData["PageSubtitle"] = "Витрина компонентов админки — образцы для новых страниц (фазы 2–5).";
+}
+
+<div class="grid gap-6">
+
+    <section class="admin-card">
+        <h2 class="mb-3 text-sm font-semibold text-white">Кнопки</h2>
+        <div class="flex flex-wrap items-center gap-2">
+            <button class="admin-btn admin-btn-primary">Сохранить</button>
+            <button class="admin-btn admin-btn-danger">Удалить</button>
+            <button class="admin-btn admin-btn-ghost">Отмена</button>
+            <button class="admin-btn admin-btn-primary" disabled>Disabled</button>
+        </div>
+    </section>
+
+    <section class="admin-card">
+        <h2 class="mb-3 text-sm font-semibold text-white">Статус-бейджи</h2>
+        <div class="flex flex-wrap gap-2">
+            <partial name="/Pages/Admin/Shared/_StatusBadge.cshtml" model='new StatusBadgeModel("Approved", "success")' />
+            <partial name="/Pages/Admin/Shared/_StatusBadge.cshtml" model='new StatusBadgeModel("Failed", "danger")' />
+            <partial name="/Pages/Admin/Shared/_StatusBadge.cshtml" model='new StatusBadgeModel("Pending", "warning")' />
+            <partial name="/Pages/Admin/Shared/_StatusBadge.cshtml" model='new StatusBadgeModel("Info", "info")' />
+            <partial name="/Pages/Admin/Shared/_StatusBadge.cshtml" model='new StatusBadgeModel("Neutral")' />
+        </div>
+    </section>
+
+    <section class="admin-card">
+        <h2 class="mb-3 text-sm font-semibold text-white">Форма</h2>
+        <div class="grid max-w-md gap-3">
+            <label class="grid gap-1 text-xs text-admin-text-muted">
+                Название
+                <input type="text" class="admin-input" placeholder="Кубок Израиля 2026" />
+            </label>
+            <label class="grid gap-1 text-xs text-admin-text-muted">
+                Бассейн
+                <select class="admin-input">
+                    <option>25m</option>
+                    <option>50m</option>
+                </select>
+            </label>
+        </div>
+    </section>
+
+    <section class="admin-card p-0">
+        <h2 class="px-5 pt-5 pb-3 text-sm font-semibold text-white">Таблица</h2>
+        <table class="admin-table">
+            <thead>
+                <tr><th>Название</th><th>Дата</th><th>Бассейн</th><th>Статус</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Winter Championship</td><td>14/02/2026</td><td>25m</td>
+                    <td><partial name="/Pages/Admin/Shared/_StatusBadge.cshtml" model='new StatusBadgeModel("Approved", "success")' /></td>
+                </tr>
+                <tr>
+                    <td>Spring Cup</td><td>03/04/2026</td><td>50m</td>
+                    <td><partial name="/Pages/Admin/Shared/_StatusBadge.cshtml" model='new StatusBadgeModel("Pending", "warning")' /></td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="admin-card">
+        <h2 class="mb-3 text-sm font-semibold text-white">Интерактив</h2>
+        <div class="flex flex-wrap gap-2">
+            <button class="admin-btn admin-btn-ghost" onclick="toast('Сохранено ✓')">Показать toast</button>
+            <button class="admin-btn admin-btn-ghost"
+                    onclick="adminConfirm({ title: 'Простое подтверждение?', message: 'Без ввода текста.' }).then(ok => toast(ok ? 'OK' : 'Отменено'))">
+                Confirm
+            </button>
+            <button class="admin-btn admin-btn-danger"
+                    onclick="adminConfirm({ title: 'Удалить соревнование?', message: 'Будет удалено 124 результата. Действие необратимо.', confirmText: 'Удалить', danger: true, requireText: 'Winter Championship' }).then(ok => toast(ok ? 'Удалено' : 'Отменено'))">
+                Confirm с вводом названия
+            </button>
+        </div>
+    </section>
+
+</div>

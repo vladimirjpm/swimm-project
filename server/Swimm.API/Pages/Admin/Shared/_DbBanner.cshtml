@@ -1,0 +1,9 @@
+@inject Swimm.API.Services.DbStatusService DbStatus
+@* Баннер «БД недоступна» — показывается на всех страницах админки. *@
+@if (!DbStatus.IsAvailable)
+{
+    <div class="flex items-center gap-2.5 border-b border-admin-warning/30 bg-admin-warning/10 px-6 py-2.5 text-[13px] text-admin-warning">
+        <partial name="/Pages/Admin/Shared/_Icon.cshtml" model='"alert-triangle"' />
+        <span>База данных временно недоступна — некоторые функции могут не работать</span>
+    </div>
+}

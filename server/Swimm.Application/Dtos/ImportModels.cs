@@ -43,4 +43,6 @@ public class DeleteCompetitionResult
     public int GalleryItems { get; set; }
     public int Galleries { get; set; }
     public int ImportHistory { get; set; }
+    /// <summary>Удалённые URL-ы результатов (по OrgCompId), если этот OrgCompId больше нигде не использовался.</summary>
+    public int ResultUrls { get; set; }
 }

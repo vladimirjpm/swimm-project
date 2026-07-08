@@ -2,85 +2,83 @@
 @model Swimm.API.Pages.Admin.ImportModel
 @{
     ViewData["Title"] = "Import JSON";
-    ViewData["HeaderTitle"] = "📥 Import JSON";
-    ViewData["TitleColor"] = "#66bb6a";
+    ViewData["PageSubtitle"] = "Загрузка результатов из JSON + очистка данных";
 }
 
-<div class="max-w-[800px] mx-auto p-6">
+<div class="max-w-[800px] mx-auto">
     <!-- Info -->
-    <div class="bg-[rgba(79,195,247,0.08)] border-l-[3px] border-l-[#4fc3f7] rounded-md py-3 px-4 mb-6 text-[0.85rem] text-[#90a4ae] leading-relaxed">
-        Загрузите JSON-файл в формате <code class="text-[#4fc3f7]">ResultWrap</code> (с полями <code class="text-[#4fc3f7]">title</code>, <code class="text-[#4fc3f7]">results[]</code>)
-        или простой массив <code class="text-[#4fc3f7]">Result[]</code>.<br>
+    <div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
+        Загрузите JSON-файл в формате <code class="text-admin-accent">ResultWrap</code> (с полями <code class="text-admin-accent">title</code>, <code class="text-admin-accent">results[]</code>)
+        или простой массив <code class="text-admin-accent">Result[]</code>.<br>
         Сервис автоматически создаст записи в справочниках (Competitions, Clubs, Swimmers, Styles, Relays, Galleries) и заполнит таблицу Results.
     </div>
 
     <!-- Drop zone -->
-    <div id="drop-zone" class="drop-zone border-2 border-dashed border-[#546e7a] rounded-xl p-12 text-center cursor-pointer transition-colors duration-200 mb-6">
+    <div id="drop-zone" class="drop-zone border-2 border-dashed border-admin-border rounded-xl p-12 text-center cursor-pointer transition-colors duration-200 mb-6">
         <div class="text-4xl mb-4">📄</div>
-        <div class="text-lg text-[#b0bec5] mb-2">Перетащите JSON-файл сюда</div>
-        <div class="text-[#546e7a] mb-4">или</div>
-        <label class="inline-flex items-center gap-2 bg-[#4fc3f7] text-[#0f3460] font-semibold py-2 px-5 rounded-md cursor-pointer hover:opacity-85 transition-opacity">
+        <div class="text-lg text-admin-text mb-2">Перетащите JSON-файл сюда</div>
+        <div class="text-admin-text-muted mb-4">или</div>
+        <label class="inline-flex items-center gap-2 bg-admin-accent text-[#0c2536] font-semibold py-2 px-5 rounded-md cursor-pointer hover:bg-[#81d4fa] transition-colors">
             📁 Выбрать файл
             <input type="file" id="file-input" accept=".json" class="hidden">
         </label>
-        <div id="file-name" class="mt-4 text-[#90a4ae] text-sm hidden"></div>
+        <div id="file-name" class="mt-4 text-admin-text-muted text-sm hidden"></div>
     </div>
 
     <!-- Categories -->
     <div id="cat-section" class="mb-6">
-        <div class="text-sm text-[#b0bec5] mb-2">
+        <div class="text-sm text-admin-text mb-2">
             Категории для этого импорта
-            <span class="text-[#546e7a] text-xs">(перекрывают <code class="text-[#4fc3f7]">categories</code> из JSON; применяются ко всем соревнованиям файла)</span>
+            <span class="text-admin-text-muted text-xs">(перекрывают <code class="text-admin-accent">categories</code> из JSON; применяются ко всем соревнованиям файла)</span>
         </div>
-        <div id="cat-list" class="flex flex-wrap gap-2 text-sm text-[#90a4ae]">загрузка...</div>
+        <div id="cat-list" class="flex flex-wrap gap-2 text-sm text-admin-text-muted">загрузка...</div>
     </div>
 
     <!-- Multi-day event -->
     <div id="event-section" class="mb-6">
-        <div class="text-sm text-[#b0bec5] mb-2">
+        <div class="text-sm text-admin-text mb-2">
             Многодневное соревнование
-            <span class="text-[#546e7a] text-xs">(привязать этот файл-день к событию; имя дня уйдёт в SubName, общее имя — у события)</span>
+            <span class="text-admin-text-muted text-xs">(привязать этот файл-день к событию; имя дня уйдёт в SubName, общее имя — у события)</span>
         </div>
         <div class="flex flex-wrap gap-3 items-center">
-            <select id="event-select"
-                class="bg-black/30 border border-[#546e7a] rounded text-[#e0e0e0] px-3 py-1.5 text-sm font-[inherit] min-w-[280px] focus:outline-none focus:border-[#66bb6a]">
+            <select id="event-select" class="admin-input min-w-[280px]">
                 <option value="">— Без события (обычное соревнование) —</option>
                 <option value="__new__">➕ Создать новое событие…</option>
             </select>
-            <input type="text" id="event-new-name" placeholder="Имя нового события" class="hidden bg-black/30 border border-[#66bb6a] rounded text-[#e0e0e0] px-3 py-1.5 text-sm font-[inherit] min-w-[280px] focus:outline-none focus:border-[#81c784]" />
+            <input type="text" id="event-new-name" placeholder="Имя нового события" class="admin-input min-w-[280px] hidden" />
         </div>
     </div>
 
     <!-- Actions -->
     <div class="flex gap-3 mb-6">
         <button id="btn-upload" disabled
-            class="bg-[#66bb6a] text-white font-semibold py-2.5 px-6 rounded-md border-none cursor-pointer text-sm transition-opacity hover:opacity-85 disabled:opacity-40 disabled:cursor-not-allowed">
+            class="bg-admin-success text-white font-semibold py-2.5 px-6 rounded-md border-none cursor-pointer text-sm transition-opacity hover:opacity-85 disabled:opacity-40 disabled:cursor-not-allowed">
             🚀 Загрузить и импортировать
         </button>
-        <button id="btn-clear" class="bg-[#546e7a] text-white py-2.5 px-5 rounded-md border-none cursor-pointer text-sm transition-opacity hover:opacity-85 hidden">
+        <button id="btn-clear" class="admin-btn admin-btn-ghost py-2.5 px-5 hidden">
             ✕ Очистить
         </button>
     </div>
 
     <!-- Progress -->
     <div id="progress" class="hidden mb-6">
-        <div class="flex items-center gap-3 text-[#90a4ae]">
-            <div class="w-5 h-5 border-2 border-[#4fc3f7] border-t-transparent rounded-full animate-spin"></div>
+        <div class="flex items-center gap-3 text-admin-text-muted">
+            <div class="w-5 h-5 border-2 border-admin-accent border-t-transparent rounded-full animate-spin"></div>
             <span>Импорт выполняется...</span>
         </div>
     </div>
 
     <!-- Result -->
     <div id="result" class="hidden">
-        <div id="result-card" class="bg-white/[.05] rounded-lg p-5 border-l-[3px]">
+        <div id="result-card" class="bg-admin-surface rounded-lg p-5 border-l-[3px]">
             <h3 id="result-title" class="text-lg mb-4"></h3>
             <div class="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 mb-4" id="result-stats"></div>
             <div id="result-errors" class="hidden mt-4">
-                <h4 class="text-[#ef5350] text-sm mb-2">Ошибки:</h4>
+                <h4 class="text-admin-danger text-sm mb-2">Ошибки:</h4>
                 <div id="error-list" class="bg-black/30 rounded-md p-3 max-h-[200px] overflow-y-auto text-xs text-[#ef9a9a] font-mono leading-relaxed"></div>
             </div>
             <div id="result-diag" class="hidden mt-4">
-                <h4 class="text-[#4fc3f7] text-sm mb-2">📋 Diagnostic Log:</h4>
+                <h4 class="text-admin-accent text-sm mb-2">📋 Diagnostic Log:</h4>
                 <div id="diag-list" class="bg-black/30 rounded-md p-3 max-h-[200px] overflow-y-auto text-xs text-[#80cbc4] font-mono leading-relaxed"></div>
             </div>
         </div>
@@ -88,29 +86,29 @@
 
     <!-- Preview -->
     <div id="preview" class="hidden mt-6">
-        <h3 class="text-[#4fc3f7] text-sm uppercase mb-2">Предпросмотр JSON</h3>
+        <h3 class="text-admin-accent text-sm uppercase mb-2">Предпросмотр JSON</h3>
         <div class="bg-black/30 rounded-lg p-4 max-h-[300px] overflow-auto">
-            <pre id="preview-content" class="text-xs text-[#b0bec5] whitespace-pre-wrap break-all leading-relaxed"></pre>
+            <pre id="preview-content" class="text-xs text-admin-text-muted whitespace-pre-wrap break-all leading-relaxed"></pre>
         </div>
     </div>
 </div>
 
 <!-- Clear Data Section -->
-<div class="max-w-[800px] mx-auto p-6 pt-0">
-    <hr class="border-[#37474f] mb-6">
-    <div class="bg-[rgba(239,83,80,0.06)] border-l-[3px] border-l-[#ef5350] rounded-md py-3 px-4 mb-4 text-[0.85rem] text-[#90a4ae] leading-relaxed">
-        ⚠️ <strong class="text-[#ef5350]">Опасная зона.</strong>
+<div class="max-w-[800px] mx-auto pt-0">
+    <hr class="border-admin-border mb-6">
+    <div class="admin-card bg-admin-danger/5 border-l-[3px] border-l-admin-danger py-3 px-4 mb-4 text-[0.85rem] text-admin-text-muted leading-relaxed">
+        ⚠️ <strong class="text-admin-danger">Опасная зона.</strong>
         Полная очистка удалит все импортированные данные: <span id="danger-tables">загрузка...</span>.<br>
         Справочник Styles и пользователи сохранятся.<br>
-        <span class="text-[#546e7a] text-xs">Список таблиц: <code class="text-[#4fc3f7]">JsonImportService.ClearableTables</code> · Метод: <code class="text-[#4fc3f7]">JsonImportService.ClearDataAsync()</code></span>
+        <span class="text-admin-text-muted text-xs">Список таблиц: <code class="text-admin-accent">JsonImportService.ClearableTables</code> · Метод: <code class="text-admin-accent">JsonImportService.ClearDataAsync()</code></span>
     </div>
     <button id="btn-clear-data"
         class="bg-[#c62828] text-white font-semibold py-2.5 px-6 rounded-md border-none cursor-pointer text-sm transition-opacity hover:opacity-85">
         🗑️ Очистить все данные
     </button>
     <div id="clear-result" class="hidden mt-4">
-        <div id="clear-result-card" class="bg-white/[.05] rounded-lg p-5 border-l-[3px] border-l-[#ef5350]">
-            <h3 class="text-[#ef5350] text-lg mb-3">Результат очистки</h3>
+        <div id="clear-result-card" class="bg-admin-surface rounded-lg p-5 border-l-[3px] border-l-admin-danger">
+            <h3 class="text-admin-danger text-lg mb-3">Результат очистки</h3>
             <div id="clear-stats" class="grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-3"></div>
         </div>
     </div>
@@ -118,16 +116,15 @@
 
 <!-- Confirm Modal -->
 <div id="confirm-modal" class="fixed inset-0 bg-black/60 z-[2000] hidden items-center justify-center" style="display:none;">
-    <div class="bg-[#1e293b] rounded-xl p-6 max-w-md w-full mx-4 border border-[#ef5350]/30 shadow-2xl">
-        <h3 class="text-[#ef5350] text-lg mb-3">⚠️ Подтверждение очистки</h3>
-        <p class="text-[#b0bec5] text-sm mb-5 leading-relaxed">
+    <div class="bg-admin-surface rounded-xl p-6 max-w-md w-full mx-4 border border-admin-danger/30 shadow-2xl">
+        <h3 class="text-admin-danger text-lg mb-3">⚠️ Подтверждение очистки</h3>
+        <p class="text-admin-text text-sm mb-5 leading-relaxed">
             Будут удалены <strong>все</strong> записи из таблиц:<br>
             <span id="confirm-tables">загрузка...</span>.<br><br>
-            Это действие <strong class="text-[#ef5350]">необратимо</strong>. Продолжить?
+            Это действие <strong class="text-admin-danger">необратимо</strong>. Продолжить?
         </p>
         <div class="flex gap-3 justify-end">
-            <button id="confirm-cancel"
-                class="bg-[#546e7a] text-white py-2 px-5 rounded-md border-none cursor-pointer text-sm hover:opacity-85">
+            <button id="confirm-cancel" class="admin-btn admin-btn-ghost py-2 px-5">
                 Отмена
             </button>
             <button id="confirm-ok"

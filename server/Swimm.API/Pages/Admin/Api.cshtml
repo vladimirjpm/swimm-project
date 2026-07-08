@@ -1,146 +1,41 @@
 @page
+@using Swimm.API.Pages.Admin.Shared
 @model Swimm.API.Pages.Admin.ApiModel
 @{
     ViewData["Title"] = "API Reference";
-    ViewData["HeaderTitle"] = "📡 API Reference";
-    ViewData["TitleColor"] = "#ffa726";
+    ViewData["PageSubtitle"] = "Каталог эндпоинтов + Results/Competitions браузер";
 }
 
-<div class="max-w-[1100px] mx-auto p-6">
+<div class="max-w-[1100px] mx-auto">
 
-    <div class="bg-[rgba(79,195,247,0.08)] border-l-[3px] border-l-[#4fc3f7] rounded-md py-3 px-4 mb-6 text-sm text-[#90a4ae] leading-relaxed">
+    <div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-sm text-admin-text-muted leading-relaxed">
         <strong>Swimm API Reference</strong> — список всех доступных эндпоинтов сервера.
         Нажмите <strong>Run</strong> для выполнения запроса прямо из браузера.
     </div>
 
     <!-- Tabs -->
     <div class="flex gap-2 mb-6">
-        <button class="tab-btn active py-2 px-5 border border-[#4fc3f7] rounded-md bg-transparent text-[#4fc3f7] cursor-pointer text-sm font-[inherit] transition-colors hover:bg-[rgba(79,195,247,0.12)] disabled:opacity-45 disabled:cursor-not-allowed" data-tab="public">🌍 Public API</button>
-        <button class="tab-btn py-2 px-5 border border-[#4fc3f7] rounded-md bg-transparent text-[#4fc3f7] cursor-pointer text-sm font-[inherit] transition-colors hover:bg-[rgba(79,195,247,0.12)] disabled:opacity-45 disabled:cursor-not-allowed" data-tab="admin" id="admin-tab-btn" disabled>🔒 Admin API</button>
-        <button class="tab-btn py-2 px-5 border border-[#ffa726] rounded-md bg-transparent text-[#ffa726] cursor-pointer text-sm font-[inherit] transition-colors hover:bg-[rgba(255,167,38,0.12)]" data-tab="results">📊 Results</button>
-        <button class="tab-btn py-2 px-5 border border-[#66bb6a] rounded-md bg-transparent text-[#66bb6a] cursor-pointer text-sm font-[inherit] transition-colors hover:bg-[rgba(102,187,106,0.12)]" data-tab="competitions" id="competitions-tab-btn" disabled>🏊 Competitions</button>
+        <button class="tab-btn active py-2 px-5 border border-admin-accent rounded-md bg-transparent text-admin-accent cursor-pointer text-sm font-[inherit] transition-colors hover:bg-admin-accent/10 disabled:opacity-45 disabled:cursor-not-allowed" data-tab="public">🌍 Public API</button>
+        <button class="tab-btn py-2 px-5 border border-admin-accent rounded-md bg-transparent text-admin-accent cursor-pointer text-sm font-[inherit] transition-colors hover:bg-admin-accent/10 disabled:opacity-45 disabled:cursor-not-allowed" data-tab="admin" id="admin-tab-btn" disabled>🔒 Admin API</button>
+        <button class="tab-btn py-2 px-5 border border-admin-warning rounded-md bg-transparent text-admin-warning cursor-pointer text-sm font-[inherit] transition-colors hover:bg-admin-warning/10" data-tab="results">📊 Results</button>
+        <button class="tab-btn py-2 px-5 border border-admin-success rounded-md bg-transparent text-admin-success cursor-pointer text-sm font-[inherit] transition-colors hover:bg-admin-success/10" data-tab="competitions" id="competitions-tab-btn" disabled>🏊 Competitions</button>
     </div>
 
     <!-- ======================== PUBLIC API ======================== -->
     <div class="tab-content active" id="tab-public">
-
-        <div class="mb-8">
-            <h2>🔐 Auth</h2>
-
-            <div class="api-card bg-white/[.05] rounded-lg px-5 py-4 mb-3">
-                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
-                    <span class="method-badge method-get">GET</span>
-                    <span class="path">/auth/login/google</span>
-                </div>
-                <div class="desc">Перенаправление на Google OAuth. После авторизации редирект на returnUrl.</div>
-                <table class="params-table">
-                    <thead><tr><th>Param</th><th>Type</th><th>In</th><th>Description</th></tr></thead>
-                    <tbody>
-                        <tr><td class="param-name">returnUrl</td><td class="param-type">string</td><td class="param-loc">query</td><td>URL для редиректа после входа (по умолчанию "/")</td></tr>
-                    </tbody>
-                </table>
-                <div class="param-inputs">
-                    <label>returnUrl <input type="text" data-param="returnUrl" value="/" /></label>
-                    <button class="py-1.5 px-4 bg-[#4fc3f7] text-[#0f3460] rounded font-semibold text-xs cursor-pointer hover:bg-[#81d4fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors" onclick="runApi(this, 'GET', '/auth/login/google', {}, 'query')">Run</button>
-                </div>
-                <div class="response-area hidden mt-3 bg-black/20 rounded p-3 overflow-auto max-h-96"><div class="response-status"></div><pre></pre></div>
+        @foreach (var group in ApiCatalog.PublicGroups)
+        {
+            <div class="mb-8">
+                @if (!string.IsNullOrEmpty(group.Title))
+                {
+                    <h2>@group.Title</h2>
+                }
+                @foreach (var endpoint in group.Endpoints)
+                {
+                    <partial name="/Pages/Admin/Shared/_ApiEndpointCard.cshtml" model="endpoint" />
+                }
             </div>
-
-            <div class="api-card bg-white/[.05] rounded-lg px-5 py-4 mb-3">
-                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
-                    <span class="method-badge method-get">GET</span>
-                    <span class="path">/auth/me</span>
-                </div>
-                <div class="desc">Текущий пользователь. Возвращает профиль или { isAuthenticated: false }.</div>
-                <div class="param-inputs">
-                    <button class="py-1.5 px-4 bg-[#4fc3f7] text-[#0f3460] rounded font-semibold text-xs cursor-pointer hover:bg-[#81d4fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors" onclick="runApi(this, 'GET', '/auth/me')">Run</button>
-                </div>
-                <div class="response-area hidden mt-3 bg-black/20 rounded p-3 overflow-auto max-h-96"><div class="response-status"></div><pre></pre></div>
-            </div>
-
-            <div class="api-card bg-white/[.05] rounded-lg px-5 py-4 mb-3">
-                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
-                    <span class="method-badge method-get">GET</span>
-                    <span class="path">/auth/logout</span>
-                    <span class="auth-badge">Auth</span>
-                </div>
-                <div class="desc">Выход из системы. Редирект на returnUrl.</div>
-                <table class="params-table">
-                    <thead><tr><th>Param</th><th>Type</th><th>In</th><th>Description</th></tr></thead>
-                    <tbody>
-                        <tr><td class="param-name">returnUrl</td><td class="param-type">string</td><td class="param-loc">query</td><td>URL для редиректа после выхода (по умолчанию "/")</td></tr>
-                    </tbody>
-                </table>
-                <div class="param-inputs">
-                    <label>returnUrl <input type="text" data-param="returnUrl" value="/" /></label>
-                    <button class="py-1.5 px-4 bg-[#4fc3f7] text-[#0f3460] rounded font-semibold text-xs cursor-pointer hover:bg-[#81d4fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors" onclick="runApi(this, 'GET', '/auth/logout', {}, 'query')">Run</button>
-                </div>
-                <div class="response-area hidden mt-3 bg-black/20 rounded p-3 overflow-auto max-h-96"><div class="response-status"></div><pre></pre></div>
-            </div>
-        </div>
-
-        <div class="mb-8">
-            <h2>📊 Results</h2>
-
-            <div class="api-card bg-white/[.05] rounded-lg px-5 py-4 mb-3">
-                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
-                    <span class="method-badge method-get">GET</span>
-                    <span class="path">/api/results</span>
-                </div>
-                <div class="desc">Получить результаты соревнований с фильтрацией и пагинацией.</div>
-                <table class="params-table">
-                    <thead><tr><th>Param</th><th>Type</th><th>In</th><th>Description</th></tr></thead>
-                    <tbody>
-                        <tr><td class="param-name">competition</td><td class="param-type">string</td><td class="param-loc">query</td><td>Фильтр по названию соревнования (StartsWith)</td></tr>
-                        <tr><td class="param-name">name</td><td class="param-type">string</td><td class="param-loc">query</td><td>Фильтр по имени/фамилии пловца (StartsWith)</td></tr>
-                        <tr><td class="param-name">club</td><td class="param-type">string</td><td class="param-loc">query</td><td>Фильтр по клубу (StartsWith)</td></tr>
-                        <tr><td class="param-name">styleName</td><td class="param-type">string</td><td class="param-loc">query</td><td>Фильтр по стилю (exact match)</td></tr>
-                        <tr><td class="param-name">distance</td><td class="param-type">string</td><td class="param-loc">query</td><td>Фильтр по дистанции (exact match)</td></tr>
-                        <tr><td class="param-name">gender</td><td class="param-type">string</td><td class="param-loc">query</td><td>Фильтр по полу (exact match)</td></tr>
-                        <tr><td class="param-name">poolType</td><td class="param-type">string</td><td class="param-loc">query</td><td>Фильтр по типу бассейна (exact match)</td></tr>
-                        <tr><td class="param-name">dateFrom</td><td class="param-type">DateTime</td><td class="param-loc">query</td><td>Дата начала диапазона</td></tr>
-                        <tr><td class="param-name">dateTo</td><td class="param-type">DateTime</td><td class="param-loc">query</td><td>Дата конца диапазона</td></tr>
-                        <tr><td class="param-name">page</td><td class="param-type">int</td><td class="param-loc">query</td><td>Номер страницы (по умолчанию 1)</td></tr>
-                        <tr><td class="param-name">pageSize</td><td class="param-type">int</td><td class="param-loc">query</td><td>Размер страницы (по умолчанию 100, макс. 500)</td></tr>
-                    </tbody>
-                </table>
-                <div class="param-inputs">
-                    <label>page <input type="number" data-param="page" value="1" style="width:60px" /></label>
-                    <label>pageSize <input type="number" data-param="pageSize" value="20" style="width:70px" /></label>
-                    <label>competition <input type="text" data-param="competition" /></label>
-                    <label>name <input type="text" data-param="name" /></label>
-                    <label>club <input type="text" data-param="club" /></label>
-                    <label>styleName <input type="text" data-param="styleName" /></label>
-                    <label>distance <input type="text" data-param="distance" /></label>
-                    <label>gender <input type="text" data-param="gender" /></label>
-                    <label>poolType <input type="text" data-param="poolType" /></label>
-                    <label>dateFrom <input type="date" data-param="dateFrom" /></label>
-                    <label>dateTo <input type="date" data-param="dateTo" /></label>
-                    <button class="py-1.5 px-4 bg-[#4fc3f7] text-[#0f3460] rounded font-semibold text-xs cursor-pointer hover:bg-[#81d4fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors" onclick="runApi(this, 'GET', '/api/results', {}, 'query')">Run</button>
-                </div>
-                <div class="response-area hidden mt-3 bg-black/20 rounded p-3 overflow-auto max-h-96"><div class="response-status"></div><pre></pre></div>
-            </div>
-
-            <div class="api-card bg-white/[.05] rounded-lg px-5 py-4 mb-3">
-                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
-                    <span class="method-badge method-get">GET</span>
-                    <span class="path">/api/results/{id}</span>
-                </div>
-                <div class="desc">Получить один результат по ID.</div>
-                <table class="params-table">
-                    <thead><tr><th>Param</th><th>Type</th><th>In</th><th>Description</th></tr></thead>
-                    <tbody>
-                        <tr><td class="param-name">id</td><td class="param-type">long</td><td class="param-loc">path</td><td>ID результата</td></tr>
-                    </tbody>
-                </table>
-                <div class="param-inputs">
-                    <label>id <input type="number" data-param="id" data-path="true" value="1" style="width:80px" /></label>
-                    <button class="py-1.5 px-4 bg-[#4fc3f7] text-[#0f3460] rounded font-semibold text-xs cursor-pointer hover:bg-[#81d4fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors" onclick="runApi(this, 'GET', '/api/results/{id}', {id:'path'})">Run</button>
-                </div>
-                <div class="response-area hidden mt-3 bg-black/20 rounded p-3 overflow-auto max-h-96"><div class="response-status"></div><pre></pre></div>
-            </div>
-        </div>
-
+        }
     </div>
 
     <!-- ======================== ADMIN API ======================== -->
@@ -150,301 +45,26 @@
             ⚠️ Эндпоинты ниже требуют роль <strong>Admin</strong>. Они не предназначены для общего доступа.
         </div>
 
-        <div class="mb-8">
-            <h2>🔧 Admin</h2>
-
-            <div class="api-card bg-white/[.05] rounded-lg px-5 py-4 mb-3">
-                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
-                    <span class="method-badge method-get">GET</span>
-                    <span class="path">/api/admin/users</span>
-                    <span class="auth-badge">Admin</span>
+        @foreach (var group in ApiCatalog.AdminGroups)
+        {
+            @if (!string.IsNullOrEmpty(group.Title))
+            {
+                <div class="mb-8">
+                    <h2>@group.Title</h2>
+                    @foreach (var endpoint in group.Endpoints)
+                    {
+                        <partial name="/Pages/Admin/Shared/_ApiEndpointCard.cshtml" model="endpoint" />
+                    }
                 </div>
-                <div class="desc">Список пользователей и их ролей.</div>
-                <div class="param-inputs">
-                    <button class="py-1.5 px-4 bg-[#4fc3f7] text-[#0f3460] rounded font-semibold text-xs cursor-pointer hover:bg-[#81d4fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors" onclick="runApi(this, 'GET', '/api/admin/users')">Run</button>
-                </div>
-                <div class="response-area hidden mt-3 bg-black/20 rounded p-3 overflow-auto max-h-96"><div class="response-status"></div><pre></pre></div>
-            </div>
-
-            <div class="api-card bg-white/[.05] rounded-lg px-5 py-4 mb-3">
-                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
-                    <span class="method-badge method-get">GET</span>
-                    <span class="path">/api/admin/roles</span>
-                    <span class="auth-badge">Admin</span>
-                </div>
-                <div class="desc">Список доступных ролей.</div>
-                <div class="param-inputs">
-                    <button class="py-1.5 px-4 bg-[#4fc3f7] text-[#0f3460] rounded font-semibold text-xs cursor-pointer hover:bg-[#81d4fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors" onclick="runApi(this, 'GET', '/api/admin/roles')">Run</button>
-                </div>
-                <div class="response-area hidden mt-3 bg-black/20 rounded p-3 overflow-auto max-h-96"><div class="response-status"></div><pre></pre></div>
-            </div>
-
-            <div class="api-card bg-white/[.05] rounded-lg px-5 py-4 mb-3">
-                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
-                    <span class="method-badge method-post">POST</span>
-                    <span class="path">/api/admin/users/{userId}/roles/{roleId}</span>
-                    <span class="auth-badge">Admin</span>
-                </div>
-                <div class="desc">Назначить роль пользователю.</div>
-                <table class="params-table">
-                    <thead><tr><th>Param</th><th>Type</th><th>In</th><th>Description</th></tr></thead>
-                    <tbody>
-                        <tr><td class="param-name">userId</td><td class="param-type">int</td><td class="param-loc">path</td><td>ID пользователя</td></tr>
-                        <tr><td class="param-name">roleId</td><td class="param-type">int</td><td class="param-loc">path</td><td>ID роли</td></tr>
-                    </tbody>
-                </table>
-                <div class="param-inputs">
-                    <label>userId <input type="number" data-param="userId" data-path="true" value="1" style="width:70px" /></label>
-                    <label>roleId <input type="number" data-param="roleId" data-path="true" value="1" style="width:70px" /></label>
-                    <button class="py-1.5 px-4 bg-[#4fc3f7] text-[#0f3460] rounded font-semibold text-xs cursor-pointer hover:bg-[#81d4fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors" onclick="runApi(this, 'POST', '/api/admin/users/{userId}/roles/{roleId}', {userId:'path',roleId:'path'})">Run</button>
-                </div>
-                <div class="response-area hidden mt-3 bg-black/20 rounded p-3 overflow-auto max-h-96"><div class="response-status"></div><pre></pre></div>
-            </div>
-
-            <div class="api-card bg-white/[.05] rounded-lg px-5 py-4 mb-3">
-                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
-                    <span class="method-badge method-delete">DELETE</span>
-                    <span class="path">/api/admin/users/{userId}/roles/{roleId}</span>
-                    <span class="auth-badge">Admin</span>
-                </div>
-                <div class="desc">Снять роль с пользователя.</div>
-                <table class="params-table">
-                    <thead><tr><th>Param</th><th>Type</th><th>In</th><th>Description</th></tr></thead>
-                    <tbody>
-                        <tr><td class="param-name">userId</td><td class="param-type">int</td><td class="param-loc">path</td><td>ID пользователя</td></tr>
-                        <tr><td class="param-name">roleId</td><td class="param-type">int</td><td class="param-loc">path</td><td>ID роли</td></tr>
-                    </tbody>
-                </table>
-                <div class="param-inputs">
-                    <label>userId <input type="number" data-param="userId" data-path="true" value="1" style="width:70px" /></label>
-                    <label>roleId <input type="number" data-param="roleId" data-path="true" value="1" style="width:70px" /></label>
-                    <button class="py-1.5 px-4 bg-[#4fc3f7] text-[#0f3460] rounded font-semibold text-xs cursor-pointer hover:bg-[#81d4fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors" onclick="runApi(this, 'DELETE', '/api/admin/users/{userId}/roles/{roleId}', {userId:'path',roleId:'path'})">Run</button>
-                </div>
-                <div class="response-area hidden mt-3 bg-black/20 rounded p-3 overflow-auto max-h-96"><div class="response-status"></div><pre></pre></div>
-            </div>
-
-            <div class="api-card bg-white/[.05] rounded-lg px-5 py-4 mb-3">
-                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
-                    <span class="method-badge method-patch">PATCH</span>
-                    <span class="path">/api/admin/users/{userId}/active</span>
-                    <span class="auth-badge">Admin</span>
-                </div>
-                <div class="desc">Активировать/деактивировать пользователя.</div>
-                <table class="params-table">
-                    <thead><tr><th>Param</th><th>Type</th><th>In</th><th>Description</th></tr></thead>
-                    <tbody>
-                        <tr><td class="param-name">userId</td><td class="param-type">int</td><td class="param-loc">path</td><td>ID пользователя</td></tr>
-                        <tr><td class="param-name">isActive</td><td class="param-type">bool</td><td class="param-loc">body</td><td>true — активировать, false — деактивировать</td></tr>
-                    </tbody>
-                </table>
-                <div class="param-inputs">
-                    <label>userId <input type="number" data-param="userId" data-path="true" value="1" style="width:70px" /></label>
-                    <label>isActive
-                        <select data-param="isActive" data-body="true">
-                            <option value="true">true</option>
-                            <option value="false">false</option>
-                        </select>
-                    </label>
-                    <button class="py-1.5 px-4 bg-[#4fc3f7] text-[#0f3460] rounded font-semibold text-xs cursor-pointer hover:bg-[#81d4fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors" onclick="runApi(this, 'PATCH', '/api/admin/users/{userId}/active', {userId:'path',isActive:'body'})">Run</button>
-                </div>
-                <div class="response-area hidden mt-3 bg-black/20 rounded p-3 overflow-auto max-h-96"><div class="response-status"></div><pre></pre></div>
-            </div>
-
-            <div class="api-card bg-white/[.05] rounded-lg px-5 py-4 mb-3">
-                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
-                    <span class="method-badge method-get">GET</span>
-                    <span class="path">/api/admin/stats</span>
-                    <span class="auth-badge">Admin</span>
-                </div>
-                <div class="desc">Статистика для дашборда: кол-во пользователей, результатов, соревнований, пловцов, клубов.</div>
-                <div class="param-inputs">
-                    <button class="py-1.5 px-4 bg-[#4fc3f7] text-[#0f3460] rounded font-semibold text-xs cursor-pointer hover:bg-[#81d4fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors" onclick="runApi(this, 'GET', '/api/admin/stats')">Run</button>
-                </div>
-                <div class="response-area hidden mt-3 bg-black/20 rounded p-3 overflow-auto max-h-96"><div class="response-status"></div><pre></pre></div>
-            </div>
-
-            <div class="api-card bg-white/[.05] rounded-lg px-5 py-4 mb-3">
-                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
-                    <span class="method-badge method-get">GET</span>
-                    <span class="path">/api/admin/db-schema</span>
-                    <span class="auth-badge">Admin</span>
-                </div>
-                <div class="desc">Структура схемы БД: таблицы, колонки, FK, индексы, CHECK, процедуры, вьюхи.</div>
-                <table class="params-table">
-                    <thead><tr><th>Param</th><th>Type</th><th>In</th><th>Description</th></tr></thead>
-                    <tbody>
-                        <tr><td class="param-name">refresh</td><td class="param-type">bool</td><td class="param-loc">query</td><td>Пересчитать кэш схемы (по умолчанию false)</td></tr>
-                    </tbody>
-                </table>
-                <div class="param-inputs">
-                    <label>refresh
-                        <select data-param="refresh">
-                            <option value="false">false</option>
-                            <option value="true">true</option>
-                        </select>
-                    </label>
-                    <button class="py-1.5 px-4 bg-[#4fc3f7] text-[#0f3460] rounded font-semibold text-xs cursor-pointer hover:bg-[#81d4fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors" onclick="runApi(this, 'GET', '/api/admin/db-schema', {}, 'query')">Run</button>
-                </div>
-                <div class="response-area hidden mt-3 bg-black/20 rounded p-3 overflow-auto max-h-96"><div class="response-status"></div><pre></pre></div>
-            </div>
-
-            <div class="api-card bg-white/[.05] rounded-lg px-5 py-4 mb-3">
-                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
-                    <span class="method-badge method-get">GET</span>
-                    <span class="path">/api/admin/clearable-tables</span>
-                    <span class="auth-badge">Admin</span>
-                </div>
-                <div class="desc">Список таблиц, очищаемых при вызове import/clear. Источник: <code>JsonImportService.ClearableTables</code>.</div>
-                <div class="param-inputs">
-                    <button class="py-1.5 px-4 bg-[#4fc3f7] text-[#0f3460] rounded font-semibold text-xs cursor-pointer hover:bg-[#81d4fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors" onclick="runApi(this, 'GET', '/api/admin/clearable-tables')">Run</button>
-                </div>
-                <div class="response-area hidden mt-3 bg-black/20 rounded p-3 overflow-auto max-h-96"><div class="response-status"></div><pre></pre></div>
-            </div>
-
-            <div class="api-card bg-white/[.05] rounded-lg px-5 py-4 mb-3">
-                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
-                    <span class="method-badge method-get">GET</span>
-                    <span class="path">/api/admin/settings</span>
-                    <span class="auth-badge">Admin</span>
-                </div>
-                <div class="desc">Все настройки сервера.</div>
-                <div class="param-inputs">
-                    <button class="py-1.5 px-4 bg-[#4fc3f7] text-[#0f3460] rounded font-semibold text-xs cursor-pointer hover:bg-[#81d4fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors" onclick="runApi(this, 'GET', '/api/admin/settings')">Run</button>
-                </div>
-                <div class="response-area hidden mt-3 bg-black/20 rounded p-3 overflow-auto max-h-96"><div class="response-status"></div><pre></pre></div>
-            </div>
-
-            <div class="api-card bg-white/[.05] rounded-lg px-5 py-4 mb-3">
-                <div class="flex items-center gap-2.5 mb-2 flex-wrap">
-                    <span class="method-badge method-put">PUT</span>
-                    <span class="path">/api/admin/settings/{key}</span>
-                    <span class="auth-badge">Admin</span>
-                </div>
-                <div class="desc">Обновить значение настройки.</div>
-                <table class="params-table">
-                    <thead><tr><th>Param</th><th>Type</th><th>In</th><th>Description</th></tr></thead>
-                    <tbody>
-                        <tr><td class="param-name">key</td><td class="param-type">string</td><td class="param-loc">path</td><td>Ключ настройки</td></tr>
-                        <tr><td class="param-name">value</td><td class="param-type">string</td><td class="param-loc">body</td><td>Новое значение</td></tr>
-                    </tbody>
-                </table>
-                <div class="param-inputs">
-                    <label>key <input type="text" data-param="key" data-path="true" /></label>
-                    <label>value <input type="text" data-param="value" data-body="true" /></label>
-                    <button class="py-1.5 px-4 bg-[#4fc3f7] text-[#0f3460] rounded font-semibold text-xs cursor-pointer hover:bg-[#81d4fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors" onclick="runApi(this, 'PUT', '/api/admin/settings/{key}', {key:'path',value:'body'})">Run</button>
-                </div>
-                <div class="response-area hidden mt-3 bg-black/20 rounded p-3 overflow-auto max-h-96"><div class="response-status"></div><pre></pre></div>
-            </div>
-        </div>
-
-        <!-- POST /api/admin/import -->
-        <div class="bg-white/[.05] rounded-lg mb-5 p-5 border-l-[3px] border-l-[#66bb6a]">
-            <div class="flex items-center gap-3 mb-2">
-                <span class="inline-block py-0.5 px-2.5 rounded font-bold text-xs uppercase bg-[#388e3c] text-white">POST</span>
-                <span class="path">/api/admin/import</span>
-            </div>
-            <p class="text-[#b0bec5] text-sm mb-3">Импорт результатов из JSON-файла (multipart/form-data). Заполняет справочники и таблицу Results.</p>
-            <div class="text-xs text-[#90a4ae] mb-2">
-                <strong>Body:</strong> <code>multipart/form-data</code> с полем <code>file</code> (.json)<br>
-                <strong>Response:</strong> <code>{ totalRows, created, skipped, errors, errorMessages[], message }</code>
-            </div>
-            <div class="text-[#546e7a] text-xs italic">Используйте страницу <a href="/Admin/Import" class="text-[#4fc3f7]">📥 Import</a> для загрузки файлов.</div>
-        </div>
-
-        <!-- DELETE /api/admin/import/clear -->
-        <div class="api-card bg-white/[.05] rounded-lg mb-5 p-5 border-l-[3px] border-l-[#ef5350]">
-            <div class="flex items-center gap-3 mb-2">
-                <span class="inline-block py-0.5 px-2.5 rounded font-bold text-xs uppercase bg-[#c62828] text-white">DELETE</span>
-                <span class="path">/api/admin/import/clear</span>
-            </div>
-            <p class="text-[#b0bec5] text-sm mb-3">Полная очистка импортированных данных. Удаляет Results, Competitions, Clubs, Swimmers, Countries, Relays, Galleries, GalleryItems. Styles и пользователи сохраняются.</p>
-            <div class="text-xs text-[#90a4ae] mb-2">
-                <strong>Response:</strong> <code>{ message, deleted: { total, results, competitions, clubs, swimmers, countries, relays, galleries, galleryItems } }</code>
-            </div>
-            <div class="param-inputs">
-                <button class="py-1.5 px-4 bg-[#4fc3f7] text-[#0f3460] rounded font-semibold text-xs cursor-pointer hover:bg-[#81d4fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors" onclick="runApi(this, 'DELETE', '/api/admin/import/clear')">Run</button>
-            </div>
-            <div class="response-area hidden mt-3 bg-black/20 rounded p-3 overflow-auto max-h-96"><div class="response-status"></div><pre></pre></div>
-        </div>
-
-        <!-- POST /api/admin/swimmers/enrich -->
-        <div class="api-card bg-white/[.05] rounded-lg mb-5 p-5 border-l-[3px] border-l-[#ffa726]">
-            <div class="flex items-center gap-3 mb-2">
-                <span class="inline-block py-0.5 px-2.5 rounded font-bold text-xs uppercase bg-[#388e3c] text-white">POST</span>
-                <span class="path">/api/admin/swimmers/enrich</span>
-                <span class="auth-badge">Admin</span>
-            </div>
-            <p class="text-[#b0bec5] text-sm mb-3">Дополнение данных спортсменов (Gender, ClubId, CountryId) из таблицы Results. Заполняет пустые поля на основе самого свежего результата каждого спортсмена. Используется для обратного заполнения ранее импортированных данных.</p>
-            <div class="text-xs text-[#90a4ae] mb-2">
-                <strong>Response:</strong> <code>{ message, updated }</code>
-            </div>
-            <div class="param-inputs">
-                <button class="py-1.5 px-4 bg-[#4fc3f7] text-[#0f3460] rounded font-semibold text-xs cursor-pointer hover:bg-[#81d4fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors" onclick="runApi(this, 'POST', '/api/admin/swimmers/enrich')">Run</button>
-            </div>
-            <div class="response-area hidden mt-3 bg-black/20 rounded p-3 overflow-auto max-h-96"><div class="response-status"></div><pre></pre></div>
-        </div>
-
-        <!-- GET /api/admin/competition-events -->
-        <div class="api-card bg-white/[.05] rounded-lg px-5 py-4 mb-3">
-            <div class="flex items-center gap-2.5 mb-2 flex-wrap">
-                <span class="method-badge method-get">GET</span>
-                <span class="path">/api/admin/competition-events</span>
-                <span class="auth-badge">Admin</span>
-            </div>
-            <div class="desc">Список многодневных событий (для привязки дней при импорте).</div>
-            <div class="text-xs text-[#90a4ae] mb-2">
-                <strong>Response:</strong> <code>[{ id, name, startDate, endDate, dayCount, resultCount }]</code>
-            </div>
-            <div class="param-inputs">
-                <button class="py-1.5 px-4 bg-[#4fc3f7] text-[#0f3460] rounded font-semibold text-xs cursor-pointer hover:bg-[#81d4fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors" onclick="runApi(this, 'GET', '/api/admin/competition-events')">Run</button>
-            </div>
-            <div class="response-area hidden mt-3 bg-black/20 rounded p-3 overflow-auto max-h-96"><div class="response-status"></div><pre></pre></div>
-        </div>
-
-        <!-- GET /api/admin/import-history -->
-        <div class="api-card bg-white/[.05] rounded-lg px-5 py-4 mb-3">
-            <div class="flex items-center gap-2.5 mb-2 flex-wrap">
-                <span class="method-badge method-get">GET</span>
-                <span class="path">/api/admin/import-history</span>
-                <span class="auth-badge">Admin</span>
-            </div>
-            <div class="desc">История импортов с названиями соревнований. Возвращает массив записей, отсортированных по дате (новые первыми).</div>
-            <div class="text-xs text-[#90a4ae] mb-2">
-                <strong>Response:</strong> <code>[{ id, competitionId, competitionName, competitionDate, importFileName, importDate, approved }]</code>
-            </div>
-            <div class="param-inputs">
-                <button class="py-1.5 px-4 bg-[#4fc3f7] text-[#0f3460] rounded font-semibold text-xs cursor-pointer hover:bg-[#81d4fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors" onclick="runApi(this, 'GET', '/api/admin/import-history')">Run</button>
-            </div>
-            <div class="response-area hidden mt-3 bg-black/20 rounded p-3 overflow-auto max-h-96"><div class="response-status"></div><pre></pre></div>
-        </div>
-
-        <!-- PATCH /api/admin/import-history/{id}/approve -->
-        <div class="api-card bg-white/[.05] rounded-lg px-5 py-4 mb-3">
-            <div class="flex items-center gap-2.5 mb-2 flex-wrap">
-                <span class="method-badge method-patch">PATCH</span>
-                <span class="path">/api/admin/import-history/{id}/approve</span>
-                <span class="auth-badge">Admin</span>
-            </div>
-            <div class="desc">Обновить статус подтверждения импорта.</div>
-            <table class="params-table">
-                <thead><tr><th>Param</th><th>Type</th><th>In</th><th>Description</th></tr></thead>
-                <tbody>
-                    <tr><td class="param-name">id</td><td class="param-type">int</td><td class="param-loc">path</td><td>ID записи истории импорта</td></tr>
-                    <tr><td class="param-name">approved</td><td class="param-type">bool</td><td class="param-loc">body</td><td>true — подтвердить, false — отменить подтверждение</td></tr>
-                </tbody>
-            </table>
-            <div class="param-inputs">
-                <label>id <input type="number" data-param="id" data-path="true" value="1" style="width:70px" /></label>
-                <label>approved
-                    <select data-param="approved" data-body="true">
-                        <option value="true">true</option>
-                        <option value="false">false</option>
-                    </select>
-                </label>
-                <button class="py-1.5 px-4 bg-[#4fc3f7] text-[#0f3460] rounded font-semibold text-xs cursor-pointer hover:bg-[#81d4fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors" onclick="runApi(this, 'PATCH', '/api/admin/import-history/{id}/approve', {id:'path',approved:'body'})">Run</button>
-            </div>
-            <div class="response-area hidden mt-3 bg-black/20 rounded p-3 overflow-auto max-h-96"><div class="response-status"></div><pre></pre></div>
-        </div>
+            }
+            else
+            {
+                @foreach (var endpoint in group.Endpoints)
+                {
+                    <partial name="/Pages/Admin/Shared/_ApiEndpointCard.cshtml" model="endpoint" />
+                }
+            }
+        }
 
     </div>
 

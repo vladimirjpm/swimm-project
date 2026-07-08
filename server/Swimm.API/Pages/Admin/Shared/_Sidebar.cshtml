@@ -1,0 +1,67 @@
+@using Swimm.API.Pages.Admin.Shared
+@{
+    var currentPath = (Context.Request.Path.Value ?? "").TrimEnd('/');
+
+    // Префиксное совпадение — только по границе сегмента пути, иначе /Admin/Import подсветился бы
+    // и на /Admin/ImportHistory (StartsWith без границы).
+    bool IsActive(AdminNavItem item) => item.ExactMatch
+        ? string.Equals(currentPath, item.Url, StringComparison.OrdinalIgnoreCase)
+        : string.Equals(currentPath, item.Url, StringComparison.OrdinalIgnoreCase)
+          || currentPath.StartsWith(item.Url + "/", StringComparison.OrdinalIgnoreCase);
+
+    const string itemBase = "flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] font-medium transition-colors";
+    const string itemActive = "bg-admin-accent/10 text-admin-accent";
+    const string itemIdle = "text-admin-text-muted hover:bg-admin-surface-hover hover:text-admin-text";
+}
+@*
+    Левый сайдбар. На lg+ виден всегда; на мобильных — off-canvas,
+    открывается гамбургером в топбаре (toggleSidebar() в _Layout).
+*@
+<aside id="admin-sidebar"
+       class="fixed inset-y-0 left-0 z-40 flex w-60 -translate-x-full flex-col border-r border-admin-border bg-admin-surface transition-transform duration-200 lg:translate-x-0">
+
+    <div class="flex items-center justify-between border-b border-admin-border px-4 py-4">
+        <a href="/Admin" class="flex items-center gap-2.5 text-admin-text no-underline">
+            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-admin-accent/15 text-lg text-admin-accent">
+                <partial name="/Pages/Admin/Shared/_Icon.cshtml" model='"waves"' />
+            </span>
+            <span class="text-sm font-semibold tracking-wide">Swimm Admin</span>
+        </a>
+        <button type="button" class="cursor-pointer text-admin-text-muted hover:text-admin-text lg:hidden"
+                onclick="toggleSidebar(false)" aria-label="Закрыть меню">
+            <partial name="/Pages/Admin/Shared/_Icon.cshtml" model='"x"' />
+        </button>
+    </div>
+
+    <nav class="flex-1 overflow-y-auto px-3 py-4">
+        @foreach (var group in AdminNav.Items.GroupBy(i => i.Section))
+        {
+            var sectionTitle = AdminNav.SectionTitles.GetValueOrDefault(group.Key, group.Key);
+            if (!string.IsNullOrEmpty(sectionTitle))
+            {
+                <div class="mt-5 mb-1.5 px-3 text-[10px] font-semibold tracking-widest text-admin-text-muted/70 uppercase">@sectionTitle</div>
+            }
+            foreach (var item in group)
+            {
+                <a href="@item.Url" class="@itemBase @(IsActive(item) ? itemActive : itemIdle) mb-0.5">
+                    <partial name="/Pages/Admin/Shared/_Icon.cshtml" model="@item.Icon" />
+                    <span>@item.Title</span>
+                </a>
+            }
+        }
+    </nav>
+
+    <div class="border-t border-admin-border px-3 py-3">
+        <a href="/" class="@itemBase @itemIdle mb-0.5">
+            <partial name="/Pages/Admin/Shared/_Icon.cshtml" model='"home"' />
+            <span>На сайт</span>
+        </a>
+        <a href="/auth/logout" class="@itemBase @itemIdle">
+            <partial name="/Pages/Admin/Shared/_Icon.cshtml" model='"log-out"' />
+            <span>Logout</span>
+        </a>
+    </div>
+</aside>
+
+@* Затемнение под открытым мобильным сайдбаром *@
+<div id="sidebar-backdrop" class="fixed inset-0 z-30 hidden bg-black/60 lg:hidden" onclick="toggleSidebar(false)"></div>

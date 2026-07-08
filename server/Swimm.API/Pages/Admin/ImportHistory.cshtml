@@ -2,52 +2,49 @@
 @model Swimm.API.Pages.Admin.ImportHistoryModel
 @{
     ViewData["Title"] = "Import History";
-    ViewData["HeaderTitle"] = "📋 Import History";
-    ViewData["TitleColor"] = "#66bb6a";
+    ViewData["PageSubtitle"] = "История импортов и подтверждение результатов";
 }
 
-<div class="max-w-[1100px] mx-auto p-6">
-    <div class="bg-[rgba(79,195,247,0.08)] border-l-[3px] border-l-[#4fc3f7] rounded-md py-3 px-4 mb-6 text-[0.85rem] text-[#90a4ae] leading-relaxed">
-        История всех импортов данных. Каждый импорт создаётся со статусом <strong class="text-[#ef9a9a]">Не подтверждён</strong>.
-        После ручной проверки данных нажмите кнопку для подтверждения.
-    </div>
-
-    <!-- Stats -->
-    <div class="flex gap-4 mb-6" id="stats">
-        <div class="bg-white/[.07] rounded-[10px] py-3 px-5 text-center">
-            <div class="text-2xl font-bold text-[#4fc3f7]" id="stat-total">—</div>
-            <div class="text-xs text-[#90a4ae] mt-1">Всего</div>
-        </div>
-        <div class="bg-white/[.07] rounded-[10px] py-3 px-5 text-center">
-            <div class="text-2xl font-bold text-[#66bb6a]" id="stat-approved">—</div>
-            <div class="text-xs text-[#90a4ae] mt-1">Подтверждено</div>
-        </div>
-        <div class="bg-white/[.07] rounded-[10px] py-3 px-5 text-center">
-            <div class="text-2xl font-bold text-[#ef9a9a]" id="stat-pending">—</div>
-            <div class="text-xs text-[#90a4ae] mt-1">Ожидает</div>
-        </div>
-    </div>
-
-    <!-- Table -->
-    <div class="overflow-x-auto">
-        <table class="w-full border-collapse">
-            <thead>
-                <tr>
-                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">ID</th>
-                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Соревнование</th>
-                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Дата соревн.</th>
-                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Файл</th>
-                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Дата импорта</th>
-                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Статус</th>
-                    <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Действие</th>
-                </tr>
-            </thead>
-            <tbody id="history-body"></tbody>
-        </table>
-    </div>
-
-    <div id="empty-msg" class="hidden text-center text-[#546e7a] italic py-10">Нет записей об импорте.</div>
+<div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
+    История всех импортов данных. Каждый импорт создаётся со статусом <strong class="text-admin-danger">Не подтверждён</strong>.
+    После ручной проверки данных нажмите кнопку для подтверждения.
 </div>
+
+<!-- Stats -->
+<div class="flex gap-4 mb-6" id="stats">
+    <div class="admin-card py-3 px-5 text-center">
+        <div class="text-2xl font-bold text-admin-accent" id="stat-total">—</div>
+        <div class="text-xs text-admin-text-muted mt-1">Всего</div>
+    </div>
+    <div class="admin-card py-3 px-5 text-center">
+        <div class="text-2xl font-bold text-admin-success" id="stat-approved">—</div>
+        <div class="text-xs text-admin-text-muted mt-1">Подтверждено</div>
+    </div>
+    <div class="admin-card py-3 px-5 text-center">
+        <div class="text-2xl font-bold text-admin-danger" id="stat-pending">—</div>
+        <div class="text-xs text-admin-text-muted mt-1">Ожидает</div>
+    </div>
+</div>
+
+<!-- Table -->
+<div class="overflow-x-auto">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Соревнование</th>
+                <th>Дата соревн.</th>
+                <th>Файл</th>
+                <th>Дата импорта</th>
+                <th>Статус</th>
+                <th>Действие</th>
+            </tr>
+        </thead>
+        <tbody id="history-body"></tbody>
+    </table>
+</div>
+
+<div id="empty-msg" class="hidden text-center text-admin-text-muted italic py-10">Нет записей об импорте.</div>
 
 @section Scripts {
 <script>

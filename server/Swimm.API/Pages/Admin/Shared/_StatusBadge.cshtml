@@ -1,0 +1,17 @@
+@using Swimm.API.Pages.Admin.Shared
+@model StatusBadgeModel
+@*
+    Статус-бейдж: <partial name="/Pages/Admin/Shared/_StatusBadge.cshtml" model='new StatusBadgeModel("Approved", "success")' />
+    Variant: success | danger | warning | info | neutral.
+*@
+@{
+    var variantClasses = Model.Variant switch
+    {
+        "success" => "border-admin-success/30 bg-admin-success/15 text-[#81c784]",
+        "danger" => "border-admin-danger/30 bg-admin-danger/15 text-admin-danger",
+        "warning" => "border-admin-warning/30 bg-admin-warning/15 text-admin-warning",
+        "info" => "border-admin-accent/30 bg-admin-accent/15 text-admin-accent",
+        _ => "border-admin-border bg-admin-surface-hover text-admin-text-muted",
+    };
+}
+<span class="admin-badge @variantClasses">@Model.Text</span>

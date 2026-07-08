@@ -1,0 +1,200 @@
+@page
+@model Swimm.API.Pages.Admin.Competitions.EditModel
+@{
+    ViewData["Title"] = Model.IsNew ? "Новое соревнование" : "Редактирование соревнования";
+    ViewData["PageSubtitle"] = Model.IsNew ? null : $"#{Model.Id} · {Model.Existing?.Name}";
+    var flash = TempData["Flash"] as string;
+}
+
+<div class="max-w-[820px] mx-auto">
+
+    <div class="mb-4 flex items-center gap-3">
+        <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">← К списку</a>
+        @if (!Model.IsNew && Model.Existing != null)
+        {
+            <span class="text-xs text-admin-text-muted">
+                Результатов у соревнования: <strong class="text-admin-text">@Model.Existing.ResultCount</strong>
+                @if (Model.Existing.EventId != null)
+                {
+                    <text> · часть события «@Model.Existing.EventName» (день @(Model.Existing.DayNumber?.ToString() ?? "?"))</text>
+                }
+            </span>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5 py-3 px-4 mb-4 text-sm text-admin-danger">
+            @Model.Error
+        </div>
+    }
+
+    <!-- ── Основные поля ─────────────────────────────────────────────────────── -->
+    <form method="post" asp-page-handler="Save" class="admin-card mb-5">
+        <input type="hidden" asp-for="Id" />
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label class="flex flex-col gap-1 sm:col-span-2">
+                <span class="text-xs text-admin-text-muted">Название <span class="text-admin-danger">*</span></span>
+                <input asp-for="Input.Name" class="admin-input" autocomplete="off" required />
+            </label>
+
+            <label class="flex flex-col gap-1 sm:col-span-2">
+                <span class="text-xs text-admin-text-muted">Подзаголовок дня (SubName)</span>
+                <input asp-for="Input.SubName" class="admin-input" autocomplete="off"
+                       placeholder="Для дней многодневного события" />
+            </label>
+
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Дата (dd/MM/yyyy)</span>
+                <input asp-for="Input.Date" class="admin-input" autocomplete="off" placeholder="24/05/2025" />
+            </label>
+
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Тип бассейна</span>
+                <input asp-for="Input.PoolType" class="admin-input" autocomplete="off" placeholder="25m / 50m" />
+            </label>
+
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Страна</span>
+                <input asp-for="Input.Country" class="admin-input" autocomplete="off" placeholder="ISR" />
+            </label>
+
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">OrgCompId (ID у организатора)</span>
+                <input asp-for="Input.OrgCompId" type="number" class="admin-input" autocomplete="off"
+                       placeholder="напр. loglig competitionId" />
+            </label>
+        </div>
+
+        <div class="mt-4">
+            <span class="text-xs text-admin-text-muted">Категории</span>
+            <div class="flex flex-wrap gap-x-6 gap-y-2 mt-1.5">
+                @foreach (var cat in Model.AllCategories)
+                {
+                    <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+                        <input type="checkbox" name="Input.CategoryKeys" value="@cat.Key"
+                               class="w-4 h-4 cursor-pointer"
+                               checked="@(Model.Input.CategoryKeys?.Contains(cat.Key) == true)" />
+                        <span class="text-admin-text">@cat.Name</span>
+                    </label>
+                }
+            </div>
+            <div class="text-[11px] text-admin-text-muted mt-1.5">
+                Флаг <strong class="text-admin-text">Masters</strong> у соревнования выставляется по членству в одноимённой категории.
+            </div>
+        </div>
+
+        <div class="flex flex-wrap gap-x-6 gap-y-2 mt-4">
+            <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+                <input asp-for="Input.IsAward" class="w-4 h-4 cursor-pointer" />
+                <span class="text-admin-text">Awards</span>
+            </label>
+            <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+                <input asp-for="Input.ShowCombineAllResults" class="w-4 h-4 cursor-pointer" />
+                <span class="text-admin-text">Combine all results</span>
+            </label>
+        </div>
+
+        <div class="mt-5 flex gap-3">
+            <button type="submit" class="admin-btn admin-btn-primary">
+                @(Model.IsNew ? "Создать" : "Сохранить")
+            </button>
+            <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">Отмена</a>
+        </div>
+    </form>
+
+    @if (!Model.IsNew && Model.Existing != null)
+    {
+        <!-- ── URL-ы результатов (по OrgCompId) ──────────────────────────────── -->
+        <div class="admin-card mb-5">
+            <h2 class="text-sm font-semibold text-white mb-1">URL результатов (PDF у организатора)</h2>
+            <p class="text-xs text-admin-text-muted mb-4">
+                Связь по <code class="text-admin-accent">OrgCompId</code>, а не по Id соревнования.
+                @if (Model.Existing.OrgCompId == null)
+                {
+                    <span class="text-admin-warning">Задайте OrgCompId и сохраните, чтобы добавлять URL-ы.</span>
+                }
+                else
+                {
+                    <text>Текущий OrgCompId: <strong class="text-admin-text">@Model.Existing.OrgCompId</strong>.</text>
+                }
+            </p>
+
+            @if (Model.Existing.ResultUrls.Count > 0)
+            {
+                <table class="admin-table mb-4">
+                    <thead>
+                        <tr><th>Culture</th><th>URL</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var u in Model.Existing.ResultUrls)
+                        {
+                            <tr>
+                                <td class="whitespace-nowrap font-medium">@u.Culture</td>
+                                <td class="max-w-[420px] truncate">
+                                    <a href="@u.Url" target="_blank" rel="noopener"
+                                       class="text-admin-accent hover:underline" title="@u.Url">@u.Url</a>
+                                </td>
+                                <td class="text-right">
+                                    <form method="post" asp-page-handler="DeleteUrl" class="inline">
+                                        <input type="hidden" asp-for="Id" />
+                                        <input type="hidden" name="urlId" value="@u.Id" />
+                                        <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else if (Model.Existing.OrgCompId != null)
+            {
+                <p class="text-xs text-admin-text-muted italic mb-4">URL-ов пока нет.</p>
+            }
+
+            @if (Model.Existing.OrgCompId != null)
+            {
+                <form method="post" asp-page-handler="AddUrl" class="flex flex-wrap items-end gap-3">
+                    <input type="hidden" asp-for="Id" />
+                    <label class="flex flex-col gap-1">
+                        <span class="text-xs text-admin-text-muted">Culture</span>
+                        <input asp-for="NewUrlCulture" class="admin-input w-32" autocomplete="off" placeholder="he-IL" />
+                    </label>
+                    <label class="flex flex-col gap-1 flex-1 min-w-[240px]">
+                        <span class="text-xs text-admin-text-muted">URL</span>
+                        <input asp-for="NewUrl" type="url" class="admin-input" autocomplete="off" placeholder="https://…" />
+                    </label>
+                    <button type="submit" class="admin-btn admin-btn-primary">Добавить URL</button>
+                </form>
+            }
+        </div>
+
+        <!-- ── Опасная зона: каскадное удаление ──────────────────────────────── -->
+        <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5">
+            <h2 class="text-sm font-semibold text-admin-danger mb-1">Опасная зона — каскадное удаление</h2>
+            <p class="text-xs text-admin-text-muted leading-relaxed mb-4">
+                Удалит соревнование вместе с <strong class="text-admin-text">@Model.Existing.ResultCount</strong> результатами,
+                связанными эстафетами, галереями и записями истории импорта. URL-ы результатов (по OrgCompId) тоже удалятся,
+                если этот OrgCompId больше нигде не используется. <strong class="text-admin-danger">Действие необратимо.</strong>
+            </p>
+            <form method="post" asp-page-handler="Delete" class="flex flex-wrap items-end gap-3">
+                <input type="hidden" asp-for="Id" />
+                <label class="flex flex-col gap-1 flex-1 min-w-[260px]">
+                    <span class="text-xs text-admin-text-muted">
+                        Для подтверждения введите точное название: <strong class="text-admin-text">@Model.Existing.Name</strong>
+                    </span>
+                    <input asp-for="ConfirmName" class="admin-input" autocomplete="off" placeholder="Название соревнования" />
+                </label>
+                <button type="submit" class="admin-btn admin-btn-danger">Удалить безвозвратно</button>
+            </form>
+        </div>
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}

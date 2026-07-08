@@ -1,0 +1,12 @@
+@model Swimm.Application.Dtos.ICompetitionFlags
+@* Ячейка флагов соревнования (Awards / Combine). Masters вынесен в категории — тут не показываем. *@
+<span class="flex flex-wrap gap-1">
+    @if (Model.IsAward)
+    {
+        <span class="admin-badge border-admin-warning/30 bg-admin-warning/15 text-admin-warning">Awards</span>
+    }
+    @if (Model.ShowCombineAllResults)
+    {
+        <span class="admin-badge border-admin-border bg-admin-surface-hover text-admin-text-muted">Combine</span>
+    }
+</span>

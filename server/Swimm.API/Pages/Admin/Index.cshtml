@@ -1,75 +1,70 @@
 @page
 @model Swimm.API.Pages.Admin.IndexModel
 @{
-    ViewData["Title"] = "Admin";
-    ViewData["HeaderTitle"] = "🔧 Swimm Admin";
-    ViewData["TitleColor"] = "#ff6b6b";
-    ViewData["BodyClass"] = "font-sans min-h-screen text-gray-300";
+    ViewData["Title"] = "Dashboard";
+    ViewData["PageSubtitle"] = "Пользователи, роли, статистика";
 }
 
-<div class="max-w-[1200px] mx-auto p-6">
+<!-- Stats -->
+<div class="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-4 mb-6" id="stats-grid"></div>
 
-    <!-- Stats -->
-    <div class="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-4 mb-6" id="stats-grid"></div>
+<!-- Tabs -->
+<div class="flex gap-2 mb-4">
+    <button class="tab-btn active py-2 px-5 border border-admin-accent rounded-md bg-transparent text-admin-accent cursor-pointer text-sm transition-colors hover:bg-admin-accent/10" data-tab="users">👥 Users</button>
+</div>
 
-    <!-- Tabs -->
-    <div class="flex gap-2 mb-4">
-        <button class="tab-btn active py-2 px-5 border border-[#4fc3f7] rounded-md bg-transparent text-[#4fc3f7] cursor-pointer text-sm transition-colors hover:bg-[rgba(79,195,247,0.12)]" data-tab="users">👥 Users</button>
+<!-- Users tab -->
+<div class="tab-content active" id="tab-users">
+
+    <!-- Filter bar -->
+    <div class="admin-card flex gap-3 items-end flex-wrap px-4 py-3 mb-4">
+        <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+            Поиск
+            <input id="uf-search" type="text" list="dl-users" autocomplete="off"
+                   class="admin-input w-48"
+                   placeholder="Имя или email…">
+            <datalist id="dl-users"></datalist>
+        </label>
+        <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+            Роль
+            <select id="uf-role" class="admin-input w-32">
+                <option value="">Все роли</option>
+            </select>
+        </label>
+        <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+            Статус
+            <select id="uf-status" class="admin-input w-28">
+                <option value="">Все</option>
+                <option value="1">Active</option>
+                <option value="0">Inactive</option>
+            </select>
+        </label>
+        <span id="uf-count" class="text-xs text-admin-text-muted self-end pb-1"></span>
     </div>
 
-    <!-- Users tab -->
-    <div class="tab-content active" id="tab-users">
+    <!-- Table + Detail panel side-by-side -->
+    <div class="flex gap-5 items-start">
 
-        <!-- Filter bar -->
-        <div class="bg-white/[.05] rounded-lg px-4 py-3 mb-4 flex gap-3 items-end flex-wrap">
-            <label class="text-xs text-[#90a4ae] flex flex-col gap-0.5">
-                Поиск
-                <input id="uf-search" type="text" list="dl-users" autocomplete="off"
-                       class="bg-black/30 border border-[#546e7a] rounded text-[#e0e0e0] px-2 py-1 text-sm font-[inherit] w-48 focus:outline-none focus:border-[#4fc3f7]"
-                       placeholder="Имя или email…">
-                <datalist id="dl-users"></datalist>
-            </label>
-            <label class="text-xs text-[#90a4ae] flex flex-col gap-0.5">
-                Роль
-                <select id="uf-role" class="bg-black/30 border border-[#546e7a] rounded text-[#e0e0e0] px-2 py-1 text-sm font-[inherit] w-32 focus:outline-none focus:border-[#4fc3f7]">
-                    <option value="">Все роли</option>
-                </select>
-            </label>
-            <label class="text-xs text-[#90a4ae] flex flex-col gap-0.5">
-                Статус
-                <select id="uf-status" class="bg-black/30 border border-[#546e7a] rounded text-[#e0e0e0] px-2 py-1 text-sm font-[inherit] w-28 focus:outline-none focus:border-[#4fc3f7]">
-                    <option value="">Все</option>
-                    <option value="1">Active</option>
-                    <option value="0">Inactive</option>
-                </select>
-            </label>
-            <span id="uf-count" class="text-xs text-[#546e7a] self-end pb-1"></span>
+        <!-- Table -->
+        <div class="flex-1 min-w-0">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Email</th>
+                        <th>Roles</th>
+                        <th>Status</th>
+                        <th>Registered</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="users-body"></tbody>
+            </table>
         </div>
 
-        <!-- Table + Detail panel side-by-side -->
-        <div class="flex gap-5 items-start">
+        <!-- Detail panel (hidden by default) -->
+        <div id="user-detail-panel" class="w-[300px] flex-shrink-0 hidden sticky top-4"></div>
 
-            <!-- Table -->
-            <div class="flex-1 min-w-0">
-                <table class="w-full border-collapse">
-                    <thead>
-                        <tr>
-                            <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">User</th>
-                            <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Email</th>
-                            <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Roles</th>
-                            <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Status</th>
-                            <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Registered</th>
-                            <th class="py-2.5 px-3 text-left border-b border-white/[.08] text-[#90a4ae] font-semibold text-xs uppercase">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="users-body"></tbody>
-                </table>
-            </div>
-
-            <!-- Detail panel (hidden by default) -->
-            <div id="user-detail-panel" class="w-[300px] flex-shrink-0 hidden sticky top-4"></div>
-
-        </div>
     </div>
 </div>
 

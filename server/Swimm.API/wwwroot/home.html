@@ -1,25 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Swimm — Home</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/css/home.css" />
-    <link rel="stylesheet" href="/css/db-banner.css" />
+    <link rel="stylesheet" href="/css/admin.min.css" />
 </head>
-<body class="font-sans min-h-screen flex flex-col items-center text-gray-300">
+<body class="min-h-screen bg-admin-bg font-sans text-sm text-admin-text antialiased flex flex-col items-center">
 
 <header class="w-full max-w-[960px] pt-8 px-4 pb-4 flex justify-between items-center">
-    <h1 class="text-3xl text-[#4fc3f7]">🏊 Swimm</h1>
+    <h1 class="text-2xl font-semibold text-admin-accent">🏊 Swimm</h1>
     <div id="auth-area" class="flex items-center gap-3"></div>
 </header>
 
+<div id="db-unavailable-banner" class="hidden w-full max-w-[960px] mx-4 mb-4 flex items-center gap-2.5 rounded-lg border border-admin-warning/30 bg-admin-warning/10 px-4 py-2.5 text-[13px] text-admin-warning">
+    База данных временно недоступна — некоторые функции могут не работать
+</div>
+
 <main class="w-full max-w-[960px] p-4 flex-1">
     <div class="text-center py-12 px-4">
-        <h2 class="text-3xl mb-4 text-white">Swimming Results Platform</h2>
-        <p class="text-lg text-[#b0bec5] mb-8">Результаты соревнований, рекорды, статистика.</p>
+        <h2 class="text-3xl font-semibold mb-4 text-admin-text">Swimming Results Platform</h2>
+        <p class="text-base text-admin-text-muted mb-8">Результаты соревнований, рекорды, статистика.</p>
 
         <!-- Кнопка логина (видна когда не залогинен) -->
         <div id="login-section">
@@ -31,22 +33,22 @@
 
         <!-- Профиль (виден когда залогинен) -->
         <div id="profile-section" class="hidden">
-            <div class="bg-white/[.06] rounded-xl p-6 mx-auto my-4 max-w-[480px]">
-                <h3 class="text-[#4fc3f7] mb-3">Ваш профиль</h3>
-                <div class="flex justify-between py-1"><span class="text-[#90a4ae]">Имя:</span> <span id="p-name"></span></div>
-                <div class="flex justify-between py-1"><span class="text-[#90a4ae]">Email:</span> <span id="p-email"></span></div>
-                <div class="flex justify-between py-1"><span class="text-[#90a4ae]">Роли:</span> <span id="p-roles"></span></div>
+            <div class="admin-card text-left mx-auto my-4 max-w-[480px]">
+                <h3 class="text-admin-accent font-semibold mb-3">Ваш профиль</h3>
+                <div class="flex justify-between py-1"><span class="text-admin-text-muted">Имя:</span> <span id="p-name"></span></div>
+                <div class="flex justify-between py-1"><span class="text-admin-text-muted">Email:</span> <span id="p-email"></span></div>
+                <div class="flex justify-between py-1"><span class="text-admin-text-muted">Роли:</span> <span id="p-roles"></span></div>
             </div>
         </div>
 
         <div class="flex gap-4 justify-center flex-wrap mt-8">
-            <a href="/Admin/Api" class="text-[#4fc3f7] no-underline text-base py-2 px-4 border border-[#4fc3f7] rounded-md transition-colors hover:bg-[rgba(79,195,247,0.15)]">📡 API Reference</a>
-            <a id="admin-link" href="/Admin" class="hidden text-[#4fc3f7] no-underline text-base py-2 px-4 border border-[#4fc3f7] rounded-md transition-colors hover:bg-[rgba(79,195,247,0.15)]">🔧 Admin Panel</a>
+            <a href="/Admin/Api" class="admin-btn admin-btn-ghost text-sm">📡 API Reference</a>
+            <a id="admin-link" href="/Admin" class="hidden admin-btn admin-btn-ghost text-sm">🔧 Admin Panel</a>
         </div>
     </div>
 </main>
 
-<footer class="p-6 text-center text-xs text-[#546e7a]">
+<footer class="p-6 text-center text-xs text-admin-text-muted">
     Swimm &copy; 2025
 </footer>
 
@@ -70,10 +72,10 @@
 
                 let userHtml = '';
                 if (data.avatarUrl) {
-                    userHtml += `<img class="w-9 h-9 rounded-full border-2 border-[#4fc3f7]" src="${data.avatarUrl}" alt="avatar" />`;
+                    userHtml += `<img class="w-9 h-9 rounded-full border-2 border-admin-accent" src="${data.avatarUrl}" alt="avatar" />`;
                 }
                 userHtml += `<span class="text-[0.95rem]">${data.displayName}</span>`;
-                userHtml += `<a class="inline-flex items-center gap-2 py-1.5 px-3.5 rounded-md bg-[#546e7a] text-white text-sm no-underline cursor-pointer transition-opacity hover:opacity-85" href="/auth/logout">Выйти</a>`;
+                userHtml += `<a class="admin-btn admin-btn-ghost text-sm" href="/auth/logout">Выйти</a>`;
                 authArea.innerHTML = userHtml;
 
                 if ((data.roles || []).includes('Admin')) {
@@ -86,17 +88,14 @@
     })();
 </script>
 
-    <div id="db-unavailable-banner" class="db-unavailable-banner" style="display:none">
-        База данных временно недоступна — некоторые функции могут не работать
-    </div>
-    <script>
-        fetch('/api/db-status')
-            .then(function(r) { return r.ok ? r.json() : null; })
-            .then(function(d) {
-                if (d && !d.available)
-                    document.getElementById('db-unavailable-banner').style.display = '';
-            })
-            .catch(function() {});
-    </script>
+<script>
+    fetch('/api/db-status')
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(d) {
+            if (d && !d.available)
+                document.getElementById('db-unavailable-banner').classList.remove('hidden');
+        })
+        .catch(function() {});
+</script>
 </body>
 </html>
