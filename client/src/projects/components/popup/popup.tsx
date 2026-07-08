@@ -3,7 +3,6 @@ import { rootActions, useAppDispatch, useAppSelector } from '../../../store/stor
 import { Enums } from '../../../utils/interfaces/enums';
 import PopupContentNormative from './popup-content-normative';
 import PopupContentHtml from './popup-content-html';
-import PopupContentMastersRecords from './popup-content-masters-records';
 import PopupContentSwimmerRecords from './popup-content-swimmer-records';
 
 const Popup: React.FC = () => {
@@ -16,7 +15,6 @@ const Popup: React.FC = () => {
     [Enums.PopupType.none]: null,
     [Enums.PopupType.normative]: <PopupContentNormative />,
     [Enums.PopupType.html]: <PopupContentHtml />,
-    [Enums.PopupType.mastersRecords]: <PopupContentMastersRecords />,
     [Enums.PopupType.swimmerRecords]: <PopupContentSwimmerRecords />,
   };
 

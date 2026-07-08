@@ -163,18 +163,44 @@ function renderTwoAges(resolvedAge: string, maleRecord: AgeRecord, femaleRecord:
 }
 
 /**
+ * Ячейка результата: время у края, ближнего к колонке AGE (по центру таблицы),
+ * имя+клуб+дата — блоком с внешней стороны, в одну строку с временем (не под ним).
+ */
+function renderGenderCell(genderKey: 'male' | 'female', rec: AgeRecord) {
+  const isMale = genderKey === 'male';
+  const color = isMale ? 'text-[#123a70] dark:text-[#dbe8fb]' : 'text-[#7a1f4b] dark:text-[#fbdcec]';
+  const bg = isMale ? 'bg-[#f6faff] dark:bg-[#1a2436]' : 'bg-[#fff7fb] dark:bg-[#2a1a24]';
+
+  const time = (
+    <div className={`text-[15px] sm:text-[17px] font-extrabold ${color} tabular-nums leading-tight shrink-0`}>
+      {rec.time}
+    </div>
+  );
+  const info = (
+    <div className="min-w-0 flex-1">
+      <div dir="rtl" className={`text-[11px] sm:text-[12.5px] font-bold ${color} truncate`}>{rec.name}</div>
+      <div dir="rtl" className="text-[10px] sm:text-[11px] text-[#8a93a3] truncate">{rec.club}</div>
+      <div className="text-[9px] sm:text-[10px] text-[#aab0bd] tabular-nums">{rec.record_date || '—'}</div>
+    </div>
+  );
+
+  return (
+    <div className={`${bg} rounded-lg px-2.5 py-[5px] sm:py-2 flex items-center gap-2`}>
+      {isMale ? <>{info}{time}</> : <>{time}{info}</>}
+    </div>
+  );
+}
+
+/**
  * «Много рекордов» (age === 'all') — свёрнутая карточка, тап заголовка разворачивает
- * таблицу. Один вариант и для мобилки, и для десктопа (раньше на десктопе была
- * отдельная всегда-открытая плитка с hover-тултипом — на touch-экранах hover нет,
- * поэтому вместо него тут тап по времени открывает те же детали держателя рекорда).
+ * таблицу. Имя/клуб/дата показаны сразу в строке (не по тапу) — строки выше, чем
+ * раньше, но без скрытого состояния. Один вариант и для мобилки, и для десктопа.
  */
 function renderManyAges(
   maleData: Record<string, AgeRecord> | null,
   femaleData: Record<string, AgeRecord> | null,
   isOpen: boolean,
   onToggle: () => void,
-  openDetailKey: string | null,
-  onToggleDetail: (key: string) => void,
 ) {
   const ageSet = new Set<string>();
   Object.keys(maleData ?? {}).forEach(k => /^\d+$/.test(k) && ageSet.add(k));
@@ -185,18 +211,6 @@ function renderManyAges(
   const rangeLabel = ages.length > 1 ? `${ages[0]}–${ages[ages.length - 1]}y` : `${ages[0]}y`;
   const showMale = !!maleData;
   const showFemale = !!femaleData;
-
-  const renderDetail = (rec: AgeRecord) => (
-    <div
-      className="absolute bottom-[calc(100%+6px)] left-1/2 -translate-x-1/2 z-20 bg-[#1f2733] dark:bg-[#0b0f15] text-white px-[11px] py-2 rounded-[10px] whitespace-nowrap"
-      style={{ boxShadow: '0 8px 22px rgba(20,28,40,0.3)' }}
-    >
-      <div dir="rtl" className="text-[12.5px] font-bold">{rec.name}</div>
-      <div dir="rtl" className="text-[11px] text-[#c4cbd6] mt-px">{rec.club}</div>
-      <div className="text-[10.5px] text-[#8b95a3] mt-[3px] tabular-nums">{rec.record_date || '—'}</div>
-      <span className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-[#1f2733] dark:border-t-[#0b0f15]" />
-    </div>
-  );
 
   return (
     <div className={`${CARD_SURFACE} border border-[#e9edf3] dark:border-[#28344a] rounded-2xl mb-4`} style={CARD_SHADOW}>
@@ -220,7 +234,7 @@ function renderManyAges(
       {isOpen && (
         <div className="border-t border-[#eef1f6] dark:border-[#232b3a] px-3.5 sm:px-5 pt-3 sm:pt-4 pb-3 sm:pb-4">
           <div
-            className="grid gap-x-2 sm:gap-x-4 gap-y-1 sm:gap-y-1.5 items-center"
+            className="grid gap-x-2 sm:gap-x-4 gap-y-1.5 sm:gap-y-2 items-center"
             style={{ gridTemplateColumns: `${showMale ? '1fr' : ''} 52px ${showFemale ? '1fr' : ''}`.trim() }}
           >
             {showMale && <div className="text-[10px] sm:text-[11px] font-extrabold text-[#1e6fd6] dark:text-[#5aa2f5] text-right">♂ MAN</div>}
@@ -229,40 +243,16 @@ function renderManyAges(
             {ages.map(a => {
               const mRec = maleData?.[a] ?? FALLBACK_RECORD;
               const fRec = femaleData?.[a] ?? FALLBACK_RECORD;
-              const mKey = `male-${a}`;
-              const fKey = `female-${a}`;
               return (
                 <React.Fragment key={a}>
-                  {showMale && (
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => onToggleDetail(mKey)}
-                        className="w-full text-[15px] sm:text-[17px] font-extrabold text-[#123a70] dark:text-[#dbe8fb] tabular-nums text-right bg-[#f6faff] dark:bg-[#1a2436] rounded-lg px-2.5 py-[5px] sm:py-2"
-                      >
-                        {mRec.time}
-                      </button>
-                      {openDetailKey === mKey && renderDetail(mRec)}
-                    </div>
-                  )}
+                  {showMale && renderGenderCell('male', mRec)}
                   <div className="text-[11px] sm:text-[12px] font-extrabold text-[#5b6470] text-center">{a}y</div>
-                  {showFemale && (
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => onToggleDetail(fKey)}
-                        className="w-full text-[15px] sm:text-[17px] font-extrabold text-[#7a1f4b] dark:text-[#fbdcec] tabular-nums text-left bg-[#fff7fb] dark:bg-[#2a1a24] rounded-lg px-2.5 py-[5px] sm:py-2"
-                      >
-                        {fRec.time}
-                      </button>
-                      {openDetailKey === fKey && renderDetail(fRec)}
-                    </div>
-                  )}
+                  {showFemale && renderGenderCell('female', fRec)}
                 </React.Fragment>
               );
             })}
           </div>
-          <div className="text-[10px] sm:text-[11px] text-[#aab0bd] mt-2.5 sm:mt-3">ⓘ Tap a time for the record holder, club and date · tap the header to collapse</div>
+          <div className="text-[10px] sm:text-[11px] text-[#aab0bd] mt-2.5 sm:mt-3">ⓘ Tap the header to collapse</div>
         </div>
       )}
     </div>
@@ -271,7 +261,6 @@ function renderManyAges(
 
 function NormativeAgeRecords({ gender, poolType, styleName, styleLen, age }: NormativeAgeRecordsProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [openDetailKey, setOpenDetailKey] = useState<string | null>(null);
 
   // Only show if style and distance are selected
   if (!styleName || !styleLen) return null;
@@ -308,8 +297,6 @@ function NormativeAgeRecords({ gender, poolType, styleName, styleLen, age }: Nor
       distanceByGender.female ?? null,
       isOpen,
       () => setIsOpen(v => !v),
-      openDetailKey,
-      (key) => setOpenDetailKey(prev => (prev === key ? null : key)),
     );
   }
 
