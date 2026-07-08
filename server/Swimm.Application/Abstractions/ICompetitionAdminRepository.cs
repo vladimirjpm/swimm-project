@@ -9,15 +9,18 @@ namespace Swimm.Application.Abstractions;
 /// </summary>
 public interface ICompetitionAdminRepository
 {
-    /// <summary>Список с поиском (по Name/SubName) и пагинацией. Многодневные соревнования
-    /// свёрнуты в одну строку-событие (<see cref="CompetitionRowDto"/>).</summary>
-    Task<PagedResult<CompetitionRowDto>> GetPagedAsync(string? search, int page, int pageSize);
+    /// <summary>Список с поиском (по Name/SubName), фильтром по категории/сезону (году) и пагинацией.
+    /// Многодневные соревнования свёрнуты в одну строку-событие (<see cref="CompetitionRowDto"/>).</summary>
+    Task<PagedResult<CompetitionRowDto>> GetPagedAsync(string? search, string? categoryKey, int? year, int page, int pageSize);
 
     /// <summary>Полные данные для формы Edit (включая URL-ы результатов). null — не найдено.</summary>
     Task<CompetitionEditDto?> GetByIdAsync(int id);
 
     /// <summary>Все категории (для чекбоксов формы), по DisplayOrder.</summary>
     Task<IReadOnlyList<CategoryTagDto>> GetAllCategoriesAsync();
+
+    /// <summary>Годы (сезоны), встречающиеся в Date соревнований, по убыванию — для фильтра списка.</summary>
+    Task<IReadOnlyList<int>> GetAvailableYearsAsync();
 
     /// <summary>Создать. Ошибки уникальности (Name+Date+PoolType, OrgCompId) возвращаются в результате.</summary>
     Task<CompetitionSaveResult> CreateAsync(CompetitionInputDto input);

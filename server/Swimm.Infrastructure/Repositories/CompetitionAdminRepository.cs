@@ -22,7 +22,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         _cache = cache;
     }
 
-    public async Task<PagedResult<CompetitionRowDto>> GetPagedAsync(string? search, int page, int pageSize)
+    public async Task<PagedResult<CompetitionRowDto>> GetPagedAsync(string? search, string? categoryKey, int? year, int page, int pageSize)
     {
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 20;
@@ -45,6 +45,29 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             heads = heads.Where(c =>
                 EF.Functions.ILike(c.Name, $"%{s}%", "\\") ||
                 (c.SubName != null && EF.Functions.ILike(c.SubName, $"%{s}%", "\\")));
+        }
+
+        if (!string.IsNullOrWhiteSpace(categoryKey))
+        {
+            // Категория может быть проставлена не на самой голове, а на другом дне того же события
+            // (обычно одинаково на всех днях, но подстраховываемся) — матчим по всей группе дней.
+            var compIdsWithCategory = _db.CategoryCompetitions
+                .Where(cc => cc.Category.Key == categoryKey)
+                .Select(cc => cc.CompetitionId);
+            heads = heads.Where(c =>
+                compIdsWithCategory.Contains(c.Id) ||
+                (c.EventId != null && _db.Competitions.Any(x =>
+                    x.EventId == c.EventId && compIdsWithCategory.Contains(x.Id))));
+        }
+
+        if (year is int y)
+        {
+            // Date хранится текстом «дд/ММ/гггг» — год всегда последние 4 символа.
+            var yearStr = y.ToString();
+            heads = heads.Where(c =>
+                c.Date.EndsWith(yearStr) ||
+                (c.EventId != null && _db.Competitions.Any(x =>
+                    x.EventId == c.EventId && x.Date.EndsWith(yearStr))));
         }
 
         var total = await heads.CountAsync();
@@ -130,6 +153,21 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             .OrderBy(c => c.DisplayOrder)
             .Select(c => new CategoryTagDto { Key = c.Key, Name = c.Name })
             .ToListAsync();
+
+    public async Task<IReadOnlyList<int>> GetAvailableYearsAsync()
+    {
+        // Date хранится текстом «дд/ММ/гггг» (длина 10) — год всегда последние 4 символа.
+        var years = await _db.Competitions.AsNoTracking()
+            .Where(c => c.Date.Length == 10)
+            .Select(c => c.Date.Substring(6, 4))
+            .Distinct()
+            .ToListAsync();
+        return years
+            .Where(y => int.TryParse(y, out _))
+            .Select(int.Parse)
+            .OrderByDescending(y => y)
+            .ToList();
+    }
 
     /// <summary>Проекция Competition → строка списка. Общая для «голов» и для дней события.</summary>
     private Expression<Func<Competition, CompetitionListItemDto>> ProjectListItem => c => new CompetitionListItemDto

@@ -5,9 +5,10 @@
     ViewData["PageSubtitle"] = "Справочник соревнований — эталонный CRUD";
 
     string PageUrl(int p) =>
-        Url.Page("Index", new { q = Model.Search, page = p })!;
+        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, year = Model.Year, page = p })!;
 
     var flash = TempData["Flash"] as string;
+    var hasFilters = !string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.CategoryKey) || Model.Year != null;
 }
 
 @functions {
@@ -34,8 +35,28 @@
         <input name="q" value="@Model.Search" autocomplete="off"
                class="admin-input w-72" placeholder="Название или подзаголовок дня…" />
     </label>
+    <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+        Категория
+        <select name="cat" class="admin-input">
+            <option value="">Все</option>
+            @foreach (var cat in Model.Categories)
+            {
+                <option value="@cat.Key" selected="@(cat.Key == Model.CategoryKey)">@cat.Name</option>
+            }
+        </select>
+    </label>
+    <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+        Сезон
+        <select name="year" class="admin-input">
+            <option value="">Все</option>
+            @foreach (var y in Model.Years)
+            {
+                <option value="@y" selected="@(y == Model.Year)">@y</option>
+            }
+        </select>
+    </label>
     <button type="submit" class="admin-btn admin-btn-primary">Найти</button>
-    @if (!string.IsNullOrEmpty(Model.Search))
+    @if (hasFilters)
     {
         <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">Сброс</a>
     }
@@ -44,9 +65,21 @@
 
 <div class="mb-3 text-xs text-admin-text-muted">
     Всего: <strong class="text-admin-text">@Model.Result.TotalCount</strong>
-    @if (!string.IsNullOrEmpty(Model.Search))
+    @if (hasFilters)
     {
-        <text> · фильтр: «@Model.Search»</text>
+        <text> · фильтры:</text>
+        @if (!string.IsNullOrEmpty(Model.Search))
+        {
+            <text> название «@Model.Search»</text>
+        }
+        @if (!string.IsNullOrEmpty(Model.CategoryKey))
+        {
+            <text> · категория «@(Model.Categories.FirstOrDefault(c => c.Key == Model.CategoryKey)?.Name ?? Model.CategoryKey)»</text>
+        }
+        @if (Model.Year != null)
+        {
+            <text> · сезон @Model.Year</text>
+        }
     }
 </div>
 
