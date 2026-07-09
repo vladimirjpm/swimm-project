@@ -50,6 +50,8 @@ public static class DependencyInjection
 
         // Repositories
         services.AddScoped<IResultRepository, ResultRepository>();
+        services.AddScoped<IRecordRepository, RecordRepository>();
+        services.AddScoped<IRecordAdminRepository, RecordAdminRepository>();
         services.AddScoped<IAdminRepository, AdminRepository>();
         services.AddScoped<ICompetitionAdminRepository, CompetitionAdminRepository>();
         services.AddScoped<ICategoryAdminRepository, CategoryAdminRepository>();
@@ -64,6 +66,9 @@ public static class DependencyInjection
 
         // DB migrator
         services.AddScoped<IDbMigrator, DbMigrator>();
+
+        // Одноразовый сид рекордов/нормативов из легаси JS (dotnet run -- --seed-records <dir>)
+        services.AddScoped<IRecordsSeeder, RecordsSeeder>();
 
         return services;
     }

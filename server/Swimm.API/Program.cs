@@ -123,6 +123,27 @@ if (args.Contains("--migrate"))
     return;
 }
 
+// Одноразовый сид рекордов/нормативов из легаси JS-файлов клиента:
+//   dotnet run -- --seed-records <путь к client/public/data> [--force]
+// --force заменяет содержимое таблиц целиком (иначе непустые таблицы — отказ).
+if (args.Contains("--seed-records"))
+{
+    var dirIndex = Array.IndexOf(args, "--seed-records") + 1;
+    if (dirIndex >= args.Length || args[dirIndex].StartsWith("--"))
+    {
+        Console.Error.WriteLine("Usage: dotnet run -- --seed-records <data-dir> [--force]");
+        Environment.Exit(1);
+        return;
+    }
+
+    using var scope = app.Services.CreateScope();
+    var seeder = scope.ServiceProvider.GetRequiredService<IRecordsSeeder>();
+    var seedLog = await seeder.SeedAsync(args[dirIndex], args.Contains("--force"));
+    foreach (var line in seedLog)
+        Console.WriteLine(line);
+    return;
+}
+
 if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 

@@ -72,7 +72,9 @@ GRANT SELECT ON
     "Categories",
     "CategoryCompetitions",
     "CompetitionEvents",
-    "CompetitionResultUrls"
+    "CompetitionResultUrls",
+    "Records",
+    "NormativeStandards"
 TO swimm_ro;
 
 -- NOTE: Sys_UserFavorites и Sys_UserMedia намеренно НЕ добавлены в этот грант.

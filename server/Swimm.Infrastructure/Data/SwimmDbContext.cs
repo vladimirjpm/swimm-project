@@ -40,6 +40,10 @@ public class SwimmDbContext : DbContext
     /* === Результаты === */
     public DbSet<ResultRecord> Results => Set<ResultRecord>();
 
+    /* === Рекорды и нормативы (фаза 2) === */
+    public DbSet<Record> Records => Set<Record>();
+    public DbSet<NormativeStandard> NormativeStandards => Set<NormativeStandard>();
+
     /* === Импорт === */
     public DbSet<ImportHistory> ImportHistory => Set<ImportHistory>();
 
@@ -170,6 +174,32 @@ public class SwimmDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.CompetitionId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // --- Рекорды и нормативы ---
+
+        modelBuilder.Entity<Record>(entity =>
+        {
+            entity.ToTable("Records");
+            // 8 осей = уникальная позиция рекорда; RegionCode/AgeKey — NOT NULL (пустая строка),
+            // иначе Postgres NULLS DISTINCT пропустил бы дубли.
+            entity.HasIndex(e => new
+            {
+                e.RegionType, e.RegionCode, e.Category, e.AgeKey,
+                e.Gender, e.PoolType, e.Style, e.Distance
+            }).IsUnique();
+            // Горячий путь клиента/кэша — выборка региона (± категории).
+            entity.HasIndex(e => new { e.RegionType, e.RegionCode, e.Category });
+        });
+
+        modelBuilder.Entity<NormativeStandard>(entity =>
+        {
+            entity.ToTable("NormativeStandards");
+            entity.HasIndex(e => new
+            {
+                e.Kind, e.Country, e.Gender, e.PoolType,
+                e.Style, e.Distance, e.AgeKey, e.Level
+            }).IsUnique();
         });
 
         // --- Правила клубных очков ---
