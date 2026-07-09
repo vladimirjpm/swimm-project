@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.14.36327.8
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Swimm.Parser", "Swimm.Parser\Swimm.Parser.csproj", "{19AF124B-F78A-4D0D-8C66-1DA7F0CBA213}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Swimm.API", "Swimm.API\Swimm.API.csproj", "{3484611B-BCCA-483D-86DA-FB650E12B73F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Swimm.Domain", "Swimm.Domain\Swimm.Domain.csproj", "{66E95C14-15FD-41F3-958B-E431D3DF1E7B}"
@@ -14,6 +12,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Swimm.Infrastructure", "Swimm.Infrastructure\Swimm.Infrastructure.csproj", "{6516E45B-9378-4C56-8B6E-ACADF8A6EAED}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Swimm.Tests", "Swimm.Tests\Swimm.Tests.csproj", "{BF017298-BF6D-4D57-A5D9-279E87CC1A14}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Swimm.Parsing", "Swimm.Parsing\Swimm.Parsing.csproj", "{86EE7BCF-2097-45CC-B240-CCF362201898}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -25,18 +25,6 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{19AF124B-F78A-4D0D-8C66-1DA7F0CBA213}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{19AF124B-F78A-4D0D-8C66-1DA7F0CBA213}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{19AF124B-F78A-4D0D-8C66-1DA7F0CBA213}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{19AF124B-F78A-4D0D-8C66-1DA7F0CBA213}.Debug|x64.Build.0 = Debug|Any CPU
-		{19AF124B-F78A-4D0D-8C66-1DA7F0CBA213}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{19AF124B-F78A-4D0D-8C66-1DA7F0CBA213}.Debug|x86.Build.0 = Debug|Any CPU
-		{19AF124B-F78A-4D0D-8C66-1DA7F0CBA213}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{19AF124B-F78A-4D0D-8C66-1DA7F0CBA213}.Release|Any CPU.Build.0 = Release|Any CPU
-		{19AF124B-F78A-4D0D-8C66-1DA7F0CBA213}.Release|x64.ActiveCfg = Release|Any CPU
-		{19AF124B-F78A-4D0D-8C66-1DA7F0CBA213}.Release|x64.Build.0 = Release|Any CPU
-		{19AF124B-F78A-4D0D-8C66-1DA7F0CBA213}.Release|x86.ActiveCfg = Release|Any CPU
-		{19AF124B-F78A-4D0D-8C66-1DA7F0CBA213}.Release|x86.Build.0 = Release|Any CPU
 		{3484611B-BCCA-483D-86DA-FB650E12B73F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{3484611B-BCCA-483D-86DA-FB650E12B73F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3484611B-BCCA-483D-86DA-FB650E12B73F}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -97,6 +85,18 @@ Global
 		{BF017298-BF6D-4D57-A5D9-279E87CC1A14}.Release|x64.Build.0 = Release|Any CPU
 		{BF017298-BF6D-4D57-A5D9-279E87CC1A14}.Release|x86.ActiveCfg = Release|Any CPU
 		{BF017298-BF6D-4D57-A5D9-279E87CC1A14}.Release|x86.Build.0 = Release|Any CPU
+		{86EE7BCF-2097-45CC-B240-CCF362201898}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{86EE7BCF-2097-45CC-B240-CCF362201898}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{86EE7BCF-2097-45CC-B240-CCF362201898}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{86EE7BCF-2097-45CC-B240-CCF362201898}.Debug|x64.Build.0 = Debug|Any CPU
+		{86EE7BCF-2097-45CC-B240-CCF362201898}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{86EE7BCF-2097-45CC-B240-CCF362201898}.Debug|x86.Build.0 = Debug|Any CPU
+		{86EE7BCF-2097-45CC-B240-CCF362201898}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{86EE7BCF-2097-45CC-B240-CCF362201898}.Release|Any CPU.Build.0 = Release|Any CPU
+		{86EE7BCF-2097-45CC-B240-CCF362201898}.Release|x64.ActiveCfg = Release|Any CPU
+		{86EE7BCF-2097-45CC-B240-CCF362201898}.Release|x64.Build.0 = Release|Any CPU
+		{86EE7BCF-2097-45CC-B240-CCF362201898}.Release|x86.ActiveCfg = Release|Any CPU
+		{86EE7BCF-2097-45CC-B240-CCF362201898}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

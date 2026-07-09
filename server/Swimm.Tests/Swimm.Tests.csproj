@@ -22,6 +22,7 @@
     <ProjectReference Include="..\Swimm.Infrastructure\Swimm.Infrastructure.csproj" />
     <ProjectReference Include="..\Swimm.Application\Swimm.Application.csproj" />
     <ProjectReference Include="..\Swimm.Domain\Swimm.Domain.csproj" />
+    <ProjectReference Include="..\Swimm.Parsing\Swimm.Parsing.csproj" />
   </ItemGroup>
 
 </Project>

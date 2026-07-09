@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Swimm.Parsing</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Swimm.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.105.0" />
+    <PackageReference Include="UglyToad.PdfPig" Version="1.7.0-custom-5" />
+    <PackageReference Include="UglyToad.PdfPig.DocumentLayoutAnalysis" Version="1.7.0-custom-5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Swimm.Application\Swimm.Application.csproj" />
+  </ItemGroup>
+
+</Project>

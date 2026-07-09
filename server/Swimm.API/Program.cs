@@ -5,12 +5,11 @@ using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.RateLimiting;
 using Swimm.API.BackgroundServices;
 using Swimm.API.Security;
+using Swimm.API.Services;
 using Swimm.Application;
 using Swimm.Application.Abstractions;
 using Swimm.Infrastructure;
-
-using Swimm.API.BackgroundServices;
-using Swimm.API.Services;
+using Swimm.Parsing;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +20,9 @@ builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, relo
 builder.Services.AddMemoryCache();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+// Парсеры протоколов + IResultSourceProvider (Swimm.Parsing) — потребитель появится
+// на этапе 1.3 (страница Import: PDF → парс → превью → импорт).
+builder.Services.AddParsing();
 
 builder.Services.AddCors(options =>
 {

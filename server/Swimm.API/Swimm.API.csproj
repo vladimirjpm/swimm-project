@@ -32,6 +32,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Swimm.Application\Swimm.Application.csproj" />
     <ProjectReference Include="..\Swimm.Infrastructure\Swimm.Infrastructure.csproj" />
+    <ProjectReference Include="..\Swimm.Parsing\Swimm.Parsing.csproj" />
   </ItemGroup>
 
   <!-- Пересобирает Tailwind-бандл админки перед билдом, если Node установлен (node_modules есть).

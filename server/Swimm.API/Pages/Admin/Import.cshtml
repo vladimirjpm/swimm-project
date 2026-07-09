@@ -1,31 +1,126 @@
 @page
 @model Swimm.API.Pages.Admin.ImportModel
 @{
-    ViewData["Title"] = "Import JSON";
-    ViewData["PageSubtitle"] = "Загрузка результатов из JSON + очистка данных";
+    ViewData["Title"] = "Import";
+    ViewData["PageSubtitle"] = "Загрузка результатов из JSON/PDF + очистка данных";
 }
 
 <div class="max-w-[800px] mx-auto">
-    <!-- Info -->
-    <div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
-        Загрузите JSON-файл в формате <code class="text-admin-accent">ResultWrap</code> (с полями <code class="text-admin-accent">title</code>, <code class="text-admin-accent">results[]</code>)
-        или простой массив <code class="text-admin-accent">Result[]</code>.<br>
-        Сервис автоматически создаст записи в справочниках (Competitions, Clubs, Swimmers, Styles, Relays, Galleries) и заполнит таблицу Results.
+    <!-- Mode switcher -->
+    <div class="flex gap-2 mb-6">
+        <button id="tab-json" class="import-tab import-tab-active py-2 px-5 rounded-md text-sm font-semibold cursor-pointer border-none">
+            JSON
+        </button>
+        <button id="tab-pdf" class="import-tab py-2 px-5 rounded-md text-sm font-semibold cursor-pointer border-none">
+            PDF
+        </button>
     </div>
 
-    <!-- Drop zone -->
-    <div id="drop-zone" class="drop-zone border-2 border-dashed border-admin-border rounded-xl p-12 text-center cursor-pointer transition-colors duration-200 mb-6">
-        <div class="text-4xl mb-4">📄</div>
-        <div class="text-lg text-admin-text mb-2">Перетащите JSON-файл сюда</div>
-        <div class="text-admin-text-muted mb-4">или</div>
-        <label class="inline-flex items-center gap-2 bg-admin-accent text-[#0c2536] font-semibold py-2 px-5 rounded-md cursor-pointer hover:bg-[#81d4fa] transition-colors">
-            📁 Выбрать файл
-            <input type="file" id="file-input" accept=".json" class="hidden">
-        </label>
-        <div id="file-name" class="mt-4 text-admin-text-muted text-sm hidden"></div>
+    <!-- ============ JSON mode ============ -->
+    <div id="json-mode">
+        <!-- Info -->
+        <div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
+            Загрузите JSON-файл в формате <code class="text-admin-accent">ResultWrap</code> (с полями <code class="text-admin-accent">title</code>, <code class="text-admin-accent">results[]</code>)
+            или простой массив <code class="text-admin-accent">Result[]</code>.<br>
+            Сервис автоматически создаст записи в справочниках (Competitions, Clubs, Swimmers, Styles, Relays, Galleries) и заполнит таблицу Results.
+        </div>
+
+        <!-- Drop zone -->
+        <div id="drop-zone" class="drop-zone border-2 border-dashed border-admin-border rounded-xl p-12 text-center cursor-pointer transition-colors duration-200 mb-6">
+            <div class="text-4xl mb-4">📄</div>
+            <div class="text-lg text-admin-text mb-2">Перетащите JSON-файл сюда</div>
+            <div class="text-admin-text-muted mb-4">или</div>
+            <label class="inline-flex items-center gap-2 bg-admin-accent text-[#0c2536] font-semibold py-2 px-5 rounded-md cursor-pointer hover:bg-[#81d4fa] transition-colors">
+                📁 Выбрать файл
+                <input type="file" id="file-input" accept=".json" class="hidden">
+            </label>
+            <div id="file-name" class="mt-4 text-admin-text-muted text-sm hidden"></div>
+        </div>
     </div>
 
-    <!-- Categories -->
+    <!-- ============ PDF mode ============ -->
+    <div id="pdf-mode" class="hidden">
+        <div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
+            Загрузите PDF-протокол соревнования. Основной файл обязателен; для многодневных/составных
+            протоколов можно добавить до трёх дополнительных файлов. После разбора появится превью —
+            проверьте счётчики и только потом нажимайте «Импортировать».
+        </div>
+
+        <div class="admin-card p-5 mb-6 space-y-4">
+            <div>
+                <label class="block text-sm text-admin-text mb-1">Основной файл <span class="text-admin-danger">*</span></label>
+                <input type="file" id="pdf-file" accept=".pdf" class="admin-input w-full">
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-xs text-admin-text-muted mb-1">Доп. файл 2</label>
+                    <input type="file" id="pdf-file-2" accept=".pdf" class="admin-input w-full text-xs">
+                </div>
+                <div>
+                    <label class="block text-xs text-admin-text-muted mb-1">Доп. файл 3</label>
+                    <input type="file" id="pdf-file-3" accept=".pdf" class="admin-input w-full text-xs">
+                </div>
+                <div>
+                    <label class="block text-xs text-admin-text-muted mb-1">Доп. файл 4</label>
+                    <input type="file" id="pdf-file-4" accept=".pdf" class="admin-input w-full text-xs">
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-4 items-end">
+                <div>
+                    <label class="block text-xs text-admin-text-muted mb-1">Формат</label>
+                    <select id="pdf-format" class="admin-input min-w-[180px]">
+                        @foreach (var f in Model.ParseFormats)
+                        {
+                            <option value="@f">@f</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-admin-text-muted mb-1">Бассейн</label>
+                    <select id="pdf-pool-type" class="admin-input min-w-[120px]">
+                        <option value="">—</option>
+                        <option value="25m">25m</option>
+                        <option value="50m">50m</option>
+                    </select>
+                </div>
+                <label class="inline-flex items-center gap-2 text-sm text-admin-text pb-2">
+                    <input type="checkbox" id="pdf-is-award"> Наградной протокол (isAward)
+                </label>
+            </div>
+            <button id="btn-parse-pdf" disabled
+                class="admin-btn admin-btn-primary py-2.5 px-6 disabled:opacity-40 disabled:cursor-not-allowed">
+                🔍 Распарсить
+            </button>
+        </div>
+
+        <!-- PDF preview -->
+        <div id="pdf-preview" class="hidden mb-6">
+            <div class="admin-card p-5">
+                <h3 class="text-lg mb-3 text-admin-accent">Превью разбора</h3>
+                <div class="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 mb-4" id="pdf-preview-stats"></div>
+                <table class="w-full text-sm mb-4" id="pdf-preview-table">
+                    <thead>
+                        <tr class="text-left text-admin-text-muted border-b border-admin-border">
+                            <th class="py-1 pr-3">Соревнование</th>
+                            <th class="py-1 pr-3">Дата</th>
+                            <th class="py-1">Результатов</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pdf-preview-competitions"></tbody>
+                </table>
+                <div id="pdf-preview-warnings" class="hidden mb-4">
+                    <h4 class="text-[#ffa726] text-sm mb-2">⚠️ Предупреждения:</h4>
+                    <div id="pdf-warnings-list" class="bg-black/30 rounded-md p-3 max-h-[160px] overflow-y-auto text-xs text-[#ffcc80] font-mono leading-relaxed"></div>
+                </div>
+                <details id="pdf-debug-details" class="hidden">
+                    <summary class="text-admin-text-muted text-xs cursor-pointer">Debug-лог парсера</summary>
+                    <pre id="pdf-debug-log" class="bg-black/30 rounded-md p-3 mt-2 max-h-[240px] overflow-auto text-xs text-admin-text-muted whitespace-pre-wrap leading-relaxed"></pre>
+                </details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Categories (shared) -->
     <div id="cat-section" class="mb-6">
         <div class="text-sm text-admin-text mb-2">
             Категории для этого импорта
@@ -34,7 +129,7 @@
         <div id="cat-list" class="flex flex-wrap gap-2 text-sm text-admin-text-muted">загрузка...</div>
     </div>
 
-    <!-- Multi-day event -->
+    <!-- Multi-day event (shared) -->
     <div id="event-section" class="mb-6">
         <div class="text-sm text-admin-text mb-2">
             Многодневное соревнование
@@ -51,11 +146,15 @@
 
     <!-- Actions -->
     <div class="flex gap-3 mb-6">
-        <button id="btn-upload" disabled
-            class="bg-admin-success text-white font-semibold py-2.5 px-6 rounded-md border-none cursor-pointer text-sm transition-opacity hover:opacity-85 disabled:opacity-40 disabled:cursor-not-allowed">
+        <button id="btn-upload"
+            class="import-action-json bg-admin-success text-white font-semibold py-2.5 px-6 rounded-md border-none cursor-pointer text-sm transition-opacity hover:opacity-85 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
             🚀 Загрузить и импортировать
         </button>
-        <button id="btn-clear" class="admin-btn admin-btn-ghost py-2.5 px-5 hidden">
+        <button id="btn-import-pdf"
+            class="import-action-pdf hidden bg-admin-success text-white font-semibold py-2.5 px-6 rounded-md border-none cursor-pointer text-sm transition-opacity hover:opacity-85 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+            🚀 Импортировать
+        </button>
+        <button id="btn-clear" class="import-action-json admin-btn admin-btn-ghost py-2.5 px-5 hidden">
             ✕ Очистить
         </button>
     </div>
@@ -157,6 +256,26 @@
 
     let selectedFile = null;
 
+    // --- Mode switcher (JSON | PDF) ---
+    const tabJson = document.getElementById('tab-json');
+    const tabPdf = document.getElementById('tab-pdf');
+    const jsonMode = document.getElementById('json-mode');
+    const pdfMode = document.getElementById('pdf-mode');
+
+    function setMode(mode) {
+        const isJson = mode === 'json';
+        jsonMode.classList.toggle('hidden', !isJson);
+        pdfMode.classList.toggle('hidden', isJson);
+        tabJson.classList.toggle('import-tab-active', isJson);
+        tabPdf.classList.toggle('import-tab-active', !isJson);
+        document.querySelectorAll('.import-action-json').forEach(el => el.classList.toggle('hidden', !isJson));
+        document.querySelectorAll('.import-action-pdf').forEach(el => el.classList.toggle('hidden', isJson));
+        resultDiv.classList.add('hidden');
+        preview.classList.add('hidden');
+    }
+    tabJson.addEventListener('click', () => setMode('json'));
+    tabPdf.addEventListener('click', () => setMode('pdf'));
+
     // Категории для привязки на импорте (мультиселект).
     const catList = document.getElementById('cat-list');
     fetch('/api/categories', { credentials: 'same-origin' })
@@ -207,6 +326,30 @@
             eventNewName.classList.add('hidden');
         }
     });
+
+    // Категории и привязка к событию общие для JSON- и PDF-режима (см. shared #cat-list/#event-select).
+    function getSelectedCategories() {
+        return [...document.querySelectorAll('.cat-cb:checked')].map(cb => cb.value);
+    }
+
+    function getSelectedEventOptions() {
+        const evVal = eventSelect.value;
+        if (evVal === '__new__') {
+            const name = eventNewName.value.trim();
+            return name ? { newEventName: name } : {};
+        }
+        if (evVal) return { eventId: Number(evVal) };
+        return {};
+    }
+
+    function resetEventSelectAfterImport() {
+        loadEvents();
+        if (eventSelect.value === '__new__') {
+            eventNewName.value = '';
+            eventNewName.classList.add('hidden');
+            eventSelect.value = '';
+        }
+    }
 
     fetch('/api/admin/clearable-tables', { credentials: 'same-origin' })
         .then(r => r.ok ? r.json() : null)
@@ -281,16 +424,13 @@
             // 1. Отправляем файл — сервер ставит задачу в очередь и сразу возвращает jobId.
             const form = new FormData();
             form.append('file', selectedFile);
-            document.querySelectorAll('.cat-cb:checked').forEach(cb => form.append('categories', cb.value));
+            getSelectedCategories().forEach(key => form.append('categories', key));
 
             // Привязка к событию: либо id существующего, либо имя нового.
-            const evVal = eventSelect.value;
-            if (evVal === '__new__') {
-                const name = eventNewName.value.trim();
-                if (name) form.append('newEventName', name);
-            } else if (evVal) {
-                form.append('eventId', evVal);
-            }
+            const evOpts = getSelectedEventOptions();
+            if (evOpts.newEventName) form.append('newEventName', evOpts.newEventName);
+            if (evOpts.eventId) form.append('eventId', String(evOpts.eventId));
+
             const res = await fetch('/api/admin/import', { method: 'POST', credentials: 'same-origin', headers: { 'X-XSRF-TOKEN': _csrfToken }, body: form });
             const queued = await res.json();
             if (!res.ok) throw new Error(queued.error || `HTTP ${res.status}`);
@@ -303,17 +443,128 @@
             showImportResult(data);
             // Обновляем список событий (могло появиться новое / вырасти число дней)
             // и сбрасываем выбор «создать новое», чтобы следующий день можно было привязать к нему.
-            loadEvents();
-            if (eventSelect.value === '__new__') {
-                eventNewName.value = '';
-                eventNewName.classList.add('hidden');
-                eventSelect.value = '';
-            }
+            resetEventSelectAfterImport();
         } catch (e) {
             showImportError(e.message);
         } finally {
             progress.classList.add('hidden');
             btnUpload.disabled = false;
+        }
+    });
+
+    // --- PDF mode ---
+    const pdfFile = document.getElementById('pdf-file');
+    const btnParsePdf = document.getElementById('btn-parse-pdf');
+    const btnImportPdf = document.getElementById('btn-import-pdf');
+    const pdfPreview = document.getElementById('pdf-preview');
+    const pdfPreviewStats = document.getElementById('pdf-preview-stats');
+    const pdfPreviewCompetitions = document.getElementById('pdf-preview-competitions');
+    const pdfPreviewWarnings = document.getElementById('pdf-preview-warnings');
+    const pdfWarningsList = document.getElementById('pdf-warnings-list');
+    const pdfDebugDetails = document.getElementById('pdf-debug-details');
+    const pdfDebugLog = document.getElementById('pdf-debug-log');
+
+    let pdfPreviewId = null;
+
+    pdfFile.addEventListener('change', () => {
+        btnParsePdf.disabled = !pdfFile.files[0];
+        btnImportPdf.disabled = true;
+        pdfPreviewId = null;
+        pdfPreview.classList.add('hidden');
+    });
+
+    btnParsePdf.addEventListener('click', async () => {
+        if (!pdfFile.files[0]) return;
+        btnParsePdf.disabled = true;
+        progress.classList.remove('hidden');
+        pdfPreview.classList.add('hidden');
+        resultDiv.classList.add('hidden');
+
+        try {
+            const form = new FormData();
+            form.append('file', pdfFile.files[0]);
+            const f2 = document.getElementById('pdf-file-2').files[0];
+            const f3 = document.getElementById('pdf-file-3').files[0];
+            const f4 = document.getElementById('pdf-file-4').files[0];
+            if (f2) form.append('secondaryFile', f2);
+            if (f3) form.append('thirdFile', f3);
+            if (f4) form.append('fourthFile', f4);
+            form.append('format', document.getElementById('pdf-format').value);
+            form.append('isAward', document.getElementById('pdf-is-award').checked);
+            const poolType = document.getElementById('pdf-pool-type').value;
+            if (poolType) form.append('poolType', poolType);
+
+            const res = await fetch('/api/admin/parse-pdf', { method: 'POST', credentials: 'same-origin', headers: { 'X-XSRF-TOKEN': _csrfToken }, body: form });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+            pdfPreviewId = data.previewId;
+            showPdfPreview(data);
+            btnImportPdf.disabled = false;
+            toast(`Распознано результатов: ${data.resultCount}`);
+        } catch (e) {
+            toast(e.message, 4000);
+        } finally {
+            progress.classList.add('hidden');
+            btnParsePdf.disabled = false;
+        }
+    });
+
+    function showPdfPreview(data) {
+        pdfPreviewStats.innerHTML = [
+            statCard('Формат', data.format, '#4fc3f7'),
+            statCard('Результатов', data.resultCount, '#66bb6a'),
+            statCard('Соревнований', (data.competitions || []).length, '#4fc3f7')
+        ].join('');
+
+        pdfPreviewCompetitions.innerHTML = (data.competitions || []).map(c =>
+            `<tr><td class="py-1 pr-3">${esc(c.competition)}</td><td class="py-1 pr-3">${esc(c.date)}</td><td class="py-1">${c.resultCount}</td></tr>`
+        ).join('') || '<tr><td class="py-1 text-admin-text-muted" colspan="3">нет данных</td></tr>';
+
+        if (data.warnings && data.warnings.length > 0) {
+            pdfWarningsList.innerHTML = data.warnings.map(w => `<div class="mb-1">${esc(w)}</div>`).join('');
+            pdfPreviewWarnings.classList.remove('hidden');
+        } else {
+            pdfPreviewWarnings.classList.add('hidden');
+        }
+
+        if (data.debugLog) {
+            pdfDebugLog.textContent = data.debugLog;
+            pdfDebugDetails.classList.remove('hidden');
+        } else {
+            pdfDebugDetails.classList.add('hidden');
+        }
+
+        pdfPreview.classList.remove('hidden');
+    }
+
+    btnImportPdf.addEventListener('click', async () => {
+        if (!pdfPreviewId) return;
+        btnImportPdf.disabled = true;
+        progress.classList.remove('hidden');
+        resultDiv.classList.add('hidden');
+
+        try {
+            const body = { previewId: pdfPreviewId, categoryKeys: getSelectedCategories(), ...getSelectedEventOptions() };
+            const queued = await api('/api/admin/import-parsed', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            toast('Импорт поставлен в очередь, обработка...');
+
+            const data = await pollJobStatus(queued.jobId);
+            showImportResult(data);
+            resetEventSelectAfterImport();
+
+            // Превью одноразовое: после импорта требуется заново распарсить.
+            pdfPreviewId = null;
+            pdfPreview.classList.add('hidden');
+        } catch (e) {
+            showImportError(e.message);
+        } finally {
+            progress.classList.add('hidden');
+            btnImportPdf.disabled = pdfPreviewId === null;
         }
     });
 

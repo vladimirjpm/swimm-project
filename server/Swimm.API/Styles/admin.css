@@ -49,6 +49,13 @@
     @apply inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold;
   }
 
+  .import-tab {
+    @apply border border-admin-border bg-admin-surface text-admin-text-muted transition-colors hover:text-admin-text;
+  }
+  .import-tab-active {
+    @apply border-admin-accent bg-admin-accent text-[#0c2536] hover:text-[#0c2536];
+  }
+
   .admin-table {
     @apply w-full border-collapse text-sm;
   }

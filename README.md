@@ -30,7 +30,7 @@ server/
   Swimm.Application/        Interfaces (Abstractions/), DTOs, mapping
   Swimm.Infrastructure/     EF Core DbContext, migrations, services, repositories
   Swimm.API/                Controllers, DI, middleware, Razor Pages admin
-  Swimm.Parser/             Standalone parsing utility
+  Swimm.Parsing/            PDF/HTML protocol parsers (class library)
   db/setup-roles.sql        Least-privilege DB roles (run once per database)
   docker-compose.yml        Local PostgreSQL
 ```

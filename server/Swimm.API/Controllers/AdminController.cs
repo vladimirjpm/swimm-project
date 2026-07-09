@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using System.Text;
 
 namespace Swimm.API.Controllers;
 
@@ -17,6 +19,8 @@ public class AdminController : ControllerBase
     private readonly IImportService _import;
     private readonly IImportJobQueue _jobs;
     private readonly IResultRepository _results;
+    private readonly IResultSourceProvider _sourceProvider;
+    private readonly IMemoryCache _cache;
 
     public AdminController(
         IAdminRepository admin,
@@ -24,7 +28,9 @@ public class AdminController : ControllerBase
         ISettingsService settings,
         IImportService import,
         IImportJobQueue jobs,
-        IResultRepository results)
+        IResultRepository results,
+        IResultSourceProvider sourceProvider,
+        IMemoryCache cache)
     {
         _admin = admin;
         _schema = schema;
@@ -32,6 +38,8 @@ public class AdminController : ControllerBase
         _import = import;
         _jobs = jobs;
         _results = results;
+        _sourceProvider = sourceProvider;
+        _cache = cache;
     }
 
     // ── Users ────────────────────────────────────────────────────────────────
@@ -159,6 +167,92 @@ public class AdminController : ControllerBase
         });
     }
 
+    // ── Import: PDF ──────────────────────────────────────────────────────────
+
+    [HttpPost("parse-pdf")]
+    [RequestSizeLimit(50 * 1024 * 1024)]
+    public async Task<IActionResult> ParsePdf(
+        IFormFile file,
+        [FromForm] IFormFile? secondaryFile = null,
+        [FromForm] IFormFile? thirdFile = null,
+        [FromForm] IFormFile? fourthFile = null,
+        [FromForm] string format = "IsrOrg",
+        [FromForm] bool isAward = false,
+        [FromForm] string? poolType = null)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(new { error = "Primary file required." });
+
+        var extraFiles = new List<SourceFilePart>();
+        if (thirdFile != null)
+            extraFiles.Add(new SourceFilePart(thirdFile.OpenReadStream(), thirdFile.FileName));
+        if (fourthFile != null)
+            extraFiles.Add(new SourceFilePart(fourthFile.OpenReadStream(), fourthFile.FileName));
+
+        var request = new ResultSourceRequest(
+            file.OpenReadStream(),
+            file.FileName,
+            format,
+            isAward,
+            poolType,
+            secondaryFile?.OpenReadStream(),
+            secondaryFile?.FileName,
+            extraFiles.Count > 0 ? extraFiles : null);
+
+        ParsedCompetition parsed;
+        try
+        {
+            parsed = await _sourceProvider.ParseAsync(request);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+
+        var previewId = Guid.NewGuid();
+        _cache.Set(PreviewCacheKey(previewId), new PdfPreviewEntry(parsed, file.FileName), TimeSpan.FromMinutes(15));
+
+        return Ok(new
+        {
+            previewId,
+            format = parsed.Format,
+            resultCount = parsed.ResultCount,
+            competitions = parsed.Competitions,
+            warnings = parsed.Warnings,
+            debugLog = parsed.DebugLog
+        });
+    }
+
+    [HttpPost("import-parsed")]
+    public IActionResult ImportParsed([FromBody] ImportParsedRequest request)
+    {
+        var key = PreviewCacheKey(request.PreviewId);
+        if (!_cache.TryGetValue(key, out PdfPreviewEntry? entry) || entry == null)
+            return NotFound(new { error = "Preview not found or expired" });
+
+        _cache.Remove(key);
+
+        ImportEventOptions? eventOptions = null;
+        if (request.EventId.HasValue || !string.IsNullOrWhiteSpace(request.NewEventName))
+            eventOptions = new ImportEventOptions(request.EventId, request.NewEventName);
+
+        var jobId = _jobs.Enqueue(
+            Encoding.UTF8.GetBytes(entry.Parsed.ResultsJson),
+            entry.FileName,
+            request.CategoryKeys,
+            eventOptions);
+
+        return Accepted(new { jobId });
+    }
+
+    [HttpGet("parse-formats")]
+    public IActionResult GetParseFormats()
+        => Ok(_sourceProvider.AvailableFormats);
+
+    private static string PreviewCacheKey(Guid previewId) => $"pdf-preview:{previewId}";
+
+    private sealed record PdfPreviewEntry(ParsedCompetition Parsed, string FileName);
+
     private static bool IsJsonContent(byte[] data)
     {
         // Пропускаем UTF-8 BOM (EF BB BF) и leading whitespace, ищем { или [.
@@ -284,4 +378,5 @@ public class AdminController : ControllerBase
     public record SetActiveRequest(bool IsActive);
     public record UpdateSettingRequest(string Value);
     public record UpdateCompetitionRequest(bool IsAward, bool ShowCombineAllResults, string[]? Categories);
+    public record ImportParsedRequest(Guid PreviewId, string[]? CategoryKeys, int? EventId, string? NewEventName);
 }
