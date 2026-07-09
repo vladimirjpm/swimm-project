@@ -4,6 +4,7 @@
 import { NormativeLevelInfo } from '../interfaces/normative-level-info';
 import HelperTime from './helper-time';
 import { Gender } from './helper-gender';
+import RecordsHelper from './records-helper';
 
 export type PoolType = '25m_pool' | '50m_pool';
 
@@ -19,15 +20,6 @@ type Normatives = {
     >
   >;
 };
-
-// Загрузка нормативов из window
-const normsDefault = (window as any).normative as Normatives;
-const normsMasters =
-  (window as any).normatives_masters ||
-  (window as any).normativesMasters ||
-  (window as any).normative_masters ||
-  (window as any).normativeMasters ||
-  null;
 
 export default class HelperNormative {
   /** Minimum age to qualify as masters */
@@ -81,6 +73,8 @@ export default class HelperNormative {
     ageGroup?: string | null;
     event_style_age?: string | null;
   }): NormativeLevelInfo {
+    const normsDefault = RecordsHelper.getStandards() as unknown as Normatives;
+    const normsMasters = RecordsHelper.getMastersStandards() as unknown as Normatives;
     const source = isMaster && normsMasters ? normsMasters : normsDefault;
 
     const poolData = source?.normatives[gender]?.[poolType];
@@ -94,7 +88,9 @@ export default class HelperNormative {
     }
 
     // For masters normative files the structure may be distance -> event_style_age -> levels
-    let styleNorms: Record<string, unknown> | undefined = styleData[distance as keyof typeof styleData];
+    let styleNorms: Record<string, unknown> | undefined = styleData[distance as keyof typeof styleData] as
+      | Record<string, unknown>
+      | undefined;
     // Ключ возрастной группы из normative-masters (например "25-29")
     let resolvedNormativeAgeGroup: string | null = null;
 
@@ -238,12 +234,12 @@ export default class HelperNormative {
     if (!styleName || !distance) return null;
 
     const data = isMasters
-      ? (window as any).normative_masters_record
-      : (window as any).normative_age_record;
+      ? RecordsHelper.getMastersRecords()
+      : RecordsHelper.getAgeRecords();
     if (!data?.normatives) return null;
 
     const resolvedPool = HelperNormative.resolvePoolType(poolType);
-    const distanceData = data.normatives?.[gender]?.[resolvedPool]?.[styleName]?.[distance];
+    const distanceData = (data.normatives as any)?.[gender]?.[resolvedPool]?.[styleName]?.[distance];
     if (!distanceData) return null;
 
     const ageStr = age != null ? String(age).trim() : '';
@@ -391,8 +387,8 @@ export default class HelperNormative {
       }
     };
 
-    scanData((window as any).normative_age_record, false);
-    scanData((window as any).normative_masters_record, true);
+    scanData(RecordsHelper.getAgeRecords(), false);
+    scanData(RecordsHelper.getMastersRecords(), true);
 
     return results;
   }

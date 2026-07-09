@@ -1,0 +1,475 @@
+@page
+@model Swimm.API.Pages.Admin.Records.IndexModel
+@{
+    ViewData["Title"] = "Records";
+    ViewData["PageSubtitle"] = "Рекорды и нормативы уровней — данные для normative-попапа и карточек рекордов";
+
+    var flash = TempData["Flash"] as string;
+    var styles = new[] { "freestyle", "backstroke", "breaststroke", "butterfly", "individual_medley" };
+
+    string RecordsTabUrl() => Url.Page("Index", new { tab = "records" })!;
+    string StandardsTabUrl() => Url.Page("Index", new { tab = "standards" })!;
+
+    string RecordsPageUrl(int p) => Url.Page("Index", new
+    {
+        tab = "records", regionType = Model.RegionType, regionCode = Model.RegionCode,
+        category = Model.Category, gender = Model.Gender, poolType = Model.PoolType, style = Model.Style, page = p
+    })!;
+
+    string StandardsPageUrl(int p) => Url.Page("Index", new
+    {
+        tab = "standards", kind = Model.Kind, gender = Model.Gender,
+        poolType = Model.PoolType, style = Model.Style, page = p
+    })!;
+}
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}
+
+<!-- Вкладки -->
+<div class="mb-4 flex gap-2 border-b border-admin-border">
+    <a href="@RecordsTabUrl()"
+       class="px-3 py-2 text-sm font-medium border-b-2 -mb-px @(Model.Tab == "records" ? "border-admin-accent text-admin-accent" : "border-transparent text-admin-text-muted hover:text-admin-text")">
+        Records
+    </a>
+    <a href="@StandardsTabUrl()"
+       class="px-3 py-2 text-sm font-medium border-b-2 -mb-px @(Model.Tab == "standards" ? "border-admin-accent text-admin-accent" : "border-transparent text-admin-text-muted hover:text-admin-text")">
+        Standards
+    </a>
+</div>
+
+@if (Model.Tab == "records")
+{
+    <form method="get" class="admin-card flex flex-wrap items-end gap-3 px-4 py-3 mb-4">
+        <input type="hidden" name="tab" value="records" />
+        <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+            Region type
+            <select name="regionType" class="admin-input" onchange="this.form.submit()">
+                <option value="">Все</option>
+                @foreach (var rt in Model.RegionTypes)
+                {
+                    <option value="@rt" selected="@(rt == Model.RegionType)">@rt</option>
+                }
+            </select>
+        </label>
+        <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+            Region code
+            <input name="regionCode" value="@Model.RegionCode" class="admin-input w-24" placeholder="ISR/EU…" />
+        </label>
+        <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+            Category
+            <select name="category" class="admin-input" onchange="this.form.submit()">
+                <option value="">Все</option>
+                @foreach (var c in Model.RecordCategories)
+                {
+                    <option value="@c" selected="@(c == Model.Category)">@c</option>
+                }
+            </select>
+        </label>
+        <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+            Gender
+            <select name="gender" class="admin-input" onchange="this.form.submit()">
+                <option value="">Все</option>
+                <option value="male" selected="@(Model.Gender == "male")">male</option>
+                <option value="female" selected="@(Model.Gender == "female")">female</option>
+            </select>
+        </label>
+        <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+            Pool
+            <select name="poolType" class="admin-input" onchange="this.form.submit()">
+                <option value="">Все</option>
+                <option value="25m" selected="@(Model.PoolType == "25m")">25m</option>
+                <option value="50m" selected="@(Model.PoolType == "50m")">50m</option>
+            </select>
+        </label>
+        <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+            Style
+            <select name="style" class="admin-input" onchange="this.form.submit()">
+                <option value="">Все</option>
+                @foreach (var s in styles)
+                {
+                    <option value="@s" selected="@(s == Model.Style)">@s</option>
+                }
+            </select>
+        </label>
+        <button type="submit" class="admin-btn admin-btn-primary">Найти</button>
+        <a href="@RecordsTabUrl()" class="admin-btn admin-btn-ghost">Сброс</a>
+        <button type="button" class="admin-btn admin-btn-primary ml-auto" onclick="toggleAddRecord()">+ Новый рекорд</button>
+    </form>
+
+    <div id="add-record-panel" class="admin-card hidden px-4 py-3 mb-4">
+        <div class="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Region type
+                <select id="nr-regionType" class="admin-input">
+                    @foreach (var rt in Model.RegionTypes) { <option value="@rt">@rt</option> }
+                </select>
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Region code
+                <input id="nr-regionCode" class="admin-input" placeholder="ISR/EU/…" />
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Category
+                <select id="nr-category" class="admin-input">
+                    @foreach (var c in Model.RecordCategories) { <option value="@c">@c</option> }
+                </select>
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Age key
+                <input id="nr-ageKey" class="admin-input" placeholder="10 / 25-29 / …" />
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Gender
+                <select id="nr-gender" class="admin-input">
+                    <option value="male">male</option>
+                    <option value="female">female</option>
+                </select>
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Pool
+                <select id="nr-poolType" class="admin-input">
+                    <option value="25m">25m</option>
+                    <option value="50m">50m</option>
+                </select>
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Style
+                <select id="nr-style" class="admin-input">
+                    @foreach (var s in styles) { <option value="@s">@s</option> }
+                </select>
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Distance
+                <input id="nr-distance" class="admin-input" placeholder="50m / 4X50m" />
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Time
+                <input id="nr-time" class="admin-input" placeholder="21.08 / 01:43.45" />
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Holder name
+                <input id="nr-holderName" class="admin-input" />
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Club
+                <input id="nr-club" class="admin-input" />
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Holder country
+                <input id="nr-holderCountry" class="admin-input" placeholder="ISR/USA/…" />
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Record date
+                <input id="nr-recordDate" class="admin-input" placeholder="dd/MM/yyyy" />
+            </label>
+        </div>
+        <div class="mt-3 flex gap-2">
+            <button type="button" class="admin-btn admin-btn-primary" onclick="createRecord()">Создать</button>
+            <button type="button" class="admin-btn admin-btn-ghost" onclick="toggleAddRecord()">Отмена</button>
+        </div>
+    </div>
+
+    <div class="mb-3 text-xs text-admin-text-muted">Всего: <strong class="text-admin-text">@Model.Records.TotalCount</strong></div>
+
+    @if (Model.Records.Items.Count == 0)
+    {
+        <div class="admin-card text-center text-admin-text-muted italic py-10">Рекордов не найдено.</div>
+    }
+    else
+    {
+        <div class="overflow-x-auto">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>ID</th><th>Region</th><th>Category</th><th>Age</th><th>Gender</th><th>Pool</th>
+                        <th>Style</th><th>Dist</th><th>Time</th><th>Holder</th><th>Club</th><th>Country</th><th>Date</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in Model.Records.Items)
+                    {
+                        <tr id="rec-row-@r.Id">
+                            <td class="text-admin-text-muted">@r.Id</td>
+                            <td class="whitespace-nowrap text-admin-text-muted">@r.RegionType@(string.IsNullOrEmpty(r.RegionCode) ? "" : $" · {r.RegionCode}")</td>
+                            <td>@r.Category</td>
+                            <td>@(string.IsNullOrEmpty(r.AgeKey) ? "—" : r.AgeKey)</td>
+                            <td>@r.Gender</td>
+                            <td>@r.PoolType</td>
+                            <td>@r.Style</td>
+                            <td>@r.Distance</td>
+                            <td><input class="admin-input w-24" data-field="time" value="@r.Time" /></td>
+                            <td><input class="admin-input w-40" data-field="holderName" value="@r.HolderName" /></td>
+                            <td><input class="admin-input w-32" data-field="club" value="@r.Club" /></td>
+                            <td><input class="admin-input w-16" data-field="holderCountry" value="@r.HolderCountry" /></td>
+                            <td><input class="admin-input w-24" data-field="recordDate" value="@r.RecordDate" /></td>
+                            <td class="whitespace-nowrap text-right">
+                                <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5" onclick="saveRecord(@r.Id)">Save</button>
+                                <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5" onclick="deleteRecord(@r.Id)">Del</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (Model.Records.TotalPages > 1)
+        {
+            <div class="flex items-center gap-3 mt-4">
+                @if (Model.Records.HasPrev)
+                { <a href="@RecordsPageUrl(Model.Records.Page - 1)" class="admin-btn admin-btn-ghost">← Назад</a> }
+                else
+                { <span class="admin-btn admin-btn-ghost opacity-40 cursor-not-allowed">← Назад</span> }
+                <span class="text-xs text-admin-text-muted">Страница @Model.Records.Page из @Model.Records.TotalPages</span>
+                @if (Model.Records.HasNext)
+                { <a href="@RecordsPageUrl(Model.Records.Page + 1)" class="admin-btn admin-btn-ghost">Вперёд →</a> }
+                else
+                { <span class="admin-btn admin-btn-ghost opacity-40 cursor-not-allowed">Вперёд →</span> }
+            </div>
+        }
+    }
+}
+else
+{
+    <form method="get" class="admin-card flex flex-wrap items-end gap-3 px-4 py-3 mb-4">
+        <input type="hidden" name="tab" value="standards" />
+        <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+            Kind
+            <select name="kind" class="admin-input" onchange="this.form.submit()">
+                <option value="">Все</option>
+                @foreach (var k in Model.StandardKinds)
+                {
+                    <option value="@k" selected="@(k == Model.Kind)">@k</option>
+                }
+            </select>
+        </label>
+        <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+            Gender
+            <select name="gender" class="admin-input" onchange="this.form.submit()">
+                <option value="">Все</option>
+                <option value="male" selected="@(Model.Gender == "male")">male</option>
+                <option value="female" selected="@(Model.Gender == "female")">female</option>
+            </select>
+        </label>
+        <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+            Pool
+            <select name="poolType" class="admin-input" onchange="this.form.submit()">
+                <option value="">Все</option>
+                <option value="25m" selected="@(Model.PoolType == "25m")">25m</option>
+                <option value="50m" selected="@(Model.PoolType == "50m")">50m</option>
+            </select>
+        </label>
+        <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+            Style
+            <select name="style" class="admin-input" onchange="this.form.submit()">
+                <option value="">Все</option>
+                @foreach (var s in styles)
+                {
+                    <option value="@s" selected="@(s == Model.Style)">@s</option>
+                }
+            </select>
+        </label>
+        <button type="submit" class="admin-btn admin-btn-primary">Найти</button>
+        <a href="@StandardsTabUrl()" class="admin-btn admin-btn-ghost">Сброс</a>
+        <button type="button" class="admin-btn admin-btn-primary ml-auto" onclick="toggleAddStandard()">+ Новый норматив</button>
+    </form>
+
+    <div id="add-standard-panel" class="admin-card hidden px-4 py-3 mb-4">
+        <div class="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Kind
+                <select id="ns-kind" class="admin-input">
+                    @foreach (var k in Model.StandardKinds) { <option value="@k">@k</option> }
+                </select>
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Country
+                <input id="ns-country" class="admin-input" placeholder="RUS" />
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Gender
+                <select id="ns-gender" class="admin-input">
+                    <option value="male">male</option>
+                    <option value="female">female</option>
+                </select>
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Pool
+                <select id="ns-poolType" class="admin-input">
+                    <option value="25m">25m</option>
+                    <option value="50m">50m</option>
+                </select>
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Style
+                <select id="ns-style" class="admin-input">
+                    @foreach (var s in styles) { <option value="@s">@s</option> }
+                </select>
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Distance
+                <input id="ns-distance" class="admin-input" placeholder="50m" />
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Age key
+                <input id="ns-ageKey" class="admin-input" placeholder="(пусто) / 25-29" />
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Level
+                <input id="ns-level" class="admin-input" placeholder="MSMK / I_adult / …" />
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Time
+                <input id="ns-time" class="admin-input" placeholder="0:59.05" />
+            </label>
+        </div>
+        <div class="mt-3 flex gap-2">
+            <button type="button" class="admin-btn admin-btn-primary" onclick="createStandard()">Создать</button>
+            <button type="button" class="admin-btn admin-btn-ghost" onclick="toggleAddStandard()">Отмена</button>
+        </div>
+    </div>
+
+    <div class="mb-3 text-xs text-admin-text-muted">Всего: <strong class="text-admin-text">@Model.Standards.TotalCount</strong></div>
+
+    @if (Model.Standards.Items.Count == 0)
+    {
+        <div class="admin-card text-center text-admin-text-muted italic py-10">Нормативов не найдено.</div>
+    }
+    else
+    {
+        <div class="overflow-x-auto">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>ID</th><th>Kind</th><th>Country</th><th>Gender</th><th>Pool</th>
+                        <th>Style</th><th>Dist</th><th>Age</th><th>Level</th><th>Time</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in Model.Standards.Items)
+                    {
+                        <tr id="std-row-@s.Id">
+                            <td class="text-admin-text-muted">@s.Id</td>
+                            <td>@s.Kind</td>
+                            <td>@s.Country</td>
+                            <td>@s.Gender</td>
+                            <td>@s.PoolType</td>
+                            <td>@s.Style</td>
+                            <td>@s.Distance</td>
+                            <td>@(string.IsNullOrEmpty(s.AgeKey) ? "—" : s.AgeKey)</td>
+                            <td>@s.Level</td>
+                            <td><input class="admin-input w-24" data-field="time" value="@s.Time" /></td>
+                            <td class="whitespace-nowrap text-right">
+                                <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5" onclick="saveStandard(@s.Id)">Save</button>
+                                <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5" onclick="deleteStandard(@s.Id)">Del</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (Model.Standards.TotalPages > 1)
+        {
+            <div class="flex items-center gap-3 mt-4">
+                @if (Model.Standards.HasPrev)
+                { <a href="@StandardsPageUrl(Model.Standards.Page - 1)" class="admin-btn admin-btn-ghost">← Назад</a> }
+                else
+                { <span class="admin-btn admin-btn-ghost opacity-40 cursor-not-allowed">← Назад</span> }
+                <span class="text-xs text-admin-text-muted">Страница @Model.Standards.Page из @Model.Standards.TotalPages</span>
+                @if (Model.Standards.HasNext)
+                { <a href="@StandardsPageUrl(Model.Standards.Page + 1)" class="admin-btn admin-btn-ghost">Вперёд →</a> }
+                else
+                { <span class="admin-btn admin-btn-ghost opacity-40 cursor-not-allowed">Вперёд →</span> }
+            </div>
+        }
+    }
+}
+
+@section Scripts {
+    <script>
+        function toggleAddRecord() { document.getElementById('add-record-panel').classList.toggle('hidden'); }
+        function toggleAddStandard() { document.getElementById('add-standard-panel').classList.toggle('hidden'); }
+
+        function rowField(rowId, field) {
+            return document.querySelector(`#${rowId} [data-field="${field}"]`);
+        }
+
+        async function saveRecord(id) {
+            const row = 'rec-row-' + id;
+            try {
+                await api(`/api/admin/records/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        time: rowField(row, 'time').value,
+                        holderName: rowField(row, 'holderName').value,
+                        club: rowField(row, 'club').value,
+                        holderCountry: rowField(row, 'holderCountry').value,
+                        recordDate: rowField(row, 'recordDate').value,
+                    }),
+                });
+                toast('Сохранено');
+            } catch (e) {
+                toast('Ошибка: ' + e.message, 4000);
+            }
+        }
+
+        async function deleteRecord(id) {
+            const ok = await adminConfirm({ title: 'Удалить рекорд?', confirmText: 'Удалить', danger: true });
+            if (!ok) return;
+            try {
+                await api(`/api/admin/records/${id}`, { method: 'DELETE' });
+                document.getElementById('rec-row-' + id)?.remove();
+                toast('Рекорд удалён');
+            } catch (e) {
+                toast('Ошибка: ' + e.message, 4000);
+            }
+        }
+
+        async function createRecord() {
+            const val = idSuffix => document.getElementById('nr-' + idSuffix).value;
+            try {
+                await api('/api/admin/records', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        regionType: val('regionType'), regionCode: val('regionCode'), category: val('category'),
+                        ageKey: val('ageKey'), gender: val('gender'), poolType: val('poolType'), style: val('style'),
+                        distance: val('distance'), time: val('time'), holderName: val('holderName'),
+                        club: val('club'), holderCountry: val('holderCountry'), recordDate: val('recordDate'),
+                    }),
+                });
+                location.reload();
+            } catch (e) {
+                toast('Ошибка: ' + e.message, 4000);
+            }
+        }
+
+        async function saveStandard(id) {
+            const row = 'std-row-' + id;
+            try {
+                await api(`/api/admin/normative-standards/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ time: rowField(row, 'time').value }),
+                });
+                toast('Сохранено');
+            } catch (e) {
+                toast('Ошибка: ' + e.message, 4000);
+            }
+        }
+
+        async function deleteStandard(id) {
+            const ok = await adminConfirm({ title: 'Удалить норматив?', confirmText: 'Удалить', danger: true });
+            if (!ok) return;
+            try {
+                await api(`/api/admin/normative-standards/${id}`, { method: 'DELETE' });
+                document.getElementById('std-row-' + id)?.remove();
+                toast('Норматив удалён');
+            } catch (e) {
+                toast('Ошибка: ' + e.message, 4000);
+            }
+        }
+
+        async function createStandard() {
+            const val = idSuffix => document.getElementById('ns-' + idSuffix).value;
+            try {
+                await api('/api/admin/normative-standards', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        kind: val('kind'), country: val('country'), gender: val('gender'), poolType: val('poolType'),
+                        style: val('style'), distance: val('distance'), ageKey: val('ageKey'),
+                        level: val('level'), time: val('time'),
+                    }),
+                });
+                location.reload();
+            } catch (e) {
+                toast('Ошибка: ' + e.message, 4000);
+            }
+        }
+    </script>
+}

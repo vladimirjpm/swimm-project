@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppSelector } from '../../../store/store';
 import Helper from '../../../utils/helpers/data-helper';
+import RecordsHelper from '../../../utils/helpers/records-helper';
 import useMode from '../../../hooks/useMode';
 import './popup-content-normative.css';
 
@@ -39,19 +40,8 @@ type RecordsTree = {
   >;
 };
 
-// Данные приходят из глобальных переменных,
-// заданных в public/data/normative.js и normative-records.js
-// normative.js:          window.normative = { ... }
-// normative-record.js:  window.normative_record = { ... }
-// normatives-masters.js: window.normatives_masters = { ... }
-
-const norms = (window as any).normative as Normatives;
-const normsMasters = (window as any).normatives_masters ||
-  (window as any).normativesMasters ||
-  (window as any).normative_masters ||
-  (window as any).normativeMasters ||
-  null;
-const recordsTree = (window as any).normative_record as RecordsTree;
+// Данные приходят из RecordsHelper (БД, /api/records + /api/normative-standards),
+// с fallback на window.normative_* пока не загрузились (см. records-helper.ts).
 
 const strokeLabel: Record<string, string> = {
   freestyle: 'Freestyle',
@@ -91,6 +81,7 @@ const normalizeDistance = (v?: string) => {
 
 // ===== helpers для рекордов =====
 const getRecordCell = (
+  recordsTree: RecordsTree,
   gender: Gender,
   poolType: PoolType,
   stroke: string,
@@ -210,6 +201,11 @@ const PopupContentNormative: React.FC = () => {
 
   // Приведение isMasters к булеву типу (строгое сравнение + строка/число)
   const isMastersBool = isMasters === true || isMasters === 'true' || isMasters === 1;
+
+  // Данные рекордов/нормативов — читаем на каждый рендер (RecordsHelper может догрузиться позже)
+  const norms = RecordsHelper.getStandards() as unknown as Normatives;
+  const normsMasters = RecordsHelper.getMastersStandards() as unknown as Normatives | null;
+  const recordsTree = RecordsHelper.getOpenRecords() as unknown as RecordsTree;
 
   const { mode } = useMode();
   const dark = mode === 'dark';
@@ -341,7 +337,7 @@ const PopupContentNormative: React.FC = () => {
   const womenPillStyle: React.CSSProperties = { ...menPillStyle, background: U.womenPill, color: U.womenText };
 
   const fmtRecord = (g: Gender, d: string, kind: 'WR' | 'ISR') => {
-    const cell = getRecordCell(g, poolType, stroke, d, kind);
+    const cell = getRecordCell(recordsTree, g, poolType, stroke, d, kind);
     return {
       text: Helper.formatSecondsToTimeString(Helper.parseTimeToSeconds(String(cell?.time ?? ''))),
       holder: cell?.name ?? undefined,

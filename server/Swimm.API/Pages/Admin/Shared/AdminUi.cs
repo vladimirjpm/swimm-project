@@ -17,6 +17,7 @@ public static class AdminNav
 
         new("Competitions", "trophy", "/Admin/Competitions", "Data"),
         new("Categories", "tag", "/Admin/Categories", "Data"),
+        new("Records", "award", "/Admin/Records", "Data"),
         new("Import", "download", "/Admin/Import", "Data"),
         new("Import History", "history", "/Admin/ImportHistory", "Data"),
 

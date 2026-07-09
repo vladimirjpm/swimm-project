@@ -7,7 +7,11 @@ import AboutPage from './projects/about-project/about';
 //import DolphineTraining from './projects/results-main/results-main';
 import ResultsMain from './projects/results-main-project/results-main-project';
 import reportWebVitals from './reportWebVitals';
+import RecordsHelper from './utils/helpers/records-helper';
 import './index.css';
+
+// Прогрев рекордов/нормативов с сервера (fallback на window.normative_* пока не загрузится)
+RecordsHelper.warmUp();
 
 const container = document.getElementById('root')!;
 const root = createRoot(container);

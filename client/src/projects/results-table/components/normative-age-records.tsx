@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Helper from '../../../utils/helpers/data-helper';
+import RecordsHelper from '../../../utils/helpers/records-helper';
 
 interface AgeRecord {
   time: string;
@@ -265,7 +266,7 @@ function NormativeAgeRecords({ gender, poolType, styleName, styleLen, age }: Nor
   // Only show if style and distance are selected
   if (!styleName || !styleLen) return null;
 
-  const data = (window as any).normative_age_record;
+  const data = RecordsHelper.getAgeRecords();
   if (!data?.normatives) return null;
 
   const distanceKey = `${styleLen}m`;

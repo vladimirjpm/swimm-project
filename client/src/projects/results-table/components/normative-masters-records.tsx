@@ -1,5 +1,6 @@
 import React from 'react';
 import Helper from '../../../utils/helpers/data-helper';
+import RecordsHelper from '../../../utils/helpers/records-helper';
 
 interface MastersRecord {
   time: string;
@@ -249,7 +250,7 @@ function NormativeMastersRecords({ gender, poolType, styleName, styleLen, age }:
 
   if (!styleName || !styleLen) return null;
 
-  const data = (window as any).normative_masters_record;
+  const data = RecordsHelper.getMastersRecords();
   if (!data?.normatives) return null;
 
   const distanceKey = `${styleLen}m`;
