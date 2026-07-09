@@ -52,7 +52,7 @@ const FilterDistance: React.FC = () => {
             <button
               key={len}
               disabled={disabled}
-              className={`fseg ${filters.style_len === len ? 'fseg-active' : ''}`}
+              className={`fseg ${String(filters.style_len) === String(len) ? 'fseg-active' : ''}`}
               onClick={() => !disabled && updateFilter(len)}
             >
               {len}m

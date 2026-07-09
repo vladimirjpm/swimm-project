@@ -233,7 +233,7 @@ const FilterTrainigSection: React.FC = () => {
                   key={len}
                   disabled={disabled}
                   className={`px-3 py-1 m-1 border rounded transition-colors ${
-                    filters.style_len === len
+                    String(filters.style_len) === String(len)
                       ? 'theme-btn-active'
                       : 'theme-btn'
                   } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
