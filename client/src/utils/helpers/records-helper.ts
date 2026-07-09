@@ -214,24 +214,46 @@ export default class RecordsHelper {
     }
   }
 
+  // Последний уровень fallback (статики normative*.js удалены на этапе 2.7): пустое
+  // дерево вместо undefined — до ответа API (или при его недоступности) потребители
+  // видят «нет данных для этой позиции», а не падение на обращении к .normatives.
+  // window.normative_* оставлены в цепочке на случай легаси-страниц со script-тегами.
+  private static readonly emptyTree = { normatives: {} };
+
   /** ISR+WR открытые рекорды (форма window.normative_record). */
   static getOpenRecords(): OpenRecordsTree {
-    return this.openCache ?? ((window as any).normative_record as OpenRecordsTree);
+    return (
+      this.openCache ??
+      ((window as any).normative_record as OpenRecordsTree) ??
+      (this.emptyTree as OpenRecordsTree)
+    );
   }
 
   /** Возрастные рекорды ISR (форма window.normative_age_record). */
   static getAgeRecords(): AgeRecordsTree {
-    return this.ageCache ?? ((window as any).normative_age_record as AgeRecordsTree);
+    return (
+      this.ageCache ??
+      ((window as any).normative_age_record as AgeRecordsTree) ??
+      (this.emptyTree as AgeRecordsTree)
+    );
   }
 
   /** Мастерс-рекорды ISR (форма window.normative_masters_record). */
   static getMastersRecords(): AgeRecordsTree {
-    return this.mastersCache ?? ((window as any).normative_masters_record as AgeRecordsTree);
+    return (
+      this.mastersCache ??
+      ((window as any).normative_masters_record as AgeRecordsTree) ??
+      (this.emptyTree as AgeRecordsTree)
+    );
   }
 
   /** Обычные нормативы уровней (форма window.normative). */
   static getStandards(): StandardsTree {
-    return this.standardsCache ?? ((window as any).normative as StandardsTree);
+    return (
+      this.standardsCache ??
+      ((window as any).normative as StandardsTree) ??
+      (this.emptyTree as StandardsTree)
+    );
   }
 
   /** Мастерс-нормативы уровней (форма window.normative_masters / варианты имени в легаси). */
@@ -242,7 +264,8 @@ export default class RecordsHelper {
         (window as any).normativesMasters ||
         (window as any).normative_masters ||
         (window as any).normativeMasters ||
-        null) as MastersStandardsTree)
+        null) as MastersStandardsTree) ??
+      (this.emptyTree as MastersStandardsTree)
     );
   }
 

@@ -5,11 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Results</title>
     <script src="/data/filter-data.js"></script>
-    <script src="/data/normative-records.js"></script>
-    <script src="/data/normative.js"></script>
-    <script src="/data/normative-masters.js"></script>
-    <script src="/data/normative-age-records.js"></script>
-    <script src="/data/normative-masters-records.js"></script>
+    <!-- normative*.js удалены (фаза 2.7): рекорды/нормативы приходят с /api/records и
+         /api/normative-standards через RecordsHelper.warmUp() в точке входа страницы. -->
     <!-- Линки на CSS вручную НЕ нужны, Vite добавит их сам благодаря import в TSX -->
   </head>
   <!-- Единая страница результатов. Категория/соревнование — URL-параметрами:
