@@ -7,6 +7,10 @@ Keep this file the single source of agent guidance; other agents are pointed her
 - [`README.md`](README.md) — what the project is + human quick-start.
 - [`.github/copilot-instructions.md`](.github/copilot-instructions.md) — architecture (Clean
   Architecture layering) and coding conventions. Follow it for where code goes and naming.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — целевая архитектура: швы (интерфейсы),
+  стратегия кэша, бэклог рефакторинга. Сверяйся перед структурными изменениями.
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — план работ по фазам (parsing-lib, рекорды в БД,
+  масштаб/кэш, логин, галереи, isr.org.il, админка). Отмечай выполненные этапы.
 
 This file covers only what those don't: how to build, run, migrate, and test **in practice here**,
 plus repo-specific footguns.

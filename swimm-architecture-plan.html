@@ -1,635 +1,613 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SwimmProject — Architecture &amp; Roadmap</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; padding: 2rem; }
-    h1 { font-size: 1.75rem; font-weight: 700; color: #f8fafc; margin-bottom: 0.25rem; }
-    .subtitle { color: #94a3b8; margin-bottom: 2rem; font-size: 0.95rem; }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SwimmProject — Архитектура и Roadmap</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0b0f17; --panel: #141a25; --panel2: #10151f; --line: #283143;
+    --text: #dfe5ee; --muted: #8a93a6; --dim: #5a6478; --head: #f3f6fb;
+    --blue: #3b82f6; --cyan: #22d3ee; --green: #4ade80; --amber: #fbbf24;
+  }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
 
-    h2.section { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #475569; margin: 2rem 0 0.75rem; }
+  /* ---- layout: sidebar + main ---- */
+  .layout { display: flex; align-items: flex-start; }
+  .sidebar {
+    position: sticky; top: 0; align-self: flex-start;
+    width: 250px; height: 100vh; flex-shrink: 0;
+    background: var(--panel2); border-right: 1px solid var(--line);
+    padding: 1.4rem 1rem; overflow-y: auto;
+  }
+  .brand { font-size: 1.15rem; font-weight: 800; color: var(--head); letter-spacing: .01em; }
+  .brand .dot { color: var(--cyan); }
+  .brand-sub { font-size: .7rem; color: var(--dim); margin: .25rem 0 1.2rem; line-height: 1.35; }
+  .nav { list-style: none; display: flex; flex-direction: column; gap: .12rem; }
+  .nav a {
+    display: flex; align-items: center; gap: .55rem;
+    text-decoration: none; color: var(--muted); font-size: .84rem;
+    padding: .45rem .6rem; border-radius: 8px; border-left: 2px solid transparent;
+    transition: background .12s, color .12s;
+  }
+  .nav a:hover { background: #1a2130; color: var(--text); }
+  .nav a.active { background: #16202f; color: var(--head); border-left-color: var(--cyan); font-weight: 600; }
+  .nav a .ico { width: 1.1rem; text-align: center; opacity: .8; font-size: .9rem; }
+  .nav .grouplabel { font-size: .64rem; text-transform: uppercase; letter-spacing: .12em; color: var(--dim); margin: 1rem 0 .35rem .6rem; font-weight: 700; }
+  .nav a.hot { color: #fde9c3; }
+  .nav a.hot .ico { opacity: 1; }
 
-    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
-    @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+  main { flex: 1; min-width: 0; padding: 2rem 2.4rem 4rem; max-width: 1180px; }
 
-    .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; }
-    .card h2 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; margin-bottom: 1rem; }
+  h1 { font-size: 1.8rem; color: var(--head); }
+  .subtitle { color: var(--muted); margin: .3rem 0 1.5rem; font-size: .88rem; }
+  h2.section { font-size: .72rem; text-transform: uppercase; letter-spacing: .12em; color: var(--dim); margin: 2.4rem 0 .8rem; font-weight: 700; scroll-margin-top: 1rem; }
+  h2.section .anchor { color: #33405a; font-weight: 400; }
 
-    .stack-row { display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0; border-bottom: 1px solid #1e293b; font-size: 0.88rem; }
-    .stack-row:last-child { border-bottom: none; }
-    .stack-label { color: #94a3b8; }
-    .stack-value { color: #e2e8f0; font-weight: 500; text-align: right; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 1.2rem 1.4rem; margin-bottom: 1rem; }
+  .card h3 { font-size: .82rem; text-transform: uppercase; letter-spacing: .06em; color: #6b7488; margin-bottom: .8rem; font-weight: 700; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 980px){ .grid2 { grid-template-columns: 1fr; } .sidebar { display: none; } main { padding: 1.4rem; } }
 
-    .cmd-block { background: #0f172a; border: 1px solid #1e3a5f; border-radius: 8px; padding: 1rem; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.9; }
-    .cmd-comment { color: #475569; }
-    .cmd-text { color: #38bdf8; }
-    .cmd-env { color: #a78bfa; }
+  .bar-row { margin: .55rem 0; }
+  .bar-top { display: flex; justify-content: space-between; font-size: .85rem; margin-bottom: .3rem; }
+  .bar-top .lbl { color: #c2cad8; }
+  .bar-top .pct { color: #9aa4b8; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .track { height: 10px; background: #1e2636; border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
+  .fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg,var(--blue),var(--cyan)); }
+  .fill.green { background: linear-gradient(90deg,#16a34a,#4ade80); }
+  .fill.amber { background: linear-gradient(90deg,#b45309,#fbbf24); }
+  .big-track { height: 18px; }
 
-    .phase-header { background: #0c1a3a; border: 1px solid #1e40af; border-radius: 10px; padding: 0.75rem 1.25rem; margin: 1.5rem 0 0.75rem; display: flex; align-items: center; gap: 1rem; }
-    .phase-header.p2 { background: #1c1a08; border-color: #854d0e; }
-    .phase-num { font-size: 1.5rem; font-weight: 800; color: #3b82f6; min-width: 3rem; }
-    .phase-header.p2 .phase-num { color: #fbbf24; }
-    .phase-title { font-size: 1rem; font-weight: 700; color: #f8fafc; }
-    .phase-sub { font-size: 0.8rem; color: #94a3b8; margin-top: 0.15rem; }
+  .note { background: #0d1b34; border-left: 3px solid #1e40af; border-radius: 0 6px 6px 0; padding: .7rem 1rem; font-size: .86rem; color: #d6e4ff; margin: .5rem 0; }
+  .note.green { background: #0a2417; border-color: #166534; color: #d7f5e3; }
+  .note.amber { background: #221a08; border-color: #854d0e; color: #fde9c3; }
+  .note strong { color: #fff; }
+  code { font-family: 'Cascadia Code','Fira Code',monospace; font-size: .82em; color: #93c5fd; background: rgba(0,0,0,.3); padding: .05rem .35rem; border-radius: 4px; }
 
-    .stages { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem; }
-    .stage { display: flex; align-items: flex-start; gap: 1rem; background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 1rem 1.25rem; }
-    .stage.phase2 { border-color: #854d0e; background: #1c1a08; }
+  .phase { border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.2rem; margin-bottom: .9rem; background: var(--panel); scroll-margin-top: 1rem; }
+  .phase.done { border-color: #1d5e3a; }
+  .phase.now  { border-color: #8a5a12; }
+  .phase.next { border-color: #1e3a6b; }
+  .phase-head { display: flex; align-items: center; gap: .9rem; margin-bottom: .5rem; }
+  .pnum { width: 2.2rem; height: 2.2rem; border-radius: 8px; display:flex; align-items:center; justify-content:center; font-weight: 800; font-size: 1.05rem; flex-shrink:0; background:#1e2636; color:var(--muted); }
+  .phase.done .pnum { background:#0a2417; color:var(--green); }
+  .phase.now  .pnum { background:#221a08; color:var(--amber); }
+  .phase.next .pnum { background:#0d1b34; color:#60a5fa; }
+  .ptitle { font-size: 1rem; font-weight: 700; color: var(--head); }
+  .pstatus { font-size: .7rem; font-weight: 700; padding: .12rem .5rem; border-radius: 999px; margin-left: .5rem; vertical-align: middle; }
+  .st-done { background:#0a2417; color:var(--green); border:1px solid #166534; }
+  .st-now  { background:#221a08; color:var(--amber); border:1px solid #854d0e; }
+  .st-next { background:#0d1b34; color:#60a5fa; border:1px solid #1e40af; }
+  .psub { font-size: .82rem; color: var(--muted); margin-bottom: .5rem; }
 
-    .stage-badge { min-width: 2rem; height: 2rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; }
-    .stage        .stage-badge { background: #334155; color: #94a3b8; }
-    .stage.phase2 .stage-badge { background: #b45309; color: #fff; }
+  .steps { list-style: none; display: flex; flex-direction: column; gap: .28rem; }
+  .steps li { font-size: .84rem; padding-left: 1.4rem; position: relative; color: #aab3c4; }
+  .steps li.ok { color: #cfe9da; }
+  .steps li.ok::before { content:'✓'; position:absolute; left:.2rem; color:var(--green); }
+  .steps li.todo::before { content:'○'; position:absolute; left:.25rem; color:var(--dim); font-size:.75rem; top:.15rem; }
+  .steps li.todo { color:var(--muted); }
 
-    .stage-info h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.2rem; }
-    .stage        .stage-info h3 { color: #94a3b8; }
-    .stage.phase2 .stage-info h3 { color: #fbbf24; }
-    .stage-info p { font-size: 0.82rem; color: #64748b; line-height: 1.5; }
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid #232c3c; vertical-align: top; }
+  th { color: #6b7488; font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }
+  td.k { color: #c2cad8; white-space: nowrap; }
+  .chip { display:inline-block; padding:.12rem .5rem; border-radius:999px; font-size:.72rem; font-weight:600; margin:.1rem .15rem .1rem 0; }
+  .c-ok { background:#0a2417; color:var(--green); border:1px solid #166534; }
+  .c-part { background:#221a08; color:var(--amber); border:1px solid #854d0e; }
+  .c-no { background:#1a1a1a; color:#7a8398; border:1px solid #333b4d; }
 
-    .stage-tasks { margin-top: 0.6rem; display: flex; flex-direction: column; gap: 0.3rem; }
-    .task { font-size: 0.8rem; padding-left: 1.2rem; position: relative; color: #94a3b8; line-height: 1.5; }
-    .task::before { content: '·'; position: absolute; left: 0.3rem; color: #475569; }
-    .task.key { color: #e2e8f0; }
-    .task.key::before { content: '▸'; color: #3b82f6; }
-    .task.done { color: #4ade80; }
-    .task.done::before { content: '✓'; color: #4ade80; }
+  .kv { display:grid; grid-template-columns: max-content 1fr; gap:.35rem 1rem; font-size:.85rem; }
+  .kv dt { color:#c2cad8; font-weight:600; }
+  .kv dd { color:#aab3c4; }
 
-    .schema-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
-    @media (max-width: 800px) { .schema-grid { grid-template-columns: 1fr; } }
+  .mono { font-family:'Cascadia Code','Fira Code',monospace; font-size:.8rem; background:#0b1422; border:1px solid #1e3a5f; border-radius:8px; padding:.8rem 1rem; color:#cfe0f5; line-height:1.7; }
+  .mono .c { color:#6b7488; }
 
-    .schema-card { background: #0f172a; border: 1px solid #1e3a5f; border-radius: 10px; padding: 1rem 1.25rem; }
-    .schema-card.sys { border-color: #4c1d95; }
-    .schema-title { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #3b82f6; margin-bottom: 0.75rem; font-family: 'Cascadia Code', monospace; }
-    .schema-card.sys .schema-title { color: #c4b5fd; }
-    .group-tag { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 4px; font-size: 0.65rem; font-weight: 700; margin-left: 0.5rem; vertical-align: middle; }
-    .group-tag.core { background: #052e16; color: #4ade80; border: 1px solid #166534; }
-    .group-tag.auth { background: #1a0a2e; color: #c4b5fd; border: 1px solid #6d28d9; }
-    .schema-field { display: flex; justify-content: space-between; align-items: baseline; padding: 0.25rem 0; border-bottom: 1px solid #1e293b; font-size: 0.8rem; font-family: 'Cascadia Code', monospace; }
-    .schema-field:last-child { border-bottom: none; }
-    .field-name { color: #e2e8f0; }
-    .field-name.key-field { color: #fbbf24; }
-    .field-type { color: #475569; font-size: 0.75rem; }
-    .field-note { color: #3b82f6; font-size: 0.72rem; margin-left: 0.5rem; }
-
-    .flow { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; }
-    .flow-box { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 0.5rem 0.85rem; font-size: 0.82rem; color: #e2e8f0; }
-    .flow-box.blue   { background: #0c1a3a; border-color: #1e40af; color: #93c5fd; }
-    .flow-box.green  { background: #052e16; border-color: #166534; color: #4ade80; }
-    .flow-box.purple { background: #1a0a2e; border-color: #6d28d9; color: #c4b5fd; }
-    .flow-box.amber  { background: #1c1008; border-color: #854d0e; color: #fbbf24; }
-    .flow-arrow { color: #475569; font-size: 0.9rem; }
-    .flow-label { color: #64748b; font-size: 0.75rem; margin: 0.25rem 0 0.5rem; }
-
-    .layer { display: flex; align-items: center; gap: 1rem; padding: 0.65rem 0; border-bottom: 1px solid #1e293b; font-size: 0.85rem; }
-    .layer:last-child { border-bottom: none; }
-    .layer-name { color: #93c5fd; font-family: 'Cascadia Code', monospace; min-width: 175px; flex-shrink: 0; }
-    .layer.parser .layer-name { color: #fbbf24; }
-    .layer-desc { color: #94a3b8; }
-
-    .chip { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.65rem;
-      border-radius: 999px; font-size: 0.78rem; font-weight: 500; margin: 0.15rem 0.15rem 0 0; }
-    .chip.ok     { background: #052e16; color: #4ade80; border: 1px solid #166534; }
-    .chip.info   { background: #0c1a3a; color: #93c5fd; border: 1px solid #1e40af; }
-    .chip.warn   { background: #1c1008; color: #fbbf24; border: 1px solid #854d0e; }
-    .chip.future { background: #1a1a1a; color: #64748b; border: 1px solid #334155; }
-    .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-
-    .deploy-row { display: flex; align-items: center; gap: 1rem; padding: 0.55rem 0; border-bottom: 1px solid #1e293b; font-size: 0.85rem; }
-    .deploy-row:last-child { border-bottom: none; }
-    .deploy-svc  { color: #94a3b8; min-width: 130px; flex-shrink: 0; }
-    .deploy-what { color: #e2e8f0; font-weight: 500; }
-    .deploy-note { color: #475569; font-size: 0.78rem; }
-
-    .note { background: #0c1a3a; border-left: 3px solid #1e40af; border-radius: 0 6px 6px 0; padding: 0.75rem 1rem; font-size: 0.84rem; color: #dbeafe; line-height: 1.6; margin-bottom: 1rem; }
-    .note strong { color: #f8fafc; }
-    .note code { color: #93c5fd; background: rgba(0,0,0,0.3); padding: 0.05rem 0.3rem; border-radius: 3px; }
-  </style>
+  .flow { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; margin-bottom: .6rem; }
+  .flow-box { background: #1e2636; border: 1px solid var(--line); border-radius: 8px; padding: .45rem .8rem; font-size: .82rem; color: var(--text); }
+  .flow-box.blue   { background: #0d1b34; border-color: #1e40af; color: #93c5fd; }
+  .flow-box.green  { background: #0a2417; border-color: #166534; color: var(--green); }
+  .flow-box.purple { background: #1a0f2e; border-color: #6d28d9; color: #c4b5fd; }
+  .flow-box.amber  { background: #221a08; border-color: #854d0e; color: var(--amber); }
+  .flow-arrow { color: var(--dim); font-size: .9rem; }
+  .flow-label { color: var(--dim); font-size: .75rem; margin: .25rem 0 .5rem; }
+</style>
 </head>
 <body>
+<div class="layout">
 
-  <h1>SwimmProject</h1>
-  <p class="subtitle">.NET 10 Web API · EF Core 10 · Npgsql · PostgreSQL 16 · Razor Pages admin · Swimm.Parser (PdfPig + ClosedXML) · React 18 + Vite + Redux</p>
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand">Swimm<span class="dot">Project</span></div>
+    <div class="brand-sub">Результаты соревнований по плаванию · .NET 10 + PostgreSQL + React · Clean Architecture</div>
 
-  <!-- STATUS BAR -->
-  <div style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:center;margin-bottom:1.5rem;padding:0.85rem 1.25rem;background:#052e16;border:1px solid #166534;border-radius:10px;font-size:0.88rem">
-    <span style="color:#4ade80;font-weight:600">PostgreSQL Migration ✓ DONE</span>
-    <span style="color:#475569">·</span>
-    <span style="color:#cbd5e1">Migrated SQL Server → PostgreSQL</span>
-    <span style="color:#475569">·</span>
-    <span style="color:#4ade80">Clean Architecture — DONE ✓ (5/5)</span>
-    <span style="flex:1"></span>
-    <a href="https://github.com/vladimirjpm/swimm-project" target="_blank" rel="noopener" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;text-decoration:none;padding:0.35rem 0.8rem;border-radius:6px;font-size:0.82rem;font-weight:500">📦 Repo</a>
-  </div>
+    <div class="nav grouplabel">Обзор</div>
+    <ul class="nav">
+      <li><a href="#overview"><span class="ico">◆</span>Где мы сейчас</a></li>
+      <li><a href="#stack"><span class="ico">▤</span>Стек</a></li>
+      <li><a href="#current"><span class="ico">⇄</span>Как работает сегодня</a></li>
+    </ul>
 
-  <!-- STACK -->
-  <h2 class="section">Stack</h2>
-  <div class="grid2">
+    <div class="nav grouplabel">Ход работ</div>
+    <ul class="nav">
+      <li><a href="#done"><span class="ico">✓</span>Сделано</a></li>
+      <li><a href="#roadmap" class="hot"><span class="ico">▦</span>Roadmap — 7 фаз</a></li>
+      <li><a href="#next" class="hot"><span class="ico">➤</span>Ближайший шаг</a></li>
+    </ul>
+
+    <div class="nav grouplabel">Архитектура</div>
+    <ul class="nav">
+      <li><a href="#arch"><span class="ico">§</span>Слои и швы</a></li>
+      <li><a href="#db"><span class="ico">▥</span>Структура БД</a></li>
+      <li><a href="#cache"><span class="ico">≋</span>Кэширование</a></li>
+      <li><a href="#ai"><span class="ico">✸</span>AI extension points</a></li>
+    </ul>
+
+    <div class="nav grouplabel">Практика</div>
+    <ul class="nav">
+      <li><a href="#run"><span class="ico">▶</span>Как запустить</a></li>
+      <li><a href="#structure"><span class="ico">≡</span>Структура репо</a></li>
+      <li><a href="#status"><span class="ico">●</span>Текущий статус</a></li>
+    </ul>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main>
+    <h1>SwimmProject — Архитектура и Roadmap</h1>
+    <p class="subtitle">.NET 10 Web API · EF Core + Npgsql · PostgreSQL 16 · Razor Pages admin (Tailwind v4) · React 18 + Vite + Redux Toolkit · Google OAuth + email/пароль (Argon2id)</p>
+
+    <!-- ===== OVERVIEW ===== -->
+    <h2 class="section" id="overview">Где мы сейчас <span class="anchor">#overview</span></h2>
     <div class="card">
-      <h2>Backend</h2>
-      <div class="stack-row"><span class="stack-label">API</span><span class="stack-value">.NET 10 Web API · C#</span></div>
-      <div class="stack-row"><span class="stack-label">ORM</span><span class="stack-value">Entity Framework Core 10</span></div>
-      <div class="stack-row"><span class="stack-label">DB driver</span><span class="stack-value">Npgsql.EntityFrameworkCore.PostgreSQL</span></div>
-      <div class="stack-row"><span class="stack-label">Database</span><span class="stack-value">PostgreSQL 16</span></div>
-      <div class="stack-row"><span class="stack-label">Admin</span><span class="stack-value">Razor Pages (server-rendered)</span></div>
-      <div class="stack-row"><span class="stack-label">Auth</span><span class="stack-value">Google OAuth · cookie session</span></div>
-      <div class="stack-row"><span class="stack-label">Parser</span><span class="stack-value">Swimm.Parser · PdfPig + ClosedXML</span></div>
+      <h3>Фундамент готов — впереди 7 фаз развития</h3>
+      <div class="bar-row">
+        <div class="bar-top"><span class="lbl">Фундамент: Postgres · Clean Architecture · Auth 0–4 · Admin redesign · клиент на API · избранное · мультидневные</span><span class="pct">DONE</span></div>
+        <div class="track big-track"><div class="fill green" style="width:100%"></div></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-top"><span class="lbl">Roadmap 2026-07: Parsing-lib → Рекорды в БД → Масштаб/кэш → Логин UI → Галереи → isr.org.il → Админка-UX</span><span class="pct">0/7</span></div>
+        <div class="track big-track"><div class="fill amber" style="width:4%"></div></div>
+      </div>
+      <div class="note green" style="margin-bottom:0">
+        <strong>Фундамент закрыт.</strong> Сервер расслоён (Domain / Application / Infrastructure / API), контроллеры
+        инжектят только интерфейсы; БД на least-privilege ролях (<code>swimm</code> / <code>swimm_rw</code> / <code>swimm_ro</code>,
+        два DbContext); auth полный (Google + локальный, SecurityStamp-ревокация, antiforgery, rate-limit);
+        клиент переведён со статики на <code>/api/results</code> · <code>/api/competitions</code> · <code>/api/categories</code> ·
+        <code>/api/club-points</code>. Источник правды: <code>docs/ARCHITECTURE.md</code> + <code>docs/ROADMAP.md</code>.
+      </div>
+      <div class="note amber" style="margin-bottom:0">
+        <strong>Главные проблемы</strong>, которые закрывают фазы 2–3 (фаза 1 — Swimm.Parser как отдельный сырой
+        сервис с ручным переносом JSON — уже закрыта): рекорды — 17k строк JS в <code>window.*</code> на клиенте;
+        клиент выкачивает все страницы результатов и фильтрует в памяти (не переживёт миллионы записей).
+      </div>
     </div>
 
+    <!-- ===== STACK ===== -->
+    <h2 class="section" id="stack">Стек <span class="anchor">#stack</span></h2>
+    <div class="grid2">
+      <div class="card">
+        <h3>Backend</h3>
+        <dl class="kv">
+          <dt>API</dt><dd>.NET 10 Web API · C#</dd>
+          <dt>ORM</dt><dd>EF Core · Npgsql · <strong>два DbContext</strong> (rw / read-only)</dd>
+          <dt>БД</dt><dd>PostgreSQL 16 (Docker локально) · least-privilege роли</dd>
+          <dt>Админка</dt><dd>Razor Pages + Tailwind v4 (<code>admin.min.css</code>, коммитится)</dd>
+          <dt>Auth</dt><dd>Google OAuth + email/пароль (Argon2id) · cookie + SecurityStamp</dd>
+          <dt>Парсинг</dt><dd>Swimm.Parsing (PdfPig) — class library, вызывается из API напрямую (фаза 1 ✓)</dd>
+          <dt>Кэш</dt><dd><code>ICacheService</code> → MemoryCache (Redis — заменой регистрации)</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h3>Frontend &amp; данные</h3>
+        <dl class="kv">
+          <dt>UI</dt><dd>React 18 · TypeScript · Vite · Tailwind v4</dd>
+          <dt>State</dt><dd>Redux Toolkit — единый <code>rootSlice</code>, роутера нет</dd>
+          <dt>Данные</dt><dd>серверный API (<code>/api/*</code> через Vite-proxy)</dd>
+          <dt>Осталась статика</dt><dd><code>normative*.js</code> (рекорды/нормативы) — <strong>фаза 2 убирает</strong></dd>
+          <dt>Темы</dt><dd>light/dark через <code>--theme-mode-*</code> + категории оформления</dd>
+          <dt>Репо</dt><dd>монорепо: <code>client/</code> + <code>server/</code></dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- ===== CURRENT ===== -->
+    <h2 class="section" id="current">Как работает сегодня <span class="anchor">#current</span></h2>
     <div class="card">
-      <h2>Frontend &amp; Tooling</h2>
-      <div class="stack-row"><span class="stack-label">UI</span><span class="stack-value">React 18 · TypeScript</span></div>
-      <div class="stack-row"><span class="stack-label">Build</span><span class="stack-value">Vite · Tailwind</span></div>
-      <div class="stack-row"><span class="stack-label">State</span><span class="stack-value">Redux Toolkit · react-redux</span></div>
-      <div class="stack-row"><span class="stack-label">Client data</span><span class="stack-value">Static JSON (public/data) <span style="color:#fbbf24">— API wiring deferred</span></span></div>
-      <div class="stack-row"><span class="stack-label">Local DB</span><span class="stack-value">Docker · postgres:16</span></div>
-      <div class="stack-row"><span class="stack-label">Repo</span><span class="stack-value">Single repo: client/ + server/</span></div>
-    </div>
-  </div>
-
-  <!-- TARGET ARCHITECTURE -->
-  <h2 class="section">Target Architecture — Clean Architecture</h2>
-  <div class="card">
-    <h2>Layers &amp; Dependency Direction</h2>
-    <div class="flow">
-      <div class="flow-box blue">Swimm.API</div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box green">Swimm.Application</div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box amber">Swimm.Domain</div>
-    </div>
-    <div class="flow">
-      <div class="flow-box purple">Swimm.Infrastructure</div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box green">Swimm.Application</div>
-      <div class="flow-arrow">+</div>
-      <div class="flow-box amber">Swimm.Domain</div>
-    </div>
-    <p class="flow-label">Dependencies point inward. Domain depends on nothing. Infrastructure plugs into Application interfaces.</p>
-
-    <div style="margin-top:1rem">
-      <div class="layer"><span class="layer-name">Swimm.Domain</span><span class="layer-desc">POCO-сущности, без EF Core / ASP.NET. Сердце модели.</span></div>
-      <div class="layer"><span class="layer-name">Swimm.Application</span><span class="layer-desc">DTO, интерфейсы репозиториев/сервисов, use-cases, единый маппинг ResultDto.</span></div>
-      <div class="layer"><span class="layer-name">Swimm.Infrastructure</span><span class="layer-desc">EF Core DbContext (Npgsql), IEntityTypeConfiguration, миграции, JsonImport / DbSchema.</span></div>
-      <div class="layer"><span class="layer-name">Swimm.API</span><span class="layer-desc">Тонкие контроллеры, DI, middleware, Razor-админка.</span></div>
-      <div class="layer parser"><span class="layer-name">Swimm.Parser</span><span class="layer-desc">Парсинг PDF/Excel протоколов. Полностью независим — без изменений.</span></div>
-    </div>
-  </div>
-
-  <!-- CURRENT STATE -->
-  <h2 class="section">Current State</h2>
-  <div class="card">
-    <h2>How it works today</h2>
-    <p class="flow-label" style="margin-top:0">Client (results UI)</p>
-    <div class="flow">
-      <div class="flow-box blue">React + Redux</div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box green">public/data/*.json (static)</div>
-    </div>
-    <p class="flow-label">Server (API)</p>
-    <div class="flow">
-      <div class="flow-box blue">Controllers / Razor admin</div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box">EF Core (Npgsql)</div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box green">PostgreSQL</div>
-    </div>
-    <p class="flow-label">Parser (standalone)</p>
-    <div class="flow">
-      <div class="flow-box amber">PDF / Excel</div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box">Swimm.Parser</div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box green">JSON</div>
-    </div>
-    <div class="note" style="margin-top:0.75rem;margin-bottom:0">
-      Клиент пока читает <strong>статические JSON</strong>, а не API. Связка client↔API — отдельный шаг,
-      вне текущего скоупа. Расслоение API в Clean Architecture его не затрагивает.
-    </div>
-  </div>
-
-  <!-- DB SCHEMA -->
-  <h2 class="section">Database Schema (PostgreSQL · schema <code style="color:#93c5fd;font-size:0.8rem">public</code>)</h2>
-  <div class="schema-grid">
-
-    <div class="schema-card">
-      <div class="schema-title">Results <span class="group-tag core">core</span></div>
-      <div class="schema-field"><span class="field-name key-field">Id</span><span class="field-type">bigint PK · identity</span></div>
-      <div class="schema-field"><span class="field-name">CompetitionId</span><span class="field-type">int FK</span></div>
-      <div class="schema-field"><span class="field-name">SwimmerId</span><span class="field-type">int FK</span></div>
-      <div class="schema-field"><span class="field-name">ClubId</span><span class="field-type">int FK</span></div>
-      <div class="schema-field"><span class="field-name">StyleId</span><span class="field-type">int FK</span></div>
-      <div class="schema-field"><span class="field-name">RelayId / GalleryId / CountryId</span><span class="field-type">int FK · null</span></div>
-      <div class="schema-field"><span class="field-name">CompetitionDate</span><span class="field-type">timestamp <span class="field-note">without tz</span></span></div>
-      <div class="schema-field"><span class="field-name">Distance / Gender / AgeGroup</span><span class="field-type">varchar</span></div>
-      <div class="schema-field"><span class="field-name">Position / Heat / Lane</span><span class="field-type">int <span class="field-note">CHECK ≥ 0</span></span></div>
-      <div class="schema-field"><span class="field-name">TimeMillisecond</span><span class="field-type">int · null</span></div>
-      <div class="schema-field"><span class="field-name">TimeOriginal / TimeSplit</span><span class="field-type">varchar</span></div>
-      <div class="schema-field"><span class="field-name">InternationalPoints</span><span class="field-type">int</span></div>
-    </div>
-
-    <div class="schema-card">
-      <div class="schema-title">Competitions <span class="group-tag core">core</span></div>
-      <div class="schema-field"><span class="field-name key-field">Id</span><span class="field-type">int PK · identity</span></div>
-      <div class="schema-field"><span class="field-name">Name</span><span class="field-type">varchar(300)</span></div>
-      <div class="schema-field"><span class="field-name">Country</span><span class="field-type">varchar(10)</span></div>
-      <div class="schema-field"><span class="field-name">Date</span><span class="field-type">varchar(20) <span class="field-note">dd/MM/yyyy</span></span></div>
-      <div class="schema-field"><span class="field-name">PoolType</span><span class="field-type">varchar(5) <span class="field-note">25m / 50m</span></span></div>
-      <div class="schema-field"><span class="field-name">IsMasters / IsAward</span><span class="field-type">boolean</span></div>
-      <div class="schema-field" style="border-top:1px dashed #1e293b;margin-top:0.4rem"><span class="field-name" style="color:#64748b">UNIQUE</span><span class="field-type">(Name, Date, PoolType)</span></div>
-    </div>
-
-    <div class="schema-card">
-      <div class="schema-title">Swimmers <span class="group-tag core">core</span></div>
-      <div class="schema-field"><span class="field-name key-field">Id</span><span class="field-type">int PK · identity</span></div>
-      <div class="schema-field"><span class="field-name">LastName / FirstName</span><span class="field-type">varchar(100)</span></div>
-      <div class="schema-field"><span class="field-name">LastNameEn / FirstNameEn</span><span class="field-type">varchar(100)</span></div>
-      <div class="schema-field"><span class="field-name">BirthYear</span><span class="field-type">int</span></div>
-      <div class="schema-field"><span class="field-name">Gender</span><span class="field-type">varchar · null</span></div>
-      <div class="schema-field"><span class="field-name">SwimmerOrgId</span><span class="field-type">varchar · null</span></div>
-      <div class="schema-field"><span class="field-name">ClubId / CountryId</span><span class="field-type">int FK · null · SetNull</span></div>
-    </div>
-
-    <div class="schema-card">
-      <div class="schema-title">Clubs · Countries · Styles <span class="group-tag core">core</span></div>
-      <div class="schema-field"><span class="field-name key-field">Clubs.Id</span><span class="field-type">int PK</span></div>
-      <div class="schema-field"><span class="field-name">Clubs.Name / NameEn</span><span class="field-type">varchar(200)</span></div>
-      <div class="schema-field"><span class="field-name">Clubs.CountryId</span><span class="field-type">int FK · null</span></div>
-      <div class="schema-field" style="border-top:1px dashed #1e293b;margin-top:0.4rem"><span class="field-name key-field">Countries.Id</span><span class="field-type">int PK</span></div>
-      <div class="schema-field"><span class="field-name">CountryCode / CountryName</span><span class="field-type">varchar <span class="field-note">code unique</span></span></div>
-      <div class="schema-field" style="border-top:1px dashed #1e293b;margin-top:0.4rem"><span class="field-name key-field">Styles.Id</span><span class="field-type">int PK</span></div>
-      <div class="schema-field"><span class="field-name">Styles.Name</span><span class="field-type">varchar <span class="field-note">seed · 7 styles</span></span></div>
-    </div>
-
-    <div class="schema-card">
-      <div class="schema-title">Relays · Galleries · GalleryItems <span class="group-tag core">core</span></div>
-      <div class="schema-field"><span class="field-name key-field">Relays.Id</span><span class="field-type">int PK</span></div>
-      <div class="schema-field"><span class="field-name">TeamName / SwimmersName</span><span class="field-type">varchar · null</span></div>
-      <div class="schema-field" style="border-top:1px dashed #1e293b;margin-top:0.4rem"><span class="field-name key-field">Galleries.Id</span><span class="field-type">int PK</span></div>
-      <div class="schema-field"><span class="field-name key-field">GalleryItems.Id</span><span class="field-type">int PK</span></div>
-      <div class="schema-field"><span class="field-name">GalleryId</span><span class="field-type">int FK · Cascade</span></div>
-      <div class="schema-field"><span class="field-name">Type / SourceType / Url / Code</span><span class="field-type">varchar</span></div>
-    </div>
-
-    <div class="schema-card">
-      <div class="schema-title">Sys_ImportHistory <span class="group-tag core">core</span></div>
-      <div class="schema-field"><span class="field-name key-field">Id</span><span class="field-type">int PK</span></div>
-      <div class="schema-field"><span class="field-name">CompetitionId</span><span class="field-type">int FK · Cascade</span></div>
-      <div class="schema-field"><span class="field-name">ImportFileName</span><span class="field-type">varchar(500)</span></div>
-      <div class="schema-field"><span class="field-name">ImportDate</span><span class="field-type">timestamptz</span></div>
-      <div class="schema-field"><span class="field-name">Approved</span><span class="field-type">boolean</span></div>
-    </div>
-
-    <div class="schema-card sys" style="grid-column: 1 / -1">
-      <div class="schema-title">Auth &amp; Access <span class="group-tag auth">Sys_* tables</span></div>
-      <div class="schema-field"><span class="field-name key-field">Sys_AppUsers</span><span class="field-type">Id PK · Email unique · DisplayName · AvatarUrl · SwimmerId FK null · IsActive · CreatedAt timestamptz</span></div>
-      <div class="schema-field"><span class="field-name key-field">Sys_AppRoles</span><span class="field-type">Id PK · Name unique <span class="field-note">seed: Admin, User</span></span></div>
-      <div class="schema-field"><span class="field-name key-field">Sys_AppUserRoles</span><span class="field-type">PK (UserId, RoleId) · M:N junction · Cascade</span></div>
-      <div class="schema-field"><span class="field-name key-field">Sys_UserExternalLogins</span><span class="field-type">Id PK · Provider + ProviderKey unique · UserId FK Cascade</span></div>
-      <div class="schema-field"><span class="field-name key-field">Sys_UserLoginHistory</span><span class="field-type">Id PK · UserId FK · Provider · IpAddress · LoginAt timestamptz</span></div>
-      <p style="font-size:0.78rem;color:#94a3b8;margin-top:0.75rem;line-height:1.5">
-        Identity-колонки (<code style="color:#c4b5fd">GENERATED BY DEFAULT AS IDENTITY</code>). Аудит-времена — <code style="color:#c4b5fd">timestamptz</code> (UTC).
-        <code style="color:#c4b5fd">Results.CompetitionDate</code> — <code style="color:#c4b5fd">timestamp without time zone</code> (календарная дата соревнования).
-      </p>
-    </div>
-  </div>
-
-  <!-- POSTGRESQL MIGRATION -->
-  <div class="phase-header">
-    <div class="phase-num" style="color:#4ade80">✓</div>
-    <div>
-      <div class="phase-title">PostgreSQL Migration <span style="font-size:0.75rem;font-weight:600;color:#4ade80;margin-left:0.5rem">DONE</span></div>
-      <div class="phase-sub">Перевод текущего API с SQL Server на PostgreSQL. БД пересоздана с нуля, эндпоинты проверены.</div>
-    </div>
-  </div>
-
-  <div class="stages">
-    <div class="stage" style="border-color:#166534;background:#052e16">
-      <div class="stage-badge" style="background:#166534;color:#4ade80">✓</div>
-      <div class="stage-info">
-        <h3 style="color:#4ade80">Local Postgres · Npgsql provider <span style="font-size:0.75rem;font-weight:400;color:#4ade80;margin-left:0.5rem">DONE</span></h3>
-        <p>Локальная БД в Docker, EF-провайдер заменён, строка подключения переносима.</p>
-        <div class="stage-tasks">
-          <div class="task done">docker-compose.yml — postgres:16, том для данных, порт 5432</div>
-          <div class="task done">Swimm.API.csproj — SqlServer → Npgsql.EntityFrameworkCore.PostgreSQL 8.0.10</div>
-          <div class="task done">Program.cs — UseSqlServer → UseNpgsql; строка подключения в Npgsql-формате</div>
-        </div>
+      <p class="flow-label" style="margin-top:0">Публичные результаты (read-only путь)</p>
+      <div class="flow">
+        <div class="flow-box blue">React + Redux</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">/api/results · /api/competitions</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box purple">SwimmReadDbContext (swimm_ro)</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box green">PostgreSQL</div>
+      </div>
+      <p class="flow-label">Импорт протоколов (фаза 1 ✓ — одним потоком, без ручного звена)</p>
+      <div class="flow">
+        <div class="flow-box amber">PDF с isr.org.il</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box blue">Админка Import: PDF-режим (Swimm.Parsing → превью → очередь)</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box green">PostgreSQL</div>
+      </div>
+      <p class="flow-label">Рекорды и нормативы (легаси, фаза 2 убирает)</p>
+      <div class="flow">
+        <div class="flow-box amber">public/data/normative*.js (~17k строк)</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box amber">window.normative_* глобалы</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box blue">helper-normative.ts</div>
       </div>
     </div>
 
-    <div class="stage" style="border-color:#166534;background:#052e16">
-      <div class="stage-badge" style="background:#166534;color:#4ade80">✓</div>
-      <div class="stage-info">
-        <h3 style="color:#4ade80">Удалён вендорный T-SQL <span style="font-size:0.75rem;font-weight:400;color:#4ade80;margin-left:0.5rem">DONE</span></h3>
-        <p>Стартовый T-SQL-скрипт убран, схема целиком описана моделью и миграцией.</p>
-        <div class="stage-tasks">
-          <div class="task done">Убран ExecuteSqlRaw(NormalizeResultsSql) со старта — только Migrate()</div>
-          <div class="task done">CHECK-ограничения: [Heat] → "Heat" (синтаксис Postgres)</div>
-          <div class="task done">Очистка данных: DBCC CHECKIDENT → ALTER TABLE ... ALTER COLUMN "Id" RESTART</div>
-          <div class="task done">Удалён legacy view vw_Results (в коде не использовался)</div>
-        </div>
-      </div>
+    <!-- ===== DONE ===== -->
+    <h2 class="section" id="done">Сделано (фундамент) <span class="anchor">#done</span></h2>
+
+    <div class="phase done">
+      <div class="phase-head"><div class="pnum">✓</div><div><span class="ptitle">PostgreSQL + Clean Architecture</span><span class="pstatus st-done">ГОТОВО</span><div class="psub">SQL Server → PostgreSQL 16; сервер расслоён на Domain / Application / Infrastructure / API.</div></div></div>
+      <ul class="steps">
+        <li class="ok">Npgsql, чистая InitialCreate-миграция, identity-колонки, timestamptz для аудита</li>
+        <li class="ok">Контроллеры — тонкие, только интерфейсы <code>Swimm.Application.Abstractions</code></li>
+        <li class="ok">Репозитории/сервисы в Infrastructure · <code>AddApplication()</code> / <code>AddInfrastructure()</code></li>
+        <li class="ok">Миграции только явно: <code>dotnet ef … --context SwimmDbContext</code> или <code>dotnet run -- --migrate</code></li>
+      </ul>
     </div>
 
-    <div class="stage" style="border-color:#166534;background:#052e16">
-      <div class="stage-badge" style="background:#166534;color:#4ade80">✓</div>
-      <div class="stage-info">
-        <h3 style="color:#4ade80">Clean migration · DbSchemaService на pg-каталогах <span style="font-size:0.75rem;font-weight:400;color:#4ade80;margin-left:0.5rem">DONE</span></h3>
-        <p>12 старых SQL Server миграций удалены, сгенерирована одна чистая под Npgsql.</p>
-        <div class="stage-tasks">
-          <div class="task done">InitialCreate — identity-колонки, boolean, timestamptz, CHECK, уникальные индексы</div>
-          <div class="task done">CompetitionDate → timestamp without time zone (Kind-safe для Npgsql)</div>
-          <div class="task done">DbSchemaService переписан: information_schema + pg_catalog (FK / индексы / row counts)</div>
-          <div class="task done">AdminSettings: DefaultSchema dbo → public</div>
-        </div>
-      </div>
+    <div class="phase done">
+      <div class="phase-head"><div class="pnum">✓</div><div><span class="ptitle">Auth — фазы 0–4 полностью</span><span class="pstatus st-done">ГОТОВО · долгов нет</span><div class="psub">Серверная сторона логина закрыта целиком; клиентского UI ещё нет (фаза 4 роадмапа).</div></div></div>
+      <ul class="steps">
+        <li class="ok">Google OAuth: identity по <code>(Provider, ProviderKey)</code>, безопасный email-linking, транзитная External-кука</li>
+        <li class="ok">SecurityStamp-ревокация сессий (деактивация, смена ролей, logout-all) · кука 7д sliding</li>
+        <li class="ok">Least-privilege БД: 3 роли, 3 connection string, два DbContext · антифорджери <code>X-XSRF-TOKEN</code></li>
+        <li class="ok">Email/пароль: Argon2id, verify/reset через SHA-256-токены, lockout, rate-limit 10/мин/IP</li>
+        <li class="todo">Прод-SMTP <code>IEmailSender</code> (сейчас LoggingEmailSender) — единственный блокер прода</li>
+      </ul>
     </div>
 
-    <div class="stage" style="border-color:#166534;background:#052e16">
-      <div class="stage-badge" style="background:#166534;color:#4ade80">✓</div>
-      <div class="stage-info">
-        <h3 style="color:#4ade80">Verified <span style="font-size:0.75rem;font-weight:400;color:#4ade80;margin-left:0.5rem">DONE</span></h3>
-        <p>Сборка зелёная, схема накатывается на пустой Postgres, эндпоинты отвечают.</p>
-        <div class="stage-tasks">
-          <div class="task done">16 таблиц + seed (7 стилей, 2 роли), FK и CHECK на месте</div>
-          <div class="task done">GET /api/results — пустая БД и чтение с данными (JOIN-проекция ResultDto)</div>
-          <div class="task done">Фильтр по дате против CompetitionDate — без ошибок Npgsql</div>
-          <div class="task done">Запросы DbSchemaService валидны под Postgres</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- CLEAN ARCHITECTURE -->
-  <div class="phase-header p2">
-    <div class="phase-num">→</div>
-    <div>
-      <div class="phase-title">Clean Architecture <span style="font-size:0.75rem;font-weight:600;color:#fbbf24;margin-left:0.5rem">IN PROGRESS · 3/5</span></div>
-      <div class="phase-sub">Расслоить серверную часть: Domain / Application / Infrastructure / API. Контроллеры — тонкие. Парсер и клиент не трогаем.</div>
-    </div>
-  </div>
-
-  <div class="stages">
-    <div class="stage" style="border-color:#166534;background:#052e16">
-      <div class="stage-badge" style="background:#166534;color:#4ade80">✓</div>
-      <div class="stage-info">
-        <h3 style="color:#4ade80">Проекты &amp; ссылки <span style="font-size:0.75rem;font-weight:400;color:#4ade80;margin-left:0.5rem">DONE</span></h3>
-        <p>Слои созданы, зависимости направлены строго внутрь.</p>
-        <div class="stage-tasks">
-          <div class="task done">Swimm.Domain · Swimm.Application · Swimm.Infrastructure (classlib, net10.0)</div>
-          <div class="task done">ProjectReference: API → Application + Infrastructure; Application → Domain; Infrastructure → Application</div>
-          <div class="task done">Все проекты в Swimm.sln · решение собирается</div>
-        </div>
-      </div>
+    <div class="phase done">
+      <div class="phase-head"><div class="pnum">✓</div><div><span class="ptitle">Admin redesign + Competitions/Categories CRUD</span><span class="pstatus st-done">ГОТОВО</span><div class="psub">Razor + Tailwind v4, один бандл <code>admin.min.css</code>; импорт — фоновая очередь со статусом.</div></div></div>
+      <ul class="steps">
+        <li class="ok">Competitions CRUD: группировка многодневных (CompetitionEvent), категории, сезоны</li>
+        <li class="ok">Categories CRUD: name/badge из БД → клиентский селектор читает <code>/api/categories</code></li>
+        <li class="ok">Import: <code>202 + jobId</code>, BackgroundService + Channel, поллинг статуса, ImportHistory</li>
+      </ul>
     </div>
 
-    <div class="stage" style="border-color:#166534;background:#052e16">
-      <div class="stage-badge" style="background:#166534;color:#4ade80">✓</div>
-      <div class="stage-info">
-        <h3 style="color:#4ade80">Сущности в Domain <span style="font-size:0.75rem;font-weight:400;color:#4ade80;margin-left:0.5rem">DONE</span></h3>
-        <p>15 сущностей перенесены через git mv (история сохранена), модель совпадает со схемой.</p>
-        <div class="stage-tasks">
-          <div class="task done">Models/ → Swimm.Domain/Entities/ (namespace Swimm.Domain.Entities)</div>
-          <div class="task done">EF Core Abstractions в Domain — только ради атрибута [Index]</div>
-          <div class="task">Вычистка data-аннотаций → IEntityTypeConfiguration отложена на Шаг 4 (Infrastructure)</div>
-        </div>
-      </div>
+    <div class="phase done">
+      <div class="phase-head"><div class="pnum">✓</div><div><span class="ptitle">Клиент на API + фичи</span><span class="pstatus st-done">ГОТОВО</span><div class="psub">Статические JSON результатов заменены серверными данными; единая страница результатов.</div></div></div>
+      <ul class="steps">
+        <li class="ok"><code>results_main.html?category=&amp;competitionId=last</code> — 3 старых HTML удалены</li>
+        <li class="ok">Селектор соревнований: <code>/api/competitions</code> (live/upcoming/архив, сезоны, поиск)</li>
+        <li class="ok">Избранное: <code>Sys_UserFavorites</code> + primary-подсветка на клиенте (RO-путь не тронут)</li>
+        <li class="ok">Мультидневные соревнования: CompetitionEvent parent + дни · клубные очки с <code>/api/club-points</code></li>
+        <li class="ok">Light/dark mode · редизайн строк результатов · карьерная карточка (<code>/api/athletes/career</code>)</li>
+      </ul>
     </div>
 
-    <div class="stage" style="border-color:#166534;background:#052e16">
-      <div class="stage-badge" style="background:#166534;color:#4ade80">✓</div>
-      <div class="stage-info">
-        <h3 style="color:#4ade80">Application: DTO + маппер <span style="font-size:0.75rem;font-weight:400;color:#4ade80;margin-left:0.5rem">DONE</span></h3>
-        <p>DTO переехал в Application, дублирование проекции устранено.</p>
-        <div class="stage-tasks">
-          <div class="task done">ResultDto → Swimm.Application/Dtos</div>
-          <div class="task done">ResultMapping.ToDto — единый Expression (EF транслирует в SQL)</div>
-          <div class="task done">ResultsController: две дублированные проекции → один .Select(ToDto)</div>
-          <div class="task">Интерфейсы (IResultRepository / IImportService / IUserService) — на Шаге 4</div>
-        </div>
-      </div>
+    <!-- ===== ROADMAP ===== -->
+    <h2 class="section" id="roadmap">Roadmap — 7 фаз <span class="anchor">#roadmap</span></h2>
+    <div class="note" style="margin-top:0">
+      Детальные этапы с критериями приёмки — в <code>docs/ROADMAP.md</code> (источник правды, там же отмечается прогресс).
+      Решения 2026-07-09: Parser → библиотека · медиа = только внешние ссылки · логин Google + email/пароль ·
+      деплой-нейтрально (хостинг не выбран, всё за интерфейсами).
     </div>
 
-    <div class="stage phase2">
-      <div class="stage-badge">4</div>
-      <div class="stage-info">
-        <h3>Infrastructure + тонкие контроллеры <span style="font-size:0.75rem;font-weight:600;color:#fbbf24;margin-left:0.5rem">NEXT · самый объёмный</span></h3>
-        <p>EF и сервисы в Infrastructure, контроллеры на интерфейсах. Делим на под-шаги для безопасности.</p>
-        <div class="stage-tasks">
-          <div class="task done">4a — SwimmDbContext + миграции + EF-конфиг (IEntityTypeConfiguration) → Infrastructure</div>
-          <div class="task done">4b — JsonImport / DbSchema / AdminSettings → Infrastructure; IImportService / ISchemaService / ISettingsService в Application; AddInfrastructure(); контроллеры на интерфейсах</div>
-          <div class="task done">4c — IResultRepository / IAdminRepository в Application; реализации в Infrastructure; AddApplication(); контроллеры без SwimmDbContext; IDbMigrator; тонкий Program.cs</div>
-        </div>
-      </div>
+    <div class="phase done" id="next">
+      <div class="phase-head"><div class="pnum">✓</div><div><span class="ptitle">Parsing как библиотека</span><span class="pstatus st-done">ГОТОВО</span><div class="psub">Сервис Swimm.Parser упразднён; пайплайн админки «PDF → парс → превью → импорт» одним потоком.</div></div></div>
+      <ul class="steps">
+        <li class="ok">Class library <code>Swimm.Parsing</code>: парсеры IsrOrg / AgeRecords / MastersRecords / WorldRecords перенесены (git mv, namespace <code>Swimm.Parsing.*</code>, DI <code>AddParsing()</code>)</li>
+        <li class="ok"><code>IResultSourceProvider</code> + DTO <code>ParsedCompetition</code> в Application; <code>PdfResultSourceProvider</code>; тесты на библиотеке (62 ✓)</li>
+        <li class="ok">Админка Import: переключатель JSON/PDF — upload → <code>POST /api/admin/parse-pdf</code> → превью (счётчики, таблица соревнований, warnings, debug-лог) → <code>POST /api/admin/import-parsed</code> → фоновая очередь</li>
+        <li class="ok">Регрессия: dotnet test (62 ✓) + смоук реального PDF (Maccabiah, 851 результатов) — сверено с БД, совпадает точно</li>
+        <li class="ok">Проект Swimm.Parser удалён из solution и репозитория целиком, включая осиротевший статический ParserFactory</li>
+      </ul>
     </div>
 
-    <div class="stage" style="border-color:#166534;background:#052e16">
-      <div class="stage-badge" style="background:#166534;color:#4ade80">✓</div>
-      <div class="stage-info">
-        <h3 style="color:#4ade80">Уборка репозитория <span style="font-size:0.75rem;font-weight:400;color:#4ade80;margin-left:0.5rem">DONE</span></h3>
-        <p>Закрыть хвост «двух репозиториев».</p>
-        <div class="stage-tasks">
-          <div class="task done">client/.github + server/.github удалены — дубли воркфлоу и инструкций убраны</div>
-          <div class="task done">Единый .github/copilot-instructions.md: клиент + сервер, EF-команды под новую архитектуру</div>
-        </div>
-      </div>
+    <div class="phase next">
+      <div class="phase-head"><div class="pnum">2</div><div><span class="ptitle">Рекорды и нормативы в БД</span><span class="pstatus st-next">ДАЛЕЕ</span><div class="psub">Убрать normative*.js — рекорды редактируются в админке и приходят с сервера.</div></div></div>
+      <ul class="steps">
+        <li class="todo">Таблицы <code>Records</code> (WR/ISR/age/masters) + <code>NormativeStandards</code> · миграция + грант swimm_ro</li>
+        <li class="todo">Одноразовый сидер из текущих normative*.js со сверкой счётчиков</li>
+        <li class="todo"><code>GET /api/records</code> + <code>/api/normative-standards</code> (RO-контекст, длинный TTL)</li>
+        <li class="todo">Клиент: <code>RecordsHelper</code> по образцу CategoryHelper · удалить script-теги и <code>window.*</code></li>
+        <li class="todo">Админка: CRUD «Records» с inline-редактированием</li>
+      </ul>
     </div>
-  </div>
 
-  <!-- ROADMAP -->
-  <h2 class="section">Roadmap / Future</h2>
-  <div class="card">
-    <h2>Hosting Evolution</h2>
-    <div class="deploy-row">
-      <span class="deploy-svc" style="color:#4ade80">Сейчас</span>
-      <span class="deploy-what">PostgreSQL в Docker · Clean Architecture</span>
-      <span class="deploy-note">всё работает локально</span>
+    <div class="phase next">
+      <div class="phase-head"><div class="pnum">3</div><div><span class="ptitle">Масштаб и кэш</span><span class="pstatus st-next">ДАЛЕЕ</span><div class="psub">Готовность к миллионам записей: сервер отдаёт быстро, клиент не выкачивает всё.</div></div></div>
+      <ul class="steps">
+        <li class="todo">OutputCache + ETag на публичных GET (завершённые соревнования иммутабельны — длинный TTL)</li>
+        <li class="ok">Шов режима загрузки: настройка <code>ResultsLoadMode</code> (full/paged/client + <code>?loadMode=</code>) · <code>GET /api/client-config</code> · <code>ResultsLoadModeHelper</code></li>
+        <li class="todo">Фильтрация на сервере: наполнить paged-ветку — фильтры query-параметрами, постраничная подгрузка вместо «качай все страницы»</li>
+        <li class="todo">EXPLAIN ANALYZE на синтетике 1–5 млн строк → недостающие индексы миграцией</li>
+        <li class="todo">Серверные агрегаты (медали, очки клубов) + нагрузочный smoke (p95 &lt; 300мс на промахе)</li>
+      </ul>
     </div>
-    <div class="deploy-row">
-      <span class="deploy-svc" style="color:#93c5fd">Потом — БД</span>
-      <span class="deploy-what">Бесплатный PostgreSQL в Neon</span>
-      <span class="deploy-note">managed · free tier</span>
-    </div>
-    <div class="deploy-row">
-      <span class="deploy-svc" style="color:#93c5fd">Потом — API</span>
-      <span class="deploy-what">Azure App Service · или Azure Container Apps</span>
-      <span class="deploy-note">родное для .NET</span>
-    </div>
-    <div class="deploy-row">
-      <span class="deploy-svc" style="color:#fbbf24">При росте</span>
-      <span class="deploy-what">БД → Azure PostgreSQL Flexible Server</span>
-      <span class="deploy-note">когда появятся пользователи</span>
-    </div>
-    <div class="note" style="margin-top:1rem;margin-bottom:0">
-      <strong>Архитектура строится вокруг PostgreSQL + Npgsql, не вокруг Azure.</strong>
-      Поэтому переезд на <strong>Azure / Neon / Supabase / Railway / любой VPS</strong> — это
-      простая замена <code>connection string</code>, без изменений кода. Это одна из причин,
-      почему переход на PostgreSQL сейчас — хорошее решение.
-    </div>
-  </div>
 
-  <!-- AI EXTENSION POINTS -->
-  <h2 class="section">AI Extension Points (future)</h2>
-  <div class="note" style="background:#1c1a08;border-color:#854d0e;color:#fbbf24">
-    <strong>Цель:</strong> заложить seam-ы так, чтобы и простой LLM сейчас, и Microsoft Agent Framework 1.0 потом
-    внедрялись за один и тот же интерфейс — сменой реализации в Infrastructure, без правок контроллеров и домена.
-    <strong>Реализация — после Clean Architecture (Шаг 4).</strong>
-  </div>
+    <div class="phase next">
+      <div class="phase-head"><div class="pnum">4</div><div><span class="ptitle">Логин на клиенте</span><span class="pstatus st-next">ДАЛЕЕ</span><div class="psub">Google + email/пароль из React. Сервер готов целиком — работа только UI + SMTP.</div></div></div>
+      <ul class="steps">
+        <li class="todo"><code>useAuth</code>-хук (обобщение /auth/me из useFavorites) + user-меню в шапке</li>
+        <li class="todo">Модал логина: Google + локальная форма (403 pre-verify, 429 lockout) · регистрация · forgot-password</li>
+        <li class="todo">Прод-<code>IEmailSender</code> (SMTP/Resend)</li>
+      </ul>
+    </div>
 
-  <div class="grid2">
-    <div class="card">
-      <h2>Seam-интерфейсы (Application)</h2>
-      <div class="layer"><span class="layer-name">ISwimmerProgressAnalyzer</span><span class="layer-desc">Детерминированная аналитика прогресса (без LLM). Она же — инструмент для агента.</span></div>
-      <div class="layer"><span class="layer-name">ITrainingPlanGenerator</span><span class="layer-desc">Генерация плана тренировок — один structured LLM-вызов.</span></div>
-      <div class="layer parser"><span class="layer-name">IVirtualCoach</span><span class="layer-desc">Разговорный сценарий. Контроллер зависит ТОЛЬКО от него — контракт не меняется при SDK→MAF.</span></div>
-      <div class="layer"><span class="layer-name">ICoachConversationStore</span><span class="layer-desc">Состояние диалога: in-memory сейчас → durable при MAF.</span></div>
+    <div class="phase next">
+      <div class="phase-head"><div class="pnum">5</div><div><span class="ptitle">Пользовательские галереи</span><span class="pstatus st-next">ДАЛЕЕ</span><div class="psub">Только внешние ссылки (YouTube/Vimeo/URL) над готовой Sys_UserMedia; private по умолчанию.</div></div></div>
+      <ul class="steps">
+        <li class="todo">CRUD <code>/api/user-media</code>: allowlist хостов, лимит на юзера, antiforgery, IDOR-тесты</li>
+        <li class="todo">UI «моя галерея» на трёх уровнях: пловец / соревнование / заплыв · sandbox-iframe embed</li>
+        <li class="todo">Публичный показ public-медиа · админ-модерация (скрыть, стереть по пловцу/юзеру)</li>
+      </ul>
+    </div>
+
+    <div class="phase next">
+      <div class="phase-head"><div class="pnum">6</div><div><span class="ptitle">Автозабор с isr.org.il</span><span class="pstatus st-next">ДАЛЕЕ</span><div class="psub">Новые соревнования с isr.org.il/competitions.asp — полуавтоматически, человек только подтверждает.</div></div></div>
+      <ul class="steps">
+        <li class="todo"><code>ICompetitionDiscoveryProvider</code> + скрейпер HTML-списка (typed HttpClient, иврит-кодировки)</li>
+        <li class="todo">Админ-«входящие»: обнаруженные соревнования → «затянуть» → PDF → пайплайн фазы 1</li>
+        <li class="todo">Фоновая проверка по расписанию (вкл/выкл в Settings) · снапшоты HTML/PDF для отладки</li>
+        <li class="todo">При смене вёрстки сайта — явная ошибка, не тихий ноль (урок бага двуязычного заголовка)</li>
+      </ul>
+    </div>
+
+    <div class="phase next">
+      <div class="phase-head"><div class="pnum">7</div><div><span class="ptitle">Админка: максимум удобства ввода</span><span class="pstatus st-next">СКВОЗНАЯ</span><div class="psub">Любые данные правятся быстро и безопасно; этапы добираются после фаз 2 и 6.</div></div></div>
+      <ul class="steps">
+        <li class="todo">Разделяемые блоки CRUD: inline-edit, поиск, фильтры, пагинация</li>
+        <li class="todo">CRUD Swimmers (merge дублей!) · Clubs · точечная правка Result</li>
+        <li class="todo">Массовые операции с dry-run превью · аудит ручных мутаций (кто/что/когда)</li>
+        <li class="todo">Дашборд: счётчики, последние импорты, здоровье БД/кэша</li>
+      </ul>
     </div>
 
     <div class="card">
-      <h2>Coach tools — обычные C#-методы</h2>
-      <p style="font-size:0.82rem;color:#94a3b8;line-height:1.5;margin-bottom:0.6rem">
-        Детерминированные функции над данными заплывов. В режиме прямого SDK подключаются как
-        function-calling tools; в MAF — как agent tools / MCP. Методы одни и те же — инвестиция не пропадает.
-      </p>
-      <div class="schema-field"><span class="field-name">GetRecentResults(swimmerId)</span><span class="field-type">последние соревнования</span></div>
-      <div class="schema-field"><span class="field-name">GetProgression(swimmerId, style, dist)</span><span class="field-type">тренд времени</span></div>
-      <div class="schema-field"><span class="field-name">CompareSwimmers(a, b, period)</span><span class="field-type">кто прогрессировал лучше</span></div>
-      <div class="schema-field"><span class="field-name">SuggestTrainingFocus(swimmerId)</span><span class="field-type">слабые дистанции/стили</span></div>
+      <h3>Зависимости фаз</h3>
+      <div class="mono">
+        1 Parsing-lib ──► 2 Рекорды в БД ──► 6 isr.org.il<br/>
+        3 Масштаб/кэш — независима (после 1 · OutputCache — дешёвый ранний выигрыш)<br/>
+        4 Логин UI ──► 5 Галереи<br/>
+        7 Админка — сквозная (7.1–7.2 можно сразу после фазы 2)
+      </div>
     </div>
-  </div>
 
-  <div class="card">
-    <h2>Virtual Coach — поток диалога</h2>
-    <div class="flow">
-      <div class="flow-box blue">«Посмотрим последние соревнования»</div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box amber">IVirtualCoach</div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box purple">LLM решает, что вызвать</div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box green">tools: GetRecentResults / CompareSwimmers / GetProgression</div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box amber">LLM</div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box blue">ответ тренера</div>
+    <!-- ===== ARCH ===== -->
+    <h2 class="section" id="arch">Слои и швы <span class="anchor">#arch</span></h2>
+    <div class="card">
+      <h3>Слои — зависимости строго внутрь</h3>
+      <div class="flow">
+        <div class="flow-box blue">Swimm.API</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box green">Swimm.Application</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box amber">Swimm.Domain</div>
+      </div>
+      <div class="flow">
+        <div class="flow-box purple">Swimm.Infrastructure · Swimm.Parsing</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box green">Swimm.Application</div>
+        <div class="flow-arrow">+</div>
+        <div class="flow-box amber">Swimm.Domain</div>
+      </div>
+      <p class="flow-label">Контроллеры и Razor-страницы инжектят ТОЛЬКО интерфейсы Application — никогда Infrastructure-типы напрямую.</p>
+      <table>
+        <tr><th>Шов (интерфейс)</th><th>Сейчас</th><th>Потом</th></tr>
+        <tr><td class="k">ICacheService</td><td>MemoryCacheService (токен-инвалидация)</td><td>Redis — заменой регистрации в DI</td></tr>
+        <tr><td class="k">IResultSourceProvider <span class="chip c-no">фаза 1</span></td><td>PdfResultSourceProvider (парсеры IsrOrg)</td><td>веб-скрейпинг isr.org.il · другие федерации</td></tr>
+        <tr><td class="k">ICompetitionDiscoveryProvider <span class="chip c-no">фаза 6</span></td><td>—</td><td>обнаружение новых соревнований → «входящие»</td></tr>
+        <tr><td class="k">IRecordSourceProvider <span class="chip c-no">фаза 2</span></td><td>сидер из JS + парсеры записей</td><td>автообновление рекордов из веба</td></tr>
+        <tr><td class="k">IImportService</td><td>JsonImportService (единственная точка записи)</td><td>принимает ParsedCompetition от любого провайдера</td></tr>
+        <tr><td class="k">IEmailSender</td><td>LoggingEmailSender (dev)</td><td>SMTP/Resend в проде (блокер логина)</td></tr>
+      </table>
+      <div class="note" style="margin-bottom:0">
+        <strong>Контракт провайдеров:</strong> возвращают общий DTO и никогда не пишут в БД сами. Пишет только
+        <code>IImportService</code> — единая точка валидации, дедупликации и инвалидации кэша. Новый источник данных =
+        новый класс + регистрация в DI, ноль изменений в импорте и админке.
+      </div>
     </div>
-    <p class="flow-label">
-      <strong style="color:#cbd5e1">Сейчас:</strong> прямой SDK — tool-loop вручную, один провайдер за интерфейсом.
-      <strong style="color:#fbbf24">Потом (MAF 1.0):</strong> те же tools регистрируются как agent tools/MCP, добавляются
-      память (threads) и multi-agent (DataAgent → CoachAgent → Critic). <code>IVirtualCoach</code> не меняется.
+
+    <!-- ===== DB ===== -->
+    <h2 class="section" id="db">Структура БД (PostgreSQL · public) <span class="anchor">#db</span></h2>
+    <div class="card">
+      <div class="note" style="margin-top:0">
+        <strong>Три роли</strong> (<code>server/db/setup-roles.sql</code>): владелец <code>swimm</code> — DDL/миграции ·
+        <code>swimm_rw</code> — runtime DML и все <code>Sys_*</code> · <code>swimm_ro</code> — SELECT только на публичных
+        бизнес-таблицах (fail-closed: новая публичная таблица без гранта — публичный путь падает, это намеренно).
+      </div>
+      <table>
+        <tr><th>Группа</th><th>Таблицы</th><th>Заметки</th></tr>
+        <tr>
+          <td class="k">Результаты <span class="chip c-ok">core · swimm_ro</span></td>
+          <td><code>Results</code> · <code>Competitions</code> · <code>CompetitionEvents</code> · <code>Swimmers</code> · <code>Clubs</code> · <code>Styles</code> · <code>Countries</code> · <code>Relays</code> · <code>Galleries/GalleryItems</code></td>
+          <td>Results: bigint PK, TimeMillisecond, InternationalPoints, CHECK ≥ 0. CompetitionEvent = родитель многодневных. Galleries — импортные медиа заплыва (НЕ путать с Sys_UserMedia).</td>
+        </tr>
+        <tr>
+          <td class="k">Справочники <span class="chip c-ok">core</span></td>
+          <td><code>Categories</code> · <code>CategoryCompetitions</code> · <code>ClubPointsRules/Entries</code> · <code>CompetitionResultUrls</code></td>
+          <td>Категории отдают name/badge клиенту через /api/categories; канонические ключи — client-only.</td>
+        </tr>
+        <tr>
+          <td class="k">Планируется <span class="chip c-part">фаза 2</span></td>
+          <td><code>Records</code> · <code>NormativeStandards</code></td>
+          <td>Замена normative*.js. Не забыть грант swimm_ro.</td>
+        </tr>
+        <tr>
+          <td class="k">Auth <span class="chip c-ok">Sys_* · только swimm_rw</span></td>
+          <td><code>Sys_AppUsers</code> · <code>Sys_AppRoles</code> · <code>Sys_AppUserRoles</code> · <code>Sys_UserExternalLogins</code> · <code>Sys_UserLocalCredentials</code> · <code>Sys_UserSecurityTokens</code> · <code>Sys_UserLoginHistory</code></td>
+          <td>SecurityStamp на AppUser · пароли Argon2id · токены — SHA-256-хэши, single-use, TTL.</td>
+        </tr>
+        <tr>
+          <td class="k">Пользовательское <span class="chip c-ok">Sys_*</span></td>
+          <td><code>Sys_UserFavorites</code> · <code>Sys_UserMedia</code> · <code>Sys_ImportHistory</code></td>
+          <td>Single-primary через partial unique index. UserMedia создана, эндпоинты откроются в фазе 5.</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- ===== CACHE ===== -->
+    <h2 class="section" id="cache">Кэширование — три уровня <span class="anchor">#cache</span></h2>
+    <div class="card">
+      <table>
+        <tr><th>Уровень</th><th>Механизм</th><th>Статус</th></tr>
+        <tr>
+          <td class="k">1 · HTTP</td>
+          <td>OutputCache + ETag на публичных GET. Завершённые соревнования иммутабельны — длинный TTL; списки — короткий.</td>
+          <td><span class="chip c-part">фаза 3</span></td>
+        </tr>
+        <tr>
+          <td class="k">2 · Приложение</td>
+          <td><code>ICacheService</code>: ключ = нормализованный фильтр; <code>InvalidateAllAsync()</code> после импорта/CRUD (токен-инвалидация).</td>
+          <td><span class="chip c-ok">работает (Memory)</span></td>
+        </tr>
+        <tr>
+          <td class="k">3 · БД</td>
+          <td>Индексы + <code>SwimmReadDbContext</code> NoTracking. Только этот уровень платит за промах.</td>
+          <td><span class="chip c-part">индексы — фаза 3</span></td>
+        </tr>
+      </table>
+      <div class="note amber" style="margin-bottom:0">
+        <strong>Правило:</strong> авторизованные и персональные данные (<code>/auth/*</code>, favorites, user media)
+        никогда не кэшируются на уровнях 1–2. Redis подключается заменой одной регистрации в DI — когда появится
+        второй инстанс, не раньше.
+      </div>
+    </div>
+
+    <!-- ===== AI ===== -->
+    <h2 class="section" id="ai">AI extension points (future) <span class="anchor">#ai</span></h2>
+    <div class="card">
+      <div class="note amber" style="margin-top:0">
+        <strong>Цель:</strong> заложить швы так, чтобы и простой LLM-вызов сейчас, и Microsoft Agent Framework потом
+        внедрялись за один и тот же интерфейс — сменой реализации в Infrastructure, без правок контроллеров и домена.
+        Реализация — после основного роадмапа; сейчас — только не мешать этим швам появиться.
+      </div>
+      <table>
+        <tr><th>Шов</th><th>Назначение</th></tr>
+        <tr><td class="k">ISwimmerProgressAnalyzer</td><td>Детерминированная аналитика прогресса (без LLM). Она же — инструмент для агента.</td></tr>
+        <tr><td class="k">ITrainingPlanGenerator</td><td>Генерация плана тренировок — один structured LLM-вызов.</td></tr>
+        <tr><td class="k">IVirtualCoach</td><td>Разговорный сценарий; контроллер зависит только от него — контракт не меняется при SDK→MAF.</td></tr>
+        <tr><td class="k">IAgent · IAgentCatalog · IAgentRouter</td><td>Каталог агентов: новый агент = класс + DI-регистрация. Примеры: VirtualCoach, ProgressAnalyst, RecordsWatcher, CompetitionScout…</td></tr>
+      </table>
+      <div class="note" style="margin-bottom:0">
+        Coach-tools — обычные C#-методы над данными заплывов (<code>GetRecentResults</code>, <code>GetProgression</code>,
+        <code>CompareSwimmers</code>, <code>SuggestTrainingFocus</code>): в режиме прямого SDK — function-calling tools,
+        в MAF — agent tools/MCP. Методы одни и те же, инвестиция не пропадает.
+      </div>
+    </div>
+
+    <!-- ===== RUN ===== -->
+    <h2 class="section" id="run">Как запустить локально <span class="anchor">#run</span></h2>
+    <div class="grid2">
+      <div class="card">
+        <h3>Backend</h3>
+        <div class="mono">
+          <span class="c"># Prerequisites: .NET 10 SDK, Docker Desktop, Node (для admin-CSS)</span><br/>
+          docker compose -f server/docker-compose.yml up -d <span class="c"># Postgres :5432</span><br/>
+          <span class="c"># миграции — явно (два контекста!):</span><br/>
+          dotnet ef database update --project server/Swimm.Infrastructure --startup-project server/Swimm.API --context SwimmDbContext<br/>
+          <span class="c"># или: dotnet run --project server/Swimm.API -- --migrate</span><br/>
+          dotnet run --project server/Swimm.API --urls http://localhost:5078<br/>
+          <span class="c"># → /api/results · /admin · /auth/login/google · home.html</span><br/>
+          <span class="c"># Tailwind админки: cd server/Swimm.API && npm run css:build</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Frontend</h3>
+        <div class="mono">
+          npm --prefix client run dev <span class="c"># Vite :5173, proxy /api,/auth → :5078</span><br/>
+          <span class="c"># прод-сборка: npm --prefix client run build (build:azure — вырезает видео)</span><br/>
+          <span class="c"># страница результатов: results_main.html?category=…&competitionId=last</span>
+        </div>
+        <div class="note amber" style="margin:.6rem 0 0;font-size:.8rem">
+          <strong>Footgun:</strong> MSB3027 «Swimm.API.dll is locked» = жив прошлый <code>dotnet run</code> —
+          убить процесс перед пересборкой. Скиллы: <code>/db-migrate</code>, <code>/smoke-test-api</code>.
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== STRUCTURE ===== -->
+    <h2 class="section" id="structure">Структура репо <span class="anchor">#structure</span></h2>
+    <div class="grid2">
+      <div class="card">
+        <h3>Сейчас</h3>
+        <div class="mono">
+          swimm-project/<br/>
+          ├── docs/                  <span class="c"># ARCHITECTURE.md · ROADMAP.md</span><br/>
+          ├── client/                <span class="c"># React + Vite + Redux</span><br/>
+          │   ├── src/projects/      <span class="c"># фичи-экраны + components/mix</span><br/>
+          │   └── public/data/       <span class="c"># normative*.js — уходит в фазе 2</span><br/>
+          └── server/<br/>
+          &nbsp;&nbsp;&nbsp;&nbsp;├── Swimm.Domain/          <span class="c"># сущности</span><br/>
+          &nbsp;&nbsp;&nbsp;&nbsp;├── Swimm.Application/     <span class="c"># DTO, интерфейсы</span><br/>
+          &nbsp;&nbsp;&nbsp;&nbsp;├── Swimm.Infrastructure/  <span class="c"># EF, репозитории, миграции</span><br/>
+          &nbsp;&nbsp;&nbsp;&nbsp;├── Swimm.API/             <span class="c"># контроллеры, Razor-админка</span><br/>
+          &nbsp;&nbsp;&nbsp;&nbsp;├── Swimm.Parsing/         <span class="c"># парсеры PDF/HTML (из Swimm.Parser)</span><br/>
+          &nbsp;&nbsp;&nbsp;&nbsp;└── Swimm.Tests/           <span class="c"># xUnit</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Цель (после фазы 1)</h3>
+        <div class="mono">
+          server/<br/>
+          ├── Swimm.Domain/<br/>
+          ├── Swimm.Application/     <span class="c"># + IResultSourceProvider и др. швы</span><br/>
+          ├── Swimm.Infrastructure/<br/>
+          ├── <strong style="color:#4ade80">Swimm.Parsing/</strong>          <span class="c"># classlib: PDF/HTML → ParsedCompetition</span><br/>
+          ├── Swimm.API/             <span class="c"># вызывает парсинг напрямую</span><br/>
+          └── Swimm.Tests/
+        </div>
+        <div class="note" style="margin:.6rem 0 0;font-size:.8rem">
+          Бэклог рефакторинга (попутно): мёртвые <code>src/pages/*</code>, следы CRA, JS-хелперы без типов,
+          опечатка <code>debigConfig</code>, цикл loadFromApi — полный список в <code>docs/ARCHITECTURE.md §7</code>.
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== STATUS ===== -->
+    <h2 class="section" id="status">Текущий статус <span class="anchor">#status</span></h2>
+    <div class="card">
+      <span class="chip c-ok">PostgreSQL 16 + .NET 10</span>
+      <span class="chip c-ok">Clean Architecture 5/5</span>
+      <span class="chip c-ok">Auth фазы 0–4 · долгов нет</span>
+      <span class="chip c-ok">least-privilege роли + 2 DbContext</span>
+      <span class="chip c-ok">Admin redesign + Competitions/Categories CRUD</span>
+      <span class="chip c-ok">клиент на /api/results · /api/competitions</span>
+      <span class="chip c-ok">избранное + primary-подсветка</span>
+      <span class="chip c-ok">мультидневные соревнования</span>
+      <span class="chip c-ok">docs/ARCHITECTURE.md + docs/ROADMAP.md</span>
+      <span class="chip c-part">фаза 1: Swimm.Parsing — следующая</span>
+      <span class="chip c-part">normative*.js ещё на клиенте (фаза 2)</span>
+      <span class="chip c-no">хостинг не выбран — деплой-нейтрально</span>
+    </div>
+
+    <p style="color:var(--dim);font-size:.78rem;margin-top:1.5rem">
+      Личный дашборд. Обновляется вручную. Источник правды по фазам — <code>docs/ROADMAP.md</code>,
+      по архитектуре — <code>docs/ARCHITECTURE.md</code>, по операционке — <code>CLAUDE.md</code>.
     </p>
-  </div>
+  </main>
+</div>
 
-  <div class="card">
-    <h2>Каталог агентов — расширяемый (агентов может быть много)</h2>
-    <p style="font-size:0.82rem;color:#94a3b8;line-height:1.5;margin-bottom:0.75rem">
-      Контроллер зависит от <strong style="color:#cbd5e1">роутера/каталога</strong>, а не от конкретных агентов.
-      Новый агент = реализовать <code style="color:#93c5fd">IAgent</code> + зарегистрировать в DI. Контроллеры и домен
-      не трогаются. В MAF это раскрывается в multi-agent с handoff/маршрутизацией.
-    </p>
-    <div class="layer"><span class="layer-name">IAgent</span><span class="layer-desc">Общий контракт: Name · Description · CanHandle(context) · HandleAsync(message, context). Каждый агент — отдельная реализация.</span></div>
-    <div class="layer"><span class="layer-name">IAgentCatalog</span><span class="layer-desc">Реестр всех агентов (discovery). Регистрация через DI — добавил класс, агент доступен.</span></div>
-    <div class="layer parser"><span class="layer-name">IAgentRouter</span><span class="layer-desc">Выбирает агента под запрос (или отдаёт оркестрацию/handoff в MAF). Точка входа для контроллера.</span></div>
-
-    <div class="flow" style="margin-top:1rem">
-      <div class="flow-box blue">запрос пользователя</div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box amber">IAgentRouter</div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box purple">выбранный IAgent</div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box green">coach tools (общие)</div>
-    </div>
-
-    <p style="font-size:0.78rem;color:#64748b;margin:0.75rem 0 0.4rem">Примеры агентов (список открытый, дополняется):</p>
-    <div>
-      <span class="chip future"><span class="dot"></span>VirtualCoach</span>
-      <span class="chip future"><span class="dot"></span>ProgressAnalyst</span>
-      <span class="chip future"><span class="dot"></span>TrainingPlanner</span>
-      <span class="chip future"><span class="dot"></span>InjuryRiskMonitor</span>
-      <span class="chip future"><span class="dot"></span>RecordsWatcher</span>
-      <span class="chip future"><span class="dot"></span>CompetitionScout</span>
-      <span class="chip future"><span class="dot"></span>TechniqueReviewer</span>
-      <span class="chip future"><span class="dot"></span>NutritionAdvisor</span>
-      <span class="chip future"><span class="dot"></span>TeamRanker</span>
-      <span class="chip future"><span class="dot"></span>…</span>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Когда переключаться SDK → MAF 1.0</h2>
-    <div class="stage-tasks" style="margin-top:0">
-      <div class="task key">Агент сам вызывает инструменты в цикле (tool-loop) — не один вопрос/ответ</div>
-      <div class="task key">Несколько специализированных агентов координируются (data / coach / critic)</div>
-      <div class="task key">Память между сессиями, durable workflow (ночные батчи по всему клубу)</div>
-      <div class="task">Провайдер/модель (Azure OpenAI · Anthropic Claude · OpenAI) — за интерфейсом, выбор конфигом</div>
-    </div>
-  </div>
-
-  <!-- RUNNING LOCALLY -->
-  <h2 class="section">Running Locally</h2>
-  <div class="card">
-    <h2>Backend</h2>
-    <div class="cmd-block">
-      <div class="cmd-comment"># Prerequisites: .NET 10 SDK, Docker Desktop</div>
-      <div class="cmd-text">cd server</div>
-      <div class="cmd-text">docker compose up -d</div>
-      <div style="color:#475569;font-size:0.78rem">→ PostgreSQL :5432 (postgres:16, db=swimm)</div>
-      <br/>
-      <div class="cmd-comment"># Apply EF Core migrations</div>
-      <div class="cmd-text">dotnet ef database update --project Swimm.Infrastructure --startup-project Swimm.API</div>
-      <br/>
-      <div class="cmd-comment"># Google OAuth secret — в user-secrets (не коммитить)</div>
-      <div class="cmd-text">dotnet user-secrets set "Authentication:Google:ClientSecret" "..." --project Swimm.API</div>
-      <br/>
-      <div class="cmd-text">cd Swimm.API</div>
-      <div class="cmd-text">dotnet run</div>
-      <div style="color:#475569;font-size:0.78rem">→ /api/results · /admin · /auth/login/google</div>
-    </div>
-  </div>
-
-  <!-- PROJECT STRUCTURE -->
-  <h2 class="section">Project Structure</h2>
-  <div class="grid2">
-    <div class="card">
-      <h2>Now</h2>
-      <div class="cmd-block">
-        <div class="cmd-comment">swimm-project/</div>
-        <div class="cmd-text">├── client/                 <span class="cmd-comment"># React + Vite + Redux</span></div>
-        <div style="color:#94a3b8;padding-left:1.5rem">├── src/                <span class="cmd-comment"># pages, components, filters</span></div>
-        <div style="color:#94a3b8;padding-left:1.5rem">└── public/data/        <span class="cmd-comment"># static JSON results</span></div>
-        <div class="cmd-text" style="margin-top:0.3rem">└── server/</div>
-        <div style="color:#94a3b8;padding-left:1.5rem">├── Swimm.sln</div>
-        <div style="color:#94a3b8;padding-left:1.5rem">├── docker-compose.yml</div>
-        <div style="color:#94a3b8;padding-left:1.5rem">├── Swimm.API/          <span class="cmd-comment"># controllers, EF, Razor admin</span></div>
-        <div style="color:#94a3b8;padding-left:1.5rem">└── Swimm.Parser/       <span class="cmd-comment"># PDF/Excel → JSON</span></div>
-      </div>
-    </div>
-    <div class="card">
-      <h2>Target (server)</h2>
-      <div class="cmd-block">
-        <div class="cmd-comment">server/</div>
-        <div class="cmd-text">├── Swimm.Domain/          <span class="cmd-comment"># POCO entities</span></div>
-        <div class="cmd-text">├── Swimm.Application/      <span class="cmd-comment"># DTO, interfaces, use-cases</span></div>
-        <div class="cmd-text">├── Swimm.Infrastructure/  <span class="cmd-comment"># EF Core, Npgsql, migrations</span></div>
-        <div class="cmd-text">├── Swimm.API/             <span class="cmd-comment"># thin controllers, DI, admin</span></div>
-        <div class="cmd-text">└── Swimm.Parser/          <span class="cmd-comment"># unchanged</span></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- STATUS -->
-  <h2 class="section">Status</h2>
-  <div>
-    <span class="chip ok"><span class="dot"></span>Migrated to PostgreSQL · .NET 10</span>
-    <span class="chip ok"><span class="dot"></span>Layers + entities in Domain</span>
-    <span class="chip ok"><span class="dot"></span>Application: DTO + single mapper</span>
-    <span class="chip warn"><span class="dot"></span>Clean Architecture — 3/5 (step 4 next)</span>
-    <span class="chip future"><span class="dot"></span>Neon — later</span>
-    <span class="chip future"><span class="dot"></span>Azure App Service — later</span>
-    <span class="chip future"><span class="dot"></span>client ↔ API — later</span>
-  </div>
+<script>
+  // Scrollspy: подсветка активного пункта меню
+  const links = [...document.querySelectorAll('.nav a')];
+  const map = new Map(links.map(a => [a.getAttribute('href').slice(1), a]));
+  const targets = [...map.keys()].map(id => document.getElementById(id)).filter(Boolean);
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(a => a.classList.remove('active'));
+        const a = map.get(e.target.id);
+        if (a) a.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-10% 0px -80% 0px', threshold: 0 });
+  targets.forEach(t => obs.observe(t));
+</script>
 
 </body>
 </html>
