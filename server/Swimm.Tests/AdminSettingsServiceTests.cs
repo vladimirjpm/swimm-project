@@ -12,16 +12,16 @@ public class AdminSettingsServiceTests
     private static AdminSettingsService Build() =>
         new(new MemoryCache(Options.Create(new MemoryCacheOptions())));
 
-    // ── GetAll: 5 дефолтов при инициализации ────────────────────────────────
+    // ── GetAll: все дефолты при инициализации ───────────────────────────────
 
     [Fact]
-    public void GetAll_OnInit_ContainsFiveDefaults()
+    public void GetAll_OnInit_ContainsAllDefaults()
     {
         var svc = Build();
 
         var all = svc.GetAll();
 
-        Assert.Equal(5, all.Count);
+        Assert.Equal(6, all.Count);
     }
 
     // ── Get: существующий ключ возвращает запись ─────────────────────────────
@@ -32,6 +32,7 @@ public class AdminSettingsServiceTests
     [InlineData("ForceRefresh")]
     [InlineData("ShowSystemTables")]
     [InlineData("DefaultSchema")]
+    [InlineData("ResultsLoadMode")]
     public void Get_ExistingKey_ReturnsNonNull(string key)
     {
         var svc = Build();
@@ -109,5 +110,35 @@ public class AdminSettingsServiceTests
         var ok = svc.Update("GhostKey", "value");
 
         Assert.False(ok);
+    }
+
+    // ── Update: ResultsLoadMode — только full/paged/client ────────────────────
+
+    [Theory]
+    [InlineData("full")]
+    [InlineData("paged")]
+    [InlineData("client")]
+    public void Update_ResultsLoadMode_ValidValue_ReturnsTrue(string value)
+    {
+        var svc = Build();
+
+        var ok = svc.Update("ResultsLoadMode", value);
+
+        Assert.True(ok);
+        Assert.Equal(value, svc.Get("ResultsLoadMode")!.Value);
+    }
+
+    [Theory]
+    [InlineData("FULL")] // регистр важен — клиент сравнивает строго
+    [InlineData("pagedd")]
+    [InlineData("")]
+    public void Update_ResultsLoadMode_InvalidValue_ReturnsFalse(string value)
+    {
+        var svc = Build();
+
+        var ok = svc.Update("ResultsLoadMode", value);
+
+        Assert.False(ok);
+        Assert.Equal("client", svc.Get("ResultsLoadMode")!.Value);
     }
 }

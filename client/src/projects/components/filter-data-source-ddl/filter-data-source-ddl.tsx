@@ -13,6 +13,7 @@ import {
   ResultsCategory,
 } from '../../../utils/constants/results-categories';
 import CategoryHelper, { CategoryDisplay } from '../../../utils/helpers/category-helper';
+import ResultsLoadModeHelper from '../../../utils/helpers/results-load-mode';
 
 // ── Категорийный селектор соревнований ──────────────────────────────────────
 // База: design_handoff_category_selector (табы + поиск + сезон + live/upcoming +
@@ -23,9 +24,20 @@ import CategoryHelper, { CategoryDisplay } from '../../../utils/helpers/category
 // Постраничная выгрузка результатов с серверного API (/api/results).
 // Поля ResultDto совпадают с клиентским Result — конвертация не нужна.
 // В dev работает через Vite-прокси /api → http://localhost:5078.
+//
+// Режим загрузки (админ-настройка ResultsLoadMode + ?loadMode=, см. ResultsLoadModeHelper):
+//   'full'  — качаем ВСЕ страницы соревнования и фильтруем на клиенте (текущее поведение);
+//   'paged' — шов под фазу 3 (этап 3.2 роадмапа): фильтры уйдут на сервер query-параметрами,
+//             грузиться будет только запрошенная страница. Пока намеренно ведёт себя как
+//             'full' — включать в админке имеет смысл только после реализации 3.2.
 const loadFromApi = async (
   params: Record<string, string> = {},
 ): Promise<Result[]> => {
+  const mode = await ResultsLoadModeHelper.getMode();
+  if (mode === 'paged') {
+    // TODO(фаза 3.2): серверная фильтрация + постраничная подгрузка вместо полного скачивания.
+    console.info('[results] loadMode=paged ещё не реализован — работаем как full (фаза 3.2)');
+  }
   const all: Result[] = [];
   let page = 1;
   const pageSize = 500; // максимум, отдаваемый сервером

@@ -235,4 +235,14 @@ app.MapGet("/api/db-status",
     (DbStatusService s) => Results.Ok(new { available = s.IsAvailable }))
     .AllowAnonymous();
 
+// Публичная конфигурация клиента (не секреты!). resultsLoadMode: full/paged — принудительный
+// режим загрузки результатов (?loadMode= игнорируется), client — режим выбирает клиент.
+// См. ResultsLoadMode в Admin/Settings и results-load-mode.ts на клиенте.
+app.MapGet("/api/client-config",
+    (ISettingsService settings) => Results.Ok(new
+    {
+        resultsLoadMode = settings.GetValue("ResultsLoadMode", "client")
+    }))
+    .AllowAnonymous();
+
 app.Run();

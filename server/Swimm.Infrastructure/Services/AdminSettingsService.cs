@@ -34,6 +34,11 @@ public class AdminSettingsService : ISettingsService
                 "Показывать системные объекты PostgreSQL (схемы pg_catalog/information_schema) в схеме БД"),
             new("DefaultSchema", "public", "string", "both",
                 "SQL-схема для фильтрации таблиц. Используется в admin (db.html) и может использоваться в публичных запросах"),
+            new("ResultsLoadMode", "client", "string", "livesite",
+                "Режим загрузки результатов клиентом: full — всё соревнование целиком (как сейчас); " +
+                "paged — постранично с фильтрами на сервере (включится в фазе 3); " +
+                "client — клиент выбирает сам через ?loadMode= (по умолчанию full). " +
+                "full/paged принудительны — URL-параметр клиента игнорируется"),
         };
 
         foreach (var s in defaults)
@@ -67,6 +72,10 @@ public class AdminSettingsService : ISettingsService
             return false;
 
         if (!ValidateType(existing.DataType, newValue))
+            return false;
+
+        // Перечислимые настройки: опечатка здесь молча сломала бы клиент — валидируем явно.
+        if (key == "ResultsLoadMode" && newValue is not ("full" or "paged" or "client"))
             return false;
 
         _settings[key] = existing with { Value = newValue };
