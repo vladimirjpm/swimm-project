@@ -168,8 +168,8 @@
         <div class="track big-track"><div class="fill green" style="width:100%"></div></div>
       </div>
       <div class="bar-row">
-        <div class="bar-top"><span class="lbl">Roadmap 2026-07: ✓ Parsing-lib → ✓ Рекорды в БД → Масштаб/кэш (3.1–3.2 начаты) → Логин UI → Галереи → isr.org.il → Админка-UX</span><span class="pct">2/7</span></div>
-        <div class="track big-track"><div class="fill amber" style="width:29%"></div></div>
+        <div class="bar-top"><span class="lbl">Roadmap 2026-07: ✓ Parsing-lib → ✓ Рекорды в БД (вкл. 2.6 URL-импорт) → Масштаб/кэш (3.1–3.3 ✓, остались агрегаты + нагрузка) → Логин UI → Галереи → isr.org.il → Админка-UX</span><span class="pct">2.6/7</span></div>
+        <div class="track big-track"><div class="fill amber" style="width:38%"></div></div>
       </div>
       <div class="note green" style="margin-bottom:0">
         <strong>Фундамент закрыт.</strong> Сервер расслоён (Domain / Application / Infrastructure / API), контроллеры
@@ -179,10 +179,12 @@
         <code>/api/club-points</code>. Источник правды: <code>docs/ARCHITECTURE.md</code> + <code>docs/ROADMAP.md</code>.
       </div>
       <div class="note amber" style="margin-bottom:0">
-        <strong>Главная оставшаяся проблема</strong> (фаза 3): клиент выкачивает все страницы результатов и
-        фильтрует в памяти — не переживёт миллионы записей. Шов уже готов (<code>ResultsLoadMode</code>),
-        осталось наполнить paged-ветку серверной фильтрацией (3.2). Фазы 1 (Parsing-lib) и 2 (рекорды в БД,
-        включая снос 17k строк статики) закрыты.
+        <strong>Проблема масштаба решена</strong> (3.1–3.3 ✓): paged-режим — сервер фильтрует и отдаёт страницу
+        (<code>total</code>, Show more, паритет с full проверен на синтетике 3 млн строк), индекс
+        <code>(CompetitionId, CompetitionDate DESC, Position)</code> снял главный провал (335 мс → 0.5 мс),
+        HTTP-кэш (ETag+304) на всех публичных GET. Осталось в фазе 3: серверные агрегаты (3.4) и
+        нагрузочный smoke k6 (3.5). Фазы 1 и 2 закрыты целиком, включая 2.6 — обновление рекордов
+        с worldaquatics/isr.org.il с превью-диффом.
       </div>
     </div>
 
@@ -206,8 +208,8 @@
         <dl class="kv">
           <dt>UI</dt><dd>React 18 · TypeScript · Vite · Tailwind v4</dd>
           <dt>State</dt><dd>Redux Toolkit — единый <code>rootSlice</code>, роутера нет</dd>
-          <dt>Данные</dt><dd>серверный API (<code>/api/*</code> через Vite-proxy)</dd>
-          <dt>Осталась статика</dt><dd><code>normative*.js</code> (рекорды/нормативы) — <strong>фаза 2 убирает</strong></dd>
+          <dt>Данные</dt><dd>серверный API (<code>/api/*</code> через Vite-proxy) · paged-режим (<code>ResultsLoadMode</code>)</dd>
+          <dt>Статика</dt><dd><code>normative*.js</code> снесены (~17k строк) — рекорды из <code>/api/records</code></dd>
           <dt>Темы</dt><dd>light/dark через <code>--theme-mode-*</code> + категории оформления</dd>
           <dt>Репо</dt><dd>монорепо: <code>client/</code> + <code>server/</code></dd>
         </dl>
@@ -217,15 +219,15 @@
     <!-- ===== CURRENT ===== -->
     <h2 class="section" id="current">Как работает сегодня <span class="anchor">#current</span></h2>
     <div class="card">
-      <p class="flow-label" style="margin-top:0">Публичные результаты (read-only путь)</p>
+      <p class="flow-label" style="margin-top:0">Публичные результаты (read-only путь; в paged-режиме фильтры — query-параметрами, сервер отдаёт страницу + total)</p>
       <div class="flow">
         <div class="flow-box blue">React + Redux</div>
         <div class="flow-arrow">→</div>
-        <div class="flow-box">/api/results · /api/competitions</div>
+        <div class="flow-box">/api/results?фильтры&amp;page= · /api/competitions · filter-hints (ETag+304)</div>
         <div class="flow-arrow">→</div>
         <div class="flow-box purple">SwimmReadDbContext (swimm_ro)</div>
         <div class="flow-arrow">→</div>
-        <div class="flow-box green">PostgreSQL</div>
+        <div class="flow-box green">PostgreSQL (индексы под paged, проверено на 3 млн строк)</div>
       </div>
       <p class="flow-label">Импорт протоколов (фаза 1 ✓ — одним потоком, без ручного звена)</p>
       <div class="flow">
@@ -235,13 +237,21 @@
         <div class="flow-arrow">→</div>
         <div class="flow-box green">PostgreSQL</div>
       </div>
-      <p class="flow-label">Рекорды и нормативы (фаза 2 — статика снесена)</p>
+      <p class="flow-label">Рекорды и нормативы (фаза 2 — статика снесена; на клиенте «updated dd/MM/yyyy»)</p>
       <div class="flow">
         <div class="flow-box">/api/records?region=… · /api/normative-standards (ETag + max-age=300)</div>
         <div class="flow-arrow">→</div>
         <div class="flow-box blue">RecordsHelper.warmUp() → легаси-формы деревьев</div>
         <div class="flow-arrow">→</div>
         <div class="flow-box blue">helper-normative.ts · попапы · карточки</div>
+      </div>
+      <p class="flow-label">Обновление рекордов из источников (2.6 ✓ — превью-дифф перед записью)</p>
+      <div class="flow">
+        <div class="flow-box amber">worldaquatics XLSX (авто-URL) · isr.org.il PDF (URL/файл)</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box blue">Admin Import «Рекорды»: Fetch → дифф (+new/~changed) → Apply</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box green">Records (+UpdatedAt) · инвалидация кэша</div>
       </div>
     </div>
 
@@ -318,17 +328,18 @@
         <li class="ok">Админка: CRUD Records/Standards (вкладки, фильтры, inline-правка, 400 на конфликт, инвалидация кэша) — смоук сквозь стек</li>
         <li class="ok">Снос normative*.js (~17k строк) + script-тегов; геттеры хелпера — пустое дерево вместо undefined, холодный сценарий проверен в браузере</li>
         <li class="ok">Бонус из 3.1: ETag + Cache-Control (max-age=300) на records-эндпоинтах; If-None-Match → 304; при падении API браузер живёт на HTTP-кэше</li>
+        <li class="ok">2.6: <code>IRecordSourceProvider</code> — 3 источника (worldaquatics авто-XLSX по URL с UA, isr.org.il PDF по URL/файлом, SSRF-whitelist) → превью-дифф по 8 осям → Apply транзакцией; <code>Record.UpdatedAt</code> + «updated dd/MM/yyyy» на клиенте; Import перепланирован (табы Соревнования/Рекорды, карточки вместо &lt;select&gt;)</li>
       </ul>
     </div>
 
-    <div class="phase next">
-      <div class="phase-head"><div class="pnum">3</div><div><span class="ptitle">Масштаб и кэш</span><span class="pstatus st-next">ДАЛЕЕ</span><div class="psub">Готовность к миллионам записей: сервер отдаёт быстро, клиент не выкачивает всё.</div></div></div>
+    <div class="phase now">
+      <div class="phase-head"><div class="pnum">3</div><div><span class="ptitle">Масштаб и кэш</span><span class="pstatus st-now">СЕЙЧАС · 3.1–3.3 ✓</span><div class="psub">Готовность к миллионам записей: сервер отдаёт быстро, клиент не выкачивает всё.</div></div></div>
       <ul class="steps">
-        <li class="todo">OutputCache + ETag на публичных GET (завершённые соревнования иммутабельны — длинный TTL)</li>
-        <li class="ok">Шов режима загрузки: настройка <code>ResultsLoadMode</code> (full/paged/client + <code>?loadMode=</code>) · <code>GET /api/client-config</code> · <code>ResultsLoadModeHelper</code></li>
-        <li class="todo">Фильтрация на сервере: наполнить paged-ветку — фильтры query-параметрами, постраничная подгрузка вместо «качай все страницы»</li>
-        <li class="todo">EXPLAIN ANALYZE на синтетике 1–5 млн строк → недостающие индексы миграцией</li>
-        <li class="todo">Серверные агрегаты (медали, очки клубов) + нагрузочный smoke (p95 &lt; 300мс на промахе)</li>
+        <li class="ok">3.1: ETag + Cache-Control на всех публичных GET (общий <code>CachedJson</code>-хелпер; 304 на If-None-Match; глобальная токен-инвалидация)</li>
+        <li class="ok">3.2: paged-режим целиком — сервер фильтрует (birthYear/ageGroup/position/eventDate + прежние), отдаёт страницу + <code>total</code>; клиент: один fetch, Show more, опции фильтров из <code>filter-hints</code>; паритет с full проверен (контракт: <code>docs/tasks/phase3-paged-results-contract.md</code>)</li>
+        <li class="ok">3.3: синтетика 3 млн строк (<code>server/db/synthetic-results.sql</code>) + EXPLAIN-профиль → индекс <code>(CompetitionId, CompetitionDate DESC, Position)</code>: 335 мс → 0.5 мс</li>
+        <li class="todo">3.4: серверные агрегаты — счётчики GetSources (~250 мс за кэшем), DISTINCT distance, серверные level_filter/recalc для paged</li>
+        <li class="todo">3.5: нагрузочный smoke k6 (p95 &lt; 300мс на промахе)</li>
       </ul>
     </div>
 
@@ -404,7 +415,7 @@
         <tr><td class="k">ICacheService</td><td>MemoryCacheService (токен-инвалидация)</td><td>Redis — заменой регистрации в DI</td></tr>
         <tr><td class="k">IResultSourceProvider <span class="chip c-no">фаза 1</span></td><td>PdfResultSourceProvider (парсеры IsrOrg)</td><td>веб-скрейпинг isr.org.il · другие федерации</td></tr>
         <tr><td class="k">ICompetitionDiscoveryProvider <span class="chip c-no">фаза 6</span></td><td>—</td><td>обнаружение новых соревнований → «входящие»</td></tr>
-        <tr><td class="k">IRecordSourceProvider <span class="chip c-no">фаза 2</span></td><td>сидер из JS + парсеры записей</td><td>автообновление рекордов из веба</td></tr>
+        <tr><td class="k">IRecordSourceProvider <span class="chip c-ok">2.6 ✓</span></td><td>3 провайдера: worldaquatics (авто-XLSX), isr.org.il age/masters (PDF по URL/файлом) + дифф-сервис</td><td>расписание автопроверки (фаза 6)</td></tr>
         <tr><td class="k">IImportService</td><td>JsonImportService (единственная точка записи)</td><td>принимает ParsedCompetition от любого провайдера</td></tr>
         <tr><td class="k">IEmailSender</td><td>LoggingEmailSender (dev)</td><td>SMTP/Resend в проде (блокер логина)</td></tr>
       </table>
@@ -436,9 +447,9 @@
           <td>Категории отдают name/badge клиенту через /api/categories; канонические ключи — client-only.</td>
         </tr>
         <tr>
-          <td class="k">Планируется <span class="chip c-part">фаза 2</span></td>
+          <td class="k">Рекорды <span class="chip c-ok">фаза 2 ✓ · swimm_ro</span></td>
           <td><code>Records</code> · <code>NormativeStandards</code></td>
-          <td>Замена normative*.js. Не забыть грант swimm_ro.</td>
+          <td>3-осевая модель; 1719 + 6510 строк из сидера; <code>UpdatedAt</code> (2.6) — дата обновления записи, не путать с <code>RecordDate</code>.</td>
         </tr>
         <tr>
           <td class="k">Auth <span class="chip c-ok">Sys_* · только swimm_rw</span></td>
@@ -460,8 +471,8 @@
         <tr><th>Уровень</th><th>Механизм</th><th>Статус</th></tr>
         <tr>
           <td class="k">1 · HTTP</td>
-          <td>OutputCache + ETag на публичных GET. Завершённые соревнования иммутабельны — длинный TTL; списки — короткий.</td>
-          <td><span class="chip c-part">фаза 3</span></td>
+          <td>ETag + Cache-Control (общий <code>CachedJson</code>): records/standards — max-age=300; competitions/career/hints — max-age=60; If-None-Match → 304 без тела.</td>
+          <td><span class="chip c-ok">3.1 ✓</span></td>
         </tr>
         <tr>
           <td class="k">2 · Приложение</td>
@@ -470,8 +481,8 @@
         </tr>
         <tr>
           <td class="k">3 · БД</td>
-          <td>Индексы + <code>SwimmReadDbContext</code> NoTracking. Только этот уровень платит за промах.</td>
-          <td><span class="chip c-part">индексы — фаза 3</span></td>
+          <td>Индексы + <code>SwimmReadDbContext</code> NoTracking. Композит <code>(CompetitionId, CompetitionDate DESC, Position)</code> под paged-выдачу; все paged-запросы ≤ 4 мс на 3 млн строк.</td>
+          <td><span class="chip c-ok">3.3 ✓</span></td>
         </tr>
       </table>
       <div class="note amber" style="margin-bottom:0">
@@ -543,18 +554,18 @@
           ├── docs/                  <span class="c"># ARCHITECTURE.md · ROADMAP.md</span><br/>
           ├── client/                <span class="c"># React + Vite + Redux</span><br/>
           │   ├── src/projects/      <span class="c"># фичи-экраны + components/mix</span><br/>
-          │   └── public/data/       <span class="c"># normative*.js — уходит в фазе 2</span><br/>
+          │   └── public/data/       <span class="c"># json/excel статика (normative*.js снесены)</span><br/>
           └── server/<br/>
           &nbsp;&nbsp;&nbsp;&nbsp;├── Swimm.Domain/          <span class="c"># сущности</span><br/>
           &nbsp;&nbsp;&nbsp;&nbsp;├── Swimm.Application/     <span class="c"># DTO, интерфейсы</span><br/>
           &nbsp;&nbsp;&nbsp;&nbsp;├── Swimm.Infrastructure/  <span class="c"># EF, репозитории, миграции</span><br/>
           &nbsp;&nbsp;&nbsp;&nbsp;├── Swimm.API/             <span class="c"># контроллеры, Razor-админка</span><br/>
-          &nbsp;&nbsp;&nbsp;&nbsp;├── Swimm.Parsing/         <span class="c"># парсеры PDF/HTML (из Swimm.Parser)</span><br/>
+          &nbsp;&nbsp;&nbsp;&nbsp;├── Swimm.Parsing/         <span class="c"># парсеры PDF/XLSX + RecordSources (2.6)</span><br/>
           &nbsp;&nbsp;&nbsp;&nbsp;└── Swimm.Tests/           <span class="c"># xUnit</span>
         </div>
       </div>
       <div class="card">
-        <h3>Цель (после фазы 1)</h3>
+        <h3>Цель (после фазы 1) — достигнута ✓</h3>
         <div class="mono">
           server/<br/>
           ├── Swimm.Domain/<br/>
@@ -565,8 +576,8 @@
           └── Swimm.Tests/
         </div>
         <div class="note" style="margin:.6rem 0 0;font-size:.8rem">
-          Бэклог рефакторинга (попутно): мёртвые <code>src/pages/*</code>, следы CRA, JS-хелперы без типов,
-          опечатка <code>debigConfig</code>, цикл loadFromApi — полный список в <code>docs/ARCHITECTURE.md §7</code>.
+          Бэклог рефакторинга (попутно): следы CRA, JS-хелперы без типов, опечатка <code>debigConfig</code> —
+          полный список в <code>docs/ARCHITECTURE.md §7</code>. Цикл loadFromApi решён paged-режимом (3.2).
         </div>
       </div>
     </div>
@@ -583,13 +594,16 @@
       <span class="chip c-ok">избранное + primary-подсветка</span>
       <span class="chip c-ok">мультидневные соревнования</span>
       <span class="chip c-ok">docs/ARCHITECTURE.md + docs/ROADMAP.md</span>
-      <span class="chip c-part">фаза 1: Swimm.Parsing — следующая</span>
-      <span class="chip c-part">normative*.js ещё на клиенте (фаза 2)</span>
+      <span class="chip c-ok">фаза 1: Swimm.Parsing (Parser снесён)</span>
+      <span class="chip c-ok">фаза 2: рекорды в БД + CRUD + 2.6 URL-импорт с диффом</span>
+      <span class="chip c-ok">3.1–3.3: paged-режим · HTTP-кэш · индексы (3 млн строк ≤ 4 мс)</span>
+      <span class="chip c-part">далее: 3.4 агрегаты · 3.5 k6 · фаза 4 логин-UI</span>
+      <span class="chip c-part">рабочая копия не закоммичена (фазы 2.6–3.3)</span>
       <span class="chip c-no">хостинг не выбран — деплой-нейтрально</span>
     </div>
 
     <p style="color:var(--dim);font-size:.78rem;margin-top:1.5rem">
-      Личный дашборд. Обновляется вручную. Источник правды по фазам — <code>docs/ROADMAP.md</code>,
+      Личный дашборд. Обновляется вручную (последний раз: 2026-07-10). Источник правды по фазам — <code>docs/ROADMAP.md</code>,
       по архитектуре — <code>docs/ARCHITECTURE.md</code>, по операционке — <code>CLAUDE.md</code>.
     </p>
   </main>
