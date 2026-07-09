@@ -15,12 +15,15 @@ npm --prefix client run dev        # Vite dev server
 npm --prefix client run build      # prebuild авто-генерит club-icons manifest
 ```
 
-## Точка входа и навигация
+## Точки входа и навигация
 
-- [`src/index.tsx`](src/index.tsx) — единственный рендер-корень. **Роутера нет**: приложение
-  монтирует один `ResultsMain` внутри `<Provider store>`. Переключение «экранов» — через
-  Redux-state, а не URL. `src/pages/*` существуют, но точка входа их сейчас не использует —
-  не считай их активными маршрутами, пока не проверишь.
+- **Multi-page Vite-сборка** (`vite.config.js` → `rollupOptions.input`): каждый html в корне
+  client/ — отдельная страница со своей точкой входа: `index.html` → `src/index.tsx`,
+  `results_main.html` → `src/pages/results-main-page.tsx`, `home/about/competitions.html` →
+  соответствующие `src/pages/*-page.tsx`. **SPA-роутера нет** — «страницы» это отдельные html,
+  а переключение экранов внутри страницы — через Redux-state.
+- Инициализацию, нужную каждой странице (напр. `RecordsHelper.warmUp()`), добавляй в точку
+  входа конкретной страницы — правка только `index.tsx` до `results_main.html` не доедет.
 
 ## Карта `src/`
 

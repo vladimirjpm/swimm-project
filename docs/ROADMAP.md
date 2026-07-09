@@ -46,19 +46,34 @@
 **Цель:** убрать `client/public/data/normative*.js` (~17k строк) — рекорды и нормативы живут
 в БД, редактируются в админке, приходят с сервера.
 
-- ☐ 2.1. Схема: таблицы `Records` (scope: WR/ISR/age/masters; пол, бассейн, стиль, дистанция,
-  возрастная группа nullable, время, держатель(и), страна, дата) и `NormativeStandards`
-  (уровни из normative.js / normative-masters.js). Миграция + грант `swimm_ro` в
-  `setup-roles.sql`.
-- ☐ 2.2. Одноразовый сидер: конвертация текущих `normative*.js` → импорт в БД
-  (консольный режим `--seed-records` или admin-кнопка). Сверка счётчиков до/после.
-- ☐ 2.3. API: `GET /api/records?scope=&gender=&poolType=` и `GET /api/normative-standards`
-  через `SwimmReadDbContext` + `ICacheService` (данные меняются редко — длинный TTL).
-- ☐ 2.4. Клиент: `RecordsHelper` по образцу `CategoryHelper` (fetch + кэш + fallback);
-  `helper-normative.ts` перестаёт читать `window.*`; `<script>`-теги из `results_main.html`
-  удалить. Проверить попапы нормативов, age/masters records-карточки, level gauge.
-- ☐ 2.5. Админка: CRUD «Records» (по образцу Categories/Competitions) — inline-редактирование
-  времени/держателя/даты, фильтры по scope/полу/бассейну.
+- ✅ 2.1. (2026-07-09) Схема — **три независимые оси** вместо плоского scope (решение
+  пользователя: система должна расширяться на любые страны/континенты/категории):
+  территория (`RegionType`: world/continent/country + `RegionCode`: ''/EU/ISR/…) →
+  категория (`Category`: open/age/junior/masters + `AgeKey`) → дисциплина
+  (Gender/PoolType/Style/Distance). `NormativeStandards` — kind (regular/masters) +
+  `Country` (система нормативов, сейчас RUS). Unique-индексы по всем осям (NOT NULL
+  пустые строки вместо nullable). Миграция `AddRecordsAndNormativeStandards` применена,
+  гранты swimm_ro/rw в setup-roles.sql и на живой БД.
+- ✅ 2.2. (2026-07-09) Сидер `IRecordsSeeder` / `dotnet run -- --seed-records <dir> [--force]`
+  (без --force отказывается перезаписывать непустые таблицы). Залито и сверено с
+  исходниками потрое: 166 open (WR+ISR) + 827 age + 726 masters рекордов; 630 regular +
+  5880 masters нормативов. Иврит не искажён.
+- ✅ 2.3. (2026-07-09) API: `GET /api/records?region=&category=` (region обязателен —
+  кэш и выборки по регионам) и `GET /api/normative-standards?kind=` через
+  `IRecordRepository` (SwimmReadDbContext + ICacheService, TTL 24ч, ключи
+  `records:{region}:{category}`). Смоук: world=83, ISR/age=827, 400 без region.
+- ✅ 2.4. (2026-07-09, Sonnet) `records-helper.ts`: warmUp при старте страницы, синхронные
+  геттеры отдают легаси-формы window.normative_* (fallback до/при недоступном API);
+  `helper-normative.ts`, попап нормативов и age/masters-карточки переведены с прямого
+  чтения `window.*`. Проверено в браузере, вкл. сценарий с выключенным API.
+  Попутная находка: client — **multi-page Vite-сборка**, у results_main.html своя точка
+  входа `src/pages/results-main-page.tsx` (client/CLAUDE.md обновлён).
+- ✅ 2.5. (2026-07-09, Sonnet) Админ-CRUD: `IRecordAdminRepository` → `RecordsAdminController`
+  → `Pages/Admin/Records` (вкладки Records/Standards, фильтры, пагинация, inline-правка,
+  валидация осей, конфликт unique-индекса → 400, каждая мутация → InvalidateAllAsync).
+  Смоук сквозь стек: правка в админке → /api/records → попап клиента.
+- ☐ 2.7. Финальный снос статики: удалить `normative*.js` и script-теги из
+  `results_main.html` после проверки 2.4–2.5 вживую (отдельный коммит).
 - ☐ 2.6. (опционально) `IRecordSourceProvider`: обновление рекордов через существующие
   парсеры IsrOrgAgeRecords/IsrOrgMastersRecords/WorldRecords с превью-диффом
   («что изменится») перед применением.

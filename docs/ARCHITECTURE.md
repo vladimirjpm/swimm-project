@@ -66,10 +66,14 @@ Application → реализация в Infrastructure → регистраци�
   что пишет или трогает `Sys_*`.
 - **Новая публичная таблица ⇒ обязательный грант** `swimm_ro` в `server/db/setup-roles.sql`
   (fail-closed: забыл грант — публичный путь падает, это намеренно).
-- **Рекорды переезжают в БД** (сейчас — 17k строк JS в `client/public/data/normative*.js`).
-  Целевая модель — одна таблица `Records` (см. ROADMAP, фаза 2): scope (WR/ISR/age/masters),
-  пол, бассейн, стиль, дистанция, возрастная группа, время, держатель, дата. Нормативы
-  уровней (`normative.js`, `normative-masters.js`) — вторая таблица `NormativeStandards`.
+- **Рекорды живут в БД** (таблицы `Records`/`NormativeStandards`, фаза 2). Модель `Records` —
+  три независимые оси, расширяемые на любые страны/континенты/категории без изменения схемы:
+  территория (`RegionType` world/continent/country + `RegionCode` ''/EU/ISR/…) → категория
+  (`Category` open/age/junior/masters + `AgeKey`) → дисциплина (Gender/PoolType/Style/Distance).
+  Страна держателя (`HolderCountry`) ≠ территория рекорда. API и кэш режутся по регионам:
+  `GET /api/records?region=…&category=…`, ключ кэша `records:{region}:{category}`.
+  `NormativeStandards`: kind (regular/masters) + `Country` — система нормативов (сейчас RUS),
+  другие системы лягут рядом. Легаси `client/public/data/normative*.js` удаляются на 2.7.
 - **Масштаб «миллионы результатов»:** ключевые индексы по `(CompetitionId)`,
   `(SwimmerId)`, `(StyleId, Distance, Gender, PoolType)`; пагинация — только keyset или
   LIMIT/OFFSET с потолком pageSize=500 (уже есть); никаких `SELECT *` без фильтра.

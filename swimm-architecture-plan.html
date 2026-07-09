@@ -310,11 +310,12 @@
     <div class="phase next">
       <div class="phase-head"><div class="pnum">2</div><div><span class="ptitle">Рекорды и нормативы в БД</span><span class="pstatus st-next">ДАЛЕЕ</span><div class="psub">Убрать normative*.js — рекорды редактируются в админке и приходят с сервера.</div></div></div>
       <ul class="steps">
-        <li class="todo">Таблицы <code>Records</code> (WR/ISR/age/masters) + <code>NormativeStandards</code> · миграция + грант swimm_ro</li>
-        <li class="todo">Одноразовый сидер из текущих normative*.js со сверкой счётчиков</li>
-        <li class="todo"><code>GET /api/records</code> + <code>/api/normative-standards</code> (RO-контекст, длинный TTL)</li>
-        <li class="todo">Клиент: <code>RecordsHelper</code> по образцу CategoryHelper · удалить script-теги и <code>window.*</code></li>
-        <li class="todo">Админка: CRUD «Records» с inline-редактированием</li>
+        <li class="ok">Таблицы: <code>Records</code> — 3 оси (территория world/continent/country → категория open/age/junior/masters → дисциплина) + <code>NormativeStandards</code> (kind+Country) · миграция + гранты</li>
+        <li class="ok">Сидер <code>--seed-records</code>: 1719 рекордов + 6510 нормативов, счётчики сверены с JS-исходниками</li>
+        <li class="ok"><code>GET /api/records?region=&amp;category=</code> + <code>/api/normative-standards</code> — кэш по регионам, TTL 24ч</li>
+        <li class="ok">Клиент: <code>records-helper.ts</code> — warmUp + легаси-формы window.* + fallback при недоступном API; helper-normative/попапы/карточки переведены</li>
+        <li class="ok">Админка: CRUD Records/Standards (вкладки, фильтры, inline-правка, 400 на конфликт, инвалидация кэша) — смоук сквозь стек</li>
+        <li class="todo">Финальный снос normative*.js (~17k строк) — этап 2.7, после проверки вживую</li>
       </ul>
     </div>
 
