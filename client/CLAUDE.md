@@ -19,7 +19,7 @@ npm --prefix client run build      # prebuild авто-генерит club-icons
 
 - **Multi-page Vite-сборка** (`vite.config.js` → `rollupOptions.input`): каждый html в корне
   client/ — отдельная страница со своей точкой входа: `index.html` → `src/index.tsx`,
-  `results_main.html` → `src/pages/results-main-page.tsx`, `home/about/competitions.html` →
+  `results_main.html` → `src/pages/results-main-page.tsx`, `home/about/competitions/groups.html` →
   соответствующие `src/pages/*-page.tsx`. **SPA-роутера нет** — «страницы» это отдельные html,
   а переключение экранов внутри страницы — через Redux-state.
 - Инициализацию, нужную каждой странице (напр. `RecordsHelper.warmUp()`), добавляй в точку

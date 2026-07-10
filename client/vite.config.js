@@ -42,6 +42,7 @@ export default defineConfig(({ command }) => ({
         results_main: resolve(__dirname, 'results_main.html'),
         about: resolve(__dirname, 'about.html'),
         competitions: resolve(__dirname, 'competitions.html'),
+        groups: resolve(__dirname, 'groups.html'),
       },
       output: {
         entryFileNames: '[name].js',

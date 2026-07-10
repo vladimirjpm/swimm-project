@@ -58,6 +58,7 @@ public static class DependencyInjection
         services.AddScoped<ICategoryAdminRepository, CategoryAdminRepository>();
         services.AddScoped<IUserFavoriteRepository, UserFavoriteRepository>();
         services.AddScoped<IHubGroupAdminService, HubGroupAdminService>();
+        services.AddScoped<IHubGroupPublicRepository, HubGroupPublicRepository>();
         services.AddScoped<IClubPointsRepository, ClubPointsRepository>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
 

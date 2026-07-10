@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-type ActivePage = 'home' | 'competitions';
+type ActivePage = 'home' | 'competitions' | 'groups';
 
 export function SwimHubLogo() {
   return (
@@ -18,6 +18,7 @@ export function SwimHubLogo() {
 const NAV_LINKS: { label: string; href?: string; key?: ActivePage }[] = [
   { label: 'Home', href: './home.html', key: 'home' },
   { label: 'Competitions', href: './competitions.html', key: 'competitions' },
+  { label: 'Groups', href: './groups.html', key: 'groups' },
   { label: 'Normatives' },
   { label: 'Records' },
   { label: 'About', href: './about.html' },

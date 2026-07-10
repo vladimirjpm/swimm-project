@@ -11,13 +11,19 @@ namespace Swimm.Infrastructure.Services;
 
 /// <summary>
 /// Админский CRUD групп (см. <see cref="IHubGroupAdminService"/>). Пишет через owner-контекст
-/// <see cref="SwimmDbContext"/>. Публичного кэша для групп пока нет (фаза 3) — инвалидировать нечего.
+/// <see cref="SwimmDbContext"/>. После мутаций инвалидирует общий кэш — публичные
+/// /api/hub-groups* (фаза 3) кэшируются через ICacheService, как остальные публичные GET.
 /// </summary>
 public partial class HubGroupAdminService : IHubGroupAdminService
 {
     private readonly SwimmDbContext _db;
+    private readonly ICacheService _cache;
 
-    public HubGroupAdminService(SwimmDbContext db) => _db = db;
+    public HubGroupAdminService(SwimmDbContext db, ICacheService cache)
+    {
+        _db = db;
+        _cache = cache;
+    }
 
     public async Task<IReadOnlyList<HubGroupAdminRowDto>> GetAllAsync()
     {
@@ -124,6 +130,7 @@ public partial class HubGroupAdminService : IHubGroupAdminService
 
         _db.HubGroups.Remove(group);
         await _db.SaveChangesAsync();
+        await _cache.InvalidateAllAsync();
         return HubGroupSaveResult.Ok(id);
     }
 
@@ -238,9 +245,13 @@ public partial class HubGroupAdminService : IHubGroupAdminService
     private async Task TouchGroupAsync(int groupId)
     {
         var group = await _db.HubGroups.FindAsync(groupId);
-        if (group == null) return;
-        group.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
+        if (group != null)
+        {
+            group.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+        }
+        // Мутации участников идут только через этот метод — инвалидация кэша здесь.
+        await _cache.InvalidateAllAsync();
     }
 
     private static void Apply(HubGroup group, HubGroupInputDto input, string slug)
@@ -274,6 +285,7 @@ public partial class HubGroupAdminService : IHubGroupAdminService
                 return HubGroupSaveResult.Fail("Не удалось сохранить: владелец или клуб не найден.");
             return HubGroupSaveResult.Fail("Не удалось сохранить группу.");
         }
+        await _cache.InvalidateAllAsync();
         return HubGroupSaveResult.Ok(group.Id);
     }
 
