@@ -1,0 +1,105 @@
+@page
+@model Swimm.API.Pages.Admin.HubGroups.IndexModel
+@{
+    ViewData["Title"] = "HubGroups";
+    ViewData["PageSubtitle"] = "Группы (SwimHub) — неформальные объединения пловцов";
+
+    var flash = TempData["Flash"] as string;
+}
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}
+
+<div class="mb-4 flex items-center justify-end">
+    <a href="@Url.Page("Edit")" class="admin-btn admin-btn-primary">+ Новая группа</a>
+</div>
+
+@if (Model.Groups.Count == 0)
+{
+    <div class="admin-card text-center text-admin-text-muted italic py-10">
+        Групп пока нет.
+    </div>
+}
+else
+{
+    <div class="overflow-x-auto">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>Название</th>
+                    <th>Slug</th>
+                    <th>Клуб</th>
+                    <th class="text-right">Участников</th>
+                    <th>Публичность</th>
+                    <th>Обновлена</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var g in Model.Groups)
+                {
+                    <tr>
+                        <td>
+                            @if (!string.IsNullOrEmpty(g.IconUrl))
+                            {
+                                <img src="@g.IconUrl" alt="" class="h-6 w-6 rounded-full object-cover" />
+                            }
+                            else
+                            {
+                                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-admin-surface-hover text-admin-text-muted">
+                                    <partial name="/Pages/Admin/Shared/_Icon.cshtml" model='"users"' />
+                                </span>
+                            }
+                        </td>
+                        <td>
+                            <a href="@Url.Page("Edit", new { id = g.Id })" class="text-admin-accent hover:underline font-medium">@g.Name</a>
+                        </td>
+                        <td class="font-mono text-xs text-admin-text-muted">@g.Slug</td>
+                        <td>@(g.ClubName ?? "—")</td>
+                        <td class="text-right tabular-nums">@g.MemberCount</td>
+                        <td>
+                            @if (g.IsPublic)
+                            {
+                                <span class="admin-badge border-admin-success/30 bg-admin-success/15 text-admin-success">public</span>
+                            }
+                            else
+                            {
+                                <span class="admin-badge border-admin-border bg-admin-surface-hover text-admin-text-muted">private</span>
+                            }
+                        </td>
+                        <td class="whitespace-nowrap text-admin-text-muted">@g.UpdatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td class="text-right whitespace-nowrap">
+                            <a href="@Url.Page("Edit", new { id = g.Id })" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
+                            <form method="post" asp-page-handler="Delete" class="inline hubgroup-delete-form">
+                                <input type="hidden" name="id" value="@g.Id" />
+                                <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        document.querySelectorAll('.hubgroup-delete-form').forEach(form => {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const ok = await adminConfirm({
+                    title: 'Удалить группу?',
+                    message: 'Все участники группы будут удалены вместе с ней. Пловцы в справочнике останутся.',
+                    confirmText: 'Удалить',
+                    danger: true,
+                });
+                if (ok) form.submit();
+            });
+        });
+    </script>
+}

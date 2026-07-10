@@ -39,6 +39,13 @@ public class AdminSettingsService : ISettingsService
                 "paged — постранично с фильтрами на сервере (включится в фазе 3); " +
                 "client — клиент выбирает сам через ?loadMode= (по умолчанию full). " +
                 "full/paged принудительны — URL-параметр клиента игнорируется"),
+            new("HubGroupCreationPolicy", "admin", "string", "livesite",
+                "Кто создаёт группы (SwimHub): admin — только админ; coach — админ и тренеры; any — любой пользователь"),
+            new("HubGroupMaxPerUser", "3", "int", "livesite",
+                "Лимит групп на пользователя (на админа не действует)"),
+            new("HubGroupVisibility", "public", "string", "livesite",
+                "Видимость групп: public — все видны всем; private — все скрыты; " +
+                "perGroup — решает флаг IsPublic у конкретной группы"),
         };
 
         foreach (var s in defaults)
@@ -76,6 +83,10 @@ public class AdminSettingsService : ISettingsService
 
         // Перечислимые настройки: опечатка здесь молча сломала бы клиент — валидируем явно.
         if (key == "ResultsLoadMode" && newValue is not ("full" or "paged" or "client"))
+            return false;
+        if (key == "HubGroupCreationPolicy" && newValue is not ("admin" or "coach" or "any"))
+            return false;
+        if (key == "HubGroupVisibility" && newValue is not ("public" or "private" or "perGroup"))
             return false;
 
         _settings[key] = existing with { Value = newValue };

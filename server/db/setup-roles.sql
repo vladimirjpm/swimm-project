@@ -74,7 +74,9 @@ GRANT SELECT ON
     "CompetitionEvents",
     "CompetitionResultUrls",
     "Records",
-    "NormativeStandards"
+    "NormativeStandards",
+    "HubGroups",
+    "HubGroupMembers"
 TO swimm_ro;
 
 -- NOTE: Sys_UserFavorites и Sys_UserMedia намеренно НЕ добавлены в этот грант.

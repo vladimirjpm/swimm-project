@@ -1,0 +1,318 @@
+@page
+@model Swimm.API.Pages.Admin.HubGroups.EditModel
+@{
+    ViewData["Title"] = Model.IsNew ? "Новая группа" : "Редактирование группы";
+    ViewData["PageSubtitle"] = Model.IsNew ? null : $"#{Model.Id} · {Model.Existing?.Name}";
+    var flash = TempData["Flash"] as string;
+}
+
+<div class="max-w-[820px] mx-auto">
+
+    <div class="mb-4 flex items-center gap-3">
+        <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">← К списку</a>
+        @if (!Model.IsNew && Model.Existing != null)
+        {
+            <span class="text-xs text-admin-text-muted">
+                Участников: <strong class="text-admin-text">@Model.Existing.Members.Count</strong>
+            </span>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5 py-3 px-4 mb-4 text-sm text-admin-danger">
+            @Model.Error
+        </div>
+    }
+
+    <!-- ── Основные поля ─────────────────────────────────────────────────────── -->
+    <form method="post" asp-page-handler="Save" class="admin-card mb-5">
+        <input type="hidden" asp-for="Id" />
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Название <span class="text-admin-danger">*</span></span>
+                <input asp-for="Input.Name" id="hg-name" class="admin-input" autocomplete="off" required />
+            </label>
+
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Название (англ.)</span>
+                <input asp-for="Input.NameEn" id="hg-name-en" class="admin-input" autocomplete="off" />
+            </label>
+
+            <label class="flex flex-col gap-1 sm:col-span-2">
+                <span class="text-xs text-admin-text-muted">
+                    Slug <span class="text-admin-danger">*</span>
+                    <span class="text-admin-text-muted/70">(для /group/{slug}; латиница, цифры, дефисы)</span>
+                </span>
+                <input asp-for="Input.Slug" id="hg-slug" class="admin-input font-mono" autocomplete="off"
+                       pattern="[a-z0-9\-]*" placeholder="dolphin-netanya-masters" />
+            </label>
+
+            <label class="flex flex-col gap-1 sm:col-span-2">
+                <span class="text-xs text-admin-text-muted">Описание</span>
+                <textarea asp-for="Input.Description" class="admin-input" rows="3"></textarea>
+            </label>
+
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Иконка (URL)</span>
+                <input asp-for="Input.IconUrl" type="url" class="admin-input" autocomplete="off" placeholder="https://…" />
+            </label>
+
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Обложка (URL)</span>
+                <input asp-for="Input.CoverImageUrl" type="url" class="admin-input" autocomplete="off" placeholder="https://…" />
+            </label>
+
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Локация (город/бассейн)</span>
+                <input asp-for="Input.Location" class="admin-input" autocomplete="off" />
+            </label>
+
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Клуб (если группа при клубе)</span>
+                <select asp-for="Input.ClubId" class="admin-input">
+                    <option value="">—</option>
+                    @foreach (var c in Model.AllClubs)
+                    {
+                        <option value="@c.Id" selected="@(c.Id == Model.Input.ClubId)">@c.Name</option>
+                    }
+                </select>
+            </label>
+        </div>
+
+        <div class="mt-4">
+            <span class="text-xs text-admin-text-muted">Ссылки</span>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-1.5">
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">WhatsApp</span>
+                    <input asp-for="Input.LinkWhatsapp" type="url" class="admin-input" autocomplete="off" placeholder="https://chat.whatsapp.com/…" />
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">Telegram</span>
+                    <input asp-for="Input.LinkTelegram" type="url" class="admin-input" autocomplete="off" placeholder="https://t.me/…" />
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">Instagram</span>
+                    <input asp-for="Input.LinkInstagram" type="url" class="admin-input" autocomplete="off" placeholder="https://instagram.com/…" />
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">Сайт</span>
+                    <input asp-for="Input.LinkSite" type="url" class="admin-input" autocomplete="off" placeholder="https://…" />
+                </label>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+                <input asp-for="Input.IsPublic" class="w-4 h-4 cursor-pointer" />
+                <span class="text-admin-text">Публичная группа</span>
+            </label>
+            <div class="text-[11px] text-admin-text-muted mt-1">
+                Действует только при настройке <code class="text-admin-accent">HubGroupVisibility = perGroup</code> (Admin/Settings).
+            </div>
+        </div>
+
+        <div class="mt-4 text-xs text-admin-text-muted">
+            Владелец:
+            @if (!Model.IsNew && Model.Existing != null)
+            {
+                <strong class="text-admin-text">@Model.Existing.OwnerDisplayName</strong>
+            }
+            else
+            {
+                <strong class="text-admin-text">@(User.Identity?.Name ?? "текущий администратор")</strong>
+                <text>(будет назначен при создании)</text>
+            }
+        </div>
+
+        <div class="mt-5 flex gap-3">
+            <button type="submit" class="admin-btn admin-btn-primary">
+                @(Model.IsNew ? "Создать" : "Сохранить")
+            </button>
+            <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">Отмена</a>
+        </div>
+    </form>
+
+    @if (!Model.IsNew && Model.Existing != null)
+    {
+        <!-- ── Участники ──────────────────────────────────────────────────────── -->
+        <div class="admin-card mb-5">
+            <h2 class="text-sm font-semibold text-white mb-3">Участники</h2>
+
+            @if (Model.Existing.Members.Count > 0)
+            {
+                <table class="admin-table mb-4">
+                    <thead>
+                        <tr>
+                            <th>Пловец</th>
+                            <th>Год р.</th>
+                            <th>Клуб</th>
+                            <th>Роль</th>
+                            <th class="text-right">Порядок</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in Model.Existing.Members)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="font-medium text-admin-text">@m.SwimmerName</div>
+                                    @if (!string.IsNullOrEmpty(m.SwimmerNameEn))
+                                    {
+                                        <div class="text-[11px] text-admin-text-muted">@m.SwimmerNameEn</div>
+                                    }
+                                </td>
+                                <td>@(m.BirthYear > 0 ? m.BirthYear.ToString() : "—")</td>
+                                <td>@(m.ClubName ?? "—")</td>
+                                <td>
+                                    <form method="post" asp-page-handler="UpdateMember" class="flex items-center gap-2">
+                                        <input type="hidden" asp-for="Id" />
+                                        <input type="hidden" name="memberId" value="@m.Id" />
+                                        <select name="role" class="admin-input py-1">
+                                            <option value="member" selected="@(m.Role == "member")">member</option>
+                                            <option value="captain" selected="@(m.Role == "captain")">captain</option>
+                                            <option value="coach" selected="@(m.Role == "coach")">coach</option>
+                                        </select>
+                                        <input type="number" name="sortOrder" value="@m.SortOrder" class="admin-input py-1 w-16" />
+                                        <button type="submit" class="admin-btn admin-btn-ghost py-1 px-2.5">Сохранить</button>
+                                    </form>
+                                </td>
+                                <td class="text-right">@m.SortOrder</td>
+                                <td class="text-right">
+                                    <form method="post" asp-page-handler="RemoveMember" class="inline">
+                                        <input type="hidden" asp-for="Id" />
+                                        <input type="hidden" name="memberId" value="@m.Id" />
+                                        <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <p class="text-xs text-admin-text-muted italic mb-4">Участников пока нет.</p>
+            }
+
+            <!-- Поиск и добавление пловца -->
+            <div class="border-t border-admin-border pt-4">
+                <form method="get" class="flex flex-wrap items-end gap-3 mb-3">
+                    <input type="hidden" asp-for="Id" />
+                    <label class="flex flex-col gap-1 flex-1 min-w-[240px]">
+                        <span class="text-xs text-admin-text-muted">Поиск пловца (фамилия/имя, RU или EN)</span>
+                        <input asp-for="SwimmerQuery" class="admin-input" autocomplete="off" placeholder="Коэн…" />
+                    </label>
+                    <button type="submit" class="admin-btn admin-btn-primary">Найти</button>
+                </form>
+
+                @if (!string.IsNullOrWhiteSpace(Model.SwimmerQuery))
+                {
+                    if (Model.SearchResults.Count == 0)
+                    {
+                        <p class="text-xs text-admin-text-muted italic">Ничего не найдено.</p>
+                    }
+                    else
+                    {
+                        <table class="admin-table">
+                            <thead>
+                                <tr><th>Пловец</th><th>Год р.</th><th>Клуб</th><th>Роль</th><th></th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var s in Model.SearchResults)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="font-medium text-admin-text">@s.Name</div>
+                                            @if (!string.IsNullOrEmpty(s.NameEn))
+                                            {
+                                                <div class="text-[11px] text-admin-text-muted">@s.NameEn</div>
+                                            }
+                                        </td>
+                                        <td>@(s.BirthYear > 0 ? s.BirthYear.ToString() : "—")</td>
+                                        <td>@(s.ClubName ?? "—")</td>
+                                        <td>
+                                            <form method="post" asp-page-handler="AddMember" class="flex items-center gap-2">
+                                                <input type="hidden" asp-for="Id" />
+                                                <input type="hidden" name="SwimmerQuery" value="@Model.SwimmerQuery" />
+                                                <input type="hidden" name="NewSwimmerId" value="@s.Id" />
+                                                <select name="NewRole" class="admin-input py-1">
+                                                    <option value="member">member</option>
+                                                    <option value="captain">captain</option>
+                                                    <option value="coach">coach</option>
+                                                </select>
+                                                <button type="submit" class="admin-btn admin-btn-primary py-1 px-2.5">Добавить</button>
+                                            </form>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                }
+            </div>
+        </div>
+
+        <!-- ── Опасная зона: удаление ────────────────────────────────────────── -->
+        <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5">
+            <h2 class="text-sm font-semibold text-admin-danger mb-1">Опасная зона — удаление</h2>
+            <p class="text-xs text-admin-text-muted leading-relaxed mb-4">
+                Удалит группу вместе со всеми участниками (пловцы в справочнике останутся).
+                <strong class="text-admin-danger">Действие необратимо.</strong>
+            </p>
+            <form method="post" asp-page-handler="Delete" id="hg-delete-form">
+                <input type="hidden" asp-for="Id" />
+                <button type="submit" class="admin-btn admin-btn-danger">Удалить безвозвратно</button>
+            </form>
+        </div>
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}
+
+@section Scripts {
+    <script>
+        // Автогенерация slug из английского названия, пока пользователь не тронул поле Slug вручную.
+        (function () {
+            const nameEn = document.getElementById('hg-name-en');
+            const slug = document.getElementById('hg-slug');
+            if (!nameEn || !slug) return;
+
+            let slugTouched = slug.value.trim().length > 0;
+            slug.addEventListener('input', () => { slugTouched = true; });
+
+            function slugify(s) {
+                return s.toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/-{2,}/g, '-')
+                    .replace(/^-|-$/g, '');
+            }
+
+            nameEn.addEventListener('input', () => {
+                if (!slugTouched) slug.value = slugify(nameEn.value);
+            });
+        })();
+
+        const hgDeleteForm = document.getElementById('hg-delete-form');
+        if (hgDeleteForm) {
+            hgDeleteForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const ok = await adminConfirm({
+                    title: 'Удалить группу?',
+                    message: 'Все участники группы будут удалены вместе с ней. Пловцы в справочнике останутся.',
+                    confirmText: 'Удалить',
+                    danger: true,
+                });
+                if (ok) hgDeleteForm.submit();
+            });
+        }
+    </script>
+}

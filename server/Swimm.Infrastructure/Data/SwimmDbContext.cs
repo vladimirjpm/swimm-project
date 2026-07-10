@@ -51,6 +51,10 @@ public class SwimmDbContext : DbContext
     public DbSet<UserFavorite> UserFavorites => Set<UserFavorite>();
     public DbSet<UserMedia> UserMedia => Set<UserMedia>();
 
+    /* === Группы (SwimHub) === */
+    public DbSet<HubGroup> HubGroups => Set<HubGroup>();
+    public DbSet<HubGroupMember> HubGroupMembers => Set<HubGroupMember>();
+
     /* === Пользователи и доступ === */
     public DbSet<AppUser> AppUsers => Set<AppUser>();
     public DbSet<AppRole> AppRoles => Set<AppRole>();
@@ -507,6 +511,40 @@ public class SwimmDbContext : DbContext
             entity.HasCheckConstraint(
                 "CK_UserMedia_Visibility",
                 @"""Visibility"" IN ('private', 'public')");
+        });
+
+        // --- Группы (SwimHub) ---
+
+        modelBuilder.Entity<HubGroup>(entity =>
+        {
+            entity.ToTable("HubGroups");
+
+            entity.HasOne(e => e.Club)
+                .WithMany()
+                .HasForeignKey(e => e.ClubId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // FK на Sys_AppUsers допустим (FK на уровне БД не требует SELECT-права у swimm_ro);
+            // навигацию Owner не Include-ить нигде за пределами админки.
+            entity.HasOne(e => e.Owner)
+                .WithMany()
+                .HasForeignKey(e => e.OwnerUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<HubGroupMember>(entity =>
+        {
+            entity.ToTable("HubGroupMembers");
+
+            entity.HasOne(e => e.HubGroup)
+                .WithMany(g => g.Members)
+                .HasForeignKey(e => e.HubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Swimmer)
+                .WithMany()
+                .HasForeignKey(e => e.SwimmerId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
