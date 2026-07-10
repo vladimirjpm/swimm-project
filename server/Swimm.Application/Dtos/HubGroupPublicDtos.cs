@@ -153,6 +153,10 @@ public sealed class HubGroupStandingDto
 /// </summary>
 public sealed class HubGroupDetailsDto
 {
+    /// <summary>Числовой id группы — для действий по id (самозапись). 0 для виртуального «избранного».</summary>
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+
     [JsonPropertyName("slug")]
     public string Slug { get; set; } = "";
 

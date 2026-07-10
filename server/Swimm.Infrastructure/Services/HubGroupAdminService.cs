@@ -67,6 +67,21 @@ public class HubGroupAdminService : IHubGroupAdminService
             })
             .ToListAsync();
 
+        var userMembers = await _db.HubGroupUserMembers.AsNoTracking()
+            .Where(m => m.HubGroupId == id)
+            .Include(m => m.User)
+            .OrderBy(m => m.JoinedAt)
+            .Select(m => new HubGroupUserMemberRowDto
+            {
+                UserId = m.UserId,
+                DisplayName = m.User!.DisplayName,
+                Email = m.User.Email,
+                Status = m.Status,
+                SelfJoined = m.AddedByUserId == null,
+                JoinedAt = m.JoinedAt
+            })
+            .ToListAsync();
+
         return new HubGroupEditDto
         {
             Id = g.Id,
@@ -83,7 +98,8 @@ public class HubGroupAdminService : IHubGroupAdminService
             IsPublic = g.IsPublic,
             IsOfficial = g.IsOfficial,
             Links = HubGroupCrudCore.ParseLinks(g.Links),
-            Members = members
+            Members = members,
+            UserMembers = userMembers
         };
     }
 

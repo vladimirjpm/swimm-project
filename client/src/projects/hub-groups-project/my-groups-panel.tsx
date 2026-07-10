@@ -222,6 +222,48 @@ function AdminsEditor({ hubGroupId, isOwnerOrAdmin }: { hubGroupId: number; isOw
   );
 }
 
+function UserMembersEditor({ hubGroupId }: { hubGroupId: number }) {
+  const edit = useMyHubGroupEdit(hubGroupId);
+  const [email, setEmail] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async () => {
+    setError(null);
+    const result = await edit.addUserMember(email);
+    if (result.success) setEmail(''); else setError(result.error ?? 'Ошибка');
+  };
+
+  const members = edit.data?.userMembers ?? [];
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-[11.5px] italic text-[#cbe0f0]/45">
+        Приватный список — виден только владельцу и админам группы, не на публичной странице.
+      </p>
+      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+        {members.map((m) => (
+          <li key={m.userId} className="flex items-center justify-between gap-2">
+            <span className="min-w-0 truncate text-[13px] text-[#f3f8fd]">
+              {m.displayName} <span className="text-[#cbe0f0]/50">({m.email})</span>
+              {m.selfJoined && <span className="ml-1 text-[10.5px] text-[#7dd3fc]/70">вступил сам</span>}
+            </span>
+            <button type="button" className={btnDangerCls} onClick={() => edit.removeUserMember(m.userId)}>✕</button>
+          </li>
+        ))}
+        {members.length === 0 && (
+          <p className="text-[12.5px] text-[#cbe0f0]/55">Участников-аккаунтов пока нет.</p>
+        )}
+      </ul>
+      <div className="flex gap-2">
+        <input className={inputCls} placeholder="Email пользователя" value={email}
+          onChange={(e) => setEmail(e.target.value)} />
+        <button type="button" className={btnCls} disabled={!email.trim()} onClick={submit}>+ Участник</button>
+      </div>
+      {error && <p className="text-[12.5px] font-bold text-[#ef5350]">{error}</p>}
+    </div>
+  );
+}
+
 function ClubRequestPanel({ hubGroupId }: { hubGroupId: number }) {
   const edit = useMyHubGroupEdit(hubGroupId);
   const clubs = useClubOptions();
@@ -305,6 +347,10 @@ function EditGroupCard({ row, currentUserId, isAdmin, onClose, onSaved }: {
       <div>
         <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#7dd3fc]">Админы группы</h3>
         <AdminsEditor hubGroupId={row.id} isOwnerOrAdmin={isOwnerOrAdmin} />
+      </div>
+      <div>
+        <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#7dd3fc]">Участники-аккаунты</h3>
+        <UserMembersEditor hubGroupId={row.id} />
       </div>
       {isOwnerOrAdmin && !edit.data.isOfficial && (
         <div>

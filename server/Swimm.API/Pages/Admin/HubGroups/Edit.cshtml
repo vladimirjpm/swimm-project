@@ -198,8 +198,10 @@
             }
 
             <!-- Поиск и добавление пловца -->
-            <div class="border-t border-admin-border pt-4">
-                <form method="get" class="flex flex-wrap items-end gap-3 mb-3">
+            <div id="hg-swimmer-search" class="border-t border-admin-border pt-4">
+                @* action="#..." — после GET-сабмита браузер рендерит сразу на блоке поиска,
+                   экран не прыгает наверх (форма — обычный GET с перезагрузкой страницы). *@
+                <form method="get" action="#hg-swimmer-search" class="flex flex-wrap items-end gap-3 mb-3">
                     <input type="hidden" asp-for="Id" />
                     <label class="flex flex-col gap-1 flex-1 min-w-[240px]">
                         <span class="text-xs text-admin-text-muted">Поиск пловца (фамилия/имя, RU или EN)</span>
@@ -255,6 +257,16 @@
                 }
             </div>
         </div>
+
+        @* Фолбэк на случай, если браузер отбросил фрагмент при GET-сабмите: после поиска
+           (SwimmerQuery задан) держим экран на блоке поиска, а не наверху. *@
+        @if (!string.IsNullOrWhiteSpace(Model.SwimmerQuery))
+        {
+            <script>
+                history.scrollRestoration = 'manual';
+                document.getElementById('hg-swimmer-search')?.scrollIntoView({ block: 'center' });
+            </script>
+        }
 
         <!-- ── Опасная зона: удаление ────────────────────────────────────────── -->
         <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5">

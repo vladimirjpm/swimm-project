@@ -76,6 +76,8 @@ export interface HubGroupStanding {
 }
 
 export interface HubGroupDetails {
+  /** Числовой id — для самозаписи; 0 у виртуального «избранного». */
+  id: number;
   slug: string;
   name: string;
   name_en?: string | null;

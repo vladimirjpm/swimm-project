@@ -251,6 +251,7 @@ Razor + Tailwind, Competitions/Categories CRUD, фоновый импорт.)
 
 Неформальные объединения пловцов из разных клубов (пример: DolphinNetanyaMasters) с публичной
 страницей-агрегатом. Дизайн и спека: `docs/tasks/hubgroups-phase1-2-sonnet.md`.
+**Модель ролей/участия (зафиксированные решения) — `docs/hubgroups-architecture.md`.**
 
 - ☑ 8.1. Схема: `HubGroup`/`HubGroupMember` (бизнес-таблицы, grant `swimm_ro`), миграция
   `AddHubGroups`; настройки `HubGroupCreationPolicy`/`HubGroupMaxPerUser`/`HubGroupVisibility`

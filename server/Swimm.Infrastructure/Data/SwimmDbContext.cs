@@ -55,6 +55,7 @@ public class SwimmDbContext : DbContext
     public DbSet<HubGroup> HubGroups => Set<HubGroup>();
     public DbSet<HubGroupMember> HubGroupMembers => Set<HubGroupMember>();
     public DbSet<HubGroupAdmin> HubGroupAdmins => Set<HubGroupAdmin>();
+    public DbSet<HubGroupUserMember> HubGroupUserMembers => Set<HubGroupUserMember>();
     public DbSet<HubGroupClubRequest> HubGroupClubRequests => Set<HubGroupClubRequest>();
 
     /* === Пользователи и доступ === */
@@ -580,6 +581,28 @@ public class SwimmDbContext : DbContext
             entity.HasOne(e => e.GrantedBy)
                 .WithMany()
                 .HasForeignKey(e => e.GrantedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Участники-аккаунты (приватный состав из юзеров) — таблица личных данных, БЕЗ grant swimm_ro.
+        modelBuilder.Entity<HubGroupUserMember>(entity =>
+        {
+            entity.ToTable("Sys_HubGroupUserMembers");
+            entity.HasIndex(e => new { e.HubGroupId, e.UserId }).IsUnique();
+
+            entity.HasOne(e => e.HubGroup)
+                .WithMany(g => g.UserMembers)
+                .HasForeignKey(e => e.HubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.AddedBy)
+                .WithMany()
+                .HasForeignKey(e => e.AddedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

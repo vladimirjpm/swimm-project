@@ -268,4 +268,146 @@ public class HubGroupUserServiceTests
         var missing = await svc.RemoveAdminAsync(group.Id, target.Id);
         Assert.False(missing.Success);
     }
+
+    // ── User-members (участники-аккаунты) + самозапись ───────────────────────
+
+    [Fact]
+    public async Task Join_PublicGroup_InstantActiveSelfJoined()
+    {
+        await using var db = CreateDb(nameof(Join_PublicGroup_InstantActiveSelfJoined));
+        var owner = await AddUserAsync(db, "owner@example.com");
+        var joiner = await AddUserAsync(db, "joiner@example.com");
+        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true };
+        db.HubGroups.Add(group);
+        await db.SaveChangesAsync();
+
+        var result = await Service(db).JoinAsync(group.Id, joiner.Id);
+
+        Assert.True(result.Success);
+        var row = await db.HubGroupUserMembers.SingleAsync(m => m.HubGroupId == group.Id && m.UserId == joiner.Id);
+        Assert.Equal(HubGroupUserMemberStatus.Active, row.Status);
+        Assert.Null(row.AddedByUserId); // самозапись
+    }
+
+    [Fact]
+    public async Task Join_PrivateVisibility_Blocked()
+    {
+        await using var db = CreateDb(nameof(Join_PrivateVisibility_Blocked));
+        var settings = new SettingsStub(new() { ["HubGroupVisibility"] = "private" });
+        var owner = await AddUserAsync(db, "owner@example.com");
+        var joiner = await AddUserAsync(db, "joiner@example.com");
+        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true };
+        db.HubGroups.Add(group);
+        await db.SaveChangesAsync();
+
+        var result = await Service(db, settings).JoinAsync(group.Id, joiner.Id);
+
+        Assert.False(result.Success);
+        Assert.Empty(db.HubGroupUserMembers);
+    }
+
+    [Fact]
+    public async Task Join_PerGroupVisibility_OnlyPublicGroups()
+    {
+        await using var db = CreateDb(nameof(Join_PerGroupVisibility_OnlyPublicGroups));
+        var settings = new SettingsStub(new() { ["HubGroupVisibility"] = "perGroup" });
+        var owner = await AddUserAsync(db, "owner@example.com");
+        var joiner = await AddUserAsync(db, "joiner@example.com");
+        var hidden = new HubGroup { Name = "H", Slug = "h", OwnerUserId = owner.Id, IsPublic = false };
+        db.HubGroups.Add(hidden);
+        await db.SaveChangesAsync();
+
+        var result = await Service(db, settings).JoinAsync(hidden.Id, joiner.Id);
+
+        Assert.False(result.Success);
+        Assert.Empty(db.HubGroupUserMembers);
+    }
+
+    [Fact]
+    public async Task Join_Twice_Dedup()
+    {
+        await using var db = CreateDb(nameof(Join_Twice_Dedup));
+        var owner = await AddUserAsync(db, "owner@example.com");
+        var joiner = await AddUserAsync(db, "joiner@example.com");
+        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true };
+        db.HubGroups.Add(group);
+        await db.SaveChangesAsync();
+        var svc = Service(db);
+        await svc.JoinAsync(group.Id, joiner.Id);
+
+        var again = await svc.JoinAsync(group.Id, joiner.Id);
+
+        Assert.False(again.Success);
+        Assert.Single(db.HubGroupUserMembers);
+    }
+
+    [Fact]
+    public async Task Leave_RemovesMembership()
+    {
+        await using var db = CreateDb(nameof(Leave_RemovesMembership));
+        var owner = await AddUserAsync(db, "owner@example.com");
+        var joiner = await AddUserAsync(db, "joiner@example.com");
+        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true };
+        db.HubGroups.Add(group);
+        await db.SaveChangesAsync();
+        var svc = Service(db);
+        await svc.JoinAsync(group.Id, joiner.Id);
+
+        var left = await svc.LeaveAsync(group.Id, joiner.Id);
+
+        Assert.True(left.Success);
+        Assert.Empty(db.HubGroupUserMembers);
+    }
+
+    [Fact]
+    public async Task AddUserMember_ByEmail_SetsAddedBy()
+    {
+        await using var db = CreateDb(nameof(AddUserMember_ByEmail_SetsAddedBy));
+        var owner = await AddUserAsync(db, "owner@example.com");
+        var target = await AddUserAsync(db, "member@example.com");
+        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true };
+        db.HubGroups.Add(group);
+        await db.SaveChangesAsync();
+
+        var result = await Service(db).AddUserMemberAsync(group.Id, "member@example.com", owner.Id);
+
+        Assert.True(result.Success);
+        var row = await db.HubGroupUserMembers.SingleAsync(m => m.UserId == target.Id);
+        Assert.Equal(owner.Id, row.AddedByUserId); // не самозапись
+        Assert.Equal(HubGroupUserMemberStatus.Active, row.Status);
+    }
+
+    [Fact]
+    public async Task AddUserMember_UnknownEmail_Fails()
+    {
+        await using var db = CreateDb(nameof(AddUserMember_UnknownEmail_Fails));
+        var owner = await AddUserAsync(db, "owner@example.com");
+        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true };
+        db.HubGroups.Add(group);
+        await db.SaveChangesAsync();
+
+        var result = await Service(db).AddUserMemberAsync(group.Id, "nobody@example.com", owner.Id);
+
+        Assert.False(result.Success);
+        Assert.Empty(db.HubGroupUserMembers);
+    }
+
+    [Fact]
+    public async Task GetJoined_ReturnsGroupsUserJoined()
+    {
+        await using var db = CreateDb(nameof(GetJoined_ReturnsGroupsUserJoined));
+        var owner = await AddUserAsync(db, "owner@example.com");
+        var joiner = await AddUserAsync(db, "joiner@example.com");
+        var g1 = new HubGroup { Name = "G1", Slug = "g1", OwnerUserId = owner.Id, IsPublic = true };
+        var g2 = new HubGroup { Name = "G2", Slug = "g2", OwnerUserId = owner.Id, IsPublic = true };
+        db.HubGroups.AddRange(g1, g2);
+        await db.SaveChangesAsync();
+        var svc = Service(db);
+        await svc.JoinAsync(g1.Id, joiner.Id);
+
+        var joined = await svc.GetJoinedAsync(joiner.Id);
+
+        Assert.Single(joined);
+        Assert.Equal("g1", joined[0].Slug);
+    }
 }

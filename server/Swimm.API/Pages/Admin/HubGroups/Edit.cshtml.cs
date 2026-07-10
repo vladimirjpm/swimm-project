@@ -22,8 +22,10 @@ public class EditModel : PageModel
     [BindProperty]
     public HubGroupForm Input { get; set; } = new();
 
-    // Поиск пловца для добавления участника
-    [BindProperty(SupportsGet = true, Name = "swq")]
+    // Поиск пловца для добавления участника. Имя параметра НЕ переопределяем: тег-хелпер
+    // <input asp-for="SwimmerQuery"> и скрытые поля формы шлют "SwimmerQuery" — с Name="swq"
+    // байндинг не срабатывал и поиск всегда был пустым.
+    [BindProperty(SupportsGet = true)]
     public string? SwimmerQuery { get; set; }
 
     // Добавление участника

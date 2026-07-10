@@ -77,4 +77,7 @@ public class HubGroup
 
     /// <summary>Админы группы (право правки, не владение). Владелец — primary GroupAdmin.</summary>
     public ICollection<HubGroupAdmin> Admins { get; set; } = new List<HubGroupAdmin>();
+
+    /// <summary>Участники-аккаунты (самозапись/добавлены админом) — приватный список, не пловцы.</summary>
+    public ICollection<HubGroupUserMember> UserMembers { get; set; } = new List<HubGroupUserMember>();
 }

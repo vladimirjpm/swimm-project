@@ -4,6 +4,7 @@ import HomeHeader from '../home-project/components/home-header';
 import RecordTicker from '../home-project/components/record-ticker';
 import MyGroupsPanel from './my-groups-panel';
 import UI_ClubIcon from '../components/mix/club-icon/club-icon';
+import { useCurrentIdentity, useHubGroupMembership } from './use-my-hub-groups';
 import type { HubGroupDetails, HubGroupLink, HubGroupListItem, HubGroupMember, HubGroupStanding } from './types';
 
 const GROUP_DISCLAIMER =
@@ -162,6 +163,42 @@ function swimmerDisplayName(last: string, first: string, lastEn: string, firstEn
   return ru.length > 0 ? ru : `${lastEn} ${firstEn}`.trim();
 }
 
+/** Самозапись в группу (для авторизованного пользователя; не для виртуального «избранного»). */
+function JoinButton({ group }: { group: HubGroupDetails }) {
+  const { isAuthenticated } = useCurrentIdentity();
+  const { joined, join, leave } = useHubGroupMembership();
+  const [busy, setBusy] = useState(false);
+
+  if (group.is_virtual || group.id <= 0 || !isAuthenticated) return null;
+
+  const isMember = joined.some((j) => j.id === group.id);
+
+  const toggle = async () => {
+    setBusy(true);
+    try {
+      if (isMember) await leave(group.id);
+      else await join(group.id);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={toggle}
+      className={
+        isMember
+          ? 'hp-mono ml-auto shrink-0 rounded-[10px] border border-[#7dd3fc]/40 px-4 py-2 text-[13px] font-extrabold text-[#7dd3fc] hover:bg-[#7dd3fc]/10 disabled:opacity-50'
+          : 'hp-mono ml-auto shrink-0 rounded-[10px] bg-[#38ef8f] px-4 py-2 text-[13px] font-extrabold text-[#04101f] hover:brightness-110 disabled:opacity-50'
+      }
+    >
+      {isMember ? 'Выйти из группы' : 'Вступить в группу'}
+    </button>
+  );
+}
+
 function GroupDetails({ group }: { group: HubGroupDetails }) {
   const [showAllBests, setShowAllBests] = useState(false);
   const bests = showAllBests ? group.bests : group.bests.slice(0, BESTS_PREVIEW_COUNT);
@@ -197,6 +234,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
               </div>
             )}
           </div>
+          <JoinButton group={group} />
         </div>
 
         {group.description && (

@@ -202,6 +202,63 @@ public class MyHubGroupsController : ControllerBase
         return result.Success ? NoContent() : BadRequest(new { error = result.Error });
     }
 
+    // ── Участники-аккаунты (приватный состав из юзеров) ──────────────────────
+
+    /// <summary>Группы, в которые текущий пользователь вступил как участник (список «участвую»).</summary>
+    [HttpGet("joined")]
+    public async Task<IActionResult> GetJoined()
+    {
+        var userId = CurrentUserId();
+        if (userId == null) return Unauthorized();
+        return Ok(await _mine.GetJoinedAsync(userId.Value));
+    }
+
+    /// <summary>Самозапись: вступить в публичную группу (мгновенно).</summary>
+    [HttpPost("{id:int}/join")]
+    public async Task<IActionResult> Join(int id)
+    {
+        var userId = CurrentUserId();
+        if (userId == null) return Unauthorized();
+        var result = await _mine.JoinAsync(id, userId.Value);
+        return result.Success ? Ok() : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>Самовыход из группы.</summary>
+    [HttpDelete("{id:int}/join")]
+    public async Task<IActionResult> Leave(int id)
+    {
+        var userId = CurrentUserId();
+        if (userId == null) return Unauthorized();
+        var result = await _mine.LeaveAsync(id, userId.Value);
+        return result.Success ? NoContent() : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>Добавить участника-аккаунт по email (владелец/админ группы).</summary>
+    [HttpPost("{id:int}/user-members")]
+    public async Task<IActionResult> AddUserMember(int id, [FromBody] AddUserMemberRequest request)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanEdit) return Forbid();
+
+        var result = await _mine.AddUserMemberAsync(id, request.Email, CurrentUserId()!.Value);
+        return result.Success ? Ok() : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>Убрать участника-аккаунт (владелец/админ группы).</summary>
+    [HttpDelete("{id:int}/user-members/{userId:int}")]
+    public async Task<IActionResult> RemoveUserMember(int id, int userId)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanEdit) return Forbid();
+
+        var result = await _mine.RemoveUserMemberAsync(id, userId);
+        return result.Success ? NoContent() : BadRequest(new { error = result.Error });
+    }
+
     /// <summary>Последняя заявка на официальный статус группы (любого статуса) — для панели «Моя группа».</summary>
     [HttpGet("{id:int}/club-request")]
     public async Task<IActionResult> GetClubRequest(int id)
@@ -245,6 +302,11 @@ public sealed class UpdateMemberRequest
 }
 
 public sealed class AddAdminRequest
+{
+    public string Email { get; set; } = "";
+}
+
+public sealed class AddUserMemberRequest
 {
     public string Email { get; set; } = "";
 }

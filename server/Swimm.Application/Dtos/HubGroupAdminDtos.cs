@@ -53,6 +53,8 @@ public sealed class HubGroupEditDto
     public bool IsOfficial { get; set; }
     public List<HubGroupLinkDto> Links { get; set; } = [];
     public List<HubGroupMemberRowDto> Members { get; set; } = [];
+    /// <summary>Участники-аккаунты (приватный список, не пловцы) — только в панели управления.</summary>
+    public List<HubGroupUserMemberRowDto> UserMembers { get; set; } = [];
 }
 
 /// <summary>Входные данные создания/обновления группы.</summary>

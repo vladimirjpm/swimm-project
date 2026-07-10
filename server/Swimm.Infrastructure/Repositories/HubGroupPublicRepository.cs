@@ -86,6 +86,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
 
         var dto = new HubGroupDetailsDto
         {
+            Id = group.Id,
             Slug = group.Slug,
             Name = group.Name,
             NameEn = group.NameEn,

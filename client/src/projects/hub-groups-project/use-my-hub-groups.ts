@@ -7,6 +7,7 @@ import type {
   HubGroupEditData,
   HubGroupInput,
   HubGroupAdmin,
+  JoinedHubGroup,
   MyHubGroupRow,
   SaveResult,
   SwimmerSearchResult,
@@ -245,9 +246,59 @@ export function useMyHubGroupEdit(id: number | null) {
     return result;
   }, [id, reload]);
 
+  const addUserMember = useCallback(async (email: string): Promise<SaveResult> => {
+    if (id == null) return { success: false, error: 'Нет группы' };
+    const r = await apiFetch(`/api/me/hub-groups/${id}/user-members`, { method: 'POST', body: JSON.stringify({ email }) });
+    const result = await saveResultFrom(r);
+    if (result.success) await reload();
+    return result;
+  }, [id, reload]);
+
+  const removeUserMember = useCallback(async (userId: number): Promise<SaveResult> => {
+    if (id == null) return { success: false, error: 'Нет группы' };
+    const r = await apiFetch(`/api/me/hub-groups/${id}/user-members/${userId}`, { method: 'DELETE' });
+    const result = await saveResultFrom(r);
+    if (result.success) await reload();
+    return result;
+  }, [id, reload]);
+
   return {
     data, admins, clubRequest, loading, forbidden,
     update, searchSwimmers, getClubSwimmers, addMember, updateMember, removeMember,
-    addAdmin, removeAdmin, submitClubRequest,
+    addAdmin, removeAdmin, submitClubRequest, addUserMember, removeUserMember,
   };
+}
+
+/** Самозапись пользователя: вступить/выйти + список «участвую». */
+export function useHubGroupMembership() {
+  const [joined, setJoined] = useState<JoinedHubGroup[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch('/api/me/hub-groups/joined', { credentials: 'include' });
+      setJoined(r.ok ? await r.json() : []);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { reload(); }, [reload]);
+
+  const join = useCallback(async (groupId: number): Promise<SaveResult> => {
+    const r = await apiFetch(`/api/me/hub-groups/${groupId}/join`, { method: 'POST' });
+    const result = await saveResultFrom(r);
+    if (result.success) await reload();
+    return result;
+  }, [reload]);
+
+  const leave = useCallback(async (groupId: number): Promise<SaveResult> => {
+    const r = await apiFetch(`/api/me/hub-groups/${groupId}/join`, { method: 'DELETE' });
+    const result = await saveResultFrom(r);
+    if (result.success) await reload();
+    return result;
+  }, [reload]);
+
+  return { joined, loading, join, leave, reload };
 }

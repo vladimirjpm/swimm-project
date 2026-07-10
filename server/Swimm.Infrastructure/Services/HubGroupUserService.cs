@@ -164,6 +164,106 @@ public class HubGroupUserService : IHubGroupUserService
         return HubGroupMemberSaveResult.Ok();
     }
 
+    // ── Участники-аккаунты ───────────────────────────────────────────────────
+    // Приватный список (Sys_-таблица) — публичная страница его не видит, кэш не трогаем.
+
+    public async Task<HubGroupMemberSaveResult> AddUserMemberAsync(int hubGroupId, string email, int addedByUserId)
+    {
+        email = (email ?? "").Trim();
+        if (email.Length == 0) return HubGroupMemberSaveResult.Fail("Email обязателен");
+
+        var groupExists = await _db.HubGroups.AnyAsync(g => g.Id == hubGroupId);
+        if (!groupExists) return HubGroupMemberSaveResult.Fail($"Группа #{hubGroupId} не найдена");
+
+        var user = await _db.AppUsers.FirstOrDefaultAsync(u => u.Email == email);
+        if (user == null) return HubGroupMemberSaveResult.Fail("Пользователь с таким email не найден");
+
+        return await InsertUserMemberAsync(hubGroupId, user.Id, addedByUserId);
+    }
+
+    public async Task<HubGroupMemberSaveResult> RemoveUserMemberAsync(int hubGroupId, int userId)
+    {
+        var member = await _db.HubGroupUserMembers
+            .FirstOrDefaultAsync(m => m.HubGroupId == hubGroupId && m.UserId == userId);
+        if (member == null) return HubGroupMemberSaveResult.Fail("Участник не найден");
+
+        _db.HubGroupUserMembers.Remove(member);
+        await _db.SaveChangesAsync();
+        return HubGroupMemberSaveResult.Ok();
+    }
+
+    public async Task<HubGroupMemberSaveResult> JoinAsync(int hubGroupId, int userId)
+    {
+        var group = await _db.HubGroups.AsNoTracking()
+            .Where(g => g.Id == hubGroupId)
+            .Select(g => new { g.Id, g.IsPublic })
+            .FirstOrDefaultAsync();
+        if (group == null) return HubGroupMemberSaveResult.Fail($"Группа #{hubGroupId} не найдена");
+
+        // Вступить можно только в публично видимую группу — тот же критерий, что у публичного
+        // списка (HubGroupVisibility: private → никуда, perGroup → только IsPublic, public → любые).
+        var visibility = _settings.GetValue("HubGroupVisibility", "public");
+        var joinable = visibility switch
+        {
+            "private" => false,
+            "perGroup" => group.IsPublic,
+            _ => true,
+        };
+        if (!joinable) return HubGroupMemberSaveResult.Fail("В эту группу нельзя вступить");
+
+        return await InsertUserMemberAsync(hubGroupId, userId, addedByUserId: null);
+    }
+
+    public async Task<HubGroupMemberSaveResult> LeaveAsync(int hubGroupId, int userId) =>
+        await RemoveUserMemberAsync(hubGroupId, userId);
+
+    public async Task<IReadOnlyList<JoinedHubGroupDto>> GetJoinedAsync(int userId)
+    {
+        return await _db.HubGroupUserMembers.AsNoTracking()
+            .Where(m => m.UserId == userId)
+            .OrderByDescending(m => m.JoinedAt)
+            .Select(m => new JoinedHubGroupDto
+            {
+                Id = m.HubGroup!.Id,
+                Name = m.HubGroup.Name,
+                Slug = m.HubGroup.Slug,
+                IconUrl = m.HubGroup.IconUrl,
+                Status = m.Status,
+                JoinedAt = m.JoinedAt
+            })
+            .ToListAsync();
+    }
+
+    /// <summary>Общая вставка участника-аккаунта: dedup + обработка гонки (23505).</summary>
+    private async Task<HubGroupMemberSaveResult> InsertUserMemberAsync(int hubGroupId, int userId, int? addedByUserId)
+    {
+        var dup = await _db.HubGroupUserMembers.AnyAsync(m => m.HubGroupId == hubGroupId && m.UserId == userId);
+        if (dup) return HubGroupMemberSaveResult.Fail("Этот пользователь уже участник группы");
+
+        _db.HubGroupUserMembers.Add(new HubGroupUserMember
+        {
+            HubGroupId = hubGroupId,
+            UserId = userId,
+            AddedByUserId = addedByUserId,
+            Status = HubGroupUserMemberStatus.Active
+        });
+
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        {
+            return HubGroupMemberSaveResult.Fail("Этот пользователь уже участник группы");
+        }
+        catch (DbUpdateException)
+        {
+            return HubGroupMemberSaveResult.Fail("Не удалось добавить участника");
+        }
+
+        return HubGroupMemberSaveResult.Ok();
+    }
+
     public async Task<MyHubGroupClubRequestDto?> GetClubRequestAsync(int hubGroupId)
     {
         return await _db.HubGroupClubRequests.AsNoTracking()

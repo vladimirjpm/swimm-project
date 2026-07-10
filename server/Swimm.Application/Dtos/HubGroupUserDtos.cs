@@ -18,3 +18,31 @@ public sealed class HubGroupAdminMemberDto
     public string Email { get; set; } = "";
     public DateTime CreatedAt { get; set; }
 }
+
+/// <summary>
+/// Участник-аккаунт группы (Sys_HubGroupUserMembers) — для приватного списка состава в
+/// панели управления. Отличается от пловца (<see cref="HubGroupMemberRowDto"/>): это аккаунт.
+/// </summary>
+public sealed class HubGroupUserMemberRowDto
+{
+    public int UserId { get; set; }
+    public string DisplayName { get; set; } = "";
+    public string Email { get; set; } = "";
+    /// <summary>active | pending.</summary>
+    public string Status { get; set; } = "";
+    /// <summary>true = вступил сам (AddedByUserId == null), false = добавлен владельцем/админом.</summary>
+    public bool SelfJoined { get; set; }
+    public DateTime JoinedAt { get; set; }
+}
+
+/// <summary>Группа, в которую текущий пользователь вступил как участник-аккаунт (список «участвую»).</summary>
+public sealed class JoinedHubGroupDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public string Slug { get; set; } = "";
+    public string? IconUrl { get; set; }
+    /// <summary>active | pending.</summary>
+    public string Status { get; set; } = "";
+    public DateTime JoinedAt { get; set; }
+}

@@ -42,6 +42,26 @@ export interface HubGroupMemberRow {
   sortOrder: number;
 }
 
+/** Участник-аккаунт группы (приватный список, не пловец). */
+export interface HubGroupUserMember {
+  userId: number;
+  displayName: string;
+  email: string;
+  status: 'active' | 'pending';
+  selfJoined: boolean;
+  joinedAt: string;
+}
+
+/** Группа, в которую текущий пользователь вступил (список «участвую»). */
+export interface JoinedHubGroup {
+  id: number;
+  name: string;
+  slug: string;
+  iconUrl?: string | null;
+  status: 'active' | 'pending';
+  joinedAt: string;
+}
+
 export interface HubGroupEditData {
   id: number;
   name: string;
@@ -58,6 +78,7 @@ export interface HubGroupEditData {
   isOfficial: boolean;
   links: HubGroupLinkInput[];
   members: HubGroupMemberRow[];
+  userMembers: HubGroupUserMember[];
 }
 
 export interface SwimmerSearchResult {

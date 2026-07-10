@@ -34,6 +34,23 @@ public interface IHubGroupUserService
 
     Task<HubGroupMemberSaveResult> RemoveAdminAsync(int hubGroupId, int adminUserId);
 
+    // ── Участники-аккаунты (приватный состав из юзеров) ──────────────────────
+
+    /// <summary>Добавить участника-аккаунт по email (владелец/админ). AddedByUserId проставляется.</summary>
+    Task<HubGroupMemberSaveResult> AddUserMemberAsync(int hubGroupId, string email, int addedByUserId);
+
+    /// <summary>Убрать участника-аккаунт (владелец/админ; либо самовыход через LeaveAsync).</summary>
+    Task<HubGroupMemberSaveResult> RemoveUserMemberAsync(int hubGroupId, int userId);
+
+    /// <summary>Самозапись: вступить в публичную/видимую группу. Мгновенно (Status=active).</summary>
+    Task<HubGroupMemberSaveResult> JoinAsync(int hubGroupId, int userId);
+
+    /// <summary>Самовыход из группы.</summary>
+    Task<HubGroupMemberSaveResult> LeaveAsync(int hubGroupId, int userId);
+
+    /// <summary>Группы, в которые пользователь вступил как участник-аккаунт (список «участвую»).</summary>
+    Task<IReadOnlyList<JoinedHubGroupDto>> GetJoinedAsync(int userId);
+
     /// <summary>Последняя заявка на официальный статус (любого статуса) для группы — для UI «Моя группа». null — заявок не было.</summary>
     Task<MyHubGroupClubRequestDto?> GetClubRequestAsync(int hubGroupId);
 
