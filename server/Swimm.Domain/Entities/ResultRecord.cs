@@ -9,7 +9,11 @@ namespace Swimm.Domain.Entities;
 /// Содержит копии ключевых полей и FK к справочникам для JOIN с сущностями (Competition, Swimmer, Club, Relay, Style, Gallery).
 /// Поля CompetitionDate, Distance и Gender хранятся inline для быстрых выборок и фильтрации.
 /// </summary>
-[Index(nameof(CompetitionId))]
+// (CompetitionId, CompetitionDate DESC, Position) — фильтр по соревнованию/событию с
+// сортировкой публичной выдачи (ORDER BY CompetitionDate DESC, Position) одним index scan;
+// без него планировщик на миллионах строк идёт по IX_CompetitionDate и фильтрует всю таблицу
+// (замер фазы 3.3: 335 мс → 0.5 мс). Он же покрывает прежний одиночный IX по CompetitionId.
+[Index(nameof(CompetitionId), nameof(CompetitionDate), nameof(Position), IsDescending = new[] { false, true, false })]
 [Index(nameof(SwimmerId))]
 [Index(nameof(StyleId), nameof(Distance))]
 [Index(nameof(CompetitionId), nameof(StyleId), nameof(Distance), nameof(Gender))]
