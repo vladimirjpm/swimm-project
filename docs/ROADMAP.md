@@ -82,9 +82,23 @@
   ICacheService (та же токен-инвалидация из админ-CRUD), If-None-Match → 304.
   Проверено curl-ом; побочный плюс — при падении API браузер до 5 мин живёт на
   HTTP-кэше.
-- ☐ 2.6. (опционально) `IRecordSourceProvider`: обновление рекордов через существующие
-  парсеры IsrOrgAgeRecords/IsrOrgMastersRecords/WorldRecords с превью-диффом
-  («что изменится») перед применением.
+- ✅ 2.6. (2026-07-09, Sonnet; принято Fable 2026-07-10) `IRecordSourceProvider` + 3 провайдера
+  в `Swimm.Parsing/RecordSources/` (WorldRecords — авто-фетч 4 XLSX с api.worldaquatics.com;
+  IsrOrgAge/IsrOrgMasters — PDF isr.org.il по URL из настроек `RecordsImport:*` с обязательным
+  файл-fallback; SSRF-whitelist доменов, URL от пользователя не принимается).
+  `IRecordDiffService`/`RecordDiffService`: дифф по 8 осям, превью-сессия 10 мин, Apply
+  в транзакции + `InvalidateAllAsync`; `RecordsImportController`
+  (`/api/admin/records/fetch|apply|source-status`, Admin + antiforgery). Экран Import
+  перепланирован: верхние табы «Соревнования»/«Рекорды», источники — карточки-кнопки вместо
+  `<select>`, на карточках рекордов «Обновлено: max(UpdatedAt)», превью-дифф перед Apply.
+  **`Record.UpdatedAt`** + миграция `AddRecordUpdatedAt` (бэкофилл через `EXTRACT(YEAR…)` —
+  точное сравнение timestamptz с DateTime-дефолтом не срабатывает из-за сдвига таймзоны),
+  `updated_at` в API, на клиенте «updated dd/MM/yyyy» в карточках age/masters и попапе
+  нормативов — проверено вживую. Уточнение против задания: парсеры IsrOrg*Records едят PDF
+  (PdfPig), а не HTML. Доводка на приёмке (Fable): HttpClient в провайдерах получил
+  User-Agent — без него api.worldaquatics.com не отвечает вовсе (висит до таймаута);
+  живость URL и формат XLSX проверены curl-ом. Интерактивный Fetch→дифф→Apply из админки —
+  за Владом (нужен админ-логин).
 
 **Критерий приёмки:** `client/public/data/normative*.js` удалены; рекорд можно поправить в
 админке, и он виден на сайте без деплоя клиента.
@@ -93,20 +107,61 @@
 
 **Цель:** сервер отдаёт быстро и дёшево; клиент не выкачивает датасеты целиком.
 
-- ◐ 3.1. HTTP-кэш: `OutputCache` + ETag на публичных GET. Политики: завершённое соревнование —
-  TTL часы + ETag; списки (`/api/competitions`, `/api/categories`) — TTL минуты; сброс при
-  импорте (тег-инвалидация). **Records-эндпоинты уже сделаны в 2.7** (ETag + max-age=300,
-  паттерн `CachedJson` в RecordsController — обобщить для остальных эндпоинтов).
-- ◐ 3.2. Серверная фильтрация на клиенте: `use-filtered-results` и filter-section передают
-  фильтры в `/api/results` query-параметрами вместо клиентской фильтрации всего датасета;
-  Redux хранит текущую страницу/выборку, а не всё соревнование.
-  **Шов уже есть (2026-07-09):** админ-настройка `ResultsLoadMode` (full / paged / client,
-  где client = выбор через `?loadMode=`, а full/paged принудительны) + `GET /api/client-config`
-  + `ResultsLoadModeHelper` на клиенте. Ветка `paged` в `loadFromApi` пока честно работает
-  как `full` — этот этап наполняет её реальной постраничной загрузкой.
-- ☐ 3.3. Индексы под реальные запросы: EXPLAIN ANALYZE на топ-5 запросов ResultRepository
-  при синтетике ~1–5 млн строк (скрипт генерации в `server/db/`); добавить недостающие
-  индексы миграцией.
+- ✅ 3.1. (2026-07-09) HTTP-кэш (ETag + Cache-Control) на публичных GET. Паттерн `CachedJson`
+  из `RecordsController` (2.7) вынесен в `CachedJsonExtensions` (extension-метод на
+  `ControllerBase`, `server/Swimm.API/Http/`) и переиспользован в `RecordsController` (без
+  изменения поведения — тот же ключи/TTL) и на новых эндпоинтах: `/api/competitions`
+  (5 мин / max-age=60), `/api/categories[/{key}]` и `/api/club-points` (1ч / max-age=300),
+  `/api/athletes/career` и `/api/results/filter-hints` (5 мин / max-age=60). 400/404-ветки
+  остаются до хелпера (не кэшируются). Инвалидация — существующая глобальная
+  `ICacheService.InvalidateAllAsync()` из админ-CRUD/импорта, отдельно ничего не добавлял.
+  `/api/results` (paged) осознанно не тронут — своя пагинация/кэш в репозитории.
+  Проверено curl-ом: заголовки, byte-for-byte тело, 304 на повторный If-None-Match.
+- ✅ 3.2. (2026-07-09) Серверная фильтрация на клиенте. Контракт —
+  `docs/tasks/phase3-paged-results-contract.md`.
+  **Сервер:** `/api/results` дополнен `birthYearFrom/To`, `ageGroup`, `position` (top/podium),
+  `eventDate`, `total` в ответе (отдельный кэш-ключ на COUNT), лимит глубины
+  `page*pageSize ≤ 10000` (иначе 400); публичный `GET /api/results/filter-hints`. Смоук на
+  живом API + 67 зелёных тестов; предикаты на синтетике 3 млн едут на индексе 3.3.
+  **Клиент:** `loadFromApi` в `filter-data-source-ddl.tsx` — paged-ветка делает один fetch
+  страницы вместо `while hasMore`; `buildResultsFilterParams` (`utils/helpers/results-api.ts`)
+  маппит `state.filterSelected` → query по контракту §2. Redux: `resultsPaging` (`store.ts`) —
+  `{page, pageSize, total, hasMore}`. Смена фильтра/источника → рефетч страницы 1
+  (`lastPagedFetchKeyRef` в DataSourceDDL защищает от задвоения с собственным
+  дозагрузка-эффектом). «Show more» в `results-table.tsx` аппендит страницу+1, счётчик
+  «showing N of total» — total из `resultsPaging`, не из длины массива. `level_filter`,
+  `is_recalculated`, `activity_type` скрыты в paged (§5 контракта) — их серверные аналоги в 3.4.
+  Опции style/distance/club/name в paged — из `/api/results/filter-hints`
+  (`useFilterHints`, debounce 300мс на текстовых полях; `enabled` гейтит фетч, чтобы full-режим
+  не дёргал hints вхолостую). Побочный фикс: `hasSource` (`results-main-project.tsx`,
+  `results-table.tsx`) считался по `results.length` — в paged первая страница с дефолтными
+  фильтрами законно может быть пустой, что прятало весь UI фильтров; переведено на `title`.
+  Проверено вживую на SYNTH-соревновании (5000 строк): один запрос страницы, «showing 100 of
+  995», Show more догружает и меняет счётчик, level/recalculate/activity_type не рендерятся;
+  full-режим (`?loadMode=full` и без параметра) — прежние N запросов по 500 без query-фильтров,
+  regression не найден.
+  **Приёмка (Fable, 2026-07-09): принято с доводками.** (1) Серверный `position=top` теперь
+  оставляет строки без места (DSQ/DNS) — зеркало клиентского фильтра, иначе ломался паритет
+  full/paged; (2) `/api/competitions` отдаёт `day_dates`, `filter-event-date` в paged берёт
+  опции дней оттуда (страница, сортированная по дате DESC, покрывает один день события);
+  (3) смена источника сбрасывает `event_date` — устранён баг «день Maccabiah фильтрует SYNTH
+  в ноль» (в full-режиме тот же сток-фильтр молча опустошал таблицу); (4) починен генератор
+  синтетики: некоррелированный `LATERAL (SELECT random())` вычислялся один раз на INSERT и
+  все 3 млн строк получали Distance='100' — рандомы перенесены во вложенный FROM, данные
+  перегенерированы, EXPLAIN-профиль перепрогнан (paged-запросы ≤ 4 мс). Живая приёмка в
+  браузере: 1 запрос страницы, Show more 100→200→300 of 328, паритет full/paged (78/78 и
+  328/328), день с 0 результатов не ломает UI. Известное ограничение: опции Age-фильтра
+  в paged — из загруженной страницы (неполные), кандидат на hints/3.4.
+- ✅ 3.3. (2026-07-09) Индексы под реальные запросы. Синтетика: `server/db/synthetic-results.sql`
+  (3 млн строк: 600 соревнований × 5000, маркировка `SYNTH`, откат `synthetic-results-cleanup.sql`);
+  EXPLAIN-профиль 10 запросов — `server/db/explain-top-queries.sql`. Найден и закрыт один провал:
+  фильтр по `CompetitionId`/`EventId` с сортировкой выдачи шёл по индексу даты с фильтрацией всей
+  таблицы (335 мс) → композитный индекс `(CompetitionId, CompetitionDate DESC, Position)`
+  миграцией `AddResultsCompetitionPagingIndex` (0.5 мс; заодно снят избыточный одиночный
+  `IX_Results_CompetitionId`). Остальные запросы ≤ 40 мс. Известные тяжёлые, но закрытые кэшем:
+  счётчики `GetSources` (~250 мс, TTL 5 мин) и `DISTINCT Distance` (~190 мс, TTL 10 мин) —
+  кандидаты на серверные агрегаты в 3.4. Глубокий OFFSET растёт линейно (~37 мс на 10k) —
+  в контракте 3.2 ограничена глубина страниц.
 - ☐ 3.4. Агрегаты, которые считаются на клиенте (медали, очки клубов, карьерные суммы) —
   посчитать на сервере и кэшировать (частично уже есть: `/api/athletes/career`).
 - ☐ 3.5. Нагрузочный smoke: k6/bombardier профиль «список + 3 фильтра + карточка спортсмена»,
