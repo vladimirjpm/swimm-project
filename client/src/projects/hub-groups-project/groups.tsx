@@ -3,7 +3,11 @@ import '../home-project/home.css';
 import HomeHeader from '../home-project/components/home-header';
 import RecordTicker from '../home-project/components/record-ticker';
 import MyGroupsPanel from './my-groups-panel';
+import UI_ClubIcon from '../components/mix/club-icon/club-icon';
 import type { HubGroupDetails, HubGroupLink, HubGroupListItem, HubGroupMember, HubGroupStanding } from './types';
+
+const GROUP_DISCLAIMER =
+  'Состав ведётся создателем группы и не является официальной заявкой клуба или федерации.';
 
 // Страница групп (HubGroups, фазы 3–4): список публичных групп + страница группы
 // с участниками, «рекордами группы» и последними заплывами. Виртуальная группа
@@ -73,8 +77,13 @@ function GroupCard({ group, href }: { group: HubGroupListItem; href: string }) {
       <div className="flex items-start gap-4">
         <GroupIcon iconUrl={group.icon_url} name={group.name_en || group.name} size="sm" />
         <div className="min-w-0">
-          <div className="truncate text-[19px] font-black tracking-[-0.02em] lg:text-[22px]">
-            {group.name}
+          <div className="flex items-center gap-2">
+            <div className="truncate text-[19px] font-black tracking-[-0.02em] lg:text-[22px]">
+              {group.name}
+            </div>
+            {group.is_official && group.club_name && (
+              <UI_ClubIcon clubName={group.club_name} iconWidth="6" styleType="icon-notext" />
+            )}
           </div>
           {group.name_en && group.name_en !== group.name && (
             <div className="truncate text-[12px] font-bold text-[#cbe0f0]/60">{group.name_en}</div>
@@ -126,6 +135,7 @@ function GroupsList({ groups, favorites }: { groups: HubGroupListItem[]; favorit
               icon_url: null,
               location: null,
               club_name: null,
+              is_official: false,
               member_count: favorites.members.length,
             }}
           />
@@ -178,6 +188,14 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
             {group.name_en && group.name_en !== group.name && (
               <p className="mt-1 text-[14px] font-bold text-[#cbe0f0]/60">{group.name_en}</p>
             )}
+            {group.is_official && group.club_name && (
+              <div className="mt-2 flex items-center gap-2">
+                <UI_ClubIcon clubName={group.club_name} iconWidth="6" styleType="icon-notext" />
+                <span className="hp-mono rounded-[8px] border border-[#38ef8f]/40 bg-[rgba(56,239,143,0.1)] px-3 py-[5px] text-[12px] font-extrabold text-[#38ef8f]">
+                  Official Group of {group.club_name}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -228,6 +246,9 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
                 </li>
               ))}
             </ul>
+          )}
+          {!group.is_virtual && (
+            <p className="mt-3 text-[11px] italic leading-snug text-[#cbe0f0]/40">{GROUP_DISCLAIMER}</p>
           )}
         </div>
 

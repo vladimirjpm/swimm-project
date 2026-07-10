@@ -4,6 +4,7 @@ using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
+using Swimm.Infrastructure.Services;
 
 namespace Swimm.Infrastructure.Repositories;
 
@@ -52,6 +53,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                 IconUrl = g.IconUrl,
                 Location = g.Location,
                 ClubName = g.Club != null ? g.Club.Name : null,
+                IsOfficial = g.IsOfficial,
                 MemberCount = g.Members.Count
             })
             .ToListAsync();
@@ -92,6 +94,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             CoverImageUrl = group.CoverImageUrl,
             Location = group.Location,
             ClubName = group.Club?.Name,
+            IsOfficial = group.IsOfficial,
             Links = ParseLinks(group.Links),
             IsVirtual = false,
             Members = members
@@ -230,37 +233,20 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                     NameEn = m.NameEn,
                     Role = m.Role,
                     Swims = rows.Count,
-                    Golds = rows.Count(r => r.Position == 1),
-                    Silvers = rows.Count(r => r.Position == 2),
-                    Bronzes = rows.Count(r => r.Position == 3),
-                    ClubPoints = rows.Sum(r => PointsFor(rules, r)),
+                    // Медали — только по зачтённым заплывам: DSQ/незачтённое время (TimeFail)
+                    // не медаль (согласовано с очками, которые тоже исключают TimeFail).
+                    Golds = rows.Count(r => !r.TimeFail && r.Position == 1),
+                    Silvers = rows.Count(r => !r.TimeFail && r.Position == 2),
+                    Bronzes = rows.Count(r => !r.TimeFail && r.Position == 3),
+                    ClubPoints = rows.Sum(r =>
+                        ClubPointsScoring.PointsFor(
+                            rules, r.Position, r.TimeFail, r.IsMasters, DateOnly.FromDateTime(r.CompetitionDate))),
                     BestFina = rows.Count > 0 ? rows.Max(r => r.InternationalPoints) : 0
                 };
             })
             .OrderByDescending(s => s.ClubPoints)
             .ThenByDescending(s => s.Swims)
             .ToList();
-    }
-
-    /// <summary>Очки за место по действующему на дату правилу нужной области (masters/non-masters/all).</summary>
-    private static int PointsFor(List<ClubPointsRule> rules, SeasonResultRow r)
-    {
-        if (r.TimeFail || r.Position is null || r.Position < 1) return 0;
-
-        var scope = r.IsMasters ? "masters" : "non-masters";
-        var date = DateOnly.FromDateTime(r.CompetitionDate);
-        // Правило: самое позднее вступившее в силу; при равенстве дат scope-специфичное
-        // (masters/non-masters) важнее общего "all" — как в клиентском club-points-helper.
-        var rule = rules
-            .Where(x => (x.Scope == scope || x.Scope == "all") && x.EffectiveFrom <= date)
-            .OrderByDescending(x => x.EffectiveFrom)
-            .ThenByDescending(x => x.Scope == "all" ? 0 : 1)
-            .FirstOrDefault();
-        if (rule is null) return 0;
-
-        if (rule.MaxScoringPlace is int max && r.Position > max) return rule.DefaultPoints;
-        var entry = rule.Entries.FirstOrDefault(e => e.Place == r.Position.Value);
-        return entry?.Points ?? rule.DefaultPoints;
     }
 
     /// <summary>Проекция сезонного результата для зачёта (in-memory).</summary>

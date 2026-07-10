@@ -62,7 +62,13 @@ public partial class HubGroupCrudCore
         return null;
     }
 
-    public static void Apply(HubGroup group, HubGroupInputDto input, string slug)
+    /// <param name="allowClubChange">
+    /// Разрешить менять привязку к клубу из ввода. Только админский путь: официальная связь
+    /// группы с клубом ведётся через одобрение заявки (8.7), поэтому пользовательский CRUD (8.6)
+    /// передаёт false — иначе владелец/админ группы мог бы крафтовым запросом проставить/перебить
+    /// ClubId в обход админа (спуфинг клуба, перепривязка официальной группы).
+    /// </param>
+    public static void Apply(HubGroup group, HubGroupInputDto input, string slug, bool allowClubChange = true)
     {
         group.Name = input.Name.Trim();
         group.NameEn = string.IsNullOrWhiteSpace(input.NameEn) ? null : input.NameEn.Trim();
@@ -71,7 +77,7 @@ public partial class HubGroupCrudCore
         group.IconUrl = string.IsNullOrWhiteSpace(input.IconUrl) ? null : input.IconUrl.Trim();
         group.CoverImageUrl = string.IsNullOrWhiteSpace(input.CoverImageUrl) ? null : input.CoverImageUrl.Trim();
         group.Location = string.IsNullOrWhiteSpace(input.Location) ? null : input.Location.Trim();
-        group.ClubId = input.ClubId;
+        if (allowClubChange) group.ClubId = input.ClubId;
         group.IsPublic = input.IsPublic;
         group.Links = SerializeLinks(input.Links);
         group.UpdatedAt = DateTime.UtcNow;

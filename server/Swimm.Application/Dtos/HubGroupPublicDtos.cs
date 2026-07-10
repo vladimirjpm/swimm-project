@@ -26,6 +26,10 @@ public sealed class HubGroupListItemDto
     [JsonPropertyName("club_name")]
     public string? ClubName { get; set; }
 
+    /// <summary>Официальная группа клуба (одобрена админом) — не путать с составом-watchlist.</summary>
+    [JsonPropertyName("is_official")]
+    public bool IsOfficial { get; set; }
+
     [JsonPropertyName("member_count")]
     public int MemberCount { get; set; }
 }
@@ -172,6 +176,10 @@ public sealed class HubGroupDetailsDto
 
     [JsonPropertyName("club_name")]
     public string? ClubName { get; set; }
+
+    /// <summary>Официальная группа клуба (одобрена админом) — не путать с составом-watchlist.</summary>
+    [JsonPropertyName("is_official")]
+    public bool IsOfficial { get; set; }
 
     [JsonPropertyName("links")]
     public List<HubGroupPublicLinkDto> Links { get; set; } = [];

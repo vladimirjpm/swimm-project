@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
@@ -26,7 +27,7 @@ public class HubGroupUserService : IHubGroupUserService
     public async Task<IReadOnlyList<HubGroupAdminRowDto>> GetMineAsync(int userId)
     {
         return await _db.HubGroups.AsNoTracking()
-            .Where(g => g.OwnerUserId == userId || g.Managers.Any(m => m.UserId == userId))
+            .Where(g => g.OwnerUserId == userId || g.Admins.Any(m => m.UserId == userId))
             .OrderByDescending(g => g.UpdatedAt)
             .Select(g => new HubGroupAdminRowDto
             {
@@ -37,6 +38,7 @@ public class HubGroupUserService : IHubGroupUserService
                 ClubName = g.Club != null ? g.Club.Name : null,
                 MemberCount = g.Members.Count,
                 IsPublic = g.IsPublic,
+                IsOfficial = g.IsOfficial,
                 UpdatedAt = g.UpdatedAt
             })
             .ToListAsync();
@@ -70,19 +72,36 @@ public class HubGroupUserService : IHubGroupUserService
         var error = await _core.ValidateAsync(input, slug, excludeId: null);
         if (error != null) return HubGroupSaveResult.Fail(error);
 
+        // allowClubChange:false — пользователь создаёт только свободную группу (как favorites);
+        // привязка к клубу — через заявку и одобрение админа (8.7), не через ввод.
         var group = new HubGroup { OwnerUserId = ownerUserId };
-        HubGroupCrudCore.Apply(group, input, slug);
+        HubGroupCrudCore.Apply(group, input, slug, allowClubChange: false);
         _db.HubGroups.Add(group);
         return await _core.SaveAsync(group);
     }
 
-    public async Task<IReadOnlyList<HubGroupManagerDto>> GetManagersAsync(int hubGroupId)
+    public async Task<HubGroupSaveResult> UpdateAsync(int id, HubGroupInputDto input)
     {
-        return await _db.HubGroupManagers.AsNoTracking()
+        var group = await _db.HubGroups.FindAsync(id);
+        if (group == null) return HubGroupSaveResult.Fail($"Группа #{id} не найдена");
+
+        var slug = await _core.ResolveSlugAsync(input, excludeId: id);
+        var error = await _core.ValidateAsync(input, slug, excludeId: id);
+        if (error != null) return HubGroupSaveResult.Fail(error);
+
+        // allowClubChange:false — сохраняем текущий ClubId (в т.ч. у официальной группы),
+        // ввод клуба игнорируем: сменить/снять клуб может только админ.
+        HubGroupCrudCore.Apply(group, input, slug, allowClubChange: false);
+        return await _core.SaveAsync(group);
+    }
+
+    public async Task<IReadOnlyList<HubGroupAdminMemberDto>> GetAdminsAsync(int hubGroupId)
+    {
+        return await _db.HubGroupAdmins.AsNoTracking()
             .Where(m => m.HubGroupId == hubGroupId)
             .Include(m => m.User)
             .OrderBy(m => m.CreatedAt)
-            .Select(m => new HubGroupManagerDto
+            .Select(m => new HubGroupAdminMemberDto
             {
                 UserId = m.UserId,
                 DisplayName = m.User!.DisplayName,
@@ -92,7 +111,7 @@ public class HubGroupUserService : IHubGroupUserService
             .ToListAsync();
     }
 
-    public async Task<HubGroupMemberSaveResult> AddManagerAsync(int hubGroupId, string email, int grantedByUserId)
+    public async Task<HubGroupMemberSaveResult> AddAdminAsync(int hubGroupId, string email, int grantedByUserId)
     {
         email = (email ?? "").Trim();
         if (email.Length == 0) return HubGroupMemberSaveResult.Fail("Email обязателен");
@@ -103,10 +122,10 @@ public class HubGroupUserService : IHubGroupUserService
         var user = await _db.AppUsers.FirstOrDefaultAsync(u => u.Email == email);
         if (user == null) return HubGroupMemberSaveResult.Fail("Пользователь с таким email не найден");
 
-        var dup = await _db.HubGroupManagers.AnyAsync(m => m.HubGroupId == hubGroupId && m.UserId == user.Id);
-        if (dup) return HubGroupMemberSaveResult.Fail("Этот пользователь уже со-тренер группы");
+        var dup = await _db.HubGroupAdmins.AnyAsync(m => m.HubGroupId == hubGroupId && m.UserId == user.Id);
+        if (dup) return HubGroupMemberSaveResult.Fail("Этот пользователь уже админ группы");
 
-        _db.HubGroupManagers.Add(new HubGroupManager
+        _db.HubGroupAdmins.Add(new HubGroupAdmin
         {
             HubGroupId = hubGroupId,
             UserId = user.Id,
@@ -117,24 +136,85 @@ public class HubGroupUserService : IHubGroupUserService
         {
             await _db.SaveChangesAsync();
         }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        {
+            // 23505 = unique_violation по (HubGroupId, UserId) — гонка добавления того же юзера.
+            return HubGroupMemberSaveResult.Fail("Этот пользователь уже админ группы");
+        }
         catch (DbUpdateException)
         {
-            return HubGroupMemberSaveResult.Fail("Этот пользователь уже со-тренер группы");
+            // Прочие ошибки записи (напр. 23503 FK на невалидный GrantedByUserId) — не выдавать
+            // за дубликат, это вводит в заблуждение (см. dev-bypass GrantedByUserId=0).
+            return HubGroupMemberSaveResult.Fail("Не удалось назначить админа группы");
         }
 
         await _core.InvalidateCacheAsync();
         return HubGroupMemberSaveResult.Ok();
     }
 
-    public async Task<HubGroupMemberSaveResult> RemoveManagerAsync(int hubGroupId, int managerUserId)
+    public async Task<HubGroupMemberSaveResult> RemoveAdminAsync(int hubGroupId, int adminUserId)
     {
-        var manager = await _db.HubGroupManagers
-            .FirstOrDefaultAsync(m => m.HubGroupId == hubGroupId && m.UserId == managerUserId);
-        if (manager == null) return HubGroupMemberSaveResult.Fail("Со-тренер не найден");
+        var admin = await _db.HubGroupAdmins
+            .FirstOrDefaultAsync(m => m.HubGroupId == hubGroupId && m.UserId == adminUserId);
+        if (admin == null) return HubGroupMemberSaveResult.Fail("Админ группы не найден");
 
-        _db.HubGroupManagers.Remove(manager);
+        _db.HubGroupAdmins.Remove(admin);
         await _db.SaveChangesAsync();
         await _core.InvalidateCacheAsync();
+        return HubGroupMemberSaveResult.Ok();
+    }
+
+    public async Task<MyHubGroupClubRequestDto?> GetClubRequestAsync(int hubGroupId)
+    {
+        return await _db.HubGroupClubRequests.AsNoTracking()
+            .Where(r => r.HubGroupId == hubGroupId)
+            .OrderByDescending(r => r.CreatedAt)
+            .Select(r => new MyHubGroupClubRequestDto
+            {
+                Id = r.Id,
+                ClubId = r.ClubId,
+                ClubName = r.Club!.Name,
+                Message = r.Message,
+                Status = r.Status,
+                CreatedAt = r.CreatedAt,
+                DecidedAt = r.DecidedAt
+            })
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<HubGroupMemberSaveResult> SubmitClubRequestAsync(int hubGroupId, int userId, HubGroupClubRequestInputDto input)
+    {
+        var group = await _db.HubGroups.FindAsync(hubGroupId);
+        if (group == null) return HubGroupMemberSaveResult.Fail($"Группа #{hubGroupId} не найдена");
+        if (group.IsOfficial) return HubGroupMemberSaveResult.Fail("Группа уже официальная");
+
+        var clubExists = await _db.Clubs.AnyAsync(c => c.Id == input.ClubId);
+        if (!clubExists) return HubGroupMemberSaveResult.Fail("Клуб не найден");
+
+        var hasPending = await _db.HubGroupClubRequests
+            .AnyAsync(r => r.HubGroupId == hubGroupId && r.Status == HubGroupClubRequestStatus.Pending);
+        if (hasPending) return HubGroupMemberSaveResult.Fail("Заявка на эту группу уже подана и ожидает решения");
+
+        var clubTaken = await _db.HubGroups.AnyAsync(g => g.ClubId == input.ClubId && g.IsOfficial);
+        if (clubTaken) return HubGroupMemberSaveResult.Fail("У этого клуба уже есть официальная группа");
+
+        _db.HubGroupClubRequests.Add(new HubGroupClubRequest
+        {
+            HubGroupId = hubGroupId,
+            UserId = userId,
+            ClubId = input.ClubId,
+            Message = string.IsNullOrWhiteSpace(input.Message) ? null : input.Message.Trim(),
+        });
+
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            return HubGroupMemberSaveResult.Fail("Заявка на эту группу уже подана и ожидает решения");
+        }
+
         return HubGroupMemberSaveResult.Ok();
     }
 }

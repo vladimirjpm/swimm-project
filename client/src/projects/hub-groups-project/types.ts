@@ -8,6 +8,8 @@ export interface HubGroupListItem {
   icon_url?: string | null;
   location?: string | null;
   club_name?: string | null;
+  /** Официальная группа клуба (одобрена админом) — не путать с составом-watchlist. */
+  is_official: boolean;
   member_count: number;
 }
 
@@ -82,6 +84,8 @@ export interface HubGroupDetails {
   cover_image_url?: string | null;
   location?: string | null;
   club_name?: string | null;
+  /** Официальная группа клуба (одобрена админом) — не путать с составом-watchlist. */
+  is_official: boolean;
   links: HubGroupLink[];
   is_virtual: boolean;
   members: HubGroupMember[];

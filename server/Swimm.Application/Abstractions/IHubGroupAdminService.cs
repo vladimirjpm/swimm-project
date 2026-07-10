@@ -28,6 +28,12 @@ public interface IHubGroupAdminService
     /// <summary>Поиск пловцов по подстроке в фамилии/имени (RU/EN), top-20 — для добавления участника.</summary>
     Task<IReadOnlyList<SwimmerSearchResultDto>> SearchSwimmersAsync(string query);
 
+    /// <summary>
+    /// Пловцы клуба (без текстового поиска) — доп. фильтр в панели официальной группы для
+    /// быстрого комплектования составом. Не право доступа (пловцы публичны), top-200.
+    /// </summary>
+    Task<IReadOnlyList<SwimmerSearchResultDto>> GetClubSwimmersAsync(int clubId);
+
     /// <summary>Добавить участника. Отказ — если пловец уже состоит в группе (unique-пара).</summary>
     Task<HubGroupMemberSaveResult> AddMemberAsync(int hubGroupId, int swimmerId, string role);
 

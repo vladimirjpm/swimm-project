@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { useCurrentIdentity, useMyHubGroupEdit, useMyHubGroups } from './use-my-hub-groups';
+import { useClubOptions, useCurrentIdentity, useMyHubGroupEdit, useMyHubGroups } from './use-my-hub-groups';
 import type { HubGroupInput, HubGroupLinkInput, MyHubGroupRow } from './my-groups-types';
+
+const DISCLAIMER =
+  'Состав ведётся создателем группы и не является официальной заявкой клуба или федерации.';
 
 const cardCls =
   'hp-card-std rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]';
@@ -98,16 +101,22 @@ function GroupInputForm({
   );
 }
 
-function MembersEditor({ hubGroupId }: { hubGroupId: number }) {
+function MembersEditor({ hubGroupId, clubId }: { hubGroupId: number; clubId?: number | null }) {
   const edit = useMyHubGroupEdit(hubGroupId);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Awaited<ReturnType<typeof edit.searchSwimmers>>>([]);
+  const [clubSwimmers, setClubSwimmers] = useState<Awaited<ReturnType<typeof edit.getClubSwimmers>> | null>(null);
 
   if (!edit.data) return null;
 
   const onSearch = async (q: string) => {
     setQuery(q);
     setResults(q.trim().length > 0 ? await edit.searchSwimmers(q) : []);
+  };
+
+  const toggleClubSwimmers = async () => {
+    if (clubSwimmers != null) { setClubSwimmers(null); return; }
+    if (clubId) setClubSwimmers(await edit.getClubSwimmers(clubId));
   };
 
   return (
@@ -149,11 +158,35 @@ function MembersEditor({ hubGroupId }: { hubGroupId: number }) {
           </ul>
         )}
       </div>
+
+      {clubId && (
+        <div>
+          <button type="button" className={btnCls} onClick={toggleClubSwimmers}>
+            {clubSwimmers != null ? 'Скрыть пловцов клуба' : 'Показать пловцов клуба'}
+          </button>
+          {clubSwimmers != null && (
+            <ul className="m-0 mt-2 flex max-h-[220px] list-none flex-col gap-1 overflow-y-auto rounded-[10px] border border-[#7dd3fc]/30 bg-[#06182c] p-2">
+              {clubSwimmers.length === 0 && (
+                <p className="px-2 py-1 text-[12.5px] text-[#cbe0f0]/55">Пловцов клуба не найдено.</p>
+              )}
+              {clubSwimmers.map((s) => (
+                <li key={s.id}>
+                  <button type="button"
+                    className="w-full cursor-pointer rounded-[6px] border-none bg-transparent px-2 py-1 text-left text-[12.5px] text-[#f3f8fd] hover:bg-[rgba(56,189,248,0.14)]"
+                    onClick={() => edit.addMember(s.id, 'member')}>
+                    {s.name || s.nameEn} {s.birthYear > 0 ? `(${s.birthYear})` : ''}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function ManagersEditor({ hubGroupId, isOwnerOrAdmin }: { hubGroupId: number; isOwnerOrAdmin: boolean }) {
+function AdminsEditor({ hubGroupId, isOwnerOrAdmin }: { hubGroupId: number; isOwnerOrAdmin: boolean }) {
   const edit = useMyHubGroupEdit(hubGroupId);
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -162,27 +195,79 @@ function ManagersEditor({ hubGroupId, isOwnerOrAdmin }: { hubGroupId: number; is
 
   const submit = async () => {
     setError(null);
-    const result = await edit.addManager(email);
+    const result = await edit.addAdmin(email);
     if (result.success) setEmail(''); else setError(result.error ?? 'Ошибка');
   };
 
   return (
     <div className="flex flex-col gap-2">
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
-        {edit.managers.map((m) => (
+        {edit.admins.map((m) => (
           <li key={m.userId} className="flex items-center justify-between gap-2">
             <span className="min-w-0 truncate text-[13px] text-[#f3f8fd]">{m.displayName} <span className="text-[#cbe0f0]/50">({m.email})</span></span>
-            <button type="button" className={btnDangerCls} onClick={() => edit.removeManager(m.userId)}>✕</button>
+            <button type="button" className={btnDangerCls} onClick={() => edit.removeAdmin(m.userId)}>✕</button>
           </li>
         ))}
-        {edit.managers.length === 0 && (
-          <p className="text-[12.5px] text-[#cbe0f0]/55">Со-тренеров пока нет.</p>
+        {edit.admins.length === 0 && (
+          <p className="text-[12.5px] text-[#cbe0f0]/55">Админов группы пока нет.</p>
         )}
       </ul>
       <div className="flex gap-2">
         <input className={inputCls} placeholder="Email пользователя" value={email}
           onChange={(e) => setEmail(e.target.value)} />
-        <button type="button" className={btnCls} disabled={!email.trim()} onClick={submit}>+ Со-тренер</button>
+        <button type="button" className={btnCls} disabled={!email.trim()} onClick={submit}>+ Админ</button>
+      </div>
+      {error && <p className="text-[12.5px] font-bold text-[#ef5350]">{error}</p>}
+    </div>
+  );
+}
+
+function ClubRequestPanel({ hubGroupId }: { hubGroupId: number }) {
+  const edit = useMyHubGroupEdit(hubGroupId);
+  const clubs = useClubOptions();
+  const [clubId, setClubId] = useState<number | ''>('');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const request = edit.clubRequest;
+  if (request?.status === 'pending') {
+    return (
+      <p className="text-[12.5px] text-[#cbe0f0]/70">
+        Заявка на официальный статус клуба «{request.clubName}» рассматривается.
+      </p>
+    );
+  }
+
+  const submit = async () => {
+    if (!clubId) return;
+    setSaving(true);
+    setError(null);
+    const r = await edit.submitClubRequest({ clubId, message: message.trim() || null });
+    setSaving(false);
+    if (!r.success) setError(r.error ?? 'Ошибка отправки заявки');
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      {request?.status === 'rejected' && (
+        <p className="text-[12.5px] text-[#cbe0f0]/55">
+          Предыдущая заявка на «{request.clubName}» отклонена — можно подать снова.
+        </p>
+      )}
+      <div className="flex gap-2">
+        <select className={`${inputCls} max-w-[220px]`} value={clubId}
+          onChange={(e) => setClubId(e.target.value ? Number(e.target.value) : '')}>
+          <option value="">Выбрать клуб…</option>
+          {clubs.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+        <input className={inputCls} placeholder="Сообщение админу (необязательно)" value={message}
+          onChange={(e) => setMessage(e.target.value)} />
+        <button type="button" className={btnCls} disabled={!clubId || saving} onClick={submit}>
+          {saving ? '…' : 'Подать заявку'}
+        </button>
       </div>
       {error && <p className="text-[12.5px] font-bold text-[#ef5350]">{error}</p>}
     </div>
@@ -214,12 +299,24 @@ function EditGroupCard({ row, currentUserId, isAdmin, onClose, onSaved }: {
       />
       <div>
         <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#7dd3fc]">Участники</h3>
-        <MembersEditor hubGroupId={row.id} />
+        <MembersEditor hubGroupId={row.id} clubId={edit.data.isOfficial ? edit.data.clubId : null} />
+        <p className="mt-2 text-[11.5px] italic text-[#cbe0f0]/45">{DISCLAIMER}</p>
       </div>
       <div>
-        <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#7dd3fc]">Со-тренеры</h3>
-        <ManagersEditor hubGroupId={row.id} isOwnerOrAdmin={isOwnerOrAdmin} />
+        <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#7dd3fc]">Админы группы</h3>
+        <AdminsEditor hubGroupId={row.id} isOwnerOrAdmin={isOwnerOrAdmin} />
       </div>
+      {isOwnerOrAdmin && !edit.data.isOfficial && (
+        <div>
+          <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#7dd3fc]">
+            Официальный статус клуба
+          </h3>
+          <ClubRequestPanel hubGroupId={row.id} />
+        </div>
+      )}
+      {edit.data.isOfficial && (
+        <p className="text-[12.5px] font-bold text-[#38ef8f]">Official Group of {row.clubName}</p>
+      )}
     </div>
   );
 }
@@ -274,6 +371,11 @@ export default function MyGroupsPanel() {
                       className="truncate text-[14px] font-extrabold text-[#f3f8fd] no-underline hover:underline">
                       {g.name}
                     </a>
+                    {g.isOfficial && (
+                      <span className="hp-mono ml-2 rounded-[6px] border border-[#38ef8f]/40 px-[6px] py-[2px] text-[10px] font-extrabold text-[#38ef8f]">
+                        Official · {g.clubName}
+                      </span>
+                    )}
                     <div className="text-[11.5px] text-[#cbe0f0]/55">{g.memberCount} · swimmers</div>
                   </div>
                   <div className="flex shrink-0 gap-2">

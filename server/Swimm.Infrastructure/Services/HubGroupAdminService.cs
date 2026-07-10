@@ -37,6 +37,7 @@ public class HubGroupAdminService : IHubGroupAdminService
                 ClubName = g.Club != null ? g.Club.Name : null,
                 MemberCount = g.Members.Count,
                 IsPublic = g.IsPublic,
+                IsOfficial = g.IsOfficial,
                 UpdatedAt = g.UpdatedAt
             })
             .ToListAsync();
@@ -80,6 +81,7 @@ public class HubGroupAdminService : IHubGroupAdminService
             OwnerUserId = g.OwnerUserId,
             OwnerDisplayName = g.Owner?.DisplayName ?? $"#{g.OwnerUserId}",
             IsPublic = g.IsPublic,
+            IsOfficial = g.IsOfficial,
             Links = HubGroupCrudCore.ParseLinks(g.Links),
             Members = members
         };
@@ -147,6 +149,24 @@ public class HubGroupAdminService : IHubGroupAdminService
                 EF.Functions.ILike(s.FirstNameEn, $"%{query}%"))
             .OrderBy(s => s.LastName)
             .Take(20)
+            .Select(s => new SwimmerSearchResultDto
+            {
+                Id = s.Id,
+                Name = (s.LastName + " " + s.FirstName).Trim(),
+                NameEn = (s.LastNameEn + " " + s.FirstNameEn).Trim(),
+                BirthYear = s.BirthYear,
+                ClubName = s.Club != null ? s.Club.Name : null
+            })
+            .ToListAsync();
+    }
+
+    public async Task<IReadOnlyList<SwimmerSearchResultDto>> GetClubSwimmersAsync(int clubId)
+    {
+        return await _db.Swimmers.AsNoTracking()
+            .Where(s => s.ClubId == clubId)
+            .Include(s => s.Club)
+            .OrderBy(s => s.LastName)
+            .Take(200)
             .Select(s => new SwimmerSearchResultDto
             {
                 Id = s.Id,

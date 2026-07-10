@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import type {
+  ClubOption,
+  ClubRequest,
   CreateEligibility,
+  HubGroupClubRequestInput,
   HubGroupEditData,
   HubGroupInput,
-  HubGroupManager,
+  HubGroupAdmin,
   MyHubGroupRow,
   SaveResult,
   SwimmerSearchResult,
@@ -127,14 +130,31 @@ export function useMyHubGroups(enabled: boolean) {
   return { groups, eligibility, loading, reload, createGroup, deleteGroup };
 }
 
+/** Справочник клубов — для select в форме заявки на официальный статус. */
+export function useClubOptions() {
+  const [clubs, setClubs] = useState<ClubOption[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/me/hub-groups/clubs', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => { if (!cancelled) setClubs(data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  return clubs;
+}
+
 export function useMyHubGroupEdit(id: number | null) {
   const [data, setData] = useState<HubGroupEditData | null>(null);
-  const [managers, setManagers] = useState<HubGroupManager[]>([]);
+  const [admins, setAdmins] = useState<HubGroupAdmin[]>([]);
+  const [clubRequest, setClubRequest] = useState<ClubRequest | null>(null);
   const [loading, setLoading] = useState(false);
   const [forbidden, setForbidden] = useState(false);
 
   const reload = useCallback(async () => {
-    if (id == null) { setData(null); setManagers([]); return; }
+    if (id == null) { setData(null); setAdmins([]); setClubRequest(null); return; }
     setLoading(true);
     setForbidden(false);
     try {
@@ -143,8 +163,11 @@ export function useMyHubGroupEdit(id: number | null) {
       if (!r.ok) { setData(null); return; }
       setData(await r.json());
 
-      const mRes = await fetch(`/api/me/hub-groups/${id}/managers`, { credentials: 'include' });
-      setManagers(mRes.ok ? await mRes.json() : []);
+      const mRes = await fetch(`/api/me/hub-groups/${id}/admins`, { credentials: 'include' });
+      setAdmins(mRes.ok ? await mRes.json() : []);
+
+      const crRes = await fetch(`/api/me/hub-groups/${id}/club-request`, { credentials: 'include' });
+      setClubRequest(crRes.ok && crRes.status !== 204 ? await crRes.json() : null);
     } finally {
       setLoading(false);
     }
@@ -162,6 +185,11 @@ export function useMyHubGroupEdit(id: number | null) {
 
   const searchSwimmers = useCallback(async (query: string): Promise<SwimmerSearchResult[]> => {
     const r = await fetch(`/api/me/hub-groups/search-swimmers?q=${encodeURIComponent(query)}`, { credentials: 'include' });
+    return r.ok ? r.json() : [];
+  }, []);
+
+  const getClubSwimmers = useCallback(async (clubId: number): Promise<SwimmerSearchResult[]> => {
+    const r = await fetch(`/api/me/hub-groups/club-swimmers?clubId=${clubId}`, { credentials: 'include' });
     return r.ok ? r.json() : [];
   }, []);
 
@@ -193,24 +221,33 @@ export function useMyHubGroupEdit(id: number | null) {
     return result;
   }, [id, reload]);
 
-  const addManager = useCallback(async (email: string): Promise<SaveResult> => {
+  const addAdmin = useCallback(async (email: string): Promise<SaveResult> => {
     if (id == null) return { success: false, error: 'Нет группы' };
-    const r = await apiFetch(`/api/me/hub-groups/${id}/managers`, { method: 'POST', body: JSON.stringify({ email }) });
+    const r = await apiFetch(`/api/me/hub-groups/${id}/admins`, { method: 'POST', body: JSON.stringify({ email }) });
     const result = await saveResultFrom(r);
     if (result.success) await reload();
     return result;
   }, [id, reload]);
 
-  const removeManager = useCallback(async (userId: number): Promise<SaveResult> => {
+  const removeAdmin = useCallback(async (userId: number): Promise<SaveResult> => {
     if (id == null) return { success: false, error: 'Нет группы' };
-    const r = await apiFetch(`/api/me/hub-groups/${id}/managers/${userId}`, { method: 'DELETE' });
+    const r = await apiFetch(`/api/me/hub-groups/${id}/admins/${userId}`, { method: 'DELETE' });
+    const result = await saveResultFrom(r);
+    if (result.success) await reload();
+    return result;
+  }, [id, reload]);
+
+  const submitClubRequest = useCallback(async (input: HubGroupClubRequestInput): Promise<SaveResult> => {
+    if (id == null) return { success: false, error: 'Нет группы' };
+    const r = await apiFetch(`/api/me/hub-groups/${id}/club-request`, { method: 'POST', body: JSON.stringify(input) });
     const result = await saveResultFrom(r);
     if (result.success) await reload();
     return result;
   }, [id, reload]);
 
   return {
-    data, managers, loading, forbidden,
-    update, searchSwimmers, addMember, updateMember, removeMember, addManager, removeManager,
+    data, admins, clubRequest, loading, forbidden,
+    update, searchSwimmers, getClubSwimmers, addMember, updateMember, removeMember,
+    addAdmin, removeAdmin, submitClubRequest,
   };
 }

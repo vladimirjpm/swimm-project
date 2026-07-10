@@ -21,7 +21,8 @@ public class AdminSettingsServiceTests
 
         var all = svc.GetAll();
 
-        Assert.Equal(6, all.Count);
+        // 6 базовых + 3 настройки HubGroups (Policy/MaxPerUser/Visibility, фаза 8.1).
+        Assert.Equal(9, all.Count);
     }
 
     // ── Get: существующий ключ возвращает запись ─────────────────────────────
@@ -33,6 +34,9 @@ public class AdminSettingsServiceTests
     [InlineData("ShowSystemTables")]
     [InlineData("DefaultSchema")]
     [InlineData("ResultsLoadMode")]
+    [InlineData("HubGroupCreationPolicy")]
+    [InlineData("HubGroupMaxPerUser")]
+    [InlineData("HubGroupVisibility")]
     public void Get_ExistingKey_ReturnsNonNull(string key)
     {
         var svc = Build();

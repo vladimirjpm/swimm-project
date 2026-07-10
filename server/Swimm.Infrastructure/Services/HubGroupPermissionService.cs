@@ -24,16 +24,16 @@ public class HubGroupPermissionService : IHubGroupPermissionService
         if (owner == null) return HubGroupPermissions.NotFound(isAdmin);
 
         var isOwner = owner.Value == userId;
-        var isCoManager = !isOwner && await _db.HubGroupManagers
+        var isGroupAdmin = !isOwner && await _db.HubGroupAdmins
             .AnyAsync(m => m.HubGroupId == hubGroupId && m.UserId == userId);
 
         return new HubGroupPermissions(
             Exists: true,
             IsAdmin: isAdmin,
             IsOwner: isOwner,
-            IsCoManager: isCoManager,
-            CanEdit: isAdmin || isOwner || isCoManager,
-            CanManageCoTrainers: isAdmin || isOwner,
+            IsGroupAdmin: isGroupAdmin,
+            CanEdit: isAdmin || isOwner || isGroupAdmin,
+            CanManageAdmins: isAdmin || isOwner,
             CanDelete: isAdmin || isOwner,
             CanChangeOwner: isAdmin);
     }

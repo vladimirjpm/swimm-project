@@ -9,8 +9,8 @@ namespace Swimm.API.Controllers;
 /// <summary>
 /// Пользовательское самообслуживание групп (HubGroups, 8.6): создание своей группы
 /// (по настройкам HubGroupCreationPolicy/HubGroupMaxPerUser), правка/удаление своей
-/// группы и участников, назначение со-тренеров. Права — единая проверка через
-/// <see cref="IHubGroupPermissionService"/> (владелец/со-тренер/админ), не размазана
+/// группы и участников, назначение админов группы. Права — единая проверка через
+/// <see cref="IHubGroupPermissionService"/> (владелец/админ группы/site-админ), не размазана
 /// по хендлерам. CRUD самой группы/участников переиспользует <see cref="IHubGroupAdminService"/> —
 /// логика идентична админской, разница только в авторизации на входе.
 /// </summary>
@@ -48,7 +48,7 @@ public class MyHubGroupsController : ControllerBase
         return await _permissions.GetPermissionsAsync(hubGroupId, userId.Value, IsAdmin);
     }
 
-    /// <summary>Группы, которыми текущий пользователь владеет или со-управляет.</summary>
+    /// <summary>Группы, которыми текущий пользователь владеет или админит.</summary>
     [HttpGet]
     public async Task<IActionResult> GetMine()
     {
@@ -97,7 +97,8 @@ public class MyHubGroupsController : ControllerBase
         if (!perms.Exists) return NotFound();
         if (!perms.CanEdit) return Forbid();
 
-        var result = await _admin.UpdateAsync(id, input);
+        // Пользовательский Update (не _admin): не даёт менять ClubId в обход одобрения (8.7).
+        var result = await _mine.UpdateAsync(id, input);
         return result.Success ? Ok(new { id = result.Id }) : BadRequest(new { error = result.Error });
     }
 
@@ -117,6 +118,18 @@ public class MyHubGroupsController : ControllerBase
     [HttpGet("search-swimmers")]
     public async Task<IActionResult> SearchSwimmers([FromQuery] string q)
         => Ok(await _admin.SearchSwimmersAsync(q));
+
+    /// <summary>Справочник клубов — для select в форме заявки на официальный статус.</summary>
+    [HttpGet("clubs")]
+    public async Task<IActionResult> GetClubs() => Ok(await _admin.GetClubOptionsAsync());
+
+    /// <summary>
+    /// Пловцы клуба — доп. фильтр комплектования официальной группы (в дополнение к обычному
+    /// поиску). Не право доступа: пловцы публичны, доступно любому авторизованному.
+    /// </summary>
+    [HttpGet("club-swimmers")]
+    public async Task<IActionResult> GetClubSwimmers([FromQuery] int clubId)
+        => Ok(await _admin.GetClubSwimmersAsync(clubId));
 
     [HttpPost("{id:int}/members")]
     public async Task<IActionResult> AddMember(int id, [FromBody] AddMemberRequest request)
@@ -154,39 +167,68 @@ public class MyHubGroupsController : ControllerBase
         return result.Success ? NoContent() : BadRequest(new { error = result.Error });
     }
 
-    [HttpGet("{id:int}/managers")]
-    public async Task<IActionResult> GetManagers(int id)
+    [HttpGet("{id:int}/admins")]
+    public async Task<IActionResult> GetAdmins(int id)
     {
         var perms = await RequirePermissionsAsync(id);
         if (perms == null) return Unauthorized();
         if (!perms.Exists) return NotFound();
-        if (!perms.CanManageCoTrainers) return Forbid();
+        if (!perms.CanManageAdmins) return Forbid();
 
-        return Ok(await _mine.GetManagersAsync(id));
+        return Ok(await _mine.GetAdminsAsync(id));
     }
 
-    [HttpPost("{id:int}/managers")]
-    public async Task<IActionResult> AddManager(int id, [FromBody] AddManagerRequest request)
+    [HttpPost("{id:int}/admins")]
+    public async Task<IActionResult> AddAdmin(int id, [FromBody] AddAdminRequest request)
     {
         var perms = await RequirePermissionsAsync(id);
         if (perms == null) return Unauthorized();
         if (!perms.Exists) return NotFound();
-        if (!perms.CanManageCoTrainers) return Forbid();
+        if (!perms.CanManageAdmins) return Forbid();
 
-        var result = await _mine.AddManagerAsync(id, request.Email, CurrentUserId()!.Value);
+        var result = await _mine.AddAdminAsync(id, request.Email, CurrentUserId()!.Value);
         return result.Success ? Ok() : BadRequest(new { error = result.Error });
     }
 
-    [HttpDelete("{id:int}/managers/{userId:int}")]
-    public async Task<IActionResult> RemoveManager(int id, int userId)
+    [HttpDelete("{id:int}/admins/{userId:int}")]
+    public async Task<IActionResult> RemoveAdmin(int id, int userId)
     {
         var perms = await RequirePermissionsAsync(id);
         if (perms == null) return Unauthorized();
         if (!perms.Exists) return NotFound();
-        if (!perms.CanManageCoTrainers) return Forbid();
+        if (!perms.CanManageAdmins) return Forbid();
 
-        var result = await _mine.RemoveManagerAsync(id, userId);
+        var result = await _mine.RemoveAdminAsync(id, userId);
         return result.Success ? NoContent() : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>Последняя заявка на официальный статус группы (любого статуса) — для панели «Моя группа».</summary>
+    [HttpGet("{id:int}/club-request")]
+    public async Task<IActionResult> GetClubRequest(int id)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanEdit) return Forbid();
+
+        var request = await _mine.GetClubRequestAsync(id);
+        return request == null ? NoContent() : Ok(request);
+    }
+
+    /// <summary>
+    /// Подать заявку на официальный статус группы. Только владелец (не админ группы) —
+    /// связь с клубом и последующая site-роль Coach касаются владельца, не назначенных админов.
+    /// </summary>
+    [HttpPost("{id:int}/club-request")]
+    public async Task<IActionResult> SubmitClubRequest(int id, [FromBody] HubGroupClubRequestInputDto input)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        if (!perms.IsOwner && !perms.IsAdmin) return Forbid();
+
+        var result = await _mine.SubmitClubRequestAsync(id, CurrentUserId()!.Value, input);
+        return result.Success ? Ok() : BadRequest(new { error = result.Error });
     }
 }
 
@@ -202,7 +244,7 @@ public sealed class UpdateMemberRequest
     public int SortOrder { get; set; }
 }
 
-public sealed class AddManagerRequest
+public sealed class AddAdminRequest
 {
     public string Email { get; set; } = "";
 }

@@ -10,8 +10,8 @@ public sealed class HubGroupCreateEligibilityDto
     public int? Remaining { get; set; }
 }
 
-/// <summary>Со-тренер группы — для списка управления в пользовательской форме.</summary>
-public sealed class HubGroupManagerDto
+/// <summary>Админ группы — для списка управления в пользовательской форме.</summary>
+public sealed class HubGroupAdminMemberDto
 {
     public int UserId { get; set; }
     public string DisplayName { get; set; } = "";

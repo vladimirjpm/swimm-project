@@ -62,11 +62,19 @@ public class HubGroup
     /// <summary>Пока значение диктует глобальная настройка HubGroupVisibility; работает только при perGroup.</summary>
     public bool IsPublic { get; set; } = true;
 
+    /// <summary>
+    /// Официальная группа клуба (одобрена админом через <see cref="HubGroupClubRequest"/>).
+    /// Официальна СВЯЗЬ с клубом, не состав — состав остаётся watchlist-ом владельца.
+    /// Если true — ClubId обязателен (CK_HubGroups_OfficialRequiresClub) и уникален
+    /// среди официальных групп (partial unique index по ClubId).
+    /// </summary>
+    public bool IsOfficial { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<HubGroupMember> Members { get; set; } = new List<HubGroupMember>();
 
-    /// <summary>Со-тренеры группы (право правки, не владение).</summary>
-    public ICollection<HubGroupManager> Managers { get; set; } = new List<HubGroupManager>();
+    /// <summary>Админы группы (право правки, не владение). Владелец — primary GroupAdmin.</summary>
+    public ICollection<HubGroupAdmin> Admins { get; set; } = new List<HubGroupAdmin>();
 }

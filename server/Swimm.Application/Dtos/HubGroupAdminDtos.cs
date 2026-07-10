@@ -10,6 +10,7 @@ public sealed class HubGroupAdminRowDto
     public string? ClubName { get; set; }
     public int MemberCount { get; set; }
     public bool IsPublic { get; set; }
+    public bool IsOfficial { get; set; }
     public DateTime UpdatedAt { get; set; }
 }
 
@@ -48,6 +49,8 @@ public sealed class HubGroupEditDto
     public int OwnerUserId { get; set; }
     public string OwnerDisplayName { get; set; } = "";
     public bool IsPublic { get; set; }
+    /// <summary>Официальная группа клуба — устанавливается только через одобрение заявки, не через форму.</summary>
+    public bool IsOfficial { get; set; }
     public List<HubGroupLinkDto> Links { get; set; } = [];
     public List<HubGroupMemberRowDto> Members { get; set; } = [];
 }

@@ -9,6 +9,7 @@ export interface MyHubGroupRow {
   clubName?: string | null;
   memberCount: number;
   isPublic: boolean;
+  isOfficial: boolean;
   updatedAt: string;
 }
 
@@ -54,6 +55,7 @@ export interface HubGroupEditData {
   ownerUserId: number;
   ownerDisplayName: string;
   isPublic: boolean;
+  isOfficial: boolean;
   links: HubGroupLinkInput[];
   members: HubGroupMemberRow[];
 }
@@ -66,7 +68,7 @@ export interface SwimmerSearchResult {
   clubName?: string | null;
 }
 
-export interface HubGroupManager {
+export interface HubGroupAdmin {
   userId: number;
   displayName: string;
   email: string;
@@ -77,6 +79,27 @@ export interface CreateEligibility {
   canCreate: boolean;
   reason?: string | null;
   remaining?: number | null;
+}
+
+export interface ClubOption {
+  id: number;
+  name: string;
+}
+
+export interface HubGroupClubRequestInput {
+  clubId: number;
+  message?: string | null;
+}
+
+/** pending | approved | rejected */
+export interface ClubRequest {
+  id: number;
+  clubId: number;
+  clubName: string;
+  message?: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  decidedAt?: string | null;
 }
 
 export interface SaveResult {

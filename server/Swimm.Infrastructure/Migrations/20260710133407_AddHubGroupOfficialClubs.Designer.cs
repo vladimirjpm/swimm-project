@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Swimm.Infrastructure.Data;
@@ -11,9 +12,11 @@ using Swimm.Infrastructure.Data;
 namespace Swimm.Infrastructure.Migrations
 {
     [DbContext(typeof(SwimmDbContext))]
-    partial class SwimmDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260710133407_AddHubGroupOfficialClubs")]
+    partial class AddHubGroupOfficialClubs
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -852,38 +855,6 @@ namespace Swimm.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Swimm.Domain.Entities.HubGroupAdmin", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("GrantedByUserId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("HubGroupId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GrantedByUserId");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("HubGroupId", "UserId")
-                        .IsUnique();
-
-                    b.ToTable("Sys_HubGroupAdmins", (string)null);
-                });
-
             modelBuilder.Entity("Swimm.Domain.Entities.HubGroupClubRequest", b =>
                 {
                     b.Property<int>("Id")
@@ -933,6 +904,38 @@ namespace Swimm.Infrastructure.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Sys_HubGroupClubRequests", (string)null);
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.HubGroupManager", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("GrantedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("HubGroupId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GrantedByUserId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("HubGroupId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("Sys_HubGroupManagers", (string)null);
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.HubGroupMember", b =>
@@ -1783,33 +1786,6 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("Owner");
                 });
 
-            modelBuilder.Entity("Swimm.Domain.Entities.HubGroupAdmin", b =>
-                {
-                    b.HasOne("Swimm.Domain.Entities.AppUser", "GrantedBy")
-                        .WithMany()
-                        .HasForeignKey("GrantedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Swimm.Domain.Entities.HubGroup", "HubGroup")
-                        .WithMany("Admins")
-                        .HasForeignKey("HubGroupId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Swimm.Domain.Entities.AppUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("GrantedBy");
-
-                    b.Navigation("HubGroup");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("Swimm.Domain.Entities.HubGroupClubRequest", b =>
                 {
                     b.HasOne("Swimm.Domain.Entities.Club", "Club")
@@ -1838,6 +1814,33 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("Club");
 
                     b.Navigation("DecidedByUser");
+
+                    b.Navigation("HubGroup");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.HubGroupManager", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.AppUser", "GrantedBy")
+                        .WithMany()
+                        .HasForeignKey("GrantedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Swimm.Domain.Entities.HubGroup", "HubGroup")
+                        .WithMany("Managers")
+                        .HasForeignKey("HubGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Swimm.Domain.Entities.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GrantedBy");
 
                     b.Navigation("HubGroup");
 
@@ -2080,7 +2083,7 @@ namespace Swimm.Infrastructure.Migrations
 
             modelBuilder.Entity("Swimm.Domain.Entities.HubGroup", b =>
                 {
-                    b.Navigation("Admins");
+                    b.Navigation("Managers");
 
                     b.Navigation("Members");
                 });

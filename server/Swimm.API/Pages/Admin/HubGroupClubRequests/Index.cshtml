@@ -1,0 +1,86 @@
+@page
+@using Swimm.API.Pages.Admin.Shared
+@model Swimm.API.Pages.Admin.HubGroupClubRequests.IndexModel
+@{
+    ViewData["Title"] = "Club requests";
+    ViewData["PageSubtitle"] = "Заявки владельцев групп на официальный статус клуба";
+
+    var flash = TempData["Flash"] as string;
+}
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}
+
+@if (Model.Requests.Count == 0)
+{
+    <div class="admin-card text-center text-admin-text-muted italic py-10">
+        Заявок пока нет.
+    </div>
+}
+else
+{
+    <div class="overflow-x-auto">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Группа</th>
+                    <th>Заявитель</th>
+                    <th>Клуб</th>
+                    <th>Сообщение</th>
+                    <th>Статус</th>
+                    <th>Подана</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in Model.Requests)
+                {
+                    <tr>
+                        <td>
+                            <a href="/Admin/HubGroups/Edit?id=@r.HubGroupId" class="text-admin-accent hover:underline font-medium">@r.HubGroupName</a>
+                        </td>
+                        <td>
+                            @r.RequesterDisplayName
+                            <div class="text-xs text-admin-text-muted">@r.RequesterEmail</div>
+                        </td>
+                        <td>@r.ClubName</td>
+                        <td class="max-w-[240px] truncate text-admin-text-muted">@(r.Message ?? "—")</td>
+                        <td>
+                            @{
+                                var (text, variant) = r.Status switch
+                                {
+                                    "approved" => ("Approved", "success"),
+                                    "rejected" => ("Rejected", "danger"),
+                                    _ => ("Pending", "warning"),
+                                };
+                            }
+                            <partial name="/Pages/Admin/Shared/_StatusBadge.cshtml" model='new StatusBadgeModel(text, variant)' />
+                        </td>
+                        <td class="whitespace-nowrap text-admin-text-muted">@r.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td class="text-right whitespace-nowrap">
+                            @if (r.Status == "pending")
+                            {
+                                <form method="post" asp-page-handler="Approve" class="inline">
+                                    <input type="hidden" name="id" value="@r.Id" />
+                                    <button type="submit" class="admin-btn admin-btn-primary py-1 px-2.5">Одобрить</button>
+                                </form>
+                                <form method="post" asp-page-handler="Reject" class="inline">
+                                    <input type="hidden" name="id" value="@r.Id" />
+                                    <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Отклонить</button>
+                                </form>
+                            }
+                            else if (r.DecidedByDisplayName != null)
+                            {
+                                <span class="text-xs text-admin-text-muted">@r.DecidedByDisplayName, @r.DecidedAt?.ToString("dd/MM/yyyy")</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

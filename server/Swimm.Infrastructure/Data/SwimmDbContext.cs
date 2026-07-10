@@ -54,7 +54,8 @@ public class SwimmDbContext : DbContext
     /* === Группы (SwimHub) === */
     public DbSet<HubGroup> HubGroups => Set<HubGroup>();
     public DbSet<HubGroupMember> HubGroupMembers => Set<HubGroupMember>();
-    public DbSet<HubGroupManager> HubGroupManagers => Set<HubGroupManager>();
+    public DbSet<HubGroupAdmin> HubGroupAdmins => Set<HubGroupAdmin>();
+    public DbSet<HubGroupClubRequest> HubGroupClubRequests => Set<HubGroupClubRequest>();
 
     /* === Пользователи и доступ === */
     public DbSet<AppUser> AppUsers => Set<AppUser>();
@@ -532,6 +533,17 @@ public class SwimmDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.OwnerUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Официальна СВЯЗЬ с клубом, не состав: одна официальная группа на клуб,
+            // и она всегда привязана к клубу (фаза 8.7).
+            entity.HasIndex(e => e.ClubId)
+                .IsUnique()
+                .HasFilter(@"""IsOfficial""")
+                .HasDatabaseName("IX_HubGroups_ClubId_Official");
+
+            entity.HasCheckConstraint(
+                "CK_HubGroups_OfficialRequiresClub",
+                @"NOT ""IsOfficial"" OR ""ClubId"" IS NOT NULL");
         });
 
         modelBuilder.Entity<HubGroupMember>(entity =>
@@ -549,14 +561,14 @@ public class SwimmDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // Со-тренеры (право правки) — таблица прав, БЕЗ grant swimm_ro.
-        modelBuilder.Entity<HubGroupManager>(entity =>
+        // Админы группы (право правки) — таблица прав, БЕЗ grant swimm_ro.
+        modelBuilder.Entity<HubGroupAdmin>(entity =>
         {
-            entity.ToTable("Sys_HubGroupManagers");
+            entity.ToTable("Sys_HubGroupAdmins");
             entity.HasIndex(e => new { e.HubGroupId, e.UserId }).IsUnique();
 
             entity.HasOne(e => e.HubGroup)
-                .WithMany(g => g.Managers)
+                .WithMany(g => g.Admins)
                 .HasForeignKey(e => e.HubGroupId)
                 .OnDelete(DeleteBehavior.Cascade);
 
@@ -568,6 +580,38 @@ public class SwimmDbContext : DbContext
             entity.HasOne(e => e.GrantedBy)
                 .WithMany()
                 .HasForeignKey(e => e.GrantedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Заявки на официальный статус группы (право/личные данные) — Sys_-таблица, БЕЗ grant swimm_ro.
+        modelBuilder.Entity<HubGroupClubRequest>(entity =>
+        {
+            entity.ToTable("Sys_HubGroupClubRequests");
+
+            // Одна pending-заявка на группу одновременно.
+            entity.HasIndex(e => e.HubGroupId)
+                .IsUnique()
+                .HasFilter(@"""Status"" = 'pending'")
+                .HasDatabaseName("IX_Sys_HubGroupClubRequests_HubGroupId_Pending");
+
+            entity.HasOne(e => e.HubGroup)
+                .WithMany()
+                .HasForeignKey(e => e.HubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Club)
+                .WithMany()
+                .HasForeignKey(e => e.ClubId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.DecidedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.DecidedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

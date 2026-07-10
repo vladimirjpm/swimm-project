@@ -1,6 +1,9 @@
 @using Swimm.API.Pages.Admin.Shared
+@using Swimm.Application.Abstractions
+@inject IHubGroupClubRequestAdminService ClubRequests
 @{
     var currentPath = (Context.Request.Path.Value ?? "").TrimEnd('/');
+    var pendingClubRequests = await ClubRequests.GetPendingCountAsync();
 
     // Префиксное совпадение — только по границе сегмента пути, иначе /Admin/Import подсветился бы
     // и на /Admin/ImportHistory (StartsWith без границы).
@@ -45,7 +48,11 @@
             {
                 <a href="@item.Url" class="@itemBase @(IsActive(item) ? itemActive : itemIdle) mb-0.5">
                     <partial name="/Pages/Admin/Shared/_Icon.cshtml" model="@item.Icon" />
-                    <span>@item.Title</span>
+                    <span class="flex-1">@item.Title</span>
+                    @if (item.Url == "/Admin/HubGroupClubRequests" && pendingClubRequests > 0)
+                    {
+                        <span class="rounded-full bg-admin-accent px-1.5 py-0.5 text-[10px] font-bold leading-none text-admin-surface">@pendingClubRequests</span>
+                    }
                 </a>
             }
         }
