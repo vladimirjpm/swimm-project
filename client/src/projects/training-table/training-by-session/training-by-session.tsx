@@ -7,6 +7,9 @@ import UI_ExpectedTimeDiff from '../../components/mix/expected-time-diff/expecte
 import UI_PaddlesIcon from '../../components/mix/paddles-icon/paddles-icon';
 import UI_PullBuoyIcon from '../../components/mix/pull-buoy-icon/pull-buoy-icon';
 import UI_NormativeLevelIcon from '../../components/mix/normative-level-icon/normative-level-icon';
+import UI_SwimmerGallery from '../../components/mix/swimmer-gallery/swimmer-gallery';
+import { GalleryItem, TrainingMediaItem } from '../../../utils/interfaces/results';
+import { HelperMedia } from '../../../utils/helpers';
 
 interface Props {
   results: Result[];
@@ -28,6 +31,63 @@ const prettyDate = (d?: string) => {
   if (!dd) return d ?? '';
   return `${dd} ${MONTHS[(Number(mm) || 1) - 1]} ${yy ?? ''}`.trim();
 };
+
+function MediaStripTile({ item, onClick }: { item: TrainingMediaItem; onClick?: () => void }) {
+  if (item.media_type === 'album') {
+    return (
+      <a href={item.url} target="_blank" rel="noopener noreferrer" className="tbs-media-tile tbs-media-album">
+        <span>📂 {item.caption || 'Album'} ↗</span>
+      </a>
+    );
+  }
+
+  const thumbUrl = HelperMedia.resolveThumbUrl(item.media_type, item.source_type, item.url);
+
+  return (
+    <div className="tbs-media-tile" onClick={onClick}>
+      {thumbUrl ? <img loading="lazy" src={thumbUrl} alt="" /> : <span className="tbs-media-fallback">🎬</span>}
+      {item.media_type === 'video' && <span className="tbs-media-play">▶</span>}
+      {item.caption && <span className="tbs-media-caption">{item.caption}</span>}
+    </div>
+  );
+}
+
+/** Медиа-лента тренировки под сводкой сессии: тайлы + ОДИН лайтбокс на полосу. */
+function TrainingMediaStrip({ media }: { media: TrainingMediaItem[] }) {
+  const [openIndex, setOpenIndex] = React.useState<number | null>(null);
+
+  // album в лайтбокс не попадает — массив и карта индексов считаются один раз на media.
+  const { lightboxGalleryItems, indexById } = useMemo(() => {
+    const lightboxItems = media.filter((m) => m.media_type !== 'album');
+    return {
+      lightboxGalleryItems: lightboxItems.map((m): GalleryItem => ({
+        type: m.media_type === 'video' ? 'video' : 'image',
+        sourceType: m.source_type === 'album' ? undefined : (m.source_type as GalleryItem['sourceType']),
+        url: m.url,
+      })),
+      indexById: new Map(lightboxItems.map((m, i) => [m.id, i])),
+    };
+  }, [media]);
+
+  if (media.length === 0) return null;
+
+  return (
+    <div className="tbs-media-strip">
+      {media.map((item) => (
+        <MediaStripTile
+          key={item.id}
+          item={item}
+          onClick={item.media_type === 'album' ? undefined : () => setOpenIndex(indexById.get(item.id) ?? 0)}
+        />
+      ))}
+      <UI_SwimmerGallery
+        gallery={lightboxGalleryItems}
+        openIndex={openIndex}
+        onClose={() => setOpenIndex(null)}
+      />
+    </div>
+  );
+}
 
 const swimmerName = (r: Result) =>
   `${r.first_name ?? ''}${r.last_name ? ' ' + r.last_name : ''}`.trim() ||
@@ -64,6 +124,7 @@ function TrainingBySession({ results, selectedSource, filters, updateFilter }: P
           volume,
           avgV,
           sets: Helper.groupTrainingBySet(items),
+          media: first?.training?.media ?? [],
         };
       })
       .sort((a, b) => dateKey(a.date).localeCompare(dateKey(b.date)));
@@ -80,7 +141,10 @@ function TrainingBySession({ results, selectedSource, filters, updateFilter }: P
           {/* ── Шапка сессии ── */}
           <header className="tbs-head">
             <div className="tbs-title" title={s.name}>{s.name}</div>
-            <span className="tbs-date">{prettyDate(s.date)}</span>
+            <div className="tbs-head-right">
+              {s.media.length > 0 && <span className="tbs-media-count" title="Media">📷 {s.media.length}</span>}
+              <span className="tbs-date">{prettyDate(s.date)}</span>
+            </div>
           </header>
 
           {/* ── Сводка сессии ── */}
@@ -91,6 +155,9 @@ function TrainingBySession({ results, selectedSource, filters, updateFilter }: P
             <div className="tbs-stat"><span className="k">Avg effort</span><span className="v">{s.avgV ? `V${s.avgV}` : '—'}</span></div>
             <div className="tbs-stat tbs-stat-pool"><span className="k">Pool</span><span className="v">{s.pool}</span></div>
           </div>
+
+          {/* ── Медиа тренировки ── */}
+          <TrainingMediaStrip media={s.media} />
 
           {/* ── Сеты ── */}
           {s.sets.map((set, si) => {

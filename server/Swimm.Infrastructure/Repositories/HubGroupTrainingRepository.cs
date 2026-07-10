@@ -47,7 +47,21 @@ public class HubGroupTrainingRepository : IHubGroupTrainingRepository
             .ThenBy(r => r.SetNo).ThenBy(r => r.OrderNo).ThenBy(r => r.Id)
             .ToListAsync();
 
-        var results = rows.Select(Map).ToList();
+        // Медиа тренировок группы (HubGroupMedia.TrainingId != null) — привязка по TrainingSession.Id,
+        // видна той же аудитории, что и сама тренировка (контроллер уже проверил права до вызова).
+        var mediaBySession = await _db.HubGroupMedia.AsNoTracking()
+            .Where(m => m.HubGroupId == hubGroupId && m.TrainingId != null)
+            .OrderBy(m => m.Id)
+            .Select(m => new { m.TrainingId, Dto = new HubGroupMediaDto
+            {
+                Id = m.Id, MediaType = m.MediaType, SourceType = m.SourceType, Url = m.Url, Caption = m.Caption,
+            } })
+            .ToListAsync();
+        var mediaLookup = mediaBySession
+            .GroupBy(m => m.TrainingId!.Value)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Dto).ToList());
+
+        var results = rows.Select(r => Map(r, mediaLookup)).ToList();
 
         return new TrainingSourceDto
         {
@@ -57,7 +71,8 @@ public class HubGroupTrainingRepository : IHubGroupTrainingRepository
         };
     }
 
-    private static TrainingRowDto Map(Swimm.Domain.Entities.TrainingResult r)
+    private static TrainingRowDto Map(
+        Swimm.Domain.Entities.TrainingResult r, Dictionary<int, List<HubGroupMediaDto>> mediaLookup)
     {
         var session = r.Session!;
         var sw = r.Swimmer!;
@@ -96,6 +111,7 @@ public class HubGroupTrainingRepository : IHubGroupTrainingRepository
             Training = new TrainingInfoDto
             {
                 TrainingId = long.TryParse(session.ExternalTrainingId, out var tid) ? tid : 0,
+                SessionId = session.Id,
                 TrainingName = session.Name ?? string.Empty,
                 Set = r.SetNo,
                 Order = r.OrderNo,
@@ -104,6 +120,7 @@ public class HubGroupTrainingRepository : IHubGroupTrainingRepository
                 ExpectedTime = FormatMs(r.ExpectedTimeMs),
                 IsPaddles = r.IsPaddles,
                 IsBuoy = r.IsBuoy,
+                Media = mediaLookup.TryGetValue(session.Id, out var media) ? media : [],
             },
         };
     }

@@ -57,6 +57,7 @@ public class SwimmDbContext : DbContext
     public DbSet<HubGroupAdmin> HubGroupAdmins => Set<HubGroupAdmin>();
     public DbSet<HubGroupUserMember> HubGroupUserMembers => Set<HubGroupUserMember>();
     public DbSet<HubGroupClubRequest> HubGroupClubRequests => Set<HubGroupClubRequest>();
+    public DbSet<HubGroupMedia> HubGroupMedia => Set<HubGroupMedia>();
 
     /* === Тренировки (приватные, Sys_) === */
     public DbSet<TrainingSession> TrainingSessions => Set<TrainingSession>();
@@ -643,6 +644,43 @@ public class SwimmDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.DecidedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Медиа группы (только ссылки) — TrainingId null = публичная галерея, задан = медиа
+        // тренировки (та же приватность, что у Sys_TrainingSessions). Sys_-таблица БЕЗ grant
+        // swimm_ro: публичная галерея читается через SwimmDbContext, не read-реплику.
+        modelBuilder.Entity<HubGroupMedia>(entity =>
+        {
+            entity.ToTable("Sys_HubGroupMedia");
+            entity.HasIndex(e => e.HubGroupId);
+            entity.HasIndex(e => e.TrainingId);
+
+            entity.HasOne(e => e.HubGroup)
+                .WithMany()
+                .HasForeignKey(e => e.HubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Training)
+                .WithMany()
+                .HasForeignKey(e => e.TrainingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasCheckConstraint(
+                "CK_HubGroupMedia_MediaType",
+                @"""MediaType"" IN ('image', 'video', 'album')");
+
+            entity.HasCheckConstraint(
+                "CK_HubGroupMedia_SourceType",
+                @"""SourceType"" IN ('youtube', 'vimeo', 'album', 'other')");
+
+            entity.HasCheckConstraint(
+                "CK_HubGroupMedia_AlbumInvariant",
+                @"(""MediaType"" = 'album') = (""SourceType"" = 'album')");
         });
 
         // Тренировочная сессия — ПРИВАТНЫЕ данные группы, Sys_-таблица БЕЗ grant swimm_ro.

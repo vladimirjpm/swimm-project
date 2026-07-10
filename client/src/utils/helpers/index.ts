@@ -11,3 +11,4 @@ export { default as ClubPointsHelper } from './club-points-helper';
 export { default as CategoryHelper, type CategoryDisplay } from './category-helper';
 export { default as HelperMedal, type MedalTier } from './helper-medal';
 export { default as ResultsLoadModeHelper, type ResultsLoadMode } from './results-load-mode';
+export { default as HelperMedia } from './helper-media';

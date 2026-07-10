@@ -4,8 +4,13 @@ import HomeHeader from '../home-project/components/home-header';
 import RecordTicker from '../home-project/components/record-ticker';
 import MyGroupsPanel from './my-groups-panel';
 import UI_ClubIcon from '../components/mix/club-icon/club-icon';
+import UI_SwimmerGallery from '../components/mix/swimmer-gallery/swimmer-gallery';
+import { GalleryItem } from '../../utils/interfaces/results';
+import { HelperMedia } from '../../utils/helpers';
 import { useCurrentIdentity, useHubGroupMembership, useMyHubGroups } from './use-my-hub-groups';
-import type { HubGroupDetails, HubGroupLink, HubGroupListItem, HubGroupMember, HubGroupStanding } from './types';
+import type {
+  HubGroupDetails, HubGroupLink, HubGroupListItem, HubGroupMediaItem, HubGroupMember, HubGroupStanding,
+} from './types';
 
 const GROUP_DISCLAIMER =
   'Состав ведётся создателем группы и не является официальной заявкой клуба или федерации.';
@@ -221,6 +226,91 @@ function TrainingsLink({ group }: { group: HubGroupDetails }) {
   );
 }
 
+// ── Галерея группы ───────────────────────────────────────────────────────────
+
+function GalleryTile({ item, onClick }: { item: HubGroupMediaItem; onClick?: () => void }) {
+  const captionOverlay = item.caption && (
+    <div className="absolute inset-x-0 bottom-0 truncate bg-[linear-gradient(0deg,rgba(2,10,24,0.85),transparent)] px-2 py-1 text-[11px] font-bold text-[#f3f8fd]">
+      {item.caption}
+    </div>
+  );
+
+  if (item.media_type === 'album') {
+    return (
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="hp-mono flex aspect-square flex-col items-center justify-center gap-1 rounded-[12px] border border-[#7dd3fc]/30 bg-[rgba(6,20,36,0.6)] p-2 text-center text-[12px] font-extrabold text-[#7dd3fc] no-underline hover:border-[#7dd3fc]/70 hover:bg-[rgba(56,189,248,0.12)]"
+      >
+        <span className="text-[24px]">📂</span>
+        <span className="line-clamp-2">{item.caption || 'Album'} ↗</span>
+      </a>
+    );
+  }
+
+  const thumbUrl = HelperMedia.resolveThumbUrl(item.media_type, item.source_type, item.url);
+
+  return (
+    <div
+      className="relative aspect-square cursor-pointer overflow-hidden rounded-[12px] border border-[#7dd3fc]/20 bg-[rgba(6,20,36,0.6)]"
+      onClick={onClick}
+    >
+      {thumbUrl ? (
+        <img loading="lazy" src={thumbUrl} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-[28px]">🎬</div>
+      )}
+      {item.media_type === 'video' && (
+        <span className="absolute right-1.5 top-1.5 rounded-full bg-[rgba(2,10,24,0.7)] px-1.5 py-1 text-[13px] leading-none">
+          ▶
+        </span>
+      )}
+      {captionOverlay}
+    </div>
+  );
+}
+
+function GroupGallery({ gallery }: { gallery: HubGroupMediaItem[] }) {
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  // Лайтбокс открывается только для image/video — album ссылка внешняя (target=_blank).
+  // Один экземпляр лайтбокса на сетку; массив и карта индексов мемоизированы.
+  const { lightboxGalleryItems, indexById } = useMemo(() => {
+    const lightboxItems = gallery.filter((g) => g.media_type !== 'album');
+    return {
+      lightboxGalleryItems: lightboxItems.map((g): GalleryItem => ({
+        type: g.media_type === 'video' ? 'video' : 'image',
+        sourceType: g.source_type === 'album' ? undefined : (g.source_type as GalleryItem['sourceType']),
+        url: g.url,
+      })),
+      indexById: new Map(lightboxItems.map((g, i) => [g.id, i])),
+    };
+  }, [gallery]);
+
+  if (gallery.length === 0) return null;
+
+  return (
+    <div id="gallery" className="hp-card-std rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]" aria-label="Gallery">
+      <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">Gallery</h2>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+        {gallery.map((item) => (
+          <GalleryTile
+            key={item.id}
+            item={item}
+            onClick={item.media_type === 'album' ? undefined : () => setOpenIndex(indexById.get(item.id) ?? 0)}
+          />
+        ))}
+      </div>
+      <UI_SwimmerGallery
+        gallery={lightboxGalleryItems}
+        openIndex={openIndex}
+        onClose={() => setOpenIndex(null)}
+      />
+    </div>
+  );
+}
+
 function GroupDetails({ group }: { group: HubGroupDetails }) {
   const [showAllBests, setShowAllBests] = useState(false);
   const bests = showAllBests ? group.bests : group.bests.slice(0, BESTS_PREVIEW_COUNT);
@@ -291,7 +381,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
 
       <section className="grid grid-cols-1 gap-4 px-4 pt-[26px] lg:grid-cols-[320px_1fr] lg:gap-[18px] lg:px-16 lg:pt-10">
         {/* Участники */}
-        <div className={cardCls} aria-label="Members">
+        <div id="members" className={cardCls} aria-label="Members">
           <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">Members</h2>
           {group.members.length === 0 ? (
             <p className="text-[13px] text-[#cbe0f0]/60">
@@ -390,7 +480,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
           </div>
 
           {/* Рекорды группы */}
-          <div className={cardCls} aria-label="Group records">
+          <div id="records" className={cardCls} aria-label="Group records">
             <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">
               Group records
             </h2>
@@ -449,6 +539,9 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
               </>
             )}
           </div>
+
+          {/* Галерея группы */}
+          <GroupGallery gallery={group.gallery} />
 
           {/* Последние заплывы */}
           <div className={cardCls} aria-label="Recent swims">

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { useClubOptions, useCurrentIdentity, useMyHubGroupEdit, useMyHubGroups } from './use-my-hub-groups';
-import type { HubGroupInput, HubGroupLinkInput, MyHubGroupRow } from './my-groups-types';
+import { useClubOptions, useCurrentIdentity, useHubGroupMedia, useMyHubGroupEdit, useMyHubGroups } from './use-my-hub-groups';
+import type { HubGroupInput, HubGroupLinkInput, HubGroupMediaInput, MyHubGroupRow } from './my-groups-types';
+import type { HubGroupMediaItem } from '../../utils/interfaces/results';
 
 const DISCLAIMER =
   'Состав ведётся создателем группы и не является официальной заявкой клуба или федерации.';
@@ -264,6 +265,117 @@ function UserMembersEditor({ hubGroupId }: { hubGroupId: number }) {
   );
 }
 
+const EMPTY_MEDIA_INPUT: HubGroupMediaInput = {
+  mediaType: 'image', sourceType: 'other', url: '', caption: '', trainingId: null,
+};
+
+/** Строка списка медиа (галерея или тренировка) с кнопкой удаления. */
+function MediaListRow({ item, onRemove }: { item: HubGroupMediaItem; onRemove: () => void }) {
+  return (
+    <li className="flex items-center justify-between gap-2">
+      <span className="min-w-0 truncate text-[13px] text-[#f3f8fd]">
+        {item.media_type === 'album' ? '📂' : item.media_type === 'video' ? '🎬' : '🖼️'} {item.caption || item.url}
+      </span>
+      <button type="button" className={btnDangerCls} onClick={onRemove}>✕</button>
+    </li>
+  );
+}
+
+/** Редактор медиа: публичная галерея группы + медиа тренировок (владелец/админ). */
+function MediaEditor({ hubGroupId, slug }: { hubGroupId: number; slug: string }) {
+  const media = useHubGroupMedia(hubGroupId, slug);
+  const [form, setForm] = useState<HubGroupMediaInput>(EMPTY_MEDIA_INPUT);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const setField = <K extends keyof HubGroupMediaInput>(key: K, value: HubGroupMediaInput[K]) =>
+    setForm((f) => ({ ...f, [key]: value }));
+
+  const onKindChange = (kind: 'image' | 'video' | 'album') => {
+    if (kind === 'album') setForm((f) => ({ ...f, mediaType: 'album', sourceType: 'album' }));
+    else setForm((f) => ({ ...f, mediaType: kind, sourceType: kind === 'video' ? 'youtube' : 'other' }));
+  };
+
+  const kind: 'image' | 'video' | 'album' =
+    form.mediaType === 'album' ? 'album' : form.mediaType === 'video' ? 'video' : 'image';
+
+  const submit = async () => {
+    setSaving(true);
+    setError(null);
+    const result = await media.addMedia(form);
+    setSaving(false);
+    if (result.success) setForm(EMPTY_MEDIA_INPUT);
+    else setError(result.error ?? 'Save failed');
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-[11.5px] italic text-[#cbe0f0]/45">
+        No training set = public gallery (visible on the group page). Pick a training to attach media to it instead.
+      </p>
+
+      {media.loadError && (
+        <p className="text-[12.5px] font-bold text-[#ef5350]">{media.loadError}</p>
+      )}
+
+      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+        {media.gallery.map((m) => (
+          <MediaListRow key={m.id} item={m} onRemove={() => media.removeMedia(m.id)} />
+        ))}
+        {media.gallery.length === 0 && !media.loadError && (
+          <p className="text-[12.5px] text-[#cbe0f0]/55">No public gallery items yet.</p>
+        )}
+      </ul>
+
+      {/* Медиа, привязанное к тренировкам, — иначе после добавления его негде увидеть/удалить. */}
+      {media.trainings.filter((t) => t.media.length > 0).map((t) => (
+        <div key={t.sessionId} className="flex flex-col gap-1">
+          <p className="m-0 text-[11.5px] font-extrabold uppercase tracking-[0.12em] text-[#7dd3fc]/70">
+            🔒 {t.label}
+          </p>
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {t.media.map((m) => (
+              <MediaListRow key={m.id} item={m} onRemove={() => media.removeMedia(m.id)} />
+            ))}
+          </ul>
+        </div>
+      ))}
+
+      <div className="flex flex-wrap gap-2">
+        <select className={`${inputCls} max-w-[110px]`} value={kind}
+          onChange={(e) => onKindChange(e.target.value as 'image' | 'video' | 'album')}>
+          <option value="image">Image</option>
+          <option value="video">Video</option>
+          <option value="album">Album</option>
+        </select>
+        {kind === 'video' && (
+          <select className={`${inputCls} max-w-[110px]`} value={form.sourceType}
+            onChange={(e) => setField('sourceType', e.target.value)}>
+            <option value="youtube">YouTube</option>
+            <option value="vimeo">Vimeo</option>
+            <option value="other">Other</option>
+          </select>
+        )}
+        <input className={inputCls} placeholder="URL (https://…)" value={form.url}
+          onChange={(e) => setField('url', e.target.value)} />
+        <input className={inputCls} placeholder="Caption (optional)" value={form.caption ?? ''}
+          onChange={(e) => setField('caption', e.target.value)} />
+        <select className={`${inputCls} max-w-[220px]`} value={form.trainingId ?? ''}
+          onChange={(e) => setField('trainingId', e.target.value ? Number(e.target.value) : null)}>
+          <option value="">Public gallery</option>
+          {media.trainings.map((t) => (
+            <option key={t.sessionId} value={t.sessionId}>{t.label}</option>
+          ))}
+        </select>
+        <button type="button" className={btnCls} disabled={saving || !form.url.trim()} onClick={submit}>
+          {saving ? '…' : '+ Add media'}
+        </button>
+      </div>
+      {error && <p className="text-[12.5px] font-bold text-[#ef5350]">{error}</p>}
+    </div>
+  );
+}
+
 function ClubRequestPanel({ hubGroupId }: { hubGroupId: number }) {
   const edit = useMyHubGroupEdit(hubGroupId);
   const clubs = useClubOptions();
@@ -351,6 +463,10 @@ function EditGroupCard({ row, currentUserId, isAdmin, onClose, onSaved }: {
       <div>
         <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#7dd3fc]">Участники-аккаунты</h3>
         <UserMembersEditor hubGroupId={row.id} />
+      </div>
+      <div>
+        <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#7dd3fc]">Gallery</h3>
+        <MediaEditor hubGroupId={row.id} slug={row.slug} />
       </div>
       {isOwnerOrAdmin && !edit.data.isOfficial && (
         <div>

@@ -7,11 +7,14 @@ import type {
   HubGroupEditData,
   HubGroupInput,
   HubGroupAdmin,
+  HubGroupMediaInput,
   JoinedHubGroup,
   MyHubGroupRow,
   SaveResult,
   SwimmerSearchResult,
+  TrainingOption,
 } from './my-groups-types';
+import type { HubGroupMediaItem } from '../../utils/interfaces/results';
 
 // Тот же паттерн antiforgery-токена, что и в hooks/useFavorites.ts.
 let cachedToken: string | null = null;
@@ -267,6 +270,82 @@ export function useMyHubGroupEdit(id: number | null) {
     update, searchSwimmers, getClubSwimmers, addMember, updateMember, removeMember,
     addAdmin, removeAdmin, submitClubRequest, addUserMember, removeUserMember,
   };
+}
+
+/**
+ * Медиа группы (галерея + медиа тренировок) для панели самообслуживания. Читает публичную галерею
+ * из /api/hub-groups/{slug} и список тренировок из /api/hub-groups/{slug}/trainings (для выбора
+ * «привязать к тренировке» — отдельного CRUD тренировок в клиенте пока нет). Мутации — снейк-кейс
+ * тело на /api/hub-groups/{id}/media, как ждёт HubGroupMediaInputDto на сервере.
+ */
+export function useHubGroupMedia(hubGroupId: number, slug: string) {
+  const [gallery, setGallery] = useState<HubGroupMediaItem[]>([]);
+  const [trainings, setTrainings] = useState<TrainingOption[]>([]);
+  const [loading, setLoading] = useState(false);
+  // Ошибка ЧТЕНИЯ списков (не мутаций): молча показывать пустую галерею нельзя —
+  // выглядит как потеря данных (напр. группа скрыта настройкой HubGroupVisibility).
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [gRes, tRes] = await Promise.all([
+        fetch(`/api/hub-groups/${encodeURIComponent(slug)}`, { credentials: 'include' }),
+        fetch(`/api/hub-groups/${encodeURIComponent(slug)}/trainings`, { credentials: 'include' }),
+      ]);
+
+      const errors: string[] = [];
+      if (!gRes.ok) errors.push(`gallery list unavailable (${gRes.status})`);
+      if (!tRes.ok) errors.push(`trainings list unavailable (${tRes.status})`);
+      setLoadError(errors.length ? `Failed to load: ${errors.join(', ')}` : null);
+
+      const g = gRes.ok ? await gRes.json() : null;
+      setGallery((g?.gallery ?? []) as HubGroupMediaItem[]);
+
+      const t = tRes.ok ? await tRes.json() : null;
+      const seen = new Map<number, TrainingOption>();
+      for (const row of t?.results ?? []) {
+        const sessionId = row?.training?.sessionId;
+        if (sessionId && !seen.has(sessionId)) {
+          seen.set(sessionId, {
+            sessionId,
+            label: `${row.training.trainingName || 'Training'} · ${row.date}`,
+            media: (row.training.media ?? []) as HubGroupMediaItem[],
+          });
+        }
+      }
+      setTrainings(Array.from(seen.values()));
+    } finally {
+      setLoading(false);
+    }
+  }, [slug]);
+
+  useEffect(() => { reload(); }, [reload]);
+
+  const addMedia = useCallback(async (input: HubGroupMediaInput): Promise<SaveResult> => {
+    const r = await apiFetch(`/api/hub-groups/${hubGroupId}/media`, {
+      method: 'POST',
+      body: JSON.stringify({
+        media_type: input.mediaType,
+        source_type: input.sourceType,
+        url: input.url,
+        caption: input.caption || null,
+        training_id: input.trainingId ?? null,
+      }),
+    });
+    const result = await saveResultFrom(r);
+    if (result.success) await reload();
+    return result;
+  }, [hubGroupId, reload]);
+
+  const removeMedia = useCallback(async (mediaId: number): Promise<SaveResult> => {
+    const r = await apiFetch(`/api/hub-groups/${hubGroupId}/media/${mediaId}`, { method: 'DELETE' });
+    const result = await saveResultFrom(r);
+    if (result.success) await reload();
+    return result;
+  }, [hubGroupId, reload]);
+
+  return { gallery, trainings, loading, loadError, addMedia, removeMedia };
 }
 
 /** Самозапись пользователя: вступить/выйти + список «участвую». */

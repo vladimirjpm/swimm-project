@@ -62,6 +62,10 @@ export interface HubGroupRecentResult {
   is_relay: boolean;
 }
 
+// Канонический тип медиа объявлен один раз в utils/interfaces/results.ts (HubGroupMediaItem).
+import type { HubGroupMediaItem } from '../../utils/interfaces/results';
+export type { HubGroupMediaItem };
+
 export interface HubGroupStanding {
   swimmer_id: number;
   name: string;
@@ -95,4 +99,6 @@ export interface HubGroupDetails {
   bests: HubGroupBest[];
   season_label: string;
   standings: HubGroupStanding[];
+  /** Публичная галерея группы (HubGroupMedia с TrainingId == null). */
+  gallery: HubGroupMediaItem[];
 }

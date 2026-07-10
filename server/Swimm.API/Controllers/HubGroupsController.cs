@@ -23,6 +23,7 @@ public class HubGroupsController : ControllerBase
     private readonly IHubGroupTrainingRepository _trainings;
     private readonly IHubGroupPermissionService _permissions;
     private readonly IResultRepository _results;
+    private readonly IHubGroupMediaService _media;
 
     private const string CacheControlValue = "public, max-age=60";
     private static readonly TimeSpan PayloadTtl = TimeSpan.FromMinutes(5);
@@ -30,7 +31,7 @@ public class HubGroupsController : ControllerBase
     public HubGroupsController(
         IHubGroupPublicRepository groups, ICacheService cache, ISettingsService settings,
         IHubGroupTrainingRepository trainings, IHubGroupPermissionService permissions,
-        IResultRepository results)
+        IResultRepository results, IHubGroupMediaService media)
     {
         _groups = groups;
         _cache = cache;
@@ -38,9 +39,16 @@ public class HubGroupsController : ControllerBase
         _trainings = trainings;
         _permissions = permissions;
         _results = results;
+        _media = media;
     }
 
     private string Visibility => _settings.GetValue("HubGroupVisibility", "public");
+
+    private int? CurrentUserId()
+    {
+        var raw = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return int.TryParse(raw, out var id) ? id : null;
+    }
 
     /// <summary>Список видимых групп.</summary>
     [HttpGet("/api/hub-groups")]
@@ -76,9 +84,16 @@ public class HubGroupsController : ControllerBase
         var dto = await _groups.GetBySlugAsync(slug);
         if (dto == null) return NotFound();
 
+        // Публичная галерея (TrainingId == null) — читается через SwimmDbContext (не read-реплику),
+        // т.к. таблица Sys_HubGroupMedia не имеет grant swimm_ro (см. SwimmDbContext.OnModelCreating).
+        // Загрузка ВНУТРИ load-лямбды: при cache hit/304 лишний запрос к БД не выполняется.
         return await this.CachedJson(_cache,
             $"http:hub-groups:group:{slug.ToLowerInvariant()}:{Visibility}",
-            () => Task.FromResult(dto), PayloadTtl, CacheControlValue);
+            async () =>
+            {
+                dto.Gallery = await _media.GetGalleryAsync(dto.Id);
+                return dto;
+            }, PayloadTtl, CacheControlValue);
     }
 
     /// <summary>
@@ -166,5 +181,50 @@ public class HubGroupsController : ControllerBase
         if (!perms.CanEdit && !isMember) return Forbid();
 
         return Ok(await _trainings.GetTrainingsAsync(groupId.Value));
+    }
+
+    /// <summary>
+    /// Добавить медиа группы (публичная галерея, если training_id не задан, иначе — медиа
+    /// тренировки). Права — владелец/админ группы/site-админ (как в самообслуживании, CanEdit).
+    /// </summary>
+    [HttpPost("/api/hub-groups/{id:int}/media")]
+    [Authorize]
+    [AutoValidateAntiforgeryToken]
+    public async Task<IActionResult> AddMedia(int id, [FromBody] HubGroupMediaInputDto input)
+    {
+        var userId = CurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var perms = await _permissions.GetPermissionsAsync(id, userId.Value, User.IsInRole("Admin"));
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanEdit) return Forbid();
+
+        var result = await _media.AddAsync(id, input, userId.Value);
+        if (!result.Success) return BadRequest(new { error = result.Error });
+
+        // Галерея встроена в кэшируемый GET /api/hub-groups/{slug} — без инвалидации
+        // владелец (и публика) до 5 минут видели бы старый список (идиома всех админ-мутаций).
+        await _cache.InvalidateAllAsync();
+        return Ok(new { id = result.Id });
+    }
+
+    /// <summary>Удалить медиа группы. 404, если запись не найдена в этой группе.</summary>
+    [HttpDelete("/api/hub-groups/{id:int}/media/{mediaId:int}")]
+    [Authorize]
+    [AutoValidateAntiforgeryToken]
+    public async Task<IActionResult> DeleteMedia(int id, int mediaId)
+    {
+        var userId = CurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var perms = await _permissions.GetPermissionsAsync(id, userId.Value, User.IsInRole("Admin"));
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanEdit) return Forbid();
+
+        var removed = await _media.DeleteAsync(id, mediaId);
+        if (!removed) return NotFound();
+
+        await _cache.InvalidateAllAsync();
+        return NoContent();
     }
 }

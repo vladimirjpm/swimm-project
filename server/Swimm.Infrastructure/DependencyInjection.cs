@@ -83,6 +83,9 @@ public static class DependencyInjection
         // Чтение приватных тренировок группы (вкладка «Тренировки»)
         services.AddScoped<IHubGroupTrainingRepository, HubGroupTrainingRepository>();
 
+        // Медиа группы (галерея + медиа тренировок)
+        services.AddScoped<IHubGroupMediaService, HubGroupMediaService>();
+
         return services;
     }
 }

@@ -14,6 +14,16 @@ import { useTheme } from '../../hooks/useTheme';
 import { useMode } from '../../hooks/useMode';
 import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import UI_ThemeDevTool from '../components/mix/theme-dev-tool/theme-dev-tool';
+import UI_ClubIcon from '../components/mix/club-icon/club-icon';
+import type { HubGroupDetails } from '../hub-groups-project/types';
+
+// Подписи чипов внешних ссылок группы (links[].kind из HubGroupDetails)
+const GROUP_LINK_LABEL: Record<string, string> = {
+  whatsapp: 'WhatsApp',
+  telegram: 'Telegram',
+  instagram: 'Instagram',
+  site: 'Site',
+};
 
 // === Вспомогательная функция ===
 function checkIsTraining(selectedSource: any, filters: any) {
@@ -128,7 +138,7 @@ function ResultsMain() {
   const [groupTab, setGroupTab] = useState<'trainings' | 'competitions'>(
     groupParams.get('tab') === 'trainings' ? 'trainings' : 'competitions',
   );
-  const [groupName, setGroupName] = useState<string | null>(null);
+  const [groupInfo, setGroupInfo] = useState<HubGroupDetails | null>(null);
   const [groupError, setGroupError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -155,7 +165,7 @@ function ResultsMain() {
           activity_type: 'training',
           date: '',
           style_name: '',
-          style_len: '',
+          style_len: 0,
           pool_type: 'all',
           gender: 'all',
           selected_name: 'all',
@@ -164,7 +174,7 @@ function ResultsMain() {
       }));
     };
 
-    const loadCompetitions = async () => {
+    const loadCompetitions = async (title: string) => {
       const all: any[] = [];
       let page = 1;
       for (;;) {
@@ -184,7 +194,7 @@ function ResultsMain() {
       dispatch(rootActions.updateState({
         dataSourceSelected: {
           results: all,
-          title: groupName ?? groupSlug,
+          title,
           is_masters: all.some((r) => r.is_masters === true),
           is_award: all.some((r) => r.is_award === true),
           sourceParams: { group: groupSlug },
@@ -195,12 +205,15 @@ function ResultsMain() {
 
     (async () => {
       try {
+        // Полный DTO группы — для богатой шапки (иконка, official-бейдж, links, участники)
+        let title = groupSlug;
         const info = await fetch(`/api/hub-groups/${encodeURIComponent(groupSlug)}`, { credentials: 'same-origin' });
         if (!cancelled && info.ok) {
-          const dto = await info.json();
-          setGroupName(dto.nameEn || dto.name || groupSlug);
+          const dto: HubGroupDetails = await info.json();
+          setGroupInfo(dto);
+          title = dto.name_en || dto.name || groupSlug;
         }
-        await (groupTab === 'trainings' ? loadTrainings() : loadCompetitions());
+        await (groupTab === 'trainings' ? loadTrainings() : loadCompetitions(title));
       } catch {
         if (!cancelled) setGroupError(`Failed to load ${groupTab}.`);
       }
@@ -235,31 +248,123 @@ function ResultsMain() {
       {/* Dev-инструмент тем (виден только при ?themes в URL) */}
       <UI_ThemeDevTool />
 
-      {/* Хаб группы (?group=): шапка группы + переключатель Trainings/Competitions вместо DataSourceDDL. */}
+      {/* Хаб группы (?group=): богатая шапка из HubGroupDetails + табы.
+          Overview/Members/Records — ссылки на обзорную groups.html; Competitions/Trainings —
+          локальный toggle (единственное место переключения активности, см. FilterActivity). */}
       {groupSlug ? (
         <div className="w-full z-40 max-lg:px-2 max-lg:pt-2">
           <div
-            className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] px-5 py-4"
+            className="overflow-hidden rounded-[14px]"
             style={{
               background: 'var(--theme-primary)',
+              // Цвет текста — токен: в dark-режиме акценты светлые и текст должен темнеть.
               color: 'var(--theme-mode-accent-text)',
               boxShadow: 'var(--theme-mode-card-shadow)',
             }}
           >
-            <div className="text-[17px] font-extrabold">{groupName ?? groupSlug}</div>
-            <div className="flex gap-2">
+            {/* Верхний ряд: иконка, имя (RTL-aware), метаданные, чипы ссылок.
+                Полупрозрачные рамки/фоны — color-mix от того же токена. */}
+            <div className="flex flex-wrap items-center gap-3.5 px-5 pb-3 pt-3.5">
+              {groupInfo?.icon_url ? (
+                <img
+                  src={groupInfo.icon_url}
+                  alt=""
+                  className="h-[52px] w-[52px] flex-none rounded-[14px] border object-cover"
+                  style={{ borderColor: 'color-mix(in srgb, var(--theme-mode-accent-text) 35%, transparent)' }}
+                />
+              ) : (
+                <span
+                  className="flex h-[52px] w-[52px] flex-none items-center justify-center rounded-[14px] border text-[22px] font-black"
+                  style={{
+                    borderColor: 'color-mix(in srgb, var(--theme-mode-accent-text) 35%, transparent)',
+                    background: 'color-mix(in srgb, var(--theme-mode-accent-text) 20%, transparent)',
+                  }}
+                >
+                  {((groupInfo?.name ?? groupSlug).trim()[0] ?? '?').toUpperCase()}
+                </span>
+              )}
+              <div className="min-w-0">
+                <div className="truncate text-[19px] font-extrabold leading-tight" dir="auto">
+                  {groupInfo?.name ?? groupSlug}
+                </div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[12px] font-semibold opacity-85">
+                  {groupInfo?.name_en && groupInfo.name_en !== groupInfo.name && (
+                    <span>{groupInfo.name_en}</span>
+                  )}
+                  {groupInfo?.location && <span dir="auto">{groupInfo.location}</span>}
+                  {groupInfo?.is_official && groupInfo.club_name && (
+                    <span
+                      className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-extrabold"
+                      style={{
+                        borderColor: 'color-mix(in srgb, var(--theme-mode-accent-text) 35%, transparent)',
+                        background: 'color-mix(in srgb, var(--theme-mode-accent-text) 15%, transparent)',
+                      }}
+                    >
+                      <UI_ClubIcon clubName={groupInfo.club_name} iconWidth="4" styleType="icon-notext" />
+                      Official · {groupInfo.club_name}
+                    </span>
+                  )}
+                  {(groupInfo?.members?.length ?? 0) > 0 && (
+                    <span>{groupInfo!.members.length} swimmers</span>
+                  )}
+                </div>
+              </div>
+              {(groupInfo?.links?.length ?? 0) > 0 && (
+                <div className="ml-auto flex flex-wrap gap-1.5">
+                  {groupInfo!.links.map((l) => (
+                    <a
+                      key={l.kind + l.url}
+                      href={l.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-full border px-3 py-[5px] text-[11.5px] font-extrabold no-underline transition-opacity hover:opacity-80"
+                      style={{
+                        color: 'inherit',
+                        borderColor: 'color-mix(in srgb, var(--theme-mode-accent-text) 30%, transparent)',
+                        background: 'color-mix(in srgb, var(--theme-mode-accent-text) 15%, transparent)',
+                      }}
+                    >
+                      {GROUP_LINK_LABEL[l.kind] ?? l.kind} ↗
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* Ряд табов */}
+            <div className="flex flex-wrap items-center gap-0.5 bg-black/10 px-4">
+              {[
+                { label: 'Overview', anchor: '' },
+                { label: 'Members', anchor: '#members' },
+                { label: 'Records', anchor: '#records' },
+              ].map((t) => (
+                <a
+                  key={t.label}
+                  href={`./groups.html?group=${encodeURIComponent(groupSlug)}${t.anchor}`}
+                  className="border-b-[2.5px] border-transparent px-3 pb-3 pt-[10px] text-[13px] font-bold no-underline opacity-75 hover:opacity-100"
+                  style={{ color: 'inherit' }}
+                >
+                  {t.label}
+                  <span className="ml-0.5 text-[10px] opacity-70">↗</span>
+                </a>
+              ))}
+              <span
+                className="mx-2 h-[18px] w-px"
+                style={{ background: 'color-mix(in srgb, var(--theme-mode-accent-text) 30%, transparent)' }}
+              />
               {(['competitions', 'trainings'] as const).map((tab) => (
                 <button
                   key={tab}
                   type="button"
                   onClick={() => setGroupTab(tab)}
-                  className="rounded-[10px] px-4 py-2 text-[13px] font-extrabold capitalize"
+                  className={`border-b-[2.5px] bg-transparent px-3 pb-3 pt-[10px] text-[13px] font-bold ${
+                    groupTab === tab ? 'opacity-100' : 'opacity-75'
+                  }`}
                   style={{
-                    background: groupTab === tab ? 'var(--theme-mode-accent-text)' : 'rgba(255,255,255,0.16)',
-                    color: groupTab === tab ? 'var(--theme-primary)' : 'inherit',
+                    color: 'inherit',
+                    borderBottomColor: groupTab === tab ? 'var(--theme-mode-accent-text)' : 'transparent',
                   }}
                 >
-                  {tab}
+                  {tab === 'trainings' ? '🔒 Trainings' : 'Competitions'}
                 </button>
               ))}
             </div>

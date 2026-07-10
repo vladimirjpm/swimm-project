@@ -64,6 +64,10 @@ public sealed class TrainingRowDto
 public sealed class TrainingInfoDto
 {
     [JsonPropertyName("trainingId")] public long TrainingId { get; set; }
+
+    /// <summary>Настоящий PK Sys_TrainingSessions.Id — в отличие от TrainingId (клиентское поле,
+    /// разобрано из ExternalTrainingId), нужен как training_id при добавлении медиа тренировки.</summary>
+    [JsonPropertyName("sessionId")] public int SessionId { get; set; }
     [JsonPropertyName("trainingName")] public string TrainingName { get; set; } = string.Empty;
     [JsonPropertyName("set")] public int Set { get; set; }
     [JsonPropertyName("order")] public int Order { get; set; }
@@ -77,4 +81,8 @@ public sealed class TrainingInfoDto
     [JsonPropertyName("isFins")] public bool IsFins { get; set; }
     [JsonPropertyName("isSnorkel")] public bool IsSnorkel { get; set; }
     [JsonPropertyName("isBoard")] public bool IsBoard { get; set; }
+
+    /// <summary>Медиа этой тренировочной сессии (HubGroupMedia.TrainingId == сессия) — одинаково у всех
+    /// строк одной тренировки, клиент читает из первой строки группы.</summary>
+    [JsonPropertyName("media")] public List<HubGroupMediaDto> Media { get; set; } = [];
 }

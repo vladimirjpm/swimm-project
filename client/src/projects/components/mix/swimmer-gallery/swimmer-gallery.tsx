@@ -1,28 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GalleryItem } from '../../../../utils/interfaces/results';
+import { HelperMedia } from '../../../../utils/helpers';
 
 interface UI_SwimmerGalleryProps {
   gallery?: GalleryItem[];
   className?: string;
   popupSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  /**
+   * Контролируемый режим (сетки галерей): триггер-иконка не рендерится,
+   * попап открыт, пока openIndex != null. Родитель держит ОДИН экземпляр
+   * лайтбокса на всю сетку и открывает его по клику на тайл.
+   */
+  openIndex?: number | null;
+  onClose?: () => void;
 }
 
 const getEmbedUrl = (item: GalleryItem): string | null => {
   if (item.sourceType === 'youtube') {
-    if (item.code) return `https://www.youtube.com/embed/${item.code}`;
-    if (item.url) {
-      const match = item.url.match(
-        /(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]+)/,
-      );
-      if (match) return `https://www.youtube.com/embed/${match[1]}`;
-    }
+    const id = item.code ?? HelperMedia.extractYoutubeId(item.url);
+    if (id) return `https://www.youtube.com/embed/${id}`;
   }
   if (item.sourceType === 'vimeo') {
-    if (item.code) return `https://player.vimeo.com/video/${item.code}`;
-    if (item.url) {
-      const match = item.url.match(/vimeo\.com\/(\d+)/);
-      if (match) return `https://player.vimeo.com/video/${match[1]}`;
-    }
+    const id = item.code ?? HelperMedia.extractVimeoId(item.url);
+    if (id) return `https://player.vimeo.com/video/${id}`;
   }
   return null;
 };
@@ -79,9 +79,23 @@ const UI_SwimmerGallery: React.FC<UI_SwimmerGalleryProps> = ({
   gallery,
   className = '',
   popupSize = 'lg',
+  openIndex,
+  onClose,
 }) => {
+  const controlled = openIndex !== undefined;
   const [showPopup, setShowPopup] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Контролируемый режим: открытие/индекс диктует родитель через openIndex.
+  useEffect(() => {
+    if (!controlled) return;
+    if (openIndex != null) {
+      setCurrentIndex(openIndex);
+      setShowPopup(true);
+    } else {
+      setShowPopup(false);
+    }
+  }, [controlled, openIndex]);
 
   if (!gallery || gallery.length === 0) {
     return null;
@@ -94,6 +108,7 @@ const UI_SwimmerGallery: React.FC<UI_SwimmerGalleryProps> = ({
 
   const handleClose = () => {
     setShowPopup(false);
+    onClose?.();
   };
 
   const handlePrev = () => {
@@ -124,12 +139,14 @@ const UI_SwimmerGallery: React.FC<UI_SwimmerGalleryProps> = ({
 
   return (
     <>
-      <div
-        className={`cursor-pointer inline-flex items-center ${className}`}
-        onClick={handleClick}
-      >
-        {hasVideo ? videoIcon : imageIcon}
-      </div>
+      {!controlled && (
+        <div
+          className={`cursor-pointer inline-flex items-center ${className}`}
+          onClick={handleClick}
+        >
+          {hasVideo ? videoIcon : imageIcon}
+        </div>
+      )}
 
       {showPopup && (
         <div

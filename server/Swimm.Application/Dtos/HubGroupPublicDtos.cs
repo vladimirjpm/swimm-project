@@ -210,4 +210,8 @@ public sealed class HubGroupDetailsDto
     /// <summary>Сезонный зачёт участников по клубным очкам (desc по очкам, затем заплывам).</summary>
     [JsonPropertyName("standings")]
     public List<HubGroupStandingDto> Standings { get; set; } = [];
+
+    /// <summary>Публичная галерея группы (HubGroupMedia.TrainingId == null).</summary>
+    [JsonPropertyName("gallery")]
+    public List<HubGroupMediaDto> Gallery { get; set; } = [];
 }

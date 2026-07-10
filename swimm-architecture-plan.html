@@ -134,7 +134,7 @@
     <div class="nav grouplabel">Ход работ</div>
     <ul class="nav">
       <li><a href="#done"><span class="ico">✓</span>Сделано</a></li>
-      <li><a href="#roadmap" class="hot"><span class="ico">▦</span>Roadmap — 7 фаз</a></li>
+      <li><a href="#roadmap" class="hot"><span class="ico">▦</span>Roadmap — 8 фаз</a></li>
       <li><a href="#next" class="hot"><span class="ico">➤</span>Ближайший шаг</a></li>
     </ul>
 
@@ -162,7 +162,7 @@
     <!-- ===== OVERVIEW ===== -->
     <h2 class="section" id="overview">Где мы сейчас <span class="anchor">#overview</span></h2>
     <div class="card">
-      <h3>Фундамент готов — впереди 7 фаз развития</h3>
+      <h3>Фундамент готов — roadmap из 8 фаз</h3>
       <div class="bar-row">
         <div class="bar-top"><span class="lbl">Фундамент: Postgres · Clean Architecture · Auth 0–4 · Admin redesign · клиент на API · избранное · мультидневные</span><span class="pct">DONE</span></div>
         <div class="track big-track"><div class="fill green" style="width:100%"></div></div>
@@ -170,6 +170,10 @@
       <div class="bar-row">
         <div class="bar-top"><span class="lbl">Roadmap 2026-07: ✓ Parsing-lib → ✓ Рекорды в БД (вкл. 2.6 URL-импорт) → Масштаб/кэш (3.1–3.3 ✓, остались агрегаты + нагрузка) → Логин UI → Галереи → isr.org.il → Админка-UX</span><span class="pct">2.6/7</span></div>
         <div class="track big-track"><div class="fill amber" style="width:38%"></div></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-top"><span class="lbl">Фаза 8 · HubGroups: группы (8.1–8.7) · участники-аккаунты · локальные пловцы + приватные тренировки · единый хаб · шапка v1 + галерея медиа</span><span class="pct">8.1–8.10 ✓</span></div>
+        <div class="track big-track"><div class="fill green" style="width:100%"></div></div>
       </div>
       <div class="note green" style="margin-bottom:0">
         <strong>Фундамент закрыт.</strong> Сервер расслоён (Domain / Application / Infrastructure / API), контроллеры
@@ -300,7 +304,7 @@
     </div>
 
     <!-- ===== ROADMAP ===== -->
-    <h2 class="section" id="roadmap">Roadmap — 7 фаз <span class="anchor">#roadmap</span></h2>
+    <h2 class="section" id="roadmap">Roadmap — 8 фаз <span class="anchor">#roadmap</span></h2>
     <div class="note" style="margin-top:0">
       Детальные этапы с критериями приёмки — в <code>docs/ROADMAP.md</code> (источник правды, там же отмечается прогресс).
       Решения 2026-07-09: Parser → библиотека · медиа = только внешние ссылки · логин Google + email/пароль ·
@@ -381,13 +385,26 @@
       </ul>
     </div>
 
+    <div class="phase done">
+      <div class="phase-head"><div class="pnum">8</div><div><span class="ptitle">HubGroups — тренировочные группы</span><span class="pstatus st-done">8.1–8.10 ✓</span><div class="psub">Неформальные группы пловцов (пример: Dolphin Netanya Masters): публичная витрина + приватные тренировки и медиа. Модель ролей/участия: <code>docs/hubgroups-architecture.md</code>.</div></div></div>
+      <ul class="steps">
+        <li class="ok">8.1–8.4: схема <code>HubGroup</code>/<code>HubGroupMember</code>, админ-CRUD, публичный API с ETag-кэшем, клиент <code>groups.html</code> + виртуальная группа «Моё избранное»</li>
+        <li class="ok">8.5–8.6: сезонный зачёт по клубным очкам (Season standings) · самообслуживание (создание по правам, лимиты, панель «Мои группы»)</li>
+        <li class="ok">8.7: официальные клубные группы (<code>IsOfficial</code>, заявки, админ-одобрение) · «со-тренеры» → <strong>админы группы</strong> (<code>Sys_HubGroupAdmins</code>)</li>
+        <li class="ok">8.8: участники-аккаунты (<code>Sys_HubGroupUserMembers</code>, приватно) — самозапись + добавление по email</li>
+        <li class="ok">8.9: локальные пловцы (<code>Swimmer.Origin='local'</code>) · приватные тренировки (<code>Sys_TrainingSessions/Results</code>, НЕ Results) · единый хаб <code>results_main.html?group=&amp;tab=trainings|competitions</code></li>
+        <li class="ok">8.10: шапка хаба из БД (иконка, official-бейдж, links-чипы, табы на groups.html) · галерея <code>Sys_HubGroupMedia</code> (ссылки-only, album-чипы наружу, приватные фото тренировок, MediaEditor) · /code-review: 8 находок исправлено</li>
+      </ul>
+    </div>
+
     <div class="card">
       <h3>Зависимости фаз</h3>
       <div class="mono">
         1 Parsing-lib ──► 2 Рекорды в БД ──► 6 isr.org.il<br/>
         3 Масштаб/кэш — независима (после 1 · OutputCache — дешёвый ранний выигрыш)<br/>
-        4 Логин UI ──► 5 Галереи<br/>
-        7 Админка — сквозная (7.1–7.2 можно сразу после фазы 2)
+        4 Логин UI ──► 5 Галереи (паттерн обкатан на галерее групп, 8.10)<br/>
+        7 Админка — сквозная (7.1–7.2 можно сразу после фазы 2)<br/>
+        8 HubGroups — выполнена (8.1–8.10); поверх фундамента, не блокирует остальные
       </div>
     </div>
 
@@ -597,13 +614,13 @@
       <span class="chip c-ok">фаза 1: Swimm.Parsing (Parser снесён)</span>
       <span class="chip c-ok">фаза 2: рекорды в БД + CRUD + 2.6 URL-импорт с диффом</span>
       <span class="chip c-ok">3.1–3.3: paged-режим · HTTP-кэш · индексы (3 млн строк ≤ 4 мс)</span>
+      <span class="chip c-ok">фаза 8: HubGroups 8.1–8.10 — группы · тренировки · единый хаб · галерея медиа</span>
       <span class="chip c-part">далее: 3.4 агрегаты · 3.5 k6 · фаза 4 логин-UI</span>
-      <span class="chip c-part">рабочая копия не закоммичена (фазы 2.6–3.3)</span>
       <span class="chip c-no">хостинг не выбран — деплой-нейтрально</span>
     </div>
 
     <p style="color:var(--dim);font-size:.78rem;margin-top:1.5rem">
-      Личный дашборд. Обновляется вручную (последний раз: 2026-07-10). Источник правды по фазам — <code>docs/ROADMAP.md</code>,
+      Личный дашборд. Обновляется вручную (последний раз: 2026-07-11). Источник правды по фазам — <code>docs/ROADMAP.md</code>,
       по архитектуре — <code>docs/ARCHITECTURE.md</code>, по операционке — <code>CLAUDE.md</code>.
     </p>
   </main>

@@ -85,9 +85,23 @@ export interface GalleryItem {
   code?: string;  
 }
 
+// Канонический wire-контракт медиа группы/тренировки (HubGroupMediaDto, snake_case).
+// Единственное объявление — hub-groups-project/types.ts и хук управления его реиспользуют.
+export interface HubGroupMediaItem {
+  id: number;
+  media_type: 'image' | 'video' | 'album';
+  source_type: 'youtube' | 'vimeo' | 'album' | 'other';
+  url: string;
+  caption?: string | null;
+}
+
+/** Алиас для контекста тренировок (TrainingInfo.media) — форма та же. */
+export type TrainingMediaItem = HubGroupMediaItem;
+
   export interface TrainingInfo {
   trainingId: number;            // уникальный ID тренировки
-  trainingName: string;           
+  sessionId?: number;             // настоящий PK Sys_TrainingSessions.Id (для медиа тренировки)
+  trainingName: string;
   set: number;                   // номер сета
   order: number;                 // порядок в сете
   interval?: number;             // интервал (секунд)
@@ -103,6 +117,9 @@ export interface GalleryItem {
   isPaddles: boolean;            // использовались лопатки
   isBuoy: boolean;               // использовалась колобашка
   isBoard: boolean;              // использовалась доска
+
+  /** Медиа этой тренировочной сессии — одинаково у всех строк одной тренировки. */
+  media?: TrainingMediaItem[];
 }
 
 export type TrainingGroup = {

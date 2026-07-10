@@ -1,4 +1,4 @@
-export type TrainingTableMode = 'groupByName' | 'groupBySet' | 'showTable';
+export type TrainingTableMode = 'bySession' | 'groupByName' | 'groupBySet' | 'showTable';
 export type ActivityType = 'training' | 'competition';
 export interface FilterSelected {
   selected_name: string;

@@ -22,14 +22,55 @@
   color: var(--theme-mode-text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.tbs-head-right { margin-left: auto; flex: none; display: flex; align-items: center; gap: 8px; }
 .tbs-date {
-  margin-left: auto; flex: none;
+  flex: none;
   font-size: 11px; font-weight: 800; letter-spacing: .04em;
   color: var(--theme-primary);
   background: var(--theme-primary-light);
   border: 1px solid color-mix(in srgb, var(--theme-primary) 30%, transparent);
   padding: 4px 10px; border-radius: 999px;
   font-variant-numeric: tabular-nums;
+}
+.tbs-media-count {
+  flex: none;
+  font-size: 11px; font-weight: 800;
+  color: var(--theme-mode-text-secondary);
+  background: var(--theme-mode-input-bg);
+  border: 1px solid var(--theme-mode-border);
+  padding: 4px 9px; border-radius: 999px;
+}
+
+/* Медиа-лента тренировки */
+.tbs-media-strip {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 0 18px 14px;
+}
+.tbs-media-tile {
+  position: relative;
+  width: 86px; height: 60px; flex: none;
+  border-radius: 8px; overflow: hidden;
+  border: 1px solid var(--theme-mode-border);
+  background: var(--theme-mode-input-bg);
+  cursor: pointer;
+}
+.tbs-media-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tbs-media-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; font-size: 20px; }
+.tbs-media-play {
+  position: absolute; top: 3px; right: 3px;
+  background: rgba(0,0,0,.6); color: #fff;
+  border-radius: 999px; padding: 2px 5px; font-size: 10px; line-height: 1;
+}
+.tbs-media-caption {
+  position: absolute; inset-inline: 0; bottom: 0;
+  background: linear-gradient(0deg, rgba(0,0,0,.75), transparent);
+  color: #fff; font-size: 9.5px; font-weight: 700;
+  padding: 3px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tbs-media-album {
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; font-size: 10px; font-weight: 800;
+  color: var(--theme-primary); text-decoration: none; padding: 4px;
 }
 
 /* Сводка сессии */

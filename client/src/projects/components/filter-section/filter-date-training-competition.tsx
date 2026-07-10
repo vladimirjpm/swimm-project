@@ -26,9 +26,13 @@ const FilterActivity: React.FC = () => {
     );
   };
 
+  // Хаб группы (?group=) — активность переключается только табами в шапке; этот фильтр
+  // дублировал их и конфликтовал (табы меняют источник данных, фильтр — только activity_type).
+  const isGroupHub = new URLSearchParams(window.location.search).has('group');
+
   // Paged-режим — только competition (сервер тренировок не отдаёт), тумблер скрыт (контракт 3.2 §5).
   // Иначе — если нет training записей — не показываем фильтр.
-  if (mode === 'paged' || !hasAnyTraining) {
+  if (isGroupHub || mode === 'paged' || !hasAnyTraining) {
     return null;
   }
 

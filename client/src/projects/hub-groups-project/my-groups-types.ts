@@ -123,6 +123,22 @@ export interface ClubRequest {
   decidedAt?: string | null;
 }
 
+export interface HubGroupMediaInput {
+  mediaType: string;
+  sourceType: string;
+  url: string;
+  caption?: string | null;
+  trainingId?: number | null;
+}
+
+/** Тренировка в справочнике для выбора «привязать медиа к тренировке» (без CRUD тренировок в UI). */
+export interface TrainingOption {
+  sessionId: number;
+  label: string;
+  /** Медиа этой тренировки — редактор показывает их списком с удалением. */
+  media: import('../../utils/interfaces/results').HubGroupMediaItem[];
+}
+
 export interface SaveResult {
   success: boolean;
   id?: number;
