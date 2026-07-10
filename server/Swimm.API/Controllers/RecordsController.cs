@@ -1,8 +1,5 @@
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Net.Http.Headers;
+using Swimm.API.Http;
 using Swimm.Application.Abstractions;
 using Swimm.Domain.Entities;
 
@@ -50,9 +47,10 @@ public class RecordsController : ControllerBase
         if (category != null && !Record.Categories.Contains(category))
             return BadRequest($"category must be one of: {string.Join(", ", Record.Categories)}");
 
-        return await CachedJson(
+        return await this.CachedJson(_cache,
             $"http:records:{region.Trim().ToUpperInvariant()}:{category ?? "all"}",
-            () => _records.GetRecordsAsync(region, category));
+            () => _records.GetRecordsAsync(region, category),
+            PayloadTtl, CacheControlValue);
     }
 
     /// <summary>Нормативы уровней. kind: regular/masters (опционально — иначе все).</summary>
@@ -62,31 +60,9 @@ public class RecordsController : ControllerBase
         if (kind != null && !NormativeStandard.Kinds.Contains(kind))
             return BadRequest($"kind must be one of: {string.Join(", ", NormativeStandard.Kinds)}");
 
-        return await CachedJson(
+        return await this.CachedJson(_cache,
             $"http:normative-standards:{kind ?? "all"}",
-            () => _records.GetStandardsAsync(kind));
+            () => _records.GetStandardsAsync(kind),
+            PayloadTtl, CacheControlValue);
     }
-
-    /// <summary>Сериализованный ответ + ETag из ICacheService; If-None-Match → 304 без тела.</summary>
-    private async Task<IActionResult> CachedJson<T>(string cacheKey, Func<Task<T>> load)
-    {
-        var entry = await _cache.GetAsync<CachedPayload>(cacheKey);
-        if (entry is null)
-        {
-            var json = JsonSerializer.Serialize(await load());
-            var etag = $"\"{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json)))[..32]}\"";
-            entry = new CachedPayload(json, etag);
-            await _cache.SetAsync(cacheKey, entry, PayloadTtl);
-        }
-
-        Response.Headers[HeaderNames.CacheControl] = CacheControlValue;
-        Response.Headers[HeaderNames.ETag] = entry.ETag;
-
-        if (Request.Headers.IfNoneMatch.Contains(entry.ETag))
-            return StatusCode(StatusCodes.Status304NotModified);
-
-        return Content(entry.Json, "application/json; charset=utf-8");
-    }
-
-    private sealed record CachedPayload(string Json, string ETag);
 }

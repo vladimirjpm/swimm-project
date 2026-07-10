@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Swimm.API.Http;
 using Swimm.Application.Abstractions;
 
 namespace Swimm.API.Controllers;
@@ -8,10 +9,15 @@ namespace Swimm.API.Controllers;
 public class ClubPointsController : ControllerBase
 {
     private readonly IClubPointsRepository _repo;
+    private readonly ICacheService _cache;
 
-    public ClubPointsController(IClubPointsRepository repo)
+    private const string CacheControlValue = "public, max-age=300";
+    private static readonly TimeSpan PayloadTtl = TimeSpan.FromHours(1);
+
+    public ClubPointsController(IClubPointsRepository repo, ICacheService cache)
     {
         _repo = repo;
+        _cache = cache;
     }
 
     /// <summary>
@@ -21,7 +27,8 @@ public class ClubPointsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetRules()
     {
-        var rules = await _repo.GetRulesAsync();
-        return Ok(new { rules });
+        return await this.CachedJson(_cache, "http:club-points",
+            async () => new { rules = await _repo.GetRulesAsync() },
+            PayloadTtl, CacheControlValue);
     }
 }

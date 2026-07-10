@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Swimm.API.Http;
 using Swimm.Application.Abstractions;
 
 namespace Swimm.API.Controllers;
@@ -8,10 +9,15 @@ namespace Swimm.API.Controllers;
 public class CategoriesController : ControllerBase
 {
     private readonly ICategoryRepository _repo;
+    private readonly ICacheService _cache;
 
-    public CategoriesController(ICategoryRepository repo)
+    private const string CacheControlValue = "public, max-age=300";
+    private static readonly TimeSpan PayloadTtl = TimeSpan.FromHours(1);
+
+    public CategoriesController(ICategoryRepository repo, ICacheService cache)
     {
         _repo = repo;
+        _cache = cache;
     }
 
     /// <summary>
@@ -20,8 +26,8 @@ public class CategoriesController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetCategories()
     {
-        var categories = await _repo.GetCategoriesAsync();
-        return Ok(categories);
+        return await this.CachedJson(_cache, "http:categories",
+            () => _repo.GetCategoriesAsync(), PayloadTtl, CacheControlValue);
     }
 
     /// <summary>
@@ -35,6 +41,7 @@ public class CategoriesController : ControllerBase
         if (result is null)
             return NotFound();
 
-        return Ok(result);
+        return await this.CachedJson(_cache, $"http:categories:{key}",
+            () => Task.FromResult(result), PayloadTtl, CacheControlValue);
     }
 }
