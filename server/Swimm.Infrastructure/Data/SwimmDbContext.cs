@@ -54,6 +54,7 @@ public class SwimmDbContext : DbContext
     /* === Группы (SwimHub) === */
     public DbSet<HubGroup> HubGroups => Set<HubGroup>();
     public DbSet<HubGroupMember> HubGroupMembers => Set<HubGroupMember>();
+    public DbSet<HubGroupManager> HubGroupManagers => Set<HubGroupManager>();
 
     /* === Пользователи и доступ === */
     public DbSet<AppUser> AppUsers => Set<AppUser>();
@@ -377,7 +378,8 @@ public class SwimmDbContext : DbContext
 
             entity.HasData(
                 new AppRole { Id = 1, Name = "Admin" },
-                new AppRole { Id = 2, Name = "User" }
+                new AppRole { Id = 2, Name = "User" },
+                new AppRole { Id = 3, Name = "Coach" }
             );
         });
 
@@ -545,6 +547,28 @@ public class SwimmDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.SwimmerId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Со-тренеры (право правки) — таблица прав, БЕЗ grant swimm_ro.
+        modelBuilder.Entity<HubGroupManager>(entity =>
+        {
+            entity.ToTable("Sys_HubGroupManagers");
+            entity.HasIndex(e => new { e.HubGroupId, e.UserId }).IsUnique();
+
+            entity.HasOne(e => e.HubGroup)
+                .WithMany(g => g.Managers)
+                .HasForeignKey(e => e.HubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.GrantedBy)
+                .WithMany()
+                .HasForeignKey(e => e.GrantedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

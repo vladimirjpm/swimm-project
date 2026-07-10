@@ -1,7 +1,4 @@
-using System.Text.Json;
-using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
@@ -13,16 +10,18 @@ namespace Swimm.Infrastructure.Services;
 /// Админский CRUD групп (см. <see cref="IHubGroupAdminService"/>). Пишет через owner-контекст
 /// <see cref="SwimmDbContext"/>. После мутаций инвалидирует общий кэш — публичные
 /// /api/hub-groups* (фаза 3) кэшируются через ICacheService, как остальные публичные GET.
+/// Write-логика (slug/валидация/PostgresException/участники) — общая с пользовательским
+/// CRUD (8.6) в <see cref="HubGroupCrudCore"/>.
 /// </summary>
-public partial class HubGroupAdminService : IHubGroupAdminService
+public class HubGroupAdminService : IHubGroupAdminService
 {
     private readonly SwimmDbContext _db;
-    private readonly ICacheService _cache;
+    private readonly HubGroupCrudCore _core;
 
-    public HubGroupAdminService(SwimmDbContext db, ICacheService cache)
+    public HubGroupAdminService(SwimmDbContext db, HubGroupCrudCore core)
     {
         _db = db;
-        _cache = cache;
+        _core = core;
     }
 
     public async Task<IReadOnlyList<HubGroupAdminRowDto>> GetAllAsync()
@@ -81,7 +80,7 @@ public partial class HubGroupAdminService : IHubGroupAdminService
             OwnerUserId = g.OwnerUserId,
             OwnerDisplayName = g.Owner?.DisplayName ?? $"#{g.OwnerUserId}",
             IsPublic = g.IsPublic,
-            Links = ParseLinks(g.Links),
+            Links = HubGroupCrudCore.ParseLinks(g.Links),
             Members = members
         };
     }
@@ -100,14 +99,14 @@ public partial class HubGroupAdminService : IHubGroupAdminService
         if (resolvedOwnerId == null)
             return HubGroupSaveResult.Fail("Не найден пользователь с ролью Admin для назначения владельцем группы.");
 
-        var slug = await ResolveSlugAsync(input, excludeId: null);
-        var error = await ValidateAsync(input, slug, excludeId: null);
+        var slug = await _core.ResolveSlugAsync(input, excludeId: null);
+        var error = await _core.ValidateAsync(input, slug, excludeId: null);
         if (error != null) return HubGroupSaveResult.Fail(error);
 
         var group = new HubGroup { OwnerUserId = resolvedOwnerId.Value };
-        Apply(group, input, slug);
+        HubGroupCrudCore.Apply(group, input, slug);
         _db.HubGroups.Add(group);
-        return await SaveAsync(group);
+        return await _core.SaveAsync(group);
     }
 
     public async Task<HubGroupSaveResult> UpdateAsync(int id, HubGroupInputDto input)
@@ -115,12 +114,12 @@ public partial class HubGroupAdminService : IHubGroupAdminService
         var group = await _db.HubGroups.FindAsync(id);
         if (group == null) return HubGroupSaveResult.Fail($"Группа #{id} не найдена");
 
-        var slug = await ResolveSlugAsync(input, excludeId: id);
-        var error = await ValidateAsync(input, slug, excludeId: id);
+        var slug = await _core.ResolveSlugAsync(input, excludeId: id);
+        var error = await _core.ValidateAsync(input, slug, excludeId: id);
         if (error != null) return HubGroupSaveResult.Fail(error);
 
-        Apply(group, input, slug);
-        return await SaveAsync(group);
+        HubGroupCrudCore.Apply(group, input, slug);
+        return await _core.SaveAsync(group);
     }
 
     public async Task<HubGroupSaveResult> DeleteAsync(int id)
@@ -130,7 +129,7 @@ public partial class HubGroupAdminService : IHubGroupAdminService
 
         _db.HubGroups.Remove(group);
         await _db.SaveChangesAsync();
-        await _cache.InvalidateAllAsync();
+        await _core.InvalidateCacheAsync();
         return HubGroupSaveResult.Ok(id);
     }
 
@@ -159,76 +158,21 @@ public partial class HubGroupAdminService : IHubGroupAdminService
             .ToListAsync();
     }
 
-    public async Task<HubGroupMemberSaveResult> AddMemberAsync(int hubGroupId, int swimmerId, string role)
-    {
-        var groupExists = await _db.HubGroups.AnyAsync(g => g.Id == hubGroupId);
-        if (!groupExists) return HubGroupMemberSaveResult.Fail($"Группа #{hubGroupId} не найдена");
+    public Task<HubGroupMemberSaveResult> AddMemberAsync(int hubGroupId, int swimmerId, string role) =>
+        _core.AddMemberAsync(hubGroupId, swimmerId, role);
 
-        var swimmerExists = await _db.Swimmers.AnyAsync(s => s.Id == swimmerId);
-        if (!swimmerExists) return HubGroupMemberSaveResult.Fail($"Пловец #{swimmerId} не найден");
+    public Task<HubGroupMemberSaveResult> UpdateMemberAsync(int hubGroupId, int memberId, string role, int sortOrder) =>
+        _core.UpdateMemberAsync(hubGroupId, memberId, role, sortOrder);
 
-        var dup = await _db.HubGroupMembers.AnyAsync(m => m.HubGroupId == hubGroupId && m.SwimmerId == swimmerId);
-        if (dup) return HubGroupMemberSaveResult.Fail("Этот пловец уже состоит в группе");
-
-        if (!HubGroupMember.Roles.Contains(role)) role = "member";
-
-        var maxOrder = await _db.HubGroupMembers.Where(m => m.HubGroupId == hubGroupId)
-            .Select(m => (int?)m.SortOrder).MaxAsync() ?? 0;
-
-        _db.HubGroupMembers.Add(new HubGroupMember
-        {
-            HubGroupId = hubGroupId,
-            SwimmerId = swimmerId,
-            Role = role,
-            SortOrder = maxOrder + 1
-        });
-
-        try
-        {
-            await _db.SaveChangesAsync();
-        }
-        catch (DbUpdateException)
-        {
-            return HubGroupMemberSaveResult.Fail("Этот пловец уже состоит в группе");
-        }
-
-        // Обновляем UpdatedAt группы отдельным простым запросом — без загрузки навигации.
-        await TouchGroupAsync(hubGroupId);
-        return HubGroupMemberSaveResult.Ok();
-    }
-
-    public async Task<HubGroupMemberSaveResult> UpdateMemberAsync(int hubGroupId, int memberId, string role, int sortOrder)
-    {
-        var member = await _db.HubGroupMembers.FindAsync(memberId);
-        if (member == null || member.HubGroupId != hubGroupId)
-            return HubGroupMemberSaveResult.Fail($"Участник #{memberId} не найден");
-
-        member.Role = HubGroupMember.Roles.Contains(role) ? role : "member";
-        member.SortOrder = sortOrder;
-        await _db.SaveChangesAsync();
-        await TouchGroupAsync(hubGroupId);
-        return HubGroupMemberSaveResult.Ok();
-    }
-
-    public async Task<HubGroupMemberSaveResult> RemoveMemberAsync(int hubGroupId, int memberId)
-    {
-        var member = await _db.HubGroupMembers.FindAsync(memberId);
-        if (member == null || member.HubGroupId != hubGroupId)
-            return HubGroupMemberSaveResult.Fail($"Участник #{memberId} не найден");
-
-        _db.HubGroupMembers.Remove(member);
-        await _db.SaveChangesAsync();
-        await TouchGroupAsync(hubGroupId);
-        return HubGroupMemberSaveResult.Ok();
-    }
-
-    // ── helpers ────────────────────────────────────────────────────────────────
+    public Task<HubGroupMemberSaveResult> RemoveMemberAsync(int hubGroupId, int memberId) =>
+        _core.RemoveMemberAsync(hubGroupId, memberId);
 
     /// <summary>
     /// DevAdminBypass (Program.cs) выдаёт неаутентифицированному запросу синтетический
     /// NameIdentifier="0", которого нет в Sys_AppUsers, — прямая вставка такого OwnerUserId
     /// падает на FK. В этом случае (и вообще если запрошенный id не существует) подставляем
-    /// первого пользователя с ролью Admin.
+    /// первого пользователя с ролью Admin. Дев-костыль, специфичный для админки — в
+    /// пользовательском CRUD (8.6) не переиспользуется: там OwnerUserId — реальный вошедший.
     /// </summary>
     private async Task<int?> ResolveOwnerIdAsync(int requestedUserId)
     {
@@ -241,128 +185,4 @@ public partial class HubGroupAdminService : IHubGroupAdminService
             .Select(ur => (int?)ur.UserId)
             .FirstOrDefaultAsync();
     }
-
-    private async Task TouchGroupAsync(int groupId)
-    {
-        var group = await _db.HubGroups.FindAsync(groupId);
-        if (group != null)
-        {
-            group.UpdatedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync();
-        }
-        // Мутации участников идут только через этот метод — инвалидация кэша здесь.
-        await _cache.InvalidateAllAsync();
-    }
-
-    private static void Apply(HubGroup group, HubGroupInputDto input, string slug)
-    {
-        group.Name = input.Name.Trim();
-        group.NameEn = string.IsNullOrWhiteSpace(input.NameEn) ? null : input.NameEn.Trim();
-        group.Slug = slug;
-        group.Description = string.IsNullOrWhiteSpace(input.Description) ? null : input.Description.Trim();
-        group.IconUrl = string.IsNullOrWhiteSpace(input.IconUrl) ? null : input.IconUrl.Trim();
-        group.CoverImageUrl = string.IsNullOrWhiteSpace(input.CoverImageUrl) ? null : input.CoverImageUrl.Trim();
-        group.Location = string.IsNullOrWhiteSpace(input.Location) ? null : input.Location.Trim();
-        group.ClubId = input.ClubId;
-        group.IsPublic = input.IsPublic;
-        group.Links = SerializeLinks(input.Links);
-        group.UpdatedAt = DateTime.UtcNow;
-    }
-
-    private async Task<HubGroupSaveResult> SaveAsync(HubGroup group)
-    {
-        try
-        {
-            await _db.SaveChangesAsync();
-        }
-        catch (DbUpdateException ex)
-        {
-            // 23505 = unique_violation (slug), 23503 = foreign_key_violation (владелец/клуб) —
-            // ловить их одинаково как «slug занят» было бы враньём, вводящим в заблуждение.
-            if (ex.InnerException is PostgresException { SqlState: "23505" })
-                return HubGroupSaveResult.Fail($"Не удалось сохранить: slug «{group.Slug}» уже занят другой группой.");
-            if (ex.InnerException is PostgresException { SqlState: "23503" })
-                return HubGroupSaveResult.Fail("Не удалось сохранить: владелец или клуб не найден.");
-            return HubGroupSaveResult.Fail("Не удалось сохранить группу.");
-        }
-        await _cache.InvalidateAllAsync();
-        return HubGroupSaveResult.Ok(group.Id);
-    }
-
-    private async Task<string> ResolveSlugAsync(HubGroupInputDto input, int? excludeId)
-    {
-        var raw = input.Slug;
-        if (string.IsNullOrWhiteSpace(raw))
-            raw = !string.IsNullOrWhiteSpace(input.NameEn) ? input.NameEn : input.Name;
-
-        var slug = Slugify(raw);
-        if (slug.Length == 0) slug = "group";
-
-        // Автодедупликация только для авто-сгенерированного (пустого исходного) слага;
-        // если пользователь ввёл slug вручную и он занят — это ошибка валидации (ValidateAsync).
-        if (!string.IsNullOrWhiteSpace(input.Slug)) return Slugify(input.Slug);
-
-        var candidate = slug;
-        var suffix = 2;
-        while (await _db.HubGroups.AnyAsync(g => g.Slug == candidate && g.Id != (excludeId ?? 0)))
-        {
-            var suffixText = $"-{suffix++}";
-            // Slug — MaxLength(120); суффикс дедупликации не должен вытолкнуть строку за лимит.
-            var baseLength = Math.Min(slug.Length, SlugMaxLength - suffixText.Length);
-            candidate = slug[..baseLength].TrimEnd('-') + suffixText;
-        }
-        return candidate;
-    }
-
-    private async Task<string?> ValidateAsync(HubGroupInputDto input, string slug, int? excludeId)
-    {
-        if (string.IsNullOrWhiteSpace(input.Name)) return "Название обязательно";
-        if (slug.Length == 0) return "Slug обязателен";
-
-        var dup = await _db.HubGroups.AnyAsync(g => g.Id != (excludeId ?? 0) && g.Slug == slug);
-        if (dup) return $"Slug «{slug}» уже занят другой группой";
-
-        return null;
-    }
-
-    private const int SlugMaxLength = 120; // HubGroup.Slug — MaxLength(120)
-
-    private static string Slugify(string source)
-    {
-        var lower = (source ?? "").Trim().ToLowerInvariant();
-        var dashed = NonSlugCharsRegex().Replace(lower, "-");
-        var collapsed = MultiDashRegex().Replace(dashed, "-");
-        var trimmed = collapsed.Trim('-');
-        if (trimmed.Length > SlugMaxLength)
-            trimmed = trimmed[..SlugMaxLength].TrimEnd('-');
-        return trimmed;
-    }
-
-    private static string SerializeLinks(List<HubGroupLinkDto> links)
-    {
-        var clean = links
-            .Where(l => !string.IsNullOrWhiteSpace(l.Kind) && !string.IsNullOrWhiteSpace(l.Url))
-            .Select(l => new HubGroupLinkDto { Kind = l.Kind.Trim(), Url = l.Url.Trim() })
-            .ToList();
-        return clean.Count == 0 ? "[]" : JsonSerializer.Serialize(clean);
-    }
-
-    private static List<HubGroupLinkDto> ParseLinks(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json)) return [];
-        try
-        {
-            return JsonSerializer.Deserialize<List<HubGroupLinkDto>>(json) ?? [];
-        }
-        catch (JsonException)
-        {
-            return [];
-        }
-    }
-
-    [GeneratedRegex("[^a-z0-9]+")]
-    private static partial Regex NonSlugCharsRegex();
-
-    [GeneratedRegex("-{2,}")]
-    private static partial Regex MultiDashRegex();
 }

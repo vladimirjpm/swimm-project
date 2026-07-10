@@ -66,4 +66,7 @@ public class HubGroup
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<HubGroupMember> Members { get; set; } = new List<HubGroupMember>();
+
+    /// <summary>Со-тренеры группы (право правки, не владение).</summary>
+    public ICollection<HubGroupManager> Managers { get; set; } = new List<HubGroupManager>();
 }

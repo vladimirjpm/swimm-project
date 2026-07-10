@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import '../home-project/home.css';
 import HomeHeader from '../home-project/components/home-header';
 import RecordTicker from '../home-project/components/record-ticker';
+import MyGroupsPanel from './my-groups-panel';
 import type { HubGroupDetails, HubGroupLink, HubGroupListItem, HubGroupMember, HubGroupStanding } from './types';
 
 // Страница групп (HubGroups, фазы 3–4): список публичных групп + страница группы
@@ -475,7 +476,14 @@ function Groups() {
           </a>
         </div>
       )}
-      {!loading && !error && (details ? <GroupDetails group={details} /> : <GroupsList groups={groups} favorites={favorites} />)}
+      {!loading && !error && (details ? (
+        <GroupDetails group={details} />
+      ) : (
+        <>
+          <GroupsList groups={groups} favorites={favorites} />
+          <MyGroupsPanel />
+        </>
+      ))}
 
       <RecordTicker />
     </div>
