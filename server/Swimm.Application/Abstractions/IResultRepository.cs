@@ -4,7 +4,8 @@ namespace Swimm.Application.Abstractions;
 
 public interface IResultRepository
 {
-    Task<(List<ResultDto> Items, bool HasMore)> GetPagedAsync(ResultFilter filter, int page, int pageSize);
+    /// <summary>Страница результатов под фильтром. Total — общее число строк под тем же фильтром (без пагинации).</summary>
+    Task<(List<ResultDto> Items, bool HasMore, int Total)> GetPagedAsync(ResultFilter filter, int page, int pageSize);
     Task<ResultDto?> GetByIdAsync(long id);
     Task<string[]> GetFilterHintsAsync(string field, string? q, int limit);
     /// <summary>Список источников для DDL: события (свёрнуты в одну запись) + однодневные соревнования.</summary>

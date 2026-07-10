@@ -24,12 +24,12 @@ public class ResultRepository : IResultRepository
         _cache = cache;
     }
 
-    public async Task<(List<ResultDto> Items, bool HasMore)> GetPagedAsync(ResultFilter filter, int page, int pageSize)
+    public async Task<(List<ResultDto> Items, bool HasMore, int Total)> GetPagedAsync(ResultFilter filter, int page, int pageSize)
     {
         pageSize = Math.Min(pageSize, 500);
         var key = ResultsCacheKey(filter, page, pageSize);
 
-        var cached = await _cache.GetAsync<(List<ResultDto>, bool)>(key);
+        var cached = await _cache.GetAsync<(List<ResultDto>, bool, int)>(key);
         if (cached != default)
             return cached;
 
@@ -46,7 +46,7 @@ public class ResultRepository : IResultRepository
                 .FirstOrDefaultAsync();
 
             if (latest is null)
-                return ([], false);
+                return ([], false, 0);
 
             if (latest.EventId.HasValue)
                 query = query.Where(r => r.Competition.EventId == latest.EventId.Value);
@@ -91,20 +91,52 @@ public class ResultRepository : IResultRepository
         if (!string.IsNullOrWhiteSpace(filter.Club))
             query = query.Where(r => r.Club.Name.StartsWith(filter.Club) || r.Club.NameEn.StartsWith(filter.Club));
 
-        // Берём pageSize + 1 чтобы определить hasMore без COUNT
+        /* Параметры paged-режима (контракт docs/tasks/phase3-paged-results-contract.md) */
+
+        // Клиентский фильтр Age — годы рождения, не возраст.
+        if (filter.BirthYearFrom.HasValue)
+            query = query.Where(r => r.Swimmer.BirthYear >= filter.BirthYearFrom.Value);
+
+        if (filter.BirthYearTo.HasValue)
+            query = query.Where(r => r.Swimmer.BirthYear <= filter.BirthYearTo.Value);
+
+        if (!string.IsNullOrWhiteSpace(filter.AgeGroup))
+            query = query.Where(r => r.AgeGroup == filter.AgeGroup);
+
+        // Семантика мест — зеркало клиентского baseFilteredResults (паритет full/paged):
+        // top (KeepUnranked=true) оставляет строки без места (DSQ/DNS), podium — исключает.
+        if (filter.PositionMax.HasValue)
+        {
+            var max = filter.PositionMax.Value;
+            query = filter.PositionKeepUnranked
+                ? query.Where(r => r.Position == null || r.Position <= max)
+                : query.Where(r => r.Position != null && r.Position <= max);
+        }
+
+        if (filter.EventDate.HasValue)
+            query = query.Where(r => r.CompetitionDate == filter.EventDate.Value);
+
+        // Total — отдельный кэш-ключ БЕЗ page/pageSize: листание страниц не пересчитывает COUNT.
+        var totalKey = $"results-total:{FilterCacheKey(filter)}";
+        var total = await _cache.GetAsync<int?>(totalKey) ?? -1;
+        if (total < 0)
+        {
+            total = await query.CountAsync();
+            await _cache.SetAsync<int?>(totalKey, total, ResultsTtl);
+        }
+
         var items = await query
             .OrderByDescending(r => r.CompetitionDate)
             .ThenBy(r => r.Position)
             .Skip((page - 1) * pageSize)
-            .Take(pageSize + 1)
+            .Take(pageSize)
             .Select(ResultMapping.ToDto)
             .ToListAsync();
 
-        var hasMore = items.Count > pageSize;
-        if (hasMore)
-            items.RemoveAt(items.Count - 1);
+        // hasMore — из total; расхождение возможно только в пределах TTL кэша (2 мин), как и раньше.
+        var hasMore = (page - 1) * pageSize + items.Count < total;
 
-        var result = (items, hasMore);
+        var result = (items, hasMore, total);
         await _cache.SetAsync(key, result, ResultsTtl);
         return result;
     }
@@ -179,10 +211,13 @@ public class ResultRepository : IResultRepository
         return hints;
     }
 
-    private static string ResultsCacheKey(ResultFilter f, int page, int pageSize) =>
-        $"results:{f.StyleName}:{f.Distance}:{f.Gender}:{f.PoolType}" +
+    private static string FilterCacheKey(ResultFilter f) =>
+        $"{f.StyleName}:{f.Distance}:{f.Gender}:{f.PoolType}" +
         $":{f.DateFrom:yyyyMMdd}:{f.DateTo:yyyyMMdd}:{f.Competition}:{f.EventId}:{f.CompetitionId}:{f.Latest}:{f.Name}:{f.Club}" +
-        $":{page}:{pageSize}";
+        $":{f.BirthYearFrom}:{f.BirthYearTo}:{f.AgeGroup}:{f.PositionMax}:{f.PositionKeepUnranked}:{f.EventDate:yyyyMMdd}";
+
+    private static string ResultsCacheKey(ResultFilter f, int page, int pageSize) =>
+        $"results:{FilterCacheKey(f)}:{page}:{pageSize}";
 
     public async Task<IReadOnlyList<CompetitionSourceDto>> GetSourcesAsync()
     {
@@ -208,7 +243,8 @@ public class ResultRepository : IResultRepository
                 IsMasters = _db.Competitions.Any(c => c.EventId == e.Id && c.IsMasters),
                 IsAward = _db.Competitions.Any(c => c.EventId == e.Id && c.IsAward),
                 ShowCombine = !_db.Competitions.Any(c => c.EventId == e.Id && !c.ShowCombineAllResults),
-                ResultCount = _db.Results.Count(r => r.Competition.EventId == e.Id)
+                ResultCount = _db.Results.Count(r => r.Competition.EventId == e.Id),
+                DayDates = _db.Competitions.Where(c => c.EventId == e.Id).Select(c => c.Date).ToList()
             })
             .ToListAsync();
 
@@ -269,6 +305,14 @@ public class ResultRepository : IResultRepository
 
         static string Fmt(DateOnly? d) => d?.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) ?? "";
 
+        // Дни события по возрастанию даты (строки dd/MM/yyyy сортируем через парсинг).
+        static List<string> SortDayDates(IEnumerable<string> dates) => dates
+            .Where(d => !string.IsNullOrWhiteSpace(d))
+            .Distinct()
+            .OrderBy(d => DateOnly.TryParseExact(d, "dd/MM/yyyy", CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var parsed) ? parsed : DateOnly.MinValue)
+            .ToList();
+
         var items = new List<(DateOnly Sort, CompetitionSourceDto Dto)>(events.Count + singles.Count);
 
         foreach (var e in events)
@@ -287,7 +331,8 @@ public class ResultRepository : IResultRepository
                 Category = CategoryFor(e.IsMasters, categoryKeysByEvent.GetValueOrDefault(e.Id)),
                 Status = StatusFor(e.StartDate, e.EndDate, today),
                 DayCount = e.DayCount,
-                ResultCount = e.ResultCount
+                ResultCount = e.ResultCount,
+                DayDates = SortDayDates(e.DayDates)
             }));
         }
 
@@ -307,7 +352,8 @@ public class ResultRepository : IResultRepository
                 Category = CategoryFor(c.IsMasters, categoryKeysMap.GetValueOrDefault(c.Id)),
                 Status = StatusFor(d == default ? null : d, null, today),
                 DayCount = 1,
-                ResultCount = c.ResultCount
+                ResultCount = c.ResultCount,
+                DayDates = string.IsNullOrWhiteSpace(c.Date) ? [] : [c.Date]
             }));
         }
 

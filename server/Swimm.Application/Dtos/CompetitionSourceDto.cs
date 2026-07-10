@@ -51,6 +51,11 @@ public sealed class CompetitionSourceDto
     [JsonPropertyName("day_count")]
     public int DayCount { get; init; }
 
+    /// <summary>Даты дней (dd/MM/yyyy, по возрастанию): для события — все дни, для однодневного —
+    /// одна. В paged-режиме клиент берёт опции фильтра по дню отсюда (страница их не покрывает).</summary>
+    [JsonPropertyName("day_dates")]
+    public IReadOnlyList<string> DayDates { get; init; } = [];
+
     [JsonPropertyName("result_count")]
     public int ResultCount { get; init; }
 }

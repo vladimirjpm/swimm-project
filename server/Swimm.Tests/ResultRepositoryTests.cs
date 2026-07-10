@@ -44,7 +44,10 @@ public class ResultRepositoryTests
         string distance  = "100",
         string gender    = "male",
         string poolType  = "50m",
-        DateTime? date   = null)
+        DateTime? date   = null,
+        int birthYear    = 2000,
+        string ageGroup  = "Open",
+        int? position    = null)
     {
         var style   = new Style { Name = styleName };
         var club    = new Club { Name = "TestClub", NameEn = "TestClub" };
@@ -57,7 +60,7 @@ public class ResultRepositoryTests
         {
             LastName = "Иванов", FirstName = "Иван",
             LastNameEn = "Ivanov", FirstNameEn = "Ivan",
-            BirthYear = 2000
+            BirthYear = birthYear
         };
         db.Styles.Add(style);
         db.Clubs.Add(club);
@@ -75,8 +78,9 @@ public class ResultRepositoryTests
             Gender          = gender,
             CompetitionDate = date ?? new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             TimeOriginal    = "1:00.00",
-            AgeGroup        = "Open",
-            EventStyleAge   = $"{distance} {styleName} Open"
+            AgeGroup        = ageGroup,
+            EventStyleAge   = $"{distance} {styleName} Open",
+            Position        = position
         };
         db.Results.Add(result);
         await db.SaveChangesAsync();
@@ -91,10 +95,11 @@ public class ResultRepositoryTests
         await using var db = CreateDb(nameof(GetPaged_EmptyDb_ReturnsEmptyList));
         var repo = new ResultRepository(db, NoCache());
 
-        var (items, hasMore) = await repo.GetPagedAsync(new ResultFilter(), 1, 10);
+        var (items, hasMore, total) = await repo.GetPagedAsync(new ResultFilter(), 1, 10);
 
         Assert.Empty(items);
         Assert.False(hasMore);
+        Assert.Equal(0, total);
     }
 
     [Fact]
@@ -106,10 +111,11 @@ public class ResultRepositoryTests
         await SeedResultAsync(db, "butterfly");
         var repo = new ResultRepository(db, NoCache());
 
-        var (items, hasMore) = await repo.GetPagedAsync(new ResultFilter(), 1, 2);
+        var (items, hasMore, total) = await repo.GetPagedAsync(new ResultFilter(), 1, 2);
 
         Assert.Equal(2, items.Count);
         Assert.True(hasMore);
+        Assert.Equal(3, total);
     }
 
     [Fact]
@@ -120,10 +126,11 @@ public class ResultRepositoryTests
         await SeedResultAsync(db, "backstroke");
         var repo = new ResultRepository(db, NoCache());
 
-        var (items, hasMore) = await repo.GetPagedAsync(new ResultFilter(), 2, 10);
+        var (items, hasMore, total) = await repo.GetPagedAsync(new ResultFilter(), 2, 10);
 
         Assert.Empty(items);
         Assert.False(hasMore);
+        Assert.Equal(2, total);
     }
 
     [Fact]
@@ -134,7 +141,7 @@ public class ResultRepositoryTests
         await SeedResultAsync(db, "backstroke");
         var repo = new ResultRepository(db, NoCache());
 
-        var (items, _) = await repo.GetPagedAsync(
+        var (items, _, _) = await repo.GetPagedAsync(
             new ResultFilter { StyleName = "freestyle" }, 1, 10);
 
         Assert.Single(items);
@@ -149,7 +156,7 @@ public class ResultRepositoryTests
         await SeedResultAsync(db, "backstroke", date: new DateTime(2024, 6, 1, 0, 0, 0, DateTimeKind.Utc));
         var repo = new ResultRepository(db, NoCache());
 
-        var (items, _) = await repo.GetPagedAsync(new ResultFilter
+        var (items, _, _) = await repo.GetPagedAsync(new ResultFilter
         {
             DateFrom = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             DateTo   = new DateTime(2024, 12, 31, 0, 0, 0, DateTimeKind.Utc)
@@ -157,6 +164,96 @@ public class ResultRepositoryTests
 
         Assert.Single(items);
         Assert.Equal("backstroke", items[0].StyleName);
+    }
+
+    // ── GetPagedAsync: параметры paged-режима (фаза 3.2) ─────────────────────
+
+    [Fact]
+    public async Task GetPaged_FilterByBirthYearRange_ExcludesOutOfRange()
+    {
+        await using var db = CreateDb(nameof(GetPaged_FilterByBirthYearRange_ExcludesOutOfRange));
+        await SeedResultAsync(db, "freestyle", birthYear: 2005);
+        await SeedResultAsync(db, "backstroke", birthYear: 2010);
+        await SeedResultAsync(db, "butterfly", birthYear: 2015);
+        var repo = new ResultRepository(db, NoCache());
+
+        var (items, _, total) = await repo.GetPagedAsync(
+            new ResultFilter { BirthYearFrom = 2008, BirthYearTo = 2012 }, 1, 10);
+
+        Assert.Single(items);
+        Assert.Equal("backstroke", items[0].StyleName);
+        Assert.Equal(1, total);
+    }
+
+    [Fact]
+    public async Task GetPaged_FilterByAgeGroup_ExactMatch()
+    {
+        await using var db = CreateDb(nameof(GetPaged_FilterByAgeGroup_ExactMatch));
+        await SeedResultAsync(db, "freestyle", ageGroup: "25-29");
+        await SeedResultAsync(db, "backstroke", ageGroup: "30-34");
+        var repo = new ResultRepository(db, NoCache());
+
+        var (items, _, _) = await repo.GetPagedAsync(
+            new ResultFilter { AgeGroup = "25-29" }, 1, 10);
+
+        Assert.Single(items);
+        Assert.Equal("freestyle", items[0].StyleName);
+    }
+
+    [Fact]
+    public async Task GetPaged_FilterByPositionMax_MirrorsClientSemantics()
+    {
+        await using var db = CreateDb(nameof(GetPaged_FilterByPositionMax_MirrorsClientSemantics));
+        await SeedResultAsync(db, "freestyle", position: 2);
+        await SeedResultAsync(db, "backstroke", position: 7);
+        await SeedResultAsync(db, "butterfly", position: null); // DSQ/DNS — без места
+        var repo = new ResultRepository(db, NoCache());
+
+        // podium (KeepUnranked=false): только места 1–3, без DSQ/DNS.
+        var (podium, _, _) = await repo.GetPagedAsync(
+            new ResultFilter { PositionMax = 3 }, 1, 10);
+        // top (KeepUnranked=true): места 1–10 ПЛЮС строки без места — зеркало клиентского фильтра.
+        var (top, _, _) = await repo.GetPagedAsync(
+            new ResultFilter { PositionMax = 10, PositionKeepUnranked = true }, 1, 10);
+
+        Assert.Single(podium);
+        Assert.Equal("freestyle", podium[0].StyleName);
+        Assert.Equal(3, top.Count);
+    }
+
+    [Fact]
+    public async Task GetPaged_FilterByEventDate_ReturnsOnlyThatDay()
+    {
+        await using var db = CreateDb(nameof(GetPaged_FilterByEventDate_ReturnsOnlyThatDay));
+        var day1 = new DateTime(2024, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        var day2 = new DateTime(2024, 6, 2, 0, 0, 0, DateTimeKind.Utc);
+        await SeedResultAsync(db, "freestyle", date: day1);
+        await SeedResultAsync(db, "backstroke", date: day2);
+        var repo = new ResultRepository(db, NoCache());
+
+        var (items, _, _) = await repo.GetPagedAsync(
+            new ResultFilter { EventDate = day2 }, 1, 10);
+
+        Assert.Single(items);
+        Assert.Equal("backstroke", items[0].StyleName);
+    }
+
+    [Fact]
+    public async Task GetPaged_Total_IsFilteredCountNotPageCount()
+    {
+        await using var db = CreateDb(nameof(GetPaged_Total_IsFilteredCountNotPageCount));
+        await SeedResultAsync(db, "freestyle");
+        await SeedResultAsync(db, "freestyle");
+        await SeedResultAsync(db, "freestyle");
+        await SeedResultAsync(db, "backstroke");
+        var repo = new ResultRepository(db, NoCache());
+
+        var (items, hasMore, total) = await repo.GetPagedAsync(
+            new ResultFilter { StyleName = "freestyle" }, 1, 2);
+
+        Assert.Equal(2, items.Count);
+        Assert.True(hasMore);
+        Assert.Equal(3, total); // все freestyle, а не размер страницы и не все 4 строки
     }
 
     // ── GetByIdAsync ──────────────────────────────────────────────────────────

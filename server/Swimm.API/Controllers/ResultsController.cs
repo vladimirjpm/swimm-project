@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Swimm.API.Http;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 
@@ -9,10 +10,15 @@ namespace Swimm.API.Controllers;
 public class ResultsController : ControllerBase
 {
     private readonly IResultRepository _results;
+    private readonly ICacheService _cache;
 
-    public ResultsController(IResultRepository results)
+    private const string CacheControlValue = "public, max-age=60";
+    private static readonly TimeSpan PayloadTtl = TimeSpan.FromMinutes(5);
+
+    public ResultsController(IResultRepository results, ICacheService cache)
     {
         _results = results;
+        _cache = cache;
     }
 
     /// <summary>
@@ -31,10 +37,44 @@ public class ResultsController : ControllerBase
         [FromQuery] string? poolType,
         [FromQuery] DateTime? dateFrom,
         [FromQuery] DateTime? dateTo,
+        [FromQuery] int? birthYearFrom,
+        [FromQuery] int? birthYearTo,
+        [FromQuery] string? ageGroup,
+        [FromQuery] string? position,
+        [FromQuery] string? eventDate,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 100)
     {
         if (pageSize > 500) pageSize = 500;
+        if (pageSize < 1) pageSize = 1;
+        if (page < 1) page = 1;
+
+        // OFFSET в Postgres линейный — глубокое листание запрещаем, пользователь сужает фильтр.
+        if ((long)page * pageSize > 10_000)
+            return BadRequest("page too deep: page*pageSize must be <= 10000, narrow the filter");
+
+        // position: all|top|podium → верхняя граница места.
+        // top оставляет строки без места (DSQ/DNS) — зеркало клиентского фильтра; podium — нет.
+        (int? positionMax, var positionKeepUnranked) = position?.ToLowerInvariant() switch
+        {
+            null or "" or "all" => ((int?)null, false),
+            "top" => (10, true),
+            "podium" => (3, false),
+            _ => (-1, false)
+        };
+        if (positionMax == -1)
+            return BadRequest("position must be 'all', 'top' or 'podium'");
+
+        // eventDate: конкретный день события, dd/MM/yyyy (формат Competition.Date)
+        DateTime? eventDateValue = null;
+        if (!string.IsNullOrWhiteSpace(eventDate))
+        {
+            if (!DateTime.TryParseExact(eventDate, "dd/MM/yyyy",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var parsedDate))
+                return BadRequest("eventDate must be in dd/MM/yyyy format");
+            eventDateValue = parsedDate;
+        }
 
         // competitionId: число или "last" (последнее по дате соревнование/событие)
         int? competitionIdValue = null;
@@ -62,12 +102,37 @@ public class ResultsController : ControllerBase
             Gender = gender,
             PoolType = poolType,
             DateFrom = dateFrom,
-            DateTo = dateTo
+            DateTo = dateTo,
+            BirthYearFrom = birthYearFrom,
+            BirthYearTo = birthYearTo,
+            AgeGroup = ageGroup,
+            PositionMax = positionMax,
+            PositionKeepUnranked = positionKeepUnranked,
+            EventDate = eventDateValue
         };
 
-        var (items, hasMore) = await _results.GetPagedAsync(filter, page, pageSize);
+        var (items, hasMore, total) = await _results.GetPagedAsync(filter, page, pageSize);
 
-        return Ok(new { page, pageSize, hasMore, data = items });
+        return Ok(new { page, pageSize, hasMore, total, data = items });
+    }
+
+    // Публичный аналог админского /api/admin/results/filter-hints: в paged-режиме клиент
+    // не имеет полного датасета и берёт опции фильтров отсюда (контракт 3.2 §4).
+    private static readonly HashSet<string> AllowedHintFields =
+        new(["style", "distance", "club", "competition", "name"]);
+
+    /// <summary>Подсказки значений фильтров (prefix-поиск, кэш на сервере).</summary>
+    [HttpGet("filter-hints")]
+    public async Task<IActionResult> GetFilterHints(
+        [FromQuery] string field,
+        [FromQuery] string? q,
+        [FromQuery] int limit = 20)
+    {
+        if (string.IsNullOrWhiteSpace(field) || !AllowedHintFields.Contains(field))
+            return BadRequest("field must be one of: style, distance, club, competition, name");
+
+        return await this.CachedJson(_cache, $"http:filter-hints:{field}:{q}:{limit}",
+            () => _results.GetFilterHintsAsync(field, q, limit), PayloadTtl, CacheControlValue);
     }
 
     /// <summary>
@@ -87,7 +152,8 @@ public class ResultsController : ControllerBase
     /// </summary>
     [HttpGet("/api/competitions")]
     public async Task<IActionResult> GetSources()
-        => Ok(await _results.GetSourcesAsync());
+        => await this.CachedJson(_cache, "http:competition-sources",
+            () => _results.GetSourcesAsync(), PayloadTtl, CacheControlValue);
 
     /// <summary>
     /// Карьерные (all-time) данные спортсмена для карточки: соревнования, заплывы,
@@ -97,7 +163,9 @@ public class ResultsController : ControllerBase
     public async Task<IActionResult> GetAthleteCareer([FromQuery] string name)
     {
         if (string.IsNullOrWhiteSpace(name)) return BadRequest("name is required");
-        var career = await _results.GetAthleteCareerAsync(name);
-        return Ok(career ?? new AthleteCareerDto());
+
+        return await this.CachedJson(_cache, $"http:athlete-career:{name.Trim().ToLowerInvariant()}",
+            async () => await _results.GetAthleteCareerAsync(name) ?? new AthleteCareerDto(),
+            PayloadTtl, CacheControlValue);
     }
 }
