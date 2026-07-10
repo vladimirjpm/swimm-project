@@ -128,10 +128,9 @@ function ResultsMain() {
   }, [dispatch, filters]);
 
   // === Проверка, выбран ли источник ===
-  const hasSource =
-    selectedSource &&
-    selectedSource.results &&
-    selectedSource.results.length > 0;
+  // По title, а не по длине results: в paged-режиме первая страница с дефолтными
+  // фильтрами может законно вернуть 0 строк — форма фильтров всё равно должна остаться видимой.
+  const hasSource = !!selectedSource?.title;
 
   const filtersSummary = useMemo(
     () => summarizeFilters(filters, isTraining),

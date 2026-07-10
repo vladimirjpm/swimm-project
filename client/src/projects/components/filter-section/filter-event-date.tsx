@@ -7,6 +7,7 @@ import {
 import UI_DateIcon from '../mix/date-icon/date-icon';
 import { useFilteredByTypeResults } from './use-filtered-results';
 import FilterCard from './filter-card';
+import { useResultsLoadMode } from '../../../hooks/useResultsLoadMode';
 
 /**
  * Парсит дату формата DD/MM/YYYY в объект Date для сортировки.
@@ -24,10 +25,15 @@ const FilterEventDate: React.FC = () => {
   const dispatch = useAppDispatch();
   const filters = useAppSelector((state) => state.filterSelected);
   const filteredByTypeResults = useFilteredByTypeResults();
+  const mode = useResultsLoadMode();
+  const dayDates = useAppSelector((state) => state.dataSourceSelected?.day_dates);
 
   const current = filters.event_date || 'all';
 
   const uniqueDates = useMemo(() => {
+    // Paged: страница (сортировка по дате DESC) обычно покрывает один день события —
+    // опции дней берём из day_dates источника (/api/competitions), а не из строк.
+    if (mode === 'paged' && dayDates?.length) return dayDates;
     const set = new Set<string>();
     filteredByTypeResults.forEach((r) => {
       if (r.date) set.add(r.date);
@@ -35,7 +41,7 @@ const FilterEventDate: React.FC = () => {
     return Array.from(set).sort(
       (a, b) => parseDateDMY(a).getTime() - parseDateDMY(b).getTime(),
     );
-  }, [filteredByTypeResults]);
+  }, [mode, dayDates, filteredByTypeResults]);
 
   const updateFilter = (value: string) => {
     if (value === 'all') {

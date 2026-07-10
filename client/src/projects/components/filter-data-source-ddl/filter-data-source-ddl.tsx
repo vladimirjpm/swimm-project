@@ -7,6 +7,7 @@ import {
   useAppSelector,
 } from '../../../store/store';
 import { Result } from '../../../utils/interfaces/results';
+import { ResultsPaging } from '../../../store/store';
 import {
   RESULTS_CATEGORIES,
   resolveCategoryKey,
@@ -14,6 +15,12 @@ import {
 } from '../../../utils/constants/results-categories';
 import CategoryHelper, { CategoryDisplay } from '../../../utils/helpers/category-helper';
 import ResultsLoadModeHelper from '../../../utils/helpers/results-load-mode';
+import { useResultsLoadMode } from '../../../hooks/useResultsLoadMode';
+import {
+  PAGED_PAGE_SIZE,
+  buildResultsFilterParams,
+  fetchResultsPage,
+} from '../../../utils/helpers/results-api';
 
 // ── Категорийный селектор соревнований ──────────────────────────────────────
 // База: design_handoff_category_selector (табы + поиск + сезон + live/upcoming +
@@ -21,29 +28,28 @@ import ResultsLoadModeHelper from '../../../utils/helpers/results-load-mode';
 // селектор в акцентную шапку; «Change» открывает панель как дропдаун (desktop)
 // или bottom sheet (mobile, <640px); deep-link ?category= рендерит панель inline.
 
-// Постраничная выгрузка результатов с серверного API (/api/results).
+// Загрузка результатов с серверного API (/api/results).
 // Поля ResultDto совпадают с клиентским Result — конвертация не нужна.
 // В dev работает через Vite-прокси /api → http://localhost:5078.
 //
 // Режим загрузки (админ-настройка ResultsLoadMode + ?loadMode=, см. ResultsLoadModeHelper):
-//   'full'  — качаем ВСЕ страницы соревнования и фильтруем на клиенте (текущее поведение);
-//   'paged' — шов под фазу 3 (этап 3.2 роадмапа): фильтры уйдут на сервер query-параметрами,
-//             грузиться будет только запрошенная страница. Пока намеренно ведёт себя как
-//             'full' — включать в админке имеет смысл только после реализации 3.2.
+//   'full'  — качаем ВСЕ страницы соревнования, фильтрация — на клиенте (ResultsTable);
+//   'paged' — этап 3.2 роадмапа: фильтры уходят на сервер query-параметрами (buildResultsFilterParams,
+//             контракт §2), грузится только одна страница за раз.
 const loadFromApi = async (
-  params: Record<string, string> = {},
-): Promise<Result[]> => {
+  sourceParams: Record<string, string> = {},
+  filterParams: Record<string, string> = {},
+): Promise<{ results: Result[]; paging?: ResultsPaging }> => {
   const mode = await ResultsLoadModeHelper.getMode();
   if (mode === 'paged') {
-    // TODO(фаза 3.2): серверная фильтрация + постраничная подгрузка вместо полного скачивания.
-    console.info('[results] loadMode=paged ещё не реализован — работаем как full (фаза 3.2)');
+    return await fetchResultsPage(sourceParams, filterParams, 1, PAGED_PAGE_SIZE);
   }
   const all: Result[] = [];
   let page = 1;
   const pageSize = 500; // максимум, отдаваемый сервером
   for (;;) {
     const qs = new URLSearchParams({
-      ...params,
+      ...sourceParams,
       page: String(page),
       pageSize: String(pageSize),
     });
@@ -54,7 +60,7 @@ const loadFromApi = async (
     if (!json.hasMore) break;
     page += 1;
   }
-  return all;
+  return { results: all };
 };
 
 // Элемент /api/competitions: событие (свёрнуто в одну запись) или однодневное соревнование.
@@ -69,6 +75,8 @@ type CompetitionSource = {
   status: 'live' | 'upcoming' | 'done';
   day_count: number;
   result_count: number;
+  /** даты дней (dd/MM/yyyy, по возрастанию) — опции фильтра по дню в paged-режиме */
+  day_dates: string[];
 };
 
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -263,18 +271,33 @@ const DataSourceDDL: React.FC = () => {
     load();
   }, []);
 
+  // Ключ последнего paged-фетча (source+фильтры) — чтобы эффект синхронизации фильтров
+  // (ниже) не задвоил запрос сразу после loadSource (тот тоже меняет filterSelected: date/date_str).
+  const lastPagedFetchKeyRef = React.useRef<string | null>(null);
+  const pagedFetchKey = (sourceParams: Record<string, string>, filterParams: Record<string, string>) =>
+    JSON.stringify({ sourceParams, filterParams });
+
   // Загрузка результатов выбранного соревнования в store.
   // Флаги датасета (is_masters/is_award/show_combine) берём из самих результатов —
-  // ResultDto несёт их денормализованно per-competition.
+  // ResultDto несёт их денормализованно per-competition. category соревнования из /api/competitions
+  // определяет isMasters ДО загрузки — нужно для маппинга фильтра Age в paged-режиме (contract §2).
   const loadSource = async (src: CompetitionSource) => {
     const [k, v] = sourceUrlParam(src);
+    const sourceParams = { [k]: v };
+    // event_date — фильтр КОНКРЕТНОГО источника: день Maccabiah бессмыслен для другого
+    // соревнования (в paged сервер честно вернёт 0 строк, в full клиентский фильтр так же
+    // опустошит таблицу) — при смене источника сбрасываем.
+    const effectiveFilters = { ...filters, event_date: 'all' };
+    const filterParams = buildResultsFilterParams(effectiveFilters, src.category === 'masters');
     let data: Result[];
+    let paging: ResultsPaging | undefined;
     try {
-      data = await loadFromApi({ [k]: v });
+      ({ results: data, paging } = await loadFromApi(sourceParams, filterParams));
     } catch (e) {
       console.error('Error loading data source', e);
       return;
     }
+    lastPagedFetchKeyRef.current = pagedFetchKey(sourceParams, filterParams);
 
     const showCombine =
       data.length > 0 && data.every((r) => r.show_combine_all_results === true);
@@ -297,14 +320,50 @@ const DataSourceDDL: React.FC = () => {
           title: src.name,
           is_masters: isMasters,
           is_award: isAward,
+          sourceParams,
+          day_dates: src.day_dates,
         },
         showCombineAllResults: showCombine,
-        ...(maxDate
-          ? { filterSelected: { ...filters, date: maxDate, date_str: iso } }
-          : {}),
+        resultsPaging: paging,
+        filterSelected: maxDate
+          ? { ...effectiveFilters, date: maxDate, date_str: iso }
+          : effectiveFilters,
       }),
     );
   };
+
+  // Paged-режим: смена любого серверного фильтра → рефетч страницы 1 с новыми query-параметрами
+  // (контракт 3.2 §4). lastPagedFetchKeyRef защищает от повторного фетча тех же параметров —
+  // срабатывает и на самостоятельный вызов loadSource (тот уже обновил ref), и на «пустые»
+  // изменения filterSelected (date/date_str), которые в query не участвуют.
+  const mode = useResultsLoadMode();
+  const dataSourceSelected = useAppSelector((s) => s.dataSourceSelected);
+  const filtersKey = JSON.stringify(filters);
+  React.useEffect(() => {
+    if (mode !== 'paged') return;
+    const sourceParams = dataSourceSelected?.sourceParams;
+    if (!sourceParams) return;
+
+    const filterParams = buildResultsFilterParams(filters, !!dataSourceSelected?.is_masters);
+    const key = pagedFetchKey(sourceParams, filterParams);
+    if (key === lastPagedFetchKeyRef.current) return;
+    lastPagedFetchKeyRef.current = key;
+
+    (async () => {
+      try {
+        const { results, paging } = await fetchResultsPage(sourceParams, filterParams, 1, PAGED_PAGE_SIZE);
+        dispatch(
+          rootActions.updateState({
+            dataSourceSelected: { ...dataSourceSelected, results, sourceParams },
+            resultsPaging: paging,
+          }),
+        );
+      } catch (e) {
+        console.error('Error refetching paged results', e);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, dataSourceSelected?.sourceParams, filtersKey]);
 
   const selectSource = (src: CompetitionSource) => {
     writeUrl({ source: src, season: seasonTouched ? season : null });
@@ -351,25 +410,31 @@ const DataSourceDDL: React.FC = () => {
     }
     // Конкретный id вне списка (например, день события) — грузим напрямую, таб не трогаем.
     // Флаги датасета обязательны и здесь: без is_award медали соревнования не считаются.
+    // category соревнования тут неизвестна заранее (нет в CompetitionSource-списке) —
+    // Age-фильтр в paged-режиме мапится как non-masters (birthYear); край-кейс direct-link.
     if (competitionId || eventId) {
       if (!urlLoadTriggered) {
         urlLoadTriggered = true;
-        void loadFromApi(eventId ? { eventId } : { competitionId: competitionId! }).then(
-          (data) =>
-            data.length &&
-            dispatch(
-              rootActions.updateState({
-                dataSourceSelected: {
-                  results: data,
-                  title: data[0].competition,
-                  is_masters: data.some((r) => r.is_masters === true),
-                  is_award: data.some((r) => r.is_award === true),
-                },
-                showCombineAllResults:
-                  data.length > 0 && data.every((r) => r.show_combine_all_results === true),
-              }),
-            ),
-        );
+        const sourceParams: Record<string, string> = eventId ? { eventId } : { competitionId: competitionId! };
+        const filterParams = buildResultsFilterParams(filters, false);
+        void loadFromApi(sourceParams, filterParams).then(({ results: data, paging }) => {
+          if (!data.length) return;
+          lastPagedFetchKeyRef.current = pagedFetchKey(sourceParams, filterParams);
+          dispatch(
+            rootActions.updateState({
+              dataSourceSelected: {
+                results: data,
+                title: data[0].competition,
+                is_masters: data.some((r) => r.is_masters === true),
+                is_award: data.some((r) => r.is_award === true),
+                sourceParams,
+              },
+              showCombineAllResults:
+                data.length > 0 && data.every((r) => r.show_combine_all_results === true),
+              resultsPaging: paging,
+            }),
+          );
+        });
       }
       return;
     }

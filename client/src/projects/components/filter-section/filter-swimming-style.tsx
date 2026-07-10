@@ -9,20 +9,28 @@ import { getFilterData } from './filter-types';
 import { useFilteredByTypeResults } from './use-filtered-results';
 import FilterCard from './filter-card';
 import FilterDistance from './filter-distance';
+import { useResultsLoadMode } from '../../../hooks/useResultsLoadMode';
+import { useFilterHints } from '../../../hooks/useFilterHints';
 
 const FilterSwimmingStyle: React.FC = () => {
   const dispatch = useAppDispatch();
   const filters = useAppSelector((state) => state.filterSelected);
   const filterData = getFilterData();
   const filteredByTypeResults = useFilteredByTypeResults();
+  const mode = useResultsLoadMode();
+  // Paged: на клиенте только текущая страница — доступность стилей не вычислить из неё,
+  // источник — filter-hints (контракт 3.2 §4). Глобальный (не per-competition) список,
+  // но в паре с serverной фильтрацией по styleName это не даёт ложных disabled.
+  const styleHints = useFilterHints('style', '', 50, mode === 'paged');
 
   const availableStyleNames = useMemo(() => {
+    if (mode === 'paged') return new Set(styleHints);
     const set = new Set<string>();
     filteredByTypeResults.forEach((r) => {
       if (r.event_style_name) set.add(r.event_style_name);
     });
     return set;
-  }, [filteredByTypeResults]);
+  }, [mode, styleHints, filteredByTypeResults]);
 
   if (!filterData) return null;
 

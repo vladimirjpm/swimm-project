@@ -4,6 +4,7 @@ import {
   useAppDispatch,
   useAppSelector,
 } from '../../../store/store';
+import { useResultsLoadMode } from '../../../hooks/useResultsLoadMode';
 
 /**
  * Кнопка-тогглер «Recalculate».
@@ -13,6 +14,7 @@ const FilterRecalculate: React.FC = () => {
   const dispatch = useAppDispatch();
   const filters = useAppSelector((state) => state.filterSelected);
   const showCombineAllResults = useAppSelector((state) => state.showCombineAllResults);
+  const mode = useResultsLoadMode();
   const isActive = !!filters.is_recalculated;
 
   const toggle = () => {
@@ -23,8 +25,9 @@ const FilterRecalculate: React.FC = () => {
     );
   };
 
+  // Пересчёт требует полного датасета события — в paged v1 недоступен (контракт 3.2 §5).
   return (
-    showCombineAllResults ? (
+    mode !== 'paged' && showCombineAllResults ? (
     <div className="flex flex-col">
       <button
         type="button"

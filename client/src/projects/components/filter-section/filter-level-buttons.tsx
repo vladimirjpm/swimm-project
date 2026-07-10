@@ -6,6 +6,7 @@ import {
 } from '../../../store/store';
 import UI_NormativeLevelIcon from '../mix/normative-level-icon/normative-level-icon';
 import FilterCard from './filter-card';
+import { useResultsLoadMode } from '../../../hooks/useResultsLoadMode';
 
 /**
  * Фильтр по уровню норматива.
@@ -18,6 +19,7 @@ const FilterLevelButtons: React.FC = () => {
   const dispatch = useAppDispatch();
   const filters = useAppSelector((state) => state.filterSelected);
   const bestLevel = useAppSelector((state) => state.bestLevelInfo);
+  const mode = useResultsLoadMode();
 
   const current = filters.level_filter || 'all';
 
@@ -29,6 +31,8 @@ const FilterLevelButtons: React.FC = () => {
     );
   };
 
+  // Серверного аналога level_filter в paged v1 нет (контракт 3.2 §5, кандидат в 3.4) — скрываем.
+  if (mode === 'paged') return null;
   // Если нет результатов с уровнем — не показываем фильтр
   if (!bestLevel) return null;
 

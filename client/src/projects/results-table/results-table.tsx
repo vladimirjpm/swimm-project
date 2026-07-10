@@ -18,6 +18,8 @@ import { recalculatePositions } from '../../utils/helpers/recalculate-positions'
 import NormativeAgeRecords from './components/normative-age-records';
 import NormativeMastersRecords from './components/normative-masters-records';
 import '../components/mix/text-effect/text-effect.css';
+import { useResultsLoadMode } from '../../hooks/useResultsLoadMode';
+import { buildResultsFilterParams, fetchResultsPage } from '../../utils/helpers/results-api';
 
 function ResultsTable() {
   const dispatch = useAppDispatch();
@@ -25,6 +27,9 @@ function ResultsTable() {
   const filters = useAppSelector((state) => state.filterSelected);
   const isMastersSource = !!selectedSource?.is_masters;
   const isAwardSource = !!selectedSource?.is_award;
+  const loadMode = useResultsLoadMode();
+  const resultsPaging = useAppSelector((state) => state.resultsPaging);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const {
     isAuthenticated,
@@ -34,7 +39,9 @@ function ResultsTable() {
     togglePrimarySwimmer,
   } = useFavoritesContext();
 
-  if (!selectedSource || !selectedSource.results?.length) {
+  // По title, а не по длине results: в paged-режиме первая страница с текущими фильтрами
+  // может законно вернуть 0 строк — это "No results match", а не "источник не выбран".
+  if (!selectedSource || !selectedSource.title) {
     return <div className="text-[var(--theme-mode-text-muted)] italic">No data source selected.</div>;
   }
 
@@ -242,6 +249,33 @@ function ResultsTable() {
       dispatch(rootActions.updateState({ filterSelected: { ...filters, ...newFilter } }));
   };
 
+  // Paged-режим: «Show more» догружает следующую страницу и аппендит к уже загруженным (контракт 3.2 §3).
+  const handleShowMore = async () => {
+    const sourceParams = selectedSource.sourceParams;
+    if (!resultsPaging || !sourceParams || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const filterParams = buildResultsFilterParams(filters, isMastersSource);
+      const nextPage = resultsPaging.page + 1;
+      const { results, paging } = await fetchResultsPage(
+        sourceParams, filterParams, nextPage, resultsPaging.pageSize,
+      );
+      dispatch(
+        rootActions.updateState({
+          dataSourceSelected: {
+            ...selectedSource,
+            results: [...(selectedSource.results ?? []), ...results],
+          },
+          resultsPaging: paging,
+        }),
+      );
+    } catch (e) {
+      console.error('Error loading more results', e);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   return (
     <div className="results table w-full">
       <div className="mb-4">
@@ -401,6 +435,24 @@ function ResultsTable() {
             )}
           </ul>
         </div>
+
+        {loadMode === 'paged' && resultsPaging && (
+          <div className="flex flex-col items-center gap-2 py-3">
+            <div className="text-xs text-[var(--theme-mode-text-muted)]">
+              Showing {displayResults.length} of {resultsPaging.total}
+            </div>
+            {resultsPaging.hasMore && (
+              <button
+                type="button"
+                onClick={handleShowMore}
+                disabled={loadingMore}
+                className="fseg"
+              >
+                {loadingMore ? 'Loading…' : 'Show more'}
+              </button>
+            )}
+          </div>
+        )}
 
       </div>
     </div>

@@ -3,6 +3,10 @@ export interface ResultWrap {
     results?: Result[];
     is_masters?: boolean;
     is_award?: boolean;
+    /** paged-режим: { eventId } | { competitionId } источника — нужен для Show more и рефетча по фильтрам. */
+    sourceParams?: Record<string, string>;
+    /** paged-режим: даты дней источника (dd/MM/yyyy, по возрастанию) — опции фильтра по дню. */
+    day_dates?: string[];
   }
   
   export interface Result {

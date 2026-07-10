@@ -6,14 +6,21 @@ import {
 } from '../../../store/store';
 import { getFilterData } from './filter-types';
 import { useFilteredByTypeResults } from './use-filtered-results';
+import { useResultsLoadMode } from '../../../hooks/useResultsLoadMode';
+import { useFilterHints } from '../../../hooks/useFilterHints';
 
 const FilterDistance: React.FC = () => {
   const dispatch = useAppDispatch();
   const filters = useAppSelector((state) => state.filterSelected);
   const filterData = getFilterData();
   const filteredByTypeResults = useFilteredByTypeResults();
+  const mode = useResultsLoadMode();
+  // Paged: см. FilterSwimmingStyle — доступность дистанций из глобального filter-hints,
+  // не из загруженной страницы (её не хватит, чтобы судить обо всей выборке).
+  const distanceHints = useFilterHints('distance', '', 50, mode === 'paged');
 
   const availableLengths = useMemo(() => {
+    if (mode === 'paged') return new Set(distanceHints.map(Number));
     const set = new Set<number>();
     if (filters.style_name) {
       filteredByTypeResults.forEach((r) => {
@@ -26,7 +33,7 @@ const FilterDistance: React.FC = () => {
       });
     }
     return set;
-  }, [filteredByTypeResults, filters.style_name]);
+  }, [mode, distanceHints, filteredByTypeResults, filters.style_name]);
 
   if (!filterData || !filters.style_name) return null;
 

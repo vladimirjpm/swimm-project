@@ -5,11 +5,13 @@ import {
   useAppSelector,
 } from '../../../store/store';
 import { ActivityType } from '../../../utils/interfaces/filter-selected';
+import { useResultsLoadMode } from '../../../hooks/useResultsLoadMode';
 
 const FilterActivity: React.FC = () => {
   const dispatch = useAppDispatch();
   const filters = useAppSelector((state) => state.filterSelected);
   const dataResults = useAppSelector((state) => state.dataSourceSelected?.results) || [];
+  const mode = useResultsLoadMode();
 
   // Проверяем, есть ли хотя бы одна запись с training
   const hasAnyTraining = React.useMemo(() => {
@@ -24,8 +26,9 @@ const FilterActivity: React.FC = () => {
     );
   };
 
-  // Если нет training записей — не показываем фильтр
-  if (!hasAnyTraining) {
+  // Paged-режим — только competition (сервер тренировок не отдаёт), тумблер скрыт (контракт 3.2 §5).
+  // Иначе — если нет training записей — не показываем фильтр.
+  if (mode === 'paged' || !hasAnyTraining) {
     return null;
   }
 

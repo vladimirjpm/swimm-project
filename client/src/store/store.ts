@@ -18,6 +18,14 @@ export interface BestLevelInfo {
   isMasters: boolean;
 }
 
+/** Paged-режим (этап 3.2 роадмапа): метаданные текущей страницы результатов из /api/results. */
+export interface ResultsPaging {
+  page: number;
+  pageSize: number;
+  total: number;
+  hasMore: boolean;
+}
+
 export interface StateInterface extends IIndexable {
   isDebug:boolean;
   debigConfig:DebugConfig
@@ -30,6 +38,7 @@ export interface StateInterface extends IIndexable {
   filterSelected:FilterSelected;
   bestLevelInfo?: BestLevelInfo | null;
   showCombineAllResults: boolean;
+  resultsPaging?: ResultsPaging;
 }
 
 // Начальное состояние (может быть заполнено динамически)
