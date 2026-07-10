@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Helper from '../../../utils/helpers/data-helper';
-import RecordsHelper from '../../../utils/helpers/records-helper';
+import RecordsHelper, { maxUpdatedAtLabel } from '../../../utils/helpers/records-helper';
 
 interface AgeRecord {
   time: string;
@@ -8,6 +8,7 @@ interface AgeRecord {
   club: string;
   country: string;
   record_date: string;
+  updated_at?: string;
 }
 
 interface NormativeAgeRecordsProps {
@@ -100,6 +101,7 @@ const FALLBACK_RECORD: AgeRecord = { time: '—', name: '', club: '', country: '
 function renderOneAge(genderKey: string, resolvedAge: string, record: AgeRecord) {
   const s = getStyles(genderKey);
   const chip = `${s.label} · ${resolvedAge}y`;
+  const updated = maxUpdatedAtLabel([record.updated_at]);
 
   return (
     <div
@@ -125,6 +127,9 @@ function renderOneAge(genderKey: string, resolvedAge: string, record: AgeRecord)
         <div className={`text-[30px] sm:text-[40px] font-extrabold ${s.deep} tabular-nums tracking-[-1px] sm:tracking-[-1.5px] leading-none`}>
           {record.time}
         </div>
+        {updated && (
+          <div className="text-[9px] sm:text-[11px] text-[#aab0bd] mt-[2px] sm:mt-1">updated {updated}</div>
+        )}
       </div>
     </div>
   );
@@ -137,12 +142,16 @@ function renderOneAge(genderKey: string, resolvedAge: string, record: AgeRecord)
 function renderTwoAges(resolvedAge: string, maleRecord: AgeRecord, femaleRecord: AgeRecord) {
   const m = getStyles('male');
   const f = getStyles('female');
+  const updated = maxUpdatedAtLabel([maleRecord.updated_at, femaleRecord.updated_at]);
 
   return (
     <div className={`${CARD_SURFACE} border border-[#e9edf3] dark:border-[#28344a] rounded-2xl sm:rounded-[18px] p-3.5 sm:p-5 mb-4`} style={CARD_SHADOW}>
       <div className="flex items-center justify-center gap-1.5 sm:gap-2 mb-3 sm:mb-4">
         <span className="text-sm sm:text-base">🏅</span>
         <span className="text-[10px] sm:text-[12px] font-extrabold tracking-[0.09em] uppercase text-[#9098a4]">National Record · {resolvedAge}y</span>
+        {updated && (
+          <span className="text-[9px] sm:text-[10px] font-semibold text-[#aab0bd] normal-case tracking-normal">· updated {updated}</span>
+        )}
       </div>
       <div className="grid gap-3 sm:gap-5 items-stretch" style={{ gridTemplateColumns: '1fr 1px 1fr' }}>
         <div className="flex flex-col items-center gap-[5px] sm:gap-2 text-center">
@@ -171,6 +180,7 @@ function renderGenderCell(genderKey: 'male' | 'female', rec: AgeRecord) {
   const isMale = genderKey === 'male';
   const color = isMale ? 'text-[#123a70] dark:text-[#dbe8fb]' : 'text-[#7a1f4b] dark:text-[#fbdcec]';
   const bg = isMale ? 'bg-[#f6faff] dark:bg-[#1a2436]' : 'bg-[#fff7fb] dark:bg-[#2a1a24]';
+  const updated = maxUpdatedAtLabel([rec.updated_at]);
 
   const time = (
     <div className={`text-[15px] sm:text-[17px] font-extrabold ${color} tabular-nums leading-tight shrink-0`}>
@@ -186,7 +196,10 @@ function renderGenderCell(genderKey: 'male' | 'female', rec: AgeRecord) {
   );
 
   return (
-    <div className={`${bg} rounded-lg px-2.5 py-[5px] sm:py-2 flex items-center gap-2`}>
+    <div
+      className={`${bg} rounded-lg px-2.5 py-[5px] sm:py-2 flex items-center gap-2`}
+      title={updated ? `updated ${updated}` : undefined}
+    >
       {isMale ? <>{info}{time}</> : <>{time}{info}</>}
     </div>
   );
@@ -212,6 +225,10 @@ function renderManyAges(
   const rangeLabel = ages.length > 1 ? `${ages[0]}–${ages[ages.length - 1]}y` : `${ages[0]}y`;
   const showMale = !!maleData;
   const showFemale = !!femaleData;
+  const updated = maxUpdatedAtLabel([
+    ...Object.values(maleData ?? {}).map(r => r.updated_at),
+    ...Object.values(femaleData ?? {}).map(r => r.updated_at),
+  ]);
 
   return (
     <div className={`${CARD_SURFACE} border border-[#e9edf3] dark:border-[#28344a] rounded-2xl mb-4`} style={CARD_SHADOW}>
@@ -225,6 +242,9 @@ function renderManyAges(
         {showMale && <span className="text-[10px] sm:text-[11px] font-extrabold text-[#1e6fd6] dark:text-[#5aa2f5] bg-[#eaf2fd] dark:bg-[rgba(90,162,245,0.16)] px-2 py-0.5 rounded-full shrink-0">♂</span>}
         {showFemale && <span className="text-[10px] sm:text-[11px] font-extrabold text-[#d6417f] dark:text-[#f072a6] bg-[#fdeff5] dark:bg-[rgba(240,114,166,0.16)] px-2 py-0.5 rounded-full shrink-0">♀</span>}
         <span className="text-[10px] sm:text-[11px] font-bold text-[#aab0bd] shrink-0 whitespace-nowrap">{rangeLabel}</span>
+        {updated && (
+          <span className="text-[9px] sm:text-[10px] font-semibold text-[#aab0bd] shrink-0 whitespace-nowrap">updated {updated}</span>
+        )}
         <span
           className={`text-[#8a93a3] text-[11px] sm:text-[12px] shrink-0 transition-transform duration-150 ease-out motion-reduce:transition-none ${isOpen ? 'rotate-180' : ''}`}
         >

@@ -98,4 +98,9 @@ public class Record
     /// встречаются и M/d/yyyy — нормализация руками через админ-CRUD, не сидером).</summary>
     [MaxLength(20)]
     public string? RecordDate { get; set; }
+
+    /// <summary>Когда МЫ обновили эту запись (UTC) — не путать с <see cref="RecordDate"/>
+    /// (дата установления рекорда спортсменом). Проставляется при создании/правке/апдейте
+    /// диффа; сидер ставит время сидинга.</summary>
+    public DateTime UpdatedAt { get; set; }
 }

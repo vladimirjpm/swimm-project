@@ -117,7 +117,8 @@ public class RecordsSeeder : IRecordsSeeder
                     Time = Str(scope.Value, "time") ?? "",
                     HolderName = Str(scope.Value, "name"),
                     HolderCountry = Str(scope.Value, "country"),
-                    RecordDate = Str(scope.Value, "record_date")
+                    RecordDate = Str(scope.Value, "record_date"),
+                    UpdatedAt = DateTime.UtcNow
                 });
             }
         log.Add($"normative-records.js → {list.Count} open-рекордов (WR+ISR)");
@@ -145,7 +146,8 @@ public class RecordsSeeder : IRecordsSeeder
                     HolderName = Str(age.Value, "name"),
                     Club = Str(age.Value, "club"),
                     HolderCountry = Str(age.Value, "country") ?? LegacyCountry,
-                    RecordDate = Str(age.Value, "record_date")
+                    RecordDate = Str(age.Value, "record_date"),
+                    UpdatedAt = DateTime.UtcNow
                 });
         log.Add($"normative-age-records.js → {list.Count} age-рекордов (ISR)");
         return list;
@@ -172,7 +174,8 @@ public class RecordsSeeder : IRecordsSeeder
                     HolderName = Str(group.Value, "name"),
                     Club = Str(group.Value, "club"),
                     HolderCountry = LegacyCountry,
-                    RecordDate = Str(group.Value, "record_date")
+                    RecordDate = Str(group.Value, "record_date"),
+                    UpdatedAt = DateTime.UtcNow
                 });
         log.Add($"normative-masters-records.js → {list.Count} masters-рекордов (ISR)");
         return list;

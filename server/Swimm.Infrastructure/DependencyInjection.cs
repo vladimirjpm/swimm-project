@@ -52,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<IResultRepository, ResultRepository>();
         services.AddScoped<IRecordRepository, RecordRepository>();
         services.AddScoped<IRecordAdminRepository, RecordAdminRepository>();
+        services.AddScoped<IRecordDiffService, RecordDiffService>();
         services.AddScoped<IAdminRepository, AdminRepository>();
         services.AddScoped<ICompetitionAdminRepository, CompetitionAdminRepository>();
         services.AddScoped<ICategoryAdminRepository, CategoryAdminRepository>();

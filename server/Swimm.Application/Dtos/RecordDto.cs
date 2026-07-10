@@ -52,6 +52,10 @@ public class RecordDto
 
     [JsonPropertyName("record_date")]
     public string? RecordDate { get; set; }
+
+    /// <summary>Когда МЫ обновили эту запись (UTC) — не дата установления рекорда.</summary>
+    [JsonPropertyName("updated_at")]
+    public DateTime UpdatedAt { get; set; }
 }
 
 /// <summary>Плоский DTO норматива для /api/normative-standards.</summary>

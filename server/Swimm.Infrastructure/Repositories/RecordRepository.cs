@@ -59,7 +59,8 @@ public class RecordRepository : IRecordRepository
                 HolderName    = r.HolderName,
                 Club          = r.Club,
                 HolderCountry = r.HolderCountry,
-                RecordDate    = r.RecordDate
+                RecordDate    = r.RecordDate,
+                UpdatedAt     = r.UpdatedAt
             })
             .ToListAsync();
 

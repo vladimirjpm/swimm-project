@@ -54,6 +54,7 @@ public class RecordAdminRepository : IRecordAdminRepository
 
         var record = new Record();
         ApplyRecordInput(record, input);
+        record.UpdatedAt = DateTime.UtcNow;
 
         _db.Records.Add(record);
         return await SaveRecordAsync(record);
@@ -71,6 +72,7 @@ public class RecordAdminRepository : IRecordAdminRepository
         record.Club = Norm(input.Club);
         record.HolderCountry = Norm(input.HolderCountry);
         record.RecordDate = Norm(input.RecordDate);
+        record.UpdatedAt = DateTime.UtcNow;
 
         return await SaveRecordAsync(record);
     }
@@ -248,7 +250,8 @@ public class RecordAdminRepository : IRecordAdminRepository
         HolderName = r.HolderName,
         Club = r.Club,
         HolderCountry = r.HolderCountry,
-        RecordDate = r.RecordDate
+        RecordDate = r.RecordDate,
+        UpdatedAt = r.UpdatedAt
     };
 
     private static NormativeStandardDto ToDto(NormativeStandard s) => new()

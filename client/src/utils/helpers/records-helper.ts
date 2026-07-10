@@ -31,6 +31,7 @@ interface RecordDto {
   club?: string | null;
   holder_country?: string | null;
   record_date?: string | null;
+  updated_at?: string;
 }
 
 interface NormativeStandardDto {
@@ -50,6 +51,7 @@ export interface OpenRecordCell {
   name: string | null;
   country?: string | null;
   record_date?: string | null;
+  updated_at?: string;
 }
 export type OpenRecordsTree = {
   normatives: Record<Gender, Record<PoolKey, Record<string, Record<string, { ISR?: OpenRecordCell; WR?: OpenRecordCell }>>>>;
@@ -61,6 +63,7 @@ export interface AgeRecordCell {
   club?: string | null;
   country?: string | null;
   record_date?: string | null;
+  updated_at?: string;
 }
 export type AgeRecordsTree = {
   normatives: Record<Gender, Record<PoolKey, Record<string, Record<string, Record<string, AgeRecordCell>>>>>;
@@ -77,6 +80,26 @@ export type MastersStandardsTree = {
 };
 
 const poolKey = (poolType: string): PoolKey => (poolType === '50m' ? '50m_pool' : '25m_pool');
+
+/**
+ * MAX(updated_at) среди переданных ISO-дат, отформатированный как dd/MM/yyyy для муляжной
+ * подписи «updated …» под карточками рекордов. null, если ни одной валидной даты нет
+ * (например, RecordsHelper ещё не догрузился и работает legacy-fallback без updated_at).
+ */
+export function maxUpdatedAtLabel(values: Array<string | undefined | null>): string | null {
+  let max: Date | null = null;
+  for (const v of values) {
+    if (!v) continue;
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) continue;
+    if (!max || d > max) max = d;
+  }
+  if (!max) return null;
+  const dd = String(max.getDate()).padStart(2, '0');
+  const mm = String(max.getMonth() + 1).padStart(2, '0');
+  const yyyy = max.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
 
 async function fetchRecords(query: string): Promise<RecordDto[]> {
   const response = await fetch(`/api/records?${query}`);
@@ -129,6 +152,7 @@ export default class RecordsHelper {
           name: rec.holder_name ?? null,
           country: rec.holder_country,
           record_date: rec.record_date,
+          updated_at: rec.updated_at,
         };
       };
       world.forEach((r) => put(r, 'WR'));
@@ -156,6 +180,7 @@ export default class RecordsHelper {
           club: rec.club,
           country: rec.holder_country,
           record_date: rec.record_date,
+          updated_at: rec.updated_at,
         };
       });
       return tree;

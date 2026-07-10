@@ -2,213 +2,323 @@
 @model Swimm.API.Pages.Admin.ImportModel
 @{
     ViewData["Title"] = "Import";
-    ViewData["PageSubtitle"] = "Загрузка результатов из JSON/PDF + очистка данных";
+    ViewData["PageSubtitle"] = "Импорт соревнований (JSON/PDF) и рекордов из внешних источников";
 }
 
-<div class="max-w-[800px] mx-auto">
-    <!-- Mode switcher -->
+<div class="max-w-[900px] mx-auto">
+    <!-- Top-level tabs: что импортируем -->
     <div class="flex gap-2 mb-6">
-        <button id="tab-json" class="import-tab import-tab-active py-2 px-5 rounded-md text-sm font-semibold cursor-pointer border-none">
-            JSON
+        <button id="top-tab-competitions" class="import-tab import-tab-active py-2 px-5 rounded-md text-sm font-semibold cursor-pointer border-none">
+            Соревнования
         </button>
-        <button id="tab-pdf" class="import-tab py-2 px-5 rounded-md text-sm font-semibold cursor-pointer border-none">
-            PDF
+        <button id="top-tab-records" class="import-tab py-2 px-5 rounded-md text-sm font-semibold cursor-pointer border-none">
+            Рекорды
         </button>
     </div>
 
-    <!-- ============ JSON mode ============ -->
-    <div id="json-mode">
-        <!-- Info -->
-        <div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
-            Загрузите JSON-файл в формате <code class="text-admin-accent">ResultWrap</code> (с полями <code class="text-admin-accent">title</code>, <code class="text-admin-accent">results[]</code>)
-            или простой массив <code class="text-admin-accent">Result[]</code>.<br>
-            Сервис автоматически создаст записи в справочниках (Competitions, Clubs, Swimmers, Styles, Relays, Galleries) и заполнит таблицу Results.
-        </div>
-
-        <!-- Drop zone -->
-        <div id="drop-zone" class="drop-zone border-2 border-dashed border-admin-border rounded-xl p-12 text-center cursor-pointer transition-colors duration-200 mb-6">
-            <div class="text-4xl mb-4">📄</div>
-            <div class="text-lg text-admin-text mb-2">Перетащите JSON-файл сюда</div>
-            <div class="text-admin-text-muted mb-4">или</div>
-            <label class="inline-flex items-center gap-2 bg-admin-accent text-[#0c2536] font-semibold py-2 px-5 rounded-md cursor-pointer hover:bg-[#81d4fa] transition-colors">
-                📁 Выбрать файл
-                <input type="file" id="file-input" accept=".json" class="hidden">
-            </label>
-            <div id="file-name" class="mt-4 text-admin-text-muted text-sm hidden"></div>
-        </div>
-    </div>
-
-    <!-- ============ PDF mode ============ -->
-    <div id="pdf-mode" class="hidden">
-        <div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
-            Загрузите PDF-протокол соревнования. Основной файл обязателен; для многодневных/составных
-            протоколов можно добавить до трёх дополнительных файлов. После разбора появится превью —
-            проверьте счётчики и только потом нажимайте «Импортировать».
-        </div>
-
-        <div class="admin-card p-5 mb-6 space-y-4">
-            <div>
-                <label class="block text-sm text-admin-text mb-1">Основной файл <span class="text-admin-danger">*</span></label>
-                <input type="file" id="pdf-file" accept=".pdf" class="admin-input w-full">
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                    <label class="block text-xs text-admin-text-muted mb-1">Доп. файл 2</label>
-                    <input type="file" id="pdf-file-2" accept=".pdf" class="admin-input w-full text-xs">
-                </div>
-                <div>
-                    <label class="block text-xs text-admin-text-muted mb-1">Доп. файл 3</label>
-                    <input type="file" id="pdf-file-3" accept=".pdf" class="admin-input w-full text-xs">
-                </div>
-                <div>
-                    <label class="block text-xs text-admin-text-muted mb-1">Доп. файл 4</label>
-                    <input type="file" id="pdf-file-4" accept=".pdf" class="admin-input w-full text-xs">
-                </div>
-            </div>
-            <div class="flex flex-wrap gap-4 items-end">
-                <div>
-                    <label class="block text-xs text-admin-text-muted mb-1">Формат</label>
-                    <select id="pdf-format" class="admin-input min-w-[180px]">
-                        @foreach (var f in Model.ParseFormats)
-                        {
-                            <option value="@f">@f</option>
-                        }
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs text-admin-text-muted mb-1">Бассейн</label>
-                    <select id="pdf-pool-type" class="admin-input min-w-[120px]">
-                        <option value="">—</option>
-                        <option value="25m">25m</option>
-                        <option value="50m">50m</option>
-                    </select>
-                </div>
-                <label class="inline-flex items-center gap-2 text-sm text-admin-text pb-2">
-                    <input type="checkbox" id="pdf-is-award"> Наградной протокол (isAward)
-                </label>
-            </div>
-            <button id="btn-parse-pdf" disabled
-                class="admin-btn admin-btn-primary py-2.5 px-6 disabled:opacity-40 disabled:cursor-not-allowed">
-                🔍 Распарсить
+    <!-- ======================================================================== -->
+    <!-- ТАБ «СОРЕВНОВАНИЯ» — прежняя логика JSON/PDF, источники теперь карточки  -->
+    <!-- ======================================================================== -->
+    <div id="competitions-panel">
+        <!-- Source cards: PDF vs JSON -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+            <button id="tab-json" class="import-tab import-tab-active source-card text-left p-4 rounded-lg border-none cursor-pointer">
+                <div class="text-2xl mb-1">🗂</div>
+                <div class="font-semibold text-admin-text mb-1">JSON (legacy формат)</div>
+                <div class="text-xs text-admin-text-muted">Файл выгрузки старого сайта — <code class="text-admin-accent">ResultWrap</code> или массив <code class="text-admin-accent">Result[]</code></div>
+            </button>
+            <button id="tab-pdf" class="import-tab source-card text-left p-4 rounded-lg border-none cursor-pointer">
+                <div class="text-2xl mb-1">📄</div>
+                <div class="font-semibold text-admin-text mb-1">PDF протокол (IsrOrg)</div>
+                <div class="text-xs text-admin-text-muted">Протокол соревнования с isr.org.il, PDF, HE/EN — до 4 файлов на составные протоколы</div>
             </button>
         </div>
 
-        <!-- PDF preview -->
-        <div id="pdf-preview" class="hidden mb-6">
-            <div class="admin-card p-5">
-                <h3 class="text-lg mb-3 text-admin-accent">Превью разбора</h3>
-                <div class="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 mb-4" id="pdf-preview-stats"></div>
-                <table class="w-full text-sm mb-4" id="pdf-preview-table">
+        <!-- ============ JSON mode ============ -->
+        <div id="json-mode">
+            <!-- Drop zone -->
+            <div id="drop-zone" class="drop-zone border-2 border-dashed border-admin-border rounded-xl p-12 text-center cursor-pointer transition-colors duration-200 mb-6">
+                <div class="text-4xl mb-4">📄</div>
+                <div class="text-lg text-admin-text mb-2">Перетащите JSON-файл сюда</div>
+                <div class="text-admin-text-muted mb-4">или</div>
+                <label class="inline-flex items-center gap-2 bg-admin-accent text-[#0c2536] font-semibold py-2 px-5 rounded-md cursor-pointer hover:bg-[#81d4fa] transition-colors">
+                    📁 Выбрать файл
+                    <input type="file" id="file-input" accept=".json" class="hidden">
+                </label>
+                <div id="file-name" class="mt-4 text-admin-text-muted text-sm hidden"></div>
+            </div>
+        </div>
+
+        <!-- ============ PDF mode ============ -->
+        <div id="pdf-mode" class="hidden">
+            <div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
+                Основной файл обязателен; для многодневных/составных протоколов можно добавить до трёх
+                дополнительных файлов. После разбора появится превью — проверьте счётчики и только потом
+                нажимайте «Импортировать».
+            </div>
+
+            <div class="admin-card p-5 mb-6 space-y-4">
+                <div>
+                    <label class="block text-sm text-admin-text mb-1">Основной файл <span class="text-admin-danger">*</span></label>
+                    <input type="file" id="pdf-file" accept=".pdf" class="admin-input w-full">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs text-admin-text-muted mb-1">Доп. файл 2</label>
+                        <input type="file" id="pdf-file-2" accept=".pdf" class="admin-input w-full text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-admin-text-muted mb-1">Доп. файл 3</label>
+                        <input type="file" id="pdf-file-3" accept=".pdf" class="admin-input w-full text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-admin-text-muted mb-1">Доп. файл 4</label>
+                        <input type="file" id="pdf-file-4" accept=".pdf" class="admin-input w-full text-xs">
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-4 items-end">
+                    <div>
+                        <label class="block text-xs text-admin-text-muted mb-1">Формат</label>
+                        <select id="pdf-format" class="admin-input min-w-[180px]">
+                            @foreach (var f in Model.ParseFormats)
+                            {
+                                <option value="@f">@f</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-admin-text-muted mb-1">Бассейн</label>
+                        <select id="pdf-pool-type" class="admin-input min-w-[120px]">
+                            <option value="">—</option>
+                            <option value="25m">25m</option>
+                            <option value="50m">50m</option>
+                        </select>
+                    </div>
+                    <label class="inline-flex items-center gap-2 text-sm text-admin-text pb-2">
+                        <input type="checkbox" id="pdf-is-award"> Наградной протокол (isAward)
+                    </label>
+                </div>
+                <button id="btn-parse-pdf" disabled
+                    class="admin-btn admin-btn-primary py-2.5 px-6 disabled:opacity-40 disabled:cursor-not-allowed">
+                    🔍 Распарсить
+                </button>
+            </div>
+
+            <!-- PDF preview -->
+            <div id="pdf-preview" class="hidden mb-6">
+                <div class="admin-card p-5">
+                    <h3 class="text-lg mb-3 text-admin-accent">Превью разбора</h3>
+                    <div class="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 mb-4" id="pdf-preview-stats"></div>
+                    <table class="w-full text-sm mb-4" id="pdf-preview-table">
+                        <thead>
+                            <tr class="text-left text-admin-text-muted border-b border-admin-border">
+                                <th class="py-1 pr-3">Соревнование</th>
+                                <th class="py-1 pr-3">Дата</th>
+                                <th class="py-1">Результатов</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pdf-preview-competitions"></tbody>
+                    </table>
+                    <div id="pdf-preview-warnings" class="hidden mb-4">
+                        <h4 class="text-[#ffa726] text-sm mb-2">⚠️ Предупреждения:</h4>
+                        <div id="pdf-warnings-list" class="bg-black/30 rounded-md p-3 max-h-[160px] overflow-y-auto text-xs text-[#ffcc80] font-mono leading-relaxed"></div>
+                    </div>
+                    <details id="pdf-debug-details" class="hidden">
+                        <summary class="text-admin-text-muted text-xs cursor-pointer">Debug-лог парсера</summary>
+                        <pre id="pdf-debug-log" class="bg-black/30 rounded-md p-3 mt-2 max-h-[240px] overflow-auto text-xs text-admin-text-muted whitespace-pre-wrap leading-relaxed"></pre>
+                    </details>
+                </div>
+            </div>
+        </div>
+
+        <!-- Categories (shared) -->
+        <div id="cat-section" class="mb-6">
+            <div class="text-sm text-admin-text mb-2">
+                Категории для этого импорта
+                <span class="text-admin-text-muted text-xs">(перекрывают <code class="text-admin-accent">categories</code> из JSON; применяются ко всем соревнованиям файла)</span>
+            </div>
+            <div id="cat-list" class="flex flex-wrap gap-2 text-sm text-admin-text-muted">загрузка...</div>
+        </div>
+
+        <!-- Multi-day event (shared) -->
+        <div id="event-section" class="mb-6">
+            <div class="text-sm text-admin-text mb-2">
+                Многодневное соревнование
+                <span class="text-admin-text-muted text-xs">(привязать этот файл-день к событию; имя дня уйдёт в SubName, общее имя — у события)</span>
+            </div>
+            <div class="flex flex-wrap gap-3 items-center">
+                <select id="event-select" class="admin-input min-w-[280px]">
+                    <option value="">— Без события (обычное соревнование) —</option>
+                    <option value="__new__">➕ Создать новое событие…</option>
+                </select>
+                <input type="text" id="event-new-name" placeholder="Имя нового события" class="admin-input min-w-[280px] hidden" />
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex gap-3 mb-6">
+            <button id="btn-upload"
+                class="import-action-json bg-admin-success text-white font-semibold py-2.5 px-6 rounded-md border-none cursor-pointer text-sm transition-opacity hover:opacity-85 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+                🚀 Загрузить и импортировать
+            </button>
+            <button id="btn-import-pdf"
+                class="import-action-pdf hidden bg-admin-success text-white font-semibold py-2.5 px-6 rounded-md border-none cursor-pointer text-sm transition-opacity hover:opacity-85 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+                🚀 Импортировать
+            </button>
+            <button id="btn-clear" class="import-action-json admin-btn admin-btn-ghost py-2.5 px-5 hidden">
+                ✕ Очистить
+            </button>
+        </div>
+
+        <!-- Progress -->
+        <div id="progress" class="hidden mb-6">
+            <div class="flex items-center gap-3 text-admin-text-muted">
+                <div class="w-5 h-5 border-2 border-admin-accent border-t-transparent rounded-full animate-spin"></div>
+                <span>Импорт выполняется...</span>
+            </div>
+        </div>
+
+        <!-- Result -->
+        <div id="result" class="hidden">
+            <div id="result-card" class="bg-admin-surface rounded-lg p-5 border-l-[3px]">
+                <h3 id="result-title" class="text-lg mb-4"></h3>
+                <div class="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 mb-4" id="result-stats"></div>
+                <div id="result-errors" class="hidden mt-4">
+                    <h4 class="text-admin-danger text-sm mb-2">Ошибки:</h4>
+                    <div id="error-list" class="bg-black/30 rounded-md p-3 max-h-[200px] overflow-y-auto text-xs text-[#ef9a9a] font-mono leading-relaxed"></div>
+                </div>
+                <div id="result-diag" class="hidden mt-4">
+                    <h4 class="text-admin-accent text-sm mb-2">📋 Diagnostic Log:</h4>
+                    <div id="diag-list" class="bg-black/30 rounded-md p-3 max-h-[200px] overflow-y-auto text-xs text-[#80cbc4] font-mono leading-relaxed"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Preview -->
+        <div id="preview" class="hidden mt-6">
+            <h3 class="text-admin-accent text-sm uppercase mb-2">Предпросмотр JSON</h3>
+            <div class="bg-black/30 rounded-lg p-4 max-h-[300px] overflow-auto">
+                <pre id="preview-content" class="text-xs text-admin-text-muted whitespace-pre-wrap break-all leading-relaxed"></pre>
+            </div>
+        </div>
+
+        <!-- Clear Data Section -->
+        <div class="pt-0">
+            <hr class="border-admin-border mb-6">
+            <div class="admin-card bg-admin-danger/5 border-l-[3px] border-l-admin-danger py-3 px-4 mb-4 text-[0.85rem] text-admin-text-muted leading-relaxed">
+                ⚠️ <strong class="text-admin-danger">Опасная зона.</strong>
+                Полная очистка удалит все импортированные данные: <span id="danger-tables">загрузка...</span>.<br>
+                Справочник Styles и пользователи сохранятся.<br>
+                <span class="text-admin-text-muted text-xs">Список таблиц: <code class="text-admin-accent">JsonImportService.ClearableTables</code> · Метод: <code class="text-admin-accent">JsonImportService.ClearDataAsync()</code></span>
+            </div>
+            <button id="btn-clear-data"
+                class="bg-[#c62828] text-white font-semibold py-2.5 px-6 rounded-md border-none cursor-pointer text-sm transition-opacity hover:opacity-85">
+                🗑️ Очистить все данные
+            </button>
+            <div id="clear-result" class="hidden mt-4">
+                <div id="clear-result-card" class="bg-admin-surface rounded-lg p-5 border-l-[3px] border-l-admin-danger">
+                    <h3 class="text-admin-danger text-lg mb-3">Результат очистки</h3>
+                    <div id="clear-stats" class="grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================================== -->
+    <!-- ТАБ «РЕКОРДЫ» — этап 2.6: fetch/файл → дифф-превью → apply               -->
+    <!-- ======================================================================== -->
+    <div id="records-panel" class="hidden">
+        <div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
+            Fetch/файл только парсит и строит дифф — запись в БД происходит отдельным шагом
+            «Применить выбранное». Ничего не удаляется автоматически — «нет в источнике» показывается
+            только для информации.
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="admin-card p-4 records-source-card" data-source="worldrecords">
+                <div class="text-2xl mb-1">🌍</div>
+                <div class="font-semibold text-admin-text mb-1">World Records</div>
+                <div class="text-xs text-admin-text-muted mb-2">api.worldaquatics.com · XLSX, 4 файла, авто</div>
+                <div class="text-xs text-admin-text-muted mb-3">Обновлено: <span class="rs-status" data-source="worldrecords">—</span></div>
+                <button class="admin-btn admin-btn-primary w-full text-sm rs-fetch-btn" data-source="worldrecords" data-pool-primary="25m">
+                    ⬇ Fetch from URL
+                </button>
+            </div>
+
+            <div class="admin-card p-4 records-source-card" data-source="isrorg-age">
+                <div class="text-2xl mb-1">🇮🇱</div>
+                <div class="font-semibold text-admin-text mb-1">Age Records</div>
+                <div class="text-xs text-admin-text-muted mb-2">isr.org.il · PDF-протокол (10–18, national)</div>
+                <div class="text-xs text-admin-text-muted mb-3">Обновлено: <span class="rs-status" data-source="isrorg-age">—</span></div>
+                <div class="flex gap-2 mb-2">
+                    <button class="admin-btn admin-btn-ghost flex-1 text-xs rs-fetch-btn" data-source="isrorg-age" data-pool-primary="25m">⬇ Fetch</button>
+                    <button class="admin-btn admin-btn-ghost flex-1 text-xs rs-file-toggle" data-source="isrorg-age">📁 Файл</button>
+                </div>
+                <div class="rs-file-panel hidden space-y-2 mt-2" data-source="isrorg-age">
+                    <div>
+                        <label class="block text-[10px] text-admin-text-muted mb-0.5">Файл 25m</label>
+                        <input type="file" accept=".pdf" class="admin-input w-full text-xs rs-file-primary">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-admin-text-muted mb-0.5">Файл 50m (опц.)</label>
+                        <input type="file" accept=".pdf" class="admin-input w-full text-xs rs-file-secondary">
+                    </div>
+                    <button class="admin-btn admin-btn-primary w-full text-xs rs-parse-files-btn" data-source="isrorg-age" data-pool-primary="25m">
+                        Разобрать файл(ы)
+                    </button>
+                </div>
+            </div>
+
+            <div class="admin-card p-4 records-source-card" data-source="isrorg-masters">
+                <div class="text-2xl mb-1">🇮🇱</div>
+                <div class="font-semibold text-admin-text mb-1">Masters Records</div>
+                <div class="text-xs text-admin-text-muted mb-2">isr.org.il · PDF-протокол (25-29…)</div>
+                <div class="text-xs text-admin-text-muted mb-3">Обновлено: <span class="rs-status" data-source="isrorg-masters">—</span></div>
+                <div class="flex gap-2 mb-2">
+                    <button class="admin-btn admin-btn-ghost flex-1 text-xs rs-fetch-btn" data-source="isrorg-masters" data-pool-primary="50m">⬇ Fetch</button>
+                    <button class="admin-btn admin-btn-ghost flex-1 text-xs rs-file-toggle" data-source="isrorg-masters">📁 Файл</button>
+                </div>
+                <div class="rs-file-panel hidden space-y-2 mt-2" data-source="isrorg-masters">
+                    <div>
+                        <label class="block text-[10px] text-admin-text-muted mb-0.5">Файл 50m</label>
+                        <input type="file" accept=".pdf" class="admin-input w-full text-xs rs-file-primary">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-admin-text-muted mb-0.5">Файл 25m (опц.)</label>
+                        <input type="file" accept=".pdf" class="admin-input w-full text-xs rs-file-secondary">
+                    </div>
+                    <button class="admin-btn admin-btn-primary w-full text-xs rs-parse-files-btn" data-source="isrorg-masters" data-pool-primary="50m">
+                        Разобрать файл(ы)
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Diff preview -->
+        <div id="records-diff" class="hidden admin-card p-5 mb-6">
+            <h3 class="text-lg mb-3 text-admin-accent">Превью диффа: <span id="records-diff-source"></span></h3>
+            <div class="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 mb-4" id="records-diff-stats"></div>
+            <div class="overflow-auto max-h-[320px] mb-4">
+                <table class="w-full text-xs" id="records-diff-table">
                     <thead>
                         <tr class="text-left text-admin-text-muted border-b border-admin-border">
-                            <th class="py-1 pr-3">Соревнование</th>
-                            <th class="py-1 pr-3">Дата</th>
-                            <th class="py-1">Результатов</th>
+                            <th class="py-1 pr-2">Дисциплина</th>
+                            <th class="py-1 pr-2">Было</th>
+                            <th class="py-1 pr-2">Станет</th>
                         </tr>
                     </thead>
-                    <tbody id="pdf-preview-competitions"></tbody>
+                    <tbody id="records-diff-rows"></tbody>
                 </table>
-                <div id="pdf-preview-warnings" class="hidden mb-4">
-                    <h4 class="text-[#ffa726] text-sm mb-2">⚠️ Предупреждения:</h4>
-                    <div id="pdf-warnings-list" class="bg-black/30 rounded-md p-3 max-h-[160px] overflow-y-auto text-xs text-[#ffcc80] font-mono leading-relaxed"></div>
-                </div>
-                <details id="pdf-debug-details" class="hidden">
-                    <summary class="text-admin-text-muted text-xs cursor-pointer">Debug-лог парсера</summary>
-                    <pre id="pdf-debug-log" class="bg-black/30 rounded-md p-3 mt-2 max-h-[240px] overflow-auto text-xs text-admin-text-muted whitespace-pre-wrap leading-relaxed"></pre>
-                </details>
             </div>
-        </div>
-    </div>
-
-    <!-- Categories (shared) -->
-    <div id="cat-section" class="mb-6">
-        <div class="text-sm text-admin-text mb-2">
-            Категории для этого импорта
-            <span class="text-admin-text-muted text-xs">(перекрывают <code class="text-admin-accent">categories</code> из JSON; применяются ко всем соревнованиям файла)</span>
-        </div>
-        <div id="cat-list" class="flex flex-wrap gap-2 text-sm text-admin-text-muted">загрузка...</div>
-    </div>
-
-    <!-- Multi-day event (shared) -->
-    <div id="event-section" class="mb-6">
-        <div class="text-sm text-admin-text mb-2">
-            Многодневное соревнование
-            <span class="text-admin-text-muted text-xs">(привязать этот файл-день к событию; имя дня уйдёт в SubName, общее имя — у события)</span>
-        </div>
-        <div class="flex flex-wrap gap-3 items-center">
-            <select id="event-select" class="admin-input min-w-[280px]">
-                <option value="">— Без события (обычное соревнование) —</option>
-                <option value="__new__">➕ Создать новое событие…</option>
-            </select>
-            <input type="text" id="event-new-name" placeholder="Имя нового события" class="admin-input min-w-[280px] hidden" />
-        </div>
-    </div>
-
-    <!-- Actions -->
-    <div class="flex gap-3 mb-6">
-        <button id="btn-upload"
-            class="import-action-json bg-admin-success text-white font-semibold py-2.5 px-6 rounded-md border-none cursor-pointer text-sm transition-opacity hover:opacity-85 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
-            🚀 Загрузить и импортировать
-        </button>
-        <button id="btn-import-pdf"
-            class="import-action-pdf hidden bg-admin-success text-white font-semibold py-2.5 px-6 rounded-md border-none cursor-pointer text-sm transition-opacity hover:opacity-85 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
-            🚀 Импортировать
-        </button>
-        <button id="btn-clear" class="import-action-json admin-btn admin-btn-ghost py-2.5 px-5 hidden">
-            ✕ Очистить
-        </button>
-    </div>
-
-    <!-- Progress -->
-    <div id="progress" class="hidden mb-6">
-        <div class="flex items-center gap-3 text-admin-text-muted">
-            <div class="w-5 h-5 border-2 border-admin-accent border-t-transparent rounded-full animate-spin"></div>
-            <span>Импорт выполняется...</span>
-        </div>
-    </div>
-
-    <!-- Result -->
-    <div id="result" class="hidden">
-        <div id="result-card" class="bg-admin-surface rounded-lg p-5 border-l-[3px]">
-            <h3 id="result-title" class="text-lg mb-4"></h3>
-            <div class="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 mb-4" id="result-stats"></div>
-            <div id="result-errors" class="hidden mt-4">
-                <h4 class="text-admin-danger text-sm mb-2">Ошибки:</h4>
-                <div id="error-list" class="bg-black/30 rounded-md p-3 max-h-[200px] overflow-y-auto text-xs text-[#ef9a9a] font-mono leading-relaxed"></div>
+            <div class="flex flex-wrap gap-4 items-center">
+                <label class="inline-flex items-center gap-1.5 text-sm text-admin-text">
+                    <input type="checkbox" id="records-apply-added" checked> Новые (<span id="records-added-count">0</span>)
+                </label>
+                <label class="inline-flex items-center gap-1.5 text-sm text-admin-text">
+                    <input type="checkbox" id="records-apply-changed" checked> Изменившиеся (<span id="records-changed-count">0</span>)
+                </label>
+                <button id="records-apply-btn" class="admin-btn admin-btn-primary py-2 px-5 text-sm">✅ Применить выбранное</button>
             </div>
-            <div id="result-diag" class="hidden mt-4">
-                <h4 class="text-admin-accent text-sm mb-2">📋 Diagnostic Log:</h4>
-                <div id="diag-list" class="bg-black/30 rounded-md p-3 max-h-[200px] overflow-y-auto text-xs text-[#80cbc4] font-mono leading-relaxed"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Preview -->
-    <div id="preview" class="hidden mt-6">
-        <h3 class="text-admin-accent text-sm uppercase mb-2">Предпросмотр JSON</h3>
-        <div class="bg-black/30 rounded-lg p-4 max-h-[300px] overflow-auto">
-            <pre id="preview-content" class="text-xs text-admin-text-muted whitespace-pre-wrap break-all leading-relaxed"></pre>
-        </div>
-    </div>
-</div>
-
-<!-- Clear Data Section -->
-<div class="max-w-[800px] mx-auto pt-0">
-    <hr class="border-admin-border mb-6">
-    <div class="admin-card bg-admin-danger/5 border-l-[3px] border-l-admin-danger py-3 px-4 mb-4 text-[0.85rem] text-admin-text-muted leading-relaxed">
-        ⚠️ <strong class="text-admin-danger">Опасная зона.</strong>
-        Полная очистка удалит все импортированные данные: <span id="danger-tables">загрузка...</span>.<br>
-        Справочник Styles и пользователи сохранятся.<br>
-        <span class="text-admin-text-muted text-xs">Список таблиц: <code class="text-admin-accent">JsonImportService.ClearableTables</code> · Метод: <code class="text-admin-accent">JsonImportService.ClearDataAsync()</code></span>
-    </div>
-    <button id="btn-clear-data"
-        class="bg-[#c62828] text-white font-semibold py-2.5 px-6 rounded-md border-none cursor-pointer text-sm transition-opacity hover:opacity-85">
-        🗑️ Очистить все данные
-    </button>
-    <div id="clear-result" class="hidden mt-4">
-        <div id="clear-result-card" class="bg-admin-surface rounded-lg p-5 border-l-[3px] border-l-admin-danger">
-            <h3 class="text-admin-danger text-lg mb-3">Результат очистки</h3>
-            <div id="clear-stats" class="grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-3"></div>
         </div>
     </div>
 </div>
@@ -256,7 +366,28 @@
 
     let selectedFile = null;
 
-    // --- Mode switcher (JSON | PDF) ---
+    // --- Top-level tabs (Соревнования | Рекорды) ---
+    const topTabCompetitions = document.getElementById('top-tab-competitions');
+    const topTabRecords = document.getElementById('top-tab-records');
+    const competitionsPanel = document.getElementById('competitions-panel');
+    const recordsPanel = document.getElementById('records-panel');
+    let recordsStatusLoaded = false;
+
+    function setTopMode(mode) {
+        const isCompetitions = mode === 'competitions';
+        competitionsPanel.classList.toggle('hidden', !isCompetitions);
+        recordsPanel.classList.toggle('hidden', isCompetitions);
+        topTabCompetitions.classList.toggle('import-tab-active', isCompetitions);
+        topTabRecords.classList.toggle('import-tab-active', !isCompetitions);
+        if (!isCompetitions && !recordsStatusLoaded) {
+            recordsStatusLoaded = true;
+            loadRecordSourceStatus();
+        }
+    }
+    topTabCompetitions.addEventListener('click', () => setTopMode('competitions'));
+    topTabRecords.addEventListener('click', () => setTopMode('records'));
+
+    // --- Mode switcher (JSON | PDF) — источники соревнований ---
     const tabJson = document.getElementById('tab-json');
     const tabPdf = document.getElementById('tab-pdf');
     const jsonMode = document.getElementById('json-mode');
@@ -684,6 +815,165 @@
             <div class="text-[10px] text-[#90a4ae] mt-1">${label}</div>
         </div>`;
     }
+
+    // ============================================================================
+    // ТАБ «РЕКОРДЫ» (этап 2.6) — fetch/файл → дифф-превью → apply
+    // ============================================================================
+    const recordsDiff = document.getElementById('records-diff');
+    const recordsDiffSource = document.getElementById('records-diff-source');
+    const recordsDiffStats = document.getElementById('records-diff-stats');
+    const recordsDiffRows = document.getElementById('records-diff-rows');
+    const recordsAddedCb = document.getElementById('records-apply-added');
+    const recordsChangedCb = document.getElementById('records-apply-changed');
+    const recordsAddedCount = document.getElementById('records-added-count');
+    const recordsChangedCount = document.getElementById('records-changed-count');
+    const recordsApplyBtn = document.getElementById('records-apply-btn');
+
+    const SOURCE_LABELS = { worldrecords: 'World Records', 'isrorg-age': 'Age Records', 'isrorg-masters': 'Masters Records' };
+    let currentDiffId = null;
+
+    function fmtDate(iso) {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        if (isNaN(d)) return '—';
+        return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    }
+
+    function loadRecordSourceStatus() {
+        fetch('/api/admin/records/source-status', { credentials: 'same-origin' })
+            .then(r => r.ok ? r.json() : [])
+            .then(list => {
+                (list || []).forEach(s => {
+                    document.querySelectorAll(`.rs-status[data-source="${s.source}"]`).forEach(el => {
+                        el.textContent = fmtDate(s.lastUpdatedAt);
+                    });
+                });
+            })
+            .catch(() => {});
+    }
+
+    // Fetch (по URL, без файлов)
+    document.querySelectorAll('.rs-fetch-btn').forEach(btn => {
+        btn.addEventListener('click', () => runRecordsFetch(btn.dataset.source, null, null, btn.dataset.poolPrimary, btn));
+    });
+
+    // Переключатель панели ручной загрузки файла(ов)
+    document.querySelectorAll('.rs-file-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const panel = document.querySelector(`.rs-file-panel[data-source="${btn.dataset.source}"]`);
+            panel.classList.toggle('hidden');
+        });
+    });
+
+    // Разобрать вручную загруженный(е) файл(ы)
+    document.querySelectorAll('.rs-parse-files-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const source = btn.dataset.source;
+            const panel = document.querySelector(`.rs-file-panel[data-source="${source}"]`);
+            const primary = panel.querySelector('.rs-file-primary').files[0];
+            const secondary = panel.querySelector('.rs-file-secondary').files[0];
+            if (!primary) { toast('Нужен минимум основной файл'); return; }
+            runRecordsFetch(source, primary, secondary, btn.dataset.poolPrimary, btn);
+        });
+    });
+
+    async function runRecordsFetch(source, primaryFile, secondaryFile, poolType, triggerBtn) {
+        const card = document.querySelector(`.records-source-card[data-source="${source}"]`);
+        card.querySelectorAll('button').forEach(b => b.disabled = true);
+        recordsDiff.classList.add('hidden');
+
+        try {
+            const form = new FormData();
+            form.append('source', source);
+            if (primaryFile) form.append('primaryFile', primaryFile);
+            if (secondaryFile) form.append('secondaryFile', secondaryFile);
+            if (poolType) form.append('poolType', poolType);
+
+            const res = await fetch('/api/admin/records/fetch', {
+                method: 'POST', credentials: 'same-origin', headers: { 'X-XSRF-TOKEN': _csrfToken }, body: form
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+            showRecordsDiff(source, data);
+            toast(`Дифф построен: +${data.addedCount} / ~${data.changedCount} / =${data.unchangedCount}`);
+        } catch (e) {
+            toast(e.message, 5000);
+        } finally {
+            card.querySelectorAll('button').forEach(b => b.disabled = false);
+        }
+    }
+
+    function discipline(e) {
+        const age = e.ageKey ? ` ${e.ageKey}` : '';
+        const region = e.regionType === 'world' ? 'WR' : (e.regionCode || e.regionType);
+        return `${esc(region)} · ${esc(e.gender)} ${esc(e.poolType)} ${esc(e.style)} ${esc(e.distance)}${esc(age)}`;
+    }
+
+    function showRecordsDiff(source, data) {
+        currentDiffId = data.diffId;
+        recordsDiffSource.textContent = SOURCE_LABELS[source] || source;
+
+        recordsDiffStats.innerHTML = [
+            statCard('Новых', data.addedCount, '#66bb6a'),
+            statCard('Изменилось', data.changedCount, '#ffa726'),
+            statCard('Без изменений', data.unchangedCount, '#546e7a'),
+            statCard('Нет в источнике', data.missingInSourceCount, '#4fc3f7')
+        ].join('');
+
+        recordsAddedCount.textContent = data.addedCount;
+        recordsChangedCount.textContent = data.changedCount;
+        recordsAddedCb.checked = data.addedCount > 0;
+        recordsChangedCb.checked = data.changedCount > 0;
+
+        const MAX_ROWS = 200;
+        const rows = [
+            ...(data.added || []).map(e => ({ e, kind: 'added' })),
+            ...(data.changed || []).map(e => ({ e, kind: 'changed' }))
+        ];
+        const shown = rows.slice(0, MAX_ROWS);
+
+        recordsDiffRows.innerHTML = shown.map(({ e, kind }) => {
+            const was = kind === 'added' ? '<span class="text-admin-text-muted">— новый —</span>' : `${esc(e.oldTime)} · ${esc(e.oldHolderName || '')}`;
+            const will = `${esc(e.newTime)} · ${esc(e.newHolderName || '')}`;
+            const rowClass = kind === 'added' ? 'text-[#66bb6a]' : 'text-[#ffa726]';
+            return `<tr class="border-b border-admin-border/30">
+                <td class="py-1 pr-2">${discipline(e)}</td>
+                <td class="py-1 pr-2 text-admin-text-muted">${was}</td>
+                <td class="py-1 pr-2 ${rowClass}">${will}</td>
+            </tr>`;
+        }).join('') || '<tr><td class="py-2 text-admin-text-muted" colspan="3">нет новых/изменившихся строк</td></tr>';
+
+        if (rows.length > MAX_ROWS) {
+            recordsDiffRows.innerHTML += `<tr><td class="py-1 text-admin-text-muted" colspan="3">…и ещё ${rows.length - MAX_ROWS} строк (показаны первые ${MAX_ROWS})</td></tr>`;
+        }
+
+        recordsDiff.classList.remove('hidden');
+    }
+
+    recordsApplyBtn.addEventListener('click', async () => {
+        if (!currentDiffId) return;
+        recordsApplyBtn.disabled = true;
+        try {
+            const body = { diffId: currentDiffId, applyAdded: recordsAddedCb.checked, applyChanged: recordsChangedCb.checked };
+            const res = await fetch('/api/admin/records/apply', {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'X-XSRF-TOKEN': _csrfToken, 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+            toast(data.message || 'Применено', 3000);
+            recordsDiff.classList.add('hidden');
+            currentDiffId = null;
+            loadRecordSourceStatus();
+        } catch (e) {
+            toast(e.message, 5000);
+        } finally {
+            recordsApplyBtn.disabled = false;
+        }
+    });
 })();
 </script>
 }

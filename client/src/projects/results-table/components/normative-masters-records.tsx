@@ -1,12 +1,13 @@
 import React from 'react';
 import Helper from '../../../utils/helpers/data-helper';
-import RecordsHelper from '../../../utils/helpers/records-helper';
+import RecordsHelper, { maxUpdatedAtLabel } from '../../../utils/helpers/records-helper';
 
 interface MastersRecord {
   time: string;
   name: string;
   club: string;
   record_date: string;
+  updated_at?: string;
 }
 
 interface NormativeMastersRecordsProps {
@@ -117,6 +118,7 @@ function renderSingleAgeGroup(
 ) {
   const s = getStyles(genderKey);
   const chip = `${GENDER_LABELS[genderKey] || genderKey} · ${ageGroup}`;
+  const updated = maxUpdatedAtLabel([record.updated_at]);
 
   return (
     <div
@@ -143,6 +145,9 @@ function renderSingleAgeGroup(
         <div className={`text-[30px] sm:text-[40px] font-extrabold ${s.deep} tabular-nums tracking-[-1px] sm:tracking-[-1.5px] leading-none`}>
           {record.time}
         </div>
+        {updated && (
+          <div className="text-[9px] sm:text-[11px] text-[#aab0bd] mt-[2px] sm:mt-1">updated {updated}</div>
+        )}
       </div>
     </div>
   );
@@ -156,6 +161,7 @@ function renderSingleAgeGroup(
 function renderGenderCell(genderKey: string, rec: MastersRecord) {
   const isMale = genderKey === 'male';
   const s = getStyles(genderKey);
+  const updated = maxUpdatedAtLabel([rec.updated_at]);
 
   const time = (
     <div className={`text-[15px] sm:text-[17px] font-extrabold ${s.deep} tabular-nums leading-tight shrink-0`}>
@@ -171,7 +177,10 @@ function renderGenderCell(genderKey: string, rec: MastersRecord) {
   );
 
   return (
-    <div className={`${s.soft} rounded-lg px-2.5 py-[5px] sm:py-2 flex items-center gap-2`}>
+    <div
+      className={`${s.soft} rounded-lg px-2.5 py-[5px] sm:py-2 flex items-center gap-2`}
+      title={updated ? `updated ${updated}` : undefined}
+    >
       {isMale ? <>{info}{time}</> : <>{time}{info}</>}
     </div>
   );
@@ -198,6 +207,10 @@ function renderManyAgeGroups(
   const rangeLabel = groups.length > 1 ? `${groups[0]}…${groups[groups.length - 1]}` : groups[0];
   const showMale = !!maleData;
   const showFemale = !!femaleData;
+  const updated = maxUpdatedAtLabel([
+    ...Object.values(maleData ?? {}).map(r => r.updated_at),
+    ...Object.values(femaleData ?? {}).map(r => r.updated_at),
+  ]);
 
   return (
     <div className={`${CARD_SURFACE} border border-[#e9edf3] dark:border-[#28344a] rounded-2xl mb-4`} style={CARD_SHADOW}>
@@ -211,6 +224,9 @@ function renderManyAgeGroups(
         {showMale && <span className="text-[10px] sm:text-[11px] font-extrabold text-[#1e6fd6] dark:text-[#5aa2f5] bg-[#eaf2fd] dark:bg-[rgba(90,162,245,0.16)] px-2 py-0.5 rounded-full shrink-0">♂</span>}
         {showFemale && <span className="text-[10px] sm:text-[11px] font-extrabold text-[#d6417f] dark:text-[#f072a6] bg-[#fdeff5] dark:bg-[rgba(240,114,166,0.16)] px-2 py-0.5 rounded-full shrink-0">♀</span>}
         <span className="text-[10px] sm:text-[11px] font-bold text-[#aab0bd] shrink-0 whitespace-nowrap">{rangeLabel}</span>
+        {updated && (
+          <span className="text-[9px] sm:text-[10px] font-semibold text-[#aab0bd] shrink-0 whitespace-nowrap">updated {updated}</span>
+        )}
         <span
           className={`text-[#8a93a3] text-[11px] sm:text-[12px] shrink-0 transition-transform duration-150 ease-out motion-reduce:transition-none ${isOpen ? 'rotate-180' : ''}`}
         >

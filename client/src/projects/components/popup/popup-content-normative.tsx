@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppSelector } from '../../../store/store';
 import Helper from '../../../utils/helpers/data-helper';
-import RecordsHelper from '../../../utils/helpers/records-helper';
+import RecordsHelper, { maxUpdatedAtLabel } from '../../../utils/helpers/records-helper';
 import useMode from '../../../hooks/useMode';
 import './popup-content-normative.css';
 
@@ -20,6 +20,7 @@ type RecordCell = {
   name: string | null;
   country?: string | null;
   record_date?: string | null;
+  updated_at?: string;
 };
 type RecordsTree = {
   normatives: Record<
@@ -341,8 +342,26 @@ const PopupContentNormative: React.FC = () => {
     return {
       text: Helper.formatSecondsToTimeString(Helper.parseTimeToSeconds(String(cell?.time ?? ''))),
       holder: cell?.name ?? undefined,
+      updatedAt: cell?.updated_at,
     };
   };
+
+  // Приглушённая подпись «updated dd/MM/yyyy» над колонками WR/ISR — сводно по всем
+  // рекордам (оба пола, обе колонки), которые сейчас видны в таблице (все дистанции текущего
+  // стиля/бассейна). Только записи Records имеют updated_at — нормативы (лестница уровней)
+  // это поле не несут и не участвуют.
+  const recordsUpdatedLabel = useMemo(() => {
+    const stamps: Array<string | undefined> = [];
+    allDistanceKeys.forEach((d) => {
+      (['WR', 'ISR'] as const).forEach((kind) => {
+        (['male', 'female'] as Gender[]).forEach((g) => {
+          stamps.push(getRecordCell(recordsTree, g, poolType, stroke, d, kind)?.updated_at);
+        });
+      });
+    });
+    return maxUpdatedAtLabel(stamps);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordsTree, poolType, stroke, allDistanceKeys.join(',')]);
 
   // ==== Мобильный пейджер: пара [текущий, следующий (быстрее)] ====
   const rawPairIdx = pairIdx ?? (myIdx > 0 ? myIdx : 1);
@@ -543,6 +562,11 @@ const PopupContentNormative: React.FC = () => {
                       <div style={{ fontSize: 9, fontWeight: 700, color: U.label, marginTop: 4, textAlign: 'center', letterSpacing: '.04em' }}>
                         {kind === 'WR' ? 'World' : 'Israel'}
                       </div>
+                      {recordsUpdatedLabel && (
+                        <div style={{ fontSize: 8, fontWeight: 600, color: U.label, marginTop: 2, textAlign: 'center', opacity: 0.75 }}>
+                          updated {recordsUpdatedLabel}
+                        </div>
+                      )}
                     </th>
                   ))}
                   {ladder.map((lv, i) => {
@@ -600,11 +624,13 @@ const PopupContentNormative: React.FC = () => {
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                             {(['male', 'female'] as Gender[]).map((g) => {
                               const rec = fmtRecord(g, d, kind);
+                              const updatedOne = maxUpdatedAtLabel([rec.updatedAt]);
+                              const titleParts = [rec.holder, updatedOne ? `updated ${updatedOne}` : null].filter(Boolean);
                               return (
                                 <div
                                   key={g}
                                   style={g === 'male' ? menPillStyle : womenPillStyle}
-                                  title={rec.holder}
+                                  title={titleParts.length ? titleParts.join(' · ') : undefined}
                                 >
                                   {rec.text}
                                 </div>
