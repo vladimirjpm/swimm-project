@@ -79,18 +79,23 @@ public class HubGroupsController : ControllerBase
         if (string.IsNullOrWhiteSpace(slug) || slug.Length > 120)
             return BadRequest("slug is required");
 
-        // Грузим до CachedJson: 404 кэшировать нельзя (хелпер пишет payload безусловно).
-        // БД-запрос идёт на каждый hit, кэш здесь даёт ETag/304 и экономию сериализации.
-        var dto = await _groups.GetBySlugAsync(slug);
-        if (dto == null) return NotFound();
+        // 404/скрытость проверяем ДЁШЕВО (slug-lookup + ids), не строя payload: агрегаты
+        // страницы (последние заплывы, рекорды группы, сезонный зачёт) ходят по Results
+        // и на большой таблице стоят сотни мс — им место ТОЛЬКО внутри load-лямбды
+        // CachedJson (выполняется на cache miss). 404 при этом не кэшируется.
+        var roster = await _groups.GetRosterSwimmerIdsAsync(slug);
+        if (roster == null) return NotFound();
 
-        // Публичная галерея (TrainingId == null) — читается через SwimmDbContext (не read-реплику),
-        // т.к. таблица Sys_HubGroupMedia не имеет grant swimm_ro (см. SwimmDbContext.OnModelCreating).
-        // Загрузка ВНУТРИ load-лямбды: при cache hit/304 лишний запрос к БД не выполняется.
         return await this.CachedJson(_cache,
             $"http:hub-groups:group:{slug.ToLowerInvariant()}:{Visibility}",
             async () =>
             {
+                var dto = await _groups.GetBySlugAsync(slug)
+                    // Группа исчезла между проверкой и загрузкой — гонка с удалением, не кэшируем мусор.
+                    ?? throw new InvalidOperationException($"hub group '{slug}' vanished during load");
+
+                // Публичная галерея (TrainingId == null) — через SwimmDbContext (не read-реплику):
+                // у Sys_HubGroupMedia нет grant swimm_ro (см. SwimmDbContext.OnModelCreating).
                 dto.Gallery = await _media.GetGalleryAsync(dto.Id);
                 return dto;
             }, PayloadTtl, CacheControlValue);

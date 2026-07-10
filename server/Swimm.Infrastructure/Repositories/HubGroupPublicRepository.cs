@@ -165,11 +165,24 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
 
         if (swimmerIds.Count == 0) return;
 
-        dto.RecentResults = await db.Results.AsNoTracking()
+        // Двухшаговый fetch «последних заплывов» — намеренно. Одним запросом (фильтр по
+        // пловцам + ORDER BY дата DESC + LIMIT + широкая проекция ToDto с джойнами)
+        // планировщик на большой таблице попадает в LIMIT-ловушку: пятится по индексу даты
+        // через ВСЮ таблицу в надежде быстро набрать 25 строк (16 с на 3 млн синтетики).
+        // Узкий id-запрос покрывается index-only сканом IX_Results_SwimmerId_CompetitionDate_Id
+        // (миграция AddResultsSwimmerRecentIndex), а полные DTO добираются по 25 конкретным id.
+        var recentIds = await db.Results.AsNoTracking()
             .Where(r => swimmerIds.Contains(r.SwimmerId))
             .OrderByDescending(r => r.CompetitionDate)
             .ThenByDescending(r => r.Id)
             .Take(RecentResultsLimit)
+            .Select(r => r.Id)
+            .ToListAsync();
+
+        dto.RecentResults = await db.Results.AsNoTracking()
+            .Where(r => recentIds.Contains(r.Id))
+            .OrderByDescending(r => r.CompetitionDate)
+            .ThenByDescending(r => r.Id)
             .Select(ResultMapping.ToDto)
             .ToListAsync();
 
