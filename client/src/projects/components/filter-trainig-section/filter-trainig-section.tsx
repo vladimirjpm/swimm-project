@@ -144,6 +144,7 @@ const FilterTrainigSection: React.FC = () => {
         <h3 className="font-semibold mb-1">Training Table View</h3>
         <div className="flex flex-col">
           {[
+            { label: 'Sessions', value: 'bySession' },
             { label: 'Group by Name', value: 'groupByName' },
             { label: 'Group by Set', value: 'groupBySet' },
             { label: 'Show Table', value: 'showTable' },

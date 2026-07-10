@@ -31,4 +31,7 @@ public class ResultFilter
     public bool PositionKeepUnranked { get; set; }
     /// <summary>Конкретный день события: CompetitionDate == дата.</summary>
     public DateTime? EventDate { get; set; }
+
+    /// <summary>Ограничение по ростеру группы (HubGroups «Competitions» tab) — null = без ограничения.</summary>
+    public List<int>? SwimmerIds { get; set; }
 }

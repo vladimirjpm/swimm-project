@@ -91,6 +91,9 @@ public class ResultRepository : IResultRepository
         if (!string.IsNullOrWhiteSpace(filter.Club))
             query = query.Where(r => r.Club.Name.StartsWith(filter.Club) || r.Club.NameEn.StartsWith(filter.Club));
 
+        if (filter.SwimmerIds is { Count: > 0 })
+            query = query.Where(r => filter.SwimmerIds.Contains(r.SwimmerId));
+
         /* Параметры paged-режима (контракт docs/tasks/phase3-paged-results-contract.md) */
 
         // Клиентский фильтр Age — годы рождения, не возраст.
@@ -214,7 +217,8 @@ public class ResultRepository : IResultRepository
     private static string FilterCacheKey(ResultFilter f) =>
         $"{f.StyleName}:{f.Distance}:{f.Gender}:{f.PoolType}" +
         $":{f.DateFrom:yyyyMMdd}:{f.DateTo:yyyyMMdd}:{f.Competition}:{f.EventId}:{f.CompetitionId}:{f.Latest}:{f.Name}:{f.Club}" +
-        $":{f.BirthYearFrom}:{f.BirthYearTo}:{f.AgeGroup}:{f.PositionMax}:{f.PositionKeepUnranked}:{f.EventDate:yyyyMMdd}";
+        $":{f.BirthYearFrom}:{f.BirthYearTo}:{f.AgeGroup}:{f.PositionMax}:{f.PositionKeepUnranked}:{f.EventDate:yyyyMMdd}" +
+        $":{(f.SwimmerIds is { Count: > 0 } ids ? string.Join(",", ids.OrderBy(x => x)) : "")}";
 
     private static string ResultsCacheKey(ResultFilter f, int page, int pageSize) =>
         $"results:{FilterCacheKey(f)}:{page}:{pageSize}";

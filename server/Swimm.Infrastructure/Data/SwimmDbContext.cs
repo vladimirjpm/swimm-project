@@ -58,6 +58,10 @@ public class SwimmDbContext : DbContext
     public DbSet<HubGroupUserMember> HubGroupUserMembers => Set<HubGroupUserMember>();
     public DbSet<HubGroupClubRequest> HubGroupClubRequests => Set<HubGroupClubRequest>();
 
+    /* === Тренировки (приватные, Sys_) === */
+    public DbSet<TrainingSession> TrainingSessions => Set<TrainingSession>();
+    public DbSet<TrainingResult> TrainingResults => Set<TrainingResult>();
+
     /* === Пользователи и доступ === */
     public DbSet<AppUser> AppUsers => Set<AppUser>();
     public DbSet<AppRole> AppRoles => Set<AppRole>();
@@ -116,6 +120,9 @@ public class SwimmDbContext : DbContext
         modelBuilder.Entity<Swimmer>(entity =>
         {
             entity.ToTable("Swimmers");
+
+            // Существующие/новые isr-пловцы = 'isr' по умолчанию; local проставляет сидер явно.
+            entity.Property(e => e.Origin).HasDefaultValue("isr");
 
             entity.HasOne(e => e.Club)
                 .WithMany()
@@ -635,6 +642,40 @@ public class SwimmDbContext : DbContext
             entity.HasOne(e => e.DecidedByUser)
                 .WithMany()
                 .HasForeignKey(e => e.DecidedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Тренировочная сессия — ПРИВАТНЫЕ данные группы, Sys_-таблица БЕЗ grant swimm_ro.
+        modelBuilder.Entity<TrainingSession>(entity =>
+        {
+            entity.ToTable("Sys_TrainingSessions");
+
+            entity.HasOne(e => e.HubGroup)
+                .WithMany()
+                .HasForeignKey(e => e.HubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Тренировочный повтор — ПРИВАТНЫЕ данные, Sys_-таблица БЕЗ grant swimm_ro.
+        // SwimmerId ссылается на публичную Swimmers (приватны времена, не сам пловец) → Restrict,
+        // чтобы удаление пловца не сносило тренировки молча.
+        modelBuilder.Entity<TrainingResult>(entity =>
+        {
+            entity.ToTable("Sys_TrainingResults");
+
+            entity.HasOne(e => e.Session)
+                .WithMany(s => s.Results)
+                .HasForeignKey(e => e.SessionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Swimmer)
+                .WithMany()
+                .HasForeignKey(e => e.SwimmerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Style)
+                .WithMany()
+                .HasForeignKey(e => e.StyleId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

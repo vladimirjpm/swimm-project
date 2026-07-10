@@ -21,4 +21,10 @@ public interface IHubGroupPublicRepository
     /// те же агрегаты. Настройка видимости НЕ применяется — это личные данные пользователя.
     /// </summary>
     Task<HubGroupDetailsDto> GetFavoritesGroupAsync(int userId);
+
+    /// <summary>
+    /// SwimmerId ростера группы (HubGroupMembers) для вкладки «Competitions» (публичный
+    /// эндпоинт результатов с фильтрами). null — группы нет или скрыта настройкой видимости.
+    /// </summary>
+    Task<List<int>?> GetRosterSwimmerIdsAsync(string slug);
 }

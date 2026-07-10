@@ -1,0 +1,116 @@
+/* Вид «по сессиям» — чистая раскладка тренировки под утверждённый макет.
+   Только токены --theme-mode-* / --theme-primary → работает в light и dark. */
+
+.tbs { display: flex; flex-direction: column; gap: 18px; }
+.tbs-empty { padding: 24px; text-align: center; font-style: italic; color: var(--theme-mode-text-muted); }
+
+.tbs-card {
+  background: var(--theme-mode-surface);
+  border: 1px solid var(--theme-mode-border);
+  border-radius: 18px;
+  box-shadow: var(--theme-mode-card-shadow);
+  overflow: hidden;
+}
+
+/* Шапка сессии */
+.tbs-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px 12px;
+}
+.tbs-title {
+  font-size: 20px; font-weight: 800; letter-spacing: -.01em; line-height: 1.1;
+  color: var(--theme-mode-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tbs-date {
+  margin-left: auto; flex: none;
+  font-size: 11px; font-weight: 800; letter-spacing: .04em;
+  color: var(--theme-primary);
+  background: var(--theme-primary-light);
+  border: 1px solid color-mix(in srgb, var(--theme-primary) 30%, transparent);
+  padding: 4px 10px; border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Сводка сессии */
+.tbs-summary {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+  padding: 0 18px 14px;
+}
+.tbs-stat {
+  display: flex; flex-direction: column; gap: 2px;
+  background: var(--theme-mode-input-bg);
+  border: 1px solid var(--theme-mode-border);
+  border-radius: 12px; padding: 9px 12px;
+}
+.tbs-stat .k {
+  font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--theme-mode-text-muted);
+}
+.tbs-stat .v {
+  font-size: 19px; font-weight: 800; letter-spacing: -.02em; color: var(--theme-mode-text);
+  font-variant-numeric: tabular-nums;
+}
+.tbs-stat .v small { font-size: 11px; font-weight: 600; color: var(--theme-mode-text-secondary); }
+
+/* Блок сета */
+.tbs-set { border-top: 1px solid var(--theme-mode-border); }
+.tbs-set-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 11px 18px;
+  background: var(--theme-mode-surface-alt);
+}
+.tbs-setno {
+  font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--theme-primary); flex: none;
+}
+.tbs-recipe { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tbs-recipe .chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; color: var(--theme-mode-text-secondary);
+  background: var(--theme-mode-input-bg);
+  border: 1px solid var(--theme-mode-border-input);
+  border-radius: 8px; padding: 2px 8px;
+}
+.tbs-recipe .chip.strong { color: var(--theme-mode-text); font-weight: 700; }
+.tbs-recipe .chip.v { padding: 1px 4px; }
+.tbs-setmeta {
+  margin-left: auto; font-size: 11px; color: var(--theme-mode-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Строки повторов */
+.tbs-rows { list-style: none; margin: 0; padding: 0; }
+.tbs-row {
+  display: grid;
+  grid-template-columns: 42px minmax(96px, 1.4fr) 40px minmax(84px, 1fr) 44px auto;
+  align-items: center; gap: 10px;
+  padding: 8px 18px;
+  border-top: 1px solid var(--theme-mode-border-row);
+}
+.tbs-row:first-child { border-top: none; }
+.tbs-row.m { background: var(--theme-mode-row-male); }
+.tbs-row.f { background: var(--theme-mode-row-female); }
+
+.tbs-order {
+  font-size: 11px; font-weight: 700; color: var(--theme-mode-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.tbs-who {
+  appearance: none; background: none; border: none; cursor: pointer; text-align: right;
+  font: inherit; font-size: 13.5px; font-weight: 700; color: var(--theme-mode-text);
+  padding: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: color .12s;
+}
+.tbs-who:hover { color: var(--theme-primary); }
+.tbs-gear { display: flex; gap: 3px; opacity: .85; }
+.tbs-time { display: flex; flex-direction: column; line-height: 1.15; }
+.tbs-time .t { font-size: 18px; font-weight: 800; letter-spacing: -.02em; color: var(--theme-mode-text); font-variant-numeric: tabular-nums; }
+.tbs-v { display: flex; justify-content: center; }
+.tbs-lvl { display: flex; align-items: center; }
+
+@media (max-width: 640px) {
+  .tbs-summary { grid-template-columns: repeat(2, 1fr); }
+  .tbs-stat-pool { display: none; }
+  .tbs-row { grid-template-columns: 36px minmax(80px, 1fr) 70px 40px; }
+  .tbs-gear, .tbs-lvl { display: none; }
+}

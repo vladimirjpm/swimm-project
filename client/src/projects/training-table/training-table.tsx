@@ -6,6 +6,7 @@ import { Result } from '../../utils/interfaces/results';
 // 👉 добавьте эти импорты своих подкомпонентов
 import TrainingTableBySet from './training-table-by-set/training-table-by-set';
 import TrainingTableByName from './training-table-by-name/training-table-by-name';
+import TrainingBySession from './training-by-session/training-by-session';
 import TrainingShowFullTable from './training-show-full-table/training-show-full-table';
 import TrainingTableHeader from './training-table-header/training-table-header';
 import Helper from '../../utils/helpers/data-helper';
@@ -71,6 +72,15 @@ function TrainingTable() {
       showEvent={showEvent}
       showDate={showDate}
     />
+
+    {mode === 'bySession' && (
+      <TrainingBySession
+        results={filteredResults}
+        selectedSource={selectedSource}
+        filters={filters}
+        updateFilter={updateFilter}
+      />
+    )}
 
     {mode === 'groupBySet' && (
       <TrainingTableBySet

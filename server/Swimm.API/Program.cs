@@ -144,6 +144,34 @@ if (args.Contains("--seed-records"))
     return;
 }
 
+// Одноразовый сид тренировок «Дельфин-мастерс» (соревнования не трогаем — они уже в БД):
+//   dotnet run -- --seed-dolphin-training <json> <canon.csv> --group <hubGroupId> [--force]
+if (args.Contains("--seed-dolphin-training"))
+{
+    string ArgAfter(string flag, string what)
+    {
+        var i = Array.IndexOf(args, flag) + 1;
+        if (i <= 0 || i >= args.Length || args[i].StartsWith("--"))
+        {
+            Console.Error.WriteLine(
+                "Usage: dotnet run -- --seed-dolphin-training <json> <canon.csv> --group <hubGroupId> [--force]");
+            Environment.Exit(1);
+        }
+        return args[i];
+    }
+
+    var jsonPath = args[Array.IndexOf(args, "--seed-dolphin-training") + 1];
+    var csvPath = args[Array.IndexOf(args, "--seed-dolphin-training") + 2];
+    var groupId = int.Parse(ArgAfter("--group", "hubGroupId"));
+
+    using var scope = app.Services.CreateScope();
+    var seeder = scope.ServiceProvider.GetRequiredService<IDolphinTrainingSeeder>();
+    var seedLog = await seeder.SeedAsync(jsonPath, csvPath, groupId, args.Contains("--force"));
+    foreach (var line in seedLog)
+        Console.WriteLine(line);
+    return;
+}
+
 if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 

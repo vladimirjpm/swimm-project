@@ -60,7 +60,10 @@ const loadCareer = (name: string): Promise<AthleteCareer> => {
   let p = careerCache.get(name);
   if (!p) {
     p = fetch(`/api/athletes/career?name=${encodeURIComponent(name)}`)
-      .then((r) => (r.ok ? (r.json() as Promise<AthleteCareer>) : EMPTY_CAREER))
+      // Мерж поверх EMPTY_CAREER: недостающее/битое поле в ответе не должно ронять карточку
+      // (career.medals.filter и т.п. падали, когда сервер слал не тот регистр ключей).
+      .then((r) => (r.ok ? (r.json() as Promise<Partial<AthleteCareer>>) : {}))
+      .then((c) => ({ ...EMPTY_CAREER, ...c }))
       .catch(() => EMPTY_CAREER);
     careerCache.set(name, p);
   }

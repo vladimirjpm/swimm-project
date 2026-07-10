@@ -136,6 +136,24 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
         return dto;
     }
 
+    public async Task<List<int>?> GetRosterSwimmerIdsAsync(string slug)
+    {
+        var visibility = Visibility;
+        if (visibility == "private") return null;
+
+        var group = await _read.HubGroups.AsNoTracking()
+            .Where(g => g.Slug == slug)
+            .Select(g => new { g.Id, g.IsPublic })
+            .FirstOrDefaultAsync();
+        if (group == null) return null;
+        if (visibility == "perGroup" && !group.IsPublic) return null;
+
+        return await _read.HubGroupMembers.AsNoTracking()
+            .Where(m => m.HubGroupId == group.Id)
+            .Select(m => m.SwimmerId)
+            .ToListAsync();
+    }
+
     /// <summary>Общие агрегаты страницы: последние заплывы, рекорды группы и сезонный зачёт.</summary>
     private static async Task FillAggregatesAsync(SwimmDbContext db, HubGroupDetailsDto dto, List<int> swimmerIds)
     {

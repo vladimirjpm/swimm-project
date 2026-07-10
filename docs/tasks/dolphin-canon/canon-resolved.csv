@@ -1,0 +1,22 @@
+canon_person,kind,existing_swimmer_id,canon_first_name,canon_last_name,canon_first_name_en,canon_last_name_en,canon_birth_year,canon_gender,src_first_name,src_last_name,src_birth_year_raw,records_train,note
+P01,existing,7141,פיטר,איזבקוב,PETER,IZVECOV,1979,male,פיטר,איזבקוב,1979,24,
+P01,existing,7141,פיטר,איזבקוב,PETER,IZVECOV,1979,male,פיטר,איזבקוב,1977,1,год 1977 = опечатка -> тот же Питер
+P02,existing,7180,ולדימיר,ברנצב,VLADIMIR,BARANTSEV,1978,male,ולדימיר,ברנצב,1978,25,
+P04,existing,7167,מקסים,שוסטין,MAXIM,SHOUSTIN,1981,male,מקסים,שוסטין,1981,13,
+P04,existing,7167,מקסים,שוסטין,MAXIM,SHOUSTIN,1981,male,מקס,,1981,10,מקс = тот же Максим
+P03,local,,דני,,,,1971,male,דני,,1971,25,
+P05,local,,אורי,,,,1977,male,אורי,,1977,18,
+P06,local,,עילי,,,,1972,male,עילי,,1972,17,
+P07,local,,מרטין,,,,1975,male,מרטין,,1975,11,
+P08,local,,רוני,,,,2000,female,רוני,,2000,11,Roni = female (по решению Влада); объединён с безлетним рядом
+P08,local,,רוני,,,,2000,female,רוני,,,7,
+P09,local,,סלבה,,,,1975,male,סלבה,,1975,9,
+P10,local,,עודד,,,,1975,male,עודד,,1975,7,
+P13,local,,עדי,,,,1972,male,עדי,,1972,4,
+P14,local,,עדי,,,,1975,male,עדי,,1975,3,другой Ади (год 1975)
+P16,local,,לי,,,,2003,male,לי,,2003,1,
+P18,local,,לי,,,,,female,לי,,,1,другая Ли (female)
+P17,local,,אופק,,,,,male,אופק,,,1,
+P11,local,,אדם ט,,,,,male,אדם ט,,,7,три разных Адама (решение Влада)
+P12,local,,אדם פ,,,,,male,אדם פ,,,7,три разных Адама
+P15,local,,אדם,,,,,male,אדם,,,3,три разных Адама (третий, без буквы)

@@ -33,6 +33,14 @@ public class Swimmer
     [MaxLength(10)]
     public string? Gender { get; set; }
 
+    /// <summary>
+    /// Источник записи: <c>isr</c> — из справочника isr.org.il (есть <see cref="SwimmerOrgId"/>);
+    /// <c>local</c> — заведён вручную (напр. «Дельфин-мастерс»: есть тренировки, но нет в федерации).
+    /// Машинерия (членство/рекорды/зачёт) одинакова для обоих. См. hubgroups-architecture.md §7.
+    /// </summary>
+    [MaxLength(10)]
+    public string Origin { get; set; } = "isr";
+
     /// <summary>ID спортсмена в федерации</summary>
     [MaxLength(50)]
     public string? SwimmerOrgId { get; set; }

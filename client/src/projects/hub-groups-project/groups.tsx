@@ -4,7 +4,7 @@ import HomeHeader from '../home-project/components/home-header';
 import RecordTicker from '../home-project/components/record-ticker';
 import MyGroupsPanel from './my-groups-panel';
 import UI_ClubIcon from '../components/mix/club-icon/club-icon';
-import { useCurrentIdentity, useHubGroupMembership } from './use-my-hub-groups';
+import { useCurrentIdentity, useHubGroupMembership, useMyHubGroups } from './use-my-hub-groups';
 import type { HubGroupDetails, HubGroupLink, HubGroupListItem, HubGroupMember, HubGroupStanding } from './types';
 
 const GROUP_DISCLAIMER =
@@ -199,6 +199,28 @@ function JoinButton({ group }: { group: HubGroupDetails }) {
   );
 }
 
+/** Ссылка на тренировки группы — видят участники и управляющие (иначе сервер вернёт 403). */
+function TrainingsLink({ group }: { group: HubGroupDetails }) {
+  const { isAuthenticated, isAdmin } = useCurrentIdentity();
+  const { groups: myGroups } = useMyHubGroups(isAuthenticated);
+  const { joined } = useHubGroupMembership();
+
+  if (group.is_virtual || group.id <= 0) return null;
+  const manages = isAdmin || myGroups.some((g) => g.id === group.id);
+  const isMember = joined.some((j) => j.id === group.id);
+  if (!manages && !isMember) return null;
+
+  return (
+    <a
+      href={`./results_main.html?group=${encodeURIComponent(group.slug)}&tab=trainings`}
+      className="hp-mono shrink-0 rounded-[10px] border border-[#38bdf8]/50 bg-[rgba(56,189,248,0.1)] px-4 py-2 text-[13px] font-extrabold text-[#7dd3fc] no-underline hover:bg-[rgba(56,189,248,0.18)]"
+      title="Private — visible to the group owner and admins only"
+    >
+      🔒 Trainings →
+    </a>
+  );
+}
+
 function GroupDetails({ group }: { group: HubGroupDetails }) {
   const [showAllBests, setShowAllBests] = useState(false);
   const bests = showAllBests ? group.bests : group.bests.slice(0, BESTS_PREVIEW_COUNT);
@@ -234,7 +256,18 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
               </div>
             )}
           </div>
-          <JoinButton group={group} />
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {!group.is_virtual && group.id > 0 && (
+              <a
+                href={`./results_main.html?group=${encodeURIComponent(group.slug)}`}
+                className="hp-mono shrink-0 rounded-[10px] border border-[#7dd3fc]/40 bg-[rgba(125,211,252,0.08)] px-4 py-2 text-[13px] font-extrabold text-[#7dd3fc] no-underline hover:bg-[rgba(125,211,252,0.16)]"
+              >
+                Competitions →
+              </a>
+            )}
+            <TrainingsLink group={group} />
+            <JoinButton group={group} />
+          </div>
         </div>
 
         {group.description && (

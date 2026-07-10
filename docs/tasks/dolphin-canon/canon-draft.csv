@@ -1,0 +1,22 @@
+﻿canon_group,existing_swimmer_id,canon_name,canon_birth_year,first_name,last_name,birth_year_raw,first_name_en,last_name_en,gender,records,n_comp,n_train,sample_events
+1,,,,פיטר,איזבקוב,1979,PETER,IZVECOV,male,33,9,24,100 freestyle - ג 45-49; 100 individual_medley - ג 45-49; 100 מעורב אישי - גברים 12-99; 200 freestyle - ג 45-49
+2,,,,ולדימיר,ברנצב,1978,VLADIMIR,BARANTSEV,male,28,3,25,100 breaststroke - ג 45-49; 100 חזה - גברים 12-99; 50 breaststroke - ג 45-49; backstroke 100m
+3,,,,דני,,1971,,,male,25,0,25,freestyle 100m; freestyle 200m; freestyle 25m; freestyle 400m
+4,,,,מקסים,שוסטין,1981,MAXIM,SHOUSTIN,male,23,10,13,100 breaststroke - ג 45-49; 100 individual_medley - ג 45-49; 50 breaststroke - ג 45-49; 50 freestyle - ג 45-49
+5,,,,אורי,,1977,,,male,18,0,18,backstroke 100m; backstroke 25m; backstroke 50m; freestyle 100m
+6,,,,עילי,,1972,,,male,17,0,17,freestyle 100m; freestyle 200m; freestyle 25m; freestyle 400m
+7,,,,מרטין,,1975,,,male,11,0,11,freestyle 100m; freestyle 200m; freestyle 25m; freestyle 50m
+8,,,,רוני,,2000,,,male,11,0,11,freestyle 100m; freestyle 200m; freestyle 25m; freestyle 50m
+9,,,,מקס,,1981,,,male,10,0,10,freestyle 100m; freestyle 200m; freestyle 50m
+10,,,,סלבה,,1975,,,male,9,0,9,freestyle 100m; freestyle 200m; freestyle 25m; freestyle 50m
+11,,,,עודד,,1975,,,male,7,0,7,freestyle 100m; freestyle 200m; freestyle 50m
+12,,,,אדם ט,,,,,male,7,0,7,freestyle 100m; freestyle 200m; freestyle 400m
+13,,,,אדם פ,,,,,male,7,0,7,freestyle 100m; freestyle 200m; freestyle 400m
+14,,,,רוני,,,,,female,7,0,7,freestyle 100m; freestyle 200m; freestyle 400m
+15,,,,עדי,,1972,,,male,4,0,4,freestyle 50m
+16,,,,עדי,,1975,,,male,3,0,3,freestyle 200m; freestyle 25m
+17,,,,אדם,,,,,male,3,0,3,freestyle 100m; freestyle 50m
+18,,,,פיטר,איזבקוב,1977,PETER,IZVECOV,male,1,0,1,freestyle 25m
+19,,,,לי,,2003,,,male,1,0,1,freestyle 25m
+20,,,,אופק,,,,,male,1,0,1,freestyle 50m
+21,,,,לי,,,,,female,1,0,1,freestyle 50m

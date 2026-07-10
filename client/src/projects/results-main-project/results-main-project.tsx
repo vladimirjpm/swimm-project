@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import '../../index.css'; // общий Tailwind + твои базовые стили
 import './results-main-project.css';
@@ -120,6 +120,97 @@ function ResultsMain() {
 
   const { isTraining } = checkIsTraining(selectedSource, filters);
 
+  // Единый ХАБ группы: ?group=<slug>[&tab=trainings|competitions] (default competitions).
+  // Competitions — публичные результаты ростера (заужение /api/results на HubGroupMembers),
+  // Trainings — приватный Sys_-источник (доступ решает сервер: владелец/админ/участник-аккаунт).
+  const groupParams = new URLSearchParams(window.location.search);
+  const groupSlug = groupParams.get('group');
+  const [groupTab, setGroupTab] = useState<'trainings' | 'competitions'>(
+    groupParams.get('tab') === 'trainings' ? 'trainings' : 'competitions',
+  );
+  const [groupName, setGroupName] = useState<string | null>(null);
+  const [groupError, setGroupError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!groupSlug) return;
+    let cancelled = false;
+
+    const loadTrainings = async () => {
+      const r = await fetch(`/api/hub-groups/${encodeURIComponent(groupSlug)}/trainings`, {
+        credentials: 'include',
+      });
+      if (cancelled) return;
+      if (r.status === 401) { setGroupError('Sign in as a group member to view trainings.'); return; }
+      if (r.status === 403) { setGroupError('Trainings are private — only group members can view them.'); return; }
+      if (r.status === 404) { setGroupError('Group not found.'); return; }
+      if (!r.ok) { setGroupError(`Failed to load trainings (${r.status}).`); return; }
+      const data = await r.json();
+      setGroupError(null);
+      dispatch(rootActions.updateState({
+        dataSourceSelected: data,
+        // Сбрасываем ограничивающие дефолты (date=сегодня, style=freestyle/50), иначе
+        // тренировки с датой «28/10/2025» отфильтровываются в ноль. Показываем всё, дальше юзер фильтрует.
+        filterSelected: {
+          ...filters,
+          activity_type: 'training',
+          date: '',
+          style_name: '',
+          style_len: '',
+          pool_type: 'all',
+          gender: 'all',
+          selected_name: 'all',
+          training_table: { ...filters.training_table, mode: 'bySession' },
+        },
+      }));
+    };
+
+    const loadCompetitions = async () => {
+      const all: any[] = [];
+      let page = 1;
+      for (;;) {
+        const r = await fetch(
+          `/api/hub-groups/${encodeURIComponent(groupSlug)}/results?page=${page}&pageSize=500`,
+          { credentials: 'same-origin' },
+        );
+        if (cancelled) return;
+        if (r.status === 404) { setGroupError('Group not found.'); return; }
+        if (!r.ok) { setGroupError(`Failed to load results (${r.status}).`); return; }
+        const json = await r.json();
+        all.push(...(json.data ?? []));
+        if (!json.hasMore) break;
+        page += 1;
+      }
+      setGroupError(null);
+      dispatch(rootActions.updateState({
+        dataSourceSelected: {
+          results: all,
+          title: groupName ?? groupSlug,
+          is_masters: all.some((r) => r.is_masters === true),
+          is_award: all.some((r) => r.is_award === true),
+          sourceParams: { group: groupSlug },
+        },
+        filterSelected: { ...filters, activity_type: 'competition' },
+      }));
+    };
+
+    (async () => {
+      try {
+        const info = await fetch(`/api/hub-groups/${encodeURIComponent(groupSlug)}`, { credentials: 'same-origin' });
+        if (!cancelled && info.ok) {
+          const dto = await info.json();
+          setGroupName(dto.nameEn || dto.name || groupSlug);
+        }
+        await (groupTab === 'trainings' ? loadTrainings() : loadCompetitions());
+      } catch {
+        if (!cancelled) setGroupError(`Failed to load ${groupTab}.`);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupSlug, groupTab]);
+
+  const trainingGroupError = groupError;
+
   // Сброс selected_name при закрытии мобильного модала
   const handleMobileModalClose = useCallback(() => {
     dispatch(rootActions.updateState({
@@ -144,15 +235,58 @@ function ResultsMain() {
       {/* Dev-инструмент тем (виден только при ?themes в URL) */}
       <UI_ThemeDevTool />
 
-      {/* Селектор соревнований: шапка/панель, единый для всех брейкпоинтов
-          (mobile — bottom sheet из «Change», design_handoff_selector_all) */}
-      <div className="w-full z-40 max-lg:px-2 max-lg:pt-2">
-        <DataSourceDDL />
-      </div>
+      {/* Хаб группы (?group=): шапка группы + переключатель Trainings/Competitions вместо DataSourceDDL. */}
+      {groupSlug ? (
+        <div className="w-full z-40 max-lg:px-2 max-lg:pt-2">
+          <div
+            className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] px-5 py-4"
+            style={{
+              background: 'var(--theme-primary)',
+              color: 'var(--theme-mode-accent-text)',
+              boxShadow: 'var(--theme-mode-card-shadow)',
+            }}
+          >
+            <div className="text-[17px] font-extrabold">{groupName ?? groupSlug}</div>
+            <div className="flex gap-2">
+              {(['competitions', 'trainings'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setGroupTab(tab)}
+                  className="rounded-[10px] px-4 py-2 text-[13px] font-extrabold capitalize"
+                  style={{
+                    background: groupTab === tab ? 'var(--theme-mode-accent-text)' : 'rgba(255,255,255,0.16)',
+                    color: groupTab === tab ? 'var(--theme-primary)' : 'inherit',
+                  }}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Селектор соревнований: шапка/панель, единый для всех брейкпоинтов
+            (mobile — bottom sheet из «Change», design_handoff_selector_all) */
+        <div className="w-full z-40 max-lg:px-2 max-lg:pt-2">
+          <DataSourceDDL />
+        </div>
+      )}
 
       {/* Источник не выбран (deep-link ?category=): селектор выше открыт inline,
           область контента приглушена с подсказкой (CHANGES.md, frame 7a) */}
-      {!hasSource ? (
+      {trainingGroupError ? (
+        <div
+          className="mt-4 flex min-h-[140px] items-center justify-center rounded-[14px] px-4 text-center text-[13px] font-semibold"
+          style={{
+            border: '1px dashed var(--theme-mode-border-input)',
+            background: 'var(--theme-mode-surface)',
+            color: 'var(--theme-mode-text-muted)',
+          }}
+        >
+          {trainingGroupError}
+        </div>
+      ) : !hasSource ? (
         <div
           className="mt-4 flex min-h-[140px] items-center justify-center rounded-[14px] text-[13px] font-semibold opacity-45"
           style={{

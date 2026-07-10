@@ -77,6 +77,12 @@ public static class DependencyInjection
         // Одноразовый сид рекордов/нормативов из легаси JS (dotnet run -- --seed-records <dir>)
         services.AddScoped<IRecordsSeeder, RecordsSeeder>();
 
+        // Одноразовый сид тренировок «Дельфин-мастерс» (dotnet run -- --seed-dolphin-training ...)
+        services.AddScoped<IDolphinTrainingSeeder, DolphinTrainingSeeder>();
+
+        // Чтение приватных тренировок группы (вкладка «Тренировки»)
+        services.AddScoped<IHubGroupTrainingRepository, HubGroupTrainingRepository>();
+
         return services;
     }
 }
