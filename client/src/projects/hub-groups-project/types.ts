@@ -60,6 +60,19 @@ export interface HubGroupRecentResult {
   is_relay: boolean;
 }
 
+export interface HubGroupStanding {
+  swimmer_id: number;
+  name: string;
+  name_en: string;
+  role: 'member' | 'captain' | 'coach';
+  swims: number;
+  golds: number;
+  silvers: number;
+  bronzes: number;
+  club_points: number;
+  best_fina: number;
+}
+
 export interface HubGroupDetails {
   slug: string;
   name: string;
@@ -74,4 +87,6 @@ export interface HubGroupDetails {
   members: HubGroupMember[];
   recent_results: HubGroupRecentResult[];
   bests: HubGroupBest[];
+  season_label: string;
+  standings: HubGroupStanding[];
 }

@@ -104,6 +104,44 @@ public sealed class HubGroupBestDto
     public int Points { get; set; }
 }
 
+/// <summary>Строка сезонного зачёта группы — рейтинг участника по клубным очкам.</summary>
+public sealed class HubGroupStandingDto
+{
+    [JsonPropertyName("swimmer_id")]
+    public int SwimmerId { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = "";
+
+    [JsonPropertyName("name_en")]
+    public string NameEn { get; set; } = "";
+
+    /// <summary>member | captain | coach</summary>
+    [JsonPropertyName("role")]
+    public string Role { get; set; } = "member";
+
+    /// <summary>Кол-во зачтённых заплывов за сезон (без эстафет).</summary>
+    [JsonPropertyName("swims")]
+    public int Swims { get; set; }
+
+    [JsonPropertyName("golds")]
+    public int Golds { get; set; }
+
+    [JsonPropertyName("silvers")]
+    public int Silvers { get; set; }
+
+    [JsonPropertyName("bronzes")]
+    public int Bronzes { get; set; }
+
+    /// <summary>Сумма клубных очков за сезон по правилам ClubPointsRule.</summary>
+    [JsonPropertyName("club_points")]
+    public int ClubPoints { get; set; }
+
+    /// <summary>Лучший FINA-балл (InternationalPoints) за сезон, 0 если нет.</summary>
+    [JsonPropertyName("best_fina")]
+    public int BestFina { get; set; }
+}
+
 /// <summary>
 /// Полная публичная страница группы (/api/hub-groups/{slug}).
 /// Тот же контракт отдаёт /api/hub-groups/favorites — виртуальная группа
@@ -152,4 +190,12 @@ public sealed class HubGroupDetailsDto
     /// <summary>Рекорды группы: лучшее время по каждой оси стиль+дистанция+бассейн.</summary>
     [JsonPropertyName("bests")]
     public List<HubGroupBestDto> Bests { get; set; } = [];
+
+    /// <summary>Метка сезона зачёта, напр. "2025/26".</summary>
+    [JsonPropertyName("season_label")]
+    public string SeasonLabel { get; set; } = "";
+
+    /// <summary>Сезонный зачёт участников по клубным очкам (desc по очкам, затем заплывам).</summary>
+    [JsonPropertyName("standings")]
+    public List<HubGroupStandingDto> Standings { get; set; } = [];
 }

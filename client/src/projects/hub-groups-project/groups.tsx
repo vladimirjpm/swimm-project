@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import '../home-project/home.css';
 import HomeHeader from '../home-project/components/home-header';
 import RecordTicker from '../home-project/components/record-ticker';
-import type { HubGroupDetails, HubGroupLink, HubGroupListItem, HubGroupMember } from './types';
+import type { HubGroupDetails, HubGroupLink, HubGroupListItem, HubGroupMember, HubGroupStanding } from './types';
 
 // Страница групп (HubGroups, фазы 3–4): список публичных групп + страница группы
 // с участниками, «рекордами группы» и последними заплывами. Виртуальная группа
@@ -231,6 +231,71 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
         </div>
 
         <div className="flex flex-col gap-4 lg:gap-[18px]">
+          {/* Сезонный зачёт */}
+          <div className={cardCls} aria-label="Season standings">
+            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">
+                Season standings
+              </h2>
+              {group.season_label && (
+                <span className="hp-mono text-[11.5px] font-bold text-[#cbe0f0]/55">
+                  {group.season_label}
+                </span>
+              )}
+            </div>
+            {group.standings.length === 0 || group.standings.every((s) => s.swims === 0) ? (
+              <p className="text-[13px] text-[#cbe0f0]/60">В этом сезоне заплывов нет.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-[#7dd3fc]/20">
+                      <th className={`${headCls} text-right`}>#</th>
+                      <th className={headCls}>Swimmer</th>
+                      <th className={`${headCls} text-right`}>Swims</th>
+                      <th className={headCls}>Medals</th>
+                      <th className={`${headCls} text-right`}>Points</th>
+                      <th className={`${headCls} text-right`}>Best FINA</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.standings.map((s: HubGroupStanding, i) => (
+                      <tr key={s.swimmer_id} className="border-b border-[#7dd3fc]/10">
+                        <td className={`${cellCls} hp-mono text-right font-extrabold text-[#cbe0f0]/70`}>
+                          {i + 1}
+                        </td>
+                        <td className={`${cellCls} font-extrabold text-[#f3f8fd]`}>
+                          <span>{s.name || s.name_en}</span>
+                          {ROLE_LABEL[s.role] && (
+                            <span className="hp-mono ml-2 rounded-[6px] border border-[#38ef8f]/40 px-[6px] py-[2px] text-[10px] font-extrabold text-[#38ef8f]">
+                              {ROLE_LABEL[s.role]}
+                            </span>
+                          )}
+                        </td>
+                        <td className={`${cellCls} hp-mono text-right`}>{s.swims || '—'}</td>
+                        <td className={`${cellCls} whitespace-nowrap`}>
+                          {s.golds + s.silvers + s.bronzes === 0 ? (
+                            <span className="text-[#cbe0f0]/40">—</span>
+                          ) : (
+                            <span className="hp-mono">
+                              {s.golds > 0 && <span className="mr-2">🥇{s.golds}</span>}
+                              {s.silvers > 0 && <span className="mr-2">🥈{s.silvers}</span>}
+                              {s.bronzes > 0 && <span>🥉{s.bronzes}</span>}
+                            </span>
+                          )}
+                        </td>
+                        <td className={`${cellCls} hp-mono text-right font-extrabold text-[#7dd3fc]`}>
+                          {s.club_points || '—'}
+                        </td>
+                        <td className={`${cellCls} hp-mono text-right`}>{s.best_fina || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
           {/* Рекорды группы */}
           <div className={cardCls} aria-label="Group records">
             <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">

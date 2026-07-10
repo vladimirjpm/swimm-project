@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
+using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
 namespace Swimm.Infrastructure.Repositories;
@@ -131,9 +132,15 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
         return dto;
     }
 
-    /// <summary>Общие агрегаты страницы: последние заплывы и рекорды группы.</summary>
+    /// <summary>Общие агрегаты страницы: последние заплывы, рекорды группы и сезонный зачёт.</summary>
     private static async Task FillAggregatesAsync(SwimmDbContext db, HubGroupDetailsDto dto, List<int> swimmerIds)
     {
+        // Сезон = израильский плавательный: с 1 сентября последнего прошедшего сентября по сегодня.
+        var today = DateTime.Today;
+        var seasonStartYear = today.Month >= 9 ? today.Year : today.Year - 1;
+        var seasonStart = new DateTime(seasonStartYear, 9, 1);
+        dto.SeasonLabel = $"{seasonStartYear}/{(seasonStartYear + 1) % 100:D2}";
+
         if (swimmerIds.Count == 0) return;
 
         dto.RecentResults = await db.Results.AsNoTracking()
@@ -179,6 +186,92 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             .ThenBy(b => b.Distance)
             .ThenBy(b => b.Gender)
             .ToList();
+
+        await FillStandingsAsync(db, dto, swimmerIds, seasonStart);
+    }
+
+    /// <summary>Сезонный зачёт: очки за место по правилам ClubPointsRule + медали за сезон.</summary>
+    private static async Task FillStandingsAsync(
+        SwimmDbContext db, HubGroupDetailsDto dto, List<int> swimmerIds, DateTime seasonStart)
+    {
+        // Сезонные заплывы участников (без эстафет) — минимальная проекция для зачёта.
+        var season = await db.Results.AsNoTracking()
+            .Where(r => swimmerIds.Contains(r.SwimmerId)
+                        && r.RelayId == null
+                        && r.CompetitionDate >= seasonStart)
+            .Select(r => new SeasonResultRow
+            {
+                SwimmerId = r.SwimmerId,
+                Position = r.Position,
+                TimeFail = r.TimeFail,
+                InternationalPoints = r.InternationalPoints,
+                CompetitionDate = r.CompetitionDate,
+                IsMasters = r.Competition.IsMasters
+            })
+            .ToListAsync();
+
+        // Правила очков грузим целиком (их единицы) и применяем в памяти.
+        var rules = await db.ClubPointsRules.AsNoTracking()
+            .Include(r => r.Entries)
+            .ToListAsync();
+
+        var bySwimmer = season.GroupBy(r => r.SwimmerId).ToDictionary(g => g.Key, g => g.ToList());
+
+        // Участники без заплывов за сезон (в т.ч. тренер) — в зачёте с нулями.
+        dto.Standings = dto.Members
+            .Select(m =>
+            {
+                bySwimmer.TryGetValue(m.SwimmerId, out var rows);
+                rows ??= [];
+                return new HubGroupStandingDto
+                {
+                    SwimmerId = m.SwimmerId,
+                    Name = m.Name,
+                    NameEn = m.NameEn,
+                    Role = m.Role,
+                    Swims = rows.Count,
+                    Golds = rows.Count(r => r.Position == 1),
+                    Silvers = rows.Count(r => r.Position == 2),
+                    Bronzes = rows.Count(r => r.Position == 3),
+                    ClubPoints = rows.Sum(r => PointsFor(rules, r)),
+                    BestFina = rows.Count > 0 ? rows.Max(r => r.InternationalPoints) : 0
+                };
+            })
+            .OrderByDescending(s => s.ClubPoints)
+            .ThenByDescending(s => s.Swims)
+            .ToList();
+    }
+
+    /// <summary>Очки за место по действующему на дату правилу нужной области (masters/non-masters/all).</summary>
+    private static int PointsFor(List<ClubPointsRule> rules, SeasonResultRow r)
+    {
+        if (r.TimeFail || r.Position is null || r.Position < 1) return 0;
+
+        var scope = r.IsMasters ? "masters" : "non-masters";
+        var date = DateOnly.FromDateTime(r.CompetitionDate);
+        // Правило: самое позднее вступившее в силу; при равенстве дат scope-специфичное
+        // (masters/non-masters) важнее общего "all" — как в клиентском club-points-helper.
+        var rule = rules
+            .Where(x => (x.Scope == scope || x.Scope == "all") && x.EffectiveFrom <= date)
+            .OrderByDescending(x => x.EffectiveFrom)
+            .ThenByDescending(x => x.Scope == "all" ? 0 : 1)
+            .FirstOrDefault();
+        if (rule is null) return 0;
+
+        if (rule.MaxScoringPlace is int max && r.Position > max) return rule.DefaultPoints;
+        var entry = rule.Entries.FirstOrDefault(e => e.Place == r.Position.Value);
+        return entry?.Points ?? rule.DefaultPoints;
+    }
+
+    /// <summary>Проекция сезонного результата для зачёта (in-memory).</summary>
+    private sealed class SeasonResultRow
+    {
+        public int SwimmerId { get; init; }
+        public int? Position { get; init; }
+        public bool TimeFail { get; init; }
+        public int InternationalPoints { get; init; }
+        public DateTime CompetitionDate { get; init; }
+        public bool IsMasters { get; init; }
     }
 
     private static List<HubGroupPublicLinkDto> ParseLinks(string? json)
