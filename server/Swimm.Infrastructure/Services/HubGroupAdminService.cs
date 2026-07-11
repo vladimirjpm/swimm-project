@@ -156,13 +156,29 @@ public class HubGroupAdminService : IHubGroupAdminService
         query = (query ?? "").Trim();
         if (query.Length == 0) return [];
 
-        return await _db.Swimmers.AsNoTracking()
-            .Include(s => s.Club)
+        // Разбиваем на слова: запрос может быть "фамилия имя" целиком, а совпадение нужно
+        // искать по обоим полям вместе (каждое слово запроса — в любом из четырёх полей имени).
+        var words = query.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (words.Length == 0) return [];
+
+        var swimmersQuery = _db.Swimmers.AsNoTracking().Include(s => s.Club).AsQueryable();
+
+        foreach (var word in words)
+        {
+            var pattern = $"%{word}%";
+            swimmersQuery = swimmersQuery.Where(s =>
+                EF.Functions.ILike(s.LastName, pattern) ||
+                EF.Functions.ILike(s.FirstName, pattern) ||
+                EF.Functions.ILike(s.LastNameEn, pattern) ||
+                EF.Functions.ILike(s.FirstNameEn, pattern));
+        }
+
+        return await swimmersQuery
             .Where(s =>
-                EF.Functions.ILike(s.LastName, $"%{query}%") ||
-                EF.Functions.ILike(s.FirstName, $"%{query}%") ||
-                EF.Functions.ILike(s.LastNameEn, $"%{query}%") ||
-                EF.Functions.ILike(s.FirstNameEn, $"%{query}%"))
+                // Эстафетные заплывы иногда попадали в парсер как "спортсмен" с составным
+                // именем — список через запятую (баг парсинга relay-строк). Это не реальные
+                // пловцы, добавлять их в группу нельзя — отсекаем по запятой в имени/фамилии.
+                !EF.Functions.ILike(s.LastName, "%,%") && !EF.Functions.ILike(s.FirstName, "%,%"))
             .OrderBy(s => s.LastName)
             .Take(20)
             .Select(s => new SwimmerSearchResultDto

@@ -129,6 +129,17 @@
                     </details>
                 </div>
             </div>
+
+            <!-- PDF parse error (persistent, copyable — не тост, чтобы не пропадало) -->
+            <div id="pdf-parse-error" class="hidden mb-6">
+                <div class="admin-card p-5 border-l-[3px] border-l-admin-danger bg-admin-danger/5">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-semibold text-admin-danger">Ошибка разбора PDF</h3>
+                        <button id="btn-copy-pdf-error" type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 text-xs">📋 Копировать</button>
+                    </div>
+                    <pre id="pdf-parse-error-log" class="bg-black/30 rounded-md p-3 max-h-[400px] overflow-auto text-xs text-admin-text whitespace-pre-wrap leading-relaxed"></pre>
+                </div>
+            </div>
         </div>
 
         <!-- Categories (shared) -->
@@ -594,6 +605,18 @@
     const pdfWarningsList = document.getElementById('pdf-warnings-list');
     const pdfDebugDetails = document.getElementById('pdf-debug-details');
     const pdfDebugLog = document.getElementById('pdf-debug-log');
+    const pdfParseError = document.getElementById('pdf-parse-error');
+    const pdfParseErrorLog = document.getElementById('pdf-parse-error-log');
+    const btnCopyPdfError = document.getElementById('btn-copy-pdf-error');
+
+    btnCopyPdfError.addEventListener('click', async () => {
+        try {
+            await navigator.clipboard.writeText(pdfParseErrorLog.textContent);
+            toast('Скопировано в буфер');
+        } catch {
+            toast('Не удалось скопировать — выделите текст вручную');
+        }
+    });
 
     let pdfPreviewId = null;
 
@@ -609,6 +632,7 @@
         btnParsePdf.disabled = true;
         progress.classList.remove('hidden');
         pdfPreview.classList.add('hidden');
+        pdfParseError.classList.add('hidden');
         resultDiv.classList.add('hidden');
 
         try {
@@ -627,14 +651,21 @@
 
             const res = await fetch('/api/admin/parse-pdf', { method: 'POST', credentials: 'same-origin', headers: { 'X-XSRF-TOKEN': _csrfToken }, body: form });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+            if (!res.ok) {
+                pdfParseErrorLog.textContent = data.error || `HTTP ${res.status}`;
+                pdfParseError.classList.remove('hidden');
+                toast('Ошибка разбора PDF — см. лог ниже', 4000);
+                return;
+            }
 
             pdfPreviewId = data.previewId;
             showPdfPreview(data);
             btnImportPdf.disabled = false;
             toast(`Распознано результатов: ${data.resultCount}`);
         } catch (e) {
-            toast(e.message, 4000);
+            pdfParseErrorLog.textContent = e.message;
+            pdfParseError.classList.remove('hidden');
+            toast('Ошибка разбора PDF — см. лог ниже', 4000);
         } finally {
             progress.classList.add('hidden');
             btnParsePdf.disabled = false;
