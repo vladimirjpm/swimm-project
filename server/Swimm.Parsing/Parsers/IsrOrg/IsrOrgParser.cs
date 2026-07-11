@@ -13,15 +13,19 @@ public class IsrOrgParser : IFormatParser
 
     public IEnumerable<Result> Parse(ParseRequest request)
     {
+        // Бассейн выбирается в UI импорта и имеет приоритет над дефолтом парсера
+        // (протокол PDF длину бассейна не указывает — парсер ставит "25m" условно).
+        var poolOverride = string.IsNullOrWhiteSpace(request.PoolType) ? null : request.PoolType.Trim();
+
         if (request.SecondaryStream == null || string.IsNullOrWhiteSpace(request.SecondaryFileName))
         {
-            return ParseHebrewOnly(request.PrimaryStream, request.PrimaryFileName, request.IsAward);
+            return ParseHebrewOnly(request.PrimaryStream, request.PrimaryFileName, request.IsAward, poolOverride);
         }
 
         return ParseBilingual(
             request.SecondaryStream, request.SecondaryFileName!,
             request.PrimaryStream, request.PrimaryFileName,
-            request.IsAward);
+            request.IsAward, poolOverride);
     }
 
     public string GetDebugLog() => IsrOrgCompetitionParser.GetDebugLog();
@@ -45,7 +49,7 @@ public class IsrOrgParser : IFormatParser
         return 0;
     }
 
-    private static IEnumerable<Result> ParseHebrewOnly(Stream hebrewPdfStream, string hebrewFileName, bool isAward)
+    private static IEnumerable<Result> ParseHebrewOnly(Stream hebrewPdfStream, string hebrewFileName, bool isAward, string? poolOverride)
     {
         var heParts = Path.GetFileNameWithoutExtension(hebrewFileName)
                           .Split('_', StringSplitOptions.RemoveEmptyEntries);
@@ -55,7 +59,20 @@ public class IsrOrgParser : IFormatParser
         var isMastersFile = Path.GetFileNameWithoutExtension(hebrewFileName)
                             .Contains("masters", StringComparison.OrdinalIgnoreCase);
 
-        foreach (var comp in IsrOrgCompetitionParser.ParseCompetitions(hebrewPdfStream, langHe))
+        var comps = IsrOrgCompetitionParser.ParseCompetitions(hebrewPdfStream, langHe);
+        return MapHebrewOnly(comps, country, isMastersFile, isAward, poolOverride);
+    }
+
+    /// <summary>
+    /// Маппинг распарсенных соревнований (HE-only) в результаты импорта. Вынесено из
+    /// <see cref="ParseHebrewOnly"/>, чтобы тестировать без PDF. <paramref name="poolOverride"/>
+    /// (бассейн из UI) имеет приоритет над дефолтом парсера <c>comp.PoolType</c>.
+    /// </summary>
+    internal static IEnumerable<Result> MapHebrewOnly(
+        IEnumerable<IsrOrgCompetitionResult> comps, string country, bool isMastersFile,
+        bool isAward, string? poolOverride)
+    {
+        foreach (var comp in comps)
         {
             foreach (var rHe in comp.Results)
             {
@@ -64,7 +81,7 @@ public class IsrOrgParser : IFormatParser
                 if (rHe.IsRelay == true && rHe.RelaySwimmers?.Count > 0)
                 {
                     yield return CreateRelayResult(rHe, comp, country, eventYear, isMastersFile, isAward,
-                        lastNameEn: string.Empty, firstNameEn: string.Empty, clubEn: string.Empty);
+                        lastNameEn: string.Empty, firstNameEn: string.Empty, clubEn: string.Empty, poolOverride);
                     continue;
                 }
 
@@ -83,7 +100,7 @@ public class IsrOrgParser : IFormatParser
                     EventStyleLen: comp.EventStyleLen,
                     EventStyleGender: comp.EventStyleGender,
                     EventStyleAge: age.ToString(),
-                    PoolType: comp.PoolType,
+                    PoolType: poolOverride ?? comp.PoolType,
                     Position: rHe.Position is int pi ? pi : null,
                     Heat: rHe.Heat,
                     Lane: rHe.Lane,
@@ -111,7 +128,7 @@ public class IsrOrgParser : IFormatParser
     private static IEnumerable<Result> ParseBilingual(
         Stream englishPdfStream, string englishFileName,
         Stream hebrewPdfStream, string hebrewFileName,
-        bool isAward)
+        bool isAward, string? poolOverride)
     {
         var enParts = Path.GetFileNameWithoutExtension(englishFileName)
                           .Split('_', StringSplitOptions.RemoveEmptyEntries);
@@ -155,7 +172,7 @@ public class IsrOrgParser : IFormatParser
 
                 if (isRelay && relaySwimmers?.Count > 0)
                 {
-                    yield return CreateRelayResultBilingual(rEn, rHe, compEn, compHe, countryEn, eventYear, isMastersFile, isAward, relaySwimmers);
+                    yield return CreateRelayResultBilingual(rEn, rHe, compEn, compHe, countryEn, eventYear, isMastersFile, isAward, relaySwimmers, poolOverride);
                     continue;
                 }
 
@@ -174,7 +191,7 @@ public class IsrOrgParser : IFormatParser
                     EventStyleLen: compEn.EventStyleLen,
                     EventStyleGender: compEn.EventStyleGender,
                     EventStyleAge: age.ToString(),
-                    PoolType: compEn.PoolType,
+                    PoolType: poolOverride ?? compEn.PoolType,
                     Position: rEn.Position is int pi ? pi : null,
                     Heat: rEn.Heat,
                     Lane: rEn.Lane,
@@ -202,7 +219,7 @@ public class IsrOrgParser : IFormatParser
     private static Result CreateRelayResult(
         IsrOrgResult rHe, IsrOrgCompetitionResult comp, string country,
         int eventYear, bool isMastersFile, bool isAward,
-        string lastNameEn, string firstNameEn, string clubEn)
+        string lastNameEn, string firstNameEn, string clubEn, string? poolOverride)
     {
         var firstSwimmer = rHe.RelaySwimmers!.First();
 
@@ -222,7 +239,7 @@ public class IsrOrgParser : IFormatParser
             EventStyleLen: comp.EventStyleLen,
             EventStyleGender: comp.EventStyleGender,
             EventStyleAge: swimmerAge.ToString(),
-            PoolType: comp.PoolType,
+            PoolType: poolOverride ?? comp.PoolType,
             Position: rHe.Position is int pi ? pi : null,
             Heat: rHe.Heat,
             Lane: rHe.Lane,
@@ -250,7 +267,7 @@ public class IsrOrgParser : IFormatParser
         IsrOrgCompetitionResult compEn, IsrOrgCompetitionResult compHe,
         string country, int eventYear, bool isMastersFile,
         bool isAward,
-        List<RelaySwimmer> relaySwimmers)
+        List<RelaySwimmer> relaySwimmers, string? poolOverride)
     {
         var firstSwimmer = relaySwimmers.First();
 
@@ -270,7 +287,7 @@ public class IsrOrgParser : IFormatParser
             EventStyleLen: compEn.EventStyleLen,
             EventStyleGender: compEn.EventStyleGender,
             EventStyleAge: swimmerAge.ToString(),
-            PoolType: compEn.PoolType,
+            PoolType: poolOverride ?? compEn.PoolType,
             Position: rEn.Position is int pi ? pi : null,
             Heat: rEn.Heat,
             Lane: rEn.Lane,
