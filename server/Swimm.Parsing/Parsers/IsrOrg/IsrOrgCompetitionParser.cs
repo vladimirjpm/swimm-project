@@ -76,9 +76,85 @@ public static class IsrOrgCompetitionParser
         @"^(?<len>\d+)m?\s+(?<style>.+?)\s*-\s*(?<age>U?\d+(?:-\d+)?|Open)\s+(?<gender>Girls|Boys|Women|Men|Female|Male|Mixed)$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    // Английский заголовок заплыва БЕЗ пола/возраста в строке (masters-экспорт
+    // Maccabiah ARENA): "400m Freestyle" / "200m Individual Medley". Пол и возраст
+    // приходят отдельной ивритской строкой "מאסטרס <пол> <возраст>". Матчим по СЫРОЙ.
+    private const string EnStylePattern =
+        @"Freestyle|Backstroke|Breaststroke|Butterfly|Individual\s+Medley|Medley";
+
+    private static Regex? _headerEnNoGenderInHE;
+    private static Regex HeaderEnNoGenderInHE => _headerEnNoGenderInHE ??= new Regex(
+        @"^(?<len>\d+)m?\s+(?<style>" + EnStylePattern + @")$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // Английский заголовок ЭСТАФЕТЫ без пола/возраста: "4X50m Medley Relay".
+    private static Regex? _relayHeaderEnInHE;
+    private static Regex RelayHeaderEnInHE => _relayHeaderEnInHE ??= new Regex(
+        @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)m?\s+(?<style>" + EnStylePattern + @")\s+Relay$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     private static Regex FullResultRx => _fullResultRx ??= new Regex(
         @"^(-|\d+)\s+\d+\s+\d+.*(\d{2}:\d{2}\.\d{2}|NS|DQ)\s+\d+$",
         RegexOptions.Compiled);
+
+    // EN-строка команды эстафеты: "<heat> <lane> <team> <time> Rank <pos>".
+    // Команда бывает пустой (перенос названия на соседние строки) → опциональна.
+    private static Regex? _relayTeamLineEn;
+    private static Regex RelayTeamLineEn => _relayTeamLineEn ??= new Regex(
+        @"^(?<heat>\d+)\s+(?<lane>\d+)\s+(?:(?<team>.+?)\s+)?(?<time>\d{2}:\d{2}\.\d{1,2}|DQ|NS)\s+Rank\s+(?<pos>\d+)$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // Каноничное имя английского стиля → к нижнему регистру + individual_medley.
+    private static string CanonEnStyle(string style)
+    {
+        var s = Regex.Replace(style.Trim(), @"\s+", " ").ToLowerInvariant();
+        return s switch
+        {
+            "individual medley" => "individual_medley",
+            "medley" => "individual_medley",
+            _ => s
+        };
+    }
+
+    // Чистый EN-экспорт (Maccabiah 2026, файл _IL_EN): заголовок заплыва —
+    // "<len>m <style> - <категория>", категория варьируется: "U17 Girls",
+    // "Women", "Men Para", а у эстафет "<legs>X<len>m <style> Relay|Mix - MIX 18-99".
+    private static Regex? _headerEnFull;
+    private static Regex HeaderEnFull => _headerEnFull ??= new Regex(
+        @"^(?<len>\d+)m?\s+(?<style>" + EnStylePattern + @")\s*-\s*(?<cat>.+)$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static Regex? _relayHeaderEnFull;
+    private static Regex RelayHeaderEnFull => _relayHeaderEnFull ??= new Regex(
+        @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)m?\s+(?<style>" + EnStylePattern + @")\s+(?:Relay|Mix)\s*-\s*(?<cat>.+)$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // Разбор правой части EN-заголовка ("U17 Girls" / "Women" / "MIX 18-99" /
+    // "Men Para") в нормализованные пол и возраст. Para/open без числа → возраст
+    // "para"/"open" (чтобы Men и Men Para не схлопнулись в одно событие).
+    private static (string gender, string age) ParseEnCategory(string cat)
+    {
+        cat = Regex.Replace(cat.Trim(), @"\s+", " ");
+        bool para = Regex.IsMatch(cat, @"\bPara\b", RegexOptions.IgnoreCase);
+
+        string gender = "none";
+        string? age = null;
+        foreach (var t in cat.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            switch (t.ToLowerInvariant())
+            {
+                case "girls" or "women" or "female": gender = "female"; break;
+                case "boys" or "men" or "male": gender = "male"; break;
+                case "mix" or "mixed": gender = "none"; break;
+                default:
+                    if (Regex.IsMatch(t, @"^U?\d+(-\d+)?$", RegexOptions.IgnoreCase))
+                        age = t.TrimStart('U', 'u');
+                    break;
+            }
+        }
+
+        return (gender, age ?? (para ? "para" : "open"));
+    }
 
     private static Regex RelayHeaderRxHE => _relayHeaderRxHE ??= new Regex(
         @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)\s+(?<style>.+?)\s+" +
@@ -446,6 +522,36 @@ public static class IsrOrgCompetitionParser
 
                 if (isHE)
                 {
+                    // Masters-экспорт Maccabiah ARENA: английский заголовок заплыва без
+                    // пола/возраста в строке. Только выставляем pending — сам заплыв
+                    // (current) создаст следующая строка "מאסטרס <пол> <возраст>" через
+                    // существующий механизм pendingEventLen / masters-continuation выше.
+                    var enRelayHead = RelayHeaderEnInHE.Match(raw);
+                    if (enRelayHead.Success)
+                    {
+                        pendingRelayLen = enRelayHead.Groups["len"].Value;
+                        pendingRelayLegs = int.Parse(enRelayHead.Groups["legs"].Value);
+                        pendingRelayStyleHe = CanonEnStyle(enRelayHead.Groups["style"].Value);
+                        pendingEventLine = raw;
+                        pendingEventLen = null;
+                        pendingEventStyle = null;
+                        Log($"  -> PENDING RelayEN-in-HE: legs={pendingRelayLegs}, len={pendingRelayLen}, style={pendingRelayStyleHe}");
+                        continue;
+                    }
+
+                    var enNoGenderHead = HeaderEnNoGenderInHE.Match(raw);
+                    if (enNoGenderHead.Success)
+                    {
+                        pendingEventLen = enNoGenderHead.Groups["len"].Value;
+                        pendingEventStyle = CanonEnStyle(enNoGenderHead.Groups["style"].Value);
+                        pendingEventLine = raw;
+                        pendingRelayLen = null;
+                        pendingRelayStyleHe = null;
+                        pendingRelayLegs = 0;
+                        Log($"  -> PENDING HeaderEN-noGender-in-HE: len={pendingEventLen}, style={pendingEventStyle}");
+                        continue;
+                    }
+
                     var enHead = HeaderRxENinHE.Match(raw);
                     if (enHead.Success)
                     {
@@ -551,6 +657,50 @@ public static class IsrOrgCompetitionParser
                         pendingRelayStyleHe = styleHe;
                         pendingEventLine = line;
 
+                        continue;
+                    }
+                }
+
+                // Чистый EN-файл: заголовок с гибкой категорией после тире.
+                if (!isHE)
+                {
+                    var enRelayFull = RelayHeaderEnFull.Match(line);
+                    var enIndivFull = enRelayFull.Success ? Match.Empty : HeaderEnFull.Match(line);
+                    if (enRelayFull.Success || enIndivFull.Success)
+                    {
+                        bool relay = enRelayFull.Success;
+                        var mm = relay ? enRelayFull : enIndivFull;
+                        var (genderNorm, age) = ParseEnCategory(mm.Groups["cat"].Value);
+                        var styleNorm = CanonEnStyle(mm.Groups["style"].Value);
+                        var len = relay
+                            ? $"{mm.Groups["legs"].Value}X{mm.Groups["len"].Value}"
+                            : mm.Groups["len"].Value;
+
+                        if (current != null) yield return current;
+
+                        currentIsRelay = relay;
+                        currentRelayLegs = relay ? int.Parse(mm.Groups["legs"].Value) : 0;
+                        pendingEventLen = null;
+                        pendingEventStyle = null;
+
+                        // Дата события — из строки времени под заголовком ("05/07/2026 17:00").
+                        var nextEn = i + 1 < lines.Count ? lines[i + 1].Trim() : string.Empty;
+                        var dmEn = Regex.Match(nextEn, @"\d{2}/\d{2}/\d{4}");
+                        var dateEn = dmEn.Success ? dmEn.Value : dat_relay;
+
+                        current = new IsrOrgCompetitionResult(
+                            Competition: lines[0].Trim(),
+                            AgeGroup: age,
+                            Date: dateEn,
+                            Event: line,
+                            EventStyleName: styleNorm,
+                            EventStyleLen: len,
+                            EventStyleGender: genderNorm,
+                            EventStyleAge: age,
+                            PoolType: "25m",
+                            Results: new List<IsrOrgResult>()
+                        );
+                        Log($"  -> NEW EN EVENT: {line} => style={styleNorm}, gender={genderNorm}, age={age}, relay={relay}");
                         continue;
                     }
                 }
@@ -731,52 +881,147 @@ public static class IsrOrgCompetitionParser
                     }
                 }
 
-                if (current != null && Regex.IsMatch(line, @"^(-|\d+)\s+\d+\s+\d+"))
+                // EN-эстафета: командный результат (место/команда/время). Имена
+                // пловцов в PDF раздроблены на 2–3 строки с непоследовательным
+                // регистром — надёжно реконструировать ноги нельзя, поэтому берём
+                // только командный результат; строки пловцов/шапки таблицы ниже
+                // ничему не матчатся и просто пропускаются.
+                if (!isHE && current != null && currentIsRelay)
                 {
-                    Log($"  -> Result line candidate");
-                    int resultLineIdx = i;
-                    var entry = line;
-                    if (!FullResultRx.IsMatch(entry) && i + 1 < lines.Count)
+                    var tmEn = RelayTeamLineEn.Match(line);
+                    if (tmEn.Success)
                     {
-                        var nxtRaw = lines[i + 1].Trim();
-                        var nxtLine = isHE ? HebrewTextHelper.NormalizeHebrewLine(nxtRaw) : nxtRaw;
-                        entry += " " + nxtLine;
-                        i++;
-                    }
+                        int pos = int.Parse(tmEn.Groups["pos"].Value);
+                        int heat = int.Parse(tmEn.Groups["heat"].Value);
+                        int lane = int.Parse(tmEn.Groups["lane"].Value);
+                        string team = tmEn.Groups["team"].Value.Trim();
+                        string timeTok = tmEn.Groups["time"].Value.Trim();
 
-                    try
-                    {
-                        var res = IsrOrgResultLineParser.ParseResultLine(entry);
-
-                        // Перенос фамилии: длинная фамилия иногда переносится PDF-ом на соседние
-                        // строки (напр. "TSCHERKOWS" / данные / "KI"), и в строке данных фамилия
-                        // оказывается пустой. Восстанавливаем из соседних строк-фрагментов
-                        // (только буквы, без цифр/пробелов), склеивая prev+next без разделителя.
-                        if (string.IsNullOrWhiteSpace(res.LastName))
+                        string? time = null;
+                        string? timeFailNote = null;
+                        if (Regex.IsMatch(timeTok, @"^\d{2}:\d{2}\.\d{1,2}$"))
                         {
-                            var prevFrag = resultLineIdx - 1 >= 0
-                                ? NormalizeIfHe(lines[resultLineIdx - 1].Trim(), isHE) : string.Empty;
-                            var nextFrag = i + 1 < lines.Count
-                                ? NormalizeIfHe(lines[i + 1].Trim(), isHE) : string.Empty;
-
-                            var recovered = string.Empty;
-                            if (IsNameFragment(prevFrag)) recovered += prevFrag;
-                            if (IsNameFragment(nextFrag)) recovered += nextFrag;
-
-                            if (recovered.Length > 0)
-                            {
-                                res = res with { LastName = recovered };
-                                Log($"  -> Recovered wrapped surname: '{recovered}' (prev='{prevFrag}', next='{nextFrag}')");
-                            }
+                            if (timeTok != "00:00.00" && timeTok != "00:00.0") time = timeTok;
+                        }
+                        else if (timeTok is "DQ" or "NS")
+                        {
+                            timeFailNote = timeTok;
                         }
 
-                        current.Results.Add(res);
-                        Log($"  -> Added result: {res.LastName} {res.FirstName}, time={res.Time}");
+                        current.Results.Add(new IsrOrgResult(
+                            Country: "",
+                            Position: pos,
+                            Heat: heat,
+                            Lane: lane,
+                            LastName: "",
+                            FirstName: "",
+                            BirthYear: 0,
+                            Club: team,
+                            Time: time,
+                            TimeFailNote: timeFailNote,
+                            InternationalPoints: 0,
+                            IsRelay: true,
+                            RelayTeamName: team,
+                            RelaySwimmersName: null,
+                            RelaySwimmers: null
+                        ));
+                        Log($"  -> Added EN relay team result: pos={pos}, team='{team}', time={time}");
+                        continue;
                     }
-                    catch (Exception ex)
+                }
+
+                // ==== Разбор строки результата с авто-детектом ориентации токенов ====
+                // Латиница строк результатов в двуязычных экспортах Maccabiah приходит
+                // в РАЗНОМ порядке: в одних файлах уже нормальном (rank heat lane FAMILY
+                // name year club time points), в других — перевёрнутом (восстанавливается
+                // RTL-реверсом). Строки-места из трёх чисел ("2 7 3") матчат стартовый
+                // детектор в ОБЕИХ ориентациях, поэтому выбираем ту, чья склейка со
+                // следующей строкой реально совпала с FullResultRx. Норм (перевёрнутая)
+                // имеет приоритет при равенстве → старые файлы не задеты.
+                if (current != null)
+                {
+                    bool startNorm = Regex.IsMatch(line, @"^(-|\d+)\s+\d+\s+\d+");
+                    bool startRaw = isHE && Regex.IsMatch(raw, @"^(-|\d+)\s+\d+\s+\d+");
+
+                    if (startNorm || startRaw)
                     {
-                        throw new InvalidOperationException(
-                            $"Parse error on page {pageNumber}, line '{entry}': {ex.Message}", ex);
+                        int resultLineIdx = i;
+
+                        // Собирает entry в заданной ориентации, при необходимости
+                        // подклеивая следующую строку (место и данные бывают разнесены).
+                        (string entry, bool full, bool consumed) BuildEntry(bool useNorm)
+                        {
+                            string Prep(string s) => useNorm && isHE ? HebrewTextHelper.NormalizeHebrewLine(s) : s;
+                            var e = Prep(raw);
+                            bool cons = false;
+                            if (!FullResultRx.IsMatch(e) && i + 1 < lines.Count)
+                            {
+                                e += " " + Prep(lines[i + 1].Trim());
+                                cons = true;
+                            }
+                            return (e, FullResultRx.IsMatch(e), cons);
+                        }
+
+                        var normC = startNorm ? BuildEntry(true) : (entry: "", full: false, consumed: false);
+                        var rawC = startRaw ? BuildEntry(false) : (entry: "", full: false, consumed: false);
+
+                        // Приоритет — ориентация, реально совпавшая с FullResultRx.
+                        // Если ни одна, но норм-стартовала — легаси-путь (склейка+парс
+                        // без полного совпадения) для сохранения прежнего поведения.
+                        // Стартовый детектор из трёх чисел не привязан к границам
+                        // токенов, поэтому ловит "1 4 02" внутри relay-строки
+                        // "1 4 02:34.24 Rank 9". Чтобы такие строки не уходили в парсер,
+                        // СЫРАЯ ориентация берётся ТОЛЬКО при реальном совпадении с
+                        // FullResultRx. Легаси-парс-без-совпадения — лишь для norm.
+                        bool useNormFinal;
+                        bool proceed = true;
+                        if (normC.full) useNormFinal = true;
+                        else if (rawC.full) useNormFinal = false;
+                        else if (startNorm) useNormFinal = true;
+                        else { useNormFinal = true; proceed = false; }
+
+                        if (proceed)
+                        {
+                            var chosen = useNormFinal ? normC : rawC;
+                            var entry = chosen.entry;
+                            if (chosen.consumed) i++;
+
+                            Log($"  -> Result line candidate ({(useNormFinal ? "reversed/norm" : "raw")} orientation)");
+
+                            try
+                            {
+                                var res = IsrOrgResultLineParser.ParseResultLine(entry);
+
+                                // Перенос длинной фамилии: PDF иногда разносит её на соседние
+                                // строки (напр. "TSCHERKOWS" / данные / "KI"), и в строке данных
+                                // фамилия пустая. Восстанавливаем из соседних строк-фрагментов
+                                // (только буквы) в той же ориентации, склеивая prev+next.
+                                if (string.IsNullOrWhiteSpace(res.LastName))
+                                {
+                                    string Prep(string s) => useNormFinal ? NormalizeIfHe(s, isHE) : s;
+                                    var prevFrag = resultLineIdx - 1 >= 0 ? Prep(lines[resultLineIdx - 1].Trim()) : string.Empty;
+                                    var nextFrag = i + 1 < lines.Count ? Prep(lines[i + 1].Trim()) : string.Empty;
+
+                                    var recovered = string.Empty;
+                                    if (IsNameFragment(prevFrag)) recovered += prevFrag;
+                                    if (IsNameFragment(nextFrag)) recovered += nextFrag;
+
+                                    if (recovered.Length > 0)
+                                    {
+                                        res = res with { LastName = recovered };
+                                        Log($"  -> Recovered wrapped surname: '{recovered}' (prev='{prevFrag}', next='{nextFrag}')");
+                                    }
+                                }
+
+                                current.Results.Add(res);
+                                Log($"  -> Added result: {res.LastName} {res.FirstName}, time={res.Time}");
+                            }
+                            catch (Exception ex)
+                            {
+                                throw new InvalidOperationException(
+                                    $"Parse error on page {pageNumber}, line '{entry}': {ex.Message}", ex);
+                            }
+                        }
                     }
                 }
             }

@@ -62,6 +62,34 @@ public class IsrOrgCompetitionParserTests
         "Powered By",
     };
 
+    // Реальные строки со стр. 17 экспорта Maccabiah ARENA 2026 (masters).
+    // Отличия от MaccabiahPage1: (1) английский заголовок заплыва БЕЗ пола/возраста
+    // ("400m Freestyle"); (2) пол/возраст отдельной ивритской masters-строкой
+    // ("21-29 ג סרטסאמ" => norm "מאסטרס ג 21-29"); (3) латиница результатов УЖЕ в
+    // нормальном порядке токенов (rank heat lane FAMILY name year club time points) —
+    // безусловный RTL-реверс её ломал => терялись все индивидуальные заплывы.
+    // См. memory/parser-maccabiah-token-order.md.
+    private static readonly string[] Maccabiah2026Page17 =
+    {
+        "לארשי תופילאו היבכמ ARENA 2026 ץיק סרטסאמל",
+        "07/07/2026 - 09/07/2026",
+        "Results",
+        "400m Freestyle",
+        "Year Of International",
+        "Rank Heat Lane Last name First name Club Result",
+        "Birth Score",
+        "21-29 ג סרטסאמ",          // norm: מאסטרס ג 21-29 (male)
+        "1 7 4 TURGEMAN Yarin 2003 Macabbi Kiryat Biyalik 04:27.96 553",
+        "Maccabi Kfar",                                              // клуб-перенос (часть 1)
+        "2 5 9 YADGAROV Oren 2005 05:42.68 264",                     // клуб пуст в строке данных
+        "Hamaccabbiah",                                              // клуб-перенос (часть 2)
+        "3 6 8 ARIEL Asaf 2004 Maccabi Olam Hamaim 05:48.00 252",
+        "30-34 ג סרטסאמ",          // смена категории => norm: מאסטרס ג 30-34
+        "1 7 5 COHEN Sagi 1992 Macabbi Haifa 04:39.74 486",
+        "2 7 3",                                                     // место на отдельной строке
+        "SALOMON Ori 1992 Macabbi Haifa 04:54.70 415",               // данные без места
+    };
+
     private static IReadOnlyList<IsrOrgCompetitionResult> Parse(params string[][] pages) =>
         IsrOrgCompetitionParser.ParseLines(pages, "HE").ToList();
 
@@ -81,6 +109,49 @@ public class IsrOrgCompetitionParserTests
         // Раньше не парсилось НИ ОДНОГО результата (current == null). Должно быть 21.
         Assert.Equal(21, comp.Results.Count);
         Assert.Equal(Enumerable.Range(1, 21), comp.Results.Select(r => (int)r.Position!));
+    }
+
+    [Fact]
+    public void EnglishNoGenderHeader_WithMastersLine_CreatesEvents_AndParsesRawOrientedResults()
+    {
+        // Заголовок без пола/возраста + masters-строка => два события (21-29 и 30-34),
+        // оба male freestyle 400. Раньше не создавалось НИ ОДНОГО (0 competitions).
+        var comps = Parse(Maccabiah2026Page17);
+
+        Assert.Equal(2, comps.Count);
+        Assert.All(comps, c =>
+        {
+            Assert.Equal("freestyle", c.EventStyleName);
+            Assert.Equal("male", c.EventStyleGender);
+            Assert.Equal("400", c.EventStyleLen);
+        });
+
+        var g1 = comps[0];
+        Assert.Equal("21-29", g1.EventStyleAge);
+        Assert.Equal(3, g1.Results.Count);
+        Assert.Equal(Enumerable.Range(1, 3), g1.Results.Select(r => (int)r.Position!));
+
+        var first = g1.Results[0];
+        Assert.Equal("TURGEMAN", first.LastName);
+        Assert.Equal("Yarin", first.FirstName);
+        Assert.Equal(2003, first.BirthYear);
+        Assert.Equal("Macabbi Kiryat Biyalik", first.Club);
+        Assert.Equal("04:27.96", first.Time);
+        Assert.Equal(553, first.InternationalPoints);
+        Assert.Equal(7, first.Heat);
+        Assert.Equal(4, first.Lane);
+
+        // Смена категории по masters-строке.
+        var g2 = comps[1];
+        Assert.Equal("30-34", g2.EventStyleAge);
+        Assert.Equal(2, g2.Results.Count);
+
+        // Место на отдельной строке склеивается с данными (raw-ориентация).
+        var salomon = g2.Results.Single(r => r.LastName == "SALOMON");
+        Assert.Equal(2, (int)salomon.Position!);
+        Assert.Equal("Ori", salomon.FirstName);
+        Assert.Equal("04:54.70", salomon.Time);
+        Assert.Equal(415, salomon.InternationalPoints);
     }
 
     [Fact]
@@ -106,5 +177,94 @@ public class IsrOrgCompetitionParserTests
 
         Assert.Equal("Esther", esther.FirstName);
         Assert.Equal("TSCHERKOWSKI", esther.LastName);
+    }
+
+    // ===== Чистый EN-экспорт (Maccabiah 2026, файл _IL_EN), EN-ветка =====
+    // Реальные строки. Заголовок с гибкой категорией после тире ("- U17 Girls"),
+    // строки результата в нормальном порядке (isHE=false => реверса нет).
+    private static readonly string[] EnIndividualPage =
+    {
+        "Maccabiah 2025 -",
+        "Swimming",
+        "OPEN & JUNIOR",
+        "05/07/2026 - 07/07/2026",
+        "Results",
+        "50m Freestyle - U17 Girls",
+        "05/07/2026 17:00",
+        "Year Of International",
+        "Rank Heat Lane Last name First name Club Result",
+        "Birth Score",
+        "1 3 4 Goltsov Eva 2009 Israel 00:26.89 676",
+        "2 3 5 SHTIFT Mika 2011 Israel 00:27.79 613",
+        "4 3 6",                                          // место на отдельной строке
+        "MAHMOUD Tatyana 2009 Israel 00:28.51 567",       // данные без места
+    };
+
+    // Реальная эстафетная страница (4X100m Freestyle Relay - U17 Girls).
+    // Пловцы раздроблены по строкам с разным регистром — берём только команду.
+    private static readonly string[] EnRelayPage =
+    {
+        "Maccabiah 2025 -",
+        "Swimming",
+        "OPEN & JUNIOR",
+        "05/07/2026 - 07/07/2026",
+        "Results",
+        "4X100m Freestyle Relay - U17 Girls",
+        "05/07/2026 19:33",
+        "1 4 Israel 04:05.04 Rank 1",
+        "Year",
+        "Last First Reaction Total",
+        "LERNE",
+        "Hilla 2009",
+        "R",
+        "1 5 USA 04:13.76 Rank 2",
+        "1 3 Maccabiah MIX 04:34.44 Rank 3",
+    };
+
+    private static IReadOnlyList<IsrOrgCompetitionResult> ParseEn(params string[][] pages) =>
+        IsrOrgCompetitionParser.ParseLines(pages, "EN").ToList();
+
+    [Fact]
+    public void En_FlexibleHeader_ParsesIndividualEvent()
+    {
+        var comp = Assert.Single(ParseEn(EnIndividualPage));
+
+        Assert.Equal("freestyle", comp.EventStyleName);
+        Assert.Equal("female", comp.EventStyleGender);
+        Assert.Equal("50", comp.EventStyleLen);
+        Assert.Equal("17", comp.EventStyleAge);           // "U17" => "17"
+        Assert.False(comp.EventStyleLen.Contains('X'));
+
+        Assert.Equal(3, comp.Results.Count);
+        var first = comp.Results[0];
+        Assert.Equal("Goltsov", first.LastName);
+        Assert.Equal("Eva", first.FirstName);
+        Assert.Equal("00:26.89", first.Time);
+        Assert.Equal(676, first.InternationalPoints);
+
+        // Место на отдельной строке склеивается с данными.
+        var mahmoud = comp.Results.Single(r => r.LastName == "MAHMOUD");
+        Assert.Equal(4, (int)mahmoud.Position!);
+        Assert.Equal("00:28.51", mahmoud.Time);
+    }
+
+    [Fact]
+    public void En_RelayHeader_ParsesTeamStandings()
+    {
+        var comp = Assert.Single(ParseEn(EnRelayPage));
+
+        Assert.Equal("4X100", comp.EventStyleLen);
+        Assert.Equal("freestyle", comp.EventStyleName);
+        Assert.Equal("female", comp.EventStyleGender);
+
+        Assert.Equal(3, comp.Results.Count);
+        Assert.All(comp.Results, r => Assert.True(r.IsRelay));
+
+        var gold = comp.Results.Single(r => (int)r.Position! == 1);
+        Assert.Equal("Israel", gold.RelayTeamName);
+        Assert.Equal("04:05.04", gold.Time);
+
+        var bronze = comp.Results.Single(r => (int)r.Position! == 3);
+        Assert.Equal("Maccabiah MIX", bronze.RelayTeamName);
     }
 }
