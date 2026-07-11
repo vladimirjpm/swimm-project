@@ -16,5 +16,9 @@ public interface IImportService
     Task<int> EnrichSwimmersFromResultsAsync();
     Task<ClearResult> ClearDataAsync();
     Task<DeleteCompetitionResult?> DeleteCompetitionAsync(int competitionId);
+
+    /// <summary>Удалить многодневное событие целиком: все дни (каскадно) + сам CompetitionEvent.
+    /// Возвращает агрегированные счётчики удалённого; null — событие не найдено.</summary>
+    Task<DeleteCompetitionResult?> DeleteCompetitionEventAsync(int eventId);
     string[] GetClearableTables();
 }

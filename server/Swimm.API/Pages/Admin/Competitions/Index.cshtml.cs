@@ -11,8 +11,15 @@ public class IndexModel : PageModel
 {
     private const int PageSize = 20;
     private readonly ICompetitionAdminRepository _repo;
+    private readonly IImportService _import;
+    private readonly ILogger<IndexModel> _logger;
 
-    public IndexModel(ICompetitionAdminRepository repo) => _repo = repo;
+    public IndexModel(ICompetitionAdminRepository repo, IImportService import, ILogger<IndexModel> logger)
+    {
+        _repo = repo;
+        _import = import;
+        _logger = logger;
+    }
 
     [BindProperty(SupportsGet = true, Name = "q")]
     public string? Search { get; set; }
@@ -40,4 +47,48 @@ public class IndexModel : PageModel
         Categories = await _repo.GetAllCategoriesAsync();
         Years = await _repo.GetAvailableYearsAsync();
     }
+
+    /// <summary>Каскадное удаление одного соревнования (одиночного или отдельного дня события).</summary>
+    public async Task<IActionResult> OnPostDeleteAsync(int id)
+    {
+        var deleted = await _import.DeleteCompetitionAsync(id);
+        if (deleted == null)
+        {
+            TempData["Flash"] = "Соревнование не найдено — возможно, уже удалено.";
+            return RedirectToBackToList();
+        }
+
+        _logger.LogWarning(
+            "Admin {User} каскадно удалил соревнование #{Id} «{Name}»: {Results} результатов, " +
+            "{Relays} эстафет, {Galleries} галерей, {ResultUrls} URL, {ImportHistory} записей истории",
+            User.Identity?.Name ?? "?", deleted.CompetitionId, deleted.CompetitionName,
+            deleted.Results, deleted.Relays, deleted.Galleries, deleted.ResultUrls, deleted.ImportHistory);
+
+        TempData["Flash"] = $"Соревнование «{deleted.CompetitionName}» удалено ({deleted.Results} результатов)";
+        return RedirectToBackToList();
+    }
+
+    /// <summary>Каскадное удаление всего многодневного события: все дни + сам CompetitionEvent.</summary>
+    public async Task<IActionResult> OnPostDeleteEventAsync(int eventId)
+    {
+        var deleted = await _import.DeleteCompetitionEventAsync(eventId);
+        if (deleted == null)
+        {
+            TempData["Flash"] = "Событие не найдено — возможно, уже удалено.";
+            return RedirectToBackToList();
+        }
+
+        _logger.LogWarning(
+            "Admin {User} каскадно удалил многодневное событие #{Id} «{Name}»: {Results} результатов, " +
+            "{Relays} эстафет, {Galleries} галерей, {ResultUrls} URL, {ImportHistory} записей истории",
+            User.Identity?.Name ?? "?", deleted.CompetitionId, deleted.CompetitionName,
+            deleted.Results, deleted.Relays, deleted.Galleries, deleted.ResultUrls, deleted.ImportHistory);
+
+        TempData["Flash"] = $"Событие «{deleted.CompetitionName}» удалено вместе со всеми днями ({deleted.Results} результатов)";
+        return RedirectToBackToList();
+    }
+
+    // Сохраняем текущие фильтры/страницу при возврате к списку.
+    private IActionResult RedirectToBackToList() =>
+        RedirectToPage("Index", new { q = Search, cat = CategoryKey, year = Year, page = PageNumber });
 }

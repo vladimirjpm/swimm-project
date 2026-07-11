@@ -137,7 +137,16 @@ else
                             <td>@await Html.PartialAsync("/Pages/Admin/Competitions/_CompFlags.cshtml", row)</td>
                             <td class="text-right tabular-nums">@row.TotalResultCount</td>
                             <td class="text-right text-admin-text-muted">—</td>
-                            <td></td>
+                            <td class="text-right" onclick="event.stopPropagation()">
+                                <form method="post" asp-page-handler="DeleteEvent"
+                                      asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
+                                      asp-route-year="@Model.Year" asp-route-page="@Model.Result.Page"
+                                      class="inline comp-delete-form"
+                                      data-kind="event" data-name="@row.EventName" data-days="@row.DayCount" data-rows="@row.TotalResultCount">
+                                    <input type="hidden" name="eventId" value="@row.EventId" />
+                                    <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
+                                </form>
+                            </td>
                         </tr>
                         @foreach (var d in row.Days)
                         {
@@ -159,9 +168,17 @@ else
                                 <td>@await Html.PartialAsync("/Pages/Admin/Competitions/_CompFlags.cshtml", d)</td>
                                 <td class="text-right tabular-nums">@d.ResultCount</td>
                                 <td class="text-right tabular-nums">@(d.ResultUrlCount > 0 ? d.ResultUrlCount.ToString() : "—")</td>
-                                <td class="text-right">
+                                <td class="text-right whitespace-nowrap">
                                     <a href="@Url.Page("Edit", new { id = d.Id })"
                                        class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
+                                    <form method="post" asp-page-handler="Delete"
+                                          asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
+                                          asp-route-year="@Model.Year" asp-route-page="@Model.Result.Page"
+                                          class="inline comp-delete-form"
+                                          data-kind="day" data-name="День @(d.DayNumber?.ToString() ?? "?")" data-rows="@d.ResultCount">
+                                        <input type="hidden" name="id" value="@d.Id" />
+                                        <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
+                                    </form>
                                 </td>
                             </tr>
                         }
@@ -187,9 +204,17 @@ else
                             <td>@await Html.PartialAsync("/Pages/Admin/Competitions/_CompFlags.cshtml", c)</td>
                             <td class="text-right tabular-nums">@c.ResultCount</td>
                             <td class="text-right tabular-nums">@(c.ResultUrlCount > 0 ? c.ResultUrlCount.ToString() : "—")</td>
-                            <td class="text-right">
+                            <td class="text-right whitespace-nowrap">
                                 <a href="@Url.Page("Edit", new { id = c.Id })"
                                    class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
+                                <form method="post" asp-page-handler="Delete"
+                                      asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
+                                      asp-route-year="@Model.Year" asp-route-page="@Model.Result.Page"
+                                      class="inline comp-delete-form"
+                                      data-kind="single" data-name="@c.Name" data-rows="@c.ResultCount">
+                                    <input type="hidden" name="id" value="@c.Id" />
+                                    <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
+                                </form>
                             </td>
                         </tr>
                     }
@@ -236,5 +261,34 @@ else
             const head = document.getElementById('evhead-' + eventId);
             if (head) head.classList.toggle('event-group');
         }
+
+        // Подтверждение каскадного удаления (одиночное / день / всё событие).
+        document.querySelectorAll('.comp-delete-form').forEach(form => {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const kind = form.dataset.kind;
+                const name = form.dataset.name || 'соревнование';
+                const rows = form.dataset.rows || '0';
+
+                let title, message;
+                if (kind === 'event') {
+                    const days = form.dataset.days || '?';
+                    title = 'Удалить всё событие?';
+                    message = `«${name}» — будут удалены ВСЕ ${days} дн. вместе с результатами ` +
+                              `(${rows} строк), эстафетами и галереями. Действие необратимо.`;
+                } else if (kind === 'day') {
+                    title = 'Удалить день?';
+                    message = `«${name}» — будут удалены его результаты (${rows} строк). Действие необратимо.`;
+                } else {
+                    title = 'Удалить соревнование?';
+                    message = `«${name}» — будут удалены его результаты (${rows} строк), эстафеты и галереи. ` +
+                              `Действие необратимо.`;
+                }
+
+                const ok = await adminConfirm({ title, message, confirmText: 'Удалить', danger: true });
+                if (ok) form.submit();
+            });
+        });
     </script>
 }

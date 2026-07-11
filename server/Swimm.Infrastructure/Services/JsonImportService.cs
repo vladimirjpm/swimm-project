@@ -641,70 +641,130 @@ public class JsonImportService : IImportService
         var result = await strategy.ExecuteAsync(async () =>
         {
             await using var tx = await _db.Database.BeginTransactionAsync();
-
-            // Собираем ID связанных Relays и Galleries до удаления Results
-            var relayIds = await _db.Results
-                .Where(r => r.CompetitionId == competitionId && r.RelayId != null)
-                .Select(r => r.RelayId!.Value)
-                .Distinct()
-                .ToListAsync();
-
-            var galleryIds = await _db.Results
-                .Where(r => r.CompetitionId == competitionId && r.GalleryId != null)
-                .Select(r => r.GalleryId!.Value)
-                .Distinct()
-                .ToListAsync();
-
-            var deletedGalleryItems = galleryIds.Count > 0
-                ? await _db.GalleryItems.Where(gi => galleryIds.Contains(gi.GalleryId)).ExecuteDeleteAsync()
-                : 0;
-
-            // Results: FK Restrict → Competition, поэтому удаляем до Competition
-            var deletedResults = await _db.Results
-                .Where(r => r.CompetitionId == competitionId)
-                .ExecuteDeleteAsync();
-
-            var deletedRelays = relayIds.Count > 0
-                ? await _db.Relays.Where(r => relayIds.Contains(r.Id)).ExecuteDeleteAsync()
-                : 0;
-
-            var deletedGalleries = galleryIds.Count > 0
-                ? await _db.Galleries.Where(g => galleryIds.Contains(g.Id)).ExecuteDeleteAsync()
-                : 0;
-
-            // ImportHistory → Competition: Cascade — удалится вместе с Competition, считаем заранее
-            var deletedImportHistory = await _db.ImportHistory.CountAsync(h => h.CompetitionId == competitionId);
-
-            // CompetitionResultUrls связаны по OrgCompId (не по Id). FK имеет ON DELETE CASCADE, поэтому
-            // при удалении Competition они удалились бы сами — удаляем явно только ради точного счётчика.
-            // OrgCompId уникален (AK_Competitions_OrgCompId), так что эти URL заведомо ничьи больше.
-            var deletedResultUrls = 0;
-            if (competition.OrgCompId is int orgCompId)
-            {
-                deletedResultUrls = await _db.CompetitionResultUrls
-                    .Where(u => u.OrgCompId == orgCompId)
-                    .ExecuteDeleteAsync();
-            }
-
-            _db.Competitions.Remove(competition);
-            await _db.SaveChangesAsync();
+            var r = await DeleteCompetitionCoreAsync(competition);
             await tx.CommitAsync();
-
-            return new DeleteCompetitionResult
-            {
-                CompetitionId = competitionId,
-                CompetitionName = competition.Name,
-                Results = deletedResults,
-                Relays = deletedRelays,
-                GalleryItems = deletedGalleryItems,
-                Galleries = deletedGalleries,
-                ImportHistory = deletedImportHistory,
-                ResultUrls = deletedResultUrls
-            };
+            return r;
         });
 
         await _cache.InvalidateAllAsync();
         return result;
+    }
+
+    /// <summary>
+    /// Удалить многодневное событие целиком: каскадно все дни (результаты, эстафеты, галереи,
+    /// URL, история импорта) + сам <see cref="CompetitionEvent"/>. FK Competition→Event = SetNull,
+    /// поэтому дни удаляем явно. Возвращает агрегированные счётчики; null — событие не найдено.
+    /// </summary>
+    public async Task<DeleteCompetitionResult?> DeleteCompetitionEventAsync(int eventId)
+    {
+        var ev = await _db.CompetitionEvents
+            .Include(e => e.Days)
+            .FirstOrDefaultAsync(e => e.Id == eventId);
+        if (ev == null) return null;
+
+        var days = ev.Days.ToList();
+
+        var strategy = _db.Database.CreateExecutionStrategy();
+        var result = await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await _db.Database.BeginTransactionAsync();
+
+            var agg = new DeleteCompetitionResult
+            {
+                CompetitionId = eventId,
+                CompetitionName = ev.Name
+            };
+
+            foreach (var day in days)
+            {
+                var r = await DeleteCompetitionCoreAsync(day);
+                agg.Results += r.Results;
+                agg.Relays += r.Relays;
+                agg.GalleryItems += r.GalleryItems;
+                agg.Galleries += r.Galleries;
+                agg.ImportHistory += r.ImportHistory;
+                agg.ResultUrls += r.ResultUrls;
+            }
+
+            _db.CompetitionEvents.Remove(ev);
+            await _db.SaveChangesAsync();
+            await tx.CommitAsync();
+
+            return agg;
+        });
+
+        await _cache.InvalidateAllAsync();
+        return result;
+    }
+
+    /// <summary>
+    /// Каскадное удаление ОДНОГО соревнования (дня) БЕЗ собственной транзакции и сброса кэша —
+    /// вызывается внутри транзакции из <see cref="DeleteCompetitionAsync"/> и
+    /// <see cref="DeleteCompetitionEventAsync"/>. Сущность <paramref name="competition"/> должна
+    /// отслеживаться контекстом (Find/Include).
+    /// </summary>
+    private async Task<DeleteCompetitionResult> DeleteCompetitionCoreAsync(Domain.Entities.Competition competition)
+    {
+        int competitionId = competition.Id;
+
+        // Собираем ID связанных Relays и Galleries до удаления Results
+        var relayIds = await _db.Results
+            .Where(r => r.CompetitionId == competitionId && r.RelayId != null)
+            .Select(r => r.RelayId!.Value)
+            .Distinct()
+            .ToListAsync();
+
+        var galleryIds = await _db.Results
+            .Where(r => r.CompetitionId == competitionId && r.GalleryId != null)
+            .Select(r => r.GalleryId!.Value)
+            .Distinct()
+            .ToListAsync();
+
+        var deletedGalleryItems = galleryIds.Count > 0
+            ? await _db.GalleryItems.Where(gi => galleryIds.Contains(gi.GalleryId)).ExecuteDeleteAsync()
+            : 0;
+
+        // Results: FK Restrict → Competition, поэтому удаляем до Competition
+        var deletedResults = await _db.Results
+            .Where(r => r.CompetitionId == competitionId)
+            .ExecuteDeleteAsync();
+
+        var deletedRelays = relayIds.Count > 0
+            ? await _db.Relays.Where(r => relayIds.Contains(r.Id)).ExecuteDeleteAsync()
+            : 0;
+
+        var deletedGalleries = galleryIds.Count > 0
+            ? await _db.Galleries.Where(g => galleryIds.Contains(g.Id)).ExecuteDeleteAsync()
+            : 0;
+
+        // ImportHistory → Competition: Cascade — удалится вместе с Competition, считаем заранее
+        var deletedImportHistory = await _db.ImportHistory.CountAsync(h => h.CompetitionId == competitionId);
+
+        // CompetitionResultUrls связаны по OrgCompId (не по Id). FK имеет ON DELETE CASCADE, поэтому
+        // при удалении Competition они удалились бы сами — удаляем явно только ради точного счётчика.
+        // OrgCompId уникален (AK_Competitions_OrgCompId), так что эти URL заведомо ничьи больше.
+        var deletedResultUrls = 0;
+        if (competition.OrgCompId is int orgCompId)
+        {
+            deletedResultUrls = await _db.CompetitionResultUrls
+                .Where(u => u.OrgCompId == orgCompId)
+                .ExecuteDeleteAsync();
+        }
+
+        _db.Competitions.Remove(competition);
+        await _db.SaveChangesAsync();
+
+        return new DeleteCompetitionResult
+        {
+            CompetitionId = competitionId,
+            CompetitionName = competition.Name,
+            Results = deletedResults,
+            Relays = deletedRelays,
+            GalleryItems = deletedGalleryItems,
+            Galleries = deletedGalleries,
+            ImportHistory = deletedImportHistory,
+            ResultUrls = deletedResultUrls
+        };
     }
 
     private static async Task<List<string>> DiagnoseJsonFieldsAsync(Stream stream)
