@@ -2,6 +2,7 @@ import React from 'react';
 import '../home-project/home.css';
 import HomeHeader from '../home-project/components/home-header';
 import RecordTicker from '../home-project/components/record-ticker';
+import { HOME_REGION_LABEL } from '../../utils/constants/home-region';
 
 type CompetitionLink = {
   href: string;
@@ -54,7 +55,7 @@ function Competitions() {
 
       <section className="relative px-5 pt-[26px] lg:px-16 lg:pt-[46px]">
         <p className="mb-[18px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[#7dd3fc] lg:text-[15px] lg:tracking-[0.3em]">
-          2026 Season · Israel
+          {`${new Date().getFullYear()} Season · ${HOME_REGION_LABEL}`}
         </p>
         <h1 className="text-[44px] font-black leading-[0.92] tracking-[-0.045em] text-[#f3f8fd] lg:text-[88px] lg:leading-[0.9]">
           Competitions

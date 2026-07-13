@@ -66,6 +66,9 @@ public class ResultRepository : IResultRepository
         if (!string.IsNullOrWhiteSpace(filter.PoolType))
             query = query.Where(r => r.Competition.PoolType == filter.PoolType);
 
+        if (!string.IsNullOrWhiteSpace(filter.Country))
+            query = query.Where(r => r.Competition.Country == filter.Country);
+
         if (filter.DateFrom.HasValue)
             query = query.Where(r => r.CompetitionDate >= filter.DateFrom.Value);
 
@@ -215,7 +218,7 @@ public class ResultRepository : IResultRepository
     }
 
     private static string FilterCacheKey(ResultFilter f) =>
-        $"{f.StyleName}:{f.Distance}:{f.Gender}:{f.PoolType}" +
+        $"{f.StyleName}:{f.Distance}:{f.Gender}:{f.PoolType}:{f.Country}" +
         $":{f.DateFrom:yyyyMMdd}:{f.DateTo:yyyyMMdd}:{f.Competition}:{f.EventId}:{f.CompetitionId}:{f.Latest}:{f.Name}:{f.Club}" +
         $":{f.BirthYearFrom}:{f.BirthYearTo}:{f.AgeGroup}:{f.PositionMax}:{f.PositionKeepUnranked}:{f.EventDate:yyyyMMdd}" +
         $":{(f.SwimmerIds is { Count: > 0 } ids ? string.Join(",", ids.OrderBy(x => x)) : "")}";
@@ -223,9 +226,11 @@ public class ResultRepository : IResultRepository
     private static string ResultsCacheKey(ResultFilter f, int page, int pageSize) =>
         $"results:{FilterCacheKey(f)}:{page}:{pageSize}";
 
-    public async Task<IReadOnlyList<CompetitionSourceDto>> GetSourcesAsync()
+    public async Task<IReadOnlyList<CompetitionSourceDto>> GetSourcesAsync(string? country = null)
     {
-        const string key = "competition-sources:all";
+        // Нормализация как в GetStandardsAsync (RecordRepository): trim + upper, пусто — без фильтра.
+        var countryKey = string.IsNullOrWhiteSpace(country) ? null : country.Trim().ToUpperInvariant();
+        var key = $"competition-sources:{countryKey ?? "all"}";
         var cached = await _cache.GetAsync<IReadOnlyList<CompetitionSourceDto>>(key);
         if (cached is not null)
             return cached;
@@ -248,7 +253,9 @@ public class ResultRepository : IResultRepository
                 IsAward = _db.Competitions.Any(c => c.EventId == e.Id && c.IsAward),
                 ShowCombine = !_db.Competitions.Any(c => c.EventId == e.Id && !c.ShowCombineAllResults),
                 ResultCount = _db.Results.Count(r => r.Competition.EventId == e.Id),
-                DayDates = _db.Competitions.Where(c => c.EventId == e.Id).Select(c => c.Date).ToList()
+                DayDates = _db.Competitions.Where(c => c.EventId == e.Id).Select(c => c.Date).ToList(),
+                // Страны всех дней — фильтр по country применяем ниже, в памяти (Any).
+                DayCountries = _db.Competitions.Where(c => c.EventId == e.Id).Select(c => c.Country).ToList()
             })
             .ToListAsync();
 
@@ -265,6 +272,7 @@ public class ResultRepository : IResultRepository
                 c.IsMasters,
                 c.IsAward,
                 c.ShowCombineAllResults,
+                c.Country,
                 ResultCount = _db.Results.Count(r => r.CompetitionId == c.Id)
             })
             .ToListAsync();
@@ -328,7 +336,16 @@ public class ResultRepository : IResultRepository
 
         var items = new List<(DateOnly Sort, CompetitionSourceDto Dto)>(events.Count + singles.Count);
 
-        foreach (var e in events)
+        // Фильтр по стране — в памяти, после сборки списков (маленький датасет, не усложняем EF).
+        // Событие проходит фильтр, если country совпадает хотя бы у ОДНОГО дня (Any).
+        var filteredEvents = countryKey is null
+            ? events
+            : events.Where(e => e.DayCountries.Any(c => c == countryKey)).ToList();
+        var filteredSingles = countryKey is null
+            ? singles
+            : singles.Where(c => c.Country == countryKey).ToList();
+
+        foreach (var e in filteredEvents)
         {
             items.Add((e.StartDate ?? DateOnly.MinValue, new CompetitionSourceDto
             {
@@ -350,7 +367,7 @@ public class ResultRepository : IResultRepository
             }));
         }
 
-        foreach (var c in singles)
+        foreach (var c in filteredSingles)
         {
             DateOnly.TryParseExact(c.Date, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d);
             items.Add((d, new CompetitionSourceDto

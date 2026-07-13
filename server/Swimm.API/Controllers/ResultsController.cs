@@ -35,6 +35,7 @@ public class ResultsController : ControllerBase
         [FromQuery] string? distance,
         [FromQuery] string? gender,
         [FromQuery] string? poolType,
+        [FromQuery] string? country,
         [FromQuery] DateTime? dateFrom,
         [FromQuery] DateTime? dateTo,
         [FromQuery] int? birthYearFrom,
@@ -101,6 +102,7 @@ public class ResultsController : ControllerBase
             Distance = distance,
             Gender = gender,
             PoolType = poolType,
+            Country = string.IsNullOrWhiteSpace(country) ? null : country.Trim().ToUpperInvariant(),
             DateFrom = dateFrom,
             DateTo = dateTo,
             BirthYearFrom = birthYearFrom,
@@ -151,9 +153,14 @@ public class ResultsController : ControllerBase
     /// однодневные соревнования. Грузить результаты источника: /api/results?eventId= или ?competitionId=.
     /// </summary>
     [HttpGet("/api/competitions")]
-    public async Task<IActionResult> GetSources()
-        => await this.CachedJson(_cache, "http:competition-sources",
-            () => _results.GetSourcesAsync(), PayloadTtl, CacheControlValue);
+    public async Task<IActionResult> GetSources([FromQuery] string? country)
+    {
+        var countryKey = string.IsNullOrWhiteSpace(country) ? null : country.Trim().ToUpperInvariant();
+
+        return await this.CachedJson(_cache,
+            $"http:competition-sources:{countryKey ?? "all"}",
+            () => _results.GetSourcesAsync(countryKey), PayloadTtl, CacheControlValue);
+    }
 
     /// <summary>
     /// Карьерные (all-time) данные спортсмена для карточки: соревнования, заплывы,

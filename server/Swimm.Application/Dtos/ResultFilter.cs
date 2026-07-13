@@ -15,6 +15,8 @@ public class ResultFilter
     public string? Distance { get; set; }
     public string? Gender { get; set; }
     public string? PoolType { get; set; }
+    /// <summary>Страна соревнования, alpha-3 (World Aquatics, "ISR"…); null — без фильтра.</summary>
+    public string? Country { get; set; }
     public DateTime? DateFrom { get; set; }
     public DateTime? DateTo { get; set; }
 
