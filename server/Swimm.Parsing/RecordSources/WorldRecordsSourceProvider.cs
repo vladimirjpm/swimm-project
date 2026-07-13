@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Parsing.Parsers;
@@ -6,24 +7,30 @@ using Swimm.Parsing.Parsers.WorldRecords;
 namespace Swimm.Parsing.RecordSources;
 
 /// <summary>
-/// Мировые + национальные (Израиль) рекорды с api.worldaquatics.com. Восстановлено из
+/// Мировые + национальные рекорды с api.worldaquatics.com. Восстановлено из
 /// снесённого <c>Swimm.Parser/Controllers/PdfController.FetchWorldRecordsAsync</c>
 /// (commit 61af61b^) — та же схема из 4 XLSX-отчётов (WR SCM/LCM + NR SCM/LCM).
+/// Чьи NR качать, задаёт RecordsImport:WorldAquaticsNationalCountryId (внутренний GUID
+/// страны в API worldaquatics); по умолчанию — Израиль (домашний регион проекта).
 /// SSRF: URL целиком собираются из константы домена + жёстко заданных query-параметров —
 /// пользовательский ввод в URL никогда не попадает.
 /// </summary>
 public class WorldRecordsSourceProvider : IRecordSourceProvider
 {
     private const string ApiHost = "api.worldaquatics.com";
-    private const string IsraelCountryId = "962f77d6-d9c0-49ad-ba93-adc831c9ec9f";
+    private const string DefaultNationalCountryId = "962f77d6-d9c0-49ad-ba93-adc831c9ec9f"; // Израиль
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly WorldRecordsParser _parser;
+    private readonly string _nationalCountryId;
 
-    public WorldRecordsSourceProvider(IHttpClientFactory httpClientFactory, WorldRecordsParser parser)
+    public WorldRecordsSourceProvider(IHttpClientFactory httpClientFactory, WorldRecordsParser parser,
+        IConfiguration? configuration = null)
     {
         _httpClientFactory = httpClientFactory;
         _parser = parser;
+        var configured = configuration?["RecordsImport:WorldAquaticsNationalCountryId"];
+        _nationalCountryId = string.IsNullOrWhiteSpace(configured) ? DefaultNationalCountryId : configured;
     }
 
     public string Source => "worldrecords";
@@ -49,8 +56,8 @@ public class WorldRecordsSourceProvider : IRecordSourceProvider
                 {
                     (BuildUrl("pool=SCM&recordCode=WR"), "WR_SCM.xlsx"),
                     (BuildUrl("pool=LCM&recordCode=WR"), "WR_LCM.xlsx"),
-                    (BuildUrl($"recordCode=NR&pool=SCM&countryId={IsraelCountryId}"), "NR_SCM.xlsx"),
-                    (BuildUrl($"recordCode=NR&pool=LCM&countryId={IsraelCountryId}"), "NR_LCM.xlsx"),
+                    (BuildUrl($"recordCode=NR&pool=SCM&countryId={_nationalCountryId}"), "NR_SCM.xlsx"),
+                    (BuildUrl($"recordCode=NR&pool=LCM&countryId={_nationalCountryId}"), "NR_LCM.xlsx"),
                 };
 
                 var client = _httpClientFactory.CreateClient();

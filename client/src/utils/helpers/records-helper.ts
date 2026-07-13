@@ -1,21 +1,26 @@
 /**
  * RecordsHelper — рекорды и нормативы с сервера (/api/records, /api/normative-standards),
- * пересобранные в легаси-форму window.normative_record / window.normative(_masters).
+ * пересобранные в деревья прежней (легаси) формы для синхронных потребителей
+ * (helper-normative.ts, popup-content-normative.tsx, normative-age-records.tsx,
+ * normative-masters-records.tsx).
  *
- * Мягкий переход (см. docs/tasks/phase2-records-client-sonnet.md, этап 2.4): пока
- * normative*.js остаются подключены как script-теги, методы отдают идентичную по форме
- * структуру, чтобы существующие потребители (helper-normative.ts, popup-content-normative.tsx,
- * normative-age-records.tsx, normative-masters-records.tsx) менялись минимально.
+ * Национальные рекорды — ключ NR (national record), чей регион — HOME_REGION
+ * (utils/constants/home-region.ts); «WR vs ISR» больше нигде не зашито.
  *
- * Геттеры — синхронные (потребители синхронные): пока сеть не ответила (или упала),
- * отдают window.normative_* as-is; после первого успешного warmUp() — данные из БД.
- * warmUp() дергается один раз при старте приложения (fire-and-forget) — вызывайте
- * геттеры внутри рендера/логики, а не на верхнем уровне модуля, иначе они замёрзнут
- * на состоянии кэша на момент импорта.
+ * Геттеры — синхронные: пока сеть не ответила (или упала), отдают пустое дерево
+ * («нет данных»), после первого успешного warmUp() — данные из БД. warmUp() дергается
+ * один раз при старте приложения (fire-and-forget) — вызывайте геттеры внутри
+ * рендера/логики, а не на верхнем уровне модуля, иначе они замёрзнут на состоянии
+ * кэша на момент импорта.
  */
+
+import { HOME_REGION } from '../constants/home-region';
 
 type Gender = 'male' | 'female';
 type PoolKey = '25m_pool' | '50m_pool';
+
+/** WR — мировой рекорд; NR — национальный рекорд домашнего региона (HOME_REGION). */
+export type RecordKind = 'WR' | 'NR';
 
 interface RecordDto {
   region_type: string;
@@ -54,7 +59,7 @@ export interface OpenRecordCell {
   updated_at?: string;
 }
 export type OpenRecordsTree = {
-  normatives: Record<Gender, Record<PoolKey, Record<string, Record<string, { ISR?: OpenRecordCell; WR?: OpenRecordCell }>>>>;
+  normatives: Record<Gender, Record<PoolKey, Record<string, Record<string, { NR?: OpenRecordCell; WR?: OpenRecordCell }>>>>;
 };
 
 export interface AgeRecordCell {
@@ -134,12 +139,12 @@ export default class RecordsHelper {
 
   private static async loadOpenRecords(): Promise<void> {
     try {
-      const [world, isr] = await Promise.all([
+      const [world, national] = await Promise.all([
         fetchRecords('region=world'),
-        fetchRecords('region=ISR&category=open'),
+        fetchRecords(`region=${HOME_REGION}&category=open`),
       ]);
       const tree: OpenRecordsTree = { normatives: {} as OpenRecordsTree['normatives'] };
-      const put = (rec: RecordDto, kind: 'ISR' | 'WR') => {
+      const put = (rec: RecordDto, kind: RecordKind) => {
         if (rec.category !== 'open') return;
         const g = rec.gender as Gender;
         const p = poolKey(rec.pool_type);
@@ -156,7 +161,7 @@ export default class RecordsHelper {
         };
       };
       world.forEach((r) => put(r, 'WR'));
-      isr.forEach((r) => put(r, 'ISR'));
+      national.forEach((r) => put(r, 'NR'));
       this.openCache = tree;
     } catch (error) {
       console.error('RecordsHelper: failed to load open records', error);
@@ -165,7 +170,7 @@ export default class RecordsHelper {
 
   private static async loadCategoryAsAgeTree(category: string): Promise<AgeRecordsTree | null> {
     try {
-      const rows = await fetchRecords(`region=ISR&category=${category}`);
+      const rows = await fetchRecords(`region=${HOME_REGION}&category=${category}`);
       const tree: AgeRecordsTree = { normatives: {} as AgeRecordsTree['normatives'] };
       rows.forEach((rec) => {
         const g = rec.gender as Gender;
@@ -239,59 +244,36 @@ export default class RecordsHelper {
     }
   }
 
-  // Последний уровень fallback (статики normative*.js удалены на этапе 2.7): пустое
-  // дерево вместо undefined — до ответа API (или при его недоступности) потребители
-  // видят «нет данных для этой позиции», а не падение на обращении к .normatives.
-  // window.normative_* оставлены в цепочке на случай легаси-страниц со script-тегами.
+  // Fallback до ответа API (или при его недоступности): пустое дерево вместо
+  // undefined — потребители видят «нет данных для этой позиции», а не падение на
+  // обращении к .normatives. Цепочка window.normative_* удалена: статики normative*.js
+  // снесены на этапе 2.7, эти глобалы больше никто не присваивает (проверено grep-ом),
+  // а их легаси-форма (ключ ISR вместо NR) всё равно несовместима с текущей.
   private static readonly emptyTree = { normatives: {} };
 
-  /** ISR+WR открытые рекорды (форма window.normative_record). */
+  /** NR (HOME_REGION) + WR открытые рекорды. */
   static getOpenRecords(): OpenRecordsTree {
-    return (
-      this.openCache ??
-      ((window as any).normative_record as OpenRecordsTree) ??
-      (this.emptyTree as OpenRecordsTree)
-    );
+    return this.openCache ?? (this.emptyTree as OpenRecordsTree);
   }
 
-  /** Возрастные рекорды ISR (форма window.normative_age_record). */
+  /** Возрастные рекорды домашнего региона (HOME_REGION). */
   static getAgeRecords(): AgeRecordsTree {
-    return (
-      this.ageCache ??
-      ((window as any).normative_age_record as AgeRecordsTree) ??
-      (this.emptyTree as AgeRecordsTree)
-    );
+    return this.ageCache ?? (this.emptyTree as AgeRecordsTree);
   }
 
-  /** Мастерс-рекорды ISR (форма window.normative_masters_record). */
+  /** Мастерс-рекорды домашнего региона (HOME_REGION). */
   static getMastersRecords(): AgeRecordsTree {
-    return (
-      this.mastersCache ??
-      ((window as any).normative_masters_record as AgeRecordsTree) ??
-      (this.emptyTree as AgeRecordsTree)
-    );
+    return this.mastersCache ?? (this.emptyTree as AgeRecordsTree);
   }
 
-  /** Обычные нормативы уровней (форма window.normative). */
+  /** Обычные нормативы уровней. */
   static getStandards(): StandardsTree {
-    return (
-      this.standardsCache ??
-      ((window as any).normative as StandardsTree) ??
-      (this.emptyTree as StandardsTree)
-    );
+    return this.standardsCache ?? (this.emptyTree as StandardsTree);
   }
 
-  /** Мастерс-нормативы уровней (форма window.normative_masters / варианты имени в легаси). */
+  /** Мастерс-нормативы уровней. */
   static getMastersStandards(): MastersStandardsTree {
-    return (
-      this.mastersStandardsCache ??
-      (((window as any).normatives_masters ||
-        (window as any).normativesMasters ||
-        (window as any).normative_masters ||
-        (window as any).normativeMasters ||
-        null) as MastersStandardsTree) ??
-      (this.emptyTree as MastersStandardsTree)
-    );
+    return this.mastersStandardsCache ?? (this.emptyTree as MastersStandardsTree);
   }
 
   /** Сброс кэша (тестирование). */

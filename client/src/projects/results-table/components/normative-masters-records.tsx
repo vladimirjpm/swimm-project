@@ -1,6 +1,7 @@
 import React from 'react';
 import Helper from '../../../utils/helpers/data-helper';
 import RecordsHelper, { maxUpdatedAtLabel } from '../../../utils/helpers/records-helper';
+import { HOME_REGION } from '../../../utils/constants/home-region';
 
 interface MastersRecord {
   time: string;
@@ -220,7 +221,7 @@ function renderManyAgeGroups(
         className="min-h-11 px-3.5 sm:px-5 py-2.5 sm:py-3 flex items-center gap-2 cursor-pointer select-none"
       >
         <span className="text-[15px] sm:text-lg shrink-0">🏅</span>
-        <span className="flex-1 text-[13.5px] sm:text-[16px] font-extrabold text-[#1a1a1a] dark:text-[#dbe8fb]">ISR Masters Records</span>
+        <span className="flex-1 text-[13.5px] sm:text-[16px] font-extrabold text-[#1a1a1a] dark:text-[#dbe8fb]">{`${HOME_REGION} Masters Records`}</span>
         {showMale && <span className="text-[10px] sm:text-[11px] font-extrabold text-[#1e6fd6] dark:text-[#5aa2f5] bg-[#eaf2fd] dark:bg-[rgba(90,162,245,0.16)] px-2 py-0.5 rounded-full shrink-0">♂</span>}
         {showFemale && <span className="text-[10px] sm:text-[11px] font-extrabold text-[#d6417f] dark:text-[#f072a6] bg-[#fdeff5] dark:bg-[rgba(240,114,166,0.16)] px-2 py-0.5 rounded-full shrink-0">♀</span>}
         <span className="text-[10px] sm:text-[11px] font-bold text-[#aab0bd] shrink-0 whitespace-nowrap">{rangeLabel}</span>

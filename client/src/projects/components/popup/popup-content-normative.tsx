@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppSelector } from '../../../store/store';
 import Helper from '../../../utils/helpers/data-helper';
 import RecordsHelper, { maxUpdatedAtLabel } from '../../../utils/helpers/records-helper';
+import { HOME_REGION, HOME_REGION_LABEL } from '../../../utils/constants/home-region';
 import useMode from '../../../hooks/useMode';
 import './popup-content-normative.css';
 
@@ -32,7 +33,7 @@ type RecordsTree = {
         Record<
           string, // distance
           {
-            ISR?: RecordCell;
+            NR?: RecordCell;
             WR?: RecordCell;
           }
         >
@@ -41,8 +42,8 @@ type RecordsTree = {
   >;
 };
 
-// Данные приходят из RecordsHelper (БД, /api/records + /api/normative-standards),
-// с fallback на window.normative_* пока не загрузились (см. records-helper.ts).
+// Данные приходят из RecordsHelper (БД, /api/records + /api/normative-standards);
+// до загрузки — пустое дерево. NR = национальный рекорд HOME_REGION (см. records-helper.ts).
 
 const strokeLabel: Record<string, string> = {
   freestyle: 'Freestyle',
@@ -87,7 +88,7 @@ const getRecordCell = (
   poolType: PoolType,
   stroke: string,
   distance: string,
-  kind: 'ISR' | 'WR',
+  kind: 'NR' | 'WR',
 ): RecordCell | null => {
   const poolNode =
     recordsTree?.normatives?.[gender]?.[poolType] ||
@@ -337,7 +338,7 @@ const PopupContentNormative: React.FC = () => {
   };
   const womenPillStyle: React.CSSProperties = { ...menPillStyle, background: U.womenPill, color: U.womenText };
 
-  const fmtRecord = (g: Gender, d: string, kind: 'WR' | 'ISR') => {
+  const fmtRecord = (g: Gender, d: string, kind: 'WR' | 'NR') => {
     const cell = getRecordCell(recordsTree, g, poolType, stroke, d, kind);
     return {
       text: Helper.formatSecondsToTimeString(Helper.parseTimeToSeconds(String(cell?.time ?? ''))),
@@ -346,14 +347,14 @@ const PopupContentNormative: React.FC = () => {
     };
   };
 
-  // Приглушённая подпись «updated dd/MM/yyyy» над колонками WR/ISR — сводно по всем
+  // Приглушённая подпись «updated dd/MM/yyyy» над колонками WR/NR — сводно по всем
   // рекордам (оба пола, обе колонки), которые сейчас видны в таблице (все дистанции текущего
   // стиля/бассейна). Только записи Records имеют updated_at — нормативы (лестница уровней)
   // это поле не несут и не участвуют.
   const recordsUpdatedLabel = useMemo(() => {
     const stamps: Array<string | undefined> = [];
     allDistanceKeys.forEach((d) => {
-      (['WR', 'ISR'] as const).forEach((kind) => {
+      (['WR', 'NR'] as const).forEach((kind) => {
         (['male', 'female'] as Gender[]).forEach((g) => {
           stamps.push(getRecordCell(recordsTree, g, poolType, stroke, d, kind)?.updated_at);
         });
@@ -556,11 +557,11 @@ const PopupContentNormative: React.FC = () => {
                   >
                     Distance
                   </th>
-                  {(['WR', 'ISR'] as const).map((kind) => (
+                  {(['WR', 'NR'] as const).map((kind) => (
                     <th key={kind} style={{ padding: '8px 8px 10px', borderBottom: `1px solid ${U.grid}`, verticalAlign: 'bottom' }}>
-                      <div className="nrm-med" style={medStyle(C.rec)}>{kind}</div>
+                      <div className="nrm-med" style={medStyle(C.rec)}>{kind === 'WR' ? 'WR' : HOME_REGION}</div>
                       <div style={{ fontSize: 9, fontWeight: 700, color: U.label, marginTop: 4, textAlign: 'center', letterSpacing: '.04em' }}>
-                        {kind === 'WR' ? 'World' : 'Israel'}
+                        {kind === 'WR' ? 'World' : HOME_REGION_LABEL}
                       </div>
                       {recordsUpdatedLabel && (
                         <div style={{ fontSize: 8, fontWeight: 600, color: U.label, marginTop: 2, textAlign: 'center', opacity: 0.75 }}>
@@ -613,7 +614,7 @@ const PopupContentNormative: React.FC = () => {
                           </div>
                         )}
                       </td>
-                      {(['WR', 'ISR'] as const).map((kind) => (
+                      {(['WR', 'NR'] as const).map((kind) => (
                         <td
                           key={kind}
                           style={{
