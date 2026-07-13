@@ -4,6 +4,7 @@ using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Infrastructure.Data;
+using Swimm.Infrastructure.Services;
 
 namespace Swimm.Infrastructure.Repositories;
 
@@ -33,6 +34,43 @@ public class ResultRepository : IResultRepository
         if (cached != default)
             return cached;
 
+        var query = await BuildFilteredQueryAsync(filter);
+        if (query is null)
+            return ([], false, 0);
+
+        // Total — отдельный кэш-ключ БЕЗ page/pageSize: листание страниц не пересчитывает COUNT.
+        var totalKey = $"results-total:{FilterCacheKey(filter)}";
+        var total = await _cache.GetAsync<int?>(totalKey) ?? -1;
+        if (total < 0)
+        {
+            total = await query.CountAsync();
+            await _cache.SetAsync<int?>(totalKey, total, ResultsTtl);
+        }
+
+        var items = await query
+            .OrderByDescending(r => r.CompetitionDate)
+            .ThenBy(r => r.Position)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(ResultMapping.ToDto)
+            .ToListAsync();
+
+        // hasMore — из total; расхождение возможно только в пределах TTL кэша (2 мин), как и раньше.
+        var hasMore = (page - 1) * pageSize + items.Count < total;
+
+        var result = (items, hasMore, total);
+        await _cache.SetAsync(key, result, ResultsTtl);
+        return result;
+    }
+
+    /// <summary>
+    /// Применяет весь фильтр к запросу результатов (включая разрешение <c>Latest</c> —
+    /// потому и async). Возвращает <c>null</c>, если <c>Latest</c> запрошен, а данных нет
+    /// (вызывающий отдаёт пустой ответ). Единая точка фильтрации для paged и агрегатов —
+    /// чтобы семантика фильтров не разъезжалась между эндпоинтами.
+    /// </summary>
+    private async Task<IQueryable<Domain.Entities.ResultRecord>?> BuildFilteredQueryAsync(ResultFilter filter)
+    {
         var query = _db.Results.AsNoTracking().AsQueryable();
 
         // "Последнее" соревнование: берём соревнование самого свежего результата;
@@ -46,7 +84,7 @@ public class ResultRepository : IResultRepository
                 .FirstOrDefaultAsync();
 
             if (latest is null)
-                return ([], false, 0);
+                return null;
 
             if (latest.EventId.HasValue)
                 query = query.Where(r => r.Competition.EventId == latest.EventId.Value);
@@ -122,29 +160,90 @@ public class ResultRepository : IResultRepository
         if (filter.EventDate.HasValue)
             query = query.Where(r => r.CompetitionDate == filter.EventDate.Value);
 
-        // Total — отдельный кэш-ключ БЕЗ page/pageSize: листание страниц не пересчитывает COUNT.
-        var totalKey = $"results-total:{FilterCacheKey(filter)}";
-        var total = await _cache.GetAsync<int?>(totalKey) ?? -1;
-        if (total < 0)
-        {
-            total = await query.CountAsync();
-            await _cache.SetAsync<int?>(totalKey, total, ResultsTtl);
-        }
+        return query;
+    }
 
-        var items = await query
-            .OrderByDescending(r => r.CompetitionDate)
-            .ThenBy(r => r.Position)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(ResultMapping.ToDto)
+    public async Task<IReadOnlyList<ClubSummaryDto>> GetClubSummaryAsync(ResultFilter filter)
+    {
+        var key = $"club-summary:{FilterCacheKey(filter)}";
+        var cached = await _cache.GetAsync<IReadOnlyList<ClubSummaryDto>>(key);
+        if (cached is not null)
+            return cached;
+
+        var query = await BuildFilteredQueryAsync(filter);
+        if (query is null)
+            return [];
+
+        // Минимальная проекция для агрегации в памяти (клубов и заплывов в одном источнике мало).
+        var rows = await query
+            .Select(r => new
+            {
+                ClubName = r.Club.Name,
+                ClubNameEn = r.Club.NameEn,
+                RelayTeamName = r.Relay != null ? r.Relay.TeamName : null,
+                LastName = r.Swimmer.LastName,
+                r.Position,
+                r.TimeFail,
+                IsRelay = r.RelayId != null,
+                IsMasters = r.Competition.IsMasters,
+                r.CompetitionDate
+            })
             .ToListAsync();
 
-        // hasMore — из total; расхождение возможно только в пределах TTL кэша (2 мин), как и раньше.
-        var hasMore = (page - 1) * pageSize + items.Count < total;
+        // Правила очков грузим целиком (их единицы), применяем в памяти — как в сезонном зачёте.
+        var rules = await _db.ClubPointsRules.AsNoTracking()
+            .Include(r => r.Entries)
+            .ToListAsync();
 
-        var result = (items, hasMore, total);
-        await _cache.SetAsync(key, result, ResultsTtl);
-        return result;
+        var map = new Dictionary<string, (int Points, HashSet<string> Swimmers, int Successful, int Gold, int Silver, int Bronze)>();
+
+        foreach (var r in rows)
+        {
+            // Ключ клуба — как в клиентском getClubsSummary: club → relay_team_name → club_en.
+            var club = FirstNonEmpty(r.ClubName, r.RelayTeamName, r.ClubNameEn);
+            if (club is null) continue;
+
+            // Очки: те же правила, что на клиенте; эстафета удваивает (fix relay club points).
+            // timeFail НЕ гейтит (паритет с клиентским getPoints, который смотрит только на место).
+            var basePoints = ClubPointsScoring.PointsFor(
+                rules, r.Position, timeFail: false, r.IsMasters, DateOnly.FromDateTime(r.CompetitionDate));
+            var points = r.IsRelay ? basePoints * 2 : basePoints;
+
+            map.TryGetValue(club, out var e);
+            e.Swimmers ??= new HashSet<string>();
+            e.Points += points;
+            if (points > 0) e.Successful += 1;
+            if (!string.IsNullOrWhiteSpace(r.LastName)) e.Swimmers.Add(r.LastName.Trim());
+            if (r.Position == 1) e.Gold += 1;
+            else if (r.Position == 2) e.Silver += 1;
+            else if (r.Position == 3) e.Bronze += 1;
+            map[club] = e;
+        }
+
+        var summary = map
+            .Select(kv => new ClubSummaryDto
+            {
+                Club = kv.Key,
+                Points = kv.Value.Points,
+                SwimmerCount = kv.Value.Swimmers.Count,
+                SuccessfulCount = kv.Value.Successful,
+                Gold = kv.Value.Gold,
+                Silver = kv.Value.Silver,
+                Bronze = kv.Value.Bronze
+            })
+            .OrderByDescending(c => c.Points)
+            .ThenBy(c => c.Club)
+            .ToList();
+
+        await _cache.SetAsync(key, (IReadOnlyList<ClubSummaryDto>)summary, ResultsTtl);
+        return summary;
+    }
+
+    private static string? FirstNonEmpty(params string?[] values)
+    {
+        foreach (var v in values)
+            if (!string.IsNullOrWhiteSpace(v)) return v.Trim();
+        return null;
     }
 
     public async Task<ResultDto?> GetByIdAsync(long id)

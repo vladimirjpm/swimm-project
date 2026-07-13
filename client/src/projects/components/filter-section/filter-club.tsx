@@ -9,11 +9,12 @@ import UI_ClubDetails from '../mix/club-details/club-details';
 import { useFilteredByTypeResults } from './use-filtered-results';
 import FilterCard from './filter-card';
 import { useResultsLoadMode } from '../../../hooks/useResultsLoadMode';
-import { useFilterHints } from '../../../hooks/useFilterHints';
+import { useClubSummary } from '../../../hooks/useClubSummary';
 
 const FilterClub: React.FC = () => {
   const dispatch = useAppDispatch();
   const filters = useAppSelector((state) => state.filterSelected);
+  const sourceParams = useAppSelector((state) => state.dataSourceSelected?.sourceParams);
   const filteredByTypeResults = useFilteredByTypeResults();
   const mode = useResultsLoadMode();
 
@@ -47,10 +48,14 @@ const FilterClub: React.FC = () => {
     };
   }, [mode, filteredByTypeResults]);
 
-  // Paged: очки/медали клуба требуют полного датасета соревнования — недоступны (нет в page).
-  // Список клубов по вводу — из глобального filter-hints (контракт 3.2 §4).
+  // Paged (фаза 3.4): сводку по клубам (очки/медали/пловцы) считает сервер — у клиента нет
+  // полного датасета соревнования. Область — sourceParams выбранного источника. Ввод фильтрует
+  // готовый (небольшой) список локально, без похода в API на каждый символ.
   const [clubQuery, setClubQuery] = useState('');
-  const clubHints = useFilterHints('club', clubQuery, 20, mode === 'paged');
+  const pagedClubs = useClubSummary(sourceParams, mode === 'paged');
+  const filteredPagedClubs = clubQuery.trim()
+    ? pagedClubs.filter((c) => c.club.toLowerCase().includes(clubQuery.trim().toLowerCase()))
+    : pagedClubs;
 
   const updateFilter = (club: string) => {
     dispatch(
@@ -75,62 +80,46 @@ const FilterClub: React.FC = () => {
         >
           all
         </button>
-        {mode === 'paged' ? (
-          <>
-            <input
-              type="text"
-              value={clubQuery}
-              onChange={(e) => setClubQuery(e.target.value)}
-              placeholder="Search club…"
-              className="rounded-lg px-2.5 py-1.5 text-[13px] outline-none"
-              style={{
-                background: 'var(--theme-mode-input-bg)',
-                border: '1px solid var(--theme-mode-border-input)',
-                color: 'var(--theme-mode-text)',
-              }}
+        <div className="text-[11px] text-[var(--theme-mode-text-muted)]">
+          ⭐ rating · 🏊 swimmers · ✅ events
+        </div>
+        {mode === 'paged' && (
+          <input
+            type="text"
+            value={clubQuery}
+            onChange={(e) => setClubQuery(e.target.value)}
+            placeholder="Search club…"
+            className="rounded-lg px-2.5 py-1.5 text-[13px] outline-none"
+            style={{
+              background: 'var(--theme-mode-input-bg)',
+              border: '1px solid var(--theme-mode-border-input)',
+              color: 'var(--theme-mode-text)',
+            }}
+          />
+        )}
+        {(mode === 'paged' ? filteredPagedClubs : availableClubs).map(
+          ({
+            club,
+            points,
+            swimmerCount,
+            successfulCount,
+            gold,
+            silver,
+            bronze,
+          }) => (
+            <UI_ClubDetails
+              key={club}
+              club={club}
+              isSelected={filters.club === club}
+              onSelect={(c) => updateFilter(c)}
+              gold={gold}
+              silver={silver}
+              bronze={bronze}
+              swimmerCount={swimmerCount}
+              successfulCount={successfulCount}
+              points={points}
             />
-            <div className="flex flex-wrap gap-2">
-              {clubHints.map((club) => (
-                <button
-                  key={club}
-                  className={`fseg ${filters.club === club ? 'fseg-active' : ''}`}
-                  onClick={() => updateFilter(club)}
-                >
-                  {club}
-                </button>
-              ))}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="text-[11px] text-[var(--theme-mode-text-muted)]">
-              ⭐ rating · 🏊 swimmers · ✅ events
-            </div>
-            {availableClubs.map(
-              ({
-                club,
-                points,
-                swimmerCount,
-                successfulCount,
-                gold,
-                silver,
-                bronze,
-              }) => (
-                <UI_ClubDetails
-                  key={club}
-                  club={club}
-                  isSelected={filters.club === club}
-                  onSelect={(c) => updateFilter(c)}
-                  gold={gold}
-                  silver={silver}
-                  bronze={bronze}
-                  swimmerCount={swimmerCount}
-                  successfulCount={successfulCount}
-                  points={points}
-                />
-              ),
-            )}
-          </>
+          ),
         )}
       </div>
     </FilterCard>

@@ -325,4 +325,126 @@ public class ResultRepositoryTests
 
         Assert.Equal(expected, hints);
     }
+
+    // ── GetClubSummaryAsync (фаза 3.4) ────────────────────────────────────────
+
+    /// <summary>Сеет одно соревнование + правило очков (1→30,2→28,3→26, иначе 0) и набор заплывов.</summary>
+    private static async Task<int> SeedClubSummaryFixtureAsync(SwimmReadDbContext db)
+    {
+        var style = new Style { Name = "freestyle" };
+        var clubA = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var clubB = new Club { Name = "Beta", NameEn = "Beta" };
+        var comp = new Competition
+        {
+            Name = "Meet", Country = new Country { CountryCode = "ISR", CountryName = "ISR" },
+            Date = "01/01/2024", PoolType = "50m", IsMasters = false
+        };
+        var s1 = new Swimmer { LastName = "Aaa", FirstName = "A", LastNameEn = "Aaa", FirstNameEn = "A", BirthYear = 2000 };
+        var s2 = new Swimmer { LastName = "Bbb", FirstName = "B", LastNameEn = "Bbb", FirstNameEn = "B", BirthYear = 2000 };
+        db.AddRange(style, clubA, clubB, comp, s1, s2);
+        db.ClubPointsRules.Add(new ClubPointsRule
+        {
+            Version = "test", Scope = "all", EffectiveFrom = new DateOnly(2000, 1, 1), DefaultPoints = 0,
+            Entries =
+            [
+                new ClubPointsRuleEntry { Place = 1, Points = 30 },
+                new ClubPointsRuleEntry { Place = 2, Points = 28 },
+                new ClubPointsRuleEntry { Place = 3, Points = 26 },
+            ]
+        });
+        await db.SaveChangesAsync();
+
+        var date = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        ResultRecord Row(int club, int swimmer, int? pos) => new()
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer, ClubId = club, StyleId = style.Id,
+            Distance = "100", Gender = "male", CompetitionDate = date, TimeOriginal = "1:00.00",
+            AgeGroup = "Open", EventStyleAge = "100 freestyle Open", Position = pos
+        };
+        // Alpha: пловец s1 — золото (30) и серебро (28); пловец s2 — 5-е место (0 очков).
+        db.Results.AddRange(Row(clubA.Id, s1.Id, 1), Row(clubA.Id, s1.Id, 2), Row(clubA.Id, s2.Id, 5));
+        // Beta: бронза (26).
+        db.Results.Add(Row(clubB.Id, s2.Id, 3));
+        await db.SaveChangesAsync();
+        return comp.Id;
+    }
+
+    [Fact]
+    public async Task GetClubSummary_AggregatesPointsMedalsAndSwimmers()
+    {
+        await using var db = CreateDb(nameof(GetClubSummary_AggregatesPointsMedalsAndSwimmers));
+        var compId = await SeedClubSummaryFixtureAsync(db);
+        var repo = new ResultRepository(db, NoCache());
+
+        var summary = await repo.GetClubSummaryAsync(new ResultFilter { CompetitionId = compId });
+
+        Assert.Equal(2, summary.Count);
+        // Отсортировано по очкам убыв.: Alpha (30+28=58) впереди Beta (26).
+        var alpha = summary[0];
+        Assert.Equal("Alpha", alpha.Club);
+        Assert.Equal(58, alpha.Points);
+        Assert.Equal(1, alpha.Gold);
+        Assert.Equal(1, alpha.Silver);
+        Assert.Equal(0, alpha.Bronze);
+        Assert.Equal(2, alpha.SwimmerCount);   // s1 и s2 (по фамилиям)
+        Assert.Equal(2, alpha.SuccessfulCount); // только заплывы с очками > 0
+
+        var beta = summary[1];
+        Assert.Equal("Beta", beta.Club);
+        Assert.Equal(26, beta.Points);
+        Assert.Equal(1, beta.Bronze);
+    }
+
+    [Fact]
+    public async Task GetClubSummary_RelayDoublesPoints()
+    {
+        await using var db = CreateDb(nameof(GetClubSummary_RelayDoublesPoints));
+        var style = new Style { Name = "freestyle" };
+        var comp = new Competition
+        {
+            Name = "Relay Meet", Country = new Country { CountryCode = "ISR", CountryName = "ISR" },
+            Date = "01/01/2024", PoolType = "50m", IsMasters = false
+        };
+        var swimmer = new Swimmer { LastName = "Xxx", FirstName = "X", LastNameEn = "Xxx", FirstNameEn = "X", BirthYear = 2000 };
+        var relay = new Relay { TeamName = "Gamma Relay", SwimmersName = "X Xxx, Y Yyy" };
+        // Эстафета в БД привязана к клубу (ClubId не nullable); имя клуба пустое —
+        // ключ уходит на Relay.TeamName, как в клиентском getClubsSummary.
+        var emptyClub = new Club { Name = "", NameEn = "" };
+        db.AddRange(style, comp, swimmer, relay, emptyClub);
+        db.ClubPointsRules.Add(new ClubPointsRule
+        {
+            Version = "test", Scope = "all", EffectiveFrom = new DateOnly(2000, 1, 1), DefaultPoints = 0,
+            Entries = [new ClubPointsRuleEntry { Place = 1, Points = 30 }]
+        });
+        await db.SaveChangesAsync();
+
+        // Эстафетный заплыв без ClubId — клуб берётся из Relay.TeamName; золото → 30×2 = 60.
+        db.Results.Add(new ResultRecord
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer.Id, ClubId = emptyClub.Id, StyleId = style.Id,
+            RelayId = relay.Id, Distance = "4x100", Gender = "male",
+            CompetitionDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            TimeOriginal = "3:30.00", AgeGroup = "Open", EventStyleAge = "4x100 freestyle Open", Position = 1
+        });
+        await db.SaveChangesAsync();
+        var repo = new ResultRepository(db, NoCache());
+
+        var summary = await repo.GetClubSummaryAsync(new ResultFilter { CompetitionId = comp.Id });
+
+        var gamma = Assert.Single(summary);
+        Assert.Equal("Gamma Relay", gamma.Club);
+        Assert.Equal(60, gamma.Points);
+        Assert.Equal(1, gamma.Gold);
+    }
+
+    [Fact]
+    public async Task GetClubSummary_EmptyDb_ReturnsEmpty()
+    {
+        await using var db = CreateDb(nameof(GetClubSummary_EmptyDb_ReturnsEmpty));
+        var repo = new ResultRepository(db, NoCache());
+
+        var summary = await repo.GetClubSummaryAsync(new ResultFilter { CompetitionId = 123 });
+
+        Assert.Empty(summary);
+    }
 }

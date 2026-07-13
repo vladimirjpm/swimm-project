@@ -163,6 +163,48 @@ public class ResultsController : ControllerBase
     }
 
     /// <summary>
+    /// Сводка по клубам для источника (очки/медали/пловцы) — в paged-режиме клиент не имеет
+    /// полного датасета, чтобы посчитать её сам (фаза 3.4). Область = тот же источник, что
+    /// у результатов: competitionId (число или 'last') / eventId / country.
+    /// </summary>
+    [HttpGet("/api/club-summary")]
+    public async Task<IActionResult> GetClubSummary(
+        [FromQuery] string? competitionId,
+        [FromQuery] int? eventId,
+        [FromQuery] string? country,
+        [FromQuery] string? poolType,
+        [FromQuery] DateTime? dateFrom,
+        [FromQuery] DateTime? dateTo)
+    {
+        int? competitionIdValue = null;
+        var latest = false;
+        if (!string.IsNullOrWhiteSpace(competitionId))
+        {
+            if (string.Equals(competitionId, "last", StringComparison.OrdinalIgnoreCase))
+                latest = true;
+            else if (int.TryParse(competitionId, out var parsed))
+                competitionIdValue = parsed;
+            else
+                return BadRequest("competitionId must be a number or 'last'");
+        }
+
+        var filter = new ResultFilter
+        {
+            CompetitionId = competitionIdValue,
+            Latest = latest,
+            EventId = eventId,
+            Country = string.IsNullOrWhiteSpace(country) ? null : country.Trim().ToUpperInvariant(),
+            PoolType = poolType,
+            DateFrom = dateFrom,
+            DateTo = dateTo
+        };
+
+        return await this.CachedJson(_cache,
+            $"http:club-summary:{filter.CompetitionId}:{filter.Latest}:{filter.EventId}:{filter.Country}:{filter.PoolType}:{filter.DateFrom:yyyyMMdd}:{filter.DateTo:yyyyMMdd}",
+            () => _results.GetClubSummaryAsync(filter), PayloadTtl, CacheControlValue);
+    }
+
+    /// <summary>
     /// Карьерные (all-time) данные спортсмена для карточки: соревнования, заплывы,
     /// сумма очков, медали, лучшие времена по стилям. Пловец не найден → нулевой DTO.
     /// </summary>
