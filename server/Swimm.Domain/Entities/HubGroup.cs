@@ -47,6 +47,12 @@ public class HubGroup
     [MaxLength(200)]
     public string? Location { get; set; }
 
+    /// <summary>Страна группы (опционально) — FK на справочник, как у Swimmer/Club.</summary>
+    public int? CountryId { get; set; }
+
+    [ForeignKey(nameof(CountryId))]
+    public Country? Country { get; set; }
+
     /// <summary>Если группа фактически при клубе (опционально)</summary>
     public int? ClubId { get; set; }
 

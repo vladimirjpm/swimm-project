@@ -45,6 +45,8 @@ public sealed class HubGroupEditDto
     public string? IconUrl { get; set; }
     public string? CoverImageUrl { get; set; }
     public string? Location { get; set; }
+    /// <summary>Alpha-3 код страны (ISR…) — форма работает кодами, FK резолвится при сохранении.</summary>
+    public string? Country { get; set; }
     public int? ClubId { get; set; }
     public int OwnerUserId { get; set; }
     public string OwnerDisplayName { get; set; } = "";
@@ -67,6 +69,8 @@ public sealed class HubGroupInputDto
     public string? IconUrl { get; set; }
     public string? CoverImageUrl { get; set; }
     public string? Location { get; set; }
+    /// <summary>Alpha-3 код страны (ISR…); пусто — без страны. FK резолвится find-or-create.</summary>
+    public string? Country { get; set; }
     public int? ClubId { get; set; }
     public bool IsPublic { get; set; }
     public List<HubGroupLinkDto> Links { get; set; } = [];

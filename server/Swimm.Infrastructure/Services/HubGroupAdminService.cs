@@ -47,6 +47,7 @@ public class HubGroupAdminService : IHubGroupAdminService
     {
         var g = await _db.HubGroups.AsNoTracking()
             .Include(x => x.Owner)
+            .Include(x => x.Country)
             .FirstOrDefaultAsync(x => x.Id == id);
         if (g == null) return null;
 
@@ -92,6 +93,7 @@ public class HubGroupAdminService : IHubGroupAdminService
             IconUrl = g.IconUrl,
             CoverImageUrl = g.CoverImageUrl,
             Location = g.Location,
+            Country = g.Country?.CountryCode,
             ClubId = g.ClubId,
             OwnerUserId = g.OwnerUserId,
             OwnerDisplayName = g.Owner?.DisplayName ?? $"#{g.OwnerUserId}",
@@ -123,6 +125,7 @@ public class HubGroupAdminService : IHubGroupAdminService
 
         var group = new HubGroup { OwnerUserId = resolvedOwnerId.Value };
         HubGroupCrudCore.Apply(group, input, slug);
+        await _core.ApplyCountryAsync(group, input.Country);
         _db.HubGroups.Add(group);
         return await _core.SaveAsync(group);
     }
@@ -137,6 +140,7 @@ public class HubGroupAdminService : IHubGroupAdminService
         if (error != null) return HubGroupSaveResult.Fail(error);
 
         HubGroupCrudCore.Apply(group, input, slug);
+        await _core.ApplyCountryAsync(group, input.Country);
         return await _core.SaveAsync(group);
     }
 

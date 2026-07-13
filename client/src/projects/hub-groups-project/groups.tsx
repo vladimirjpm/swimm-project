@@ -4,6 +4,7 @@ import HomeHeader from '../home-project/components/home-header';
 import RecordTicker from '../home-project/components/record-ticker';
 import MyGroupsPanel from './my-groups-panel';
 import UI_ClubIcon from '../components/mix/club-icon/club-icon';
+import UI_FlagEmoji from '../components/mix/flag-icon/flag-icon';
 import UI_SwimmerGallery from '../components/mix/swimmer-gallery/swimmer-gallery';
 import { GalleryItem } from '../../utils/interfaces/results';
 import { HelperMedia } from '../../utils/helpers';
@@ -103,7 +104,8 @@ function GroupCard({ group, href }: { group: HubGroupListItem; href: string }) {
         <span className="hp-mono rounded-[7px] border border-[#7dd3fc]/40 px-2 py-[3px] text-[11px] font-extrabold text-[#7dd3fc]">
           {group.member_count} · swimmers
         </span>
-        <span className="truncate pl-3 text-[12px] font-bold text-[#cbe0f0]/60">
+        <span className="inline-flex min-w-0 items-center gap-1.5 truncate pl-3 text-[12px] font-bold text-[#cbe0f0]/60">
+          {group.country && <UI_FlagEmoji countryCode={group.country} size="16x12" />}
           {group.location ?? group.club_name ?? ''}
         </span>
       </div>
@@ -367,7 +369,14 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
         )}
 
         <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] font-bold text-[#cbe0f0]/70">
-          {group.location && <span>📍 {group.location}</span>}
+          {(group.country || group.location) && (
+            <span className="inline-flex items-center gap-1.5">
+              {group.country
+                ? <UI_FlagEmoji countryCode={group.country} size="16x12" />
+                : '📍'}
+              {group.location}
+            </span>
+          )}
           {group.club_name && <span>Клуб: {group.club_name}</span>}
           <span>
             {group.members.length} · swimmers

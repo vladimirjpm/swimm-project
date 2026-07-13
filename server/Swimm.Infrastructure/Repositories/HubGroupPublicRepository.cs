@@ -52,6 +52,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                 Description = g.Description,
                 IconUrl = g.IconUrl,
                 Location = g.Location,
+                Country = g.Country != null ? g.Country.CountryCode : null,
                 ClubName = g.Club != null ? g.Club.Name : null,
                 IsOfficial = g.IsOfficial,
                 MemberCount = g.Members.Count
@@ -66,6 +67,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
 
         var group = await _read.HubGroups.AsNoTracking()
             .Include(g => g.Club)
+            .Include(g => g.Country)
             .FirstOrDefaultAsync(g => g.Slug == slug);
         if (group == null) return null;
         if (visibility == "perGroup" && !group.IsPublic) return null;
@@ -94,6 +96,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             IconUrl = group.IconUrl,
             CoverImageUrl = group.CoverImageUrl,
             Location = group.Location,
+            Country = group.Country?.CountryCode,
             ClubName = group.Club?.Name,
             IsOfficial = group.IsOfficial,
             Links = ParseLinks(group.Links),

@@ -7,6 +7,8 @@ export interface HubGroupListItem {
   description?: string | null;
   icon_url?: string | null;
   location?: string | null;
+  /** Alpha-3 код страны группы (ISR…), null — не задана. Флаг — через UI_FlagEmoji. */
+  country?: string | null;
   club_name?: string | null;
   /** Официальная группа клуба (одобрена админом) — не путать с составом-watchlist. */
   is_official: boolean;
@@ -89,6 +91,8 @@ export interface HubGroupDetails {
   icon_url?: string | null;
   cover_image_url?: string | null;
   location?: string | null;
+  /** Alpha-3 код страны группы (ISR…), null — не задана. Флаг — через UI_FlagEmoji. */
+  country?: string | null;
   club_name?: string | null;
   /** Официальная группа клуба (одобрена админом) — не путать с составом-watchlist. */
   is_official: boolean;

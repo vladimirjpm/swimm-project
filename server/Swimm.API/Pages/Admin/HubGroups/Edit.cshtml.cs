@@ -51,6 +51,8 @@ public class EditModel : PageModel
         public string? IconUrl { get; set; }
         public string? CoverImageUrl { get; set; }
         public string? Location { get; set; }
+        /// <summary>Alpha-3 код страны (ISR…); пусто — без страны.</summary>
+        public string? Country { get; set; }
         public int? ClubId { get; set; }
         public bool IsPublic { get; set; } = true;
         public string? LinkWhatsapp { get; set; }
@@ -159,6 +161,7 @@ public class EditModel : PageModel
             IconUrl = d.IconUrl,
             CoverImageUrl = d.CoverImageUrl,
             Location = d.Location,
+            Country = d.Country,
             ClubId = d.ClubId,
             IsPublic = d.IsPublic,
             LinkWhatsapp = Find("whatsapp"),
@@ -189,6 +192,8 @@ public class EditModel : PageModel
             IconUrl = f.IconUrl,
             CoverImageUrl = f.CoverImageUrl,
             Location = f.Location,
+            // Select всегда постится: незаполненный придёт "" — явное «снять страну» (не null).
+            Country = f.Country ?? "",
             ClubId = f.ClubId,
             IsPublic = f.IsPublic,
             Links = links,

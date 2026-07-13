@@ -23,6 +23,10 @@ public sealed class HubGroupListItemDto
     [JsonPropertyName("location")]
     public string? Location { get; set; }
 
+    /// <summary>Alpha-3 код страны группы (ISR…), null — не задана.</summary>
+    [JsonPropertyName("country")]
+    public string? Country { get; set; }
+
     [JsonPropertyName("club_name")]
     public string? ClubName { get; set; }
 
@@ -177,6 +181,10 @@ public sealed class HubGroupDetailsDto
 
     [JsonPropertyName("location")]
     public string? Location { get; set; }
+
+    /// <summary>Alpha-3 код страны группы (ISR…), null — не задана.</summary>
+    [JsonPropertyName("country")]
+    public string? Country { get; set; }
 
     [JsonPropertyName("club_name")]
     public string? ClubName { get; set; }

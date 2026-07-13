@@ -17,7 +17,7 @@ const btnDangerCls =
 
 const EMPTY_INPUT: HubGroupInput = {
   name: '', nameEn: '', slug: '', description: '', iconUrl: '', coverImageUrl: '', location: '',
-  clubId: null, isPublic: true, links: [],
+  country: '', clubId: null, isPublic: true, links: [],
 };
 
 function GroupInputForm({
@@ -63,6 +63,9 @@ function GroupInputForm({
         onChange={(e) => setField('description', e.target.value)} />
       <input className={inputCls} placeholder="Город/бассейн" value={form.location ?? ''}
         onChange={(e) => setField('location', e.target.value)} />
+      {/* Alpha-3 код World Aquatics (ISR/GER/…) — как в БД; резолв FK делает сервер. */}
+      <input className={inputCls} placeholder="Страна — код (ISR)" maxLength={3} value={form.country ?? ''}
+        onChange={(e) => setField('country', e.target.value.toUpperCase())} />
       <input className={inputCls} placeholder="Иконка (ссылка)" value={form.iconUrl ?? ''}
         onChange={(e) => setField('iconUrl', e.target.value)} />
 
@@ -440,6 +443,8 @@ function EditGroupCard({ row, currentUserId, isAdmin, onClose, onSaved }: {
   const input: HubGroupInput = {
     name: edit.data.name, nameEn: edit.data.nameEn, slug: edit.data.slug, description: edit.data.description,
     iconUrl: edit.data.iconUrl, coverImageUrl: edit.data.coverImageUrl, location: edit.data.location,
+    // "" (не null): пустое поле формы = явное «снять страну» на сервере.
+    country: edit.data.country ?? '',
     clubId: edit.data.clubId, isPublic: edit.data.isPublic, links: edit.data.links,
   };
 

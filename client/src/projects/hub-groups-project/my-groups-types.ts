@@ -26,6 +26,8 @@ export interface HubGroupInput {
   iconUrl?: string | null;
   coverImageUrl?: string | null;
   location?: string | null;
+  /** Alpha-3 код страны (ISR…); "" — снять; null/отсутствует — не менять. */
+  country?: string | null;
   clubId?: number | null;
   isPublic: boolean;
   links: HubGroupLinkInput[];
@@ -71,6 +73,8 @@ export interface HubGroupEditData {
   iconUrl?: string | null;
   coverImageUrl?: string | null;
   location?: string | null;
+  /** Alpha-3 код страны (ISR…), null — не задана. */
+  country?: string | null;
   clubId?: number | null;
   ownerUserId: number;
   ownerDisplayName: string;

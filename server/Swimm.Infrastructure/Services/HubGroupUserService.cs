@@ -76,6 +76,7 @@ public class HubGroupUserService : IHubGroupUserService
         // привязка к клубу — через заявку и одобрение админа (8.7), не через ввод.
         var group = new HubGroup { OwnerUserId = ownerUserId };
         HubGroupCrudCore.Apply(group, input, slug, allowClubChange: false);
+        await _core.ApplyCountryAsync(group, input.Country);
         _db.HubGroups.Add(group);
         return await _core.SaveAsync(group);
     }
@@ -92,6 +93,7 @@ public class HubGroupUserService : IHubGroupUserService
         // allowClubChange:false — сохраняем текущий ClubId (в т.ч. у официальной группы),
         // ввод клуба игнорируем: сменить/снять клуб может только админ.
         HubGroupCrudCore.Apply(group, input, slug, allowClubChange: false);
+        await _core.ApplyCountryAsync(group, input.Country);
         return await _core.SaveAsync(group);
     }
 

@@ -51,6 +51,33 @@ public partial class HubGroupCrudCore
         return candidate;
     }
 
+    /// <summary>
+    /// Страна группы из ввода: alpha-3 код (ISR…) → FK на Countries, find-or-create —
+    /// как в импорте результатов (JsonImportService). Семантика ввода: null — поле не
+    /// прислано, страну НЕ трогаем (старый клиент не сотрёт выставленное админом);
+    /// пустая строка — явное «снять страну». Вызывать после <see cref="Apply"/>.
+    /// </summary>
+    public async Task ApplyCountryAsync(HubGroup group, string? countryCode)
+    {
+        if (countryCode == null) return;
+
+        var code = countryCode.Trim().ToUpperInvariant();
+        if (code.Length == 0)
+        {
+            group.CountryId = null;
+            return;
+        }
+
+        var country = await _db.Countries.FirstOrDefaultAsync(c => c.CountryCode == code);
+        if (country == null)
+        {
+            country = new Country { CountryCode = code, CountryName = code };
+            _db.Countries.Add(country);
+            await _db.SaveChangesAsync();
+        }
+        group.CountryId = country.Id;
+    }
+
     public async Task<string?> ValidateAsync(HubGroupInputDto input, string slug, int? excludeId)
     {
         if (string.IsNullOrWhiteSpace(input.Name)) return "Название обязательно";
