@@ -24,9 +24,14 @@ public class CategoryAdminRepository : ICategoryAdminRepository
 
     public async Task<IReadOnlyList<CategoryAdminRowDto>> GetAllAsync()
     {
+        // Многодневное событие даёт по одной CategoryCompetitions-строке на каждый день,
+        // поэтому считаем не строки, а уникальные логические соревнования
+        // (все дни одного EventId = одно соревнование).
         var counts = await _db.CategoryCompetitions.AsNoTracking()
-            .GroupBy(cc => cc.CategoryId)
-            .Select(g => new { CategoryId = g.Key, Count = g.Count() })
+            .Join(_db.Competitions, cc => cc.CompetitionId, comp => comp.Id,
+                (cc, comp) => new { cc.CategoryId, LogicalId = comp.EventId ?? -comp.Id })
+            .GroupBy(x => x.CategoryId)
+            .Select(g => new { CategoryId = g.Key, Count = g.Select(x => x.LogicalId).Distinct().Count() })
             .ToDictionaryAsync(x => x.CategoryId, x => x.Count);
 
         var categories = await _db.Categories.AsNoTracking()
@@ -50,7 +55,12 @@ public class CategoryAdminRepository : ICategoryAdminRepository
         var c = await _db.Categories.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
         if (c == null) return null;
 
-        var count = await _db.CategoryCompetitions.CountAsync(cc => cc.CategoryId == id);
+        var count = await _db.CategoryCompetitions.AsNoTracking()
+            .Where(cc => cc.CategoryId == id)
+            .Join(_db.Competitions, cc => cc.CompetitionId, comp => comp.Id,
+                (cc, comp) => comp.EventId ?? -comp.Id)
+            .Distinct()
+            .CountAsync();
 
         return new CategoryEditDto
         {
