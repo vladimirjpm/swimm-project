@@ -90,7 +90,8 @@ function SportsmenDetails() {
 
   const base = import.meta.env.BASE_URL;
   const gender = firstResult.event_style_gender || 'female';
-  const countryCode = (firstResult.country || 'il').toLowerCase().slice(0, 2);
+  // alpha-3 из данных (ISR…) конвертирует сам UI_FlagEmoji; дефолт — Израиль.
+  const countryCode = firstResult.country || 'il';
 
   return (
     <div className="sportsmen-details">
