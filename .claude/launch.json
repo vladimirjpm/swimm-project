@@ -4,15 +4,36 @@
     {
       "name": "client",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "client", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "client",
+        "run",
+        "dev"
+      ],
       "port": 5173,
       "autoPort": true
     },
     {
       "name": "swimm-api",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "server/Swimm.API", "--urls", "http://localhost:5078"],
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "server/Swimm.API",
+        "--urls",
+        "http://localhost:5078"
+      ],
       "port": 5078
+    },
+    {
+      "name": "client-5079",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set SWIMM_API_TARGET=http://localhost:5079&& npm --prefix client run dev"
+      ],
+      "port": 5173,
+      "autoPort": true
     }
   ]
 }

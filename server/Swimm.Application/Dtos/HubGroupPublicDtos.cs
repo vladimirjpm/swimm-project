@@ -151,6 +151,77 @@ public sealed class HubGroupStandingDto
 }
 
 /// <summary>
+/// Карточка ленты хайлайтов шапки группы (design_handoff_group_header).
+/// Дискриминированный union по <see cref="Type"/>: record | medals | video | photo —
+/// у каждого варианта заполнен свой поднабор полей, остальные null и не сериализуются.
+/// Состав и порядок ленты задаёт сервер (HubGroupHighlightsBuilder); новые типы
+/// добавляются новым значением Type без изменения шапки на клиенте.
+/// </summary>
+public sealed class HubGroupHighlightDto
+{
+    /// <summary>record | medals | video | photo</summary>
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "";
+
+    /// <summary>Куда ведёт клик по карточке (относительный или внешний URL).</summary>
+    [JsonPropertyName("url")]
+    public string Url { get; set; } = "";
+
+    // --- record ---
+    [JsonPropertyName("badge")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Badge { get; set; }
+
+    [JsonPropertyName("title")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Title { get; set; }
+
+    [JsonPropertyName("detail")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Detail { get; set; }
+
+    // --- medals ---
+    [JsonPropertyName("place")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Place { get; set; }
+
+    [JsonPropertyName("place_label")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? PlaceLabel { get; set; }
+
+    [JsonPropertyName("gold")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Gold { get; set; }
+
+    [JsonPropertyName("silver")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Silver { get; set; }
+
+    [JsonPropertyName("bronze")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Bronze { get; set; }
+
+    // --- video / photo ---
+    [JsonPropertyName("label")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Label { get; set; }
+
+    /// <summary>Длительность видео (mm:ss); в БД её нет, поэтому обычно null.</summary>
+    [JsonPropertyName("duration")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Duration { get; set; }
+
+    [JsonPropertyName("thumb_url")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ThumbUrl { get; set; }
+
+    /// <summary>«+N» — сколько ещё фото в галерее сверх превью.</summary>
+    [JsonPropertyName("extra")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Extra { get; set; }
+}
+
+/// <summary>
 /// Полная публичная страница группы (/api/hub-groups/{slug}).
 /// Тот же контракт отдаёт /api/hub-groups/favorites — виртуальная группа
 /// «Моё избранное» поверх Sys_UserFavorites (is_virtual=true, slug="favorites").
@@ -222,4 +293,11 @@ public sealed class HubGroupDetailsDto
     /// <summary>Публичная галерея группы (HubGroupMedia.TrainingId == null).</summary>
     [JsonPropertyName("gallery")]
     public List<HubGroupMediaDto> Gallery { get; set; } = [];
+
+    /// <summary>
+    /// Лента хайлайтов шапки (record/medals/video/photo) — собирается сервером из
+    /// bests/standings/gallery (HubGroupHighlightsBuilder). Пустая лента = модуль скрыт.
+    /// </summary>
+    [JsonPropertyName("highlights")]
+    public List<HubGroupHighlightDto> Highlights { get; set; } = [];
 }

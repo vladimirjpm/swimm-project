@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Swimm.API.Http;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 
 namespace Swimm.API.Controllers;
 
@@ -69,7 +70,10 @@ public class HubGroupsController : ControllerBase
         if (!int.TryParse(raw, out var userId)) return Unauthorized();
 
         // Личные данные — без общего кэша и без Cache-Control (пусть браузер не хранит).
-        return Ok(await _groups.GetFavoritesGroupAsync(userId));
+        var dto = await _groups.GetFavoritesGroupAsync(userId);
+        // У виртуальной группы галереи нет (Id=0) — лента соберётся из record/medals.
+        dto.Highlights = HubGroupHighlightsBuilder.Build(dto);
+        return Ok(dto);
     }
 
     /// <summary>Страница группы по slug: инфо, участники, последние заплывы, рекорды группы.</summary>
@@ -97,6 +101,8 @@ public class HubGroupsController : ControllerBase
                 // Публичная галерея (TrainingId == null) — через SwimmDbContext (не read-реплику):
                 // у Sys_HubGroupMedia нет grant swimm_ro (см. SwimmDbContext.OnModelCreating).
                 dto.Gallery = await _media.GetGalleryAsync(dto.Id);
+                // Лента хайлайтов шапки — строго после заполнения Gallery (video/photo берутся из неё).
+                dto.Highlights = HubGroupHighlightsBuilder.Build(dto);
                 return dto;
             }, PayloadTtl, CacheControlValue);
     }

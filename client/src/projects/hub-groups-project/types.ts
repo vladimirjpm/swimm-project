@@ -64,6 +64,19 @@ export interface HubGroupRecentResult {
   is_relay: boolean;
 }
 
+/**
+ * Карточка ленты хайлайтов шапки группы (design_handoff_group_header).
+ * Дискриминированный union по type; состав и порядок задаёт сервер
+ * (HubGroupHighlightsBuilder) — клиент рендерит массив как есть.
+ * Новый тип карточки = новый вариант union + ветка в HighlightCard.
+ */
+export type HubGroupHighlight =
+  | { type: 'record'; badge: string; title: string; detail: string; url: string }
+  | { type: 'medals'; badge: string; place: string; place_label: string;
+      gold: number; silver: number; bronze: number; url: string }
+  | { type: 'video'; label: string; duration?: string | null; thumb_url?: string | null; url: string }
+  | { type: 'photo'; label: string; extra?: string | null; thumb_url?: string | null; url: string };
+
 // Канонический тип медиа объявлен один раз в utils/interfaces/results.ts (HubGroupMediaItem).
 import type { HubGroupMediaItem } from '../../utils/interfaces/results';
 export type { HubGroupMediaItem };
@@ -105,4 +118,6 @@ export interface HubGroupDetails {
   standings: HubGroupStanding[];
   /** Публичная галерея группы (HubGroupMedia с TrainingId == null). */
   gallery: HubGroupMediaItem[];
+  /** Лента хайлайтов шапки; пустая/отсутствует — модуль скрыт (старый вид шапки). */
+  highlights?: HubGroupHighlight[];
 }

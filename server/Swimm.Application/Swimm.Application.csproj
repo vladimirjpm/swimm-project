@@ -8,6 +8,11 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- internal-хелперы (HubGroupHighlightsBuilder.YoutubeThumb) видны юнит-тестам -->
+    <InternalsVisibleTo Include="Swimm.Tests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
