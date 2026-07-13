@@ -17,15 +17,52 @@ public class IsrOrgParser : IFormatParser
         // (протокол PDF длину бассейна не указывает — парсер ставит "25m" условно).
         var poolOverride = string.IsNullOrWhiteSpace(request.PoolType) ? null : request.PoolType.Trim();
 
+        // Страна и язык тоже выбираются в UI и имеют приоритет над легаси-конвенцией
+        // имени файла «*_{COUNTRY}_{LANG}.pdf» (она остаётся fallback-ом).
+        var countryOverride = string.IsNullOrWhiteSpace(request.Country)
+            ? null : request.Country.Trim().ToUpperInvariant();
+        var langOverride = string.IsNullOrWhiteSpace(request.Language)
+            ? null : request.Language.Trim().ToLowerInvariant();
+
         if (request.SecondaryStream == null || string.IsNullOrWhiteSpace(request.SecondaryFileName))
         {
-            return ParseHebrewOnly(request.PrimaryStream, request.PrimaryFileName, request.IsAward, poolOverride);
+            return ParseHebrewOnly(request.PrimaryStream, request.PrimaryFileName, request.IsAward,
+                poolOverride, countryOverride, langOverride);
+        }
+
+        // Двуязычная пара: роли файлов определяет язык основного (из UI);
+        // без выбора — легаси-конвенция «основной = HE, дополнительный = EN».
+        if (langOverride == "en")
+        {
+            return ParseBilingual(
+                request.PrimaryStream, request.PrimaryFileName,
+                request.SecondaryStream, request.SecondaryFileName!,
+                request.IsAward, poolOverride, countryOverride,
+                englishLang: "en", hebrewLang: "he");
         }
 
         return ParseBilingual(
             request.SecondaryStream, request.SecondaryFileName!,
             request.PrimaryStream, request.PrimaryFileName,
-            request.IsAward, poolOverride);
+            request.IsAward, poolOverride, countryOverride,
+            englishLang: langOverride != null ? "en" : null,
+            hebrewLang: langOverride);
+    }
+
+    /// <summary>Страна: выбор из UI приоритетнее предпоследнего сегмента имени файла.</summary>
+    internal static string ResolveCountry(string fileName, string? countryOverride)
+    {
+        if (!string.IsNullOrWhiteSpace(countryOverride)) return countryOverride.Trim().ToUpperInvariant();
+        var parts = Path.GetFileNameWithoutExtension(fileName).Split('_', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2 ? parts[^2] : string.Empty;
+    }
+
+    /// <summary>Язык: выбор из UI приоритетнее последнего сегмента имени файла.</summary>
+    internal static string ResolveLanguage(string fileName, string? languageOverride)
+    {
+        if (!string.IsNullOrWhiteSpace(languageOverride)) return languageOverride.Trim().ToLowerInvariant();
+        var parts = Path.GetFileNameWithoutExtension(fileName).Split('_', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 1 ? parts[^1] : string.Empty;
     }
 
     public string GetDebugLog() => IsrOrgCompetitionParser.GetDebugLog();
@@ -49,12 +86,11 @@ public class IsrOrgParser : IFormatParser
         return 0;
     }
 
-    private static IEnumerable<Result> ParseHebrewOnly(Stream hebrewPdfStream, string hebrewFileName, bool isAward, string? poolOverride)
+    private static IEnumerable<Result> ParseHebrewOnly(Stream hebrewPdfStream, string hebrewFileName, bool isAward,
+        string? poolOverride, string? countryOverride, string? langOverride)
     {
-        var heParts = Path.GetFileNameWithoutExtension(hebrewFileName)
-                          .Split('_', StringSplitOptions.RemoveEmptyEntries);
-        var country = heParts.Length >= 2 ? heParts[^2] : string.Empty;
-        var langHe = heParts.Length >= 1 ? heParts[^1] : string.Empty;
+        var country = ResolveCountry(hebrewFileName, countryOverride);
+        var langHe = ResolveLanguage(hebrewFileName, langOverride);
 
         var isMastersFile = Path.GetFileNameWithoutExtension(hebrewFileName)
                             .Contains("masters", StringComparison.OrdinalIgnoreCase);
@@ -128,16 +164,12 @@ public class IsrOrgParser : IFormatParser
     private static IEnumerable<Result> ParseBilingual(
         Stream englishPdfStream, string englishFileName,
         Stream hebrewPdfStream, string hebrewFileName,
-        bool isAward, string? poolOverride)
+        bool isAward, string? poolOverride, string? countryOverride = null,
+        string? englishLang = null, string? hebrewLang = null)
     {
-        var enParts = Path.GetFileNameWithoutExtension(englishFileName)
-                          .Split('_', StringSplitOptions.RemoveEmptyEntries);
-        var countryEn = enParts.Length >= 2 ? enParts[^2] : string.Empty;
-        var langEn = enParts.Length >= 1 ? enParts[^1] : string.Empty;
-
-        var hePartsSync = Path.GetFileNameWithoutExtension(hebrewFileName)
-                              .Split('_', StringSplitOptions.RemoveEmptyEntries);
-        var langHeSync = hePartsSync.Length >= 1 ? hePartsSync[^1] : string.Empty;
+        var countryEn = ResolveCountry(englishFileName, countryOverride);
+        var langEn = ResolveLanguage(englishFileName, englishLang);
+        var langHeSync = ResolveLanguage(hebrewFileName, hebrewLang);
 
         var isMastersFile = Path.GetFileNameWithoutExtension(hebrewFileName)
                             .Contains("masters", StringComparison.OrdinalIgnoreCase);

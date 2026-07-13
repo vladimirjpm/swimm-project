@@ -94,6 +94,32 @@
                             <option value="50m">50m</option>
                         </select>
                     </div>
+                    <div>
+                        <label class="block text-xs text-admin-text-muted mb-1">Язык основного файла</label>
+                        <select id="pdf-language" class="admin-input min-w-[150px]">
+                            @foreach (var l in Swimm.API.Pages.Admin.ImportModel.Languages)
+                            {
+                                <option value="@l.Code">@l.Label</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-admin-text-muted mb-1">Страна соревнования</label>
+                        <select id="pdf-country" class="admin-input min-w-[180px]">
+                            <optgroup label="★ Избранные">
+                                @foreach (var c in Swimm.API.Pages.Admin.Shared.CountryCatalog.Favorites)
+                                {
+                                    <option value="@c.Code">@c.Label (@c.Code)</option>
+                                }
+                            </optgroup>
+                            <optgroup label="Все страны">
+                                @foreach (var c in Swimm.API.Pages.Admin.Shared.CountryCatalog.Others)
+                                {
+                                    <option value="@c.Code">@c.Label (@c.Code)</option>
+                                }
+                            </optgroup>
+                        </select>
+                    </div>
                     <label class="inline-flex items-center gap-2 text-sm text-admin-text pb-2">
                         <input type="checkbox" id="pdf-is-award"> Наградной протокол (isAward)
                     </label>
@@ -648,6 +674,9 @@
             form.append('isAward', document.getElementById('pdf-is-award').checked);
             const poolType = document.getElementById('pdf-pool-type').value;
             if (poolType) form.append('poolType', poolType);
+            // Страна и язык из DDL заменяют легаси-конвенцию имени файла «*_ISR_he.pdf».
+            form.append('country', document.getElementById('pdf-country').value);
+            form.append('language', document.getElementById('pdf-language').value);
 
             const res = await fetch('/api/admin/parse-pdf', { method: 'POST', credentials: 'same-origin', headers: { 'X-XSRF-TOKEN': _csrfToken }, body: form });
             const data = await res.json();

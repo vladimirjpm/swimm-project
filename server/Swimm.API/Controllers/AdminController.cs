@@ -178,7 +178,9 @@ public class AdminController : ControllerBase
         [FromForm] IFormFile? fourthFile = null,
         [FromForm] string format = "IsrOrg",
         [FromForm] bool isAward = false,
-        [FromForm] string? poolType = null)
+        [FromForm] string? poolType = null,
+        [FromForm] string? country = null,
+        [FromForm] string? language = null)
     {
         if (file == null || file.Length == 0)
             return BadRequest(new { error = "Primary file required." });
@@ -197,7 +199,9 @@ public class AdminController : ControllerBase
             poolType,
             secondaryFile?.OpenReadStream(),
             secondaryFile?.FileName,
-            extraFiles.Count > 0 ? extraFiles : null);
+            extraFiles.Count > 0 ? extraFiles : null,
+            country,
+            language);
 
         ParsedCompetition parsed;
         try

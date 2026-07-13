@@ -23,5 +23,7 @@ public record ParseRequest(
     string? SecondaryFileName = null,
     bool IsAward = false,
     string? PoolType = null,
-    IReadOnlyList<(Stream Stream, string FileName)>? ExtraStreams = null
+    IReadOnlyList<(Stream Stream, string FileName)>? ExtraStreams = null,
+    string? Country = null,
+    string? Language = null
 );

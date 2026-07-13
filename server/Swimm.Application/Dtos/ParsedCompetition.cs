@@ -13,7 +13,9 @@ public record ResultSourceRequest(
     string? PoolType = null,
     Stream? SecondaryStream = null,
     string? SecondaryFileName = null,
-    IReadOnlyList<SourceFilePart>? ExtraFiles = null);
+    IReadOnlyList<SourceFilePart>? ExtraFiles = null,
+    string? Country = null,
+    string? Language = null);
 
 /// <summary>Дополнительный файл запроса (третий и далее).</summary>
 public record SourceFilePart(Stream Stream, string FileName);

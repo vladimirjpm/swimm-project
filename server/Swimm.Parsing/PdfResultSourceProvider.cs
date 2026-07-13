@@ -35,7 +35,9 @@ public class PdfResultSourceProvider : IResultSourceProvider
             request.SecondaryFileName,
             request.IsAward,
             request.PoolType,
-            request.ExtraFiles?.Select(f => (f.Stream, f.FileName)).ToList());
+            request.ExtraFiles?.Select(f => (f.Stream, f.FileName)).ToList(),
+            request.Country,
+            request.Language);
 
         // Парсеры синхронные (CPU-bound); вызывающий код гоняет их через фоновую
         // очередь импорта, поэтому здесь без Task.Run.

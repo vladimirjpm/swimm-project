@@ -16,6 +16,16 @@ public class ImportModel : PageModel
 
     public IReadOnlyList<string> ParseFormats { get; private set; } = [];
 
+    /// <summary>Опция DDL языка: код + подпись. Страны — общий каталог <see cref="Shared.CountryCatalog"/>.</summary>
+    public record SelectOption(string Code, string Label);
+
+    /// <summary>Языки протокола: he/en — единственные, которые понимает парсер isr.org.il.</summary>
+    public static readonly IReadOnlyList<SelectOption> Languages =
+    [
+        new("he", "HE — иврит"),
+        new("en", "EN — английский")
+    ];
+
     public void OnGet()
     {
         ParseFormats = _sourceProvider.AvailableFormats;
