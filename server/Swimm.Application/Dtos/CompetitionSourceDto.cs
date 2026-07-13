@@ -39,10 +39,18 @@ public sealed class CompetitionSourceDto
     [JsonPropertyName("show_combine_all_results")]
     public bool ShowCombineAllResults { get; init; }
 
-    /// <summary>Категория для селектора: "young8_11" | "junior" | "masters".
-    /// Выводится: is_masters → masters; макс. возраст результатов ≤ 11 → young8_11; иначе junior.</summary>
+    /// <summary>Канонический таб селектора: "young8_11" | "junior" | "masters" | null.
+    /// Из реального членства (CategoryCompetitions): masters (is_masters/results-masters) >
+    /// results-youth-team > results-junior-results/results-main. null — ни в одной из
+    /// канонических (кастомная категория или без категории): клиент показывает такое
+    /// соревнование в «All» и в табах кастомных категорий по <see cref="Categories"/>.</summary>
     [JsonPropertyName("category")]
-    public string Category { get; init; } = "junior";
+    public string? Category { get; init; }
+
+    /// <summary>Полное членство — сырые Category.Key (включая кастомные вроде
+    /// result-maccabiah); у событий — объединение по всем дням.</summary>
+    [JsonPropertyName("categories")]
+    public IReadOnlyList<string> Categories { get; init; } = [];
 
     /// <summary>Статус по датам: "live" (идёт сегодня) | "upcoming" (в будущем) | "done".</summary>
     [JsonPropertyName("status")]

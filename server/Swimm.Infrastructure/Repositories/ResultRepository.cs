@@ -294,10 +294,19 @@ public class ResultRepository : IResultRepository
                 g => g.Key,
                 g => g.SelectMany(d => categoryKeysMap[d.Id]).ToHashSet());
 
-        static string CategoryFor(bool isMasters, HashSet<string>? keys) =>
-            isMasters ? "masters"
+        // null — соревнование ни в одной из канонических категорий (кастомные вроде
+        // result-maccabiah или вовсе без категории): клиент покажет его в «All» и в табах
+        // кастомных категорий по списку Categories, но НЕ в Junior. Раньше здесь был
+        // фоллбек «всё прочее = junior», из-за которого в Junior падала вся синтетика.
+        static string? CategoryFor(bool isMasters, HashSet<string>? keys) =>
+            isMasters || keys?.Contains("results-masters") == true ? "masters"
             : keys?.Contains("results-youth-team") == true ? "young8_11"
-            : "junior";
+            : keys?.Contains("results-junior-results") == true || keys?.Contains("results-main") == true ? "junior"
+            : null;
+
+        // Полное членство (сырые Category.Key) — для табов кастомных категорий на клиенте.
+        static IReadOnlyList<string> CategoriesFor(HashSet<string>? keys) =>
+            keys is null ? [] : keys.OrderBy(k => k, StringComparer.Ordinal).ToList();
 
         var today = DateOnly.FromDateTime(DateTime.Now);
         static string StatusFor(DateOnly? start, DateOnly? end, DateOnly today)
@@ -333,6 +342,7 @@ public class ResultRepository : IResultRepository
                 IsAward = e.IsAward,
                 ShowCombineAllResults = e.ShowCombine,
                 Category = CategoryFor(e.IsMasters, categoryKeysByEvent.GetValueOrDefault(e.Id)),
+                Categories = CategoriesFor(categoryKeysByEvent.GetValueOrDefault(e.Id)),
                 Status = StatusFor(e.StartDate, e.EndDate, today),
                 DayCount = e.DayCount,
                 ResultCount = e.ResultCount,
@@ -354,6 +364,7 @@ public class ResultRepository : IResultRepository
                 IsAward = c.IsAward,
                 ShowCombineAllResults = c.ShowCombineAllResults,
                 Category = CategoryFor(c.IsMasters, categoryKeysMap.GetValueOrDefault(c.Id)),
+                Categories = CategoriesFor(categoryKeysMap.GetValueOrDefault(c.Id)),
                 Status = StatusFor(d == default ? null : d, null, today),
                 DayCount = 1,
                 ResultCount = c.ResultCount,

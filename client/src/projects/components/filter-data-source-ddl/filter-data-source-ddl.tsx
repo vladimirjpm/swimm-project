@@ -71,7 +71,10 @@ type CompetitionSource = {
   date: string; // dd/MM/yyyy
   date_end?: string | null;
   pool_type: string;
-  category: 'young8_11' | 'junior' | 'masters';
+  /** Канонический таб; null — только «All» + кастомные табы по categories. */
+  category: 'young8_11' | 'junior' | 'masters' | null;
+  /** Полное членство — сырые Category.Key из БД (включая кастомные, напр. result-maccabiah). */
+  categories?: string[];
   status: 'live' | 'upcoming' | 'done';
   day_count: number;
   result_count: number;
@@ -177,22 +180,48 @@ const DataSourceDDL: React.FC = () => {
   const [panelOpen, setPanelOpen] = React.useState(false);
   // Мобильное меню категорий (вариант 9b: строка «Category: … ▾» вместо табов)
   const [catMenuOpen, setCatMenuOpen] = React.useState(false);
-  // name/badge категорий из /api/categories (БД) — ключ здесь канонический ('young8_11' и т.п.),
-  // не Category.Key в БД (маппинг внутри CategoryHelper). Пусто до первой загрузки — тогда
-  // используется статичный RESULTS_CATEGORIES.label (см. categoryLabel ниже).
+  // name/badge категорий из /api/categories (БД). Ключи: канонические ('young8_11' и т.п.,
+  // маппинг внутри CategoryHelper) + сырые ключи кастомных категорий (result-maccabiah…).
+  // Пусто до первой загрузки — тогда используется статичный RESULTS_CATEGORIES.label.
   const [liveCategoryLabels, setLiveCategoryLabels] = React.useState<Record<string, CategoryDisplay>>({});
+  // Кастомные категории из Admin/Categories — отдельные табы после статичных.
+  const [customCategories, setCustomCategories] = React.useState<ResultsCategory[]>([]);
+  const [categoriesLoaded, setCategoriesLoaded] = React.useState(false);
   const wrapRef = React.useRef<HTMLDivElement>(null);
   const touchStartY = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
-    CategoryHelper.getCanonicalMap().then((map) => {
-      if (!cancelled) setLiveCategoryLabels(map);
+    Promise.all([CategoryHelper.getCanonicalMap(), CategoryHelper.getAll()]).then(([map, all]) => {
+      if (cancelled) return;
+      const customs = all
+        .filter((c) => !CategoryHelper.SYSTEM_DB_KEYS.has(c.key))
+        .sort((a, b) => a.display_order - b.display_order);
+      const labels: Record<string, CategoryDisplay> = { ...map };
+      customs.forEach((c) => {
+        labels[c.key] = { name: c.name, badge: c.badge };
+      });
+      setLiveCategoryLabels(labels);
+      setCustomCategories(
+        customs.map((c) => ({
+          key: c.key,
+          label: c.name,
+          title: c.name,
+          competitionTheme: 'competition-emerald',
+        })),
+      );
+      setCategoriesLoaded(true);
     });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // Статичные канонические табы + кастомные категории из БД.
+  const allCategories = React.useMemo(
+    () => [...RESULTS_CATEGORIES, ...customCategories],
+    [customCategories],
+  );
 
   // Живой name+badge из БД (Admin/Categories), пока не загружен — статичный label.
   const categoryLabel = (c: ResultsCategory): string => {
@@ -401,7 +430,7 @@ const DataSourceDDL: React.FC = () => {
     }
 
     if (target) {
-      setCat(target.category);
+      setCat(target.category ?? 'all');
       if (!urlLoadTriggered) {
         urlLoadTriggered = true;
         void loadSource(target);
@@ -439,9 +468,21 @@ const DataSourceDDL: React.FC = () => {
       return;
     }
 
-    setCat(resolveCategoryKey(params.get('category') ?? params.get('cat')));
+    // resolveCategoryKey сводит неизвестные ключи к 'all' — кастомные категории из БД
+    // (result-maccabiah и т.п.) пропускаем как есть: их таб появится после /api/categories,
+    // а мусорный ключ сбросит валидация ниже.
+    const rawCat = params.get('category') ?? params.get('cat');
+    const staticKey = resolveCategoryKey(rawCat);
+    setCat(staticKey === 'all' && rawCat && rawCat !== 'all' ? rawCat : staticKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, sources]);
+
+  // Ключ из URL, которого нет ни среди статичных, ни среди кастомных категорий → 'all'.
+  React.useEffect(() => {
+    if (!categoriesLoaded) return;
+    if (cat !== 'all' && !allCategories.some((c) => c.key === cat)) setCat('all');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoriesLoaded, allCategories]);
 
   // ── Производные списки ──
   const seasons = React.useMemo(() => {
@@ -453,7 +494,10 @@ const DataSourceDDL: React.FC = () => {
   const activeSeason = season ?? seasons[0] ?? new Date().getFullYear();
 
   const now = new Date();
-  const inCat = (s: CompetitionSource) => cat === 'all' || s.category === cat;
+  // Канонический таб матчится по category, кастомный — по членству в categories
+  // (одно соревнование может быть в нескольких: Maccabiah Masters = Masters + Maccabiah).
+  const inCat = (s: CompetitionSource) =>
+    cat === 'all' || s.category === cat || (s.categories?.includes(cat) ?? false);
   const inSeason = (s: CompetitionSource) =>
     activeSeason === 'all' || parseDate(s.date)?.getFullYear() === activeSeason;
   const matchesSearch = (s: CompetitionSource) =>
@@ -476,7 +520,7 @@ const DataSourceDDL: React.FC = () => {
     g.items.push(s);
   });
 
-  const activeCategory = RESULTS_CATEGORIES.find((c) => c.key === cat);
+  const activeCategory = allCategories.find((c) => c.key === cat);
   const activeCatLabel = activeCategory ? categoryLabel(activeCategory) : 'All';
   const isSelected = (s: CompetitionSource) =>
     !!selectedTitle && selectedTitle === s.name;
@@ -554,7 +598,9 @@ const DataSourceDDL: React.FC = () => {
   };
 
   const catCount = (key: string) =>
-    key === 'all' ? sources.length : sources.filter((s) => s.category === key).length;
+    key === 'all'
+      ? sources.length
+      : sources.filter((s) => s.category === key || (s.categories?.includes(key) ?? false)).length;
 
   const selectCat = (key: string) => {
     setCat(key);
@@ -571,7 +617,7 @@ const DataSourceDDL: React.FC = () => {
   // Десктоп: табы-пилюли (как в базовом хендоффе)
   const tabsRow = (
     <div className="flex flex-wrap gap-2">
-      {RESULTS_CATEGORIES.map((c) => {
+      {allCategories.map((c) => {
         const active = cat === c.key;
         return (
           <button
@@ -635,7 +681,7 @@ const DataSourceDDL: React.FC = () => {
             border: '1px solid var(--theme-mode-border-input)',
           }}
         >
-          {RESULTS_CATEGORIES.map((c) => {
+          {allCategories.map((c) => {
             const active = cat === c.key;
             return (
               <button
@@ -908,7 +954,13 @@ const DataSourceDDL: React.FC = () => {
   // Бейдж категории соревнования в шапке — «выбит» в акцентном фоне (--theme-mode-accent-text),
   // а не currentColor-обводка, как в табах: тут фон всегда сплошной --theme-primary,
   // так что можно уверенно закрасить кружок, а не только обвести.
-  const headerCategoryBadge = liveCategoryLabels[selectedSourceObj.category]?.badge;
+  // Без канонической категории (null) берём бейдж первой кастомной из членства.
+  const headerCategoryKey =
+    selectedSourceObj.category ??
+    selectedSourceObj.categories?.find((k) => liveCategoryLabels[k]?.badge);
+  const headerCategoryBadge = headerCategoryKey
+    ? liveCategoryLabels[headerCategoryKey]?.badge
+    : undefined;
 
   return (
     <div ref={wrapRef} className="relative">

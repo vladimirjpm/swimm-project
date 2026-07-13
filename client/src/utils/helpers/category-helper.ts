@@ -31,6 +31,15 @@ export default class CategoryHelper {
     masters: 'results-masters',
   };
 
+  /** Системные ключи БД, уже покрытые статичными табами (results-main живёт под 'junior').
+   *  Всё, чего здесь нет, — кастомная категория (result-maccabiah и т.п.): отдельный таб. */
+  static readonly SYSTEM_DB_KEYS: ReadonlySet<string> = new Set([
+    'results-main',
+    'results-masters',
+    'results-youth-team',
+    'results-junior-results',
+  ]);
+
   private static async loadCategories(): Promise<CategoryApiDto[]> {
     if (this.cachedCategories) {
       return this.cachedCategories;
@@ -101,6 +110,11 @@ export default class CategoryHelper {
     }
 
     return map;
+  }
+
+  /** Полный список категорий из БД (включая кастомные) — для динамических табов селектора. */
+  static async getAll(): Promise<CategoryApiDto[]> {
+    return this.loadCategories();
   }
 
   /** Сброс кэша (для тестирования или перезагрузки конфига). */
