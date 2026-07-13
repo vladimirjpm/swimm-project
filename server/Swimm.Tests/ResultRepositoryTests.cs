@@ -53,7 +53,7 @@ public class ResultRepositoryTests
         var club    = new Club { Name = "TestClub", NameEn = "TestClub" };
         var comp    = new Competition
         {
-            Name = "TestComp", Country = "ISR",
+            Name = "TestComp", Country = new Country { CountryCode = "ISR", CountryName = "ISR" },
             Date = "01/01/2024", PoolType = poolType
         };
         var swimmer = new Swimmer

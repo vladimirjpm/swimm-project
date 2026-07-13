@@ -177,7 +177,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         SubName = c.SubName,
         Date = c.Date,
         PoolType = c.PoolType,
-        Country = c.Country,
+        Country = c.Country != null ? c.Country.CountryCode : "",
         OrgCompId = c.OrgCompId,
         IsMasters = c.IsMasters,
         IsAward = c.IsAward,
@@ -204,6 +204,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         var c = await _db.Competitions
             .AsNoTracking()
             .Include(x => x.Event)
+            .Include(x => x.Country)
             .FirstOrDefaultAsync(x => x.Id == id);
 
         if (c == null) return null;
@@ -215,7 +216,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             SubName = c.SubName,
             Date = c.Date,
             PoolType = c.PoolType,
-            Country = c.Country,
+            Country = c.Country != null ? c.Country.CountryCode : "",
             OrgCompId = c.OrgCompId,
             IsMasters = c.IsMasters,
             IsAward = c.IsAward,
@@ -257,6 +258,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
 
         var comp = new Competition();
         Apply(comp, input);
+        await ApplyCountryAsync(comp, input.Country);
         _db.Competitions.Add(comp);
         var save = await SaveAsync(comp);
         if (save.Success) await SyncCategoriesAsync(comp.Id, input.CategoryKeys);
@@ -284,6 +286,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         }
 
         Apply(comp, input);
+        await ApplyCountryAsync(comp, input.Country);
         var save = await SaveAsync(comp);
         if (save.Success) await SyncCategoriesAsync(comp.Id, input.CategoryKeys);
         return save;
@@ -363,12 +366,35 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         comp.SubName = string.IsNullOrWhiteSpace(input.SubName) ? null : input.SubName.Trim();
         comp.Date = (input.Date ?? "").Trim();
         comp.PoolType = (input.PoolType ?? "").Trim();
-        comp.Country = (input.Country ?? "").Trim();
         comp.OrgCompId = input.OrgCompId;
         // IsMasters — производный от членства в категории Masters (галочки в форме нет).
         comp.IsMasters = input.CategoryKeys.Contains(Category.MastersKey);
         comp.IsAward = input.IsAward;
         comp.ShowCombineAllResults = input.ShowCombineAllResults;
+    }
+
+    /// <summary>
+    /// Страна соревнования из ввода: alpha-3 код (ISR…) → FK на Countries, find-or-create
+    /// (как в импорте JsonImportService и HubGroupCrudCore.ApplyCountryAsync). Пустой код —
+    /// снимает страну (CountryId = null).
+    /// </summary>
+    private async Task ApplyCountryAsync(Competition comp, string? countryCode)
+    {
+        var code = (countryCode ?? "").Trim().ToUpperInvariant();
+        if (code.Length == 0)
+        {
+            comp.CountryId = null;
+            return;
+        }
+
+        var country = await _db.Countries.FirstOrDefaultAsync(c => c.CountryCode == code);
+        if (country == null)
+        {
+            country = new Country { CountryCode = code, CountryName = code };
+            _db.Countries.Add(country);
+            await _db.SaveChangesAsync();
+        }
+        comp.CountryId = country.Id;
     }
 
     /// <summary>Приводит членство соревнования в категориях к заданному набору ключей (add/remove).</summary>

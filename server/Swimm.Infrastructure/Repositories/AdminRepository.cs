@@ -218,7 +218,7 @@ public class AdminRepository : IAdminRepository
                 Name = c.Name,
                 Date = c.Date,
                 PoolType = c.PoolType,
-                Country = c.Country,
+                Country = c.Country != null ? c.Country.CountryCode : "",
                 IsMasters = c.IsMasters,
                 IsAward = c.IsAward,
                 ShowCombineAllResults = c.ShowCombineAllResults,

@@ -14,7 +14,7 @@ public static class ResultMapping
     public static readonly Expression<Func<ResultRecord, ResultDto>> ToDto = r => new ResultDto
     {
         Id = r.Id,
-        Country = r.Competition.Country,
+        Country = r.Competition.Country != null ? r.Competition.Country.CountryCode : "",
         CompetitionName = r.Competition.Name,
         IsMasters = r.Competition.IsMasters,
         IsAward = r.Competition.IsAward,

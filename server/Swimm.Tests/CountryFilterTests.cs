@@ -43,13 +43,16 @@ public class CountryFilterTests
     {
         var db = CreateDb(dbName);
 
+        var isr = new Country { CountryCode = "ISR", CountryName = "ISR" };
+        var usa = new Country { CountryCode = "USA", CountryName = "USA" };
+
         db.Competitions.Add(new Competition
         {
-            Name = "Israel Open", Country = "ISR", Date = "01/01/2024", PoolType = "50m"
+            Name = "Israel Open", Country = isr, Date = "01/01/2024", PoolType = "50m"
         });
         db.Competitions.Add(new Competition
         {
-            Name = "USA Open", Country = "USA", Date = "02/01/2024", PoolType = "50m"
+            Name = "USA Open", Country = usa, Date = "02/01/2024", PoolType = "50m"
         });
 
         var evt = new CompetitionEvent
@@ -63,12 +66,12 @@ public class CountryFilterTests
 
         db.Competitions.Add(new Competition
         {
-            Name = "Mixed Event", Country = "ISR", Date = "01/03/2024", PoolType = "50m",
+            Name = "Mixed Event", Country = isr, Date = "01/03/2024", PoolType = "50m",
             EventId = evt.Id, DayNumber = 1
         });
         db.Competitions.Add(new Competition
         {
-            Name = "Mixed Event", Country = "USA", Date = "02/03/2024", PoolType = "50m",
+            Name = "Mixed Event", Country = usa, Date = "02/03/2024", PoolType = "50m",
             EventId = evt.Id, DayNumber = 2
         });
         await db.SaveChangesAsync();
@@ -135,8 +138,8 @@ public class CountryFilterTests
             LastNameEn = "Ivanov", FirstNameEn = "Ivan",
             BirthYear = 2000
         };
-        var compIsr = new Competition { Name = "Israel Open", Country = "ISR", Date = "01/01/2024", PoolType = "50m" };
-        var compUsa = new Competition { Name = "USA Open", Country = "USA", Date = "02/01/2024", PoolType = "50m" };
+        var compIsr = new Competition { Name = "Israel Open", Country = new Country { CountryCode = "ISR", CountryName = "ISR" }, Date = "01/01/2024", PoolType = "50m" };
+        var compUsa = new Competition { Name = "USA Open", Country = new Country { CountryCode = "USA", CountryName = "USA" }, Date = "02/01/2024", PoolType = "50m" };
 
         db.Styles.Add(style);
         db.Clubs.Add(club);

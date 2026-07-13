@@ -57,7 +57,21 @@
 
             <label class="flex flex-col gap-1">
                 <span class="text-xs text-admin-text-muted">Страна</span>
-                <input asp-for="Input.Country" class="admin-input" autocomplete="off" placeholder="ISR" />
+                <select asp-for="Input.Country" class="admin-input">
+                    <option value="">—</option>
+                    <optgroup label="★ Избранные">
+                        @foreach (var c in Swimm.API.Pages.Admin.Shared.CountryCatalog.Favorites)
+                        {
+                            <option value="@c.Code">@c.Label (@c.Code)</option>
+                        }
+                    </optgroup>
+                    <optgroup label="Все страны">
+                        @foreach (var c in Swimm.API.Pages.Admin.Shared.CountryCatalog.Others)
+                        {
+                            <option value="@c.Code">@c.Label (@c.Code)</option>
+                        }
+                    </optgroup>
+                </select>
             </label>
 
             <label class="flex flex-col gap-1">

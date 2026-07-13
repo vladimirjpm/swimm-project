@@ -239,7 +239,7 @@ public class JsonImportService : IImportService
                     competition = new Competition
                     {
                         Name = displayName,
-                        Country = item.Country ?? string.Empty,
+                        CountryId = country?.Id,
                         Date = item.Date ?? string.Empty,
                         PoolType = NormalizePoolType(item.PoolType),
                         IsMasters = isMasters || (item.IsMasters ?? false),

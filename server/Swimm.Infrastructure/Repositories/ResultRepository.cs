@@ -67,7 +67,7 @@ public class ResultRepository : IResultRepository
             query = query.Where(r => r.Competition.PoolType == filter.PoolType);
 
         if (!string.IsNullOrWhiteSpace(filter.Country))
-            query = query.Where(r => r.Competition.Country == filter.Country);
+            query = query.Where(r => r.Competition.Country != null && r.Competition.Country.CountryCode == filter.Country);
 
         if (filter.DateFrom.HasValue)
             query = query.Where(r => r.CompetitionDate >= filter.DateFrom.Value);
@@ -254,8 +254,9 @@ public class ResultRepository : IResultRepository
                 ShowCombine = !_db.Competitions.Any(c => c.EventId == e.Id && !c.ShowCombineAllResults),
                 ResultCount = _db.Results.Count(r => r.Competition.EventId == e.Id),
                 DayDates = _db.Competitions.Where(c => c.EventId == e.Id).Select(c => c.Date).ToList(),
-                // Страны всех дней — фильтр по country применяем ниже, в памяти (Any).
-                DayCountries = _db.Competitions.Where(c => c.EventId == e.Id).Select(c => c.Country).ToList()
+                // Страны всех дней (alpha-3 коды) — фильтр по country применяем ниже, в памяти (Any).
+                DayCountries = _db.Competitions.Where(c => c.EventId == e.Id)
+                    .Select(c => c.Country != null ? c.Country.CountryCode : "").ToList()
             })
             .ToListAsync();
 
@@ -272,7 +273,7 @@ public class ResultRepository : IResultRepository
                 c.IsMasters,
                 c.IsAward,
                 c.ShowCombineAllResults,
-                c.Country,
+                Country = c.Country != null ? c.Country.CountryCode : "",
                 ResultCount = _db.Results.Count(r => r.CompetitionId == c.Id)
             })
             .ToListAsync();

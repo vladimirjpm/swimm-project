@@ -16,9 +16,12 @@ public class Competition
   [MaxLength(300)]
   public string Name { get; set; } = string.Empty;
 
-  /// <summary>Страна проведения (ISR и т. д.)</summary>
-  [MaxLength(10)]
-  public string Country { get; set; } = string.Empty;
+  /// <summary>Страна проведения — FK на справочник Countries (как у Swimmer/Club/HubGroup).
+  /// null — страна не задана (старые/ручные соревнования).</summary>
+  public int? CountryId { get; set; }
+
+  [ForeignKey(nameof(CountryId))]
+  public Country? Country { get; set; }
 
   /// <summary>Дата соревнования в формате dd/MM/yyyy</summary>
   [MaxLength(20)]
