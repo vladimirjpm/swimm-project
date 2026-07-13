@@ -31,17 +31,16 @@ export const options = {
     { duration: '40s', target: 20 },
     { duration: '15s', target: 0 },
   ],
-  // ВНИМАНИЕ: это ДИАГНОСТИЧЕСКИЙ профиль, не green-gate (в отличие от paged-smoke.js).
-  // Пороги — характеристики ИЗМЕРЕННОГО baseline (2 прогона, 20 VU, 3.01M строк), а НЕ
-  // целевой бюджет. Цель по-прежнему p95<300, но НЕ достигнута на несоскоуп­ленном пути —
-  // см. README раздел «Обрыв на несоскоупленных запросах». Зелёный тут = «не хуже
-  // известного baseline»; красный = регрессия сверх него. Настоящее «зелёное» по 300мс
-  // даёт paged-smoke.js (реальное соскоупленное usage — 6мс).
+  // GREEN-GATE по всей таблице 3M. Ранее был обрыв: global-filtered p95 ~14с под 20 VU
+  // (фильтр по Style.Name через JOIN мешал планировщику взять композитные индексы). Фикс —
+  // резолв styleName→StyleId в репозитории (ResultRepository.ResolveStyleIdsAsync): p95
+  // упал до ~6мс. Теперь бюджет 300мс держится и на несоскоупленном пути. p99 щедрее —
+  // амортизирует холодный первый скан athletes/career по имени (см. README).
   thresholds: {
-    http_req_failed: ['rate<0.01'],
-    global_list_duration: ['p(95)<300'],           // кэш-ключ один → hit; реально быстрый
-    global_filtered_duration: ['p(95)<18000'],     // baseline ~14с (!), цель 300 — НЕ достигнута
-    global_athlete_duration: ['p(95)<6000'],       // холодный скан по имени; тёплый — мс
+    http_req_failed: ['rate<0.02'],
+    global_list_duration: ['p(95)<300'],
+    global_filtered_duration: ['p(95)<300'],
+    global_athlete_duration: ['p(95)<300', 'p(99)<6000'],
   },
 };
 

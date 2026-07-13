@@ -92,8 +92,21 @@ public class ResultRepository : IResultRepository
                 query = query.Where(r => r.CompetitionId == latest.CompetitionId);
         }
 
+        // Стиль фильтруем по StyleId, а НЕ по Style.Name через JOIN: JOIN мешает планировщику
+        // взять композитные индексы (StyleId,Distance,Gender,CompDate) и (CompetitionId,StyleId,
+        // Distance,Gender) — на 3М это разница LIMIT 34→4 мс, COUNT 86→4 мс (под конкуренцией
+        // именно JOIN-версия давала обрыв p95 ~14с, см. server/loadtest/full-scan-smoke.js).
+        // Styles — 8 строк, карта Name→Id кэшируется. Неизвестный стиль → заведомо пустой набор.
         if (!string.IsNullOrWhiteSpace(filter.StyleName))
-            query = query.Where(r => r.Style.Name == filter.StyleName);
+        {
+            // Список (а не один id) сохраняет старую семантику Style.Name==x даже при дублях имени
+            // (в реальной БД Name уникален → 1 элемент → Postgres сводит IN(x) к равенству, индекс
+            // работает; пустой список → заведомо пустой набор).
+            var styleIds = await ResolveStyleIdsAsync(filter.StyleName);
+            query = styleIds.Length > 0
+                ? query.Where(r => styleIds.Contains(r.StyleId))
+                : query.Where(r => false);
+        }
 
         if (!string.IsNullOrWhiteSpace(filter.Distance))
             query = query.Where(r => r.Distance == filter.Distance);
@@ -161,6 +174,23 @@ public class ResultRepository : IResultRepository
             query = query.Where(r => r.CompetitionDate == filter.EventDate.Value);
 
         return query;
+    }
+
+    /// <summary>Name→Id(ы) стиля из кэша (Styles — крошечный справочник, TTL 10 мин); пусто — нет
+    /// такого. Матч точный, как раньше сравнение <c>Style.Name == filter.StyleName</c>. Возвращает
+    /// список на случай неуникальных имён (в проде Name уникален — обычно 1 элемент).</summary>
+    private async Task<int[]> ResolveStyleIdsAsync(string styleName)
+    {
+        const string key = "styles:name-to-ids";
+        var map = await _cache.GetAsync<Dictionary<string, int[]>>(key);
+        if (map is null)
+        {
+            map = (await _db.Styles.AsNoTracking().Select(s => new { s.Name, s.Id }).ToListAsync())
+                .GroupBy(s => s.Name)
+                .ToDictionary(g => g.Key, g => g.Select(s => s.Id).ToArray());
+            await _cache.SetAsync(key, map, TimeSpan.FromMinutes(10));
+        }
+        return map.TryGetValue(styleName, out var ids) ? ids : [];
     }
 
     public async Task<IReadOnlyList<ClubSummaryDto>> GetClubSummaryAsync(ResultFilter filter)
