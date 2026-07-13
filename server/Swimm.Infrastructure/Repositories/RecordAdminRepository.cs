@@ -98,6 +98,7 @@ public class RecordAdminRepository : IRecordAdminRepository
         if (!string.IsNullOrWhiteSpace(filter.Gender)) query = query.Where(s => s.Gender == filter.Gender);
         if (!string.IsNullOrWhiteSpace(filter.PoolType)) query = query.Where(s => s.PoolType == filter.PoolType);
         if (!string.IsNullOrWhiteSpace(filter.Style)) query = query.Where(s => s.Style == filter.Style);
+        if (!string.IsNullOrWhiteSpace(filter.Country)) query = query.Where(s => s.Country == filter.Country);
 
         var total = await query.CountAsync();
 

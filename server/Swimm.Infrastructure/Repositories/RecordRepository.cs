@@ -69,9 +69,11 @@ public class RecordRepository : IRecordRepository
         return records;
     }
 
-    public async Task<IReadOnlyList<NormativeStandardDto>> GetStandardsAsync(string? kind = null)
+    public async Task<IReadOnlyList<NormativeStandardDto>> GetStandardsAsync(string? kind = null, string? country = null)
     {
-        var cacheKey = $"normative-standards:{kind ?? "all"}";
+        // Страну нормализуем как регион выше: trim + upper.
+        var countryKey = string.IsNullOrWhiteSpace(country) ? null : country.Trim().ToUpperInvariant();
+        var cacheKey = $"normative-standards:{kind ?? "all"}:{countryKey ?? "all"}";
 
         var cached = await _cache.GetAsync<IReadOnlyList<NormativeStandardDto>>(cacheKey);
         if (cached is not null)
@@ -81,6 +83,10 @@ public class RecordRepository : IRecordRepository
 
         if (!string.IsNullOrWhiteSpace(kind))
             query = query.Where(s => s.Kind == kind);
+
+        // Страна задана — отдаём её строки плюс универсальные (Country == "").
+        if (countryKey is not null)
+            query = query.Where(s => s.Country == countryKey || s.Country == "");
 
         var standards = await query
             .OrderBy(s => s.Kind).ThenBy(s => s.Gender).ThenBy(s => s.PoolType)

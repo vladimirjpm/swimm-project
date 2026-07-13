@@ -15,6 +15,10 @@ public interface IRecordRepository
     /// </summary>
     Task<IReadOnlyList<RecordDto>> GetRecordsAsync(string region, string? category = null);
 
-    /// <summary>Нормативы. kind: regular/masters; null — все.</summary>
-    Task<IReadOnlyList<NormativeStandardDto>> GetStandardsAsync(string? kind = null);
+    /// <summary>
+    /// Нормативы. kind: regular/masters; null — все.
+    /// country: alpha-3 код системы нормативов (RUS/ISR/…); null — без фильтра (легаси).
+    /// Задан — отдаёт строки с этой страной плюс универсальные (Country == "").
+    /// </summary>
+    Task<IReadOnlyList<NormativeStandardDto>> GetStandardsAsync(string? kind = null, string? country = null);
 }

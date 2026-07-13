@@ -53,16 +53,21 @@ public class RecordsController : ControllerBase
             PayloadTtl, CacheControlValue);
     }
 
-    /// <summary>Нормативы уровней. kind: regular/masters (опционально — иначе все).</summary>
+    /// <summary>
+    /// Нормативы уровней. kind: regular/masters (опционально — иначе все).
+    /// country: alpha-3 код системы нормативов (опционально — иначе легаси-поведение без фильтра).
+    /// </summary>
     [HttpGet("/api/normative-standards")]
-    public async Task<IActionResult> GetStandards([FromQuery] string? kind)
+    public async Task<IActionResult> GetStandards([FromQuery] string? kind, [FromQuery] string? country)
     {
         if (kind != null && !NormativeStandard.Kinds.Contains(kind))
             return BadRequest($"kind must be one of: {string.Join(", ", NormativeStandard.Kinds)}");
 
+        var countryKey = string.IsNullOrWhiteSpace(country) ? null : country.Trim().ToUpperInvariant();
+
         return await this.CachedJson(_cache,
-            $"http:normative-standards:{kind ?? "all"}",
-            () => _records.GetStandardsAsync(kind),
+            $"http:normative-standards:{kind ?? "all"}:{countryKey ?? "all"}",
+            () => _records.GetStandardsAsync(kind, countryKey),
             PayloadTtl, CacheControlValue);
     }
 }

@@ -14,7 +14,8 @@ public sealed record StandardFilter(
     string? Kind,
     string? Gender,
     string? PoolType,
-    string? Style);
+    string? Style,
+    string? Country = null);
 
 /// <summary>Полный набор полей для создания рекорда (все три оси + значение).</summary>
 public sealed class RecordInputDto

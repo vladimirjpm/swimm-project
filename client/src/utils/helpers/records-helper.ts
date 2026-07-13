@@ -14,7 +14,7 @@
  * кэша на момент импорта.
  */
 
-import { HOME_REGION } from '../constants/home-region';
+import { HOME_REGION, NORMATIVE_COUNTRY } from '../constants/home-region';
 
 type Gender = 'male' | 'female';
 type PoolKey = '25m_pool' | '50m_pool';
@@ -113,8 +113,8 @@ async function fetchRecords(query: string): Promise<RecordDto[]> {
 }
 
 async function fetchStandards(kind: string): Promise<NormativeStandardDto[]> {
-  const response = await fetch(`/api/normative-standards?kind=${kind}`);
-  if (!response.ok) throw new Error(`GET /api/normative-standards?kind=${kind} failed: ${response.status}`);
+  const response = await fetch(`/api/normative-standards?kind=${kind}&country=${NORMATIVE_COUNTRY}`);
+  if (!response.ok) throw new Error(`GET /api/normative-standards?kind=${kind}&country=${NORMATIVE_COUNTRY} failed: ${response.status}`);
   return (await response.json()) as NormativeStandardDto[];
 }
 

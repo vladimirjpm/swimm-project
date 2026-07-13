@@ -68,10 +68,11 @@ public class RecordsAdminController : ControllerBase
         [FromQuery] string? gender,
         [FromQuery] string? poolType,
         [FromQuery] string? style,
+        [FromQuery] string? country,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = DefaultPageSize)
     {
-        var filter = new StandardFilter(kind, gender, poolType, style);
+        var filter = new StandardFilter(kind, gender, poolType, style, country);
         return Ok(await _repo.GetStandardsAsync(filter, Math.Max(page, 1), pageSize));
     }
 
