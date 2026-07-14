@@ -53,7 +53,7 @@
 - Вывод в списке участников панели: «Displayname — родитель: <имя пловца>».
 - Тесты: валидация существования пловца; SetNull при удалении пловца.
 
-## Шаг 3. 2A — личное owner-only медиа — **Sonnet** (независим, можно параллельно шагу 1)
+## Шаг 3. 2A — личное owner-only медиа — **Sonnet** ✅ СДЕЛАНО (коммит `2ad8b5d`, 2026-07-14; таск `user-media-2a-sonnet.md`, приёмка Fable)
 
 Полная спека — `docs/favorites-media-phase2-design.md` §3–§7. Кратко:
 - `MediaController` `api/me/media` (GET/POST/PUT/DELETE), образец — `FavoritesController`
