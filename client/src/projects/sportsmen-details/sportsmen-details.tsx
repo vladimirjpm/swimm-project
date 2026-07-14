@@ -3,7 +3,9 @@ import './sportsmen-details.css';
 import { useAppSelector } from '../../store/store';
 import { useFavoritesContext } from '../../hooks/favorites-context';
 import { useAthleteCareer, AthleteCareer } from '../../hooks/useAthleteCareer';
+import { useUserMedia, UserMediaDto } from '../../hooks/useUserMedia';
 import Helper from '../../utils/helpers/data-helper'
+import { HelperMedia } from '../../utils/helpers';
 import UI_ClubIcon from '../components/mix/club-icon/club-icon';
 import UI_NormativeLevelIcon from '../components/mix/normative-level-icon/normative-level-icon';
 import UI_MedalIcon from '../components/mix/medal-icon/medal-icon';
@@ -13,6 +15,8 @@ import UI_PoolIcon from '../components/mix/pool-icon/pool-icon';
 import UI_SwimmerTimeCell from '../components/mix/swimmer-time-cell/swimmer-time-cell';
 import UI_FlagEmoji from '../components/mix/flag-icon/flag-icon';
 import UI_RecordCount from '../components/mix/record-count/record-count';
+import UI_SwimmerGallery from '../components/mix/swimmer-gallery/swimmer-gallery';
+import { GalleryItem } from '../../utils/interfaces/results';
 import { recalculatePositions } from '../../utils/helpers/recalculate-positions';
 
 /** "15/02/2026" → "Feb 2026" (для подписи сегмента-переключателя). */
@@ -291,6 +295,11 @@ function SportsmenDetails() {
 
           {/* all-time section: best times by style, в том же виде, что и результаты соревнования */}
           {scope === 'alltime' && <AllTimeBests career={career} />}
+
+          {/* «Мои ссылки» — личное owner-only медиа (2A), видно только залогиненному. */}
+          {isAuthenticated && swimmerId != null && (
+            <MyMediaSection swimmerId={swimmerId} />
+          )}
       </div>
     </div>
   );
@@ -338,6 +347,181 @@ function AllTimeBests({ career }: { career: AthleteCareer }) {
       ) : (
         <div className="text-[var(--theme-mode-text-muted)] italic">—</div>
       )}
+    </div>
+  );
+}
+
+// «Мои ссылки» (2A): личное owner-only медиа пловца. Видно только залогиненному владельцу
+// (проверка isAuthenticated делается в родителе). Рендер: youtube/vimeo → лайтбокс
+// UI_SwimmerGallery (никогда сырой URL в iframe), other → внешняя ссылка noopener/noreferrer.
+function MyMediaSection({ swimmerId }: { swimmerId: number }) {
+  const { media, loading, add, remove } = useUserMedia(swimmerId);
+  const [url, setUrl] = useState('');
+  const [otherKind, setOtherKind] = useState<'image' | 'video'>('video');
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  // Только youtube/vimeo идут в лайтбокс — эти элементы и их порядок в gallery
+  // соответствуют lightboxIndex, которым мы кликаем.
+  const lightboxItems = useMemo<GalleryItem[]>(
+    () => media
+      .filter((m) => m.source_type === 'youtube' || m.source_type === 'vimeo')
+      .map((m) => ({ type: 'video', sourceType: m.source_type, url: m.url })),
+    [media]
+  );
+
+  const detectSourceType = (value: string): 'youtube' | 'vimeo' | 'other' => {
+    if (HelperMedia.extractYoutubeId(value)) return 'youtube';
+    if (HelperMedia.extractVimeoId(value)) return 'vimeo';
+    return 'other';
+  };
+
+  const handleAdd = async () => {
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    setFormError(null);
+    setSubmitting(true);
+    const sourceType = detectSourceType(trimmed);
+    const mediaType: 'image' | 'video' = sourceType === 'other' ? otherKind : 'video';
+    const result = await add({ swimmer_id: swimmerId, media_type: mediaType, source_type: sourceType, url: trimmed });
+    setSubmitting(false);
+    if (result) {
+      setUrl('');
+    } else {
+      setFormError('Не удалось добавить ссылку — проверьте формат URL');
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    await remove(id);
+    setConfirmDeleteId(null);
+  };
+
+  const openLightboxFor = (item: UserMediaDto) => {
+    const idx = lightboxItems.findIndex((g) => g.url === item.url);
+    if (idx >= 0) setLightboxIndex(idx);
+  };
+
+  return (
+    <div className="p-4 border-t" style={{ borderColor: 'var(--theme-mode-border)' }}>
+      <h2 className="text-[15px] font-extrabold mb-3" style={{ color: 'var(--theme-primary)' }}>Мои ссылки</h2>
+
+      {/* Форма добавления */}
+      <div className="flex flex-col gap-2 mb-3">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://youtube.com/... или https://vimeo.com/... или другая ссылка"
+            className="flex-1 min-w-0 rounded-lg px-3 py-2 text-sm"
+            style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
+          />
+          <button
+            type="button"
+            onClick={handleAdd}
+            disabled={submitting || !url.trim()}
+            className="shrink-0 rounded-lg px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
+            style={{ background: 'var(--theme-primary)' }}
+          >
+            Добавить
+          </button>
+        </div>
+        {detectSourceType(url) === 'other' && url.trim() && (
+          <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--theme-mode-text-muted)' }}>
+            <span>Тип:</span>
+            <label className="flex items-center gap-1">
+              <input type="radio" checked={otherKind === 'video'} onChange={() => setOtherKind('video')} /> видео
+            </label>
+            <label className="flex items-center gap-1">
+              <input type="radio" checked={otherKind === 'image'} onChange={() => setOtherKind('image')} /> фото
+            </label>
+          </div>
+        )}
+        {formError && <div className="text-xs" style={{ color: '#e23b5a' }}>{formError}</div>}
+      </div>
+
+      {/* Список */}
+      {loading ? (
+        <div className="text-xs italic" style={{ color: 'var(--theme-mode-text-muted)' }}>Загрузка…</div>
+      ) : media.length === 0 ? (
+        <div className="text-xs italic" style={{ color: 'var(--theme-mode-text-muted)' }}>Пока нет ссылок</div>
+      ) : (
+        <ul className="grid grid-cols-3 gap-2">
+          {media.map((item) => {
+            const thumb = HelperMedia.resolveThumbUrl(item.media_type, item.source_type, item.url);
+            const isEmbeddable = item.source_type === 'youtube' || item.source_type === 'vimeo';
+            return (
+              <li key={item.id} className="relative rounded-lg overflow-hidden group" style={{ background: 'var(--theme-mode-input-bg)' }}>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteId(item.id)}
+                  title="Удалить"
+                  className="absolute top-1 right-1 z-10 w-5 h-5 rounded-full inline-flex items-center justify-center text-xs font-bold text-white"
+                  style={{ background: 'rgba(0,0,0,0.55)' }}
+                >
+                  ×
+                </button>
+
+                {isEmbeddable ? (
+                  <div className="cursor-pointer aspect-video flex items-center justify-center" onClick={() => openLightboxFor(item)}>
+                    {thumb ? (
+                      <img src={thumb} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xs" style={{ color: 'var(--theme-mode-text-muted)' }}>video</span>
+                    )}
+                  </div>
+                ) : (
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                    className="aspect-video flex items-center justify-center"
+                  >
+                    {thumb ? (
+                      <img src={thumb} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xs underline" style={{ color: 'var(--theme-mode-text-muted)' }}>ссылка</span>
+                    )}
+                  </a>
+                )}
+
+                {confirmDeleteId === item.id && (
+                  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1 text-center p-1" style={{ background: 'rgba(0,0,0,0.75)' }}>
+                    <span className="text-[10px] text-white">Удалить?</span>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(item.id)}
+                        className="text-[10px] font-bold px-2 py-0.5 rounded"
+                        style={{ background: '#e23b5a', color: '#fff' }}
+                      >
+                        Да
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="text-[10px] font-bold px-2 py-0.5 rounded"
+                        style={{ background: 'rgba(255,255,255,0.2)', color: '#fff' }}
+                      >
+                        Нет
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <UI_SwimmerGallery
+        gallery={lightboxItems}
+        openIndex={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+      />
     </div>
   );
 }
