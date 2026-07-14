@@ -264,6 +264,10 @@ public sealed class HubGroupDetailsDto
     [JsonPropertyName("is_official")]
     public bool IsOfficial { get; set; }
 
+    /// <summary>open | approval — чтобы кнопка вступления показывала «Подать заявку».</summary>
+    [JsonPropertyName("join_policy")]
+    public string JoinPolicy { get; set; } = "open";
+
     [JsonPropertyName("links")]
     public List<HubGroupPublicLinkDto> Links { get; set; } = [];
 

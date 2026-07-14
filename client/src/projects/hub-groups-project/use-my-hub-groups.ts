@@ -258,6 +258,14 @@ export function useMyHubGroupEdit(id: number | null) {
     return result;
   }, [id, reload]);
 
+  const approveUserMember = useCallback(async (userId: number): Promise<SaveResult> => {
+    if (id == null) return { success: false, error: 'Нет группы' };
+    const r = await apiFetch(`/api/me/hub-groups/${id}/user-members/${userId}/approve`, { method: 'POST' });
+    const result = await saveResultFrom(r);
+    if (result.success) await reload();
+    return result;
+  }, [id, reload]);
+
   const removeUserMember = useCallback(async (userId: number): Promise<SaveResult> => {
     if (id == null) return { success: false, error: 'Нет группы' };
     const r = await apiFetch(`/api/me/hub-groups/${id}/user-members/${userId}`, { method: 'DELETE' });
@@ -269,7 +277,7 @@ export function useMyHubGroupEdit(id: number | null) {
   return {
     data, admins, clubRequest, loading, forbidden,
     update, searchSwimmers, getClubSwimmers, addMember, updateMember, removeMember,
-    addAdmin, removeAdmin, submitClubRequest, addUserMember, removeUserMember,
+    addAdmin, removeAdmin, submitClubRequest, addUserMember, approveUserMember, removeUserMember,
   };
 }
 

@@ -3,6 +3,7 @@ using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
+using Swimm.Infrastructure.Repositories;
 using Swimm.Infrastructure.Services;
 using Xunit;
 
@@ -390,6 +391,143 @@ public class HubGroupUserServiceTests
 
         Assert.False(result.Success);
         Assert.Empty(db.HubGroupUserMembers);
+    }
+
+    // ── JoinPolicy (гейт members-контента) ───────────────────────────────────
+
+    private static async Task<(HubGroup group, AppUser joiner)> AddApprovalGroupAsync(SwimmDbContext db)
+    {
+        var owner = await AddUserAsync(db, "owner@example.com");
+        var joiner = await AddUserAsync(db, "joiner@example.com");
+        var group = new HubGroup
+        {
+            Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true,
+            JoinPolicy = HubGroupJoinPolicy.Approval
+        };
+        db.HubGroups.Add(group);
+        await db.SaveChangesAsync();
+        return (group, joiner);
+    }
+
+    [Fact]
+    public async Task Join_ApprovalPolicy_CreatesPending_NotActiveMember()
+    {
+        await using var db = CreateDb(nameof(Join_ApprovalPolicy_CreatesPending_NotActiveMember));
+        var (group, joiner) = await AddApprovalGroupAsync(db);
+
+        var result = await Service(db).JoinAsync(group.Id, joiner.Id);
+
+        Assert.True(result.Success);
+        var row = await db.HubGroupUserMembers.SingleAsync(m => m.HubGroupId == group.Id && m.UserId == joiner.Id);
+        Assert.Equal(HubGroupUserMemberStatus.Pending, row.Status);
+        // pending НЕ проходит гейт members-контента (тренировки/разборы)
+        Assert.False(await new HubGroupTrainingRepository(db).IsActiveAccountMemberAsync(group.Id, joiner.Id));
+    }
+
+    [Fact]
+    public async Task Join_WhilePending_FailsWithPendingMessage()
+    {
+        await using var db = CreateDb(nameof(Join_WhilePending_FailsWithPendingMessage));
+        var (group, joiner) = await AddApprovalGroupAsync(db);
+        var svc = Service(db);
+        await svc.JoinAsync(group.Id, joiner.Id);
+
+        var again = await svc.JoinAsync(group.Id, joiner.Id);
+
+        Assert.False(again.Success);
+        Assert.Contains("Заявка", again.Error);
+        Assert.Single(db.HubGroupUserMembers);
+    }
+
+    [Fact]
+    public async Task ApproveUserMember_PendingBecomesActive_PassesGate()
+    {
+        await using var db = CreateDb(nameof(ApproveUserMember_PendingBecomesActive_PassesGate));
+        var (group, joiner) = await AddApprovalGroupAsync(db);
+        var svc = Service(db);
+        await svc.JoinAsync(group.Id, joiner.Id);
+
+        var approved = await svc.ApproveUserMemberAsync(group.Id, joiner.Id);
+
+        Assert.True(approved.Success);
+        var row = await db.HubGroupUserMembers.SingleAsync(m => m.UserId == joiner.Id);
+        Assert.Equal(HubGroupUserMemberStatus.Active, row.Status);
+        Assert.True(await new HubGroupTrainingRepository(db).IsActiveAccountMemberAsync(group.Id, joiner.Id));
+    }
+
+    [Fact]
+    public async Task ApproveUserMember_NotFoundOrAlreadyActive_Fails()
+    {
+        await using var db = CreateDb(nameof(ApproveUserMember_NotFoundOrAlreadyActive_Fails));
+        var owner = await AddUserAsync(db, "owner@example.com");
+        var joiner = await AddUserAsync(db, "joiner@example.com");
+        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true };
+        db.HubGroups.Add(group);
+        await db.SaveChangesAsync();
+        var svc = Service(db);
+
+        Assert.False((await svc.ApproveUserMemberAsync(group.Id, joiner.Id)).Success); // не участник
+
+        await svc.JoinAsync(group.Id, joiner.Id); // open → сразу active
+        Assert.False((await svc.ApproveUserMemberAsync(group.Id, joiner.Id)).Success); // уже active
+    }
+
+    [Fact]
+    public async Task AddUserMember_ByEmail_ActiveEvenWithApprovalPolicy()
+    {
+        await using var db = CreateDb(nameof(AddUserMember_ByEmail_ActiveEvenWithApprovalPolicy));
+        var (group, target) = await AddApprovalGroupAsync(db);
+
+        var result = await Service(db).AddUserMemberAsync(group.Id, target.Email, group.OwnerUserId);
+
+        Assert.True(result.Success);
+        var row = await db.HubGroupUserMembers.SingleAsync(m => m.UserId == target.Id);
+        Assert.Equal(HubGroupUserMemberStatus.Active, row.Status); // добавление админом — сразу active
+    }
+
+    [Fact]
+    public async Task Leave_RemovesPendingRequestToo()
+    {
+        await using var db = CreateDb(nameof(Leave_RemovesPendingRequestToo));
+        var (group, joiner) = await AddApprovalGroupAsync(db);
+        var svc = Service(db);
+        await svc.JoinAsync(group.Id, joiner.Id);
+
+        var left = await svc.LeaveAsync(group.Id, joiner.Id); // отмена заявки = самовыход
+
+        Assert.True(left.Success);
+        Assert.Empty(db.HubGroupUserMembers);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_NullJoinPolicy_Preserved_InvalidRejected()
+    {
+        await using var db = CreateDb(nameof(UpdateAsync_NullJoinPolicy_Preserved_InvalidRejected));
+        var owner = await AddUserAsync(db, "owner@example.com");
+        var group = new HubGroup
+        {
+            Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true,
+            JoinPolicy = HubGroupJoinPolicy.Approval
+        };
+        db.HubGroups.Add(group);
+        await db.SaveChangesAsync();
+        var svc = Service(db);
+
+        // Старый клиент без поля — политика не сбрасывается.
+        var noField = await svc.UpdateAsync(group.Id, new HubGroupInputDto { Name = "G", Slug = "g", IsPublic = true });
+        Assert.True(noField.Success);
+        Assert.Equal(HubGroupJoinPolicy.Approval, (await db.HubGroups.SingleAsync(g => g.Id == group.Id)).JoinPolicy);
+
+        // Мусорное значение — валидация.
+        var bad = await svc.UpdateAsync(group.Id,
+            new HubGroupInputDto { Name = "G", Slug = "g", IsPublic = true, JoinPolicy = "vip" });
+        Assert.False(bad.Success);
+
+        // Явная смена на open.
+        var open = await svc.UpdateAsync(group.Id,
+            new HubGroupInputDto { Name = "G", Slug = "g", IsPublic = true, JoinPolicy = HubGroupJoinPolicy.Open });
+        Assert.True(open.Success);
+        Assert.Equal(HubGroupJoinPolicy.Open, (await db.HubGroups.SingleAsync(g => g.Id == group.Id)).JoinPolicy);
     }
 
     [Fact]

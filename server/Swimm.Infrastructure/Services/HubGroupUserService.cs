@@ -198,7 +198,7 @@ public class HubGroupUserService : IHubGroupUserService
     {
         var group = await _db.HubGroups.AsNoTracking()
             .Where(g => g.Id == hubGroupId)
-            .Select(g => new { g.Id, g.IsPublic })
+            .Select(g => new { g.Id, g.IsPublic, g.JoinPolicy })
             .FirstOrDefaultAsync();
         if (group == null) return HubGroupMemberSaveResult.Fail($"Группа #{hubGroupId} не найдена");
 
@@ -213,7 +213,25 @@ public class HubGroupUserService : IHubGroupUserService
         };
         if (!joinable) return HubGroupMemberSaveResult.Fail("В эту группу нельзя вступить");
 
-        return await InsertUserMemberAsync(hubGroupId, userId, addedByUserId: null);
+        // Гейт members-контента: при approval самозапись создаёт заявку (pending),
+        // активирует владелец/админ группы через ApproveUserMemberAsync.
+        var status = group.JoinPolicy == HubGroupJoinPolicy.Approval
+            ? HubGroupUserMemberStatus.Pending
+            : HubGroupUserMemberStatus.Active;
+        return await InsertUserMemberAsync(hubGroupId, userId, addedByUserId: null, status);
+    }
+
+    public async Task<HubGroupMemberSaveResult> ApproveUserMemberAsync(int hubGroupId, int userId)
+    {
+        var member = await _db.HubGroupUserMembers
+            .FirstOrDefaultAsync(m => m.HubGroupId == hubGroupId && m.UserId == userId);
+        if (member == null) return HubGroupMemberSaveResult.Fail("Участник не найден");
+        if (member.Status == HubGroupUserMemberStatus.Active)
+            return HubGroupMemberSaveResult.Fail("Участник уже активен");
+
+        member.Status = HubGroupUserMemberStatus.Active;
+        await _db.SaveChangesAsync();
+        return HubGroupMemberSaveResult.Ok();
     }
 
     public async Task<HubGroupMemberSaveResult> LeaveAsync(int hubGroupId, int userId) =>
@@ -237,17 +255,24 @@ public class HubGroupUserService : IHubGroupUserService
     }
 
     /// <summary>Общая вставка участника-аккаунта: dedup + обработка гонки (23505).</summary>
-    private async Task<HubGroupMemberSaveResult> InsertUserMemberAsync(int hubGroupId, int userId, int? addedByUserId)
+    private async Task<HubGroupMemberSaveResult> InsertUserMemberAsync(
+        int hubGroupId, int userId, int? addedByUserId, string status = HubGroupUserMemberStatus.Active)
     {
-        var dup = await _db.HubGroupUserMembers.AnyAsync(m => m.HubGroupId == hubGroupId && m.UserId == userId);
-        if (dup) return HubGroupMemberSaveResult.Fail("Этот пользователь уже участник группы");
+        var existing = await _db.HubGroupUserMembers.AsNoTracking()
+            .Where(m => m.HubGroupId == hubGroupId && m.UserId == userId)
+            .Select(m => m.Status)
+            .FirstOrDefaultAsync();
+        if (existing != null)
+            return HubGroupMemberSaveResult.Fail(existing == HubGroupUserMemberStatus.Pending
+                ? "Заявка уже отправлена и ждёт одобрения"
+                : "Этот пользователь уже участник группы");
 
         _db.HubGroupUserMembers.Add(new HubGroupUserMember
         {
             HubGroupId = hubGroupId,
             UserId = userId,
             AddedByUserId = addedByUserId,
-            Status = HubGroupUserMemberStatus.Active
+            Status = status
         });
 
         try

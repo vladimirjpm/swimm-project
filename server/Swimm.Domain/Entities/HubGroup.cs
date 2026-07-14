@@ -4,6 +4,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Swimm.Domain.Entities;
 
+/// <summary>Политика вступления в группу (самозапись через JoinAsync).</summary>
+public static class HubGroupJoinPolicy
+{
+    /// <summary>Свободное вступление — участник сразу active.</summary>
+    public const string Open = "open";
+    /// <summary>Заявка: участник создаётся pending, активирует владелец/админ группы (approve).</summary>
+    public const string Approval = "approval";
+}
+
 /// <summary>
 /// Группа (SwimHub) — неформальное тренировочное объединение пловцов из разных клубов,
 /// созданное пользователем. НЕ <see cref="Club"/> (официальный справочник федерации)
@@ -75,6 +84,14 @@ public class HubGroup
     /// среди официальных групп (partial unique index по ClubId).
     /// </summary>
     public bool IsOfficial { get; set; }
+
+    /// <summary>
+    /// Политика самозаписи: open (сразу active) | approval (заявка pending до одобрения).
+    /// Гейт доступа к members-контенту (разборы/тренировки): при open любой залогиненный
+    /// становится активным участником одним кликом — для групп с members-медиа ставь approval.
+    /// </summary>
+    [Required, MaxLength(20)]
+    public string JoinPolicy { get; set; } = HubGroupJoinPolicy.Open;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

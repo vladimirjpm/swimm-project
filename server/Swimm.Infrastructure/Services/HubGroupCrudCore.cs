@@ -86,6 +86,11 @@ public partial class HubGroupCrudCore
         var dup = await _db.HubGroups.AnyAsync(g => g.Id != (excludeId ?? 0) && g.Slug == slug);
         if (dup) return $"Slug «{slug}» уже занят другой группой";
 
+        if (input.JoinPolicy != null &&
+            input.JoinPolicy != HubGroupJoinPolicy.Open &&
+            input.JoinPolicy != HubGroupJoinPolicy.Approval)
+            return "Политика вступления: допустимо open или approval";
+
         return null;
     }
 
@@ -106,6 +111,8 @@ public partial class HubGroupCrudCore
         group.Location = string.IsNullOrWhiteSpace(input.Location) ? null : input.Location.Trim();
         if (allowClubChange) group.ClubId = input.ClubId;
         group.IsPublic = input.IsPublic;
+        // null — поле не прислано (старый клиент), политику не трогаем.
+        if (input.JoinPolicy != null) group.JoinPolicy = input.JoinPolicy;
         group.Links = SerializeLinks(input.Links);
         group.UpdatedAt = DateTime.UtcNow;
     }

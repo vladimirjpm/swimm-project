@@ -246,6 +246,19 @@ public class MyHubGroupsController : ControllerBase
         return result.Success ? Ok() : BadRequest(new { error = result.Error });
     }
 
+    /// <summary>Одобрить заявку участника-аккаунта (pending → active). Владелец/админ группы.</summary>
+    [HttpPost("{id:int}/user-members/{userId:int}/approve")]
+    public async Task<IActionResult> ApproveUserMember(int id, int userId)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanEdit) return Forbid();
+
+        var result = await _mine.ApproveUserMemberAsync(id, userId);
+        return result.Success ? Ok() : BadRequest(new { error = result.Error });
+    }
+
     /// <summary>Убрать участника-аккаунт (владелец/админ группы).</summary>
     [HttpDelete("{id:int}/user-members/{userId:int}")]
     public async Task<IActionResult> RemoveUserMember(int id, int userId)

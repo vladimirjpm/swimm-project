@@ -30,6 +30,8 @@ export interface HubGroupInput {
   country?: string | null;
   clubId?: number | null;
   isPublic: boolean;
+  /** open | approval; null/отсутствует — сервер не меняет политику. */
+  joinPolicy?: 'open' | 'approval' | null;
   links: HubGroupLinkInput[];
 }
 
@@ -80,6 +82,8 @@ export interface HubGroupEditData {
   ownerDisplayName: string;
   isPublic: boolean;
   isOfficial: boolean;
+  /** open | approval — политика самозаписи. */
+  joinPolicy: 'open' | 'approval';
   links: HubGroupLinkInput[];
   members: HubGroupMemberRow[];
   userMembers: HubGroupUserMember[];

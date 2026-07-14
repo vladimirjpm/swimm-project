@@ -17,16 +17,18 @@ const btnDangerCls =
 
 const EMPTY_INPUT: HubGroupInput = {
   name: '', nameEn: '', slug: '', description: '', iconUrl: '', coverImageUrl: '', location: '',
-  country: '', clubId: null, isPublic: true, links: [],
+  country: '', clubId: null, isPublic: true, joinPolicy: 'open', links: [],
 };
 
 function GroupInputForm({
-  initial, onSubmit, onCancel, submitLabel,
+  initial, onSubmit, onCancel, submitLabel, recommendApproval,
 }: {
   initial: HubGroupInput;
   onSubmit: (input: HubGroupInput) => Promise<{ success: boolean; error?: string | null }>;
   onCancel: () => void;
   submitLabel: string;
+  /** Подсказка (не форс): официальной группе с members-контентом лучше режим заявок. */
+  recommendApproval?: boolean;
 }) {
   const [form, setForm] = useState<HubGroupInput>(initial);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +94,21 @@ function GroupInputForm({
           onChange={(e) => setField('isPublic', e.target.checked)} />
         Публичная группа
       </label>
+
+      <label className="flex items-center gap-2 text-[13px] font-bold text-[#cbe0f0]/80">
+        Вступление:
+        <select className={`${inputCls} max-w-[220px]`} value={form.joinPolicy ?? 'open'}
+          onChange={(e) => setField('joinPolicy', e.target.value as 'open' | 'approval')}>
+          <option value="open">свободное</option>
+          <option value="approval">по заявке (одобряет тренер)</option>
+        </select>
+      </label>
+      {recommendApproval && (form.joinPolicy ?? 'open') === 'open' && (
+        <p className="m-0 text-[11.5px] italic text-[#ffca7a]/80">
+          У официальной группы members-контент (разборы, тренировки) виден всем вступившим —
+          рекомендуем режим «по заявке».
+        </p>
+      )}
 
       {error && <p className="text-[12.5px] font-bold text-[#ef5350]">{error}</p>}
 
@@ -250,8 +267,20 @@ function UserMembersEditor({ hubGroupId }: { hubGroupId: number }) {
             <span className="min-w-0 truncate text-[13px] text-[#f3f8fd]">
               {m.displayName} <span className="text-[#cbe0f0]/50">({m.email})</span>
               {m.selfJoined && <span className="ml-1 text-[10.5px] text-[#7dd3fc]/70">вступил сам</span>}
+              {m.status === 'pending' && (
+                <span className="ml-1 rounded-[6px] border border-[#ffca7a]/50 px-[5px] py-[1px] text-[10px] font-extrabold text-[#ffca7a]">
+                  заявка
+                </span>
+              )}
             </span>
-            <button type="button" className={btnDangerCls} onClick={() => edit.removeUserMember(m.userId)}>✕</button>
+            <div className="flex shrink-0 items-center gap-2">
+              {m.status === 'pending' && (
+                <button type="button" className={btnCls} onClick={() => edit.approveUserMember(m.userId)}>
+                  Одобрить
+                </button>
+              )}
+              <button type="button" className={btnDangerCls} onClick={() => edit.removeUserMember(m.userId)}>✕</button>
+            </div>
           </li>
         ))}
         {members.length === 0 && (
@@ -483,13 +512,15 @@ function EditGroupCard({ row, currentUserId, isAdmin, onClose, onSaved }: {
     iconUrl: edit.data.iconUrl, coverImageUrl: edit.data.coverImageUrl, location: edit.data.location,
     // "" (не null): пустое поле формы = явное «снять страну» на сервере.
     country: edit.data.country ?? '',
-    clubId: edit.data.clubId, isPublic: edit.data.isPublic, links: edit.data.links,
+    clubId: edit.data.clubId, isPublic: edit.data.isPublic,
+    joinPolicy: edit.data.joinPolicy, links: edit.data.links,
   };
 
   return (
     <div className="flex flex-col gap-4">
       <GroupInputForm
         initial={input}
+        recommendApproval={edit.data.isOfficial}
         submitLabel="Сохранить"
         onCancel={onClose}
         onSubmit={async (i) => { const r = await edit.update(i); if (r.success) onSaved(); return r; }}

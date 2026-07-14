@@ -99,6 +99,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             Country = group.Country?.CountryCode,
             ClubName = group.Club?.Name,
             IsOfficial = group.IsOfficial,
+            JoinPolicy = group.JoinPolicy,
             Links = ParseLinks(group.Links),
             IsVirtual = false,
             Members = members

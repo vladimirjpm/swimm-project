@@ -42,8 +42,14 @@ public interface IHubGroupUserService
     /// <summary>Убрать участника-аккаунт (владелец/админ; либо самовыход через LeaveAsync).</summary>
     Task<HubGroupMemberSaveResult> RemoveUserMemberAsync(int hubGroupId, int userId);
 
-    /// <summary>Самозапись: вступить в публичную/видимую группу. Мгновенно (Status=active).</summary>
+    /// <summary>
+    /// Самозапись: вступить в публичную/видимую группу. При JoinPolicy=open — сразу active,
+    /// при approval — заявка pending (активирует владелец/админ через ApproveUserMemberAsync).
+    /// </summary>
     Task<HubGroupMemberSaveResult> JoinAsync(int hubGroupId, int userId);
+
+    /// <summary>Одобрить заявку участника-аккаунта: pending → active. Авторизация (CanEdit) — в контроллере.</summary>
+    Task<HubGroupMemberSaveResult> ApproveUserMemberAsync(int hubGroupId, int userId);
 
     /// <summary>Самовыход из группы.</summary>
     Task<HubGroupMemberSaveResult> LeaveAsync(int hubGroupId, int userId);

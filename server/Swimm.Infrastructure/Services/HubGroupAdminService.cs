@@ -99,6 +99,7 @@ public class HubGroupAdminService : IHubGroupAdminService
             OwnerDisplayName = g.Owner?.DisplayName ?? $"#{g.OwnerUserId}",
             IsPublic = g.IsPublic,
             IsOfficial = g.IsOfficial,
+            JoinPolicy = g.JoinPolicy,
             Links = HubGroupCrudCore.ParseLinks(g.Links),
             Members = members,
             UserMembers = userMembers

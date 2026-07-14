@@ -53,6 +53,8 @@ public sealed class HubGroupEditDto
     public bool IsPublic { get; set; }
     /// <summary>Официальная группа клуба — устанавливается только через одобрение заявки, не через форму.</summary>
     public bool IsOfficial { get; set; }
+    /// <summary>open | approval — политика самозаписи (см. HubGroupJoinPolicy).</summary>
+    public string JoinPolicy { get; set; } = "open";
     public List<HubGroupLinkDto> Links { get; set; } = [];
     public List<HubGroupMemberRowDto> Members { get; set; } = [];
     /// <summary>Участники-аккаунты (приватный список, не пловцы) — только в панели управления.</summary>
@@ -73,6 +75,8 @@ public sealed class HubGroupInputDto
     public string? Country { get; set; }
     public int? ClubId { get; set; }
     public bool IsPublic { get; set; }
+    /// <summary>open | approval; null/отсутствует — не менять (старый клиент не сбросит политику).</summary>
+    public string? JoinPolicy { get; set; }
     public List<HubGroupLinkDto> Links { get; set; } = [];
 }
 

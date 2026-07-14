@@ -553,6 +553,10 @@ public class SwimmDbContext : DbContext
             entity.HasCheckConstraint(
                 "CK_HubGroups_OfficialRequiresClub",
                 @"NOT ""IsOfficial"" OR ""ClubId"" IS NOT NULL");
+
+            entity.HasCheckConstraint(
+                "CK_HubGroups_JoinPolicy",
+                @"""JoinPolicy"" IN ('open', 'approval')");
         });
 
         modelBuilder.Entity<HubGroupMember>(entity =>

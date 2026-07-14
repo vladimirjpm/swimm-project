@@ -125,6 +125,8 @@ export interface HubGroupDetails {
   club_name?: string | null;
   /** Официальная группа клуба (одобрена админом) — не путать с составом-watchlist. */
   is_official: boolean;
+  /** open | approval — политика самозаписи (кнопка «Вступить» vs «Подать заявку»). */
+  join_policy?: 'open' | 'approval';
   links: HubGroupLink[];
   is_virtual: boolean;
   members: HubGroupMember[];

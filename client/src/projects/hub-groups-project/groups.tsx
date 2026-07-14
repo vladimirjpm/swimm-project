@@ -179,17 +179,22 @@ function JoinButton({ group }: { group: HubGroupDetails }) {
 
   if (group.is_virtual || group.id <= 0 || !isAuthenticated) return null;
 
-  const isMember = joined.some((j) => j.id === group.id);
+  const membership = joined.find((j) => j.id === group.id);
+  const isPending = membership?.status === 'pending';
 
   const toggle = async () => {
     setBusy(true);
     try {
-      if (isMember) await leave(group.id);
+      if (membership) await leave(group.id); // active — выход; pending — отмена заявки
       else await join(group.id);
     } finally {
       setBusy(false);
     }
   };
+
+  const label = membership
+    ? (isPending ? 'Заявка отправлена — отменить' : 'Выйти из группы')
+    : (group.join_policy === 'approval' ? 'Подать заявку' : 'Вступить в группу');
 
   return (
     <button
@@ -197,12 +202,14 @@ function JoinButton({ group }: { group: HubGroupDetails }) {
       disabled={busy}
       onClick={toggle}
       className={
-        isMember
-          ? 'hp-mono ml-auto shrink-0 rounded-[10px] border border-[#7dd3fc]/40 px-4 py-2 text-[13px] font-extrabold text-[#7dd3fc] hover:bg-[#7dd3fc]/10 disabled:opacity-50'
+        membership
+          ? isPending
+            ? 'hp-mono ml-auto shrink-0 rounded-[10px] border border-[#ffca7a]/50 px-4 py-2 text-[13px] font-extrabold text-[#ffca7a] hover:bg-[#ffca7a]/10 disabled:opacity-50'
+            : 'hp-mono ml-auto shrink-0 rounded-[10px] border border-[#7dd3fc]/40 px-4 py-2 text-[13px] font-extrabold text-[#7dd3fc] hover:bg-[#7dd3fc]/10 disabled:opacity-50'
           : 'hp-mono ml-auto shrink-0 rounded-[10px] bg-[#38ef8f] px-4 py-2 text-[13px] font-extrabold text-[#04101f] hover:brightness-110 disabled:opacity-50'
       }
     >
-      {isMember ? 'Выйти из группы' : 'Вступить в группу'}
+      {label}
     </button>
   );
 }
@@ -215,7 +222,8 @@ function TrainingsLink({ group }: { group: HubGroupDetails }) {
 
   if (group.is_virtual || group.id <= 0) return null;
   const manages = isAdmin || myGroups.some((g) => g.id === group.id);
-  const isMember = joined.some((j) => j.id === group.id);
+  // pending-заявка доступа не даёт — сервер вернул бы 403, ссылку не показываем.
+  const isMember = joined.some((j) => j.id === group.id && j.status === 'active');
   if (!manages && !isMember) return null;
 
   return (
