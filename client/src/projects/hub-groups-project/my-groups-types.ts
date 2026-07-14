@@ -133,6 +133,10 @@ export interface HubGroupMediaInput {
   url: string;
   caption?: string | null;
   trainingId?: number | null;
+  /** 'public' (дефолт, витрина) | 'members' (разборы; только официальная группа, 2B′). */
+  visibility?: 'public' | 'members';
+  /** Якорь-пловец разбора (только при visibility='members'). */
+  swimmerId?: number | null;
 }
 
 /** Тренировка в справочнике для выбора «привязать медиа к тренировке» (без CRUD тренировок в UI). */

@@ -222,4 +222,168 @@ public class HubGroupMediaServiceTests
         Assert.True(removed);
         Assert.Null(await db.HubGroupMedia.FindAsync(added.Id));
     }
+
+    // ── 2B′: members-слой (тренерские разборы) ───────────────────────────────
+
+    /// <summary>Официальная группа + пловец + заплыв — фикстура для members-тестов.</summary>
+    private static async Task<(int userId, int groupId, int swimmerId, long resultId)> SeedOfficialWithResultAsync(
+        SwimmDbContext db, bool relay = false)
+    {
+        var owner = new AppUser { Email = "o@example.com", DisplayName = "O", SecurityStamp = "s" };
+        db.AppUsers.Add(owner);
+        await db.SaveChangesAsync();
+        var group = new HubGroup { Name = "Off", Slug = "off", OwnerUserId = owner.Id, IsPublic = true, IsOfficial = true };
+        var style = new Style { Name = "freestyle" };
+        var club = new Club { Name = "C", NameEn = "C" };
+        var comp = new Competition { Name = "Meet", Date = "01/01/2026", PoolType = "50m" };
+        var swimmer = new Swimmer { LastName = "Иванов", FirstName = "Иван", LastNameEn = "Ivanov", FirstNameEn = "Ivan", BirthYear = 2005 };
+        Relay? rel = relay ? new Relay { TeamName = "T" } : null;
+        db.AddRange(group, style, club, comp, swimmer);
+        if (rel != null) db.Add(rel);
+        await db.SaveChangesAsync();
+        var result = new ResultRecord
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer.Id, ClubId = club.Id, StyleId = style.Id,
+            RelayId = rel?.Id, Distance = "100", Gender = "male",
+            CompetitionDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            TimeOriginal = "1:00.00", AgeGroup = "Open", EventStyleAge = "100 freestyle Open"
+        };
+        db.Results.Add(result);
+        await db.SaveChangesAsync();
+        return (owner.Id, group.Id, swimmer.Id, result.Id);
+    }
+
+    private static HubGroupMediaInputDto MembersVideo(int? swimmerId = null, long? resultId = null) => new()
+    {
+        MediaType = "video",
+        SourceType = "youtube",
+        Url = "https://www.youtube.com/watch?v=abc123",
+        Visibility = "members",
+        SwimmerId = swimmerId,
+        ResultId = resultId,
+    };
+
+    [Fact]
+    public async Task AddAsync_MembersInUnofficialGroup_Rejected()
+    {
+        await using var db = CreateDb(nameof(AddAsync_MembersInUnofficialGroup_Rejected));
+        var (userId, groupId) = await SeedGroupAsync(db); // IsOfficial = false
+        var service = new HubGroupMediaService(db);
+
+        var result = await service.AddAsync(groupId, MembersVideo(), userId);
+
+        Assert.False(result.Success);
+        Assert.Contains("official", result.Error);
+    }
+
+    [Fact]
+    public async Task AddAsync_PublicWithAnchor_Rejected()
+    {
+        await using var db = CreateDb(nameof(AddAsync_PublicWithAnchor_Rejected));
+        var (userId, groupId, swimmerId, _) = await SeedOfficialWithResultAsync(db);
+        var service = new HubGroupMediaService(db);
+        var input = ValidImage();
+        input.SwimmerId = swimmerId; // якорь при public — запрещено
+
+        var result = await service.AddAsync(groupId, input, userId);
+
+        Assert.False(result.Success);
+        Assert.Contains("members", result.Error);
+    }
+
+    [Fact]
+    public async Task AddAsync_MembersWithResultAnchor_DenormalizesSwimmer()
+    {
+        await using var db = CreateDb(nameof(AddAsync_MembersWithResultAnchor_DenormalizesSwimmer));
+        var (userId, groupId, swimmerId, resultId) = await SeedOfficialWithResultAsync(db);
+        var service = new HubGroupMediaService(db);
+
+        var result = await service.AddAsync(groupId, MembersVideo(resultId: resultId), userId);
+
+        Assert.True(result.Success);
+        var entity = await db.HubGroupMedia.FindAsync(result.Id);
+        Assert.NotNull(entity);
+        Assert.Equal(HubGroupMediaVisibility.Members, entity!.Visibility);
+        Assert.Equal(resultId, entity.ResultId);
+        Assert.Equal(swimmerId, entity.SwimmerId); // выведен из заплыва, не из входа
+    }
+
+    [Fact]
+    public async Task AddAsync_MembersWithRelayResult_Rejected()
+    {
+        await using var db = CreateDb(nameof(AddAsync_MembersWithRelayResult_Rejected));
+        var (userId, groupId, _, resultId) = await SeedOfficialWithResultAsync(db, relay: true);
+        var service = new HubGroupMediaService(db);
+
+        var result = await service.AddAsync(groupId, MembersVideo(resultId: resultId), userId);
+
+        Assert.False(result.Success);
+        Assert.Contains("relay", result.Error);
+    }
+
+    [Fact]
+    public async Task AddAsync_MembersWithUnknownSwimmer_Rejected()
+    {
+        await using var db = CreateDb(nameof(AddAsync_MembersWithUnknownSwimmer_Rejected));
+        var (userId, groupId, _, _) = await SeedOfficialWithResultAsync(db);
+        var service = new HubGroupMediaService(db);
+
+        var result = await service.AddAsync(groupId, MembersVideo(swimmerId: 99999), userId);
+
+        Assert.False(result.Success);
+        Assert.Contains("swimmer_id", result.Error);
+    }
+
+    [Fact]
+    public async Task GetGalleryAsync_ExcludesMembersMedia()
+    {
+        await using var db = CreateDb(nameof(GetGalleryAsync_ExcludesMembersMedia));
+        var (userId, groupId, _, _) = await SeedOfficialWithResultAsync(db);
+        var service = new HubGroupMediaService(db);
+        await service.AddAsync(groupId, ValidImage(), userId);           // public — в галерее
+        await service.AddAsync(groupId, MembersVideo(), userId);          // members — нет
+
+        var gallery = await service.GetGalleryAsync(groupId);
+
+        Assert.Single(gallery);
+        Assert.Equal("image", gallery[0].MediaType);
+    }
+
+    [Fact]
+    public async Task GetMembersMediaAsync_ReturnsOnlyMembersWithAnchorContext()
+    {
+        await using var db = CreateDb(nameof(GetMembersMediaAsync_ReturnsOnlyMembersWithAnchorContext));
+        var (userId, groupId, swimmerId, resultId) = await SeedOfficialWithResultAsync(db);
+        var service = new HubGroupMediaService(db);
+        await service.AddAsync(groupId, ValidImage(), userId);                       // public — не попадёт
+        await service.AddAsync(groupId, MembersVideo(resultId: resultId), userId);   // разбор заплыва
+
+        var media = await service.GetMembersMediaAsync(groupId);
+
+        var item = Assert.Single(media);
+        Assert.Equal(swimmerId, item.SwimmerId);
+        Assert.Equal("Иванов Иван", item.SwimmerName);
+        Assert.Equal(resultId, item.ResultId);
+        Assert.Contains("freestyle 100", item.ResultLabel);
+        Assert.Contains("Meet", item.ResultLabel);
+    }
+
+    [Fact]
+    public async Task AddAsync_TrainingMedia_IgnoresVisibilityInput()
+    {
+        await using var db = CreateDb(nameof(AddAsync_TrainingMedia_IgnoresVisibilityInput));
+        var (userId, groupId) = await SeedGroupAsync(db);
+        var training = new TrainingSession { HubGroupId = groupId, ExternalTrainingId = "1", Date = DateTime.UtcNow, PoolType = "25m" };
+        db.TrainingSessions.Add(training);
+        await db.SaveChangesAsync();
+        var service = new HubGroupMediaService(db);
+        var input = ValidImage(training.Id);
+        input.Visibility = "members"; // для медиа тренировки поле игнорируется
+
+        var result = await service.AddAsync(groupId, input, userId);
+
+        Assert.True(result.Success);
+        var entity = await db.HubGroupMedia.FindAsync(result.Id);
+        Assert.Equal(HubGroupMediaVisibility.Public, entity!.Visibility);
+    }
 }

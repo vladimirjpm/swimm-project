@@ -10,7 +10,8 @@ import { GalleryItem } from '../../utils/interfaces/results';
 import { HelperMedia } from '../../utils/helpers';
 import { useCurrentIdentity, useHubGroupMembership, useMyHubGroups } from './use-my-hub-groups';
 import type {
-  HubGroupDetails, HubGroupLink, HubGroupListItem, HubGroupMediaItem, HubGroupMember, HubGroupStanding,
+  HubGroupDetails, HubGroupLink, HubGroupListItem, HubGroupMediaItem, HubGroupMember,
+  HubGroupMemberMediaItem, HubGroupStanding,
 } from './types';
 
 const GROUP_DISCLAIMER =
@@ -313,6 +314,76 @@ function GroupGallery({ gallery }: { gallery: HubGroupMediaItem[] }) {
   );
 }
 
+/**
+ * 🔒 Members reviews (2B′): тренерские разборы — members-медиа группы с якорем пловец/заплыв.
+ * Доступ решает сервер (403/401 → секция молча скрыта), клиент без логина даже не грузит.
+ * Рендер видео — тот же лайтбокс, что у галереи (embed из канонического id, не сырого URL).
+ */
+function MembersReviews({ group }: { group: HubGroupDetails }) {
+  const { isAuthenticated } = useCurrentIdentity();
+  const [items, setItems] = useState<HubGroupMemberMediaItem[]>([]);
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated || group.is_virtual || group.id <= 0) { setItems([]); return; }
+    let alive = true;
+    fetch(`/api/hub-groups/${encodeURIComponent(group.slug)}/media/members`, { credentials: 'include' })
+      .then((r) => (r.ok ? (r.json() as Promise<HubGroupMemberMediaItem[]>) : []))
+      .then((data) => { if (alive) setItems(data); })
+      .catch(() => { if (alive) setItems([]); });
+    return () => { alive = false; };
+  }, [isAuthenticated, group.slug, group.is_virtual, group.id]);
+
+  const { lightboxGalleryItems, indexById } = useMemo(() => {
+    const lightboxItems = items.filter((g) => g.media_type !== 'album');
+    return {
+      lightboxGalleryItems: lightboxItems.map((g): GalleryItem => ({
+        type: g.media_type === 'video' ? 'video' : 'image',
+        sourceType: g.source_type === 'album' ? undefined : (g.source_type as GalleryItem['sourceType']),
+        url: g.url,
+      })),
+      indexById: new Map(lightboxItems.map((g, i) => [g.id, i])),
+    };
+  }, [items]);
+
+  if (items.length === 0) return null;
+
+  return (
+    <div id="members-reviews" className="hp-card-std rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]" aria-label="Members reviews">
+      <h2 className="mb-1 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">🔒 Reviews</h2>
+      <p className="mb-4 text-[11.5px] italic text-[#cbe0f0]/45">Visible to group members only.</p>
+      <div className="flex flex-col gap-2">
+        {items.map((item) => (
+          <div key={item.id} className="flex items-center gap-3">
+            <div className="w-[96px] shrink-0">
+              <GalleryTile
+                item={{ id: item.id, media_type: item.media_type, source_type: item.source_type, url: item.url, caption: null }}
+                onClick={item.media_type === 'album' ? undefined : () => setOpenIndex(indexById.get(item.id) ?? 0)}
+              />
+            </div>
+            <div className="min-w-0">
+              {item.swimmer_name && (
+                <p className="m-0 truncate text-[13.5px] font-extrabold text-[#f3f8fd]">{item.swimmer_name}</p>
+              )}
+              {item.result_label && (
+                <p className="m-0 truncate text-[12px] text-[#7dd3fc]/80">{item.result_label}</p>
+              )}
+              {item.caption && (
+                <p className="m-0 truncate text-[12px] text-[#cbe0f0]/70">{item.caption}</p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      <UI_SwimmerGallery
+        gallery={lightboxGalleryItems}
+        openIndex={openIndex}
+        onClose={() => setOpenIndex(null)}
+      />
+    </div>
+  );
+}
+
 function GroupDetails({ group }: { group: HubGroupDetails }) {
   const [showAllBests, setShowAllBests] = useState(false);
   const bests = showAllBests ? group.bests : group.bests.slice(0, BESTS_PREVIEW_COUNT);
@@ -551,6 +622,9 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
 
           {/* Галерея группы */}
           <GroupGallery gallery={group.gallery} />
+
+          {/* 🔒 Разборы (members-медиа) — рендерится только участникам */}
+          <MembersReviews group={group} />
 
           {/* Последние заплывы */}
           <div className={cardCls} aria-label="Recent swims">

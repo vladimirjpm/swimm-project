@@ -363,17 +363,55 @@ function MediaEditor({ hubGroupId, slug }: { hubGroupId: number; slug: string })
           onChange={(e) => setField('url', e.target.value)} />
         <input className={inputCls} placeholder="Caption (optional)" value={form.caption ?? ''}
           onChange={(e) => setField('caption', e.target.value)} />
-        <select className={`${inputCls} max-w-[220px]`} value={form.trainingId ?? ''}
-          onChange={(e) => setField('trainingId', e.target.value ? Number(e.target.value) : null)}>
+        {/* Куда: витрина / members-разборы (2B′, только официальная группа) / тренировка. */}
+        <select className={`${inputCls} max-w-[220px]`}
+          value={form.visibility === 'members' ? 'members' : (form.trainingId ?? '')}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === 'members') setForm((f) => ({ ...f, visibility: 'members', trainingId: null }));
+            else setForm((f) => ({
+              ...f, visibility: 'public', swimmerId: null,
+              trainingId: v ? Number(v) : null,
+            }));
+          }}>
           <option value="">Public gallery</option>
+          {media.isOfficial && <option value="members">🔒 Members reviews</option>}
           {media.trainings.map((t) => (
             <option key={t.sessionId} value={t.sessionId}>{t.label}</option>
           ))}
         </select>
+        {form.visibility === 'members' && (
+          <select className={`${inputCls} max-w-[220px]`} value={form.swimmerId ?? ''}
+            onChange={(e) => setField('swimmerId', e.target.value ? Number(e.target.value) : null)}>
+            <option value="">— group media —</option>
+            {media.groupSwimmers.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        )}
         <button type="button" className={btnCls} disabled={saving || !form.url.trim()} onClick={submit}>
           {saving ? '…' : '+ Add media'}
         </button>
       </div>
+
+      {/* Members-разборы — отдельным списком, иначе после добавления их негде увидеть/удалить. */}
+      {media.membersMedia.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <p className="m-0 text-[11.5px] font-extrabold uppercase tracking-[0.12em] text-[#7dd3fc]/70">
+            🔒 Members reviews
+          </p>
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {media.membersMedia.map((m) => (
+              <MediaListRow
+                key={m.id}
+                item={{ id: m.id, media_type: m.media_type, source_type: m.source_type, url: m.url,
+                  caption: [m.swimmer_name, m.caption].filter(Boolean).join(' · ') || m.caption }}
+                onRemove={() => media.removeMedia(m.id)}
+              />
+            ))}
+          </ul>
+        </div>
+      )}
       {error && <p className="text-[12.5px] font-bold text-[#ef5350]">{error}</p>}
     </div>
   );

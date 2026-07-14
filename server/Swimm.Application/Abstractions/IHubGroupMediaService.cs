@@ -9,12 +9,19 @@ namespace Swimm.Application.Abstractions;
 /// </summary>
 public interface IHubGroupMediaService
 {
-    /// <summary>Публичная галерея группы (TrainingId == null), в порядке добавления.</summary>
+    /// <summary>Публичная галерея группы (TrainingId == null, Visibility=public), в порядке добавления.</summary>
     Task<List<HubGroupMediaDto>> GetGalleryAsync(int hubGroupId);
 
     /// <summary>
+    /// Members-слой (2B′): тренерские разборы (Visibility=members, вне тренировок) с контекстом
+    /// якоря (пловец/заплыв). Авторизацию (активный член группы / админ) решает контроллер.
+    /// </summary>
+    Task<List<HubGroupMemberMediaDto>> GetMembersMediaAsync(int hubGroupId);
+
+    /// <summary>
     /// Добавить медиа. Валидирует media_type/source_type/album-инвариант/https-url,
-    /// а если задан training_id — что тренировка принадлежит этой же группе.
+    /// training_id — принадлежность тренировки группе; для visibility=members — что группа
+    /// официальная и якоря (swimmer_id/result_id) корректны; якорь при public запрещён.
     /// </summary>
     Task<(bool Success, string? Error, int Id)> AddAsync(int hubGroupId, HubGroupMediaInputDto input, int createdByUserId);
 

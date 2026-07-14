@@ -15,6 +15,7 @@ import type {
   TrainingOption,
 } from './my-groups-types';
 import type { HubGroupMediaItem } from '../../utils/interfaces/results';
+import type { HubGroupMemberMediaItem } from './types';
 
 // Тот же паттерн antiforgery-токена, что и в hooks/useFavorites.ts.
 let cachedToken: string | null = null;
@@ -280,7 +281,12 @@ export function useMyHubGroupEdit(id: number | null) {
  */
 export function useHubGroupMedia(hubGroupId: number, slug: string) {
   const [gallery, setGallery] = useState<HubGroupMediaItem[]>([]);
+  const [membersMedia, setMembersMedia] = useState<HubGroupMemberMediaItem[]>([]);
   const [trainings, setTrainings] = useState<TrainingOption[]>([]);
+  // is_official + состав группы из деталей — редактору нужны для members-слоя
+  // (переключатель видимости и select пловца-якоря).
+  const [isOfficial, setIsOfficial] = useState(false);
+  const [groupSwimmers, setGroupSwimmers] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
   // Ошибка ЧТЕНИЯ списков (не мутаций): молча показывать пустую галерею нельзя —
   // выглядит как потеря данных (напр. группа скрыта настройкой HubGroupVisibility).
@@ -289,18 +295,25 @@ export function useHubGroupMedia(hubGroupId: number, slug: string) {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [gRes, tRes] = await Promise.all([
+      const [gRes, tRes, mRes] = await Promise.all([
         fetch(`/api/hub-groups/${encodeURIComponent(slug)}`, { credentials: 'include' }),
         fetch(`/api/hub-groups/${encodeURIComponent(slug)}/trainings`, { credentials: 'include' }),
+        fetch(`/api/hub-groups/${encodeURIComponent(slug)}/media/members`, { credentials: 'include' }),
       ]);
 
       const errors: string[] = [];
       if (!gRes.ok) errors.push(`gallery list unavailable (${gRes.status})`);
       if (!tRes.ok) errors.push(`trainings list unavailable (${tRes.status})`);
+      if (!mRes.ok) errors.push(`members media unavailable (${mRes.status})`);
       setLoadError(errors.length ? `Failed to load: ${errors.join(', ')}` : null);
 
       const g = gRes.ok ? await gRes.json() : null;
       setGallery((g?.gallery ?? []) as HubGroupMediaItem[]);
+      setIsOfficial(Boolean(g?.is_official));
+      setGroupSwimmers(((g?.members ?? []) as { swimmer_id: number; name: string }[])
+        .map((m) => ({ id: m.swimmer_id, name: m.name })));
+
+      setMembersMedia(mRes.ok ? ((await mRes.json()) as HubGroupMemberMediaItem[]) : []);
 
       const t = tRes.ok ? await tRes.json() : null;
       const seen = new Map<number, TrainingOption>();
@@ -331,6 +344,8 @@ export function useHubGroupMedia(hubGroupId: number, slug: string) {
         url: input.url,
         caption: input.caption || null,
         training_id: input.trainingId ?? null,
+        visibility: input.visibility ?? 'public',
+        swimmer_id: input.swimmerId ?? null,
       }),
     });
     const result = await saveResultFrom(r);
@@ -345,7 +360,7 @@ export function useHubGroupMedia(hubGroupId: number, slug: string) {
     return result;
   }, [hubGroupId, reload]);
 
-  return { gallery, trainings, loading, loadError, addMedia, removeMedia };
+  return { gallery, membersMedia, trainings, isOfficial, groupSwimmers, loading, loadError, addMedia, removeMedia };
 }
 
 /** Самозапись пользователя: вступить/выйти + список «участвую». */

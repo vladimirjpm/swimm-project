@@ -195,6 +195,31 @@ public class HubGroupsController : ControllerBase
     }
 
     /// <summary>
+    /// Members-медиа группы (тренерские разборы, 2B′): Visibility=members вне тренировок,
+    /// с контекстом якоря (пловец/заплыв). Видят активные участники-аккаунты группы и
+    /// управляющие (CanEdit) — та же аудитория, что у тренировок. Без кэша (личное).
+    /// </summary>
+    [HttpGet("/api/hub-groups/{slug}/media/members")]
+    [Authorize]
+    public async Task<IActionResult> GetMembersMedia(string slug)
+    {
+        if (string.IsNullOrWhiteSpace(slug) || slug.Length > 120)
+            return BadRequest("slug is required");
+
+        var raw = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(raw, out var userId)) return Unauthorized();
+
+        var groupId = await _trainings.ResolveGroupIdBySlugAsync(slug);
+        if (groupId is null) return NotFound();
+
+        var perms = await _permissions.GetPermissionsAsync(groupId.Value, userId, User.IsInRole("Admin"));
+        var isMember = await _trainings.IsActiveAccountMemberAsync(groupId.Value, userId);
+        if (!perms.CanEdit && !isMember) return Forbid();
+
+        return Ok(await _media.GetMembersMediaAsync(groupId.Value));
+    }
+
+    /// <summary>
     /// Добавить медиа группы (публичная галерея, если training_id не задан, иначе — медиа
     /// тренировки). Права — владелец/админ группы/site-админ (как в самообслуживании, CanEdit).
     /// </summary>

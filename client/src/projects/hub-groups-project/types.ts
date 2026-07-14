@@ -81,6 +81,22 @@ export type HubGroupHighlight =
 import type { HubGroupMediaItem } from '../../utils/interfaces/results';
 export type { HubGroupMediaItem };
 
+/** Медиа members-слоя (тренерские разборы, 2B′) — GET /api/hub-groups/{slug}/media/members. */
+export interface HubGroupMemberMediaItem {
+  id: number;
+  media_type: HubGroupMediaItem['media_type'];
+  source_type: HubGroupMediaItem['source_type'];
+  url: string;
+  caption?: string | null;
+  created_at: string;
+  swimmer_id?: number | null;
+  swimmer_name?: string | null;
+  swimmer_name_en?: string | null;
+  result_id?: number | null;
+  /** «freestyle 100 · 01/07/2026 · Competition» — контекст заплыва-якоря. */
+  result_label?: string | null;
+}
+
 export interface HubGroupStanding {
   swimmer_id: number;
   name: string;

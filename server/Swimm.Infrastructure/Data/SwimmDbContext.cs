@@ -670,6 +670,18 @@ public class SwimmDbContext : DbContext
                 .HasForeignKey(e => e.CreatedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // Якоря 2B′: удаление пловца/заплыва уносит и привязанные разборы (cascade) —
+            // медиа-ссылка без своего якоря бессмысленна.
+            entity.HasOne(e => e.Swimmer)
+                .WithMany()
+                .HasForeignKey(e => e.SwimmerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Result)
+                .WithMany()
+                .HasForeignKey(e => e.ResultId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             entity.HasCheckConstraint(
                 "CK_HubGroupMedia_MediaType",
                 @"""MediaType"" IN ('image', 'video', 'album')");
@@ -681,6 +693,15 @@ public class SwimmDbContext : DbContext
             entity.HasCheckConstraint(
                 "CK_HubGroupMedia_AlbumInvariant",
                 @"(""MediaType"" = 'album') = (""SourceType"" = 'album')");
+
+            entity.HasCheckConstraint(
+                "CK_HubGroupMedia_Visibility",
+                @"""Visibility"" IN ('public', 'members')");
+
+            // Якорь на персону — только members-слой: публично вешать медиа на пловца нельзя.
+            entity.HasCheckConstraint(
+                "CK_HubGroupMedia_AnchorMembersOnly",
+                @"(""SwimmerId"" IS NULL AND ""ResultId"" IS NULL) OR ""Visibility"" = 'members'");
         });
 
         // Тренировочная сессия — ПРИВАТНЫЕ данные группы, Sys_-таблица БЕЗ grant swimm_ro.
