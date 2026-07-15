@@ -37,6 +37,9 @@ public static class DependencyInjection
 
         services.AddSingleton<IResultSourceProvider, PdfResultSourceProvider>();
 
+        // Автозабор соревнований isr.org.il (фаза 6): singleton — троттлинг общий на процесс
+        services.AddSingleton<ICompetitionDiscoveryProvider, Discovery.IsrOrgDiscoveryProvider>();
+
         services.AddSingleton<IRecordSourceProvider, WorldRecordsSourceProvider>();
         services.AddSingleton<IRecordSourceProvider, IsrOrgAgeRecordsSourceProvider>();
         services.AddSingleton<IRecordSourceProvider, IsrOrgMastersRecordsSourceProvider>();

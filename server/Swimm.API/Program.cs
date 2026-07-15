@@ -110,6 +110,7 @@ if (googleEnabled)
 
 builder.Services.AddSingleton<DbStatusService>();
 builder.Services.AddHostedService<DbPingBackgroundService>();
+builder.Services.AddHostedService<Swimm.API.BackgroundServices.CompetitionDiscoveryBackgroundService>();
 
 var app = builder.Build();
 
@@ -169,6 +170,17 @@ if (args.Contains("--seed-dolphin-training"))
     var seedLog = await seeder.SeedAsync(jsonPath, csvPath, groupId, args.Contains("--force"));
     foreach (var line in seedLog)
         Console.WriteLine(line);
+    return;
+}
+
+// Разовая синхронизация «входящих» автозабора isr.org.il (фаза 6) и выход:
+//   dotnet run -- --discovery-sync
+if (args.Contains("--discovery-sync"))
+{
+    using var scope = app.Services.CreateScope();
+    var discovery = scope.ServiceProvider.GetRequiredService<ICompetitionDiscoveryService>();
+    var sync = await discovery.SyncAsync();
+    Console.WriteLine($"Discovery: на сайте {sync.TotalOnSite}, добавлено {sync.Added}, обновлено {sync.Updated}");
     return;
 }
 

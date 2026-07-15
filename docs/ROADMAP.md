@@ -242,17 +242,26 @@
 **Цель:** новые соревнования обнаруживаются и затягиваются с
 https://isr.org.il/competitions.asp полуавтоматически (человек подтверждает, машина делает).
 
-- ☐ 6.1. `ICompetitionDiscoveryProvider` + `IsrOrgDiscoveryProvider`: скачивание и парс
-  HTML-списка соревнований (даты, названия, ссылки на PDF-протоколы). Отдельный typed
-  HttpClient, вежливые интервалы, User-Agent, обработка иврит-кодировок.
-- ☐ 6.2. Админ-«входящие»: страница со списком обнаруженных соревнований (новое/уже
-  импортировано — матчинг по дате+названию), кнопка «затянуть» → скачивание PDF →
-  пайплайн фазы 1 (парс → превью → импорт).
-- ☐ 6.3. Фоновая проверка по расписанию (BackgroundService, конфигурируемый интервал,
-  вкл/выкл через Settings) + отметка в ImportHistory.
-- ☐ 6.4. Устойчивость: снапшоты скачанного HTML/PDF на диск для отладки; при изменении
-  вёрстки сайта — понятная ошибка в админке, а не тихий ноль результатов
-  (урок бага «англ. заголовок в HE-файле»).
+- ✅ 6.1. (2026-07-15) `ICompetitionDiscoveryProvider` + `IsrOrgDiscoveryProvider`
+  (`Swimm.Parsing/Discovery`): список competitions.asp (regex, UTF-8, диапазоны дат
+  «19-20.6.2026»), детальная comp.asp (площадка, loglig-id). Вежливый троттлинг 2с,
+  User-Agent, whitelist доменов. **Важно: PDF-протоколов на isr.org.il больше нет** —
+  результаты в iframe loglig.com; PDF добывается экспортом
+  `loglig.com/Leagues/ExportSwimmingCompetitionResults?competitionId=<logligId>` и
+  парсится существующим IsrOrgParser (проверено вживую, language=he обязателен).
+- ✅ 6.2. (2026-07-15) Админ-«входящие»: `Sys_DiscoveredCompetitions` (миграция
+  AddDiscoveredCompetitions) + страница `/Admin/Discovery` + `DiscoveryAdminController`
+  (`/api/admin/discovery`): sync, матчинг «уже импортировано» по дате+нормализованному
+  имени, «Затянуть» → PDF → превью парсера → импорт через очередь (категории, событие
+  для многодневных), ручное скачивание PDF, скрытие строк.
+- ✅ 6.3. (2026-07-15) `CompetitionDiscoveryBackgroundService`: настройки
+  `DiscoveryEnabled` (выкл. по умолчанию) / `DiscoveryIntervalHours`, перечитываются
+  на лету. Плюс разовый прогон `dotnet run -- --discovery-sync`.
+- ✅ 6.4. (2026-07-15) Устойчивость: снапшоты HTML/PDF на диск (конфиг
+  `Discovery:SnapshotDir`), 0 распознанных строк / не-PDF от loglig / отсутствие
+  loglig-iframe → явные ошибки в админке (LastError у строки, 502 у sync).
+  Тесты — на снапшотах живого HTML в `Swimm.Tests/Fixtures/Discovery` (сеть в тестах
+  запрещена).
 
 **Критерий приёмки:** новое соревнование на isr.org.il появляется во «входящих» без участия
 человека; импорт — в два клика.

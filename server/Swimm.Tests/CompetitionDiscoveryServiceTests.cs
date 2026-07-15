@@ -1,0 +1,92 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Swimm.Application.Abstractions;
+using Swimm.Application.Dtos;
+using Swimm.Domain.Entities;
+using Swimm.Infrastructure.Data;
+using Swimm.Infrastructure.Services;
+using Xunit;
+
+namespace Swimm.Tests;
+
+/// <summary>Синхронизация «входящих» автозабора + матчинг «уже импортировано» (фаза 6).</summary>
+public class CompetitionDiscoveryServiceTests
+{
+    private sealed class FakeProvider : ICompetitionDiscoveryProvider
+    {
+        public List<DiscoveredListItem> Finished { get; } = [];
+        public List<DiscoveredListItem> Upcoming { get; } = [];
+
+        public Task<IReadOnlyList<DiscoveredListItem>> FetchListAsync(bool finished, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<DiscoveredListItem>>(finished ? Finished : Upcoming);
+
+        public Task<DiscoveredDetails> FetchDetailsAsync(int orgCompId, CancellationToken ct = default)
+            => Task.FromResult(new DiscoveredDetails("N", "V", 123, 1));
+
+        public Task<byte[]> FetchResultsPdfAsync(int logligId, string culture = "he-IL", CancellationToken ct = default)
+            => throw new NotSupportedException();
+    }
+
+    private static SwimmDbContext CreateDb(string name) =>
+        new(new DbContextOptionsBuilder<SwimmDbContext>().UseInMemoryDatabase(name).Options);
+
+    private static CompetitionDiscoveryService CreateService(SwimmDbContext db, FakeProvider provider) =>
+        new(db, provider, NullLogger<CompetitionDiscoveryService>.Instance);
+
+    private static DiscoveredListItem Item(int id, string name, string startIso, string? endIso = null) =>
+        new(id, name,
+            DateTime.SpecifyKind(DateTime.Parse(startIso), DateTimeKind.Utc),
+            DateTime.SpecifyKind(DateTime.Parse(endIso ?? startIso), DateTimeKind.Utc));
+
+    [Fact]
+    public async Task Sync_AddsNew_UpdatesChanged_KeepsStatus()
+    {
+        await using var db = CreateDb(nameof(Sync_AddsNew_UpdatesChanged_KeepsStatus));
+        var provider = new FakeProvider();
+        provider.Finished.Add(Item(100, "Старое имя", "2026-06-01"));
+        var svc = CreateService(db, provider);
+
+        var first = await svc.SyncAsync();
+        Assert.Equal(1, first.Added);
+
+        // Пометим ignored и «переименуем» на сайте — статус должен сохраниться, имя обновиться.
+        var row = await db.DiscoveredCompetitions.SingleAsync();
+        row.Status = DiscoveredCompetitionStatus.Ignored;
+        await db.SaveChangesAsync();
+
+        provider.Finished[0] = Item(100, "Новое имя", "2026-06-01");
+        provider.Upcoming.Add(Item(200, "Будущее", "2026-09-01"));
+        var second = await svc.SyncAsync();
+
+        Assert.Equal(1, second.Added);
+        Assert.Equal(1, second.Updated);
+        var updated = await db.DiscoveredCompetitions.SingleAsync(d => d.OrgCompId == 100);
+        Assert.Equal("Новое имя", updated.Name);
+        Assert.Equal(DiscoveredCompetitionStatus.Ignored, updated.Status);
+    }
+
+    [Fact]
+    public async Task GetAll_MatchesImportedByNameAndDate()
+    {
+        await using var db = CreateDb(nameof(GetAll_MatchesImportedByNameAndDate));
+        db.Competitions.Add(new Competition { Name = "ליגה מס 4", Date = "03/07/2026", PoolType = "25m" });
+        db.DiscoveredCompetitions.Add(new DiscoveredCompetition
+        {
+            OrgCompId = 1, Name = " ליגה  מס 4 ", // лишние пробелы — нормализация должна съесть
+            DateStart = new DateTime(2026, 7, 3, 0, 0, 0, DateTimeKind.Utc),
+            DateEnd = new DateTime(2026, 7, 3, 0, 0, 0, DateTimeKind.Utc)
+        });
+        db.DiscoveredCompetitions.Add(new DiscoveredCompetition
+        {
+            OrgCompId = 2, Name = "ליגה מס 4", // то же имя, другая дата — НЕ матч
+            DateStart = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            DateEnd = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+        });
+        await db.SaveChangesAsync();
+
+        var all = await CreateService(db, new FakeProvider()).GetAllAsync();
+
+        Assert.Equal("ליגה מס 4", all.Single(d => d.OrgCompId == 1).MatchedCompetitionName);
+        Assert.Null(all.Single(d => d.OrgCompId == 2).MatchedCompetitionName);
+    }
+}

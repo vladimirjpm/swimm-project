@@ -46,6 +46,7 @@ public class SwimmDbContext : DbContext
 
     /* === Импорт === */
     public DbSet<ImportHistory> ImportHistory => Set<ImportHistory>();
+    public DbSet<DiscoveredCompetition> DiscoveredCompetitions => Set<DiscoveredCompetition>();
 
     /* === Фавориты и медиа пользователей === */
     public DbSet<UserFavorite> UserFavorites => Set<UserFavorite>();
@@ -355,6 +356,12 @@ public class SwimmDbContext : DbContext
         });
 
         // --- Импорт ---
+
+        // «Входящие» автозабора isr.org.il (фаза 6) — приватная Sys_-таблица, без grant swimm_ro.
+        modelBuilder.Entity<DiscoveredCompetition>(entity =>
+        {
+            entity.ToTable("Sys_DiscoveredCompetitions");
+        });
 
         modelBuilder.Entity<ImportHistory>(entity =>
         {

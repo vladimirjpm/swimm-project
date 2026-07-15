@@ -46,6 +46,10 @@ public class AdminSettingsService : ISettingsService
             new("HubGroupVisibility", "public", "string", "livesite",
                 "Видимость групп: public — все видны всем; private — все скрыты; " +
                 "perGroup — решает флаг IsPublic у конкретной группы"),
+            new("DiscoveryEnabled", "false", "bool", "admin",
+                "Автозабор isr.org.il: true — фоновая проверка списка соревнований по расписанию"),
+            new("DiscoveryIntervalHours", "12", "int", "admin",
+                "Интервал фоновой проверки isr.org.il в часах (минимум 1)"),
         };
 
         foreach (var s in defaults)

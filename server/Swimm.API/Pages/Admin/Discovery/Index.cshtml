@@ -1,0 +1,229 @@
+@page
+@model Swimm.API.Pages.Admin.Discovery.IndexModel
+@{
+    ViewData["Title"] = "Discovery";
+    ViewData["PageSubtitle"] = "Автозабор соревнований с isr.org.il — входящие";
+}
+
+<div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
+    Список соревнований с <a class="text-admin-accent" href="https://isr.org.il/competitions.asp" target="_blank" rel="noopener">isr.org.il/competitions.asp</a>.
+    «Проверить сейчас» обновляет входящие; «Затянуть» скачивает PDF-протокол (loglig) и открывает превью парсера —
+    импорт пойдёт через обычную очередь (см. Import History). Фоновая проверка включается настройками
+    <code>DiscoveryEnabled</code> / <code>DiscoveryIntervalHours</code>.
+</div>
+
+<div class="mb-4 flex flex-wrap items-center gap-3">
+    <button id="btn-sync" class="admin-btn admin-btn-primary cursor-pointer rounded-md px-4 py-2 text-[13px] font-semibold">
+        Проверить сейчас
+    </button>
+    <label class="flex items-center gap-2 text-[13px] text-admin-text-muted">
+        <input type="checkbox" id="show-ignored" class="cursor-pointer" /> показывать скрытые
+    </label>
+    <span id="sync-info" class="text-[12.5px] text-admin-text-muted"></span>
+</div>
+
+<div class="overflow-x-auto">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Даты</th>
+                <th>Соревнование</th>
+                <th>Площадка</th>
+                <th>Статус</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody id="disc-body"></tbody>
+    </table>
+</div>
+<div id="empty-msg" class="hidden text-center text-admin-text-muted italic py-10">
+    Входящие пусты — нажмите «Проверить сейчас».
+</div>
+
+<!-- Превью «затянутого» PDF перед импортом -->
+<div id="preview-card" class="admin-card mt-6 hidden p-4">
+    <div class="mb-2 text-sm font-semibold text-admin-text" id="preview-title"></div>
+    <div id="preview-summary" class="mb-3 text-[13px] text-admin-text-muted"></div>
+    <div id="preview-warnings" class="mb-3 hidden rounded-md border border-admin-danger/40 bg-admin-danger/10 p-3 text-[12.5px]"></div>
+
+    <div class="mb-3">
+        <div class="mb-1 text-[12px] font-semibold uppercase tracking-wide text-admin-text-muted">Категории</div>
+        <div id="preview-categories" class="flex flex-wrap gap-3 text-[13px]"></div>
+    </div>
+
+    <div class="mb-4" id="event-block">
+        <label class="flex items-center gap-2 text-[13px] text-admin-text-muted">
+            <input type="checkbox" id="event-create" class="cursor-pointer" />
+            многодневное — создать событие с именем
+        </label>
+        <input type="text" id="event-name" class="admin-input mt-2 w-full max-w-md rounded-md px-3 py-2 text-[13px]" placeholder="Название события" />
+    </div>
+
+    <div class="flex gap-3">
+        <button id="btn-import" class="admin-btn admin-btn-primary cursor-pointer rounded-md px-4 py-2 text-[13px] font-semibold">Импортировать</button>
+        <button id="btn-cancel-preview" class="cursor-pointer rounded-md border border-admin-border px-4 py-2 text-[13px] text-admin-text-muted">Отмена</button>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    const API = '/api/admin/discovery';
+    let rows = [];
+    let preview = null; // { previewId, row }
+
+    const fmtDate = (iso) => new Date(iso).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const dateRange = (r) => r.dateStart === r.dateEnd ? fmtDate(r.dateStart) : `${fmtDate(r.dateStart)} – ${fmtDate(r.dateEnd)}`;
+
+    async function apiJson(url, opts = {}) {
+        opts.headers = { 'X-XSRF-TOKEN': _csrfToken, ...(opts.headers ?? {}) };
+        const res = await fetch(url, { credentials: 'same-origin', ...opts });
+        let body = null;
+        try { body = await res.json(); } catch { /* пустое тело */ }
+        if (!res.ok) throw new Error(body?.error ?? `${res.status} ${res.statusText}`);
+        return body;
+    }
+
+    function statusBadge(r) {
+        if (r.status === 'imported' || r.matchedCompetitionName)
+            return '<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold bg-[rgba(102,187,106,0.2)] text-[#66bb6a]">импортировано</span>';
+        if (r.status === 'ignored')
+            return '<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold bg-white/[.08] text-admin-text-muted">скрыто</span>';
+        const future = new Date(r.dateStart) > new Date();
+        return future
+            ? '<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold bg-[rgba(79,195,247,0.15)] text-[#4fc3f7]">предстоит</span>'
+            : '<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold bg-[rgba(255,213,79,0.15)] text-[#ffd54f]">новое</span>';
+    }
+
+    function render() {
+        const showIgnored = document.getElementById('show-ignored').checked;
+        const visible = rows.filter(r => showIgnored || r.status !== 'ignored');
+        const tbody = document.getElementById('disc-body');
+        document.getElementById('empty-msg').classList.toggle('hidden', visible.length > 0);
+
+        tbody.innerHTML = visible.map(r => {
+            const isNew = r.status === 'new' && !r.matchedCompetitionName && new Date(r.dateStart) <= new Date();
+            return `
+            <tr class="border-b border-white/[.04] hover:bg-white/[.03]">
+                <td class="py-2.5 px-3 whitespace-nowrap text-[#90a4ae]">${dateRange(r)}</td>
+                <td class="py-2.5 px-3" dir="rtl" style="text-align:left">
+                    <a class="text-admin-accent" href="https://isr.org.il/comp.asp?compID=${r.orgCompId}" target="_blank" rel="noopener">${esc(r.name)}</a>
+                    ${r.lastError ? `<div class="text-[11px] text-[#ef9a9a]" dir="ltr">${esc(r.lastError)}</div>` : ''}
+                    ${r.matchedCompetitionName ? `<div class="text-[11px] text-[#66bb6a]" dir="rtl">= ${esc(r.matchedCompetitionName)}</div>` : ''}
+                </td>
+                <td class="py-2.5 px-3 text-[#90a4ae]" dir="rtl" style="text-align:left">${esc(r.venue ?? '—')}</td>
+                <td class="py-2.5 px-3">${statusBadge(r)}</td>
+                <td class="py-2.5 px-3 whitespace-nowrap">
+                    ${isNew ? `<button onclick="discPreview(${r.id})" class="py-1 px-3 rounded text-xs font-semibold cursor-pointer bg-[rgba(79,195,247,0.15)] text-[#4fc3f7] hover:bg-[rgba(79,195,247,0.25)]">Затянуть</button>` : ''}
+                    <a href="${API}/${r.id}/pdf" class="py-1 px-3 rounded text-xs font-semibold bg-white/[.06] text-admin-text-muted hover:bg-white/[.1]">PDF</a>
+                    ${r.status === 'ignored'
+                        ? `<button onclick="discStatus(${r.id}, 'new')" class="py-1 px-3 rounded text-xs cursor-pointer text-admin-text-muted">вернуть</button>`
+                        : `<button onclick="discStatus(${r.id}, 'ignored')" class="py-1 px-3 rounded text-xs cursor-pointer text-admin-text-muted" title="Скрыть">✕</button>`}
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    async function load() {
+        try {
+            rows = await apiJson(`${API}/list`);
+            render();
+        } catch (e) { toast('Ошибка загрузки: ' + e.message); }
+    }
+
+    document.getElementById('btn-sync').addEventListener('click', async () => {
+        const btn = document.getElementById('btn-sync');
+        btn.disabled = true;
+        document.getElementById('sync-info').textContent = 'Проверяю сайт…';
+        try {
+            const r = await apiJson(`${API}/sync`, { method: 'POST' });
+            document.getElementById('sync-info').textContent =
+                `На сайте: ${r.totalOnSite}, новых: ${r.added}, обновлено: ${r.updated}`;
+            await load();
+        } catch (e) {
+            document.getElementById('sync-info').textContent = '';
+            toast('Ошибка: ' + e.message, 5000);
+        } finally { btn.disabled = false; }
+    });
+
+    document.getElementById('show-ignored').addEventListener('change', render);
+
+    window.discStatus = async function (id, status) {
+        try {
+            await apiJson(`${API}/${id}/status`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+            await load();
+        } catch (e) { toast('Ошибка: ' + e.message); }
+    };
+
+    window.discPreview = async function (id) {
+        const row = rows.find(r => r.id === id);
+        toast('Скачиваю и парсю PDF…', 4000);
+        try {
+            const p = await apiJson(`${API}/${id}/preview`, { method: 'POST' });
+            preview = { previewId: p.previewId, row };
+            showPreview(p, row);
+        } catch (e) { toast('Ошибка: ' + e.message, 6000); }
+    };
+
+    async function showPreview(p, row) {
+        document.getElementById('preview-card').classList.remove('hidden');
+        document.getElementById('preview-title').textContent = `Превью: ${row.name}`;
+        document.getElementById('preview-summary').innerHTML =
+            `Распознано результатов: <b>${p.resultCount}</b>` +
+            (p.competitions?.length
+                ? '<ul class="mt-1 list-disc pl-5">' + p.competitions.map(c =>
+                    `<li dir="rtl" style="text-align:left">${esc(c.competition)} — ${esc(c.date)} (${c.resultCount})</li>`).join('') + '</ul>'
+                : '');
+        const warn = document.getElementById('preview-warnings');
+        warn.classList.toggle('hidden', !(p.warnings?.length));
+        warn.innerHTML = (p.warnings ?? []).map(esc).join('<br>');
+
+        // Многодневное — предлагаем событие сразу
+        const multiDay = (p.competitions?.length ?? 0) > 1;
+        document.getElementById('event-create').checked = multiDay;
+        document.getElementById('event-name').value = row.name;
+
+        // Категории из БД
+        try {
+            const cats = await fetch('/api/categories', { credentials: 'same-origin' }).then(r => r.json());
+            document.getElementById('preview-categories').innerHTML = cats.map(c =>
+                `<label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" value="${esc(c.key)}" class="disc-cat cursor-pointer"> ${esc(c.name)}</label>`
+            ).join('');
+        } catch { /* категории опциональны */ }
+
+        document.getElementById('preview-card').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    document.getElementById('btn-cancel-preview').addEventListener('click', () => {
+        preview = null;
+        document.getElementById('preview-card').classList.add('hidden');
+    });
+
+    document.getElementById('btn-import').addEventListener('click', async () => {
+        if (!preview) return;
+        const categoryKeys = [...document.querySelectorAll('.disc-cat:checked')].map(i => i.value);
+        const createEvent = document.getElementById('event-create').checked;
+        try {
+            const r = await apiJson(`${API}/import`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    previewId: preview.previewId,
+                    categoryKeys: categoryKeys.length ? categoryKeys : null,
+                    eventId: null,
+                    newEventName: createEvent ? document.getElementById('event-name').value.trim() : null
+                })
+            });
+            toast(`Импорт поставлен в очередь (job ${r.jobId}) — статус в Import History`, 6000);
+            preview = null;
+            document.getElementById('preview-card').classList.add('hidden');
+            await load();
+        } catch (e) { toast('Ошибка импорта: ' + e.message, 6000); }
+    });
+
+    load();
+})();
+</script>
+}
