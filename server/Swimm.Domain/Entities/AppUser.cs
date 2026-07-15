@@ -44,6 +44,13 @@ public class AppUser
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 
+    /// <summary>
+    /// Последняя активность (обновляется в CookieSecurityStampValidator при успешной
+    /// ре-валидации, т.е. не чаще раза в ~5 минут на сессию). «Онлайн сейчас» в админке =
+    /// LastSeenAt свежее ~15 минут. null — не заходил после введения поля.
+    /// </summary>
+    public DateTime? LastSeenAt { get; set; }
+
     // --- Навигация ---
     public ICollection<AppUserRole> UserRoles { get; set; } = new List<AppUserRole>();
     public ICollection<UserExternalLogin> ExternalLogins { get; set; } = new List<UserExternalLogin>();

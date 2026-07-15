@@ -120,7 +120,15 @@ public class LocalAuthService : ILocalAuthService
         }
 
         if (cred.LockoutEnd is { } until && until > DateTime.UtcNow)
+        {
+            // Попытка входа во время lockout — тоже событие аудита (подбор пароля).
+            _db.UserLoginHistory.Add(new UserLoginHistory
+            {
+                UserId = user.Id, Provider = "Local", Success = false, LoginAt = DateTime.UtcNow
+            });
+            await _db.SaveChangesAsync(ct);
             return LoginResult.Locked(until);
+        }
 
         if (!user.IsActive)
             return LoginResult.Fail(LoginStatus.InvalidCredentials);
@@ -136,6 +144,10 @@ public class LocalAuthService : ILocalAuthService
                 status = LoginStatus.LockedOut;
             }
             cred.UpdatedAt = DateTime.UtcNow;
+            _db.UserLoginHistory.Add(new UserLoginHistory
+            {
+                UserId = user.Id, Provider = "Local", Success = false, LoginAt = DateTime.UtcNow
+            });
             await _db.SaveChangesAsync(ct);
             return status == LoginStatus.LockedOut
                 ? LoginResult.Locked(cred.LockoutEnd!.Value)

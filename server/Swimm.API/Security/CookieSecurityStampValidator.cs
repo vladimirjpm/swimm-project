@@ -88,6 +88,12 @@ public static class CookieSecurityStampValidator
                 await RejectAsync(context);
                 return;
             }
+
+            // Метка активности для админки («онлайн сейчас»). Дёшево: мы уже на
+            // троттленном пути (≤ раза в ValidateInterval на сессию), один UPDATE без чтения.
+            await db.AppUsers
+                .Where(u => u.Id == userId)
+                .ExecuteUpdateAsync(s => s.SetProperty(u => u.LastSeenAt, now.UtcDateTime));
         }
         catch (Exception ex) when (ex is NpgsqlException or InvalidOperationException or RetryLimitExceededException)
         {

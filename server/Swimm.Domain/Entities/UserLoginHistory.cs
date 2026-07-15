@@ -26,4 +26,11 @@ public class UserLoginHistory
     public string? IpAddress { get; set; }
 
     public DateTime LoginAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// false — неудачная попытка входа (неверный пароль / lockout). Пишется только для
+    /// существующих пользователей: для неизвестного email события нет (нет UserId,
+    /// и это дало бы противнику сигнал о существовании адреса).
+    /// </summary>
+    public bool Success { get; set; } = true;
 }

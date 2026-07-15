@@ -19,10 +19,14 @@ public class AdminRepository : IAdminRepository
 
     public async Task<List<UserDto>> GetUsersAsync()
     {
+        var since7d = DateTime.UtcNow.AddDays(-7);
+        var since30d = DateTime.UtcNow.AddDays(-30);
+
         return await _db.AppUsers
             .AsNoTracking()
             .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
-            .OrderByDescending(u => u.CreatedAt)
+            .OrderByDescending(u => u.LastSeenAt)
+            .ThenByDescending(u => u.CreatedAt)
             .Select(u => new UserDto
             {
                 Id = u.Id,
@@ -32,7 +36,12 @@ public class AdminRepository : IAdminRepository
                 IsActive = u.IsActive,
                 CreatedAt = u.CreatedAt,
                 SwimmerId = u.SwimmerId,
-                Roles = u.UserRoles.Select(r => r.Role.Name).ToArray()
+                Roles = u.UserRoles.Select(r => r.Role.Name).ToArray(),
+                HasLocalPassword = u.LocalCredential != null && u.LocalCredential.PasswordHash != null,
+                HasGoogle = u.ExternalLogins.Any(e => e.Provider == "Google"),
+                LastSeenAt = u.LastSeenAt,
+                Logins7d = _db.UserLoginHistory.Count(h => h.UserId == u.Id && h.Success && h.LoginAt >= since7d),
+                Logins30d = _db.UserLoginHistory.Count(h => h.UserId == u.Id && h.Success && h.LoginAt >= since30d)
             })
             .ToListAsync();
     }
@@ -101,6 +110,43 @@ public class AdminRepository : IAdminRepository
     {
         user.SecurityStamp = Guid.NewGuid().ToString("N");
         user.UpdatedAt = DateTime.UtcNow;
+    }
+
+    public async Task<bool> ForceSignOutAsync(int userId)
+    {
+        var user = await _db.AppUsers.FindAsync(userId);
+        if (user == null) return false;
+
+        BumpSecurityStamp(user);
+        await _db.SaveChangesAsync();
+        return true;
+    }
+
+    /// <summary>Окно «онлайн сейчас»: 3× интервала ре-валидации куки (5 мин) с запасом.</summary>
+    public static readonly TimeSpan OnlineWindow = TimeSpan.FromMinutes(15);
+
+    public async Task<LoginStatsDto> GetLoginStatsAsync()
+    {
+        var now = DateTime.UtcNow;
+        var onlineSince = now - OnlineWindow;
+        var since7d = now.AddDays(-7);
+        var since30d = now.AddDays(-30);
+
+        return new LoginStatsDto
+        {
+            OnlineNow = await _db.AppUsers.CountAsync(u => u.IsActive && u.LastSeenAt >= onlineSince),
+            Logins7d = await _db.UserLoginHistory.CountAsync(h => h.Success && h.LoginAt >= since7d),
+            Logins30d = await _db.UserLoginHistory.CountAsync(h => h.Success && h.LoginAt >= since30d),
+            FailedLogins7d = await _db.UserLoginHistory.CountAsync(h => !h.Success && h.LoginAt >= since7d)
+        };
+    }
+
+    public async Task<int> CleanupLoginHistoryAsync()
+    {
+        var cutoff = DateTime.UtcNow.AddDays(-90);
+        return await _db.UserLoginHistory
+            .Where(h => h.LoginAt < cutoff)
+            .ExecuteDeleteAsync();
     }
 
     public async Task<AdminStatsDto> GetStatsAsync()
@@ -195,7 +241,8 @@ public class AdminRepository : IAdminRepository
                 {
                     Provider = h.Provider,
                     IpAddress = h.IpAddress,
-                    LoginAt = h.LoginAt
+                    LoginAt = h.LoginAt,
+                    Success = h.Success
                 }).ToList()
         };
     }

@@ -439,6 +439,8 @@ public class SwimmDbContext : DbContext
             entity.ToTable("Sys_UserLoginHistory");
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => e.LoginAt);
+            // Существующие строки истории — успешные логины (фейлы начали писаться позже).
+            entity.Property(e => e.Success).HasDefaultValue(true);
 
             entity.HasOne(e => e.User)
                 .WithMany()

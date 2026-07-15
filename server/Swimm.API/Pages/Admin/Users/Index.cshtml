@@ -1,0 +1,186 @@
+@page
+@model Swimm.API.Pages.Admin.Users.IndexModel
+@{
+    ViewData["Title"] = "Users";
+    ViewData["PageSubtitle"] = "Пользователи и логины: кто онлайн, активность, отзыв сессий";
+
+    var flash = TempData["Flash"] as string;
+}
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}
+
+@* ── Счётчики логинов ── *@
+<div class="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div class="admin-card">
+        <div class="text-2xl font-bold tabular-nums text-admin-text">@Model.Stats.OnlineNow</div>
+        <div class="text-xs text-admin-text-muted">онлайн сейчас (≤15 мин)</div>
+    </div>
+    <div class="admin-card">
+        <div class="text-2xl font-bold tabular-nums text-admin-text">@Model.Stats.Logins7d</div>
+        <div class="text-xs text-admin-text-muted">логинов за 7 дней</div>
+    </div>
+    <div class="admin-card">
+        <div class="text-2xl font-bold tabular-nums text-admin-text">@Model.Stats.Logins30d</div>
+        <div class="text-xs text-admin-text-muted">логинов за 30 дней</div>
+    </div>
+    <div class="admin-card">
+        <div class="text-2xl font-bold tabular-nums @(Model.Stats.FailedLogins7d > 0 ? "text-admin-warning" : "text-admin-text")">@Model.Stats.FailedLogins7d</div>
+        <div class="text-xs text-admin-text-muted">неудачных попыток за 7 дней</div>
+    </div>
+</div>
+
+<div class="overflow-x-auto">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Пользователь</th>
+                <th>Роли</th>
+                <th>Вход</th>
+                <th>Последняя активность</th>
+                <th class="text-right">Логины 7д / 30д</th>
+                <th>Статус</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var u in Model.Users)
+            {
+                var online = Swimm.API.Pages.Admin.Users.IndexModel.IsOnline(u.LastSeenAt);
+                <tr class="@(u.Id == Model.UserId ? "bg-admin-surface-hover" : null)">
+                    <td>
+                        <a href="@Url.Page("Index", new { userId = u.Id })" class="text-admin-accent hover:underline font-medium">@u.DisplayName</a>
+                        <div class="text-xs text-admin-text-muted">@u.Email</div>
+                    </td>
+                    <td>
+                        @if (u.Roles.Length == 0)
+                        {
+                            <span class="text-admin-text-muted">—</span>
+                        }
+                        @foreach (var r in u.Roles)
+                        {
+                            <span class="admin-badge border-admin-border bg-admin-surface-hover text-admin-text mr-1">@r</span>
+                        }
+                    </td>
+                    <td class="text-xs text-admin-text-muted whitespace-nowrap">
+                        @(u.HasGoogle ? "Google" : null)@(u.HasGoogle && u.HasLocalPassword ? " + " : null)@(u.HasLocalPassword ? "пароль" : null)
+                        @if (!u.HasGoogle && !u.HasLocalPassword)
+                        {
+                            <span>—</span>
+                        }
+                    </td>
+                    <td class="whitespace-nowrap">
+                        @if (online)
+                        {
+                            <span class="admin-badge border-admin-success/30 bg-admin-success/15 text-admin-success">● online</span>
+                        }
+                        else if (u.LastSeenAt != null)
+                        {
+                            <span class="text-xs text-admin-text-muted" title="@u.LastSeenAt UTC">@u.LastSeenAt.Value.ToString("dd.MM.yyyy HH:mm") UTC</span>
+                        }
+                        else
+                        {
+                            <span class="text-admin-text-muted">—</span>
+                        }
+                    </td>
+                    <td class="text-right tabular-nums">@u.Logins7d / @u.Logins30d</td>
+                    <td>
+                        @if (u.IsActive)
+                        {
+                            <span class="admin-badge border-admin-success/30 bg-admin-success/15 text-admin-success">active</span>
+                        }
+                        else
+                        {
+                            <span class="admin-badge border-admin-danger/30 bg-admin-danger/15 text-admin-danger">disabled</span>
+                        }
+                    </td>
+                    <td class="text-right whitespace-nowrap">
+                        <form method="post" asp-page-handler="ForceSignOut" class="inline"
+                              onsubmit="return confirm('Отозвать все сессии пользователя @u.Email?');">
+                            <input type="hidden" name="userId" value="@u.Id" />
+                            <button type="submit" class="admin-btn admin-btn-ghost py-1 px-2.5" title="Разлогинить со всех устройств (аккаунт остаётся активным)">Выход везде</button>
+                        </form>
+                        @if (u.IsActive)
+                        {
+                            <form method="post" asp-page-handler="SetActive" class="inline"
+                                  onsubmit="return confirm('Отключить пользователя @u.Email? Все сессии будут отозваны немедленно.');">
+                                <input type="hidden" name="userId" value="@u.Id" />
+                                <input type="hidden" name="isActive" value="false" />
+                                <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Отключить</button>
+                            </form>
+                        }
+                        else
+                        {
+                            <form method="post" asp-page-handler="SetActive" class="inline">
+                                <input type="hidden" name="userId" value="@u.Id" />
+                                <input type="hidden" name="isActive" value="true" />
+                                <button type="submit" class="admin-btn admin-btn-primary py-1 px-2.5">Включить</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@* ── Панель деталей: история логинов выбранного пользователя ── *@
+@if (Model.Detail is { } d)
+{
+    <div class="admin-card mt-5">
+        <div class="mb-3 flex items-center justify-between">
+            <h3 class="font-semibold text-admin-text">
+                История логинов — @d.DisplayName <span class="text-admin-text-muted font-normal">(@d.Email)</span>
+            </h3>
+            <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost py-1 px-2.5">Закрыть</a>
+        </div>
+        <div class="mb-3 flex flex-wrap gap-2 text-xs text-admin-text-muted">
+            <span>Создан: @d.CreatedAt.ToString("dd.MM.yyyy")</span>
+            <span>· Пароль: @(d.HasLocalPassword ? (d.LocalEmailConfirmed ? "есть (email подтверждён)" : "есть (email НЕ подтверждён)") : "нет")</span>
+            @if (d.LocalFailedLoginCount > 0)
+            {
+                <span class="text-admin-warning">· Неудачных попыток подряд: @d.LocalFailedLoginCount</span>
+            }
+            @if (d.LocalLockoutEnd is { } lockout && lockout > DateTime.UtcNow)
+            {
+                <span class="text-admin-danger">· Lockout до @lockout.ToString("dd.MM HH:mm") UTC</span>
+            }
+        </div>
+        @if (d.LoginHistory.Count == 0)
+        {
+            <p class="text-sm text-admin-text-muted">Событий нет (журнал хранится 90 дней).</p>
+        }
+        else
+        {
+            <table class="admin-table">
+                <thead>
+                    <tr><th>Когда (UTC)</th><th>Провайдер</th><th>IP</th><th>Результат</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var h in d.LoginHistory)
+                    {
+                        <tr>
+                            <td class="tabular-nums">@h.LoginAt.ToString("dd.MM.yyyy HH:mm:ss")</td>
+                            <td>@h.Provider</td>
+                            <td class="font-mono text-xs">@(h.IpAddress ?? "—")</td>
+                            <td>
+                                @if (h.Success)
+                                {
+                                    <span class="admin-badge border-admin-success/30 bg-admin-success/15 text-admin-success">ok</span>
+                                }
+                                else
+                                {
+                                    <span class="admin-badge border-admin-danger/30 bg-admin-danger/15 text-admin-danger">fail</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+}

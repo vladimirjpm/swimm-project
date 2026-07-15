@@ -10,6 +10,24 @@ public class UserDto
     public DateTime CreatedAt { get; set; }
     public int? SwimmerId { get; set; }
     public string[] Roles { get; set; } = [];
+    /// <summary>Есть локальный пароль / привязан Google — для колонки «провайдеры».</summary>
+    public bool HasLocalPassword { get; set; }
+    public bool HasGoogle { get; set; }
+    public DateTime? LastSeenAt { get; set; }
+    /// <summary>Успешных логинов за 7/30 дней (для панели логинов).</summary>
+    public int Logins7d { get; set; }
+    public int Logins30d { get; set; }
+}
+
+/// <summary>Сводка по логинам для шапки Admin/Users.</summary>
+public class LoginStatsDto
+{
+    /// <summary>Юзеров с активностью за последние ~15 минут.</summary>
+    public int OnlineNow { get; set; }
+    public int Logins7d { get; set; }
+    public int Logins30d { get; set; }
+    /// <summary>Неудачных попыток входа за 7 дней — индикатор перебора паролей.</summary>
+    public int FailedLogins7d { get; set; }
 }
 
 public class RoleDto
@@ -106,6 +124,7 @@ public class LoginHistoryItemDto
     public string Provider { get; set; } = "";
     public string? IpAddress { get; set; }
     public DateTime LoginAt { get; set; }
+    public bool Success { get; set; } = true;
 }
 
 public enum RoleOperationResult

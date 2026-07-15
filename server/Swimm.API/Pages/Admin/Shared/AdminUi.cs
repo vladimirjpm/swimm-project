@@ -23,6 +23,7 @@ public static class AdminNav
         new("Import", "download", "/Admin/Import", "Data"),
         new("Import History", "history", "/Admin/ImportHistory", "Data"),
 
+        new("Users", "users", "/Admin/Users", "System"),
         new("DB Schema", "database", "/Admin/Db", "System"),
         new("API Reference", "radio", "/Admin/Api", "System"),
         new("Settings", "settings", "/Admin/Settings", "System"),

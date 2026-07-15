@@ -81,6 +81,18 @@ public class AdminController : ControllerBase
         return Ok(new { message = request.IsActive ? "User activated" : "User deactivated" });
     }
 
+    [HttpPost("users/{userId}/force-signout")]
+    public async Task<IActionResult> ForceSignOut(int userId)
+    {
+        var ok = await _admin.ForceSignOutAsync(userId);
+        if (!ok) return NotFound(new { error = "User not found" });
+        return Ok(new { message = "All sessions revoked" });
+    }
+
+    [HttpGet("login-stats")]
+    public async Task<IActionResult> GetLoginStats()
+        => Ok(await _admin.GetLoginStatsAsync());
+
     [HttpGet("users/{userId}/details")]
     public async Task<IActionResult> GetUserDetails(int userId)
     {

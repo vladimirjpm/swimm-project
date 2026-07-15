@@ -9,6 +9,15 @@ public interface IAdminRepository
     Task<RoleOperationResult> AddRoleAsync(int userId, int roleId);
     Task<bool> RemoveRoleAsync(int userId, int roleId);
     Task<bool> SetUserActiveAsync(int userId, bool isActive);
+
+    /// <summary>Принудительный выход со всех устройств (бамп SecurityStamp), аккаунт остаётся активным.</summary>
+    Task<bool> ForceSignOutAsync(int userId);
+
+    /// <summary>Сводка по логинам (онлайн сейчас, логины 7/30д, фейлы 7д) для панели Admin/Users.</summary>
+    Task<LoginStatsDto> GetLoginStatsAsync();
+
+    /// <summary>Ретеншн журнала логинов: удалить события старше 90 дней. Возвращает число удалённых.</summary>
+    Task<int> CleanupLoginHistoryAsync();
     Task<AdminStatsDto> GetStatsAsync();
     Task<List<ImportHistoryDto>> GetImportHistoryAsync();
     Task<bool> SetImportApprovedAsync(int id, bool approved);
