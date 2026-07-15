@@ -69,7 +69,30 @@ public static class DependencyInjection
 
         // Локальный вход (email + пароль)
         services.AddSingleton<IPasswordHasher, Argon2PasswordHasher>();
-        services.AddSingleton<IEmailSender, LoggingEmailSender>(); // дев: логирует ссылку; прод — SMTP
+
+        // Email: есть Email:Smtp:Host (обычно через env Email__Smtp__* или user-secrets) → реальный
+        // SMTP; нет — дев-реализация, логирующая письмо со ссылкой в консоль.
+        var smtpSection = configuration.GetSection(SmtpEmailOptions.SectionName);
+        if (!string.IsNullOrWhiteSpace(smtpSection["Host"]))
+        {
+            // Ручная привязка: не тащим Options.ConfigurationExtensions ради одной секции.
+            services.AddSingleton(Microsoft.Extensions.Options.Options.Create(new SmtpEmailOptions
+            {
+                Host = smtpSection["Host"]!.Trim(),
+                Port = int.TryParse(smtpSection["Port"], out var smtpPort) ? smtpPort : 587,
+                EnableSsl = !bool.TryParse(smtpSection["EnableSsl"], out var smtpSsl) || smtpSsl,
+                User = smtpSection["User"] ?? "",
+                Password = smtpSection["Password"] ?? "",
+                From = smtpSection["From"] ?? "",
+                FromName = smtpSection["FromName"] ?? "SwimHub",
+            }));
+            services.AddSingleton<IEmailSender, SmtpEmailSender>();
+        }
+        else
+        {
+            services.AddSingleton<IEmailSender, LoggingEmailSender>();
+        }
+
         services.AddScoped<ILocalAuthService, LocalAuthService>();
 
         // DB migrator
