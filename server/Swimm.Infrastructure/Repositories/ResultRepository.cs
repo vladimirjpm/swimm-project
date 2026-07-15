@@ -549,6 +549,7 @@ public class ResultRepository : IResultRepository
             .Select(r => new
             {
                 r.CompetitionId,
+                EventId = (int?)r.Competition.EventId,
                 r.CompetitionDate,
                 r.Position,
                 r.InternationalPoints,
@@ -576,12 +577,12 @@ public class ResultRepository : IResultRepository
         var nameTokens = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var relayCandidates = nameTokens.Length == 0
             ? []
-            : await _db.Results.AsNoTracking()
-                .Where(r => r.RelayId != null &&
-                    nameTokens.Any(t => r.Relay!.SwimmersName != null && r.Relay.SwimmersName.Contains(t)))
+            : (await _db.Results.AsNoTracking()
+                .Where(r => r.RelayId != null)
                 .Select(r => new
                 {
                     r.CompetitionId,
+                    EventId = (int?)r.Competition.EventId,
                     r.Position,
                     r.Relay!.SwimmersName,
                     StyleName = r.Style.Name,
@@ -589,7 +590,12 @@ public class ResultRepository : IResultRepository
                     CompetitionName = r.Competition.Name,
                     DateRaw = r.Competition.Date
                 })
-                .ToListAsync();
+                .ToListAsync())
+                // Грубый фильтр по вхождению имени — на клиенте (EF InMemory-провайдер в тестах
+                // не транслирует Any() с захваченным массивом внутри Where; на Postgres было бы
+                // эффективнее фильтровать в SQL, но датасет эстафет некрупный — не критично).
+                .Where(r => nameTokens.Any(t => r.SwimmersName != null && r.SwimmersName.Contains(t)))
+                .ToList();
 
         static bool SegmentMatchesName(string segment, string name)
         {
@@ -653,8 +659,10 @@ public class ResultRepository : IResultRepository
 
         var dto = new AthleteCareerDto
         {
-            Competitions = rows.Select(r => r.CompetitionId)
-                .Concat(relayMedals.Select(r => r.CompetitionId))
+            // Ключ дедупликации: у многодневных событий все дни делят один EventId — считаем
+            // событие как одно "соревнование" карьеры, а не по числу дней.
+            Competitions = rows.Select(r => r.EventId != null ? $"e{r.EventId}" : $"c{r.CompetitionId}")
+                .Concat(relayMedals.Select(r => r.EventId != null ? $"e{r.EventId}" : $"c{r.CompetitionId}"))
                 .Distinct()
                 .Count(),
             Races = rows.Count,
