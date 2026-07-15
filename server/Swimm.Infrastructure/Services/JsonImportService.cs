@@ -684,6 +684,7 @@ public class JsonImportService : IImportService
                 agg.Galleries += r.Galleries;
                 agg.ImportHistory += r.ImportHistory;
                 agg.ResultUrls += r.ResultUrls;
+                agg.Swimmers += r.Swimmers;
             }
 
             _db.CompetitionEvents.Remove(ev);
@@ -717,6 +718,14 @@ public class JsonImportService : IImportService
         var galleryIds = await _db.Results
             .Where(r => r.CompetitionId == competitionId && r.GalleryId != null)
             .Select(r => r.GalleryId!.Value)
+            .Distinct()
+            .ToListAsync();
+
+        // Пловцы этого соревнования — после удаления результатов проверим их на сиротство
+        // (дедуп A4: раньше удаление соревнования оставляло Swimmer-ов без единого результата).
+        var swimmerIds = await _db.Results
+            .Where(r => r.CompetitionId == competitionId)
+            .Select(r => r.SwimmerId)
             .Distinct()
             .ToListAsync();
 
@@ -754,6 +763,24 @@ public class JsonImportService : IImportService
         _db.Competitions.Remove(competition);
         await _db.SaveChangesAsync();
 
+        // Чистка сирот: пловец удаляется, только если после этого соревнования у него не
+        // осталось НИЧЕГО — ни результатов, ни членств/избранного/медиа/тренировок/аккаунта.
+        var deletedSwimmers = 0;
+        if (swimmerIds.Count > 0)
+        {
+            deletedSwimmers = await _db.Swimmers
+                .Where(s => swimmerIds.Contains(s.Id))
+                .Where(s => !_db.Results.Any(r => r.SwimmerId == s.Id)
+                    && !_db.HubGroupMembers.Any(m => m.SwimmerId == s.Id)
+                    && !_db.HubGroupUserMembers.Any(m => m.SwimmerId == s.Id)
+                    && !_db.UserFavorites.Any(f => f.SwimmerId == s.Id)
+                    && !_db.UserMedia.Any(m => m.SwimmerId == s.Id)
+                    && !_db.HubGroupMedia.Any(m => m.SwimmerId == s.Id)
+                    && !_db.TrainingResults.Any(t => t.SwimmerId == s.Id)
+                    && !_db.AppUsers.Any(u => u.SwimmerId == s.Id))
+                .ExecuteDeleteAsync();
+        }
+
         return new DeleteCompetitionResult
         {
             CompetitionId = competitionId,
@@ -763,7 +790,8 @@ public class JsonImportService : IImportService
             GalleryItems = deletedGalleryItems,
             Galleries = deletedGalleries,
             ImportHistory = deletedImportHistory,
-            ResultUrls = deletedResultUrls
+            ResultUrls = deletedResultUrls,
+            Swimmers = deletedSwimmers
         };
     }
 

@@ -172,6 +172,50 @@ if (args.Contains("--seed-dolphin-training"))
     return;
 }
 
+// Склейка пловцов-дублей (см. docs/tasks/dedup-report.md):
+//   dotnet run -- --merge-swimmers <pairs.csv> [--apply]
+// CSV: строки "canonicalId,duplicateId" (пустые и # -комментарии пропускаются).
+// Без --apply — dry-run: печатает план, БД не меняется.
+if (args.Contains("--merge-swimmers"))
+{
+    var csvIndex = Array.IndexOf(args, "--merge-swimmers") + 1;
+    if (csvIndex >= args.Length || args[csvIndex].StartsWith("--"))
+    {
+        Console.Error.WriteLine("Usage: dotnet run -- --merge-swimmers <pairs.csv> [--apply]");
+        Environment.Exit(1);
+        return;
+    }
+
+    var mergePairs = new List<Swimm.Application.Dtos.SwimmerMergePair>();
+    foreach (var line in File.ReadLines(args[csvIndex]))
+    {
+        var trimmed = line.Trim();
+        if (trimmed.Length == 0 || trimmed.StartsWith('#')) continue;
+        var parts = trimmed.Split(',', StringSplitOptions.TrimEntries);
+        if (parts.Length != 2 || !int.TryParse(parts[0], out var canon) || !int.TryParse(parts[1], out var dup))
+        {
+            Console.Error.WriteLine($"Некорректная строка CSV: «{line}» (ожидается canonicalId,duplicateId)");
+            Environment.Exit(1);
+            return;
+        }
+        mergePairs.Add(new Swimm.Application.Dtos.SwimmerMergePair(canon, dup));
+    }
+
+    using var scope = app.Services.CreateScope();
+    var merge = scope.ServiceProvider.GetRequiredService<ISwimmerMergeService>();
+    var mergeReport = await merge.MergeAsync(mergePairs, dryRun: !args.Contains("--apply"));
+    Console.WriteLine(mergeReport.DryRun
+        ? "=== DRY-RUN: план склейки, БД не изменена (добавь --apply для применения) ==="
+        : "=== ПРИМЕНЕНО ===");
+    foreach (var p in mergeReport.Pairs)
+    {
+        Console.WriteLine($"[{p.Status}] canonical {p.CanonicalId} ← duplicate {p.DuplicateId}");
+        foreach (var a in p.Actions) Console.WriteLine($"    {a}");
+        foreach (var c in p.Conflicts) Console.WriteLine($"    !! {c}");
+    }
+    return;
+}
+
 if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 

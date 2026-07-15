@@ -150,9 +150,9 @@ public class EditModel : PageModel
 
         _logger.LogWarning(
             "Admin {User} каскадно удалил соревнование #{Id} «{Name}»: {Results} результатов, " +
-            "{Relays} эстафет, {Galleries} галерей, {ResultUrls} URL, {ImportHistory} записей истории",
+            "{Relays} эстафет, {Galleries} галерей, {ResultUrls} URL, {ImportHistory} записей истории, {Swimmers} пловцов-сирот",
             User.Identity?.Name ?? "?", deleted.CompetitionId, deleted.CompetitionName,
-            deleted.Results, deleted.Relays, deleted.Galleries, deleted.ResultUrls, deleted.ImportHistory);
+            deleted.Results, deleted.Relays, deleted.Galleries, deleted.ResultUrls, deleted.ImportHistory, deleted.Swimmers);
 
         TempData["Flash"] = $"Соревнование «{deleted.CompetitionName}» удалено ({deleted.Results} результатов)";
         return RedirectToPage("Index");
