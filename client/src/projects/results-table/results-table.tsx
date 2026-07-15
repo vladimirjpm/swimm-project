@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import './results-table.css';
 import { rootActions,useAppDispatch, useAppSelector } from '../../store/store';
 import { useFavoritesContext } from '../../hooks/favorites-context';
+import { useLoginModal } from '../components/login-modal/login-modal-context';
 import Helper from '../../utils/helpers/data-helper'
 import ClubPointsHelper from '../../utils/helpers/club-points-helper';
 import UI_DateIcon from '../components/mix/date-icon/date-icon';
@@ -38,6 +39,7 @@ function ResultsTable() {
     toggleFavoriteSwimmer,
     togglePrimarySwimmer,
   } = useFavoritesContext();
+  const { openLoginModal } = useLoginModal();
 
   // По title, а не по длине results: в paged-режиме первая страница с текущими фильтрами
   // может законно вернуть 0 строк — это "No results match", а не "источник не выбран".
@@ -361,17 +363,29 @@ function ResultsTable() {
               const swimmerId = res.swimmer_id;
               const isFav = isAuthenticated && swimmerId != null && favoriteSwimmerIds.has(swimmerId);
               const isPrimary = isAuthenticated && swimmerId != null && swimmerId === primarySwimmerId;
-              const favoriteProps = {
-                // "звезда отменяет сердечко": у primary (me) сердечко в таблице не горит
-                isFavorite: isFav && !isPrimary,
-                isPrimaryFavorite: isPrimary,
-                onToggleFavorite: isAuthenticated && swimmerId != null && !res.is_relay
-                  ? () => toggleFavoriteSwimmer(swimmerId)
-                  : undefined,
-                onTogglePrimary: isFav && swimmerId != null && !res.is_relay
-                  ? () => togglePrimarySwimmer(swimmerId)
-                  : undefined,
-              };
+              // Гость (фаза 4.5): сердечко рендерим в "пустом" состоянии, клик открывает
+              // LoginModal вместо undefined-колбэка — фича видна, но требует логина.
+              // "это я"/primary гостю не нужен, там просто ничего не показываем.
+              const favoriteProps = isAuthenticated
+                ? {
+                    // "звезда отменяет сердечко": у primary (me) сердечко в таблице не горит
+                    isFavorite: isFav && !isPrimary,
+                    isPrimaryFavorite: isPrimary,
+                    onToggleFavorite: swimmerId != null && !res.is_relay
+                      ? () => toggleFavoriteSwimmer(swimmerId)
+                      : undefined,
+                    onTogglePrimary: isFav && swimmerId != null && !res.is_relay
+                      ? () => togglePrimarySwimmer(swimmerId)
+                      : undefined,
+                  }
+                : {
+                    isFavorite: false,
+                    isPrimaryFavorite: false,
+                    onToggleFavorite: swimmerId != null && !res.is_relay
+                      ? () => openLoginModal()
+                      : undefined,
+                    onTogglePrimary: undefined,
+                  };
 
               const resultKey = getResultKey(res);
               const isRowExpanded = expandedOverrides[resultKey] ?? showAllOpen;

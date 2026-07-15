@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import './sportsmen-details.css';
 import { useAppSelector } from '../../store/store';
 import { useFavoritesContext } from '../../hooks/favorites-context';
+import { useLoginModal } from '../components/login-modal/login-modal-context';
 import { useAthleteCareer, AthleteCareer } from '../../hooks/useAthleteCareer';
 import { useUserMedia, UserMediaDto } from '../../hooks/useUserMedia';
 import Helper from '../../utils/helpers/data-helper'
@@ -53,6 +54,7 @@ function SportsmenDetails() {
   const isMastersSource = !!selectedSource?.is_masters;
   const isAwardSource = !!selectedSource?.is_award;
   const { isAuthenticated, primarySwimmerId, favoriteSwimmerIds, setMeBySwimmer, toggleFavoriteSwimmer } = useFavoritesContext();
+  const { openLoginModal } = useLoginModal();
 
   // Режим карточки: данные этого соревнования / карьерные (all-time).
   // При смене спортсмена всегда сбрасываемся на «соревнование» (TASK.md).
@@ -91,6 +93,8 @@ function SportsmenDetails() {
   const isMe = isAuthenticated && swimmerId != null && swimmerId === primarySwimmerId;
   const isFav = isAuthenticated && swimmerId != null && favoriteSwimmerIds.has(swimmerId);
   const canMark = isAuthenticated && swimmerId != null;
+  // Гость (фаза 4.5): вместо звезды/сердечка и «Моих ссылок» — компактный CTA «войти».
+  const showGuestCta = !isAuthenticated && swimmerId != null;
 
   const base = import.meta.env.BASE_URL;
   const gender = firstResult.event_style_gender || 'female';
@@ -149,6 +153,19 @@ function SportsmenDetails() {
                     </svg>
                   </button>
                 </div>
+              )}
+              {showGuestCta && (
+                <button
+                  type="button"
+                  onClick={openLoginModal}
+                  title="Sign in to save favorites"
+                  className="w-8 h-8 rounded-full inline-flex items-center justify-center leading-none hover:scale-110 transition-transform"
+                  style={{ background: 'rgba(255,255,255,0.9)', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}
+                >
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9aa3af" strokeWidth="2">
+                    <path d="M12 21s-7.5-4.6-10-9.3C.4 8.3 2 5 5.2 5c2 0 3.3 1.1 4.1 2.3C10.1 6.1 11.4 5 13.4 5 16.6 5 18.2 8.3 16.6 11.7 14.1 16.4 12 21 12 21z" />
+                  </svg>
+                </button>
               )}
             </div>
             <div className='flex-1 min-w-0 flex flex-col gap-1.5 items-end'>
@@ -300,6 +317,33 @@ function SportsmenDetails() {
           {isAuthenticated && swimmerId != null && (
             <MyMediaSection swimmerId={swimmerId} />
           )}
+
+          {/* Гость (фаза 4.5): вместо звёзд/«Моих ссылок» — один компактный CTA. */}
+          {showGuestCta && <GuestFavoritesCta onSignIn={openLoginModal} />}
+      </div>
+    </div>
+  );
+}
+
+// Гость (фаза 4.5): компактный CTA вместо звезды/сердечка и «Моих ссылок» —
+// стиль карточек попапа + кнопка в стиле кнопок LoginModal.
+function GuestFavoritesCta({ onSignIn }: { onSignIn: () => void }) {
+  return (
+    <div className="p-4 border-t" style={{ borderColor: 'var(--theme-mode-border)' }}>
+      <div
+        className="flex items-center justify-between gap-3 rounded-xl px-4 py-3"
+        style={{ background: 'var(--theme-mode-input-bg)' }}
+      >
+        <span className="text-[13px] font-semibold" style={{ color: 'var(--theme-mode-text-secondary)' }}>
+          Sign in to save favorites and links
+        </span>
+        <button
+          type="button"
+          onClick={onSignIn}
+          className="shrink-0 rounded-[11px] bg-[linear-gradient(140deg,#38bdf8,#0369a1)] px-3.5 py-[9px] text-[13px] font-black text-[#06263f] transition-opacity hover:opacity-90"
+        >
+          Sign in
+        </button>
       </div>
     </div>
   );

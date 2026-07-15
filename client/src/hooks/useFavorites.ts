@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuth } from './useAuth';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,6 +49,10 @@ function invalidateTokenCache() {
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useFavorites() {
+  // Реактивный auth (фаза 4.5): переподгружаем избранное при смене isAuthenticated
+  // (напр. логин через LoginModal без перезагрузки страницы), а не только один раз.
+  const { isAuthenticated: authIsAuthenticated, loading: authLoading } = useAuth();
+
   const [state, setState] = useState<FavoritesState>({
     isAuthenticated: false,
     favorites: [],
@@ -74,21 +79,18 @@ export function useFavorites() {
     }
   }, []);
 
-  // Начальная загрузка
+  // Загрузка, реактивная к auth: пока /auth/me не готов — ждём (тот же один запрос,
+  // что и раньше на первом рендере); гость → пустое состояние; залогинен → грузим
+  // /api/me/favorites. После логина через LoginModal (auth.refresh()) isAuthenticated
+  // меняется на true и эффект перезапускается без перезагрузки страницы.
   useEffect(() => {
+    if (authLoading) return;
     let cancelled = false;
 
-    async function init() {
+    async function load() {
+      if (!authIsAuthenticated) { applyFavorites([], false); return; }
+
       try {
-        // 1. Проверяем аутентификацию
-        const meRes = await fetch('/auth/me', { credentials: 'include' });
-        if (cancelled) return;
-        if (!meRes.ok) { applyFavorites([], false); return; }
-
-        const me = await meRes.json();
-        if (!me?.isAuthenticated) { applyFavorites([], false); return; }
-
-        // 2. Загружаем фавориты
         const favsRes = await fetch('/api/me/favorites', { credentials: 'include' });
         if (cancelled) return;
         if (!favsRes.ok) { applyFavorites([], true); return; }
@@ -100,9 +102,9 @@ export function useFavorites() {
       }
     }
 
-    init();
+    load();
     return () => { cancelled = true; };
-  }, [applyFavorites]);
+  }, [authIsAuthenticated, authLoading, applyFavorites]);
 
   // ── Mutations ───────────────────────────────────────────────────────────────
 

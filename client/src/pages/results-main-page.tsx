@@ -5,6 +5,7 @@ import store from '../store/store';
 import '../index.css';
 import ResultsMain from '../projects/results-main-project/results-main-project';
 import { FavoritesProvider } from '../hooks/favorites-context';
+import { LoginModalProvider } from '../projects/components/login-modal/login-modal-context';
 import { applyResultsCategory } from '../utils/constants/results-categories';
 import RecordsHelper from '../utils/helpers/records-helper';
 
@@ -20,9 +21,11 @@ const root = createRoot(container);
 root.render(
   <React.StrictMode>
     <Provider store={store}>
-      <FavoritesProvider>
-        <ResultsMain />
-      </FavoritesProvider>
+      <LoginModalProvider>
+        <FavoritesProvider>
+          <ResultsMain />
+        </FavoritesProvider>
+      </LoginModalProvider>
     </Provider>
   </React.StrictMode>
 );
