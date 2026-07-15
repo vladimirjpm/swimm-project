@@ -52,11 +52,14 @@
     </div>
 
     <div class="mb-4" id="event-block">
-        <label class="flex items-center gap-2 text-[13px] text-admin-text-muted">
-            <input type="checkbox" id="event-create" class="cursor-pointer" />
-            многодневное — создать событие с именем
-        </label>
-        <input type="text" id="event-name" class="admin-input mt-2 w-full max-w-md rounded-md px-3 py-2 text-[13px]" placeholder="Название события" />
+        <div class="mb-1 text-[12px] font-semibold uppercase tracking-wide text-admin-text-muted">
+            Многодневное событие (второй день того же турнира — выбери существующее)
+        </div>
+        <select id="event-select" class="admin-input w-full max-w-md rounded-md px-3 py-2 text-[13px]">
+            <option value="">Без события (однодневное)</option>
+            <option value="__new__">➕ Создать новое событие…</option>
+        </select>
+        <input type="text" id="event-name" class="admin-input mt-2 hidden w-full max-w-md rounded-md px-3 py-2 text-[13px]" placeholder="Название события" />
     </div>
 
     <div class="flex gap-3">
@@ -181,10 +184,26 @@
         warn.classList.toggle('hidden', !(p.warnings?.length));
         warn.innerHTML = (p.warnings ?? []).map(esc).join('<br>');
 
-        // Многодневное — предлагаем событие сразу
+        // Список существующих событий (как в Import) — второй день дописывается к первому.
+        const eventSelect = document.getElementById('event-select');
+        [...eventSelect.querySelectorAll('option[data-event]')].forEach(o => o.remove());
+        try {
+            const events = await fetch('/api/admin/competition-events', { credentials: 'same-origin' })
+                .then(r => r.ok ? r.json() : []);
+            (Array.isArray(events) ? events : []).forEach(e => {
+                const opt = document.createElement('option');
+                opt.value = String(e.id);
+                opt.dataset.event = '1';
+                opt.textContent = `${e.name} · дней: ${e.dayCount}`;
+                eventSelect.appendChild(opt);
+            });
+        } catch { /* список событий опционален */ }
+
+        // Многодневный PDF (несколько дат внутри) — сразу предлагаем создать событие.
         const multiDay = (p.competitions?.length ?? 0) > 1;
-        document.getElementById('event-create').checked = multiDay;
+        eventSelect.value = multiDay ? '__new__' : '';
         document.getElementById('event-name').value = row.name;
+        document.getElementById('event-name').classList.toggle('hidden', !multiDay);
 
         // Категории из БД
         try {
@@ -202,18 +221,23 @@
         document.getElementById('preview-card').classList.add('hidden');
     });
 
+    // «Создать новое…» показывает поле имени; выбор существующего/«без события» прячет.
+    document.getElementById('event-select').addEventListener('change', (e) => {
+        document.getElementById('event-name').classList.toggle('hidden', e.target.value !== '__new__');
+    });
+
     document.getElementById('btn-import').addEventListener('click', async () => {
         if (!preview) return;
         const categoryKeys = [...document.querySelectorAll('.disc-cat:checked')].map(i => i.value);
-        const createEvent = document.getElementById('event-create').checked;
+        const eventChoice = document.getElementById('event-select').value;
         try {
             const r = await apiJson(`${API}/import`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     previewId: preview.previewId,
                     categoryKeys: categoryKeys.length ? categoryKeys : null,
-                    eventId: null,
-                    newEventName: createEvent ? document.getElementById('event-name').value.trim() : null
+                    eventId: eventChoice && eventChoice !== '__new__' ? Number(eventChoice) : null,
+                    newEventName: eventChoice === '__new__' ? document.getElementById('event-name').value.trim() : null
                 })
             });
             toast(`Импорт поставлен в очередь (job ${r.jobId}) — статус в Import History`, 6000);
