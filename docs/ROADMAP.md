@@ -199,15 +199,17 @@
 **Цель:** пользователь логинится из React-приложения. Бэкенд полностью готов
 (auth-фазы 0–4 закрыты) — работа только клиентская + SMTP.
 
-- ☐ 4.1. `useAuth`-хук (обобщение логики `/auth/me` из `useFavorites`) + user-меню в шапке:
+- ✅ 4.1. `useAuth`-хук (обобщение логики `/auth/me` из `useFavorites`) + user-меню в шапке:
   аватар/имя, Sign out, Sign out everywhere (`POST /auth/logout-all`).
-- ☐ 4.2. Экран/модал логина: кнопка Google (`/auth/login/google?returnUrl=`) + форма
+- ✅ 4.2. Экран/модал логина: кнопка Google (`/auth/login/google?returnUrl=`) + форма
   email/пароль (`POST /auth/login/local`), обработка 403 pre-verify и 429 lockout.
-- ☐ 4.3. Регистрация + «забыл пароль» на клиенте (`/auth/register`, `/auth/forgot-password`);
+- ✅ 4.3. Регистрация + «забыл пароль» на клиенте (`/auth/register`, `/auth/forgot-password`);
   verify/reset остаются серверными HTML-страницами (уже есть).
-- ☐ 4.4. Прод-`IEmailSender` (SMTP/Resend) вместо `LoggingEmailSender` — без него
-  email/пароль в проде не работает.
+- ✅ 4.4. Прод-`IEmailSender`: `SmtpEmailSender` (встроенный SmtpClient, STARTTLS) —
+  включается конфигом `Email:Smtp:*` (env/user-secrets), без него остаётся `LoggingEmailSender`.
 - ☐ 4.5. Favorites-UI показывает CTA «залогинься» вместо скрытия функций.
+
+План/детали шагов: `docs/tasks/client-login-plan.md`.
 
 **Критерий приёмки:** полный цикл register → verify → login → favorites → logout-all
 проходит из UI клиента без curl.
@@ -371,6 +373,27 @@ Razor + Tailwind, Competitions/Categories CRUD, фоновый импорт.)
 9.8–9.9 — по продуктовому поводу / данным.**
 
 ---
+
+## Хостинг — решение (2026-07-15, зафиксировано, не реализовано)
+
+**Весь стек на Azure, без гибридов:**
+- **App Service (Linux, план B1)** — Swimm.API, он же раздаёт прод-сборку клиента из
+  `wwwroot` (`npm run build:azure`). Один origin — cookie-auth/antiforgery работают как
+  в деве, CORS не открываем. Отдельный фронт-хостинг (Vercel/Static Web Apps) отвергнут:
+  второй origin ломает cookie-модель (SameSite=None, CORS+credentials, OAuth-редиректы).
+- **Azure Database for PostgreSQL Flexible Server (B1ms)** — роли
+  `swimm`/`swimm_rw`/`swimm_ro` переносятся как есть. Регион БД = регион App Service
+  (West Europe): кросс-регионные/кросс-провайдерные задержки убивают наш перф-бюджет.
+  Гибриды (БД на Railway/Neon/Supabase) отвергнуты: экономия ~$15/мес не стоит
+  cold start'ов и второго провайдера.
+- **Email** — любой SMTP-провайдер (Resend/Postmark/…): `Email__Smtp__*` в конфигурации
+  App Service; код уже готов (фаза 4.4).
+- Секреты — App Service Configuration/Key Vault; прод-redirect URI в Google OAuth Console;
+  `ASPNETCORE_ENVIRONMENT=Production`; миграции — явный шаг (`--migrate`), не автостарт.
+- Ориентир по цене: ~$30+/мес. Альтернатива «весь Railway» (~$5–15/мес) осознанно
+  отклонена в пользу managed-БД с бэкапами и запаса на рост.
+
+Реализация (создание ресурсов, CI/CD) — отдельной задачей, пока НЕ делаем.
 
 ## Порядок и зависимости
 
