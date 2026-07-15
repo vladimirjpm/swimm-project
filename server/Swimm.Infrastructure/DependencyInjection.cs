@@ -106,6 +106,7 @@ public static class DependencyInjection
 
         // Склейка пловцов-дублей (dry-run по умолчанию; см. docs/tasks/dedup-report.md)
         services.AddScoped<ISwimmerMergeService, SwimmerMergeService>();
+        services.AddScoped<ISwimmerDedupService, SwimmerDedupService>();
 
         // «Входящие» автозабора isr.org.il (фаза 6); провайдер живёт в Swimm.Parsing
         services.AddScoped<ICompetitionDiscoveryService, CompetitionDiscoveryService>();

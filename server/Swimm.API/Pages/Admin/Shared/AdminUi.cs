@@ -22,6 +22,7 @@ public static class AdminNav
         new("Club requests", "inbox", "/Admin/HubGroupClubRequests", "Data"),
         new("Import", "download", "/Admin/Import", "Data"),
         new("Discovery", "inbox", "/Admin/Discovery", "Data"),
+        new("Swimmers", "users", "/Admin/Swimmers", "Data"),
         new("Import History", "history", "/Admin/ImportHistory", "Data"),
 
         new("Users", "users", "/Admin/Users", "System"),
