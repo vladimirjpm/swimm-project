@@ -11,6 +11,7 @@ import type {
   JoinedHubGroup,
   MyHubGroupRow,
   SaveResult,
+  SwimmerResultOption,
   SwimmerSearchResult,
   TrainingOption,
 } from './my-groups-types';
@@ -250,9 +251,23 @@ export function useMyHubGroupEdit(id: number | null) {
     return result;
   }, [id, reload]);
 
-  const addUserMember = useCallback(async (email: string): Promise<SaveResult> => {
+  const addUserMember = useCallback(async (email: string, swimmerId?: number | null, note?: string | null): Promise<SaveResult> => {
     if (id == null) return { success: false, error: 'Нет группы' };
-    const r = await apiFetch(`/api/me/hub-groups/${id}/user-members`, { method: 'POST', body: JSON.stringify({ email }) });
+    const r = await apiFetch(`/api/me/hub-groups/${id}/user-members`, {
+      method: 'POST',
+      body: JSON.stringify({ email, swimmerId: swimmerId ?? null, note: note ?? null }),
+    });
+    const result = await saveResultFrom(r);
+    if (result.success) await reload();
+    return result;
+  }, [id, reload]);
+
+  const setUserMemberLabel = useCallback(async (userId: number, swimmerId: number | null, note: string | null): Promise<SaveResult> => {
+    if (id == null) return { success: false, error: 'Нет группы' };
+    const r = await apiFetch(`/api/me/hub-groups/${id}/user-members/${userId}/label`, {
+      method: 'PUT',
+      body: JSON.stringify({ swimmerId, note }),
+    });
     const result = await saveResultFrom(r);
     if (result.success) await reload();
     return result;
@@ -277,7 +292,7 @@ export function useMyHubGroupEdit(id: number | null) {
   return {
     data, admins, clubRequest, loading, forbidden,
     update, searchSwimmers, getClubSwimmers, addMember, updateMember, removeMember,
-    addAdmin, removeAdmin, submitClubRequest, addUserMember, approveUserMember, removeUserMember,
+    addAdmin, removeAdmin, submitClubRequest, addUserMember, approveUserMember, removeUserMember, setUserMemberLabel,
   };
 }
 
@@ -354,6 +369,7 @@ export function useHubGroupMedia(hubGroupId: number, slug: string) {
         training_id: input.trainingId ?? null,
         visibility: input.visibility ?? 'public',
         swimmer_id: input.swimmerId ?? null,
+        result_id: input.resultId ?? null,
       }),
     });
     const result = await saveResultFrom(r);
@@ -368,7 +384,25 @@ export function useHubGroupMedia(hubGroupId: number, slug: string) {
     return result;
   }, [hubGroupId, reload]);
 
-  return { gallery, membersMedia, trainings, isOfficial, groupSwimmers, loading, loadError, addMedia, removeMedia };
+  /** Последние заплывы пловца-якоря — для выбора «привязать разбор к заплыву» в редакторе. */
+  const getSwimmerResults = useCallback(async (swimmerId: number): Promise<SwimmerResultOption[]> => {
+    const r = await fetch(`/api/results?swimmerId=${swimmerId}&pageSize=20`, { credentials: 'include' });
+    if (!r.ok) return [];
+    const data = await r.json();
+    return ((data?.data ?? []) as any[]).map((row) => ({
+      id: row.id,
+      competition: row.competition,
+      date: row.date,
+      styleName: row.event_style_name,
+      distance: row.event_style_len,
+      time: row.time,
+    }));
+  }, []);
+
+  return {
+    gallery, membersMedia, trainings, isOfficial, groupSwimmers, loading, loadError,
+    addMedia, removeMedia, getSwimmerResults,
+  };
 }
 
 /** Самозапись пользователя: вступить/выйти + список «участвую». */

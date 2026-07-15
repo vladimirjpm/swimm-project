@@ -530,6 +530,105 @@ public class HubGroupUserServiceTests
         Assert.Equal(HubGroupJoinPolicy.Open, (await db.HubGroups.SingleAsync(g => g.Id == group.Id)).JoinPolicy);
     }
 
+    // ── Ярлык «родитель пловца» (SwimmerId/Note) ─────────────────────────────
+
+    [Fact]
+    public async Task AddUserMember_WithSwimmerLabel_SetsSwimmerIdAndNote()
+    {
+        await using var db = CreateDb(nameof(AddUserMember_WithSwimmerLabel_SetsSwimmerIdAndNote));
+        var owner = await AddUserAsync(db, "owner@example.com");
+        var target = await AddUserAsync(db, "member@example.com");
+        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true };
+        var swimmer = new Swimmer { FirstName = "Иван", LastName = "Иванов" };
+        db.HubGroups.Add(group);
+        db.Swimmers.Add(swimmer);
+        await db.SaveChangesAsync();
+
+        var result = await Service(db).AddUserMemberAsync(group.Id, "member@example.com", owner.Id, swimmer.Id, "родитель");
+
+        Assert.True(result.Success);
+        var row = await db.HubGroupUserMembers.SingleAsync(m => m.UserId == target.Id);
+        Assert.Equal(swimmer.Id, row.SwimmerId);
+        Assert.Equal("родитель", row.Note);
+    }
+
+    [Fact]
+    public async Task AddUserMember_UnknownSwimmerId_Fails()
+    {
+        await using var db = CreateDb(nameof(AddUserMember_UnknownSwimmerId_Fails));
+        var owner = await AddUserAsync(db, "owner@example.com");
+        await AddUserAsync(db, "member@example.com");
+        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true };
+        db.HubGroups.Add(group);
+        await db.SaveChangesAsync();
+
+        var result = await Service(db).AddUserMemberAsync(group.Id, "member@example.com", owner.Id, swimmerId: 999);
+
+        Assert.False(result.Success);
+        Assert.Empty(db.HubGroupUserMembers);
+    }
+
+    [Fact]
+    public async Task SetUserMemberLabel_SetsAndClears()
+    {
+        await using var db = CreateDb(nameof(SetUserMemberLabel_SetsAndClears));
+        var owner = await AddUserAsync(db, "owner@example.com");
+        var joiner = await AddUserAsync(db, "joiner@example.com");
+        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true };
+        var swimmer = new Swimmer { FirstName = "Пётр", LastName = "Петров" };
+        db.HubGroups.Add(group);
+        db.Swimmers.Add(swimmer);
+        await db.SaveChangesAsync();
+        var svc = Service(db);
+        await svc.JoinAsync(group.Id, joiner.Id);
+
+        var set = await svc.SetUserMemberLabelAsync(group.Id, joiner.Id, swimmer.Id, "мама");
+        Assert.True(set.Success);
+        var row = await db.HubGroupUserMembers.SingleAsync(m => m.UserId == joiner.Id);
+        Assert.Equal(swimmer.Id, row.SwimmerId);
+        Assert.Equal("мама", row.Note);
+
+        var cleared = await svc.SetUserMemberLabelAsync(group.Id, joiner.Id, null, null);
+        Assert.True(cleared.Success);
+        var row2 = await db.HubGroupUserMembers.SingleAsync(m => m.UserId == joiner.Id);
+        Assert.Null(row2.SwimmerId);
+        Assert.Null(row2.Note);
+    }
+
+    [Fact]
+    public async Task SetUserMemberLabel_MemberNotFound_Fails()
+    {
+        await using var db = CreateDb(nameof(SetUserMemberLabel_MemberNotFound_Fails));
+        var owner = await AddUserAsync(db, "owner@example.com");
+        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true };
+        db.HubGroups.Add(group);
+        await db.SaveChangesAsync();
+
+        var result = await Service(db).SetUserMemberLabelAsync(group.Id, userId: 999, swimmerId: null, note: null);
+
+        Assert.False(result.Success);
+    }
+
+    [Fact]
+    public async Task DeletingSwimmer_SetsMemberLabelSwimmerIdNull_KeepsMembership()
+    {
+        await using var db = CreateDb(nameof(DeletingSwimmer_SetsMemberLabelSwimmerIdNull_KeepsMembership));
+        var owner = await AddUserAsync(db, "owner@example.com");
+        var joiner = await AddUserAsync(db, "joiner@example.com");
+        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true };
+        var swimmer = new Swimmer { FirstName = "Анна", LastName = "Сидорова" };
+        db.HubGroups.Add(group);
+        db.Swimmers.Add(swimmer);
+        await db.SaveChangesAsync();
+        await Service(db).AddUserMemberAsync(group.Id, "joiner@example.com", owner.Id, swimmer.Id, "родитель");
+
+        db.Swimmers.Remove(swimmer);
+        await db.SaveChangesAsync();
+
+        var row = await db.HubGroupUserMembers.SingleAsync(m => m.UserId == joiner.Id);
+        Assert.Null(row.SwimmerId); // SetNull — членство не теряется при удалении пловца
+    }
+
     [Fact]
     public async Task GetJoined_ReturnsGroupsUserJoined()
     {

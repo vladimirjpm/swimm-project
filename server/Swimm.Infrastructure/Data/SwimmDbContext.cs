@@ -616,6 +616,11 @@ public class SwimmDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.AddedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Swimmer)
+                .WithMany()
+                .HasForeignKey(e => e.SwimmerId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         // Заявки на официальный статус группы (право/личные данные) — Sys_-таблица, БЕЗ grant swimm_ro.

@@ -71,6 +71,7 @@ public class HubGroupAdminService : IHubGroupAdminService
         var userMembers = await _db.HubGroupUserMembers.AsNoTracking()
             .Where(m => m.HubGroupId == id)
             .Include(m => m.User)
+            .Include(m => m.Swimmer)
             .OrderBy(m => m.JoinedAt)
             .Select(m => new HubGroupUserMemberRowDto
             {
@@ -79,7 +80,10 @@ public class HubGroupAdminService : IHubGroupAdminService
                 Email = m.User.Email,
                 Status = m.Status,
                 SelfJoined = m.AddedByUserId == null,
-                JoinedAt = m.JoinedAt
+                JoinedAt = m.JoinedAt,
+                SwimmerId = m.SwimmerId,
+                SwimmerName = m.Swimmer != null ? (m.Swimmer.LastName + " " + m.Swimmer.FirstName) : null,
+                Note = m.Note
             })
             .ToListAsync();
 

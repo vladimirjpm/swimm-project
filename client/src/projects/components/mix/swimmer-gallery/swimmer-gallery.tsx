@@ -18,7 +18,7 @@ interface UI_SwimmerGalleryProps {
 const getEmbedUrl = (item: GalleryItem): string | null => {
   if (item.sourceType === 'youtube') {
     const id = item.code ?? HelperMedia.extractYoutubeId(item.url);
-    if (id) return `https://www.youtube.com/embed/${id}`;
+    if (id) return `https://www.youtube-nocookie.com/embed/${id}`;
   }
   if (item.sourceType === 'vimeo') {
     const id = item.code ?? HelperMedia.extractVimeoId(item.url);
@@ -48,6 +48,8 @@ const GalleryItemView: React.FC<{ item: GalleryItem }> = ({ item }) => {
         className="w-full aspect-video"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen
+        sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
+        referrerPolicy="strict-origin-when-cross-origin"
       />
     );
   }

@@ -33,6 +33,12 @@ public sealed class HubGroupUserMemberRowDto
     /// <summary>true = вступил сам (AddedByUserId == null), false = добавлен владельцем/админом.</summary>
     public bool SelfJoined { get; set; }
     public DateTime JoinedAt { get; set; }
+
+    /// <summary>Ярлык «за какого пловца этот аккаунт» — чисто отображение, прав не даёт. null = не привязан.</summary>
+    public int? SwimmerId { get; set; }
+    public string? SwimmerName { get; set; }
+    /// <summary>Произвольная подпись («родитель», …), опционально.</summary>
+    public string? Note { get; set; }
 }
 
 /// <summary>Группа, в которую текущий пользователь вступил как участник-аккаунт (список «участвую»).</summary>

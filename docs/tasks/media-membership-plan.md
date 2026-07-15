@@ -42,7 +42,7 @@
   (не видит тренировки/разборы); approve→active→видит; approve чужим юзером (не CanEdit) → 403;
   повторный join при pending — no-op/понятная ошибка.
 
-## Шаг 2. Ярлык «родитель пловца» — **Sonnet** (после шага 1)
+## Шаг 2. Ярлык «родитель пловца» — **Sonnet** ✅ СДЕЛАНО (2026-07-15)
 
 Чисто отображение, прав не меняет.
 
@@ -67,20 +67,24 @@
   `UI_SwimmerGallery` (embed из канонического id).
 - Тесты §7: IDOR, валидации, дефолт private, каскад по SwimmerId.
 
-## Шаг 4. Выбор заплыва в редакторе разборов — **Sonnet** (мелкий)
+## Шаг 4. Выбор заплыва в редакторе разборов — **Sonnet** ✅ СДЕЛАНО (2026-07-15)
 
-Сервер уже принимает `result_id` (валидация+денормализация SwimmerId готовы, эстафеты
-отбиты). Только UI: в `MediaEditor` при выбранном пловце-якоре подгрузить его последние
-N заплывов (`GET /api/results?swimmerIds=...` уже умеет; или paged c фильтром) → select
-«привязать к заплыву» → слать `result_id`.
+Сервер уже принимал `result_id` (валидация+денормализация SwimmerId, эстафеты отбиты).
+Уточнение по факту: `/api/results` публично **не** принимал `swimmerIds` — добавлен
+query-параметр `swimmerId` (единственное число) в `ResultsController.GetResults`,
+маппится в существующий `ResultFilter.SwimmerIds` (репозиторий уже фильтровал по нему
+для ростера групп). `MediaEditor`: при выборе пловца-якоря (visibility=members) подгружает
+последние 20 заплывов через `getSwimmerResults` → select «привязать к заплыву» → шлёт
+`result_id`.
 
-## Шаг 5. Усиление лайтбокса — **Sonnet** (мелкий, отдельный коммит)
+## Шаг 5. Усиление лайтбокса — **Sonnet** ✅ СДЕЛАНО (2026-07-15)
 
 `client/src/projects/components/mix/swimmer-gallery/swimmer-gallery.tsx`:
-- youtube → `https://www.youtube-nocookie.com/embed/{id}`;
-- iframe: атрибут `sandbox` (минимум для плеера) + суженный `allow`.
-- Общий компонент! Прогнать визуально ВСЕ места: галерея группы, медиа тренировок,
-  members-разборы, галерея заплыва в таблице результатов.
+youtube → `youtube-nocookie.com/embed/{id}`; iframe получил `sandbox="allow-scripts
+allow-same-origin allow-presentation allow-popups"` + `referrerPolicy`. Единственное
+место с iframe-эмбедом в клиенте — все перечисленные точки (галерея группы, тренировки,
+members-разборы, галерея заплыва в `sportsmen-details.tsx`) идут через этот общий
+компонент, отдельно ничего не трогали.
 
 ## Порядок
 

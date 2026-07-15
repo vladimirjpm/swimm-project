@@ -43,6 +43,7 @@ public class ResultsController : ControllerBase
         [FromQuery] string? ageGroup,
         [FromQuery] string? position,
         [FromQuery] string? eventDate,
+        [FromQuery] int? swimmerId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 100)
     {
@@ -110,7 +111,8 @@ public class ResultsController : ControllerBase
             AgeGroup = ageGroup,
             PositionMax = positionMax,
             PositionKeepUnranked = positionKeepUnranked,
-            EventDate = eventDateValue
+            EventDate = eventDateValue,
+            SwimmerIds = swimmerId != null ? [swimmerId.Value] : null
         };
 
         var (items, hasMore, total) = await _results.GetPagedAsync(filter, page, pageSize);

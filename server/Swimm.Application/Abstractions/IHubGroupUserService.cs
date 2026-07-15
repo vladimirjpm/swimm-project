@@ -36,11 +36,20 @@ public interface IHubGroupUserService
 
     // ── Участники-аккаунты (приватный состав из юзеров) ──────────────────────
 
-    /// <summary>Добавить участника-аккаунт по email (владелец/админ). AddedByUserId проставляется.</summary>
-    Task<HubGroupMemberSaveResult> AddUserMemberAsync(int hubGroupId, string email, int addedByUserId);
+    /// <summary>
+    /// Добавить участника-аккаунт по email (владелец/админ). AddedByUserId проставляется.
+    /// swimmerId/note — опциональный ярлык «за какого пловца» (напр. родитель), см. <see cref="SetUserMemberLabelAsync"/>.
+    /// </summary>
+    Task<HubGroupMemberSaveResult> AddUserMemberAsync(int hubGroupId, string email, int addedByUserId, int? swimmerId = null, string? note = null);
 
     /// <summary>Убрать участника-аккаунт (владелец/админ; либо самовыход через LeaveAsync).</summary>
     Task<HubGroupMemberSaveResult> RemoveUserMemberAsync(int hubGroupId, int userId);
+
+    /// <summary>
+    /// Проставить/снять ярлык «родитель пловца» у уже существующего участника-аккаунта —
+    /// чисто отображение в списке состава, прав не меняет. swimmerId=null снимает ярлык.
+    /// </summary>
+    Task<HubGroupMemberSaveResult> SetUserMemberLabelAsync(int hubGroupId, int userId, int? swimmerId, string? note);
 
     /// <summary>
     /// Самозапись: вступить в публичную/видимую группу. При JoinPolicy=open — сразу active,

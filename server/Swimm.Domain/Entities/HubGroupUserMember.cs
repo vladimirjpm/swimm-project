@@ -46,4 +46,17 @@ public class HubGroupUserMember
     public string Status { get; set; } = HubGroupUserMemberStatus.Active;
 
     public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Ярлык «за какого пловца этот аккаунт» (напр. родитель) — чисто отображение, прав не
+    /// меняет. null = не привязан. SetNull при удалении пловца — не терять членство.
+    /// </summary>
+    public int? SwimmerId { get; set; }
+
+    [ForeignKey(nameof(SwimmerId))]
+    public Swimmer? Swimmer { get; set; }
+
+    /// <summary>Произвольная подпись к ярлыку («родитель», «бабушка», …), опционально.</summary>
+    [MaxLength(100)]
+    public string? Note { get; set; }
 }

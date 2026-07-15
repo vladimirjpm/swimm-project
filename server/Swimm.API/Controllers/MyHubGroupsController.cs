@@ -242,7 +242,20 @@ public class MyHubGroupsController : ControllerBase
         if (!perms.Exists) return NotFound();
         if (!perms.CanEdit) return Forbid();
 
-        var result = await _mine.AddUserMemberAsync(id, request.Email, CurrentUserId()!.Value);
+        var result = await _mine.AddUserMemberAsync(id, request.Email, CurrentUserId()!.Value, request.SwimmerId, request.Note);
+        return result.Success ? Ok() : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>Проставить/снять ярлык «родитель пловца» у участника-аккаунта (владелец/админ группы).</summary>
+    [HttpPut("{id:int}/user-members/{userId:int}/label")]
+    public async Task<IActionResult> SetUserMemberLabel(int id, int userId, [FromBody] SetUserMemberLabelRequest request)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanEdit) return Forbid();
+
+        var result = await _mine.SetUserMemberLabelAsync(id, userId, request.SwimmerId, request.Note);
         return result.Success ? Ok() : BadRequest(new { error = result.Error });
     }
 
@@ -322,4 +335,14 @@ public sealed class AddAdminRequest
 public sealed class AddUserMemberRequest
 {
     public string Email { get; set; } = "";
+    /// <summary>Опциональный ярлык «за какого пловца» (напр. родитель).</summary>
+    public int? SwimmerId { get; set; }
+    public string? Note { get; set; }
+}
+
+public sealed class SetUserMemberLabelRequest
+{
+    /// <summary>null — снять ярлык.</summary>
+    public int? SwimmerId { get; set; }
+    public string? Note { get; set; }
 }

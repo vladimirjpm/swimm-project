@@ -54,6 +54,10 @@ export interface HubGroupUserMember {
   status: 'active' | 'pending';
   selfJoined: boolean;
   joinedAt: string;
+  /** Ярлык «за какого пловца этот аккаунт» (напр. родитель) — только отображение, прав не даёт. */
+  swimmerId?: number | null;
+  swimmerName?: string | null;
+  note?: string | null;
 }
 
 /** Группа, в которую текущий пользователь вступил (список «участвую»). */
@@ -141,6 +145,18 @@ export interface HubGroupMediaInput {
   visibility?: 'public' | 'members';
   /** Якорь-пловец разбора (только при visibility='members'). */
   swimmerId?: number | null;
+  /** Якорь-заплыв разбора (только при visibility='members', с выбранным swimmerId). */
+  resultId?: number | null;
+}
+
+/** Заплыв пловца-якоря — для выбора «привязать разбор к заплыву» в редакторе медиа. */
+export interface SwimmerResultOption {
+  id: number;
+  competition: string;
+  date: string;
+  styleName: string;
+  distance: string;
+  time: string;
 }
 
 /** Тренировка в справочнике для выбора «привязать медиа к тренировке» (без CRUD тренировок в UI). */

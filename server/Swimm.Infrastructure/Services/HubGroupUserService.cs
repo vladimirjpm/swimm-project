@@ -169,7 +169,7 @@ public class HubGroupUserService : IHubGroupUserService
     // ── Участники-аккаунты ───────────────────────────────────────────────────
     // Приватный список (Sys_-таблица) — публичная страница его не видит, кэш не трогаем.
 
-    public async Task<HubGroupMemberSaveResult> AddUserMemberAsync(int hubGroupId, string email, int addedByUserId)
+    public async Task<HubGroupMemberSaveResult> AddUserMemberAsync(int hubGroupId, string email, int addedByUserId, int? swimmerId = null, string? note = null)
     {
         email = (email ?? "").Trim();
         if (email.Length == 0) return HubGroupMemberSaveResult.Fail("Email обязателен");
@@ -180,7 +180,31 @@ public class HubGroupUserService : IHubGroupUserService
         var user = await _db.AppUsers.FirstOrDefaultAsync(u => u.Email == email);
         if (user == null) return HubGroupMemberSaveResult.Fail("Пользователь с таким email не найден");
 
-        return await InsertUserMemberAsync(hubGroupId, user.Id, addedByUserId);
+        if (swimmerId != null && !await _db.Swimmers.AnyAsync(s => s.Id == swimmerId))
+            return HubGroupMemberSaveResult.Fail("Пловец не найден");
+
+        return await InsertUserMemberAsync(hubGroupId, user.Id, addedByUserId, swimmerId: swimmerId, note: NormalizeNote(note));
+    }
+
+    public async Task<HubGroupMemberSaveResult> SetUserMemberLabelAsync(int hubGroupId, int userId, int? swimmerId, string? note)
+    {
+        var member = await _db.HubGroupUserMembers
+            .FirstOrDefaultAsync(m => m.HubGroupId == hubGroupId && m.UserId == userId);
+        if (member == null) return HubGroupMemberSaveResult.Fail("Участник не найден");
+
+        if (swimmerId != null && !await _db.Swimmers.AnyAsync(s => s.Id == swimmerId))
+            return HubGroupMemberSaveResult.Fail("Пловец не найден");
+
+        member.SwimmerId = swimmerId;
+        member.Note = NormalizeNote(note);
+        await _db.SaveChangesAsync();
+        return HubGroupMemberSaveResult.Ok();
+    }
+
+    private static string? NormalizeNote(string? note)
+    {
+        note = note?.Trim();
+        return string.IsNullOrEmpty(note) ? null : note;
     }
 
     public async Task<HubGroupMemberSaveResult> RemoveUserMemberAsync(int hubGroupId, int userId)
@@ -256,7 +280,8 @@ public class HubGroupUserService : IHubGroupUserService
 
     /// <summary>Общая вставка участника-аккаунта: dedup + обработка гонки (23505).</summary>
     private async Task<HubGroupMemberSaveResult> InsertUserMemberAsync(
-        int hubGroupId, int userId, int? addedByUserId, string status = HubGroupUserMemberStatus.Active)
+        int hubGroupId, int userId, int? addedByUserId, string status = HubGroupUserMemberStatus.Active,
+        int? swimmerId = null, string? note = null)
     {
         var existing = await _db.HubGroupUserMembers.AsNoTracking()
             .Where(m => m.HubGroupId == hubGroupId && m.UserId == userId)
@@ -272,7 +297,9 @@ public class HubGroupUserService : IHubGroupUserService
             HubGroupId = hubGroupId,
             UserId = userId,
             AddedByUserId = addedByUserId,
-            Status = status
+            Status = status,
+            SwimmerId = swimmerId,
+            Note = note
         });
 
         try
