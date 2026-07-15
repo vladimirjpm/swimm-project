@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useAuth } from '../../hooks/useAuth';
 import type {
   ClubOption,
   ClubRequest,
@@ -68,33 +69,10 @@ export interface CurrentIdentity {
   isAdmin: boolean;
 }
 
-export function useCurrentIdentity() {
-  const [identity, setIdentity] = useState<CurrentIdentity>({ isAuthenticated: false, userId: null, isAdmin: false });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const r = await fetch('/auth/me', { credentials: 'include' });
-        if (cancelled) return;
-        if (!r.ok) { setIdentity({ isAuthenticated: false, userId: null, isAdmin: false }); return; }
-        const me = await r.json();
-        setIdentity({
-          isAuthenticated: !!me?.isAuthenticated,
-          userId: me?.id ?? null,
-          isAdmin: Array.isArray(me?.roles) && me.roles.includes('Admin'),
-        });
-      } catch {
-        if (!cancelled) setIdentity({ isAuthenticated: false, userId: null, isAdmin: false });
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  return { ...identity, loading };
+/** Тонкая обёртка над общим useAuth (hooks/useAuth.ts) — сохраняет прежний контракт. */
+export function useCurrentIdentity(): CurrentIdentity & { loading: boolean } {
+  const { isAuthenticated, userId, isAdmin, loading } = useAuth();
+  return { isAuthenticated, userId, isAdmin, loading };
 }
 
 export function useMyHubGroups(enabled: boolean) {
