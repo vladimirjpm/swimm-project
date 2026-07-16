@@ -51,6 +51,11 @@
 </div>
 
 <h2 class="mt-10 mb-2 text-sm font-semibold text-admin-text">Сироты (0 результатов, 0 связей)</h2>
+<div class="mb-3">
+    <button id="btn-delete-orphans" class="cursor-pointer rounded-md bg-admin-danger/20 border border-admin-danger/50 px-4 py-2 text-[13px] font-semibold text-[#ef9a9a] disabled:opacity-40" disabled>
+        Удалить всех сирот (0)
+    </button>
+</div>
 <div id="orphans" class="text-[12.5px] text-admin-text-muted leading-relaxed"></div>
 
 @section Scripts {
@@ -93,6 +98,10 @@
         document.getElementById('orphans').innerHTML = data.orphans.length
             ? data.orphans.map(o => `<span dir="rtl">${esc(o.name)}</span> <span class="text-[#546e7a]">#${o.id} (${o.birthYear || '—'}, ${esc(o.club ?? '—')})</span>`).join(' · ')
             : 'нет';
+
+        const btnDel = document.getElementById('btn-delete-orphans');
+        btnDel.textContent = `Удалить всех сирот (${data.orphans.length})`;
+        btnDel.disabled = data.orphans.length === 0;
 
         // Любое изменение выбора инвалидирует прошлый dry-run
         [...document.querySelectorAll('.pair-cb')].forEach(cb =>
@@ -171,6 +180,20 @@
             toast('Склейка применена', 4000);
             await load();
         } catch (e) { toast('Ошибка применения: ' + e.message, 6000); }
+    });
+
+    document.getElementById('btn-delete-orphans').addEventListener('click', async () => {
+        const n = data.orphans.length;
+        if (!n) return;
+        if (!confirm(`Удалить ${n} карточек без единой связи? Пловцы с результатами, тренировками и членствами не могут быть удалены. Действие необратимо.`)) return;
+        try {
+            const report = await apiJson(`${API}/orphans/delete`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            toast(`Удалено сирот: ${report.deleted}`, 4000);
+            await load();
+        } catch (e) { toast('Ошибка удаления: ' + e.message, 6000); }
     });
 
     load();

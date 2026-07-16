@@ -76,16 +76,7 @@ public class SwimmerDedupService(SwimmDbContext db) : ISwimmerDedupService
             (!x.Sure, x.Distance, x.CanonicalName).CompareTo((!y.Sure, y.Distance, y.CanonicalName)));
 
         // Сироты: вообще без результатов (включая синтетические) и без единой связи.
-        var orphanIds = await db.Swimmers.AsNoTracking()
-            .Where(s => s.SwimmerOrgId == null || !s.SwimmerOrgId.StartsWith("SYNTH-"))
-            .Where(s => !db.Results.Any(r => r.SwimmerId == s.Id)
-                && !db.HubGroupMembers.Any(m => m.SwimmerId == s.Id)
-                && !db.HubGroupUserMembers.Any(m => m.SwimmerId == s.Id)
-                && !db.UserFavorites.Any(f => f.SwimmerId == s.Id)
-                && !db.UserMedia.Any(m => m.SwimmerId == s.Id)
-                && !db.HubGroupMedia.Any(m => m.SwimmerId == s.Id)
-                && !db.TrainingResults.Any(t => t.SwimmerId == s.Id)
-                && !db.AppUsers.Any(u => u.SwimmerId == s.Id))
+        var orphanIds = await OrphanQuery()
             .Select(s => new SwimmerOrphan(
                 s.Id, (s.LastName + " " + s.FirstName).Trim(), s.BirthYear, s.Origin,
                 s.Club != null ? s.Club.Name : null))
@@ -94,6 +85,49 @@ public class SwimmerDedupService(SwimmDbContext db) : ISwimmerDedupService
 
         return report;
     }
+
+    public async Task<SwimmerOrphanCleanupReport> DeleteOrphansAsync(IReadOnlyCollection<int>? ids, CancellationToken ct = default)
+    {
+        var orphanIds = await OrphanQuery().Select(s => s.Id).ToListAsync(ct);
+        var orphanSet = orphanIds.ToHashSet();
+
+        List<int> toDelete;
+        List<int> skipped;
+        if (ids is null)
+        {
+            toDelete = orphanIds;
+            skipped = [];
+        }
+        else
+        {
+            toDelete = ids.Where(orphanSet.Contains).Distinct().ToList();
+            skipped = ids.Where(id => !orphanSet.Contains(id)).Distinct().ToList();
+        }
+
+        if (toDelete.Count > 0)
+        {
+            var swimmers = await db.Swimmers.Where(s => toDelete.Contains(s.Id)).ToListAsync(ct);
+            db.Swimmers.RemoveRange(swimmers);
+            await db.SaveChangesAsync(ct);
+        }
+
+        return new SwimmerOrphanCleanupReport(toDelete.Count, toDelete, skipped);
+    }
+
+    /// <summary>Критерий сироты — единственное место, где он живёт (Решение 1 в задаче B2).
+    /// Ничего не ссылается: ни результаты, ни группы (админ/пользовательские), ни избранное,
+    /// ни медиа, ни тренировки, ни привязанный аккаунт. Синтетика (SYNTH-) исключена заранее.</summary>
+    private IQueryable<Swimm.Domain.Entities.Swimmer> OrphanQuery() =>
+        db.Swimmers.AsNoTracking()
+            .Where(s => s.SwimmerOrgId == null || !s.SwimmerOrgId.StartsWith("SYNTH-"))
+            .Where(s => !db.Results.Any(r => r.SwimmerId == s.Id)
+                && !db.HubGroupMembers.Any(m => m.SwimmerId == s.Id)
+                && !db.HubGroupUserMembers.Any(m => m.SwimmerId == s.Id)
+                && !db.UserFavorites.Any(f => f.SwimmerId == s.Id)
+                && !db.UserMedia.Any(m => m.SwimmerId == s.Id)
+                && !db.HubGroupMedia.Any(m => m.SwimmerId == s.Id)
+                && !db.TrainingResults.Any(t => t.SwimmerId == s.Id)
+                && !db.AppUsers.Any(u => u.SwimmerId == s.Id));
 
     /// <summary>Нормализация как в dedup-report.sql: trim/lower, финальные ивритские буквы,
     /// гереш ׳/гершаим ״ → ASCII, схлопнуть пробелы.</summary>

@@ -69,4 +69,35 @@ public class SwimmersAdminController : ControllerBase
 
         return Ok(report);
     }
+
+    public sealed record DeleteOrphansRequest(List<int>? Ids);
+
+    /// <summary>Массовое удаление сирот (B2). Критерий пересчитывается на сервере —
+    /// ids из тела не является истиной, см. ISwimmerDedupService.DeleteOrphansAsync.</summary>
+    [HttpPost("orphans/delete")]
+    public async Task<IActionResult> DeleteOrphans([FromBody] DeleteOrphansRequest? request, CancellationToken ct)
+    {
+        var report = await _dedup.DeleteOrphansAsync(request?.Ids, ct);
+
+        if (report.Deleted > 0)
+        {
+            _logger.LogWarning(
+                "Admin {User} удалил {Count} пловцов-сирот: {Ids}",
+                User.Identity?.Name ?? "?", report.Deleted, string.Join(",", report.DeletedIds));
+            await _cache.InvalidateAllAsync();
+        }
+
+        return Ok(report);
+    }
+
+    /// <summary>Лёгкая сводка для карточек «Требует внимания» на дашборде.</summary>
+    [HttpGet("attention-summary")]
+    public async Task<IActionResult> GetAttentionSummary(CancellationToken ct)
+    {
+        var report = await _dedup.FindCandidatesAsync(ct);
+        return Ok(new SwimmerAttentionSummary(
+            report.Orphans.Count,
+            report.Candidates.Count(c => c.Sure),
+            report.Candidates.Count(c => !c.Sure)));
+    }
 }

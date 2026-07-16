@@ -12,4 +12,9 @@ public interface ISwimmerDedupService
 {
     /// <summary>Пары-кандидаты (уверенные + спорные) и сироты.</summary>
     Task<SwimmerDedupReport> FindCandidatesAsync(CancellationToken ct = default);
+
+    /// <summary>Удаляет пловцов-сирот (B2). Критерий сироты пересчитывается на сервере —
+    /// <paramref name="ids"/> не является истиной: удаляется пересечение с актуальными
+    /// сиротами, остальные id из запроса попадают в SkippedIds. null — удалить всех сирот.</summary>
+    Task<SwimmerOrphanCleanupReport> DeleteOrphansAsync(IReadOnlyCollection<int>? ids, CancellationToken ct = default);
 }

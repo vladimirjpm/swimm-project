@@ -25,3 +25,10 @@ public sealed class SwimmerDedupReport
     public List<SwimmerOrphan> Orphans { get; } = [];
     public int RealSwimmers { get; set; }
 }
+
+/// <summary>Итог массового удаления сирот (B2). Сервер сам пересчитывает актуальных
+/// сирот тем же критерием — SkippedIds это id из запроса, которые сиротами не оказались.</summary>
+public sealed record SwimmerOrphanCleanupReport(int Deleted, List<int> DeletedIds, List<int> SkippedIds);
+
+/// <summary>Лёгкая сводка для карточек «Требует внимания» на дашборде.</summary>
+public sealed record SwimmerAttentionSummary(int Orphans, int SureCandidates, int UnsureCandidates);

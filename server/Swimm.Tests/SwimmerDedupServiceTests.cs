@@ -103,6 +103,112 @@ public class SwimmerDedupServiceTests
     }
 
     [Fact]
+    public async Task DeleteOrphans_NullIds_DeletesAllCurrentOrphans()
+    {
+        await using var db = CreateDb(nameof(DeleteOrphans_NullIds_DeletesAllCurrentOrphans));
+        var orphan1 = S("Один", "Пловец", 2010);
+        var orphan2 = S("Два", "Пловец", 2011);
+        var synth = S("Synth", "One", 2000);
+        synth.SwimmerOrgId = "SYNTH-1";
+        db.AddRange(orphan1, orphan2, synth);
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerDedupService(db).DeleteOrphansAsync(null);
+
+        Assert.Equal(2, report.Deleted);
+        Assert.Equal(0, await db.Swimmers.CountAsync(s => s.Id == orphan1.Id || s.Id == orphan2.Id));
+        Assert.Equal(1, await db.Swimmers.CountAsync()); // синтетика не тронута
+    }
+
+    [Fact]
+    public async Task DeleteOrphans_SwimmerWithResults_NotDeleted()
+    {
+        await using var db = CreateDb(nameof(DeleteOrphans_SwimmerWithResults_NotDeleted));
+        var comp = new Competition { Name = "M", Date = "01/06/2026", PoolType = "25m" };
+        var style = new Style { Name = "free" };
+        var swimmer = S("Есть", "Результаты", 2010);
+        db.AddRange(comp, style, swimmer);
+        await db.SaveChangesAsync();
+        db.Results.Add(new ResultRecord { Swimmer = swimmer, Competition = comp, Style = style, Distance = "50", Gender = "male", CompetitionDate = DateTime.UtcNow });
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerDedupService(db).DeleteOrphansAsync(null);
+
+        Assert.Equal(0, report.Deleted);
+        Assert.Equal(1, await db.Swimmers.CountAsync(s => s.Id == swimmer.Id));
+    }
+
+    [Fact]
+    public async Task DeleteOrphans_SwimmerWithTrainingResults_NotDeleted()
+    {
+        await using var db = CreateDb(nameof(DeleteOrphans_SwimmerWithTrainingResults_NotDeleted));
+        var swimmer = S("Тренируется", "Пловец", 2010);
+        db.Add(swimmer);
+        await db.SaveChangesAsync();
+        db.TrainingResults.Add(new TrainingResult { SwimmerId = swimmer.Id, Distance = "50", Gender = "male", TimeOriginal = "30.00" });
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerDedupService(db).DeleteOrphansAsync(null);
+
+        Assert.Equal(0, report.Deleted);
+        Assert.Equal(1, await db.Swimmers.CountAsync(s => s.Id == swimmer.Id));
+    }
+
+    [Fact]
+    public async Task DeleteOrphans_SwimmerWithHubGroupMembership_NotDeleted()
+    {
+        await using var db = CreateDb(nameof(DeleteOrphans_SwimmerWithHubGroupMembership_NotDeleted));
+        var group = new HubGroup { Name = "Group", Slug = "group-" + nameof(DeleteOrphans_SwimmerWithHubGroupMembership_NotDeleted) };
+        var swimmer = S("Член", "Группы", 2010);
+        db.AddRange(group, swimmer);
+        await db.SaveChangesAsync();
+        db.HubGroupMembers.Add(new HubGroupMember { HubGroupId = group.Id, SwimmerId = swimmer.Id });
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerDedupService(db).DeleteOrphansAsync(null);
+
+        Assert.Equal(0, report.Deleted);
+        Assert.Equal(1, await db.Swimmers.CountAsync(s => s.Id == swimmer.Id));
+    }
+
+    [Fact]
+    public async Task DeleteOrphans_SynthExcluded()
+    {
+        await using var db = CreateDb(nameof(DeleteOrphans_SynthExcluded));
+        var synth = S("Synth", "One", 2000);
+        synth.SwimmerOrgId = "SYNTH-1";
+        db.Add(synth);
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerDedupService(db).DeleteOrphansAsync(null);
+
+        Assert.Equal(0, report.Deleted);
+        Assert.Equal(1, await db.Swimmers.CountAsync());
+    }
+
+    [Fact]
+    public async Task DeleteOrphans_IdsWithNonOrphan_Skipped()
+    {
+        await using var db = CreateDb(nameof(DeleteOrphans_IdsWithNonOrphan_Skipped));
+        var comp = new Competition { Name = "M", Date = "01/06/2026", PoolType = "25m" };
+        var style = new Style { Name = "free" };
+        var withResults = S("Есть", "Результаты", 2010);
+        var orphan = S("Одинокий", "Пловец", 2011);
+        db.AddRange(comp, style, withResults, orphan);
+        await db.SaveChangesAsync();
+        db.Results.Add(new ResultRecord { Swimmer = withResults, Competition = comp, Style = style, Distance = "50", Gender = "male", CompetitionDate = DateTime.UtcNow });
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerDedupService(db).DeleteOrphansAsync([withResults.Id, orphan.Id]);
+
+        Assert.Equal(1, report.Deleted);
+        Assert.Equal([orphan.Id], report.DeletedIds);
+        Assert.Equal([withResults.Id], report.SkippedIds);
+        Assert.Equal(1, await db.Swimmers.CountAsync(s => s.Id == withResults.Id));
+        Assert.Equal(0, await db.Swimmers.CountAsync(s => s.Id == orphan.Id));
+    }
+
+    [Fact]
     public async Task FindCandidates_YearZeroPhantoms_NotSure()
     {
         await using var db = CreateDb(nameof(FindCandidates_YearZeroPhantoms_NotSure));

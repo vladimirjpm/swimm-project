@@ -8,6 +8,9 @@
 <!-- Stats -->
 <div class="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-4 mb-6" id="stats-grid"></div>
 
+<!-- Attention (сироты, спорные дубли) — рендерится только если сводка ненулевая -->
+<div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 mb-6 hidden" id="attention-grid"></div>
+
 <!-- Tabs -->
 <div class="flex gap-2 mb-4">
     <button class="tab-btn active py-2 px-5 border border-admin-accent rounded-md bg-transparent text-admin-accent cursor-pointer text-sm transition-colors hover:bg-admin-accent/10" data-tab="users">👥 Users</button>
@@ -106,6 +109,34 @@
                 <div class="text-3xl font-bold text-[#4fc3f7]">${i.value}</div>
                 <div class="text-sm text-[#90a4ae] mt-1">${i.label}</div>
             </div>`).join('');
+    }
+
+    // --- Требует внимания (сироты, спорные дубли) ---
+    async function loadAttention() {
+        const a = await api(`${API}/swimmers/attention-summary`);
+        const grid = document.getElementById('attention-grid');
+        const cards = [];
+        if (a.orphans > 0) {
+            cards.push(`
+                <a href="/Admin/Swimmers" class="bg-white/[.07] rounded-[10px] p-5 text-center block no-underline hover:bg-white/[.1] transition-colors">
+                    <div class="text-3xl font-bold" style="color:#ffa726">${a.orphans}</div>
+                    <div class="text-sm text-[#90a4ae] mt-1">Сироты — карточки без единой связи, можно массово удалить</div>
+                </a>`);
+        }
+        if (a.sureCandidates > 0 || a.unsureCandidates > 0) {
+            const sureLine = a.sureCandidates > 0
+                ? `<div class="text-xs text-[#90a4ae] mt-1">уверенных: ${a.sureCandidates}</div>` : '';
+            cards.push(`
+                <a href="/Admin/Swimmers" class="bg-white/[.07] rounded-[10px] p-5 text-center block no-underline hover:bg-white/[.1] transition-colors">
+                    <div class="text-3xl font-bold" style="color:#ffa726">${a.unsureCandidates}</div>
+                    <div class="text-sm text-[#90a4ae] mt-1">Спорные дубли — разобрать глазами</div>
+                    ${sureLine}
+                </a>`);
+        }
+        if (cards.length) {
+            grid.innerHTML = cards.join('');
+            grid.classList.remove('hidden');
+        }
     }
 
     // --- Filters ---
@@ -387,7 +418,7 @@
 
     // --- Init ---
     try {
-        [allRoles] = await Promise.all([api(`${API}/roles`), loadStats()]);
+        [allRoles] = await Promise.all([api(`${API}/roles`), loadStats(), loadAttention()]);
         populateRoleFilter();
         allUsers = await api(`${API}/users`);
         populateUserDatalist();
