@@ -343,8 +343,11 @@ public class AdminRepository : IAdminRepository
 
     public async Task<List<CompetitionEventDto>> GetCompetitionEventsAsync()
     {
+        // Пустые события (без единого дня — остатки отвязок/экспериментов) в селекторы
+        // импорта не отдаём: привязаться к ним всё равно осмысленно нельзя, только мусорят.
         return await _db.CompetitionEvents
             .AsNoTracking()
+            .Where(e => _db.Competitions.Any(c => c.EventId == e.Id))
             .OrderByDescending(e => e.StartDate)
             .ThenBy(e => e.Name)
             .Select(e => new CompetitionEventDto
