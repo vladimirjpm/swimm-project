@@ -642,6 +642,21 @@ public class JsonImportService : IImportService
         {
             await using var tx = await _db.Database.BeginTransactionAsync();
             var r = await DeleteCompetitionCoreAsync(competition);
+
+            // Удалили последний день события — само событие больше не нужно (пустые
+            // события не отдаются селекторам и только мусорят; см. GetCompetitionEventsAsync).
+            // В DeleteCompetitionEventAsync этой ветки нет: там событие удаляется явно.
+            if (competition.EventId is int evId
+                && !await _db.Competitions.AnyAsync(c => c.EventId == evId))
+            {
+                var emptyEvent = await _db.CompetitionEvents.FindAsync(evId);
+                if (emptyEvent != null)
+                {
+                    _db.CompetitionEvents.Remove(emptyEvent);
+                    await _db.SaveChangesAsync();
+                }
+            }
+
             await tx.CommitAsync();
             return r;
         });
