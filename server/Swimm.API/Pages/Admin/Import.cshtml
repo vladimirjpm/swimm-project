@@ -90,8 +90,10 @@
                         <label class="block text-xs text-admin-text-muted mb-1">Бассейн</label>
                         <select id="pdf-pool-type" class="admin-input min-w-[120px]">
                             <option value="">—</option>
-                            <option value="25m">25m</option>
-                            <option value="50m">50m</option>
+                            @foreach (var pt in Model.PoolTypeOptions)
+                            {
+                                <option value="@pt">@pt</option>
+                            }
                         </select>
                     </div>
                     <div>

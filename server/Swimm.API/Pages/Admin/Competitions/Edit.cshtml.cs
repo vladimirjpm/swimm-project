@@ -1,7 +1,9 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 
 namespace Swimm.API.Pages.Admin.Competitions;
@@ -28,6 +30,9 @@ public class EditModel : PageModel
     [BindProperty]
     public CompetitionForm Input { get; set; } = new();
 
+    /// <summary>Канонические типы бассейна для select-а формы.</summary>
+    public IReadOnlyList<string> PoolTypeOptions => PoolTypes.All;
+
     // Форма добавления URL результатов
     [BindProperty] public string? NewUrlCulture { get; set; }
     [BindProperty] public string? NewUrl { get; set; }
@@ -49,6 +54,7 @@ public class EditModel : PageModel
         public string Name { get; set; } = "";
         public string? SubName { get; set; }
         public string Date { get; set; } = "";
+        [Required(ErrorMessage = "Выберите тип бассейна")]
         public string PoolType { get; set; } = "";
         public string Country { get; set; } = "";
         public int? OrgCompId { get; set; }

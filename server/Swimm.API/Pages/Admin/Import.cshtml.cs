@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 
 namespace Swimm.API.Pages.Admin;
 
@@ -15,6 +16,9 @@ public class ImportModel : PageModel
     }
 
     public IReadOnlyList<string> ParseFormats { get; private set; } = [];
+
+    /// <summary>Канонические типы бассейна для select-а (парсер может определить сам — «—» остаётся).</summary>
+    public IReadOnlyList<string> PoolTypeOptions => PoolTypes.All;
 
     /// <summary>Опция DDL языка: код + подпись. Страны — общий каталог <see cref="Shared.CountryCatalog"/>.</summary>
     public record SelectOption(string Code, string Label);

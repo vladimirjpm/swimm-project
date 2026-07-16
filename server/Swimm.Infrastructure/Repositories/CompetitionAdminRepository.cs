@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
@@ -446,6 +447,9 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         // (не обязательные, без required-проверки) нормализуем через ?? "" перед Trim().
         var date = (input.Date ?? "").Trim();
         var pool = (input.PoolType ?? "").Trim();
+
+        if (!PoolTypes.IsValid(pool))
+            return $"Тип бассейна должен быть одним из: {string.Join(" / ", PoolTypes.All)}";
 
         // UNIQUE (Name, Date, PoolType)
         var dupKey = await _db.Competitions.AnyAsync(c =>

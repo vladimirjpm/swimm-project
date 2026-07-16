@@ -51,8 +51,14 @@
             </label>
 
             <label class="flex flex-col gap-1">
-                <span class="text-xs text-admin-text-muted">Тип бассейна</span>
-                <input asp-for="Input.PoolType" class="admin-input" autocomplete="off" placeholder="25m / 50m" />
+                <span class="text-xs text-admin-text-muted">Тип бассейна <span class="text-admin-danger">*</span></span>
+                <select asp-for="Input.PoolType" class="admin-input">
+                    <option value="" disabled selected>— выберите —</option>
+                    @foreach (var pt in Model.PoolTypeOptions)
+                    {
+                        <option value="@pt">@pt</option>
+                    }
+                </select>
             </label>
 
             <label class="flex flex-col gap-1">
