@@ -15,6 +15,7 @@ import { useMode } from '../../hooks/useMode';
 import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import UI_ThemeDevTool from '../components/mix/theme-dev-tool/theme-dev-tool';
 import GroupHeader from './components/group-header/group-header';
+import AppTopbar from '../components/app-topbar/app-topbar';
 import type { HubGroupDetails } from '../hub-groups-project/types';
 
 // === Вспомогательная функция ===
@@ -235,6 +236,7 @@ function ResultsMain() {
 
   return (
     <div className="dolphine-training md:p-4 pt-safe pb-safe min-h-screen bg-[var(--theme-mode-page-bg)]">
+      <AppTopbar />
       {/* Переключатель Light/Dark (fixed внизу-справа) */}
       <UI_ModeToggle />
       {/* Dev-инструмент тем (виден только при ?themes в URL) */}
@@ -244,7 +246,7 @@ function ResultsMain() {
           Overview/Members/Records — ссылки на обзорную groups.html; Competitions/Trainings —
           локальный toggle (единственное место переключения активности, см. FilterActivity). */}
       {groupSlug ? (
-        <div className="w-full z-40 max-lg:px-2 max-lg:pt-2">
+        <div className="relative w-full z-40 max-lg:px-2 max-lg:pt-2">
           <GroupHeader
             slug={groupSlug}
             group={groupInfo}
@@ -256,7 +258,7 @@ function ResultsMain() {
       ) : (
         /* Селектор соревнований: шапка/панель, единый для всех брейкпоинтов
             (mobile — bottom sheet из «Change», design_handoff_selector_all) */
-        <div className="w-full z-40 max-lg:px-2 max-lg:pt-2">
+        <div className="relative w-full z-40 max-lg:px-2 max-lg:pt-2">
           <DataSourceDDL />
         </div>
       )}

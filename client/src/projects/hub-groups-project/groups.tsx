@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import '../home-project/home.css';
-import HomeHeader from '../home-project/components/home-header';
+import AppTopbar from '../components/app-topbar/app-topbar';
 import RecordTicker from '../home-project/components/record-ticker';
 import MyGroupsPanel from './my-groups-panel';
 import UI_ClubIcon from '../components/mix/club-icon/club-icon';
@@ -739,7 +739,7 @@ function Groups() {
     <div className="home-page relative min-h-screen overflow-x-clip pb-[96px] text-[#f3f8fd]">
       <div className="hp-shimmer" aria-hidden="true" />
 
-      <HomeHeader active="groups" />
+      <AppTopbar active="groups" />
 
       {loading && (
         <p className="px-5 pt-10 text-[14px] font-bold text-[#cbe0f0]/60 lg:px-16">Loading…</p>

@@ -1,6 +1,6 @@
 import React from 'react';
 import '../home-project/home.css';
-import HomeHeader from '../home-project/components/home-header';
+import AppTopbar from '../components/app-topbar/app-topbar';
 import RecordTicker from '../home-project/components/record-ticker';
 import { HOME_REGION_LABEL } from '../../utils/constants/home-region';
 import {
@@ -157,7 +157,7 @@ function Competitions() {
     <div className="home-page relative min-h-screen overflow-x-clip pb-[96px] text-[#f3f8fd]">
       <div className="hp-shimmer" aria-hidden="true" />
 
-      <HomeHeader active="competitions" />
+      <AppTopbar active="competitions" />
 
       <section className="relative px-5 pt-[26px] lg:px-16 lg:pt-[46px]">
         <p className="mb-[18px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[#7dd3fc] lg:text-[15px] lg:tracking-[0.3em]">
