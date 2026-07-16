@@ -28,7 +28,7 @@ public sealed class ImportBackgroundService : BackgroundService
     {
         try
         {
-            await foreach (var (jobId, data, fileName, categoryKeys, eventOptions) in _queue.ConsumeAsync(stoppingToken))
+            await foreach (var (jobId, data, fileName, categoryKeys, eventOptions, discoveredId) in _queue.ConsumeAsync(stoppingToken))
             {
                 _queue.SetRunning(jobId);
                 _logger.LogInformation("Import job {JobId} started: {FileName}", jobId, fileName);
@@ -44,6 +44,19 @@ public sealed class ImportBackgroundService : BackgroundService
                     _queue.SetCompleted(jobId, result);
                     _logger.LogInformation("Import job {JobId} completed: {Created} created, {Errors} errors",
                         jobId, result.Created, result.Errors);
+
+                    if (discoveredId is int id)
+                    {
+                        try
+                        {
+                            var discovery = scope.ServiceProvider.GetRequiredService<ICompetitionDiscoveryService>();
+                            await discovery.SetStatusAsync(id, "imported", stoppingToken);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Import job {JobId}: не удалось проставить статус imported для discovery {DiscoveredId}", jobId, id);
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {

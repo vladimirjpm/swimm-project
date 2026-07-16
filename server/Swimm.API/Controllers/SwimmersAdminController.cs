@@ -47,7 +47,15 @@ public class SwimmersAdminController : ControllerBase
         if (request.Pairs is not { Count: > 0 })
             return BadRequest(new { error = "Пары не выбраны" });
 
-        var report = await _merge.MergeAsync(request.Pairs, dryRun: !request.Apply, ct);
+        SwimmerMergeReport report;
+        try
+        {
+            report = await _merge.MergeAsync(request.Pairs, dryRun: !request.Apply, ct);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
 
         if (request.Apply)
         {

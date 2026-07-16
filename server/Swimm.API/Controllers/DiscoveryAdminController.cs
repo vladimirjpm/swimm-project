@@ -77,7 +77,7 @@ public class DiscoveryAdminController : ControllerBase
     [IgnoreAntiforgeryToken] // GET-скачивание файла; мутаций нет
     public async Task<IActionResult> DownloadPdf(int id, [FromQuery] string language = "he", CancellationToken ct = default)
     {
-        var (pdf, fileName, error) = await FetchPdfAsync(id, language, ct);
+        var (pdf, fileName, error) = await FetchPdfAsync(id, language, refreshIfMissing: false, ct);
         if (pdf is null) return BadRequest(new { error });
         return File(pdf, "application/pdf", fileName);
     }
@@ -86,7 +86,7 @@ public class DiscoveryAdminController : ControllerBase
     [HttpPost("{id:int}/preview")]
     public async Task<IActionResult> Preview(int id, [FromQuery] string language = "he", CancellationToken ct = default)
     {
-        var (pdf, fileName, error) = await FetchPdfAsync(id, language, ct);
+        var (pdf, fileName, error) = await FetchPdfAsync(id, language, refreshIfMissing: true, ct);
         if (pdf is null) return BadRequest(new { error });
 
         ParsedCompetition parsed;
@@ -139,14 +139,15 @@ public class DiscoveryAdminController : ControllerBase
             Encoding.UTF8.GetBytes(entry.Parsed.ResultsJson),
             entry.FileName,
             request.CategoryKeys,
-            eventOptions);
+            eventOptions,
+            entry.DiscoveredId);
 
-        await _discovery.SetStatusAsync(entry.DiscoveredId, "imported", ct);
+        // Статус imported проставляет фоновый обработчик после успешного завершения job (A1).
         return Accepted(new { jobId });
     }
 
     private async Task<(byte[]? pdf, string fileName, string? error)> FetchPdfAsync(
-        int id, string language, CancellationToken ct)
+        int id, string language, bool refreshIfMissing, CancellationToken ct)
     {
         var all = await _discovery.GetAllAsync(ct);
         var row = all.FirstOrDefault(d => d.Id == id);
@@ -155,6 +156,9 @@ public class DiscoveryAdminController : ControllerBase
         var logligId = row.LogligId;
         if (logligId is null)
         {
+            if (!refreshIfMissing)
+                return (null, "", "Детали не загружены — нажмите «Затянуть» (нет loglig-id).");
+
             // Детали могли ещё не загружаться — пробуем один раз.
             var refreshed = await _discovery.RefreshDetailsAsync(id, ct);
             logligId = refreshed?.LogligId;

@@ -149,19 +149,23 @@ public class SwimmerMergeServiceTests
         await using var db = CreateDb(nameof(Merge_SyntheticOrMissingOrSelf_Errors));
         var synth = NewSwimmer("Synth", "S");
         synth.SwimmerOrgId = "SYNTH-1";
-        var real = NewSwimmer("Real", "R");
-        db.AddRange(synth, real);
+        // A2: у каждой пары свои Id — иначе сработает новая проверка пересекающихся пар
+        // (один и тот же canonical/duplicate в нескольких парах), которая тестируется отдельно.
+        var real1 = NewSwimmer("Real1", "R");
+        var real2 = NewSwimmer("Real2", "R");
+        var real3 = NewSwimmer("Real3", "R");
+        db.AddRange(synth, real1, real2, real3);
         await db.SaveChangesAsync();
 
         var report = await new SwimmerMergeService(db).MergeAsync(
         [
-            new SwimmerMergePair(real.Id, synth.Id),
-            new SwimmerMergePair(real.Id, 424242),
-            new SwimmerMergePair(real.Id, real.Id),
+            new SwimmerMergePair(real1.Id, synth.Id),
+            new SwimmerMergePair(real2.Id, 424242),
+            new SwimmerMergePair(real3.Id, real3.Id),
         ], dryRun: false);
 
         Assert.All(report.Pairs, p => Assert.Equal("error", p.Status));
-        Assert.Equal(2, await db.Swimmers.CountAsync());
+        Assert.Equal(4, await db.Swimmers.CountAsync());
     }
 
     // ── Дозаполнение пустых полей канонического из дубля ─────────────────────
@@ -189,5 +193,50 @@ public class SwimmerMergeServiceTests
         Assert.Equal(club.Id, merged.ClubId);
         Assert.Equal("Last", merged.LastNameEn);
         Assert.Equal("12345", merged.SwimmerOrgId);
+    }
+
+    // ── A2: пересекающиеся пары отклоняются целиком, до любых изменений в БД ────
+
+    [Fact]
+    public async Task Merge_ThrowsOnOverlappingPairs()
+    {
+        await using var db = CreateDb(nameof(Merge_ThrowsOnOverlappingPairs));
+        var a = NewSwimmer("A", "X");
+        var b = NewSwimmer("B", "X");
+        var c = NewSwimmer("C", "X");
+        db.AddRange(a, b, c);
+        await db.SaveChangesAsync();
+
+        var service = new SwimmerMergeService(db);
+        await Assert.ThrowsAsync<ArgumentException>(() => service.MergeAsync(
+        [
+            new SwimmerMergePair(a.Id, b.Id),
+            new SwimmerMergePair(c.Id, b.Id),
+        ], dryRun: false));
+
+        Assert.Equal(3, await db.Swimmers.CountAsync());
+        Assert.NotNull(await db.Swimmers.FindAsync(a.Id));
+        Assert.NotNull(await db.Swimmers.FindAsync(b.Id));
+        Assert.NotNull(await db.Swimmers.FindAsync(c.Id));
+    }
+
+    [Fact]
+    public async Task Merge_ThrowsWhenSameCanonicalIdUsedTwice()
+    {
+        await using var db = CreateDb(nameof(Merge_ThrowsWhenSameCanonicalIdUsedTwice));
+        var a = NewSwimmer("A", "X");
+        var b = NewSwimmer("B", "X");
+        var c = NewSwimmer("C", "X");
+        db.AddRange(a, b, c);
+        await db.SaveChangesAsync();
+
+        var service = new SwimmerMergeService(db);
+        await Assert.ThrowsAsync<ArgumentException>(() => service.MergeAsync(
+        [
+            new SwimmerMergePair(a.Id, b.Id),
+            new SwimmerMergePair(a.Id, c.Id),
+        ], dryRun: false));
+
+        Assert.Equal(3, await db.Swimmers.CountAsync());
     }
 }

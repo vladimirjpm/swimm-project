@@ -18,6 +18,23 @@ public class SwimmerMergeService(SwimmDbContext db) : ISwimmerMergeService
     public async Task<SwimmerMergeReport> MergeAsync(
         IReadOnlyList<SwimmerMergePair> pairs, bool dryRun = true, CancellationToken ct = default)
     {
+        // A2: пересекающиеся пары (один и тот же Id в нескольких парах, в любой роли) —
+        // ошибка ввода, отклоняем весь вызов до любых обращений к БД. Self-пары (canonical
+        // == duplicate) в этот подсчёт не включаем — для них остаётся отдельный per-pair error.
+        var idCounts = new Dictionary<int, int>();
+        foreach (var pair in pairs)
+        {
+            if (pair.CanonicalId == pair.DuplicateId) continue;
+            idCounts[pair.CanonicalId] = idCounts.GetValueOrDefault(pair.CanonicalId) + 1;
+            idCounts[pair.DuplicateId] = idCounts.GetValueOrDefault(pair.DuplicateId) + 1;
+        }
+        var overlapping = idCounts.Where(kv => kv.Value > 1).Select(kv => kv.Key).ToList();
+        if (overlapping.Count > 0)
+        {
+            throw new ArgumentException(
+                $"Пересекающиеся пары: один и тот же пловец участвует в нескольких парах (Id: {string.Join(", ", overlapping)}). Разбейте на отдельные вызовы.");
+        }
+
         var report = new SwimmerMergeReport { DryRun = dryRun };
 
         foreach (var pair in pairs)
