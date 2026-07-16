@@ -22,6 +22,18 @@ public class SwimmerDedupServiceTests
         Assert.Equal("abc def", SwimmerDedupService.Normalize("  ABC   DEF "));
     }
 
+    [Fact]
+    public void Normalize_TypographicApostrophe()
+    {
+        Assert.Equal(SwimmerDedupService.Normalize("O'Brien"), SwimmerDedupService.Normalize("O’Brien"));
+    }
+
+    [Fact]
+    public void Normalize_DifferentLettersNotEqual()
+    {
+        Assert.NotEqual(SwimmerDedupService.Normalize("דרזנר דין"), SwimmerDedupService.Normalize("דרזנר שון"));
+    }
+
     [Theory]
     [InlineData("abc", "abc", 0)]
     [InlineData("abc", "abd", 1)]

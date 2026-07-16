@@ -102,7 +102,7 @@ public class SwimmerDedupService(SwimmDbContext db) : ISwimmerDedupService
         var chars = name.Trim().ToLowerInvariant().Select(c => c switch
         {
             'ך' => 'כ', 'ם' => 'מ', 'ן' => 'נ', 'ף' => 'פ', 'ץ' => 'צ',
-            '׳' => '\'', '״' => '"',
+            '׳' => '\'', '״' => '"', '’' => '\'',
             _ => c
         });
         return string.Join(' ',

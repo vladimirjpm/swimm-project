@@ -133,7 +133,7 @@ public class JsonImportService : IImportService
         // Swimmers: tracked — EnrichSwimmerFromResult modifies them, changes saved in batch
         var swimmerCache = new Dictionary<string, Swimmer>();
         foreach (var s in await _db.Swimmers.ToListAsync())
-            swimmerCache.TryAdd($"{s.LastName}|{s.FirstName}|{s.BirthYear}", s);
+            swimmerCache.TryAdd(SwimmerMatchKey(s.LastName, s.FirstName, s.BirthYear), s);
 
         // Categories: Key → Category (для привязки соревнований к категориям на импорте).
         var categoryCache = new Dictionary<string, Category>(StringComparer.OrdinalIgnoreCase);
@@ -313,7 +313,7 @@ public class JsonImportService : IImportService
                 }
 
                 // 5. Swimmer
-                var swimmerKey = $"{item.LastName}|{item.FirstName}|{item.BirthYear}";
+                var swimmerKey = SwimmerMatchKey(item.LastName, item.FirstName, item.BirthYear);
                 if (!swimmerCache.TryGetValue(swimmerKey, out var swimmer))
                 {
                     // Not in pre-loaded cache — may still exist if duplicate key collision was silenced
@@ -501,6 +501,15 @@ public class JsonImportService : IImportService
         }
         });
     }
+
+    /// <summary>
+    /// Ключ матчинга пловца для кэша/поиска — нормализует фамилию и имя по правилам
+    /// <see cref="SwimmerDedupService.Normalize"/> (гереш/апостроф, регистр, пробелы),
+    /// чтобы не плодить дублей из-за непоследовательной пунктуации в протоколах isr.org.il.
+    /// Хранимые Swimmer.LastName/FirstName нормализацию НЕ проходят.
+    /// </summary>
+    private static string SwimmerMatchKey(string? last, string? first, int? year) =>
+        $"{SwimmerDedupService.Normalize(last ?? "")}|{SwimmerDedupService.Normalize(first ?? "")}|{year ?? 0}";
 
     /// <summary>
     /// Дополняет данные спортсмена полями из результатов:
