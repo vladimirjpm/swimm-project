@@ -313,6 +313,37 @@
 }
 
 /* ========================================
+   ТОПБАР (AppTopbar): цвета полосы ДЕРИВИРУЮТСЯ из темы формулой color-mix —
+   не рисуем вручную для каждой data-theme (design_handoff_topbar/README.md).
+   --theme-topbar-bg зависит от --theme-primary → автоматически меняется темой;
+   осью режима переопределяется только формула (доля primary и тёмная база).
+   Размещён ПОСЛЕ блоков тем, чтобы var(--theme-primary) уже был темовым.
+   ======================================== */
+:root {
+  --theme-topbar-bg: color-mix(in srgb, var(--theme-primary) 22%, #0b0e14);
+  --theme-topbar-text: #ffffff;
+  --theme-topbar-text-muted: rgba(255, 255, 255, 0.62);
+  --theme-topbar-accent: var(--theme-accent);
+  /* Текст на accent-фоне (кнопка Login, аватар-кружок, иконка лого).
+     Дефолт — белый (--theme-text-active); темы со светлым accent
+     переопределяют на тёмный точечно ниже. */
+  --theme-topbar-accent-text: var(--theme-text-active);
+}
+
+:root[data-mode="dark"] {
+  --theme-topbar-bg: color-mix(in srgb, var(--theme-primary) 14%, #141922);
+  --theme-topbar-text: #eef1f6;
+  --theme-topbar-text-muted: rgba(238, 241, 246, 0.55);
+}
+
+/* Точечные override: светлый accent → белый текст не читается, нужен тёмный.
+   nexaverse #2dd4bf, ocean #00b4d8, competition-dark #34d399 — контраст
+   белого на них < 3:1, тёмный текст берём из тёмной базы соответствующей темы. */
+:root[data-theme="training-nexaverse"] { --theme-topbar-accent-text: #0a2239; }
+:root[data-theme="training-ocean"] { --theme-topbar-accent-text: #023e58; }
+:root[data-theme="competition-dark"] { --theme-topbar-accent-text: #022c22; }
+
+/* ========================================
    DARK × ACCENT: в тёмном режиме accent-ПОВЕРХНОСТИ (header/section/btn/границы/
    текст) переводим на тёмные mode-значения — единообразно для всех data-theme,
    чтобы не рисовать тёмный вариант каждой именованной темы. POP-акценты
