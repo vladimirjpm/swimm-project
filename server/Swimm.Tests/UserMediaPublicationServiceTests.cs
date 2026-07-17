@@ -368,4 +368,64 @@ public class UserMediaPublicationServiceTests
         Assert.True(result);
         Assert.Empty(await service.GetApprovedForGroupAsync(group.Id, "members"));
     }
+
+    // ── GetPublishTargetsAsync — честный селектор «куда можно подать» ────────
+
+    [Fact]
+    public async Task GetPublishTargets_RosterAndMembership_ReturnsGroup()
+    {
+        await using var db = CreateDb(nameof(GetPublishTargets_RosterAndMembership_ReturnsGroup));
+        var (owner, _, group, media) = await SeedBasicAsync(db);
+        var service = new UserMediaPublicationService(db);
+
+        var targets = await service.GetPublishTargetsAsync(owner.Id, media.Id);
+
+        Assert.Equal(group.Id, Assert.Single(targets).Id);
+    }
+
+    [Fact]
+    public async Task GetPublishTargets_SwimmerNotInRoster_GroupExcluded()
+    {
+        await using var db = CreateDb(nameof(GetPublishTargets_SwimmerNotInRoster_GroupExcluded));
+        var (owner, _, _, media) = await SeedBasicAsync(db);
+        // Вторая группа: владелец — член, но пловца медиа в ростере нет (кейс «Дельфин мастерс
+        // для видео Сабины») — предлагаться не должна.
+        var other = new HubGroup { Name = "Other", Slug = Guid.NewGuid().ToString("N"), OwnerUserId = owner.Id, IsPublic = true };
+        db.HubGroups.Add(other);
+        await db.SaveChangesAsync();
+        db.HubGroupUserMembers.Add(new HubGroupUserMember { HubGroupId = other.Id, UserId = owner.Id, Status = HubGroupUserMemberStatus.Active });
+        await db.SaveChangesAsync();
+        var service = new UserMediaPublicationService(db);
+
+        var targets = await service.GetPublishTargetsAsync(owner.Id, media.Id);
+
+        Assert.DoesNotContain(targets, t => t.Id == other.Id);
+    }
+
+    [Fact]
+    public async Task GetPublishTargets_OwnerWithoutMembership_StillIncluded()
+    {
+        // Владелец/админ группы подаёт без user-членства (isGroupPrivileged) — селектор
+        // обязан предлагать такую группу.
+        await using var db = CreateDb(nameof(GetPublishTargets_OwnerWithoutMembership_StillIncluded));
+        var (owner, _, group, media) = await SeedBasicAsync(db, ownerIsActiveMember: false);
+        var service = new UserMediaPublicationService(db);
+
+        var targets = await service.GetPublishTargetsAsync(owner.Id, media.Id);
+
+        Assert.Equal(group.Id, Assert.Single(targets).Id);
+    }
+
+    [Fact]
+    public async Task GetPublishTargets_ForeignMedia_Empty()
+    {
+        await using var db = CreateDb(nameof(GetPublishTargets_ForeignMedia_Empty));
+        var (_, _, _, media) = await SeedBasicAsync(db);
+        var stranger = NewUser("stranger2@example.com");
+        db.AppUsers.Add(stranger);
+        await db.SaveChangesAsync();
+        var service = new UserMediaPublicationService(db);
+
+        Assert.Empty(await service.GetPublishTargetsAsync(stranger.Id, media.Id));
+    }
 }

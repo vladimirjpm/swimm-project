@@ -77,6 +77,16 @@ public class MediaController : ControllerBase
         return Ok(await _publications.GetForOwnerAsync(userId.Value));
     }
 
+    /// <summary>Куда можно подать это медиа (я член/владелец/админ группы + пловец в ростере).</summary>
+    [HttpGet("{id:int}/publish-targets")]
+    public async Task<IActionResult> GetPublishTargets(int id)
+    {
+        var userId = CurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        return Ok(await _publications.GetPublishTargetsAsync(userId.Value, id));
+    }
+
     /// <summary>Подать медиа в группу (level: members|public). Админ группы — сразу approved.</summary>
     [HttpPost("{id:int}/publications")]
     public async Task<IActionResult> SubmitPublication(int id, [FromBody] SubmitPublicationRequest request)

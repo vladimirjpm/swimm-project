@@ -134,6 +134,27 @@ public class UserMediaPublicationService : IUserMediaPublicationService
             })
             .ToListAsync();
 
+    public async Task<List<PublishTargetDto>> GetPublishTargetsAsync(int ownerUserId, int mediaId)
+    {
+        var media = await _db.UserMedia.AsNoTracking()
+            .Where(m => m.Id == mediaId && m.UserId == ownerUserId)
+            .Select(m => new { m.SwimmerId })
+            .FirstOrDefaultAsync();
+        if (media == null) return [];
+
+        // Владелец/админ группы проходит подачу и без user-членства (isGroupPrivileged в
+        // SubmitAsync) — поэтому объединение: активный член ИЛИ владелец/админ группы.
+        return await _db.HubGroups.AsNoTracking()
+            .Where(g => _db.HubGroupMembers.Any(m => m.HubGroupId == g.Id && m.SwimmerId == media.SwimmerId)
+                        && (g.OwnerUserId == ownerUserId
+                            || _db.HubGroupAdmins.Any(a => a.HubGroupId == g.Id && a.UserId == ownerUserId)
+                            || _db.HubGroupUserMembers.Any(um => um.HubGroupId == g.Id
+                                && um.UserId == ownerUserId && um.Status == HubGroupUserMemberStatus.Active)))
+            .OrderBy(g => g.Name)
+            .Select(g => new PublishTargetDto { Id = g.Id, Name = g.Name })
+            .ToListAsync();
+    }
+
     public Task<List<GroupPublicationInboxItemDto>> GetForGroupAsync(int hubGroupId)
         => QueryGroupItems(_db.UserMediaPublications.AsNoTracking()
             .Where(p => p.HubGroupId == hubGroupId

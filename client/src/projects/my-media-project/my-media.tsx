@@ -58,17 +58,22 @@ function MyMediaContent() {
   const { media, loading, remove } = useAllMyMedia();
   const { publications, submit: submitPublication, withdraw: withdrawPublication } = useMyMediaPublications();
 
-  const [myGroups, setMyGroups] = useState<{ id: number; name: string }[]>([]);
-  useEffect(() => {
-    fetch('/api/me/hub-groups/joined', { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((list: { id: number; name: string; status: string }[]) =>
-        setMyGroups(list.filter((g) => g.status === 'active').map((g) => ({ id: g.id, name: g.name }))))
-      .catch(() => setMyGroups([]));
-  }, []);
-
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [publishMediaId, setPublishMediaId] = useState<number | null>(null);
+
+  // Куда МОЖНО подать выбранное медиа — сервер отдаёт только группы, где я член/админ
+  // и пловец медиа в ростере (не предлагаем группы, где подача всё равно откажет).
+  const [publishTargets, setPublishTargets] = useState<{ id: number; name: string }[] | null>(null);
+  useEffect(() => {
+    if (publishMediaId == null) { setPublishTargets(null); return; }
+    let alive = true;
+    setPublishTargets(null);
+    fetch(`/api/me/media/${publishMediaId}/publish-targets`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: { id: number; name: string }[]) => { if (alive) setPublishTargets(list); })
+      .catch(() => { if (alive) setPublishTargets([]); });
+    return () => { alive = false; };
+  }, [publishMediaId]);
   const [pubGroupId, setPubGroupId] = useState<number | ''>('');
   const [pubLevel, setPubLevel] = useState<'members' | 'public'>('members');
   const [pubSubmitting, setPubSubmitting] = useState(false);
@@ -164,8 +169,7 @@ function MyMediaContent() {
                           ×
                         </button>
 
-                        {myGroups.length > 0 && (
-                          <button
+                        <button
                             type="button"
                             onClick={() => {
                               setPublishMediaId(publishMediaId === item.id ? null : item.id);
@@ -177,7 +181,6 @@ function MyMediaContent() {
                           >
                             ↗
                           </button>
-                        )}
 
                         {isEmbeddable ? (
                           <div
@@ -273,6 +276,11 @@ function MyMediaContent() {
                               className="flex flex-col gap-2 rounded-lg p-2"
                               style={{ background: 'var(--theme-mode-surface-alt)' }}
                             >
+                              {publishTargets != null && publishTargets.length === 0 && (
+                                <div className="text-[10px]" style={{ color: 'var(--theme-mode-text-muted)' }}>
+                                  No eligible groups — the swimmer must be in the group's roster and you must be a member.
+                                </div>
+                              )}
                               <div className="flex flex-wrap gap-1.5">
                                 <select
                                   value={pubGroupId}
@@ -281,7 +289,7 @@ function MyMediaContent() {
                                   style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
                                 >
                                   <option value="">— group —</option>
-                                  {myGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                                  {(publishTargets ?? []).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                                 </select>
                                 <select
                                   value={pubLevel}

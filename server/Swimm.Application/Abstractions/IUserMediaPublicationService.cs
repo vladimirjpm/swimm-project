@@ -24,6 +24,13 @@ public interface IUserMediaPublicationService
     /// <summary>Публикации всех медиа владельца (для списка «Мои ссылки»/страницы медиа).</summary>
     Task<List<UserMediaPublicationDto>> GetForOwnerAsync(int ownerUserId);
 
+    /// <summary>
+    /// Куда владелец может подать это медиа: группы, где он активный user-член И пловец
+    /// медиа в ростере. Для честного селектора в UI (не предлагать группы, где сервер
+    /// всё равно откажет). Чужое/несуществующее медиа → пустой список.
+    /// </summary>
+    Task<List<PublishTargetDto>> GetPublishTargetsAsync(int ownerUserId, int mediaId);
+
     /// <summary>Inbox модерации группы: pending + approved (для снятия). Авторизацию решает контроллер.</summary>
     Task<List<GroupPublicationInboxItemDto>> GetForGroupAsync(int hubGroupId);
 

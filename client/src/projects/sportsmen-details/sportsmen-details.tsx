@@ -488,16 +488,19 @@ function MyMediaSection({
   const [pubLevel, setPubLevel] = useState<'members' | 'public'>('members');
   const [pubSubmitting, setPubSubmitting] = useState(false);
   const [pubError, setPubError] = useState<string | null>(null);
-  const [myGroups, setMyGroups] = useState<{ id: number; name: string }[]>([]);
-
+  // Куда МОЖНО подать выбранное медиа — сервер отдаёт только группы, где я член/админ
+  // и пловец медиа в ростере (не предлагаем группы, где подача всё равно откажет).
+  const [publishTargets, setPublishTargets] = useState<{ id: number; name: string }[] | null>(null);
   useEffect(() => {
-    // Мои активные группы — кандидаты для подачи (сервер сам отсечёт группы без пловца в ростере).
-    fetch('/api/me/hub-groups/joined', { credentials: 'include' })
+    if (publishMediaId == null) { setPublishTargets(null); return; }
+    let alive = true;
+    setPublishTargets(null);
+    fetch(`/api/me/media/${publishMediaId}/publish-targets`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : []))
-      .then((list: { id: number; name: string; status: string }[]) =>
-        setMyGroups(list.filter((g) => g.status === 'active').map((g) => ({ id: g.id, name: g.name }))))
-      .catch(() => setMyGroups([]));
-  }, []);
+      .then((list: { id: number; name: string }[]) => { if (alive) setPublishTargets(list); })
+      .catch(() => { if (alive) setPublishTargets([]); });
+    return () => { alive = false; };
+  }, [publishMediaId]);
 
   const handlePublish = async () => {
     if (publishMediaId == null || pubGroupId === '') return;
@@ -661,20 +664,18 @@ function MyMediaSection({
                 </button>
 
                 {/* Подача в группу (этап 3): открывает панель публикации под сеткой. */}
-                {myGroups.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPublishMediaId(publishMediaId === item.id ? null : item.id);
-                      setPubError(null);
-                    }}
-                    title="Share with a group"
-                    className="absolute top-1 left-1 z-10 w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px] font-bold text-white"
-                    style={{ background: publishMediaId === item.id ? 'var(--theme-primary)' : 'rgba(0,0,0,0.55)' }}
-                  >
-                    ↗
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPublishMediaId(publishMediaId === item.id ? null : item.id);
+                    setPubError(null);
+                  }}
+                  title="Share with a group"
+                  className="absolute top-1 left-1 z-10 w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px] font-bold text-white"
+                  style={{ background: publishMediaId === item.id ? 'var(--theme-primary)' : 'rgba(0,0,0,0.55)' }}
+                >
+                  ↗
+                </button>
 
                 {isEmbeddable ? (
                   <div className="cursor-pointer aspect-video flex items-center justify-center" onClick={() => openLightboxFor(item)}>
@@ -741,8 +742,13 @@ function MyMediaSection({
       {publishMediaId != null && (
         <div className="mt-3 flex flex-col gap-2 rounded-[10px] p-2.5" style={{ background: 'var(--theme-mode-surface-alt)' }}>
           <div className="text-xs font-bold" style={{ color: 'var(--theme-mode-text-secondary)' }}>
-            Поделиться с группой
+            Share with a group
           </div>
+          {publishTargets != null && publishTargets.length === 0 && (
+            <div className="text-[10px]" style={{ color: 'var(--theme-mode-text-muted)' }}>
+              No eligible groups — the swimmer must be in the group's roster and you must be a member.
+            </div>
+          )}
           <div className="flex flex-wrap gap-2">
             <select
               value={pubGroupId}
@@ -751,7 +757,7 @@ function MyMediaSection({
               style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
             >
               <option value="">— group —</option>
-              {myGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              {(publishTargets ?? []).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
             <select
               value={pubLevel}

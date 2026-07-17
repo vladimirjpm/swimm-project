@@ -62,6 +62,16 @@ public class VisibleResultMediaDto
     public string Url { get; set; } = string.Empty;
 }
 
+/// <summary>Группа, куда владелец может подать конкретное медиа (селектор подачи).</summary>
+public class PublishTargetDto
+{
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+}
+
 /// <summary>Решение админа группы по заявке.</summary>
 public class PublicationDecisionRequest
 {
