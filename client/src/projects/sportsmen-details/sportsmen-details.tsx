@@ -562,11 +562,14 @@ function MyMediaSection({
   };
 
   // Клик по иконке «есть видео» на строке результата (см. onOpenMedia в ResultsTable) —
-  // открываем лайтбокс с медиа этого заплыва, если оно уже загружено.
+  // отдельный лайтбокс ТОЛЬКО из медиа этого заплыва (не всего списка пловца).
+  const [rowGallery, setRowGallery] = useState<GalleryItem[] | null>(null);
   useEffect(() => {
     if (openResultId == null) return;
-    const item = media.find((m) => m.result_id === openResultId);
-    if (item) openLightboxFor(item);
+    const items = media
+      .filter((m) => m.result_id === openResultId && (m.source_type === 'youtube' || m.source_type === 'vimeo'))
+      .map((m): GalleryItem => ({ type: 'video', sourceType: m.source_type, url: m.url }));
+    if (items.length > 0) setRowGallery(items);
     onOpenHandled();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openResultId, media]);
@@ -794,12 +797,21 @@ function MyMediaSection({
       </div>
       </details>
 
-      {/* Лайтбокс — вне <details>: открывается и по клику на иконку строки, когда секция свёрнута. */}
+      {/* Лайтбокс списка «Мои ссылки» — вне <details>, работает и при свёрнутой секции. */}
       <UI_SwimmerGallery
         gallery={lightboxItems}
         openIndex={lightboxIndex}
         onClose={() => setLightboxIndex(null)}
       />
+
+      {/* Лайтбокс иконки строки — только видео конкретного заплыва. */}
+      {rowGallery && (
+        <UI_SwimmerGallery
+          gallery={rowGallery}
+          openIndex={0}
+          onClose={() => setRowGallery(null)}
+        />
+      )}
     </div>
   );
 }
