@@ -516,7 +516,6 @@ const DataSourceDDL: React.FC = () => {
             }}
           >
             {s.name}
-            {s.day_count > 1 ? ` (${s.day_count} дн.)` : ''}
           </span>
         </span>
         {live ? (
@@ -893,9 +892,9 @@ const DataSourceDDL: React.FC = () => {
 
   // С выбором — компактная шапка соревнования; «Change» открывает панель поверх контента
   const seasonYear = parseDate(selectedSourceObj.date)?.getFullYear();
-  const headerName = `${selectedSourceObj.name}${
-    selectedSourceObj.day_count > 1 ? ` (${selectedSourceObj.day_count} дн.)` : ''
-  }`;
+  // day_count в имя не подмешиваем: RTL-имена ломают порядок LTR-суффикса,
+  // а многодневность и так видна по диапазону дат в headerMeta («15–16 Jul»).
+  const headerName = selectedSourceObj.name;
   const headerMeta = [
     dateLabel(selectedSourceObj),
     selectedSourceObj.pool_type,
