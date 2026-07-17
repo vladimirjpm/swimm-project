@@ -590,8 +590,17 @@ function MyMediaSection({
         className="cursor-pointer select-none list-none text-[15px] font-extrabold"
         style={{ color: 'var(--theme-primary)' }}
       >
-        Мои ссылки{!loading && media.length > 0 ? ` (${media.length})` : ''}
+        My links{!loading && media.length > 0 ? ` (${media.length})` : ''}
       </summary>
+      <div className="mt-1 mb-2">
+        <a
+          href="./media.html"
+          className="text-xs font-semibold underline"
+          style={{ color: 'var(--theme-mode-text-secondary)' }}
+        >
+          Manage all my media →
+        </a>
+      </div>
       <div className="mt-3">
 
       {/* Форма добавления */}
