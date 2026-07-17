@@ -162,6 +162,9 @@ function HomeHeader({ active }: { active: ActivePage }) {
             </button>
             {userMenuOpen && (
               <div className="absolute right-0 top-[42px] z-40 w-[220px] rounded-[16px] border border-[#7dd3fc]/35 bg-[rgba(4,16,32,0.94)] p-2 shadow-[0_28px_60px_rgba(2,10,24,0.7)] backdrop-blur-[18px]">
+                <a href="./media.html" className={dropdownItemClass}>
+                  My media
+                </a>
                 <a href={logoutHref} className={dropdownItemClass}>
                   Sign out
                 </a>
@@ -238,6 +241,12 @@ function HomeHeader({ active }: { active: ActivePage }) {
                     <UserAvatar name={userName} avatarUrl={auth.avatarUrl} size={28} />
                     <span className="truncate text-[14px] font-extrabold text-[#f3f8fd]">{userName}</span>
                   </div>
+                  <a
+                    href="./media.html"
+                    className="block rounded-[13px] px-4 py-[12px] text-[15px] font-extrabold text-[#f3f8fd] no-underline transition-colors hover:bg-[rgba(56,189,248,0.12)]"
+                  >
+                    My media
+                  </a>
                   <a
                     href={logoutHref}
                     className="block rounded-[13px] px-4 py-[12px] text-[15px] font-extrabold text-[#f3f8fd] no-underline transition-colors hover:bg-[rgba(56,189,248,0.12)]"

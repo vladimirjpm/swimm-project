@@ -192,6 +192,9 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
       </button>
       {userMenuOpen && (
         <div className="absolute right-0 top-[40px] w-[210px] rounded-[12px] border border-[color-mix(in_srgb,var(--theme-topbar-text)_18%,transparent)] bg-[var(--theme-topbar-bg)] p-1.5 shadow-[0_18px_44px_rgba(0,0,0,0.45)]">
+          <a href="./media.html" className={dropdownItemClass}>
+            My media
+          </a>
           {onLogout ? (
             <button type="button" className={dropdownItemClass} onClick={() => { setUserMenuOpen(false); onLogout(); }}>
               Sign out
@@ -267,6 +270,12 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
                 <TopbarAvatar name={userName} avatarUrl={avatarUrl} size={28} />
                 <span className="truncate text-[13px] font-extrabold text-[var(--theme-topbar-text)]">{userName}</span>
               </div>
+              <a
+                href="./media.html"
+                className="block rounded-[10px] px-4 py-[10px] text-[14px] font-extrabold text-[var(--theme-topbar-text)] no-underline transition-colors hover:bg-[color-mix(in_srgb,var(--theme-topbar-accent)_16%,transparent)]"
+              >
+                My media
+              </a>
               {onLogout ? (
                 <button
                   type="button"
