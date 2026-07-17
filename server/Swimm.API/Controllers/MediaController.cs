@@ -18,10 +18,17 @@ namespace Swimm.API.Controllers;
 public class MediaController : ControllerBase
 {
     private readonly IUserMediaRepository _media;
+    private readonly IUserMediaPublicationService _publications;
+    private readonly IHubGroupPermissionService _groupPermissions;
 
-    public MediaController(IUserMediaRepository media)
+    public MediaController(
+        IUserMediaRepository media,
+        IUserMediaPublicationService publications,
+        IHubGroupPermissionService groupPermissions)
     {
         _media = media;
+        _publications = publications;
+        _groupPermissions = groupPermissions;
     }
 
     private int? CurrentUserId()
@@ -56,6 +63,48 @@ public class MediaController : ControllerBase
             return BadRequest(new { error = "Swimmer not found" });
 
         return CreatedAtAction(nameof(GetMedia), media);
+    }
+
+    /* — Публикации в группы (этап 2 media-visibility-model) — */
+
+    /// <summary>Публикации всех моих медиа (статусы заявок для «Моих ссылок»).</summary>
+    [HttpGet("publications")]
+    public async Task<IActionResult> GetMyPublications()
+    {
+        var userId = CurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        return Ok(await _publications.GetForOwnerAsync(userId.Value));
+    }
+
+    /// <summary>Подать медиа в группу (level: members|public). Админ группы — сразу approved.</summary>
+    [HttpPost("{id:int}/publications")]
+    public async Task<IActionResult> SubmitPublication(int id, [FromBody] SubmitPublicationRequest request)
+    {
+        var userId = CurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        // Привилегия группы (владелец/админ группы/site-админ) → авто-approve своей заявки.
+        var perms = await _groupPermissions.GetPermissionsAsync(
+            request.HubGroupId, userId.Value, User.IsInRole("Admin"));
+        if (!perms.Exists) return BadRequest(new { error = "group not found" });
+
+        var (success, error, publication) = await _publications.SubmitAsync(
+            userId.Value, id, request, perms.CanEdit);
+        if (!success) return BadRequest(new { error });
+
+        return Ok(publication);
+    }
+
+    /// <summary>Отозвать публикацию своего медиа из группы (любой статус).</summary>
+    [HttpDelete("{id:int}/publications/{hubGroupId:int}")]
+    public async Task<IActionResult> WithdrawPublication(int id, int hubGroupId)
+    {
+        var userId = CurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var ok = await _publications.WithdrawAsync(userId.Value, id, hubGroupId);
+        return ok ? NoContent() : NotFound(new { error = "Publication not found" });
     }
 
     [HttpDelete("{id:int}")]

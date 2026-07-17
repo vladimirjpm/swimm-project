@@ -51,6 +51,7 @@ public class SwimmDbContext : DbContext
     /* === Фавориты и медиа пользователей === */
     public DbSet<UserFavorite> UserFavorites => Set<UserFavorite>();
     public DbSet<UserMedia> UserMedia => Set<UserMedia>();
+    public DbSet<UserMediaPublication> UserMediaPublications => Set<UserMediaPublication>();
 
     /* === Группы (SwimHub) === */
     public DbSet<HubGroup> HubGroups => Set<HubGroup>();
@@ -532,6 +533,36 @@ public class SwimmDbContext : DbContext
             entity.HasCheckConstraint(
                 "CK_UserMedia_Visibility",
                 @"""Visibility"" IN ('private', 'public')");
+        });
+
+        // Публикации личного медиа в группы (этап 2 media-visibility-model) — заявки/решения,
+        // таблица с личными данными, БЕЗ grant swimm_ro (читается сервисами через RW-контекст).
+        modelBuilder.Entity<UserMediaPublication>(entity =>
+        {
+            entity.ToTable("Sys_UserMediaPublications");
+
+            entity.HasOne(e => e.Media)
+                .WithMany()
+                .HasForeignKey(e => e.UserMediaId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.HubGroup)
+                .WithMany()
+                .HasForeignKey(e => e.HubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.DecidedBy)
+                .WithMany()
+                .HasForeignKey(e => e.DecidedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasCheckConstraint(
+                "CK_UserMediaPublications_Level",
+                @"""Level"" IN ('members', 'public')");
+
+            entity.HasCheckConstraint(
+                "CK_UserMediaPublications_Status",
+                @"""Status"" IN ('pending', 'approved', 'rejected')");
         });
 
         // --- Группы (SwimHub) ---
