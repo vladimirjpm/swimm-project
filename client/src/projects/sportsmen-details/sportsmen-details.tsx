@@ -175,7 +175,7 @@ function SportsmenDetails() {
                   <button
                     type="button"
                     onClick={() => toggleFavoriteSwimmer(swimmerId!)}
-                    title={isFav ? 'Убрать из избранного' : 'Добавить в избранное'}
+                    title={isFav ? 'Remove from favorites' : 'Add to favorites'}
                     aria-pressed={isFav}
                     className="w-8 h-8 rounded-full inline-flex items-center justify-center leading-none hover:scale-110 transition-transform"
                     style={{ background: 'rgba(255,255,255,0.9)', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}
@@ -187,7 +187,7 @@ function SportsmenDetails() {
                   <button
                     type="button"
                     onClick={() => setMeBySwimmer(swimmerId!)}
-                    title={isMe ? 'Это я — снять отметку' : 'Отметить: это я'}
+                    title={isMe ? 'This is me — unmark' : 'Mark: this is me'}
                     aria-pressed={isMe}
                     className="w-8 h-8 rounded-full inline-flex items-center justify-center leading-none hover:scale-110 transition-transform"
                     style={{ background: isMe ? '#fff6da' : 'rgba(255,255,255,0.75)', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}
@@ -509,14 +509,14 @@ function MyMediaSection({
       setPublishMediaId(null);
       setPubGroupId('');
     } else {
-      setPubError(res.error ?? 'Не удалось подать заявку');
+      setPubError(res.error ?? 'Could not submit the request');
     }
   };
 
   const pubStatusLabel: Record<string, string> = {
-    pending: 'на модерации',
-    approved: 'опубликовано',
-    rejected: 'отклонено',
+    pending: 'pending review',
+    approved: 'published',
+    rejected: 'rejected',
   };
 
   // Только youtube/vimeo идут в лайтбокс — эти элементы и их порядок в gallery
@@ -547,7 +547,7 @@ function MyMediaSection({
     if (result) {
       setUrl('');
     } else {
-      setFormError('Не удалось добавить ссылку — проверьте формат URL');
+      setFormError('Could not add the link — check the URL format');
     }
   };
 
@@ -578,7 +578,7 @@ function MyMediaSection({
   const resultChipLabel = (item: UserMediaDto): string | null => {
     if (item.result_id == null) return null;
     const row = allSwimmerResults.find((r) => r.id === item.result_id);
-    return row ? `${row.event_style_len}m ${row.event_style_name}` : 'заплыв';
+    return row ? `${row.event_style_len}m ${row.event_style_name}` : 'swim';
   };
 
   return (
@@ -601,7 +601,7 @@ function MyMediaSection({
             type="text"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://youtube.com/... или https://vimeo.com/... или другая ссылка"
+            placeholder="https://youtube.com/... or https://vimeo.com/... or another link"
             className="flex-1 min-w-0 rounded-lg px-3 py-2 text-sm"
             style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
           />
@@ -617,12 +617,12 @@ function MyMediaSection({
         </div>
         {detectSourceType(url) === 'other' && url.trim() && (
           <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--theme-mode-text-muted)' }}>
-            <span>Тип:</span>
+            <span>Type:</span>
             <label className="flex items-center gap-1">
-              <input type="radio" checked={otherKind === 'video'} onChange={() => setOtherKind('video')} /> видео
+              <input type="radio" checked={otherKind === 'video'} onChange={() => setOtherKind('video')} /> video
             </label>
             <label className="flex items-center gap-1">
-              <input type="radio" checked={otherKind === 'image'} onChange={() => setOtherKind('image')} /> фото
+              <input type="radio" checked={otherKind === 'image'} onChange={() => setOtherKind('image')} /> photo
             </label>
           </div>
         )}
@@ -631,9 +631,9 @@ function MyMediaSection({
 
       {/* Список */}
       {loading ? (
-        <div className="text-xs italic" style={{ color: 'var(--theme-mode-text-muted)' }}>Загрузка…</div>
+        <div className="text-xs italic" style={{ color: 'var(--theme-mode-text-muted)' }}>Loading…</div>
       ) : media.length === 0 ? (
-        <div className="text-xs italic" style={{ color: 'var(--theme-mode-text-muted)' }}>Пока нет ссылок</div>
+        <div className="text-xs italic" style={{ color: 'var(--theme-mode-text-muted)' }}>No links yet</div>
       ) : (
         <ul className="grid grid-cols-3 gap-2">
           {media.map((item) => {
@@ -644,7 +644,7 @@ function MyMediaSection({
                 <button
                   type="button"
                   onClick={() => setConfirmDeleteId(item.id)}
-                  title="Удалить"
+                  title="Delete"
                   className="absolute top-1 right-1 z-10 w-5 h-5 rounded-full inline-flex items-center justify-center text-xs font-bold text-white"
                   style={{ background: 'rgba(0,0,0,0.55)' }}
                 >
@@ -659,7 +659,7 @@ function MyMediaSection({
                       setPublishMediaId(publishMediaId === item.id ? null : item.id);
                       setPubError(null);
                     }}
-                    title="Поделиться с группой"
+                    title="Share with a group"
                     className="absolute top-1 left-1 z-10 w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px] font-bold text-white"
                     style={{ background: publishMediaId === item.id ? 'var(--theme-primary)' : 'rgba(0,0,0,0.55)' }}
                   >
@@ -685,7 +685,7 @@ function MyMediaSection({
                     {thumb ? (
                       <img src={thumb} alt="" className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-xs underline" style={{ color: 'var(--theme-mode-text-muted)' }}>ссылка</span>
+                      <span className="text-xs underline" style={{ color: 'var(--theme-mode-text-muted)' }}>link</span>
                     )}
                   </a>
                 )}
@@ -701,7 +701,7 @@ function MyMediaSection({
 
                 {confirmDeleteId === item.id && (
                   <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1 text-center p-1" style={{ background: 'rgba(0,0,0,0.75)' }}>
-                    <span className="text-[10px] text-white">Удалить?</span>
+                    <span className="text-[10px] text-white">Delete?</span>
                     <div className="flex gap-1">
                       <button
                         type="button"
@@ -741,7 +741,7 @@ function MyMediaSection({
               className="rounded-lg px-2 py-1.5 text-xs"
               style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
             >
-              <option value="">— группа —</option>
+              <option value="">— group —</option>
               {myGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
             <select
@@ -750,8 +750,8 @@ function MyMediaSection({
               className="rounded-lg px-2 py-1.5 text-xs"
               style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
             >
-              <option value="members">участникам группы</option>
-              <option value="public">публично (видно всем)</option>
+              <option value="members">group members</option>
+              <option value="public">public (visible to everyone)</option>
             </select>
             <button
               type="button"
@@ -779,10 +779,10 @@ function MyMediaSection({
                     border: '1px solid var(--theme-mode-border)',
                   }}
                 >
-                  {p.hub_group_name} · {pubStatusLabel[p.status] ?? p.status}{p.status === 'approved' && p.level === 'public' ? ' (всем)' : ''}
+                  {p.hub_group_name} · {pubStatusLabel[p.status] ?? p.status}{p.status === 'approved' && p.level === 'public' ? ' (everyone)' : ''}
                   <button
                     type="button"
-                    title="Отозвать"
+                    title="Withdraw"
                     onClick={() => withdrawPublication(p.user_media_id, p.hub_group_id)}
                     className="leading-none opacity-60 hover:opacity-100"
                   >
@@ -1039,7 +1039,7 @@ function ResultsTable({
                 <button
                   type="button"
                   onClick={() => onOpenMedia?.(rowId!)}
-                  title="Открыть видео"
+                  title="Open video"
                   className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full transition-opacity hover:opacity-80"
                   style={{ background: 'var(--theme-primary)' }}
                 >
@@ -1052,11 +1052,11 @@ function ResultsTable({
                 <button
                   type="button"
                   onClick={() => onAttachResult?.(attachResultId === rowId ? null : rowId!)}
-                  title="Добавить видео к этому заплыву"
+                  title="Add a video for this swim"
                   className="shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold"
                   style={{ background: 'var(--theme-mode-surface-alt)', color: 'var(--theme-mode-text-secondary)' }}
                 >
-                  {attachResultId === rowId ? '× отмена' : '+ видео'}
+                  {attachResultId === rowId ? '× cancel' : '+ video'}
                 </button>
               )}
 
@@ -1114,7 +1114,7 @@ function InlineAttachForm({
     setSubmitting(true);
     const ok = await onSubmit(trimmed, sourceType === 'other' ? otherKind : 'video', sourceType);
     setSubmitting(false);
-    if (!ok) setError('Не удалось добавить — проверьте формат URL');
+    if (!ok) setError('Could not add — check the URL format');
   };
 
   return (
@@ -1126,7 +1126,7 @@ function InlineAttachForm({
           autoFocus
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
-          placeholder="https://youtube.com/… или https://vimeo.com/…"
+          placeholder="https://youtube.com/… or https://vimeo.com/…"
           className="flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-xs"
           style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
         />
@@ -1142,12 +1142,12 @@ function InlineAttachForm({
       </div>
       {sourceType === 'other' && url.trim() && (
         <div className="flex items-center gap-3 text-[10px]" style={{ color: 'var(--theme-mode-text-muted)' }}>
-          <span>Тип:</span>
+          <span>Type:</span>
           <label className="flex items-center gap-1">
-            <input type="radio" checked={otherKind === 'video'} onChange={() => setOtherKind('video')} /> видео
+            <input type="radio" checked={otherKind === 'video'} onChange={() => setOtherKind('video')} /> video
           </label>
           <label className="flex items-center gap-1">
-            <input type="radio" checked={otherKind === 'image'} onChange={() => setOtherKind('image')} /> фото
+            <input type="radio" checked={otherKind === 'image'} onChange={() => setOtherKind('image')} /> photo
           </label>
         </div>
       )}

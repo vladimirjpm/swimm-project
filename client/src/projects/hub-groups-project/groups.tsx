@@ -15,7 +15,7 @@ import type {
 } from './types';
 
 const GROUP_DISCLAIMER =
-  'Состав ведётся создателем группы и не является официальной заявкой клуба или федерации.';
+  'The roster is maintained by the group creator and is not an official club or federation entry.';
 
 // Тот же паттерн antiforgery-токена, что в use-my-hub-groups.ts (там не экспортирован —
 // дублируем локально, чтобы не трогать файл, который правит параллельный агент).
@@ -54,8 +54,8 @@ async function publicationsApiFetch(url: string, init?: RequestInit): Promise<Re
 
 const ROLE_LABEL: Record<HubGroupMember['role'], string | null> = {
   member: null,
-  captain: 'капитан',
-  coach: 'тренер',
+  captain: 'captain',
+  coach: 'coach',
 };
 
 const LINK_LABEL: Record<string, string> = {
@@ -156,7 +156,7 @@ function GroupsList({ groups, favorites }: { groups: HubGroupListItem[]; favorit
           Groups
         </h1>
         <p className="mt-5 max-w-[560px] text-[14.5px] leading-[1.55] text-[#e2f0fc]/[0.82] lg:text-[18px] lg:leading-[1.6]">
-          Тренировочные группы: состав, рекорды группы и свежие заплывы участников.
+          Training groups: rosters, group records and recent swims.
         </p>
       </section>
 
@@ -171,7 +171,7 @@ function GroupsList({ groups, favorites }: { groups: HubGroupListItem[]; favorit
               slug: 'favorites',
               name: favorites.name,
               name_en: favorites.name_en,
-              description: 'Пловцы из твоего избранного — как личная группа',
+              description: 'Swimmers from your favorites — as a personal group',
               icon_url: null,
               location: null,
               club_name: null,
@@ -224,8 +224,8 @@ function JoinButton({ group }: { group: HubGroupDetails }) {
   };
 
   const label = membership
-    ? (isPending ? 'Заявка отправлена — отменить' : 'Выйти из группы')
-    : (group.join_policy === 'approval' ? 'Подать заявку' : 'Вступить в группу');
+    ? (isPending ? 'Request sent — cancel' : 'Leave group')
+    : (group.join_policy === 'approval' ? 'Request to join' : 'Join group');
 
   return (
     <button
@@ -536,8 +536,8 @@ function MembersPublications({ group }: { group: HubGroupDetails }) {
 }
 
 const PUBLICATION_LEVEL_LABEL: Record<GroupPublicationItem['level'], string> = {
-  public: 'публично',
-  members: 'участникам',
+  public: 'public',
+  members: 'members',
 };
 
 /**
@@ -592,7 +592,7 @@ function PublicationsInbox({ group, onDecided }: { group: HubGroupDetails; onDec
 
   return (
     <div id="publications-inbox" className="hp-card-std rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]" aria-label="Publications inbox">
-      <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">Заявки на публикацию</h2>
+      <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">Publication requests</h2>
       <div className="flex flex-col gap-2">
         {items.map((item) => {
           let domain = item.url;
@@ -726,7 +726,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
               {group.location}
             </span>
           )}
-          {group.club_name && <span>Клуб: {group.club_name}</span>}
+          {group.club_name && <span>Club: {group.club_name}</span>}
           <span>
             {group.members.length} · swimmers
           </span>
@@ -743,7 +743,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
           <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">Members</h2>
           {group.members.length === 0 ? (
             <p className="text-[13px] text-[#cbe0f0]/60">
-              {group.is_virtual ? 'В избранном пока нет пловцов — жми сердечки на результатах.' : 'Состав пока не заполнен.'}
+              {group.is_virtual ? 'No swimmers in favorites yet — tap the hearts on results.' : 'The roster is empty for now.'}
             </p>
           ) : (
             <ul className="m-0 flex list-none flex-col gap-[10px] p-0">
@@ -785,7 +785,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
               )}
             </div>
             {group.standings.length === 0 || group.standings.every((s) => s.swims === 0) ? (
-              <p className="text-[13px] text-[#cbe0f0]/60">В этом сезоне заплывов нет.</p>
+              <p className="text-[13px] text-[#cbe0f0]/60">No swims this season.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
@@ -843,7 +843,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
               Group records
             </h2>
             {group.bests.length === 0 ? (
-              <p className="text-[13px] text-[#cbe0f0]/60">У участников пока нет зачтённых результатов.</p>
+              <p className="text-[13px] text-[#cbe0f0]/60">No counted results yet.</p>
             ) : (
               <>
                 <div className="overflow-x-auto">
@@ -919,7 +919,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
               Recent swims
             </h2>
             {group.recent_results.length === 0 ? (
-              <p className="text-[13px] text-[#cbe0f0]/60">Заплывов пока нет.</p>
+              <p className="text-[13px] text-[#cbe0f0]/60">No swims yet.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
@@ -984,7 +984,7 @@ function Groups() {
           // favorites — авторизованный эндпоинт с тем же контрактом
           const url = slug === 'favorites' ? '/api/hub-groups/favorites' : `/api/hub-groups/${encodeURIComponent(slug)}`;
           const r = await fetch(url, { credentials: 'include' });
-          if (!r.ok) throw new Error(r.status === 404 ? 'Группа не найдена' : `Ошибка загрузки (${r.status})`);
+          if (!r.ok) throw new Error(r.status === 404 ? 'Group not found' : `Failed to load (${r.status})`);
           const data: HubGroupDetails = await r.json();
           if (!cancelled) setDetails(data);
         } else {
@@ -993,7 +993,7 @@ function Groups() {
             // 401 для незалогиненного — норма, карточка избранного просто не показывается
             fetch('/api/hub-groups/favorites', { credentials: 'include' }).catch(() => null),
           ]);
-          if (!listR.ok) throw new Error(`Ошибка загрузки (${listR.status})`);
+          if (!listR.ok) throw new Error(`Failed to load (${listR.status})`);
           const list: HubGroupListItem[] = await listR.json();
           const fav: HubGroupDetails | null = favR && favR.ok ? await favR.json() : null;
           if (!cancelled) {
@@ -1002,7 +1002,7 @@ function Groups() {
           }
         }
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Ошибка загрузки');
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load');
       } finally {
         if (!cancelled) setLoading(false);
       }

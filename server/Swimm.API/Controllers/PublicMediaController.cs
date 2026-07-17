@@ -20,16 +20,20 @@ public class PublicMediaController : ControllerBase
         _publications = publications;
     }
 
-    /// <summary>Видимое зрителю медиа заплывов соревнования (или всех дней события).</summary>
+    /// <summary>Видимое зрителю медиа заплывов соревнования, события или group-режима (?group=slug).</summary>
     [HttpGet("results")]
-    public async Task<IActionResult> GetForResults([FromQuery] int? competitionId, [FromQuery] int? eventId)
+    public async Task<IActionResult> GetForResults(
+        [FromQuery] int? competitionId, [FromQuery] int? eventId, [FromQuery] string? group)
     {
-        if (competitionId == null && eventId == null)
-            return BadRequest(new { error = "competitionId or eventId is required" });
+        if (competitionId == null && eventId == null && string.IsNullOrWhiteSpace(group))
+            return BadRequest(new { error = "competitionId, eventId or group is required" });
+
+        if (group is { Length: > 120 })
+            return BadRequest(new { error = "group slug too long" });
 
         var raw = User.FindFirstValue(ClaimTypes.NameIdentifier);
         int? userId = int.TryParse(raw, out var id) ? id : null;
 
-        return Ok(await _publications.GetVisibleForResultsAsync(competitionId, eventId, userId));
+        return Ok(await _publications.GetVisibleForResultsAsync(competitionId, eventId, group, userId));
     }
 }

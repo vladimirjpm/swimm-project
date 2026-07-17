@@ -42,9 +42,10 @@ public interface IUserMediaPublicationService
 
     /// <summary>
     /// Медиа с привязкой к заплыву, видимое зрителю userId (null = аноним) в рамках
-    /// соревнования competitionId или всех дней события eventId: своё (любое) +
-    /// approved public (всем) + approved members (только активным членам той группы).
-    /// Для иконок видео в таблице результатов.
+    /// соревнования competitionId, всех дней события eventId или group-режима groupSlug
+    /// (заплывы пловцов из ростера группы): своё (любое) + approved public (всем) +
+    /// approved members (только активным членам той группы). Для иконок видео в таблице.
     /// </summary>
-    Task<List<VisibleResultMediaDto>> GetVisibleForResultsAsync(int? competitionId, int? eventId, int? userId);
+    Task<List<VisibleResultMediaDto>> GetVisibleForResultsAsync(
+        int? competitionId, int? eventId, string? groupSlug, int? userId);
 }

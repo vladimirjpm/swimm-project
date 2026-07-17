@@ -172,16 +172,20 @@ public class UserMediaPublicationService : IUserMediaPublicationService
             .ToListAsync();
 
     public async Task<List<VisibleResultMediaDto>> GetVisibleForResultsAsync(
-        int? competitionId, int? eventId, int? userId)
+        int? competitionId, int? eventId, string? groupSlug, int? userId)
     {
-        if (competitionId == null && eventId == null) return [];
+        if (competitionId == null && eventId == null && string.IsNullOrWhiteSpace(groupSlug)) return [];
 
-        // Скоуп по соревнованию или по всем дням события (многодневные).
+        // Скоуп: соревнование / все дни события (многодневные) / group-режим страницы
+        // результатов (?group=slug — заплывы пловцов из ростера группы, соревнования разные).
         IQueryable<UserMedia> mediaInScope = _db.UserMedia.AsNoTracking()
             .Where(m => m.ResultId != null);
         mediaInScope = eventId != null
             ? mediaInScope.Where(m => m.Competition!.EventId == eventId)
-            : mediaInScope.Where(m => m.CompetitionId == competitionId);
+            : competitionId != null
+                ? mediaInScope.Where(m => m.CompetitionId == competitionId)
+                : mediaInScope.Where(m => _db.HubGroupMembers.Any(gm =>
+                    gm.SwimmerId == m.SwimmerId && gm.HubGroup!.Slug == groupSlug));
 
         // 1. Своё медиа — видно владельцу целиком (private в том числе).
         var mine = userId == null
@@ -203,7 +207,10 @@ public class UserMediaPublicationService : IUserMediaPublicationService
                         && p.Media!.ResultId != null
                         && (eventId != null
                             ? p.Media.Competition!.EventId == eventId
-                            : p.Media.CompetitionId == competitionId)
+                            : competitionId != null
+                                ? p.Media.CompetitionId == competitionId
+                                : _db.HubGroupMembers.Any(gm =>
+                                    gm.SwimmerId == p.Media.SwimmerId && gm.HubGroup!.Slug == groupSlug))
                         && (p.Level == UserMediaPublicationLevel.Public
                             || (userId != null && _db.HubGroupUserMembers.Any(um =>
                                 um.HubGroupId == p.HubGroupId && um.UserId == userId

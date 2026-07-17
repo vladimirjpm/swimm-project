@@ -12,17 +12,23 @@ export function useCompetitionMedia(sourceParams?: Record<string, string>): Map<
 
   const competitionId = sourceParams?.competitionId;
   const eventId = sourceParams?.eventId;
+  const groupSlug = sourceParams?.group;
 
   useEffect(() => {
     // Только числовые id: селектор может держать competitionId=last до резолва.
+    // group-режим (?group=slug) — слаг, сервер сам скоупит по ростеру группы.
     const isNum = (v?: string) => !!v && /^\d+$/.test(v);
-    if (!isNum(competitionId) && !isNum(eventId)) {
+    if (!isNum(competitionId) && !isNum(eventId) && !groupSlug) {
       setByResultId(new Map());
       return;
     }
 
     let cancelled = false;
-    const query = isNum(eventId) ? `eventId=${eventId}` : `competitionId=${competitionId}`;
+    const query = isNum(eventId)
+      ? `eventId=${eventId}`
+      : isNum(competitionId)
+        ? `competitionId=${competitionId}`
+        : `group=${encodeURIComponent(groupSlug!)}`;
 
     fetch(`/api/media/results?${query}`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : []))
@@ -47,7 +53,7 @@ export function useCompetitionMedia(sourceParams?: Record<string, string>): Map<
     return () => {
       cancelled = true;
     };
-  }, [competitionId, eventId]);
+  }, [competitionId, eventId, groupSlug]);
 
   return byResultId;
 }
