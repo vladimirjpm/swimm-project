@@ -10,6 +10,8 @@ export interface ResultWrap {
   }
   
   export interface Result {
+    /** DB id заплыва — есть только у данных с /api/results, на статике отсутствует. */
+    id?: number;
     /*group data*/
     country: string;
     competition: string;

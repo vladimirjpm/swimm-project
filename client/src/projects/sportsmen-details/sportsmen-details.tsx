@@ -96,6 +96,22 @@ function SportsmenDetails() {
   // Гость (фаза 4.5): вместо звезды/сердечка и «Моих ссылок» — компактный CTA «войти».
   const showGuestCta = !isAuthenticated && swimmerId != null;
 
+  // Медиа пловца (2A) — один хук на карточку, используется и в MyMediaSection,
+  // и для иконки «есть видео» на строках результатов (только owner-view).
+  const userMedia = useUserMedia(swimmerId);
+  const mediaResultIds = useMemo(
+    () => new Set(userMedia.media.filter((m) => typeof m.result_id === 'number').map((m) => m.result_id as number)),
+    [userMedia.media]
+  );
+
+  // Привязка «+ видео» со строки результата к секции «Мои ссылки» (см. Шаги 5–6 задания).
+  const [attachResultId, setAttachResultId] = useState<number | null>(null);
+  const [openMediaResultId, setOpenMediaResultId] = useState<number | null>(null);
+  useEffect(() => {
+    setAttachResultId(null);
+    setOpenMediaResultId(null);
+  }, [filters.selected_name]);
+
   const base = import.meta.env.BASE_URL;
   const gender = firstResult.event_style_gender || 'female';
   // alpha-3 из данных (ISR…) конвертирует сам UI_FlagEmoji; дефолт — Израиль.
@@ -306,7 +322,15 @@ function SportsmenDetails() {
           {scope === 'competition' && allSwimmerResults.length > 0 && (
             <div className="p-4 flex-1 min-h-0 overflow-y-auto">
               <h2 className="text-[15px] font-extrabold mb-3" style={{ color: 'var(--theme-primary)' }}>All results</h2>
-              <TopResultsTabs sortedBestResults={allSwimmerResults} isMastersSource={isMastersSource} isAwardSource={isAwardSource} />
+              <TopResultsTabs
+                sortedBestResults={allSwimmerResults}
+                isMastersSource={isMastersSource}
+                isAwardSource={isAwardSource}
+                canAttachMedia={isAuthenticated}
+                mediaResultIds={mediaResultIds}
+                onAttachResult={setAttachResultId}
+                onOpenMedia={setOpenMediaResultId}
+              />
             </div>
           )}
 
@@ -315,7 +339,15 @@ function SportsmenDetails() {
 
           {/* «Мои ссылки» — личное owner-only медиа (2A), видно только залогиненному. */}
           {isAuthenticated && swimmerId != null && (
-            <MyMediaSection swimmerId={swimmerId} />
+            <MyMediaSection
+              swimmerId={swimmerId}
+              userMedia={userMedia}
+              allSwimmerResults={allSwimmerResults}
+              attachResultId={attachResultId}
+              onClearAttach={() => setAttachResultId(null)}
+              openResultId={openMediaResultId}
+              onOpenHandled={() => setOpenMediaResultId(null)}
+            />
           )}
 
           {/* Гость (фаза 4.5): вместо звёзд/«Моих ссылок» — один компактный CTA. */}
@@ -398,8 +430,26 @@ function AllTimeBests({ career }: { career: AthleteCareer }) {
 // «Мои ссылки» (2A): личное owner-only медиа пловца. Видно только залогиненному владельцу
 // (проверка isAuthenticated делается в родителе). Рендер: youtube/vimeo → лайтбокс
 // UI_SwimmerGallery (никогда сырой URL в iframe), other → внешняя ссылка noopener/noreferrer.
-function MyMediaSection({ swimmerId }: { swimmerId: number }) {
-  const { media, loading, add, remove } = useUserMedia(swimmerId);
+// Хук useUserMedia поднят в SportsmenDetails (один запрос на карточку, нужен и для иконок
+// на строках результатов) — сюда приходит уже готовый объект хука.
+function MyMediaSection({
+  swimmerId,
+  userMedia,
+  allSwimmerResults,
+  attachResultId,
+  onClearAttach,
+  openResultId,
+  onOpenHandled,
+}: {
+  swimmerId: number;
+  userMedia: ReturnType<typeof useUserMedia>;
+  allSwimmerResults: any[];
+  attachResultId: number | null;
+  onClearAttach: () => void;
+  openResultId: number | null;
+  onOpenHandled: () => void;
+}) {
+  const { media, loading, add, remove } = userMedia;
   const [url, setUrl] = useState('');
   const [otherKind, setOtherKind] = useState<'image' | 'video'>('video');
   const [submitting, setSubmitting] = useState(false);
@@ -429,10 +479,17 @@ function MyMediaSection({ swimmerId }: { swimmerId: number }) {
     setSubmitting(true);
     const sourceType = detectSourceType(trimmed);
     const mediaType: 'image' | 'video' = sourceType === 'other' ? otherKind : 'video';
-    const result = await add({ swimmer_id: swimmerId, media_type: mediaType, source_type: sourceType, url: trimmed });
+    const result = await add({
+      swimmer_id: swimmerId,
+      media_type: mediaType,
+      source_type: sourceType,
+      url: trimmed,
+      result_id: attachResultId ?? undefined,
+    });
     setSubmitting(false);
     if (result) {
       setUrl('');
+      onClearAttach();
     } else {
       setFormError('Не удалось добавить ссылку — проверьте формат URL');
     }
@@ -448,9 +505,50 @@ function MyMediaSection({ swimmerId }: { swimmerId: number }) {
     if (idx >= 0) setLightboxIndex(idx);
   };
 
+  // Клик по иконке «есть видео» на строке результата (см. onOpenMedia в ResultsTable) —
+  // открываем лайтбокс с медиа этого заплыва, если оно уже загружено.
+  useEffect(() => {
+    if (openResultId == null) return;
+    const item = media.find((m) => m.result_id === openResultId);
+    if (item) openLightboxFor(item);
+    onOpenHandled();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openResultId, media]);
+
+  // Подпись привязанного заплыва для чипа «Привязать к заплыву: …».
+  const attachedRow = useMemo(
+    () => (attachResultId != null ? allSwimmerResults.find((r) => r.id === attachResultId) : undefined),
+    [attachResultId, allSwimmerResults]
+  );
+  const attachedLabel = attachedRow
+    ? `${attachedRow.event_style_len}m ${attachedRow.event_style_name}`
+    : attachResultId != null
+      ? 'заплыв'
+      : null;
+
+  // Чип у привязанного к заплыву элемента в списке — по совпадению result_id со строкой карточки.
+  const resultChipLabel = (item: UserMediaDto): string | null => {
+    if (item.result_id == null) return null;
+    const row = allSwimmerResults.find((r) => r.id === item.result_id);
+    return row ? `${row.event_style_len}m ${row.event_style_name}` : 'заплыв';
+  };
+
   return (
     <div className="p-4 border-t" style={{ borderColor: 'var(--theme-mode-border)' }}>
       <h2 className="text-[15px] font-extrabold mb-3" style={{ color: 'var(--theme-primary)' }}>Мои ссылки</h2>
+
+      {/* Чип привязки к заплыву — появляется после клика «+» на строке результата. */}
+      {attachedLabel && (
+        <div
+          className="mb-2 flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold text-white w-fit"
+          style={{ background: 'var(--theme-primary)' }}
+        >
+          <span>Привязать к заплыву: {attachedLabel}</span>
+          <button type="button" onClick={onClearAttach} className="leading-none opacity-80 hover:opacity-100" title="Отменить привязку">
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Форма добавления */}
       <div className="flex flex-col gap-2 mb-3">
@@ -532,6 +630,15 @@ function MyMediaSection({ swimmerId }: { swimmerId: number }) {
                   </a>
                 )}
 
+                {resultChipLabel(item) && (
+                  <div
+                    className="absolute bottom-1 left-1 z-10 max-w-[calc(100%-8px)] truncate rounded px-1.5 py-0.5 text-[9px] font-bold text-white"
+                    style={{ background: 'rgba(0,0,0,0.55)' }}
+                  >
+                    {resultChipLabel(item)}
+                  </div>
+                )}
+
                 {confirmDeleteId === item.id && (
                   <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1 text-center p-1" style={{ background: 'rgba(0,0,0,0.75)' }}>
                     <span className="text-[10px] text-white">Удалить?</span>
@@ -571,7 +678,23 @@ function MyMediaSection({ swimmerId }: { swimmerId: number }) {
 }
 
 // Компонент табов для Training/Competition
-function TopResultsTabs({ sortedBestResults, isMastersSource, isAwardSource }: { sortedBestResults: any[]; isMastersSource: boolean; isAwardSource: boolean }) {
+function TopResultsTabs({
+  sortedBestResults,
+  isMastersSource,
+  isAwardSource,
+  canAttachMedia,
+  mediaResultIds,
+  onAttachResult,
+  onOpenMedia,
+}: {
+  sortedBestResults: any[];
+  isMastersSource: boolean;
+  isAwardSource: boolean;
+  canAttachMedia?: boolean;
+  mediaResultIds?: Set<number>;
+  onAttachResult?: (resultId: number) => void;
+  onOpenMedia?: (resultId: number) => void;
+}) {
   // Разделяем результаты на training и competition
   const trainingResults = useMemo(() => {
     return sortedBestResults.filter(r => !!r.training?.trainingId);
@@ -590,7 +713,17 @@ function TopResultsTabs({ sortedBestResults, isMastersSource, isAwardSource }: {
 
   // Если нет masters — показываем все результаты без табов
   if (!hasMasters) {
-    return <ResultsTable results={sortedBestResults} isMastersSource={isMastersSource} isAwardSource={isAwardSource} />;
+    return (
+      <ResultsTable
+        results={sortedBestResults}
+        isMastersSource={isMastersSource}
+        isAwardSource={isAwardSource}
+        canAttachMedia={canAttachMedia}
+        mediaResultIds={mediaResultIds}
+        onAttachResult={onAttachResult}
+        onOpenMedia={onOpenMedia}
+      />
+    );
   }
 
   const currentResults = activeTab === 'training' ? trainingResults : competitionResults;
@@ -619,7 +752,15 @@ function TopResultsTabs({ sortedBestResults, isMastersSource, isAwardSource }: {
 
       {/* Карточки результатов */}
       {currentResults.length > 0 ? (
-        <ResultsTable results={currentResults} isMastersSource={isMastersSource} isAwardSource={isAwardSource} />
+        <ResultsTable
+          results={currentResults}
+          isMastersSource={isMastersSource}
+          isAwardSource={isAwardSource}
+          canAttachMedia={canAttachMedia}
+          mediaResultIds={mediaResultIds}
+          onAttachResult={onAttachResult}
+          onOpenMedia={onOpenMedia}
+        />
       ) : (
         <div className="text-[var(--theme-mode-text-muted)] italic p-4">No {activeTab} results</div>
       )}
@@ -640,7 +781,23 @@ const formatDayMonthYear = (date?: string): string => {
 // Строка результата в 2 линии (design_handoff_athlete_card §5):
 // линия 1 — место/возраст, картинка стиля с дистанцией, время;
 // линия 2 — сплиты/очки/дата слева, дуга уровня справа.
-function ResultsTable({ results, isMastersSource, isAwardSource }: { results: any[]; isMastersSource: boolean; isAwardSource: boolean }) {
+function ResultsTable({
+  results,
+  isMastersSource,
+  isAwardSource,
+  canAttachMedia,
+  mediaResultIds,
+  onAttachResult,
+  onOpenMedia,
+}: {
+  results: any[];
+  isMastersSource: boolean;
+  isAwardSource: boolean;
+  canAttachMedia?: boolean;
+  mediaResultIds?: Set<number>;
+  onAttachResult?: (resultId: number) => void;
+  onOpenMedia?: (resultId: number) => void;
+}) {
   const base = import.meta.env.BASE_URL;
 
   return (
@@ -654,6 +811,13 @@ function ResultsTable({ results, isMastersSource, isAwardSource }: { results: an
         // По-строчный флаг (all-time может смешивать разные соревнования) с фолбэком
         // на общий isAwardSource (одно соревнование — таб «это соревнование»).
         const rowIsAward = res.is_award ?? isAwardSource ?? false;
+
+        // Кнопка «+ видео» / иконка «есть видео» — только для строк с DB id заплыва
+        // (статические источники его не имеют, см. Footguns задания).
+        const rowId = typeof res.id === 'number' ? res.id : null;
+        const hasMedia = rowId != null && !!mediaResultIds?.has(rowId);
+        // «+ видео» не прячем при hasMedia — на один заплыв можно несколько видео.
+        const showAttachButton = canAttachMedia && rowId != null;
 
         return (
           <li
@@ -717,6 +881,34 @@ function ResultsTable({ results, isMastersSource, isAwardSource }: { results: an
                   <UI_DateIcon styleType="row-style-1" date={res.date} className="justify-start" fontClassName="text-[11px]" />
                 </div>
               </div>
+
+              {/* Медиа заплыва (2A): «+ видео» для владельца без привязки, иконка «есть видео»
+                  для строк с уже загруженным медиа (owner-view; см. задание §Решения). */}
+              {hasMedia && (
+                <button
+                  type="button"
+                  onClick={() => onOpenMedia?.(rowId!)}
+                  title="Открыть видео"
+                  className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full transition-opacity hover:opacity-80"
+                  style={{ background: 'var(--theme-primary)' }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="#fff">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </button>
+              )}
+              {showAttachButton && (
+                <button
+                  type="button"
+                  onClick={() => onAttachResult?.(rowId!)}
+                  title="Добавить видео к этому заплыву"
+                  className="shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold"
+                  style={{ background: 'var(--theme-mode-surface-alt)', color: 'var(--theme-mode-text-secondary)' }}
+                >
+                  + видео
+                </button>
+              )}
+
               {levelInfo?.currentLevel ? (
                 <UI_NormativeLevelIcon
                   levelName={levelInfo.currentLevel}

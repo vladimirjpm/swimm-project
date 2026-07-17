@@ -22,12 +22,20 @@ public class UserMediaDto
     [JsonPropertyName("url")]
     public string Url { get; set; } = string.Empty;
 
+    [JsonPropertyName("result_id")]
+    public long? ResultId { get; set; }
+
+    [JsonPropertyName("competition_id")]
+    public int? CompetitionId { get; set; }
+
     [JsonPropertyName("created_at")]
     public DateTime CreatedAt { get; set; }
 }
 
 /// <summary>
-/// Level не принимаем — 2A поддерживает только "swimmer", сервер ставит его сам.
+/// Level не принимаем — сервер выводит его сам из result_id/competition_id (см.
+/// UserMediaRepository.AddAsync): есть result_id → "result"; нет result_id, есть
+/// competition_id → "competition"; ничего → "swimmer".
 /// Visibility не принимаем — всегда "private" (2A: личное, не публичное).
 /// </summary>
 public class AddUserMediaRequest
@@ -43,4 +51,12 @@ public class AddUserMediaRequest
 
     [JsonPropertyName("url")]
     public string Url { get; set; } = string.Empty;
+
+    /// <summary>Опционально — привязка к конкретному заплыву; владение проверяется в репозитории.</summary>
+    [JsonPropertyName("result_id")]
+    public long? ResultId { get; set; }
+
+    /// <summary>Опционально — привязка к соревнованию; игнорируется, если задан ResultId.</summary>
+    [JsonPropertyName("competition_id")]
+    public int? CompetitionId { get; set; }
 }

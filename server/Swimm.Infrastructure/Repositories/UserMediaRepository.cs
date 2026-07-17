@@ -40,6 +40,8 @@ public class UserMediaRepository : IUserMediaRepository
                 MediaType = m.MediaType,
                 SourceType = m.SourceType,
                 Url = m.Url,
+                ResultId = m.ResultId,
+                CompetitionId = m.CompetitionId,
                 CreatedAt = m.CreatedAt
             })
             .ToListAsync();
@@ -50,14 +52,50 @@ public class UserMediaRepository : IUserMediaRepository
         var swimmerExists = await _db.Swimmers.AnyAsync(s => s.Id == request.SwimmerId);
         if (!swimmerExists) return null;
 
+        // Уровень выводим сами из привязок — клиенту не доверяем.
+        string level;
+        long? resultId = null;
+        int? competitionId = null;
+
+        if (request.ResultId != null)
+        {
+            // result_id задан → заплыв должен существовать и принадлежать этому пловцу;
+            // CompetitionId берём из заплыва, клиентский competition_id игнорируем.
+            var result = await _db.Results
+                .Where(r => r.Id == request.ResultId.Value)
+                .Select(r => new { r.SwimmerId, r.CompetitionId })
+                .FirstOrDefaultAsync();
+
+            if (result == null || result.SwimmerId != request.SwimmerId)
+                return null;
+
+            level = "result";
+            resultId = request.ResultId.Value;
+            competitionId = result.CompetitionId;
+        }
+        else if (request.CompetitionId != null)
+        {
+            var competitionExists = await _db.Competitions.AnyAsync(c => c.Id == request.CompetitionId.Value);
+            if (!competitionExists) return null;
+
+            level = "competition";
+            competitionId = request.CompetitionId.Value;
+        }
+        else
+        {
+            level = "swimmer";
+        }
+
         var media = new UserMedia
         {
             UserId = userId,
             SwimmerId = request.SwimmerId,
-            Level = "swimmer",
+            Level = level,
             MediaType = request.MediaType,
             SourceType = request.SourceType,
             Url = request.Url,
+            ResultId = resultId,
+            CompetitionId = competitionId,
             Visibility = "private",
             CreatedAt = DateTime.UtcNow
         };
@@ -73,6 +111,8 @@ public class UserMediaRepository : IUserMediaRepository
             MediaType = media.MediaType,
             SourceType = media.SourceType,
             Url = media.Url,
+            ResultId = media.ResultId,
+            CompetitionId = media.CompetitionId,
             CreatedAt = media.CreatedAt
         };
     }

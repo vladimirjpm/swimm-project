@@ -26,6 +26,21 @@
       "port": 5078
     },
     {
+      "name": "swimm-api-5079",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "server/Swimm.API",
+        "--no-build",
+        "--configuration",
+        "Release",
+        "--urls",
+        "http://localhost:5079"
+      ],
+      "port": 5079
+    },
+    {
       "name": "client-5079",
       "runtimeExecutable": "cmd",
       "runtimeArgs": [

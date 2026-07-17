@@ -5,10 +5,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 export interface UserMediaDto {
   id: number;
   swimmer_id: number;
-  level: 'swimmer';
+  level: 'swimmer' | 'competition' | 'result';
   media_type: 'image' | 'video';
   source_type: 'youtube' | 'vimeo' | 'other';
   url: string;
+  result_id?: number | null;
+  competition_id?: number | null;
   created_at: string;
 }
 
@@ -17,6 +19,8 @@ export interface AddUserMediaInput {
   media_type: 'image' | 'video';
   source_type: 'youtube' | 'vimeo' | 'other';
   url: string;
+  result_id?: number | null;
+  competition_id?: number | null;
 }
 
 // ── Antiforgery token cache (та же механика, что и useFavorites) ───────────────
