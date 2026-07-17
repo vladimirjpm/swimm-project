@@ -84,7 +84,6 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
                 secondLineClassName="text-sm mt-0.5 text-[var(--theme-mode-text-secondary)]"
                 showClubIcon={false}
                 isRecordHolder={isRecordHolder}
-                isMe={isPrimaryFavorite}
               />
               <UI_SwimmerGallery gallery={res.gallery} />
             </div>
