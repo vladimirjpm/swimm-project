@@ -236,7 +236,12 @@ function ResultsMain() {
 
   return (
     <div className="dolphine-training md:p-4 pt-safe pb-safe min-h-screen bg-[var(--theme-mode-page-bg)]">
-      <AppTopbar />
+      {/* Топбар full-bleed: гасим паддинги корня, чтобы полоса шла от края до края
+          и шапка селектора/группы прижималась к ней слитным блоком (без зазора).
+          sticky — на обёртке: внутри неё sticky самого топбара некуда «липнуть». */}
+      <div className="sticky top-0 z-50 md:-m-4 md:mb-0">
+        <AppTopbar />
+      </div>
       {/* Переключатель Light/Dark (fixed внизу-справа) */}
       <UI_ModeToggle />
       {/* Dev-инструмент тем (виден только при ?themes в URL) */}
@@ -246,7 +251,7 @@ function ResultsMain() {
           Overview/Members/Records — ссылки на обзорную groups.html; Competitions/Trainings —
           локальный toggle (единственное место переключения активности, см. FilterActivity). */}
       {groupSlug ? (
-        <div className="relative w-full z-40 max-lg:px-2 max-lg:pt-2">
+        <div className="relative w-full z-40 max-md:px-2 max-md:pt-2 md:-mx-4 md:w-auto">
           <GroupHeader
             slug={groupSlug}
             group={groupInfo}
@@ -258,7 +263,7 @@ function ResultsMain() {
       ) : (
         /* Селектор соревнований: шапка/панель, единый для всех брейкпоинтов
             (mobile — bottom sheet из «Change», design_handoff_selector_all) */
-        <div className="relative w-full z-40 max-lg:px-2 max-lg:pt-2">
+        <div className="relative w-full z-40 max-md:px-2 max-md:pt-2 md:-mx-4 md:w-auto">
           <DataSourceDDL />
         </div>
       )}

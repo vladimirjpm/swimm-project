@@ -918,7 +918,7 @@ const DataSourceDDL: React.FC = () => {
     <div ref={wrapRef} className="relative">
       {/* Desktop-шапка: одна строка ~72px */}
       <div
-        className="hidden items-center justify-between gap-4 rounded-[14px] px-5 py-4 sm:flex"
+        className="hidden items-center justify-between gap-4 rounded-[14px] px-5 py-4 sm:flex md:rounded-t-none"
         style={{
           background: 'var(--theme-primary)',
           color: 'var(--theme-mode-accent-text)',

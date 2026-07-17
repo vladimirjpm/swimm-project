@@ -11,7 +11,7 @@ import type { GroupHeaderProps } from './types';
 export default function GroupHeader({ slug, group, highlights, activeTab, onTabChange }: GroupHeaderProps) {
   return (
     <div
-      className="overflow-hidden rounded-[14px]"
+      className="overflow-hidden rounded-[14px] md:rounded-t-none"
       style={{ boxShadow: 'var(--theme-mode-card-shadow)' }}
     >
       <GroupHeaderTop slug={slug} group={group} />
