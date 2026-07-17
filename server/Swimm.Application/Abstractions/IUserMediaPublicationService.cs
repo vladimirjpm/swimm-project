@@ -39,4 +39,12 @@ public interface IUserMediaPublicationService
     /// (для approved это «снять с публикации»). false — заявка не найдена/не этой группы.
     /// </summary>
     Task<bool> DecideAsync(int hubGroupId, int publicationId, bool approve, int decidedByUserId);
+
+    /// <summary>
+    /// Медиа с привязкой к заплыву, видимое зрителю userId (null = аноним) в рамках
+    /// соревнования competitionId или всех дней события eventId: своё (любое) +
+    /// approved public (всем) + approved members (только активным членам той группы).
+    /// Для иконок видео в таблице результатов.
+    /// </summary>
+    Task<List<VisibleResultMediaDto>> GetVisibleForResultsAsync(int? competitionId, int? eventId, int? userId);
 }

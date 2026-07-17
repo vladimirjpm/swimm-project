@@ -43,6 +43,25 @@ public class SubmitPublicationRequest
     public string Level { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// Медиа, привязанное к заплыву и видимое текущему зрителю (своё + одобренные публикации) —
+/// для иконок видео в общей таблице результатов.
+/// </summary>
+public class VisibleResultMediaDto
+{
+    [JsonPropertyName("result_id")]
+    public long ResultId { get; set; }
+
+    [JsonPropertyName("media_type")]
+    public string MediaType { get; set; } = string.Empty;
+
+    [JsonPropertyName("source_type")]
+    public string SourceType { get; set; } = string.Empty;
+
+    [JsonPropertyName("url")]
+    public string Url { get; set; } = string.Empty;
+}
+
 /// <summary>Решение админа группы по заявке.</summary>
 public class PublicationDecisionRequest
 {

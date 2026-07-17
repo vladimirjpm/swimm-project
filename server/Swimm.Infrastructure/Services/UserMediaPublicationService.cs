@@ -171,6 +171,60 @@ public class UserMediaPublicationService : IUserMediaPublicationService
             })
             .ToListAsync();
 
+    public async Task<List<VisibleResultMediaDto>> GetVisibleForResultsAsync(
+        int? competitionId, int? eventId, int? userId)
+    {
+        if (competitionId == null && eventId == null) return [];
+
+        // Скоуп по соревнованию или по всем дням события (многодневные).
+        IQueryable<UserMedia> mediaInScope = _db.UserMedia.AsNoTracking()
+            .Where(m => m.ResultId != null);
+        mediaInScope = eventId != null
+            ? mediaInScope.Where(m => m.Competition!.EventId == eventId)
+            : mediaInScope.Where(m => m.CompetitionId == competitionId);
+
+        // 1. Своё медиа — видно владельцу целиком (private в том числе).
+        var mine = userId == null
+            ? []
+            : await mediaInScope
+                .Where(m => m.UserId == userId)
+                .Select(m => new VisibleResultMediaDto
+                {
+                    ResultId = m.ResultId!.Value,
+                    MediaType = m.MediaType,
+                    SourceType = m.SourceType,
+                    Url = m.Url,
+                })
+                .ToListAsync();
+
+        // 2. Одобренные публикации: public — всем; members — активным членам группы публикации.
+        var published = await _db.UserMediaPublications.AsNoTracking()
+            .Where(p => p.Status == UserMediaPublicationStatus.Approved
+                        && p.Media!.ResultId != null
+                        && (eventId != null
+                            ? p.Media.Competition!.EventId == eventId
+                            : p.Media.CompetitionId == competitionId)
+                        && (p.Level == UserMediaPublicationLevel.Public
+                            || (userId != null && _db.HubGroupUserMembers.Any(um =>
+                                um.HubGroupId == p.HubGroupId && um.UserId == userId
+                                && um.Status == HubGroupUserMemberStatus.Active))))
+            .Select(p => new VisibleResultMediaDto
+            {
+                ResultId = p.Media!.ResultId!.Value,
+                MediaType = p.Media.MediaType,
+                SourceType = p.Media.SourceType,
+                Url = p.Media.Url,
+            })
+            .ToListAsync();
+
+        // Дедуп: одно и то же медиа может быть и своим, и опубликованным в нескольких группах.
+        return mine.Concat(published)
+            .GroupBy(v => new { v.ResultId, v.Url })
+            .Select(g => g.First())
+            .OrderBy(v => v.ResultId)
+            .ToList();
+    }
+
     public async Task<bool> DecideAsync(int hubGroupId, int publicationId, bool approve, int decidedByUserId)
     {
         var entity = await _db.UserMediaPublications

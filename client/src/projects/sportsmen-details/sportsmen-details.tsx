@@ -4,7 +4,7 @@ import { useAppSelector } from '../../store/store';
 import { useFavoritesContext } from '../../hooks/favorites-context';
 import { useLoginModal } from '../components/login-modal/login-modal-context';
 import { useAthleteCareer, AthleteCareer } from '../../hooks/useAthleteCareer';
-import { useUserMedia, UserMediaDto } from '../../hooks/useUserMedia';
+import { useUserMedia, useMyMediaPublications, UserMediaDto } from '../../hooks/useUserMedia';
 import Helper from '../../utils/helpers/data-helper'
 import { HelperMedia } from '../../utils/helpers';
 import UI_ClubIcon from '../components/mix/club-icon/club-icon';
@@ -481,6 +481,44 @@ function MyMediaSection({
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
+  // Публикации в группы (этап 3): статусы заявок + панель «поделиться» для одного медиа.
+  const { publications, submit: submitPublication, withdraw: withdrawPublication } = useMyMediaPublications();
+  const [publishMediaId, setPublishMediaId] = useState<number | null>(null);
+  const [pubGroupId, setPubGroupId] = useState<number | ''>('');
+  const [pubLevel, setPubLevel] = useState<'members' | 'public'>('members');
+  const [pubSubmitting, setPubSubmitting] = useState(false);
+  const [pubError, setPubError] = useState<string | null>(null);
+  const [myGroups, setMyGroups] = useState<{ id: number; name: string }[]>([]);
+
+  useEffect(() => {
+    // Мои активные группы — кандидаты для подачи (сервер сам отсечёт группы без пловца в ростере).
+    fetch('/api/me/hub-groups/joined', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: { id: number; name: string; status: string }[]) =>
+        setMyGroups(list.filter((g) => g.status === 'active').map((g) => ({ id: g.id, name: g.name }))))
+      .catch(() => setMyGroups([]));
+  }, []);
+
+  const handlePublish = async () => {
+    if (publishMediaId == null || pubGroupId === '') return;
+    setPubError(null);
+    setPubSubmitting(true);
+    const res = await submitPublication(publishMediaId, pubGroupId, pubLevel);
+    setPubSubmitting(false);
+    if (res.ok) {
+      setPublishMediaId(null);
+      setPubGroupId('');
+    } else {
+      setPubError(res.error ?? 'Не удалось подать заявку');
+    }
+  };
+
+  const pubStatusLabel: Record<string, string> = {
+    pending: 'на модерации',
+    approved: 'опубликовано',
+    rejected: 'отклонено',
+  };
+
   // Только youtube/vimeo идут в лайтбокс — эти элементы и их порядок в gallery
   // соответствуют lightboxIndex, которым мы кликаем.
   const lightboxItems = useMemo<GalleryItem[]>(
@@ -610,6 +648,22 @@ function MyMediaSection({
                   ×
                 </button>
 
+                {/* Подача в группу (этап 3): открывает панель публикации под сеткой. */}
+                {myGroups.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPublishMediaId(publishMediaId === item.id ? null : item.id);
+                      setPubError(null);
+                    }}
+                    title="Поделиться с группой"
+                    className="absolute top-1 left-1 z-10 w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px] font-bold text-white"
+                    style={{ background: publishMediaId === item.id ? 'var(--theme-primary)' : 'rgba(0,0,0,0.55)' }}
+                  >
+                    ↗
+                  </button>
+                )}
+
                 {isEmbeddable ? (
                   <div className="cursor-pointer aspect-video flex items-center justify-center" onClick={() => openLightboxFor(item)}>
                     {thumb ? (
@@ -669,6 +723,73 @@ function MyMediaSection({
             );
           })}
         </ul>
+      )}
+
+      {/* Панель публикации выбранного медиа + статусы её заявок. */}
+      {publishMediaId != null && (
+        <div className="mt-3 flex flex-col gap-2 rounded-[10px] p-2.5" style={{ background: 'var(--theme-mode-surface-alt)' }}>
+          <div className="text-xs font-bold" style={{ color: 'var(--theme-mode-text-secondary)' }}>
+            Поделиться с группой
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={pubGroupId}
+              onChange={(e) => setPubGroupId(e.target.value === '' ? '' : Number(e.target.value))}
+              className="rounded-lg px-2 py-1.5 text-xs"
+              style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
+            >
+              <option value="">— группа —</option>
+              {myGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+            <select
+              value={pubLevel}
+              onChange={(e) => setPubLevel(e.target.value as 'members' | 'public')}
+              className="rounded-lg px-2 py-1.5 text-xs"
+              style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
+            >
+              <option value="members">участникам группы</option>
+              <option value="public">публично (видно всем)</option>
+            </select>
+            <button
+              type="button"
+              onClick={handlePublish}
+              disabled={pubSubmitting || pubGroupId === ''}
+              className="rounded-lg px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+              style={{ background: 'var(--theme-primary)' }}
+            >
+              Подать
+            </button>
+          </div>
+          {pubError && <div className="text-[10px]" style={{ color: '#e23b5a' }}>{pubError}</div>}
+
+          {/* Заявки этого медиа */}
+          {publications.filter((p) => p.user_media_id === publishMediaId).length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {publications.filter((p) => p.user_media_id === publishMediaId).map((p) => (
+                <span
+                  key={p.id}
+                  className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                  style={{
+                    background: 'var(--theme-mode-input-bg)',
+                    color: p.status === 'approved' ? 'var(--theme-primary)'
+                      : p.status === 'rejected' ? '#e23b5a' : 'var(--theme-mode-text-secondary)',
+                    border: '1px solid var(--theme-mode-border)',
+                  }}
+                >
+                  {p.hub_group_name} · {pubStatusLabel[p.status] ?? p.status}{p.status === 'approved' && p.level === 'public' ? ' (всем)' : ''}
+                  <button
+                    type="button"
+                    title="Отозвать"
+                    onClick={() => withdrawPublication(p.user_media_id, p.hub_group_id)}
+                    className="leading-none opacity-60 hover:opacity-100"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       )}
       </div>
       </details>
