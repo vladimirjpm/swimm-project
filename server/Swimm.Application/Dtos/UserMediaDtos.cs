@@ -30,6 +30,14 @@ public class UserMediaDto
 
     [JsonPropertyName("created_at")]
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>Имя пловца (для сводной страницы «My media» — медиа разных пловцов).</summary>
+    [JsonPropertyName("swimmer_name")]
+    public string? SwimmerName { get; set; }
+
+    /// <summary>Подпись заплыва (стиль/дистанция/дата), если привязано к заплыву.</summary>
+    [JsonPropertyName("result_label")]
+    public string? ResultLabel { get; set; }
 }
 
 /// <summary>

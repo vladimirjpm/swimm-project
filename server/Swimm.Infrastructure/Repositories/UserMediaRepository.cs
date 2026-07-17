@@ -42,7 +42,12 @@ public class UserMediaRepository : IUserMediaRepository
                 Url = m.Url,
                 ResultId = m.ResultId,
                 CompetitionId = m.CompetitionId,
-                CreatedAt = m.CreatedAt
+                CreatedAt = m.CreatedAt,
+                SwimmerName = (m.Swimmer.LastName + " " + m.Swimmer.FirstName).Trim(),
+                ResultLabel = m.ResultRecord != null
+                    ? m.ResultRecord.Style.Name + " " + m.ResultRecord.Distance + " · "
+                      + m.ResultRecord.Competition.Date
+                    : null
             })
             .ToListAsync();
     }
