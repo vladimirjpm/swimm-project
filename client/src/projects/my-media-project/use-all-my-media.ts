@@ -2,19 +2,36 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-/** Одна запись «всего медиа юзера» — DTO GET /api/me/media (без swimmerId). */
+/** Одна запись «всего медиа юзера» — DTO GET /api/me/media (v2, страница My media). */
 export interface AllUserMediaDto {
   id: number;
   swimmer_id: number;
+  swimmer_name: string;
   level: 'swimmer' | 'competition' | 'result';
   media_type: 'image' | 'video';
   source_type: 'youtube' | 'vimeo' | 'other';
   url: string;
   result_id?: number | null;
-  competition_id?: number | null;
-  created_at: string;
-  swimmer_name: string;
   result_label?: string | null;
+  competition_id?: number | null;
+  competition_name?: string | null;
+  /** dd/MM/yyyy, как отдаёт сервер */
+  competition_date?: string | null;
+  club_name?: string | null;
+  created_at: string;
+}
+
+export interface AddMediaInput {
+  swimmer_id: number;
+  media_type: 'image' | 'video';
+  source_type: 'youtube' | 'vimeo' | 'other';
+  url: string;
+  result_id?: number | null;
+}
+
+export interface PublishTargetDto {
+  id: number;
+  name: string;
 }
 
 // ── Antiforgery token cache (та же механика, что и useUserMedia/useFavorites) ──
@@ -38,10 +55,20 @@ function invalidateTokenCache() {
   cachedToken = null;
 }
 
+/** Год из dd/MM/yyyy — сезон карточки для фильтра Season. Без даты → null (только "All"). */
+export function seasonFromCompetitionDate(date?: string | null): string | null {
+  if (!date) return null;
+  const parts = date.split('/');
+  if (parts.length !== 3) return null;
+  const year = parts[2];
+  return /^\d{4}$/.test(year) ? year : null;
+}
+
 /**
  * Всё медиа залогиненного юзера по всем его пловцам (страница «My media»).
- * Лёгкий хук по образцу useUserMedia — тут не нужен swimmerId и add(), только
- * список + удаление записи. Публикациями заведует useMyMediaPublications (реиспользуется).
+ * Лёгкий хук по образцу useUserMedia — тут не нужен swimmerId и add() для
+ * конкретного пловца: список + удаление + общий add (Add link флоу, шаг 3).
+ * Публикациями заведует useMyMediaPublications (реиспользуется как есть).
  */
 export function useAllMyMedia() {
   const [media, setMedia] = useState<AllUserMediaDto[]>([]);
@@ -92,5 +119,76 @@ export function useAllMyMedia() {
     }
   }, []);
 
-  return { media, loading, remove, reload: load };
+  /** Add link, шаг 3: POST /api/me/media — новый элемент попадает в начало сетки. */
+  const add = useCallback(async (input: AddMediaInput): Promise<AllUserMediaDto | null> => {
+    const token = await fetchAntiforgeryToken();
+    if (!token) return null;
+
+    try {
+      const r = await fetch('/api/me/media', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
+        body: JSON.stringify(input),
+      });
+
+      if (!r.ok) { invalidateTokenCache(); return null; }
+
+      const item: AllUserMediaDto = await r.json();
+      if (mountedRef.current) {
+        setMedia(prev => [item, ...prev]);
+      }
+      return item;
+    } catch {
+      invalidateTokenCache();
+      return null;
+    }
+  }, []);
+
+  return { media, loading, remove, add, reload: load };
 }
+
+// ── Пикер заплывов (Add link, шаг 3 / «Link to a swim») ────────────────────────
+
+export interface SwimmerCompetitionBrief {
+  id: number;
+  name: string;
+  date: string;
+}
+
+export interface SwimmerResultBrief {
+  result_id: number;
+  distance: string;
+  style: string;
+  time: string;
+  date: string;
+}
+
+export async function fetchSwimmerCompetitionsBrief(swimmerId: number): Promise<SwimmerCompetitionBrief[]> {
+  try {
+    const r = await fetch(`/api/swimmers/${swimmerId}/competitions-brief`, { credentials: 'include' });
+    return r.ok ? await r.json() : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchSwimmerResultsBrief(swimmerId: number, competitionId: number): Promise<SwimmerResultBrief[]> {
+  try {
+    const r = await fetch(`/api/swimmers/${swimmerId}/results-brief?competitionId=${competitionId}`, { credentials: 'include' });
+    return r.ok ? await r.json() : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Куда можно подать выбранное медиа — GET /api/me/media/{id}/publish-targets. */
+export async function fetchPublishTargets(mediaId: number): Promise<PublishTargetDto[]> {
+  try {
+    const r = await fetch(`/api/me/media/${mediaId}/publish-targets`, { credentials: 'include' });
+    return r.ok ? await r.json() : [];
+  } catch {
+    return [];
+  }
+}
+
