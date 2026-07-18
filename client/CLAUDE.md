@@ -70,6 +70,16 @@ npm --prefix client run build      # prebuild авто-генерит club-icons
 (куки/antiforgery без CORS). Запусти API на :5078 (через Visual Studio или `dotnet run`) + `npm run dev`.
 Точечные API-вызовы уже есть (напр. избранное в [`hooks/useFavorites.ts`](src/hooks/useFavorites.ts)).
 
+## Правило парных токенов (темизация)
+
+Текст на тем-зависимой поверхности красится ТОЛЬКО парным токеном той же поверхности,
+никаких фиксированных hex: фон `--theme-primary` → текст `--theme-mode-accent-text`
+(вторичная строка — тот же токен с opacity), фон `--theme-topbar-bg` → `--theme-topbar-text`,
+фон `--theme-mode-surface*` → `--theme-mode-text*`. Меняешь/добавляешь оверрайд токена в
+одном режиме — проверь его ПАРУ в обоих режимах (light и dark, `data-mode` на `<html>`),
+контраст ≥ 4.5:1. Прецедент: dark-оверрайд `--theme-mode-accent-text` был тёмным при
+неизменном `--theme-primary` → нечитаемая шапка селектора (исправлено 2026-07-18).
+
 ## Footguns
 
 - Поле в store опечатано как `debigConfig` — не «чини» вслепую, на него могут быть ссылки.
