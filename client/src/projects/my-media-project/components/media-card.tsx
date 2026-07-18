@@ -35,9 +35,11 @@ function MediaCard({ item, publications, onOpenLightbox, onDelete, onWithdraw, o
         }));
 
   return (
-    <div className={`flex flex-col overflow-hidden ${hpCardCls}`}>
+    // Без overflow-hidden на корне: он резал дропдаун «⋯» (и любой absolute-выпад).
+    // Скругление превью — на самом блоке превью.
+    <div className={`flex flex-col ${hpCardCls}`}>
       <div
-        className="relative flex aspect-video cursor-pointer items-center justify-center bg-[linear-gradient(140deg,#12314f,#0a1c33)]"
+        className="relative flex aspect-video cursor-pointer items-center justify-center overflow-hidden rounded-t-[16px] bg-[linear-gradient(140deg,#12314f,#0a1c33)]"
         onClick={() => { if (isEmbeddable) onOpenLightbox(); else window.open(item.url, '_blank', 'noopener,noreferrer'); }}
       >
         {thumb ? (
@@ -126,7 +128,8 @@ function MediaCard({ item, publications, onOpenLightbox, onDelete, onWithdraw, o
               ⋯
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-[24px] z-20 w-[140px] rounded-[10px] border border-[rgba(125,211,252,0.3)] bg-[#0e2138] p-1 shadow-[0_18px_44px_rgba(0,0,0,0.45)]">
+              // Вверх (bottom-full): кнопка у нижнего края карточки, вниз меню уходило бы под соседей.
+              <div className="absolute bottom-[24px] right-0 z-30 w-[140px] rounded-[10px] border border-[rgba(125,211,252,0.3)] bg-[#0e2138] p-1 shadow-[0_18px_44px_rgba(0,0,0,0.45)]">
                 {!confirmDelete ? (
                   <button
                     type="button"
