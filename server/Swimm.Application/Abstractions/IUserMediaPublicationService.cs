@@ -35,6 +35,12 @@ public interface IUserMediaPublicationService
     Task<List<GroupPublicationInboxItemDto>> GetForGroupAsync(int hubGroupId);
 
     /// <summary>
+    /// Сводный inbox модерации (страница My media → Moderation): заявки ВСЕХ статусов по
+    /// группам, где userId владелец или админ; isSiteAdmin=true — по всем группам. Pending первыми.
+    /// </summary>
+    Task<List<GroupPublicationInboxItemDto>> GetModerationFeedAsync(int userId, bool isSiteAdmin);
+
+    /// <summary>
     /// Одобренные публикации группы уровня level (members|public) — для отображения на
     /// странице группы. Авторизацию members-уровня решает контроллер; не подмешивается
     /// в HubGroupMedia-галереи (другая природа id, снятие — через DecideAsync, не Delete).

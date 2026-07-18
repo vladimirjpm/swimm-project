@@ -162,6 +162,14 @@ public class UserMediaPublicationService : IUserMediaPublicationService
             .OrderBy(p => p.Status == UserMediaPublicationStatus.Pending ? 0 : 1)
             .ThenByDescending(p => p.Id));
 
+    public Task<List<GroupPublicationInboxItemDto>> GetModerationFeedAsync(int userId, bool isSiteAdmin)
+        => QueryGroupItems(_db.UserMediaPublications.AsNoTracking()
+            .Where(p => isSiteAdmin
+                        || p.HubGroup!.OwnerUserId == userId
+                        || _db.HubGroupAdmins.Any(a => a.HubGroupId == p.HubGroupId && a.UserId == userId))
+            .OrderBy(p => p.Status == UserMediaPublicationStatus.Pending ? 0 : 1)
+            .ThenByDescending(p => p.Id));
+
     public Task<List<GroupPublicationInboxItemDto>> GetApprovedForGroupAsync(int hubGroupId, string level)
         => QueryGroupItems(_db.UserMediaPublications.AsNoTracking()
             .Where(p => p.HubGroupId == hubGroupId
@@ -174,6 +182,8 @@ public class UserMediaPublicationService : IUserMediaPublicationService
             .Select(p => new GroupPublicationInboxItemDto
             {
                 Id = p.Id,
+                HubGroupId = p.HubGroupId,
+                HubGroupName = p.HubGroup!.Name,
                 Level = p.Level,
                 Status = p.Status,
                 CreatedAt = p.CreatedAt,

@@ -10,4 +10,12 @@ public interface IUserMediaRepository
     Task<UserMediaDto?> AddAsync(int userId, AddUserMediaRequest request);
 
     Task<bool> RemoveAsync(int userId, int mediaId);
+
+    /* Пикер привязки к заплыву (Add link, дизайн-бриф §6.3) — публичные данные результатов. */
+
+    /// <summary>Соревнования, где у пловца есть заплывы (для чипов пикера), новые первыми.</summary>
+    Task<List<SwimmerCompetitionBriefDto>> GetSwimmerCompetitionsBriefAsync(int swimmerId);
+
+    /// <summary>Заплывы пловца на соревновании (без эстафет) для выбора привязки.</summary>
+    Task<List<SwimmerResultBriefDto>> GetSwimmerResultsBriefAsync(int swimmerId, int competitionId);
 }

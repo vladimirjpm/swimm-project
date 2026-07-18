@@ -14,10 +14,27 @@ namespace Swimm.API.Controllers;
 public class PublicMediaController : ControllerBase
 {
     private readonly IUserMediaPublicationService _publications;
+    private readonly IUserMediaRepository _media;
 
-    public PublicMediaController(IUserMediaPublicationService publications)
+    public PublicMediaController(IUserMediaPublicationService publications, IUserMediaRepository media)
     {
         _publications = publications;
+        _media = media;
+    }
+
+    /* Пикер привязки к заплыву (Add link, дизайн-бриф §6.3) — публичные данные результатов. */
+
+    /// <summary>Соревнования пловца (для чипов пикера).</summary>
+    [HttpGet("/api/swimmers/{id:int}/competitions-brief")]
+    public async Task<IActionResult> GetSwimmerCompetitions(int id)
+        => Ok(await _media.GetSwimmerCompetitionsBriefAsync(id));
+
+    /// <summary>Заплывы пловца на соревновании (без эстафет).</summary>
+    [HttpGet("/api/swimmers/{id:int}/results-brief")]
+    public async Task<IActionResult> GetSwimmerResults(int id, [FromQuery] int competitionId)
+    {
+        if (competitionId <= 0) return BadRequest(new { error = "competitionId is required" });
+        return Ok(await _media.GetSwimmerResultsBriefAsync(id, competitionId));
     }
 
     /// <summary>Видимое зрителю медиа заплывов соревнования, события или group-режима (?group=slug).</summary>

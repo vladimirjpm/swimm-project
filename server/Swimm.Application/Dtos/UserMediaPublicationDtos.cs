@@ -86,6 +86,14 @@ public class GroupPublicationInboxItemDto
     [JsonPropertyName("id")]
     public int Id { get; set; }
 
+    /* Группа — для сводного inbox-а по всем моим группам (страница My media, Moderation). */
+
+    [JsonPropertyName("hub_group_id")]
+    public int HubGroupId { get; set; }
+
+    [JsonPropertyName("hub_group_name")]
+    public string HubGroupName { get; set; } = string.Empty;
+
     [JsonPropertyName("level")]
     public string Level { get; set; } = string.Empty;
 

@@ -77,6 +77,20 @@ public class MediaController : ControllerBase
         return Ok(await _publications.GetForOwnerAsync(userId.Value));
     }
 
+    /// <summary>
+    /// Сводный inbox модерации (My media → Moderation): заявки по всем группам, где я
+    /// владелец/админ; site admin видит все группы. Решения — существующим
+    /// POST /api/hub-groups/{id}/media/publications/{pubId}/decision (hub_group_id в строках).
+    /// </summary>
+    [HttpGet("/api/me/moderation/media")]
+    public async Task<IActionResult> GetModerationFeed()
+    {
+        var userId = CurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        return Ok(await _publications.GetModerationFeedAsync(userId.Value, User.IsInRole("Admin")));
+    }
+
     /// <summary>Куда можно подать это медиа (я член/владелец/админ группы + пловец в ростере).</summary>
     [HttpGet("{id:int}/publish-targets")]
     public async Task<IActionResult> GetPublishTargets(int id)
