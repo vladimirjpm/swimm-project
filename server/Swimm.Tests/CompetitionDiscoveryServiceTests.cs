@@ -89,4 +89,28 @@ public class CompetitionDiscoveryServiceTests
         Assert.Equal("ליגה מס 4", all.Single(d => d.OrgCompId == 1).MatchedCompetitionName);
         Assert.Null(all.Single(d => d.OrgCompId == 2).MatchedCompetitionName);
     }
+
+    [Fact]
+    public async Task GetAll_MatchesDistrictSuffixAndMangledQuotes()
+    {
+        // Реальный кейс Arena 8-11 חורף 2026: сайт дописывает суффикс района, а в БД
+        // кавычки вокруг «ארנה» то есть, то нет, то с литеральными бэкслешами.
+        await using var db = CreateDb(nameof(GetAll_MatchesDistrictSuffixAndMangledQuotes));
+        db.Competitions.Add(new Competition
+        {
+            Name = "אליפות ישראל \\\"ארנה\\\" לגילאי 8-11 חורף 2026", // литеральные \" из импорта
+            Date = "15/02/2026", PoolType = "25m"
+        });
+        db.DiscoveredCompetitions.Add(new DiscoveredCompetition
+        {
+            OrgCompId = 1, Name = "אליפות ישראל \"ארנה\" לגילאי 8-11 חורף 2026- מחוז צפון",
+            DateStart = new DateTime(2026, 2, 15, 0, 0, 0, DateTimeKind.Utc),
+            DateEnd = new DateTime(2026, 2, 15, 0, 0, 0, DateTimeKind.Utc)
+        });
+        await db.SaveChangesAsync();
+
+        var all = await CreateService(db, new FakeProvider()).GetAllAsync();
+
+        Assert.NotNull(all.Single(d => d.OrgCompId == 1).MatchedCompetitionName);
+    }
 }

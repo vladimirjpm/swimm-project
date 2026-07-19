@@ -60,7 +60,10 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
     public async Task<byte[]> FetchResultsPdfAsync(int logligId, string culture = "he-IL", CancellationToken ct = default)
     {
         var url = string.Format(CultureInfo.InvariantCulture, PdfUrlTemplate, logligId, culture);
-        var bytes = await GetBytesAsync(url, $"results-{logligId}.pdf", ct);
+        // loglig игнорирует culture в query string — язык протокола выбирается ТОЛЬКО
+        // по куке _culture (классическая ASP.NET MVC culture-кука; выяснено 2026-07-18:
+        // curl без куки отдаёт иврит на любой culture=, браузер Влада с кукой — английский).
+        var bytes = await GetBytesAsync(url, $"results-{logligId}-{culture}.pdf", ct, cookie: $"_culture={culture}");
         // PDF начинается с %PDF — HTML-страница ошибки loglig не должна уйти в парсер молча.
         if (bytes.Length < 4 || bytes[0] != '%' || bytes[1] != 'P' || bytes[2] != 'D' || bytes[3] != 'F')
             throw new InvalidOperationException(
@@ -174,7 +177,7 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
         return System.Text.Encoding.UTF8.GetString(bytes);
     }
 
-    private async Task<byte[]> GetBytesAsync(string url, string snapshotName, CancellationToken ct)
+    private async Task<byte[]> GetBytesAsync(string url, string snapshotName, CancellationToken ct, string? cookie = null)
     {
         var uri = new Uri(url);
         if (!IsAllowedHost(uri.Host))
@@ -185,6 +188,8 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
         var client = _httpClientFactory.CreateClient();
         client.Timeout = TimeSpan.FromSeconds(60);
         client.DefaultRequestHeaders.UserAgent.ParseAdd("SwimmBot/1.0 (+swimm-project discovery)");
+        if (cookie != null)
+            client.DefaultRequestHeaders.Add("Cookie", cookie);
 
         var response = await client.GetAsync(uri, ct);
         response.EnsureSuccessStatusCode();

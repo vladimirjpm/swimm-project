@@ -77,22 +77,27 @@ public class CompetitionDiscoveryService(
             .ToListAsync(ct);
 
         // Матч «уже импортировано»: дата дня попадает в [DateStart..DateEnd] и имя совпадает
-        // после нормализации. Дни в Competitions.Date — строка dd/MM/yyyy.
+        // после нормализации ЛИБО имя Discovery начинается с имени соревнования — сайт дописывает
+        // суффикс района («…- מחוז צפון»), которого в протоколе/БД нет. Нормализация выкидывает
+        // кавычки и бэкслеши: в БД встречаются «ארנה», «"ארנה"» и «\"ארנה\"» (артефакт импорта).
+        // Дни в Competitions.Date — строка dd/MM/yyyy.
         var competitions = await db.Competitions
             .AsNoTracking()
             .Select(c => new { c.Name, c.Date })
             .ToListAsync(ct);
-        var byName = competitions
+        var candidates = competitions
             .Select(c => new { Key = Normalize(c.Name), c.Name, Date = ParseDdMmYyyy(c.Date) })
-            .Where(c => c.Date != null)
-            .ToLookup(c => c.Key);
+            .Where(c => c.Date != null && c.Key.Length > 0)
+            .ToList();
 
         return rows.Select(d =>
         {
+            var dKey = Normalize(d.Name);
             string? matched = null;
-            foreach (var c in byName[Normalize(d.Name)])
+            foreach (var c in candidates)
             {
-                if (c.Date >= d.DateStart && c.Date <= d.DateEnd)
+                if (c.Date < d.DateStart || c.Date > d.DateEnd) continue;
+                if (dKey == c.Key || dKey.StartsWith(c.Key, StringComparison.Ordinal))
                 {
                     matched = c.Name;
                     break;
@@ -140,12 +145,47 @@ public class CompetitionDiscoveryService(
         return true;
     }
 
+    public async Task<bool> AddLanguagesAsync(int id, IEnumerable<string> languages, CancellationToken ct = default)
+    {
+        var row = await db.DiscoveredCompetitions.FirstOrDefaultAsync(d => d.Id == id, ct);
+        if (row is null) return false;
+
+        // Объединение с уже сохранёнными, канонический порядок "he,en".
+        var set = (row.Languages ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Concat(languages)
+            .Select(l => l.Trim().ToLowerInvariant())
+            .Where(l => l is "he" or "en")
+            .ToHashSet();
+        var merged = string.Join(',', new[] { "he", "en" }.Where(set.Contains));
+
+        if (merged.Length > 0 && merged != row.Languages)
+        {
+            row.Languages = merged;
+            await db.SaveChangesAsync(ct);
+        }
+        return true;
+    }
+
+    public async Task<bool> SetLastErrorAsync(int id, string? error, CancellationToken ct = default)
+    {
+        var row = await db.DiscoveredCompetitions.FirstOrDefaultAsync(d => d.Id == id, ct);
+        if (row is null) return false;
+        row.LastError = error is { Length: > 1000 } ? error[..1000] : error;
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
     private static DiscoveredCompetitionDto ToDto(DiscoveredCompetition d, string? matched) => new(
         d.Id, d.OrgCompId, d.Name, d.DateStart, d.DateEnd, d.Venue, d.LogligId,
-        d.Status, d.DiscoveredAt, d.LastSeenAt, d.LastError, matched);
+        d.Status, d.DiscoveredAt, d.LastSeenAt, d.LastError, matched, d.Languages);
 
-    private static string Normalize(string name) =>
-        string.Join(' ', name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();
+    /// <summary>Trim/lower, схлопнуть пробелы, выкинуть кавычки/бэкслеши/гереш-гершаим —
+    /// они непоследовательны между сайтом и импортированными именами.</summary>
+    internal static string Normalize(string name)
+    {
+        var cleaned = new string(name.Where(c => c is not ('"' or '\\' or '\'' or '׳' or '״' or '`' or '’' or '“' or '”')).ToArray());
+        return string.Join(' ', cleaned.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();
+    }
 
     private static DateTime? ParseDdMmYyyy(string date)
     {

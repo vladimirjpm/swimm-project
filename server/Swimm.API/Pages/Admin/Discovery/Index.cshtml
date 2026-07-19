@@ -7,8 +7,9 @@
 
 <div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
     Список соревнований с <a class="text-admin-accent" href="https://isr.org.il/competitions.asp" target="_blank" rel="noopener">isr.org.il/competitions.asp</a>.
-    «Проверить сейчас» обновляет входящие; «Затянуть» скачивает PDF-протокол (loglig) и открывает превью парсера —
-    импорт пойдёт через обычную очередь (см. Import History). Фоновая проверка включается настройками
+    «Проверить сейчас» обновляет входящие; «Затянуть» скачивает PDF-протоколы (loglig, иврит + английский,
+    если EN-экспорт опубликован) и открывает превью парсера — импорт пойдёт через обычную очередь (см. Import History).
+    «Синхр. языки» у импортированных дозаполняет английские имена пловцов из EN-протокола без переимпорта. Фоновая проверка включается настройками
     <code>DiscoveryEnabled</code> / <code>DiscoveryIntervalHours</code>.
 </div>
 
@@ -98,6 +99,15 @@
             : '<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold bg-[rgba(255,213,79,0.15)] text-[#ffd54f]">новое</span>';
     }
 
+    // Бэйджи языков загруженных PDF: he — синий, en — фиолетовый, нет — прочерк не рисуем.
+    function langBadges(r) {
+        const langs = (r.languages ?? '').split(',').filter(Boolean);
+        return langs.map(l =>
+            `<span class="inline-block ml-1 py-0.5 px-1.5 rounded text-[10px] font-bold uppercase ${
+                l === 'he' ? 'bg-[rgba(79,195,247,0.15)] text-[#4fc3f7]' : 'bg-[rgba(186,104,200,0.2)] text-[#ce93d8]'
+            }">${l}</span>`).join('');
+    }
+
     function render() {
         const showIgnored = document.getElementById('show-ignored').checked;
         const visible = rows.filter(r => showIgnored || r.status !== 'ignored');
@@ -115,9 +125,12 @@
                     ${r.matchedCompetitionName ? `<div class="text-[11px] text-[#66bb6a]" dir="rtl">= ${esc(r.matchedCompetitionName)}</div>` : ''}
                 </td>
                 <td class="py-2.5 px-3 text-[#90a4ae]" dir="rtl" style="text-align:left">${esc(r.venue ?? '—')}</td>
-                <td class="py-2.5 px-3">${statusBadge(r)}</td>
+                <td class="py-2.5 px-3">${statusBadge(r)}${langBadges(r)}</td>
                 <td class="py-2.5 px-3 whitespace-nowrap">
                     ${isNew ? `<button onclick="discPreview(${r.id})" class="py-1 px-3 rounded text-xs font-semibold cursor-pointer bg-[rgba(79,195,247,0.15)] text-[#4fc3f7] hover:bg-[rgba(79,195,247,0.25)]">Затянуть</button>` : ''}
+                    ${isNew ? `<button onclick="discStatus(${r.id}, 'imported')" class="py-1 px-3 rounded text-xs cursor-pointer bg-[rgba(102,187,106,0.12)] text-[#66bb6a] hover:bg-[rgba(102,187,106,0.22)]" title="Пометить импортированным вручную — когда соревнование уже в БД, но автоматч не видит его из-за другого написания имени">✓ импорт.</button>` : ''}
+                    ${new Date(r.dateStart) <= new Date() && r.languages !== 'he,en'
+                        ? `<button onclick="discSyncLangs(${r.id}, this)" class="py-1 px-3 rounded text-xs font-semibold cursor-pointer bg-[rgba(186,104,200,0.15)] text-[#ce93d8] hover:bg-[rgba(186,104,200,0.25)]" title="Скачать HE+EN пару и дозаполнить английские имена пловцов (без переимпорта)">Синхр. языки</button>` : ''}
                     <a href="${API}/${r.id}/pdf" class="py-1 px-3 rounded text-xs font-semibold bg-white/[.06] text-admin-text-muted hover:bg-white/[.1]">PDF</a>
                     ${r.status === 'ignored'
                         ? `<button onclick="discStatus(${r.id}, 'new')" class="py-1 px-3 rounded text-xs cursor-pointer text-admin-text-muted">вернуть</button>`
@@ -159,6 +172,26 @@
             });
             await load();
         } catch (e) { toast('Ошибка: ' + e.message); }
+    };
+
+    // Статус синхронизации — в стойкой строке #sync-info (тост живёт секунды);
+    // ошибки к тому же сохраняются сервером в LastError и видны в таблице после load().
+    window.discSyncLangs = async function (id, btn) {
+        const row = rows.find(r => r.id === id);
+        const info = document.getElementById('sync-info');
+        if (btn) { btn.disabled = true; btn.textContent = 'Синхронизирую…'; }
+        info.textContent = `Синхр. языки «${row?.name ?? id}»: скачиваю HE+EN пару, склеиваю, обновляю имена… (может занять минуту)`;
+        try {
+            const s = await apiJson(`${API}/${id}/sync-languages`, { method: 'POST' });
+            info.textContent = s.monolingual
+                ? `Синхр. языки «${row?.name ?? id}»: ${s.message}`
+                : `Синхр. языки «${row?.name ?? id}»: готово — пловцов в протоколе: ${s.swimmersInProtocol}, `
+                    + `EN-имён дозаполнено: ${s.enNamesFilled}, канонизировано: ${s.canonized}, `
+                    + `уже полные: ${s.alreadyComplete}, не найдено: ${s.notFound}`;
+        } catch (e) {
+            info.textContent = `Синхр. языки «${row?.name ?? id}»: ОШИБКА — ${e.message}`;
+        }
+        await load(); // перерисовка вернёт кнопку и покажет LastError/бэйджи в строке
     };
 
     window.discPreview = async function (id) {

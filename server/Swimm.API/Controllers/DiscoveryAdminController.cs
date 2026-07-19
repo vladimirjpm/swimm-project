@@ -20,6 +20,7 @@ public class DiscoveryAdminController : ControllerBase
     private readonly ICompetitionDiscoveryService _discovery;
     private readonly ICompetitionDiscoveryProvider _provider;
     private readonly IResultSourceProvider _sourceProvider;
+    private readonly ISwimmerNameSyncService _nameSync;
     private readonly IImportJobQueue _jobs;
     private readonly IMemoryCache _cache;
     private readonly ILogger<DiscoveryAdminController> _logger;
@@ -28,6 +29,7 @@ public class DiscoveryAdminController : ControllerBase
         ICompetitionDiscoveryService discovery,
         ICompetitionDiscoveryProvider provider,
         IResultSourceProvider sourceProvider,
+        ISwimmerNameSyncService nameSync,
         IImportJobQueue jobs,
         IMemoryCache cache,
         ILogger<DiscoveryAdminController> logger)
@@ -35,6 +37,7 @@ public class DiscoveryAdminController : ControllerBase
         _discovery = discovery;
         _provider = provider;
         _sourceProvider = sourceProvider;
+        _nameSync = nameSync;
         _jobs = jobs;
         _cache = cache;
         _logger = logger;
@@ -82,22 +85,55 @@ public class DiscoveryAdminController : ControllerBase
         return File(pdf, "application/pdf", fileName);
     }
 
-    /// <summary>«Затянуть»: скачать PDF из loglig и прогнать через парсер → превью (как parse-pdf).</summary>
+    /// <summary>«Затянуть»: скачать оба PDF из loglig (HE + EN) и прогнать через парсер → превью.
+    /// EN-экспорт может отсутствовать — тогда молча парсим только HE (языки видны в бэйджах).</summary>
     [HttpPost("{id:int}/preview")]
-    public async Task<IActionResult> Preview(int id, [FromQuery] string language = "he", CancellationToken ct = default)
+    public async Task<IActionResult> Preview(int id, CancellationToken ct = default)
     {
-        var (pdf, fileName, error) = await FetchPdfAsync(id, language, refreshIfMissing: true, ct);
-        if (pdf is null) return BadRequest(new { error });
+        var (pdfHe, fileNameHe, errorHe) = await FetchPdfAsync(id, "he", refreshIfMissing: true, ct);
+        var (pdfEn, fileNameEn, _) = await FetchPdfAsync(id, "en", refreshIfMissing: false, ct);
+        if (pdfHe is null && pdfEn is null) return BadRequest(new { error = errorHe });
+
+        // Основной файл — HE (канонические имена); EN вторым даёт LastNameEn/FirstNameEn.
+        // Если HE недоступен (маловероятно) — парсим EN-only.
+        var language = pdfHe != null ? "he" : "en";
+        var primary = pdfHe ?? pdfEn!;
+        var primaryName = pdfHe != null ? fileNameHe : fileNameEn;
+        var languages = new List<string>();
+        if (pdfHe != null) languages.Add("he");
+        if (pdfEn != null) languages.Add("en");
 
         ParsedCompetition parsed;
         try
         {
-            using var ms = new MemoryStream(pdf);
+            using var ms = new MemoryStream(primary);
+            using var msEn = pdfHe != null && pdfEn != null ? new MemoryStream(pdfEn) : null;
             parsed = await _sourceProvider.ParseAsync(new ResultSourceRequest(
-                ms, fileName, "IsrOrg",
+                ms, primaryName, "IsrOrg",
                 IsAward: false, PoolType: null,
-                SecondaryStream: null, SecondaryFileName: null, ExtraFiles: null,
+                SecondaryStream: msEn, SecondaryFileName: msEn != null ? fileNameEn : null,
+                ExtraFiles: null,
                 Country: null, Language: language));
+        }
+        catch (InvalidOperationException ex) when (pdfHe != null && pdfEn != null)
+        {
+            // Пара не склеилась (разный порядок записей и т.п.) — деградируем до HE-only,
+            // EN-имена добираются потом кнопкой «Синхр. языки» после починки.
+            _logger.LogWarning(ex, "Discovery: двуязычная пара не склеилась (id={Id}), парсим HE-only", id);
+            languages.Remove("en");
+            using var ms = new MemoryStream(pdfHe);
+            try
+            {
+                parsed = await _sourceProvider.ParseAsync(new ResultSourceRequest(
+                    ms, fileNameHe, "IsrOrg",
+                    IsAward: false, PoolType: null,
+                    SecondaryStream: null, SecondaryFileName: null, ExtraFiles: null,
+                    Country: null, Language: "he"));
+            }
+            catch (InvalidOperationException ex2)
+            {
+                return BadRequest(new { error = ex2.Message });
+            }
         }
         catch (InvalidOperationException ex)
         {
@@ -107,9 +143,11 @@ public class DiscoveryAdminController : ControllerBase
         if (parsed.ResultCount == 0)
             return BadRequest(new { error = "Парсер не распознал ни одного результата — формат протокола изменился? (B4)" });
 
+        await _discovery.AddLanguagesAsync(id, languages, ct);
+
         var previewId = Guid.NewGuid();
         _cache.Set(PreviewCacheKey(previewId),
-            new DiscoveryPreviewEntry(parsed, fileName, id), TimeSpan.FromMinutes(15));
+            new DiscoveryPreviewEntry(parsed, primaryName, id), TimeSpan.FromMinutes(15));
 
         return Ok(new
         {
@@ -117,8 +155,83 @@ public class DiscoveryAdminController : ControllerBase
             format = parsed.Format,
             resultCount = parsed.ResultCount,
             competitions = parsed.Competitions,
-            warnings = parsed.Warnings
+            warnings = parsed.Warnings,
+            languages
         });
+    }
+
+    /// <summary>«Синхронизировать языки»: скачать оба PDF, склеить пару и дозаполнить
+    /// EN/HE-имена пловцов в БД по уже импортированным результатам (без переимпорта).</summary>
+    [HttpPost("{id:int}/sync-languages")]
+    public async Task<IActionResult> SyncLanguages(int id, CancellationToken ct = default)
+    {
+        // Ошибки пишем в LastError записи — тост в админке живёт секунды, строка таблицы — нет.
+        _logger.LogInformation("Discovery sync-languages: старт (id={Id})", id);
+
+        var (pdfHe, fileNameHe, errorHe) = await FetchPdfAsync(id, "he", refreshIfMissing: true, ct);
+        if (pdfHe is null) return await SyncFailedAsync(id, $"HE-протокол недоступен: {errorHe}", ct);
+        var (pdfEn, fileNameEn, errorEn) = await FetchPdfAsync(id, "en", refreshIfMissing: false, ct);
+        if (pdfEn is null) return await SyncFailedAsync(id, $"EN-экспорт недоступен: {errorEn}", ct);
+
+        ParsedCompetition parsed;
+        try
+        {
+            using var ms = new MemoryStream(pdfHe);
+            using var msEn = new MemoryStream(pdfEn);
+            parsed = await _sourceProvider.ParseAsync(new ResultSourceRequest(
+                ms, fileNameHe, "IsrOrg",
+                IsAward: false, PoolType: null,
+                SecondaryStream: msEn, SecondaryFileName: fileNameEn, ExtraFiles: null,
+                Country: null, Language: "he"));
+        }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("No competitions found in PDF (language=") && pdfHe.Length == pdfEn.Length)
+        {
+            // Обе культуры отдали один и тот же файл (размер совпадает до байта, отличаются
+            // только метаданные) — отдельной второй версии на loglig не существует
+            // (Maccabiah-кейс). Это не ошибка, синхронизировать нечего.
+            _logger.LogInformation("Discovery sync-languages: протокол одноязычный (id={Id})", id);
+            await _discovery.SetLastErrorAsync(id, null, ct);
+            return Ok(new
+            {
+                monolingual = true,
+                message = "Второй языковой версии протокола на loglig нет (обе культуры отдают один файл) — синхронизировать нечего."
+            });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("No competitions found in PDF (language="))
+        {
+            // Файлы разные (EN-версия существует), но парсер не распознал формат одной из
+            // сторон — например, EN-ветка не знает мастерс-заголовки. Честная ошибка.
+            return await SyncFailedAsync(id,
+                $"EN-версия на loglig есть (файлы разного размера), но парсер не распознал её формат: {FirstLine(ex.Message)}", ct);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return await SyncFailedAsync(id, $"Склейка HE+EN пары не удалась: {ex.Message}", ct);
+        }
+
+        var summary = await _nameSync.SyncFromResultsJsonAsync(parsed.ResultsJson, ct);
+        await _discovery.AddLanguagesAsync(id, ["he", "en"], ct);
+        await _discovery.SetLastErrorAsync(id, null, ct);
+        _logger.LogInformation(
+            "Discovery sync-languages: готово (id={Id}) — в протоколе {Total}, EN дозаполнено {Filled}, канонизировано {Canonized}, полных {Complete}, не найдено {NotFound}",
+            id, summary.SwimmersInProtocol, summary.EnNamesFilled, summary.Canonized,
+            summary.AlreadyComplete, summary.NotFound);
+        return Ok(summary);
+    }
+
+    /// <summary>Первая строка сообщения парсера — без многостраничного DEBUG LOG.</summary>
+    private static string FirstLine(string message)
+    {
+        var idx = message.IndexOf('\n');
+        return idx > 0 ? message[..idx].TrimEnd() : message;
+    }
+
+    private async Task<IActionResult> SyncFailedAsync(int id, string error, CancellationToken ct)
+    {
+        _logger.LogWarning("Discovery sync-languages: ошибка (id={Id}): {Error}", id, error);
+        await _discovery.SetLastErrorAsync(id, $"Синхр. языки: {error}", ct);
+        return BadRequest(new { error });
     }
 
     /// <summary>Импорт превью в очередь (аналог import-parsed) + пометка записи imported.</summary>

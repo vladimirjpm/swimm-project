@@ -34,7 +34,11 @@ public class JsonImportService : IImportService
     /// Импортирует JSON-файл и возвращает статистику.
     /// Поддерживает два формата: ResultWrap { results: [...] } и простой массив Result[].
     /// </summary>
-    public async Task<ImportResult> ImportAsync(Stream jsonStream, string? fileName = null, IReadOnlyCollection<string>? categoryKeys = null, ImportEventOptions? eventOptions = null)
+    /// <summary>
+    /// Опции чтения results-JSON парсера: строковые "true"/"44" вместо bool/int и т.п.
+    /// Используются также SwimmerNameSyncService — форматы должны читаться одинаково.
+    /// </summary>
+    internal static JsonSerializerOptions CreateLenientOptions()
     {
         var options = new JsonSerializerOptions
         {
@@ -46,6 +50,12 @@ public class JsonImportService : IImportService
         options.Converters.Add(new LenientNullableBoolConverter());
         options.Converters.Add(new LenientNullableIntConverter());
         options.Converters.Add(new LenientStringConverter());
+        return options;
+    }
+
+    public async Task<ImportResult> ImportAsync(Stream jsonStream, string? fileName = null, IReadOnlyCollection<string>? categoryKeys = null, ImportEventOptions? eventOptions = null)
+    {
+        var options = CreateLenientOptions();
 
         // Читаем весь поток в память для возможности двойной десериализации
         using var ms = new MemoryStream();
@@ -130,10 +140,17 @@ public class JsonImportService : IImportService
         foreach (var c in await _db.Clubs.AsNoTracking().ToListAsync())
             clubCache.TryAdd($"{c.Name}|{c.NameEn}", c);
 
-        // Swimmers: tracked — EnrichSwimmerFromResult modifies them, changes saved in batch
+        // Swimmers: tracked — EnrichSwimmerFromResult modifies them, changes saved in batch.
+        // Второй индекс по EN-имени — фоллбек-матчинг для двуязычных/EN-протоколов
+        // (Maccabiah-кейс: пловец известен под английским именем).
         var swimmerCache = new Dictionary<string, Swimmer>();
+        var swimmerCacheEn = new Dictionary<string, Swimmer>();
         foreach (var s in await _db.Swimmers.ToListAsync())
+        {
             swimmerCache.TryAdd(SwimmerMatchKey(s.LastName, s.FirstName, s.BirthYear), s);
+            if (!string.IsNullOrWhiteSpace(s.LastNameEn))
+                swimmerCacheEn.TryAdd(SwimmerMatchKey(s.LastNameEn, s.FirstNameEn, s.BirthYear), s);
+        }
 
         // Categories: Key → Category (для привязки соревнований к категориям на импорте).
         var categoryCache = new Dictionary<string, Category>(StringComparer.OrdinalIgnoreCase);
@@ -314,13 +331,38 @@ public class JsonImportService : IImportService
 
                 // 5. Swimmer
                 var swimmerKey = SwimmerMatchKey(item.LastName, item.FirstName, item.BirthYear);
+                // EN-ключ значим, только если EN-имя реально отличается от основного
+                // (двуязычный парсер фоллбечит EN←HE при пустой английской строке).
+                var swimmerKeyEn = !string.IsNullOrWhiteSpace(item.LastNameEn)
+                    ? SwimmerMatchKey(item.LastNameEn, item.FirstNameEn, item.BirthYear)
+                    : null;
+                if (swimmerKeyEn == swimmerKey) swimmerKeyEn = null;
+
                 if (!swimmerCache.TryGetValue(swimmerKey, out var swimmer))
                 {
-                    // Not in pre-loaded cache — may still exist if duplicate key collision was silenced
-                    swimmer = await _db.Swimmers.FirstOrDefaultAsync(s =>
-                        s.LastName == (item.LastName ?? "") &&
-                        s.FirstName == (item.FirstName ?? "") &&
-                        s.BirthYear == (item.BirthYear ?? 0));
+                    // Фоллбек по EN-имени: пловец с заполненными *En-полями либо созданный
+                    // из EN-протокола (английское имя в основных полях) — второй случай
+                    // канонизируем: HE в основные поля, EN в *En.
+                    if (swimmerKeyEn != null
+                        && (swimmerCacheEn.TryGetValue(swimmerKeyEn, out swimmer)
+                            || swimmerCache.TryGetValue(swimmerKeyEn, out swimmer)))
+                    {
+                        if (SwimmerMatchKey(swimmer.LastName, swimmer.FirstName, swimmer.BirthYear) == swimmerKeyEn)
+                        {
+                            swimmer.LastName = item.LastName ?? string.Empty;
+                            swimmer.FirstName = item.FirstName ?? string.Empty;
+                            swimmer.LastNameEn = item.LastNameEn ?? string.Empty;
+                            swimmer.FirstNameEn = item.FirstNameEn ?? string.Empty;
+                        }
+                    }
+                    else
+                    {
+                        // Not in pre-loaded cache — may still exist if duplicate key collision was silenced
+                        swimmer = await _db.Swimmers.FirstOrDefaultAsync(s =>
+                            s.LastName == (item.LastName ?? "") &&
+                            s.FirstName == (item.FirstName ?? "") &&
+                            s.BirthYear == (item.BirthYear ?? 0));
+                    }
 
                     if (swimmer == null)
                     {
@@ -341,6 +383,14 @@ public class JsonImportService : IImportService
 
                 // Дополнение данных спортсмена из результата (Gender, ClubId, CountryId)
                 EnrichSwimmerFromResult(swimmer, item.EventStyleGender, club, country);
+
+                // Дозаполнение пустых EN-имён у существующего пловца (двуязычный импорт)
+                if (swimmerKeyEn != null && string.IsNullOrWhiteSpace(swimmer.LastNameEn))
+                {
+                    swimmer.LastNameEn = item.LastNameEn ?? string.Empty;
+                    swimmer.FirstNameEn = item.FirstNameEn ?? string.Empty;
+                    swimmerCacheEn.TryAdd(swimmerKeyEn, swimmer);
+                }
 
                 // 6. Relay — created but NOT saved yet; will be inserted via ResultRecord.Relay navigation
                 Relay? relay = null;

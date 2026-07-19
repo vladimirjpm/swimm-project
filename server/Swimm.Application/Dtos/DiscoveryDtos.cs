@@ -36,4 +36,21 @@ public sealed record DiscoveredCompetitionDto(
     DateTime LastSeenAt,
     string? LastError,
     /// <summary>Имя совпавшего уже-импортированного соревнования (матч по дате+имени), если есть.</summary>
-    string? MatchedCompetitionName);
+    string? MatchedCompetitionName,
+    /// <summary>Языки успешно загруженных PDF: null | "he" | "en" | "he,en".</summary>
+    string? Languages);
+
+/// <summary>Итог «синхронизации языков»: дозаполнение EN/HE-имён пловцов из двуязычной пары PDF.</summary>
+public sealed class SwimmerNameSyncResult
+{
+    /// <summary>Уникальных пловцов (не эстафет) в протоколе.</summary>
+    public int SwimmersInProtocol { get; set; }
+    /// <summary>Существующим пловцам дозаполнены пустые LastNameEn/FirstNameEn.</summary>
+    public int EnNamesFilled { get; set; }
+    /// <summary>Пловцы, созданные из EN-протокола, канонизированы: HE-имя в основные поля, EN — в *En.</summary>
+    public int Canonized { get; set; }
+    /// <summary>Не найдены в БД ни по HE-, ни по EN-имени.</summary>
+    public int NotFound { get; set; }
+    /// <summary>Уже были синхронизированы (обе пары имён на месте).</summary>
+    public int AlreadyComplete { get; set; }
+}

@@ -49,6 +49,12 @@ public class DiscoveredCompetition
     [MaxLength(20)]
     public string Status { get; set; } = DiscoveredCompetitionStatus.New;
 
+    /// <summary>Языки, на которых PDF-протокол успешно загружался с loglig:
+    /// null (не загружался) | "he" | "en" | "he,en". Заполняется при «затянуть» и
+    /// «синхронизировать языки» — по нему админка показывает бэйджи и предлагает досинхронизацию.</summary>
+    [MaxLength(20)]
+    public string? Languages { get; set; }
+
     public DateTime DiscoveredAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>Когда соревнование в последний раз встречалось в списке на сайте.</summary>

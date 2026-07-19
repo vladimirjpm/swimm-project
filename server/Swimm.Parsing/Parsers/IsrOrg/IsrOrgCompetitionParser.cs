@@ -647,7 +647,10 @@ public static class IsrOrgCompetitionParser
 
                         Log($"  -> MATCH RelayHeader (masters, no age): legs={legs}, len={legLen}, style={styleHe}");
 
+                        // current обнуляется, иначе masters-continuation (строка возраста ниже)
+                        // отдаст то же событие второй раз — дубль в выводе парсера.
                         if (current != null) yield return current;
+                        current = null;
 
                         currentIsRelay = true;
                         currentRelayLegs = legs;
@@ -664,6 +667,129 @@ public static class IsrOrgCompetitionParser
                 // Чистый EN-файл: заголовок с гибкой категорией после тире.
                 if (!isHE)
                 {
+                    // ── Masters-EN экспорт loglig (зимние мастерс ARENA и т.п.): английский
+                    // заголовок без пола/возраста ("400m Freestyle", "4X50m Freestyle Relay"),
+                    // а категории идут ивритскими строками "מאסטרס <пол> <возраст>" /
+                    // "מאסטרס שליחות <возраст>" — в сырых строках в RTL-реверсе, нормализуем.
+                    // ВАЖНО: логика зеркалит HE-ветку (masters-continuation + category change),
+                    // чтобы EN и HE стороны пары дали одинаковую последовательность событий:
+                    // в частности, заголовок эстафеты с хвостом "Mix" НЕ считается новым
+                    // событием (как "מיקס" в HE) — его результаты копятся в текущем.
+                    var heNormLine = HebrewTextHelper.NormalizeHebrewLine(raw);
+                    var mAgeEn = MastersAgeLineRxHE.Match(heNormLine);
+                    var mRelayAgeEn = MastersRelayAgeLineRxHE.Match(heNormLine);
+
+                    if (pendingRelayLen != null && (mAgeEn.Success || mRelayAgeEn.Success))
+                    {
+                        var ageEn = (mAgeEn.Success ? mAgeEn : mRelayAgeEn).Groups["age"].Value;
+                        var genderEn = mAgeEn.Success
+                            ? HebrewTextHelper.NormalizeGenderHE(mAgeEn.Groups["gender"].Value.Trim())
+                            : "none";
+
+                        if (current != null) yield return current;
+
+                        currentIsRelay = true;
+                        currentRelayLegs = pendingRelayLegs;
+                        current = new IsrOrgCompetitionResult(
+                            Competition: HebrewTextHelper.NormalizeHebrewLine(lines[0].Trim()),
+                            AgeGroup: ageEn,
+                            Date: dat_relay,
+                            Event: pendingEventLine ?? string.Empty,
+                            EventStyleName: pendingRelayStyleHe!,
+                            EventStyleLen: pendingRelayLen,
+                            EventStyleGender: genderEn,
+                            EventStyleAge: ageEn,
+                            PoolType: "25m",
+                            Results: new List<IsrOrgResult>()
+                        );
+                        Log($"  -> NEW RELAY EVENT (masters EN): {current.Event}, age={ageEn}");
+                        pendingRelayLen = null;
+                        pendingRelayStyleHe = null;
+                        pendingRelayLegs = 0;
+                        pendingEventLine = null;
+                        continue;
+                    }
+
+                    if (pendingEventLen != null && mAgeEn.Success)
+                    {
+                        var ageEn = mAgeEn.Groups["age"].Value;
+                        var genderEn = HebrewTextHelper.NormalizeGenderHE(mAgeEn.Groups["gender"].Value.Trim());
+
+                        if (current != null) yield return current;
+
+                        currentIsRelay = false;
+                        currentRelayLegs = 0;
+                        current = new IsrOrgCompetitionResult(
+                            Competition: HebrewTextHelper.NormalizeHebrewLine(lines[0].Trim()),
+                            AgeGroup: ageEn,
+                            Date: dat_relay,
+                            Event: $"{pendingEventLen} {pendingEventStyle} - masters {genderEn} {ageEn}",
+                            EventStyleName: pendingEventStyle!,
+                            EventStyleLen: pendingEventLen,
+                            EventStyleGender: genderEn,
+                            EventStyleAge: ageEn,
+                            PoolType: "25m",
+                            Results: new List<IsrOrgResult>()
+                        );
+                        Log($"  -> NEW EVENT (masters EN): {current.Event}");
+                        pendingEventLen = null;
+                        pendingEventStyle = null;
+                        pendingEventLine = null;
+                        continue;
+                    }
+
+                    if (pendingEventLen == null && current != null && mAgeEn.Success)
+                    {
+                        var newAgeEn = mAgeEn.Groups["age"].Value;
+                        var newGenderEn = HebrewTextHelper.NormalizeGenderHE(mAgeEn.Groups["gender"].Value.Trim());
+
+                        if (newAgeEn != current.EventStyleAge || newGenderEn != current.EventStyleGender)
+                        {
+                            yield return current;
+
+                            current = new IsrOrgCompetitionResult(
+                                Competition: current.Competition,
+                                AgeGroup: newAgeEn,
+                                Date: current.Date,
+                                Event: $"{current.EventStyleLen} {current.EventStyleName} - masters {newGenderEn} {newAgeEn}",
+                                EventStyleName: current.EventStyleName,
+                                EventStyleLen: current.EventStyleLen,
+                                EventStyleGender: newGenderEn,
+                                EventStyleAge: newAgeEn,
+                                PoolType: current.PoolType,
+                                Results: new List<IsrOrgResult>()
+                            );
+                            Log($"  -> NEW EVENT (masters EN, category change): {current.Event}");
+                            continue;
+                        }
+                    }
+
+                    var enMastersRelayHead = RelayHeaderEnInHE.Match(line);
+                    if (enMastersRelayHead.Success)
+                    {
+                        pendingRelayLegs = int.Parse(enMastersRelayHead.Groups["legs"].Value);
+                        pendingRelayLen = $"{pendingRelayLegs}X{enMastersRelayHead.Groups["len"].Value}";
+                        pendingRelayStyleHe = CanonEnStyle(enMastersRelayHead.Groups["style"].Value);
+                        pendingEventLine = line;
+                        pendingEventLen = null;
+                        pendingEventStyle = null;
+                        Log($"  -> PENDING masters-EN relay header: len={pendingRelayLen}, style={pendingRelayStyleHe}");
+                        continue;
+                    }
+
+                    var enMastersHead = HeaderEnNoGenderInHE.Match(line);
+                    if (enMastersHead.Success)
+                    {
+                        pendingEventLen = enMastersHead.Groups["len"].Value;
+                        pendingEventStyle = CanonEnStyle(enMastersHead.Groups["style"].Value);
+                        pendingEventLine = line;
+                        pendingRelayLen = null;
+                        pendingRelayStyleHe = null;
+                        pendingRelayLegs = 0;
+                        Log($"  -> PENDING masters-EN header: len={pendingEventLen}, style={pendingEventStyle}");
+                        continue;
+                    }
+
                     var enRelayFull = RelayHeaderEnFull.Match(line);
                     var enIndivFull = enRelayFull.Success ? Match.Empty : HeaderEnFull.Match(line);
                     if (enRelayFull.Success || enIndivFull.Success)
@@ -930,6 +1056,17 @@ public static class IsrOrgCompetitionParser
                     }
                 }
 
+                // EN-строка команды эстафеты ВНЕ отслеживаемого relay-события — секции
+                // "...Relay Mix", заголовок которых сознательно не считается новым событием
+                // (зеркало HE, где "מיקס"-заголовок не матчится и команды пропадают молча).
+                // Пропускаем явно: пустая команда ("1 1 02:19.73 Rank 4") иначе ложно
+                // срабатывает как строка личного результата и валит парс.
+                if (!isHE && RelayTeamLineEn.IsMatch(line))
+                {
+                    Log($"  -> Skipped relay team line outside tracked relay event");
+                    continue;
+                }
+
                 // ==== Разбор строки результата с авто-детектом ориентации токенов ====
                 // Латиница строк результатов в двуязычных экспортах Maccabiah приходит
                 // в РАЗНОМ порядке: в одних файлах уже нормальном (rank heat lane FAMILY
@@ -956,8 +1093,20 @@ public static class IsrOrgCompetitionParser
                             bool cons = false;
                             if (!FullResultRx.IsMatch(e) && i + 1 < lines.Count)
                             {
-                                e += " " + Prep(lines[i + 1].Trim());
-                                cons = true;
+                                // Строку смены категории ("מאסטרס נ 60-64", "בנות 13" и т.п.)
+                                // подклеивать нельзя: не-полная строка результата (напр. DQ
+                                // "…DQ / SW 4.4 0") съела бы её, событие не разделилось бы,
+                                // и результаты соседних возрастов слились бы в одно событие.
+                                var nextRaw = lines[i + 1].Trim();
+                                var nextNorm = HebrewTextHelper.NormalizeHebrewLine(nextRaw);
+                                bool nextIsCategory = MastersAgeLineRxHE.IsMatch(nextNorm)
+                                    || MastersRelayAgeLineRxHE.IsMatch(nextNorm)
+                                    || GenderAgeLineRxHE.IsMatch(nextNorm);
+                                if (!nextIsCategory)
+                                {
+                                    e += " " + Prep(nextRaw);
+                                    cons = true;
+                                }
                             }
                             return (e, FullResultRx.IsMatch(e), cons);
                         }

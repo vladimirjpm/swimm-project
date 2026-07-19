@@ -20,4 +20,11 @@ public interface ICompetitionDiscoveryService
 
     /// <summary>Сменить статус (new | imported | ignored). false — записи нет или статус неизвестен.</summary>
     Task<bool> SetStatusAsync(int id, string status, CancellationToken ct = default);
+
+    /// <summary>Дописать языки успешно загруженных PDF (объединение с уже сохранёнными,
+    /// канонический порядок "he,en"). false — записи нет.</summary>
+    Task<bool> AddLanguagesAsync(int id, IEnumerable<string> languages, CancellationToken ct = default);
+
+    /// <summary>Записать/очистить LastError записи (диагностика «затянуть»/«синхр. языки» в админке).</summary>
+    Task<bool> SetLastErrorAsync(int id, string? error, CancellationToken ct = default);
 }
