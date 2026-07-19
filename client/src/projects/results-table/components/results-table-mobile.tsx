@@ -10,6 +10,7 @@ import UI_AgeLabel from '../../components/mix/age-label/age-label';
 import UI_FavoriteControls from '../../components/mix/favorite-controls/favorite-controls';
 import UI_PositionBadge from '../../components/mix/position-badge/position-badge';
 import { ResultsTableRowProps } from './types';
+import ResultRowDateInfo from './result-row-date-info';
 
 const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
   res,
@@ -19,6 +20,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
   showEvent,
   showPoolType,
   showDate,
+  showCompetition,
   hasInternationalPoints,
   levelInfo,
   updateFilter,
@@ -85,6 +87,9 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
                 showClubIcon={false}
                 isRecordHolder={isRecordHolder}
               />
+              {showDate && (
+                <ResultRowDateInfo date={res.date} competition={res.competition} showCompetition={showCompetition} />
+              )}
               <UI_SwimmerGallery gallery={res.gallery} />
             </div>
 
@@ -147,9 +152,6 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
                     <span className="text-[var(--theme-mode-text-muted)]">Points: </span>
                     <span className="text-[var(--theme-mode-text)]">{res.international_points ?? ''}</span>
                   </div>
-                )}
-                {showDate && (
-                  <div className="text-xs text-[var(--theme-mode-text-muted)]">{res.date}</div>
                 )}
               </div>
 

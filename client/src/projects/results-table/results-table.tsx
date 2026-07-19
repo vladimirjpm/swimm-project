@@ -239,6 +239,9 @@ function ResultsTable() {
   const showClub = uniqueClubs.size > 1;
   const showEvent = uniqueStyleName.size > 1;
   const showDate = uniqueDates.size > 1;
+  // Здесь всегда одно соревнование (мультидневные — те же дни одного турнира),
+  // название рядом с датой не нужно — только в all-time карточке спортсмена.
+  const showCompetition = false;
   const showAge = uniqueAge.size > 1;
   const showPoolType = uniquePoolType.size > 1;
 
@@ -414,6 +417,7 @@ function ResultsTable() {
                       showEvent={showEvent}
                       showPoolType={showPoolType}
                       showDate={showDate}
+                      showCompetition={showCompetition}
                       hasInternationalPoints={hasInternationalPoints}
                       clubPoints={clubPoints}
                       levelInfo={levelInfo}
@@ -439,6 +443,7 @@ function ResultsTable() {
                       showEvent={showEvent}
                       showPoolType={showPoolType}
                       showDate={showDate}
+                      showCompetition={showCompetition}
                       hasInternationalPoints={hasInternationalPoints}
                       clubPoints={clubPoints}
                       levelInfo={levelInfo}

@@ -17,19 +17,19 @@ export const RESULTS_CATEGORIES: ResultsCategory[] = [
     key: 'all',
     label: 'All',
     title: 'Results',
-    competitionTheme: 'competition-emerald',
+    competitionTheme: 'competition-blue',
   },
   {
     key: 'young8_11',
     label: 'Young 8–11',
     title: 'Youth Results',
-    competitionTheme: 'competition-emerald',
+    competitionTheme: 'competition-blue',
   },
   {
     key: 'junior',
     label: 'Junior',
     title: 'Junior Results',
-    competitionTheme: 'competition-emerald',
+    competitionTheme: 'competition-blue',
   },
   {
     key: 'masters',

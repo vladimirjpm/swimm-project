@@ -42,6 +42,14 @@ const FilterSwimmingStyle: React.FC = () => {
     );
   };
 
+  const resetFilter = () => {
+    dispatch(
+      rootActions.updateState({
+        filterSelected: { ...filters, style_name: '', style_len: 0 },
+      }),
+    );
+  };
+
   const summary = filters.style_name
     ? `${filters.style_name}${filters.style_len ? ` · ${filters.style_len}m` : ''}`
     : 'All';
@@ -56,6 +64,14 @@ const FilterSwimmingStyle: React.FC = () => {
       {/* Колонки стиль | дистанция; на узком сайдбаре дистанции переносятся вниз */}
       <div className="flex flex-wrap gap-3">
         <div className="flex flex-col gap-2">
+          <button
+            className={`fseg flex items-center justify-center ${
+              !filters.style_name ? 'fseg-active' : ''
+            }`}
+            onClick={resetFilter}
+          >
+            All
+          </button>
           {filterData.style_list.map((style) => {
             const disabled = !availableStyleNames.has(style.style_name);
             return (

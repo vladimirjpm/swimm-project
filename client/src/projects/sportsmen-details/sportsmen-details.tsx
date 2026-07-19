@@ -11,7 +11,7 @@ import UI_ClubIcon from '../components/mix/club-icon/club-icon';
 import UI_NormativeLevelIcon from '../components/mix/normative-level-icon/normative-level-icon';
 import UI_MedalIcon from '../components/mix/medal-icon/medal-icon';
 import UI_PositionBadge from '../components/mix/position-badge/position-badge';
-import UI_DateIcon from '../components/mix/date-icon/date-icon';
+import ResultRowDateInfo from '../results-table/components/result-row-date-info';
 import UI_PoolIcon from '../components/mix/pool-icon/pool-icon';
 import UI_SwimmerTimeCell from '../components/mix/swimmer-time-cell/swimmer-time-cell';
 import UI_FlagEmoji from '../components/mix/flag-icon/flag-icon';
@@ -433,6 +433,7 @@ function AllTimeBests({ career }: { career: AthleteCareer }) {
       time: b.time,
       international_points: b.points,
       date: b.date,
+      competition: b.competition,
       pool_type: b.pool,
       // Каждая строка all-time — из СВОЕГО соревнования, поэтому award-eligibility
       // берём по-строчно (b.isAward), а не общим флагом на весь список.
@@ -447,7 +448,7 @@ function AllTimeBests({ career }: { career: AthleteCareer }) {
     <div className="p-4 flex-1 min-h-0 overflow-y-auto">
       <h2 className="text-[15px] font-extrabold mb-3" style={{ color: 'var(--theme-primary)' }}>Best times by style</h2>
       {rows.length > 0 ? (
-        <ResultsTable results={rows} isMastersSource={isMastersOverall} isAwardSource={false} />
+        <ResultsTable results={rows} isMastersSource={isMastersOverall} isAwardSource={false} showCompetition />
       ) : (
         <div className="text-[var(--theme-mode-text-muted)] italic">—</div>
       )}
@@ -953,6 +954,7 @@ function ResultsTable({
   onAttachResult,
   onAddToResult,
   onOpenMedia,
+  showCompetition,
 }: {
   results: any[];
   isMastersSource: boolean;
@@ -963,6 +965,8 @@ function ResultsTable({
   onAttachResult?: (resultId: number | null) => void;
   onAddToResult?: (resultId: number, url: string, mediaType: 'image' | 'video', sourceType: 'youtube' | 'vimeo' | 'other') => Promise<boolean>;
   onOpenMedia?: (resultId: number) => void;
+  /** Название соревнования рядом с датой — только там, где строки реально смешивают разные соревнования (all-time) */
+  showCompetition?: boolean;
 }) {
   const base = import.meta.env.BASE_URL;
 
@@ -1044,7 +1048,12 @@ function ResultsTable({
                   </div>
                 )}
                 <div className="mt-px" style={{ color: 'var(--theme-mode-text-secondary)' }}>
-                  <UI_DateIcon styleType="row-style-1" date={res.date} className="justify-start" fontClassName="text-[11px]" />
+                  <ResultRowDateInfo
+                    date={res.date}
+                    competition={res.competition}
+                    showCompetition={showCompetition}
+                    className="justify-start"
+                  />
                 </div>
               </div>
 

@@ -53,6 +53,10 @@ const FilterDistance: React.FC = () => {
   return (
     <div className="pl-3 border-l border-dashed border-[var(--theme-mode-border-input)]">
       <div className="flex flex-col gap-2">
+        {/* Пустая ячейка на уровне кнопки "All" в колонке стилей, чтобы 50m совпал со строкой freestyle */}
+        <button className="fseg invisible" disabled aria-hidden="true" tabIndex={-1}>
+          All
+        </button>
         {styleLens.map((len) => {
           const disabled = !availableLengths.has(Number(len));
           return (

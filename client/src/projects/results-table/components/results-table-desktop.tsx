@@ -11,6 +11,7 @@ import UI_AgeLabel from '../../components/mix/age-label/age-label';
 import UI_FavoriteControls from '../../components/mix/favorite-controls/favorite-controls';
 import UI_PositionBadge from '../../components/mix/position-badge/position-badge';
 import UI_MedalIcon from '../../components/mix/medal-icon/medal-icon';
+import ResultRowDateInfo from './result-row-date-info';
 
 const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
   res,
@@ -20,6 +21,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
   showEvent,
   showPoolType,
   showDate,
+  showCompetition,
   hasInternationalPoints,
   levelInfo,
   updateFilter,
@@ -91,6 +93,9 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
           isRecordHolder={isRecordHolder}
           isMe={isPrimaryFavorite}
         />
+        {showDate && (
+          <ResultRowDateInfo date={res.date} competition={res.competition} showCompetition={showCompetition} />
+        )}
         <UI_SwimmerGallery gallery={res.gallery} />
       </div>
 
