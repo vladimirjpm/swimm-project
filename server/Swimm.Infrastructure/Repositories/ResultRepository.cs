@@ -205,7 +205,9 @@ public class ResultRepository : IResultRepository
             return [];
 
         // Минимальная проекция для агрегации в памяти (клубов и заплывов в одном источнике мало).
+        // Псевдоклубы (страна/сборная вместо клуба, Maccabiah) в клубный зачёт не входят.
         var rows = await query
+            .Where(r => !r.Club.IsPseudo)
             .Select(r => new
             {
                 ClubName = r.Club.Name,

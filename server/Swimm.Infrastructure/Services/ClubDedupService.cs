@@ -16,16 +16,6 @@ namespace Swimm.Infrastructure.Services;
 /// </summary>
 public class ClubDedupService(SwimmDbContext db) : IClubDedupService
 {
-    /// <summary>
-    /// Псевдоклубы Maccabiah: в протоколе вместо клуба страна/сборная. НЕ дубли —
-    /// из кандидатов исключаются (решение по плану: оставить в БД, не мержить).
-    /// </summary>
-    public static readonly IReadOnlySet<string> PseudoClubNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        "USA", "Israel", "Germany", "Ukraine", "Mexico", "Brazil",
-        "M25", "Maccabiah MIX",
-    };
-
     // Хвост заметки дисквалификации, прилипший к названию клуба в старых импортах
     // (до фикса парсера в фазе A): "DNS", "DNF", "NS", "DQ", "SW", "/", "4.4" и их
     // цепочки (включая "10.2 SW / DNF").
@@ -44,10 +34,11 @@ public class ClubDedupService(SwimmDbContext db) : IClubDedupService
     {
         // Счётчики и пары «клуб-пловец» считаем ТОЛЬКО по реальным клубам: синтетика
         // (SYNTH%) держит миллионы Results, скан по ним кладёт запрос на десятки секунд.
-        // Пустое название — технический «клуб без клуба» (результаты, где клуб не был
-        // указан в протоколе): это не дубль ничего, в кандидаты не попадает.
+        // Исключены: синтетика, псевдоклубы (страна/сборная вместо клуба, флаг IsPseudo —
+        // ставится импортом по справочнику Countries) и пустое название — технический
+        // «клуб без клуба» (результаты, где клуб не был указан в протоколе).
         var rawClubs = await db.Clubs.AsNoTracking()
-            .Where(c => !c.Name.StartsWith("SYNTH") && c.Name.Trim() != "")
+            .Where(c => !c.Name.StartsWith("SYNTH") && !c.IsPseudo && c.Name.Trim() != "")
             .Select(c => new { c.Id, c.Name, c.NameEn })
             .ToListAsync(ct);
         var realClubIds = rawClubs.Select(c => c.Id).ToList();
@@ -65,7 +56,7 @@ public class ClubDedupService(SwimmDbContext db) : IClubDedupService
 
         var report = new ClubDedupReport { RealClubs = clubs.Count };
 
-        var real = clubs.Where(c => !PseudoClubNames.Contains(c.Name.Trim())).ToList();
+        var real = clubs;
         var byName = real
             .GroupBy(c => c.Name.Trim())
             .ToDictionary(g => g.Key, g => g.First());

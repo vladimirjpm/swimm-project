@@ -206,14 +206,14 @@ public class ClubDedupServiceTests
         await using var db = CreateDb(nameof(SynthAndPseudoClubs_Excluded));
         db.AddRange(
             new Club { Name = "SYNTH Club 1" },
-            new Club { Name = "SYNTH Club 2" },      // лев-дистанция 1, но синтетика
-            new Club { Name = "Israel" },
-            new Club { Name = "Israek" });           // dist 1 к псевдоклубу — не кандидат
+            new Club { Name = "SYNTH Club 2" },              // лев-дистанция 1, но синтетика
+            new Club { Name = "Israel", IsPseudo = true },   // флаг ставит импорт по Countries
+            new Club { Name = "Israek" });                   // dist 1 к псевдоклубу — не кандидат
         await db.SaveChangesAsync();
 
         var report = await new ClubDedupService(db).FindCandidatesAsync();
 
         Assert.Empty(report.Candidates);
-        Assert.Equal(2, report.RealClubs);           // SYNTH% не считаются реальными
+        Assert.Equal(1, report.RealClubs);           // SYNTH% и псевдоклубы не считаются реальными
     }
 }

@@ -125,10 +125,15 @@ public class JsonImportService : IImportService
         // Styles: tracked (seed data, rarely new)
         var styleCache = await _db.Styles.ToDictionaryAsync(s => s.Name);
 
-        // Countries: AsNoTracking — we only read their IDs, don't modify them
+        // Countries: AsNoTracking — we only read their IDs, don't modify them.
+        // Второй индекс по имени — распознавание псевдоклубов (страна в графе клуба).
         var countryCache = new Dictionary<string, Country>(StringComparer.OrdinalIgnoreCase);
+        var countryByName = new Dictionary<string, Country>(StringComparer.OrdinalIgnoreCase);
         foreach (var c in await _db.Countries.AsNoTracking().ToListAsync())
+        {
             countryCache.TryAdd(c.CountryCode, c);
+            countryByName.TryAdd(c.CountryName, c);
+        }
 
         // Competitions: AsNoTracking — we read IDs and check for duplicates
         var competitionCache = new Dictionary<string, Competition>();
@@ -323,6 +328,21 @@ public class JsonImportService : IImportService
                     if (club == null)
                     {
                         club = new Club { Name = clubName, NameEn = clubNameEn, CountryId = country?.Id };
+
+                        // Псевдоклуб: в графе клуба страна/сборная (Maccabiah: "USA",
+                        // "Israel", "M25"). Метим флагом и привязываем страну по
+                        // справочнику Countries (имя или alpha-3 код).
+                        var pseudoCountry =
+                            countryByName.GetValueOrDefault(clubName.Trim())
+                            ?? countryByName.GetValueOrDefault(clubNameEn.Trim())
+                            ?? countryCache.GetValueOrDefault(clubName.Trim());
+                        if (pseudoCountry != null || PseudoTeamNames.Contains(clubName.Trim()))
+                        {
+                            club.IsPseudo = true;
+                            club.CountryId ??= pseudoCountry?.Id;
+                            diagnosticLog.Add($"Pseudo club (country/team in club column): '{clubName}'");
+                        }
+
                         _db.Clubs.Add(club);
                         await _db.SaveChangesAsync();
                     }
@@ -427,7 +447,8 @@ public class JsonImportService : IImportService
                     SwimmerId = swimmer.Id,
                     ClubId = club.Id,
                     StyleId = style.Id,
-                    CountryId = country?.Id,
+                    // Страна результата: явная из протокола, иначе — от псевдоклуба-сборной.
+                    CountryId = country?.Id ?? (club.IsPseudo ? club.CountryId : null),
                     Relay = relay,      // EF Core inserts Relay and sets RelayId
                     Gallery = gallery,  // EF Core inserts Gallery + GalleryItems and sets GalleryId
                     CompetitionDate = ParseDate(item.Date),
@@ -571,12 +592,20 @@ public class JsonImportService : IImportService
         if (string.IsNullOrEmpty(swimmer.Gender) && !string.IsNullOrWhiteSpace(gender))
             swimmer.Gender = gender;
 
-        if (swimmer.ClubId == null && club != null)
+        // Псевдоклуб (страна/сборная) — не «клуб пловца»; страна уходит в CountryId ниже.
+        if (swimmer.ClubId == null && club != null && !club.IsPseudo)
             swimmer.ClubId = club.Id;
 
         if (swimmer.CountryId == null && country != null)
             swimmer.CountryId = country.Id;
+
+        if (swimmer.CountryId == null && club is { IsPseudo: true, CountryId: not null })
+            swimmer.CountryId = club.CountryId;
     }
+
+    /// <summary>Псевдо-«клубы»-сборные Maccabiah, не являющиеся странами.</summary>
+    private static readonly HashSet<string> PseudoTeamNames =
+        new(StringComparer.OrdinalIgnoreCase) { "M25", "Maccabiah MIX" };
 
     /// <summary>
     /// Пакетное дополнение спортсменов данными из таблицы Results.
@@ -596,8 +625,10 @@ public class JsonImportService : IImportService
 
         var swimmerIds = swimmers.Select(s => s.Id).ToHashSet();
 
+        // Псевдоклубы (сборные) не считаются клубом пловца — исключаем их результаты
+        // из выбора «самого свежего» источника ClubId.
         var latestResults = await _db.Results
-            .Where(r => swimmerIds.Contains(r.SwimmerId))
+            .Where(r => swimmerIds.Contains(r.SwimmerId) && !r.Club.IsPseudo)
             .GroupBy(r => r.SwimmerId)
             .Select(g => g.OrderByDescending(r => r.CompetitionDate).First())
             .Select(r => new { r.SwimmerId, r.Gender, r.ClubId, r.CountryId })
