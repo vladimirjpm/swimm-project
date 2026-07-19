@@ -142,6 +142,11 @@ public static class DependencyInjection
         services.AddScoped<ILogligClient, LogligClient>();
         services.AddScoped<ILogligMatchService, LogligMatchService>();
 
+        // Поиск кандидатов Loglig ID (шаг 4): serper.dev вместо закрытого Google CSE. Graceful —
+        // пустой CandidateSearch:ApiKey отключает поиск (см. SerperCandidateSearchProvider).
+        services.AddHttpClient("serper");
+        services.AddScoped<ICandidateSearchProvider, SerperCandidateSearchProvider>();
+
         return services;
     }
 }
