@@ -31,12 +31,18 @@
                 <th>Рез.</th>
                 <th>dist</th>
                 <th>Тип</th>
+                <th></th>
             </tr>
         </thead>
         <tbody id="cand-body"></tbody>
     </table>
 </div>
 <div id="empty-msg" class="hidden text-center text-admin-text-muted italic py-10">Кандидатов на склейку нет.</div>
+
+<details id="ignored-wrap" class="mt-3 hidden text-[12.5px] text-admin-text-muted">
+    <summary class="cursor-pointer select-none" id="ignored-summary">Скрытые пары</summary>
+    <div id="ignored-body" class="mt-2 leading-relaxed"></div>
+</details>
 
 <div class="mt-4 flex gap-3">
     <button id="btn-dryrun" class="admin-btn admin-btn-primary cursor-pointer rounded-md px-4 py-2 text-[13px] font-semibold">Dry-run выбранных</button>
@@ -93,7 +99,23 @@
                 <td class="py-2 px-3">${c.sure
                     ? '<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold bg-[rgba(102,187,106,0.2)] text-[#66bb6a]">уверенная</span>'
                     : '<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold bg-[rgba(255,213,79,0.15)] text-[#ffd54f]">спорная</span>'}</td>
+                <td class="py-2 px-3"><button class="pair-hide cursor-pointer text-[#546e7a] hover:text-[#ef9a9a]" data-i="${i}" title="Не дубли — скрыть пару навсегда">✕</button></td>
             </tr>`).join('');
+
+        // «Не дубли»: пара уходит в Sys_DedupIgnoredPairs и больше не всплывает.
+        [...document.querySelectorAll('.pair-hide')].forEach(btn =>
+            btn.addEventListener('click', async () => {
+                const c = data.candidates[+btn.dataset.i];
+                if (!confirm(`Скрыть пару «${c.canonicalName}» ↔ «${c.duplicateName}» как НЕ дубли? Вернуть можно из блока «Скрытые пары».`)) return;
+                try {
+                    await apiJson(`${API}/dedup-ignore`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ idA: c.canonicalId, idB: c.duplicateId })
+                    });
+                    toast('Пара скрыта', 3000);
+                    await load();
+                } catch (e) { toast('Ошибка: ' + e.message, 5000); }
+            }));
 
         document.getElementById('orphans').innerHTML = data.orphans.length
             ? data.orphans.map(o => `<span dir="rtl">${esc(o.name)}</span> <span class="text-[#546e7a]">#${o.id} (${o.birthYear || '—'}, ${esc(o.club ?? '—')})</span>`).join(' · ')
@@ -116,7 +138,32 @@
             document.getElementById('btn-apply').disabled = true;
             document.getElementById('plan-card').classList.add('hidden');
             render();
+            await loadIgnored();
         } catch (e) { toast('Ошибка: ' + e.message, 5000); }
+    }
+
+    async function loadIgnored() {
+        const list = await apiJson(`${API}/dedup-ignore`);
+        const wrap = document.getElementById('ignored-wrap');
+        wrap.classList.toggle('hidden', list.length === 0);
+        document.getElementById('ignored-summary').textContent = `Скрытые пары (${list.length})`;
+        document.getElementById('ignored-body').innerHTML = list.map(p => `
+            <div class="mb-1">
+                <span dir="rtl">${esc(p.nameA)}</span> <span class="text-[#546e7a]">#${p.idA}</span> ↔
+                <span dir="rtl">${esc(p.nameB)}</span> <span class="text-[#546e7a]">#${p.idB}</span>
+                <button class="pair-unhide cursor-pointer ml-2 text-admin-accent hover:underline" data-a="${p.idA}" data-b="${p.idB}">вернуть</button>
+            </div>`).join('');
+        [...document.querySelectorAll('.pair-unhide')].forEach(btn =>
+            btn.addEventListener('click', async () => {
+                try {
+                    await apiJson(`${API}/dedup-ignore/remove`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ idA: +btn.dataset.a, idB: +btn.dataset.b })
+                    });
+                    toast('Пара возвращена в кандидаты', 3000);
+                    await load();
+                } catch (e) { toast('Ошибка: ' + e.message, 5000); }
+            }));
     }
 
     function selectedPairs() {

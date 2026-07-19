@@ -18,20 +18,47 @@ public class SwimmersAdminController : ControllerBase
 {
     private readonly ISwimmerDedupService _dedup;
     private readonly ISwimmerMergeService _merge;
+    private readonly IDedupIgnoreService _ignore;
     private readonly ICacheService _cache;
     private readonly ILogger<SwimmersAdminController> _logger;
 
     public SwimmersAdminController(
         ISwimmerDedupService dedup,
         ISwimmerMergeService merge,
+        IDedupIgnoreService ignore,
         ICacheService cache,
         ILogger<SwimmersAdminController> logger)
     {
         _dedup = dedup;
         _merge = merge;
+        _ignore = ignore;
         _cache = cache;
         _logger = logger;
     }
+
+    public sealed record IgnorePairRequest(int IdA, int IdB);
+
+    /// <summary>Пометить пару «не дубли» (например, однофамильцы, плававшие в одном
+    /// заплыве) — больше не всплывает в кандидатах на склейку.</summary>
+    [HttpPost("dedup-ignore")]
+    public async Task<IActionResult> IgnorePair([FromBody] IgnorePairRequest request, CancellationToken ct)
+    {
+        try { await _ignore.AddAsync(Swimm.Domain.Entities.DedupEntityType.Swimmer, request.IdA, request.IdB, ct); }
+        catch (ArgumentException ex) { return BadRequest(new { error = ex.Message }); }
+        return Ok();
+    }
+
+    /// <summary>Вернуть развязанную пару обратно в кандидаты.</summary>
+    [HttpPost("dedup-ignore/remove")]
+    public async Task<IActionResult> UnignorePair([FromBody] IgnorePairRequest request, CancellationToken ct)
+        => await _ignore.RemoveAsync(Swimm.Domain.Entities.DedupEntityType.Swimmer, request.IdA, request.IdB, ct)
+            ? Ok()
+            : NotFound(new { error = "Пара не найдена в списке развязанных" });
+
+    /// <summary>Список развязанных пар (для блока «Скрытые пары»).</summary>
+    [HttpGet("dedup-ignore")]
+    public async Task<IActionResult> ListIgnored(CancellationToken ct)
+        => Ok(await _ignore.ListAsync(Swimm.Domain.Entities.DedupEntityType.Swimmer, ct));
 
     /// <summary>Кандидаты на склейку + сироты. Считается на лету (тысячи пловцов — дёшево).</summary>
     [HttpGet("dedup-candidates")]

@@ -83,6 +83,47 @@ public class SwimmerDedupServiceTests
     }
 
     [Fact]
+    public async Task FindCandidates_CrossScript_LatinMainMatchesEnFields_SureHebrewCanonical()
+    {
+        // Кросс-скриптовый дубль (кейс SHOUSTIN): пловец из EN-протокола Maccabiah
+        // с латиницей в основных полях против ивритского с заполненными EN-полями.
+        // Клубы разные — при точном совпадении имени это НЕ понижает уверенность.
+        await using var db = CreateDb(nameof(FindCandidates_CrossScript_LatinMainMatchesEnFields_SureHebrewCanonical));
+        var clubHe = new Club { Name = "מכבי" };
+        var clubEn = new Club { Name = "Maccabi TLV" };
+        var hebrew = S("שוסטין", "מקסים", 1981, clubHe);
+        hebrew.LastNameEn = "SHOUSTIN";
+        hebrew.FirstNameEn = "Maxim";
+        var latin = S("SHOUSTIN", "Maxim", 1981, clubEn);
+        db.AddRange(clubHe, clubEn, hebrew, latin);
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerDedupService(db).FindCandidatesAsync();
+
+        var c = Assert.Single(report.Candidates);
+        Assert.True(c.Sure);
+        Assert.Equal(0, c.Distance);
+        Assert.Equal(hebrew.Id, c.CanonicalId);   // канонический — ивритская запись
+        Assert.Equal(latin.Id, c.DuplicateId);
+    }
+
+    [Fact]
+    public async Task FindCandidates_CrossScript_LooseTransliteration_NotPaired()
+    {
+        // Транслитерационные вариации дальше dist=1 — шум, кросс-скрипт их не предлагает.
+        await using var db = CreateDb(nameof(FindCandidates_CrossScript_LooseTransliteration_NotPaired));
+        var hebrew = S("שוסטין", "מקסים", 1981);
+        hebrew.LastNameEn = "SHUSTIN";       // dist=2 от SHOWSTEEN
+        hebrew.FirstNameEn = "Maxim";
+        var latin = S("SHOWSTEEN", "Maxim", 1981);
+        db.AddRange(hebrew, latin);
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerDedupService(db).FindCandidatesAsync();
+        Assert.Empty(report.Candidates);
+    }
+
+    [Fact]
     public async Task FindCandidates_SyntheticExcluded_OrphanListed()
     {
         await using var db = CreateDb(nameof(FindCandidates_SyntheticExcluded_OrphanListed));

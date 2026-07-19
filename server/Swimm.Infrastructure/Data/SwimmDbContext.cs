@@ -61,6 +61,9 @@ public class SwimmDbContext : DbContext
     public DbSet<HubGroupClubRequest> HubGroupClubRequests => Set<HubGroupClubRequest>();
     public DbSet<HubGroupMedia> HubGroupMedia => Set<HubGroupMedia>();
 
+    /* === Дедуп: «развязанные» пары (Sys_) === */
+    public DbSet<DedupIgnoredPair> DedupIgnoredPairs => Set<DedupIgnoredPair>();
+
     /* === Тренировки (приватные, Sys_) === */
     public DbSet<TrainingSession> TrainingSessions => Set<TrainingSession>();
     public DbSet<TrainingResult> TrainingResults => Set<TrainingResult>();
@@ -661,6 +664,13 @@ public class SwimmDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.SwimmerId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // «Развязанные» пары дедупа (админ подтвердил «не дубли») — Sys_-таблица, БЕЗ grant swimm_ro.
+        modelBuilder.Entity<DedupIgnoredPair>(entity =>
+        {
+            entity.ToTable("Sys_DedupIgnoredPairs");
+            entity.HasIndex(e => new { e.EntityType, e.IdA, e.IdB }).IsUnique();
         });
 
         // Заявки на официальный статус группы (право/личные данные) — Sys_-таблица, БЕЗ grant swimm_ro.
