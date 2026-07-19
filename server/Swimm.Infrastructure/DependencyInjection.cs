@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -127,6 +128,19 @@ public static class DependencyInjection
 
         // Медиа группы (галерея + медиа тренировок)
         services.AddScoped<IHubGroupMediaService, HubGroupMediaService>();
+
+        // Loglig ID (docs/loglig-id-plan.md, шаги 2-3): клиент карточки игрока + сверка результатов.
+        // Карточка отдаётся после self-redirect с кукой DetailsPageVisited — нужны CookieContainer
+        // и AllowAutoRedirect.
+        services.AddHttpClient("loglig")
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                UseCookies = true,
+                CookieContainer = new CookieContainer(),
+                AllowAutoRedirect = true,
+            });
+        services.AddScoped<ILogligClient, LogligClient>();
+        services.AddScoped<ILogligMatchService, LogligMatchService>();
 
         return services;
     }

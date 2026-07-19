@@ -139,6 +139,12 @@ public class SwimmDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.CountryId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Привязка к loglig.com уникальна только среди заполненных значений — частичный
+            // индекс (Npgsql по умолчанию делает индекс по nullable-колонке полным, не partial).
+            entity.HasIndex(e => e.LogligId)
+                .IsUnique()
+                .HasFilter("\"LogligId\" IS NOT NULL");
         });
 
         modelBuilder.Entity<Country>(entity =>
