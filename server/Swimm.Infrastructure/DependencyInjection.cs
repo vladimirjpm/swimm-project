@@ -147,6 +147,9 @@ public static class DependencyInjection
         services.AddHttpClient("serper");
         services.AddScoped<ICandidateSearchProvider, SerperCandidateSearchProvider>();
 
+        // Loglig ID (шаг 5): оркестрация привязки для админ-UI.
+        services.AddScoped<ILogligLinkService, LogligLinkService>();
+
         return services;
     }
 }

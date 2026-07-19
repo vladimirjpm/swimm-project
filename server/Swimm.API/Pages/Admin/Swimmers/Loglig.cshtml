@@ -1,0 +1,228 @@
+@page
+@model Swimm.API.Pages.Admin.Swimmers.LogligModel
+@{
+    ViewData["Title"] = "Loglig ID";
+    ViewData["PageSubtitle"] = "Привязка пловцов к профилям loglig.com";
+}
+
+<div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
+    «Find loglig ID» ищет профиль пловца по имени и сверяет его с нашими результатами; если
+    находится ровно один надёжный кандидат — привязка сохраняется автоматически, иначе показывается
+    список кандидатов на выбор. Привязку можно также поставить вручную, вставив ссылку на карточку
+    (<code>loglig.com/Players/Details/{id}</code>) или просто число. Привязка — только обогащение
+    данных: она не влияет на права, зачёты и рекорды. Снять привязку можно кнопкой «Отвязать».
+</div>
+
+<div class="mb-4 flex flex-wrap items-center gap-3">
+    <input id="q" type="text" placeholder="Поиск по имени…" dir="rtl"
+           class="rounded-md border border-admin-border bg-transparent px-3 py-2 text-[13px] w-64" />
+    <select id="status" class="rounded-md border border-admin-border bg-transparent px-3 py-2 text-[13px]">
+        <option value="">Все</option>
+        <option value="unlinked">Непривязанные</option>
+        <option value="linked">Привязанные</option>
+    </select>
+    <button id="btn-search" class="admin-btn admin-btn-primary cursor-pointer rounded-md px-4 py-2 text-[13px] font-semibold">Найти</button>
+    <span id="info" class="text-[12.5px] text-admin-text-muted"></span>
+</div>
+
+<div class="overflow-x-auto">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Имя</th>
+                <th>Год</th>
+                <th>Клуб</th>
+                <th>Статус</th>
+                <th>Loglig ID</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody id="rows-body"></tbody>
+    </table>
+</div>
+<div id="empty-msg" class="hidden text-center text-admin-text-muted italic py-10">Ничего не найдено.</div>
+
+@section Scripts {
+<script>
+(function () {
+    const API = '/api/admin/loglig';
+    const LOGLIG_HOST = 'https://loglig.com:2053';
+    let rows = [];
+    let searchConfigured = true; // уточняется запросом GET config при загрузке
+
+    async function apiJson(url, opts = {}) {
+        opts.headers = { 'X-XSRF-TOKEN': _csrfToken, ...(opts.headers ?? {}) };
+        const res = await fetch(url, { credentials: 'same-origin', ...opts });
+        let body = null;
+        try { body = await res.json(); } catch { }
+        if (!res.ok) throw new Error(body?.error ?? `${res.status} ${res.statusText}`);
+        return body;
+    }
+
+    function badge(row) {
+        if (row.status === 'Verified')
+            return '<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold bg-[rgba(102,187,106,0.2)] text-[#66bb6a]">Verified</span>';
+        if (row.status)
+            return `<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold bg-[rgba(255,213,79,0.15)] text-[#ffd54f]">${esc(row.status)}</span>`;
+        return '<span class="text-[#546e7a]">—</span>';
+    }
+
+    function candidateRowHtml(swimmerId, c) {
+        return `
+            <div class="flex items-center gap-3 py-1.5 border-b border-white/[.04] last:border-0">
+                <span dir="rtl" style="text-align:left" class="flex-1">${esc(c.fullName)}</span>
+                <span class="text-[#90a4ae] w-14">${c.birthYear || '—'}</span>
+                <span class="text-[#90a4ae] flex-1" dir="rtl" style="text-align:left">${esc(c.clubName ?? '—')}</span>
+                <span class="text-[#90a4ae] w-24">${c.decision} · ${c.matchedResultCount} совп.</span>
+                <a href="${LOGLIG_HOST}/Players/Details/${c.logligId}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">#${c.logligId}</a>
+                <button class="cand-set cursor-pointer rounded-md border border-admin-border px-2 py-1 text-[12px]" data-swimmer="${swimmerId}" data-loglig="${c.logligId}">Привязать</button>
+            </div>`;
+    }
+
+    function render() {
+        const tbody = document.getElementById('rows-body');
+        document.getElementById('empty-msg').classList.toggle('hidden', rows.length > 0);
+        document.getElementById('info').textContent = `Строк: ${rows.length}`;
+
+        tbody.innerHTML = rows.map((r, i) => {
+            const linked = r.status === 'Verified';
+            const link = r.logligId
+                ? `<a href="${LOGLIG_HOST}/Players/Details/${r.logligId}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">#${r.logligId}</a>`
+                : '<span class="text-[#546e7a]">—</span>';
+
+            const actions = linked
+                ? `<button class="btn-unlink cursor-pointer rounded-md border border-admin-danger/50 bg-admin-danger/20 px-2 py-1 text-[12px] text-[#ef9a9a]" data-i="${i}">Отвязать</button>`
+                : `<div class="flex flex-wrap items-center gap-2">
+                        <button class="btn-find cursor-pointer rounded-md border border-admin-border px-2 py-1 text-[12px]" data-i="${i}"
+                            ${searchConfigured === false ? 'disabled title="поиск не сконфигурирован (CandidateSearch:ApiKey)"' : ''}>Find loglig ID</button>
+                        <input class="manual-link rounded-md border border-admin-border bg-transparent px-2 py-1 text-[12px] w-40" placeholder="ссылка или ID" data-i="${i}" />
+                        <button class="btn-manual cursor-pointer rounded-md border border-admin-border px-2 py-1 text-[12px]" data-i="${i}">Привязать вручную</button>
+                   </div>`;
+
+            return `
+                <tr class="border-b border-white/[.04] hover:bg-white/[.03]" data-i="${i}">
+                    <td class="py-2 px-3" dir="rtl" style="text-align:left">${esc(r.lastName)} ${esc(r.firstName)} <span class="text-[#546e7a]">#${r.swimmerId}</span></td>
+                    <td class="py-2 px-3 text-[#90a4ae]">${r.birthYear || '—'}</td>
+                    <td class="py-2 px-3 text-[#90a4ae]" dir="rtl" style="text-align:left">${esc(r.clubName ?? '—')}</td>
+                    <td class="py-2 px-3">${badge(r)}</td>
+                    <td class="py-2 px-3">${link}</td>
+                    <td class="py-2 px-3">${actions}</td>
+                </tr>
+                <tr class="cand-row hidden" data-cand-for="${i}"><td colspan="6" class="py-2 px-3"><div class="cand-list text-[12.5px]"></div></td></tr>`;
+        }).join('');
+
+        bindRowEvents();
+    }
+
+    function extractLogligId(raw) {
+        const s = (raw || '').trim();
+        const m = s.match(/Players\/Details\/(\d+)/);
+        if (m) return parseInt(m[1], 10);
+        if (/^\d+$/.test(s)) return parseInt(s, 10);
+        return null;
+    }
+
+    function showCandidates(i, candidates) {
+        const row = document.querySelector(`tr.cand-row[data-cand-for="${i}"]`);
+        const list = row.querySelector('.cand-list');
+        if (!candidates || candidates.length === 0) {
+            row.classList.add('hidden');
+            return;
+        }
+        list.innerHTML = candidates.map(c => candidateRowHtml(rows[i].swimmerId, c)).join('');
+        row.classList.remove('hidden');
+        [...list.querySelectorAll('.cand-set')].forEach(btn =>
+            btn.addEventListener('click', async () => {
+                try {
+                    const result = await apiJson(`${API}/set`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ swimmerId: +btn.dataset.swimmer, logligId: +btn.dataset.loglig })
+                    });
+                    await handleResult(i, result);
+                } catch (e) { toast('Ошибка: ' + e.message, 5000); }
+            }));
+    }
+
+    async function handleResult(i, result) {
+        if (result.linked) {
+            toast('Привязано', 3000);
+            await load();
+            return;
+        }
+        if (result.error) toast('Ошибка: ' + result.error, 6000);
+        else if (result.candidates?.length) toast(`Кандидатов: ${result.candidates.length} — выбери и привяжи`, 4000);
+        else toast('Не найдено ни одного кандидата', 4000);
+        showCandidates(i, result.candidates);
+    }
+
+    function bindRowEvents() {
+        [...document.querySelectorAll('.btn-find')].forEach(btn =>
+            btn.addEventListener('click', async () => {
+                const i = +btn.dataset.i;
+                btn.disabled = true;
+                try {
+                    const result = await apiJson(`${API}/find`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ swimmerId: rows[i].swimmerId })
+                    });
+                    await handleResult(i, result);
+                } catch (e) { toast('Ошибка: ' + e.message, 5000); }
+                finally { btn.disabled = false; }
+            }));
+
+        [...document.querySelectorAll('.btn-manual')].forEach(btn =>
+            btn.addEventListener('click', async () => {
+                const i = +btn.dataset.i;
+                const input = document.querySelector(`.manual-link[data-i="${i}"]`);
+                const logligId = extractLogligId(input.value);
+                if (!logligId) { toast('Не удалось распознать ID из ссылки'); return; }
+                try {
+                    const result = await apiJson(`${API}/set`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ swimmerId: rows[i].swimmerId, logligId })
+                    });
+                    await handleResult(i, result);
+                } catch (e) { toast('Ошибка: ' + e.message, 5000); }
+            }));
+
+        [...document.querySelectorAll('.btn-unlink')].forEach(btn =>
+            btn.addEventListener('click', async () => {
+                const i = +btn.dataset.i;
+                if (!confirm(`Отвязать loglig ID у «${rows[i].lastName} ${rows[i].firstName}»?`)) return;
+                try {
+                    await apiJson(`${API}/unlink`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ swimmerId: rows[i].swimmerId })
+                    });
+                    toast('Привязка снята', 3000);
+                    await load();
+                } catch (e) { toast('Ошибка: ' + e.message, 5000); }
+            }));
+    }
+
+    async function probeSearchConfigured() {
+        try {
+            const result = await apiJson(`${API}/config`);
+            searchConfigured = result.searchConfigured;
+        } catch { /* не критично — по умолчанию считаем сконфигурированным */ }
+    }
+
+    async function load() {
+        document.getElementById('info').textContent = 'Загрузка…';
+        try {
+            await probeSearchConfigured();
+            const query = document.getElementById('q').value.trim();
+            const status = document.getElementById('status').value;
+            rows = await apiJson(`${API}/list?query=${encodeURIComponent(query)}&status=${encodeURIComponent(status)}&take=200`);
+            render();
+        } catch (e) { toast('Ошибка: ' + e.message, 5000); }
+    }
+
+    document.getElementById('btn-search').addEventListener('click', load);
+    document.getElementById('q').addEventListener('keydown', e => { if (e.key === 'Enter') load(); });
+    document.getElementById('status').addEventListener('change', load);
+
+    load();
+})();
+</script>
+}

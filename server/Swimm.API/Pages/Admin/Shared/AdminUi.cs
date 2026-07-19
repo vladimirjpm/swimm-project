@@ -23,6 +23,7 @@ public static class AdminNav
         new("Import", "download", "/Admin/Import", "Data"),
         new("Discovery", "inbox", "/Admin/Discovery", "Data"),
         new("Swimmers", "users", "/Admin/Swimmers", "Data"),
+        new("Loglig ID", "users", "/Admin/Swimmers/Loglig", "Data"),
         new("Clubs", "shield", "/Admin/Clubs", "Data"),
         new("Import History", "history", "/Admin/ImportHistory", "Data"),
 

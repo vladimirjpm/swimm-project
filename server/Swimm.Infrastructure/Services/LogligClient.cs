@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -17,18 +18,24 @@ public partial class LogligClient : ILogligClient
 {
     private const string BaseUrl = "https://loglig.com:2053";
 
+    /// <summary>Без валидного seasonId карточка отдаёт 500; старый сезон — урезанную таблицу
+    /// результатов. Значение сезона меняется раз в год — переопределяется конфигом Loglig:SeasonId.</summary>
+    private const int DefaultSeasonId = 1715; // сезон 2025/26
+
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<LogligClient> _logger;
+    private readonly int _seasonId;
 
-    public LogligClient(IHttpClientFactory httpClientFactory, ILogger<LogligClient> logger)
+    public LogligClient(IHttpClientFactory httpClientFactory, IConfiguration configuration, ILogger<LogligClient> logger)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
+        _seasonId = configuration.GetValue("Loglig:SeasonId", DefaultSeasonId);
     }
 
     public async Task<LogligPlayerCard?> GetPlayerCardAsync(int logligId, CancellationToken ct = default)
     {
-        var url = $"{BaseUrl}/Players/Details/{logligId}";
+        var url = $"{BaseUrl}/Players/Details/{logligId}?seasonId={_seasonId}";
         try
         {
             var client = _httpClientFactory.CreateClient("loglig");
