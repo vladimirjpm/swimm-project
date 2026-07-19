@@ -261,6 +261,7 @@ function SportsmenDetails() {
                 styleLen={firstResult.event_style_len}
                 poolType={firstResult.pool_type}
                 isMasters={Helper.isResultMasters(isMastersSource, firstResult.event_style_age)}
+                normativeAgeGroup={firstResult.levelInfo.normativeAgeGroup}
                 progressPercent={firstResult.levelInfo.progressToNextLevel}
                 nextTime={firstResult.levelInfo.nextTime}
               />

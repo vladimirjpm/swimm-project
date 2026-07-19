@@ -24,7 +24,18 @@ const ALPHA3_TO_ALPHA2: Record<string, string> = {
   SRB: 'rs', CRO: 'hr', SLO: 'si', LTU: 'lt', LAT: 'lv', EST: 'ee', GEO: 'ge',
   AZE: 'az', KAZ: 'kz', UZB: 'uz', MDA: 'md', BLR: 'by', CYP: 'cy', JPN: 'jp',
   CHN: 'cn', KOR: 'kr', IND: 'in', RSA: 'za', BRA: 'br', ARG: 'ar', MEX: 'mx',
-  NZL: 'nz', IRL: 'ie',
+  NZL: 'nz', IRL: 'ie', ARM: 'am',
+  // Латинская Америка (Маккабиада)
+  URU: 'uy', CHI: 'cl', VEN: 've', PER: 'pe', COL: 'co', CRC: 'cr', PAN: 'pa',
+  GUA: 'gt', ECU: 'ec', BOL: 'bo', PAR: 'py', CUB: 'cu', DOM: 'do', PUR: 'pr',
+  // Европа (остальные из справочника Countries)
+  ISL: 'is', MKD: 'mk', MNE: 'me', ALB: 'al', BIH: 'ba', LUX: 'lu', MLT: 'mt',
+  MON: 'mc', AND: 'ad',
+  // Африка, Азия, Ближний Восток
+  ZIM: 'zw', EGY: 'eg', MAR: 'ma', TUN: 'tn', ALG: 'dz', KEN: 'ke', NGR: 'ng',
+  ETH: 'et', HKG: 'hk', SGP: 'sg', THA: 'th', PHI: 'ph', INA: 'id', MAS: 'my',
+  VIE: 'vn', UAE: 'ae', JOR: 'jo', LBN: 'lb', IRN: 'ir', IRQ: 'iq', SAU: 'sa',
+  QAT: 'qa', KUW: 'kw', BRN: 'bh', OMA: 'om',
 };
 
 /** ISR → il; il/IL → il; неизвестный код → null (флаг не рисуем). */
