@@ -111,6 +111,7 @@ if (googleEnabled)
 builder.Services.AddSingleton<DbStatusService>();
 builder.Services.AddHostedService<DbPingBackgroundService>();
 builder.Services.AddHostedService<Swimm.API.BackgroundServices.CompetitionDiscoveryBackgroundService>();
+builder.Services.AddHostedService<Swimm.API.BackgroundServices.LogligSuggestionVerificationBackgroundService>();
 
 var app = builder.Build();
 

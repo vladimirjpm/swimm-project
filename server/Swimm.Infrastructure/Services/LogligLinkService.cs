@@ -128,12 +128,23 @@ public class LogligLinkService(
     private async Task<(bool Linked, string? Error)> TryLinkAsync(
         Swimm.Domain.Entities.Swimmer swimmer, int logligId, string source, CancellationToken ct)
     {
-        var holder = await db.Swimmers.AsNoTracking()
+        var holder = await db.Swimmers
             .Where(s => s.LogligId == logligId && s.Id != swimmer.Id)
-            .Select(s => new { s.Id, Name = s.LastName + " " + s.FirstName })
             .FirstOrDefaultAsync(ct);
         if (holder is not null)
-            return (false, $"loglig ID {logligId} уже привязан к пловцу {holder.Name} #{holder.Id}");
+        {
+            // Rejected-держатель — ошибочное отклонённое предложение (шаг 6), уникальный индекс
+            // один на колонку: освобождаем слот, легитимная привязка важнее анти-спам-метки.
+            if (holder.LogligIdStatus != "Rejected")
+                return (false, $"loglig ID {logligId} уже привязан к пловцу {holder.LastName} {holder.FirstName} #{holder.Id}");
+
+            holder.LogligId = null;
+            holder.LogligIdStatus = null;
+            holder.LogligIdSource = null;
+            holder.LogligIdSuggestedByUserId = null;
+            holder.LogligIdSuggestedAt = null;
+            holder.LogligIdVerifiedAt = null;
+        }
 
         swimmer.LogligId = logligId;
         swimmer.LogligIdStatus = "Verified";

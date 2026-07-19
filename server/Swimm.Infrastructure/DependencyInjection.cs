@@ -150,6 +150,9 @@ public static class DependencyInjection
         // Loglig ID (шаг 5): оркестрация привязки для админ-UI.
         services.AddScoped<ILogligLinkService, LogligLinkService>();
 
+        // Loglig ID (шаг 6): краудсорс-предложения + ночная верификация.
+        services.AddScoped<ILogligSuggestionService, LogligSuggestionService>();
+
         return services;
     }
 }
