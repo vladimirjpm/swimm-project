@@ -93,8 +93,10 @@ public static class IsrOrgCompetitionParser
         @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)m?\s+(?<style>" + EnStylePattern + @")\s+Relay$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    // После маркера срыва (DQ/DNS/NS) допускается заметка правила ("/ SW 7.1"):
+    // иначе такая строка не считалась полной, подклеивала следующую и теряла её.
     private static Regex FullResultRx => _fullResultRx ??= new Regex(
-        @"^(-|\d+)\s+\d+\s+\d+.*(\d{2}:\d{2}\.\d{2}|NS|DQ)\s+\d+$",
+        @"^(-|\d+)\s+\d+\s+\d+.*(\d{2}:\d{2}\.\d{2}|DNS|DNF|NS|DQ)(\s+(?:/|SW|\d+\.\d+))*\s+\d+$",
         RegexOptions.Compiled);
 
     // EN-строка команды эстафеты: "<heat> <lane> <team> <time> Rank <pos>".
