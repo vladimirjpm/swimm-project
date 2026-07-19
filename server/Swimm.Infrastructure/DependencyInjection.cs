@@ -109,8 +109,18 @@ public static class DependencyInjection
         services.AddScoped<ISwimmerMergeService, SwimmerMergeService>();
         services.AddScoped<ISwimmerDedupService, SwimmerDedupService>();
 
+        // Склейка клубов-дублей (docs/tasks/club-merge-plan.md, фаза B)
+        services.AddScoped<IClubMergeService, ClubMergeService>();
+        services.AddScoped<IClubDedupService, ClubDedupService>();
+
+        // «Развязка» пар дедупа (пловцы/клубы): пара помечена «не дубли» — не всплывает
+        services.AddScoped<IDedupIgnoreService, DedupIgnoreService>();
+
         // «Входящие» автозабора isr.org.il (фаза 6); провайдер живёт в Swimm.Parsing
         services.AddScoped<ICompetitionDiscoveryService, CompetitionDiscoveryService>();
+
+        // «Синхронизация языков» из Discovery: EN/HE-имена пловцов из двуязычной пары PDF
+        services.AddScoped<ISwimmerNameSyncService, SwimmerNameSyncService>();
 
         // Чтение приватных тренировок группы (вкладка «Тренировки»)
         services.AddScoped<IHubGroupTrainingRepository, HubGroupTrainingRepository>();
