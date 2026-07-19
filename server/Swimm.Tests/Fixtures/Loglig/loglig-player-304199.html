@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <link href="/style/css?v=NcPC4kktwv43cYo6ETrb9sqhv-zBDYIz55Mp4WFnub81" rel="stylesheet"/>
+
+<link href="/Content/css/bootstrap-rtl.css" rel="stylesheet"/>
+    <script src="/Resources/Messages.js"></script>
+
+    <link href="/style/site?v=wTwbaWormSGo9UHM4vjVXdeWgaa7Vz5TOWJt3sVvEaU1" rel="stylesheet"/>
+
+    
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.3.1/css/all.css" integrity="sha384-mzrmE5qonljUremFsqc01SB46JvROS7bZs3IO2EmfFsd15uHvIt+Y8vEf7N7fWAU" crossorigin="anonymous">
+
+    <script src="/Scripts/sweetalert.min.js"></script>
+    <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCjLbmhIJnJ5rSLgd7acl-pXSd6CQdgvMg&libraries=places"></script>
+</head>
+<body>
+    <div id="navbar" class="navbar-collapse">
+        <div class="flags">
+            <select id="front-language-select" class="form-control" style="max-width: 180px;">
+                <option value="he" selected>&#1506;&#1489;&#1512;&#1497;&#1514;</option>
+                <option value="en" >English</option>
+                <option value="uk" >&#1059;&#1082;&#1088;&#1072;&#1111;&#1085;&#1089;&#1100;&#1082;&#1080;&#1081;</option>
+                <option value="fr" >Fran&#231;ais</option>
+                <option value="es" >Espa&#241;ol</option>
+                <option value="ar" >&#1575;&#1604;&#1593;&#1585;&#1576;&#1610;&#1577;</option>
+            </select>
+        </div>
+    </div>
+    <div class="container body-content" style="max-width:1150px">
+        <div class="row">
+            <div class="col-sm-12" id="render-body">
+                
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.31.1/css/theme.bootstrap_3.min.css" integrity="sha256-vgjicWNWkVklkfuqKnQth9ww987V7wCOzh6A0qkJ2Lw=" crossorigin="anonymous" />
+<link href="/Content/css/player-details.css" rel="stylesheet" />
+
+<div id="pld-page">
+    <header class="pld-hero">
+        <div class="pld-hero-inner">
+            <div class="pld-hero-top">
+                <div>
+                    <h1>סבינה ברנצב</h1>
+                    <div class="pld-hero-meta">
+                            <span class="pld-chip">
+                                <span class="pld-chip-label">שנת לידה</span>
+                                2017
+                            </span>
+                        <span class="pld-chip">
+                            <span class="pld-chip-label">מגדר</span>
+                            נקבה
+                        </span>
+                            <span class="pld-chip">
+                                <span class="pld-chip-label">אגודה</span>
+                                הפועל דולפין נתניה
+                            </span>
+                                            </div>
+                </div>
+            </div>
+        </div>
+        <div class="pld-filters">
+            <div class="pld-fgroup">
+                <label for="ddlSeasons">עונה</label>
+                <select class="form-control" data-val="true" data-val-number="The field SeasonId must be a number." id="ddlSeasons" name="SeasonId" title="Season"><option selected="selected" value="1715">2025-2026</option>
+<option value="1605">2024-2025</option>
+<option value="1533">2023-2024</option>
+<option value="1396">2022-2023</option>
+<option value="1284">2021-2022</option>
+<option value="1164">2020-2021</option>
+</select>
+            </div>
+        </div>
+    </header>
+
+    <div class="pld-wrap">
+        <ul class="nav nav-tabs pld-tabs" id="myTab" role="tablist">
+                    <li class="nav-item active">
+                        <a class="nav-link active" id="personalbests-tab" data-toggle="tab" href="#personalbests" role="tab" aria-controls="personalbests" aria-selected="true">שיאים אישיים</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="seasonalbests-tab" data-toggle="tab" href="#seasonalbests" role="tab" aria-controls="seasonalbests" aria-selected="false">שיאים עונתיים</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="results-tab" data-toggle="tab" href="#results" role="tab" aria-controls="results" aria-selected="false">תוצאות</a>
+                    </li>
+        </ul>
+
+        <div class="tab-content pld-tab-content" id="myTabContent">
+            <div class="tab-pane fade active in" id="personalbests" role="tabpanel" aria-labelledby="personalbests-tab">
+                        <div class="pld-card">
+                            <div class="pld-card-scroll">
+                                <table class="table pld-table white_arrow" id="pld-pb-table" data-section="Swimming">
+                                    <thead>
+                                        <tr>
+                                            <th class="pld-col-start">מקצוע</th>
+                                                <th>אורך הבריכה</th>
+                                            <th>תוצאה</th>
+                                            <th class="sorter-shortDate dateFormat-ddmmyyyy">תאריך</th>
+                                            <th class="pld-col-start">שם תחרות</th>
+                                                <th class="pld-pb-chart-col sorter-false"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                                <tr class="pld-pb-row"
+                                                    data-section="swimming"
+                                                    data-discipline-id="325"
+                                                    data-pool-length="25"
+                                                    data-pb-result="01:32.68"
+                                                    data-pb-date="16/06/2026"
+                                                    data-format="">
+                                                    <td class="pld-col-start">100 חופשי</td>
+                                                    <td>25</td>
+                                                    <td>01:32.68</td>
+                                                    <td>16/06/2026</td>
+                                                    <td class="pld-col-start">אליפות חדרה הפתוחה 2026</td>
+                                                    <td class="pld-pb-chart-col">
+                                                        <button type="button" class="pld-pb-chart-btn" title="תוצאות" aria-label="תוצאות">
+                                                            <i class="fas fa-chart-line"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                <tr class="pld-pb-chart-row tablesorter-childRow" style="display:none;">
+                                                    <td colspan="6">
+                                                        <div class="pld-pb-chart-wrap">
+                                                            <div class="pld-pb-chart-loading" style="display:none;">טוען...</div>
+                                                            <div class="pld-pb-chart-empty" style="display:none;">אין תחרויות</div>
+                                                            <canvas class="pld-pb-chart-canvas" height="120"></canvas>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <tr class="pld-pb-row"
+                                                    data-section="swimming"
+                                                    data-discipline-id="342"
+                                                    data-pool-length="25"
+                                                    data-pb-result="01:43.33"
+                                                    data-pb-date="06/02/2026"
+                                                    data-format="">
+                                                    <td class="pld-col-start">100 מעורב אישי</td>
+                                                    <td>25</td>
+                                                    <td>01:43.33</td>
+                                                    <td>06/02/2026</td>
+                                                    <td class="pld-col-start">ליגה מס 2 צעירים- דולפין נתניה</td>
+                                                    <td class="pld-pb-chart-col">
+                                                        <button type="button" class="pld-pb-chart-btn" title="תוצאות" aria-label="תוצאות">
+                                                            <i class="fas fa-chart-line"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                <tr class="pld-pb-chart-row tablesorter-childRow" style="display:none;">
+                                                    <td colspan="6">
+                                                        <div class="pld-pb-chart-wrap">
+                                                            <div class="pld-pb-chart-loading" style="display:none;">טוען...</div>
+                                                            <div class="pld-pb-chart-empty" style="display:none;">אין תחרויות</div>
+                                                            <canvas class="pld-pb-chart-canvas" height="120"></canvas>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <tr class="pld-pb-row"
+                                                    data-section="swimming"
+                                                    data-discipline-id="326"
+                                                    data-pool-length="25"
+                                                    data-pb-result="03:31.65"
+                                                    data-pb-date="22/12/2025"
+                                                    data-format="">
+                                                    <td class="pld-col-start">200 חופשי</td>
+                                                    <td>25</td>
+                                                    <td>03:31.65</td>
+                                                    <td>22/12/2025</td>
+                                                    <td class="pld-col-start">ליגה מס 3 מכבי רחובות וייסגל</td>
+                                                    <td class="pld-pb-chart-col">
+                                                        <button type="button" class="pld-pb-chart-btn" title="תוצאות" aria-label="תוצאות">
+                                                            <i class="fas fa-chart-line"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                <tr class="pld-pb-chart-row tablesorter-childRow" style="display:none;">
+                                                    <td colspan="6">
+                                                        <div class="pld-pb-chart-wrap">
+                                                            <div class="pld-pb-chart-loading" style="display:none;">טוען...</div>
+                                                            <div class="pld-pb-chart-empty" style="display:none;">אין תחרויות</div>
+                                                            <canvas class="pld-pb-chart-canvas" height="120"></canvas>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <tr class="pld-pb-row"
+                                                    data-section="swimming"
+                                                    data-discipline-id="345"
+                                                    data-pool-length="25"
+                                                    data-pb-result="03:08.64"
+                                                    data-pb-date="16/02/2026"
+                                                    data-format="">
+                                                    <td class="pld-col-start">4X50 חופשי שליחים</td>
+                                                    <td>25</td>
+                                                    <td>03:08.64</td>
+                                                    <td>16/02/2026</td>
+                                                    <td class="pld-col-start">אליפות ישראל &quot;ארנה&quot; לגילאי 8-11 חורף 2026- מחוז מרכז בנות</td>
+                                                    <td class="pld-pb-chart-col">
+                                                        <button type="button" class="pld-pb-chart-btn" title="תוצאות" aria-label="תוצאות">
+                                                            <i class="fas fa-chart-line"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                <tr class="pld-pb-chart-row tablesorter-childRow" style="display:none;">
+                                                    <td colspan="6">
+                                                        <div class="pld-pb-chart-wrap">
+                                                            <div class="pld-pb-chart-loading" style="display:none;">טוען...</div>
+                                                            <div class="pld-pb-chart-empty" style="display:none;">אין תחרויות</div>
+                                                            <canvas class="pld-pb-chart-canvas" height="120"></canvas>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <tr class="pld-pb-row"
+                                                    data-section="swimming"
+                                                    data-discipline-id="346"
+                                                    data-pool-length="25"
+                                                    data-pb-result="03:35.03"
+                                                    data-pb-date="16/02/2026"
+                                                    data-format="">
+                                                    <td class="pld-col-start">4X50 מעורב שליחים</td>
+                                                    <td>25</td>
+                                                    <td>03:35.03</td>
+                                                    <td>16/02/2026</td>
+                                                    <td class="pld-col-start">אליפות ישראל &quot;ארנה&quot; לגילאי 8-11 חורף 2026- מחוז מרכז בנות</td>
+                                                    <td class="pld-pb-chart-col">
+                                                        <button type="button" class="pld-pb-chart-btn" title="תוצאות" aria-label="תוצאות">
+                                                            <i class="fas fa-chart-line"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                <tr class="pld-pb-chart-row tablesorter-childRow" style="display:none;">
+                                                    <td colspan="6">
+                                                        <div class="pld-pb-chart-wrap">
+                                                            <div class="pld-pb-chart-loading" style="display:none;">טוען...</div>
+                                                            <div class="pld-pb-chart-empty" style="display:none;">אין תחרויות</div>
+                                                            <canvas class="pld-pb-chart-canvas" height="120"></canvas>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <tr class="pld-pb-row"
+                                                    data-section="swimming"
+                                                    data-discipline-id="324"
+                                                    data-pool-length="25"
+                                                    data-pb-result="00:41.97"
+                                                    data-pb-date="22/12/2025"
+                                                    data-format="">
+                                                    <td class="pld-col-start">50 חופשי</td>
+                                                    <td>25</td>
+                                                    <td>00:41.97</td>
+                                                    <td>22/12/2025</td>
+                                                    <td class="pld-col-start">ליגה מס 3 מכבי רחובות וייסגל</td>
+                                                    <td class="pld-pb-chart-col">
+                                                        <button type="button" class="pld-pb-chart-btn" title="תוצאות" aria-label="תוצאות">
+                                                            <i class="fas fa-chart-line"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                <tr class="pld-pb-chart-row tablesorter-childRow" style="display:none;">
+                                                    <td colspan="6">
+                                                        <div class="pld-pb-chart-wrap">
+                                                            <div class="pld-pb-chart-loading" style="display:none;">טוען...</div>
+                                                            <div class="pld-pb-chart-empty" style="display:none;">אין תחרויות</div>
+                                                            <canvas class="pld-pb-chart-canvas" height="120"></canvas>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <tr class="pld-pb-row"
+                                                    data-section="swimming"
+                                                    data-discipline-id="330"
+                                                    data-pool-length="50"
+                                                    data-pb-result="00:49.64"
+                                                    data-pb-date="16/07/2026"
+                                                    data-format="">
+                                                    <td class="pld-col-start">50 חזה</td>
+                                                    <td>50</td>
+                                                    <td>00:49.64</td>
+                                                    <td>16/07/2026</td>
+                                                    <td class="pld-col-start">אליפות ישראל arena קיץ 2026 לגילאי 8-11 צפון</td>
+                                                    <td class="pld-pb-chart-col">
+                                                        <button type="button" class="pld-pb-chart-btn" title="תוצאות" aria-label="תוצאות">
+                                                            <i class="fas fa-chart-line"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                <tr class="pld-pb-chart-row tablesorter-childRow" style="display:none;">
+                                                    <td colspan="6">
+                                                        <div class="pld-pb-chart-wrap">
+                                                            <div class="pld-pb-chart-loading" style="display:none;">טוען...</div>
+                                                            <div class="pld-pb-chart-empty" style="display:none;">אין תחרויות</div>
+                                                            <canvas class="pld-pb-chart-canvas" height="120"></canvas>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <tr class="pld-pb-row"
+                                                    data-section="swimming"
+                                                    data-discipline-id="330"
+                                                    data-pool-length="25"
+                                                    data-pb-result="00:48.52"
+                                                    data-pb-date="06/02/2026"
+                                                    data-format="">
+                                                    <td class="pld-col-start">50 חזה</td>
+                                                    <td>25</td>
+                                                    <td>00:48.52</td>
+                                                    <td>06/02/2026</td>
+                                                    <td class="pld-col-start">ליגה מס 2 צעירים- דולפין נתניה</td>
+                                                    <td class="pld-pb-chart-col">
+                                                        <button type="button" class="pld-pb-chart-btn" title="תוצאות" aria-label="תוצאות">
+                                                            <i class="fas fa-chart-line"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                <tr class="pld-pb-chart-row tablesorter-childRow" style="display:none;">
+                                                    <td colspan="6">
+                                                        <div class="pld-pb-chart-wrap">
+                                                            <div class="pld-pb-chart-loading" style="display:none;">טוען...</div>
+                                                            <div class="pld-pb-chart-empty" style="display:none;">אין תחרויות</div>
+                                                            <canvas class="pld-pb-chart-canvas" height="120"></canvas>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <tr class="pld-pb-row"
+                                                    data-section="swimming"
+                                                    data-discipline-id="334"
+                                                    data-pool-length="50"
+                                                    data-pb-result="00:44.87"
+                                                    data-pb-date="16/07/2026"
+                                                    data-format="">
+                                                    <td class="pld-col-start">50 פרפר</td>
+                                                    <td>50</td>
+                                                    <td>00:44.87</td>
+                                                    <td>16/07/2026</td>
+                                                    <td class="pld-col-start">אליפות ישראל arena קיץ 2026 לגילאי 8-11 צפון</td>
+                                                    <td class="pld-pb-chart-col">
+                                                        <button type="button" class="pld-pb-chart-btn" title="תוצאות" aria-label="תוצאות">
+                                                            <i class="fas fa-chart-line"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                <tr class="pld-pb-chart-row tablesorter-childRow" style="display:none;">
+                                                    <td colspan="6">
+                                                        <div class="pld-pb-chart-wrap">
+                                                            <div class="pld-pb-chart-loading" style="display:none;">טוען...</div>
+                                                            <div class="pld-pb-chart-empty" style="display:none;">אין תחרויות</div>
+                                                            <canvas class="pld-pb-chart-canvas" height="120"></canvas>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+            </div>
+
+            <div class="tab-pane fade" id="seasonalbests" role="tabpanel" aria-labelledby="seasonalbests-tab">
+                            <div class="pld-card">
+                                <div class="pld-card-scroll">
+                                    <table class="table pld-table white_arrow">
+                                        <thead>
+                                            <tr>
+                                                <th class="pld-col-start">מקצוע</th>
+                                                <th>אורך הבריכה</th>
+                                                <th>מיקום במשחה</th>
+                                                <th>תוצאה</th>
+                                                <th>ניקוד</th>
+                                                <th class="sorter-shortDate dateFormat-ddmmyyyy">תאריך</th>
+                                                <th class="pld-col-start">שם תחרות</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                                <tr>
+                                                    <td class="pld-col-start">100 חופשי</td>
+                                                    <td>25</td>
+                                                    <td>17</td>
+                                                    <td>01:32.68</td>
+                                                    <td>159</td>
+                                                    <td>16/06/2026</td>
+                                                    <td class="pld-col-start">אליפות חדרה הפתוחה 2026</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="pld-col-start">100 מעורב אישי</td>
+                                                    <td>25</td>
+                                                    <td>5</td>
+                                                    <td>01:43.33</td>
+                                                    <td>151</td>
+                                                    <td>06/02/2026</td>
+                                                    <td class="pld-col-start">ליגה מס 2 צעירים- דולפין נתניה</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="pld-col-start">200 חופשי</td>
+                                                    <td>25</td>
+                                                    <td>31</td>
+                                                    <td>03:31.65</td>
+                                                    <td>141</td>
+                                                    <td>22/12/2025</td>
+                                                    <td class="pld-col-start">ליגה מס 3 מכבי רחובות וייסגל</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="pld-col-start">4X50 חופשי שליחים</td>
+                                                    <td>25</td>
+                                                    <td>2</td>
+                                                    <td>03:08.64</td>
+                                                    <td>117</td>
+                                                    <td>16/02/2026</td>
+                                                    <td class="pld-col-start">אליפות ישראל &quot;ארנה&quot; לגילאי 8-11 חורף 2026- מחוז מרכז בנות</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="pld-col-start">4X50 מעורב שליחים</td>
+                                                    <td>25</td>
+                                                    <td>1</td>
+                                                    <td>03:35.03</td>
+                                                    <td>107</td>
+                                                    <td>16/02/2026</td>
+                                                    <td class="pld-col-start">אליפות ישראל &quot;ארנה&quot; לגילאי 8-11 חורף 2026- מחוז מרכז בנות</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="pld-col-start">50 חופשי</td>
+                                                    <td>25</td>
+                                                    <td>38</td>
+                                                    <td>00:41.97</td>
+                                                    <td>160</td>
+                                                    <td>22/12/2025</td>
+                                                    <td class="pld-col-start">ליגה מס 3 מכבי רחובות וייסגל</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="pld-col-start">50 חזה</td>
+                                                    <td>50</td>
+                                                    <td>1</td>
+                                                    <td>00:49.64</td>
+                                                    <td>202</td>
+                                                    <td>16/07/2026</td>
+                                                    <td class="pld-col-start">אליפות ישראל arena קיץ 2026 לגילאי 8-11 צפון</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="pld-col-start">50 חזה</td>
+                                                    <td>25</td>
+                                                    <td>2</td>
+                                                    <td>00:48.52</td>
+                                                    <td>199</td>
+                                                    <td>06/02/2026</td>
+                                                    <td class="pld-col-start">ליגה מס 2 צעירים- דולפין נתניה</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="pld-col-start">50 פרפר</td>
+                                                    <td>50</td>
+                                                    <td>1</td>
+                                                    <td>00:44.87</td>
+                                                    <td>161</td>
+                                                    <td>16/07/2026</td>
+                                                    <td class="pld-col-start">אליפות ישראל arena קיץ 2026 לגילאי 8-11 צפון</td>
+                                                </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+            </div>
+
+            <div class="tab-pane fade" id="results" role="tabpanel" aria-labelledby="results-tab">
+
+
+                            <div class="pld-card">
+                                    <div class="pld-group-title">50 חופשי</div>
+                                    <div class="pld-card-scroll">
+                                        <table class="table pld-table white_arrow">
+                                            <thead>
+                                                <tr>
+                                                    <th class="sorter-shortDate dateFormat-ddmmyyyy" width="10%">תאריך</th>
+                                                    <th class="pld-col-start" width="20%">שם תחרות</th>
+                                                    <th width="15%">משחה</th>
+                                                    <th width="15%">קטגוריה</th>
+                                                    <th width="5%">אורך הבריכה</th>
+                                                    <th width="5%">מקצה</th>
+                                                    <th width="5%">מסלול</th>
+                                                    <th width="5%">מיקום במקצה</th>
+                                                    <th width="5%">מיקום במשחה</th>
+                                                    <th width="10%">תוצאה</th>
+                                                    <th width="5%">ניקוד</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                    <tr>
+                                                        <td>22/12/2025</td>
+                                                        <td class="pld-col-start">ליגה מס 3 מכבי רחובות וייסגל</td>
+                                                        <td>50 חופשי</td>
+                                                        <td>בנות 9-13</td>
+                                                        <td>25</td>
+                                                        <td>2</td>
+                                                        <td>7</td>
+                                                        <td>1</td>
+                                                        <td>38</td>
+                                                        <td>00:41.97</td>
+                                                        <td>160</td>
+                                                    </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                            </div>
+                            <div class="pld-card">
+                                    <div class="pld-group-title">4X50 חופשי שליחים</div>
+                                    <div class="pld-card-scroll">
+                                        <table class="table pld-table white_arrow">
+                                            <thead>
+                                                <tr>
+                                                    <th class="sorter-shortDate dateFormat-ddmmyyyy" width="10%">תאריך</th>
+                                                    <th class="pld-col-start" width="20%">שם תחרות</th>
+                                                    <th width="15%">משחה</th>
+                                                    <th width="15%">קטגוריה</th>
+                                                    <th width="5%">אורך הבריכה</th>
+                                                    <th width="5%">מקצה</th>
+                                                    <th width="5%">מסלול</th>
+                                                    <th width="5%">מיקום במקצה</th>
+                                                    <th width="5%">מיקום במשחה</th>
+                                                    <th width="10%">תוצאה</th>
+                                                    <th width="5%">ניקוד</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                    <tr>
+                                                        <td>22/12/2025</td>
+                                                        <td class="pld-col-start">ליגה מס 3 מכבי רחובות וייסגל</td>
+                                                        <td>4X50 חופשי שליחים</td>
+                                                        <td>בנות 9-13</td>
+                                                        <td>25</td>
+                                                        <td>1</td>
+                                                        <td>1</td>
+                                                        <td>6</td>
+                                                        <td>12</td>
+                                                        <td>03:19.21</td>
+                                                        <td>100</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>16/02/2026</td>
+                                                        <td class="pld-col-start">אליפות ישראל &quot;ארנה&quot; לגילאי 8-11 חורף 2026- מחוז מרכז בנות</td>
+                                                        <td>4X50 חופשי שליחים</td>
+                                                        <td>בנות 8-9</td>
+                                                        <td>25</td>
+                                                        <td>1</td>
+                                                        <td>4</td>
+                                                        <td>2</td>
+                                                        <td>2</td>
+                                                        <td>03:08.64</td>
+                                                        <td>117</td>
+                                                    </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                            </div>
+                            <div class="pld-card">
+                                    <div class="pld-group-title">200 חופשי</div>
+                                    <div class="pld-card-scroll">
+                                        <table class="table pld-table white_arrow">
+                                            <thead>
+                                                <tr>
+                                                    <th class="sorter-shortDate dateFormat-ddmmyyyy" width="10%">תאריך</th>
+                                                    <th class="pld-col-start" width="20%">שם תחרות</th>
+                                                    <th width="15%">משחה</th>
+                                                    <th width="15%">קטגוריה</th>
+                                                    <th width="5%">אורך הבריכה</th>
+                                                    <th width="5%">מקצה</th>
+                                                    <th width="5%">מסלול</th>
+                                                    <th width="5%">מיקום במקצה</th>
+                                                    <th width="5%">מיקום במשחה</th>
+                                                    <th width="10%">תוצאה</th>
+                                                    <th width="5%">ניקוד</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                    <tr>
+                                                        <td>22/12/2025</td>
+                                                        <td class="pld-col-start">ליגה מס 3 מכבי רחובות וייסגל</td>
+                                                        <td>200 חופשי</td>
+                                                        <td>בנות 9-11</td>
+                                                        <td>25</td>
+                                                        <td>1</td>
+                                                        <td>3</td>
+                                                        <td>2</td>
+                                                        <td>31</td>
+                                                        <td>03:31.65</td>
+                                                        <td>141</td>
+                                                    </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                            </div>
+                            <div class="pld-card">
+                                    <div class="pld-group-title">100 מעורב אישי</div>
+                                    <div class="pld-card-scroll">
+                                        <table class="table pld-table white_arrow">
+                                            <thead>
+                                                <tr>
+                                                    <th class="sorter-shortDate dateFormat-ddmmyyyy" width="10%">תאריך</th>
+                                                    <th class="pld-col-start" width="20%">שם תחרות</th>
+                                                    <th width="15%">משחה</th>
+                                                    <th width="15%">קטגוריה</th>
+                                                    <th width="5%">אורך הבריכה</th>
+                                                    <th width="5%">מקצה</th>
+                                                    <th width="5%">מסלול</th>
+                                                    <th width="5%">מיקום במקצה</th>
+                                                    <th width="5%">מיקום במשחה</th>
+                                                    <th width="10%">תוצאה</th>
+                                                    <th width="5%">ניקוד</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                    <tr>
+                                                        <td>06/02/2026</td>
+                                                        <td class="pld-col-start">ליגה מס 2 צעירים- דולפין נתניה</td>
+                                                        <td>100 מעורב אישי</td>
+                                                        <td>בנות 8-13</td>
+                                                        <td>25</td>
+                                                        <td>1</td>
+                                                        <td>2</td>
+                                                        <td>3</td>
+                                                        <td>5</td>
+                                                        <td>01:43.33</td>
+                                                        <td>151</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>16/02/2026</td>
+                                                        <td class="pld-col-start">אליפות ישראל &quot;ארנה&quot; לגילאי 8-11 חורף 2026- מחוז מרכז בנות</td>
+                                                        <td>100 מעורב אישי</td>
+                                                        <td>בנות 9</td>
+                                                        <td>25</td>
+                                                        <td>1</td>
+                                                        <td>4</td>
+                                                        <td>2</td>
+                                                        <td>2</td>
+                                                        <td>01:45.88</td>
+                                                        <td>141</td>
+                                                    </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                            </div>
+                            <div class="pld-card">
+                                    <div class="pld-group-title">50 חזה</div>
+                                    <div class="pld-card-scroll">
+                                        <table class="table pld-table white_arrow">
+                                            <thead>
+                                                <tr>
+                                                    <th class="sorter-shortDate dateFormat-ddmmyyyy" width="10%">תאריך</th>
+                                                    <th class="pld-col-start" width="20%">שם תחרות</th>
+                                                    <th width="15%">משחה</th>
+                                                    <th width="15%">קטגוריה</th>
+                                                    <th width="5%">אורך הבריכה</th>
+                                                    <th width="5%">מקצה</th>
+                                                    <th width="5%">מסלול</th>
+                                                    <th width="5%">מיקום במקצה</th>
+                                                    <th width="5%">מיקום במשחה</th>
+                                                    <th width="10%">תוצאה</th>
+                                                    <th width="5%">ניקוד</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                    <tr>
+                                                        <td>06/02/2026</td>
+                                                        <td class="pld-col-start">ליגה מס 2 צעירים- דולפין נתניה</td>
+                                                        <td>50 חזה</td>
+                                                        <td>בנות 8-13</td>
+                                                        <td>25</td>
+                                                        <td>1</td>
+                                                        <td>5</td>
+                                                        <td>1</td>
+                                                        <td>2</td>
+                                                        <td>00:48.52</td>
+                                                        <td>199</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>16/02/2026</td>
+                                                        <td class="pld-col-start">אליפות ישראל &quot;ארנה&quot; לגילאי 8-11 חורף 2026- מחוז מרכז בנות</td>
+                                                        <td>50 חזה</td>
+                                                        <td>בנות 9</td>
+                                                        <td>25</td>
+                                                        <td>2</td>
+                                                        <td>4</td>
+                                                        <td>1</td>
+                                                        <td>1</td>
+                                                        <td>00:51.97</td>
+                                                        <td>162</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>16/06/2026</td>
+                                                        <td class="pld-col-start">אליפות חדרה הפתוחה 2026</td>
+                                                        <td>50 חזה</td>
+                                                        <td>בנות 8-99</td>
+                                                        <td>25</td>
+                                                        <td>5</td>
+                                                        <td>2</td>
+                                                        <td>5</td>
+                                                        <td>7</td>
+                                                        <td>00:49.18</td>
+                                                        <td>191</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>16/07/2026</td>
+                                                        <td class="pld-col-start">אליפות ישראל arena קיץ 2026 לגילאי 8-11 צפון</td>
+                                                        <td>50 חזה</td>
+                                                        <td>בנות 9</td>
+                                                        <td>50</td>
+                                                        <td>2</td>
+                                                        <td>8</td>
+                                                        <td>1</td>
+                                                        <td>1</td>
+                                                        <td>00:49.64</td>
+                                                        <td>202</td>
+                                                    </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                            </div>
+                            <div class="pld-card">
+                                    <div class="pld-group-title">4X50 מעורב שליחים</div>
+                                    <div class="pld-card-scroll">
+                                        <table class="table pld-table white_arrow">
+                                            <thead>
+                                                <tr>
+                                                    <th class="sorter-shortDate dateFormat-ddmmyyyy" width="10%">תאריך</th>
+                                                    <th class="pld-col-start" width="20%">שם תחרות</th>
+                                                    <th width="15%">משחה</th>
+                                                    <th width="15%">קטגוריה</th>
+                                                    <th width="5%">אורך הבריכה</th>
+                                                    <th width="5%">מקצה</th>
+                                                    <th width="5%">מסלול</th>
+                                                    <th width="5%">מיקום במקצה</th>
+                                                    <th width="5%">מיקום במשחה</th>
+                                                    <th width="10%">תוצאה</th>
+                                                    <th width="5%">ניקוד</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                    <tr>
+                                                        <td>16/02/2026</td>
+                                                        <td class="pld-col-start">אליפות ישראל &quot;ארנה&quot; לגילאי 8-11 חורף 2026- מחוז מרכז בנות</td>
+                                                        <td>4X50 מעורב שליחים</td>
+                                                        <td>בנות 8-9</td>
+                                                        <td>25</td>
+                                                        <td>1</td>
+                                                        <td>4</td>
+                                                        <td>1</td>
+                                                        <td>1</td>
+                                                        <td>03:35.03</td>
+                                                        <td>107</td>
+                                                    </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                            </div>
+                            <div class="pld-card">
+                                    <div class="pld-group-title">100 חופשי</div>
+                                    <div class="pld-card-scroll">
+                                        <table class="table pld-table white_arrow">
+                                            <thead>
+                                                <tr>
+                                                    <th class="sorter-shortDate dateFormat-ddmmyyyy" width="10%">תאריך</th>
+                                                    <th class="pld-col-start" width="20%">שם תחרות</th>
+                                                    <th width="15%">משחה</th>
+                                                    <th width="15%">קטגוריה</th>
+                                                    <th width="5%">אורך הבריכה</th>
+                                                    <th width="5%">מקצה</th>
+                                                    <th width="5%">מסלול</th>
+                                                    <th width="5%">מיקום במקצה</th>
+                                                    <th width="5%">מיקום במשחה</th>
+                                                    <th width="10%">תוצאה</th>
+                                                    <th width="5%">ניקוד</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                    <tr>
+                                                        <td>16/06/2026</td>
+                                                        <td class="pld-col-start">אליפות חדרה הפתוחה 2026</td>
+                                                        <td>100 חופשי</td>
+                                                        <td>בנות 8-99</td>
+                                                        <td>25</td>
+                                                        <td>1</td>
+                                                        <td>4</td>
+                                                        <td>1</td>
+                                                        <td>17</td>
+                                                        <td>01:32.68</td>
+                                                        <td>159</td>
+                                                    </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                            </div>
+                            <div class="pld-card">
+                                    <div class="pld-group-title">50 פרפר</div>
+                                    <div class="pld-card-scroll">
+                                        <table class="table pld-table white_arrow">
+                                            <thead>
+                                                <tr>
+                                                    <th class="sorter-shortDate dateFormat-ddmmyyyy" width="10%">תאריך</th>
+                                                    <th class="pld-col-start" width="20%">שם תחרות</th>
+                                                    <th width="15%">משחה</th>
+                                                    <th width="15%">קטגוריה</th>
+                                                    <th width="5%">אורך הבריכה</th>
+                                                    <th width="5%">מקצה</th>
+                                                    <th width="5%">מסלול</th>
+                                                    <th width="5%">מיקום במקצה</th>
+                                                    <th width="5%">מיקום במשחה</th>
+                                                    <th width="10%">תוצאה</th>
+                                                    <th width="5%">ניקוד</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                    <tr>
+                                                        <td>16/07/2026</td>
+                                                        <td class="pld-col-start">אליפות ישראל arena קיץ 2026 לגילאי 8-11 צפון</td>
+                                                        <td>50 פרפר</td>
+                                                        <td>בנות 9</td>
+                                                        <td>50</td>
+                                                        <td>1</td>
+                                                        <td>2</td>
+                                                        <td>1</td>
+                                                        <td>1</td>
+                                                        <td>00:44.87</td>
+                                                        <td>161</td>
+                                                    </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                            </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+            </div>
+        </div>
+        <footer style="margin-top: 5px; margin-left: 15px;">
+            <a href="https://loglig.com" style="color:#333333">
+                <div class="pull-left bot-title">Powered By</div>
+                <img src="/content/img/logo.png" class="pull-left bot-logo" alt="Powered By LogLig" />
+                <div class="clearfix"></div>
+            </a>
+        </footer>
+    </div>
+
+    <script src="/bundles/jquery?v=Wc4RAEumdPDf8Jyydt3C5wAbts7LJsFIjFtKQV1-0Rs1"></script>
+
+    <script src="/bundles/bootstrap?v=V_pN0RpLuiw5-I9jzrpkivcREDeKkccW_PY6pZ2LOG41"></script>
+
+    <script src="/Scripts/bootstrap-jquery3-modal-fix.js"></script>
+    <script src="/bundles/main?v=WGEYe5PuR-CJjUNsTuB9FvARWnHP-9omsadQbADdXGU1"></script>
+
+    <script src="/bundles/jquery-ui?v=nmuMA-O4C0zphhL2ApoyudBi4v4VCXr0cCFlFmBK2eU1"></script>
+
+    <script src="/Scripts/commonLib.js"></script>
+    <script>
+        $(function () {
+            frontLib.init();
+
+            $(document).off("change", "#front-language-select").on("change", "#front-language-select", function () {
+                var selectedLang = $(this).val();
+                var targetUrl = "/Common/SetCulture" + "?lang=" + encodeURIComponent(selectedLang);
+                window.location.href = targetUrl;
+            });
+        });
+    </script>
+    
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.31.1/js/jquery.tablesorter.min.js" integrity="sha256-uC1JMW5e1U5D28+mXFxzTz4SSMCywqhxQIodqLECnfU=" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.31.1/js/jquery.tablesorter.widgets.min.js" integrity="sha256-Xx4HRK+CKijuO3GX6Wx7XOV2IVmv904m0HKsjgzvZiY=" crossorigin="anonymous"></script>
+<script src="/Scripts/Chart.js"></script>
+<script>
+    function updatePlayerDetailsTabInUrl(tabName) {
+        if (!tabName) {
+            return;
+        }
+        var url = window.location.href;
+        if (/([?&])tab=/.test(url)) {
+            url = url.replace(/([?&])tab=[^&#]*/, '$1tab=' + encodeURIComponent(tabName));
+        } else {
+            url += (url.indexOf('?') >= 0 ? '&' : '?') + 'tab=' + encodeURIComponent(tabName);
+        }
+        if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, '', url);
+        }
+    }
+
+    $('.pld-table').tablesorter({
+        usNumberFormat: false,
+        sortReset: true,
+        sortRestart: true,
+        cssChildRow: 'tablesorter-childRow'
+    });
+    $('#ddlSeasons').change(function (i, v) {
+        var seasonId = $(this).val();
+        var tabName = null;
+        var tabs = $('#myTab li.active a');
+        if (tabs && tabs.length) {
+            var href = tabs.attr('href') || '';
+            tabName = href.indexOf('#') >= 0 ? href.substring(href.indexOf('#') + 1) : href;
+        }
+        var link = "";
+        var selectedSeason = this.options[this.selectedIndex].innerHTML;
+        var isArchiveSeason = true;
+        var notArchiveSeasons = ["2020-2021","2021-2022","2022-2023","2023-2024","2024-2025","2025-2026"];
+        $.each(notArchiveSeasons, function (index, value) {
+            if (selectedSeason == value) {
+                isArchiveSeason = false;
+                return false;
+            }
+        });
+        if (isArchiveSeason == false)
+            link = "/Players/Details/304199" + "?seasonId=" + seasonId;
+        else
+            link = "/Players/ArchiveDetails/304199" + "?seasonId=" + seasonId + "&unionId=" + '67';
+
+        if (tabName) {
+            link = link + "&tab=" + tabName;
+        }
+
+        window.location.href = link;
+    });
+
+    $(document).on('click', '#myTab a[data-toggle="tab"]', function () {
+        var href = $(this).attr('href') || '';
+        var tabName = href.indexOf('#') >= 0 ? href.substring(href.indexOf('#') + 1) : href;
+        updatePlayerDetailsTabInUrl(tabName);
+    });
+
+    (function () {
+        var userId = 304199;
+        var chartCache = {};
+        var chartInstances = {};
+
+        function isMoreBetterFormat(format) {
+            var f = parseInt(format, 10);
+            return !isNaN(f) && ((f >= 6 && f <= 8) || f === 10 || f === 11 || f === 12 || f === 13);
+        }
+
+        function destroyChart($row) {
+            var key = $row.data('chartKey');
+            if (key && chartInstances[key]) {
+                chartInstances[key].destroy();
+                delete chartInstances[key];
+            }
+            $row.removeData('chartKey');
+        }
+
+        function renderProgressionChart($chartRow, items, pbResult, pbDate, format) {
+            var $row = $chartRow.prev('.pld-pb-row');
+            var $canvas = $chartRow.find('.pld-pb-chart-canvas');
+            var canvas = $canvas.get(0);
+            if (!canvas || typeof Chart === 'undefined') {
+                return;
+            }
+
+            var labels = items.map(function (item) {
+                return [item.leagueStartDate || '', item.leagueName || ''];
+            });
+            var values = items.map(function (item) { return Number(item.sortValue); });
+            var displays = items.map(function (item) { return item.resultDisplay || item.result; });
+            var pointRadii = items.map(function (item) {
+                return (item.result === pbResult && item.leagueStartDate === pbDate) ? 7 : 3;
+            });
+            var pointColors = items.map(function (item) {
+                return (item.result === pbResult && item.leagueStartDate === pbDate) ? '#dc2626' : '#4f46e5';
+            });
+
+            var dataMin = Math.min.apply(null, values);
+            var dataMax = Math.max.apply(null, values);
+            var minItem = items.find(function (item) { return Number(item.sortValue) === dataMin; });
+            var maxItem = items.find(function (item) { return Number(item.sortValue) === dataMax; });
+            var minDisplay = minItem ? (minItem.resultDisplay || minItem.result) : '';
+            var maxDisplay = maxItem ? (maxItem.resultDisplay || maxItem.result) : '';
+            var yMin = dataMin;
+            var yMax = dataMax;
+            if (yMin === yMax) {
+                var pad = Math.max(Math.abs(yMin) * 0.01, 1);
+                yMin = yMin - pad;
+                yMax = yMax + pad;
+            }
+
+            var reverseY = (($row.data('section') || '').toString().toLowerCase() === 'swimming')
+                ? true
+                : !isMoreBetterFormat(format || (items[0] && items[0].format));
+            var chartKey = (($row.data('section') || '').toString().toLowerCase() === 'swimming')
+                ? ('swim|' + $row.data('discipline-id') + '|' + ($row.attr('data-pool-length') || ''))
+                : ($row.data('discipline-type') + '|' + $row.data('is-indoor'));
+            destroyChart($row);
+            $row.data('chartKey', chartKey);
+
+            chartInstances[chartKey] = new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        fill: false,
+                        borderColor: '#6366f1',
+                        backgroundColor: '#6366f1',
+                        pointBackgroundColor: pointColors,
+                        pointBorderColor: pointColors,
+                        pointRadius: pointRadii,
+                        pointHoverRadius: pointRadii.map(function (r) { return r + 2; }),
+                        lineTension: 0.2,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    legend: { display: false },
+                    tooltips: {
+                        displayColors: false,
+                        callbacks: {
+                            title: function (tooltipItems) {
+                                var i = tooltipItems[0].index;
+                                var item = items[i];
+                                return (item.leagueStartDate || '') + ' - ' + (item.leagueName || '');
+                            },
+                            label: function (tooltipItem) {
+                                return displays[tooltipItem.index] || '';
+                            }
+                        }
+                    },
+                    scales: {
+                        xAxes: [{
+                            ticks: {
+                                autoSkip: true,
+                                maxRotation: 45,
+                                minRotation: 0
+                            }
+                        }],
+                        yAxes: [{
+                            afterBuildTicks: function (axis) {
+                                var mid = (axis.ticks || []).filter(function (t) {
+                                    return t > dataMin && t < dataMax;
+                                });
+                                if (dataMin === dataMax) {
+                                    axis.ticks = [yMin, dataMin, yMax];
+                                } else {
+                                    axis.ticks = [dataMin].concat(mid).concat([dataMax]);
+                                }
+                            },
+                            ticks: {
+                                reverse: reverseY,
+                                min: yMin,
+                                max: yMax,
+                                maxTicksLimit: 5,
+                                callback: function (value) {
+                                    var num = Number(value);
+                                    if (num === dataMin) {
+                                        return minDisplay;
+                                    }
+                                    if (num === dataMax) {
+                                        return maxDisplay;
+                                    }
+                                    return '';
+                                }
+                            }
+                        }]
+                    }
+                }
+            });
+        }
+
+        function loadAndShowChart($row) {
+            var $chartRow = $row.next('.pld-pb-chart-row');
+            var section = ($row.data('section') || '').toString().toLowerCase();
+            var pbResult = $row.data('pb-result');
+            var pbDate = $row.data('pb-date');
+            var format = $row.data('format');
+            var requestUrl;
+            var requestData;
+            var cacheKey;
+
+            if (section === 'swimming') {
+                var disciplineId = $row.data('discipline-id');
+                var poolLengthRaw = $row.attr('data-pool-length');
+                var poolLength = (poolLengthRaw === undefined || poolLengthRaw === null || poolLengthRaw === '')
+                    ? null
+                    : parseInt(poolLengthRaw, 10);
+                cacheKey = 'swim|' + disciplineId + '|' + (poolLength == null || isNaN(poolLength) ? '' : poolLength);
+                requestUrl = '/Players/GetSwimmingDisciplineProgression';
+                requestData = {
+                    userId: userId,
+                    disciplineId: disciplineId
+                };
+                if (poolLength != null && !isNaN(poolLength)) {
+                    requestData.poolLength = poolLength;
+                }
+            } else {
+                var disciplineType = $row.data('discipline-type');
+                var isIndoor = $row.data('is-indoor') === true || $row.data('is-indoor') === 'true';
+                cacheKey = 'ath|' + disciplineType + '|' + isIndoor;
+                requestUrl = '/Players/GetAthleticsDisciplineProgression';
+                requestData = {
+                    userId: userId,
+                    disciplineType: disciplineType,
+                    isIndoor: isIndoor
+                };
+            }
+
+            $chartRow.show();
+            $row.addClass('pld-pb-row-open');
+
+            if (chartCache[cacheKey]) {
+                $chartRow.find('.pld-pb-chart-loading, .pld-pb-chart-empty').hide();
+                $chartRow.find('.pld-pb-chart-canvas').show();
+                renderProgressionChart($chartRow, chartCache[cacheKey], pbResult, pbDate, format);
+                return;
+            }
+
+            $chartRow.find('.pld-pb-chart-canvas').hide();
+            $chartRow.find('.pld-pb-chart-empty').hide();
+            $chartRow.find('.pld-pb-chart-loading').show();
+
+            $.getJSON(requestUrl, requestData).done(function (response) {
+                $chartRow.find('.pld-pb-chart-loading').hide();
+                var items = (response && response.items) ? response.items : [];
+                if (!items.length) {
+                    $chartRow.find('.pld-pb-chart-empty').show();
+                    $chartRow.find('.pld-pb-chart-canvas').hide();
+                    return;
+                }
+                chartCache[cacheKey] = items;
+                $chartRow.find('.pld-pb-chart-canvas').show();
+                renderProgressionChart($chartRow, items, pbResult, pbDate, format);
+            }).fail(function () {
+                $chartRow.find('.pld-pb-chart-loading').hide();
+                $chartRow.find('.pld-pb-chart-empty').show();
+                $chartRow.find('.pld-pb-chart-canvas').hide();
+            });
+        }
+
+        $(document).on('click', '#pld-pb-table .pld-pb-row', function (e) {
+            var $row = $(this);
+            var $chartRow = $row.next('.pld-pb-chart-row');
+            var isOpen = $chartRow.is(':visible');
+
+            $('#pld-pb-table .pld-pb-chart-row:visible').each(function () {
+                var $openChart = $(this);
+                var $openRow = $openChart.prev('.pld-pb-row');
+                destroyChart($openRow);
+                $openChart.hide();
+                $openRow.removeClass('pld-pb-row-open');
+            });
+
+            if (!isOpen) {
+                loadAndShowChart($row);
+            }
+        });
+    })();
+</script>
+<script src="https://cdn.userway.org/widget.js" data-account="qpdKqwUKio"></script>
+
+</body>
+</html>
