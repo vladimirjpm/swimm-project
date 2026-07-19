@@ -319,8 +319,15 @@ public class JsonImportService : IImportService
                 }
 
                 // 4. Club
-                var clubName = item.Club ?? string.Empty;
-                var clubNameEn = item.ClubEn ?? string.Empty;
+                var clubName = (item.Club ?? string.Empty).Trim();
+                var clubNameEn = (item.ClubEn ?? string.Empty).Trim();
+                // Пустая графа клуба в протоколе → единый псевдоклуб «No club»
+                // (клуб у Results NOT NULL; пловцам он, как и сборные, не проставляется).
+                if (clubName.Length == 0 && clubNameEn.Length == 0)
+                {
+                    clubName = NoClubName;
+                    clubNameEn = NoClubName;
+                }
                 var clubKey = $"{clubName}|{clubNameEn}";
                 if (!clubCache.TryGetValue(clubKey, out var club))
                 {
@@ -336,7 +343,7 @@ public class JsonImportService : IImportService
                             countryByName.GetValueOrDefault(clubName.Trim())
                             ?? countryByName.GetValueOrDefault(clubNameEn.Trim())
                             ?? countryCache.GetValueOrDefault(clubName.Trim());
-                        if (pseudoCountry != null || PseudoTeamNames.Contains(clubName.Trim()))
+                        if (pseudoCountry != null || PseudoTeamNames.Contains(clubName.Trim()) || clubName == NoClubName)
                         {
                             club.IsPseudo = true;
                             club.CountryId ??= pseudoCountry?.Id;
@@ -606,6 +613,9 @@ public class JsonImportService : IImportService
     /// <summary>Псевдо-«клубы»-сборные Maccabiah, не являющиеся странами.</summary>
     private static readonly HashSet<string> PseudoTeamNames =
         new(StringComparer.OrdinalIgnoreCase) { "M25", "Maccabiah MIX" };
+
+    /// <summary>Единый псевдоклуб для результатов с пустой графой клуба (Results.ClubId NOT NULL).</summary>
+    private const string NoClubName = "No club";
 
     /// <summary>
     /// Пакетное дополнение спортсменов данными из таблицы Results.
