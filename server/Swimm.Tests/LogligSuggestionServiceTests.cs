@@ -138,6 +138,31 @@ public class LogligSuggestionServiceTests
         Assert.Equal(111, (await db.Swimmers.SingleAsync(x => x.Id == s.Id)).LogligId);
     }
 
+    // ── GetStatusAsync: публичный статус ──────────────────────────────────────
+
+    [Fact]
+    public async Task GetStatus_ExistingSwimmer_ReturnsStatus()
+    {
+        await using var db = CreateDb(nameof(GetStatus_ExistingSwimmer_ReturnsStatus));
+        var s = S("ברנצב", "סבינה", 2017, "Verified", 304199);
+        db.Swimmers.Add(s);
+        await db.SaveChangesAsync();
+
+        var status = await Service(db).GetStatusAsync(s.Id);
+
+        Assert.Equal("Verified", status);
+    }
+
+    [Fact]
+    public async Task GetStatus_UnknownSwimmer_ReturnsNull()
+    {
+        await using var db = CreateDb(nameof(GetStatus_UnknownSwimmer_ReturnsNull));
+
+        var status = await Service(db).GetStatusAsync(999999);
+
+        Assert.Null(status);
+    }
+
     // ── VerifySuggestedAsync: ночной джоб ─────────────────────────────────────
 
     [Fact]

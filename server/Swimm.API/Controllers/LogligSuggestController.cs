@@ -14,13 +14,13 @@ namespace Swimm.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/swimmers")]
-[Authorize]
 [AutoValidateAntiforgeryToken]
 public class LogligSuggestController(ILogligSuggestionService suggestions) : ControllerBase
 {
     public sealed record SuggestRequest(int LogligId);
 
     [HttpPost("{id:int}/loglig-suggest")]
+    [Authorize]
     [EnableRateLimiting("auth")]
     public async Task<IActionResult> Suggest(int id, [FromBody] SuggestRequest request, CancellationToken ct)
     {
@@ -29,5 +29,14 @@ public class LogligSuggestController(ILogligSuggestionService suggestions) : Con
 
         var result = await suggestions.SuggestAsync(id, request.LogligId, userId, ct);
         return result.Accepted ? Ok(result) : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>Статус привязки для показа кнопки/бейджа. Публичный (без [Authorize]) — только
+    /// статус, без LogligId и аудита; не кэшируется (точечный дешёвый запрос).</summary>
+    [HttpGet("{id:int}/loglig-status")]
+    public async Task<IActionResult> Status(int id, CancellationToken ct)
+    {
+        var status = await suggestions.GetStatusAsync(id, ct);
+        return Ok(new { status });
     }
 }

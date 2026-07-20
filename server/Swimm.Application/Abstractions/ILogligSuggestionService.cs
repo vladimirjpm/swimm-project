@@ -19,4 +19,8 @@ public interface ILogligSuggestionService
 
     /// <summary>Проверить все Suggested-привязки (вызывается ночным джобом).</summary>
     Task<LogligSuggestionVerifyReport> VerifySuggestedAsync(CancellationToken ct = default);
+
+    /// <summary>Статус привязки для публичного показа (без LogligId и аудита). Null и для
+    /// несуществующего пловца — не палим существование.</summary>
+    Task<string?> GetStatusAsync(int swimmerId, CancellationToken ct = default);
 }

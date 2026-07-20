@@ -5,6 +5,7 @@ import { useFavoritesContext } from '../../hooks/favorites-context';
 import { useLoginModal } from '../components/login-modal/login-modal-context';
 import { useAthleteCareer, AthleteCareer } from '../../hooks/useAthleteCareer';
 import { useUserMedia, useMyMediaPublications, UserMediaDto } from '../../hooks/useUserMedia';
+import { useLogligStatus } from '../../hooks/useLogligStatus';
 import Helper from '../../utils/helpers/data-helper'
 import { HelperMedia } from '../../utils/helpers';
 import UI_ClubIcon from '../components/mix/club-icon/club-icon';
@@ -106,6 +107,8 @@ function SportsmenDetails() {
   // Медиа пловца (2A) — один хук на карточку, используется и в MyMediaSection,
   // и для иконки «есть видео» на строках результатов (только owner-view).
   const userMedia = useUserMedia(swimmerId);
+  // Loglig ID (docs/loglig-id-plan.md, шаг 6 — хвост): статус привязки + краудсорс-предложение.
+  const logligStatus = useLogligStatus(swimmerId);
   const mediaResultIds = useMemo(
     () => new Set(userMedia.media.filter((m) => typeof m.result_id === 'number').map((m) => m.result_id as number)),
     [userMedia.media]
@@ -210,6 +213,13 @@ function SportsmenDetails() {
                     <path d="M12 21s-7.5-4.6-10-9.3C.4 8.3 2 5 5.2 5c2 0 3.3 1.1 4.1 2.3C10.1 6.1 11.4 5 13.4 5 16.6 5 18.2 8.3 16.6 11.7 14.1 16.4 12 21 12 21z" />
                   </svg>
                 </button>
+              )}
+              {swimmerId != null && (
+                <LogligSuggestBadge
+                  status={logligStatus.status}
+                  isAuthenticated={isAuthenticated}
+                  suggest={logligStatus.suggest}
+                />
               )}
             </div>
             <div className='flex-1 min-w-0 flex flex-col gap-1.5 items-end'>
@@ -382,6 +392,110 @@ function SportsmenDetails() {
           {/* Гость (фаза 4.5): вместо звёзд/«Моих ссылок» — один компактный CTA. */}
           {showGuestCta && <GuestFavoritesCta onSignIn={openLoginModal} />}
       </div>
+    </div>
+  );
+}
+
+// Loglig ID (docs/loglig-id-plan.md, шаг 6 — хвост): бейдж статуса привязки либо кнопка
+// краудсорс-предложения с инлайн-полем. Гость без статуса/при Rejected не видит ничего —
+// не плодим CTA логина рядом.
+function LogligSuggestBadge({
+  status,
+  isAuthenticated,
+  suggest,
+}: {
+  status: string | null;
+  isAuthenticated: boolean;
+  suggest: (input: string) => Promise<{ ok: boolean; error?: string }>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  if (status === 'Verified') {
+    return (
+      <span
+        title="Профиль на loglig.com подтверждён"
+        className="inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold"
+        style={{ background: 'rgba(255,255,255,0.9)', color: 'var(--theme-primary)' }}
+      >
+        loglig ✓
+      </span>
+    );
+  }
+
+  if (status === 'Suggested') {
+    return (
+      <span
+        className="inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold"
+        style={{ background: 'rgba(255,255,255,0.75)', color: '#6b7280' }}
+      >
+        loglig: на проверке
+      </span>
+    );
+  }
+
+  if (!isAuthenticated) return null;
+
+  const handleSubmit = async () => {
+    setError(null);
+    setSubmitting(true);
+    const res = await suggest(input);
+    setSubmitting(false);
+    if (res.ok) {
+      setOpen(false);
+      setInput('');
+    } else {
+      setError(res.error ?? 'Не удалось отправить предложение');
+    }
+  };
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold hover:opacity-90"
+        style={{ background: 'rgba(255,255,255,0.9)', color: 'var(--theme-mode-text-secondary)' }}
+      >
+        Предложить loglig-профиль
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1 rounded-lg p-1.5" style={{ background: 'rgba(255,255,255,0.9)' }}>
+      <div className="flex gap-1">
+        <input
+          type="text"
+          value={input}
+          autoFocus
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+          placeholder="ссылка на карточку loglig.com"
+          className="w-[150px] min-w-0 rounded px-1.5 py-1 text-[10px]"
+          style={{ border: '1px solid var(--theme-mode-border)' }}
+        />
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={submitting || !input.trim()}
+          className="shrink-0 rounded px-1.5 py-1 text-[10px] font-bold text-white disabled:opacity-50"
+          style={{ background: 'var(--theme-primary)' }}
+        >
+          Отправить
+        </button>
+        <button
+          type="button"
+          onClick={() => { setOpen(false); setInput(''); setError(null); }}
+          className="shrink-0 rounded px-1.5 py-1 text-[10px] font-bold"
+          style={{ background: 'var(--theme-mode-surface-alt)', color: 'var(--theme-mode-text-secondary)' }}
+        >
+          Отмена
+        </button>
+      </div>
+      {error && <div className="text-[9px]" style={{ color: '#e23b5a' }}>{error}</div>}
     </div>
   );
 }

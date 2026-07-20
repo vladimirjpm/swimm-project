@@ -67,6 +67,12 @@ public class LogligSuggestionService(
         return new LogligSuggestResult(true, null);
     }
 
+    public async Task<string?> GetStatusAsync(int swimmerId, CancellationToken ct = default) =>
+        await db.Swimmers.AsNoTracking()
+            .Where(s => s.Id == swimmerId)
+            .Select(s => s.LogligIdStatus)
+            .FirstOrDefaultAsync(ct);
+
     public async Task<LogligSuggestionVerifyReport> VerifySuggestedAsync(CancellationToken ct = default)
     {
         var pending = await db.Swimmers
