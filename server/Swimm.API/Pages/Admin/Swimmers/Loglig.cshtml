@@ -51,6 +51,9 @@
 (function () {
     const API = '/api/admin/loglig';
     const LOGLIG_HOST = 'https://loglig.com:2053';
+    // Без валидного seasonId карточка loglig отдаёт 500 (сезон приходит из конфига Loglig:SeasonId).
+    const LOGLIG_SEASON = @Model.SeasonId;
+    const logligCardUrl = (id) => `${LOGLIG_HOST}/Players/Details/${id}?seasonId=${LOGLIG_SEASON}`;
     let rows = [];
     let searchConfigured = true; // уточняется запросом GET config при загрузке
 
@@ -78,7 +81,7 @@
                 <span class="text-[#90a4ae] w-14">${c.birthYear || '—'}</span>
                 <span class="text-[#90a4ae] flex-1" dir="rtl" style="text-align:left">${esc(c.clubName ?? '—')}</span>
                 <span class="text-[#90a4ae] w-24">${c.decision} · ${c.matchedResultCount} совп.</span>
-                <a href="${LOGLIG_HOST}/Players/Details/${c.logligId}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">#${c.logligId}</a>
+                <a href="${logligCardUrl(c.logligId)}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">#${c.logligId}</a>
                 <button class="cand-set cursor-pointer rounded-md border border-admin-border px-2 py-1 text-[12px]" data-swimmer="${swimmerId}" data-loglig="${c.logligId}">Привязать</button>
             </div>`;
     }
@@ -91,7 +94,7 @@
         tbody.innerHTML = rows.map((r, i) => {
             const linked = r.status === 'Verified';
             const link = r.logligId
-                ? `<a href="${LOGLIG_HOST}/Players/Details/${r.logligId}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">#${r.logligId}</a>`
+                ? `<a href="${logligCardUrl(r.logligId)}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">#${r.logligId}</a>`
                 : '<span class="text-[#546e7a]">—</span>';
 
             const actions = linked
