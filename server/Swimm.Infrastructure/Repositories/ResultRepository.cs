@@ -50,6 +50,11 @@ public class ResultRepository : IResultRepository
         var items = await query
             .OrderByDescending(r => r.CompetitionDate)
             .ThenBy(r => r.Position)
+            // Id — стабильный tie-breaker: (дата, позиция) массово неуникальны (одно место в
+            // каждой возрастной группе каждого стиля), и без него OFFSET-пагинация Postgres
+            // дублирует строки на стыках страниц и молча теряет другие (замер 2026-07-20 на
+            // событии 5: 198 дублей из 1670 строк).
+            .ThenBy(r => r.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(ResultMapping.ToDto)
