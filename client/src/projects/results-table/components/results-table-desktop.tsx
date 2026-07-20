@@ -65,7 +65,9 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
         {/* При пересчёте (Combine All Results): большой badge — новое место,
             маленький внахлёст снизу — оригинальное место. */}
         <div className="relative">
-          <UI_MedalIcon place={String(res.position ?? index + 1)} styleType={rowIsAward ? 'icon-place' : 'icon-noplace'} styleSize="medal-40" />
+          {/* Фолбэк index+1 — только для валидного времени: NS/DQ без места не должны
+              получать «медаль» по порядковому номеру строки на экране. */}
+          <UI_MedalIcon place={String(res.position ?? (res.time_fail || !res.time ? '—' : index + 1))} styleType={rowIsAward ? 'icon-place' : 'icon-noplace'} styleSize="medal-40" />
           {(res as any).position_original != null && (res as any).position_original !== res.position && (
             <UI_PositionBadge
               position={(res as any).position_original}
