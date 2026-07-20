@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Linq;
 using Swimm.Parsing.Parsers.IsrOrg;
@@ -14,20 +15,19 @@ namespace Swimm.Tests;
 /// строки пропадали целиком (см. IsrOrgCompetitionParser.cs, блок `if (isHE)`
 /// и добавленный туда матч RelayHeaderEnFull-in-HE).
 ///
-/// Файл не входит в репозиторий (личный download пользователя) — тест
-/// пропускается, если его нет на диске, чтобы не ломать CI на других машинах.
+/// Протокол лежит в Fixtures/Parsing — тест в сеть НЕ ходит и не зависит от
+/// машины. Раньше путь вёл в личный Downloads, а отсутствие файла молча
+/// возвращало зелёный: тест «проходил», ничего не проверив.
 /// </summary>
 public class IsrOrgCompetitionParserMaccabiahRealPdfTests
 {
-    private const string PdfPath = @"C:\Users\Vlad\Downloads\Maccabiah-2026_IL_EN.pdf";
+    private static string PdfPath =>
+        Path.Combine(AppContext.BaseDirectory, "Fixtures", "Parsing", "Maccabiah-2026_IL_EN.pdf");
 
     [Fact]
     public void HeMode_ParsesBothIndividualAndInternationalRelayRows()
     {
-        if (!File.Exists(PdfPath))
-        {
-            return; // файл недоступен на этой машине — пропускаем, не проваливаем сборку.
-        }
+        Assert.True(File.Exists(PdfPath), $"Фикстура протокола не найдена: {PdfPath}");
 
         using var fs = File.OpenRead(PdfPath);
         var results = IsrOrgCompetitionParser.ParseCompetitions(fs, "he").ToList();
