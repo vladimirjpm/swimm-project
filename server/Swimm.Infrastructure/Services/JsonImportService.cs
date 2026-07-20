@@ -177,6 +177,9 @@ public class JsonImportService : IImportService
         // матчинг/UPDATE/DELETE-с-защитой (import-upsert-plan.md, шаг 2).
         var upsertCompetitionIds = new HashSet<int>();
         var overwriteExisting = eventOptions?.OverwriteExisting ?? false;
+        // Удаление исчезнувших результатов — опт-ин поверх overwriteExisting (см. ImportModels.cs,
+        // DeleteMissing). Без него upsert только обновляет/вставляет и НИКОГДА не удаляет.
+        var deleteMissing = overwriteExisting && (eventOptions?.DeleteMissing ?? false);
 
         int created = 0, skipped = 0, errors = 0;
         var errorMessages = new List<string>();
@@ -580,32 +583,44 @@ public class JsonImportService : IImportService
                 updatedCount++;
             }
 
-            foreach (var old in match.Deleted)
+            if (!deleteMissing)
             {
-                var hasMedia = await _db.UserMedia.AnyAsync(m => m.ResultId == old.Id)
-                    || await _db.HubGroupMedia.AnyAsync(m => m.ResultId == old.Id);
-                if (hasMedia)
+                // DeleteMissing=false (default, ImportModels.cs): исчезнувшие из файла результаты
+                // остаются нетронутыми — никакого удаления и, соответственно, никакой чистки
+                // Relay/Gallery/пловцов-заглушек по ним (инцидент 2026-07-20: partial-переимпорт
+                // с OverwriteExisting без явного согласия на удаление снёс 661 из 915 результатов).
+                if (match.Deleted.Count > 0)
+                    diagnosticLog.Add($"Upsert: {match.Deleted.Count} результат(ов) в comp {competitionId} отсутствуют в файле, но DeleteMissing=false — оставлены как есть");
+            }
+            else
+            {
+                foreach (var old in match.Deleted)
                 {
-                    skippedWithMediaCount++;
-                    diagnosticLog.Add($"Upsert: result {old.Id} (comp {competitionId}) исчез из файла, но на нём есть UserMedia/HubGroupMedia — не удалён, разберитесь руками");
-                    continue;
+                    var hasMedia = await _db.UserMedia.AnyAsync(m => m.ResultId == old.Id)
+                        || await _db.HubGroupMedia.AnyAsync(m => m.ResultId == old.Id);
+                    if (hasMedia)
+                    {
+                        skippedWithMediaCount++;
+                        diagnosticLog.Add($"Upsert: result {old.Id} (comp {competitionId}) исчез из файла, но на нём есть UserMedia/HubGroupMedia — не удалён, разберитесь руками");
+                        continue;
+                    }
+
+                    orphanCandidateSwimmerIds.Add(old.SwimmerId);
+
+                    // Relay/Gallery — приватные 1:1-довески результата (Р4): при удалении результата
+                    // становятся сиротами, подчищаем вместе с ним.
+                    if (old.Relay != null)
+                        _db.Relays.Remove(old.Relay);
+                    if (old.Gallery != null)
+                    {
+                        if (old.Gallery.Items.Count > 0)
+                            _db.GalleryItems.RemoveRange(old.Gallery.Items);
+                        _db.Galleries.Remove(old.Gallery);
+                    }
+
+                    _db.Results.Remove(old);
+                    deletedCount++;
                 }
-
-                orphanCandidateSwimmerIds.Add(old.SwimmerId);
-
-                // Relay/Gallery — приватные 1:1-довески результата (Р4): при удалении результата
-                // становятся сиротами, подчищаем вместе с ним.
-                if (old.Relay != null)
-                    _db.Relays.Remove(old.Relay);
-                if (old.Gallery != null)
-                {
-                    if (old.Gallery.Items.Count > 0)
-                        _db.GalleryItems.RemoveRange(old.Gallery.Items);
-                    _db.Galleries.Remove(old.Gallery);
-                }
-
-                _db.Results.Remove(old);
-                deletedCount++;
             }
         }
 
@@ -682,8 +697,10 @@ public class JsonImportService : IImportService
         // upsert-строки были из него удалены выше); created включает и их (полный успешный проход).
         var insertedCount = resultBatch.Count;
         var message = upsertCompetitionIds.Count > 0
-            ? $"Import complete (upsert): {updatedCount} updated, {insertedCount} inserted, {deletedCount} deleted"
-                + (skippedWithMediaCount > 0 ? $", {skippedWithMediaCount} skipped (медиа)" : "")
+            ? $"Import complete (upsert): {updatedCount} updated, {insertedCount} inserted"
+                + (deleteMissing
+                    ? $", {deletedCount} deleted" + (skippedWithMediaCount > 0 ? $", {skippedWithMediaCount} skipped (медиа)" : "")
+                    : " (DeleteMissing off — исчезнувшие из файла результаты не удалялись)")
             : $"Import complete: {created} created, {skipped} skipped, {errors} errors";
 
         return new ImportResult

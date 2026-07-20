@@ -136,7 +136,8 @@ public class AdminController : ControllerBase
         [FromForm] string[]? categories,
         [FromForm] int? eventId,
         [FromForm] string? newEventName,
-        [FromForm] bool overwriteExisting = false)
+        [FromForm] bool overwriteExisting = false,
+        [FromForm] bool deleteMissing = false)
     {
         if (file == null || file.Length == 0)
             return BadRequest(new { error = "No file uploaded" });
@@ -156,7 +157,7 @@ public class AdminController : ControllerBase
         // Привязка к многодневному событию (опционально): existing eventId XOR newEventName.
         ImportEventOptions? eventOptions = null;
         if (eventId.HasValue || !string.IsNullOrWhiteSpace(newEventName) || overwriteExisting)
-            eventOptions = new ImportEventOptions(eventId, newEventName, overwriteExisting);
+            eventOptions = new ImportEventOptions(eventId, newEventName, overwriteExisting, deleteMissing);
 
         var jobId = _jobs.Enqueue(data, file.FileName, categories, eventOptions);
         return Accepted(new { jobId });
@@ -256,7 +257,7 @@ public class AdminController : ControllerBase
 
         ImportEventOptions? eventOptions = null;
         if (request.EventId.HasValue || !string.IsNullOrWhiteSpace(request.NewEventName) || request.OverwriteExisting)
-            eventOptions = new ImportEventOptions(request.EventId, request.NewEventName, request.OverwriteExisting);
+            eventOptions = new ImportEventOptions(request.EventId, request.NewEventName, request.OverwriteExisting, request.DeleteMissing);
 
         var jobId = _jobs.Enqueue(
             Encoding.UTF8.GetBytes(entry.Parsed.ResultsJson),
@@ -400,5 +401,5 @@ public class AdminController : ControllerBase
     public record SetActiveRequest(bool IsActive);
     public record UpdateSettingRequest(string Value);
     public record UpdateCompetitionRequest(bool IsAward, bool ShowCombineAllResults, string[]? Categories);
-    public record ImportParsedRequest(Guid PreviewId, string[]? CategoryKeys, int? EventId, string? NewEventName, bool OverwriteExisting = false);
+    public record ImportParsedRequest(Guid PreviewId, string[]? CategoryKeys, int? EventId, string? NewEventName, bool OverwriteExisting = false, bool DeleteMissing = false);
 }

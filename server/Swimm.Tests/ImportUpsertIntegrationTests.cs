@@ -106,6 +106,7 @@ public class ImportUpsertIntegrationTests
     }
 
     private static ImportEventOptions Overwrite => new(EventId: null, NewEventName: null, OverwriteExisting: true);
+    private static ImportEventOptions OverwriteWithDelete => new(EventId: null, NewEventName: null, OverwriteExisting: true, DeleteMissing: true);
 
     [Fact]
     public async Task ReimportIdenticalData_WithFlag_ZeroInsertNUpdateZeroDelete()
@@ -234,10 +235,11 @@ public class ImportUpsertIntegrationTests
         await db.SaveChangesAsync();
         var laneTwoResultId = laneTwoResult.Id;
 
-        // Переимпорт без lane=2 — этот результат "исчез из файла".
+        // Переимпорт без lane=2 — этот результат "исчез из файла". DeleteMissing=true, иначе
+        // (новый дефолт) удаление вообще не пытается запуститься и skippedWithMedia не считается.
         var reimport = await svc.ImportAsync(
             ToStream(new[] { Item("Cohen", "Tal", 2005, lane: 1) }),
-            eventOptions: Overwrite);
+            eventOptions: OverwriteWithDelete);
 
         Assert.Empty(reimport.ErrorMessages);
         Assert.Equal(0, reimport.Deleted);
@@ -246,6 +248,62 @@ public class ImportUpsertIntegrationTests
         // Результат с HubGroupMedia НЕ удалён, несмотря на исчезновение из файла.
         Assert.True(await db.Results.AnyAsync(r => r.Id == laneTwoResultId));
         Assert.Equal(2, await db.Results.CountAsync());
+    }
+
+    [Fact]
+    public async Task PartialReimport_OverwriteWithoutDeleteMissing_KeepsMissingRows_ZeroDeleted()
+    {
+        await using var db = CreateDb(nameof(PartialReimport_OverwriteWithoutDeleteMissing_KeepsMissingRows_ZeroDeleted));
+        var svc = new JsonImportService(db, new NullCacheService());
+
+        await svc.ImportAsync(ToStream(new[]
+        {
+            Item("Cohen", "Tal", 2005, lane: 1, time: "00:30.00"),
+            Item("Levi", "Dan", 2006, lane: 2)
+        }));
+        Assert.Equal(2, await db.Results.CountAsync());
+
+        // Партиальный файл: lane=1 обновлён, lane=2 отсутствует. Инцидент 2026-07-20: раньше
+        // OverwriteExisting без явного согласия удалял такие "исчезнувшие" строки молча.
+        var reimport = await svc.ImportAsync(
+            ToStream(new[] { Item("Cohen", "Tal", 2005, lane: 1, time: "00:29.00") }),
+            eventOptions: Overwrite);
+
+        Assert.Empty(reimport.ErrorMessages);
+        Assert.Equal(1, reimport.Updated);
+        Assert.Equal(0, reimport.Deleted);
+        Assert.Equal(0, reimport.SkippedWithMedia);
+        Assert.Equal(2, await db.Results.CountAsync()); // lane=2 сохранился
+
+        var laneTwo = await db.Results.SingleAsync(r => r.Lane == 2);
+        var laneOne = await db.Results.SingleAsync(r => r.Lane == 1);
+        Assert.Equal(29000, laneOne.TimeMillisecond); // сматченная строка всё же обновилась
+        Assert.NotNull(laneTwo);
+    }
+
+    [Fact]
+    public async Task PartialReimport_OverwriteWithDeleteMissing_DeletesMissingRows()
+    {
+        await using var db = CreateDb(nameof(PartialReimport_OverwriteWithDeleteMissing_DeletesMissingRows));
+        var svc = new JsonImportService(db, new NullCacheService());
+
+        await svc.ImportAsync(ToStream(new[]
+        {
+            Item("Cohen", "Tal", 2005, lane: 1),
+            Item("Levi", "Dan", 2006, lane: 2)
+        }));
+        Assert.Equal(2, await db.Results.CountAsync());
+
+        var reimport = await svc.ImportAsync(
+            ToStream(new[] { Item("Cohen", "Tal", 2005, lane: 1) }),
+            eventOptions: OverwriteWithDelete);
+
+        Assert.Empty(reimport.ErrorMessages);
+        Assert.Equal(1, reimport.Updated);
+        Assert.Equal(1, reimport.Deleted);
+        Assert.Equal(0, reimport.SkippedWithMedia);
+        Assert.Equal(1, await db.Results.CountAsync());
+        Assert.False(await db.Results.AnyAsync(r => r.Lane == 2));
     }
 
     [Fact]

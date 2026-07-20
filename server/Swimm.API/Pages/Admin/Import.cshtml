@@ -185,6 +185,10 @@
                 <input type="checkbox" id="overwrite-existing-cb">
                 Обновить существующее соревнование <span id="overwrite-comp-name" class="text-admin-text-muted"></span> (upsert: сматченные результаты обновятся на месте, медиа сохранится)
             </label>
+            <label id="delete-missing-block" class="hidden mt-2 inline-flex items-center gap-2 text-sm text-admin-text bg-admin-danger/5 border border-admin-danger/30 rounded-md py-2 px-3 cursor-pointer">
+                <input type="checkbox" id="delete-missing-cb">
+                Удалять результаты, которых нет в файле
+            </label>
             <div id="overwrite-delete-warning" class="hidden mt-2 text-sm text-admin-danger border-l-[3px] border-l-admin-danger bg-admin-danger/5 rounded-md py-2 px-3"></div>
         </div>
 
@@ -549,26 +553,39 @@
     const overwriteSection = document.getElementById('overwrite-section');
     const overwriteCb = document.getElementById('overwrite-existing-cb');
     const overwriteCompName = document.getElementById('overwrite-comp-name');
+    const deleteMissingBlock = document.getElementById('delete-missing-block');
+    const deleteMissingCb = document.getElementById('delete-missing-cb');
     const overwriteDeleteWarning = document.getElementById('overwrite-delete-warning');
     // Данные последнего PDF-превью (competitions + existingCompetitions с ExistingResultCount) —
-    // нужны, чтобы посчитать предупреждение об удалении при переключении чекбокса overwrite.
+    // нужны, чтобы посчитать предупреждение об удалении при переключении чекбокса delete-missing.
     let lastPdfPreviewData = null;
 
     function getOverwriteExisting() { return overwriteCb.checked; }
+    function getDeleteMissing() { return overwriteCb.checked && deleteMissingCb.checked; }
 
     function setOverwriteVisible(visible, compName) {
         overwriteSection.classList.toggle('hidden', !visible);
         overwriteCompName.textContent = compName ? `«${compName}»` : '';
-        if (!visible) overwriteCb.checked = false;
+        if (!visible) { overwriteCb.checked = false; deleteMissingCb.checked = false; }
+        updateDeleteMissingVisibility();
+    }
+
+    // «Удалять результаты, которых нет в файле» видим/доступен только когда включён overwrite —
+    // удаление осмысленно лишь как часть upsert-переимпорта (ImportModels.cs, DeleteMissing).
+    function updateDeleteMissingVisibility() {
+        const show = overwriteCb.checked;
+        deleteMissingBlock.classList.toggle('hidden', !show);
+        if (!show) deleteMissingCb.checked = false;
         updateOverwriteDeleteWarning();
     }
 
-    // Gap 1 (import-upsert-plan.md): OverwriteExisting может молча удалить результаты, которых
-    // нет в переимпортируемом файле (напр. частичный файл поверх полного соревнования). Считаем
-    // по всем сматченным дням превью: в БД уже есть ExistingResultCount, в файле — resultCount дня.
+    // Gap 1 (import-upsert-plan.md) + инцидент 2026-07-20: предупреждение о массовом удалении
+    // теперь показывается только когда реально включено удаление (delete-missing-cb), а не просто
+    // overwrite — сам overwrite больше ничего не удаляет. Считаем по всем сматченным дням превью:
+    // в БД уже есть ExistingResultCount, в файле — resultCount дня.
     function updateOverwriteDeleteWarning() {
         if (!overwriteDeleteWarning) return;
-        if (!overwriteCb.checked || !lastPdfPreviewData) {
+        if (!getDeleteMissing() || !lastPdfPreviewData) {
             overwriteDeleteWarning.classList.add('hidden');
             return;
         }
@@ -595,7 +612,8 @@
         overwriteDeleteWarning.classList.remove('hidden');
     }
 
-    overwriteCb.addEventListener('change', updateOverwriteDeleteWarning);
+    overwriteCb.addEventListener('change', updateDeleteMissingVisibility);
+    deleteMissingCb.addEventListener('change', updateOverwriteDeleteWarning);
 
     function setFile(file) {
         if (!file) return;
@@ -666,6 +684,7 @@
             if (evOpts.newEventName) form.append('newEventName', evOpts.newEventName);
             if (evOpts.eventId) form.append('eventId', String(evOpts.eventId));
             if (getOverwriteExisting()) form.append('overwriteExisting', 'true');
+            if (getDeleteMissing()) form.append('deleteMissing', 'true');
 
             const res = await fetch('/api/admin/import', { method: 'POST', credentials: 'same-origin', headers: { 'X-XSRF-TOKEN': _csrfToken }, body: form });
             const queued = await res.json();
@@ -810,7 +829,7 @@
         try {
             const body = {
                 previewId: pdfPreviewId, categoryKeys: getSelectedCategories(),
-                overwriteExisting: getOverwriteExisting(), ...getSelectedEventOptions()
+                overwriteExisting: getOverwriteExisting(), deleteMissing: getDeleteMissing(), ...getSelectedEventOptions()
             };
             const queued = await api('/api/admin/import-parsed', {
                 method: 'POST',

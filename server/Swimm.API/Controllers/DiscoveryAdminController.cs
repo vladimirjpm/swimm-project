@@ -255,7 +255,7 @@ public class DiscoveryAdminController : ControllerBase
 
         ImportEventOptions? eventOptions = null;
         if (request.EventId.HasValue || !string.IsNullOrWhiteSpace(request.NewEventName) || request.OverwriteExisting)
-            eventOptions = new ImportEventOptions(request.EventId, request.NewEventName, request.OverwriteExisting);
+            eventOptions = new ImportEventOptions(request.EventId, request.NewEventName, request.OverwriteExisting, request.DeleteMissing);
 
         var jobId = _jobs.Enqueue(
             Encoding.UTF8.GetBytes(entry.Parsed.ResultsJson),
@@ -312,5 +312,6 @@ public class DiscoveryAdminController : ControllerBase
         string[]? CategoryKeys,
         int? EventId,
         string? NewEventName,
-        bool OverwriteExisting = false);
+        bool OverwriteExisting = false,
+        bool DeleteMissing = false);
 }
