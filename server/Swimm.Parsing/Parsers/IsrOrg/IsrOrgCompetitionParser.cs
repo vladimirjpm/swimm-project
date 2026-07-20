@@ -249,20 +249,178 @@ public static class IsrOrgCompetitionParser
 
         // Извлекаем текст страниц в строки (RTL-порядок восстанавливается позже, при нормализации).
         // Вынесено отдельно, чтобы ядро разбора (ParseLines) можно было тестировать на голых строках.
+        bool isHE = language.Equals("HE", StringComparison.OrdinalIgnoreCase);
         var pages = new List<IReadOnlyList<string>>();
         foreach (var page in doc.GetPages())
         {
             var words = page.GetWords();
-            var lines = words
+            var groups = words
                 .GroupBy(w => Math.Round(w.BoundingBox.Bottom / 2.0) * 2.0)
                 .OrderByDescending(g => g.Key)
-                .Select(g => string.Join(' ', g.OrderBy(w => w.BoundingBox.Left)
-                    .Select(w => w.Text)))
+                .Select(g => g.OrderBy(w => w.BoundingBox.Left)
+                    .Select(w => new PositionedWord(w.Text, w.BoundingBox.Left))
+                    .ToList())
                 .ToList();
+
+            var lines = groups
+                .Select(g => string.Join(' ', g.Select(w => w.Text)))
+                .ToList();
+
+            // EN-экспорт Маккабиады (в т.ч. интернациональная эстафета внутри
+            // HE-экспорта, где таблица команд остаётся англоязычной): имена
+            // пловцов в таблице эстафеты визуально переносятся посреди слова
+            // (узкие колонки Last/First name), и обрывок попадает на СОСЕДНЮЮ
+            // строку (по Y), а не в ту же — join выше это не лечит.
+            // Реконструируем такие имена по X-координатам колонок Last/First.
+            // Работает независимо от isHE: срабатывает только если в группах
+            // реально нашлись заголовки колонок "Last"/"First" — но в HE-экспорте
+            // те же английские подписи колонок встречаются и в шапке ОБЫЧНОЙ
+            // (не-эстафетной) таблицы результатов, поэтому там реконструкция
+            // ошибочно склеивала/удаляла строки индивидуальных заплывов.
+            // Ограничиваем запуск страницами, где реально есть командная строка
+            // эстафеты "heat lane team time Rank pos" — маркер "Rank <pos>" в
+            // конце строки уникален для интернациональной эстафеты Маккабиады
+            // и не встречается в обычных индивидуальных результатах. Проверяем
+            // и в EN-, и в HE-режиме (условие безвредно для чисто EN-файлов,
+            // где реконструкция и так нужна только на эстафетных страницах).
+            bool looksLikeRelayPage = lines.Any(l => Regex.IsMatch(l, @"\bRank\s+\d+\s*$"));
+
+            if (looksLikeRelayPage)
+            {
+                lines = ReconstructEnRelaySwimmerNames(groups, lines);
+            }
+
             pages.Add(lines);
         }
 
         return ParseLines(pages, language);
+    }
+
+    // Слово + его X-координата (левый край) на странице. Лёгкая обёртка над
+    // UglyToad.PdfPig.Content.Word, чтобы логику реконструкции можно было
+    // тестировать без реального PDF/PdfPig-объектов — см.
+    // Swimm.Tests/IsrOrgCompetitionParserRelayNameReconstructionTests.cs.
+    internal readonly record struct PositionedWord(string Text, double Left);
+
+    // Обрывок перенесённого слова: одна "строка" (Y-группа) из ровно одного алфавитного токена.
+    private static bool IsSoleNameFragmentGroup(List<PositionedWord> group) =>
+        group.Count == 1 && IsNameFragment(group[0].Text);
+
+    /// <summary>
+    /// Чинит перенос имён/фамилий эстафетной таблицы EN-экспорта (Maccabiah).
+    /// Колонки "Last name"/"First name" узкие, поэтому длинные имена переносятся
+    /// на отдельную Y-строку (только обрывок, без остального содержимого строки).
+    /// Опорные X-координаты колонок берём из заголовка таблицы ("Last ... First ...",
+    /// повторяется перед каждой командой), затем классифицируем строку с годом
+    /// рождения (4 цифры) как "опорную" и достраиваем недостающую фамилию/имя
+    /// обрывками с соседних строк, если те по X ближе к недостающей колонке.
+    /// Консервативно: при любой неоднозначности строки не трогаем (возврат как есть).
+    /// </summary>
+    internal static List<string> ReconstructEnRelaySwimmerNames(List<List<PositionedWord>> groups, List<string> lines)
+    {
+        var result = new List<string>(lines);
+        var consumed = new HashSet<int>();
+        var replacements = new Dictionary<int, string>();
+
+        double? lastColX = null;
+        double? firstColX = null;
+
+        for (int i = 0; i < groups.Count; i++)
+        {
+            var g = groups[i];
+
+            var lastHeaderIdx = g.FindIndex(w => w.Text == "Last");
+            var firstHeaderIdx = g.FindIndex(w => w.Text == "First");
+            if (lastHeaderIdx >= 0 && firstHeaderIdx >= 0)
+            {
+                lastColX = g[lastHeaderIdx].Left;
+                firstColX = g[firstHeaderIdx].Left;
+                continue;
+            }
+
+            if (lastColX is null || firstColX is null) continue;
+            if (consumed.Contains(i)) continue;
+
+            var yearIdx = g.FindIndex(w => Regex.IsMatch(w.Text, @"^\d{4}$"));
+            if (yearIdx < 0) continue;
+            var yearWord = g[yearIdx];
+
+            var otherWords = g.Where((w, idx) => idx != yearIdx).ToList();
+            // Опорная строка результата эстафеты ("1 4 Israel 04:05.04 Rank 1") тоже может
+            // случайно содержать 4-значный токен — но там больше 3 колоночных слов и они
+            // не близки к Last/First колонкам. Такие строки просто не наберут last/first ниже.
+            string? lastCore = ClassifyNearest(otherWords, lastColX.Value, firstColX.Value, wantLast: true);
+            string? firstCore = ClassifyNearest(otherWords, lastColX.Value, firstColX.Value, wantLast: false);
+
+            bool lastMissing = lastCore is null;
+            bool firstMissing = firstCore is null;
+
+            // Ни одна из колонок не распозналась рядом с годом — это не строка пловца
+            // (например, шапка таблицы или посторонний текст). Пропускаем.
+            if (lastCore is null && firstCore is null) continue;
+
+            string lastPrefix = "", lastSuffix = "", firstPrefix = "", firstSuffix = "";
+
+            if (lastMissing || firstMissing)
+            {
+                if (i > 0 && !consumed.Contains(i - 1) && IsSoleNameFragmentGroup(groups[i - 1]))
+                {
+                    var frag = groups[i - 1][0];
+                    var col = NearestColumn(frag.Left, lastColX.Value, firstColX.Value);
+                    if (col == "last" && lastMissing) { lastPrefix = frag.Text; consumed.Add(i - 1); }
+                    else if (col == "first" && firstMissing) { firstPrefix = frag.Text; consumed.Add(i - 1); }
+                }
+
+                if (i + 1 < groups.Count && IsSoleNameFragmentGroup(groups[i + 1]))
+                {
+                    var frag = groups[i + 1][0];
+                    var col = NearestColumn(frag.Left, lastColX.Value, firstColX.Value);
+                    if (col == "last" && lastMissing) { lastSuffix = frag.Text; consumed.Add(i + 1); }
+                    else if (col == "first" && firstMissing) { firstSuffix = frag.Text; consumed.Add(i + 1); }
+                }
+            }
+
+            string last = (lastPrefix + (lastCore ?? "") + lastSuffix).Trim();
+            string first = (firstPrefix + (firstCore ?? "") + firstSuffix).Trim();
+
+            if (last.Length == 0 || first.Length == 0) continue;
+
+            replacements[i] = $"{last} {first} {yearWord.Text}";
+        }
+
+        if (replacements.Count == 0 && consumed.Count == 0) return result;
+
+        var final = new List<string>();
+        for (int i = 0; i < result.Count; i++)
+        {
+            if (consumed.Contains(i)) continue;
+            final.Add(replacements.TryGetValue(i, out var repl) ? repl : result[i]);
+        }
+
+        return final;
+    }
+
+    private static string NearestColumn(double x, double lastColX, double firstColX)
+    {
+        double dLast = Math.Abs(x - lastColX);
+        double dFirst = Math.Abs(x - firstColX);
+        // Неоднозначная классификация (координаты слишком близки) — не рискуем.
+        if (Math.Abs(dLast - dFirst) < 3.0) return "ambiguous";
+        return dLast < dFirst ? "last" : "first";
+    }
+
+    private static string? ClassifyNearest(List<PositionedWord> otherWords, double lastColX, double firstColX, bool wantLast)
+    {
+        PositionedWord? best = null;
+        double bestDist = double.MaxValue;
+        foreach (var w in otherWords)
+        {
+            var col = NearestColumn(w.Left, lastColX, firstColX);
+            if (col != (wantLast ? "last" : "first")) continue;
+            var dist = Math.Abs(w.Left - (wantLast ? lastColX : firstColX));
+            if (dist < bestDist) { bestDist = dist; best = w; }
+        }
+        return best?.Text;
     }
 
     /// <summary>
@@ -589,6 +747,45 @@ public static class IsrOrgCompetitionParser
                             Results: new List<IsrOrgResult>()
                         );
                         Log($"  -> NEW EVENT (EN-in-HE): {current.Event}, gender={genderNorm}");
+                        continue;
+                    }
+
+                    // Интернациональная эстафета Маккабиады: заголовок целиком на английском,
+                    // с полом/возрастом в той же строке ("4X100m Freestyle Relay - U17 Girls"),
+                    // без отдельной ивритской строки-продолжения (в отличие от masters-EN-в-HE
+                    // выше). Матчим по СЫРОЙ строке — normalize-реверс её ломает.
+                    var relEnFullHead = RelayHeaderEnFull.Match(raw);
+                    if (relEnFullHead.Success)
+                    {
+                        var (genderNormRel, ageRel) = ParseEnCategory(relEnFullHead.Groups["cat"].Value);
+                        var styleNormRel = CanonEnStyle(relEnFullHead.Groups["style"].Value);
+                        int legsRel = int.Parse(relEnFullHead.Groups["legs"].Value);
+
+                        Log($"  -> MATCH RelayHeaderEnFull-in-HE: legs={legsRel}, len={relEnFullHead.Groups["len"].Value}, style={styleNormRel}, gender={genderNormRel}, age={ageRel}");
+
+                        pendingEventLen = null;
+                        currentIsRelay = true;
+                        currentRelayLegs = legsRel;
+
+                        if (current != null) yield return current;
+
+                        var nextRelEn = i + 1 < lines.Count ? lines[i + 1].Trim() : string.Empty;
+                        var dmRelEn = Regex.Match(nextRelEn, @"\d{2}/\d{2}/\d{4}");
+                        var dateRelEn = dmRelEn.Success ? dmRelEn.Value : dat_relay;
+
+                        current = new IsrOrgCompetitionResult(
+                            Competition: lines[0].Trim(),
+                            AgeGroup: ageRel,
+                            Date: dateRelEn,
+                            Event: raw,
+                            EventStyleName: styleNormRel,
+                            EventStyleLen: $"{legsRel}X{relEnFullHead.Groups["len"].Value}",
+                            EventStyleGender: genderNormRel,
+                            EventStyleAge: ageRel,
+                            PoolType: "25m",
+                            Results: new List<IsrOrgResult>()
+                        );
+                        Log($"  -> NEW RELAY EVENT (EN-in-HE): {current.Event}, gender={genderNormRel}");
                         continue;
                     }
 
@@ -1009,14 +1206,20 @@ public static class IsrOrgCompetitionParser
                     }
                 }
 
-                // EN-эстафета: командный результат (место/команда/время). Имена
-                // пловцов в PDF раздроблены на 2–3 строки с непоследовательным
-                // регистром — надёжно реконструировать ноги нельзя, поэтому берём
-                // только командный результат; строки пловцов/шапки таблицы ниже
-                // ничему не матчатся и просто пропускаются.
-                if (!isHE && current != null && currentIsRelay)
+                // EN-эстафета: командный результат (место/команда/время). Ниже, если
+                // строки пловцов удалось восстановить в ParseCompetitionsInternal
+                // (см. ReconstructEnRelaySwimmerNames — там переносы имён по X-колонкам
+                // Last/First name склеиваются обратно в "LAST First Year"), подбираем
+                // до currentRelayLegs таких строк для состава эстафеты. Если строк
+                // меньше ожидаемого или формат не совпал — состав остаётся null
+                // (garbage-in-garbage-out недопустим, лучше пустой состав).
+                // Матчим по СЫРОЙ строке (не по normalize-реверснутой `line`): в EN-режиме
+                // raw==line, а интернациональная эстафета внутри HE-экспорта тоже печатается
+                // англоязычной строкой "heat lane team time Rank pos" — normalize-реверс
+                // (рассчитанный на иврит) ломает её порядок токенов.
+                if (current != null && currentIsRelay)
                 {
-                    var tmEn = RelayTeamLineEn.Match(line);
+                    var tmEn = RelayTeamLineEn.Match(raw);
                     if (tmEn.Success)
                     {
                         int pos = int.Parse(tmEn.Groups["pos"].Value);
@@ -1036,6 +1239,31 @@ public static class IsrOrgCompetitionParser
                             timeFailNote = timeTok;
                         }
 
+                        List<RelaySwimmer>? enSwimmers = null;
+                        if (currentRelayLegs > 0)
+                        {
+                            var candidates = new List<RelaySwimmer>();
+                            int k = i + 1;
+                            int order = 1;
+                            while (k < lines.Count && candidates.Count < currentRelayLegs)
+                            {
+                                var sRaw = lines[k].Trim();
+                                if (RelayTeamLineEn.IsMatch(sRaw)) break; // следующая команда — стоп
+                                if (Regex.IsMatch(sRaw, @"^[\p{L}][\p{L}'\-]*\s+[\p{L}][\p{L}'\-]*\s+\d{4}$"))
+                                {
+                                    candidates.Add(IsrOrgResultLineParser.ParseRelaySwimmerLine(sRaw, order));
+                                    order++;
+                                }
+                                k++;
+                            }
+
+                            if (candidates.Count == currentRelayLegs)
+                            {
+                                enSwimmers = candidates;
+                                i = k - 1;
+                            }
+                        }
+
                         current.Results.Add(new IsrOrgResult(
                             Country: "",
                             Position: pos,
@@ -1050,10 +1278,12 @@ public static class IsrOrgCompetitionParser
                             InternationalPoints: 0,
                             IsRelay: true,
                             RelayTeamName: team,
-                            RelaySwimmersName: null,
-                            RelaySwimmers: null
+                            RelaySwimmersName: enSwimmers is null
+                                ? null
+                                : string.Join(", ", enSwimmers.Select(s => $"{s.FirstName} {s.LastName}".Trim())),
+                            RelaySwimmers: enSwimmers
                         ));
-                        Log($"  -> Added EN relay team result: pos={pos}, team='{team}', time={time}");
+                        Log($"  -> Added EN relay team result: pos={pos}, team='{team}', time={time}, legs={enSwimmers?.Count ?? 0}");
                         continue;
                     }
                 }
