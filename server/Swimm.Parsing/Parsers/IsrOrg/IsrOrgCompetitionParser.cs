@@ -251,6 +251,12 @@ public static class IsrOrgCompetitionParser
         // Вынесено отдельно, чтобы ядро разбора (ParseLines) можно было тестировать на голых строках.
         bool isHE = language.Equals("HE", StringComparison.OrdinalIgnoreCase);
         var pages = new List<IReadOnlyList<string>>();
+        // Колонки Last/First, перенесённые с предыдущей relay-страницы — если её
+        // командная таблица разорвана page break'ом (см. ReconstructEnRelaySwimmerNames).
+        // Перенос действует только на ОДИН следующий page hop, затем сбрасывается —
+        // подтверждённый в PDF кейс это ровно один разрыв посреди 4-ногой команды.
+        double? carriedLastColX = null;
+        double? carriedFirstColX = null;
         foreach (var page in doc.GetPages())
         {
             var words = page.GetWords();
@@ -285,9 +291,30 @@ public static class IsrOrgCompetitionParser
             // где реконструкция и так нужна только на эстафетных страницах).
             bool looksLikeRelayPage = lines.Any(l => Regex.IsMatch(l, @"\bRank\s+\d+\s*$"));
 
-            if (looksLikeRelayPage)
+            // Если это НЕ явная relay-страница (нет маркера "Rank N"), но с предыдущей
+            // страницы перенесены колонки Last/First — это может быть продолжение
+            // командной таблицы, разорванной page break'ом (нет ни командной строки,
+            // ни повторной шапки колонок). Пробуем реконструкцию и там.
+            bool isCarriedContinuation = !looksLikeRelayPage && carriedLastColX is not null && carriedFirstColX is not null;
+
+            double? seedLast = looksLikeRelayPage ? carriedLastColX : (isCarriedContinuation ? carriedLastColX : null);
+            double? seedFirst = looksLikeRelayPage ? carriedFirstColX : (isCarriedContinuation ? carriedFirstColX : null);
+
+            // Сбрасываем перенос сразу — действует только на один hop вперёд.
+            carriedLastColX = null;
+            carriedFirstColX = null;
+
+            if (looksLikeRelayPage || isCarriedContinuation)
             {
-                lines = ReconstructEnRelaySwimmerNames(groups, lines);
+                lines = ReconstructEnRelaySwimmerNames(groups, lines, seedLast, seedFirst, out var outLastColX, out var outFirstColX);
+
+                // Переносим дальше только если ЭТА страница сама была явной relay-страницей
+                // (обнаружен маркер "Rank N") — продолжение продолжения не подтверждено данными.
+                if (looksLikeRelayPage)
+                {
+                    carriedLastColX = outLastColX;
+                    carriedFirstColX = outFirstColX;
+                }
             }
 
             pages.Add(lines);
@@ -302,10 +329,6 @@ public static class IsrOrgCompetitionParser
     // Swimm.Tests/IsrOrgCompetitionParserRelayNameReconstructionTests.cs.
     internal readonly record struct PositionedWord(string Text, double Left);
 
-    // Обрывок перенесённого слова: одна "строка" (Y-группа) из ровно одного алфавитного токена.
-    private static bool IsSoleNameFragmentGroup(List<PositionedWord> group) =>
-        group.Count == 1 && IsNameFragment(group[0].Text);
-
     /// <summary>
     /// Чинит перенос имён/фамилий эстафетной таблицы EN-экспорта (Maccabiah).
     /// Колонки "Last name"/"First name" узкие, поэтому длинные имена переносятся
@@ -316,14 +339,28 @@ public static class IsrOrgCompetitionParser
     /// обрывками с соседних строк, если те по X ближе к недостающей колонке.
     /// Консервативно: при любой неоднозначности строки не трогаем (возврат как есть).
     /// </summary>
-    internal static List<string> ReconstructEnRelaySwimmerNames(List<List<PositionedWord>> groups, List<string> lines)
+    internal static List<string> ReconstructEnRelaySwimmerNames(List<List<PositionedWord>> groups, List<string> lines) =>
+        ReconstructEnRelaySwimmerNames(groups, lines, null, null, out _, out _);
+
+    /// <summary>
+    /// Перегрузка с "затравочными" X-координатами колонок Last/First — используется,
+    /// когда команда эстафеты разорвана page break'ом: продолжение (2 последние ноги)
+    /// печатается в начале СЛЕДУЮЩЕЙ страницы БЕЗ повторной шапки "Last First ...".
+    /// Вызывающий код (ParseCompetitionsInternal) переносит колонки с предыдущей
+    /// relay-страницы через seedLastColX/seedFirstColX, а finalLastColX/finalFirstColX
+    /// возвращает наружу, если в ЭТОЙ странице шапка встретилась (для следующей пары).
+    /// </summary>
+    internal static List<string> ReconstructEnRelaySwimmerNames(
+        List<List<PositionedWord>> groups, List<string> lines,
+        double? seedLastColX, double? seedFirstColX,
+        out double? finalLastColX, out double? finalFirstColX)
     {
         var result = new List<string>(lines);
         var consumed = new HashSet<int>();
         var replacements = new Dictionary<int, string>();
 
-        double? lastColX = null;
-        double? firstColX = null;
+        double? lastColX = seedLastColX;
+        double? firstColX = seedFirstColX;
 
         for (int i = 0; i < groups.Count; i++)
         {
@@ -355,28 +392,43 @@ public static class IsrOrgCompetitionParser
             bool lastMissing = lastCore is null;
             bool firstMissing = firstCore is null;
 
-            // Ни одна из колонок не распозналась рядом с годом — это не строка пловца
-            // (например, шапка таблицы или посторонний текст). Пропускаем.
-            if (lastCore is null && firstCore is null) continue;
-
+            // Раньше здесь был ранний continue, если ОБЕ колонки не распознались рядом
+            // с годом (типичный случай — шапка таблицы/посторонний текст). Но при
+            // двойном переносе (и Last, и First сломаны переносом ОДНОВРЕМЕННО) год
+            // печатается совсем ОДИН на своей Y-строке — обе колонки целиком уезжают
+            // на соседние строки (Last+First-обрывки ДО года, их суффиксы ПОСЛЕ), и
+            // otherWords пуст. Поэтому здесь больше не бракуем такую строку сразу —
+            // ниже пытаемся достроить обе колонки из соседних fragment-групп, и уже
+            // финальная проверка (last.Length==0 || first.Length==0) отбраковывает
+            // некандидатов: шапки/посторонний текст не наберут распознанных обрывков
+            // в соседних Y-строках по X-координате колонок.
             string lastPrefix = "", lastSuffix = "", firstPrefix = "", firstSuffix = "";
 
             if (lastMissing || firstMissing)
             {
-                if (i > 0 && !consumed.Contains(i - 1) && IsSoleNameFragmentGroup(groups[i - 1]))
+                if (i > 0 && !consumed.Contains(i - 1) &&
+                    TryFillFromFragmentGroup(groups[i - 1], lastColX.Value, firstColX.Value, lastMissing, firstMissing,
+                        out var lp, out var fp))
                 {
-                    var frag = groups[i - 1][0];
-                    var col = NearestColumn(frag.Left, lastColX.Value, firstColX.Value);
-                    if (col == "last" && lastMissing) { lastPrefix = frag.Text; consumed.Add(i - 1); }
-                    else if (col == "first" && firstMissing) { firstPrefix = frag.Text; consumed.Add(i - 1); }
+                    lastPrefix = lp;
+                    firstPrefix = fp;
+                    consumed.Add(i - 1);
                 }
 
-                if (i + 1 < groups.Count && IsSoleNameFragmentGroup(groups[i + 1]))
+                // Суффикс проверяем по ИСХОДНЫМ lastMissing/firstMissing (не по тому,
+                // закрыл ли уже что-то prefix): один и тот же перенесённый столбец может
+                // быть разорван НА ТРИ строки вокруг года — префикс ДО ("DABBA"), сам год
+                // строкой "Alan 2008" (без Last вообще), и суффикс ПОСЛЕ ("H") —
+                // last = DABBA + "" + H = DABBAH. Здесь core уже null, поэтому оба
+                // обрывка нужны одновременно для ОДНОЙ и той же колонки, а не только
+                // "то, что не заполнил prefix".
+                if (i + 1 < groups.Count && !consumed.Contains(i + 1) &&
+                    TryFillFromFragmentGroup(groups[i + 1], lastColX.Value, firstColX.Value, lastMissing, firstMissing,
+                        out var ls, out var fs))
                 {
-                    var frag = groups[i + 1][0];
-                    var col = NearestColumn(frag.Left, lastColX.Value, firstColX.Value);
-                    if (col == "last" && lastMissing) { lastSuffix = frag.Text; consumed.Add(i + 1); }
-                    else if (col == "first" && firstMissing) { firstSuffix = frag.Text; consumed.Add(i + 1); }
+                    lastSuffix = ls;
+                    firstSuffix = fs;
+                    consumed.Add(i + 1);
                 }
             }
 
@@ -388,6 +440,9 @@ public static class IsrOrgCompetitionParser
             replacements[i] = $"{last} {first} {yearWord.Text}";
         }
 
+        finalLastColX = lastColX;
+        finalFirstColX = firstColX;
+
         if (replacements.Count == 0 && consumed.Count == 0) return result;
 
         var final = new List<string>();
@@ -398,6 +453,47 @@ public static class IsrOrgCompetitionParser
         }
 
         return final;
+    }
+
+    /// <summary>
+    /// Пытается объяснить ВСЮ соседнюю Y-группу (1 или 2 слова) как обрывок(и)
+    /// недостающих колонок Last/First. Раньше признавали только группы из ровно
+    /// одного слова (перенос ломал одну колонку за раз) — но перенос может сломать
+    /// ОБЕ колонки одновременно, и тогда оба обрывка попадают на одну соседнюю
+    /// строку как два отдельных "слова" (напр. "VSKY n" — Last-суффикс и
+    /// First-суффикс одной группой). Строго консервативно: группа принимается,
+    /// только если КАЖДОЕ слово однозначно попадает в РЕАЛЬНО недостающую колонку
+    /// (никаких лишних/конфликтующих/неоднозначных слов) — иначе вся группа
+    /// отклоняется и строка остаётся как есть.
+    /// </summary>
+    private static bool TryFillFromFragmentGroup(
+        List<PositionedWord> group, double lastColX, double firstColX,
+        bool lastMissing, bool firstMissing,
+        out string lastFrag, out string firstFrag)
+    {
+        lastFrag = "";
+        firstFrag = "";
+
+        if (group.Count == 0 || group.Count > 2) return false;
+        if (!group.All(w => IsNameFragment(w.Text))) return false;
+        if (!lastMissing && !firstMissing) return false;
+
+        string? last = null, first = null;
+        foreach (var w in group)
+        {
+            var col = NearestColumn(w.Left, lastColX, firstColX);
+            if (col == "last" && lastMissing && last is null) last = w.Text;
+            else if (col == "first" && firstMissing && first is null) first = w.Text;
+            else return false; // непристыкованное/неоднозначное/дублирующее слово — бракуем всю группу
+        }
+
+        // Двухсловная группа обязана объяснить оба слова недостающими колонками —
+        // иначе один из "фрагментов" на самом деле посторонний текст.
+        if (group.Count == 2 && (last is null || first is null)) return false;
+
+        lastFrag = last ?? "";
+        firstFrag = first ?? "";
+        return true;
     }
 
     private static string NearestColumn(double x, double lastColX, double firstColX)
@@ -453,15 +549,27 @@ public static class IsrOrgCompetitionParser
         List<RelaySwimmer>? pendingSwimmers = null;
         int pendingSwimmersOrder = 1;
 
+        // Кол-во строк в начале СЛЕДУЮЩЕЙ страницы, уже "съеденных" как ноги
+        // эстафеты, разорванной page-break'ом (см. ветку EN relay ниже) — их
+        // не нужно заново прогонять через основной цикл разбора строк.
+        int skipLeadingLinesNextPage = 0;
+
         for (int pageIdx = 0; pageIdx < pages.Count; pageIdx++)
         {
             int pageNumber = pageIdx + 1;
             var lines = pages[pageIdx];
 
+            int startI = 0;
+            if (skipLeadingLinesNextPage > 0)
+            {
+                startI = Math.Min(skipLeadingLinesNextPage, lines.Count);
+                skipLeadingLinesNextPage = 0;
+            }
+
             Log($"--- Page {pageNumber} ---");
             Log($"Page {pageNumber}: {lines.Count} lines extracted");
 
-            for (int i = 0; i < lines.Count; i++)
+            for (int i = startI; i < lines.Count; i++)
             {
                 var raw = lines[i].Trim();
                 var line = isHE ? HebrewTextHelper.NormalizeHebrewLine(raw) : raw;
@@ -1257,10 +1365,82 @@ public static class IsrOrgCompetitionParser
                                 k++;
                             }
 
+                            // Разрыв страницы посреди состава команды: 4-ногая таблица
+                            // может быть отпечатана СПОСОБОМ, при котором первые 1-3 ноги
+                            // остаются на текущей странице, а остаток — в начале следующей,
+                            // без повтора заголовка команды/колонок (см. кейс "Maccabiah MIX"
+                            // 4X50, comp 1484 — HARAS/BENTES на одной странице, DABBAH/ACUNA
+                            // на следующей). Если ног не хватило и текущая страница закончилась
+                            // (а не просто наткнулись на новую команду/не-лег строку) —
+                            // дособираем недостающие ноги с начала следующей страницы.
+                            bool crossedPage = false;
+                            int nextPageLinesConsumed = 0;
+                            if (candidates.Count < currentRelayLegs && k >= lines.Count && pageIdx + 1 < pages.Count)
+                            {
+                                var nextLines = pages[pageIdx + 1];
+                                int k2 = 0;
+                                int nonMatchStreak = 0;
+                                // Небольшой запас непарных строк-обрывков (см. ReconstructEnRelaySwimmerNames —
+                                // фрагмент имени, для которого на этой странице не нашлось соседа для склейки,
+                                // остаётся отдельной "шумовой" строкой из одного слова и не должен обрывать
+                                // сбор ног). Явная строка команды/нового события — однозначный стоп-маркер.
+                                while (k2 < nextLines.Count && candidates.Count < currentRelayLegs)
+                                {
+                                    var sRaw = nextLines[k2].Trim();
+                                    if (RelayTeamLineEn.IsMatch(sRaw)) break; // новая команда — стоп
+                                    if (RelayHeaderEnFull.IsMatch(sRaw) || HeaderEnFull.IsMatch(sRaw)) break; // новое событие — стоп
+
+                                    if (Regex.IsMatch(sRaw, @"^[\p{L}][\p{L}'\-]*\s+[\p{L}][\p{L}'\-]*\s+\d{4}$"))
+                                    {
+                                        // Строка "выглядит" как готовая нога (два слова + год), НО если ей
+                                        // непосредственно предшествует непристыкованный обрывок имени (шум,
+                                        // который реконструкция НЕ смогла склеить в пределах этой страницы —
+                                        // склейка-с-предыдущей-страницы в ReconstructEnRelaySwimmerNames не
+                                        // поддерживается, у неё нет контекста прошлой страницы), это явный
+                                        // признак, что "готовая" строка сама — недостроенный фрагмент (напр.
+                                        // "KOZUC" / "HOWIC Micael 2009" / "Z" — читается как KOZUCHOWICZ, но
+                                        // мы не можем это надёжно доказать). Гарантированно неоднозначный
+                                        // случай — консервативно останавливаем сборку состава здесь, а не
+                                        // подсовываем частично verно ногу.
+                                        if (nonMatchStreak > 0) break;
+
+                                        candidates.Add(IsrOrgResultLineParser.ParseRelaySwimmerLine(sRaw, order));
+                                        order++;
+                                        nonMatchStreak = 0;
+                                    }
+                                    else if (IsNameFragment(sRaw))
+                                    {
+                                        // Непристыкованный обрывок имени (шум реконструкции) — пропускаем.
+                                        nonMatchStreak++;
+                                    }
+                                    else
+                                    {
+                                        break; // явно не строка ноги и не шумовой обрывок — стоп (safety)
+                                    }
+
+                                    if (nonMatchStreak > 4) break; // защита от рантвэя по несвязанной странице
+                                    k2++;
+                                }
+
+                                if (candidates.Count == currentRelayLegs)
+                                {
+                                    crossedPage = true;
+                                    nextPageLinesConsumed = k2;
+                                }
+                            }
+
                             if (candidates.Count == currentRelayLegs)
                             {
                                 enSwimmers = candidates;
-                                i = k - 1;
+                                if (crossedPage)
+                                {
+                                    skipLeadingLinesNextPage = nextPageLinesConsumed;
+                                    i = lines.Count; // текущая страница исчерпана этой командой
+                                }
+                                else
+                                {
+                                    i = k - 1;
+                                }
                             }
                         }
 
