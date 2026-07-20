@@ -113,4 +113,29 @@ public class CompetitionDiscoveryServiceTests
 
         Assert.NotNull(all.Single(d => d.OrgCompId == 1).MatchedCompetitionName);
     }
+
+    [Fact]
+    public async Task AddLanguagesAsync_He_PersistsMonolingualVerdict()
+    {
+        // Регрессия: DiscoveryAdminController.SyncLanguages, ветка «monolingual» (обе культуры
+        // отдают один и тот же PDF — второй языковой версии на loglig нет), должна пометить
+        // запись Languages="he", чтобы кнопка «Синхр. языки» перестала показываться и рендер
+        // строки объяснял, почему. Раньше эта ветка возвращала 200, но ничего не сохраняла.
+        await using var db = CreateDb(nameof(AddLanguagesAsync_He_PersistsMonolingualVerdict));
+        db.DiscoveredCompetitions.Add(new DiscoveredCompetition
+        {
+            Id = 100, OrgCompId = 16825, Name = "אליפות חדרה הפתוחה 2026",
+            DateStart = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            DateEnd = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            Status = DiscoveredCompetitionStatus.Imported
+        });
+        await db.SaveChangesAsync();
+
+        var svc = CreateService(db, new FakeProvider());
+        var ok = await svc.AddLanguagesAsync(100, ["he"]);
+
+        Assert.True(ok);
+        var row = await db.DiscoveredCompetitions.SingleAsync(d => d.Id == 100);
+        Assert.Equal("he", row.Languages);
+    }
 }

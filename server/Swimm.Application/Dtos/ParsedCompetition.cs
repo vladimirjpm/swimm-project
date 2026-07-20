@@ -48,4 +48,4 @@ public record ParsedCompetition
 }
 
 /// <summary>Одно соревнование из распарсенного файла (файл может содержать несколько дней/дат).</summary>
-public record ParsedCompetitionSummary(string Competition, string Date, int ResultCount);
+public record ParsedCompetitionSummary(string Competition, string Date, int ResultCount, string? PoolType = null);

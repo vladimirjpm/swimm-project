@@ -21,4 +21,11 @@ public interface IImportService
     /// Возвращает агрегированные счётчики удалённого; null — событие не найдено.</summary>
     Task<DeleteCompetitionResult?> DeleteCompetitionEventAsync(int eventId);
     string[] GetClearableTables();
+
+    /// <summary>
+    /// Для превью перед импортом: по каждому дню файла ищет уже существующее в БД соревнование
+    /// по ключу Name|Date|PoolType (тот же ключ, что использует ImportAsync). Не требует парсинга —
+    /// принимает готовую сводку по дням из ParsedCompetition.Competitions.
+    /// </summary>
+    Task<List<ExistingCompetitionMatch>> FindExistingCompetitionsAsync(IReadOnlyList<ParsedCompetitionSummary> competitions);
 }

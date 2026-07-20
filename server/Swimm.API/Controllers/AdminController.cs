@@ -135,7 +135,8 @@ public class AdminController : ControllerBase
         IFormFile? file,
         [FromForm] string[]? categories,
         [FromForm] int? eventId,
-        [FromForm] string? newEventName)
+        [FromForm] string? newEventName,
+        [FromForm] bool overwriteExisting = false)
     {
         if (file == null || file.Length == 0)
             return BadRequest(new { error = "No file uploaded" });
@@ -154,8 +155,8 @@ public class AdminController : ControllerBase
 
         // Привязка к многодневному событию (опционально): existing eventId XOR newEventName.
         ImportEventOptions? eventOptions = null;
-        if (eventId.HasValue || !string.IsNullOrWhiteSpace(newEventName))
-            eventOptions = new ImportEventOptions(eventId, newEventName);
+        if (eventId.HasValue || !string.IsNullOrWhiteSpace(newEventName) || overwriteExisting)
+            eventOptions = new ImportEventOptions(eventId, newEventName, overwriteExisting);
 
         var jobId = _jobs.Enqueue(data, file.FileName, categories, eventOptions);
         return Accepted(new { jobId });
@@ -228,6 +229,9 @@ public class AdminController : ControllerBase
         var previewId = Guid.NewGuid();
         _cache.Set(PreviewCacheKey(previewId), new PdfPreviewEntry(parsed, file.FileName), TimeSpan.FromMinutes(15));
 
+        var existingMatches = await _import.FindExistingCompetitionsAsync(parsed.Competitions);
+        var existingCompetitionId = existingMatches.FirstOrDefault(m => m.ExistingCompetitionId != null)?.ExistingCompetitionId;
+
         return Ok(new
         {
             previewId,
@@ -235,7 +239,9 @@ public class AdminController : ControllerBase
             resultCount = parsed.ResultCount,
             competitions = parsed.Competitions,
             warnings = parsed.Warnings,
-            debugLog = parsed.DebugLog
+            debugLog = parsed.DebugLog,
+            existingCompetitionId,
+            existingCompetitions = existingMatches
         });
     }
 
@@ -249,8 +255,8 @@ public class AdminController : ControllerBase
         _cache.Remove(key);
 
         ImportEventOptions? eventOptions = null;
-        if (request.EventId.HasValue || !string.IsNullOrWhiteSpace(request.NewEventName))
-            eventOptions = new ImportEventOptions(request.EventId, request.NewEventName);
+        if (request.EventId.HasValue || !string.IsNullOrWhiteSpace(request.NewEventName) || request.OverwriteExisting)
+            eventOptions = new ImportEventOptions(request.EventId, request.NewEventName, request.OverwriteExisting);
 
         var jobId = _jobs.Enqueue(
             Encoding.UTF8.GetBytes(entry.Parsed.ResultsJson),
@@ -394,5 +400,5 @@ public class AdminController : ControllerBase
     public record SetActiveRequest(bool IsActive);
     public record UpdateSettingRequest(string Value);
     public record UpdateCompetitionRequest(bool IsAward, bool ShowCombineAllResults, string[]? Categories);
-    public record ImportParsedRequest(Guid PreviewId, string[]? CategoryKeys, int? EventId, string? NewEventName);
+    public record ImportParsedRequest(Guid PreviewId, string[]? CategoryKeys, int? EventId, string? NewEventName, bool OverwriteExisting = false);
 }

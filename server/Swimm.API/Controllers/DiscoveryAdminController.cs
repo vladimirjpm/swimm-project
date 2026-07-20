@@ -22,6 +22,7 @@ public class DiscoveryAdminController : ControllerBase
     private readonly IResultSourceProvider _sourceProvider;
     private readonly ISwimmerNameSyncService _nameSync;
     private readonly IImportJobQueue _jobs;
+    private readonly IImportService _import;
     private readonly IMemoryCache _cache;
     private readonly ILogger<DiscoveryAdminController> _logger;
 
@@ -31,6 +32,7 @@ public class DiscoveryAdminController : ControllerBase
         IResultSourceProvider sourceProvider,
         ISwimmerNameSyncService nameSync,
         IImportJobQueue jobs,
+        IImportService import,
         IMemoryCache cache,
         ILogger<DiscoveryAdminController> logger)
     {
@@ -39,6 +41,7 @@ public class DiscoveryAdminController : ControllerBase
         _sourceProvider = sourceProvider;
         _nameSync = nameSync;
         _jobs = jobs;
+        _import = import;
         _cache = cache;
         _logger = logger;
     }
@@ -149,6 +152,9 @@ public class DiscoveryAdminController : ControllerBase
         _cache.Set(PreviewCacheKey(previewId),
             new DiscoveryPreviewEntry(parsed, primaryName, id), TimeSpan.FromMinutes(15));
 
+        var existingMatches = await _import.FindExistingCompetitionsAsync(parsed.Competitions);
+        var existingCompetitionId = existingMatches.FirstOrDefault(m => m.ExistingCompetitionId != null)?.ExistingCompetitionId;
+
         return Ok(new
         {
             previewId,
@@ -156,7 +162,9 @@ public class DiscoveryAdminController : ControllerBase
             resultCount = parsed.ResultCount,
             competitions = parsed.Competitions,
             warnings = parsed.Warnings,
-            languages
+            languages,
+            existingCompetitionId,
+            existingCompetitions = existingMatches
         });
     }
 
@@ -191,6 +199,7 @@ public class DiscoveryAdminController : ControllerBase
             // только метаданные) — отдельной второй версии на loglig не существует
             // (Maccabiah-кейс). Это не ошибка, синхронизировать нечего.
             _logger.LogInformation("Discovery sync-languages: протокол одноязычный (id={Id})", id);
+            await _discovery.AddLanguagesAsync(id, ["he"], ct);
             await _discovery.SetLastErrorAsync(id, null, ct);
             return Ok(new
             {
@@ -245,8 +254,8 @@ public class DiscoveryAdminController : ControllerBase
         _cache.Remove(key);
 
         ImportEventOptions? eventOptions = null;
-        if (request.EventId.HasValue || !string.IsNullOrWhiteSpace(request.NewEventName))
-            eventOptions = new ImportEventOptions(request.EventId, request.NewEventName);
+        if (request.EventId.HasValue || !string.IsNullOrWhiteSpace(request.NewEventName) || request.OverwriteExisting)
+            eventOptions = new ImportEventOptions(request.EventId, request.NewEventName, request.OverwriteExisting);
 
         var jobId = _jobs.Enqueue(
             Encoding.UTF8.GetBytes(entry.Parsed.ResultsJson),
@@ -302,5 +311,6 @@ public class DiscoveryAdminController : ControllerBase
         Guid PreviewId,
         string[]? CategoryKeys,
         int? EventId,
-        string? NewEventName);
+        string? NewEventName,
+        bool OverwriteExisting = false);
 }
