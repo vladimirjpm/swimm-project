@@ -34,4 +34,16 @@ public interface ILogligLinkService
 
     /// <summary>Снять привязку (обнуляет все Loglig-поля).</summary>
     Task<bool> UnlinkAsync(int swimmerId, CancellationToken ct);
+
+    /// <summary>
+    /// Батч (шаг 7): прогоняет до take непривязанных пловцов через FindAndLinkAsync.
+    /// Берутся пловцы с ивритским именем (по ним ищет loglig) и хотя бы одним личным
+    /// результатом (без результатов сверке не с чем работать), сначала — с наибольшим
+    /// числом результатов. Пловцы, у которых поиск дал кандидатов без однозначного
+    /// AutoVerify, остаются непривязанными — их смотрит админ кнопкой.
+    /// </summary>
+    Task<LogligBatchReport> RunBatchAsync(int take, CancellationToken ct);
 }
+
+/// <summary>Итог батч-прогона (шаг 7) для лога/мониторинга.</summary>
+public sealed record LogligBatchReport(int Processed, int Linked, int WithCandidates, int NothingFound);

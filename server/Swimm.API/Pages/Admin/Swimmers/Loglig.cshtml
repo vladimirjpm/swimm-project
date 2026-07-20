@@ -22,6 +22,10 @@
         <option value="linked">Привязанные</option>
     </select>
     <button id="btn-search" class="admin-btn admin-btn-primary cursor-pointer rounded-md px-4 py-2 text-[13px] font-semibold">Найти</button>
+    <button id="btn-batch" class="cursor-pointer rounded-md border border-admin-border px-3 py-2 text-[13px] text-admin-text-muted"
+            title="Прогнать через поиск+сверку N непривязанных пловцов с наибольшим числом результатов (каждый — 1–3 платных Serper-запроса)">
+        Батч ×20
+    </button>
     <span id="info" class="text-[12.5px] text-admin-text-muted"></span>
 </div>
 
@@ -219,6 +223,24 @@
     }
 
     document.getElementById('btn-search').addEventListener('click', load);
+
+    // Батч (шаг 7): до 20 непривязанных за клик; ночной вариант — LogligBatchEnabled в Settings.
+    document.getElementById('btn-batch').addEventListener('click', async () => {
+        if (!searchConfigured) { toast('Поиск не сконфигурирован (CandidateSearch:ApiKey)', 5000); return; }
+        if (!confirm('Прогнать батч по 20 непривязанным пловцам? Это платные запросы к Serper (копейки, но осознанно).')) return;
+        const btn = document.getElementById('btn-batch');
+        btn.disabled = true;
+        document.getElementById('info').textContent = 'Батч идёт (до пары минут)…';
+        try {
+            const r = await apiJson(`${API}/batch`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ take: 20 })
+            });
+            toast(`Батч: обработано ${r.processed}, привязано ${r.linked}, с кандидатами ${r.withCandidates}, впустую ${r.nothingFound}`, 8000);
+            await load();
+        } catch (e) { toast('Ошибка батча: ' + e.message, 6000); }
+        finally { btn.disabled = false; }
+    });
     document.getElementById('q').addEventListener('keydown', e => { if (e.key === 'Enter') load(); });
     document.getElementById('status').addEventListener('change', load);
 

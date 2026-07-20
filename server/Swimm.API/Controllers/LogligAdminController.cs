@@ -41,6 +41,17 @@ public class LogligAdminController(ILogligLinkService linkService, ICandidateSea
     public async Task<IActionResult> Set([FromBody] SetRequest request, CancellationToken ct)
         => Ok(await linkService.SetManualAsync(request.SwimmerId, request.LogligId, ct));
 
+    public sealed record BatchRequest(int Take);
+
+    /// <summary>Ручной запуск батча (шаг 7): до take непривязанных пловцов через поиск+сверку.
+    /// Каждый пловец — 1–3 платных Serper-запроса, поэтому take жёстко ограничен.</summary>
+    [HttpPost("batch")]
+    public async Task<IActionResult> RunBatch([FromBody] BatchRequest request, CancellationToken ct)
+    {
+        var take = Math.Clamp(request.Take <= 0 ? 20 : request.Take, 1, 200);
+        return Ok(await linkService.RunBatchAsync(take, ct));
+    }
+
     public sealed record UnlinkRequest(int SwimmerId);
 
     /// <summary>Снять привязку.</summary>

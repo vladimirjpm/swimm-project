@@ -112,6 +112,7 @@ builder.Services.AddSingleton<DbStatusService>();
 builder.Services.AddHostedService<DbPingBackgroundService>();
 builder.Services.AddHostedService<Swimm.API.BackgroundServices.CompetitionDiscoveryBackgroundService>();
 builder.Services.AddHostedService<Swimm.API.BackgroundServices.LogligSuggestionVerificationBackgroundService>();
+builder.Services.AddHostedService<Swimm.API.BackgroundServices.LogligBatchBackgroundService>();
 
 var app = builder.Build();
 

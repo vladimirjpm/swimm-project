@@ -269,4 +269,83 @@ public class LogligLinkServiceTests
         Assert.Equal(2, byName.Count);
         Assert.All(byName, r => Assert.Equal("כהן", r.LastName));
     }
+
+    // ── RunBatchAsync (шаг 7) ─────────────────────────────────────────────────
+
+    private static ResultRecord R(int swimmerId) => new()
+    {
+        SwimmerId = swimmerId, CompetitionId = 1, ClubId = 1, StyleId = 1,
+        CompetitionDate = new DateTime(2026, 6, 16, 0, 0, 0, DateTimeKind.Utc),
+        Distance = "100", Gender = "F",
+    };
+
+    private static async Task SeedStyleAsync(SwimmDbContext db)
+    {
+        db.Styles.Add(new Style { Id = 1, Name = "freestyle" });
+        await db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task RunBatch_LinksAutoVerify_SkipsNonHebrewAndResultless()
+    {
+        await using var db = CreateDb(nameof(RunBatch_LinksAutoVerify_SkipsNonHebrewAndResultless));
+        await SeedStyleAsync(db);
+        var hebrew = S("ברנצב", "סבינה", 2017);
+        var latin = S("Smith", "John", 1990);      // латиница — квоту не жжём
+        var noResults = S("כהן", "נועה", 2015);    // без результатов — сверке не с чем работать
+        db.Swimmers.AddRange(hebrew, latin, noResults);
+        await db.SaveChangesAsync();
+        db.Results.AddRange(R(hebrew.Id), R(latin.Id));
+        await db.SaveChangesAsync();
+
+        var service = Service(db,
+            search: new FakeSearchProvider([111]),
+            client: new FakeLogligClient(new Dictionary<int, LogligPlayerCard?> { [111] = Card("סבינה ברנצב") }),
+            match: new FakeMatchService(_ => LogligMatchDecision.AutoVerify));
+
+        var report = await service.RunBatchAsync(10, CancellationToken.None);
+
+        Assert.Equal(new LogligBatchReport(1, 1, 0, 0), report);
+        Assert.Equal(111, (await db.Swimmers.SingleAsync(s => s.Id == hebrew.Id)).LogligId);
+        Assert.Null((await db.Swimmers.SingleAsync(s => s.Id == latin.Id)).LogligId);
+        Assert.Null((await db.Swimmers.SingleAsync(s => s.Id == noResults.Id)).LogligId);
+    }
+
+    [Fact]
+    public async Task RunBatch_RespectsTake_AndCountsOutcomes()
+    {
+        await using var db = CreateDb(nameof(RunBatch_RespectsTake_AndCountsOutcomes));
+        await SeedStyleAsync(db);
+        var s1 = S("ברנצב", "סבינה", 2017);
+        var s2 = S("כהן", "נועה", 2015);
+        var s3 = S("לוי", "דן", 2016);
+        db.Swimmers.AddRange(s1, s2, s3);
+        await db.SaveChangesAsync();
+        // s1 — 3 результата, s2 — 2, s3 — 1: порядок прогона по числу результатов.
+        db.Results.AddRange(R(s1.Id), R(s1.Id), R(s1.Id), R(s2.Id), R(s2.Id), R(s3.Id));
+        await db.SaveChangesAsync();
+
+        // Поиск ничего не находит → оба обработанных уходят в NothingFound; s3 не трогаем (take=2).
+        var service = Service(db, search: new FakeSearchProvider([]));
+
+        var report = await service.RunBatchAsync(2, CancellationToken.None);
+
+        Assert.Equal(new LogligBatchReport(2, 0, 0, 2), report);
+    }
+
+    [Fact]
+    public async Task RunBatch_SearchNotConfigured_DoesNothing()
+    {
+        await using var db = CreateDb(nameof(RunBatch_SearchNotConfigured_DoesNothing));
+        await SeedStyleAsync(db);
+        var s = S("ברנצב", "סבינה", 2017);
+        db.Swimmers.Add(s);
+        await db.SaveChangesAsync();
+        db.Results.Add(R(s.Id));
+        await db.SaveChangesAsync();
+
+        var service = Service(db, search: new FakeSearchProvider(null, configured: false));
+
+        Assert.Equal(new LogligBatchReport(0, 0, 0, 0), await service.RunBatchAsync(10, CancellationToken.None));
+    }
 }

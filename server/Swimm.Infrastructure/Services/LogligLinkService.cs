@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
@@ -123,6 +124,47 @@ public class LogligLinkService(
         await db.SaveChangesAsync(ct);
         return true;
     }
+
+    public async Task<LogligBatchReport> RunBatchAsync(int take, CancellationToken ct)
+    {
+        if (take <= 0 || !searchProvider.IsConfigured)
+            return new LogligBatchReport(0, 0, 0, 0);
+
+        // Кандидаты на прогон: без какого-либо loglig-статуса (Suggested/Rejected не трогаем —
+        // ими занимается краудсорс-цикл), с ивритским именем (loglig ищется по ивриту;
+        // латиница/хэши только жгли бы квоту) и хотя бы одним личным результатом; сначала — с
+        // наибольшим числом результатов (там сверке есть за что зацепиться).
+        // Regex.IsMatch Npgsql транслирует в SQL-оператор ~, InMemory-провайдер тестов
+        // исполняет в памяти.
+        var targets = await db.Swimmers.AsNoTracking()
+            .Where(s => s.LogligIdStatus == null && s.LogligId == null)
+            .Where(s => Regex.IsMatch(s.LastName, "[א-ת]") || Regex.IsMatch(s.FirstName, "[א-ת]"))
+            .Select(s => new
+            {
+                s.Id,
+                ResultCount = db.Results.Count(r => r.SwimmerId == s.Id && r.RelayId == null),
+            })
+            .Where(x => x.ResultCount > 0)
+            .OrderByDescending(x => x.ResultCount)
+            .Take(take)
+            .ToListAsync(ct);
+
+        int linked = 0, withCandidates = 0, nothingFound = 0;
+        foreach (var target in targets)
+        {
+            ct.ThrowIfCancellationRequested();
+            var result = await FindAndLinkAsync(target.Id, ct);
+            if (result.Linked) linked++;
+            else if (result.Candidates.Count > 0) withCandidates++;
+            else nothingFound++;
+        }
+
+        logger.LogInformation(
+            "Loglig batch: обработано {Processed}, привязано {Linked}, с кандидатами {WithCandidates}, впустую {NothingFound}",
+            targets.Count, linked, withCandidates, nothingFound);
+        return new LogligBatchReport(targets.Count, linked, withCandidates, nothingFound);
+    }
+
 
     /// <summary>Сохраняет привязку с проверкой занятости LogligId (AnyAsync + перехват гонки на SaveChanges).</summary>
     private async Task<(bool Linked, string? Error)> TryLinkAsync(
