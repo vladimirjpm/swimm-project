@@ -135,10 +135,14 @@ public class JsonImportService : IImportService
             countryByName.TryAdd(c.CountryName, c);
         }
 
-        // Competitions: AsNoTracking — we read IDs and check for duplicates
-        var competitionCache = new Dictionary<string, Competition>();
-        foreach (var c in await _db.Competitions.AsNoTracking().ToListAsync())
-            competitionCache.TryAdd($"{c.Name}|{c.Date}|{c.PoolType}", c);
+        // Competitions: AsNoTracking — we read IDs and check for duplicates. Индекс строится тем же
+        // правилом (Name-или-SubName+Date+PoolType), что и превью (ImportCompetitionMatcher) —
+        // раньше здесь был строгий Name-only ключ, из-за чего импорт промахивался мимо дней,
+        // переименованных при привязке к CompetitionEvent (Name=имя события, SubName=заголовок
+        // файла), и создавал дубль там, где превью репортило совпадение (инцидент Maccabiah).
+        var competitionCache = ImportCompetitionMatcher.BuildIndex(
+            await _db.Competitions.AsNoTracking().ToListAsync(),
+            c => c.Name, c => c.SubName, c => c.Date, c => c.PoolType);
 
         // Clubs: AsNoTracking — we only read their IDs
         var clubCache = new Dictionary<string, Club>();
@@ -263,7 +267,11 @@ public class JsonImportService : IImportService
                 // чтобы дни одного события не плодили дубликаты и совпадали с unique-индексом
                 // (Name, Date, PoolType). Оригинальный заголовок файла уходит в SubName.
                 var displayName = targetEvent != null ? targetEvent.Name : (item.Competition ?? string.Empty);
-                var compKey = $"{displayName}|{item.Date}|{item.PoolType}";
+                // NormalizePoolType — как и в FindExistingCompetitionsAsync/ImportCompetitionMatcher:
+                // индекс построен по уже нормализованному Competition.PoolType из БД, а item.PoolType
+                // приходит из файла в сыром виде ("25"/"25m") — сравнивать нужно нормализованное с
+                // нормализованным, иначе тот же промах мимо кэша, что и с Name/SubName.
+                var compKey = ImportCompetitionMatcher.Key(displayName, item.Date ?? string.Empty, NormalizePoolType(item.PoolType));
                 if (!competitionCache.TryGetValue(compKey, out var competition))
                 {
                     competition = new Competition
@@ -282,6 +290,13 @@ public class JsonImportService : IImportService
                     _db.Competitions.Add(competition);
                     await _db.SaveChangesAsync();
                     competitionCache[compKey] = competition;
+                    // Индексируем и по SubName (тем же правилом, что ImportCompetitionMatcher.BuildIndex),
+                    // чтобы последующие строки этого же импорта и повторный импорт того же файла
+                    // находили соревнование по обоим ключам.
+                    if (!string.IsNullOrWhiteSpace(competition.SubName))
+                        competitionCache.TryAdd(
+                            ImportCompetitionMatcher.Key(competition.SubName, competition.Date, competition.PoolType),
+                            competition);
                     verifiedNewCompetitions.Add(competition.Id);
                     touchedCompetitionKeys.Add(compKey);
 
@@ -567,7 +582,10 @@ public class JsonImportService : IImportService
                     .ThenInclude(g => g!.Items)
                 .ToListAsync();
 
-            var match = ResultMatcher.Match(oldRows, newRowsForComp, ResultMatcher.KeyOfPersisted, ResultMatcher.KeyOfTransient);
+            var match = ResultMatcher.Match(
+                oldRows, newRowsForComp,
+                ResultMatcher.KeyOfPersisted, ResultMatcher.KeyOfTransient,
+                ResultMatcher.SwimmerIdOfPersisted, ResultMatcher.SwimmerIdOfTransient);
 
             foreach (var (old, incoming) in match.Matched)
             {
@@ -823,22 +841,21 @@ public class JsonImportService : IImportService
             .Select(g => new { CompetitionId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.CompetitionId, x => x.Count);
 
-        var byKey = new Dictionary<string, (int Id, string Name)>();
-        foreach (var c in existing)
-        {
-            byKey.TryAdd($"{c.Name}|{c.Date}|{c.PoolType}", (c.Id, c.Name));
-            if (!string.IsNullOrWhiteSpace(c.SubName))
-                byKey.TryAdd($"{c.SubName}|{c.Date}|{c.PoolType}", (c.Id, c.Name));
-        }
+        // Общее правило матчинга «эта строка уже импортирована» (Name-или-SubName+Date+PoolType) —
+        // см. ImportCompetitionMatcher. То же самое правило использует competitionCache в
+        // ImportAsync ниже: раньше это были два разных правила, и импорт создавал дубль там, где
+        // превью репортило совпадение (инцидент Maccabiah, docs/plans/import-upsert-plan.md).
+        var byKey = ImportCompetitionMatcher.BuildIndex(
+            existing, c => c.Name, c => c.SubName, c => c.Date, c => c.PoolType);
 
         foreach (var day in competitions)
         {
             (int Id, string Name)? found = null;
             if (!string.IsNullOrWhiteSpace(day.PoolType))
             {
-                var key = $"{day.Competition}|{day.Date}|{NormalizePoolType(day.PoolType)}";
+                var key = ImportCompetitionMatcher.Key(day.Competition, day.Date, NormalizePoolType(day.PoolType));
                 if (byKey.TryGetValue(key, out var m))
-                    found = m;
+                    found = (m.Id, m.Name);
             }
             int? existingResultCount = found.HasValue
                 ? resultCounts.GetValueOrDefault(found.Value.Id, 0)

@@ -340,6 +340,135 @@ public class ImportUpsertIntegrationTests
     }
 
     [Fact]
+    public async Task RenamedByEventAttachment_ReimportMatchesBySubName_DoesNotDuplicate()
+    {
+        // Инцидент 2026-07-20 (Маккабиада): Competition.Id 1483/1484/1485 — Name «Maccabiah 2026»
+        // (имя CompetitionEvent), SubName «Maccabiah 2025 -» (исходный заголовок файла). Превью
+        // (FindExistingCompetitionsAsync) матчит по Name-ИЛИ-SubName и находит соревнование, но
+        // раньше ИМПОРТ искал в своём кэше строго по Name и промахивался — создавал НОВОЕ
+        // соревнование («Maccabiah 2025 -», Id 1488-1490) вместо апдейта существующего. Этот тест
+        // гоняет реальный ImportAsync (не только превью) через тот же сценарий переименования.
+        await using var db = CreateDb(nameof(RenamedByEventAttachment_ReimportMatchesBySubName_DoesNotDuplicate));
+        var svc = new JsonImportService(db, new NullCacheService());
+
+        await svc.ImportAsync(ToStream(new[]
+        {
+            Item("Cohen", "Tal", 2005, lane: 1, competition: "Maccabiah 2025 -", date: "01/06/2026"),
+            Item("Levi", "Dan", 2006, lane: 2, competition: "Maccabiah 2025 -", date: "01/06/2026")
+        }));
+        var competition = await db.Competitions.SingleAsync();
+        var originalCompetitionId = competition.Id;
+
+        // Симулируем привязку дня к CompetitionEvent: Name становится именем события, исходный
+        // заголовок файла уходит в SubName (как делает ветка targetEvent != null в ImportAsync).
+        competition.Name = "Maccabiah 2026";
+        competition.SubName = "Maccabiah 2025 -";
+        await db.SaveChangesAsync();
+
+        // Переимпорт того же файла БЕЗ EventId (обычный overwrite, ровно как в инциденте — второй
+        // раз файл залили не через "дописать к событию", а как обычный upsert). Заголовок в файле
+        // всё ещё "Maccabiah 2025 -" — теперь это SubName существующего соревнования, не Name.
+        var reimport = await svc.ImportAsync(ToStream(new[]
+        {
+            Item("Cohen", "Tal", 2005, lane: 1, time: "00:29.00", competition: "Maccabiah 2025 -", date: "01/06/2026"),
+            Item("Levi", "Dan", 2006, lane: 2, competition: "Maccabiah 2025 -", date: "01/06/2026")
+        }), eventOptions: Overwrite);
+
+        Assert.Empty(reimport.ErrorMessages);
+        Assert.DoesNotContain("Дубль", reimport.Message);
+        Assert.Equal(2, reimport.Updated);
+        Assert.Equal(0, reimport.Inserted);
+
+        // Никакого нового соревнования не создано — тот же Id, Name/SubName не тронуты.
+        Assert.Equal(1, await db.Competitions.CountAsync());
+        var stillTheSame = await db.Competitions.SingleAsync();
+        Assert.Equal(originalCompetitionId, stillTheSame.Id);
+        Assert.Equal("Maccabiah 2026", stillTheSame.Name);
+        Assert.Equal("Maccabiah 2025 -", stillTheSame.SubName);
+        Assert.Equal(2, await db.Results.CountAsync());
+    }
+
+    [Fact]
+    public async Task RenamedByEventAttachment_ReimportWithoutOverwrite_StillRaisesDuplicateError()
+    {
+        // Симметричный случай без флага OverwriteExisting: даже когда заголовок файла совпадает
+        // только с SubName (не с Name), обычный (не-overwrite) повторный импорт обязан по-прежнему
+        // отбиваться «Дубль», а не тихо создавать новое соревнование — фикс матчинга не должен
+        // ослаблять защиту от случайного дубля для не-overwrite пути.
+        await using var db = CreateDb(nameof(RenamedByEventAttachment_ReimportWithoutOverwrite_StillRaisesDuplicateError));
+        var svc = new JsonImportService(db, new NullCacheService());
+
+        await svc.ImportAsync(ToStream(new[]
+        {
+            Item("Cohen", "Tal", 2005, lane: 1, competition: "Maccabiah 2025 -", date: "01/06/2026")
+        }));
+        var competition = await db.Competitions.SingleAsync();
+        competition.Name = "Maccabiah 2026";
+        competition.SubName = "Maccabiah 2025 -";
+        await db.SaveChangesAsync();
+
+        var reimport = await svc.ImportAsync(ToStream(new[]
+        {
+            Item("Cohen", "Tal", 2005, lane: 1, competition: "Maccabiah 2025 -", date: "01/06/2026")
+        })); // без eventOptions — overwriteExisting=false
+
+        Assert.Contains("Дубль", reimport.Message);
+        Assert.Equal(1, await db.Competitions.CountAsync()); // не создано нового соревнования
+        Assert.Equal(1, await db.Results.CountAsync());
+    }
+
+    [Fact]
+    public async Task RelayLegKeyCollision_MembershipChangedAndReordered_UpdatesSurvivorsNotDuplicates()
+    {
+        // Инцидент 2026-07-20 (Маккабиада), вторая половина: relay-leg строки без RelayId делят
+        // Heat/Lane/Style/Distance/Gender между собой (ключ Р2 коллизирует). Фикс парсера сменил
+        // состав ног между переимпортами (одна нога пропала, оставшиеся переставились местами в
+        // файле) — раньше чистый FIFO путал ноги местами / плодил вставки; SwimmerId-приоритет
+        // обязан узнать переживших ног по SwimmerId независимо от позиции и обновить их на месте.
+        await using var db = CreateDb(nameof(RelayLegKeyCollision_MembershipChangedAndReordered_UpdatesSurvivorsNotDuplicates));
+        var svc = new JsonImportService(db, new NullCacheService());
+
+        // Три "ноги" в одной группе коллизии: один и тот же heat/lane (как в реальных данных —
+        // relay-leg-строки не несут собственный Lane, парсер проставляет им Lane команды).
+        var first = await svc.ImportAsync(ToStream(new[]
+        {
+            Item("Rtzma", "Cooper", 2007, lane: 5, heat: 1, time: "00:37.32"),
+            Item("Semenenko", "Yaroslav", 2008, lane: 5, heat: 1, time: "00:47.75"),
+            Item("Iaich", "Itsik", 2006, lane: 5, heat: 1, time: "00:58.52")
+        }));
+        Assert.Empty(first.ErrorMessages);
+        Assert.Equal(3, await db.Results.CountAsync());
+
+        var oldRows = await db.Results.Include(r => r.Swimmer).Where(r => r.Lane == 5).ToListAsync();
+        var cooperOldId = oldRows.Single(r => r.Swimmer.LastName == "Rtzma").Id;
+        var semenenkoOldId = oldRows.Single(r => r.Swimmer.LastName == "Semenenko").Id;
+        var iaichOldId = oldRows.Single(r => r.Swimmer.LastName == "Iaich").Id;
+
+        // Переимпорт после фикса парсера: Iaich пропал из группы, Semenenko и Rtzma остались, но
+        // переставлены местами в файле и получили новое время.
+        var reimport = await svc.ImportAsync(ToStream(new[]
+        {
+            Item("Semenenko", "Yaroslav", 2008, lane: 5, heat: 1, time: "00:46.10"),
+            Item("Rtzma", "Cooper", 2007, lane: 5, heat: 1, time: "00:36.90")
+        }), eventOptions: Overwrite);
+
+        Assert.Empty(reimport.ErrorMessages);
+        Assert.Equal(2, reimport.Updated);
+        Assert.Equal(0, reimport.Inserted);
+        // DeleteMissing=false (default) — Iaich не удалён, просто не тронут.
+        Assert.Equal(0, reimport.Deleted);
+        Assert.Equal(3, await db.Results.CountAsync());
+
+        var cooperNow = await db.Results.SingleAsync(r => r.Id == cooperOldId);
+        var semenenkoNow = await db.Results.SingleAsync(r => r.Id == semenenkoOldId);
+        var iaichNow = await db.Results.SingleAsync(r => r.Id == iaichOldId);
+
+        Assert.Equal(36900, cooperNow.TimeMillisecond); // обновлён, Id сохранён
+        Assert.Equal(46100, semenenkoNow.TimeMillisecond); // обновлён, Id сохранён
+        Assert.Equal(58520, iaichNow.TimeMillisecond); // не тронут (DeleteMissing=false)
+    }
+
+    [Fact]
     public async Task ReimportWithoutFlag_StillFailsWithDuplicateError()
     {
         await using var db = CreateDb(nameof(ReimportWithoutFlag_StillFailsWithDuplicateError));

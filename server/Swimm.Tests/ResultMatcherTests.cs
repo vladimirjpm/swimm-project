@@ -12,7 +12,7 @@ namespace Swimm.Tests;
 public class ResultMatcherTests
 {
     private static ResultRecord Old(int id, int compId = 1, int styleId = 1, string distance = "50",
-        string gender = "male", int heat = 1, int lane = 1, int? relayId = null) => new()
+        string gender = "male", int heat = 1, int lane = 1, int? relayId = null, int swimmerId = 0) => new()
     {
         Id = id,
         CompetitionId = compId,
@@ -21,11 +21,13 @@ public class ResultMatcherTests
         Gender = gender,
         Heat = heat,
         Lane = lane,
-        RelayId = relayId
+        RelayId = relayId,
+        SwimmerId = swimmerId == 0 ? id : swimmerId
     };
 
     private static ResultRecord New(int compId = 1, int styleId = 1, string distance = "50",
-        string gender = "male", int heat = 1, int lane = 1, bool isRelay = false, string? note = null) => new()
+        string gender = "male", int heat = 1, int lane = 1, bool isRelay = false, string? note = null,
+        int swimmerId = 0) => new()
     {
         CompetitionId = compId,
         StyleId = styleId,
@@ -34,12 +36,15 @@ public class ResultMatcherTests
         Heat = heat,
         Lane = lane,
         Relay = isRelay ? new Relay() : null,
-        Note = note
+        Note = note,
+        SwimmerId = swimmerId
     };
 
     private static ResultMatch<ResultRecord, ResultRecord> RunMatch(
         IReadOnlyList<ResultRecord> oldRows, IReadOnlyList<ResultRecord> newRows) =>
-        ResultMatcher.Match(oldRows, newRows, ResultMatcher.KeyOfPersisted, ResultMatcher.KeyOfTransient);
+        ResultMatcher.Match(oldRows, newRows,
+            ResultMatcher.KeyOfPersisted, ResultMatcher.KeyOfTransient,
+            ResultMatcher.SwimmerIdOfPersisted, ResultMatcher.SwimmerIdOfTransient);
 
     [Fact]
     public void SameKey_Matches()
@@ -210,6 +215,116 @@ public class ResultMatcherTests
         Assert.Equal("day1", day1Match.New.Note);
         var day2Match = result.Matched.Single(m => m.Old.Id == 2);
         Assert.Equal("day2", day2Match.New.Note);
+    }
+
+    [Fact]
+    public void KeyCollision_SwimmerIdReordered_MatchesBySwimmerIdNotPosition()
+    {
+        // Инцидент 2026-07-20 (Маккабиада): фикс парсера сменил порядок восстановленных
+        // relay-ног в файле. Чистый FIFO сматчил бы old1↔new (первый по позиции) неверно —
+        // с SwimmerId-приоритетом каждая нога находит СВОЮ старую строку независимо от того,
+        // в каком порядке она появилась в новом файле.
+        var old1 = Old(1, lane: 5, swimmerId: 100, relayId: null);
+        var old2 = Old(2, lane: 5, swimmerId: 200, relayId: null);
+        var old3 = Old(3, lane: 5, swimmerId: 300, relayId: null);
+        // Новый файл: та же тройка ног, но в другом порядке следования.
+        var new3 = New(lane: 5, swimmerId: 300, note: "leg-c");
+        var new1 = New(lane: 5, swimmerId: 100, note: "leg-a");
+        var new2 = New(lane: 5, swimmerId: 200, note: "leg-b");
+
+        var result = RunMatch([old1, old2, old3], [new3, new1, new2]);
+
+        Assert.Equal(3, result.Matched.Count);
+        Assert.Contains(result.Matched, m => m.Old.Id == 1 && m.New.Note == "leg-a");
+        Assert.Contains(result.Matched, m => m.Old.Id == 2 && m.New.Note == "leg-b");
+        Assert.Contains(result.Matched, m => m.Old.Id == 3 && m.New.Note == "leg-c");
+        Assert.Empty(result.Inserted);
+        Assert.Empty(result.Deleted);
+    }
+
+    [Fact]
+    public void KeyCollision_MembershipShrunkAndReordered_UpdatesSurvivorsAndDeletesMissing()
+    {
+        // Инцидент: между переимпортами состав коллизионной группы меняется (нога пропала),
+        // а не только переставляется. SwimmerId-приоритет обязан обновить переживших ног на
+        // месте (Matched, Id сохранён) невзирая на смену позиции, а пропавшую — удалить, а не
+        // "переиспользовать" её строку под случайного соседа по FIFO.
+        var old1 = Old(1, lane: 5, swimmerId: 100);
+        var old2 = Old(2, lane: 5, swimmerId: 200);
+        var old3 = Old(3, lane: 5, swimmerId: 300); // эта нога пропадёт из нового файла
+        // Новый файл: leg 100 и 200 остались, но в другом порядке следования; leg 300 исчезла
+        // (парсер перестал восстанавливать эту ногу) — новых строк меньше, чем старых.
+        var new200 = New(lane: 5, swimmerId: 200, note: "still-here");
+        var new100 = New(lane: 5, swimmerId: 100, note: "still-here-too");
+
+        var result = RunMatch([old1, old2, old3], [new200, new100]);
+
+        Assert.Equal(2, result.Matched.Count);
+        Assert.Contains(result.Matched, m => m.Old.Id == 1 && m.New.Note == "still-here-too");
+        Assert.Contains(result.Matched, m => m.Old.Id == 2 && m.New.Note == "still-here");
+        Assert.Empty(result.Inserted);
+        Assert.Single(result.Deleted);
+        Assert.Equal(3, result.Deleted[0].Id);
+    }
+
+    [Fact]
+    public void KeyCollision_MembershipGrownAndReordered_UpdatesSurvivorsAndInsertsNew()
+    {
+        // Симметричный случай: новая нога появилась (парсер научился восстанавливать ещё одну),
+        // а существующие переставились местами в файле — SwimmerId всё равно находит их старые
+        // строки, лишняя новая строка становится insert, а не путается с существующими по FIFO.
+        var old1 = Old(1, lane: 5, swimmerId: 100);
+        var old2 = Old(2, lane: 5, swimmerId: 200);
+        var new200 = New(lane: 5, swimmerId: 200, note: "still-here");
+        var new100 = New(lane: 5, swimmerId: 100, note: "still-here-too");
+        var new300 = New(lane: 5, swimmerId: 300, note: "brand-new-leg");
+
+        var result = RunMatch([old1, old2], [new200, new100, new300]);
+
+        Assert.Equal(2, result.Matched.Count);
+        Assert.Contains(result.Matched, m => m.Old.Id == 1 && m.New.Note == "still-here-too");
+        Assert.Contains(result.Matched, m => m.Old.Id == 2 && m.New.Note == "still-here");
+        Assert.Single(result.Inserted);
+        Assert.Equal("brand-new-leg", result.Inserted[0].Note);
+        Assert.Empty(result.Deleted);
+    }
+
+    [Fact]
+    public void KeyCollision_AnonymousToNamedWholeGroup_StillMatchesByPosition()
+    {
+        // Обычный анонимный→именованный переход (Р5, "правильно и желаемо"): весь состав
+        // группы был анонимным (у каждой ноги — одноразовый SwimmerId с прошлого импорта) и
+        // становится именованным разом. SwimmerId никогда не совпадёт (новые ID выданы заново
+        // для анонимных строк на каждом импорте) — доматч должен провалиться в FIFO по позиции,
+        // как и раньше, а не оставить строки unmatched.
+        var old1 = Old(1, lane: 5, swimmerId: 9001); // анонимная заглушка, импорт №1
+        var old2 = Old(2, lane: 5, swimmerId: 9002); // анонимная заглушка, импорт №1
+        var new1 = New(lane: 5, swimmerId: 501, note: "named-first"); // именован при переимпорте
+        var new2 = New(lane: 5, swimmerId: 502, note: "named-second");
+
+        var result = RunMatch([old1, old2], [new1, new2]);
+
+        Assert.Equal(2, result.Matched.Count);
+        Assert.Contains(result.Matched, m => m.Old.Id == 1 && m.New.Note == "named-first");
+        Assert.Contains(result.Matched, m => m.Old.Id == 2 && m.New.Note == "named-second");
+        Assert.Empty(result.Inserted);
+        Assert.Empty(result.Deleted);
+    }
+
+    [Fact]
+    public void NoCollision_SingleRowPerKey_SwimmerIdChangeStillMatches()
+    {
+        // Без коллизии (обычный одиночный результат на дорожку) SwimmerId-логика вообще не
+        // участвует — единственная старая строка матчится единственной новой независимо от
+        // SwimmerId (Р5: анонимная заглушка → именованный пловец сохраняет Id результата).
+        var old = Old(1, lane: 3, swimmerId: 42);
+        var @new = New(lane: 3, swimmerId: 999, note: "renamed");
+
+        var result = RunMatch([old], [@new]);
+
+        Assert.Single(result.Matched);
+        Assert.Equal(1, result.Matched[0].Old.Id);
+        Assert.Equal("renamed", result.Matched[0].New.Note);
     }
 
     [Fact]
