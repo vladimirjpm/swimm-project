@@ -17,6 +17,8 @@ public class CompetitionDiscoveryService(
     ICompetitionDiscoveryProvider provider,
     ILogger<CompetitionDiscoveryService> logger) : ICompetitionDiscoveryService
 {
+    private readonly DiscoveryCompetitionMatcher matcher = new(db);
+
     public async Task<DiscoverySyncResult> SyncAsync(CancellationToken ct = default)
     {
         // Завершённые + предстоящие текущего сезона (2 запроса, провайдер сам держит паузу).
@@ -76,35 +78,8 @@ public class CompetitionDiscoveryService(
             .OrderByDescending(d => d.DateStart)
             .ToListAsync(ct);
 
-        // Матч «уже импортировано»: дата дня попадает в [DateStart..DateEnd] и имя совпадает
-        // после нормализации ЛИБО имя Discovery начинается с имени соревнования — сайт дописывает
-        // суффикс района («…- מחוז צפון»), которого в протоколе/БД нет. Нормализация выкидывает
-        // кавычки и бэкслеши: в БД встречаются «ארנה», «"ארנה"» и «\"ארנה\"» (артефакт импорта).
-        // Дни в Competitions.Date — строка dd/MM/yyyy.
-        var competitions = await db.Competitions
-            .AsNoTracking()
-            .Select(c => new { c.Name, c.Date })
-            .ToListAsync(ct);
-        var candidates = competitions
-            .Select(c => new { Key = Normalize(c.Name), c.Name, Date = ParseDdMmYyyy(c.Date) })
-            .Where(c => c.Date != null && c.Key.Length > 0)
-            .ToList();
-
-        return rows.Select(d =>
-        {
-            var dKey = Normalize(d.Name);
-            string? matched = null;
-            foreach (var c in candidates)
-            {
-                if (c.Date < d.DateStart || c.Date > d.DateEnd) continue;
-                if (dKey == c.Key || dKey.StartsWith(c.Key, StringComparison.Ordinal))
-                {
-                    matched = c.Name;
-                    break;
-                }
-            }
-            return ToDto(d, matched);
-        }).ToList();
+        var matches = await matcher.MatchAsync(rows, ct);
+        return rows.Select(d => ToDto(d, matches.GetValueOrDefault(d.Id))).ToList();
     }
 
     public async Task<DiscoveredCompetitionDto?> RefreshDetailsAsync(int id, CancellationToken ct = default)
@@ -178,22 +153,4 @@ public class CompetitionDiscoveryService(
     private static DiscoveredCompetitionDto ToDto(DiscoveredCompetition d, string? matched) => new(
         d.Id, d.OrgCompId, d.Name, d.DateStart, d.DateEnd, d.Venue, d.LogligId,
         d.Status, d.DiscoveredAt, d.LastSeenAt, d.LastError, matched, d.Languages);
-
-    /// <summary>Trim/lower, схлопнуть пробелы, выкинуть кавычки/бэкслеши/гереш-гершаим —
-    /// они непоследовательны между сайтом и импортированными именами.</summary>
-    internal static string Normalize(string name)
-    {
-        var cleaned = new string(name.Where(c => c is not ('"' or '\\' or '\'' or '׳' or '״' or '`' or '’' or '“' or '”')).ToArray());
-        return string.Join(' ', cleaned.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();
-    }
-
-    private static DateTime? ParseDdMmYyyy(string date)
-    {
-        var seg = date.Split('/');
-        if (seg.Length != 3
-            || !int.TryParse(seg[0], out var d) || !int.TryParse(seg[1], out var m) || !int.TryParse(seg[2], out var y))
-            return null;
-        try { return new DateTime(y, m, d, 0, 0, 0, DateTimeKind.Utc); }
-        catch (ArgumentOutOfRangeException) { return null; }
-    }
 }

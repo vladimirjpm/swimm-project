@@ -153,6 +153,9 @@ public static class DependencyInjection
         // Loglig ID (шаг 6): краудсорс-предложения + ночная верификация.
         services.AddScoped<ILogligSuggestionService, LogligSuggestionService>();
 
+        // Сводка «Статус данных» для дашборда /Admin (docs/plans/admin-dashboard-status-cards-plan.md)
+        services.AddScoped<IDashboardStatusService, DashboardStatusService>();
+
         return services;
     }
 }

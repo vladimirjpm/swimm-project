@@ -1,8 +1,23 @@
 # Админ-дашборд: карточки статуса данных (дубли / loglig / discovery)
 
-Статус: **план, не начато** (2026-07-20, Fable). Реализация — в отдельной сессии;
-задача целиком делегируема Сонету (нет auth/миграций), таск-документ писать по этому
-плану + скиллу /delegate.
+Статус: **реализовано, собрано и протестировано** (452 теста зелёные), 2026-07-20.
+**Не закоммичено** — правки лежат в рабочей копии.
+
+## Поправка к премисе (важно, не повторять ошибку)
+
+План исходил из того, что `Sys_DiscoveredCompetitions.Status` отражает, загружено ли
+соревнование. **Это не так**: нигде в пайплайне импорта `Status` не выставляется в
+`Imported` — он меняется только вручную, через `CompetitionDiscoveryService.
+SetStatusAsync`. Поэтому карточка Discovery считает «импортировано» не по `Status`,
+а **матчингом** строк discovery с таблицей `Competitions` (нормализация имени +
+попадание в диапазон дат) — той же логикой, что уже использовал `/Admin/Discovery`.
+Матчинг вынесен в одно общее место — `server/Swimm.Infrastructure/Services/
+DiscoveryCompetitionMatcher.cs` — и используется и `DashboardStatusService`, и
+`CompetitionDiscoveryService.GetAllAsync`, чтобы не разъезжались две копии логики.
+Правило: `imported` = матч по имени+дате ИЛИ `Status == Imported`; `other` =
+`Status == Ignored`; `new` = всё остальное. Реальные цифры на dev-БД разошлись с
+ожиданием из плана: было заявлено 3 imported / 113 new, по факту после матчинга —
+**12 imported / 104 new**.
 
 ## Что хотим (заказ Влада)
 
@@ -90,3 +105,35 @@
   написания DTO (поле «sure» может называться иначе, чем у пловцов).
 - Не трогать чужие незакоммиченные правки, если ещё висят (my-media, HubGroups/
   MediaController).
+
+## Реализация (файлы, 2026-07-20)
+
+- `server/Swimm.Application/Abstractions/IDashboardStatusService.cs` — интерфейс,
+  один метод `GetStatusAsync`.
+- `server/Swimm.Application/Dtos/DashboardStatusDtos.cs` — `DashboardStatusSummary`
+  + `DashboardSwimmerStatus`/`DashboardClubStatus`/`DashboardLogligStatus`/
+  `DashboardDiscoveryStatus` — как и планировалось.
+- `server/Swimm.Infrastructure/Services/DashboardStatusService.cs` — реализация:
+  дубли пловцов/клубов через существующие dedup-сервисы, Loglig — groupby по
+  `LogligIdStatus`, Discovery — через `DiscoveryCompetitionMatcher` (см. поправку
+  премисы выше).
+- `server/Swimm.Infrastructure/Services/DiscoveryCompetitionMatcher.cs` — новый
+  общий класс матчинга discovery-строк с `Competitions` (не было в исходном плане —
+  появился из-за поправки премисы).
+- `server/Swimm.API/Controllers/DashboardAdminController.cs` —
+  `[Authorize(Roles="Admin")]`, `GET api/admin/dashboard/status`.
+- `server/Swimm.Infrastructure/DependencyInjection.cs` — регистрация
+  `services.AddScoped<IDashboardStatusService, DashboardStatusService>()`.
+- `server/Swimm.Tests/DashboardStatusServiceTests.cs` — тесты счётчиков.
+- `Pages/Admin/Index.cshtml` — блок `#status-grid` вместо старого
+  `#attention-grid`, `loadStatus()` дёргает `${API}/dashboard/status` и рисует
+  4 карточки (Swimmers/Clubs/Loglig/Discovery).
+- Старый эндпоинт `attention-summary` (`SwimmersAdminController.
+  GetAttentionSummary`) и DTO `SwimmerAttentionSummary` — удалены после grep'а по
+  потребителям (других не нашлось).
+
+## Что осталось не сделано
+
+Шаг 4 «Порядок реализации» выполнен частично: API `dashboard/status` проверен
+вживую и отдаёт реальные цифры dev-БД, но **вёрстку 4 карточек на `/Admin` никто
+глазами не смотрел** — визуальную проверку рендера ещё нужно сделать.

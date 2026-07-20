@@ -116,15 +116,4 @@ public class SwimmersAdminController : ControllerBase
 
         return Ok(report);
     }
-
-    /// <summary>Лёгкая сводка для карточек «Требует внимания» на дашборде.</summary>
-    [HttpGet("attention-summary")]
-    public async Task<IActionResult> GetAttentionSummary(CancellationToken ct)
-    {
-        var report = await _dedup.FindCandidatesAsync(ct);
-        return Ok(new SwimmerAttentionSummary(
-            report.Orphans.Count,
-            report.Candidates.Count(c => c.Sure),
-            report.Candidates.Count(c => !c.Sure)));
-    }
 }
