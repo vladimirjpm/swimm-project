@@ -132,7 +132,12 @@ public class ResultRepository : IResultRepository
             query = query.Where(r => r.CompetitionDate <= filter.DateTo.Value);
 
         if (filter.EventId.HasValue)
-            query = query.Where(r => r.Competition.EventId == filter.EventId.Value);
+        {
+            var eventCompIds = await ResolveEventCompetitionIdsAsync(filter.EventId.Value);
+            query = eventCompIds.Length > 0
+                ? query.Where(r => eventCompIds.Contains(r.CompetitionId))
+                : query.Where(r => false);
+        }
 
         if (filter.CompetitionId.HasValue)
             query = query.Where(r => r.CompetitionId == filter.CompetitionId.Value);
@@ -196,6 +201,25 @@ public class ResultRepository : IResultRepository
             await _cache.SetAsync(key, map, TimeSpan.FromMinutes(10));
         }
         return map.TryGetValue(styleName, out var ids) ? ids : [];
+    }
+
+    /// <summary>EventId → его CompetitionId(ы) из кэша (TTL 10 мин). Пусто — событие без
+    /// соревнований или несуществующий id. Резолвим в Id, чтобы фильтр по Results шёл по
+    /// композитному индексу (CompetitionId,...), а не через JOIN на Competition.EventId —
+    /// последнее на большом объёме заставляет планировщик сканировать всю таблицу.</summary>
+    private async Task<int[]> ResolveEventCompetitionIdsAsync(int eventId)
+    {
+        var key = $"event-competitions:{eventId}";
+        var ids = await _cache.GetAsync<int[]>(key);
+        if (ids is null)
+        {
+            ids = await _db.Competitions.AsNoTracking()
+                .Where(c => c.EventId == eventId)
+                .Select(c => c.Id)
+                .ToArrayAsync();
+            await _cache.SetAsync(key, ids, TimeSpan.FromMinutes(10));
+        }
+        return ids;
     }
 
     public async Task<IReadOnlyList<ClubSummaryDto>> GetClubSummaryAsync(ResultFilter filter)

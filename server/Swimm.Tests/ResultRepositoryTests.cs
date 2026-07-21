@@ -256,6 +256,73 @@ public class ResultRepositoryTests
         Assert.Equal(3, total); // все freestyle, а не размер страницы и не все 4 строки
     }
 
+    // ── GetPagedAsync: EventId → CompetitionId(ы) резолв (perf-фикс) ─────────
+
+    [Fact]
+    public async Task GetPaged_FilterByEventId_ReturnsOnlyResultsFromEventCompetitions()
+    {
+        await using var db = CreateDb(nameof(GetPaged_FilterByEventId_ReturnsOnlyResultsFromEventCompetitions));
+
+        // Два дня одного события (EventId=42) + одно "чужое" соревнование без EventId.
+        var style   = new Style { Name = "freestyle" };
+        var club    = new Club { Name = "TestClub", NameEn = "TestClub" };
+        var swimmer = new Swimmer
+        {
+            LastName = "Иванов", FirstName = "Иван",
+            LastNameEn = "Ivanov", FirstNameEn = "Ivan", BirthYear = 2000
+        };
+        var day1 = new Competition
+        {
+            Name = "Event Day 1", Country = new Country { CountryCode = "ISR", CountryName = "ISR" },
+            Date = "01/01/2024", PoolType = "50m", EventId = 42
+        };
+        var day2 = new Competition
+        {
+            Name = "Event Day 2", Country = new Country { CountryCode = "ISR", CountryName = "ISR" },
+            Date = "02/01/2024", PoolType = "50m", EventId = 42
+        };
+        var other = new Competition
+        {
+            Name = "Other Comp", Country = new Country { CountryCode = "ISR", CountryName = "ISR" },
+            Date = "03/01/2024", PoolType = "50m", EventId = null
+        };
+        db.AddRange(style, club, swimmer, day1, day2, other);
+        await db.SaveChangesAsync();
+
+        var date = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        ResultRecord Row(int compId) => new()
+        {
+            CompetitionId = compId, SwimmerId = swimmer.Id, ClubId = club.Id, StyleId = style.Id,
+            Distance = "100", Gender = "male", CompetitionDate = date, TimeOriginal = "1:00.00",
+            AgeGroup = "Open", EventStyleAge = "100 freestyle Open"
+        };
+        db.Results.AddRange(Row(day1.Id), Row(day2.Id), Row(other.Id));
+        await db.SaveChangesAsync();
+
+        var repo = new ResultRepository(db, NoCache());
+
+        var (items, _, total) = await repo.GetPagedAsync(new ResultFilter { EventId = 42 }, 1, 100);
+
+        Assert.Equal(2, total);
+        Assert.Equal(2, items.Count);
+        Assert.All(items, i => Assert.Contains(i.CompetitionName, new[] { "Event Day 1", "Event Day 2" }));
+        Assert.DoesNotContain(items, i => i.CompetitionName == "Other Comp");
+    }
+
+    [Fact]
+    public async Task GetPaged_FilterByEventId_UnknownEvent_ReturnsEmpty()
+    {
+        await using var db = CreateDb(nameof(GetPaged_FilterByEventId_UnknownEvent_ReturnsEmpty));
+        await SeedResultAsync(db, "freestyle");
+        var repo = new ResultRepository(db, NoCache());
+
+        var (items, hasMore, total) = await repo.GetPagedAsync(new ResultFilter { EventId = 999 }, 1, 100);
+
+        Assert.Empty(items);
+        Assert.False(hasMore);
+        Assert.Equal(0, total);
+    }
+
     // ── GetByIdAsync ──────────────────────────────────────────────────────────
 
     [Fact]
