@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Swimm.Parsing.Parsers.IsrOrg;
 using Xunit;
 
@@ -67,5 +68,52 @@ public class IsrOrgCompetitionParserMaccabiahRealPdfTests
         //    одновременный перенос ОБЕИХ), сознательно не в скоупе.
         var withNames = relay.Count(r => !string.IsNullOrEmpty(r.RelaySwimmersName));
         Assert.True(withNames >= 62, $"Expected at least 62/64 relay rows with reconstructed names, got {withNames}");
+    }
+
+    private static string HePdfPath =>
+        Path.Combine(AppContext.BaseDirectory, "Fixtures", "Parsing", "Maccabiah-2026_IL_HE.pdf");
+
+    /// <summary>
+    /// Регрессия по HEBREW-экспорту ТОГО ЖЕ протокола ("Maccabiah-2026_IL_HE.pdf"):
+    /// таблица легов эстафеты в этом файле физически RTL — колонки на странице идут
+    /// "год рождения | имя | фамилия" (год слева), а не "фамилия | имя | год", как в
+    /// EN-экспорте. Раньше реконструкция колонок опознавала только английские подписи
+    /// шапки ("Last"/"First") и предполагала фамилию крайней слева — на HE-файле это
+    /// давало корректные счётчики строк (915/851/64), но 57 из 64 ростеров эстафет были
+    /// испорчены: год рождения утекал в поле имени вместо фамилии (напр. "2009 Hilla"
+    /// вместо "Hilla LERNER" — год ПОДМЕНЯЛ фамилию как "первое слово" строки).
+    /// Фикс детектирует ивритские подписи шапки ("יטרפ"/"החפשמ") и строит роль→X
+    /// маппинг по фактической шапке таблицы, а не по предположению "фамилия слева".
+    /// </summary>
+    [Fact]
+    public void HeMode_RelayRosters_MatchCountAndNeverLeakBirthYearAsName()
+    {
+        Assert.True(File.Exists(HePdfPath), $"Фикстура HE-протокола не найдена: {HePdfPath}");
+
+        using var fs = File.OpenRead(HePdfPath);
+        var results = IsrOrgCompetitionParser.ParseCompetitions(fs, "he").ToList();
+        var allResults = results.SelectMany(c => c.Results).ToList();
+
+        var relay = allResults.Where(r => r.IsRelay == true).ToList();
+        var indiv = allResults.Where(r => r.IsRelay != true).ToList();
+
+        Assert.Equal(851, indiv.Count);
+        Assert.Equal(64, relay.Count);
+        Assert.Equal(915, allResults.Count);
+
+        // Главная сигнатура регрессии: 4-значный год рождения, просочившийся в состав
+        // как будто это имя пловца. Если роль-маппинг колонок сломан, это выглядит
+        // именно так ("2009 Hilla" вместо "Hilla LERNER") — проверяем явно, а не
+        // полагаемся только на общий процент воссозданных ростеров.
+        foreach (var r in relay)
+        {
+            if (string.IsNullOrEmpty(r.RelaySwimmersName)) continue;
+            Assert.False(
+                Regex.IsMatch(r.RelaySwimmersName, @"\b\d{4}\b"),
+                $"Relay roster leaked a birth year as a name token: '{r.RelaySwimmersName}'");
+        }
+
+        var withNames = relay.Count(r => !string.IsNullOrEmpty(r.RelaySwimmersName));
+        Assert.Equal(64, withNames);
     }
 }

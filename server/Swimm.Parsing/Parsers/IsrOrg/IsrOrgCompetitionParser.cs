@@ -23,16 +23,16 @@ public static class IsrOrgCompetitionParser
     private static Regex? _dateLineRx;
 
     private const string GenderPatternOriginal =
-        "\u05D1\u05E0\u05D5\u05EA|\u05D1\u05E0\u05D9\u05DD|\u05E0\u05E9\u05D9\u05DD|\u05D2\u05D1\u05E8\u05D9\u05DD";
+        "בנות|בנים|נשים|גברים";
 
     private const string GenderPatternReversed =
-        "\u05EA\u05D5\u05E0\u05D1|\u05DD\u05D9\u05E0\u05D1|\u05DD\u05D9\u05E9\u05E0|\u05DD\u05D9\u05E8\u05D1\u05D2";
+        "תונב|םינב|םישנ|םירבג";
 
-    private const string HebrewMix = "\u05DE\u05D9\u05E7\u05E1";
-    private const string HebrewMixReversed = "\u05E1\u05E7\u05D9\u05DE";
+    private const string HebrewMix = "מיקס";
+    private const string HebrewMixReversed = "סקימ";
 
-    private const string HebrewKlali = "\u05DB\u05DC\u05DC\u05D9";
-    private const string HebrewKlaliReversed = "\u05D9\u05DC\u05DC\u05DB";
+    private const string HebrewKlali = "כללי";
+    private const string HebrewKlaliReversed = "יללכ";
 
     private const string GenderPatternWithMix =
         GenderPatternOriginal + "|" + GenderPatternReversed + "|" + HebrewMix + "|" + HebrewMixReversed;
@@ -44,7 +44,7 @@ public static class IsrOrgCompetitionParser
         RegexOptions.Compiled);
 
     private static Regex HeaderRxHESimple => _headerRxHESimple ??= new Regex(
-        @"^(?<len>\d+)\s+(?<style>[\u0590-\u05FF\s]+)$",
+        @"^(?<len>\d+)\s+(?<style>[֐-׿\s]+)$",
         RegexOptions.Compiled);
 
     private static Regex GenderAgeLineRxHE => _genderAgeLineRxHE ??= new Regex(
@@ -55,12 +55,12 @@ public static class IsrOrgCompetitionParser
 
     private static Regex? _mastersAgeLineRxHE;
     private static Regex MastersAgeLineRxHE => _mastersAgeLineRxHE ??= new Regex(
-        @"^\u05DE\u05D0\u05E1\u05D8\u05E8\u05E1\s+(?<gender>[\u05D0-\u05EA])\s+(?<age>\d+(?:-\d+)?)$",
+        @"^מאסטרס\s+(?<gender>[א-ת])\s+(?<age>\d+(?:-\d+)?)$",
         RegexOptions.Compiled);
 
     private static Regex? _mastersRelayAgeLineRxHE;
     private static Regex MastersRelayAgeLineRxHE => _mastersRelayAgeLineRxHE ??= new Regex(
-        @"^\u05DE\u05D0\u05E1\u05D8\u05E8\u05E1\s+\u05E9\u05DC\u05D9\u05D7(?:\u05D5\u05EA|\u05D9\u05DD)?\s+(?<age>\d+(?:-\d+)?)$",
+        @"^מאסטרס\s+שליח(?:ות|ים)?\s+(?<age>\d+(?:-\d+)?)$",
         RegexOptions.Compiled);
 
     private static Regex HeaderRxEN => _headerRxEN ??= new Regex(
@@ -160,25 +160,25 @@ public static class IsrOrgCompetitionParser
 
     private static Regex RelayHeaderRxHE => _relayHeaderRxHE ??= new Regex(
         @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)\s+(?<style>.+?)\s+" +
-        "\u05E9\u05DC\u05D9\u05D7(?:\u05D9\u05DD|\u05D5\u05EA)?\\s*" +
+        "שליח(?:ים|ות)?\\s*" +
         "(?:" + HebrewMix + "|" + HebrewMixReversed + ")?\\s*" +
         @"-\s*(?<gender>" +
-        "\u05E0|\u05D6|" + GenderPatternWithMix +
+        "נ|ז|" + GenderPatternWithMix +
         @")\s+(?<age>\d+(?:-\d+)?)$",
         RegexOptions.Compiled);
 
     private static Regex RelayHeaderRxHE2 => _relayHeaderRxHE2 ??= new Regex(
         @"^(?<len>\d+)\s*[Xx]\s*(?<legs>\d+)\s+(?<style>.+?)\s+" +
-        "\u05E9\u05DC\u05D9\u05D7(?:\u05D9\u05DD|\u05D5\u05EA)?\\s*" +
+        "שליח(?:ים|ות)?\\s*" +
         "(?:" + HebrewMix + "|" + HebrewMixReversed + ")?\\s*" +
         @"-\s*(?<gender>" +
-        "\u05E0|\u05D6|" + GenderPatternWithMix +
+        "נ|ז|" + GenderPatternWithMix +
         @")\s+(?<age>\d+(?:-\d+)?)$",
         RegexOptions.Compiled);
 
     private static Regex RelayTeamLineRxHE => _relayTeamLineRxHE ??= new Regex(
         @"^(?<heat>\d+)\s+(?<lane>\d+)\s+(?<team>.+?)\s+(?<time>\d{2}:\d{2}\.\d{1,2}|DQ|NS)\s+" +
-        "\u05DE\u05D9\u05E7\u05D5\u05DD" +
+        "מיקום" +
         @"\s+(?<pos>\d+)\s*$",
         RegexOptions.Compiled);
 
@@ -186,7 +186,7 @@ public static class IsrOrgCompetitionParser
         @"(?<date>\d{2}/\d{2}/\d{4})$",
         RegexOptions.Compiled);
 
-    private const string HebrewRelay = "\u05E9\u05DC\u05D9\u05D7";
+    private const string HebrewRelay = "שליח";
 
     private static List<string> _debugLog = new();
 
@@ -257,6 +257,14 @@ public static class IsrOrgCompetitionParser
         // подтверждённый в PDF кейс это ровно один разрыв посреди 4-ногой команды.
         double? carriedLastColX = null;
         double? carriedFirstColX = null;
+        // Роль-вокабуляр колонок (EN "Last"/"First" vs HE "יטרפ"/"החפשמ") тоже
+        // переносится через page break вместе с X-координатами — иначе на
+        // continuation-странице без собственной шапки мы бы не знали, в каком
+        // порядке эмитить восстановленную строку для нижестоящего парсера
+        // (EN-потребитель читает "Last First Year" как есть; HE-потребитель
+        // прогоняет строку через NormalizeHebrewLine, которая переворачивает
+        // порядок токенов, поэтому туда нужно эмитить "Year First Last").
+        bool? carriedColsAreHebrew = null;
         foreach (var page in doc.GetPages())
         {
             var words = page.GetWords();
@@ -289,7 +297,15 @@ public static class IsrOrgCompetitionParser
             // и не встречается в обычных индивидуальных результатах. Проверяем
             // и в EN-, и в HE-режиме (условие безвредно для чисто EN-файлов,
             // где реконструкция и так нужна только на эстафетных страницах).
-            bool looksLikeRelayPage = lines.Any(l => Regex.IsMatch(l, @"\bRank\s+\d+\s*$"));
+            // HE-native релейная страница (та же Маккабиада, ивритский экспорт того же
+            // протокола): командная строка помечена не "Rank N" (латиница), а ивритским
+            // столбцом "מיקום" — на СЫРОЙ странице (до нормализации/реверса) это слово
+            // приходит уже как отдельный "перевёрнутый" глиф-токен "םוקימ" (см.
+            // RelayTeamLineRxHE, где нормализованная форма — "מיקום"). Формат строки —
+            // "<pos> םוקימ <time> <team> <heat> <lane>", поэтому маркер ищем сразу после
+            // ведущего числа.
+            bool looksLikeRelayPage = lines.Any(l => Regex.IsMatch(l, @"\bRank\s+\d+\s*$"))
+                || lines.Any(l => Regex.IsMatch(l, @"^\d+\s+םוקימ\b"));
 
             // Если это НЕ явная relay-страница (нет маркера "Rank N"), но с предыдущей
             // страницы перенесены колонки Last/First — это может быть продолжение
@@ -299,21 +315,27 @@ public static class IsrOrgCompetitionParser
 
             double? seedLast = looksLikeRelayPage ? carriedLastColX : (isCarriedContinuation ? carriedLastColX : null);
             double? seedFirst = looksLikeRelayPage ? carriedFirstColX : (isCarriedContinuation ? carriedFirstColX : null);
+            bool? seedIsHebrewVocab = looksLikeRelayPage ? carriedColsAreHebrew : (isCarriedContinuation ? carriedColsAreHebrew : null);
 
             // Сбрасываем перенос сразу — действует только на один hop вперёд.
             carriedLastColX = null;
             carriedFirstColX = null;
+            carriedColsAreHebrew = null;
 
             if (looksLikeRelayPage || isCarriedContinuation)
             {
-                lines = ReconstructEnRelaySwimmerNames(groups, lines, seedLast, seedFirst, out var outLastColX, out var outFirstColX);
+                lines = ReconstructEnRelaySwimmerNames(
+                    groups, lines, seedLast, seedFirst, seedIsHebrewVocab,
+                    out var outLastColX, out var outFirstColX, out var outIsHebrewVocab);
 
                 // Переносим дальше только если ЭТА страница сама была явной relay-страницей
-                // (обнаружен маркер "Rank N") — продолжение продолжения не подтверждено данными.
+                // (обнаружен маркер "Rank N"/"מיקום") — продолжение продолжения не
+                // подтверждено данными.
                 if (looksLikeRelayPage)
                 {
                     carriedLastColX = outLastColX;
                     carriedFirstColX = outFirstColX;
+                    carriedColsAreHebrew = outIsHebrewVocab;
                 }
             }
 
@@ -340,7 +362,22 @@ public static class IsrOrgCompetitionParser
     /// Консервативно: при любой неоднозначности строки не трогаем (возврат как есть).
     /// </summary>
     internal static List<string> ReconstructEnRelaySwimmerNames(List<List<PositionedWord>> groups, List<string> lines) =>
-        ReconstructEnRelaySwimmerNames(groups, lines, null, null, out _, out _);
+        ReconstructEnRelaySwimmerNames(groups, lines, null, null, null, out _, out _, out _);
+
+    /// <summary>
+    /// Обратная совместимость для существующих юнит-тестов (LTR-only, без вокабуляра ролей).
+    /// </summary>
+    internal static List<string> ReconstructEnRelaySwimmerNames(
+        List<List<PositionedWord>> groups, List<string> lines,
+        double? seedLastColX, double? seedFirstColX,
+        out double? finalLastColX, out double? finalFirstColX) =>
+        // Вызывающие этот overload (старые EN-only юнит-тесты и продакшн-код до
+        // добавления HE-вокабуляра) всегда имели дело только с EN-колонками — если
+        // сид передан БЕЗ явного вокабуляра, но X-координаты колонок всё же заданы,
+        // это заведомо EN-контекст (единственный, что существовал раньше).
+        ReconstructEnRelaySwimmerNames(groups, lines, seedLastColX, seedFirstColX,
+            seedLastColX is not null || seedFirstColX is not null ? false : null,
+            out finalLastColX, out finalFirstColX, out _);
 
     /// <summary>
     /// Перегрузка с "затравочными" X-координатами колонок Last/First — используется,
@@ -352,8 +389,8 @@ public static class IsrOrgCompetitionParser
     /// </summary>
     internal static List<string> ReconstructEnRelaySwimmerNames(
         List<List<PositionedWord>> groups, List<string> lines,
-        double? seedLastColX, double? seedFirstColX,
-        out double? finalLastColX, out double? finalFirstColX)
+        double? seedLastColX, double? seedFirstColX, bool? seedIsHebrewVocab,
+        out double? finalLastColX, out double? finalFirstColX, out bool? finalIsHebrewVocab)
     {
         var result = new List<string>(lines);
         var consumed = new HashSet<int>();
@@ -361,6 +398,14 @@ public static class IsrOrgCompetitionParser
 
         double? lastColX = seedLastColX;
         double? firstColX = seedFirstColX;
+        // Вокабуляр шапки, из которого узнали роли колонок: EN ("Last"/"First") или
+        // HE ("יטרפ"/"החפשמ"). От него зависит, в каком порядке эмитить восстановленную
+        // строку (см. использование ниже) — потребители различаются: EN-ветка читает
+        // "Last First Year" как есть (сырую строку), HE-ветка (RelayTeamLineRxHE +
+        // цикл сборки состава) прогоняет строку через NormalizeHebrewLine, которая
+        // ЦЕЛИКОМ переворачивает порядок токенов, поэтому туда нужно отдавать
+        // "Year First Last" — после переворота получится нужный порядок.
+        bool? isHebrewVocab = seedIsHebrewVocab;
 
         for (int i = 0; i < groups.Count; i++)
         {
@@ -372,15 +417,58 @@ public static class IsrOrgCompetitionParser
             {
                 lastColX = g[lastHeaderIdx].Left;
                 firstColX = g[firstHeaderIdx].Left;
+                isHebrewVocab = false;
+                continue;
+            }
+
+            // Ивритская шапка того же протокола (Maccabiah HE-экспорт): колонки те же
+            // "Last name"/"First name" по смыслу, но подписаны на иврите и с обратным
+            // (RTL) физическим порядком — год слева, имя посередине, фамилия справа
+            // (см. диагностику реального PDF: заголовки на отдельных строках блока
+            // сплит-таймов — "...משפחה שם" (перевёрнуто как "םש"+"החפשמ") и
+            // "...פרטי שם" (как "יטרפ"+"םש")). Токены "החפשמ" ("family"→Last name) и
+            // "יטרפ" ("private"→First name) уникальны каждый своей роли (в отличие от
+            // "םש"="שם"="name", который встречается в ОБЕИХ парах и потому неоднозначен
+            // как якорь), поэтому классифицируем колонку по ним напрямую — X-координата
+            // РОЛИ берётся как есть, без предположений о её стороне (лево/право).
+            var heLastIdx = g.FindIndex(w => w.Text == "החפשמ"); // החפשמ
+            if (heLastIdx >= 0)
+            {
+                lastColX = g[heLastIdx].Left;
+                isHebrewVocab = true;
+                continue;
+            }
+
+            var heFirstIdx = g.FindIndex(w => w.Text == "יטרפ"); // יטרפ
+            if (heFirstIdx >= 0)
+            {
+                firstColX = g[heFirstIdx].Left;
+                isHebrewVocab = true;
                 continue;
             }
 
             if (lastColX is null || firstColX is null) continue;
+            // Роль-вокабуляр не установлен (не должно происходить, если lastColX/firstColX
+            // не null — они выставляются только вместе с isHebrewVocab), но проверяем явно:
+            // без известного вокабуляра эмитить строку безопасно НЕЛЬЗЯ (не знаем, в каком
+            // порядке — не гадаем, пропускаем строку как есть).
+            if (isHebrewVocab is null) continue;
             if (consumed.Contains(i)) continue;
 
             var yearIdx = g.FindIndex(w => Regex.IsMatch(w.Text, @"^\d{4}$"));
             if (yearIdx < 0) continue;
             var yearWord = g[yearIdx];
+
+            // Строка ноги эстафеты содержит год + не больше 2 доп. слов (имя, фамилия).
+            // ОБЫЧНАЯ (не-эстафетная) строка результата, случайно содержащая год рождения
+            // (он там тоже есть), несёт МНОГО дополнительных токенов — ранг, время, клуб,
+            // сплит-таймы, очки (реально 6-9 слов). Не бракуем эту консервативную защиту:
+            // без неё carry-continuation, переносящий колонки на следующую HE-страницу,
+            // способен принять целую страницу ОБЫЧНЫХ результатов за хвост эстафетной
+            // таблицы (нет собственной шапки, но каждая строка содержит год) и подменить
+            // информативные строки урезанным "фейковым именем" — воспроизведено при
+            // диагностике (851→808 индивидуальных строк).
+            if (g.Count - 1 > 2) continue;
 
             var otherWords = g.Where((w, idx) => idx != yearIdx).ToList();
             // Опорная строка результата эстафеты ("1 4 Israel 04:05.04 Rank 1") тоже может
@@ -437,11 +525,20 @@ public static class IsrOrgCompetitionParser
 
             if (last.Length == 0 || first.Length == 0) continue;
 
-            replacements[i] = $"{last} {first} {yearWord.Text}";
+            // Порядок эмита зависит от того, чей вокабуляр шапки распознан (см. комментарий
+            // у объявления isHebrewVocab выше). EN-потребитель (RelayTeamLineEn-ветка) читает
+            // строку как есть — эмитим готовый порядок "Last First Year". HE-потребитель
+            // (RelayTeamLineRxHE-ветка) сначала прогоняет строку через NormalizeHebrewLine,
+            // которая переворачивает ВЕСЬ порядок токенов — поэтому туда эмитим ЗЕРКАЛЬНЫЙ
+            // порядок "Year First Last", чтобы после переворота получить "Last First Year".
+            replacements[i] = isHebrewVocab == true
+                ? $"{yearWord.Text} {first} {last}"
+                : $"{last} {first} {yearWord.Text}";
         }
 
         finalLastColX = lastColX;
         finalFirstColX = firstColX;
+        finalIsHebrewVocab = isHebrewVocab;
 
         if (replacements.Count == 0 && consumed.Count == 0) return result;
 
@@ -945,9 +1042,9 @@ public static class IsrOrgCompetitionParser
                         continue;
                     }
 
-                    if (Regex.IsMatch(line, @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)\s+(?<style>.+?)\s+\u05E9\u05DC\u05D9\u05D7(?:\u05D9\u05DD|\u05D5\u05EA)?\s*$"))
+                    if (Regex.IsMatch(line, @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)\s+(?<style>.+?)\s+שליח(?:ים|ות)?\s*$"))
                     {
-                        var mm = Regex.Match(line, @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)\s+(?<style>.+?)\s+\u05E9\u05DC\u05D9\u05D7(?:\u05D9\u05DD|\u05D5\u05EA)?\s*$");
+                        var mm = Regex.Match(line, @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)\s+(?<style>.+?)\s+שליח(?:ים|ות)?\s*$");
                         int legs = int.Parse(mm.Groups["legs"].Value);
                         int legLen = int.Parse(mm.Groups["len"].Value);
                         var styleHe = mm.Groups["style"].Value.Trim();
@@ -1202,9 +1299,9 @@ public static class IsrOrgCompetitionParser
                         var styleCheck = simpleMatch.Groups["style"].Value.Trim();
                         Log($"  -> SimpleHeader candidate: len={simpleMatch.Groups["len"].Value}, style='{styleCheck}'");
 
-                        if (!styleCheck.Contains("\u05DE\u05D9\u05E7\u05D5\u05DD") &&
-                            !styleCheck.Contains("\u05DE\u05E7\u05E6\u05D4") &&
-                            !styleCheck.Contains("\u05EA\u05D5\u05E6\u05D0\u05D5\u05EA"))
+                        if (!styleCheck.Contains("מיקום") &&
+                            !styleCheck.Contains("מקצה") &&
+                            !styleCheck.Contains("תוצאות"))
                         {
                             pendingEventLen = simpleMatch.Groups["len"].Value;
                             pendingEventStyle = styleCheck;

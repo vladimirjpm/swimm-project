@@ -309,6 +309,135 @@ public class IsrOrgCompetitionParserRelayNameReconstructionTests
     }
 }
 
+// Ивритский (HE) экспорт того же протокола Маккабиады рендерит ТУ ЖЕ таблицу легов
+// RTL: физически на странице колонки идут "год рождения | имя | фамилия" (год —
+// КРАЙНИЙ СЛЕВА), а не "фамилия | имя | год", как в EN. Шапка колонок подписана
+// ивритскими словами ("יטרפ" = "פרטי" = "private"/first name, "החפשמ" = "משפחה" =
+// "family"/last name — обе подписи хранятся в PDF как raw-извлечённый, уже
+// "перевёрнутый по словам" текст, см. диагностику реального PDF). Координаты ниже —
+// реальные X с релейной страницы "Maccabiah-2026_IL_HE.pdf" (команда Israel,
+// 4X100m Freestyle U17 Girls).
+public class IsrOrgCompetitionParserHebrewRtlRoleMappingTests
+{
+    // Шапка ивритской таблицы легов — фактически разбита на 3 физические Y-строки:
+    // одна содержит "תנש"+"םש" (year+ambiguous "name" token), другая — длинный ряд
+    // подписей сплит-таймов, заканчивающийся "יטרפ"+"םש" (=First name), третья —
+    // "'מ 150"+"הדיל"+"החפשמ" (=Year of birth + Last name). Для теста используем
+    // только уникальные, однозначные для роли токены ("יטרפ" и "החפשמ") — токен
+    // "םש" намеренно НЕ используется как якорь колонки, т.к. он неоднозначен
+    // (встречается в обеих парах).
+    private static List<List<PW>> HeaderRows() => new()
+    {
+        new() { new PW("כהס", 182.3), new PW("תנש", 471.5), new PW("מש", 548.6) },
+        new()
+        {
+            new PW("'מ", 32.1), new PW("200", 41.8), new PW("כהס", 101.7),
+            new PW("יטרפ", 497.8), new PW("מש", 517.3),
+        },
+        new() { new PW("'מ", 179.0), new PW("150", 188.6), new PW("דילה", 470.9), new PW("החפשמ", 540.8) },
+    };
+
+    [Fact]
+    public void RtlHeader_YearLeftmost_ColumnRolesDetectedFromHebrewVocab_NotPhysicalSide()
+    {
+        // "LERNE" / "2009 Hilla" / "R" -> год слева, фамилия разорвана ВОКРУГ строки
+        // года (префикс "LERNE" ДО, суффикс "R" ПОСЛЕ) — как реально в HE PDF.
+        // Ожидаемый эмит для HE-потребителя (RelayTeamLineRxHE-ветка ParseLines,
+        // которая затем прогоняет строку через NormalizeHebrewLine, переворачивающую
+        // ВЕСЬ порядок токенов) — "Year First Last", т.е. ПОСЛЕ переворота получится
+        // "Last First Year", готовое для ParseRelaySwimmerLine.
+        var groups = new List<List<PW>>(HeaderRows())
+        {
+            new() { new PW("LERNE", 540.1) },
+            new() { new PW("2009", 471.9), new PW("Hilla", 506.4) },
+            new() { new PW("R", 551.8) },
+        };
+        var lines = new List<string> { "h1", "h2", "h3", "LERNE", "2009 Hilla", "R" };
+
+        var result = IsrOrgCompetitionParser.ReconstructEnRelaySwimmerNames(
+            groups, lines, null, null, null,
+            out _, out _, out var isHebrewVocab);
+
+        Assert.True(isHebrewVocab);
+        Assert.Equal(new[] { "h1", "h2", "h3", "2009 Hilla LERNER" }, result);
+    }
+
+    [Fact]
+    public void RtlHeader_FirstNameWrapsAroundRow_IsReassembled()
+    {
+        // "Charlott" / "2009 ROTH" / "e" -> ROTH разорвана? Нет: тут разорвано ИМЯ
+        // (First), а не фамилия — "Charlott"+"e"="Charlotte", ROTH цела на строке года.
+        var groups = new List<List<PW>>(HeaderRows())
+        {
+            new() { new PW("Charlott", 499.4) },
+            new() { new PW("2009", 471.9), new PW("ROTH", 542.3) },
+            new() { new PW("e", 512.7) },
+        };
+        var lines = new List<string> { "h1", "h2", "h3", "Charlott", "2009 ROTH", "e" };
+
+        var result = IsrOrgCompetitionParser.ReconstructEnRelaySwimmerNames(
+            groups, lines, null, null, null,
+            out _, out _, out var isHebrewVocab);
+
+        Assert.True(isHebrewVocab);
+        Assert.Equal(new[] { "h1", "h2", "h3", "2009 Charlotte ROTH" }, result);
+    }
+
+    [Fact]
+    public void RtlHeader_UnwrappedRow_EmitsYearFirstLastOrder()
+    {
+        // "2010 Eryn LEE" — уже полная строка (год, имя, фамилия все на одной Y-строке) —
+        // всё равно проходит через реконструкцию (не no-op'ится), потому что порядок
+        // токенов на входе ("Year First Last") ещё не тот, что нужен HE-потребителю
+        // после NormalizeHebrewLine — реконструкция должна пересобрать её в тот же
+        // канонический эмит-формат, что и разорванные строки.
+        var groups = new List<List<PW>>(HeaderRows())
+        {
+            new() { new PW("2010", 471.9), new PW("Eryn", 505.9), new PW("LEE", 546.6) },
+        };
+        var lines = new List<string> { "h1", "h2", "h3", "2010 Eryn LEE" };
+
+        var result = IsrOrgCompetitionParser.ReconstructEnRelaySwimmerNames(
+            groups, lines, null, null, null,
+            out _, out _, out var isHebrewVocab);
+
+        Assert.True(isHebrewVocab);
+        Assert.Equal(new[] { "h1", "h2", "h3", "2010 Eryn LEE" }, result);
+    }
+
+    [Fact]
+    public void OrdinaryResultRow_WithManyExtraColumns_IsNeverMistakenForALegFragment()
+    {
+        // Защита от РЕАЛЬНОЙ регрессии, найденной при диагностике: обычная (не-
+        // эстафетная) строка результата тоже содержит год рождения, но несёт МНОГО
+        // дополнительных токенов (ранг/время/клуб/сплиты/очки) — это НЕ строка ноги
+        // эстафеты (там максимум 2 доп. слова: имя+фамилия). Такая строка не должна
+        // подменяться "реконструированным" огрызком — иначе индивидуальные результаты
+        // молча портятся, если колонки HE перенесены carry-continuation'ом на страницу
+        // обычных результатов без вводного маркера "מיקום".
+        var groups = new List<List<PW>>(HeaderRows())
+        {
+            new()
+            {
+                new PW("504", 48.4), new PW("04:54.24", 114.9), new PW("Brazil", 221.7),
+                new PW("2009", 306.6), new PW("Dalia", 354.2), new PW("LEEBERMAN", 396.6),
+                new PW("1", 477.1), new PW("2", 515.4), new PW("7", 553.6),
+            },
+        };
+        var lines = new List<string>
+        {
+            "h1", "h2", "h3",
+            "504 04:54.24 Brazil 2009 Dalia LEEBERMAN 1 2 7",
+        };
+
+        var result = IsrOrgCompetitionParser.ReconstructEnRelaySwimmerNames(
+            groups, lines, null, null, null,
+            out _, out _, out _);
+
+        Assert.Equal(lines, result);
+    }
+}
+
 // Оборачиваем end-to-end проверку через ParseLines, используя уже реконструированные
 // строки — так тестируется и сама реконструкция, и её интеграция с существующей
 // логикой парсинга состава эстафеты (RelaySwimmersName/RelaySwimmers).
