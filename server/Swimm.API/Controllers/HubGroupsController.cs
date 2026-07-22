@@ -104,6 +104,19 @@ public class HubGroupsController : ControllerBase
                 // Публичная галерея (TrainingId == null) — через SwimmDbContext (не read-реплику):
                 // у Sys_HubGroupMedia нет grant swimm_ro (см. SwimmDbContext.OnModelCreating).
                 dto.Gallery = await _media.GetGalleryAsync(dto.Id);
+                // Одобренные public-публикации участников — тоже часть публичной витрины
+                // (утверждённая модель видимости: public = «видно любому посетителю»).
+                // Id отрицательный: ключи HubGroupMedia и Sys_UserMediaPublications из разных
+                // последовательностей, минус исключает коллизию и метит источник «публикация».
+                var publishedPublic = await _publications.GetApprovedForGroupAsync(dto.Id, "public");
+                dto.Gallery.AddRange(publishedPublic.Select(p => new HubGroupMediaDto
+                {
+                    Id = -p.Id,
+                    MediaType = p.MediaType,
+                    SourceType = p.SourceType,
+                    Url = p.Url,
+                    Caption = p.ResultLabel,
+                }));
                 // Лента хайлайтов шапки — строго после заполнения Gallery (video/photo берутся из неё).
                 dto.Highlights = HubGroupHighlightsBuilder.Build(dto);
                 return dto;
@@ -302,6 +315,8 @@ public class HubGroupsController : ControllerBase
         var ok = await _publications.DecideAsync(id, publicationId, request.Approve, userId.Value);
         if (!ok) return NotFound(new { error = "Publication not found" });
 
+        // Approved public-публикации входят в кэшируемый payload страницы группы (Gallery/Highlights).
+        await _cache.InvalidateAllAsync();
         return NoContent();
     }
 
