@@ -92,6 +92,8 @@ public class CompetitionAdminRepositoryTests
         db.Competitions.Add(new Competition { Id = 1, Name = "Imported comp", Date = "05/07/2026", PoolType = "50m", OrgCompId = 100 });
         // DbOnly: соревнование без OrgCompId, ни одна discovery-строка на него не матчится.
         db.Competitions.Add(new Competition { Id = 2, Name = "PDF only comp", Date = "01/01/2020", PoolType = "25m" });
+        // Синтетика: по умолчанию должна быть скрыта.
+        db.Competitions.Add(new Competition { Id = 3, Name = "SYNTH Meet 0001", Date = "07/01/2016", PoolType = "50m" });
         db.DiscoveredCompetitions.AddRange(
             new DiscoveredCompetition
             {
@@ -114,8 +116,9 @@ public class CompetitionAdminRepositoryTests
         await db.SaveChangesAsync();
 
         var repo = new CompetitionAdminRepository(db, NoCache());
-        var all = await repo.GetUnifiedAsync(null, null, null, null, 1, 20);
+        var all = await repo.GetUnifiedAsync(null, null, null, null, showSynthetic: false, 1, 20);
 
+        // SYNTH скрыта по умолчанию → 4 (imported/dbOnly/onSite/ignored), без синтетики.
         Assert.Equal(4, all.TotalCount);
         var byStage = all.Items.GroupBy(u => u.Stage).ToDictionary(g => g.Key, g => g.ToList());
         Assert.Single(byStage[CompetitionStage.Imported]);
@@ -129,8 +132,13 @@ public class CompetitionAdminRepositoryTests
         Assert.Equal(100, imported.Site!.OrgCompId);
 
         // Фильтр по стадии.
-        var onSiteOnly = await repo.GetUnifiedAsync(null, null, null, "OnSite", 1, 20);
+        var onSiteOnly = await repo.GetUnifiedAsync(null, null, null, "OnSite", showSynthetic: false, 1, 20);
         Assert.Equal(1, onSiteOnly.TotalCount);
         Assert.Equal(200, onSiteOnly.Items[0].Site!.OrgCompId);
+
+        // Показ синтетики — SYNTH-строка появляется (DbOnly).
+        var withSynth = await repo.GetUnifiedAsync(null, null, null, null, showSynthetic: true, 1, 20);
+        Assert.Equal(5, withSynth.TotalCount);
+        Assert.Contains(withSynth.Items, u => u.Db?.Single?.Name == "SYNTH Meet 0001");
     }
 }

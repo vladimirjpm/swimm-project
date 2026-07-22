@@ -32,6 +32,10 @@ public class IndexModel : PageModel
     [BindProperty(SupportsGet = true, Name = "stage")]
     public string? Stage { get; set; }
 
+    /// <summary>Показывать тестовую синтетику (SYNTH Meet…). По умолчанию скрыта.</summary>
+    [BindProperty(SupportsGet = true, Name = "synth")]
+    public bool ShowSynthetic { get; set; }
+
     [BindProperty(SupportsGet = true, Name = "page")]
     public int PageNumber { get; set; } = 1;
 
@@ -45,7 +49,7 @@ public class IndexModel : PageModel
     public async Task OnGetAsync()
     {
         if (PageNumber < 1) PageNumber = 1;
-        Result = await _repo.GetUnifiedAsync(Search, CategoryKey, Year, Stage, PageNumber, PageSize);
+        Result = await _repo.GetUnifiedAsync(Search, CategoryKey, Year, Stage, ShowSynthetic, PageNumber, PageSize);
         Categories = await _repo.GetAllCategoriesAsync();
         Years = await _repo.GetAvailableYearsAsync();
     }

@@ -6,7 +6,7 @@
     ViewData["PageSubtitle"] = "Соревнования: справочник БД + входящие isr.org.il одним списком (β)";
 
     string PageUrl(int p) =>
-        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, year = Model.Year, stage = Model.Stage, page = p })!;
+        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, year = Model.Year, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, page = p })!;
 
     var hasFilters = !string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.CategoryKey)
         || Model.Year != null || !string.IsNullOrEmpty(Model.Stage);
@@ -80,6 +80,10 @@
                 <option value="@y" selected="@(y == Model.Year)">@y</option>
             }
         </select>
+    </label>
+    <label class="flex items-center gap-2 text-[13px] text-admin-text-muted self-center mt-3.5">
+        <input type="checkbox" name="synth" value="true" checked="@Model.ShowSynthetic" class="cursor-pointer" />
+        показать синтетику (SYNTH)
     </label>
     <button type="submit" class="admin-btn admin-btn-primary">Найти</button>
     @if (hasFilters)

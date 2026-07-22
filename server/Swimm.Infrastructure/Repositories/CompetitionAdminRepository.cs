@@ -61,14 +61,18 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
     }
 
     public async Task<PagedResult<UnifiedCompetitionRowDto>> GetUnifiedAsync(
-        string? search, string? categoryKey, int? year, string? stage, int page, int pageSize)
+        string? search, string? categoryKey, int? year, string? stage, bool showSynthetic, int page, int pageSize)
     {
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 20;
 
         // 1) БД-сторона: все «головы» под фильтрами (без пагинации — мержим и режем в памяти).
         // На admin-масштабе (~1.5k соревнований) это приемлемо; при росте — вынести в БД-пагинацию.
-        var headItems = await FilteredHeads(search, categoryKey, year)
+        var heads = FilteredHeads(search, categoryKey, year);
+        // Тестовая синтетика (SYNTH Meet…) по умолчанию скрыта — её сотни и она забивает список.
+        if (!showSynthetic)
+            heads = heads.Where(c => !c.Name.StartsWith("SYNTH "));
+        var headItems = await heads
             .Select(ProjectListItem)
             .ToListAsync();
         var dbRows = await BuildRowsAsync(headItems);
