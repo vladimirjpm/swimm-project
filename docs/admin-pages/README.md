@@ -14,15 +14,13 @@
 | /Admin/Swimmers | [swimmers.md](swimmers.md) | Дубли пловцов: кандидаты, dry-run, склейка, сироты |
 | /Admin/Swimmers/Loglig | [swimmers-loglig.md](swimmers-loglig.md) | Привязка пловцов к loglig.com |
 | /Admin/Clubs | [clubs.md](clubs.md) | Дубли клубов: кандидаты, dry-run, склейка |
-| /Admin/Competitions | [competitions.md](competitions.md) | Справочник соревнований — эталонный CRUD |
-| /Admin/CompetitionsHub | [competitionshub.md](competitionshub.md) | β: Competitions + Discovery одним списком со стадией |
+| /Admin/Competitions | [competitions.md](competitions.md) | Соревнования: справочник БД + входящие isr.org.il одним списком (CRUD + импорт) |
 | /Admin/Categories | [categories.md](categories.md) | Категории соревнований (бейджи) |
 | /Admin/Records | [records.md](records.md) | Рекорды и нормативы уровней |
 | /Admin/HubGroups | [hubgroups.md](hubgroups.md) | Группы SwimHub |
 | /Admin/HubGroupClubRequests | [hubgroupclubrequests.md](hubgroupclubrequests.md) | Заявки групп на статус клуба |
 | /Admin/Import | [import.md](import.md) | Импорт соревнований (JSON/PDF) и рекордов |
 | /Admin/ImportHistory | [importhistory.md](importhistory.md) | История импортов |
-| /Admin/Discovery | [discovery.md](discovery.md) | Автозабор соревнований с isr.org.il |
 | /Admin/Users | [users.md](users.md) | Пользователи и сессии |
 | /Admin/Db | [db.md](db.md) | Схема БД |
 | /Admin/Api | [api.md](api.md) | Каталог эндпоинтов + браузер данных |

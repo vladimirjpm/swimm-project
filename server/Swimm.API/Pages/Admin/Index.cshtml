@@ -160,8 +160,8 @@
         // Discovery: не загружено крупно, загружено мелко
         {
             const d = s.discovery;
-            cards.push(statusCard('/Admin/Discovery', d.new,
-                'Discovery — не загружено', [`загружено: ${d.imported}`],
+            cards.push(statusCard('/Admin/Competitions?stage=OnSite', d.new,
+                'Входящие — не загружено', [`загружено: ${d.imported}`],
                 d.new > 0 ? '#ffa726' : '#66bb6a'));
         }
 

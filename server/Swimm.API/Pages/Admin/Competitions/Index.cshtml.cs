@@ -6,6 +6,12 @@ using Swimm.Application.Dtos;
 
 namespace Swimm.API.Pages.Admin.Competitions;
 
+/// <summary>
+/// Соревнования: объединённый список справочника БД (Competitions) и входящих isr.org.il
+/// (Discovery) одной таблицей со стадией жизненного цикла. Заменил обе прежние страницы
+/// (Competitions/Index + Discovery). Действия входящих — через /api/admin/discovery/*
+/// (клиентский JS); CRUD БД — здесь (Edit-страница + каскадное удаление).
+/// </summary>
 [Authorize(Roles = "Admin")]
 public class IndexModel : PageModel
 {
@@ -30,15 +36,18 @@ public class IndexModel : PageModel
     [BindProperty(SupportsGet = true, Name = "year")]
     public int? Year { get; set; }
 
+    /// <summary>Фильтр по стадии: OnSite | Imported | DbOnly | Ignored (пусто — все).</summary>
+    [BindProperty(SupportsGet = true, Name = "stage")]
+    public string? Stage { get; set; }
+
+    /// <summary>Показывать тестовую синтетику (SYNTH Meet…). По умолчанию скрыта.</summary>
+    [BindProperty(SupportsGet = true, Name = "synth")]
+    public bool ShowSynthetic { get; set; }
+
     [BindProperty(SupportsGet = true, Name = "page")]
     public int PageNumber { get; set; } = 1;
 
-    /// <summary>Переход с /Admin/Discovery: сужает список до соревнования с этим OrgCompId
-    /// и подсвечивает нужную строку (data-org).</summary>
-    [BindProperty(SupportsGet = true, Name = "org")]
-    public int? OrgCompId { get; set; }
-
-    public PagedResult<CompetitionRowDto> Result { get; private set; } =
+    public PagedResult<UnifiedCompetitionRowDto> Result { get; private set; } =
         new([], 0, 1, PageSize);
 
     public IReadOnlyList<CategoryTagDto> Categories { get; private set; } = [];
@@ -48,7 +57,7 @@ public class IndexModel : PageModel
     public async Task OnGetAsync()
     {
         if (PageNumber < 1) PageNumber = 1;
-        Result = await _repo.GetPagedAsync(Search, CategoryKey, Year, PageNumber, PageSize, OrgCompId);
+        Result = await _repo.GetUnifiedAsync(Search, CategoryKey, Year, Stage, ShowSynthetic, PageNumber, PageSize);
         Categories = await _repo.GetAllCategoriesAsync();
         Years = await _repo.GetAvailableYearsAsync();
     }
@@ -95,5 +104,9 @@ public class IndexModel : PageModel
 
     // Сохраняем текущие фильтры/страницу при возврате к списку.
     private IActionResult RedirectToBackToList() =>
-        RedirectToPage("Index", new { q = Search, cat = CategoryKey, year = Year, org = OrgCompId, page = PageNumber });
+        RedirectToPage("Index", new
+        {
+            q = Search, cat = CategoryKey, year = Year, stage = Stage,
+            synth = ShowSynthetic ? "true" : null, page = PageNumber
+        });
 }

@@ -16,13 +16,11 @@ public static class AdminNav
         new("Dashboard", "gauge", "/Admin", ExactMatch: true),
 
         new("Competitions", "trophy", "/Admin/Competitions", "Data"),
-        new("Competitions Hub β", "trophy", "/Admin/CompetitionsHub", "Data"),
         new("Categories", "tag", "/Admin/Categories", "Data"),
         new("Records", "award", "/Admin/Records", "Data"),
         new("HubGroups", "users", "/Admin/HubGroups", "Data"),
         new("Club requests", "inbox", "/Admin/HubGroupClubRequests", "Data"),
         new("Import", "download", "/Admin/Import", "Data"),
-        new("Discovery", "inbox", "/Admin/Discovery", "Data"),
         new("Swimmers", "users", "/Admin/Swimmers", "Data"),
         new("Loglig ID", "users", "/Admin/Swimmers/Loglig", "Data"),
         new("Clubs", "shield", "/Admin/Clubs", "Data"),

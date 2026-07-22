@@ -16,7 +16,7 @@ public interface ICompetitionAdminRepository
     Task<PagedResult<CompetitionRowDto>> GetPagedAsync(string? search, string? categoryKey, int? year, int page, int pageSize, int? orgCompId = null);
 
     /// <summary>
-    /// Объединённый список Competitions + Discovery (новая страница /Admin/CompetitionsHub):
+    /// Объединённый список Competitions + Discovery (страница /Admin/Competitions):
     /// каждое соревнование одной строкой с <see cref="CompetitionStage"/> (на сайте / импортировано /
     /// только в БД / скрыто). Склейка по OrgCompId (+ fallback имя+дата). Фильтры поиск/категория/
     /// сезон применяются к БД-стороне; <paramref name="stage"/> — по стадии. Сортировка по дате (убыв.).
