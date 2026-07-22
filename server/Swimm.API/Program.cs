@@ -242,6 +242,27 @@ if (args.Contains("--merge-swimmers"))
     return;
 }
 
+// Разовый бэкфилл структурного состава эстафет (RelayMembers) для данных,
+// импортированных до появления структурных ног:
+//   dotnet run -- --backfill-relay-members [--apply]
+// Без --apply — dry-run: печатает отчёт, БД не меняется. Идемпотентно.
+if (args.Contains("--backfill-relay-members"))
+{
+    using var scope = app.Services.CreateScope();
+    var backfill = scope.ServiceProvider.GetRequiredService<IRelayMemberBackfillService>();
+    var rep = await backfill.BackfillAsync(apply: args.Contains("--apply"));
+    Console.WriteLine(rep.Applied
+        ? "=== ПРИМЕНЕНО: RelayMembers бэкфилл ==="
+        : "=== DRY-RUN: RelayMembers бэкфилл, БД не изменена (добавь --apply) ===");
+    Console.WriteLine($"Эстафет всего (без состава): {rep.RelaysTotal}");
+    Console.WriteLine($"  уже с составом (пропущены):  {rep.RelaysAlreadyPopulated}");
+    Console.WriteLine($"  залинковано (>=1 нога):      {rep.RelaysLinked}");
+    Console.WriteLine($"Ног привязано:  {rep.LegsLinked}");
+    Console.WriteLine($"Ног не сопоставлено: {rep.LegsUnmatched}");
+    foreach (var s in rep.UnmatchedSamples) Console.WriteLine($"    ? {s}");
+    return;
+}
+
 if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 
