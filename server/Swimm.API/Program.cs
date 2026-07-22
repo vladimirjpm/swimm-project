@@ -263,6 +263,34 @@ if (args.Contains("--backfill-relay-members"))
     return;
 }
 
+// Разовый бэкфилл Competition.OrgCompId по Discovery-строкам (для соревнований, импортированных
+// до того, как импорт научился штамповать OrgCompId; кросс-линк Competitions↔Discovery для них пуст):
+//   dotnet run -- --backfill-discovery-orgcompid [--apply]
+// Без --apply — dry-run: печатает mapping-таблицу, БД не меняется. Идемпотентно.
+if (args.Contains("--backfill-discovery-orgcompid"))
+{
+    using var scope = app.Services.CreateScope();
+    var discovery = scope.ServiceProvider.GetRequiredService<ICompetitionDiscoveryService>();
+    var apply = args.Contains("--apply");
+    var rows = await discovery.BackfillImportedOrgCompIdsAsync(apply: apply);
+
+    Console.WriteLine(apply
+        ? "=== ПРИМЕНЕНО ==="
+        : "=== DRY-RUN: бэкфилл Discovery→OrgCompId, БД не изменена (добавь --apply) ===");
+    foreach (var r in rows)
+    {
+        Console.WriteLine(
+            $"[{r.Action}] compID {r.OrgCompId} → comp #{r.CompetitionId} «{r.CompetitionName}»  (discovered: «{r.DiscoveredName}»)");
+    }
+
+    var wouldLink = rows.Count(r => r.Action is "WouldLink");
+    var linked = rows.Count(r => r.Action is "Linked");
+    var already = rows.Count(r => r.Action is "AlreadyLinked");
+    var takenByOther = rows.Count(r => r.Action is "TakenByOther");
+    Console.WriteLine($"Итого: would-link {wouldLink}, linked {linked}, already {already}, taken-by-other {takenByOther}");
+    return;
+}
+
 if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 

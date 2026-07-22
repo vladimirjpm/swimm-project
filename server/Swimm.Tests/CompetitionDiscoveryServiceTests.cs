@@ -203,4 +203,75 @@ public class CompetitionDiscoveryServiceTests
         var dto = (await CreateService(db, new FakeProvider()).GetAllAsync()).Single(d => d.OrgCompId == 1);
         Assert.Equal(comp.Id, dto.MatchedCompetitionId);
     }
+
+    // ── Батч-бэкфилл (CLI --backfill-discovery-orgcompid) ───────────────────────
+
+    [Fact]
+    public async Task BackfillImportedOrgCompIds_DryRun_ReportsWouldLink_DoesNotWrite()
+    {
+        await using var db = CreateDb(nameof(BackfillImportedOrgCompIds_DryRun_ReportsWouldLink_DoesNotWrite));
+        var matched = new Competition { Name = "ליגה מס 4", Date = "03/07/2026", PoolType = "25m" };
+        var takenComp = new Competition { Name = "Другое соревнование", Date = "01/01/2026", PoolType = "25m", OrgCompId = 999 };
+        db.Competitions.AddRange(matched, takenComp);
+        db.DiscoveredCompetitions.AddRange(
+            new DiscoveredCompetition
+            {
+                Id = 1, OrgCompId = 777, Name = "ליגה מס 4",
+                DateStart = new DateTime(2026, 7, 3, 0, 0, 0, DateTimeKind.Utc),
+                DateEnd = new DateTime(2026, 7, 3, 0, 0, 0, DateTimeKind.Utc),
+                Status = DiscoveredCompetitionStatus.Imported
+            },
+            new DiscoveredCompetition
+            {
+                Id = 2, OrgCompId = 888, Name = "Соревнование без импорта",
+                DateStart = new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc),
+                DateEnd = new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc),
+                Status = DiscoveredCompetitionStatus.New
+            },
+            new DiscoveredCompetition
+            {
+                Id = 3, OrgCompId = 999, Name = "Другое соревнование",
+                DateStart = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                DateEnd = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                Status = DiscoveredCompetitionStatus.Imported
+            });
+        await db.SaveChangesAsync();
+
+        var svc = CreateService(db, new FakeProvider());
+        var report = await svc.BackfillImportedOrgCompIdsAsync(apply: false);
+
+        // Строка без матча (Id=2) не попадает в отчёт.
+        Assert.Equal(2, report.Count);
+        Assert.Equal("WouldLink", report.Single(r => r.OrgCompId == 777).Action);
+        Assert.Equal("AlreadyLinked", report.Single(r => r.OrgCompId == 999).Action);
+
+        // dry-run — БД не изменена.
+        Assert.Null((await db.Competitions.SingleAsync(c => c.Id == matched.Id)).OrgCompId);
+    }
+
+    [Fact]
+    public async Task BackfillImportedOrgCompIds_Apply_StampsOrgCompId_ThenIdempotent()
+    {
+        await using var db = CreateDb(nameof(BackfillImportedOrgCompIds_Apply_StampsOrgCompId_ThenIdempotent));
+        var matched = new Competition { Name = "ליגה מס 4", Date = "03/07/2026", PoolType = "25m" };
+        db.Competitions.Add(matched);
+        db.DiscoveredCompetitions.Add(new DiscoveredCompetition
+        {
+            Id = 1, OrgCompId = 777, Name = "ליגה מס 4",
+            DateStart = new DateTime(2026, 7, 3, 0, 0, 0, DateTimeKind.Utc),
+            DateEnd = new DateTime(2026, 7, 3, 0, 0, 0, DateTimeKind.Utc),
+            Status = DiscoveredCompetitionStatus.Imported
+        });
+        await db.SaveChangesAsync();
+
+        var svc = CreateService(db, new FakeProvider());
+        var report = await svc.BackfillImportedOrgCompIdsAsync(apply: true);
+
+        Assert.Equal("Linked", report.Single().Action);
+        Assert.Equal(777, (await db.Competitions.SingleAsync(c => c.Id == matched.Id)).OrgCompId);
+
+        // Повторный вызов — идемпотентно.
+        var again = await svc.BackfillImportedOrgCompIdsAsync(apply: true);
+        Assert.Equal("AlreadyLinked", again.Single().Action);
+    }
 }

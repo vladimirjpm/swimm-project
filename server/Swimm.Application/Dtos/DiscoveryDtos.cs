@@ -52,6 +52,14 @@ public sealed class RelinkResult
     public string Message { get; set; } = string.Empty;
 }
 
+/// <summary>Строка отчёта батч-бэкфилла OrgCompId (CLI, см. Program.cs --backfill-discovery-orgcompid).</summary>
+public sealed record DiscoveryBackfillRow(
+    int OrgCompId,
+    string DiscoveredName,
+    int CompetitionId,
+    string CompetitionName,
+    string Action);
+
 /// <summary>Итог «синхронизации языков»: дозаполнение EN/HE-имён пловцов из двуязычной пары PDF.</summary>
 public sealed class SwimmerNameSyncResult
 {

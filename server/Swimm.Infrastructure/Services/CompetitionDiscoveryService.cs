@@ -181,4 +181,48 @@ public class CompetitionDiscoveryService(
         await db.SaveChangesAsync(ct);
         return new RelinkResult { Ok = true, CompetitionId = comp.Id, CompetitionName = comp.Name, Message = "Привязано" };
     }
+
+    /// <summary>Разовый CLI-бэкфилл (см. Program.cs --backfill-discovery-orgcompid): прогоняет
+    /// ВСЕ Discovery-строки через матчер и для каждой сматченной проставляет OrgCompId, уважая
+    /// уникальность. Строки без матча в отчёт не попадают. dry-run по умолчанию.</summary>
+    public async Task<IReadOnlyList<DiscoveryBackfillRow>> BackfillImportedOrgCompIdsAsync(bool apply, CancellationToken ct = default)
+    {
+        var rows = await db.DiscoveredCompetitions.AsNoTracking().ToListAsync(ct);
+        var matches = await matcher.MatchAsync(rows, ct);
+
+        var report = new List<DiscoveryBackfillRow>();
+        foreach (var row in rows)
+        {
+            var match = matches.GetValueOrDefault(row.Id);
+            if (match is not { } m) continue;
+
+            var comp = await db.Competitions.FirstAsync(c => c.Id == m.CompetitionId, ct);
+            var action = await DetermineLinkActionAsync(comp, row.OrgCompId, apply, ct);
+            report.Add(new DiscoveryBackfillRow(row.OrgCompId, row.Name, comp.Id, comp.Name, action));
+        }
+
+        if (apply)
+            await db.SaveChangesAsync(ct);
+
+        return report;
+    }
+
+    /// <summary>Общая логика «привязать compID к соревнованию, если ещё не занят другим»,
+    /// переиспользуемая <see cref="LinkImportedAsync"/> и батч-бэкфиллом. При apply=false
+    /// только определяет действие (WouldLink), не мутирует comp.</summary>
+    private async Task<string> DetermineLinkActionAsync(Competition comp, int orgCompId, bool apply, CancellationToken ct)
+    {
+        if (comp.OrgCompId == orgCompId)
+            return "AlreadyLinked";
+
+        var takenByOther = await db.Competitions.AnyAsync(c => c.OrgCompId == orgCompId && c.Id != comp.Id, ct);
+        if (takenByOther)
+            return "TakenByOther";
+
+        if (!apply)
+            return "WouldLink";
+
+        comp.OrgCompId = orgCompId;
+        return "Linked";
+    }
 }
