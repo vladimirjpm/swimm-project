@@ -22,6 +22,14 @@ interface Props {
   initialUrl?: string;
   initialStep?: 1 | 2 | 3;
   initialSwimmerId?: number;
+  /**
+   * Single-step режим (v3): цель уже известна («+ Add video» на строке заплыва /
+   * «+ Photo/Video» на соревновании) — только URL, шаги 2–3 пропускаются.
+   * fixedResultId имеет приоритет; contextLabel — карточка контекста над инпутом.
+   */
+  fixedResultId?: number;
+  fixedCompetitionId?: number;
+  contextLabel?: React.ReactNode;
 }
 
 type Detected = 'YOUTUBE' | 'VIMEO' | 'PHOTO' | 'OTHER';
@@ -34,7 +42,11 @@ function detectType(url: string): Detected {
 }
 
 /** Add link — модал (desktop)/bottom sheet (mobile), 3 шага (README §3). */
-function AddLinkModal({ swimmers, onClose, onSave, initialUrl, initialStep, initialSwimmerId }: Props) {
+function AddLinkModal({
+  swimmers, onClose, onSave, initialUrl, initialStep, initialSwimmerId,
+  fixedResultId, fixedCompetitionId, contextLabel,
+}: Props) {
+  const singleStep = fixedResultId != null || fixedCompetitionId != null;
   const [step, setStep] = useState<1 | 2 | 3>(initialStep ?? 1);
   const [url, setUrl] = useState(initialUrl ?? '');
   const [otherKind, setOtherKind] = useState<'video' | 'photo'>('video');
@@ -69,7 +81,7 @@ function AddLinkModal({ swimmers, onClose, onSave, initialUrl, initialStep, init
     return { media_type: kind === 'photo' ? 'image' : 'video', source_type: 'other' };
   };
 
-  const save = async (withResult: boolean) => {
+  const save = async (attach: 'result' | 'competition' | 'none') => {
     if (swimmerId == null || saving) return;
     setSaving(true);
     const { media_type, source_type } = mediaTypeSourceType();
@@ -78,7 +90,10 @@ function AddLinkModal({ swimmers, onClose, onSave, initialUrl, initialStep, init
       media_type,
       source_type,
       url: url.trim(),
-      result_id: withResult ? resultId : null,
+      result_id: singleStep ? fixedResultId ?? null : attach === 'result' ? resultId : null,
+      competition_id: singleStep
+        ? (fixedResultId != null ? null : fixedCompetitionId ?? null)
+        : attach === 'competition' ? competitionId : null,
     });
     setSaving(false);
     if (ok) onClose();
@@ -104,11 +119,17 @@ function AddLinkModal({ swimmers, onClose, onSave, initialUrl, initialStep, init
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3">
-          <h2 className="m-0 text-[19px] font-black tracking-[-0.02em]">Add link</h2>
-          <div className="ml-1.5 flex gap-[5px]">{stepDots}</div>
-          <span className="hp-mono ml-auto text-[11px] font-extrabold text-[rgba(125,211,252,0.6)]">step {step} / 3</span>
-          <button type="button" onClick={onClose} className="cursor-pointer border-none bg-transparent p-1 text-[16px] text-[rgba(203,224,240,0.6)]">✕</button>
+          <h2 className="m-0 text-[19px] font-black tracking-[-0.02em]">{singleStep ? 'Add media' : 'Add link'}</h2>
+          {!singleStep && <div className="ml-1.5 flex gap-[5px]">{stepDots}</div>}
+          {!singleStep && <span className="hp-mono ml-auto text-[11px] font-extrabold text-[rgba(125,211,252,0.6)]">step {step} / 3</span>}
+          <button type="button" onClick={onClose} className={`cursor-pointer border-none bg-transparent p-1 text-[16px] text-[rgba(203,224,240,0.6)] ${singleStep ? 'ml-auto' : ''}`}>✕</button>
         </div>
+
+        {singleStep && contextLabel && (
+          <div className="mt-3 rounded-[12px] border border-[rgba(125,211,252,0.25)] bg-[rgba(2,10,24,0.35)] p-[10px_14px] text-[13px]">
+            {contextLabel}
+          </div>
+        )}
 
         {step === 1 && (
           <div className="mt-[18px] flex flex-col gap-[14px]">
@@ -147,12 +168,12 @@ function AddLinkModal({ swimmers, onClose, onSave, initialUrl, initialStep, init
               <button type="button" onClick={onClose} className="hp-mono rounded-[10px] border border-[rgba(125,211,252,0.3)] bg-transparent px-4 py-[9px] text-[12px] font-extrabold text-[rgba(125,211,252,0.7)]">Cancel</button>
               <button
                 type="button"
-                disabled={!canNext}
-                onClick={() => setStep(2)}
+                disabled={!canNext || (singleStep && saving)}
+                onClick={() => (singleStep ? save('none') : setStep(2))}
                 className="hp-mono rounded-[10px] border-none px-[18px] py-[9px] text-[12px] font-extrabold disabled:cursor-default"
                 style={{ background: canNext ? '#38ef8f' : 'rgba(56,239,143,0.25)', color: canNext ? '#04101f' : 'rgba(4,16,31,0.6)' }}
               >
-                Next →
+                {singleStep ? 'Save' : 'Next →'}
               </button>
             </div>
           </div>
@@ -247,19 +268,29 @@ function AddLinkModal({ swimmers, onClose, onSave, initialUrl, initialStep, init
             )}
             <div className="mt-1 flex justify-between gap-2">
               <button type="button" onClick={() => setStep(2)} className="hp-mono rounded-[10px] border border-[rgba(125,211,252,0.3)] bg-transparent px-4 py-[9px] text-[12px] font-extrabold text-[rgba(125,211,252,0.7)]">← Back</button>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap justify-end gap-2">
                 <button
                   type="button"
                   disabled={saving}
-                  onClick={() => save(false)}
+                  onClick={() => save('none')}
                   className="hp-mono rounded-[10px] border border-[rgba(125,211,252,0.35)] bg-transparent px-4 py-[9px] text-[12px] font-extrabold text-[#7dd3fc] disabled:opacity-50"
                 >
                   Skip — save as general
                 </button>
+                {competitionId != null && resultId == null && (
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => save('competition')}
+                    className="hp-mono rounded-[10px] border border-dashed border-[rgba(56,239,143,0.5)] bg-transparent px-4 py-[9px] text-[12px] font-extrabold text-[#38ef8f] disabled:opacity-50"
+                  >
+                    📎 Whole competition
+                  </button>
+                )}
                 <button
                   type="button"
                   disabled={resultId == null || saving}
-                  onClick={() => save(true)}
+                  onClick={() => save('result')}
                   className="hp-mono rounded-[10px] border-none px-[18px] py-[9px] text-[12px] font-extrabold disabled:cursor-default"
                   style={{ background: resultId != null ? '#38ef8f' : 'rgba(56,239,143,0.25)', color: resultId != null ? '#04101f' : 'rgba(4,16,31,0.6)' }}
                 >

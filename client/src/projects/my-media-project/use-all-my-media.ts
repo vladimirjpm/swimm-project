@@ -27,6 +27,8 @@ export interface AddMediaInput {
   source_type: 'youtube' | 'vimeo' | 'other';
   url: string;
   result_id?: number | null;
+  /** Привязка ко всему соревнованию (📎 в шапке группы); игнорируется, если задан result_id. */
+  competition_id?: number | null;
 }
 
 export interface PublishTargetDto {
