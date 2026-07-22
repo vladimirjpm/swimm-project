@@ -129,7 +129,13 @@ else
                             </td>
                             <td class="whitespace-nowrap text-admin-text-muted">@(string.IsNullOrEmpty(ev.DateRange) ? "—" : ev.DateRange)</td>
                             <td>@(string.IsNullOrEmpty(ev.PoolType) ? "—" : ev.PoolType)</td>
-                            <td class="text-admin-text-muted">@(u.Site != null ? u.Site.OrgCompId.ToString() : "—")</td>
+                            <td class="text-admin-text-muted">
+                                @if (u.Site is { } es)
+                                {
+                                    <a href="https://isr.org.il/comp.asp?compID=@es.OrgCompId" target="_blank" rel="noopener" class="text-admin-accent hover:underline" onclick="event.stopPropagation()">@es.OrgCompId ↗</a>
+                                }
+                                else { <text>—</text> }
+                            </td>
                             <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(u.Site != null ? System.Net.WebUtility.HtmlEncode(u.Site.Venue ?? "—") + LangBadges(u.Site.Languages) : "—")</td>
                             <td class="text-right tabular-nums">@ev.TotalResultCount</td>
                             <td></td>
