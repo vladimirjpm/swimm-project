@@ -79,7 +79,21 @@ public class CompetitionDiscoveryService(
             .ToListAsync(ct);
 
         var matches = await matcher.MatchAsync(rows, ct);
-        return rows.Select(d => ToDto(d, matches.GetValueOrDefault(d.Id))).ToList();
+
+        // Fallback-линк по OrgCompId: если справочник уже штампован этим compID (ручная привязка
+        // или кросс-языковое имя «מכביה»↔«Maccabiah», которое матчер по имени+дате не спарит) —
+        // это авторитетная связь, приоритетнее эвристики матчера.
+        var orgCompIds = rows.Select(d => d.OrgCompId).ToList();
+        var byOrgCompId = (await db.Competitions
+                .AsNoTracking()
+                .Where(c => c.OrgCompId != null && orgCompIds.Contains(c.OrgCompId.Value))
+                .Select(c => new { OrgCompId = c.OrgCompId!.Value, c.Id, c.Name })
+                .ToListAsync(ct))
+            .ToDictionary(c => c.OrgCompId, c => new CompetitionMatch(c.Id, c.Name));
+
+        return rows.Select(d => ToDto(d,
+            byOrgCompId.TryGetValue(d.OrgCompId, out var linked) ? linked : matches.GetValueOrDefault(d.Id)))
+            .ToList();
     }
 
     public async Task<DiscoveredCompetitionDto?> RefreshDetailsAsync(int id, CancellationToken ct = default)

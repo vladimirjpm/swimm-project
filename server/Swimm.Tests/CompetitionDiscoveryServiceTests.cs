@@ -204,6 +204,28 @@ public class CompetitionDiscoveryServiceTests
         Assert.Equal(comp.Id, dto.MatchedCompetitionId);
     }
 
+    [Fact]
+    public async Task GetAll_FallsBackToOrgCompIdLink_WhenNameDateMatcherMisses()
+    {
+        // Кросс-языковой случай: Discovery «מכביה» (иврит), справочник «Maccabiah 2026» (англ.) —
+        // матчер по имени+дате НЕ спарит, но OrgCompId уже штампован (ручная привязка). Ожидаем,
+        // что fallback по OrgCompId всё равно вернёт линк.
+        await using var db = CreateDb(nameof(GetAll_FallsBackToOrgCompIdLink_WhenNameDateMatcherMisses));
+        var comp = new Competition { Name = "Maccabiah 2026", Date = "05/07/2026", PoolType = "50m", OrgCompId = 16723 };
+        db.Competitions.Add(comp);
+        db.DiscoveredCompetitions.Add(new DiscoveredCompetition
+        {
+            OrgCompId = 16723, Name = "מכביה",
+            DateStart = new DateTime(2026, 7, 5, 0, 0, 0, DateTimeKind.Utc),
+            DateEnd = new DateTime(2026, 7, 10, 0, 0, 0, DateTimeKind.Utc)
+        });
+        await db.SaveChangesAsync();
+
+        var dto = (await CreateService(db, new FakeProvider()).GetAllAsync()).Single(d => d.OrgCompId == 16723);
+        Assert.Equal(comp.Id, dto.MatchedCompetitionId);
+        Assert.Equal("Maccabiah 2026", dto.MatchedCompetitionName);
+    }
+
     // ── Батч-бэкфилл (CLI --backfill-discovery-orgcompid) ───────────────────────
 
     [Fact]
