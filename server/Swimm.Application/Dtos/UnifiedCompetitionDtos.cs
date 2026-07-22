@@ -17,6 +17,13 @@ public enum CompetitionStage
     Ignored
 }
 
+/// <summary>Результат объединённого списка: страница строк + счётчики по месяцам (для фильтр-кнопок).</summary>
+public sealed record UnifiedCompetitionList(
+    PagedResult<UnifiedCompetitionRowDto> Page,
+    /// <summary>Число соревнований в каждом месяце (индекс 0 = январь … 11 = декабрь) под текущими
+    /// фильтрами, но БЕЗ фильтра по месяцу — чтобы на кнопках были полные счётчики.</summary>
+    IReadOnlyList<int> MonthCounts);
+
 /// <summary>Discovery-сторона объединённой строки: данные с isr.org.il.</summary>
 public sealed class UnifiedSiteInfo
 {

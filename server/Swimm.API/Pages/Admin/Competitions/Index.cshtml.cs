@@ -44,11 +44,20 @@ public class IndexModel : PageModel
     [BindProperty(SupportsGet = true, Name = "synth")]
     public bool ShowSynthetic { get; set; }
 
-    [BindProperty(SupportsGet = true, Name = "page")]
+    /// <summary>Фильтр по месяцу 1–12 (null — все). Кнопки-месяцы над списком.</summary>
+    [BindProperty(SupportsGet = true, Name = "month")]
+    public int? Month { get; set; }
+
+    // ВНИМАНИЕ: имя параметра — «p», а НЕ «page»: «page» зарезервировано роутингом Razor Pages
+    // (и для Url.Page-генерации, и для байндинга), из-за чего пагинация молча ломается.
+    [BindProperty(SupportsGet = true, Name = "p")]
     public int PageNumber { get; set; } = 1;
 
     public PagedResult<UnifiedCompetitionRowDto> Result { get; private set; } =
         new([], 0, 1, PageSize);
+
+    /// <summary>Счётчики соревнований по месяцам (индекс 0 = январь) для кнопок-фильтров.</summary>
+    public IReadOnlyList<int> MonthCounts { get; private set; } = new int[12];
 
     public IReadOnlyList<CategoryTagDto> Categories { get; private set; } = [];
 
@@ -57,7 +66,9 @@ public class IndexModel : PageModel
     public async Task OnGetAsync()
     {
         if (PageNumber < 1) PageNumber = 1;
-        Result = await _repo.GetUnifiedAsync(Search, CategoryKey, Year, Stage, ShowSynthetic, PageNumber, PageSize);
+        var list = await _repo.GetUnifiedAsync(Search, CategoryKey, Year, Stage, ShowSynthetic, Month, PageNumber, PageSize);
+        Result = list.Page;
+        MonthCounts = list.MonthCounts;
         Categories = await _repo.GetAllCategoriesAsync();
         Years = await _repo.GetAvailableYearsAsync();
     }
@@ -107,6 +118,6 @@ public class IndexModel : PageModel
         RedirectToPage("Index", new
         {
             q = Search, cat = CategoryKey, year = Year, stage = Stage,
-            synth = ShowSynthetic ? "true" : null, page = PageNumber
+            synth = ShowSynthetic ? "true" : null, month = Month, p = PageNumber
         });
 }

@@ -60,8 +60,8 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         return new PagedResult<CompetitionRowDto>(rows, total, page, pageSize);
     }
 
-    public async Task<PagedResult<UnifiedCompetitionRowDto>> GetUnifiedAsync(
-        string? search, string? categoryKey, int? year, string? stage, bool showSynthetic, int page, int pageSize)
+    public async Task<UnifiedCompetitionList> GetUnifiedAsync(
+        string? search, string? categoryKey, int? year, string? stage, bool showSynthetic, int? month, int page, int pageSize)
     {
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 20;
@@ -144,14 +144,25 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 Stage = CompetitionStage.DbOnly, Db = row, SortDate = RowDate(row)
             });
 
-        // 3) Фильтр по стадии (если задан) + единый date-desc порядок + пагинация в памяти.
+        // 3) Фильтр по стадии (если задан).
         if (!string.IsNullOrWhiteSpace(stage) && Enum.TryParse<CompetitionStage>(stage, ignoreCase: true, out var st))
             unified = unified.Where(u => u.Stage == st).ToList();
+
+        // 4) Счётчики по месяцам (под текущими фильтрами, но ДО фильтра по месяцу — для кнопок).
+        var monthCounts = new int[12];
+        foreach (var u in unified)
+            if (u.SortDate.Year > 1) // непарсибельные даты (MinValue) не считаем
+                monthCounts[u.SortDate.Month - 1]++;
+
+        // 5) Фильтр по месяцу (если задан) + единый date-desc порядок + пагинация в памяти.
+        if (month is >= 1 and <= 12)
+            unified = unified.Where(u => u.SortDate.Year > 1 && u.SortDate.Month == month).ToList();
 
         unified = unified.OrderByDescending(u => u.SortDate).ToList();
         var total = unified.Count;
         var pageItems = unified.Skip((page - 1) * pageSize).Take(pageSize).ToList();
-        return new PagedResult<UnifiedCompetitionRowDto>(pageItems, total, page, pageSize);
+        return new UnifiedCompetitionList(
+            new PagedResult<UnifiedCompetitionRowDto>(pageItems, total, page, pageSize), monthCounts);
     }
 
     /// <summary>Дата строки для сортировки: одиночное — своя дата, событие — дата первого дня.

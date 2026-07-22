@@ -21,10 +21,11 @@ public interface ICompetitionAdminRepository
     /// только в БД / скрыто). Склейка по OrgCompId (+ fallback имя+дата). Фильтры поиск/категория/
     /// сезон применяются к БД-стороне; <paramref name="stage"/> — по стадии. Сортировка по дате (убыв.).
     /// <paramref name="showSynthetic"/>=false (по умолч.) прячет тестовые синтетические соревнования
-    /// (Name начинается с «SYNTH »).
+    /// (Name начинается с «SYNTH »). <paramref name="month"/> (1–12, null — все) фильтрует по месяцу;
+    /// результат несёт счётчики по всем 12 месяцам (без учёта самого month-фильтра) для кнопок.
     /// </summary>
-    Task<PagedResult<UnifiedCompetitionRowDto>> GetUnifiedAsync(
-        string? search, string? categoryKey, int? year, string? stage, bool showSynthetic, int page, int pageSize);
+    Task<UnifiedCompetitionList> GetUnifiedAsync(
+        string? search, string? categoryKey, int? year, string? stage, bool showSynthetic, int? month, int page, int pageSize);
 
     /// <summary>Полные данные для формы Edit (включая URL-ы результатов). null — не найдено.</summary>
     Task<CompetitionEditDto?> GetByIdAsync(int id);

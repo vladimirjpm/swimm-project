@@ -5,11 +5,18 @@
     ViewData["Title"] = "Competitions";
     ViewData["PageSubtitle"] = "Соревнования: справочник БД + входящие isr.org.il одним списком";
 
-    string PageUrl(int p) =>
-        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, year = Model.Year, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, page = p })!;
+    // ВНИМАНИЕ: параметр пагинации — «p», НЕ «page» (page зарезервирован Razor Pages, ломает переходы).
+    string PageUrl(int pg) =>
+        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, year = Model.Year, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = Model.Month, p = pg })!;
+
+    // Ссылка на месяц (сброс страницы на 1; повторный клик по активному — снять фильтр).
+    string MonthUrl(int? m) =>
+        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, year = Model.Year, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = m })!;
+
+    var monthNames = new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
     var hasFilters = !string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.CategoryKey)
-        || Model.Year != null || !string.IsNullOrEmpty(Model.Stage);
+        || Model.Year != null || !string.IsNullOrEmpty(Model.Stage) || Model.Month != null;
 
     (string Text, string Cls) StageBadge(CompetitionStage s) => s switch
     {
@@ -121,6 +128,7 @@
             }
         </select>
     </label>
+    <input type="hidden" name="month" value="@Model.Month" />
     <label class="flex items-center gap-2 text-[13px] text-admin-text-muted self-center mt-3.5">
         <input type="checkbox" name="synth" value="true" checked="@Model.ShowSynthetic" class="cursor-pointer" />
         показать синтетику (SYNTH)
@@ -132,8 +140,29 @@
     }
 </form>
 
+<!-- Фильтр по месяцам: 12 кнопок со счётчиками (под текущими фильтрами; клик по активному снимает) -->
+<div class="mb-3 flex flex-wrap gap-1.5">
+    @for (var i = 0; i < 12; i++)
+    {
+        var m = i + 1;
+        var active = Model.Month == m;
+        var count = Model.MonthCounts.Count > i ? Model.MonthCounts[i] : 0;
+        <a href="@MonthUrl(active ? (int?)null : m)"
+           class="@(active
+               ? "admin-btn admin-btn-primary py-1 px-2.5"
+               : "admin-btn admin-btn-ghost py-1 px-2.5") @(count == 0 && !active ? "opacity-40" : "")"
+           title="@(active ? "Снять фильтр по месяцу" : $"Показать только {monthNames[i]}")">
+            @monthNames[i] <span class="ml-1 tabular-nums opacity-70">@count</span>
+        </a>
+    }
+</div>
+
 <div class="mb-3 text-xs text-admin-text-muted">
     Всего: <strong class="text-admin-text">@Model.Result.TotalCount</strong>
+    @if (Model.Month is int mm)
+    {
+        <text> · месяц: <strong class="text-admin-text">@monthNames[mm - 1]</strong></text>
+    }
 </div>
 
 @if (Model.Result.Items.Count == 0)
@@ -187,7 +216,7 @@ else
                                 <form method="post" asp-page-handler="DeleteEvent"
                                       asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
                                       asp-route-year="@Model.Year" asp-route-stage="@Model.Stage"
-                                      asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-page="@Model.Result.Page"
+                                      asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
                                       class="inline comp-delete-form" data-kind="event" data-name="@ev.EventName" data-days="@ev.DayCount" data-rows="@ev.TotalResultCount">
                                     <input type="hidden" name="eventId" value="@ev.EventId" />
                                     <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
@@ -222,7 +251,7 @@ else
                                     <form method="post" asp-page-handler="Delete"
                                           asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
                                           asp-route-year="@Model.Year" asp-route-stage="@Model.Stage"
-                                          asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-page="@Model.Result.Page"
+                                          asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
                                           class="inline comp-delete-form" data-kind="day" data-name="День @(d.DayNumber?.ToString() ?? "?")" data-rows="@d.ResultCount">
                                         <input type="hidden" name="id" value="@d.Id" />
                                         <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
@@ -262,7 +291,7 @@ else
                                 <form method="post" asp-page-handler="Delete"
                                       asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
                                       asp-route-year="@Model.Year" asp-route-stage="@Model.Stage"
-                                      asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-page="@Model.Result.Page"
+                                      asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
                                       class="inline comp-delete-form" data-kind="single" data-name="@c.Name" data-rows="@c.ResultCount">
                                     <input type="hidden" name="id" value="@c.Id" />
                                     <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>

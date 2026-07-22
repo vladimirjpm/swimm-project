@@ -116,11 +116,11 @@ public class CompetitionAdminRepositoryTests
         await db.SaveChangesAsync();
 
         var repo = new CompetitionAdminRepository(db, NoCache());
-        var all = await repo.GetUnifiedAsync(null, null, null, null, showSynthetic: false, 1, 20);
+        var all = await repo.GetUnifiedAsync(null, null, null, null, showSynthetic: false, month: null, 1, 20);
 
         // SYNTH скрыта по умолчанию → 4 (imported/dbOnly/onSite/ignored), без синтетики.
-        Assert.Equal(4, all.TotalCount);
-        var byStage = all.Items.GroupBy(u => u.Stage).ToDictionary(g => g.Key, g => g.ToList());
+        Assert.Equal(4, all.Page.TotalCount);
+        var byStage = all.Page.Items.GroupBy(u => u.Stage).ToDictionary(g => g.Key, g => g.ToList());
         Assert.Single(byStage[CompetitionStage.Imported]);
         Assert.Single(byStage[CompetitionStage.DbOnly]);
         Assert.Single(byStage[CompetitionStage.OnSite]);
@@ -131,14 +131,25 @@ public class CompetitionAdminRepositoryTests
         Assert.NotNull(imported.Db);
         Assert.Equal(100, imported.Site!.OrgCompId);
 
+        // Счётчики по месяцам: imported (05.07), onSite (01.08), ignored (01.03), dbOnly (01.01).
+        Assert.Equal(1, all.MonthCounts[6]);  // июль
+        Assert.Equal(1, all.MonthCounts[7]);  // август
+        Assert.Equal(1, all.MonthCounts[2]);  // март
+        Assert.Equal(1, all.MonthCounts[0]);  // январь
+
+        // Фильтр по месяцу: только июльская (imported) строка.
+        var july = await repo.GetUnifiedAsync(null, null, null, null, showSynthetic: false, month: 7, 1, 20);
+        Assert.Equal(1, july.Page.TotalCount);
+        Assert.Equal(CompetitionStage.Imported, july.Page.Items[0].Stage);
+
         // Фильтр по стадии.
-        var onSiteOnly = await repo.GetUnifiedAsync(null, null, null, "OnSite", showSynthetic: false, 1, 20);
-        Assert.Equal(1, onSiteOnly.TotalCount);
-        Assert.Equal(200, onSiteOnly.Items[0].Site!.OrgCompId);
+        var onSiteOnly = await repo.GetUnifiedAsync(null, null, null, "OnSite", showSynthetic: false, month: null, 1, 20);
+        Assert.Equal(1, onSiteOnly.Page.TotalCount);
+        Assert.Equal(200, onSiteOnly.Page.Items[0].Site!.OrgCompId);
 
         // Показ синтетики — SYNTH-строка появляется (DbOnly).
-        var withSynth = await repo.GetUnifiedAsync(null, null, null, null, showSynthetic: true, 1, 20);
-        Assert.Equal(5, withSynth.TotalCount);
-        Assert.Contains(withSynth.Items, u => u.Db?.Single?.Name == "SYNTH Meet 0001");
+        var withSynth = await repo.GetUnifiedAsync(null, null, null, null, showSynthetic: true, month: null, 1, 20);
+        Assert.Equal(5, withSynth.Page.TotalCount);
+        Assert.Contains(withSynth.Page.Items, u => u.Db?.Single?.Name == "SYNTH Meet 0001");
     }
 }
