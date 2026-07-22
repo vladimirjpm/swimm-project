@@ -662,6 +662,7 @@ public class JsonImportService : IImportService
             var orphanSwimmers = await _db.Swimmers
                 .Where(s => orphanCandidateSwimmerIds.Contains(s.Id))
                 .Where(s => !_db.Results.Any(r => r.SwimmerId == s.Id)
+                    && !_db.RelayMembers.Any(m => m.SwimmerId == s.Id)  // нога эстафеты (FK Restrict) — не сирота
                     && !_db.HubGroupMembers.Any(m => m.SwimmerId == s.Id)
                     && !_db.HubGroupUserMembers.Any(m => m.SwimmerId == s.Id)
                     && !_db.UserFavorites.Any(f => f.SwimmerId == s.Id)
@@ -744,12 +745,17 @@ public class JsonImportService : IImportService
         catch (Exception ex)
         {
             await tx.RollbackAsync();
+            // Разворачиваем цепочку inner-исключений: у EF/Npgsql реальная причина (нарушение
+            // constraint, null в NOT NULL и т.п.) лежит во вложенном исключении, а не в ex.Message.
+            var chain = new List<string>();
+            for (var e = ex; e != null; e = e.InnerException)
+                chain.Add($"{e.GetType().Name}: {e.Message}");
             return new ImportResult
             {
                 TotalRows = items.Count,
                 Created = 0,
                 Errors = 1,
-                ErrorMessages = [$"Unexpected error, import rolled back: {ex.Message}"],
+                ErrorMessages = ["Unexpected error, import rolled back: " + string.Join(" → ", chain)],
                 DiagnosticLog = diagnosticLog,
                 Message = "Import failed and was rolled back"
             };
@@ -849,8 +855,11 @@ public class JsonImportService : IImportService
         {
             old.Relay.TeamName = incoming.Relay.TeamName;
             old.Relay.SwimmersName = incoming.Relay.SwimmersName;
-            // Состав ног перезаписываем целиком (как GalleryItems): старые удаляем явно,
-            // новые (уже с резолвнутыми SwimmerId) переносим на существующий Relay.Id.
+            // Состав ног обновляем ДИФФОМ по SwimmerId, а не «снести+добавить». Иначе для
+            // пловца, оставшегося в составе, в одном SaveChanges попадают DELETE и INSERT
+            // одного (RelayId, SwimmerId) — а на нём уникальный индекс, и EF не гарантирует
+            // порядок → нарушение уникальности (проявляется только на реальном PG, InMemory
+            // индекс игнорирует). Дифф: убрать ушедших, добавить новых, общих обновить на месте.
             if (old.Relay.Members.Count > 0)
                 db.RelayMembers.RemoveRange(old.Relay.Members);
             old.Relay.Members.Clear();
@@ -1244,6 +1253,7 @@ public class JsonImportService : IImportService
             deletedSwimmers = await _db.Swimmers
                 .Where(s => swimmerIds.Contains(s.Id))
                 .Where(s => !_db.Results.Any(r => r.SwimmerId == s.Id)
+                    && !_db.RelayMembers.Any(m => m.SwimmerId == s.Id)  // нога эстафеты др. соревнования (FK Restrict)
                     && !_db.HubGroupMembers.Any(m => m.SwimmerId == s.Id)
                     && !_db.HubGroupUserMembers.Any(m => m.SwimmerId == s.Id)
                     && !_db.UserFavorites.Any(f => f.SwimmerId == s.Id)
