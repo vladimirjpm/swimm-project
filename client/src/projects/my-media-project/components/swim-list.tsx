@@ -3,6 +3,7 @@ import { UserMediaPublicationDto } from '../../../hooks/useUserMedia';
 import { fetchPublishTargets, PublishTargetDto } from '../use-all-my-media';
 import { MySwimDto, SwimMediaDto } from '../use-my-swims';
 import { STATUS_COLORS, CardStatus, derivedCardStatus, hpCardCls } from './status-styles';
+import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
 
 // Список заплывов, сгруппированный по соревнованиям — ядро My media v3
 // (README design_handoff_my_swims_v3,1 §7). Desktop: строки с фикс. колонками
@@ -244,11 +245,16 @@ function SwimRow({ swim, showSwimmerName, swimmerName, cb }: {
         >
           {swimmerName.trim().charAt(0).toUpperCase()}
         </span>
-        <span className="min-w-[120px] overflow-hidden text-ellipsis whitespace-nowrap text-[13.5px] font-extrabold" style={{ color: noVideo ? 'rgba(226,240,252,0.55)' : '#f3f8fd' }}>
-          {swim.distance}m {styleLabel(swim.style)}
-          {showSwimmerName && <span className="ml-2 text-[11px] font-bold text-[rgba(203,224,240,0.5)]">{swimmerName}</span>}
+        <span className="flex min-w-[120px] items-center gap-2 overflow-hidden text-[13.5px] font-extrabold" style={{ color: noVideo ? 'rgba(226,240,252,0.55)' : '#f3f8fd' }}>
+          <UI_SwimmStyleIcon
+            styleName={swim.style}
+            styleLen={swim.distance}
+            styleType="icon-len"
+            className="w-[46px] shrink-0 rounded-[8px] bg-[rgba(226,240,252,0.92)] px-1 py-0.5 text-[15px]"
+          />
+          {showSwimmerName && <span className="truncate text-[11px] font-bold text-[rgba(203,224,240,0.5)]">{swimmerName}</span>}
           {swim.is_relay && (
-            <span className="hp-mono ml-2 rounded-[5px] border border-[rgba(125,211,252,0.4)] px-1.5 py-[1px] text-[9px] font-extrabold text-[#7dd3fc]">RELAY</span>
+            <span className="hp-mono ml-1 rounded-[5px] border border-[rgba(125,211,252,0.4)] px-1.5 py-[1px] text-[9px] font-extrabold text-[#7dd3fc]">RELAY</span>
           )}
         </span>
         <span className="hp-mono w-[84px] shrink-0 text-[13.5px] font-extrabold text-[#7dd3fc]">{swim.time_fail ? 'DSQ' : swim.time}</span>
@@ -294,11 +300,18 @@ function SwimRow({ swim, showSwimmerName, swimmerName, cb }: {
           {medal(swim.place)}
           {swim.is_pb && <span className="block text-[9px] text-[#ffca7a]">⚡</span>}
         </span>
+        <UI_SwimmStyleIcon
+          styleName={swim.style}
+          styleLen={swim.distance}
+          styleType="icon-len"
+          className="w-[40px] shrink-0 rounded-[8px] bg-[rgba(226,240,252,0.92)] px-1 py-0.5 text-[14px]"
+        />
         <span className="min-w-0 flex-1">
-          <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-extrabold" style={{ color: noVideo ? 'rgba(226,240,252,0.55)' : '#f3f8fd' }}>
-            {swim.distance}m {styleLabel(swim.style)}
-            {swim.is_relay && <span className="hp-mono ml-1.5 rounded-[5px] border border-[rgba(125,211,252,0.4)] px-1 py-[1px] text-[8.5px] font-extrabold text-[#7dd3fc]">RELAY</span>}
-          </span>
+          {swim.is_relay && (
+            <span className="block">
+              <span className="hp-mono rounded-[5px] border border-[rgba(125,211,252,0.4)] px-1 py-[1px] text-[8.5px] font-extrabold text-[#7dd3fc]">RELAY</span>
+            </span>
+          )}
           <span className="mt-0.5 flex items-center gap-2">
             <span className="hp-mono text-[12px] font-extrabold text-[#7dd3fc]">{swim.time_fail ? 'DSQ' : swim.time}</span>
             <span className="text-[10px] text-[rgba(203,224,240,0.45)]">
