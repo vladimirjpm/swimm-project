@@ -279,13 +279,11 @@ https://isr.org.il/competitions.asp полуавтоматически (чело
   ни discovery) — связь Discovery↔Competitions держалась только на имени+дате. Теперь:
   compID протянут через очередь импорта (`DiscoveryController.Import` → `ImportJobQueue` →
   `ImportBackgroundService` → `JsonImportService.ImportAsync(orgCompId)`), штампуется
-  «первичному» соревнованию (OrgCompId уникален). Кросс-линк: ячейка OrgCompId в
-  /Admin/Competitions → ссылка на Discovery; сматченное имя в Discovery → ссылка на
-  Competitions; `?org=<id>` сужает список (`GetPagedAsync(orgCompId)`) + скролл/подсветка.
-  Кнопка **«Обновить»** у импортированных строк Discovery: `POST {id}/link-competition` →
-  `LinkImportedAsync` бэкфиллит OrgCompId на сматченное соревнование. Тесты 530/530,
-  проверено вживую. Осталось: закоммитить; опц. «Обновить все» + fallback линка по
-  `MatchedCompetitionId` (уже в DTO).
+  «первичному» соревнованию (OrgCompId уникален). Разовый бэкфилл для старых импортов —
+  CLI `--backfill-discovery-orgcompid` (dry-run + `--apply`). Связь строк со справочником
+  видна прямо в объединённой странице `/Admin/Competitions` (стадии OnSite/Imported/DbOnly).
+  Discovery и старый справочник объединены в одну страницу 2026-07 (см.
+  `docs/admin-pages/competitions.md`).
 
 **Критерий приёмки:** новое соревнование на isr.org.il появляется во «входящих» без участия
 человека; импорт — в два клика.

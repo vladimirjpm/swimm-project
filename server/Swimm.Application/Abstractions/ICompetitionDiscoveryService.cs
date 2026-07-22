@@ -21,10 +21,6 @@ public interface ICompetitionDiscoveryService
     /// <summary>Сменить статус (new | imported | ignored). false — записи нет или статус неизвестен.</summary>
     Task<bool> SetStatusAsync(int id, string status, CancellationToken ct = default);
 
-    /// <summary>Бэкфилл связи Discovery → Competition: проставить OrgCompId сматченному
-    /// (по имени+дате) соревнованию. Для строк, импортированных до штампа OrgCompId.</summary>
-    Task<RelinkResult> LinkImportedAsync(int id, CancellationToken ct = default);
-
     /// <summary>Разовый CLI-бэкфилл всех Discovery-строк: проставляет OrgCompId сматченным
     /// (по имени+дате) соревнованиям, импортированным до появления штампа OrgCompId. dry-run
     /// при apply=false (БД не меняется, Action=WouldLink); apply=true пишет одним SaveChanges.</summary>

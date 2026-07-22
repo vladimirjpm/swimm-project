@@ -42,16 +42,6 @@ public sealed record DiscoveredCompetitionDto(
     /// <summary>Языки успешно загруженных PDF: null | "he" | "en" | "he,en".</summary>
     string? Languages);
 
-/// <summary>Итог бэкфилла связи Discovery → Competition (проставление OrgCompId).</summary>
-public sealed class RelinkResult
-{
-    public bool Ok { get; set; }
-    public bool AlreadyLinked { get; set; }
-    public int? CompetitionId { get; set; }
-    public string? CompetitionName { get; set; }
-    public string Message { get; set; } = string.Empty;
-}
-
 /// <summary>Строка отчёта батч-бэкфилла OrgCompId (CLI, см. Program.cs --backfill-discovery-orgcompid).</summary>
 public sealed record DiscoveryBackfillRow(
     int OrgCompId,
