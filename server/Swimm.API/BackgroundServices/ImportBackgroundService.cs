@@ -28,7 +28,7 @@ public sealed class ImportBackgroundService : BackgroundService
     {
         try
         {
-            await foreach (var (jobId, data, fileName, categoryKeys, eventOptions, discoveredId) in _queue.ConsumeAsync(stoppingToken))
+            await foreach (var (jobId, data, fileName, categoryKeys, eventOptions, discoveredId, orgCompId) in _queue.ConsumeAsync(stoppingToken))
             {
                 _queue.SetRunning(jobId);
                 _logger.LogInformation("Import job {JobId} started: {FileName}", jobId, fileName);
@@ -39,7 +39,7 @@ public sealed class ImportBackgroundService : BackgroundService
                     var importService = scope.ServiceProvider.GetRequiredService<IImportService>();
 
                     using var stream = new MemoryStream(data, writable: false);
-                    var result = await importService.ImportAsync(stream, fileName, categoryKeys, eventOptions);
+                    var result = await importService.ImportAsync(stream, fileName, categoryKeys, eventOptions, orgCompId);
 
                     _queue.SetCompleted(jobId, result);
                     _logger.LogInformation("Import job {JobId} completed: {Created} created, {Errors} errors",

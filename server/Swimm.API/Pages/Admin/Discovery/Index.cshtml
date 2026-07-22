@@ -129,12 +129,12 @@
         tbody.innerHTML = visible.map(r => {
             const isNew = r.status === 'new' && !r.matchedCompetitionName && new Date(r.dateStart) <= new Date();
             return `
-            <tr class="border-b border-white/[.04] hover:bg-white/[.03]">
+            <tr class="border-b border-white/[.04] hover:bg-white/[.03]" data-org="${r.orgCompId}">
                 <td class="py-2.5 px-3 whitespace-nowrap text-[#90a4ae]">${dateRange(r)}</td>
                 <td class="py-2.5 px-3" dir="rtl" style="text-align:left">
                     <a class="text-admin-accent" href="https://isr.org.il/comp.asp?compID=${r.orgCompId}" target="_blank" rel="noopener">${esc(r.name)}</a>
                     ${r.lastError ? `<div class="text-[11px] text-[#ef9a9a]" dir="ltr">${esc(r.lastError)}</div>` : ''}
-                    ${r.matchedCompetitionName ? `<div class="text-[11px] text-[#66bb6a]" dir="rtl">= ${esc(r.matchedCompetitionName)}</div>` : ''}
+                    ${r.matchedCompetitionName ? `<div class="text-[11px]" dir="rtl"><a class="text-[#66bb6a] hover:underline" href="/Admin/Competitions?org=${r.orgCompId}" title="Показать в справочнике соревнований">= ${esc(r.matchedCompetitionName)} ↗</a></div>` : ''}
                 </td>
                 <td class="py-2.5 px-3 text-[#90a4ae]" dir="rtl" style="text-align:left">${esc(r.venue ?? '—')}</td>
                 <td class="py-2.5 px-3">${statusBadge(r)}${langBadges(r)}</td>
@@ -145,6 +145,8 @@
                         ? `<button onclick="discSyncLangs(${r.id}, this)" class="py-1 px-3 rounded text-xs font-semibold cursor-pointer bg-[rgba(186,104,200,0.15)] text-[#ce93d8] hover:bg-[rgba(186,104,200,0.25)]" title="Скачать HE+EN пару и дозаполнить английские имена пловцов (без переимпорта)">Синхр. языки</button>` : ''}
                     ${r.languages === 'he'
                         ? `<span class="inline-block py-0.5 px-2 rounded text-[11px] text-admin-text-muted" title="Вторая языковая версия протокола на loglig не найдена — синхронизировать нечего">только HE</span>` : ''}
+                    ${(r.status === 'imported' || r.matchedCompetitionName)
+                        ? `<button onclick="discLink(${r.id}, this)" class="py-1 px-3 rounded text-xs font-semibold cursor-pointer bg-[rgba(102,187,106,0.15)] text-[#66bb6a] hover:bg-[rgba(102,187,106,0.25)]" title="Привязать compID к соревнованию в справочнике (проставить OrgCompId для кросс-линка)">Обновить</button>` : ''}
                     <a href="${API}/${r.id}/pdf" class="py-1 px-3 rounded text-xs font-semibold bg-white/[.06] text-admin-text-muted hover:bg-white/[.1]">PDF</a>
                     ${r.status === 'ignored'
                         ? `<button onclick="discStatus(${r.id}, 'new')" class="py-1 px-3 rounded text-xs cursor-pointer text-admin-text-muted">вернуть</button>`
@@ -154,10 +156,35 @@
         }).join('');
     }
 
+    // Переход с /Admin/Competitions по ?org=<OrgCompId>: один раз после первой загрузки
+    // проскроллить + подсветить нужную строку (если она скрыта как ignored — показать скрытые).
+    const orgParam = new URLSearchParams(location.search).get('org');
+    let orgHighlighted = false;
+    function maybeHighlightOrg() {
+        if (!orgParam || orgHighlighted) return;
+        let row = document.querySelector(`#disc-body tr[data-org="${orgParam}"]`);
+        if (!row) {
+            const cb = document.getElementById('show-ignored');
+            if (!cb.checked && rows.some(r => String(r.orgCompId) === orgParam && r.status === 'ignored')) {
+                cb.checked = true;
+                render();
+                row = document.querySelector(`#disc-body tr[data-org="${orgParam}"]`);
+            }
+        }
+        orgHighlighted = true;
+        if (!row) { toast('OrgCompId ' + orgParam + ' не найден во входящих', 4000); return; }
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const prev = row.style.transition;
+        row.style.transition = 'background-color .3s';
+        row.style.backgroundColor = 'rgba(79,195,247,0.28)';
+        setTimeout(() => { row.style.backgroundColor = ''; setTimeout(() => row.style.transition = prev, 300); }, 2400);
+    }
+
     async function load() {
         try {
             rows = await apiJson(`${API}/list`);
             render();
+            maybeHighlightOrg();
         } catch (e) { toast('Ошибка загрузки: ' + e.message); }
     }
 
@@ -206,6 +233,20 @@
             info.textContent = `Синхр. языки «${row?.name ?? id}»: ОШИБКА — ${e.message}`;
         }
         await load(); // перерисовка вернёт кнопку и покажет LastError/бэйджи в строке
+    };
+
+    // «Обновить»: бэкфилл связи Discovery → Competition (проставить OrgCompId сматченному
+    // соревнованию), чтобы заработал кросс-линк. Идемпотентно.
+    window.discLink = async function (id, btn) {
+        if (btn) btn.disabled = true;
+        try {
+            const s = await apiJson(`${API}/${id}/link-competition`, { method: 'POST' });
+            toast(s.alreadyLinked ? 'Уже привязано' : `Привязано: ${s.competitionName ?? ''}`, 4000);
+            await load();
+        } catch (e) {
+            toast('Ошибка: ' + e.message, 5000);
+            if (btn) btn.disabled = false;
+        }
     };
 
     window.discPreview = async function (id) {

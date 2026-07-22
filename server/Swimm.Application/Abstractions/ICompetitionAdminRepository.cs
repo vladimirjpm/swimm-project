@@ -11,7 +11,9 @@ public interface ICompetitionAdminRepository
 {
     /// <summary>Список с поиском (по Name/SubName), фильтром по категории/сезону (году) и пагинацией.
     /// Многодневные соревнования свёрнуты в одну строку-событие (<see cref="CompetitionRowDto"/>).</summary>
-    Task<PagedResult<CompetitionRowDto>> GetPagedAsync(string? search, string? categoryKey, int? year, int page, int pageSize);
+    /// <param name="orgCompId">Если задан — список сужается до соревнования (или всего его
+    /// события) с этим OrgCompId. Для точного перехода со страницы Discovery на нужную строку.</param>
+    Task<PagedResult<CompetitionRowDto>> GetPagedAsync(string? search, string? categoryKey, int? year, int page, int pageSize, int? orgCompId = null);
 
     /// <summary>Полные данные для формы Edit (включая URL-ы результатов). null — не найдено.</summary>
     Task<CompetitionEditDto?> GetByIdAsync(int id);

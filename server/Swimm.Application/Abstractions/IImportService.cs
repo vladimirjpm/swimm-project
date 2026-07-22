@@ -12,7 +12,9 @@ public interface IImportService
     /// Привязка к многодневному событию (создать новое / дописать к существующему).
     /// null — обычное однодневное соревнование.
     /// </param>
-    Task<ImportResult> ImportAsync(Stream jsonStream, string? fileName = null, IReadOnlyCollection<string>? categoryKeys = null, ImportEventOptions? eventOptions = null);
+    /// <param name="orgCompId">compID сайта федерации (только Discovery-импорт) — штампуется в
+    /// Competition.OrgCompId «первичного» соревнования импорта для связи Discovery ↔ Competitions.</param>
+    Task<ImportResult> ImportAsync(Stream jsonStream, string? fileName = null, IReadOnlyCollection<string>? categoryKeys = null, ImportEventOptions? eventOptions = null, int? orgCompId = null);
     Task<int> EnrichSwimmersFromResultsAsync();
     Task<ClearResult> ClearDataAsync();
     Task<DeleteCompetitionResult?> DeleteCompetitionAsync(int competitionId);

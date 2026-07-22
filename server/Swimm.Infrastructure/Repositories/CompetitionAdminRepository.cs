@@ -23,7 +23,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         _cache = cache;
     }
 
-    public async Task<PagedResult<CompetitionRowDto>> GetPagedAsync(string? search, string? categoryKey, int? year, int page, int pageSize)
+    public async Task<PagedResult<CompetitionRowDto>> GetPagedAsync(string? search, string? categoryKey, int? year, int page, int pageSize, int? orgCompId = null)
     {
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 20;
@@ -69,6 +69,21 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 c.Date.EndsWith(yearStr) ||
                 (c.EventId != null && _db.Competitions.Any(x =>
                     x.EventId == c.EventId && x.Date.EndsWith(yearStr))));
+        }
+
+        if (orgCompId is int oc)
+        {
+            // Сужаем до соревнования с этим OrgCompId (или всего его события) — точный переход
+            // с Discovery на нужную строку. OrgCompId у дня события — резолвим к «голове» события.
+            var target = await _db.Competitions.AsNoTracking()
+                .Where(c => c.OrgCompId == oc)
+                .Select(c => new { c.Id, c.EventId })
+                .FirstOrDefaultAsync();
+            heads = target == null
+                ? heads.Where(_ => false)
+                : target.EventId is int ev
+                    ? heads.Where(c => c.EventId == ev)
+                    : heads.Where(c => c.Id == target.Id);
         }
 
         var total = await heads.CountAsync();

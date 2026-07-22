@@ -5,10 +5,10 @@
     ViewData["PageSubtitle"] = "Справочник соревнований — эталонный CRUD";
 
     string PageUrl(int p) =>
-        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, year = Model.Year, page = p })!;
+        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, year = Model.Year, org = Model.OrgCompId, page = p })!;
 
     var flash = TempData["Flash"] as string;
-    var hasFilters = !string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.CategoryKey) || Model.Year != null;
+    var hasFilters = !string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.CategoryKey) || Model.Year != null || Model.OrgCompId != null;
 }
 
 @functions {
@@ -81,6 +81,10 @@
         {
             <text> · сезон @Model.Year</text>
         }
+        @if (Model.OrgCompId != null)
+        {
+            <text> · OrgCompId <strong class="text-admin-text">@Model.OrgCompId</strong> (переход с Discovery)</text>
+        }
     }
 </div>
 
@@ -140,7 +144,7 @@ else
                             <td class="text-right" onclick="event.stopPropagation()">
                                 <form method="post" asp-page-handler="DeleteEvent"
                                       asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                      asp-route-year="@Model.Year" asp-route-page="@Model.Result.Page"
+                                      asp-route-year="@Model.Year" asp-route-org="@Model.OrgCompId" asp-route-page="@Model.Result.Page"
                                       class="inline comp-delete-form"
                                       data-kind="event" data-name="@row.EventName" data-days="@row.DayCount" data-rows="@row.TotalResultCount">
                                     <input type="hidden" name="eventId" value="@row.EventId" />
@@ -150,7 +154,7 @@ else
                         </tr>
                         @foreach (var d in row.Days)
                         {
-                            <tr class="event-day-@row.EventId hidden event-group">
+                            <tr class="event-day-@row.EventId hidden event-group" data-org="@(d.OrgCompId?.ToString() ?? "")">
                                 <td class="text-admin-text-muted pl-6">@d.Id</td>
                                 <td>
                                     <span class="text-admin-text-muted/60 mr-1">↳</span>
@@ -164,7 +168,14 @@ else
                                 <td class="whitespace-nowrap text-admin-text-muted">@(string.IsNullOrEmpty(d.Date) ? "—" : d.Date)</td>
                                 <td>@(string.IsNullOrEmpty(d.PoolType) ? "—" : d.PoolType)</td>
                                 <td>@(string.IsNullOrEmpty(d.Country) ? "—" : d.Country)</td>
-                                <td class="text-admin-text-muted">@(d.OrgCompId?.ToString() ?? "—")</td>
+                                <td class="text-admin-text-muted">
+                                    @if (d.OrgCompId is int doc)
+                                    {
+                                        <a href="@Url.Page("/Admin/Discovery/Index", new { org = doc })"
+                                           class="text-admin-accent hover:underline" title="Показать во «Входящих» (Discovery)">@doc ↗</a>
+                                    }
+                                    else { <text>—</text> }
+                                </td>
                                 <td>@await Html.PartialAsync("/Pages/Admin/Competitions/_CompFlags.cshtml", d)</td>
                                 <td class="text-right tabular-nums">@d.ResultCount</td>
                                 <td class="text-right tabular-nums">@(d.ResultUrlCount > 0 ? d.ResultUrlCount.ToString() : "—")</td>
@@ -173,7 +184,7 @@ else
                                        class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
                                     <form method="post" asp-page-handler="Delete"
                                           asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                          asp-route-year="@Model.Year" asp-route-page="@Model.Result.Page"
+                                          asp-route-year="@Model.Year" asp-route-org="@Model.OrgCompId" asp-route-page="@Model.Result.Page"
                                           class="inline comp-delete-form"
                                           data-kind="day" data-name="День @(d.DayNumber?.ToString() ?? "?")" data-rows="@d.ResultCount">
                                         <input type="hidden" name="id" value="@d.Id" />
@@ -186,7 +197,7 @@ else
                     else
                     {
                         var c = row.Single!;
-                        <tr>
+                        <tr data-org="@(c.OrgCompId?.ToString() ?? "")">
                             <td class="text-admin-text-muted">@c.Id</td>
                             <td>
                                 <a href="@Url.Page("Edit", new { id = c.Id })"
@@ -200,7 +211,14 @@ else
                             <td class="whitespace-nowrap text-admin-text-muted">@(string.IsNullOrEmpty(c.Date) ? "—" : c.Date)</td>
                             <td>@(string.IsNullOrEmpty(c.PoolType) ? "—" : c.PoolType)</td>
                             <td>@(string.IsNullOrEmpty(c.Country) ? "—" : c.Country)</td>
-                            <td class="text-admin-text-muted">@(c.OrgCompId?.ToString() ?? "—")</td>
+                            <td class="text-admin-text-muted">
+                                @if (c.OrgCompId is int soc)
+                                {
+                                    <a href="@Url.Page("/Admin/Discovery/Index", new { org = soc })"
+                                       class="text-admin-accent hover:underline" title="Показать во «Входящих» (Discovery)">@soc ↗</a>
+                                }
+                                else { <text>—</text> }
+                            </td>
                             <td>@await Html.PartialAsync("/Pages/Admin/Competitions/_CompFlags.cshtml", c)</td>
                             <td class="text-right tabular-nums">@c.ResultCount</td>
                             <td class="text-right tabular-nums">@(c.ResultUrlCount > 0 ? c.ResultUrlCount.ToString() : "—")</td>
@@ -209,7 +227,7 @@ else
                                    class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
                                 <form method="post" asp-page-handler="Delete"
                                       asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                      asp-route-year="@Model.Year" asp-route-page="@Model.Result.Page"
+                                      asp-route-year="@Model.Year" asp-route-org="@Model.OrgCompId" asp-route-page="@Model.Result.Page"
                                       class="inline comp-delete-form"
                                       data-kind="single" data-name="@c.Name" data-rows="@c.ResultCount">
                                     <input type="hidden" name="id" value="@c.Id" />
@@ -261,6 +279,26 @@ else
             const head = document.getElementById('evhead-' + eventId);
             if (head) head.classList.toggle('event-group');
         }
+
+        // Переход с /Admin/Discovery по ?org=<OrgCompId>: раскрыть событие (если целевая строка —
+        // день) и проскроллить + подсветить нужную строку.
+        (function () {
+            const org = @(Model.OrgCompId?.ToString() ?? "null");
+            if (org == null) return;
+            const row = document.querySelector(`tr[data-org="${org}"]`);
+            if (!row) return;
+            // Если это скрытый день события — раскрываем его событие.
+            const dayCls = [...row.classList].find(c => c.startsWith('event-day-'));
+            if (dayCls) {
+                const evId = dayCls.slice('event-day-'.length);
+                if (row.classList.contains('hidden') && typeof toggleEvent === 'function') toggleEvent(Number(evId));
+            }
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const prev = row.style.transition;
+            row.style.transition = 'background-color .3s';
+            row.style.backgroundColor = 'rgba(79,195,247,0.28)';
+            setTimeout(() => { row.style.backgroundColor = ''; setTimeout(() => row.style.transition = prev, 300); }, 2400);
+        })();
 
         // Подтверждение каскадного удаления (одиночное / день / всё событие).
         document.querySelectorAll('.comp-delete-form').forEach(form => {

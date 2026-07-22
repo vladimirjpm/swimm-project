@@ -109,6 +109,20 @@ public class ImportUpsertIntegrationTests
     private static ImportEventOptions OverwriteWithDelete => new(EventId: null, NewEventName: null, OverwriteExisting: true, DeleteMissing: true);
 
     [Fact]
+    public async Task Import_WithOrgCompId_StampsItOnCompetition()
+    {
+        await using var db = CreateDb(nameof(Import_WithOrgCompId_StampsItOnCompetition));
+        var svc = new JsonImportService(db, new NullCacheService());
+
+        var result = await svc.ImportAsync(ToStream(new[] { Item("Cohen", "Tal", 2005, lane: 1) }),
+            orgCompId: 16745);
+
+        Assert.Empty(result.ErrorMessages);
+        var comp = await db.Competitions.SingleAsync();
+        Assert.Equal(16745, comp.OrgCompId);
+    }
+
+    [Fact]
     public async Task ReimportIdenticalData_WithFlag_ZeroInsertNUpdateZeroDelete()
     {
         await using var db = CreateDb(nameof(ReimportIdenticalData_WithFlag_ZeroInsertNUpdateZeroDelete));

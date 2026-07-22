@@ -138,4 +138,69 @@ public class CompetitionDiscoveryServiceTests
         var row = await db.DiscoveredCompetitions.SingleAsync(d => d.Id == 100);
         Assert.Equal("he", row.Languages);
     }
+
+    // ── Бэкфилл связи Discovery → Competition (проставление OrgCompId) ─────────
+
+    [Fact]
+    public async Task LinkImported_StampsOrgCompId_OnMatchedCompetition()
+    {
+        await using var db = CreateDb(nameof(LinkImported_StampsOrgCompId_OnMatchedCompetition));
+        var comp = new Competition { Name = "ליגה מס 4", Date = "03/07/2026", PoolType = "25m" };
+        db.Competitions.Add(comp);
+        db.DiscoveredCompetitions.Add(new DiscoveredCompetition
+        {
+            Id = 5, OrgCompId = 777, Name = "ליגה מס 4",
+            DateStart = new DateTime(2026, 7, 3, 0, 0, 0, DateTimeKind.Utc),
+            DateEnd = new DateTime(2026, 7, 3, 0, 0, 0, DateTimeKind.Utc),
+            Status = DiscoveredCompetitionStatus.Imported
+        });
+        await db.SaveChangesAsync();
+
+        var res = await CreateService(db, new FakeProvider()).LinkImportedAsync(5);
+
+        Assert.True(res.Ok);
+        Assert.False(res.AlreadyLinked);
+        Assert.Equal(777, (await db.Competitions.SingleAsync(c => c.Id == comp.Id)).OrgCompId);
+
+        // Повторный вызов — идемпотентно (already linked), OrgCompId не меняется.
+        var again = await CreateService(db, new FakeProvider()).LinkImportedAsync(5);
+        Assert.True(again.Ok);
+        Assert.True(again.AlreadyLinked);
+    }
+
+    [Fact]
+    public async Task LinkImported_NoMatch_ReturnsNotOk()
+    {
+        await using var db = CreateDb(nameof(LinkImported_NoMatch_ReturnsNotOk));
+        db.DiscoveredCompetitions.Add(new DiscoveredCompetition
+        {
+            Id = 6, OrgCompId = 888, Name = "Соревнование без импорта",
+            DateStart = new DateTime(2026, 7, 3, 0, 0, 0, DateTimeKind.Utc),
+            DateEnd = new DateTime(2026, 7, 3, 0, 0, 0, DateTimeKind.Utc),
+            Status = DiscoveredCompetitionStatus.Imported
+        });
+        await db.SaveChangesAsync();
+
+        var res = await CreateService(db, new FakeProvider()).LinkImportedAsync(6);
+
+        Assert.False(res.Ok);
+    }
+
+    [Fact]
+    public async Task GetAll_ReturnsMatchedCompetitionId()
+    {
+        await using var db = CreateDb(nameof(GetAll_ReturnsMatchedCompetitionId));
+        var comp = new Competition { Name = "ליגה מס 4", Date = "03/07/2026", PoolType = "25m" };
+        db.Competitions.Add(comp);
+        db.DiscoveredCompetitions.Add(new DiscoveredCompetition
+        {
+            OrgCompId = 1, Name = "ליגה מס 4",
+            DateStart = new DateTime(2026, 7, 3, 0, 0, 0, DateTimeKind.Utc),
+            DateEnd = new DateTime(2026, 7, 3, 0, 0, 0, DateTimeKind.Utc)
+        });
+        await db.SaveChangesAsync();
+
+        var dto = (await CreateService(db, new FakeProvider()).GetAllAsync()).Single(d => d.OrgCompId == 1);
+        Assert.Equal(comp.Id, dto.MatchedCompetitionId);
+    }
 }

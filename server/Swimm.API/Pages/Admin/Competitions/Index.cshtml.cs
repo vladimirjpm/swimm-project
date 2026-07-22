@@ -33,6 +33,11 @@ public class IndexModel : PageModel
     [BindProperty(SupportsGet = true, Name = "page")]
     public int PageNumber { get; set; } = 1;
 
+    /// <summary>Переход с /Admin/Discovery: сужает список до соревнования с этим OrgCompId
+    /// и подсвечивает нужную строку (data-org).</summary>
+    [BindProperty(SupportsGet = true, Name = "org")]
+    public int? OrgCompId { get; set; }
+
     public PagedResult<CompetitionRowDto> Result { get; private set; } =
         new([], 0, 1, PageSize);
 
@@ -43,7 +48,7 @@ public class IndexModel : PageModel
     public async Task OnGetAsync()
     {
         if (PageNumber < 1) PageNumber = 1;
-        Result = await _repo.GetPagedAsync(Search, CategoryKey, Year, PageNumber, PageSize);
+        Result = await _repo.GetPagedAsync(Search, CategoryKey, Year, PageNumber, PageSize, OrgCompId);
         Categories = await _repo.GetAllCategoriesAsync();
         Years = await _repo.GetAvailableYearsAsync();
     }
@@ -90,5 +95,5 @@ public class IndexModel : PageModel
 
     // Сохраняем текущие фильтры/страницу при возврате к списку.
     private IActionResult RedirectToBackToList() =>
-        RedirectToPage("Index", new { q = Search, cat = CategoryKey, year = Year, page = PageNumber });
+        RedirectToPage("Index", new { q = Search, cat = CategoryKey, year = Year, org = OrgCompId, page = PageNumber });
 }

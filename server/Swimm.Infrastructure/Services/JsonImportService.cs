@@ -53,7 +53,7 @@ public class JsonImportService : IImportService
         return options;
     }
 
-    public async Task<ImportResult> ImportAsync(Stream jsonStream, string? fileName = null, IReadOnlyCollection<string>? categoryKeys = null, ImportEventOptions? eventOptions = null)
+    public async Task<ImportResult> ImportAsync(Stream jsonStream, string? fileName = null, IReadOnlyCollection<string>? categoryKeys = null, ImportEventOptions? eventOptions = null, int? orgCompId = null)
     {
         var options = CreateLenientOptions();
 
@@ -697,6 +697,25 @@ public class JsonImportService : IImportService
                 targetEvent.StartDate = parsed.Min();
                 targetEvent.EndDate = parsed.Max();
                 await _db.SaveChangesAsync();
+            }
+        }
+
+        // Штамп OrgCompId (compID сайта) на «первичное» соревнование этого импорта — приходит
+        // только из Discovery-импорта. OrgCompId уникален (partial UNIQUE), поэтому держит его
+        // один ряд (для многодневных — первый затронутый; кросс-линк резолвит его к событию).
+        if (orgCompId is int oc && touchedCompetitionKeys.Count > 0)
+        {
+            var primary = competitionCache[touchedCompetitionKeys[0]];
+            if (primary.OrgCompId != oc)
+            {
+                var takenByOther = await _db.Competitions.AnyAsync(c => c.OrgCompId == oc && c.Id != primary.Id);
+                if (takenByOther)
+                    diagnosticLog.Add($"OrgCompId {oc} уже занят другим соревнованием — штамп пропущен");
+                else
+                {
+                    primary.OrgCompId = oc;
+                    await _db.SaveChangesAsync();
+                }
             }
         }
 

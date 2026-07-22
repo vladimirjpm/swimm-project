@@ -150,7 +150,35 @@ public class CompetitionDiscoveryService(
         return true;
     }
 
-    private static DiscoveredCompetitionDto ToDto(DiscoveredCompetition d, string? matched) => new(
+    private static DiscoveredCompetitionDto ToDto(DiscoveredCompetition d, CompetitionMatch? matched) => new(
         d.Id, d.OrgCompId, d.Name, d.DateStart, d.DateEnd, d.Venue, d.LogligId,
-        d.Status, d.DiscoveredAt, d.LastSeenAt, d.LastError, matched, d.Languages);
+        d.Status, d.DiscoveredAt, d.LastSeenAt, d.LastError, matched?.Name, matched?.CompetitionId, d.Languages);
+
+    /// <summary>
+    /// Бэкфилл связи «Discovery → Competition»: находит уже импортированное соревнование этой
+    /// строки (матч по дате+имени) и проставляет ему <see cref="Competition.OrgCompId"/> = compID
+    /// сайта, если он ещё не занят другим соревнованием. Нужно для строк, импортированных до
+    /// того, как импорт научился штамповать OrgCompId. Идемпотентно.
+    /// </summary>
+    public async Task<RelinkResult> LinkImportedAsync(int id, CancellationToken ct = default)
+    {
+        var row = await db.DiscoveredCompetitions.AsNoTracking().FirstOrDefaultAsync(d => d.Id == id, ct);
+        if (row == null) return new RelinkResult { Ok = false, Message = "Запись не найдена" };
+
+        var match = (await matcher.MatchAsync([row], ct)).GetValueOrDefault(row.Id);
+        if (match is not { } m)
+            return new RelinkResult { Ok = false, Message = "Соревнование не найдено в справочнике (нет матча по имени+дате)" };
+
+        var comp = await db.Competitions.FirstAsync(c => c.Id == m.CompetitionId, ct);
+        if (comp.OrgCompId == row.OrgCompId)
+            return new RelinkResult { Ok = true, AlreadyLinked = true, CompetitionId = comp.Id, CompetitionName = comp.Name, Message = "Уже привязано" };
+
+        var takenByOther = await db.Competitions.AnyAsync(c => c.OrgCompId == row.OrgCompId && c.Id != comp.Id, ct);
+        if (takenByOther)
+            return new RelinkResult { Ok = false, CompetitionId = comp.Id, CompetitionName = comp.Name, Message = $"compID {row.OrgCompId} уже занят другим соревнованием" };
+
+        comp.OrgCompId = row.OrgCompId;
+        await db.SaveChangesAsync(ct);
+        return new RelinkResult { Ok = true, CompetitionId = comp.Id, CompetitionName = comp.Name, Message = "Привязано" };
+    }
 }

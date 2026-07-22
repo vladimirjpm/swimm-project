@@ -37,8 +37,20 @@ public sealed record DiscoveredCompetitionDto(
     string? LastError,
     /// <summary>Имя совпавшего уже-импортированного соревнования (матч по дате+имени), если есть.</summary>
     string? MatchedCompetitionName,
+    /// <summary>Id совпавшего соревнования (для перехода в /Admin/Competitions), если есть.</summary>
+    int? MatchedCompetitionId,
     /// <summary>Языки успешно загруженных PDF: null | "he" | "en" | "he,en".</summary>
     string? Languages);
+
+/// <summary>Итог бэкфилла связи Discovery → Competition (проставление OrgCompId).</summary>
+public sealed class RelinkResult
+{
+    public bool Ok { get; set; }
+    public bool AlreadyLinked { get; set; }
+    public int? CompetitionId { get; set; }
+    public string? CompetitionName { get; set; }
+    public string Message { get; set; } = string.Empty;
+}
 
 /// <summary>Итог «синхронизации языков»: дозаполнение EN/HE-имён пловцов из двуязычной пары PDF.</summary>
 public sealed class SwimmerNameSyncResult

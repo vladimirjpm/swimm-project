@@ -21,6 +21,10 @@ public interface ICompetitionDiscoveryService
     /// <summary>Сменить статус (new | imported | ignored). false — записи нет или статус неизвестен.</summary>
     Task<bool> SetStatusAsync(int id, string status, CancellationToken ct = default);
 
+    /// <summary>Бэкфилл связи Discovery → Competition: проставить OrgCompId сматченному
+    /// (по имени+дате) соревнованию. Для строк, импортированных до штампа OrgCompId.</summary>
+    Task<RelinkResult> LinkImportedAsync(int id, CancellationToken ct = default);
+
     /// <summary>Дописать языки успешно загруженных PDF (объединение с уже сохранёнными,
     /// канонический порядок "he,en"). false — записи нет.</summary>
     Task<bool> AddLanguagesAsync(int id, IEnumerable<string> languages, CancellationToken ct = default);

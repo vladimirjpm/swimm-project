@@ -78,6 +78,17 @@ public class DiscoveryAdminController : ControllerBase
             ? Ok(new { ok = true })
             : BadRequest(new { error = "Запись не найдена или статус неизвестен" });
 
+    /// <summary>Бэкфилл связи: проставить OrgCompId сматченному соревнованию (для строк,
+    /// импортированных до штампа compID). Идемпотентно.</summary>
+    [HttpPost("{id:int}/link-competition")]
+    public async Task<IActionResult> LinkCompetition(int id, CancellationToken ct)
+    {
+        var r = await _discovery.LinkImportedAsync(id, ct);
+        return r.Ok
+            ? Ok(new { ok = true, r.AlreadyLinked, r.CompetitionId, r.CompetitionName, r.Message })
+            : BadRequest(new { error = r.Message, r.CompetitionId, r.CompetitionName });
+    }
+
     /// <summary>Скачать PDF-протокол вручную (для существующего Import-флоу или глазами посмотреть).</summary>
     [HttpGet("{id:int}/pdf")]
     [IgnoreAntiforgeryToken] // GET-скачивание файла; мутаций нет
@@ -257,12 +268,17 @@ public class DiscoveryAdminController : ControllerBase
         if (request.EventId.HasValue || !string.IsNullOrWhiteSpace(request.NewEventName) || request.OverwriteExisting)
             eventOptions = new ImportEventOptions(request.EventId, request.NewEventName, request.OverwriteExisting, request.DeleteMissing);
 
+        // compID сайта — штампуется в Competition.OrgCompId для связи Discovery ↔ Competitions.
+        var discoveredOrgCompId = (await _discovery.GetAllAsync(ct))
+            .FirstOrDefault(d => d.Id == entry.DiscoveredId)?.OrgCompId;
+
         var jobId = _jobs.Enqueue(
             Encoding.UTF8.GetBytes(entry.Parsed.ResultsJson),
             entry.FileName,
             request.CategoryKeys,
             eventOptions,
-            entry.DiscoveredId);
+            entry.DiscoveredId,
+            discoveredOrgCompId);
 
         // Статус imported проставляет фоновый обработчик после успешного завершения job (A1).
         return Accepted(new { jobId });

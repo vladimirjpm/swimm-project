@@ -11,11 +11,14 @@ namespace Swimm.Infrastructure.Services;
 /// и карточкой дашборда (<see cref="DashboardStatusService"/>) — не должно быть двух копий,
 /// которые могут разойтись.
 /// </summary>
+/// <summary>Совпавшее соревнование: его Id и отображаемое имя.</summary>
+internal readonly record struct CompetitionMatch(int CompetitionId, string Name);
+
 internal class DiscoveryCompetitionMatcher(SwimmDbContext db)
 {
-    /// <summary>Для каждой переданной Discovery-строки возвращает имя совпавшего Competition
-    /// (или null, если совпадения нет). Ключ словаря — Id строки Discovery.</summary>
-    public async Task<Dictionary<int, string?>> MatchAsync(
+    /// <summary>Для каждой переданной Discovery-строки возвращает совпавшее Competition
+    /// (Id+имя) или null, если совпадения нет. Ключ словаря — Id строки Discovery.</summary>
+    public async Task<Dictionary<int, CompetitionMatch?>> MatchAsync(
         IReadOnlyList<DiscoveredCompetition> rows, CancellationToken ct = default)
     {
         // Матч «уже импортировано»: дата дня попадает в [DateStart..DateEnd] и имя совпадает
@@ -25,24 +28,24 @@ internal class DiscoveryCompetitionMatcher(SwimmDbContext db)
         // Дни в Competitions.Date — строка dd/MM/yyyy.
         var competitions = await db.Competitions
             .AsNoTracking()
-            .Select(c => new { c.Name, c.Date })
+            .Select(c => new { c.Id, c.Name, c.Date })
             .ToListAsync(ct);
         var candidates = competitions
-            .Select(c => new { Key = Normalize(c.Name), c.Name, Date = ParseDdMmYyyy(c.Date) })
+            .Select(c => new { c.Id, Key = Normalize(c.Name), c.Name, Date = ParseDdMmYyyy(c.Date) })
             .Where(c => c.Date != null && c.Key.Length > 0)
             .ToList();
 
-        var result = new Dictionary<int, string?>();
+        var result = new Dictionary<int, CompetitionMatch?>();
         foreach (var d in rows)
         {
             var dKey = Normalize(d.Name);
-            string? matched = null;
+            CompetitionMatch? matched = null;
             foreach (var c in candidates)
             {
                 if (c.Date < d.DateStart || c.Date > d.DateEnd) continue;
                 if (dKey == c.Key || dKey.StartsWith(c.Key, StringComparison.Ordinal))
                 {
-                    matched = c.Name;
+                    matched = new CompetitionMatch(c.Id, c.Name);
                     break;
                 }
             }
