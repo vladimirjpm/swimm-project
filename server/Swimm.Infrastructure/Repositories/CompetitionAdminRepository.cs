@@ -5,6 +5,7 @@ using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
+using Swimm.Infrastructure.Services;
 
 namespace Swimm.Infrastructure.Repositories;
 
@@ -28,9 +29,145 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 20;
 
-        // Единица списка = одиночное соревнование ИЛИ многодневное событие (свёрнуто в одну строку).
-        // «Голова» единицы: соревнование без события, либо день события с минимальным DayNumber
-        // (min, а не ==1, чтобы событие не пропало из списка, если день 1 удалили).
+        var heads = FilteredHeads(search, categoryKey, year);
+
+        if (orgCompId is int oc)
+        {
+            // Сужаем до соревнования с этим OrgCompId (или всего его события) — точный переход
+            // с Discovery на нужную строку. OrgCompId у дня события — резолвим к «голове» события.
+            var target = await _db.Competitions.AsNoTracking()
+                .Where(c => c.OrgCompId == oc)
+                .Select(c => new { c.Id, c.EventId })
+                .FirstOrDefaultAsync();
+            heads = target == null
+                ? heads.Where(_ => false)
+                : target.EventId is int ev
+                    ? heads.Where(c => c.EventId == ev)
+                    : heads.Where(c => c.Id == target.Id);
+        }
+
+        var total = await heads.CountAsync();
+
+        var headItems = await heads
+            .OrderByDescending(c => c.Date)
+            .ThenBy(c => c.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(ProjectListItem)
+            .ToListAsync();
+
+        var rows = await BuildRowsAsync(headItems);
+        return new PagedResult<CompetitionRowDto>(rows, total, page, pageSize);
+    }
+
+    public async Task<PagedResult<UnifiedCompetitionRowDto>> GetUnifiedAsync(
+        string? search, string? categoryKey, int? year, string? stage, int page, int pageSize)
+    {
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 20;
+
+        // 1) БД-сторона: все «головы» под фильтрами (без пагинации — мержим и режем в памяти).
+        // На admin-масштабе (~1.5k соревнований) это приемлемо; при росте — вынести в БД-пагинацию.
+        var headItems = await FilteredHeads(search, categoryKey, year)
+            .Select(ProjectListItem)
+            .ToListAsync();
+        var dbRows = await BuildRowsAsync(headItems);
+
+        // Индекс «id соревнования (одиночного или дня события) → строка списка» — чтобы привязать
+        // Discovery-оверлей к нужной строке (день события резолвится к «голове»).
+        var rowByCompId = new Dictionary<int, CompetitionRowDto>();
+        foreach (var r in dbRows)
+            foreach (var id in r.Single != null ? [r.Single.Id] : r.Days.Select(d => d.Id))
+                rowByCompId[id] = r;
+
+        // 2) Discovery-сторона: все строки + резолв «discovered → соревнование» (OrgCompId
+        // приоритетно, иначе имя+дата через общий матчер). OrgCompId соревнований — для приоритета.
+        var discovered = await _db.DiscoveredCompetitions.AsNoTracking().ToListAsync();
+        var matches = await new DiscoveryCompetitionMatcher(_db).MatchAsync(discovered);
+        var compByOrgCompId = await _db.Competitions.AsNoTracking()
+            .Where(c => c.OrgCompId != null)
+            .Select(c => new { OrgCompId = c.OrgCompId!.Value, c.Id })
+            .ToDictionaryAsync(c => c.OrgCompId, c => c.Id);
+
+        var unified = new List<UnifiedCompetitionRowDto>(dbRows.Count + discovered.Count);
+        var overlaidRows = new HashSet<CompetitionRowDto>();
+
+        foreach (var d in discovered)
+        {
+            var site = new UnifiedSiteInfo
+            {
+                DiscoveredId = d.Id, OrgCompId = d.OrgCompId, Name = d.Name,
+                DateStart = d.DateStart, DateEnd = d.DateEnd, Venue = d.Venue,
+                Status = d.Status, Languages = d.Languages, LastError = d.LastError, LogligId = d.LogligId
+            };
+
+            // Резолв к соревнованию: OrgCompId штампован → он; иначе матч по имени+дате.
+            int? compId = compByOrgCompId.TryGetValue(d.OrgCompId, out var byOrg)
+                ? byOrg
+                : matches.GetValueOrDefault(d.Id)?.CompetitionId;
+
+            if (compId is int cid && rowByCompId.TryGetValue(cid, out var row))
+            {
+                // Импортировано: вешаем site-оверлей на строку БД (первый выигрывает — для многодневки
+                // берём одну репрезентативную discovery-строку; языки/площадка из неё).
+                if (overlaidRows.Add(row))
+                    unified.Add(new UnifiedCompetitionRowDto
+                    {
+                        Stage = CompetitionStage.Imported, Db = row, Site = site, SortDate = RowDate(row)
+                    });
+            }
+            else
+            {
+                // Только на сайте: в БД соревнования нет. Фильтры БД-стороны применяем и здесь:
+                // category — исключает (у discovery нет категорий); search/year — по имени/датам.
+                if (!string.IsNullOrWhiteSpace(categoryKey)) continue;
+                if (!string.IsNullOrWhiteSpace(search) &&
+                    d.Name.IndexOf(search.Trim(), StringComparison.OrdinalIgnoreCase) < 0) continue;
+                if (year is int yy && d.DateStart.Year != yy && d.DateEnd.Year != yy) continue;
+
+                unified.Add(new UnifiedCompetitionRowDto
+                {
+                    Stage = d.Status == "ignored" ? CompetitionStage.Ignored : CompetitionStage.OnSite,
+                    Site = site, SortDate = d.DateStart
+                });
+            }
+        }
+
+        // Строки БД без discovery-оверлея → «только в БД» (PDF-импорт без OrgCompId).
+        foreach (var row in dbRows.Where(r => !overlaidRows.Contains(r)))
+            unified.Add(new UnifiedCompetitionRowDto
+            {
+                Stage = CompetitionStage.DbOnly, Db = row, SortDate = RowDate(row)
+            });
+
+        // 3) Фильтр по стадии (если задан) + единый date-desc порядок + пагинация в памяти.
+        if (!string.IsNullOrWhiteSpace(stage) && Enum.TryParse<CompetitionStage>(stage, ignoreCase: true, out var st))
+            unified = unified.Where(u => u.Stage == st).ToList();
+
+        unified = unified.OrderByDescending(u => u.SortDate).ToList();
+        var total = unified.Count;
+        var pageItems = unified.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+        return new PagedResult<UnifiedCompetitionRowDto>(pageItems, total, page, pageSize);
+    }
+
+    /// <summary>Дата строки для сортировки: одиночное — своя дата, событие — дата первого дня.
+    /// Date хранится текстом «дд/ММ/гггг»; непарсибельное → MinValue (уедет вниз списка).</summary>
+    private static DateTime RowDate(CompetitionRowDto row)
+    {
+        var s = row.Single?.Date ?? (row.Days.Count > 0 ? row.Days[0].Date : null);
+        return DateTime.TryParseExact(s, "dd/MM/yyyy",
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var dt) ? dt : DateTime.MinValue;
+    }
+
+    /// <summary>
+    /// «Головы» списка = одиночные соревнования ИЛИ многодневные события (свёрнуты в одну строку),
+    /// с фильтрами поиск/категория/сезон. «Голова» события — день с минимальным DayNumber
+    /// (min, а не ==1, чтобы событие не пропало, если день 1 удалили). Общий шов для
+    /// <see cref="GetPagedAsync"/> и <see cref="GetUnifiedAsync"/>.
+    /// </summary>
+    private IQueryable<Competition> FilteredHeads(string? search, string? categoryKey, int? year)
+    {
         var heads = _db.Competitions.AsNoTracking().Where(c =>
             c.EventId == null ||
             c.DayNumber == _db.Competitions.Where(x => x.EventId == c.EventId).Min(x => x.DayNumber));
@@ -71,32 +208,17 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                     x.EventId == c.EventId && x.Date.EndsWith(yearStr))));
         }
 
-        if (orgCompId is int oc)
-        {
-            // Сужаем до соревнования с этим OrgCompId (или всего его события) — точный переход
-            // с Discovery на нужную строку. OrgCompId у дня события — резолвим к «голове» события.
-            var target = await _db.Competitions.AsNoTracking()
-                .Where(c => c.OrgCompId == oc)
-                .Select(c => new { c.Id, c.EventId })
-                .FirstOrDefaultAsync();
-            heads = target == null
-                ? heads.Where(_ => false)
-                : target.EventId is int ev
-                    ? heads.Where(c => c.EventId == ev)
-                    : heads.Where(c => c.Id == target.Id);
-        }
+        return heads;
+    }
 
-        var total = await heads.CountAsync();
-
-        var headItems = await heads
-            .OrderByDescending(c => c.Date)
-            .ThenBy(c => c.Name)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(ProjectListItem)
-            .ToListAsync();
-
-        // Дни событий, попавших на страницу, — одним запросом.
+    /// <summary>
+    /// Достраивает проектированные «головы» до строк списка: подтягивает дни событий и категории
+    /// (по одному запросу на набор), сворачивает события ≥2 дней. Общий шов для пагинированного
+    /// и объединённого списков.
+    /// </summary>
+    private async Task<List<CompetitionRowDto>> BuildRowsAsync(IReadOnlyList<CompetitionListItemDto> headItems)
+    {
+        // Дни событий, попавших в набор, — одним запросом.
         var eventIds = headItems.Where(h => h.EventId != null).Select(h => h.EventId!.Value).ToList();
         var daysByEvent = new Dictionary<int, List<CompetitionListItemDto>>();
         if (eventIds.Count > 0)
@@ -135,7 +257,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             return new CompetitionRowDto { Single = h };
         }).ToList();
 
-        // Категории для всех соревнований на странице (одиночные + дни) — одним запросом (бейджи в списке).
+        // Категории для всех соревнований в наборе (одиночные + дни) — одним запросом (бейджи в списке).
         var allItems = rows.SelectMany(r => r.Single != null ? new[] { r.Single } : r.Days.ToArray()).ToList();
         var itemIds = allItems.Select(i => i.Id).ToList();
         if (itemIds.Count > 0)
@@ -161,7 +283,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 .ToList();
         }
 
-        return new PagedResult<CompetitionRowDto>(rows, total, page, pageSize);
+        return rows;
     }
 
     public async Task<IReadOnlyList<CategoryTagDto>> GetAllCategoriesAsync() =>

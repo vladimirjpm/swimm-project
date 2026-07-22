@@ -16,6 +16,7 @@ public static class AdminNav
         new("Dashboard", "gauge", "/Admin", ExactMatch: true),
 
         new("Competitions", "trophy", "/Admin/Competitions", "Data"),
+        new("Competitions Hub β", "trophy", "/Admin/CompetitionsHub", "Data"),
         new("Categories", "tag", "/Admin/Categories", "Data"),
         new("Records", "award", "/Admin/Records", "Data"),
         new("HubGroups", "users", "/Admin/HubGroups", "Data"),

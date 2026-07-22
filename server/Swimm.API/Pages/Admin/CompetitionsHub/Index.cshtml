@@ -1,0 +1,256 @@
+@page
+@using Swimm.Application.Dtos
+@model Swimm.API.Pages.Admin.CompetitionsHub.IndexModel
+@{
+    ViewData["Title"] = "Competitions Hub";
+    ViewData["PageSubtitle"] = "Соревнования: справочник БД + входящие isr.org.il одним списком (β)";
+
+    string PageUrl(int p) =>
+        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, year = Model.Year, stage = Model.Stage, page = p })!;
+
+    var hasFilters = !string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.CategoryKey)
+        || Model.Year != null || !string.IsNullOrEmpty(Model.Stage);
+
+    (string Text, string Cls) StageBadge(CompetitionStage s) => s switch
+    {
+        CompetitionStage.OnSite => ("на сайте", "bg-[rgba(79,195,247,0.15)] text-[#4fc3f7]"),
+        CompetitionStage.Imported => ("импортировано", "bg-[rgba(102,187,106,0.2)] text-[#66bb6a]"),
+        CompetitionStage.DbOnly => ("только в БД", "bg-white/[.08] text-admin-text-muted"),
+        _ => ("скрыто", "bg-white/[.05] text-admin-text-muted/70"),
+    };
+}
+
+@functions {
+    static string DaysWord(int n)
+    {
+        var t = n % 100;
+        if (t is >= 11 and <= 14) return "дней";
+        return (n % 10) switch { 1 => "день", >= 2 and <= 4 => "дня", _ => "дней" };
+    }
+
+    // Бейджи языков загруженных PDF (he — синий, en — фиолетовый).
+    static string LangBadges(string? languages)
+    {
+        if (string.IsNullOrEmpty(languages)) return "";
+        return string.Join("", languages.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(l =>
+            $"<span class=\"inline-block ml-1 py-0.5 px-1.5 rounded text-[10px] font-bold uppercase {(l == "he" ? "bg-[rgba(79,195,247,0.15)] text-[#4fc3f7]" : "bg-[rgba(186,104,200,0.2)] text-[#ce93d8]")}\">{l}</span>"));
+    }
+}
+
+<div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-4 text-[0.85rem] text-admin-text-muted leading-relaxed">
+    Экспериментальная объединённая страница (β): одно соревнование — одна строка со стадией
+    (<b>на сайте</b> / <b>импортировано</b> / <b>только в БД</b> / <b>скрыто</b>). Заменит
+    <a class="text-admin-accent" href="/Admin/Competitions">Competitions</a> и
+    <a class="text-admin-accent" href="/Admin/Discovery">Discovery</a> после проверки.
+    v1 — только просмотр; действия (Затянуть/импорт, изменить/удалить) переносятся следующими шагами.
+</div>
+
+<!-- Фильтры -->
+<form method="get" class="admin-card flex flex-wrap items-end gap-3 px-4 py-3 mb-4">
+    <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+        Поиск по названию
+        <input name="q" value="@Model.Search" autocomplete="off" class="admin-input w-72" placeholder="Название или подзаголовок…" />
+    </label>
+    <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+        Стадия
+        <select name="stage" class="admin-input">
+            <option value="">Все</option>
+            <option value="OnSite" selected="@(Model.Stage == "OnSite")">на сайте</option>
+            <option value="Imported" selected="@(Model.Stage == "Imported")">импортировано</option>
+            <option value="DbOnly" selected="@(Model.Stage == "DbOnly")">только в БД</option>
+            <option value="Ignored" selected="@(Model.Stage == "Ignored")">скрыто</option>
+        </select>
+    </label>
+    <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+        Категория
+        <select name="cat" class="admin-input">
+            <option value="">Все</option>
+            @foreach (var cat in Model.Categories)
+            {
+                <option value="@cat.Key" selected="@(cat.Key == Model.CategoryKey)">@(!string.IsNullOrEmpty(cat.Badge) ? cat.Badge + " " : "")@cat.Name</option>
+            }
+        </select>
+    </label>
+    <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+        Сезон
+        <select name="year" class="admin-input">
+            <option value="">Все</option>
+            @foreach (var y in Model.Years)
+            {
+                <option value="@y" selected="@(y == Model.Year)">@y</option>
+            }
+        </select>
+    </label>
+    <button type="submit" class="admin-btn admin-btn-primary">Найти</button>
+    @if (hasFilters)
+    {
+        <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">Сброс</a>
+    }
+</form>
+
+<div class="mb-3 text-xs text-admin-text-muted">
+    Всего: <strong class="text-admin-text">@Model.Result.TotalCount</strong>
+</div>
+
+@if (Model.Result.Items.Count == 0)
+{
+    <div class="admin-card text-center text-admin-text-muted italic py-10">Ничего не найдено.</div>
+}
+else
+{
+    <div class="overflow-x-auto">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Стадия</th>
+                    <th>Название</th>
+                    <th>Дата</th>
+                    <th>Бассейн</th>
+                    <th>OrgCompId</th>
+                    <th>Площадка / языки</th>
+                    <th class="text-right">Строк</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var u in Model.Result.Items)
+                {
+                    var badge = StageBadge(u.Stage);
+                    @if (u.Db is { IsEvent: true } ev)
+                    {
+                        <!-- Многодневное событие: заголовок + разворачиваемые дни -->
+                        <tr id="evhead-@ev.EventId" class="cursor-pointer hover:bg-admin-surface-hover select-none" onclick="toggleEvent(@ev.EventId)">
+                            <td><span class="inline-block py-0.5 px-2 rounded text-xs font-semibold @badge.Cls">@badge.Text</span></td>
+                            <td>
+                                <svg id="chev-@ev.EventId" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-3.5 h-3.5 inline-block transition-transform text-admin-text-muted"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+                                <span class="font-medium text-admin-text">@ev.EventName</span>
+                                <span class="ml-1.5 inline-block py-0.5 px-1.5 rounded text-[10px] font-semibold bg-admin-success/15 text-admin-success">@ev.DayCount @DaysWord(ev.DayCount)</span>
+                                @await Html.PartialAsync("/Pages/Admin/Competitions/_CompCategories.cshtml", ev.Categories)
+                            </td>
+                            <td class="whitespace-nowrap text-admin-text-muted">@(string.IsNullOrEmpty(ev.DateRange) ? "—" : ev.DateRange)</td>
+                            <td>@(string.IsNullOrEmpty(ev.PoolType) ? "—" : ev.PoolType)</td>
+                            <td class="text-admin-text-muted">@(u.Site != null ? u.Site.OrgCompId.ToString() : "—")</td>
+                            <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(u.Site != null ? System.Net.WebUtility.HtmlEncode(u.Site.Venue ?? "—") + LangBadges(u.Site.Languages) : "—")</td>
+                            <td class="text-right tabular-nums">@ev.TotalResultCount</td>
+                            <td></td>
+                        </tr>
+                        @foreach (var d in ev.Days)
+                        {
+                            <tr class="event-day-@ev.EventId hidden event-group">
+                                <td></td>
+                                <td>
+                                    <span class="text-admin-text-muted/60 mr-1">↳</span>
+                                    <a href="/Admin/Competitions/Edit?id=@d.Id" class="text-admin-accent hover:underline">День @(d.DayNumber?.ToString() ?? "?")</a>
+                                    @if (!string.IsNullOrEmpty(d.SubName))
+                                    {
+                                        <div class="pl-4 text-[11px] text-admin-text-muted truncate max-w-[280px]" title="@d.SubName">@d.SubName</div>
+                                    }
+                                </td>
+                                <td class="whitespace-nowrap text-admin-text-muted">@(string.IsNullOrEmpty(d.Date) ? "—" : d.Date)</td>
+                                <td>@(string.IsNullOrEmpty(d.PoolType) ? "—" : d.PoolType)</td>
+                                <td class="text-admin-text-muted">
+                                    @if (d.OrgCompId is int doc)
+                                    {
+                                        <a href="https://isr.org.il/comp.asp?compID=@doc" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@doc ↗</a>
+                                    }
+                                    else { <text>—</text> }
+                                </td>
+                                <td>@await Html.PartialAsync("/Pages/Admin/Competitions/_CompFlags.cshtml", d)</td>
+                                <td class="text-right tabular-nums">@d.ResultCount</td>
+                                <td class="text-right whitespace-nowrap">
+                                    <a href="/Admin/Competitions/Edit?id=@d.Id" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else if (u.Db?.Single is { } c)
+                    {
+                        <!-- Одиночное соревнование (импортировано или только в БД) -->
+                        <tr>
+                            <td><span class="inline-block py-0.5 px-2 rounded text-xs font-semibold @badge.Cls">@badge.Text</span></td>
+                            <td>
+                                <a href="/Admin/Competitions/Edit?id=@c.Id" class="text-admin-accent hover:underline font-medium">@c.Name</a>
+                                @if (!string.IsNullOrEmpty(c.SubName))
+                                {
+                                    <div class="text-[11px] text-admin-text-muted truncate max-w-[280px]" title="@c.SubName">@c.SubName</div>
+                                }
+                                @await Html.PartialAsync("/Pages/Admin/Competitions/_CompCategories.cshtml", c.Categories)
+                            </td>
+                            <td class="whitespace-nowrap text-admin-text-muted">@(string.IsNullOrEmpty(c.Date) ? "—" : c.Date)</td>
+                            <td>@(string.IsNullOrEmpty(c.PoolType) ? "—" : c.PoolType)</td>
+                            <td class="text-admin-text-muted">
+                                @{ var org = c.OrgCompId ?? u.Site?.OrgCompId; }
+                                @if (org is int soc)
+                                {
+                                    <a href="https://isr.org.il/comp.asp?compID=@soc" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@soc ↗</a>
+                                }
+                                else { <text>—</text> }
+                            </td>
+                            <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(u.Site != null ? System.Net.WebUtility.HtmlEncode(u.Site.Venue ?? "—") + LangBadges(u.Site.Languages) : "—")</td>
+                            <td class="text-right tabular-nums">@c.ResultCount</td>
+                            <td class="text-right whitespace-nowrap">
+                                <a href="/Admin/Competitions/Edit?id=@c.Id" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
+                            </td>
+                        </tr>
+                    }
+                    else if (u.Site is { } s)
+                    {
+                        <!-- Только на сайте (в БД ещё нет) -->
+                        <tr>
+                            <td><span class="inline-block py-0.5 px-2 rounded text-xs font-semibold @badge.Cls">@badge.Text</span></td>
+                            <td dir="rtl" style="text-align:left">
+                                <a class="text-admin-accent hover:underline" href="https://isr.org.il/comp.asp?compID=@s.OrgCompId" target="_blank" rel="noopener">@s.Name ↗</a>
+                                @if (!string.IsNullOrEmpty(s.LastError))
+                                {
+                                    <div class="text-[11px] text-[#ef9a9a]" dir="ltr">@s.LastError</div>
+                                }
+                            </td>
+                            <td class="whitespace-nowrap text-admin-text-muted">@(s.DateStart == s.DateEnd ? s.DateStart.ToString("dd/MM/yyyy") : $"{s.DateStart:dd/MM/yyyy} – {s.DateEnd:dd/MM/yyyy}")</td>
+                            <td class="text-admin-text-muted">—</td>
+                            <td class="text-admin-text-muted">@s.OrgCompId</td>
+                            <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(System.Net.WebUtility.HtmlEncode(s.Venue ?? "—") + LangBadges(s.Languages))</td>
+                            <td class="text-right text-admin-text-muted">—</td>
+                            <td></td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (Model.Result.TotalPages > 1)
+    {
+        <div class="flex items-center gap-3 mt-4">
+            @if (Model.Result.HasPrev)
+            {
+                <a href="@PageUrl(Model.Result.Page - 1)" class="admin-btn admin-btn-ghost">← Назад</a>
+            }
+            else
+            {
+                <span class="admin-btn admin-btn-ghost opacity-40 cursor-not-allowed">← Назад</span>
+            }
+            <span class="text-xs text-admin-text-muted">Страница @Model.Result.Page из @Model.Result.TotalPages</span>
+            @if (Model.Result.HasNext)
+            {
+                <a href="@PageUrl(Model.Result.Page + 1)" class="admin-btn admin-btn-ghost">Вперёд →</a>
+            }
+            else
+            {
+                <span class="admin-btn admin-btn-ghost opacity-40 cursor-not-allowed">Вперёд →</span>
+            }
+        </div>
+    }
+}
+
+@section Scripts {
+    <script>
+        // Разворачивание/сворачивание дней многодневного события (как в /Admin/Competitions).
+        function toggleEvent(eventId) {
+            document.querySelectorAll('.event-day-' + eventId).forEach(tr => tr.classList.toggle('hidden'));
+            const chev = document.getElementById('chev-' + eventId);
+            if (chev) chev.classList.toggle('rotate-90');
+            const head = document.getElementById('evhead-' + eventId);
+            if (head) head.classList.toggle('event-group');
+        }
+    </script>
+}

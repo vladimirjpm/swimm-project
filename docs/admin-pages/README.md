@@ -15,6 +15,7 @@
 | /Admin/Swimmers/Loglig | [swimmers-loglig.md](swimmers-loglig.md) | Привязка пловцов к loglig.com |
 | /Admin/Clubs | [clubs.md](clubs.md) | Дубли клубов: кандидаты, dry-run, склейка |
 | /Admin/Competitions | [competitions.md](competitions.md) | Справочник соревнований — эталонный CRUD |
+| /Admin/CompetitionsHub | [competitionshub.md](competitionshub.md) | β: Competitions + Discovery одним списком со стадией |
 | /Admin/Categories | [categories.md](categories.md) | Категории соревнований (бейджи) |
 | /Admin/Records | [records.md](records.md) | Рекорды и нормативы уровней |
 | /Admin/HubGroups | [hubgroups.md](hubgroups.md) | Группы SwimHub |

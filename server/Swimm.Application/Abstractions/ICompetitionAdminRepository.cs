@@ -15,6 +15,15 @@ public interface ICompetitionAdminRepository
     /// события) с этим OrgCompId. Для точного перехода со страницы Discovery на нужную строку.</param>
     Task<PagedResult<CompetitionRowDto>> GetPagedAsync(string? search, string? categoryKey, int? year, int page, int pageSize, int? orgCompId = null);
 
+    /// <summary>
+    /// Объединённый список Competitions + Discovery (новая страница /Admin/CompetitionsHub):
+    /// каждое соревнование одной строкой с <see cref="CompetitionStage"/> (на сайте / импортировано /
+    /// только в БД / скрыто). Склейка по OrgCompId (+ fallback имя+дата). Фильтры поиск/категория/
+    /// сезон применяются к БД-стороне; <paramref name="stage"/> — по стадии. Сортировка по дате (убыв.).
+    /// </summary>
+    Task<PagedResult<UnifiedCompetitionRowDto>> GetUnifiedAsync(
+        string? search, string? categoryKey, int? year, string? stage, int page, int pageSize);
+
     /// <summary>Полные данные для формы Edit (включая URL-ы результатов). null — не найдено.</summary>
     Task<CompetitionEditDto?> GetByIdAsync(int id);
 
