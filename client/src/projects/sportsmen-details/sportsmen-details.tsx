@@ -49,13 +49,6 @@ const MedalWithTooltip: React.FC<{ place: '1' | '2' | '3'; count: number; notes:
 
 type Scope = 'competition' | 'alltime';
 
-/** Определение источника медиа по URL — общее для «Моих ссылок» и инлайн-формы на строке. */
-const detectMediaSourceType = (value: string): 'youtube' | 'vimeo' | 'other' => {
-  if (HelperMedia.extractYoutubeId(value)) return 'youtube';
-  if (HelperMedia.extractVimeoId(value)) return 'vimeo';
-  return 'other';
-};
-
 function SportsmenDetails() {
  const filters = useAppSelector((state) => state.filterSelected);
   const selectedSource = useAppSelector((state) => state.dataSourceSelected);
@@ -114,34 +107,13 @@ function SportsmenDetails() {
     [userMedia.media]
   );
 
-  // «+ видео» на строке раскрывает инлайн-форму ПОД строкой (карточка не растёт от
-  // общей секции «Мои ссылки» — запрос Влада); attachResultId = строка с открытой формой.
-  const [attachResultId, setAttachResultId] = useState<number | null>(null);
+  // Просмотр уже добавленного медиа на строке (иконка play → onOpenMedia). Добавление
+  // медиа с публичных страниц убрано (docs/tasks/public-pages-media-cleanup-sonnet.md) —
+  // единственная точка входа для добавления теперь client/media.html.
   const [openMediaResultId, setOpenMediaResultId] = useState<number | null>(null);
   useEffect(() => {
-    setAttachResultId(null);
     setOpenMediaResultId(null);
   }, [filters.selected_name]);
-
-  // Добавление из инлайн-формы: успех → форма закрывается, иконка на строке появится
-  // из обновлённого userMedia.media.
-  const addMediaToResult = async (
-    resultId: number,
-    url: string,
-    mediaType: 'image' | 'video',
-    sourceType: 'youtube' | 'vimeo' | 'other'
-  ): Promise<boolean> => {
-    if (swimmerId == null) return false;
-    const item = await userMedia.add({
-      swimmer_id: swimmerId,
-      media_type: mediaType,
-      source_type: sourceType,
-      url,
-      result_id: resultId,
-    });
-    if (item) setAttachResultId(null);
-    return !!item;
-  };
 
   const base = import.meta.env.BASE_URL;
   const gender = firstResult.event_style_gender || 'female';
@@ -365,11 +337,7 @@ function SportsmenDetails() {
                 sortedBestResults={allSwimmerResults}
                 isMastersSource={isMastersSource}
                 isAwardSource={isAwardSource}
-                canAttachMedia={isAuthenticated}
                 mediaResultIds={mediaResultIds}
-                attachResultId={attachResultId}
-                onAttachResult={setAttachResultId}
-                onAddToResult={addMediaToResult}
                 onOpenMedia={setOpenMediaResultId}
               />
             </div>
@@ -589,11 +557,7 @@ function MyMediaSection({
   openResultId: number | null;
   onOpenHandled: () => void;
 }) {
-  const { media, loading, add, remove } = userMedia;
-  const [url, setUrl] = useState('');
-  const [otherKind, setOtherKind] = useState<'image' | 'video'>('video');
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  const { media, loading, remove } = userMedia;
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
@@ -647,29 +611,6 @@ function MyMediaSection({
     [media]
   );
 
-  const detectSourceType = detectMediaSourceType;
-
-  const handleAdd = async () => {
-    const trimmed = url.trim();
-    if (!trimmed) return;
-    setFormError(null);
-    setSubmitting(true);
-    const sourceType = detectSourceType(trimmed);
-    const mediaType: 'image' | 'video' = sourceType === 'other' ? otherKind : 'video';
-    const result = await add({
-      swimmer_id: swimmerId,
-      media_type: mediaType,
-      source_type: sourceType,
-      url: trimmed,
-    });
-    setSubmitting(false);
-    if (result) {
-      setUrl('');
-    } else {
-      setFormError('Could not add the link — check the URL format');
-    }
-  };
-
   const handleDelete = async (id: number) => {
     await remove(id);
     setConfirmDeleteId(null);
@@ -703,7 +644,8 @@ function MyMediaSection({
   return (
     <div className="border-t" style={{ borderColor: 'var(--theme-mode-border)' }}>
       {/* Свёрнуто по умолчанию — попап пловца не растёт в высоту (запрос Влада);
-          привязка к заплыву делается инлайн-формой на строке, а здесь — общие ссылки. */}
+          добавление медиа убрано с публичных страниц (docs/tasks/public-pages-media-cleanup-sonnet.md) —
+          единственная точка входа теперь client/media.html, здесь только просмотр/удаление/публикация. */}
       <details className="p-4">
       <summary
         className="cursor-pointer select-none list-none text-[15px] font-extrabold"
@@ -717,45 +659,10 @@ function MyMediaSection({
           className="text-xs font-semibold underline"
           style={{ color: 'var(--theme-mode-text-secondary)' }}
         >
-          Manage all my media →
+          Manage in My media →
         </a>
       </div>
       <div className="mt-3">
-
-      {/* Форма добавления */}
-      <div className="flex flex-col gap-2 mb-3">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://youtube.com/... or https://vimeo.com/... or another link"
-            className="flex-1 min-w-0 rounded-lg px-3 py-2 text-sm"
-            style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
-          />
-          <button
-            type="button"
-            onClick={handleAdd}
-            disabled={submitting || !url.trim()}
-            className="shrink-0 rounded-lg px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
-            style={{ background: 'var(--theme-primary)' }}
-          >
-            Добавить
-          </button>
-        </div>
-        {detectSourceType(url) === 'other' && url.trim() && (
-          <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--theme-mode-text-muted)' }}>
-            <span>Type:</span>
-            <label className="flex items-center gap-1">
-              <input type="radio" checked={otherKind === 'video'} onChange={() => setOtherKind('video')} /> video
-            </label>
-            <label className="flex items-center gap-1">
-              <input type="radio" checked={otherKind === 'image'} onChange={() => setOtherKind('image')} /> photo
-            </label>
-          </div>
-        )}
-        {formError && <div className="text-xs" style={{ color: '#e23b5a' }}>{formError}</div>}
-      </div>
 
       {/* Список */}
       {loading ? (
@@ -952,21 +859,13 @@ function TopResultsTabs({
   sortedBestResults,
   isMastersSource,
   isAwardSource,
-  canAttachMedia,
   mediaResultIds,
-  attachResultId,
-  onAttachResult,
-  onAddToResult,
   onOpenMedia,
 }: {
   sortedBestResults: any[];
   isMastersSource: boolean;
   isAwardSource: boolean;
-  canAttachMedia?: boolean;
   mediaResultIds?: Set<number>;
-  attachResultId?: number | null;
-  onAttachResult?: (resultId: number | null) => void;
-  onAddToResult?: (resultId: number, url: string, mediaType: 'image' | 'video', sourceType: 'youtube' | 'vimeo' | 'other') => Promise<boolean>;
   onOpenMedia?: (resultId: number) => void;
 }) {
   // Разделяем результаты на training и competition
@@ -992,11 +891,7 @@ function TopResultsTabs({
         results={sortedBestResults}
         isMastersSource={isMastersSource}
         isAwardSource={isAwardSource}
-        canAttachMedia={canAttachMedia}
         mediaResultIds={mediaResultIds}
-        attachResultId={attachResultId}
-        onAttachResult={onAttachResult}
-        onAddToResult={onAddToResult}
         onOpenMedia={onOpenMedia}
       />
     );
@@ -1032,11 +927,7 @@ function TopResultsTabs({
           results={currentResults}
           isMastersSource={isMastersSource}
           isAwardSource={isAwardSource}
-          canAttachMedia={canAttachMedia}
           mediaResultIds={mediaResultIds}
-          attachResultId={attachResultId}
-          onAttachResult={onAttachResult}
-          onAddToResult={onAddToResult}
           onOpenMedia={onOpenMedia}
         />
       ) : (
@@ -1063,22 +954,14 @@ function ResultsTable({
   results,
   isMastersSource,
   isAwardSource,
-  canAttachMedia,
   mediaResultIds,
-  attachResultId,
-  onAttachResult,
-  onAddToResult,
   onOpenMedia,
   showCompetition,
 }: {
   results: any[];
   isMastersSource: boolean;
   isAwardSource: boolean;
-  canAttachMedia?: boolean;
   mediaResultIds?: Set<number>;
-  attachResultId?: number | null;
-  onAttachResult?: (resultId: number | null) => void;
-  onAddToResult?: (resultId: number, url: string, mediaType: 'image' | 'video', sourceType: 'youtube' | 'vimeo' | 'other') => Promise<boolean>;
   onOpenMedia?: (resultId: number) => void;
   /** Название соревнования рядом с датой — только там, где строки реально смешивают разные соревнования (all-time) */
   showCompetition?: boolean;
@@ -1097,12 +980,11 @@ function ResultsTable({
         // на общий isAwardSource (одно соревнование — таб «это соревнование»).
         const rowIsAward = res.is_award ?? isAwardSource ?? false;
 
-        // Кнопка «+ видео» / иконка «есть видео» — только для строк с DB id заплыва
-        // (статические источники его не имеют, см. Footguns задания).
+        // Иконка «есть видео» — только для строк с DB id заплыва (статические источники
+        // его не имеют, см. Footguns задания). Добавление медиа с этой страницы убрано —
+        // остаётся только просмотр уже привязанного медиа.
         const rowId = typeof res.id === 'number' ? res.id : null;
         const hasMedia = rowId != null && !!mediaResultIds?.has(rowId);
-        // «+ видео» не прячем при hasMedia — на один заплыв можно несколько видео.
-        const showAttachButton = canAttachMedia && rowId != null;
 
         return (
           <li
@@ -1172,8 +1054,8 @@ function ResultsTable({
                 </div>
               </div>
 
-              {/* Медиа заплыва (2A): «+ видео» для владельца без привязки, иконка «есть видео»
-                  для строк с уже загруженным медиа (owner-view; см. задание §Решения). */}
+              {/* Медиа заплыва (2A): иконка «есть видео» — только просмотр уже загруженного
+                  медиа (owner-view). Добавление медиа с этой страницы убрано (см. задание). */}
               {hasMedia && (
                 <button
                   type="button"
@@ -1185,17 +1067,6 @@ function ResultsTable({
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="#fff">
                     <path d="M8 5v14l11-7z" />
                   </svg>
-                </button>
-              )}
-              {showAttachButton && (
-                <button
-                  type="button"
-                  onClick={() => onAttachResult?.(attachResultId === rowId ? null : rowId!)}
-                  title="Add a video for this swim"
-                  className="shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold"
-                  style={{ background: 'var(--theme-mode-surface-alt)', color: 'var(--theme-mode-text-secondary)' }}
-                >
-                  {attachResultId === rowId ? '× cancel' : '+ video'}
                 </button>
               )}
 
@@ -1217,81 +1088,10 @@ function ResultsTable({
                 <span style={{ color: 'var(--theme-mode-text-muted)' }}>—</span>
               )}
             </div>
-
-            {/* Инлайн-форма привязки — раскрывается под строкой по «+ видео»,
-                чтобы попап пловца не рос в высоту (запрос Влада 2026-07-17). */}
-            {attachResultId != null && attachResultId === rowId && onAddToResult && (
-              <InlineAttachForm
-                onSubmit={(url, mediaType, sourceType) => onAddToResult(rowId!, url, mediaType, sourceType)}
-              />
-            )}
           </li>
         );
       })}
     </ul>
-  );
-}
-
-// Компактная форма «добавить видео к заплыву» под строкой результата. Успешное
-// добавление закрывает форму снаружи (родитель сбрасывает attachResultId).
-function InlineAttachForm({
-  onSubmit,
-}: {
-  onSubmit: (url: string, mediaType: 'image' | 'video', sourceType: 'youtube' | 'vimeo' | 'other') => Promise<boolean>;
-}) {
-  const [url, setUrl] = useState('');
-  const [otherKind, setOtherKind] = useState<'image' | 'video'>('video');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const sourceType = detectMediaSourceType(url.trim());
-
-  const handleSubmit = async () => {
-    const trimmed = url.trim();
-    if (!trimmed) return;
-    setError(null);
-    setSubmitting(true);
-    const ok = await onSubmit(trimmed, sourceType === 'other' ? otherKind : 'video', sourceType);
-    setSubmitting(false);
-    if (!ok) setError('Could not add — check the URL format');
-  };
-
-  return (
-    <div className="flex flex-col gap-1.5 rounded-[10px] p-2" style={{ background: 'var(--theme-mode-surface-alt)' }}>
-      <div className="flex gap-1.5">
-        <input
-          type="text"
-          value={url}
-          autoFocus
-          onChange={(e) => setUrl(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
-          placeholder="https://youtube.com/… or https://vimeo.com/…"
-          className="flex-1 min-w-0 rounded-lg px-2.5 py-1.5 text-xs"
-          style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
-        />
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={submitting || !url.trim()}
-          className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-50"
-          style={{ background: 'var(--theme-primary)' }}
-        >
-          Добавить
-        </button>
-      </div>
-      {sourceType === 'other' && url.trim() && (
-        <div className="flex items-center gap-3 text-[10px]" style={{ color: 'var(--theme-mode-text-muted)' }}>
-          <span>Type:</span>
-          <label className="flex items-center gap-1">
-            <input type="radio" checked={otherKind === 'video'} onChange={() => setOtherKind('video')} /> video
-          </label>
-          <label className="flex items-center gap-1">
-            <input type="radio" checked={otherKind === 'image'} onChange={() => setOtherKind('image')} /> photo
-          </label>
-        </div>
-      )}
-      {error && <div className="text-[10px]" style={{ color: '#e23b5a' }}>{error}</div>}
-    </div>
   );
 }
 
