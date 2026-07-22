@@ -53,6 +53,9 @@ public class SwimmDbContext : DbContext
     public DbSet<UserMedia> UserMedia => Set<UserMedia>();
     public DbSet<UserMediaPublication> UserMediaPublications => Set<UserMediaPublication>();
 
+    /* === Реакции (лайки на медиа, поздравления на заплывы) === */
+    public DbSet<UserReaction> UserReactions => Set<UserReaction>();
+
     /* === Группы (SwimHub) === */
     public DbSet<HubGroup> HubGroups => Set<HubGroup>();
     public DbSet<HubGroupMember> HubGroupMembers => Set<HubGroupMember>();
@@ -572,6 +575,37 @@ public class SwimmDbContext : DbContext
             entity.HasCheckConstraint(
                 "CK_UserMediaPublications_Status",
                 @"""Status"" IN ('pending', 'approved', 'rejected')");
+        });
+
+        // Реакции пользователей (❤ на медиа / 🎉 на заплыв) — Sys_-таблица БЕЗ grant swimm_ro:
+        // публичные счётчики отдаются агрегатами через RW-контекст, сырые строки наружу не идут.
+        modelBuilder.Entity<UserReaction>(entity =>
+        {
+            entity.ToTable("Sys_UserReactions");
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Media)
+                .WithMany()
+                .HasForeignKey(e => e.MediaId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.ResultRecord)
+                .WithMany()
+                .HasForeignKey(e => e.ResultId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Дискриминатор: like → MediaId NOT NULL, congrats → ResultId NOT NULL.
+            entity.HasCheckConstraint(
+                "CK_UserReactions_Kind",
+                @"(""Kind"" = 'like'     AND ""MediaId""  IS NOT NULL AND ""ResultId"" IS NULL) OR " +
+                @"(""Kind"" = 'congrats' AND ""ResultId"" IS NOT NULL AND ""MediaId""  IS NULL)");
+
+            // Partial unique indexes (одна реакция на юзера+цель) + счётные индексы по цели —
+            // вручную в миграции через migrationBuilder.Sql (UX_UserReactions_Like/Congrats).
         });
 
         // --- Группы (SwimHub) ---

@@ -18,17 +18,23 @@ namespace Swimm.API.Controllers;
 public class MediaController : ControllerBase
 {
     private readonly IUserMediaRepository _media;
+    private readonly IMySwimsRepository _mySwims;
     private readonly IUserMediaPublicationService _publications;
     private readonly IHubGroupPermissionService _groupPermissions;
+    private readonly ICacheService _cache;
 
     public MediaController(
         IUserMediaRepository media,
+        IMySwimsRepository mySwims,
         IUserMediaPublicationService publications,
-        IHubGroupPermissionService groupPermissions)
+        IHubGroupPermissionService groupPermissions,
+        ICacheService cache)
     {
         _media = media;
+        _mySwims = mySwims;
         _publications = publications;
         _groupPermissions = groupPermissions;
+        _cache = cache;
     }
 
     private int? CurrentUserId()
@@ -44,6 +50,22 @@ public class MediaController : ControllerBase
         if (userId == null) return Unauthorized();
 
         return Ok(await _media.GetForUserAsync(userId.Value, swimmerId));
+    }
+
+    /// <summary>
+    /// My media v3: заплывы favorite-пловцов за сезон (сентябрь–август, ?season=стартовый год,
+    /// дефолт — текущий) с медиа, реакциями и PB-флагами + competition-level и unlinked медиа.
+    /// </summary>
+    [HttpGet("/api/me/swims")]
+    public async Task<IActionResult> GetMySwims([FromQuery] int? season)
+    {
+        var userId = CurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        // Санити: сезоны вне разумного окна режем до дефолта (текущий сезон).
+        if (season is < 1990 or > 2100) season = null;
+
+        return Ok(await _mySwims.GetMySwimsAsync(userId.Value, season));
     }
 
     [HttpPost]
@@ -117,6 +139,9 @@ public class MediaController : ControllerBase
             userId.Value, id, request, perms.CanEdit);
         if (!success) return BadRequest(new { error });
 
+        // Авто-approve привилегированной подачи сразу меняет публичную витрину группы
+        // (Gallery/Highlights в кэшируемом payload страницы группы).
+        if (publication!.Status == "approved") await _cache.InvalidateAllAsync();
         return Ok(publication);
     }
 
@@ -128,7 +153,11 @@ public class MediaController : ControllerBase
         if (userId == null) return Unauthorized();
 
         var ok = await _publications.WithdrawAsync(userId.Value, id, hubGroupId);
-        return ok ? NoContent() : NotFound(new { error = "Publication not found" });
+        if (!ok) return NotFound(new { error = "Publication not found" });
+
+        // Отзыв approved public-публикации убирает её из витрины группы — сброс кэша страницы.
+        await _cache.InvalidateAllAsync();
+        return NoContent();
     }
 
     [HttpDelete("{id:int}")]

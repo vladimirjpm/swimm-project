@@ -52,6 +52,18 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
+    // Реакции (❤/🎉): щедрее auth — это обычные клики, но защищаемся от бот-накрутки.
+    // Ключ — userId (эндпоинты только для залогиненных), IP — фоллбек до авторизации.
+    options.AddPolicy("reactions", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                          ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
 });
 // Antiforgery: header-based (double-submit) для защиты admin-мутаций.
 // Клиент читает токен из JS-переменной, генерируемой в _Layout.cshtml, и посылает в этом заголовке.

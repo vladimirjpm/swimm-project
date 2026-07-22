@@ -52,6 +52,15 @@ public class UserMediaDto
     /// <summary>Клуб пловца в этом заплыве (только при привязке к заплыву).</summary>
     [JsonPropertyName("club_name")]
     public string? ClubName { get; set; }
+
+    /* Реакции (❤ на медиа) — Sys_UserReactions, страница My media v3. */
+
+    [JsonPropertyName("likes_count")]
+    public int LikesCount { get; set; }
+
+    /// <summary>Текущий пользователь уже лайкнул это медиа.</summary>
+    [JsonPropertyName("my_like")]
+    public bool MyLike { get; set; }
 }
 
 /// <summary>Соревнование пловца для пикера привязки (Add link, шаг 3).</summary>
