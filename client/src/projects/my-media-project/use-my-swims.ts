@@ -29,6 +29,8 @@ export interface MySwimDto {
   style: string;
   style_id: number;
   is_relay: boolean;
+  /** SwimmerId всех ног эстафеты — для чип-фильтра/счётчиков (эстафета принадлежит всем). */
+  member_swimmer_ids: number[];
   place: number | null;
   points: number;
   time: string;

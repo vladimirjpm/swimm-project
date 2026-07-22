@@ -155,7 +155,9 @@ function MyMediaContent() {
   );
 
   // ── Фильтрация ────────────────────────────────────────────────────────────
-  const bySwimmer = swimmerFilter === 'all' ? swims : swims.filter((s) => s.swimmer_id === swimmerFilter);
+  // Заплыв принадлежит пловцу, если он владелец строки ИЛИ нога эстафеты (member).
+  const swimBelongsTo = (s: MySwimDto, id: number) => s.swimmer_id === id || s.member_swimmer_ids.includes(id);
+  const bySwimmer = swimmerFilter === 'all' ? swims : swims.filter((s) => swimBelongsTo(s, swimmerFilter));
 
   const segCount = (k: Seg) =>
     bySwimmer.filter((s) => {
@@ -398,7 +400,7 @@ function MyMediaContent() {
                   >
                     {s.name.trim().charAt(0).toUpperCase()}
                   </span>
-                  {s.name} · {swims.filter((x) => x.swimmer_id === s.id).length}
+                  {s.name} · {swims.filter((x) => swimBelongsTo(x, s.id)).length}
                 </button>
               ))}
               <button

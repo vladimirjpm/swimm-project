@@ -67,6 +67,7 @@ GRANT SELECT ON
     "Styles",
     "Countries",
     "Results",
+    "RelayMembers",
     "ClubPointsRules",
     "ClubPointsRuleEntries",
     "Categories",

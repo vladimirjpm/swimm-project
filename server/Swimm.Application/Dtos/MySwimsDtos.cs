@@ -81,6 +81,18 @@ public class MySwimDto
     [JsonPropertyName("is_relay")]
     public bool IsRelay { get; set; }
 
+    /// <summary>Внутреннее — для донасыщения членства эстафеты; наружу не сериализуется.</summary>
+    [JsonIgnore]
+    public int? RelayId { get; set; }
+
+    /// <summary>
+    /// SwimmerId всех ног эстафеты (для эстафет). Клиент матчит чип-фильтр и счётчики по
+    /// членству, т.к. строка эстафеты привязана к одному «владельцу», но принадлежит всем.
+    /// У индивидуальных заплывов пусто.
+    /// </summary>
+    [JsonPropertyName("member_swimmer_ids")]
+    public List<int> MemberSwimmerIds { get; set; } = new();
+
     [JsonPropertyName("place")]
     public int? Place { get; set; }
 

@@ -52,7 +52,9 @@ public class MySwimsRepository : IMySwimsRepository
         // 2. Сезоны с результатами (для селекта Season) — год+месяц, свёртка в сезон в памяти.
         var yearMonths = await _db.Results
             .AsNoTracking()
-            .Where(r => swimmerIds.Contains(r.SwimmerId))
+            .Where(r => swimmerIds.Contains(r.SwimmerId)
+                        || (r.RelayId != null && _db.RelayMembers.Any(m =>
+                                m.RelayId == r.RelayId && swimmerIds.Contains(m.SwimmerId))))
             .Select(r => new { r.CompetitionDate.Year, r.CompetitionDate.Month })
             .Distinct()
             .ToListAsync();
@@ -66,16 +68,20 @@ public class MySwimsRepository : IMySwimsRepository
         var seasonStart = new DateTime(response.Season, 9, 1, 0, 0, 0, DateTimeKind.Unspecified);
         var seasonEnd = seasonStart.AddYears(1);
 
-        // 3. Заплывы сезона.
+        // 3. Заплывы сезона. Эстафеты приходят и по членству (RelayMembers), а не только
+        //    по «владельцу» строки: строка привязана к одной ноге, но принадлежит всем.
         var swims = await _db.Results
             .AsNoTracking()
-            .Where(r => swimmerIds.Contains(r.SwimmerId)
-                        && r.CompetitionDate >= seasonStart && r.CompetitionDate < seasonEnd)
+            .Where(r => r.CompetitionDate >= seasonStart && r.CompetitionDate < seasonEnd
+                        && (swimmerIds.Contains(r.SwimmerId)
+                            || (r.RelayId != null && _db.RelayMembers.Any(m =>
+                                    m.RelayId == r.RelayId && swimmerIds.Contains(m.SwimmerId)))))
             .OrderByDescending(r => r.CompetitionDate).ThenBy(r => r.Id)
             .Select(r => new MySwimDto
             {
                 ResultId = r.Id,
                 SwimmerId = r.SwimmerId,
+                RelayId = r.RelayId,
                 CompetitionId = r.CompetitionId,
                 CompetitionName = r.Competition.Name,
                 CompetitionDate = r.Competition.Date,
@@ -92,6 +98,22 @@ public class MySwimsRepository : IMySwimsRepository
             })
             .ToListAsync();
         response.Swims = swims;
+
+        // Донасыщаем членство эстафет: SwimmerId всех ног (для чип-фильтра/счётчиков на клиенте).
+        var swimRelayIds = swims.Where(s => s.RelayId != null).Select(s => s.RelayId!.Value).Distinct().ToList();
+        if (swimRelayIds.Count > 0)
+        {
+            var membersByRelay = (await _db.RelayMembers
+                .AsNoTracking()
+                .Where(m => swimRelayIds.Contains(m.RelayId))
+                .Select(m => new { m.RelayId, m.SwimmerId })
+                .ToListAsync())
+                .GroupBy(m => m.RelayId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.SwimmerId).ToList());
+            foreach (var s in swims)
+                if (s.RelayId != null && membersByRelay.TryGetValue(s.RelayId.Value, out var ids))
+                    s.MemberSwimmerIds = ids;
+        }
 
         var resultIds = swims.Select(s => s.ResultId).ToList();
 

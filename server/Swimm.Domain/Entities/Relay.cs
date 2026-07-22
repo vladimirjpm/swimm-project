@@ -17,4 +17,8 @@ public class Relay
 
     [MaxLength(500)]
     public string? SwimmersName { get; set; }
+
+    /// <summary>Структурный состав ног (эстафета → пловцы). Текст <see cref="SwimmersName"/>
+    /// остаётся для отображения; членство для запросов «заплывы пловца» — тут.</summary>
+    public List<RelayMember> Members { get; set; } = new();
 }

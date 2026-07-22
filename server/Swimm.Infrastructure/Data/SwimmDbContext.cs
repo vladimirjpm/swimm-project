@@ -24,6 +24,7 @@ public class SwimmDbContext : DbContext
     public DbSet<Club> Clubs => Set<Club>();
     public DbSet<Swimmer> Swimmers => Set<Swimmer>();
     public DbSet<Relay> Relays => Set<Relay>();
+    public DbSet<RelayMember> RelayMembers => Set<RelayMember>();
     public DbSet<Gallery> Galleries => Set<Gallery>();
     public DbSet<GalleryItem> GalleryItems => Set<GalleryItem>();
     public DbSet<Style> Styles => Set<Style>();
@@ -158,6 +159,23 @@ public class SwimmDbContext : DbContext
         modelBuilder.Entity<Relay>(entity =>
         {
             entity.ToTable("Relays");
+        });
+
+        // Ноги эстафеты (публичная reference-таблица, грант swimm_ro в миграции) —
+        // структурное членство «эстафета → пловцы», см. RelayMember.
+        modelBuilder.Entity<RelayMember>(entity =>
+        {
+            entity.ToTable("RelayMembers");
+
+            entity.HasOne(e => e.Relay)
+                .WithMany(r => r.Members)
+                .HasForeignKey(e => e.RelayId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Swimmer)
+                .WithMany()
+                .HasForeignKey(e => e.SwimmerId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Style>(entity =>

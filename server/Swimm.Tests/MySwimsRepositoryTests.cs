@@ -309,4 +309,45 @@ public class MySwimsRepositoryTests
         Assert.Equal(1, swimMedia.LikesCount);
         Assert.True(swimMedia.MyLike);
     }
+
+    // ── Эстафета видна НЕ-владельцу строки (по членству RelayMembers) ──────────
+
+    [Fact]
+    public async Task GetMySwims_RelayMember_SurfacesForNonOwnerFavorite()
+    {
+        await using var db = CreateDb(nameof(GetMySwims_RelayMember_SurfacesForNonOwnerFavorite));
+        var user = NewUser("relaymember@example.com");
+        var owner = NewSwimmer("Owner", "Mia");   // первая нога = владелец строки, НЕ в favorites
+        var fav = NewSwimmer("Fav", "Sabina");    // нога эстафеты, в favorites
+        db.AppUsers.Add(user);
+        db.Swimmers.AddRange(owner, fav);
+        await db.SaveChangesAsync();
+        var (style, club) = await SeedRefsAsync(db);
+        var comp = await SeedCompetitionAsync(db);
+        await AddFavoriteAsync(db, user, fav);
+
+        var relay = new Relay { TeamName = "Team", SwimmersName = "Mia, Sabina" };
+        db.Relays.Add(relay);
+        await db.SaveChangesAsync();
+        relay.Members.Add(new RelayMember { RelayId = relay.Id, SwimmerId = owner.Id, LegOrder = 1 });
+        relay.Members.Add(new RelayMember { RelayId = relay.Id, SwimmerId = fav.Id, LegOrder = 2 });
+        await db.SaveChangesAsync();
+
+        var relayResult = NewResult(owner, comp, style, club, new DateTime(2025, 10, 1),
+            distance: "4X50", relayId: relay.Id);
+        db.Results.Add(relayResult);
+        await db.SaveChangesAsync();
+
+        var repo = new MySwimsRepository(db);
+        var response = await repo.GetMySwimsAsync(user.Id, season: 2025);
+
+        // Эстафета пришла, хотя фаворит — только нога, а не владелец строки.
+        var swim = Assert.Single(response.Swims);
+        Assert.Equal(relayResult.Id, swim.ResultId);
+        Assert.True(swim.IsRelay);
+        Assert.Contains(fav.Id, swim.MemberSwimmerIds);
+        Assert.Contains(owner.Id, swim.MemberSwimmerIds);
+        // Владелец строки в чипы (favorites) не попадает — он не в избранном.
+        Assert.DoesNotContain(response.Swimmers, s => s.Id == owner.Id);
+    }
 }

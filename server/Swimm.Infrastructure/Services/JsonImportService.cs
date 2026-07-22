@@ -475,7 +475,10 @@ public class JsonImportService : IImportService
                     swimmerCacheEn.TryAdd(swimmerKeyEn, swimmer);
                 }
 
-                // 6. Relay — created but NOT saved yet; will be inserted via ResultRecord.Relay navigation
+                // 6. Relay — created but NOT saved yet; will be inserted via ResultRecord.Relay navigation.
+                // Структурный состав ног (RelayMembers) резолвим по именам легов из парсера —
+                // тем же матчингом, что и обычных пловцов, — чтобы эстафета была видна каждому
+                // участнику, а не только «владельцу» строки (первой ноге).
                 Relay? relay = null;
                 if (item.IsRelay == true)
                 {
@@ -484,6 +487,7 @@ public class JsonImportService : IImportService
                         TeamName = item.RelayTeamName,
                         SwimmersName = item.RelaySwimmersName
                     };
+                    relay.Members = await ResolveRelayMembersAsync(item.RelaySwimmers, swimmerCache);
                 }
 
                 // 7. Gallery — created but NOT saved yet; will be inserted via ResultRecord.Gallery navigation
@@ -578,6 +582,7 @@ public class JsonImportService : IImportService
             var oldRows = await _db.Results
                 .Where(r => r.CompetitionId == competitionId)
                 .Include(r => r.Relay)
+                    .ThenInclude(rl => rl!.Members)
                 .Include(r => r.Gallery)
                     .ThenInclude(g => g!.Items)
                 .ToListAsync();
@@ -593,7 +598,7 @@ public class JsonImportService : IImportService
                     orphanCandidateSwimmerIds.Add(old.SwimmerId); // может осиротеть анонимная заглушка (Р5, Маккабиада-кейс)
 
                 ApplyPayloadUpdate(old, incoming);
-                ApplyRelayUpdate(old, incoming);
+                ApplyRelayUpdate(_db, old, incoming);
                 ApplyGalleryUpdate(_db, old, incoming);
 
                 // Не вставляем строку-«двойник» отдельным INSERT — она смёржена в old.
@@ -778,10 +783,65 @@ public class JsonImportService : IImportService
     }
 
     /// <summary>
+    /// Резолвит ноги эстафеты (леги из парсера) в <see cref="RelayMember"/>: каждое имя —
+    /// в Swimmer тем же матчингом, что и обычный пловец (кэш → БД → заглушка). Анонимные
+    /// леги (без имени) пропускаем — членство им не атрибутировать. Дубли SwimmerId внутри
+    /// одной эстафеты схлопываем (уникальный индекс RelayId+SwimmerId).
+    /// </summary>
+    private async Task<List<RelayMember>> ResolveRelayMembersAsync(
+        List<RelaySwimmerJson>? legs, Dictionary<string, Swimmer> swimmerCache)
+    {
+        var members = new List<RelayMember>();
+        if (legs == null || legs.Count == 0) return members;
+
+        var seen = new HashSet<int>();
+        foreach (var leg in legs)
+        {
+            var normLast = SwimmerDedupService.Normalize(leg.LastName ?? "");
+            var normFirst = SwimmerDedupService.Normalize(leg.FirstName ?? "");
+            if (normLast == string.Empty && normFirst == string.Empty)
+                continue; // анонимная нога
+
+            var key = SwimmerMatchKey(leg.LastName, leg.FirstName, leg.BirthYear);
+            if (!swimmerCache.TryGetValue(key, out var swimmer))
+            {
+                swimmer = await _db.Swimmers.FirstOrDefaultAsync(s =>
+                    s.LastName == (leg.LastName ?? "") &&
+                    s.FirstName == (leg.FirstName ?? "") &&
+                    s.BirthYear == (leg.BirthYear ?? 0));
+
+                if (swimmer == null)
+                {
+                    swimmer = new Swimmer
+                    {
+                        LastName = leg.LastName ?? string.Empty,
+                        FirstName = leg.FirstName ?? string.Empty,
+                        LastNameEn = string.Empty,
+                        FirstNameEn = string.Empty,
+                        BirthYear = leg.BirthYear ?? 0
+                    };
+                    _db.Swimmers.Add(swimmer);
+                    await _db.SaveChangesAsync();
+                }
+                swimmerCache[key] = swimmer;
+            }
+
+            if (!seen.Add(swimmer.Id)) continue;
+            members.Add(new RelayMember
+            {
+                SwimmerId = swimmer.Id,
+                LegOrder = leg.Order ?? 0,
+                SplitTime = leg.SplitTime,
+            });
+        }
+        return members;
+    }
+
+    /// <summary>
     /// Upsert (Р4): обновляет Relay существующего результата на месте (сохраняя Relay.Id), либо
     /// привязывает новую Relay-навигацию, если у старого результата её ещё не было.
     /// </summary>
-    private static void ApplyRelayUpdate(ResultRecord old, ResultRecord incoming)
+    private static void ApplyRelayUpdate(SwimmDbContext db, ResultRecord old, ResultRecord incoming)
     {
         if (incoming.Relay == null) return;
 
@@ -789,10 +849,17 @@ public class JsonImportService : IImportService
         {
             old.Relay.TeamName = incoming.Relay.TeamName;
             old.Relay.SwimmersName = incoming.Relay.SwimmersName;
+            // Состав ног перезаписываем целиком (как GalleryItems): старые удаляем явно,
+            // новые (уже с резолвнутыми SwimmerId) переносим на существующий Relay.Id.
+            if (old.Relay.Members.Count > 0)
+                db.RelayMembers.RemoveRange(old.Relay.Members);
+            old.Relay.Members.Clear();
+            foreach (var m in incoming.Relay.Members)
+                old.Relay.Members.Add(m);
         }
         else
         {
-            old.Relay = incoming.Relay; // EF вставит новую Relay и проставит RelayId при SaveChanges
+            old.Relay = incoming.Relay; // EF вставит новую Relay + Members и проставит RelayId при SaveChanges
         }
     }
 
@@ -979,6 +1046,7 @@ public class JsonImportService : IImportService
         result.Results = await _db.Results.ExecuteDeleteAsync();
         result.GalleryItems = await _db.GalleryItems.ExecuteDeleteAsync();
         result.Galleries = await _db.Galleries.ExecuteDeleteAsync();
+        await _db.RelayMembers.ExecuteDeleteAsync(); // до Relays (FK Cascade подстрахует, но чистим явно)
         result.Relays = await _db.Relays.ExecuteDeleteAsync();
         result.Swimmers = await _db.Swimmers.ExecuteDeleteAsync();
         result.Clubs = await _db.Clubs.ExecuteDeleteAsync();
@@ -997,7 +1065,7 @@ public class JsonImportService : IImportService
         // Sys_AppUsers (FK SwimmerId, ON DELETE SET NULL), CASCADE прошёл бы до AppUsers.
         var clearedTables = new[]
         {
-            "Results", "GalleryItems", "Galleries", "Relays",
+            "Results", "GalleryItems", "Galleries", "RelayMembers", "Relays",
             "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "CompetitionEvents", "Countries"
         };
 
@@ -1138,6 +1206,10 @@ public class JsonImportService : IImportService
         var deletedResults = await _db.Results
             .Where(r => r.CompetitionId == competitionId)
             .ExecuteDeleteAsync();
+
+        // Ноги эстафет — до Relays (FK Cascade подстраховал бы, но чистим явно, как GalleryItems)
+        if (relayIds.Count > 0)
+            await _db.RelayMembers.Where(m => relayIds.Contains(m.RelayId)).ExecuteDeleteAsync();
 
         var deletedRelays = relayIds.Count > 0
             ? await _db.Relays.Where(r => relayIds.Contains(r.Id)).ExecuteDeleteAsync()
