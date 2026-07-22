@@ -35,6 +35,32 @@
         return string.Join("", languages.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(l =>
             $"<span class=\"inline-block ml-1 py-0.5 px-1.5 rounded text-[10px] font-bold uppercase {(l == "he" ? "bg-[rgba(79,195,247,0.15)] text-[#4fc3f7]" : "bg-[rgba(186,104,200,0.2)] text-[#ce93d8]")}\">{l}</span>"));
     }
+
+    // Кнопки действий Discovery для site-стороны строки (imported=true — только синхр.языки + PDF;
+    // site-only — Затянуть/✓имп./синхр.языки/PDF/скрыть). Имена не через onclick (экранирование) —
+    // discPreview читает имя из window.__DISC по id.
+    static string SiteActions(Swimm.Application.Dtos.UnifiedSiteInfo s, bool imported)
+    {
+        const string api = "/api/admin/discovery";
+        const string btn = "admin-btn admin-btn-ghost py-1 px-2.5";
+        var finished = s.DateStart <= DateTime.UtcNow;
+        var sb = new System.Text.StringBuilder();
+        if (!imported && s.Status != "ignored" && finished)
+        {
+            sb.Append($"<button onclick=\"discPreview({s.DiscoveredId})\" class=\"{btn}\">Затянуть</button> ");
+            sb.Append($"<button onclick=\"discStatus({s.DiscoveredId},'imported')\" class=\"{btn}\" title=\"Пометить импортированным вручную\">✓ имп.</button> ");
+        }
+        if (finished && string.IsNullOrEmpty(s.Languages))
+            sb.Append($"<button onclick=\"discSyncLangs({s.DiscoveredId}, this)\" class=\"{btn}\" title=\"Скачать HE+EN пару и дозаполнить англ. имена пловцов\">Синхр. языки</button> ");
+        else if (s.Languages == "he")
+            sb.Append("<span class=\"text-[11px] text-admin-text-muted\" title=\"Второй язык на loglig не найден\">только HE</span> ");
+        sb.Append($"<a href=\"{api}/{s.DiscoveredId}/pdf\" class=\"{btn}\">PDF</a> ");
+        if (!imported)
+            sb.Append(s.Status == "ignored"
+                ? $"<button onclick=\"discStatus({s.DiscoveredId},'new')\" class=\"{btn}\">вернуть</button>"
+                : $"<button onclick=\"discStatus({s.DiscoveredId},'ignored')\" class=\"{btn}\" title=\"Скрыть\">✕</button>");
+        return sb.ToString();
+    }
 }
 
 <div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-4 text-[0.85rem] text-admin-text-muted leading-relaxed">
@@ -42,7 +68,13 @@
     (<b>на сайте</b> / <b>импортировано</b> / <b>только в БД</b> / <b>скрыто</b>). Заменит
     <a class="text-admin-accent" href="/Admin/Competitions">Competitions</a> и
     <a class="text-admin-accent" href="/Admin/Discovery">Discovery</a> после проверки.
-    v1 — только просмотр; действия (Затянуть/импорт, изменить/удалить) переносятся следующими шагами.
+    Действия входящих (Проверить/Затянуть/импорт, синхр. языки, скрыть) уже здесь; изменить/удалить —
+    на строках БД.
+</div>
+
+<div class="mb-4 flex flex-wrap items-center gap-3">
+    <button id="btn-sync" class="admin-btn admin-btn-primary cursor-pointer">Проверить сейчас</button>
+    <span id="sync-info" class="text-[12.5px] text-admin-text-muted"></span>
 </div>
 
 <!-- Фильтры -->
@@ -142,7 +174,7 @@ else
                             </td>
                             <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(u.Site != null ? System.Net.WebUtility.HtmlEncode(u.Site.Venue ?? "—") + LangBadges(u.Site.Languages) : "—")</td>
                             <td class="text-right tabular-nums">@ev.TotalResultCount</td>
-                            <td></td>
+                            <td class="text-right whitespace-nowrap" onclick="event.stopPropagation()">@Html.Raw(u.Site != null ? SiteActions(u.Site, imported: true) : "")</td>
                         </tr>
                         @foreach (var d in ev.Days)
                         {
@@ -200,6 +232,7 @@ else
                             <td class="text-right tabular-nums">@c.ResultCount</td>
                             <td class="text-right whitespace-nowrap">
                                 <a href="/Admin/Competitions/Edit?id=@c.Id" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
+                                @Html.Raw(u.Site != null ? SiteActions(u.Site, imported: true) : "")
                             </td>
                         </tr>
                     }
@@ -220,7 +253,7 @@ else
                             <td class="text-admin-text-muted">@s.OrgCompId</td>
                             <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(System.Net.WebUtility.HtmlEncode(s.Venue ?? "—") + LangBadges(s.Languages))</td>
                             <td class="text-right text-admin-text-muted">—</td>
-                            <td></td>
+                            <td class="text-right whitespace-nowrap">@Html.Raw(SiteActions(s, imported: false))</td>
                         </tr>
                     }
                 }
@@ -252,8 +285,56 @@ else
     }
 }
 
+<!-- Превью «затянутого» PDF перед импортом (перенос из /Admin/Discovery) -->
+<div id="preview-card" class="admin-card mt-6 hidden p-4">
+    <div class="mb-2 text-sm font-semibold text-admin-text" id="preview-title"></div>
+    <div id="preview-summary" class="mb-3 text-[13px] text-admin-text-muted"></div>
+    <div id="preview-warnings" class="mb-3 hidden rounded-md border border-admin-danger/40 bg-admin-danger/10 p-3 text-[12.5px]"></div>
+
+    <div class="mb-3">
+        <div class="mb-1 text-[12px] font-semibold uppercase tracking-wide text-admin-text-muted">Категории</div>
+        <div id="preview-categories" class="flex flex-wrap gap-3 text-[13px]"></div>
+    </div>
+
+    <div class="mb-3 hidden" id="overwrite-block">
+        <label class="inline-flex items-center gap-2 text-[13px] text-admin-text bg-[rgba(255,213,79,0.08)] border border-[rgba(255,213,79,0.3)] rounded-md py-2 px-3 cursor-pointer">
+            <input type="checkbox" id="overwrite-existing-cb">
+            Обновить существующее соревнование <span id="overwrite-comp-name" class="text-admin-text-muted"></span> (upsert: сматченные результаты обновятся на месте, медиа сохранится)
+        </label>
+        <label id="delete-missing-block" class="hidden mt-2 inline-flex items-center gap-2 text-[13px] text-admin-text bg-admin-danger/5 border border-admin-danger/30 rounded-md py-2 px-3 cursor-pointer">
+            <input type="checkbox" id="delete-missing-cb">
+            Удалять результаты, которых нет в файле
+        </label>
+        <div id="overwrite-delete-warning" class="hidden mt-2 text-[13px] text-admin-danger border-l-[3px] border-l-admin-danger bg-admin-danger/5 rounded-md py-2 px-3"></div>
+    </div>
+
+    <div class="mb-4" id="event-block">
+        <div class="mb-1 text-[12px] font-semibold uppercase tracking-wide text-admin-text-muted">
+            Многодневное событие (второй день того же турнира — выбери существующее)
+        </div>
+        <select id="event-select" class="admin-input w-full max-w-md rounded-md px-3 py-2 text-[13px]">
+            <option value="">Без события (однодневное)</option>
+            <option value="__new__">➕ Создать новое событие…</option>
+        </select>
+        <input type="text" id="event-name" class="admin-input mt-2 hidden w-full max-w-md rounded-md px-3 py-2 text-[13px]" placeholder="Название события" />
+    </div>
+
+    <div class="flex gap-3">
+        <button id="btn-import" class="admin-btn admin-btn-primary cursor-pointer">Импортировать</button>
+        <button id="btn-cancel-preview" class="cursor-pointer rounded-md border border-admin-border px-4 py-2 text-[13px] text-admin-text-muted">Отмена</button>
+    </div>
+</div>
+
 @section Scripts {
     <script>
+        // Словарь discovery-строк на странице: id → { name, languages } — чтобы действия не
+        // тащили имя через onclick (проблемы экранирования иврита/кавычек).
+        window.__DISC = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            Model.Result.Items.Where(u => u.Site != null)
+                .GroupBy(u => u.Site!.DiscoveredId).Select(g => g.First())
+                .ToDictionary(u => u.Site!.DiscoveredId.ToString(),
+                    u => new { name = u.Site!.Name, languages = u.Site!.Languages })));
+
         // Разворачивание/сворачивание дней многодневного события (как в /Admin/Competitions).
         function toggleEvent(eventId) {
             document.querySelectorAll('.event-day-' + eventId).forEach(tr => tr.classList.toggle('hidden'));
@@ -262,5 +343,184 @@ else
             const head = document.getElementById('evhead-' + eventId);
             if (head) head.classList.toggle('event-group');
         }
+
+        // ── Действия Discovery (перенос из /Admin/Discovery; после мутаций перезагружаем SSR) ──
+        (function () {
+            const API = '/api/admin/discovery';
+            const info = document.getElementById('sync-info');
+            let preview = null; // { previewId, id, name }
+
+            async function apiJson(url, opts = {}) {
+                opts.headers = { 'X-XSRF-TOKEN': _csrfToken, ...(opts.headers ?? {}) };
+                const res = await fetch(url, { credentials: 'same-origin', ...opts });
+                let body = null;
+                try { body = await res.json(); } catch { /* пустое тело */ }
+                if (!res.ok) throw new Error(body?.error ?? `${res.status} ${res.statusText}`);
+                return body;
+            }
+            const discName = (id) => (window.__DISC?.[id]?.name) || ('#' + id);
+
+            document.getElementById('btn-sync').addEventListener('click', async () => {
+                const btn = document.getElementById('btn-sync');
+                btn.disabled = true;
+                info.textContent = 'Проверяю сайт…';
+                try {
+                    const r = await apiJson(`${API}/sync`, { method: 'POST' });
+                    info.textContent = `На сайте: ${r.totalOnSite}, новых: ${r.added}, обновлено: ${r.updated}. Обновляю…`;
+                    location.reload();
+                } catch (e) { info.textContent = ''; toast('Ошибка: ' + e.message, 5000); btn.disabled = false; }
+            });
+
+            window.discStatus = async function (id, status) {
+                try {
+                    await apiJson(`${API}/${id}/status`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status })
+                    });
+                    location.reload();
+                } catch (e) { toast('Ошибка: ' + e.message); }
+            };
+
+            window.discSyncLangs = async function (id, btn) {
+                const name = discName(id);
+                if (btn) { btn.disabled = true; btn.textContent = 'Синхронизирую…'; }
+                info.textContent = `Синхр. языки «${name}»: скачиваю HE+EN пару, склеиваю, обновляю имена… (может занять минуту)`;
+                try {
+                    const s = await apiJson(`${API}/${id}/sync-languages`, { method: 'POST' });
+                    info.textContent = s.monolingual
+                        ? `Синхр. языки «${name}»: ${s.message}`
+                        : `Синхр. языки «${name}»: готово — EN дозаполнено ${s.enNamesFilled}, канонизировано ${s.canonized}, не найдено ${s.notFound}`;
+                } catch (e) {
+                    info.textContent = `Синхр. языки «${name}»: ОШИБКА — ${e.message}`;
+                }
+                setTimeout(() => location.reload(), 1500); // дать прочитать итог перед перезагрузкой
+            };
+
+            window.discPreview = async function (id) {
+                const name = discName(id);
+                toast('Скачиваю и парсю PDF…', 4000);
+                try {
+                    const p = await apiJson(`${API}/${id}/preview`, { method: 'POST' });
+                    preview = { previewId: p.previewId, id, name };
+                    await showPreview(p, name);
+                } catch (e) { toast('Ошибка: ' + e.message, 6000); }
+            };
+
+            async function showPreview(p, name) {
+                document.getElementById('preview-card').classList.remove('hidden');
+                document.getElementById('preview-title').textContent = `Превью: ${name}`;
+                document.getElementById('preview-summary').innerHTML =
+                    `Распознано результатов: <b>${p.resultCount}</b>` +
+                    (p.competitions?.length
+                        ? '<ul class="mt-1 list-disc pl-5">' + p.competitions.map(c =>
+                            `<li dir="rtl" style="text-align:left">${esc(c.competition)} — ${esc(c.date)} (${c.resultCount})</li>`).join('') + '</ul>'
+                        : '');
+                const warn = document.getElementById('preview-warnings');
+                warn.classList.toggle('hidden', !(p.warnings?.length));
+                warn.innerHTML = (p.warnings ?? []).map(esc).join('<br>');
+
+                // Upsert-чекбокс — только когда превью нашло существующее соревнование по ключу Name|Date|PoolType.
+                const overwriteBlock = document.getElementById('overwrite-block');
+                const overwriteCb = document.getElementById('overwrite-existing-cb');
+                const overwriteCompName = document.getElementById('overwrite-comp-name');
+                const deleteMissingBlock = document.getElementById('delete-missing-block');
+                const deleteMissingCb = document.getElementById('delete-missing-cb');
+                const overwriteDeleteWarning = document.getElementById('overwrite-delete-warning');
+                const existingMatch = (p.existingCompetitions || []).find(m => m.existingCompetitionId);
+                overwriteBlock.classList.toggle('hidden', !p.existingCompetitionId);
+                overwriteCompName.textContent = existingMatch ? `«${existingMatch.existingCompetitionName}»` : '';
+                overwriteCb.checked = false;
+                deleteMissingCb.checked = false;
+                deleteMissingBlock.classList.add('hidden');
+
+                function updateDeleteMissingVisibility() {
+                    const show = overwriteCb.checked;
+                    deleteMissingBlock.classList.toggle('hidden', !show);
+                    if (!show) deleteMissingCb.checked = false;
+                    updateOverwriteDeleteWarning();
+                }
+                function updateOverwriteDeleteWarning() {
+                    if (!overwriteDeleteWarning) return;
+                    if (!overwriteCb.checked || !deleteMissingCb.checked) { overwriteDeleteWarning.classList.add('hidden'); return; }
+                    const matches = p.existingCompetitions || [];
+                    let dbTotal = 0, fileTotal = 0, anyOverage = false;
+                    matches.forEach(m => {
+                        if (!m.existingCompetitionId) return;
+                        const existing = m.existingResultCount || 0;
+                        const day = (p.competitions || []).find(c => c.competition === m.competition && c.date === m.date);
+                        const fileCount = day ? (day.resultCount || 0) : 0;
+                        dbTotal += existing; fileTotal += fileCount;
+                        if (existing > fileCount) anyOverage = true;
+                    });
+                    if (!anyOverage) { overwriteDeleteWarning.classList.add('hidden'); return; }
+                    const maxDeleted = Math.max(0, dbTotal - fileTotal);
+                    overwriteDeleteWarning.textContent =
+                        `В БД ${dbTotal} результатов, в файле ${fileTotal} — до ${maxDeleted} результатов будет удалено. ` +
+                        `Результаты с привязанным медиа удалены не будут.`;
+                    overwriteDeleteWarning.classList.remove('hidden');
+                }
+                overwriteDeleteWarning.classList.add('hidden');
+                overwriteCb.onchange = updateDeleteMissingVisibility;
+                deleteMissingCb.onchange = updateOverwriteDeleteWarning;
+
+                // Список существующих событий (второй день дописывается к первому).
+                const eventSelect = document.getElementById('event-select');
+                [...eventSelect.querySelectorAll('option[data-event]')].forEach(o => o.remove());
+                try {
+                    const events = await fetch('/api/admin/competition-events', { credentials: 'same-origin' })
+                        .then(r => r.ok ? r.json() : []);
+                    (Array.isArray(events) ? events : []).forEach(e => {
+                        const opt = document.createElement('option');
+                        opt.value = String(e.id); opt.dataset.event = '1';
+                        opt.textContent = `${e.name} · дней: ${e.dayCount}`;
+                        eventSelect.appendChild(opt);
+                    });
+                } catch { /* список событий опционален */ }
+
+                const multiDay = (p.competitions?.length ?? 0) > 1;
+                eventSelect.value = multiDay ? '__new__' : '';
+                document.getElementById('event-name').value = name;
+                document.getElementById('event-name').classList.toggle('hidden', !multiDay);
+
+                try {
+                    const cats = await fetch('/api/categories', { credentials: 'same-origin' }).then(r => r.json());
+                    document.getElementById('preview-categories').innerHTML = cats.map(c =>
+                        `<label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" value="${esc(c.key)}" class="disc-cat cursor-pointer"> ${esc(c.name)}</label>`
+                    ).join('');
+                } catch { /* категории опциональны */ }
+
+                document.getElementById('preview-card').scrollIntoView({ behavior: 'smooth' });
+            }
+
+            document.getElementById('btn-cancel-preview').addEventListener('click', () => {
+                preview = null;
+                document.getElementById('preview-card').classList.add('hidden');
+            });
+            document.getElementById('event-select').addEventListener('change', (e) => {
+                document.getElementById('event-name').classList.toggle('hidden', e.target.value !== '__new__');
+            });
+
+            document.getElementById('btn-import').addEventListener('click', async () => {
+                if (!preview) return;
+                const categoryKeys = [...document.querySelectorAll('.disc-cat:checked')].map(i => i.value);
+                const eventChoice = document.getElementById('event-select').value;
+                try {
+                    const r = await apiJson(`${API}/import`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            previewId: preview.previewId,
+                            categoryKeys: categoryKeys.length ? categoryKeys : null,
+                            eventId: eventChoice && eventChoice !== '__new__' ? Number(eventChoice) : null,
+                            newEventName: eventChoice === '__new__' ? document.getElementById('event-name').value.trim() : null,
+                            overwriteExisting: document.getElementById('overwrite-existing-cb').checked,
+                            deleteMissing: document.getElementById('overwrite-existing-cb').checked && document.getElementById('delete-missing-cb').checked
+                        })
+                    });
+                    toast(`Импорт поставлен в очередь (job ${r.jobId}) — статус в Import History`, 6000);
+                    preview = null;
+                    document.getElementById('preview-card').classList.add('hidden');
+                } catch (e) { toast('Ошибка импорта: ' + e.message, 6000); }
+            });
+        })();
     </script>
 }
