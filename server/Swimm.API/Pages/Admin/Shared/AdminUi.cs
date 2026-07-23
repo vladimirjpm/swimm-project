@@ -28,6 +28,8 @@ public static class AdminNav
         new("Clubs", "shield", "/Admin/Clubs", "Data"),
         new("Import History", "history", "/Admin/ImportHistory", "Data"),
 
+        new("Media", "alert-triangle", "/Admin/Media", "System"),
+
         new("Users", "users", "/Admin/Users", "System"),
         new("Audit log", "history", "/Admin/Audit", "System"),
         new("DB Schema", "database", "/Admin/Db", "System"),

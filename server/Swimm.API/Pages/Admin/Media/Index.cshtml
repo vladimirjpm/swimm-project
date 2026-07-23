@@ -1,0 +1,81 @@
+@page
+@model Swimm.API.Pages.Admin.Media.IndexModel
+@{
+    ViewData["Title"] = "Media";
+    ViewData["PageSubtitle"] = "Health of external UserMedia links (YouTube/Vimeo/images)";
+}
+
+<div class="mb-4 flex items-center justify-between">
+    <div class="text-admin-text-muted">
+        Broken links: <strong class="text-admin-text">@Model.Broken.Count</strong>
+    </div>
+    <button id="btn-check-links" class="admin-btn admin-btn-primary" onclick="checkLinks()">Check links now</button>
+</div>
+
+@if (Model.Broken.Count == 0)
+{
+    <div class="admin-card text-center text-admin-text-muted italic py-10">
+        No broken media links.
+    </div>
+}
+else
+{
+    <div class="overflow-x-auto">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Url</th>
+                    <th>Owner</th>
+                    <th>Swimmer</th>
+                    <th>Type</th>
+                    <th class="whitespace-nowrap">Checked</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var m in Model.Broken)
+                {
+                    <tr>
+                        <td class="max-w-[360px] truncate">
+                            <a href="@m.Url" target="_blank" rel="noopener noreferrer" class="text-admin-accent hover:underline">@m.Url</a>
+                        </td>
+                        <td class="whitespace-nowrap text-admin-text-muted">@m.OwnerEmail</td>
+                        <td class="whitespace-nowrap">@m.SwimmerName</td>
+                        <td class="whitespace-nowrap text-admin-text-muted">@m.MediaType / @m.SourceType</td>
+                        <td class="whitespace-nowrap text-admin-text-muted">
+                            @(m.LinkCheckedAt is { } checkedAt ? checkedAt.ToString("dd/MM/yyyy HH:mm:ss") : "—")
+                        </td>
+                        <td class="text-xs text-admin-text-muted">
+                            @(m.LinkStatusCode is { } code ? $"HTTP {code}" : "")
+                            @if (!string.IsNullOrEmpty(m.LinkError))
+                            {
+                                <div>@m.LinkError</div>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@section Scripts {
+<script>
+async function checkLinks() {
+    const btn = document.getElementById('btn-check-links');
+    btn.disabled = true;
+    const originalText = btn.textContent;
+    btn.textContent = 'Checking…';
+    try {
+        const report = await api('/api/admin/media/check-links', { method: 'POST' });
+        toast(`Checked ${report.checked}, broken ${report.broken}`, 3000);
+        location.reload();
+    } catch (e) {
+        toast('Check failed: ' + e.message, 4000);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+</script>
+}

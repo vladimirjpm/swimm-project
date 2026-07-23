@@ -50,4 +50,19 @@ public class UserMedia
     public string Visibility { get; set; } = "private";
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    // ── Здоровье ссылки (фаза 7.5: on-demand проверка битых ссылок) ────────
+
+    /// <summary>Когда ссылку проверяли последний раз. null = ещё не проверяли.</summary>
+    public DateTime? LinkCheckedAt { get; set; }
+
+    /// <summary>true = жива, false = битая, null = не проверяли.</summary>
+    public bool? LinkOk { get; set; }
+
+    /// <summary>Последний HTTP-код ответа (или null).</summary>
+    public int? LinkStatusCode { get; set; }
+
+    /// <summary>Краткая причина, если ссылка битая (обрезано до 200 символов).</summary>
+    [MaxLength(200)]
+    public string? LinkError { get; set; }
 }

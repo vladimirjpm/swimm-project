@@ -163,6 +163,14 @@ public static class DependencyInjection
         // Сводка «Статус данных» для дашборда /Admin (docs/plans/admin-dashboard-status-cards-plan.md)
         services.AddScoped<IDashboardStatusService, DashboardStatusService>();
 
+        // Здоровье ссылок UserMedia (фаза 7.5): on-demand проверка живости по кнопке /Admin/Media.
+        services.AddHttpClient("media-link-check", c =>
+        {
+            c.Timeout = TimeSpan.FromSeconds(10);
+            c.DefaultRequestHeaders.UserAgent.ParseAdd("SwimmLinkCheck/1.0");
+        });
+        services.AddScoped<IUserMediaLinkChecker, UserMediaLinkChecker>();
+
         // Аудит ручных мутаций админки (фаза 7.4): запись «кто/что/когда» + чтение журнала.
         // Actor приходит через ICurrentActor (реализация в API-слое поверх HttpContext).
         services.AddScoped<IAdminAuditService, AdminAuditService>();
