@@ -1,0 +1,36 @@
+@page
+@model Swimm.API.Pages.Admin.Results.IndexModel
+@{
+    ViewData["Title"] = "Results";
+    ViewData["PageSubtitle"] = "Ручная правка отдельного результата по Id";
+
+    var flash = TempData["Flash"] as string;
+}
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}
+
+<div class="max-w-[560px]">
+    <div class="admin-card mb-4">
+        <form method="post" class="flex items-end gap-3">
+            <label class="flex flex-col gap-1 flex-1">
+                <span class="text-xs text-admin-text-muted">Id результата <span class="text-admin-danger">*</span></span>
+                <input asp-for="ResultId" type="number" min="1" class="admin-input" autocomplete="off" placeholder="напр. 123456" required />
+            </label>
+            <button type="submit" class="admin-btn admin-btn-primary">Открыть</button>
+        </form>
+    </div>
+
+    <div class="admin-card border-l-[3px] border-l-admin-warning bg-admin-warning/5 py-3 px-4 text-xs text-admin-text-muted leading-relaxed">
+        Форма правит одну строку результата (время, место, дорожку, дисквалификацию и т.п.)
+        для исправления опечаток протокола — вместо переимпорта всего соревнования.
+        <strong class="text-admin-text">Меняет публичные данные</strong>, все правки пишутся в
+        <a href="/Admin/Audit" class="text-admin-accent hover:underline">журнал аудита</a>.
+        Id результата виден в браузере данных <a href="/Admin/Api" class="text-admin-accent hover:underline">Admin/Api</a>.
+        Эстафетные строки этой формой не правятся.
+    </div>
+</div>
