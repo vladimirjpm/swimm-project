@@ -1,0 +1,95 @@
+@page
+@model Swimm.API.Pages.Admin.Competitions.MoveResultsModel
+@{
+    ViewData["Title"] = "Перенос результатов";
+    ViewData["PageSubtitle"] = "Массовый перенос всех результатов из одного соревнования в другое (склейка дублей)";
+
+    var flash = TempData["Flash"] as string;
+    var p = Model.Preview;
+}
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 4000));
+    </script>
+}
+
+<div class="max-w-[720px] mx-auto">
+
+    <div class="mb-4">
+        <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">← К соревнованиям</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5 py-3 px-4 mb-4 text-sm text-admin-danger">
+            @Model.Error
+        </div>
+    }
+
+    <form method="get" class="admin-card mb-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Источник — Id соревнования (все результаты переедут)</span>
+                <input asp-for="SourceId" type="number" min="1" class="admin-input" autocomplete="off" placeholder="напр. 123" />
+            </label>
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Цель — Id соревнования</span>
+                <input asp-for="TargetId" type="number" min="1" class="admin-input" autocomplete="off" placeholder="напр. 456" />
+            </label>
+        </div>
+        <div class="mt-4">
+            <button type="submit" class="admin-btn admin-btn-primary">Предпросмотр</button>
+        </div>
+        <p class="mt-3 text-xs text-admin-text-muted leading-relaxed">
+            Id соревнований видны в списке <a href="@Url.Page("Index")" class="text-admin-accent hover:underline">Competitions</a>
+            и в браузере данных <a href="/Admin/Api" class="text-admin-accent hover:underline">Admin/Api</a>.
+            Эстафеты и галереи переезжают вместе со своими результатами. Дата результатов
+            обновляется на дату цели. Источник после переноса пустеет — удалите его отдельно на странице Competitions.
+        </p>
+    </form>
+
+    @if (p != null)
+    {
+        <div class="admin-card mb-4">
+            <h2 class="text-sm font-semibold text-admin-text mb-3">План переноса</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                <div>
+                    <div class="text-xs text-admin-text-muted uppercase tracking-wide mb-1">Источник</div>
+                    <div class="text-admin-text">#@p.SourceId · @p.SourceName</div>
+                    <div class="text-admin-text-muted text-xs">@p.SourceDate · результатов: <strong class="text-admin-text">@p.ResultsToMove</strong></div>
+                </div>
+                <div>
+                    <div class="text-xs text-admin-text-muted uppercase tracking-wide mb-1">Цель</div>
+                    <div class="text-admin-text">#@p.TargetId · @p.TargetName</div>
+                    <div class="text-admin-text-muted text-xs">@p.TargetDate · уже результатов: @p.TargetExistingResults</div>
+                </div>
+            </div>
+
+            @if (p.ResultsToMove == 0)
+            {
+                <div class="mt-4 text-sm text-admin-text-muted">В источнике нет результатов — переносить нечего.</div>
+            }
+            else
+            {
+                @if (p.OverlapCount > 0)
+                {
+                    <div class="mt-4 border-l-[3px] border-l-admin-warning bg-admin-warning/5 py-3 px-4 text-xs text-admin-warning leading-relaxed">
+                        Внимание: <strong>@p.OverlapCount</strong> индивидуальных заплывов источника имеют совпадение
+                        (пловец + стиль + дистанция) в цели — после переноса возможны дубли. Перенос не запрещён,
+                        но проверьте, что это действительно один и тот же турнир (напр. разные категории одного события).
+                    </div>
+                }
+
+                <form method="post" asp-page-handler="Apply" class="mt-4"
+                      asp-route-source="@p.SourceId" asp-route-target="@p.TargetId"
+                      onsubmit="return confirm('Перенести @p.ResultsToMove результатов из #@p.SourceId в #@p.TargetId? Действие затрагивает публичные данные.');">
+                    <button type="submit" class="admin-btn admin-btn-danger">
+                        Перенести @p.ResultsToMove результатов →
+                    </button>
+                </form>
+            }
+        </div>
+    }
+</div>
