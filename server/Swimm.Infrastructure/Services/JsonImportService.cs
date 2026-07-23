@@ -1363,10 +1363,18 @@ public class JsonImportService : IImportService
         };
     }
 
-    private static string NormalizeStyleName(string? name)
+    internal static string NormalizeStyleName(string? name)
     {
         if (string.IsNullOrEmpty(name)) return "unknown";
-        return name.Trim().ToLowerInvariant().Replace(" ", "_");
+        var norm = name.Trim().ToLowerInvariant().Replace(" ", "_");
+
+        // Синонимы → канонический стиль (чтобы не плодить дубли в справочнике Styles).
+        // Комплекс: источники иногда пишут просто "medley" — это individual_medley.
+        return norm switch
+        {
+            "medley" or "im" or "individual" => "individual_medley",
+            _ => norm
+        };
     }
 
     private static DateTime ParseDate(string? date)
