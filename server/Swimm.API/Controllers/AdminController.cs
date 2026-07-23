@@ -22,6 +22,7 @@ public class AdminController : ControllerBase
     private readonly IResultSourceProvider _sourceProvider;
     private readonly IMemoryCache _cache;
     private readonly IAdminAuditService _audit;
+    private readonly ICacheService _cacheService;
 
     public AdminController(
         IAdminRepository admin,
@@ -32,7 +33,8 @@ public class AdminController : ControllerBase
         IResultRepository results,
         IResultSourceProvider sourceProvider,
         IMemoryCache cache,
-        IAdminAuditService audit)
+        IAdminAuditService audit,
+        ICacheService cacheService)
     {
         _admin = admin;
         _schema = schema;
@@ -43,6 +45,7 @@ public class AdminController : ControllerBase
         _sourceProvider = sourceProvider;
         _cache = cache;
         _audit = audit;
+        _cacheService = cacheService;
     }
 
     // ── Users ────────────────────────────────────────────────────────────────
@@ -141,6 +144,23 @@ public class AdminController : ControllerBase
         await _audit.LogAsync("setting.update", "Setting", key,
             $"Настройка «{key}» изменена на «{request.Value}»", new { key, request.Value });
         return Ok(_settings.Get(key));
+    }
+
+    // ── Кэш ──────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Пересчёт агрегатов = сброс кэша (фаза 7.3 op#3). Агрегаты (club-summary, club-points,
+    /// результаты) считаются на чтение и кэшируются в памяти с TTL — отдельной таблицы нет,
+    /// поэтому «пересчёт» = инвалидация: следующий публичный запрос пересоберёт свежие данные.
+    /// Полезно после ручных правок (Result edit, перенос результатов).
+    /// </summary>
+    [HttpPost("cache/invalidate")]
+    public async Task<IActionResult> InvalidateCache()
+    {
+        await _cacheService.InvalidateAllAsync();
+        await _audit.LogAsync("cache.invalidate", "Cache", null,
+            "Сброшен кэш агрегатов (пересчёт при следующем запросе)");
+        return Ok(new { message = "Cache invalidated" });
     }
 
     // ── Import ───────────────────────────────────────────────────────────────

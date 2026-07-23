@@ -16,6 +16,10 @@
     <button id="btn-reload" class="admin-btn admin-btn-primary cursor-pointer rounded-md px-4 py-2 text-[13px] font-semibold">Обновить кандидатов</button>
     <button id="btn-check-sure" class="cursor-pointer rounded-md border border-admin-border px-3 py-2 text-[13px] text-admin-text-muted">Выбрать все уверенные</button>
     <span id="info" class="text-[12.5px] text-admin-text-muted"></span>
+    <form method="get" action="/Admin/Clubs/Edit" class="ml-auto flex items-center gap-2">
+        <input type="number" name="id" min="1" class="admin-input w-40" placeholder="Клуб по Id…" autocomplete="off" />
+        <button type="submit" class="admin-btn admin-btn-ghost">Открыть / переименовать</button>
+    </form>
 </div>
 
 <div class="overflow-x-auto">
@@ -97,11 +101,11 @@
             <tr class="border-b border-white/[.04] hover:bg-white/[.03]">
                 <td class="py-2 px-3"><input type="checkbox" class="pair-cb cursor-pointer" data-i="${i}"></td>
                 <td class="py-2 px-3" dir="rtl" style="text-align:left">
-                    ${esc(c.canonicalName)}${c.canonicalNameEn ? ' <span class="text-[#546e7a]">(' + esc(c.canonicalNameEn) + ')</span>' : ''}
+                    <a href="/Admin/Clubs/Edit?id=${c.canonicalId}" target="_blank" class="text-admin-accent hover:underline" title="Открыть / переименовать">${esc(c.canonicalName)}</a>${c.canonicalNameEn ? ' <span class="text-[#546e7a]">(' + esc(c.canonicalNameEn) + ')</span>' : ''}
                     <span class="text-[#546e7a]">#${c.canonicalId}</span> · <span class="text-[#90a4ae]">рез. ${c.canonicalResults}</span>
                 </td>
                 <td class="py-2 px-3" dir="rtl" style="text-align:left">
-                    ${esc(c.duplicateName)}${c.duplicateNameEn ? ' <span class="text-[#546e7a]">(' + esc(c.duplicateNameEn) + ')</span>' : ''}
+                    <a href="/Admin/Clubs/Edit?id=${c.duplicateId}" target="_blank" class="text-admin-accent hover:underline" title="Открыть / переименовать">${esc(c.duplicateName)}</a>${c.duplicateNameEn ? ' <span class="text-[#546e7a]">(' + esc(c.duplicateNameEn) + ')</span>' : ''}
                     <span class="text-[#546e7a]">#${c.duplicateId}</span> · <span class="text-[#90a4ae]">рез. ${c.duplicateResults}</span>
                 </td>
                 <td class="py-2 px-3 text-[#90a4ae]">${esc(heuristicLabel(c))}</td>

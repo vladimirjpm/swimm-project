@@ -14,6 +14,17 @@
     Изменение параметров со scope <span class="text-[0.7rem] py-0.5 px-1.5 rounded-sm font-semibold uppercase whitespace-nowrap bg-admin-accent/15 text-admin-accent">admin</span> автоматически сбрасывает кеш схемы БД.
 </div>
 
+<div class="admin-card mb-6 flex flex-wrap items-center gap-3">
+    <div class="flex-1 min-w-[240px]">
+        <div class="text-sm font-semibold text-admin-text">Кэш агрегатов</div>
+        <div class="text-xs text-admin-text-muted leading-relaxed">
+            Пересчитать агрегаты (club-summary, клубные очки, результаты) — сброс кэша, свежие данные
+            соберутся при следующем запросе. Полезно после ручных правок результатов/переноса.
+        </div>
+    </div>
+    <button id="btn-invalidate-cache" class="admin-btn admin-btn-primary cursor-pointer">Пересчитать / сбросить кэш</button>
+</div>
+
 <div class="flex gap-1.5 mb-5 flex-wrap" id="scope-tabs">
     <button class="scope-tab active py-1.5 px-4 rounded-[5px] border border-admin-border bg-transparent text-admin-text-muted cursor-pointer text-xs font-[inherit] transition-all hover:border-admin-accent hover:text-admin-accent" data-scope="all">All</button>
     <button class="scope-tab py-1.5 px-4 rounded-[5px] border border-admin-border bg-transparent text-admin-text-muted cursor-pointer text-xs font-[inherit] transition-all hover:border-admin-accent hover:text-admin-accent" data-scope="admin">Admin</button>
@@ -144,6 +155,19 @@
             toast(`Error: ${e.message}`);
         }
     };
+
+    document.getElementById('btn-invalidate-cache').addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        try {
+            await api('/api/admin/cache/invalidate', { method: 'POST' });
+            toast('Кэш сброшен — агрегаты пересчитаются при следующем запросе', 3500);
+        } catch (err) {
+            toast('Ошибка: ' + err.message, 5000);
+        } finally {
+            btn.disabled = false;
+        }
+    });
 
     document.getElementById('scope-tabs').addEventListener('click', (e) => {
         const btn = e.target.closest('.scope-tab');

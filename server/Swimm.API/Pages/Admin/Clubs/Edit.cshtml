@@ -1,0 +1,63 @@
+@page
+@model Swimm.API.Pages.Admin.Clubs.EditModel
+@{
+    ViewData["Title"] = "Правка клуба";
+    ViewData["PageSubtitle"] = Model.Existing == null ? null : $"#{Model.Id} · {Model.Existing.Name}";
+    var flash = TempData["Flash"] as string;
+    var d = Model.Existing;
+}
+
+<div class="max-w-[560px] mx-auto">
+
+    <div class="mb-4">
+        <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">← К клубам</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5 py-3 px-4 mb-4 text-sm text-admin-danger">
+            @Model.Error
+        </div>
+    }
+
+    @if (d != null)
+    {
+        <div class="admin-card mb-4 text-xs text-admin-text-muted">
+            Результатов у клуба: <strong class="text-admin-text">@d.ResultCount</strong>.
+            Переименование меняет публичные выдачи (кэш сбрасывается). Склейка дублей — на странице
+            <a href="@Url.Page("Index")" class="text-admin-accent hover:underline">Clubs</a>.
+        </div>
+
+        <form method="post" asp-page-handler="Save" class="admin-card">
+            <input type="hidden" asp-for="Id" />
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">Название <span class="text-admin-danger">*</span></span>
+                    <input asp-for="Input.Name" class="admin-input" autocomplete="off" required dir="auto" />
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">Название (англ.)</span>
+                    <input asp-for="Input.NameEn" class="admin-input" autocomplete="off" />
+                </label>
+            </div>
+
+            <label class="mt-4 flex items-center gap-2">
+                <input asp-for="Input.IsPseudo" type="checkbox" class="h-4 w-4" />
+                <span class="text-xs text-admin-text-muted">Псевдоклуб (страна/сборная в графе клуба — исключается из club-summary и дедупа)</span>
+            </label>
+
+            <div class="mt-5 flex gap-3">
+                <button type="submit" class="admin-btn admin-btn-primary">Сохранить</button>
+                <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">Отмена</a>
+            </div>
+        </form>
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}
