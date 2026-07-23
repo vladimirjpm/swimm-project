@@ -149,7 +149,7 @@
 
         // Loglig: верифицировано крупно, не привязано мелко, ожидающие/отклонённые — пометки
         {
-            const lg = s.loglig;
+            const lg = s.swimmers.loglig;
             const sub = [`не привязано: ${lg.unlinked}`];
             if (lg.suggested > 0) sub.push(`<span style="color:#ffee58">на проверке: ${lg.suggested}</span>`);
             if (lg.rejected > 0) sub.push(`отклонено: ${lg.rejected}`);
@@ -159,10 +159,10 @@
 
         // Discovery: не загружено крупно, загружено мелко
         {
-            const d = s.discovery;
-            cards.push(statusCard('/Admin/Competitions?stage=OnSite', d.new,
-                'Входящие — не загружено', [`загружено: ${d.imported}`],
-                d.new > 0 ? '#ffa726' : '#66bb6a'));
+            const c = s.competitions;
+            cards.push(statusCard('/Admin/Competitions?stage=OnSite', c.discoveryNew,
+                'Входящие — не загружено', [`загружено: ${c.discoveryImported}`],
+                c.discoveryNew > 0 ? '#ffa726' : '#66bb6a'));
         }
 
         // Media: битые ссылки крупно, всего + непроверенные мелко
