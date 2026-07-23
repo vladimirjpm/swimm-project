@@ -75,6 +75,9 @@ const FilterNameDropdown: React.FC = () => {
           : {})}
         isClearable
         classNamePrefix="fname"
+        // Портал в body: FilterCard (overflow-hidden) и скролл drawer-а резали меню.
+        menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
+        styles={{ menuPortal: (base) => ({ ...base, zIndex: 60 }) }}
       />
     </FilterCard>
   );

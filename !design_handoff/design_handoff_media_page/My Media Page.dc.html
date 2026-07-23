@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#04101f}
+a{color:#7dd3fc}a:hover{color:#bae6fd}
+@keyframes hp-shimmer{0%{background-position:-150% 0}100%{background-position:250% 0}}
+</style>
+</helmet>
+<div style="position:relative;min-height:100vh;overflow-x:clip;padding-bottom:80px;color:#f3f8fd;font-family:'Inter',system-ui,sans-serif;background:linear-gradient(160deg,#0d2036 0%,#0b1b31 45%,#050e1c 100%)">
+<div style="position:absolute;inset:0;background:linear-gradient(105deg,transparent 40%,rgba(125,211,252,0.08) 50%,transparent 60%);background-size:300% 100%;animation:hp-shimmer 9s linear infinite;pointer-events:none"></div>
+
+<header dir="ltr" style="position:sticky;top:0;z-index:50;background:#161a2e">
+<div style="display:flex;height:46px;align-items:center;justify-content:space-between;gap:16px;padding:0 32px">
+<div style="display:flex;flex:none;align-items:center;gap:8px">
+<span style="display:flex;height:26px;width:26px;align-items:center;justify-content:center;border-radius:8px;background:#5b5fc7;font-size:13px;font-weight:900;color:#ffffff">S</span>
+<span style="font-size:11px;font-weight:900;letter-spacing:0.22em;color:#eef1f6">SWIM<span style="color:#5b5fc7">HUB</span></span>
+</div>
+<nav style="display:flex;align-items:center;gap:24px">
+<a href="#" style="display:flex;height:46px;align-items:center;border-bottom:2px solid transparent;font-size:13px;font-weight:700;color:rgba(238,241,246,0.55);text-decoration:none">Home</a>
+<a href="#" style="display:flex;height:46px;align-items:center;border-bottom:2px solid transparent;font-size:13px;font-weight:700;color:rgba(238,241,246,0.55);text-decoration:none">Competitions</a>
+<a href="#" style="display:flex;height:46px;align-items:center;border-bottom:2px solid transparent;font-size:13px;font-weight:700;color:rgba(238,241,246,0.55);text-decoration:none">Groups</a>
+<span style="display:flex;height:46px;align-items:center;border-bottom:2px solid transparent;font-size:13px;font-weight:700;color:rgba(238,241,246,0.4)">Normatives</span>
+<span style="display:flex;height:46px;align-items:center;border-bottom:2px solid transparent;font-size:13px;font-weight:700;color:rgba(238,241,246,0.4)">Records</span>
+<a href="#" style="display:flex;height:46px;align-items:center;border-bottom:2px solid transparent;font-size:13px;font-weight:700;color:rgba(238,241,246,0.55);text-decoration:none">About</a>
+</nav>
+<div style="display:flex;align-items:center;gap:8px">
+<span style="display:flex;height:30px;width:30px;align-items:center;justify-content:center;border-radius:50%;background:#5b5fc7;font-size:13px;font-weight:900;color:#ffffff">{{ userInitial }}</span>
+<span style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:700;color:#eef1f6">{{ userName }}</span>
+<span style="font-size:9px;color:#5b5fc7">▾</span>
+</div>
+</div>
+</header>
+
+<section style="position:relative;padding:40px 64px 0">
+<p style="margin:0 0 14px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.28em;color:#7dd3fc">My profile · {{ userName }}</p>
+<div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:24px">
+<h1 style="margin:0;font-size:56px;font-weight:900;line-height:0.92;letter-spacing:-0.045em;color:#f3f8fd">My media</h1>
+<nav style="display:flex;align-items:center;gap:8px;padding-bottom:6px" aria-label="Profile sections">
+<span style="white-space:nowrap;font-family:'JetBrains Mono',monospace;border-radius:8px;border:1px solid #7dd3fc;background:rgba(125,211,252,0.14);padding:5px 12px;font-size:12px;font-weight:800;color:#7dd3fc">Media</span>
+<a href="#" style="white-space:nowrap;font-family:'JetBrains Mono',monospace;border-radius:8px;border:1px solid rgba(125,211,252,0.3);padding:5px 12px;font-size:12px;font-weight:800;color:rgba(125,211,252,0.6);text-decoration:none">My groups ↗</a>
+<span style="white-space:nowrap;font-family:'JetBrains Mono',monospace;border-radius:8px;border:1px dashed rgba(203,224,240,0.25);padding:5px 12px;font-size:12px;font-weight:800;color:rgba(203,224,240,0.35)" title="Coming later">Settings · soon</span>
+</nav>
+</div>
+<p style="margin:16px 0 0;max-width:560px;font-size:14.5px;line-height:1.55;color:rgba(226,240,252,0.82)">All your links across swimmers — share them with groups and track publication status.</p>
+</section>
+
+<section style="position:relative;padding:26px 64px 0">
+<div style="display:flex;align-items:center;gap:10px">
+<button type="button" onClick="{{ goMedia }}" style="{{ mediaTabStyle }}">My media <span style="opacity:0.65;font-weight:700">· {{ totalCount }}</span></button>
+<sc-if value="{{ isAdmin }}" hint-placeholder-val="{{ true }}">
+<button type="button" onClick="{{ goModeration }}" style="{{ modTabStyle }}">Moderation
+<sc-if value="{{ hasPending }}" hint-placeholder-val="{{ true }}"><span style="display:inline-flex;min-width:18px;height:18px;align-items:center;justify-content:center;border-radius:9px;background:#ffca7a;padding:0 5px;font-size:10.5px;font-weight:900;color:#3a2a08">{{ pendingCount }}</span></sc-if>
+</button>
+</sc-if>
+</div>
+
+<sc-if value="{{ isMedia }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:16px;margin-top:18px">
+
+<sc-if value="{{ showBanner }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:center;gap:12px;border-radius:14px;border:1px solid rgba(255,202,122,0.4);background:linear-gradient(180deg,rgba(255,202,122,0.1),rgba(8,25,48,0.6));padding:12px 16px">
+<span style="display:inline-flex;min-width:22px;height:22px;align-items:center;justify-content:center;border-radius:11px;background:#ffca7a;padding:0 6px;font-size:12px;font-weight:900;color:#3a2a08">{{ pendingCount }}</span>
+<span style="min-width:0;font-size:13.5px;font-weight:700;color:#ffe3b8">requests are waiting for your approval</span>
+<button type="button" onClick="{{ goModeration }}" style="margin-left:auto;border:none;border-radius:9px;background:#ffca7a;padding:7px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:800;color:#3a2a08;cursor:pointer">Review →</button>
+</div>
+</sc-if>
+
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">
+<sc-for list="{{ swimmerChips }}" as="ch" hint-placeholder-count="3">
+<button type="button" onClick="{{ ch.pick }}" style="{{ ch.style }}"><sc-if value="{{ ch.init }}" hint-placeholder-val="{{ false }}"><span style="{{ ch.avaStyle }}">{{ ch.init }}</span></sc-if>{{ ch.label }} · {{ ch.count }}</button>
+</sc-for>
+<button type="button" onClick="{{ openAdd }}" style="margin-left:auto;border:none;border-radius:10px;background:#38ef8f;padding:9px 18px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:#04101f;cursor:pointer;white-space:nowrap">+ Add link</button>
+</div>
+
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+<div style="display:inline-flex;overflow:hidden;border-radius:10px;border:1px solid rgba(125,211,252,0.35)">
+<sc-for list="{{ statusSegs }}" as="sg" hint-placeholder-count="5">
+<button type="button" onClick="{{ sg.pick }}" style="{{ sg.style }}">{{ sg.label }}</button>
+</sc-for>
+</div>
+<button type="button" style="border-radius:10px;border:1px solid rgba(125,211,252,0.3);background:transparent;padding:7px 12px;font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:800;color:rgba(125,211,252,0.7);cursor:pointer">More filters ▾</button>
+<span style="margin-left:auto;font-size:11.5px;font-weight:700;color:rgba(203,224,240,0.5)">sorted by swim date ↓</span>
+</div>
+
+<sc-if value="{{ hasItems }}" hint-placeholder-val="{{ true }}">
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px">
+<sc-for list="{{ items }}" as="it" hint-placeholder-count="6">
+<div style="display:flex;flex-direction:column;overflow:hidden;border-radius:16px;border:1px solid rgba(125,211,252,0.22);background:linear-gradient(180deg,rgba(56,189,248,0.08),rgba(8,25,48,0.78));box-shadow:0 24px 60px rgba(2,10,24,0.5)">
+<div style="position:relative;display:flex;align-items:center;justify-content:center;aspect-ratio:16/9;cursor:pointer;background:linear-gradient(140deg,#12314f,#0a1c33)">
+<span style="display:flex;height:44px;width:44px;align-items:center;justify-content:center;border-radius:50%;border:1px solid rgba(125,211,252,0.4);background:rgba(2,10,24,0.65);font-size:15px;color:#7dd3fc">{{ it.icon }}</span>
+<span style="position:absolute;left:10px;top:10px;border-radius:6px;background:rgba(2,10,24,0.7);padding:2px 7px;font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:800;letter-spacing:0.08em;color:rgba(203,224,240,0.7)">{{ it.srcLabel }}</span>
+</div>
+<div style="display:flex;flex:1;flex-direction:column;gap:9px;padding:12px 14px">
+<div style="display:flex;align-items:flex-start;gap:9px">
+<span style="display:flex;flex:none;height:24px;width:24px;align-items:center;justify-content:center;border-radius:50%;background:#2c3d52;font-size:9.5px;font-weight:900;color:#bfe0f5">{{ it.init }}</span>
+<div style="min-width:0">
+<sc-if value="{{ it.linked }}" hint-placeholder-val="{{ true }}">
+<div style="font-size:13px;font-weight:800;color:#f3f8fd">{{ it.title }}</div>
+<div dir="rtl" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;font-size:11.5px;color:rgba(203,224,240,0.55)">{{ it.comp }}</div>
+</sc-if>
+<sc-if value="{{ it.notLinked }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:3px">
+<span style="display:block;font-size:12.5px;font-style:italic;line-height:1.3;color:rgba(203,224,240,0.5)">Not linked to a swim</span>
+<span style="display:block;font-size:11.5px;font-weight:800;line-height:1.3;color:#7dd3fc;cursor:pointer">Link to a swim →</span>
+</div>
+</sc-if>
+</div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:5px">
+<sc-for list="{{ it.pubs }}" as="p" hint-placeholder-count="1">
+<span style="{{ p.style }}">{{ p.label }}</span>
+</sc-for>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px dashed rgba(125,211,252,0.18);padding-top:8px;margin-top:auto">
+<span style="font-size:11.5px;font-weight:800;color:#7dd3fc;cursor:pointer">Share with a group</span>
+<span style="font-size:14px;font-weight:800;color:rgba(203,224,240,0.5);cursor:pointer;letter-spacing:2px">⋯</span>
+</div>
+</div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ showFilterEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="border-radius:16px;border:1px dashed rgba(125,211,252,0.25);padding:40px;text-align:center">
+<p style="margin:0;font-size:14px;font-weight:700;color:rgba(203,224,240,0.6)">Nothing matches the filters</p>
+<button type="button" onClick="{{ clearFilters }}" style="margin-top:12px;border-radius:9px;border:1px solid rgba(125,211,252,0.4);background:transparent;padding:7px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:800;color:#7dd3fc;cursor:pointer">Clear all</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ showTotalEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="border-radius:18px;border:1px solid rgba(125,211,252,0.22);background:linear-gradient(180deg,rgba(56,189,248,0.08),rgba(8,25,48,0.78));padding:56px 40px;text-align:center">
+<div style="font-size:40px">🎬</div>
+<p style="margin:12px 0 0;font-size:17px;font-weight:900;color:#f3f8fd">No media yet</p>
+<p style="margin:8px auto 0;max-width:380px;font-size:13px;line-height:1.5;color:rgba(203,224,240,0.6)">Add a YouTube or Vimeo link — or add videos straight from a swim row on the results page.</p>
+<button type="button" onClick="{{ openAdd }}" style="margin-top:18px;border:none;border-radius:10px;background:#38ef8f;padding:10px 20px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:#04101f;cursor:pointer">+ Add link</button>
+</div>
+</sc-if>
+
+</div>
+</sc-if>
+
+<sc-if value="{{ isMod }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:16px;margin-top:18px">
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">
+<sc-for list="{{ groupChips }}" as="gc" hint-placeholder-count="3">
+<button type="button" onClick="{{ gc.pick }}" style="{{ gc.style }}">{{ gc.label }} · {{ gc.count }}</button>
+</sc-for>
+<div style="margin-left:auto;display:inline-flex;overflow:hidden;border-radius:10px;border:1px solid rgba(125,211,252,0.35)">
+<sc-for list="{{ modSegs }}" as="ms" hint-placeholder-count="3">
+<button type="button" onClick="{{ ms.pick }}" style="{{ ms.style }}">{{ ms.label }}</button>
+</sc-for>
+</div>
+</div>
+
+<sc-if value="{{ hasModRows }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ modRows }}" as="r" hint-placeholder-count="3">
+<div style="{{ r.rowStyle }}">
+<div style="display:flex;width:88px;flex:none;align-items:center;justify-content:center;aspect-ratio:16/9;border-radius:8px;background:linear-gradient(140deg,#12314f,#0a1c33);cursor:pointer;color:#7dd3fc;font-size:13px">{{ r.icon }}</div>
+<div style="min-width:0;flex:1.3">
+<div dir="auto" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px;font-weight:800;color:#f3f8fd">{{ r.swimmer }}</div>
+<div style="font-size:11.5px;color:rgba(203,224,240,0.55)">{{ r.result }}</div>
+</div>
+<div style="min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;color:rgba(203,224,240,0.6)">{{ r.owner }}</div>
+<div dir="rtl" style="min-width:0;flex:0.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;font-size:12px;font-weight:700;color:rgba(226,240,252,0.85)">{{ r.group }}</div>
+<div style="flex:none"><span style="{{ r.levelStyle }}">{{ r.levelLabel }}</span></div>
+<div style="width:56px;flex:none;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:rgba(203,224,240,0.5)">{{ r.date }}</div>
+<div style="display:flex;flex:none;gap:6px">
+<sc-if value="{{ r.isPending }}" hint-placeholder-val="{{ true }}">
+<button type="button" onClick="{{ r.publish }}" style="border:none;border-radius:8px;background:#38ef8f;padding:6px 12px;font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:800;color:#04101f;cursor:pointer">Publish</button>
+<button type="button" onClick="{{ r.reject }}" style="border:1px solid rgba(239,83,80,0.5);border-radius:8px;background:transparent;padding:6px 12px;font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:800;color:#ef5350;cursor:pointer">Reject</button>
+</sc-if>
+<sc-if value="{{ r.isPublished }}" hint-placeholder-val="{{ false }}">
+<button type="button" onClick="{{ r.reject }}" style="border:1px solid rgba(125,211,252,0.4);border-radius:8px;background:transparent;padding:6px 12px;font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:800;color:#7dd3fc;cursor:pointer">Unpublish</button>
+</sc-if>
+</div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ showModEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="border-radius:16px;border:1px dashed rgba(56,239,143,0.35);padding:48px;text-align:center">
+<p style="margin:0;font-size:15px;font-weight:800;color:#38ef8f">No pending requests 🎉</p>
+</div>
+</sc-if>
+
+<p style="margin:0;font-size:11px;font-style:italic;color:rgba(203,224,240,0.4)">Public = visible to everyone on the internet. Click a thumbnail to watch before deciding.</p>
+</div>
+</sc-if>
+
+</section>
+
+<sc-if value="{{ showModal }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ closeAdd }}" style="position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:rgba(2,10,24,0.72);backdrop-filter:blur(4px)">
+<div onClick="{{ stopClick }}" style="width:540px;max-width:calc(100vw - 40px);max-height:calc(100vh - 60px);overflow-y:auto;border-radius:20px;border:1px solid rgba(125,211,252,0.3);background:linear-gradient(180deg,#0e2138,#081527);box-shadow:0 40px 90px rgba(0,0,0,0.6);padding:22px 24px;font-family:'Inter',system-ui,sans-serif;color:#f3f8fd">
+<div style="display:flex;align-items:center;gap:12px">
+<h2 style="margin:0;font-size:19px;font-weight:900;letter-spacing:-0.02em">Add link</h2>
+<div style="display:flex;gap:5px;margin-left:6px">
+<sc-for list="{{ stepDots }}" as="d" hint-placeholder-count="3"><span style="{{ d.style }}"></span></sc-for>
+</div>
+<span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:800;color:rgba(125,211,252,0.6)">{{ stepLabel }}</span>
+<button type="button" onClick="{{ closeAdd }}" style="border:none;background:transparent;font-size:16px;color:rgba(203,224,240,0.6);cursor:pointer;padding:4px">✕</button>
+</div>
+
+<sc-if value="{{ step1 }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:14px;margin-top:18px">
+<label style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.14em;color:#7dd3fc">Paste a link</label>
+<input value="{{ modalUrl }}" onChange="{{ setUrl }}" placeholder="https://www.youtube.com/watch?v=…" style="width:100%;box-sizing:border-box;border-radius:10px;border:1px solid rgba(125,211,252,0.35);background:rgba(2,10,24,0.5);padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:13px;color:#f3f8fd;outline:none">
+<sc-if value="{{ hasUrl }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:center;gap:10px">
+<span style="border-radius:6px;border:1px solid rgba(56,239,143,0.45);background:rgba(56,239,143,0.08);padding:3px 9px;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:800;color:#38ef8f;white-space:nowrap">detected · {{ detected }}</span>
+<sc-if value="{{ isOther }}" hint-placeholder-val="{{ false }}">
+<div style="display:inline-flex;overflow:hidden;border-radius:8px;border:1px solid rgba(125,211,252,0.35)">
+<button type="button" onClick="{{ pickVideo }}" style="{{ videoKindStyle }}">Video</button>
+<button type="button" onClick="{{ pickPhoto }}" style="{{ photoKindStyle }}">Photo</button>
+</div>
+</sc-if>
+</div>
+<div style="display:flex;align-items:center;justify-content:center;aspect-ratio:16/9;border-radius:12px;border:1px solid rgba(125,211,252,0.2);background:linear-gradient(140deg,#12314f,#0a1c33)">
+<span style="display:flex;height:48px;width:48px;align-items:center;justify-content:center;border-radius:50%;border:1px solid rgba(125,211,252,0.4);background:rgba(2,10,24,0.65);font-size:16px;color:#7dd3fc">{{ previewIcon }}</span>
+</div>
+</sc-if>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
+<button type="button" onClick="{{ closeAdd }}" style="border:1px solid rgba(125,211,252,0.3);border-radius:10px;background:transparent;padding:9px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:800;color:rgba(125,211,252,0.7);cursor:pointer">Cancel</button>
+<button type="button" onClick="{{ next }}" style="{{ nextStyle }}">Next →</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ step2 }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:14px;margin-top:18px">
+<label style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.14em;color:#7dd3fc">Whose swim is it?</label>
+<div style="display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ swOpts }}" as="o" hint-placeholder-count="2">
+<button type="button" onClick="{{ o.pick }}" style="{{ o.style }}">
+<span style="display:flex;flex:none;height:34px;width:34px;align-items:center;justify-content:center;border-radius:50%;background:#2c3d52;font-size:12px;font-weight:900;color:#bfe0f5">{{ o.init }}</span>
+<span style="font-size:14px;font-weight:800">{{ o.label }}</span>
+<span style="margin-left:auto;font-size:11.5px;color:rgba(203,224,240,0.5)">{{ o.hint }}</span>
+</button>
+</sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;gap:8px;margin-top:4px">
+<button type="button" onClick="{{ back }}" style="border:1px solid rgba(125,211,252,0.3);border-radius:10px;background:transparent;padding:9px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:800;color:rgba(125,211,252,0.7);cursor:pointer">← Back</button>
+<button type="button" onClick="{{ next }}" style="{{ nextStyle }}">Next →</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ step3 }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:14px;margin-top:18px">
+<label style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.14em;color:#7dd3fc">Link to a swim <span style="text-transform:none;letter-spacing:0;font-weight:700;color:rgba(203,224,240,0.45)">· optional</span></label>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ compOpts }}" as="c" hint-placeholder-count="2">
+<button type="button" onClick="{{ c.pick }}" style="{{ c.style }}"><span dir="rtl">{{ c.name }}</span><span style="opacity:0.6;margin-left:6px">{{ c.date }}</span></button>
+</sc-for>
+</div>
+<sc-if value="{{ compPicked }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:6px">
+<sc-for list="{{ swimOpts }}" as="s" hint-placeholder-count="2">
+<button type="button" onClick="{{ s.pick }}" style="{{ s.style }}">
+<span style="font-size:13px;font-weight:800">{{ s.label }}</span>
+<span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:800;color:#7dd3fc">{{ s.time }}</span>
+</button>
+</sc-for>
+</div>
+</sc-if>
+<div style="display:flex;justify-content:space-between;gap:8px;margin-top:4px">
+<button type="button" onClick="{{ back }}" style="border:1px solid rgba(125,211,252,0.3);border-radius:10px;background:transparent;padding:9px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:800;color:rgba(125,211,252,0.7);cursor:pointer">← Back</button>
+<div style="display:flex;gap:8px">
+<button type="button" onClick="{{ saveGeneral }}" style="border:1px solid rgba(125,211,252,0.35);border-radius:10px;background:transparent;padding:9px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:800;color:#7dd3fc;cursor:pointer">Skip — save as general</button>
+<button type="button" onClick="{{ saveLinked }}" style="{{ saveStyle }}">Save</button>
+</div>
+</div>
+</div>
+</sc-if>
+
+</div>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;isGroupAdmin&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Role&quot;},&quot;emptyState&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;States&quot;},&quot;userName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Vladimir&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Role&quot;}}">
+class Component extends DCLogic {
+  state = { tab: 'media', swimmer: 'all', status: 'all', modGroup: 'all', modStatus: 'pending', decided: {}, modal: null, added: [] };
+
+  comps = [
+    { id: 'c1', name: 'אליפות חיפה החורפית', date: 'Feb 16, 2026', swims: [{ label: '50m breast', time: '0:39.12' }, { label: '200m IM', time: '2:48.77' }, { label: '100m free', time: '1:07.40' }] },
+    { id: 'c2', name: 'גביע החורף תל אביב', date: 'Jan 12, 2026', swims: [{ label: '100m free', time: '1:08.02' }, { label: '50m fly', time: '0:33.90' }] },
+  ];
+
+  detect(url) {
+    if (/youtu\.?be/i.test(url)) return 'YOUTUBE';
+    if (/vimeo/i.test(url)) return 'VIMEO';
+    if (/\.(jpe?g|png|webp|gif|heic)(\?|#|$)/i.test(url) || /imgur|googleusercontent|photos\.app/i.test(url)) return 'PHOTO';
+    return 'OTHER';
+  }
+
+  media = [
+    { id: 1, sw: 'sabina', video: true, src: 'YOUTUBE', title: '50m breast · Feb 16, 2026', comp: 'אליפות חיפה החורפית', pubs: [{ g: 'Maccabi A', st: 'published' }] },
+    { id: 2, sw: 'sabina', video: true, src: 'YOUTUBE', title: '200m IM · Feb 16, 2026', comp: 'אליפות חיפה החורפית', pubs: [{ g: 'Maccabi A', st: 'published', pub: true }] },
+    { id: 3, sw: 'sabina', video: true, src: 'VIMEO', title: '100m free · Jan 12, 2026', comp: 'גביע החורף תל אביב', pubs: [{ g: 'Maccabi A', st: 'pending' }] },
+    { id: 4, sw: 'sabina', video: false, src: 'PHOTO', title: null, comp: null, pubs: [] },
+    { id: 5, sw: 'sabina', video: true, src: 'YOUTUBE', title: '50m fly · Dec 3, 2025', comp: 'ליגת הנוער סבב 2', pubs: [{ g: 'Hapoel B', st: 'rejected' }] },
+    { id: 6, sw: 'me', video: true, src: 'YOUTUBE', title: '400m free · Nov 20, 2025', comp: 'אליפות מאסטרס', pubs: [{ g: 'Masters', st: 'published' }] },
+    { id: 7, sw: 'me', video: true, src: 'OTHER', title: null, comp: null, pubs: [] },
+    { id: 8, sw: 'me', video: false, src: 'PHOTO', title: '50m breast · Oct 2, 2025', comp: 'אליפות מאסטרס', pubs: [{ g: 'Masters', st: 'pending' }] },
+  ];
+
+  mods = [
+    { id: 'm1', video: true, swimmer: 'סבינה ברנצב', result: '50m breast · Feb 16, 2026', owner: 'parent@gmail.com', group: 'מכבי חיפה', level: 'members', st: 'pending', date: '2d ago' },
+    { id: 'm2', video: true, swimmer: 'Dan Katz', result: '100m free · Jan 12, 2026', owner: 'dan.k@gmail.com', group: 'מכבי חיפה', level: 'public', st: 'pending', date: '5h ago' },
+    { id: 'm3', video: false, swimmer: 'יובל לוי', result: 'Not linked to a swim', owner: 'yuval@gmail.com', group: 'הפועל ב׳', level: 'members', st: 'pending', date: '1w ago' },
+    { id: 'm4', video: true, swimmer: 'סבינה ברנצב', result: '200m IM · Feb 16, 2026', owner: 'parent@gmail.com', group: 'מכבי חיפה', level: 'public', st: 'published', date: '3w ago' },
+  ];
+
+  swimmers = [{ id: 'sabina', label: 'Sabina', init: 'SB' }, { id: 'me', label: 'Me', init: 'VB' }];
+
+  renderVals() {
+    const P = this.props;
+    const isAdmin = P.isGroupAdmin ?? true;
+    const empty = P.emptyState ?? false;
+    const userName = P.userName ?? 'Vladimir';
+    const { tab, swimmer, status, modGroup, modStatus, decided } = this.state;
+    const mono = "'JetBrains Mono',monospace";
+
+    const chipSt = (on, extra) => Object.assign({
+      fontFamily: mono, borderRadius: 8, border: '1px solid ' + (on ? '#7dd3fc' : 'rgba(125,211,252,0.4)'),
+      padding: '7px 13px', fontSize: 12, fontWeight: 800, color: on ? '#04101f' : '#7dd3fc',
+      background: on ? '#7dd3fc' : 'transparent', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap',
+    }, extra || {});
+    const segSt = (on) => ({
+      fontFamily: mono, border: 'none', borderRight: '1px solid rgba(125,211,252,0.25)',
+      padding: '7px 12px', fontSize: 11.5, fontWeight: 800, cursor: 'pointer',
+      color: on ? '#04101f' : 'rgba(125,211,252,0.75)', background: on ? '#7dd3fc' : 'transparent', whiteSpace: 'nowrap',
+    });
+    const tabSt = (on) => ({
+      display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: mono, borderRadius: 12,
+      border: '1px solid ' + (on ? '#7dd3fc' : 'rgba(125,211,252,0.3)'),
+      background: on ? 'rgba(125,211,252,0.14)' : 'transparent',
+      padding: '10px 18px', fontSize: 13.5, fontWeight: 800, color: on ? '#7dd3fc' : 'rgba(125,211,252,0.55)', cursor: 'pointer', whiteSpace: 'nowrap',
+    });
+    const STATUS = {
+      pending: ['#ffca7a', 'rgba(255,202,122,0.45)', 'rgba(255,202,122,0.08)'],
+      published: ['#38ef8f', 'rgba(56,239,143,0.45)', 'rgba(56,239,143,0.08)'],
+      rejected: ['#ef5350', 'rgba(239,83,80,0.45)', 'rgba(239,83,80,0.08)'],
+      private: ['#94a3b8', 'rgba(148,163,184,0.4)', 'rgba(148,163,184,0.08)'],
+    };
+    const pubChipSt = (k, bold) => {
+      const [c, b, bg] = STATUS[k];
+      return { color: c, border: (bold ? '1.5px' : '1px') + ' solid ' + b, background: bg, borderRadius: 6, padding: '2.5px 8px', fontSize: 10.5, fontWeight: 800, fontFamily: mono, display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' };
+    };
+
+    const itemStatus = (m) => m.pubs.length === 0 ? 'private'
+      : m.pubs.some((p) => p.st === 'pending') ? 'pending'
+      : m.pubs.some((p) => p.st === 'published') ? 'published' : 'rejected';
+
+    const all = empty ? [] : [...this.state.added, ...this.media];
+    const bySwimmer = all.filter((m) => swimmer === 'all' || m.sw === swimmer);
+    const items = bySwimmer.filter((m) => status === 'all' || itemStatus(m) === status).map((m) => {
+      const sw = this.swimmers.find((s) => s.id === m.sw);
+      return {
+        id: m.id, icon: m.video ? '▶' : '🖼', srcLabel: m.src, init: sw.init,
+        linked: !!m.title, notLinked: !m.title, title: m.title, comp: m.comp,
+        pubs: m.pubs.length === 0
+          ? [{ label: 'private', style: pubChipSt('private') }]
+          : m.pubs.map((p) => ({ label: p.g + ' · ' + p.st + (p.pub ? ' 🌐' : ''), style: pubChipSt(p.st, p.pub) })),
+      };
+    });
+
+    const swimmerChips = [{ id: 'all', label: 'All', init: null }].concat(this.swimmers).map((s) => ({
+      label: s.label, init: s.init,
+      count: s.id === 'all' ? all.length : all.filter((m) => m.sw === s.id).length,
+      style: chipSt(swimmer === s.id),
+      avaStyle: { display: 'inline-flex', width: 17, height: 17, borderRadius: '50%', background: swimmer === s.id ? 'rgba(4,16,31,0.2)' : '#2c3d52', color: swimmer === s.id ? '#04101f' : '#bfe0f5', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 900 },
+      pick: () => this.setState({ swimmer: s.id }),
+    }));
+
+    const statusSegs = ['all', 'private', 'pending', 'published', 'rejected'].map((k) => ({
+      label: (k === 'all' ? 'All' : k[0].toUpperCase() + k.slice(1)) + (k === 'all' ? ' · ' + bySwimmer.length : ''),
+      style: segSt(status === k),
+      pick: () => this.setState({ status: k }),
+    }));
+
+    // Moderation
+    const rowsAll = this.mods.map((r) => ({ ...r, st: decided[r.id] || r.st }));
+    const pendingCount = rowsAll.filter((r) => r.st === 'pending').length;
+    const byGroup = rowsAll.filter((r) => modGroup === 'all' || r.group === modGroup);
+    const modVisible = byGroup.filter((r) => modStatus === 'all' ? r.st !== 'rejected' : r.st === modStatus);
+    const modRows = modVisible.map((r) => ({
+      icon: r.video ? '▶' : '🖼', swimmer: r.swimmer, result: r.result, owner: r.owner, group: r.group, date: r.date,
+      levelLabel: r.level === 'public' ? 'Public 🌐' : 'Members',
+      levelStyle: r.level === 'public' ? pubChipSt('pending', true) : pubChipSt('private'),
+      isPending: r.st === 'pending', isPublished: r.st === 'published',
+      publish: () => this.setState((s) => ({ decided: { ...s.decided, [r.id]: 'published' } })),
+      reject: () => this.setState((s) => ({ decided: { ...s.decided, [r.id]: 'rejected' } })),
+      rowStyle: {
+        display: 'flex', alignItems: 'center', gap: 14, borderRadius: 14, padding: '10px 14px',
+        border: '1px solid ' + (r.level === 'public' && r.st === 'pending' ? 'rgba(255,202,122,0.45)' : 'rgba(125,211,252,0.22)'),
+        background: 'linear-gradient(180deg,rgba(56,189,248,0.08),rgba(8,25,48,0.78))',
+        boxShadow: '0 12px 32px rgba(2,10,24,0.4)',
+      },
+    }));
+
+    const groups = [...new Set(this.mods.map((r) => r.group))];
+    const groupChips = [{ id: 'all', label: 'All my groups' }].concat(groups.map((g) => ({ id: g, label: g }))).map((g) => ({
+      label: g.label,
+      count: rowsAll.filter((r) => (g.id === 'all' || r.group === g.id) && r.st === 'pending').length,
+      style: chipSt(modGroup === g.id),
+      pick: () => this.setState({ modGroup: g.id }),
+    }));
+
+    const modSegs = [['pending', 'Pending'], ['published', 'Published'], ['all', 'All']].map(([k, l]) => ({
+      label: l + (k === 'pending' ? ' · ' + pendingCount : ''),
+      style: segSt(modStatus === k),
+      pick: () => this.setState({ modStatus: k }),
+    }));
+
+    // ── Add link modal ──
+    const modal = this.state.modal;
+    const mUrl = modal ? modal.url : '';
+    const detected = this.detect(mUrl);
+    const isOther = detected === 'OTHER';
+    const kind = modal ? (detected === 'PHOTO' ? 'photo' : (isOther ? modal.kind : 'video')) : 'video';
+    const step = modal ? modal.step : 1;
+    const canNext = step === 1 ? mUrl.trim().length > 0 : step === 2 ? !!modal.sw : true;
+    const btnPri = (on) => ({ border: 'none', borderRadius: 10, background: on ? '#38ef8f' : 'rgba(56,239,143,0.25)', padding: '9px 18px', fontFamily: mono, fontSize: 12, fontWeight: 800, color: on ? '#04101f' : 'rgba(4,16,31,0.6)', cursor: on ? 'pointer' : 'default', whiteSpace: 'nowrap' });
+    const rowSt = (on) => ({ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', borderRadius: 12, border: '1px solid ' + (on ? '#7dd3fc' : 'rgba(125,211,252,0.25)'), background: on ? 'rgba(125,211,252,0.12)' : 'rgba(2,10,24,0.35)', padding: '10px 14px', color: '#f3f8fd', cursor: 'pointer', fontFamily: "'Inter',sans-serif" });
+    const upd = (patch) => this.setState((s) => ({ modal: { ...s.modal, ...patch } }));
+    const doSave = (withSwim) => {
+      const m = this.state.modal;
+      const comp = this.comps.find((c) => c.id === m.comp);
+      const swim = withSwim && comp ? comp.swims[m.swim] : null;
+      const item = {
+        id: 'a' + Date.now(), sw: m.sw, video: kind !== 'photo',
+        src: isOther ? (kind === 'photo' ? 'PHOTO' : 'OTHER') : detected,
+        title: swim ? swim.label + ' · ' + comp.date : null,
+        comp: swim ? comp.name : null, pubs: [],
+      };
+      this.setState((s) => ({ added: [item, ...s.added], modal: null, swimmer: 'all', status: 'all' }));
+    };
+    const modalVals = {
+      showModal: !!modal,
+      openAdd: () => this.setState({ modal: { step: 1, url: '', kind: 'video', sw: null, comp: null, swim: null } }),
+      closeAdd: () => this.setState({ modal: null }),
+      stopClick: (e) => e.stopPropagation(),
+      step1: step === 1, step2: step === 2, step3: step === 3,
+      stepLabel: 'step ' + step + ' / 3',
+      stepDots: [1, 2, 3].map((n) => ({ style: { display: 'inline-block', width: n === step ? 18 : 7, height: 7, borderRadius: 4, background: n <= step ? '#7dd3fc' : 'rgba(125,211,252,0.25)', transition: 'all 0.2s' } })),
+      modalUrl: mUrl,
+      setUrl: (e) => upd({ url: e.target.value }),
+      hasUrl: mUrl.trim().length > 0, detected, isOther,
+      pickVideo: () => upd({ kind: 'video' }), pickPhoto: () => upd({ kind: 'photo' }),
+      videoKindStyle: segSt(kind === 'video'), photoKindStyle: segSt(kind === 'photo'),
+      previewIcon: kind === 'photo' ? '🖼' : '▶',
+      next: () => { if (canNext) upd({ step: step + 1 }); },
+      back: () => upd({ step: step - 1 }),
+      nextStyle: btnPri(canNext),
+      swOpts: this.swimmers.map((s) => ({
+        label: s.id === 'me' ? s.label + ' (you)' : s.label, init: s.init,
+        hint: s.id === 'me' ? 'your own results' : 'primary swimmer',
+        style: rowSt(modal && modal.sw === s.id), pick: () => upd({ sw: s.id }),
+      })),
+      compOpts: this.comps.map((c) => ({
+        name: c.name, date: c.date,
+        style: chipSt(modal && modal.comp === c.id, { padding: '8px 13px' }),
+        pick: () => upd({ comp: c.id, swim: null }),
+      })),
+      compPicked: !!(modal && modal.comp),
+      swimOpts: (modal && modal.comp ? this.comps.find((c) => c.id === modal.comp).swims : []).map((s, i) => ({
+        label: s.label, time: s.time,
+        style: rowSt(modal && modal.swim === i), pick: () => upd({ swim: i }),
+      })),
+      saveGeneral: () => doSave(false),
+      saveLinked: () => { if (modal && modal.swim !== null) doSave(true); },
+      saveStyle: btnPri(!!(modal && modal.swim !== null)),
+    };
+
+    return {
+      ...modalVals,
+      userName, userInitial: userName[0].toUpperCase(), isAdmin,
+      isMedia: tab === 'media', isMod: tab === 'mod' && isAdmin,
+      goMedia: () => this.setState({ tab: 'media' }),
+      goModeration: () => this.setState({ tab: 'mod' }),
+      mediaTabStyle: tabSt(tab === 'media'), modTabStyle: tabSt(tab === 'mod'),
+      totalCount: all.length, pendingCount, hasPending: pendingCount > 0,
+      showBanner: isAdmin && pendingCount > 0 && tab === 'media',
+      swimmerChips, statusSegs, items,
+      hasItems: items.length > 0,
+      showFilterEmpty: items.length === 0 && all.length > 0,
+      showTotalEmpty: all.length === 0,
+      clearFilters: () => this.setState({ swimmer: 'all', status: 'all' }),
+      groupChips, modSegs, modRows,
+      hasModRows: modRows.length > 0, showModEmpty: modRows.length === 0,
+    };
+  }
+}
+</script>
+</body>
+</html>

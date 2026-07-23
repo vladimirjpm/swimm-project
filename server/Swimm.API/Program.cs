@@ -36,6 +36,10 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddRazorPages();
+
+// Аудит админки (фаза 7.4): actor берётся из HTTP-контекста через ICurrentActor.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentActor, Swimm.API.Services.HttpCurrentActor>();
 builder.Services.AddHostedService<ImportBackgroundService>();
 
 // Rate limiting для чувствительных к перебору auth-эндпоинтов (login/register/forgot/reset).
@@ -49,6 +53,18 @@ builder.Services.AddRateLimiter(options =>
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+    // Реакции (❤/🎉): щедрее auth — это обычные клики, но защищаемся от бот-накрутки.
+    // Ключ — userId (эндпоинты только для залогиненных), IP — фоллбек до авторизации.
+    options.AddPolicy("reactions", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                          ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
@@ -111,6 +127,8 @@ if (googleEnabled)
 builder.Services.AddSingleton<DbStatusService>();
 builder.Services.AddHostedService<DbPingBackgroundService>();
 builder.Services.AddHostedService<Swimm.API.BackgroundServices.CompetitionDiscoveryBackgroundService>();
+builder.Services.AddHostedService<Swimm.API.BackgroundServices.LogligSuggestionVerificationBackgroundService>();
+builder.Services.AddHostedService<Swimm.API.BackgroundServices.LogligBatchBackgroundService>();
 
 var app = builder.Build();
 
@@ -225,6 +243,55 @@ if (args.Contains("--merge-swimmers"))
         foreach (var a in p.Actions) Console.WriteLine($"    {a}");
         foreach (var c in p.Conflicts) Console.WriteLine($"    !! {c}");
     }
+    return;
+}
+
+// Разовый бэкфилл структурного состава эстафет (RelayMembers) для данных,
+// импортированных до появления структурных ног:
+//   dotnet run -- --backfill-relay-members [--apply]
+// Без --apply — dry-run: печатает отчёт, БД не меняется. Идемпотентно.
+if (args.Contains("--backfill-relay-members"))
+{
+    using var scope = app.Services.CreateScope();
+    var backfill = scope.ServiceProvider.GetRequiredService<IRelayMemberBackfillService>();
+    var rep = await backfill.BackfillAsync(apply: args.Contains("--apply"));
+    Console.WriteLine(rep.Applied
+        ? "=== ПРИМЕНЕНО: RelayMembers бэкфилл ==="
+        : "=== DRY-RUN: RelayMembers бэкфилл, БД не изменена (добавь --apply) ===");
+    Console.WriteLine($"Эстафет всего (без состава): {rep.RelaysTotal}");
+    Console.WriteLine($"  уже с составом (пропущены):  {rep.RelaysAlreadyPopulated}");
+    Console.WriteLine($"  залинковано (>=1 нога):      {rep.RelaysLinked}");
+    Console.WriteLine($"Ног привязано:  {rep.LegsLinked}");
+    Console.WriteLine($"Ног не сопоставлено: {rep.LegsUnmatched}");
+    foreach (var s in rep.UnmatchedSamples) Console.WriteLine($"    ? {s}");
+    return;
+}
+
+// Разовый бэкфилл Competition.OrgCompId по Discovery-строкам (для соревнований, импортированных
+// до того, как импорт научился штамповать OrgCompId; кросс-линк Competitions↔Discovery для них пуст):
+//   dotnet run -- --backfill-discovery-orgcompid [--apply]
+// Без --apply — dry-run: печатает mapping-таблицу, БД не меняется. Идемпотентно.
+if (args.Contains("--backfill-discovery-orgcompid"))
+{
+    using var scope = app.Services.CreateScope();
+    var discovery = scope.ServiceProvider.GetRequiredService<ICompetitionDiscoveryService>();
+    var apply = args.Contains("--apply");
+    var rows = await discovery.BackfillImportedOrgCompIdsAsync(apply: apply);
+
+    Console.WriteLine(apply
+        ? "=== ПРИМЕНЕНО ==="
+        : "=== DRY-RUN: бэкфилл Discovery→OrgCompId, БД не изменена (добавь --apply) ===");
+    foreach (var r in rows)
+    {
+        Console.WriteLine(
+            $"[{r.Action}] compID {r.OrgCompId} → comp #{r.CompetitionId} «{r.CompetitionName}»  (discovered: «{r.DiscoveredName}»)");
+    }
+
+    var wouldLink = rows.Count(r => r.Action is "WouldLink");
+    var linked = rows.Count(r => r.Action is "Linked");
+    var already = rows.Count(r => r.Action is "AlreadyLinked");
+    var takenByOther = rows.Count(r => r.Action is "TakenByOther");
+    Console.WriteLine($"Итого: would-link {wouldLink}, linked {linked}, already {already}, taken-by-other {takenByOther}");
     return;
 }
 

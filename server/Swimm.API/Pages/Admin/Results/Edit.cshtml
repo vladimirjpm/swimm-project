@@ -1,0 +1,118 @@
+@page
+@model Swimm.API.Pages.Admin.Results.EditModel
+@{
+    ViewData["Title"] = "Правка результата";
+    ViewData["PageSubtitle"] = Model.Existing == null ? null
+        : $"#{Model.Id} · {Model.Existing.SwimmerName} · {Model.Existing.CompetitionName}";
+    var flash = TempData["Flash"] as string;
+    var d = Model.Existing;
+}
+
+<div class="max-w-[720px] mx-auto">
+
+    <div class="mb-4">
+        <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">← К поиску</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5 py-3 px-4 mb-4 text-sm text-admin-danger">
+            @Model.Error
+        </div>
+    }
+
+    @if (d != null)
+    {
+        <div class="admin-card mb-4 text-xs text-admin-text-muted leading-relaxed">
+            <div><span class="text-admin-text">Соревнование:</span> @d.CompetitionName (@d.CompetitionDate.ToString("dd/MM/yyyy"))</div>
+            <div><span class="text-admin-text">Стиль:</span> <code>@d.StyleName</code> · <span class="text-admin-text">текущий пловец:</span> @d.SwimmerName (#@d.SwimmerId) · <span class="text-admin-text">клуб:</span> @d.ClubName (#@d.ClubId)</div>
+            <div class="mt-1 text-admin-warning">Правка меняет публичные данные — записывается в аудит. Пловца/клуб можно переназначить по Id.</div>
+        </div>
+
+        <form method="post" asp-page-handler="Save" class="admin-card">
+            <input type="hidden" asp-for="Id" />
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">Время (м:сс.дд)</span>
+                    <input asp-for="Input.TimeText" class="admin-input font-mono" autocomplete="off" placeholder="1:02.34 или 58.21" />
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">Место</span>
+                    <input asp-for="Input.Position" type="number" min="1" class="admin-input" autocomplete="off" />
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">Место в возр. группе</span>
+                    <input asp-for="Input.PositionAgeGroup" type="number" min="1" class="admin-input" autocomplete="off" />
+                </label>
+
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">Заплыв (Heat)</span>
+                    <input asp-for="Input.Heat" type="number" min="0" class="admin-input" autocomplete="off" />
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">Дорожка (Lane)</span>
+                    <input asp-for="Input.Lane" type="number" min="0" class="admin-input" autocomplete="off" />
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">Очки (international)</span>
+                    <input asp-for="Input.InternationalPoints" type="number" min="0" class="admin-input" autocomplete="off" />
+                </label>
+
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">Дистанция</span>
+                    <input asp-for="Input.Distance" class="admin-input" autocomplete="off" placeholder="50, 100, 4x100" />
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">Пол</span>
+                    <input asp-for="Input.Gender" class="admin-input" autocomplete="off" placeholder="male / female / mix" />
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">Возр. группа</span>
+                    <input asp-for="Input.AgeGroup" class="admin-input" autocomplete="off" />
+                </label>
+
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">EventStyleAge</span>
+                    <input asp-for="Input.EventStyleAge" class="admin-input" autocomplete="off" />
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">Пловец (Id)</span>
+                    <input asp-for="Input.SwimmerId" type="number" min="1" class="admin-input" autocomplete="off" />
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">Клуб (Id)</span>
+                    <input asp-for="Input.ClubId" type="number" min="1" class="admin-input" autocomplete="off" />
+                </label>
+            </div>
+
+            <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                <label class="flex items-center gap-2 sm:col-span-1">
+                    <input asp-for="Input.TimeFail" type="checkbox" class="h-4 w-4" />
+                    <span class="text-xs text-admin-text-muted">Дисквалификация / без времени (DQ/NS)</span>
+                </label>
+                <label class="flex flex-col gap-1 sm:col-span-2">
+                    <span class="text-xs text-admin-text-muted">Пометка дисквалификации</span>
+                    <input asp-for="Input.TimeFailNote" class="admin-input" autocomplete="off" maxlength="100" placeholder="DQ SA 1.4" />
+                </label>
+            </div>
+
+            <label class="flex flex-col gap-1 mt-4">
+                <span class="text-xs text-admin-text-muted">Заметка</span>
+                <input asp-for="Input.Note" class="admin-input" autocomplete="off" maxlength="500" />
+            </label>
+
+            <div class="mt-5 flex gap-3">
+                <button type="submit" class="admin-btn admin-btn-primary">Сохранить</button>
+                <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">Отмена</a>
+            </div>
+        </form>
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}

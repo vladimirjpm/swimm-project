@@ -179,6 +179,19 @@
             <div id="cat-list" class="flex flex-wrap gap-2 text-sm text-admin-text-muted">загрузка...</div>
         </div>
 
+        <!-- Overwrite existing (upsert) — показывается только когда превью/файл матчит существующее соревнование -->
+        <div id="overwrite-section" class="mb-6 hidden">
+            <label class="inline-flex items-center gap-2 text-sm text-admin-text bg-[rgba(255,213,79,0.08)] border border-[rgba(255,213,79,0.3)] rounded-md py-2 px-3 cursor-pointer">
+                <input type="checkbox" id="overwrite-existing-cb">
+                Обновить существующее соревнование <span id="overwrite-comp-name" class="text-admin-text-muted"></span> (upsert: сматченные результаты обновятся на месте, медиа сохранится)
+            </label>
+            <label id="delete-missing-block" class="hidden mt-2 inline-flex items-center gap-2 text-sm text-admin-text bg-admin-danger/5 border border-admin-danger/30 rounded-md py-2 px-3 cursor-pointer">
+                <input type="checkbox" id="delete-missing-cb">
+                Удалять результаты, которых нет в файле
+            </label>
+            <div id="overwrite-delete-warning" class="hidden mt-2 text-sm text-admin-danger border-l-[3px] border-l-admin-danger bg-admin-danger/5 rounded-md py-2 px-3"></div>
+        </div>
+
         <!-- Multi-day event (shared) -->
         <div id="event-section" class="mb-6">
             <div class="text-sm text-admin-text mb-2">
@@ -534,6 +547,74 @@
         })
         .catch(() => {});
 
+    // Upsert-чекбокс: показываем в JSON-режиме всегда (нет отдельного preview-шага перед
+    // загрузкой JSON, в отличие от PDF — см. docs/plans/import-upsert-plan.md, известное упрощение),
+    // в PDF-режиме — только когда /parse-pdf сообщил existingCompetitionId.
+    const overwriteSection = document.getElementById('overwrite-section');
+    const overwriteCb = document.getElementById('overwrite-existing-cb');
+    const overwriteCompName = document.getElementById('overwrite-comp-name');
+    const deleteMissingBlock = document.getElementById('delete-missing-block');
+    const deleteMissingCb = document.getElementById('delete-missing-cb');
+    const overwriteDeleteWarning = document.getElementById('overwrite-delete-warning');
+    // Данные последнего PDF-превью (competitions + existingCompetitions с ExistingResultCount) —
+    // нужны, чтобы посчитать предупреждение об удалении при переключении чекбокса delete-missing.
+    let lastPdfPreviewData = null;
+
+    function getOverwriteExisting() { return overwriteCb.checked; }
+    function getDeleteMissing() { return overwriteCb.checked && deleteMissingCb.checked; }
+
+    function setOverwriteVisible(visible, compName) {
+        overwriteSection.classList.toggle('hidden', !visible);
+        overwriteCompName.textContent = compName ? `«${compName}»` : '';
+        if (!visible) { overwriteCb.checked = false; deleteMissingCb.checked = false; }
+        updateDeleteMissingVisibility();
+    }
+
+    // «Удалять результаты, которых нет в файле» видим/доступен только когда включён overwrite —
+    // удаление осмысленно лишь как часть upsert-переимпорта (ImportModels.cs, DeleteMissing).
+    function updateDeleteMissingVisibility() {
+        const show = overwriteCb.checked;
+        deleteMissingBlock.classList.toggle('hidden', !show);
+        if (!show) deleteMissingCb.checked = false;
+        updateOverwriteDeleteWarning();
+    }
+
+    // Gap 1 (import-upsert-plan.md) + инцидент 2026-07-20: предупреждение о массовом удалении
+    // теперь показывается только когда реально включено удаление (delete-missing-cb), а не просто
+    // overwrite — сам overwrite больше ничего не удаляет. Считаем по всем сматченным дням превью:
+    // в БД уже есть ExistingResultCount, в файле — resultCount дня.
+    function updateOverwriteDeleteWarning() {
+        if (!overwriteDeleteWarning) return;
+        if (!getDeleteMissing() || !lastPdfPreviewData) {
+            overwriteDeleteWarning.classList.add('hidden');
+            return;
+        }
+        const matches = lastPdfPreviewData.existingCompetitions || [];
+        let dbTotal = 0, fileTotal = 0, anyOverage = false;
+        matches.forEach(m => {
+            if (!m.existingCompetitionId) return;
+            const existing = m.existingResultCount || 0;
+            const day = (lastPdfPreviewData.competitions || [])
+                .find(c => c.competition === m.competition && c.date === m.date);
+            const fileCount = day ? (day.resultCount || 0) : 0;
+            dbTotal += existing;
+            fileTotal += fileCount;
+            if (existing > fileCount) anyOverage = true;
+        });
+        if (!anyOverage) {
+            overwriteDeleteWarning.classList.add('hidden');
+            return;
+        }
+        const maxDeleted = Math.max(0, dbTotal - fileTotal);
+        overwriteDeleteWarning.textContent =
+            `В БД ${dbTotal} результатов, в файле ${fileTotal} — до ${maxDeleted} результатов будет удалено. ` +
+            `Результаты с привязанным медиа удалены не будут.`;
+        overwriteDeleteWarning.classList.remove('hidden');
+    }
+
+    overwriteCb.addEventListener('change', updateDeleteMissingVisibility);
+    deleteMissingCb.addEventListener('change', updateOverwriteDeleteWarning);
+
     function setFile(file) {
         if (!file) return;
         if (!file.name.endsWith('.json')) { toast('Только .json файлы'); return; }
@@ -543,6 +624,7 @@
         btnUpload.disabled = false;
         btnClear.classList.remove('hidden');
         resultDiv.classList.add('hidden');
+        setOverwriteVisible(true, null); // JSON: нет превью — чекбокс доступен всегда, пока файл выбран
 
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -569,6 +651,7 @@
         btnClear.classList.add('hidden');
         preview.classList.add('hidden');
         resultDiv.classList.add('hidden');
+        setOverwriteVisible(false, null);
     }
 
     dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
@@ -600,6 +683,8 @@
             const evOpts = getSelectedEventOptions();
             if (evOpts.newEventName) form.append('newEventName', evOpts.newEventName);
             if (evOpts.eventId) form.append('eventId', String(evOpts.eventId));
+            if (getOverwriteExisting()) form.append('overwriteExisting', 'true');
+            if (getDeleteMissing()) form.append('deleteMissing', 'true');
 
             const res = await fetch('/api/admin/import', { method: 'POST', credentials: 'same-origin', headers: { 'X-XSRF-TOKEN': _csrfToken }, body: form });
             const queued = await res.json();
@@ -653,6 +738,7 @@
         btnImportPdf.disabled = true;
         pdfPreviewId = null;
         pdfPreview.classList.add('hidden');
+        setOverwriteVisible(false, null);
     });
 
     btnParsePdf.addEventListener('click', async () => {
@@ -690,7 +776,10 @@
             }
 
             pdfPreviewId = data.previewId;
+            lastPdfPreviewData = data;
             showPdfPreview(data);
+            setOverwriteVisible(!!data.existingCompetitionId,
+                (data.existingCompetitions || []).find(m => m.existingCompetitionId)?.existingCompetitionName);
             btnImportPdf.disabled = false;
             toast(`Распознано результатов: ${data.resultCount}`);
         } catch (e) {
@@ -738,7 +827,10 @@
         resultDiv.classList.add('hidden');
 
         try {
-            const body = { previewId: pdfPreviewId, categoryKeys: getSelectedCategories(), ...getSelectedEventOptions() };
+            const body = {
+                previewId: pdfPreviewId, categoryKeys: getSelectedCategories(),
+                overwriteExisting: getOverwriteExisting(), deleteMissing: getDeleteMissing(), ...getSelectedEventOptions()
+            };
             const queued = await api('/api/admin/import-parsed', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -752,7 +844,9 @@
 
             // Превью одноразовое: после импорта требуется заново распарсить.
             pdfPreviewId = null;
+            lastPdfPreviewData = null;
             pdfPreview.classList.add('hidden');
+            setOverwriteVisible(false, null);
         } catch (e) {
             showImportError(e.message);
         } finally {
@@ -788,11 +882,18 @@
             : hasErrors ? '⚠️ Импорт завершен с ошибками' : '✅ Импорт успешен';
         resultTitle.className = `text-lg mb-4 ${data.totalRows === 0 && hasErrors ? 'text-[#ef5350]' : hasErrors ? 'text-[#ffa726]' : 'text-[#66bb6a]'}`;
 
+        const isUpsert = (data.updated || 0) > 0 || (data.deleted || 0) > 0 || (data.skippedWithMedia || 0) > 0;
         resultStats.innerHTML = [
             statCard('Total', data.totalRows, '#4fc3f7'),
             statCard('Created', data.created, '#66bb6a'),
             statCard('Skipped', data.skipped, '#ffa726'),
-            statCard('Errors', data.errors, data.errors ? '#ef5350' : '#546e7a')
+            statCard('Errors', data.errors, data.errors ? '#ef5350' : '#546e7a'),
+            ...(isUpsert ? [
+                statCard('Updated', data.updated, '#4fc3f7'),
+                statCard('Inserted', data.inserted, '#66bb6a'),
+                statCard('Deleted', data.deleted, '#ef5350'),
+                statCard('С медиа (не удалено)', data.skippedWithMedia, '#ffa726')
+            ] : [])
         ].join('');
 
         if (data.errorMessages && data.errorMessages.length > 0) {

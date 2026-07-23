@@ -9,6 +9,7 @@ namespace Swimm.Domain.Entities;
 /// </summary>
 [Index(nameof(LastName), nameof(FirstName))]
 [Index(nameof(LastNameEn), nameof(FirstNameEn))]
+[Index(nameof(LogligId), IsUnique = true)]
 public class Swimmer
 {
     [Key]
@@ -60,4 +61,26 @@ public class Swimmer
 
     [ForeignKey(nameof(CountryId))]
     public Country? Country { get; set; }
+
+    /* === Привязка к профилю loglig.com (docs/loglig-id-plan.md) === */
+
+    /// <summary>ID игрока на loglig.com (карточка Players/Details/{id}); уникален среди непустых значений.</summary>
+    public int? LogligId { get; set; }
+
+    /// <summary>Статус привязки: Suggested / Verified / Rejected; null — привязки нет.</summary>
+    [MaxLength(20)]
+    public string? LogligIdStatus { get; set; }
+
+    /// <summary>Источник привязки: admin / user-claim / auto.</summary>
+    [MaxLength(20)]
+    public string? LogligIdSource { get; set; }
+
+    /// <summary>Пользователь, предложивший привязку (аудит; FK на AppUser намеренно не заведён).</summary>
+    public int? LogligIdSuggestedByUserId { get; set; }
+
+    /// <summary>Когда предложена привязка (UTC).</summary>
+    public DateTime? LogligIdSuggestedAt { get; set; }
+
+    /// <summary>Когда привязка подтверждена (UTC).</summary>
+    public DateTime? LogligIdVerifiedAt { get; set; }
 }

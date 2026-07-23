@@ -1,0 +1,51 @@
+@page
+@model Swimm.API.Pages.Admin.Styles.IndexModel
+@{
+    ViewData["Title"] = "Styles";
+    ViewData["PageSubtitle"] = "Справочник стилей плавания (StyleId результатов)";
+
+    var flash = TempData["Flash"] as string;
+}
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}
+
+<div class="mb-4 flex items-center justify-end">
+    <a href="@Url.Page("Edit")" class="admin-btn admin-btn-primary">+ Новый стиль</a>
+</div>
+
+<div class="overflow-x-auto">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th class="w-16 text-right">#</th>
+                <th>Имя</th>
+                <th class="text-right">Результатов</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var s in Model.Styles)
+            {
+                <tr>
+                    <td class="text-right tabular-nums text-admin-text-muted">@s.Id</td>
+                    <td>
+                        <a href="@Url.Page("Edit", new { id = s.Id })" class="text-admin-accent hover:underline font-medium font-mono">@s.Name</a>
+                        @if (s.IsReserved)
+                        {
+                            <span class="ml-1.5 admin-badge border-admin-warning/30 bg-admin-warning/15 text-admin-warning" title="Имя зашито в код (парсер/импорт/рекорды) — переименовать или удалить нельзя">system</span>
+                        }
+                    </td>
+                    <td class="text-right tabular-nums">@s.ResultCount</td>
+                    <td class="text-right whitespace-nowrap">
+                        <a href="@Url.Page("Edit", new { id = s.Id })" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

@@ -9,6 +9,14 @@ public static class IsrOrgResultLineParser
 {
     private static readonly Regex TimeRx = new(@"^\d{2}:\d{2}\.\d{1,2}$", RegexOptions.Compiled);
 
+    // Маркер срыва результата (дисквалификация / неявка / не финишировал). Раньше
+    // "DNS"/"DNF" не распознавались и прилипали к названию клуба ("… DNS", "… 10.2 SW / DNF").
+    private static readonly Regex FailMarkerRx = new(@"^(DQ|DNS|DNF|NS)$", RegexOptions.Compiled);
+
+    // Фрагменты заметки правила вокруг маркера: "DQ / SW 7.1" в нормальном
+    // порядке токенов, "7.1 SW / DQ" — после RTL-реверса ивритской строки.
+    private static readonly Regex NoteFragmentRx = new(@"^(SW|/|\d+\.\d+)$", RegexOptions.Compiled);
+
     public static IsrOrgResult ParseResultLine(string line)
     {
         var tok = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -68,6 +76,8 @@ public static class IsrOrgResultLineParser
 
         string? time = null;
         string? timeFailNote = null;
+        int idxNoteStart = -1;
+        int idxNoteEnd = -1;
 
         if (idxTime >= 0)
         {
@@ -90,10 +100,22 @@ public static class IsrOrgResultLineParser
         }
         else
         {
-            int idxDQ = Array.FindIndex(tok, idxYear + 1, t => t == "DQ" || t == "NS");
-            if (idxDQ >= 0 && idxDQ < nextResultStart)
+            int idxMarker = Array.FindIndex(tok, idxYear + 1, t => FailMarkerRx.IsMatch(t));
+            if (idxMarker >= 0 && idxMarker < nextResultStart)
             {
-                timeFailNote = tok[idxDQ];
+                // Собираем фрагменты заметки по обе стороны от маркера и приводим
+                // к каноничному порядку (маркер первым) независимо от ориентации.
+                idxNoteStart = idxMarker;
+                idxNoteEnd = idxMarker;
+                while (idxNoteStart - 1 > idxYear && NoteFragmentRx.IsMatch(tok[idxNoteStart - 1])) idxNoteStart--;
+                while (idxNoteEnd + 1 < nextResultStart && NoteFragmentRx.IsMatch(tok[idxNoteEnd + 1])) idxNoteEnd++;
+
+                var noteTok = tok[idxNoteStart..(idxNoteEnd + 1)];
+                if (idxMarker == idxNoteEnd && idxNoteStart < idxNoteEnd)
+                {
+                    Array.Reverse(noteTok);
+                }
+                timeFailNote = string.Join(' ', noteTok);
             }
         }
 
@@ -112,14 +134,26 @@ public static class IsrOrgResultLineParser
         }
         else if (idxTime < 0 && idxPoints > idxYear + 1)
         {
-            int idxDQ = Array.FindIndex(tok, idxYear + 1, t => t == "DQ" || t == "NS");
-            if (idxDQ > idxYear + 1 && idxDQ < nextResultStart)
+            if (idxNoteStart > idxYear + 1)
             {
-                club = string.Join(' ', tok[(idxYear + 1)..idxDQ]);
+                club = string.Join(' ', tok[(idxYear + 1)..idxNoteStart]);
             }
-            else if (idxDQ < 0)
+            else if (idxNoteStart < 0)
             {
                 club = string.Join(' ', tok[(idxYear + 1)..idxPoints]);
+            }
+        }
+
+        // Клуб, перенесённый на соседнюю строку: после склейки строк его токены
+        // оказываются в хвосте, за очками. Подбираем буквенные токены хвоста.
+        if (club.Length == 0 && idxTime < 0 && idxPoints > 0 && idxPoints + 1 < nextResultStart)
+        {
+            var tail = tok[(idxPoints + 1)..nextResultStart]
+                .Where(t => t.Any(char.IsLetter) && !FailMarkerRx.IsMatch(t) && !NoteFragmentRx.IsMatch(t))
+                .ToArray();
+            if (tail.Length > 0)
+            {
+                club = string.Join(' ', tail);
             }
         }
 

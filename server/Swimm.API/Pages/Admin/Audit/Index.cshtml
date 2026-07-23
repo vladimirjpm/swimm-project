@@ -1,0 +1,88 @@
+@page
+@model Swimm.API.Pages.Admin.Audit.IndexModel
+@{
+    ViewData["Title"] = "Audit log";
+    ViewData["PageSubtitle"] = "Журнал ручных мутаций админки: кто / что / когда";
+}
+
+<form method="get" class="admin-card flex flex-wrap items-end gap-3 mb-4">
+    <div class="flex flex-col gap-1">
+        <label class="text-xs text-admin-text-muted">Поиск</label>
+        <input name="q" value="@Model.Search" autocomplete="off" class="admin-input w-72"
+               placeholder="Сводка, актор или id объекта…" />
+    </div>
+    <div class="flex flex-col gap-1">
+        <label class="text-xs text-admin-text-muted">Действие</label>
+        <select name="action" class="admin-input">
+            <option value="">Все действия</option>
+            @foreach (var a in Model.Actions)
+            {
+                <option value="@a" selected="@(a == Model.Action)">@a</option>
+            }
+        </select>
+    </div>
+    <button type="submit" class="admin-btn admin-btn-primary">Найти</button>
+    <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">Сброс</a>
+    <div class="ml-auto self-center text-admin-text-muted">
+        Всего: <strong class="text-admin-text">@Model.Result.TotalCount</strong>
+    </div>
+</form>
+
+@if (Model.Result.TotalCount == 0)
+{
+    <div class="admin-card text-center text-admin-text-muted italic py-10">
+        Записей аудита пока нет.
+    </div>
+}
+else
+{
+    <div class="overflow-x-auto">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th class="whitespace-nowrap">Когда (UTC)</th>
+                    <th>Актор</th>
+                    <th>Действие</th>
+                    <th>Объект</th>
+                    <th>Сводка</th>
+                    <th>IP</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in Model.Result.Items)
+                {
+                    <tr>
+                        <td class="whitespace-nowrap text-admin-text-muted">@r.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss")</td>
+                        <td class="whitespace-nowrap">
+                            @r.ActorName
+                            @if (r.ActorUserId is int uid)
+                            {
+                                <span class="text-xs text-admin-text-muted">#@uid</span>
+                            }
+                        </td>
+                        <td class="whitespace-nowrap"><code class="text-admin-accent">@r.Action</code></td>
+                        <td class="whitespace-nowrap text-admin-text-muted">
+                            @r.EntityType@(r.EntityId is null ? "" : $" #{r.EntityId}")
+                        </td>
+                        <td class="max-w-[420px]">
+                            @r.Summary
+                            @if (!string.IsNullOrEmpty(r.DetailsJson))
+                            {
+                                <details class="mt-1">
+                                    <summary class="cursor-pointer text-xs text-admin-text-muted">детали</summary>
+                                    <pre class="mt-1 max-w-full overflow-x-auto rounded bg-admin-surface p-2 text-xs">@r.DetailsJson</pre>
+                                </details>
+                            }
+                        </td>
+                        <td class="whitespace-nowrap text-xs text-admin-text-muted">@(r.IpAddress ?? "—")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <partial name="/Pages/Admin/Shared/_Pagination.cshtml"
+             model='new Swimm.API.Pages.Admin.Shared.PaginationModel(Model.Result.Page, Model.Result.TotalPages,
+                        Model.Result.HasPrev ? Model.PageUrl(Model.Result.Page - 1) : null,
+                        Model.Result.HasNext ? Model.PageUrl(Model.Result.Page + 1) : null)' />
+}

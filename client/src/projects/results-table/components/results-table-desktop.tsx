@@ -11,6 +11,7 @@ import UI_AgeLabel from '../../components/mix/age-label/age-label';
 import UI_FavoriteControls from '../../components/mix/favorite-controls/favorite-controls';
 import UI_PositionBadge from '../../components/mix/position-badge/position-badge';
 import UI_MedalIcon from '../../components/mix/medal-icon/medal-icon';
+import ResultRowDateInfo from './result-row-date-info';
 
 const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
   res,
@@ -20,6 +21,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
   showEvent,
   showPoolType,
   showDate,
+  showCompetition,
   hasInternationalPoints,
   levelInfo,
   updateFilter,
@@ -63,7 +65,9 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
         {/* При пересчёте (Combine All Results): большой badge — новое место,
             маленький внахлёст снизу — оригинальное место. */}
         <div className="relative">
-          <UI_MedalIcon place={String(res.position ?? index + 1)} styleType={rowIsAward ? 'icon-place' : 'icon-noplace'} styleSize="medal-40" />
+          {/* Место — только из БД (при Combine All Results сюда уже подставлен position_recalc,
+              оригинал — в маленьком бейдже ниже). Никаких фолбэков на номер строки. */}
+          <UI_MedalIcon place={String(res.position ?? '—')} styleType={rowIsAward ? 'icon-place' : 'icon-noplace'} styleSize="medal-40" />
           {(res as any).position_original != null && (res as any).position_original !== res.position && (
             <UI_PositionBadge
               position={(res as any).position_original}
@@ -91,6 +95,9 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
           isRecordHolder={isRecordHolder}
           isMe={isPrimaryFavorite}
         />
+        {showDate && (
+          <ResultRowDateInfo date={res.date} competition={res.competition} showCompetition={showCompetition} />
+        )}
         <UI_SwimmerGallery gallery={res.gallery} />
       </div>
 

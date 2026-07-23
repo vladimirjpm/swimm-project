@@ -177,6 +177,18 @@ public class IsrOrgParser : IFormatParser
         var compsEn = IsrOrgCompetitionParser.ParseCompetitions(englishPdfStream, langEn).ToList();
         var compsHe = IsrOrgCompetitionParser.ParseCompetitions(hebrewPdfStream, langHeSync).ToList();
 
+        return MergeBilingual(compsEn, compsHe, countryEn, isMastersFile, isAward, poolOverride);
+    }
+
+    /// <summary>
+    /// Склейка распарсенных EN- и HE-версий одного протокола. Вынесена из
+    /// <see cref="ParseBilingual"/>, чтобы тестировать ресинк без PDF-фикстур.
+    /// </summary>
+    internal static IEnumerable<Result> MergeBilingual(
+        IReadOnlyList<IsrOrgCompetitionResult> compsEn,
+        IReadOnlyList<IsrOrgCompetitionResult> compsHe,
+        string countryEn, bool isMastersFile, bool isAward, string? poolOverride)
+    {
         for (int i = 0; i < compsEn.Count; i++)
         {
             var compEn = compsEn[i];
@@ -184,13 +196,46 @@ public class IsrOrgParser : IFormatParser
                 ? compsHe[i]
                 : throw new InvalidOperationException($"No matching HE event for '{compEn.Event}'");
 
-            for (int j = 0; j < compEn.Results.Count; j++)
+            // Толерантный merge вместо жёсткой склейки по индексу: loglig иногда ТЕРЯЕТ
+            // строку в одном из языковых рендеров того же протокола (реальный кейс —
+            // безвременной результат, выпавший только из EN-версии). Пара строк
+            // опознаётся по (Heat, Lane) — уникальны внутри события; при рассинхроне
+            // одна сторона пропускается вперёд (осиротевшая строка идёт одноязычной),
+            // и только если ресинк на соседней строке не находится — это настоящий
+            // рассинхрон файлов, кидаем ошибку как раньше.
+            static bool SameSlot(IsrOrgResult a, IsrOrgResult b) => a.Heat == b.Heat && a.Lane == b.Lane;
+
+            var listEn = compEn.Results;
+            var listHe = compHe.Results;
+            int ie = 0, ih = 0;
+            while (ie < listEn.Count || ih < listHe.Count)
             {
-                var rEn = compEn.Results[j];
-                var rHe = j < compHe.Results.Count
-                    ? compHe.Results[j]
-                    : throw new InvalidOperationException(
-                        $"No matching HE result for {compEn.Event} heat={rEn.Heat}, lane={rEn.Lane}");
+                bool hasEn = ie < listEn.Count;
+                bool hasHe = ih < listHe.Count;
+                IsrOrgResult rEn, rHe;
+
+                if (hasEn && hasHe && SameSlot(listEn[ie], listHe[ih]))
+                {
+                    rEn = listEn[ie++];
+                    rHe = listHe[ih++];
+                }
+                else if (hasHe && (!hasEn || (ih + 1 < listHe.Count && SameSlot(listEn[ie], listHe[ih + 1]))))
+                {
+                    // Строка есть только в HE-версии — берём её за обе стороны
+                    // (EN-имена сфоллбечатся на ивритские ниже).
+                    rEn = rHe = listHe[ih++];
+                }
+                else if (hasEn && (!hasHe || (ie + 1 < listEn.Count && SameSlot(listEn[ie + 1], listHe[ih]))))
+                {
+                    // Строка есть только в EN-версии.
+                    rEn = rHe = listEn[ie++];
+                }
+                else
+                {
+                    throw new InvalidOperationException(
+                        $"Results diverged in '{compEn.Event}': EN heat={listEn[ie].Heat} lane={listEn[ie].Lane} " +
+                        $"vs HE heat={listHe[ih].Heat} lane={listHe[ih].Lane} — файлы не совпадают, ресинк не найден.");
+                }
 
                 if (!string.IsNullOrEmpty(rEn.Time) && !string.IsNullOrEmpty(rHe.Time) && rEn.Time != rHe.Time)
                 {

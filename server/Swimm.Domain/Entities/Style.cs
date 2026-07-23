@@ -17,4 +17,16 @@ public class Style
     /// <summary>freestyle, backstroke, breaststroke, butterfly, individual_medley, etc.</summary>
     [MaxLength(50)]
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Посевные стили (id 1–7): их имена зашиты в парсер, импорт (NormalizeStyleName),
+    /// рекорды и подсчёт очков. Переименование сломает эту логику незаметно, а удаление
+    /// оборвёт FK результатов — поэтому у зарезервированных стилей блокируем rename/delete
+    /// (по аналогии с <see cref="Category.ReservedKeys"/>).
+    /// </summary>
+    public static readonly IReadOnlySet<string> ReservedNames = new HashSet<string>
+    {
+        "freestyle", "backstroke", "breaststroke", "butterfly",
+        "individual_medley", "medley_relay", "free_relay"
+    };
 }

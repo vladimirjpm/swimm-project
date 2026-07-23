@@ -47,7 +47,8 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
         {/* При пересчёте (Combine All Results): большой badge — новое место,
             маленький внахлёст снизу — оригинальное место. */}
         <div className="relative">
-          <UI_PositionBadge position={res.position} fallbackIndex={index} isAward={rowIsAward} />
+          {/* Место — только из БД (при Combine All Results — position_recalc), без фолбэка на номер строки. */}
+          <UI_PositionBadge position={res.position ?? '—'} isAward={rowIsAward} />
           {(res as any).position_original != null && (res as any).position_original !== res.position && (
             <UI_PositionBadge
               position={(res as any).position_original}

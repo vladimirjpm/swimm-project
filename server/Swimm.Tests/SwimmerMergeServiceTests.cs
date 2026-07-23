@@ -141,6 +141,47 @@ public class SwimmerMergeServiceTests
         Assert.Equal(canon.Id, (await db.HubGroupMembers.SingleAsync()).SwimmerId);
     }
 
+    // ── Ноги эстафет: перенос на канонического (иначе FK Restrict роняет удаление) ──
+
+    [Fact]
+    public async Task Merge_MovesRelayLegs_ToCanonical()
+    {
+        await using var db = CreateDb(nameof(Merge_MovesRelayLegs_ToCanonical));
+        var canon = NewSwimmer("A", "X");
+        var dup = NewSwimmer("B", "X");
+        var relay = new Relay { TeamName = "Team" };
+        db.AddRange(canon, dup, relay);
+        db.RelayMembers.Add(new RelayMember { Relay = relay, Swimmer = dup, LegOrder = 2 });
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerMergeService(db)
+            .MergeAsync([new SwimmerMergePair(canon.Id, dup.Id)], dryRun: false);
+
+        Assert.Equal("merged", report.Pairs.Single().Status);
+        Assert.Null(await db.Swimmers.FindAsync(dup.Id));
+        Assert.Equal(canon.Id, (await db.RelayMembers.SingleAsync()).SwimmerId);
+    }
+
+    [Fact]
+    public async Task Merge_DuplicateRelayLegOnSameRelay_RowRemoved()
+    {
+        await using var db = CreateDb(nameof(Merge_DuplicateRelayLegOnSameRelay_RowRemoved));
+        var canon = NewSwimmer("A", "X");
+        var dup = NewSwimmer("B", "X");
+        var relay = new Relay { TeamName = "Team" };
+        db.AddRange(canon, dup, relay);
+        db.RelayMembers.Add(new RelayMember { Relay = relay, Swimmer = canon, LegOrder = 1 });
+        db.RelayMembers.Add(new RelayMember { Relay = relay, Swimmer = dup, LegOrder = 2 });
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerMergeService(db)
+            .MergeAsync([new SwimmerMergePair(canon.Id, dup.Id)], dryRun: false);
+
+        Assert.Equal("merged", report.Pairs.Single().Status);
+        var leg = await db.RelayMembers.SingleAsync();   // строка дубля удалена, осталась одна
+        Assert.Equal(canon.Id, leg.SwimmerId);
+    }
+
     // ── Ошибки: синтетика, отсутствующий пловец, self-merge ──────────────────
 
     [Fact]

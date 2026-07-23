@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -56,8 +57,15 @@ public static class DependencyInjection
         services.AddScoped<IAdminRepository, AdminRepository>();
         services.AddScoped<ICompetitionAdminRepository, CompetitionAdminRepository>();
         services.AddScoped<ICategoryAdminRepository, CategoryAdminRepository>();
+        services.AddScoped<IStyleAdminRepository, StyleAdminRepository>();
+        services.AddScoped<IResultAdminRepository, ResultAdminRepository>();
+        services.AddScoped<IResultTransferService, ResultTransferService>();
+        services.AddScoped<IClubAdminRepository, ClubAdminRepository>();
         services.AddScoped<IUserFavoriteRepository, UserFavoriteRepository>();
         services.AddScoped<IUserMediaRepository, UserMediaRepository>();
+        services.AddScoped<IMySwimsRepository, MySwimsRepository>();
+        services.AddScoped<IReactionRepository, ReactionRepository>();
+        services.AddScoped<IUserMediaPublicationService, UserMediaPublicationService>();
         services.AddScoped<HubGroupCrudCore>();
         services.AddScoped<IHubGroupAdminService, HubGroupAdminService>();
         services.AddScoped<IHubGroupPublicRepository, HubGroupPublicRepository>();
@@ -106,16 +114,59 @@ public static class DependencyInjection
 
         // Склейка пловцов-дублей (dry-run по умолчанию; см. docs/tasks/dedup-report.md)
         services.AddScoped<ISwimmerMergeService, SwimmerMergeService>();
+        services.AddScoped<IRelayMemberBackfillService, RelayMemberBackfillService>();
         services.AddScoped<ISwimmerDedupService, SwimmerDedupService>();
+
+        // Склейка клубов-дублей (docs/tasks/club-merge-plan.md, фаза B)
+        services.AddScoped<IClubMergeService, ClubMergeService>();
+        services.AddScoped<IClubDedupService, ClubDedupService>();
+
+        // «Развязка» пар дедупа (пловцы/клубы): пара помечена «не дубли» — не всплывает
+        services.AddScoped<IDedupIgnoreService, DedupIgnoreService>();
 
         // «Входящие» автозабора isr.org.il (фаза 6); провайдер живёт в Swimm.Parsing
         services.AddScoped<ICompetitionDiscoveryService, CompetitionDiscoveryService>();
+
+        // «Синхронизация языков» из Discovery: EN/HE-имена пловцов из двуязычной пары PDF
+        services.AddScoped<ISwimmerNameSyncService, SwimmerNameSyncService>();
 
         // Чтение приватных тренировок группы (вкладка «Тренировки»)
         services.AddScoped<IHubGroupTrainingRepository, HubGroupTrainingRepository>();
 
         // Медиа группы (галерея + медиа тренировок)
         services.AddScoped<IHubGroupMediaService, HubGroupMediaService>();
+
+        // Loglig ID (docs/loglig-id-plan.md, шаги 2-3): клиент карточки игрока + сверка результатов.
+        // Карточка отдаётся после self-redirect с кукой DetailsPageVisited — нужны CookieContainer
+        // и AllowAutoRedirect.
+        services.AddHttpClient("loglig")
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                UseCookies = true,
+                CookieContainer = new CookieContainer(),
+                AllowAutoRedirect = true,
+            });
+        services.AddScoped<ILogligClient, LogligClient>();
+        services.AddScoped<ILogligMatchService, LogligMatchService>();
+
+        // Поиск кандидатов Loglig ID (шаг 4): serper.dev вместо закрытого Google CSE. Graceful —
+        // пустой CandidateSearch:ApiKey отключает поиск (см. SerperCandidateSearchProvider).
+        services.AddHttpClient("serper");
+        services.AddScoped<ICandidateSearchProvider, SerperCandidateSearchProvider>();
+
+        // Loglig ID (шаг 5): оркестрация привязки для админ-UI.
+        services.AddScoped<ILogligLinkService, LogligLinkService>();
+
+        // Loglig ID (шаг 6): краудсорс-предложения + ночная верификация.
+        services.AddScoped<ILogligSuggestionService, LogligSuggestionService>();
+
+        // Сводка «Статус данных» для дашборда /Admin (docs/plans/admin-dashboard-status-cards-plan.md)
+        services.AddScoped<IDashboardStatusService, DashboardStatusService>();
+
+        // Аудит ручных мутаций админки (фаза 7.4): запись «кто/что/когда» + чтение журнала.
+        // Actor приходит через ICurrentActor (реализация в API-слое поверх HttpContext).
+        services.AddScoped<IAdminAuditService, AdminAuditService>();
+        services.AddScoped<IAdminAuditRepository, AdminAuditRepository>();
 
         return services;
     }

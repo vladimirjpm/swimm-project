@@ -56,6 +56,13 @@ Stop-Process -Id <pid> -Force
 When smoke-testing, run the API in the background, poll `/auth/me` until it returns 200, curl the
 endpoints, then **stop the process** so the next build isn't locked.
 
+### Admin pages map
+
+`docs/admin-pages/` holds one MD per admin page (naming: route without `/Admin/`,
+lowercase, `/` → `-`; index — `README.md`). **Read the page's MD before touching an
+admin page; when adding a page, add its MD + a row in the README table** — part of
+definition of done.
+
 ### Admin/home CSS (Tailwind v4)
 
 The admin panel (`/Admin/*`) and `wwwroot/home.html` share one compiled bundle,

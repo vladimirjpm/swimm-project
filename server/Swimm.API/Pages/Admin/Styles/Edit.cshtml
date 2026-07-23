@@ -1,0 +1,85 @@
+@page
+@model Swimm.API.Pages.Admin.Styles.EditModel
+@{
+    ViewData["Title"] = Model.IsNew ? "Новый стиль" : "Редактирование стиля";
+    ViewData["PageSubtitle"] = Model.IsNew ? null : $"#{Model.Id} · {Model.Existing?.Name}";
+    var flash = TempData["Flash"] as string;
+    var nameLocked = Model.Existing?.IsReserved == true;
+}
+
+<div class="max-w-[480px] mx-auto">
+
+    <div class="mb-4">
+        <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">← К списку</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5 py-3 px-4 mb-4 text-sm text-admin-danger">
+            @Model.Error
+        </div>
+    }
+
+    @if (nameLocked)
+    {
+        <div class="admin-card border-l-[3px] border-l-admin-warning bg-admin-warning/5 py-3 px-4 mb-4 text-xs text-admin-text-muted leading-relaxed">
+            Имя этого стиля зашито в код (нормализация импорта, парсер протоколов, рекорды,
+            подсчёт клубных очков) — переименовать или удалить нельзя.
+        </div>
+    }
+
+    <form method="post" asp-page-handler="Save" class="admin-card mb-5">
+        <input type="hidden" asp-for="Id" />
+
+        <label class="flex flex-col gap-1">
+            <span class="text-xs text-admin-text-muted">Имя <span class="text-admin-danger">*</span></span>
+            <input asp-for="Input.Name" class="admin-input font-mono @(nameLocked ? "opacity-60 cursor-not-allowed" : "")"
+                   autocomplete="off" placeholder="freestyle" required readonly="@nameLocked" />
+            <span class="text-xs text-admin-text-muted/70">Латиницей, snake_case (напр. individual_medley).</span>
+        </label>
+
+        <div class="mt-5 flex gap-3">
+            <button type="submit" class="admin-btn admin-btn-primary">
+                @(Model.IsNew ? "Создать" : "Сохранить")
+            </button>
+            <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">Отмена</a>
+        </div>
+    </form>
+
+    @if (!Model.IsNew && Model.Existing != null)
+    {
+        <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5">
+            <h2 class="text-sm font-semibold text-admin-danger mb-1">Опасная зона — удаление</h2>
+            @if (nameLocked)
+            {
+                <p class="text-xs text-admin-text-muted leading-relaxed">
+                    Стиль зарезервирован в коде — удаление недоступно.
+                </p>
+            }
+            else if (Model.Existing.ResultCount > 0)
+            {
+                <p class="text-xs text-admin-text-muted leading-relaxed">
+                    На стиль ссылаются <strong class="text-admin-text">@Model.Existing.ResultCount</strong> результатов —
+                    удаление недоступно, пока есть заплывы этого стиля.
+                </p>
+            }
+            else
+            {
+                <p class="text-xs text-admin-text-muted leading-relaxed mb-4">
+                    Стиль не используется ни одним результатом. <strong class="text-admin-danger">Действие необратимо.</strong>
+                </p>
+                <form method="post" asp-page-handler="Delete">
+                    <input type="hidden" asp-for="Id" />
+                    <button type="submit" class="admin-btn admin-btn-danger">Удалить безвозвратно</button>
+                </form>
+            }
+        </div>
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}

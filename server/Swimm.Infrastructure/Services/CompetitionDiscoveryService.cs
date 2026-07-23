@@ -17,6 +17,8 @@ public class CompetitionDiscoveryService(
     ICompetitionDiscoveryProvider provider,
     ILogger<CompetitionDiscoveryService> logger) : ICompetitionDiscoveryService
 {
+    private readonly DiscoveryCompetitionMatcher matcher = new(db);
+
     public async Task<DiscoverySyncResult> SyncAsync(CancellationToken ct = default)
     {
         // Завершённые + предстоящие текущего сезона (2 запроса, провайдер сам держит паузу).
@@ -76,30 +78,22 @@ public class CompetitionDiscoveryService(
             .OrderByDescending(d => d.DateStart)
             .ToListAsync(ct);
 
-        // Матч «уже импортировано»: дата дня попадает в [DateStart..DateEnd] и имя совпадает
-        // после нормализации. Дни в Competitions.Date — строка dd/MM/yyyy.
-        var competitions = await db.Competitions
-            .AsNoTracking()
-            .Select(c => new { c.Name, c.Date })
-            .ToListAsync(ct);
-        var byName = competitions
-            .Select(c => new { Key = Normalize(c.Name), c.Name, Date = ParseDdMmYyyy(c.Date) })
-            .Where(c => c.Date != null)
-            .ToLookup(c => c.Key);
+        var matches = await matcher.MatchAsync(rows, ct);
 
-        return rows.Select(d =>
-        {
-            string? matched = null;
-            foreach (var c in byName[Normalize(d.Name)])
-            {
-                if (c.Date >= d.DateStart && c.Date <= d.DateEnd)
-                {
-                    matched = c.Name;
-                    break;
-                }
-            }
-            return ToDto(d, matched);
-        }).ToList();
+        // Fallback-линк по OrgCompId: если справочник уже штампован этим compID (ручная привязка
+        // или кросс-языковое имя «מכביה»↔«Maccabiah», которое матчер по имени+дате не спарит) —
+        // это авторитетная связь, приоритетнее эвристики матчера.
+        var orgCompIds = rows.Select(d => d.OrgCompId).ToList();
+        var byOrgCompId = (await db.Competitions
+                .AsNoTracking()
+                .Where(c => c.OrgCompId != null && orgCompIds.Contains(c.OrgCompId.Value))
+                .Select(c => new { OrgCompId = c.OrgCompId!.Value, c.Id, c.Name })
+                .ToListAsync(ct))
+            .ToDictionary(c => c.OrgCompId, c => new CompetitionMatch(c.Id, c.Name));
+
+        return rows.Select(d => ToDto(d,
+            byOrgCompId.TryGetValue(d.OrgCompId, out var linked) ? linked : matches.GetValueOrDefault(d.Id)))
+            .ToList();
     }
 
     public async Task<DiscoveredCompetitionDto?> RefreshDetailsAsync(int id, CancellationToken ct = default)
@@ -140,20 +134,81 @@ public class CompetitionDiscoveryService(
         return true;
     }
 
-    private static DiscoveredCompetitionDto ToDto(DiscoveredCompetition d, string? matched) => new(
-        d.Id, d.OrgCompId, d.Name, d.DateStart, d.DateEnd, d.Venue, d.LogligId,
-        d.Status, d.DiscoveredAt, d.LastSeenAt, d.LastError, matched);
-
-    private static string Normalize(string name) =>
-        string.Join(' ', name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();
-
-    private static DateTime? ParseDdMmYyyy(string date)
+    public async Task<bool> AddLanguagesAsync(int id, IEnumerable<string> languages, CancellationToken ct = default)
     {
-        var seg = date.Split('/');
-        if (seg.Length != 3
-            || !int.TryParse(seg[0], out var d) || !int.TryParse(seg[1], out var m) || !int.TryParse(seg[2], out var y))
-            return null;
-        try { return new DateTime(y, m, d, 0, 0, 0, DateTimeKind.Utc); }
-        catch (ArgumentOutOfRangeException) { return null; }
+        var row = await db.DiscoveredCompetitions.FirstOrDefaultAsync(d => d.Id == id, ct);
+        if (row is null) return false;
+
+        // Объединение с уже сохранёнными, канонический порядок "he,en".
+        var set = (row.Languages ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Concat(languages)
+            .Select(l => l.Trim().ToLowerInvariant())
+            .Where(l => l is "he" or "en")
+            .ToHashSet();
+        var merged = string.Join(',', new[] { "he", "en" }.Where(set.Contains));
+
+        if (merged.Length > 0 && merged != row.Languages)
+        {
+            row.Languages = merged;
+            await db.SaveChangesAsync(ct);
+        }
+        return true;
+    }
+
+    public async Task<bool> SetLastErrorAsync(int id, string? error, CancellationToken ct = default)
+    {
+        var row = await db.DiscoveredCompetitions.FirstOrDefaultAsync(d => d.Id == id, ct);
+        if (row is null) return false;
+        row.LastError = error is { Length: > 1000 } ? error[..1000] : error;
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    private static DiscoveredCompetitionDto ToDto(DiscoveredCompetition d, CompetitionMatch? matched) => new(
+        d.Id, d.OrgCompId, d.Name, d.DateStart, d.DateEnd, d.Venue, d.LogligId,
+        d.Status, d.DiscoveredAt, d.LastSeenAt, d.LastError, matched?.Name, matched?.CompetitionId, d.Languages);
+
+    /// <summary>Разовый CLI-бэкфилл (см. Program.cs --backfill-discovery-orgcompid): прогоняет
+    /// ВСЕ Discovery-строки через матчер и для каждой сматченной проставляет OrgCompId, уважая
+    /// уникальность. Строки без матча в отчёт не попадают. dry-run по умолчанию.</summary>
+    public async Task<IReadOnlyList<DiscoveryBackfillRow>> BackfillImportedOrgCompIdsAsync(bool apply, CancellationToken ct = default)
+    {
+        var rows = await db.DiscoveredCompetitions.AsNoTracking().ToListAsync(ct);
+        var matches = await matcher.MatchAsync(rows, ct);
+
+        var report = new List<DiscoveryBackfillRow>();
+        foreach (var row in rows)
+        {
+            var match = matches.GetValueOrDefault(row.Id);
+            if (match is not { } m) continue;
+
+            var comp = await db.Competitions.FirstAsync(c => c.Id == m.CompetitionId, ct);
+            var action = await DetermineLinkActionAsync(comp, row.OrgCompId, apply, ct);
+            report.Add(new DiscoveryBackfillRow(row.OrgCompId, row.Name, comp.Id, comp.Name, action));
+        }
+
+        if (apply)
+            await db.SaveChangesAsync(ct);
+
+        return report;
+    }
+
+    /// <summary>Общая логика «привязать compID к соревнованию, если ещё не занят другим»,
+    /// используемая батч-бэкфиллом (<see cref="BackfillImportedOrgCompIdsAsync"/>). При apply=false
+    /// только определяет действие (WouldLink), не мутирует comp.</summary>
+    private async Task<string> DetermineLinkActionAsync(Competition comp, int orgCompId, bool apply, CancellationToken ct)
+    {
+        if (comp.OrgCompId == orgCompId)
+            return "AlreadyLinked";
+
+        var takenByOther = await db.Competitions.AnyAsync(c => c.OrgCompId == orgCompId && c.Id != comp.Id, ct);
+        if (takenByOther)
+            return "TakenByOther";
+
+        if (!apply)
+            return "WouldLink";
+
+        comp.OrgCompId = orgCompId;
+        return "Linked";
     }
 }

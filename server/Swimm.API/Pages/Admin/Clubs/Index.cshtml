@@ -1,0 +1,262 @@
+@page
+@model Swimm.API.Pages.Admin.Clubs.IndexModel
+@{
+    ViewData["Title"] = "Clubs";
+    ViewData["PageSubtitle"] = "Дубли клубов: кандидаты, dry-run и склейка";
+}
+
+<div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
+    Кандидаты ищутся по трём эвристикам: мусорный хвост парсера (<code>suffix</code>), общие
+    пловцы между клубами (<code>swimmers</code>), опечатка в названии (<code>levenshtein</code>).
+    Отметь пары → <b>Dry-run</b> покажет план без изменений; <b>Merge выбранные</b> —
+    необратимо: связи дубля перевешиваются на канонический клуб.
+</div>
+
+<div class="mb-4 flex flex-wrap items-center gap-3">
+    <button id="btn-reload" class="admin-btn admin-btn-primary cursor-pointer rounded-md px-4 py-2 text-[13px] font-semibold">Обновить кандидатов</button>
+    <button id="btn-check-sure" class="cursor-pointer rounded-md border border-admin-border px-3 py-2 text-[13px] text-admin-text-muted">Выбрать все уверенные</button>
+    <span id="info" class="text-[12.5px] text-admin-text-muted"></span>
+    <form method="get" action="/Admin/Clubs/Edit" class="ml-auto flex items-center gap-2">
+        <input type="number" name="id" min="1" class="admin-input w-40" placeholder="Клуб по Id…" autocomplete="off" />
+        <button type="submit" class="admin-btn admin-btn-ghost">Открыть / переименовать</button>
+    </form>
+</div>
+
+<div class="overflow-x-auto">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th></th>
+                <th>Канонический (остаётся)</th>
+                <th>Дубль (удаляется)</th>
+                <th>Эвристика</th>
+                <th>Общих пловцов</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="cand-body"></tbody>
+    </table>
+</div>
+<div id="empty-msg" class="hidden text-center text-admin-text-muted italic py-10">Кандидатов на склейку нет.</div>
+
+<details id="ignored-wrap" class="mt-3 hidden text-[12.5px] text-admin-text-muted">
+    <summary class="cursor-pointer select-none" id="ignored-summary">Скрытые пары</summary>
+    <div id="ignored-body" class="mt-2 leading-relaxed"></div>
+</details>
+
+<div class="mt-4 flex gap-3">
+    <button id="btn-dryrun" class="admin-btn admin-btn-primary cursor-pointer rounded-md px-4 py-2 text-[13px] font-semibold">Dry-run</button>
+    <button id="btn-merge" class="cursor-pointer rounded-md bg-admin-danger/20 border border-admin-danger/50 px-4 py-2 text-[13px] font-semibold text-[#ef9a9a] disabled:opacity-40" disabled>
+        Merge выбранные (необратимо)
+    </button>
+</div>
+
+<div id="status-line" class="admin-card mt-6 hidden p-4">
+    <div class="mb-2 text-sm font-semibold text-admin-text" id="status-title"></div>
+    <div id="status-summary" class="mb-3 text-[13px] text-admin-text-muted"></div>
+    <div id="status-body" class="text-[13px] leading-relaxed"></div>
+</div>
+
+<partial name="/Pages/Admin/Shared/_ConfirmDialog.cshtml" />
+
+@section Scripts {
+<script>
+(function () {
+    const API = '/api/admin/clubs';
+    let data = null;
+    let dryRunOkPairs = null; // пары, прошедшие dry-run без конфликтов/ошибок — только их можно merge'ить
+
+    async function apiJson(url, opts = {}) {
+        opts.headers = { 'X-XSRF-TOKEN': _csrfToken, ...(opts.headers ?? {}) };
+        const res = await fetch(url, { credentials: 'same-origin', ...opts });
+        let body = null;
+        try { body = await res.json(); } catch { }
+        if (!res.ok) throw new Error(body?.error ?? `${res.status} ${res.statusText}`);
+        return body;
+    }
+
+    function heuristicLabel(c) {
+        switch (c.heuristic) {
+            case 'suffix': return 'Мусорный хвост';
+            case 'swimmers': return `Общие пловцы (${c.sharedSwimmers})`;
+            case 'levenshtein': return 'Опечатка';
+            default: return c.heuristic;
+        }
+    }
+
+    function sureBadge(sure) {
+        return sure
+            ? '<span class="admin-badge border-admin-success/30 bg-admin-success/15 text-[#81c784]">уверенная</span>'
+            : '<span class="admin-badge border-admin-border bg-admin-surface-hover text-admin-text-muted">спорная</span>';
+    }
+
+    function render() {
+        const tbody = document.getElementById('cand-body');
+        const cands = data.candidates;
+        document.getElementById('empty-msg').classList.toggle('hidden', cands.length > 0);
+        document.getElementById('info').textContent =
+            `Реальных клубов: ${data.realClubs}; кандидатов: ${cands.length} (уверенных ${cands.filter(c => c.sure).length})`;
+
+        tbody.innerHTML = cands.map((c, i) => `
+            <tr class="border-b border-white/[.04] hover:bg-white/[.03]">
+                <td class="py-2 px-3"><input type="checkbox" class="pair-cb cursor-pointer" data-i="${i}"></td>
+                <td class="py-2 px-3" dir="rtl" style="text-align:left">
+                    <a href="/Admin/Clubs/Edit?id=${c.canonicalId}" target="_blank" class="text-admin-accent hover:underline" title="Открыть / переименовать">${esc(c.canonicalName)}</a>${c.canonicalNameEn ? ' <span class="text-[#546e7a]">(' + esc(c.canonicalNameEn) + ')</span>' : ''}
+                    <span class="text-[#546e7a]">#${c.canonicalId}</span> · <span class="text-[#90a4ae]">рез. ${c.canonicalResults}</span>
+                </td>
+                <td class="py-2 px-3" dir="rtl" style="text-align:left">
+                    <a href="/Admin/Clubs/Edit?id=${c.duplicateId}" target="_blank" class="text-admin-accent hover:underline" title="Открыть / переименовать">${esc(c.duplicateName)}</a>${c.duplicateNameEn ? ' <span class="text-[#546e7a]">(' + esc(c.duplicateNameEn) + ')</span>' : ''}
+                    <span class="text-[#546e7a]">#${c.duplicateId}</span> · <span class="text-[#90a4ae]">рез. ${c.duplicateResults}</span>
+                </td>
+                <td class="py-2 px-3 text-[#90a4ae]">${esc(heuristicLabel(c))}</td>
+                <td class="py-2 px-3">${sureBadge(c.sure)}</td>
+                <td class="py-2 px-3"><button class="pair-hide cursor-pointer text-[#546e7a] hover:text-[#ef9a9a]" data-i="${i}" title="Не дубли — скрыть пару навсегда">✕</button></td>
+            </tr>`).join('');
+
+        // Любое изменение выбора инвалидирует прошлый dry-run
+        [...document.querySelectorAll('.pair-cb')].forEach(cb =>
+            cb.addEventListener('change', () => { dryRunOkPairs = null; document.getElementById('btn-merge').disabled = true; }));
+
+        // «Не дубли»: пара уходит в Sys_DedupIgnoredPairs и больше не всплывает.
+        [...document.querySelectorAll('.pair-hide')].forEach(btn =>
+            btn.addEventListener('click', async () => {
+                const c = data.candidates[+btn.dataset.i];
+                const ok = await adminConfirm({
+                    title: 'Скрыть пару как «не дубли»?',
+                    message: `«${c.canonicalName}» ↔ «${c.duplicateName}» больше не будет предлагаться. Вернуть можно из блока «Скрытые пары».`,
+                    confirmText: 'Скрыть',
+                });
+                if (!ok) return;
+                try {
+                    await apiJson(`${API}/dedup-ignore`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ idA: c.canonicalId, idB: c.duplicateId })
+                    });
+                    toast('Пара скрыта', 3000);
+                    await load();
+                } catch (e) { toast('Ошибка: ' + e.message, 5000); }
+            }));
+    }
+
+    async function loadIgnored() {
+        const list = await apiJson(`${API}/dedup-ignore`);
+        const wrap = document.getElementById('ignored-wrap');
+        wrap.classList.toggle('hidden', list.length === 0);
+        document.getElementById('ignored-summary').textContent = `Скрытые пары (${list.length})`;
+        document.getElementById('ignored-body').innerHTML = list.map(p => `
+            <div class="mb-1">
+                <span dir="rtl">${esc(p.nameA)}</span> <span class="text-[#546e7a]">#${p.idA}</span> ↔
+                <span dir="rtl">${esc(p.nameB)}</span> <span class="text-[#546e7a]">#${p.idB}</span>
+                <button class="pair-unhide cursor-pointer ml-2 text-admin-accent hover:underline" data-a="${p.idA}" data-b="${p.idB}">вернуть</button>
+            </div>`).join('');
+        [...document.querySelectorAll('.pair-unhide')].forEach(btn =>
+            btn.addEventListener('click', async () => {
+                try {
+                    await apiJson(`${API}/dedup-ignore/remove`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ idA: +btn.dataset.a, idB: +btn.dataset.b })
+                    });
+                    toast('Пара возвращена в кандидаты', 3000);
+                    await load();
+                } catch (e) { toast('Ошибка: ' + e.message, 5000); }
+            }));
+    }
+
+    // keepStatus — не прятать строку статуса (после apply отчёт должен остаться на экране).
+    async function load(keepStatus) {
+        document.getElementById('info').textContent = 'Ищу кандидатов…';
+        try {
+            data = await apiJson(`${API}/dedup-candidates`);
+            dryRunOkPairs = null;
+            document.getElementById('btn-merge').disabled = true;
+            if (!keepStatus) document.getElementById('status-line').classList.add('hidden');
+            render();
+            await loadIgnored();
+        } catch (e) { toast('Ошибка: ' + e.message, 5000); }
+    }
+
+    function selectedPairs() {
+        return [...document.querySelectorAll('.pair-cb:checked')].map(cb => {
+            const c = data.candidates[+cb.dataset.i];
+            return { canonicalId: c.canonicalId, duplicateId: c.duplicateId };
+        });
+    }
+
+    function showReport(report) {
+        const line = document.getElementById('status-line');
+        line.classList.remove('hidden');
+        document.getElementById('status-title').textContent = report.dryRun
+            ? 'Dry-run: план (БД не изменена)' : 'ПРИМЕНЕНО';
+
+        const merged = report.pairs.filter(p => p.status === 'merged').length;
+        const dryRunN = report.pairs.filter(p => p.status === 'dry-run').length;
+        const conflict = report.pairs.filter(p => p.status === 'conflict').length;
+        const error = report.pairs.filter(p => p.status === 'error').length;
+        document.getElementById('status-summary').textContent =
+            `Всего пар: ${report.pairs.length}` +
+            (merged ? `; merged: ${merged}` : '') +
+            (dryRunN ? `; dry-run: ${dryRunN}` : '') +
+            (conflict ? `; conflict: ${conflict}` : '') +
+            (error ? `; error: ${error}` : '');
+
+        document.getElementById('status-body').innerHTML = report.pairs.map(p => `
+            <details class="mb-2">
+                <summary class="cursor-pointer"><b>[${esc(p.status)}]</b> canonical #${p.canonicalId} ← duplicate #${p.duplicateId}</summary>
+                <ul class="list-disc pl-5 text-admin-text-muted">
+                    ${p.actions.map(a => `<li>${esc(a)}</li>`).join('')}
+                    ${p.conflicts.map(c => `<li class="text-[#ef9a9a]">!! ${esc(c)}</li>`).join('')}
+                </ul>
+            </details>`).join('');
+        line.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    document.getElementById('btn-reload').addEventListener('click', () => load());
+
+    document.getElementById('btn-check-sure').addEventListener('click', () => {
+        [...document.querySelectorAll('.pair-cb')].forEach(cb => {
+            cb.checked = data.candidates[+cb.dataset.i].sure;
+        });
+        dryRunOkPairs = null;
+        document.getElementById('btn-merge').disabled = true;
+    });
+
+    document.getElementById('btn-dryrun').addEventListener('click', async () => {
+        const pairs = selectedPairs();
+        if (!pairs.length) { toast('Отметь хотя бы одну пару'); return; }
+        try {
+            const report = await apiJson(`${API}/merge`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pairs, apply: false })
+            });
+            showReport(report);
+            const bad = report.pairs.filter(p => p.status !== 'dry-run');
+            dryRunOkPairs = bad.length ? null : pairs;
+            document.getElementById('btn-merge').disabled = !dryRunOkPairs;
+            if (bad.length) toast(`Есть конфликты/ошибки (${bad.length}) — merge заблокирован`, 6000);
+        } catch (e) { toast('Ошибка: ' + e.message, 5000); }
+    });
+
+    document.getElementById('btn-merge').addEventListener('click', async () => {
+        if (!dryRunOkPairs) return;
+        const ok = await adminConfirm({
+            title: 'Применить склейку клубов?',
+            message: `Будет применена склейка ${dryRunOkPairs.length} пар(ы). Дубли будут удалены НЕОБРАТИМО.`,
+            confirmText: 'Merge',
+            danger: true,
+        });
+        if (!ok) return;
+        try {
+            const report = await apiJson(`${API}/merge`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pairs: dryRunOkPairs, apply: true })
+            });
+            showReport(report);
+            toast('Склейка применена', 4000);
+            await load(true);
+        } catch (e) { toast('Ошибка применения: ' + e.message, 6000); }
+    });
+
+    load();
+})();
+</script>
+}

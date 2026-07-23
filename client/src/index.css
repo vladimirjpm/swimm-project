@@ -116,8 +116,13 @@
   --theme-mode-modal-shadow: 0 24px 70px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.06);
   --theme-mode-card-border: rgba(255, 255, 255, 0.09);
   --theme-mode-card-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
-  --theme-mode-accent-text: #0f1319; /* акценты в dark яркие → текст тёмный */
-  --theme-mode-header-btn-border: rgba(15, 19, 25, 0.35);
+  /* ПАРНЫЕ ТОКЕНЫ: --theme-mode-accent-text живёт ТОЛЬКО на фоне --theme-primary
+     (шапка селектора, шапка группы, активные табы). --theme-primary в dark НЕ меняется
+     (остаётся насыщенным средним/тёмным) → текст на нём обязан оставаться светлым.
+     Прошлое значение #0f1319 («акценты в dark яркие») не соответствовало реальному
+     использованию и давало тёмный текст на тёмно-синем фоне. */
+  --theme-mode-accent-text: #ffffff;
+  --theme-mode-header-btn-border: rgba(255, 255, 255, 0.4);
   --status-live: #3ddc97;
   --status-live-bg: rgba(61, 220, 151, 0.10);
   --status-live-border: rgba(61, 220, 151, 0.45);

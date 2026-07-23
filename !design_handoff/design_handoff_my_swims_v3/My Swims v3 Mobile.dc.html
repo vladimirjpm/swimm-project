@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#04101f}
+a{color:#7dd3fc}a:hover{color:#bae6fd}
+@keyframes hp-shimmer{0%{background-position:-150% 0}100%{background-position:250% 0}}
+::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+<div style="position:relative;margin:0 auto;max-width:375px;min-height:100vh;overflow-x:clip;padding-bottom:90px;color:#f3f8fd;font-family:'Inter',system-ui,sans-serif;background:linear-gradient(160deg,#0d2036 0%,#0b1b31 45%,#050e1c 100%)">
+
+<header style="position:sticky;top:0;z-index:50;display:flex;height:48px;align-items:center;justify-content:space-between;gap:12px;background:#161a2e;padding:0 16px">
+<div style="display:flex;align-items:center;gap:8px">
+<span style="display:flex;height:26px;width:26px;align-items:center;justify-content:center;border-radius:8px;background:#5b5fc7;font-size:13px;font-weight:900;color:#ffffff">S</span>
+<span style="font-size:11px;font-weight:900;letter-spacing:0.22em;color:#eef1f6">SWIM<span style="color:#5b5fc7">HUB</span></span>
+</div>
+<div style="display:flex;align-items:center;gap:10px">
+<span style="display:flex;height:30px;width:30px;align-items:center;justify-content:center;border-radius:50%;background:#5b5fc7;font-size:13px;font-weight:900;color:#ffffff">{{ userInitial }}</span>
+<span style="font-size:16px;color:rgba(238,241,246,0.6)">☰</span>
+</div>
+</header>
+
+<section style="padding:24px 16px 0">
+<p style="margin:0 0 10px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.26em;color:#7dd3fc">My profile · {{ userName }}</p>
+<h1 style="margin:0;font-size:34px;font-weight:900;line-height:0.95;letter-spacing:-0.04em;color:#f3f8fd">My media</h1>
+<nav style="display:flex;align-items:center;gap:6px;margin-top:12px;overflow-x:auto" aria-label="Profile sections">
+<span style="white-space:nowrap;font-family:'JetBrains Mono',monospace;border-radius:8px;border:1px solid #7dd3fc;background:rgba(125,211,252,0.14);padding:5px 11px;font-size:11.5px;font-weight:800;color:#7dd3fc">Media</span>
+<a href="#" style="white-space:nowrap;font-family:'JetBrains Mono',monospace;border-radius:8px;border:1px solid rgba(125,211,252,0.3);padding:5px 11px;font-size:11.5px;font-weight:800;color:rgba(125,211,252,0.6);text-decoration:none">My groups ↗</a>
+<span style="white-space:nowrap;font-family:'JetBrains Mono',monospace;border-radius:8px;border:1px dashed rgba(203,224,240,0.25);padding:5px 11px;font-size:11.5px;font-weight:800;color:rgba(203,224,240,0.35)">Settings · soon</span>
+</nav>
+</section>
+
+<section style="padding:18px 16px 0">
+<div style="display:flex;align-items:center;gap:8px">
+<button type="button" onClick="{{ goMedia }}" style="{{ mediaTabStyle }}">My swims</button>
+<sc-if value="{{ isAdmin }}" hint-placeholder-val="{{ true }}">
+<button type="button" onClick="{{ goModeration }}" style="{{ modTabStyle }}">Moderation
+<sc-if value="{{ hasPending }}" hint-placeholder-val="{{ true }}"><span style="display:inline-flex;min-width:17px;height:17px;align-items:center;justify-content:center;border-radius:9px;background:#ffca7a;padding:0 5px;font-size:10px;font-weight:900;color:#3a2a08">{{ pendingCount }}</span></sc-if>
+</button>
+</sc-if>
+</div>
+
+<sc-if value="{{ isMedia }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:12px;margin-top:14px">
+
+<sc-if value="{{ showChips }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;align-items:center;gap:7px;overflow-x:auto;margin:0 -16px;padding:2px 16px">
+<sc-for list="{{ swimmerChips }}" as="ch" hint-placeholder-count="3">
+<button type="button" onClick="{{ ch.pick }}" style="{{ ch.style }}"><sc-if value="{{ ch.init }}" hint-placeholder-val="{{ false }}"><span style="{{ ch.avaStyle }}">{{ ch.init }}</span></sc-if>{{ ch.label }} · {{ ch.count }}</button>
+</sc-for>
+</div>
+
+<div style="display:flex;align-items:center;gap:8px">
+<div style="display:inline-flex;flex:1;overflow:hidden;border-radius:10px;border:1px solid rgba(125,211,252,0.35)">
+<sc-for list="{{ videoSegs }}" as="sg" hint-placeholder-count="3">
+<button type="button" onClick="{{ sg.pick }}" style="{{ sg.style }}">{{ sg.label }}</button>
+</sc-for>
+</div>
+<button type="button" onClick="{{ openSheet }}" style="{{ filtersBtnStyle }}">Filters<sc-if value="{{ hasActiveFilters }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;min-width:16px;height:16px;align-items:center;justify-content:center;border-radius:8px;background:#7dd3fc;padding:0 4px;font-size:10px;font-weight:900;color:#04101f">{{ activeFilterCount }}</span></sc-if></button>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between">
+<span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:800;letter-spacing:0.1em;color:rgba(125,211,252,0.55)">SEASON {{ seasonLabel }}</span>
+<span style="font-size:11px;font-weight:700;color:rgba(203,224,240,0.5)">{{ resultSummary }}</span>
+</div>
+</sc-if>
+
+<sc-if value="{{ showLoading }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:12px">
+<sc-for list="{{ skeletons }}" as="sk" hint-placeholder-count="2">
+<div style="border-radius:14px;border:1px solid rgba(125,211,252,0.14);background:rgba(8,25,48,0.5);padding:14px;display:flex;flex-direction:column;gap:10px">
+<div style="height:14px;width:200px;border-radius:6px;background:linear-gradient(90deg,rgba(125,211,252,0.08) 30%,rgba(125,211,252,0.18) 50%,rgba(125,211,252,0.08) 70%);background-size:250% 100%;animation:hp-shimmer 1.6s linear infinite"></div>
+<div style="height:46px;border-radius:10px;background:linear-gradient(90deg,rgba(125,211,252,0.06) 30%,rgba(125,211,252,0.14) 50%,rgba(125,211,252,0.06) 70%);background-size:250% 100%;animation:hp-shimmer 1.6s linear infinite"></div>
+<div style="height:46px;border-radius:10px;background:linear-gradient(90deg,rgba(125,211,252,0.06) 30%,rgba(125,211,252,0.14) 50%,rgba(125,211,252,0.06) 70%);background-size:250% 100%;animation:hp-shimmer 1.6s linear infinite"></div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ showNoFavorites }}" hint-placeholder-val="{{ false }}">
+<div style="border-radius:16px;border:1px solid rgba(125,211,252,0.22);background:linear-gradient(180deg,rgba(56,189,248,0.08),rgba(8,25,48,0.78));padding:44px 24px;text-align:center">
+<div style="font-size:36px">⭐</div>
+<p style="margin:12px 0 0;font-size:16px;font-weight:900;color:#f3f8fd">No favorite swimmers yet</p>
+<p style="margin:8px auto 0;max-width:280px;font-size:12.5px;line-height:1.5;color:rgba(203,224,240,0.6)">Add yourself or your kids as favorites — their swims will appear here.</p>
+<button type="button" style="margin-top:16px;min-height:44px;border:none;border-radius:10px;background:#38ef8f;padding:10px 20px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:#04101f;cursor:pointer">Find swimmers →</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ showNoSeason }}" hint-placeholder-val="{{ false }}">
+<div style="border-radius:16px;border:1px dashed rgba(125,211,252,0.3);padding:38px 24px;text-align:center">
+<p style="margin:0;font-size:15px;font-weight:900;color:#f3f8fd">No results in season {{ seasonLabel }}</p>
+<p style="margin:8px auto 0;max-width:260px;font-size:12.5px;line-height:1.5;color:rgba(203,224,240,0.6)">This swimmer has no recorded swims this season.</p>
+<button type="button" onClick="{{ prevSeason }}" style="margin-top:14px;min-height:44px;border:1px solid rgba(125,211,252,0.4);border-radius:9px;background:transparent;padding:8px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:800;color:#7dd3fc;cursor:pointer">Season 2024–25 →</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ showFilterEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="border-radius:14px;border:1px dashed rgba(125,211,252,0.25);padding:32px 20px;text-align:center">
+<p style="margin:0;font-size:13.5px;font-weight:700;color:rgba(203,224,240,0.6)">Nothing matches the filters</p>
+<button type="button" onClick="{{ clearAll }}" style="margin-top:12px;min-height:44px;border-radius:9px;border:1px solid rgba(125,211,252,0.4);background:transparent;padding:7px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:800;color:#7dd3fc;cursor:pointer">Clear all</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ showGroups }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:12px">
+<sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+<div style="border-radius:14px;border:1px solid rgba(125,211,252,0.22);background:linear-gradient(180deg,rgba(56,189,248,0.06),rgba(8,25,48,0.7));overflow:hidden">
+<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px;border-bottom:1px solid rgba(125,211,252,0.14);background:rgba(2,10,24,0.3);padding:10px 14px">
+<span dir="rtl" style="font-size:13.5px;font-weight:900;color:#f3f8fd">{{ g.name }}</span>
+<span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:800;color:#7dd3fc">{{ g.date }}</span>
+<span style="font-size:10.5px;color:rgba(203,224,240,0.5)">{{ g.city }}</span>
+<sc-if value="{{ g.hasAward }}" hint-placeholder-val="{{ false }}"><span title="Podium finish" style="font-size:12px">🏅</span></sc-if>
+<sc-if value="{{ g.hasRec }}" hint-placeholder-val="{{ false }}"><span title="Record" style="display:inline-flex;align-items:center;gap:3px;border-radius:5px;border:1px solid rgba(255,202,122,0.45);background:rgba(255,202,122,0.08);padding:1.5px 6px;font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:800;color:#ffca7a">⚡ REC</span></sc-if>
+</div>
+<sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="3">
+<div onClick="{{ r.tap }}" style="{{ r.rowStyle }}">
+<div style="width:20px;flex:none;display:flex;flex-direction:column;align-items:center;gap:2px">
+<sc-if value="{{ r.medal }}" hint-placeholder-val="{{ false }}"><span title="Podium finish" style="font-size:13px;line-height:1">{{ r.medal }}</span></sc-if>
+<sc-if value="{{ r.hasRec }}" hint-placeholder-val="{{ false }}"><span title="Record" style="font-size:9.5px;line-height:1;color:#ffca7a">⚡</span></sc-if>
+</div>
+<div style="min-width:0;flex:1">
+<div style="display:flex;align-items:center;gap:6px">
+<span style="{{ r.labelStyle }}">{{ r.label }}</span>
+<sc-if value="{{ r.relay }}" hint-placeholder-val="{{ false }}"><span style="flex:none;border-radius:5px;border:1px solid rgba(125,211,252,0.35);padding:1px 5px;font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:800;letter-spacing:0.08em;color:rgba(125,211,252,0.75)">RELAY</span></sc-if>
+</div>
+<div style="display:flex;align-items:center;gap:8px;margin-top:3px">
+<span style="font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:800;color:#7dd3fc">{{ r.time }}</span>
+<span style="font-size:10.5px;color:rgba(203,224,240,0.5)">{{ r.placePts }}</span>
+</div>
+</div>
+<sc-if value="{{ r.hasVideo }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex:none;flex-direction:column;align-items:flex-end;gap:5px">
+<div style="display:flex;align-items:center;gap:5px">
+<sc-if value="{{ r.hasPhoto }}" hint-placeholder-val="{{ false }}"><span title="Has photos" style="display:inline-flex;align-items:center;border-radius:7px;border:1px solid rgba(125,211,252,0.3);background:rgba(2,10,24,0.35);padding:3px 7px;font-size:10.5px">🖼</span></sc-if>
+<span style="display:inline-flex;align-items:center;gap:5px;border-radius:7px;border:1px solid rgba(125,211,252,0.45);background:rgba(125,211,252,0.1);padding:3px 9px;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:800;color:#7dd3fc">▶<sc-if value="{{ r.multi }}" hint-placeholder-val="{{ false }}"><span>{{ r.vidCount }}</span></sc-if></span>
+</div>
+<sc-for list="{{ r.videoPills }}" as="vp" hint-placeholder-count="1">
+<span style="{{ vp.style }}">{{ vp.label }}</span>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ r.noVideo }}" hint-placeholder-val="{{ false }}">
+<sc-if value="{{ r.hasPhoto }}" hint-placeholder-val="{{ false }}"><span title="Has photos" style="display:inline-flex;flex:none;align-items:center;border-radius:7px;border:1px solid rgba(125,211,252,0.3);background:rgba(2,10,24,0.35);padding:3px 7px;font-size:10.5px">🖼</span></sc-if>
+<button type="button" onClick="{{ r.addVideo }}" style="flex:none;min-height:34px;border:1px dashed rgba(56,239,143,0.45);border-radius:8px;background:transparent;padding:4px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:800;color:#38ef8f;cursor:pointer;white-space:nowrap">+ Add video</button>
+</sc-if>
+</div>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ showUnlinked }}" hint-placeholder-val="{{ true }}">
+<div style="border-radius:14px;border:1px solid rgba(125,211,252,0.16);background:rgba(8,25,48,0.45);overflow:hidden">
+<button type="button" onClick="{{ toggleUnlinked }}" style="display:flex;width:100%;min-height:48px;align-items:center;gap:8px;border:none;background:transparent;padding:12px 14px;cursor:pointer;text-align:left">
+<span style="font-size:12.5px;font-weight:900;color:#f3f8fd">Unlinked media</span>
+<span style="display:inline-flex;min-width:19px;height:19px;align-items:center;justify-content:center;border-radius:10px;background:rgba(125,211,252,0.15);padding:0 5px;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:800;color:#7dd3fc">{{ unlinkedCount }}</span>
+<span style="margin-left:auto;font-size:10.5px;color:#7dd3fc">{{ unlinkedChevron }}</span>
+</button>
+<sc-if value="{{ unlinkedOpen }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:8px;border-top:1px dashed rgba(125,211,252,0.15);padding:12px 14px 14px">
+<sc-for list="{{ unlinkedItems }}" as="u" hint-placeholder-count="2">
+<div style="display:flex;align-items:center;gap:10px;border-radius:10px;border:1px solid rgba(125,211,252,0.18);background:rgba(2,10,24,0.35);padding:9px 10px">
+<div onClick="{{ u.play }}" style="display:flex;width:56px;flex:none;align-items:center;justify-content:center;aspect-ratio:16/9;border-radius:7px;background:linear-gradient(140deg,#12314f,#0a1c33);cursor:pointer;color:#7dd3fc;font-size:11px">▶</div>
+<div style="min-width:0;flex:1">
+<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:800;color:#f3f8fd">{{ u.label }}</div>
+<div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+<span style="{{ u.pillStyle }}">{{ u.pillLabel }}</span>
+<span style="font-size:9.5px;color:rgba(203,224,240,0.45)">{{ u.created }}</span>
+</div>
+</div>
+<button type="button" onClick="{{ u.menu }}" style="flex:none;min-height:40px;border:none;background:transparent;padding:4px 8px;font-size:15px;letter-spacing:2px;color:rgba(203,224,240,0.55);cursor:pointer">⋯</button>
+</div>
+</sc-for>
+<button type="button" onClick="{{ openAddGeneral }}" style="min-height:44px;border:1px dashed rgba(125,211,252,0.35);border-radius:9px;background:transparent;padding:8px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:800;color:rgba(125,211,252,0.75);cursor:pointer">+ Add link without a swim</button>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
+</div>
+</sc-if>
+
+<sc-if value="{{ isMod }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:12px;margin-top:14px">
+<div style="display:flex;align-items:center;gap:7px;overflow-x:auto;margin:0 -16px;padding:2px 16px">
+<sc-for list="{{ modSegChips }}" as="ms" hint-placeholder-count="3">
+<button type="button" onClick="{{ ms.pick }}" style="{{ ms.style }}">{{ ms.label }}</button>
+</sc-for>
+</div>
+<sc-for list="{{ modRows }}" as="r" hint-placeholder-count="3">
+<div style="{{ r.rowStyle }}">
+<div style="display:flex;align-items:center;gap:10px">
+<div style="display:flex;width:64px;flex:none;align-items:center;justify-content:center;aspect-ratio:16/9;border-radius:7px;background:linear-gradient(140deg,#12314f,#0a1c33);color:#7dd3fc;font-size:11px">▶</div>
+<div style="min-width:0;flex:1">
+<div dir="auto" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;font-weight:800;color:#f3f8fd">{{ r.swimmer }}</div>
+<div style="font-size:10.5px;color:rgba(203,224,240,0.55)">{{ r.result }}</div>
+<div style="font-size:10px;color:rgba(203,224,240,0.45)">{{ r.owner }} · {{ r.date }}</div>
+</div>
+<span style="{{ r.levelStyle }}">{{ r.levelLabel }}</span>
+</div>
+<sc-if value="{{ r.isPending }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;gap:8px;margin-top:10px">
+<button type="button" onClick="{{ r.publish }}" style="flex:1;min-height:40px;border:none;border-radius:8px;background:#38ef8f;padding:8px;font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:800;color:#04101f;cursor:pointer">Publish</button>
+<button type="button" onClick="{{ r.reject }}" style="flex:1;min-height:40px;border:1px solid rgba(239,83,80,0.5);border-radius:8px;background:transparent;padding:8px;font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:800;color:#ef5350;cursor:pointer">Reject</button>
+</div>
+</sc-if>
+</div>
+</sc-for>
+</div>
+</sc-if>
+</section>
+
+<sc-if value="{{ isMedia }}" hint-placeholder-val="{{ true }}">
+<button type="button" onClick="{{ openAdd }}" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:60;display:inline-flex;min-height:48px;align-items:center;gap:8px;border:none;border-radius:24px;background:#38ef8f;padding:12px 24px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:#04101f;box-shadow:0 14px 36px rgba(56,239,143,0.3);cursor:pointer">+ Add link</button>
+</sc-if>
+
+<sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ closeSheet }}" style="position:fixed;inset:0;z-index:100;background:rgba(2,10,24,0.72);backdrop-filter:blur(3px)"></div>
+<div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);z-index:101;width:100%;max-width:375px;max-height:82vh;overflow-y:auto;border-radius:20px 20px 0 0;border:1px solid rgba(125,211,252,0.3);border-bottom:none;background:linear-gradient(180deg,#0e2138,#081527);box-shadow:0 -20px 60px rgba(0,0,0,0.6);padding:10px 18px 18px;box-sizing:border-box">
+<div style="margin:0 auto 12px;height:4px;width:44px;border-radius:2px;background:rgba(125,211,252,0.3)"></div>
+<div style="display:flex;align-items:center;gap:10px">
+<h2 style="margin:0;font-size:17px;font-weight:900;letter-spacing:-0.02em;color:#f3f8fd">Filters</h2>
+<button type="button" onClick="{{ clearMore }}" style="margin-left:auto;border:none;background:transparent;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:800;color:rgba(203,224,240,0.5);cursor:pointer;padding:6px 0">Reset</button>
+</div>
+<div style="display:flex;flex-direction:column;gap:16px;margin-top:14px;color:#f3f8fd">
+<div style="display:flex;flex-direction:column;gap:7px">
+<span style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.16em;color:#7dd3fc">Season</span>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ seasonOpts }}" as="so" hint-placeholder-count="2">
+<button type="button" onClick="{{ so.pick }}" style="{{ so.style }}">{{ so.label }}</button>
+</sc-for>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:7px">
+<span style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.16em;color:#7dd3fc">Competition</span>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ compFilterOpts }}" as="c" hint-placeholder-count="3">
+<button type="button" onClick="{{ c.pick }}" style="{{ c.style }}"><span dir="auto">{{ c.label }}</span></button>
+</sc-for>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:7px">
+<span style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.16em;color:#7dd3fc">Style</span>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ styleOpts }}" as="st" hint-placeholder-count="4">
+<button type="button" onClick="{{ st.pick }}" style="{{ st.style }}">{{ st.label }}</button>
+</sc-for>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:7px">
+<span style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.16em;color:#7dd3fc">Distance</span>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ distOpts }}" as="d" hint-placeholder-count="4">
+<button type="button" onClick="{{ d.pick }}" style="{{ d.style }}">{{ d.label }}</button>
+</sc-for>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:7px">
+<span style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.16em;color:#7dd3fc">Date range</span>
+<div style="display:flex;align-items:center;gap:8px">
+<input type="date" value="{{ dateFrom }}" onChange="{{ setFrom }}" style="flex:1;min-width:0;border-radius:8px;border:1px solid rgba(125,211,252,0.3);background:rgba(2,10,24,0.5);padding:9px 10px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#f3f8fd;outline:none;color-scheme:dark">
+<span style="color:rgba(203,224,240,0.4);font-size:12px">→</span>
+<input type="date" value="{{ dateTo }}" onChange="{{ setTo }}" style="flex:1;min-width:0;border-radius:8px;border:1px solid rgba(125,211,252,0.3);background:rgba(2,10,24,0.5);padding:9px 10px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#f3f8fd;outline:none;color-scheme:dark">
+</div>
+</div>
+<sc-if value="{{ segIsWith }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:7px">
+<span style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.16em;color:#7dd3fc">Publication status</span>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ statusOpts }}" as="so2" hint-placeholder-count="4">
+<button type="button" onClick="{{ so2.pick }}" style="{{ so2.style }}">{{ so2.label }}</button>
+</sc-for>
+</div>
+</div>
+</sc-if>
+<button type="button" onClick="{{ closeSheet }}" style="min-height:48px;border:none;border-radius:12px;background:#38ef8f;padding:12px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:#04101f;cursor:pointer">Show {{ resultCount }} {{ resultNoun }}</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ actionsOpen }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ closeActions }}" style="position:fixed;inset:0;z-index:100;background:rgba(2,10,24,0.72);backdrop-filter:blur(3px)"></div>
+<div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);z-index:101;width:100%;max-width:375px;border-radius:20px 20px 0 0;border:1px solid rgba(125,211,252,0.3);border-bottom:none;background:linear-gradient(180deg,#0e2138,#081527);box-shadow:0 -20px 60px rgba(0,0,0,0.6);padding:10px 18px 20px;box-sizing:border-box;color:#f3f8fd">
+<div style="margin:0 auto 12px;height:4px;width:44px;border-radius:2px;background:rgba(125,211,252,0.3)"></div>
+<div style="font-size:14px;font-weight:900">{{ actionsTitle }}</div>
+<div dir="rtl" style="text-align:left;font-size:11.5px;color:rgba(203,224,240,0.55);margin-top:2px">{{ actionsSub }}</div>
+<sc-if value="{{ actMulti }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
+<sc-for list="{{ actVidChips }}" as="vc" hint-placeholder-count="2">
+<button type="button" onClick="{{ vc.pick }}" style="{{ vc.style }}">{{ vc.label }}</button>
+</sc-for>
+</div>
+</sc-if>
+<div style="display:flex;flex-direction:column;gap:6px;margin-top:14px">
+<button type="button" onClick="{{ actPlay }}" style="display:flex;min-height:48px;align-items:center;gap:10px;border:1px solid rgba(125,211,252,0.25);border-radius:12px;background:rgba(2,10,24,0.35);padding:12px 14px;font-size:13.5px;font-weight:800;color:#7dd3fc;cursor:pointer;text-align:left">▶ Play {{ actPlayCount }}</button>
+<button type="button" onClick="{{ actShare }}" style="display:flex;min-height:48px;align-items:center;gap:10px;border:1px solid rgba(125,211,252,0.25);border-radius:12px;background:rgba(2,10,24,0.35);padding:12px 14px;font-size:13.5px;font-weight:800;color:#f3f8fd;cursor:pointer;text-align:left">Share with a group</button>
+<sc-if value="{{ actCanWithdraw }}" hint-placeholder-val="{{ false }}">
+<button type="button" onClick="{{ actWithdraw }}" style="display:flex;min-height:48px;align-items:center;gap:10px;border:1px solid rgba(255,202,122,0.3);border-radius:12px;background:rgba(2,10,24,0.35);padding:12px 14px;font-size:13.5px;font-weight:800;color:#ffca7a;cursor:pointer;text-align:left">Withdraw from group</button>
+</sc-if>
+<button type="button" onClick="{{ actDelete }}" style="display:flex;min-height:48px;align-items:center;gap:10px;border:1px solid rgba(239,83,80,0.35);border-radius:12px;background:rgba(2,10,24,0.35);padding:12px 14px;font-size:13.5px;font-weight:800;color:#ef5350;cursor:pointer;text-align:left">Delete video</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ showAddVideo }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ closeModals }}" style="position:fixed;inset:0;z-index:100;background:rgba(2,10,24,0.72);backdrop-filter:blur(3px)"></div>
+<div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);z-index:101;width:100%;max-width:375px;border-radius:20px 20px 0 0;border:1px solid rgba(125,211,252,0.3);border-bottom:none;background:linear-gradient(180deg,#0e2138,#081527);padding:10px 18px 20px;box-sizing:border-box;color:#f3f8fd">
+<div style="margin:0 auto 12px;height:4px;width:44px;border-radius:2px;background:rgba(125,211,252,0.3)"></div>
+<h2 style="margin:0;font-size:17px;font-weight:900;letter-spacing:-0.02em">Add video</h2>
+<div style="display:flex;align-items:center;gap:10px;border-radius:12px;border:1px solid rgba(125,211,252,0.25);background:rgba(2,10,24,0.4);padding:10px 12px;margin-top:12px">
+<div style="min-width:0">
+<div style="font-size:12.5px;font-weight:800">{{ avSwimLabel }} · <span style="font-family:'JetBrains Mono',monospace;color:#7dd3fc">{{ avSwimTime }}</span></div>
+<div dir="rtl" style="text-align:left;font-size:10.5px;color:rgba(203,224,240,0.55)">{{ avSwimComp }} · {{ avSwimDate }}</div>
+</div>
+</div>
+<input value="{{ avUrl }}" onChange="{{ setAvUrl }}" placeholder="https://www.youtube.com/watch?v=…" style="margin-top:12px;width:100%;box-sizing:border-box;border-radius:10px;border:1px solid rgba(125,211,252,0.35);background:rgba(2,10,24,0.5);padding:13px 12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#f3f8fd;outline:none">
+<sc-if value="{{ avHasUrl }}" hint-placeholder-val="{{ false }}">
+<span style="display:inline-block;margin-top:8px;border-radius:6px;border:1px solid rgba(56,239,143,0.45);background:rgba(56,239,143,0.08);padding:3px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:800;color:#38ef8f">detected · {{ avDetected }}</span>
+</sc-if>
+<button type="button" onClick="{{ avSave }}" style="{{ avSaveStyle }}">Save</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ showShare }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ closeModals }}" style="position:fixed;inset:0;z-index:100;background:rgba(2,10,24,0.72);backdrop-filter:blur(3px)"></div>
+<div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);z-index:101;width:100%;max-width:375px;border-radius:20px 20px 0 0;border:1px solid rgba(125,211,252,0.3);border-bottom:none;background:linear-gradient(180deg,#0e2138,#081527);padding:10px 18px 20px;box-sizing:border-box;color:#f3f8fd">
+<div style="margin:0 auto 12px;height:4px;width:44px;border-radius:2px;background:rgba(125,211,252,0.3)"></div>
+<h2 style="margin:0;font-size:17px;font-weight:900;letter-spacing:-0.02em">Share with a group</h2>
+<p style="margin:6px 0 0;font-size:11.5px;color:rgba(203,224,240,0.6)">{{ shareTitle }}</p>
+<div style="display:flex;flex-direction:column;gap:7px;margin-top:12px">
+<sc-for list="{{ shareGroups }}" as="sg" hint-placeholder-count="2">
+<button type="button" onClick="{{ sg.pick }}" style="{{ sg.style }}"><span dir="rtl">{{ sg.label }}</span><span style="margin-left:auto;font-size:10.5px;color:rgba(203,224,240,0.5)">{{ sg.hint }}</span></button>
+</sc-for>
+</div>
+<div style="display:inline-flex;overflow:hidden;border-radius:8px;border:1px solid rgba(125,211,252,0.35);margin-top:12px">
+<button type="button" onClick="{{ pickMembers }}" style="{{ membersStyle }}">Members</button>
+<button type="button" onClick="{{ pickPublic }}" style="{{ publicStyle }}">Public 🌐</button>
+</div>
+<sc-if value="{{ isPublicLevel }}" hint-placeholder-val="{{ false }}">
+<p style="margin:8px 0 0;font-size:10.5px;font-weight:700;color:#ffca7a">Public = visible to everyone on the internet after approval.</p>
+</sc-if>
+<button type="button" onClick="{{ shareSubmit }}" style="{{ shareSubmitStyle }}">Submit for approval</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ showLightbox }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ closeModals }}" style="position:fixed;inset:0;z-index:110;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(2,10,24,0.92);padding:20px;box-sizing:border-box">
+<span style="font-size:13px;font-weight:800;color:#f3f8fd;text-align:center">{{ lightboxTitle }}</span>
+<div style="display:flex;width:100%;max-width:340px;align-items:center;justify-content:center;aspect-ratio:16/9;border-radius:14px;border:1px solid rgba(125,211,252,0.3);background:linear-gradient(140deg,#12314f,#0a1c33)">
+<span style="display:flex;height:52px;width:52px;align-items:center;justify-content:center;border-radius:50%;border:1px solid rgba(125,211,252,0.4);background:rgba(2,10,24,0.65);font-size:18px;color:#7dd3fc">▶</span>
+</div>
+<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(203,224,240,0.4)">tap anywhere to close</span>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:375,&quot;height&quot;:812},&quot;pageState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;normal&quot;,&quot;options&quot;:[&quot;normal&quot;,&quot;loading&quot;,&quot;no-favorites&quot;,&quot;empty-season&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;States&quot;},&quot;isGroupAdmin&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Role&quot;},&quot;userName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Vladimir&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Role&quot;}}">
+class Component extends DCLogic {
+  state = {
+    tab: 'media', swimmer: 'all', seg: 'all', season: '2025-26',
+    more: { comp: 'all', style: 'all', dist: 'all', from: '', to: '', status: 'all' },
+    sheetOpen: false, unlinkedOpen: false, actionsFor: null, modal: null, lightbox: null,
+    modStatus: 'pending', decided: {},
+    deletedVid: {}, withdrawn: {}, addedPubs: {}, extraVideos: {}, deletedUnlinked: {},
+  };
+
+  swimmers = [{ id: 'sabina', label: 'Sabina', init: 'SB' }, { id: 'me', label: 'Me', init: 'VB' }];
+
+  comps = {
+    c1: { name: 'אליפות חיפה החורפית', date: 'Feb 16, 2026', d: 20260216, city: 'Haifa', season: '2025-26' },
+    c2: { name: 'גביע החורף תל אביב', date: 'Jan 12, 2026', d: 20260112, city: 'Tel Aviv', season: '2025-26' },
+    c3: { name: 'ליגת הנוער סבב 2', date: 'Dec 3, 2025', d: 20251203, city: 'Netanya', season: '2025-26' },
+    c4: { name: 'אליפות מאסטרס', date: 'Nov 20, 2025', d: 20251120, city: 'Wingate', season: '2025-26' },
+    c5: { name: 'אליפות הקיץ', date: 'Jun 20, 2025', d: 20250620, city: 'Jerusalem', season: '2024-25' },
+  };
+
+  swims = [
+    { id: 's1', sw: 'sabina', comp: 'c1', dist: 50, style: 'Breast', label: '50m breast', time: '0:39.12', place: 4, pts: 512, videos: [{ src: 'YOUTUBE', pubs: [{ g: 'מכבי חיפה', st: 'pending' }] }, { src: 'OTHER', pubs: [] }] },
+    { id: 's2', sw: 'sabina', comp: 'c1', dist: 200, style: 'IM', label: '200m IM', time: '2:48.77', place: 2, pts: 548, photos: 2, rec: 'PB', videos: [{ src: 'YOUTUBE', pubs: [{ g: 'מכבי חיפה', st: 'published', pub: true }] }] },
+    { id: 's3', sw: 'sabina', comp: 'c1', dist: 100, style: 'Free', label: '100m free', time: '1:07.40', place: 6, pts: 495, videos: [] },
+    { id: 's4', sw: 'sabina', comp: 'c1', dist: 200, style: 'IM', label: '4×50 medley relay', time: '2:12.40', place: 3, pts: null, relay: true, videos: [] },
+    { id: 's5', sw: 'sabina', comp: 'c2', dist: 100, style: 'Free', label: '100m free', time: '1:08.02', place: 5, pts: 481, videos: [{ src: 'YOUTUBE', pubs: [] }] },
+    { id: 's6', sw: 'sabina', comp: 'c2', dist: 50, style: 'Fly', label: '50m fly', time: '0:33.90', place: 3, pts: 520, photos: 1, videos: [] },
+    { id: 's7', sw: 'sabina', comp: 'c3', dist: 50, style: 'Fly', label: '50m fly', time: '0:34.51', place: 7, pts: 502, videos: [{ src: 'VIMEO', pubs: [{ g: 'הפועל ב׳', st: 'rejected' }] }] },
+    { id: 's8', sw: 'me', comp: 'c4', dist: 400, style: 'Free', label: '400m free', time: '5:32.10', place: 1, pts: 601, photos: 1, rec: 'CR', videos: [{ src: 'YOUTUBE', pubs: [{ g: 'Masters IL', st: 'published' }] }] },
+    { id: 's9', sw: 'me', comp: 'c4', dist: 50, style: 'Breast', label: '50m breast', time: '0:41.88', place: 2, pts: 555, videos: [] },
+    { id: 's10', sw: 'sabina', comp: 'c5', dist: 50, style: 'Breast', label: '50m breast', time: '0:41.02', place: 5, pts: 470, videos: [] },
+  ];
+
+  unlinked = [
+    { id: 'u1', sw: 'sabina', src: 'YOUTUBE', label: 'Club training day — underwater cam', created: 'Mar 2, 2026', pubs: [{ g: 'מכבי חיפה', st: 'published' }] },
+    { id: 'u2', sw: 'me', src: 'OTHER', label: 'Masters meet warm-up footage', created: 'Nov 21, 2025', pubs: [] },
+  ];
+
+  groupsDir = [{ g: 'מכבי חיפה', hint: 'club group' }, { g: 'Masters IL', hint: 'masters' }];
+
+  mods = [
+    { id: 'm1', swimmer: 'סבינה ברנצב', result: '50m breast · Feb 16, 2026', owner: 'parent@gmail.com', group: 'מכבי חיפה', level: 'members', st: 'pending', date: '2d ago' },
+    { id: 'm2', swimmer: 'Dan Katz', result: '100m free · Jan 12, 2026', owner: 'dan.k@gmail.com', group: 'מכבי חיפה', level: 'public', st: 'pending', date: '5h ago' },
+  ];
+
+  detect(url) {
+    if (/youtu\.?be/i.test(url)) return 'YOUTUBE';
+    if (/vimeo/i.test(url)) return 'VIMEO';
+    return 'OTHER';
+  }
+  photoPairs(s) {
+    return Array.from({ length: s.photos || 0 }, (_, i) => ({ v: { src: 'PHOTO', pubs: [] }, key: s.id + ':p' + i })).filter((x) => !this.state.deletedVid[x.key]);
+  }
+  vidPairs(s) {
+    const base = s.videos.concat(this.state.extraVideos[s.id] || []);
+    return base.map((v, i) => ({ v, key: s.id + ':' + i })).filter((x) => !this.state.deletedVid[x.key]);
+  }
+  vids(s) { return this.vidPairs(s).map((x) => x.v); }
+  pubsOf(key, base) {
+    if (this.state.withdrawn[key]) return [];
+    return base.concat(this.state.addedPubs[key] || []);
+  }
+  aggStatus(pubs) {
+    if (pubs.length === 0) return 'private';
+    if (pubs.some((p) => p.st === 'pending')) return 'pending';
+    if (pubs.some((p) => p.st === 'published')) return 'published';
+    return 'rejected';
+  }
+
+  renderVals() {
+    const P = this.props;
+    const isAdmin = P.isGroupAdmin ?? true;
+    const pageState = P.pageState ?? 'normal';
+    const userName = P.userName ?? 'Vladimir';
+    const S = this.state;
+    const mono = "'JetBrains Mono',monospace";
+
+    const chipSt = (on, extra) => Object.assign({
+      fontFamily: mono, borderRadius: 8, border: '1px solid ' + (on ? '#7dd3fc' : 'rgba(125,211,252,0.4)'),
+      padding: '8px 13px', fontSize: 12, fontWeight: 800, color: on ? '#04101f' : '#7dd3fc',
+      background: on ? '#7dd3fc' : 'transparent', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap', flex: 'none', minHeight: 36,
+    }, extra || {});
+    const smallChip = (on) => chipSt(on, { padding: '7px 11px', fontSize: 11, borderRadius: 7, minHeight: 34 });
+    const segSt = (on) => ({
+      flex: 1, fontFamily: mono, border: 'none', borderRight: '1px solid rgba(125,211,252,0.25)',
+      padding: '9px 4px', fontSize: 10.5, fontWeight: 800, cursor: 'pointer', minHeight: 40,
+      color: on ? '#04101f' : 'rgba(125,211,252,0.75)', background: on ? '#7dd3fc' : 'transparent', whiteSpace: 'nowrap',
+    });
+    const tabSt = (on) => ({
+      display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: mono, borderRadius: 11,
+      border: '1px solid ' + (on ? '#7dd3fc' : 'rgba(125,211,252,0.3)'),
+      background: on ? 'rgba(125,211,252,0.14)' : 'transparent', minHeight: 42,
+      padding: '9px 15px', fontSize: 12.5, fontWeight: 800, color: on ? '#7dd3fc' : 'rgba(125,211,252,0.55)', cursor: 'pointer', whiteSpace: 'nowrap',
+    });
+    const STATUS = {
+      pending: ['#ffca7a', 'rgba(255,202,122,0.45)', 'rgba(255,202,122,0.08)'],
+      published: ['#38ef8f', 'rgba(56,239,143,0.45)', 'rgba(56,239,143,0.08)'],
+      rejected: ['#ef5350', 'rgba(239,83,80,0.45)', 'rgba(239,83,80,0.08)'],
+      private: ['#94a3b8', 'rgba(148,163,184,0.4)', 'rgba(148,163,184,0.08)'],
+    };
+    const pillSt = (k, bold) => {
+      const [c, b, bg] = STATUS[k];
+      return { color: c, border: (bold ? '1.5px' : '1px') + ' solid ' + b, background: bg, borderRadius: 6, padding: '2px 7px', fontSize: 9.5, fontWeight: 800, fontFamily: mono, display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' };
+    };
+    const rowBtnSt = (on) => ({ display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 48, textAlign: 'left', borderRadius: 12, border: '1px solid ' + (on ? '#7dd3fc' : 'rgba(125,211,252,0.25)'), background: on ? 'rgba(125,211,252,0.12)' : 'rgba(2,10,24,0.35)', padding: '10px 12px', color: '#f3f8fd', cursor: 'pointer', fontFamily: "'Inter',sans-serif", fontSize: 13, fontWeight: 800, boxSizing: 'border-box' });
+    const btnPri = (on) => ({ marginTop: 14, width: '100%', minHeight: 48, border: 'none', borderRadius: 12, background: on ? '#38ef8f' : 'rgba(56,239,143,0.25)', padding: '12px', fontFamily: mono, fontSize: 13, fontWeight: 800, color: on ? '#04101f' : 'rgba(4,16,31,0.6)', cursor: on ? 'pointer' : 'default' });
+
+    const seasonSwims = this.swims.filter((s) => this.comps[s.comp].season === S.season);
+    const bySwimmer = seasonSwims.filter((s) => S.swimmer === 'all' || s.sw === S.swimmer);
+    const M = S.more;
+    const n = (v) => parseInt(v.replace(/-/g, ''), 10);
+    const filtered = bySwimmer.filter((s) => {
+      const v = this.vids(s);
+      const c = this.comps[s.comp];
+      if (S.seg === 'with' && v.length === 0) return false;
+      if (S.seg === 'without' && v.length > 0) return false;
+      if (M.comp !== 'all' && s.comp !== M.comp) return false;
+      if (M.style !== 'all' && s.style !== M.style) return false;
+      if (M.dist !== 'all' && s.dist !== M.dist) return false;
+      if (M.from && c.d < n(M.from)) return false;
+      if (M.to && c.d > n(M.to)) return false;
+      if (S.seg === 'with' && M.status !== 'all') {
+        if (this.aggStatus(this.vidPairs(s).flatMap((x) => this.pubsOf(x.key, x.v.pubs))) !== M.status) return false;
+      }
+      return true;
+    });
+
+    const compIds = [...new Set(filtered.map((s) => s.comp))].sort((a, b) => this.comps[b].d - this.comps[a].d);
+    const groups = compIds.map((cid) => {
+      const c = this.comps[cid];
+      const rows = filtered.filter((s) => s.comp === cid).map((s) => {
+        const pairs = this.vidPairs(s);
+        const v = pairs.map((x) => x.v);
+        const has = v.length > 0;
+        const videoPills = pairs.map((x) => {
+          const vpubs = this.pubsOf(x.key, x.v.pubs);
+          const vst = this.aggStatus(vpubs);
+          return { label: vst === 'published' && vpubs.some((p) => p.pub) ? 'published 🌐' : vst, style: pillSt(vst, vpubs.some((p) => p.pub)) };
+        });
+        return {
+          videoPills,
+          label: s.label, relay: !!s.relay,
+          labelStyle: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13, fontWeight: 800, color: has ? '#f3f8fd' : 'rgba(226,240,252,0.55)' },
+          time: s.time, placePts: '#' + s.place + (s.pts ? ' · ' + s.pts + ' pts' : ''),
+          medal: s.place === 1 ? '🥇' : s.place === 2 ? '🥈' : s.place === 3 ? '🥉' : '',
+          hasMedalCol: s.place <= 3 || !!s.rec,
+          hasPhoto: this.photoPairs(s).length > 0, hasRec: !!s.rec, recLabel: s.rec || '',
+          hasVideo: has, noVideo: !has, multi: v.length > 1, vidCount: v.length,
+          rowStyle: { display: 'flex', alignItems: 'center', gap: 10, minHeight: 56, padding: '9px 14px', borderBottom: '1px solid rgba(125,211,252,0.08)', background: has ? 'transparent' : 'rgba(2,10,24,0.25)', cursor: has ? 'pointer' : 'default', boxSizing: 'border-box' },
+          tap: () => { if (has || this.photoPairs(s).length > 0) this.setState({ actionsFor: s.id, actionsVid: 0 }); },
+          addVideo: (e) => { e.stopPropagation(); this.setState({ modal: { kind: 'addVideo', swimId: s.id, url: '' } }); },
+        };
+      });
+      const compSwims = filtered.filter((s) => s.comp === cid);
+      return { name: c.name, date: c.date, city: c.city, hasAward: compSwims.some((s) => s.place <= 3), hasRec: compSwims.some((s) => !!s.rec), rows };
+    });
+
+    const swimmerChips = [{ id: 'all', label: 'All', init: null }].concat(this.swimmers).map((s) => ({
+      label: s.label, init: s.init,
+      count: s.id === 'all' ? seasonSwims.length : seasonSwims.filter((m) => m.sw === s.id).length,
+      style: chipSt(S.swimmer === s.id),
+      avaStyle: { display: 'inline-flex', width: 17, height: 17, borderRadius: '50%', background: S.swimmer === s.id ? 'rgba(4,16,31,0.2)' : '#2c3d52', color: S.swimmer === s.id ? '#04101f' : '#bfe0f5', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 900, flex: 'none' },
+      pick: () => this.setState({ swimmer: s.id }),
+    }));
+
+    const videoSegs = [['all', 'All'], ['with', 'With video'], ['without', 'No video']].map(([k, l]) => ({
+      label: l, style: segSt(S.seg === k), pick: () => this.setState({ seg: k }),
+    }));
+
+    const setMore = (patch) => this.setState((p) => ({ more: { ...p.more, ...patch } }));
+    const activeFilterCount = (M.comp !== 'all') + (M.style !== 'all') + (M.dist !== 'all') + (!!M.from) + (!!M.to) + (S.seg === 'with' && M.status !== 'all') + (S.season !== '2025-26');
+    const seasonComps = [...new Set(seasonSwims.map((s) => s.comp))].sort((a, b) => this.comps[b].d - this.comps[a].d);
+    const compFilterOpts = [{ id: 'all', label: 'All competitions' }].concat(seasonComps.map((cid) => ({ id: cid, label: this.comps[cid].name }))).map((o) => ({
+      label: o.label, style: smallChip(M.comp === o.id), pick: () => setMore({ comp: o.id }),
+    }));
+    const styleOpts = ['all', 'Free', 'Back', 'Breast', 'Fly', 'IM'].map((k) => ({
+      label: k === 'all' ? 'All' : k, style: smallChip(M.style === k), pick: () => setMore({ style: k }),
+    }));
+    const distOpts = ['all', 50, 100, 200, 400].map((k) => ({
+      label: k === 'all' ? 'All' : k + 'm', style: smallChip(M.dist === k), pick: () => setMore({ dist: k }),
+    }));
+    const statusOpts = ['all', 'private', 'pending', 'published', 'rejected'].map((k) => ({
+      label: k === 'all' ? 'All' : k[0].toUpperCase() + k.slice(1), style: smallChip(M.status === k), pick: () => setMore({ status: k }),
+    }));
+    const seasonOpts = ['2025-26', '2024-25'].map((k) => ({
+      label: k.replace('-', '–'), style: smallChip(S.season === k), pick: () => this.setState({ season: k }),
+    }));
+
+    const unlinkedItems = this.unlinked
+      .filter((u) => !S.deletedUnlinked[u.id])
+      .filter((u) => S.swimmer === 'all' || u.sw === S.swimmer)
+      .map((u) => {
+        const pubs = this.pubsOf(u.id, u.pubs);
+        const st = this.aggStatus(pubs);
+        return {
+          label: u.label, created: u.created,
+          pillLabel: st, pillStyle: pillSt(st),
+          play: () => this.setState({ lightbox: { kind: 'unlinked', id: u.id } }),
+          menu: () => this.setState({ actionsFor: u.id }),
+        };
+      });
+
+    // actions sheet target (swim or unlinked)
+    const actSwim = S.actionsFor ? this.swims.find((s) => s.id === S.actionsFor) : null;
+    const actUn = !actSwim && S.actionsFor ? this.unlinked.find((u) => u.id === S.actionsFor) : null;
+    const actPairs = actSwim ? this.vidPairs(actSwim).concat(this.photoPairs(actSwim)) : actUn ? [{ v: { src: actUn.src, pubs: actUn.pubs }, key: actUn.id }] : [];
+    const actIdx = Math.min(S.actionsVid || 0, Math.max(actPairs.length - 1, 0));
+    const actSel = actPairs[actIdx];
+    const actKey = actSel ? actSel.key : null;
+    const actPubs = actSel ? this.pubsOf(actKey, actSel.v.pubs) : [];
+    const actionsVals = {
+      actionsOpen: !!(actSwim || actUn),
+      actionsTitle: actSwim ? actSwim.label + ' · ' + actSwim.time : actUn ? actUn.label : '',
+      actionsSub: actSwim ? this.comps[actSwim.comp].name + ' · ' + this.comps[actSwim.comp].date : actUn ? 'added ' + actUn.created : '',
+      actMulti: actPairs.length > 1,
+      actVidChips: actPairs.map((x, i) => {
+        const st = this.aggStatus(this.pubsOf(x.key, x.v.pubs));
+        return { label: (x.v.src === 'PHOTO' ? '🖼 ' : '▶ ') + (i + 1) + ' · ' + x.v.src + ' · ' + st, style: smallChip(i === actIdx), pick: () => this.setState({ actionsVid: i }) };
+      }),
+      actPlayCount: '',
+      closeActions: () => this.setState({ actionsFor: null }),
+      actPlay: () => this.setState({ lightbox: { id: S.actionsFor, swim: !!actSwim }, actionsFor: null }),
+      actShare: () => this.setState({ modal: { kind: 'share', target: actKey, label: (actSwim ? actSwim.label : (actUn ? actUn.label : '')) + (actPairs.length > 1 ? ' · video ' + (actIdx + 1) : ''), group: null, level: 'members' }, actionsFor: null }),
+      actCanWithdraw: actPubs.length > 0,
+      actWithdraw: () => this.setState((p) => ({ withdrawn: { ...p.withdrawn, [actKey]: true }, actionsFor: null })),
+      actDelete: () => {
+        if (actUn) this.setState((p) => ({ deletedUnlinked: { ...p.deletedUnlinked, [S.actionsFor]: true }, actionsFor: null }));
+        else this.setState((p) => ({ deletedVid: { ...p.deletedVid, [actKey]: true }, actionsFor: null }));
+      },
+    };
+
+    // add video modal
+    const modal = S.modal;
+    const avSwim = modal && modal.kind === 'addVideo' ? this.swims.find((s) => s.id === modal.swimId) : null;
+    const avComp = avSwim ? this.comps[avSwim.comp] : {};
+    const avUrl = avSwim ? modal.url : '';
+    const avOk = avUrl.trim().length > 0;
+    const avVals = {
+      showAddVideo: !!avSwim,
+      avSwimLabel: avSwim ? avSwim.label : '', avSwimTime: avSwim ? avSwim.time : '',
+      avSwimComp: avComp.name || '', avSwimDate: avComp.date || '',
+      avUrl, setAvUrl: (e) => this.setState((p) => ({ modal: { ...p.modal, url: e.target.value } })),
+      avHasUrl: avOk, avDetected: this.detect(avUrl), avSaveStyle: btnPri(avOk),
+      avSave: () => {
+        if (!avOk) return;
+        this.setState((p) => ({
+          extraVideos: { ...p.extraVideos, [avSwim.id]: (p.extraVideos[avSwim.id] || []).concat([{ src: this.detect(avUrl), pubs: [] }]) },
+          modal: null,
+        }));
+      },
+    };
+
+    // share sheet
+    const isShare = modal && modal.kind === 'share';
+    const shareOk = isShare && !!modal.group;
+    const shareVals = {
+      showShare: isShare,
+      shareTitle: isShare ? modal.label : '',
+      shareGroups: this.groupsDir.map((g) => ({
+        label: g.g, hint: g.hint, style: rowBtnSt(isShare && modal.group === g.g),
+        pick: () => this.setState((p) => ({ modal: { ...p.modal, group: g.g } })),
+      })),
+      isPublicLevel: isShare && modal.level === 'public',
+      membersStyle: Object.assign(segSt(isShare && modal.level === 'members'), { flex: 'none', padding: '9px 16px' }),
+      publicStyle: Object.assign(segSt(isShare && modal.level === 'public'), { flex: 'none', padding: '9px 16px' }),
+      pickMembers: () => this.setState((p) => ({ modal: { ...p.modal, level: 'members' } })),
+      pickPublic: () => this.setState((p) => ({ modal: { ...p.modal, level: 'public' } })),
+      shareSubmitStyle: btnPri(shareOk),
+      shareSubmit: () => {
+        if (!shareOk) return;
+        const t = modal.target;
+        this.setState((p) => ({
+          addedPubs: { ...p.addedPubs, [t]: (p.addedPubs[t] || []).concat([{ g: modal.group, st: 'pending', pub: modal.level === 'public' }]) },
+          withdrawn: { ...p.withdrawn, [t]: false }, modal: null,
+        }));
+      },
+    };
+
+    // lightbox
+    const lb = S.lightbox;
+    let lightboxTitle = '';
+    if (lb) {
+      const s = this.swims.find((x) => x.id === lb.id);
+      const u = this.unlinked.find((x) => x.id === lb.id);
+      lightboxTitle = s ? s.label + ' · ' + s.time + ' · ' + this.comps[s.comp].date : u ? u.label : '';
+    }
+
+    // moderation
+    const rowsAll = this.mods.map((r) => ({ ...r, st: S.decided[r.id] || r.st }));
+    const pendingCount = rowsAll.filter((r) => r.st === 'pending').length;
+    const modRows = rowsAll.filter((r) => S.modStatus === 'all' || r.st === S.modStatus).map((r) => ({
+      swimmer: r.swimmer, result: r.result, owner: r.owner, date: r.date,
+      levelLabel: r.level === 'public' ? 'Public 🌐' : 'Members',
+      levelStyle: r.level === 'public' ? pillSt('pending', true) : pillSt('private'),
+      isPending: r.st === 'pending',
+      publish: () => this.setState((p) => ({ decided: { ...p.decided, [r.id]: 'published' } })),
+      reject: () => this.setState((p) => ({ decided: { ...p.decided, [r.id]: 'rejected' } })),
+      rowStyle: { borderRadius: 14, padding: '12px 14px', border: '1px solid ' + (r.level === 'public' && r.st === 'pending' ? 'rgba(255,202,122,0.45)' : 'rgba(125,211,252,0.22)'), background: 'linear-gradient(180deg,rgba(56,189,248,0.08),rgba(8,25,48,0.78))' },
+    }));
+    const modSegChips = [['pending', 'Pending · ' + pendingCount], ['published', 'Published'], ['all', 'All']].map(([k, l]) => ({
+      label: l, style: chipSt(S.modStatus === k), pick: () => this.setState({ modStatus: k }),
+    }));
+
+    const isNormal = pageState === 'normal';
+    const noSeasonData = isNormal && seasonSwims.length > 0 && bySwimmer.length === 0;
+    const filterEmpty = isNormal && bySwimmer.length > 0 && filtered.length === 0;
+
+    return {
+      ...actionsVals, ...avVals, ...shareVals,
+      userName, userInitial: userName[0].toUpperCase(), isAdmin,
+      isMedia: S.tab === 'media', isMod: S.tab === 'mod' && isAdmin,
+      goMedia: () => this.setState({ tab: 'media' }),
+      goModeration: () => this.setState({ tab: 'mod' }),
+      mediaTabStyle: tabSt(S.tab === 'media'), modTabStyle: tabSt(S.tab === 'mod'),
+      pendingCount, hasPending: pendingCount > 0,
+      showChips: pageState !== 'no-favorites',
+      swimmerChips, videoSegs,
+      seasonLabel: S.season.replace('-', '–'),
+      prevSeason: () => this.setState({ season: '2024-25' }),
+      sheetOpen: S.sheetOpen,
+      openSheet: () => this.setState({ sheetOpen: true }),
+      closeSheet: () => this.setState({ sheetOpen: false }),
+      filtersBtnStyle: {
+        display: 'inline-flex', alignItems: 'center', gap: 6, flex: 'none', minHeight: 40, borderRadius: 10,
+        border: '1px solid ' + (activeFilterCount > 0 ? '#7dd3fc' : 'rgba(125,211,252,0.3)'),
+        background: 'transparent', padding: '8px 13px', fontFamily: mono, fontSize: 11.5, fontWeight: 800,
+        color: activeFilterCount > 0 ? '#7dd3fc' : 'rgba(125,211,252,0.7)', cursor: 'pointer',
+      },
+      hasActiveFilters: activeFilterCount > 0, activeFilterCount,
+      segIsWith: S.seg === 'with',
+      seasonOpts, compFilterOpts, styleOpts, distOpts, statusOpts,
+      dateFrom: M.from, dateTo: M.to,
+      setFrom: (e) => setMore({ from: e.target.value }), setTo: (e) => setMore({ to: e.target.value }),
+      clearMore: () => this.setState({ season: '2025-26', more: { comp: 'all', style: 'all', dist: 'all', from: '', to: '', status: 'all' } }),
+      clearAll: () => this.setState({ seg: 'all', swimmer: 'all', more: { comp: 'all', style: 'all', dist: 'all', from: '', to: '', status: 'all' } }),
+      resultSummary: filtered.length + (filtered.length === 1 ? ' swim' : ' swims') + ' · date ↓',
+      resultCount: filtered.length, resultNoun: filtered.length === 1 ? 'swim' : 'swims',
+      showLoading: pageState === 'loading',
+      showNoFavorites: pageState === 'no-favorites',
+      showNoSeason: pageState === 'empty-season' || noSeasonData,
+      showFilterEmpty: pageState !== 'empty-season' && filterEmpty,
+      showGroups: isNormal && !noSeasonData && filtered.length > 0,
+      skeletons: [1, 2], groups,
+      showUnlinked: isNormal && !noSeasonData,
+      unlinkedCount: unlinkedItems.length,
+      unlinkedOpen: S.unlinkedOpen,
+      unlinkedChevron: S.unlinkedOpen ? '▲' : '▼',
+      toggleUnlinked: () => this.setState({ unlinkedOpen: !S.unlinkedOpen }),
+      unlinkedItems,
+      openAdd: () => this.setState({ modal: { kind: 'addVideo', swimId: 's3', url: '' } }),
+      openAddGeneral: () => this.setState({ modal: { kind: 'addVideo', swimId: 's3', url: '' } }),
+      closeModals: () => this.setState({ modal: null, lightbox: null }),
+      showLightbox: !!lb, lightboxTitle,
+      modSegChips, modRows,
+    };
+  }
+}
+</script>
+</body>
+</html>

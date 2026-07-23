@@ -97,6 +97,27 @@ export interface HubGroupMemberMediaItem {
   result_label?: string | null;
 }
 
+/**
+ * Публикация личного медиа участника в группу (GroupPublicationInboxItemDto, snake_case).
+ * Используется и для published-списков (GET .../media/published?level=...), и для inbox
+ * модерации (GET /api/hub-groups/{id}/media/publications) — форма одинаковая.
+ */
+export interface GroupPublicationItem {
+  id: number;
+  level: 'public' | 'members';
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  media_type: HubGroupMediaItem['media_type'];
+  source_type: HubGroupMediaItem['source_type'];
+  url: string;
+  owner_user_id: number;
+  owner_email: string;
+  swimmer_id?: number | null;
+  swimmer_name?: string | null;
+  result_id?: number | null;
+  result_label?: string | null;
+}
+
 export interface HubGroupStanding {
   swimmer_id: number;
   name: string;

@@ -21,6 +21,8 @@ public class AdminController : ControllerBase
     private readonly IResultRepository _results;
     private readonly IResultSourceProvider _sourceProvider;
     private readonly IMemoryCache _cache;
+    private readonly IAdminAuditService _audit;
+    private readonly ICacheService _cacheService;
 
     public AdminController(
         IAdminRepository admin,
@@ -30,7 +32,9 @@ public class AdminController : ControllerBase
         IImportJobQueue jobs,
         IResultRepository results,
         IResultSourceProvider sourceProvider,
-        IMemoryCache cache)
+        IMemoryCache cache,
+        IAdminAuditService audit,
+        ICacheService cacheService)
     {
         _admin = admin;
         _schema = schema;
@@ -40,6 +44,8 @@ public class AdminController : ControllerBase
         _results = results;
         _sourceProvider = sourceProvider;
         _cache = cache;
+        _audit = audit;
+        _cacheService = cacheService;
     }
 
     // ── Users ────────────────────────────────────────────────────────────────
@@ -56,6 +62,9 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> AddRole(int userId, int roleId)
     {
         var result = await _admin.AddRoleAsync(userId, roleId);
+        if (result == RoleOperationResult.Ok)
+            await _audit.LogAsync("user.role-add", "AppUser", userId.ToString(),
+                $"Пользователю #{userId} выдана роль #{roleId}", new { userId, roleId });
         return result switch
         {
             RoleOperationResult.Ok => Ok(new { message = "Role added" }),
@@ -70,6 +79,9 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> RemoveRole(int userId, int roleId)
     {
         var ok = await _admin.RemoveRoleAsync(userId, roleId);
+        if (ok)
+            await _audit.LogAsync("user.role-remove", "AppUser", userId.ToString(),
+                $"У пользователя #{userId} снята роль #{roleId}", new { userId, roleId });
         return ok ? Ok(new { message = "Role removed" }) : NotFound(new { error = "Role assignment not found" });
     }
 
@@ -78,6 +90,9 @@ public class AdminController : ControllerBase
     {
         var ok = await _admin.SetUserActiveAsync(userId, request.IsActive);
         if (!ok) return NotFound(new { error = "User not found" });
+        await _audit.LogAsync("user.set-active", "AppUser", userId.ToString(),
+            $"Пользователь #{userId} {(request.IsActive ? "активирован" : "деактивирован")}",
+            new { userId, request.IsActive });
         return Ok(new { message = request.IsActive ? "User activated" : "User deactivated" });
     }
 
@@ -86,6 +101,8 @@ public class AdminController : ControllerBase
     {
         var ok = await _admin.ForceSignOutAsync(userId);
         if (!ok) return NotFound(new { error = "User not found" });
+        await _audit.LogAsync("user.force-signout", "AppUser", userId.ToString(),
+            $"Отозваны все сессии пользователя #{userId}", new { userId });
         return Ok(new { message = "All sessions revoked" });
     }
 
@@ -120,11 +137,30 @@ public class AdminController : ControllerBase
         => Ok(_settings.GetAll());
 
     [HttpPut("settings/{key}")]
-    public IActionResult UpdateSetting(string key, [FromBody] UpdateSettingRequest request)
+    public async Task<IActionResult> UpdateSetting(string key, [FromBody] UpdateSettingRequest request)
     {
         if (!_settings.Update(key, request.Value))
             return BadRequest(new { error = "Invalid key or value type mismatch" });
+        await _audit.LogAsync("setting.update", "Setting", key,
+            $"Настройка «{key}» изменена на «{request.Value}»", new { key, request.Value });
         return Ok(_settings.Get(key));
+    }
+
+    // ── Кэш ──────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Пересчёт агрегатов = сброс кэша (фаза 7.3 op#3). Агрегаты (club-summary, club-points,
+    /// результаты) считаются на чтение и кэшируются в памяти с TTL — отдельной таблицы нет,
+    /// поэтому «пересчёт» = инвалидация: следующий публичный запрос пересоберёт свежие данные.
+    /// Полезно после ручных правок (Result edit, перенос результатов).
+    /// </summary>
+    [HttpPost("cache/invalidate")]
+    public async Task<IActionResult> InvalidateCache()
+    {
+        await _cacheService.InvalidateAllAsync();
+        await _audit.LogAsync("cache.invalidate", "Cache", null,
+            "Сброшен кэш агрегатов (пересчёт при следующем запросе)");
+        return Ok(new { message = "Cache invalidated" });
     }
 
     // ── Import ───────────────────────────────────────────────────────────────
@@ -135,7 +171,9 @@ public class AdminController : ControllerBase
         IFormFile? file,
         [FromForm] string[]? categories,
         [FromForm] int? eventId,
-        [FromForm] string? newEventName)
+        [FromForm] string? newEventName,
+        [FromForm] bool overwriteExisting = false,
+        [FromForm] bool deleteMissing = false)
     {
         if (file == null || file.Length == 0)
             return BadRequest(new { error = "No file uploaded" });
@@ -154,8 +192,8 @@ public class AdminController : ControllerBase
 
         // Привязка к многодневному событию (опционально): existing eventId XOR newEventName.
         ImportEventOptions? eventOptions = null;
-        if (eventId.HasValue || !string.IsNullOrWhiteSpace(newEventName))
-            eventOptions = new ImportEventOptions(eventId, newEventName);
+        if (eventId.HasValue || !string.IsNullOrWhiteSpace(newEventName) || overwriteExisting)
+            eventOptions = new ImportEventOptions(eventId, newEventName, overwriteExisting, deleteMissing);
 
         var jobId = _jobs.Enqueue(data, file.FileName, categories, eventOptions);
         return Accepted(new { jobId });
@@ -228,6 +266,9 @@ public class AdminController : ControllerBase
         var previewId = Guid.NewGuid();
         _cache.Set(PreviewCacheKey(previewId), new PdfPreviewEntry(parsed, file.FileName), TimeSpan.FromMinutes(15));
 
+        var existingMatches = await _import.FindExistingCompetitionsAsync(parsed.Competitions);
+        var existingCompetitionId = existingMatches.FirstOrDefault(m => m.ExistingCompetitionId != null)?.ExistingCompetitionId;
+
         return Ok(new
         {
             previewId,
@@ -235,7 +276,9 @@ public class AdminController : ControllerBase
             resultCount = parsed.ResultCount,
             competitions = parsed.Competitions,
             warnings = parsed.Warnings,
-            debugLog = parsed.DebugLog
+            debugLog = parsed.DebugLog,
+            existingCompetitionId,
+            existingCompetitions = existingMatches
         });
     }
 
@@ -249,8 +292,8 @@ public class AdminController : ControllerBase
         _cache.Remove(key);
 
         ImportEventOptions? eventOptions = null;
-        if (request.EventId.HasValue || !string.IsNullOrWhiteSpace(request.NewEventName))
-            eventOptions = new ImportEventOptions(request.EventId, request.NewEventName);
+        if (request.EventId.HasValue || !string.IsNullOrWhiteSpace(request.NewEventName) || request.OverwriteExisting)
+            eventOptions = new ImportEventOptions(request.EventId, request.NewEventName, request.OverwriteExisting, request.DeleteMissing);
 
         var jobId = _jobs.Enqueue(
             Encoding.UTF8.GetBytes(entry.Parsed.ResultsJson),
@@ -394,5 +437,5 @@ public class AdminController : ControllerBase
     public record SetActiveRequest(bool IsActive);
     public record UpdateSettingRequest(string Value);
     public record UpdateCompetitionRequest(bool IsAward, bool ShowCombineAllResults, string[]? Categories);
-    public record ImportParsedRequest(Guid PreviewId, string[]? CategoryKeys, int? EventId, string? NewEventName);
+    public record ImportParsedRequest(Guid PreviewId, string[]? CategoryKeys, int? EventId, string? NewEventName, bool OverwriteExisting = false, bool DeleteMissing = false);
 }

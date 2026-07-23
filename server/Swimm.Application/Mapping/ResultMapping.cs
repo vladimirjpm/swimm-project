@@ -14,7 +14,11 @@ public static class ResultMapping
     public static readonly Expression<Func<ResultRecord, ResultDto>> ToDto = r => new ResultDto
     {
         Id = r.Id,
-        Country = r.Competition.Country != null ? r.Competition.Country.CountryCode : "",
+        // Флаг атлета в UI: страна пловца → страна результата (сборная из протокола,
+        // напр. Uruguay на Маккабиаде) → страна соревнования (легаси-фоллбек).
+        Country = r.Swimmer.Country != null ? r.Swimmer.Country.CountryCode
+            : r.Country != null ? r.Country.CountryCode
+            : r.Competition.Country != null ? r.Competition.Country.CountryCode : "",
         CompetitionName = r.Competition.Name,
         IsMasters = r.Competition.IsMasters,
         IsAward = r.Competition.IsAward,

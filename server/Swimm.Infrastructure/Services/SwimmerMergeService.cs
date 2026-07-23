@@ -89,6 +89,23 @@ public class SwimmerMergeService(SwimmDbContext db) : ISwimmerMergeService
             foreach (var r in results) r.SwimmerId = canonical.Id;
             Note(res, "Results", results.Count);
 
+            // Ноги эстафет: FK RelayMember→Swimmer = Restrict, уникальный (RelayId, SwimmerId).
+            // Без переноса удаление дубля падает DbUpdateException. Если канонический уже нога
+            // той же эстафеты (обычно дефект данных — один человек дважды) — строку дубля удаляем.
+            var relayLegs = await db.RelayMembers.Where(m => m.SwimmerId == duplicate.Id).ToListAsync(ct);
+            var canonRelays = await db.RelayMembers
+                .Where(m => m.SwimmerId == canonical.Id).Select(m => m.RelayId).ToListAsync(ct);
+            foreach (var leg in relayLegs)
+            {
+                if (canonRelays.Contains(leg.RelayId))
+                {
+                    db.RelayMembers.Remove(leg);
+                    res.Actions.Add($"RelayMembers: нога эстафеты {leg.RelayId} удалена (canonical уже в составе)");
+                }
+                else leg.SwimmerId = canonical.Id;
+            }
+            Note(res, "RelayMembers", relayLegs.Count);
+
             // Favorites: у пользователя может быть избранным и канонический — тогда строку дубля удаляем.
             var favs = await db.UserFavorites.Where(f => f.SwimmerId == duplicate.Id).ToListAsync(ct);
             var favUsersOfCanonical = await db.UserFavorites

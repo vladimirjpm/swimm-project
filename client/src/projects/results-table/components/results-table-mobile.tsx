@@ -10,6 +10,7 @@ import UI_AgeLabel from '../../components/mix/age-label/age-label';
 import UI_FavoriteControls from '../../components/mix/favorite-controls/favorite-controls';
 import UI_PositionBadge from '../../components/mix/position-badge/position-badge';
 import { ResultsTableRowProps } from './types';
+import ResultRowDateInfo from './result-row-date-info';
 
 const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
   res,
@@ -19,6 +20,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
   showEvent,
   showPoolType,
   showDate,
+  showCompetition,
   hasInternationalPoints,
   levelInfo,
   updateFilter,
@@ -49,7 +51,8 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
           {/* При пересчёте (Combine All Results): большой badge — новое место,
               маленький внахлёст снизу — оригинальное место. */}
           <div className="relative">
-            <UI_PositionBadge position={res.position} fallbackIndex={index} size={36} isAward={rowIsAward} />
+            {/* Место — только из БД (при Combine All Results — position_recalc), без фолбэка на номер строки. */}
+            <UI_PositionBadge position={res.position ?? '—'} size={36} isAward={rowIsAward} />
             {(res as any).position_original != null && (res as any).position_original !== res.position && (
               <UI_PositionBadge
                 position={(res as any).position_original}
@@ -84,8 +87,10 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
                 secondLineClassName="text-sm mt-0.5 text-[var(--theme-mode-text-secondary)]"
                 showClubIcon={false}
                 isRecordHolder={isRecordHolder}
-                isMe={isPrimaryFavorite}
               />
+              {showDate && (
+                <ResultRowDateInfo date={res.date} competition={res.competition} showCompetition={showCompetition} />
+              )}
               <UI_SwimmerGallery gallery={res.gallery} />
             </div>
 
@@ -148,9 +153,6 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
                     <span className="text-[var(--theme-mode-text-muted)]">Points: </span>
                     <span className="text-[var(--theme-mode-text)]">{res.international_points ?? ''}</span>
                   </div>
-                )}
-                {showDate && (
-                  <div className="text-xs text-[var(--theme-mode-text-muted)]">{res.date}</div>
                 )}
               </div>
 

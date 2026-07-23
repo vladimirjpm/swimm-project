@@ -22,6 +22,13 @@ public class Club
     [MaxLength(200)]
     public string NameEn { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Псевдоклуб: в графе клуба протокола стоит страна/сборная («USA», «Israel»,
+    /// «M25», «Maccabiah MIX»), а не реальный клуб. Такие записи исключаются из
+    /// club-summary и дедупа; страна уходит в <see cref="CountryId"/>.
+    /// </summary>
+    public bool IsPseudo { get; set; }
+
     /// <summary>Ссылка на страну (опционально)</summary>
     public int? CountryId { get; set; }
 

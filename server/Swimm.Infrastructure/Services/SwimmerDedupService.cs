@@ -29,14 +29,30 @@ public class SwimmerDedupService(SwimmDbContext db) : ISwimmerDedupService
 
         var report = new SwimmerDedupReport { RealSwimmers = swimmers.Count };
 
+        // «Развязанные» админом пары (Sys_DedupIgnoredPairs) — не показываем.
+        var ignored = (await db.DedupIgnoredPairs.AsNoTracking()
+                .Where(p => p.EntityType == Swimm.Domain.Entities.DedupEntityType.Swimmer)
+                .Select(p => new { p.IdA, p.IdB })
+                .ToListAsync(ct))
+            .Select(p => (p.IdA, p.IdB))
+            .ToHashSet();
+
         var prepared = swimmers.Select(s => new
         {
             s.Id, s.BirthYear, s.Gender, s.Club, s.ResultCount,
             Name = $"{s.LastName} {s.FirstName}".Trim(),
             Nh = Normalize($"{s.LastName} {s.FirstName}"),
             NhSwap = Normalize($"{s.FirstName} {s.LastName}"),
-            Ne = (s.LastNameEn + s.FirstNameEn).Length > 0 ? Normalize($"{s.LastNameEn} {s.FirstNameEn}") : null
+            Ne = (s.LastNameEn + s.FirstNameEn).Length > 0 ? Normalize($"{s.LastNameEn} {s.FirstNameEn}") : null,
+            // Иврит в основных полях: кросс-скриптовый дубль канонизируем в ивритскую запись.
+            HasHebrewName = s.LastName.Any(c => c is >= 'א' and <= 'ת')
         }).ToList();
+
+        // Левенштейн с быстрым отсевом по длине (как в SQL: abs(len diff) ≤ 2).
+        static int Lev(string? x, string? y) =>
+            x is null || y is null || Math.Abs(x.Length - y.Length) > 2
+                ? int.MaxValue
+                : Levenshtein(x, y, 2);
 
         foreach (var group in prepared.GroupBy(s => s.BirthYear))
         {
@@ -46,24 +62,41 @@ public class SwimmerDedupService(SwimmDbContext db) : ISwimmerDedupService
             {
                 var a = list[i];
                 var b = list[j];
-                // Быстрый отсев по длине — как в SQL (abs(len diff) ≤ 2).
-                if (Math.Abs(a.Nh.Length - b.Nh.Length) > 2) continue;
 
-                var dist = Math.Min(
-                    Levenshtein(a.Nh, b.Nh, 2),
-                    Math.Min(
-                        Levenshtein(a.Nh, b.NhSwap, 2),
-                        a.Ne != null && b.Ne != null ? Levenshtein(a.Ne, b.Ne, 2) : int.MaxValue));
+                var mainDist = Math.Min(
+                    Lev(a.Nh, b.Nh),
+                    Math.Min(Lev(a.Nh, b.NhSwap), Lev(a.Ne, b.Ne)));
+
+                // Кросс-скрипт: латинское ОСНОВНОЕ имя одного (импорт EN-протокола,
+                // напр. Maccabiah) против EN-полей другого. Ивритское против латиницы
+                // Левенштейном не матчится никогда — это единственный шов между ними.
+                var crossDist = Math.Min(
+                    Math.Min(Lev(a.Nh, b.Ne), Lev(a.NhSwap, b.Ne)),
+                    Math.Min(Lev(b.Nh, a.Ne), Lev(b.NhSwap, a.Ne)));
+                // Кросс-скрипт строже: только точное/почти точное совпадение,
+                // иначе транслитерационные вариации дают шум.
+                if (crossDist > 1) crossDist = int.MaxValue;
+
+                var cross = crossDist < mainDist;
+                var dist = Math.Min(mainDist, crossDist);
                 if (dist > 2) continue;
 
                 var genderOk = a.Gender == b.Gender || a.Gender is null || b.Gender is null;
                 var clubOk = a.Club == b.Club || a.Club is null || b.Club is null;
-                var sure = dist <= 1 && group.Key != 0 && genderOk && clubOk;
+                // У кросс-скриптового дубля клуб почти всегда «свой» (латинский из
+                // EN-протокола) — несовпадение клубов при точном имени не понижает уверенность.
+                var sure = dist <= 1 && group.Key != 0 && genderOk && (clubOk || (cross && dist == 0));
                 // Шум: dist=2 у разных клубов — почти всегда разные люди, не показываем.
                 if (!sure && dist == 2 && a.Club != b.Club) continue;
 
-                // canonical — у кого больше результатов (при равенстве — меньший Id).
-                var (canon, dup) = a.ResultCount >= b.ResultCount ? (a, b) : (b, a);
+                // canonical — у кого больше результатов (при равенстве — меньший Id);
+                // для кросс-скриптовой пары — ивритская запись (латинская вливается в неё,
+                // merge дозаполнит пустые EN-поля из дубля).
+                if (ignored.Contains((Math.Min(a.Id, b.Id), Math.Max(a.Id, b.Id)))) continue;
+
+                var (canon, dup) = cross && a.HasHebrewName != b.HasHebrewName
+                    ? (a.HasHebrewName ? (a, b) : (b, a))
+                    : a.ResultCount >= b.ResultCount ? (a, b) : (b, a);
                 report.Candidates.Add(new SwimmerDedupCandidate(
                     canon.Id, canon.Name, canon.Club, canon.ResultCount,
                     dup.Id, dup.Name, dup.Club, dup.ResultCount,

@@ -20,6 +20,7 @@ import NormativeAgeRecords from './components/normative-age-records';
 import NormativeMastersRecords from './components/normative-masters-records';
 import '../components/mix/text-effect/text-effect.css';
 import { useResultsLoadMode } from '../../hooks/useResultsLoadMode';
+import { useCompetitionMedia } from '../../hooks/useCompetitionMedia';
 import { buildResultsFilterParams, fetchResultsPage } from '../../utils/helpers/results-api';
 
 function ResultsTable() {
@@ -40,6 +41,9 @@ function ResultsTable() {
     togglePrimarySwimmer,
   } = useFavoritesContext();
   const { openLoginModal } = useLoginModal();
+
+  // Медиа заплывов, видимое зрителю (своё + одобренные публикации) — иконки видео на строках.
+  const mediaByResultId = useCompetitionMedia(selectedSource?.sourceParams);
 
   // По title, а не по длине results: в paged-режиме первая страница с текущими фильтрами
   // может законно вернуть 0 строк — это "No results match", а не "источник не выбран".
@@ -235,6 +239,9 @@ function ResultsTable() {
   const showClub = uniqueClubs.size > 1;
   const showEvent = uniqueStyleName.size > 1;
   const showDate = uniqueDates.size > 1;
+  // Здесь всегда одно соревнование (мультидневные — те же дни одного турнира),
+  // название рядом с датой не нужно — только в all-time карточке спортсмена.
+  const showCompetition = false;
   const showAge = uniqueAge.size > 1;
   const showPoolType = uniquePoolType.size > 1;
 
@@ -390,19 +397,27 @@ function ResultsTable() {
               const resultKey = getResultKey(res);
               const isRowExpanded = expandedOverrides[resultKey] ?? showAllOpen;
 
+              // Медиа заплыва (видимое зрителю) подмешиваем в gallery — иконку/лайтбокс
+              // рендерит уже существующий UI_SwimmerGallery внутри строк.
+              const rowMedia = typeof (res as any).id === 'number' ? mediaByResultId.get((res as any).id) : undefined;
+              const resForRow = rowMedia?.length
+                ? { ...res, gallery: [...(res.gallery ?? []), ...rowMedia] }
+                : res;
+
               return (
                 <React.Fragment key={index}>
                   <li
                     className={`lg:hidden flex flex-col gap-2 px-3 py-2 rounded border-l-4 border-b border-b-[var(--theme-mode-border-row)] ${isPrimary ? 'border-l-[#f5b800] bg-[var(--theme-mode-me-highlight)]' : `border-l-transparent ${Helper.getGenderBgClass(rowGender)}`}`}
                   >
                     <ResultsTableMobile
-                      res={res}
+                      res={resForRow}
                       index={index}
                       showAge={showAge}
                       showClub={showClub}
                       showEvent={showEvent}
                       showPoolType={showPoolType}
                       showDate={showDate}
+                      showCompetition={showCompetition}
                       hasInternationalPoints={hasInternationalPoints}
                       clubPoints={clubPoints}
                       levelInfo={levelInfo}
@@ -421,13 +436,14 @@ function ResultsTable() {
                     className={`hidden lg:grid ${isPrimary ? '' : Helper.getGenderBgClass(rowGender)}`}
                   >
                     <ResultsTableDesktop
-                      res={res}
+                      res={resForRow}
                       index={index}
                       showAge={showAge}
                       showClub={showClub}
                       showEvent={showEvent}
                       showPoolType={showPoolType}
                       showDate={showDate}
+                      showCompetition={showCompetition}
                       hasInternationalPoints={hasInternationalPoints}
                       clubPoints={clubPoints}
                       levelInfo={levelInfo}

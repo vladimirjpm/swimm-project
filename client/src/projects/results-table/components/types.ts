@@ -8,6 +8,8 @@ export interface ResultsTableRowProps {
   showClub: boolean;
   showEvent: boolean;
   showDate: boolean;
+  /** Название соревнования рядом с датой — только если загружено больше одного соревнования */
+  showCompetition: boolean;
   showAge: boolean;
   showPoolType: boolean;
   hasInternationalPoints: boolean;

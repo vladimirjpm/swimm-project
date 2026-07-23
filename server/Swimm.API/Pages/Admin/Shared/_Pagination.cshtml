@@ -1,0 +1,31 @@
+@using Swimm.API.Pages.Admin.Shared
+@model PaginationModel
+@*
+    Единый блок пагинации списков админки (фаза 7.1). Использование:
+    <partial name="/Pages/Admin/Shared/_Pagination.cshtml"
+             model='new PaginationModel(r.Page, r.TotalPages,
+                        r.HasPrev ? PageUrl(r.Page - 1) : null,
+                        r.HasNext ? PageUrl(r.Page + 1) : null)' />
+*@
+@if (Model.TotalPages > 1)
+{
+    <div class="flex items-center gap-3 mt-4">
+        @if (Model.PrevUrl != null)
+        {
+            <a href="@Model.PrevUrl" class="admin-btn admin-btn-ghost">← Назад</a>
+        }
+        else
+        {
+            <span class="admin-btn admin-btn-ghost opacity-40 cursor-not-allowed">← Назад</span>
+        }
+        <span class="text-xs text-admin-text-muted">Страница @Model.Page из @Model.TotalPages</span>
+        @if (Model.NextUrl != null)
+        {
+            <a href="@Model.NextUrl" class="admin-btn admin-btn-ghost">Вперёд →</a>
+        }
+        else
+        {
+            <span class="admin-btn admin-btn-ghost opacity-40 cursor-not-allowed">Вперёд →</span>
+        }
+    </div>
+}

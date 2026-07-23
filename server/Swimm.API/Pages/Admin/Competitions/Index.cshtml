@@ -1,26 +1,84 @@
 @page
+@using Swimm.Application.Dtos
 @model Swimm.API.Pages.Admin.Competitions.IndexModel
 @{
     ViewData["Title"] = "Competitions";
-    ViewData["PageSubtitle"] = "Справочник соревнований — эталонный CRUD";
+    ViewData["PageSubtitle"] = "Соревнования: справочник БД + входящие isr.org.il одним списком";
 
-    string PageUrl(int p) =>
-        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, year = Model.Year, page = p })!;
+    // ВНИМАНИЕ: параметр пагинации — «p», НЕ «page» (page зарезервирован Razor Pages, ломает переходы).
+    string PageUrl(int pg) =>
+        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, year = Model.Year, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = Model.Month, p = pg })!;
 
-    var flash = TempData["Flash"] as string;
-    var hasFilters = !string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.CategoryKey) || Model.Year != null;
+    // Ссылка на месяц (сброс страницы на 1; повторный клик по активному — снять фильтр).
+    string MonthUrl(int? m) =>
+        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, year = Model.Year, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = m })!;
+
+    var monthNames = new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+
+    var hasFilters = !string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.CategoryKey)
+        || Model.Year != null || !string.IsNullOrEmpty(Model.Stage) || Model.Month != null;
+
+    (string Text, string Cls) StageBadge(CompetitionStage s) => s switch
+    {
+        CompetitionStage.OnSite => ("на сайте", "bg-[rgba(79,195,247,0.15)] text-[#4fc3f7]"),
+        CompetitionStage.Imported => ("импортировано", "bg-[rgba(102,187,106,0.2)] text-[#66bb6a]"),
+        CompetitionStage.DbOnly => ("только в БД", "bg-white/[.08] text-admin-text-muted"),
+        _ => ("скрыто", "bg-white/[.05] text-admin-text-muted/70"),
+    };
 }
 
 @functions {
-    // Русское склонение: 1 день, 2–4 дня, 5–20 дней, 21 день, …
     static string DaysWord(int n)
     {
         var t = n % 100;
         if (t is >= 11 and <= 14) return "дней";
         return (n % 10) switch { 1 => "день", >= 2 and <= 4 => "дня", _ => "дней" };
     }
+
+    // Бейджи языков загруженных PDF (he — синий, en — фиолетовый).
+    static string LangBadges(string? languages)
+    {
+        if (string.IsNullOrEmpty(languages)) return "";
+        return string.Join("", languages.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(l =>
+            $"<span class=\"inline-block ml-1 py-0.5 px-1.5 rounded text-[10px] font-bold uppercase {(l == "he" ? "bg-[rgba(79,195,247,0.15)] text-[#4fc3f7]" : "bg-[rgba(186,104,200,0.2)] text-[#ce93d8]")}\">{l}</span>"));
+    }
+
+    // Кнопки действий Discovery для site-стороны строки (imported=true — только синхр.языки + PDF;
+    // site-only — Затянуть/✓имп./синхр.языки/PDF/скрыть). Имена не через onclick (экранирование) —
+    // discPreview читает имя из window.__DISC по id.
+    static string SiteActions(Swimm.Application.Dtos.UnifiedSiteInfo s, bool imported)
+    {
+        const string api = "/api/admin/discovery";
+        const string btn = "admin-btn admin-btn-ghost py-1 px-2.5";
+        var finished = s.DateStart <= DateTime.UtcNow;
+        var sb = new System.Text.StringBuilder();
+        if (!imported && s.Status != "ignored" && finished)
+        {
+            sb.Append($"<button onclick=\"discPreview({s.DiscoveredId})\" class=\"{btn}\">Затянуть</button> ");
+            sb.Append($"<button onclick=\"discStatus({s.DiscoveredId},'imported')\" class=\"{btn}\" title=\"Пометить импортированным вручную\">✓ имп.</button> ");
+        }
+        if (finished && string.IsNullOrEmpty(s.Languages))
+            sb.Append($"<button onclick=\"discSyncLangs({s.DiscoveredId}, this)\" class=\"{btn}\" title=\"Скачать HE+EN пару и дозаполнить англ. имена пловцов\">Синхр. языки</button> ");
+        else if (s.Languages == "he")
+            sb.Append("<span class=\"text-[11px] text-admin-text-muted\" title=\"Второй язык на loglig не найден\">только HE</span> ");
+        sb.Append($"<a href=\"{api}/{s.DiscoveredId}/pdf\" class=\"{btn}\">PDF</a> ");
+        if (!imported)
+            sb.Append(s.Status == "ignored"
+                ? $"<button onclick=\"discStatus({s.DiscoveredId},'new')\" class=\"{btn}\">вернуть</button>"
+                : $"<button onclick=\"discStatus({s.DiscoveredId},'ignored')\" class=\"{btn}\" title=\"Скрыть\">✕</button>");
+        return sb.ToString();
+    }
 }
 
+<div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-4 text-[0.85rem] text-admin-text-muted leading-relaxed">
+    Одно соревнование — одна строка со стадией (<b>на сайте</b> / <b>импортировано</b> /
+    <b>только в БД</b> / <b>скрыто</b>). Справочник БД и входящие с
+    <a class="text-admin-accent" href="https://isr.org.il/competitions.asp" target="_blank" rel="noopener">isr.org.il</a>
+    объединены. Действия входящих (Проверить/Затянуть/импорт, синхр. языки, скрыть) и CRUD
+    справочника (изменить/удалить/создать) — здесь же.
+</div>
+
+@{ var flash = TempData["Flash"] as string; }
 @if (!string.IsNullOrEmpty(flash))
 {
     <script>
@@ -28,12 +86,28 @@
     </script>
 }
 
-<!-- Search + create -->
+<div class="mb-4 flex flex-wrap items-center gap-3">
+    <button id="btn-sync" class="admin-btn admin-btn-primary cursor-pointer">Проверить сейчас</button>
+    <span id="sync-info" class="text-[12.5px] text-admin-text-muted"></span>
+    <a href="/Admin/Competitions/MoveResults" class="admin-btn admin-btn-ghost ml-auto">Перенос результатов</a>
+    <a href="/Admin/Competitions/Edit" class="admin-btn admin-btn-primary">+ Новое соревнование</a>
+</div>
+
+<!-- Фильтры -->
 <form method="get" class="admin-card flex flex-wrap items-end gap-3 px-4 py-3 mb-4">
     <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
         Поиск по названию
-        <input name="q" value="@Model.Search" autocomplete="off"
-               class="admin-input w-72" placeholder="Название или подзаголовок дня…" />
+        <input name="q" value="@Model.Search" autocomplete="off" class="admin-input w-72" placeholder="Название или подзаголовок…" />
+    </label>
+    <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+        Стадия
+        <select name="stage" class="admin-input">
+            <option value="">Все</option>
+            <option value="OnSite" selected="@(Model.Stage == "OnSite")">на сайте</option>
+            <option value="Imported" selected="@(Model.Stage == "Imported")">импортировано</option>
+            <option value="DbOnly" selected="@(Model.Stage == "DbOnly")">только в БД</option>
+            <option value="Ignored" selected="@(Model.Stage == "Ignored")">скрыто</option>
+        </select>
     </label>
     <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
         Категория
@@ -55,40 +129,46 @@
             }
         </select>
     </label>
+    <input type="hidden" name="month" value="@Model.Month" />
+    <label class="flex items-center gap-2 text-[13px] text-admin-text-muted self-center mt-3.5">
+        <input type="checkbox" name="synth" value="true" checked="@Model.ShowSynthetic" class="cursor-pointer" />
+        показать синтетику (SYNTH)
+    </label>
     <button type="submit" class="admin-btn admin-btn-primary">Найти</button>
     @if (hasFilters)
     {
         <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">Сброс</a>
     }
-    <a href="@Url.Page("Edit")" class="admin-btn admin-btn-primary ml-auto">+ Новое соревнование</a>
 </form>
+
+<!-- Фильтр по месяцам: 12 кнопок со счётчиками (под текущими фильтрами; клик по активному снимает) -->
+<div class="mb-3 flex flex-wrap gap-1.5">
+    @for (var i = 0; i < 12; i++)
+    {
+        var m = i + 1;
+        var active = Model.Month == m;
+        var count = Model.MonthCounts.Count > i ? Model.MonthCounts[i] : 0;
+        <a href="@MonthUrl(active ? (int?)null : m)"
+           class="@(active
+               ? "admin-btn admin-btn-primary py-1 px-2.5"
+               : "admin-btn admin-btn-ghost py-1 px-2.5") @(count == 0 && !active ? "opacity-40" : "")"
+           title="@(active ? "Снять фильтр по месяцу" : $"Показать только {monthNames[i]}")">
+            @monthNames[i] <span class="ml-1 tabular-nums opacity-70">@count</span>
+        </a>
+    }
+</div>
 
 <div class="mb-3 text-xs text-admin-text-muted">
     Всего: <strong class="text-admin-text">@Model.Result.TotalCount</strong>
-    @if (hasFilters)
+    @if (Model.Month is int mm)
     {
-        <text> · фильтры:</text>
-        @if (!string.IsNullOrEmpty(Model.Search))
-        {
-            <text> название «@Model.Search»</text>
-        }
-        @if (!string.IsNullOrEmpty(Model.CategoryKey))
-        {
-            var selectedCat = Model.Categories.FirstOrDefault(c => c.Key == Model.CategoryKey);
-            <text> · категория «@(!string.IsNullOrEmpty(selectedCat?.Badge) ? selectedCat.Badge + " " : "")@(selectedCat?.Name ?? Model.CategoryKey)»</text>
-        }
-        @if (Model.Year != null)
-        {
-            <text> · сезон @Model.Year</text>
-        }
+        <text> · месяц: <strong class="text-admin-text">@monthNames[mm - 1]</strong></text>
     }
 </div>
 
 @if (Model.Result.Items.Count == 0)
 {
-    <div class="admin-card text-center text-admin-text-muted italic py-10">
-        Соревнований не найдено.
-    </div>
+    <div class="admin-card text-center text-admin-text-muted italic py-10">Ничего не найдено.</div>
 }
 else
 {
@@ -96,66 +176,61 @@ else
         <table class="admin-table">
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th>Стадия</th>
                     <th>Название</th>
                     <th>Дата</th>
                     <th>Бассейн</th>
-                    <th>Страна</th>
                     <th>OrgCompId</th>
-                    <th>Флаги</th>
+                    <th>Площадка / языки</th>
                     <th class="text-right">Строк</th>
-                    <th class="text-right">URL</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var row in Model.Result.Items)
+                @foreach (var u in Model.Result.Items)
                 {
-                    if (row.IsEvent)
+                    var badge = StageBadge(u.Stage);
+                    @if (u.Db is { IsEvent: true } ev)
                     {
-                        <!-- Заголовок многодневного события: клик по строке или шеврону разворачивает дни -->
-                        <tr id="evhead-@row.EventId"
-                            class="cursor-pointer hover:bg-admin-surface-hover select-none"
-                            onclick="toggleEvent(@row.EventId)">
-                            <td class="text-admin-text-muted">
-                                <svg id="chev-@row.EventId" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     class="w-3.5 h-3.5 inline-block transition-transform text-admin-text-muted">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                                </svg>
-                            </td>
+                        <!-- Многодневное событие: заголовок + разворачиваемые дни -->
+                        <tr id="evhead-@ev.EventId" class="cursor-pointer hover:bg-admin-surface-hover select-none" onclick="toggleEvent(@ev.EventId)">
+                            <td><span class="inline-block py-0.5 px-2 rounded text-xs font-semibold @badge.Cls">@badge.Text</span></td>
                             <td>
-                                <span class="font-medium text-admin-text">@row.EventName</span>
-                                <span class="ml-1.5 inline-block py-0.5 px-1.5 rounded text-[10px] font-semibold bg-admin-success/15 text-admin-success">
-                                    @row.DayCount @DaysWord(row.DayCount)
-                                </span>
-                                @await Html.PartialAsync("/Pages/Admin/Competitions/_CompCategories.cshtml", row.Categories)
+                                <svg id="chev-@ev.EventId" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-3.5 h-3.5 inline-block transition-transform text-admin-text-muted"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+                                <span class="font-medium text-admin-text">@ev.EventName</span>
+                                <span class="ml-1.5 inline-block py-0.5 px-1.5 rounded text-[10px] font-semibold bg-admin-success/15 text-admin-success">@ev.DayCount @DaysWord(ev.DayCount)</span>
+                                @await Html.PartialAsync("/Pages/Admin/Competitions/_CompCategories.cshtml", ev.Categories)
                             </td>
-                            <td class="whitespace-nowrap text-admin-text-muted">@(string.IsNullOrEmpty(row.DateRange) ? "—" : row.DateRange)</td>
-                            <td>@(string.IsNullOrEmpty(row.PoolType) ? "—" : row.PoolType)</td>
-                            <td>@(string.IsNullOrEmpty(row.Country) ? "—" : row.Country)</td>
-                            <td class="text-admin-text-muted">—</td>
-                            <td>@await Html.PartialAsync("/Pages/Admin/Competitions/_CompFlags.cshtml", row)</td>
-                            <td class="text-right tabular-nums">@row.TotalResultCount</td>
-                            <td class="text-right text-admin-text-muted">—</td>
-                            <td class="text-right" onclick="event.stopPropagation()">
+                            <td class="whitespace-nowrap text-admin-text-muted">@(string.IsNullOrEmpty(ev.DateRange) ? "—" : ev.DateRange)</td>
+                            <td>@(string.IsNullOrEmpty(ev.PoolType) ? "—" : ev.PoolType)</td>
+                            <td class="text-admin-text-muted">
+                                @if (u.Site is { } es)
+                                {
+                                    <a href="https://isr.org.il/comp.asp?compID=@es.OrgCompId" target="_blank" rel="noopener" class="text-admin-accent hover:underline" onclick="event.stopPropagation()">@es.OrgCompId ↗</a>
+                                }
+                                else { <text>—</text> }
+                            </td>
+                            <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(u.Site != null ? System.Net.WebUtility.HtmlEncode(u.Site.Venue ?? "—") + LangBadges(u.Site.Languages) : "—")</td>
+                            <td class="text-right tabular-nums">@ev.TotalResultCount</td>
+                            <td class="text-right whitespace-nowrap" onclick="event.stopPropagation()">
+                                @Html.Raw(u.Site != null ? SiteActions(u.Site, imported: true) : "")
                                 <form method="post" asp-page-handler="DeleteEvent"
                                       asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                      asp-route-year="@Model.Year" asp-route-page="@Model.Result.Page"
-                                      class="inline comp-delete-form"
-                                      data-kind="event" data-name="@row.EventName" data-days="@row.DayCount" data-rows="@row.TotalResultCount">
-                                    <input type="hidden" name="eventId" value="@row.EventId" />
+                                      asp-route-year="@Model.Year" asp-route-stage="@Model.Stage"
+                                      asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
+                                      class="inline comp-delete-form" data-kind="event" data-name="@ev.EventName" data-days="@ev.DayCount" data-rows="@ev.TotalResultCount">
+                                    <input type="hidden" name="eventId" value="@ev.EventId" />
                                     <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
                                 </form>
                             </td>
                         </tr>
-                        @foreach (var d in row.Days)
+                        @foreach (var d in ev.Days)
                         {
-                            <tr class="event-day-@row.EventId hidden event-group">
-                                <td class="text-admin-text-muted pl-6">@d.Id</td>
+                            <tr class="event-day-@ev.EventId hidden event-group">
+                                <td></td>
                                 <td>
                                     <span class="text-admin-text-muted/60 mr-1">↳</span>
-                                    <a href="@Url.Page("Edit", new { id = d.Id })"
-                                       class="text-admin-accent hover:underline">День @(d.DayNumber?.ToString() ?? "?")</a>
+                                    <a href="/Admin/Competitions/Edit?id=@d.Id" class="text-admin-accent hover:underline">День @(d.DayNumber?.ToString() ?? "?")</a>
                                     @if (!string.IsNullOrEmpty(d.SubName))
                                     {
                                         <div class="pl-4 text-[11px] text-admin-text-muted truncate max-w-[280px]" title="@d.SubName">@d.SubName</div>
@@ -163,19 +238,22 @@ else
                                 </td>
                                 <td class="whitespace-nowrap text-admin-text-muted">@(string.IsNullOrEmpty(d.Date) ? "—" : d.Date)</td>
                                 <td>@(string.IsNullOrEmpty(d.PoolType) ? "—" : d.PoolType)</td>
-                                <td>@(string.IsNullOrEmpty(d.Country) ? "—" : d.Country)</td>
-                                <td class="text-admin-text-muted">@(d.OrgCompId?.ToString() ?? "—")</td>
+                                <td class="text-admin-text-muted">
+                                    @if (d.OrgCompId is int doc)
+                                    {
+                                        <a href="https://isr.org.il/comp.asp?compID=@doc" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@doc ↗</a>
+                                    }
+                                    else { <text>—</text> }
+                                </td>
                                 <td>@await Html.PartialAsync("/Pages/Admin/Competitions/_CompFlags.cshtml", d)</td>
                                 <td class="text-right tabular-nums">@d.ResultCount</td>
-                                <td class="text-right tabular-nums">@(d.ResultUrlCount > 0 ? d.ResultUrlCount.ToString() : "—")</td>
                                 <td class="text-right whitespace-nowrap">
-                                    <a href="@Url.Page("Edit", new { id = d.Id })"
-                                       class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
+                                    <a href="/Admin/Competitions/Edit?id=@d.Id" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
                                     <form method="post" asp-page-handler="Delete"
                                           asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                          asp-route-year="@Model.Year" asp-route-page="@Model.Result.Page"
-                                          class="inline comp-delete-form"
-                                          data-kind="day" data-name="День @(d.DayNumber?.ToString() ?? "?")" data-rows="@d.ResultCount">
+                                          asp-route-year="@Model.Year" asp-route-stage="@Model.Stage"
+                                          asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
+                                          class="inline comp-delete-form" data-kind="day" data-name="День @(d.DayNumber?.ToString() ?? "?")" data-rows="@d.ResultCount">
                                         <input type="hidden" name="id" value="@d.Id" />
                                         <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
                                     </form>
@@ -183,14 +261,13 @@ else
                             </tr>
                         }
                     }
-                    else
+                    else if (u.Db?.Single is { } c)
                     {
-                        var c = row.Single!;
+                        <!-- Одиночное соревнование (импортировано или только в БД) -->
                         <tr>
-                            <td class="text-admin-text-muted">@c.Id</td>
+                            <td><span class="inline-block py-0.5 px-2 rounded text-xs font-semibold @badge.Cls">@badge.Text</span></td>
                             <td>
-                                <a href="@Url.Page("Edit", new { id = c.Id })"
-                                   class="text-admin-accent hover:underline font-medium">@c.Name</a>
+                                <a href="/Admin/Competitions/Edit?id=@c.Id" class="text-admin-accent hover:underline font-medium">@c.Name</a>
                                 @if (!string.IsNullOrEmpty(c.SubName))
                                 {
                                     <div class="text-[11px] text-admin-text-muted truncate max-w-[280px]" title="@c.SubName">@c.SubName</div>
@@ -199,23 +276,48 @@ else
                             </td>
                             <td class="whitespace-nowrap text-admin-text-muted">@(string.IsNullOrEmpty(c.Date) ? "—" : c.Date)</td>
                             <td>@(string.IsNullOrEmpty(c.PoolType) ? "—" : c.PoolType)</td>
-                            <td>@(string.IsNullOrEmpty(c.Country) ? "—" : c.Country)</td>
-                            <td class="text-admin-text-muted">@(c.OrgCompId?.ToString() ?? "—")</td>
-                            <td>@await Html.PartialAsync("/Pages/Admin/Competitions/_CompFlags.cshtml", c)</td>
+                            <td class="text-admin-text-muted">
+                                @{ var org = c.OrgCompId ?? u.Site?.OrgCompId; }
+                                @if (org is int soc)
+                                {
+                                    <a href="https://isr.org.il/comp.asp?compID=@soc" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@soc ↗</a>
+                                }
+                                else { <text>—</text> }
+                            </td>
+                            <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(u.Site != null ? System.Net.WebUtility.HtmlEncode(u.Site.Venue ?? "—") + LangBadges(u.Site.Languages) : "—")</td>
                             <td class="text-right tabular-nums">@c.ResultCount</td>
-                            <td class="text-right tabular-nums">@(c.ResultUrlCount > 0 ? c.ResultUrlCount.ToString() : "—")</td>
                             <td class="text-right whitespace-nowrap">
-                                <a href="@Url.Page("Edit", new { id = c.Id })"
-                                   class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
+                                <a href="/Admin/Competitions/Edit?id=@c.Id" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
+                                @Html.Raw(u.Site != null ? SiteActions(u.Site, imported: true) : "")
                                 <form method="post" asp-page-handler="Delete"
                                       asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                      asp-route-year="@Model.Year" asp-route-page="@Model.Result.Page"
-                                      class="inline comp-delete-form"
-                                      data-kind="single" data-name="@c.Name" data-rows="@c.ResultCount">
+                                      asp-route-year="@Model.Year" asp-route-stage="@Model.Stage"
+                                      asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
+                                      class="inline comp-delete-form" data-kind="single" data-name="@c.Name" data-rows="@c.ResultCount">
                                     <input type="hidden" name="id" value="@c.Id" />
                                     <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
                                 </form>
                             </td>
+                        </tr>
+                    }
+                    else if (u.Site is { } s)
+                    {
+                        <!-- Только на сайте (в БД ещё нет) -->
+                        <tr>
+                            <td><span class="inline-block py-0.5 px-2 rounded text-xs font-semibold @badge.Cls">@badge.Text</span></td>
+                            <td dir="rtl" style="text-align:left">
+                                <a class="text-admin-accent hover:underline" href="https://isr.org.il/comp.asp?compID=@s.OrgCompId" target="_blank" rel="noopener">@s.Name ↗</a>
+                                @if (!string.IsNullOrEmpty(s.LastError))
+                                {
+                                    <div class="text-[11px] text-[#ef9a9a]" dir="ltr">@s.LastError</div>
+                                }
+                            </td>
+                            <td class="whitespace-nowrap text-admin-text-muted">@(s.DateStart == s.DateEnd ? s.DateStart.ToString("dd/MM/yyyy") : $"{s.DateStart:dd/MM/yyyy} – {s.DateEnd:dd/MM/yyyy}")</td>
+                            <td class="text-admin-text-muted">—</td>
+                            <td class="text-admin-text-muted">@s.OrgCompId</td>
+                            <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(System.Net.WebUtility.HtmlEncode(s.Venue ?? "—") + LangBadges(s.Languages))</td>
+                            <td class="text-right text-admin-text-muted">—</td>
+                            <td class="text-right whitespace-nowrap">@Html.Raw(SiteActions(s, imported: false))</td>
                         </tr>
                     }
                 }
@@ -223,46 +325,72 @@ else
         </table>
     </div>
 
-    @if (Model.Result.TotalPages > 1)
-    {
-        <div class="flex items-center gap-3 mt-4">
-            @if (Model.Result.HasPrev)
-            {
-                <a href="@PageUrl(Model.Result.Page - 1)" class="admin-btn admin-btn-ghost">← Назад</a>
-            }
-            else
-            {
-                <span class="admin-btn admin-btn-ghost opacity-40 cursor-not-allowed">← Назад</span>
-            }
-            <span class="text-xs text-admin-text-muted">
-                Страница @Model.Result.Page из @Model.Result.TotalPages
-            </span>
-            @if (Model.Result.HasNext)
-            {
-                <a href="@PageUrl(Model.Result.Page + 1)" class="admin-btn admin-btn-ghost">Вперёд →</a>
-            }
-            else
-            {
-                <span class="admin-btn admin-btn-ghost opacity-40 cursor-not-allowed">Вперёд →</span>
-            }
-        </div>
-    }
+    <partial name="/Pages/Admin/Shared/_Pagination.cshtml"
+             model='new Swimm.API.Pages.Admin.Shared.PaginationModel(Model.Result.Page, Model.Result.TotalPages,
+                        Model.Result.HasPrev ? PageUrl(Model.Result.Page - 1) : null,
+                        Model.Result.HasNext ? PageUrl(Model.Result.Page + 1) : null)' />
 }
+
+<!-- Превью «затянутого» PDF перед импортом (перенос из /Admin/Discovery) -->
+<div id="preview-card" class="admin-card mt-6 hidden p-4">
+    <div class="mb-2 text-sm font-semibold text-admin-text" id="preview-title"></div>
+    <div id="preview-summary" class="mb-3 text-[13px] text-admin-text-muted"></div>
+    <div id="preview-warnings" class="mb-3 hidden rounded-md border border-admin-danger/40 bg-admin-danger/10 p-3 text-[12.5px]"></div>
+
+    <div class="mb-3">
+        <div class="mb-1 text-[12px] font-semibold uppercase tracking-wide text-admin-text-muted">Категории</div>
+        <div id="preview-categories" class="flex flex-wrap gap-3 text-[13px]"></div>
+    </div>
+
+    <div class="mb-3 hidden" id="overwrite-block">
+        <label class="inline-flex items-center gap-2 text-[13px] text-admin-text bg-[rgba(255,213,79,0.08)] border border-[rgba(255,213,79,0.3)] rounded-md py-2 px-3 cursor-pointer">
+            <input type="checkbox" id="overwrite-existing-cb">
+            Обновить существующее соревнование <span id="overwrite-comp-name" class="text-admin-text-muted"></span> (upsert: сматченные результаты обновятся на месте, медиа сохранится)
+        </label>
+        <label id="delete-missing-block" class="hidden mt-2 inline-flex items-center gap-2 text-[13px] text-admin-text bg-admin-danger/5 border border-admin-danger/30 rounded-md py-2 px-3 cursor-pointer">
+            <input type="checkbox" id="delete-missing-cb">
+            Удалять результаты, которых нет в файле
+        </label>
+        <div id="overwrite-delete-warning" class="hidden mt-2 text-[13px] text-admin-danger border-l-[3px] border-l-admin-danger bg-admin-danger/5 rounded-md py-2 px-3"></div>
+    </div>
+
+    <div class="mb-4" id="event-block">
+        <div class="mb-1 text-[12px] font-semibold uppercase tracking-wide text-admin-text-muted">
+            Многодневное событие (второй день того же турнира — выбери существующее)
+        </div>
+        <select id="event-select" class="admin-input w-full max-w-md rounded-md px-3 py-2 text-[13px]">
+            <option value="">Без события (однодневное)</option>
+            <option value="__new__">➕ Создать новое событие…</option>
+        </select>
+        <input type="text" id="event-name" class="admin-input mt-2 hidden w-full max-w-md rounded-md px-3 py-2 text-[13px]" placeholder="Название события" />
+    </div>
+
+    <div class="flex gap-3">
+        <button id="btn-import" class="admin-btn admin-btn-primary cursor-pointer">Импортировать</button>
+        <button id="btn-cancel-preview" class="cursor-pointer rounded-md border border-admin-border px-4 py-2 text-[13px] text-admin-text-muted">Отмена</button>
+    </div>
+</div>
 
 @section Scripts {
     <script>
-        // Разворачивание/сворачивание дней многодневного события.
+        // Словарь discovery-строк на странице: id → { name, languages } — чтобы действия не
+        // тащили имя через onclick (проблемы экранирования иврита/кавычек).
+        window.__DISC = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            Model.Result.Items.Where(u => u.Site != null)
+                .GroupBy(u => u.Site!.DiscoveredId).Select(g => g.First())
+                .ToDictionary(u => u.Site!.DiscoveredId.ToString(),
+                    u => new { name = u.Site!.Name, languages = u.Site!.Languages })));
+
+        // Разворачивание/сворачивание дней многодневного события (как в /Admin/Competitions).
         function toggleEvent(eventId) {
-            document.querySelectorAll('.event-day-' + eventId)
-                .forEach(tr => tr.classList.toggle('hidden'));
+            document.querySelectorAll('.event-day-' + eventId).forEach(tr => tr.classList.toggle('hidden'));
             const chev = document.getElementById('chev-' + eventId);
             if (chev) chev.classList.toggle('rotate-90');
-            // Заголовок раскрытого события подсвечиваем той же зелёной группой, что и дни.
             const head = document.getElementById('evhead-' + eventId);
             if (head) head.classList.toggle('event-group');
         }
 
-        // Подтверждение каскадного удаления (одиночное / день / всё событие).
+        // Подтверждение каскадного удаления (одиночное / день / всё событие) — как в /Admin/Competitions.
         document.querySelectorAll('.comp-delete-form').forEach(form => {
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
@@ -270,25 +398,200 @@ else
                 const kind = form.dataset.kind;
                 const name = form.dataset.name || 'соревнование';
                 const rows = form.dataset.rows || '0';
-
                 let title, message;
                 if (kind === 'event') {
                     const days = form.dataset.days || '?';
                     title = 'Удалить всё событие?';
-                    message = `«${name}» — будут удалены ВСЕ ${days} дн. вместе с результатами ` +
-                              `(${rows} строк), эстафетами и галереями. Действие необратимо.`;
+                    message = `«${name}» — будут удалены ВСЕ ${days} дн. вместе с результатами (${rows} строк), эстафетами и галереями. Действие необратимо.`;
                 } else if (kind === 'day') {
                     title = 'Удалить день?';
                     message = `«${name}» — будут удалены его результаты (${rows} строк). Действие необратимо.`;
                 } else {
                     title = 'Удалить соревнование?';
-                    message = `«${name}» — будут удалены его результаты (${rows} строк), эстафеты и галереи. ` +
-                              `Действие необратимо.`;
+                    message = `«${name}» — будут удалены его результаты (${rows} строк), эстафеты и галереи. Действие необратимо.`;
                 }
-
                 const ok = await adminConfirm({ title, message, confirmText: 'Удалить', danger: true });
                 if (ok) form.submit();
             });
         });
+
+        // ── Действия Discovery (перенос из /Admin/Discovery; после мутаций перезагружаем SSR) ──
+        (function () {
+            const API = '/api/admin/discovery';
+            const info = document.getElementById('sync-info');
+            let preview = null; // { previewId, id, name }
+
+            async function apiJson(url, opts = {}) {
+                opts.headers = { 'X-XSRF-TOKEN': _csrfToken, ...(opts.headers ?? {}) };
+                const res = await fetch(url, { credentials: 'same-origin', ...opts });
+                let body = null;
+                try { body = await res.json(); } catch { /* пустое тело */ }
+                if (!res.ok) throw new Error(body?.error ?? `${res.status} ${res.statusText}`);
+                return body;
+            }
+            const discName = (id) => (window.__DISC?.[id]?.name) || ('#' + id);
+
+            document.getElementById('btn-sync').addEventListener('click', async () => {
+                const btn = document.getElementById('btn-sync');
+                btn.disabled = true;
+                info.textContent = 'Проверяю сайт…';
+                try {
+                    const r = await apiJson(`${API}/sync`, { method: 'POST' });
+                    info.textContent = `На сайте: ${r.totalOnSite}, новых: ${r.added}, обновлено: ${r.updated}. Обновляю…`;
+                    location.reload();
+                } catch (e) { info.textContent = ''; toast('Ошибка: ' + e.message, 5000); btn.disabled = false; }
+            });
+
+            window.discStatus = async function (id, status) {
+                try {
+                    await apiJson(`${API}/${id}/status`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status })
+                    });
+                    location.reload();
+                } catch (e) { toast('Ошибка: ' + e.message); }
+            };
+
+            window.discSyncLangs = async function (id, btn) {
+                const name = discName(id);
+                if (btn) { btn.disabled = true; btn.textContent = 'Синхронизирую…'; }
+                info.textContent = `Синхр. языки «${name}»: скачиваю HE+EN пару, склеиваю, обновляю имена… (может занять минуту)`;
+                try {
+                    const s = await apiJson(`${API}/${id}/sync-languages`, { method: 'POST' });
+                    info.textContent = s.monolingual
+                        ? `Синхр. языки «${name}»: ${s.message}`
+                        : `Синхр. языки «${name}»: готово — EN дозаполнено ${s.enNamesFilled}, канонизировано ${s.canonized}, не найдено ${s.notFound}`;
+                } catch (e) {
+                    info.textContent = `Синхр. языки «${name}»: ОШИБКА — ${e.message}`;
+                }
+                setTimeout(() => location.reload(), 1500); // дать прочитать итог перед перезагрузкой
+            };
+
+            window.discPreview = async function (id) {
+                const name = discName(id);
+                toast('Скачиваю и парсю PDF…', 4000);
+                try {
+                    const p = await apiJson(`${API}/${id}/preview`, { method: 'POST' });
+                    preview = { previewId: p.previewId, id, name };
+                    await showPreview(p, name);
+                } catch (e) { toast('Ошибка: ' + e.message, 6000); }
+            };
+
+            async function showPreview(p, name) {
+                document.getElementById('preview-card').classList.remove('hidden');
+                document.getElementById('preview-title').textContent = `Превью: ${name}`;
+                document.getElementById('preview-summary').innerHTML =
+                    `Распознано результатов: <b>${p.resultCount}</b>` +
+                    (p.competitions?.length
+                        ? '<ul class="mt-1 list-disc pl-5">' + p.competitions.map(c =>
+                            `<li dir="rtl" style="text-align:left">${esc(c.competition)} — ${esc(c.date)} (${c.resultCount})</li>`).join('') + '</ul>'
+                        : '');
+                const warn = document.getElementById('preview-warnings');
+                warn.classList.toggle('hidden', !(p.warnings?.length));
+                warn.innerHTML = (p.warnings ?? []).map(esc).join('<br>');
+
+                // Upsert-чекбокс — только когда превью нашло существующее соревнование по ключу Name|Date|PoolType.
+                const overwriteBlock = document.getElementById('overwrite-block');
+                const overwriteCb = document.getElementById('overwrite-existing-cb');
+                const overwriteCompName = document.getElementById('overwrite-comp-name');
+                const deleteMissingBlock = document.getElementById('delete-missing-block');
+                const deleteMissingCb = document.getElementById('delete-missing-cb');
+                const overwriteDeleteWarning = document.getElementById('overwrite-delete-warning');
+                const existingMatch = (p.existingCompetitions || []).find(m => m.existingCompetitionId);
+                overwriteBlock.classList.toggle('hidden', !p.existingCompetitionId);
+                overwriteCompName.textContent = existingMatch ? `«${existingMatch.existingCompetitionName}»` : '';
+                overwriteCb.checked = false;
+                deleteMissingCb.checked = false;
+                deleteMissingBlock.classList.add('hidden');
+
+                function updateDeleteMissingVisibility() {
+                    const show = overwriteCb.checked;
+                    deleteMissingBlock.classList.toggle('hidden', !show);
+                    if (!show) deleteMissingCb.checked = false;
+                    updateOverwriteDeleteWarning();
+                }
+                function updateOverwriteDeleteWarning() {
+                    if (!overwriteDeleteWarning) return;
+                    if (!overwriteCb.checked || !deleteMissingCb.checked) { overwriteDeleteWarning.classList.add('hidden'); return; }
+                    const matches = p.existingCompetitions || [];
+                    let dbTotal = 0, fileTotal = 0, anyOverage = false;
+                    matches.forEach(m => {
+                        if (!m.existingCompetitionId) return;
+                        const existing = m.existingResultCount || 0;
+                        const day = (p.competitions || []).find(c => c.competition === m.competition && c.date === m.date);
+                        const fileCount = day ? (day.resultCount || 0) : 0;
+                        dbTotal += existing; fileTotal += fileCount;
+                        if (existing > fileCount) anyOverage = true;
+                    });
+                    if (!anyOverage) { overwriteDeleteWarning.classList.add('hidden'); return; }
+                    const maxDeleted = Math.max(0, dbTotal - fileTotal);
+                    overwriteDeleteWarning.textContent =
+                        `В БД ${dbTotal} результатов, в файле ${fileTotal} — до ${maxDeleted} результатов будет удалено. ` +
+                        `Результаты с привязанным медиа удалены не будут.`;
+                    overwriteDeleteWarning.classList.remove('hidden');
+                }
+                overwriteDeleteWarning.classList.add('hidden');
+                overwriteCb.onchange = updateDeleteMissingVisibility;
+                deleteMissingCb.onchange = updateOverwriteDeleteWarning;
+
+                // Список существующих событий (второй день дописывается к первому).
+                const eventSelect = document.getElementById('event-select');
+                [...eventSelect.querySelectorAll('option[data-event]')].forEach(o => o.remove());
+                try {
+                    const events = await fetch('/api/admin/competition-events', { credentials: 'same-origin' })
+                        .then(r => r.ok ? r.json() : []);
+                    (Array.isArray(events) ? events : []).forEach(e => {
+                        const opt = document.createElement('option');
+                        opt.value = String(e.id); opt.dataset.event = '1';
+                        opt.textContent = `${e.name} · дней: ${e.dayCount}`;
+                        eventSelect.appendChild(opt);
+                    });
+                } catch { /* список событий опционален */ }
+
+                const multiDay = (p.competitions?.length ?? 0) > 1;
+                eventSelect.value = multiDay ? '__new__' : '';
+                document.getElementById('event-name').value = name;
+                document.getElementById('event-name').classList.toggle('hidden', !multiDay);
+
+                try {
+                    const cats = await fetch('/api/categories', { credentials: 'same-origin' }).then(r => r.json());
+                    document.getElementById('preview-categories').innerHTML = cats.map(c =>
+                        `<label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" value="${esc(c.key)}" class="disc-cat cursor-pointer"> ${esc(c.name)}</label>`
+                    ).join('');
+                } catch { /* категории опциональны */ }
+
+                document.getElementById('preview-card').scrollIntoView({ behavior: 'smooth' });
+            }
+
+            document.getElementById('btn-cancel-preview').addEventListener('click', () => {
+                preview = null;
+                document.getElementById('preview-card').classList.add('hidden');
+            });
+            document.getElementById('event-select').addEventListener('change', (e) => {
+                document.getElementById('event-name').classList.toggle('hidden', e.target.value !== '__new__');
+            });
+
+            document.getElementById('btn-import').addEventListener('click', async () => {
+                if (!preview) return;
+                const categoryKeys = [...document.querySelectorAll('.disc-cat:checked')].map(i => i.value);
+                const eventChoice = document.getElementById('event-select').value;
+                try {
+                    const r = await apiJson(`${API}/import`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            previewId: preview.previewId,
+                            categoryKeys: categoryKeys.length ? categoryKeys : null,
+                            eventId: eventChoice && eventChoice !== '__new__' ? Number(eventChoice) : null,
+                            newEventName: eventChoice === '__new__' ? document.getElementById('event-name').value.trim() : null,
+                            overwriteExisting: document.getElementById('overwrite-existing-cb').checked,
+                            deleteMissing: document.getElementById('overwrite-existing-cb').checked && document.getElementById('delete-missing-cb').checked
+                        })
+                    });
+                    toast(`Импорт поставлен в очередь (job ${r.jobId}) — статус в Import History`, 6000);
+                    preview = null;
+                    document.getElementById('preview-card').classList.add('hidden');
+                } catch (e) { toast('Ошибка импорта: ' + e.message, 6000); }
+            });
+        })();
     </script>
 }

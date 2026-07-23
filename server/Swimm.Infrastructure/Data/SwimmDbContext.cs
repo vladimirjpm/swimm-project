@@ -24,6 +24,7 @@ public class SwimmDbContext : DbContext
     public DbSet<Club> Clubs => Set<Club>();
     public DbSet<Swimmer> Swimmers => Set<Swimmer>();
     public DbSet<Relay> Relays => Set<Relay>();
+    public DbSet<RelayMember> RelayMembers => Set<RelayMember>();
     public DbSet<Gallery> Galleries => Set<Gallery>();
     public DbSet<GalleryItem> GalleryItems => Set<GalleryItem>();
     public DbSet<Style> Styles => Set<Style>();
@@ -51,6 +52,10 @@ public class SwimmDbContext : DbContext
     /* === Фавориты и медиа пользователей === */
     public DbSet<UserFavorite> UserFavorites => Set<UserFavorite>();
     public DbSet<UserMedia> UserMedia => Set<UserMedia>();
+    public DbSet<UserMediaPublication> UserMediaPublications => Set<UserMediaPublication>();
+
+    /* === Реакции (лайки на медиа, поздравления на заплывы) === */
+    public DbSet<UserReaction> UserReactions => Set<UserReaction>();
 
     /* === Группы (SwimHub) === */
     public DbSet<HubGroup> HubGroups => Set<HubGroup>();
@@ -59,6 +64,12 @@ public class SwimmDbContext : DbContext
     public DbSet<HubGroupUserMember> HubGroupUserMembers => Set<HubGroupUserMember>();
     public DbSet<HubGroupClubRequest> HubGroupClubRequests => Set<HubGroupClubRequest>();
     public DbSet<HubGroupMedia> HubGroupMedia => Set<HubGroupMedia>();
+
+    /* === Дедуп: «развязанные» пары (Sys_) === */
+    public DbSet<DedupIgnoredPair> DedupIgnoredPairs => Set<DedupIgnoredPair>();
+
+    /* === Аудит ручных мутаций админки (фаза 7.4, Sys_) === */
+    public DbSet<AdminAudit> AdminAudits => Set<AdminAudit>();
 
     /* === Тренировки (приватные, Sys_) === */
     public DbSet<TrainingSession> TrainingSessions => Set<TrainingSession>();
@@ -135,6 +146,12 @@ public class SwimmDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.CountryId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Привязка к loglig.com уникальна только среди заполненных значений — частичный
+            // индекс (Npgsql по умолчанию делает индекс по nullable-колонке полным, не partial).
+            entity.HasIndex(e => e.LogligId)
+                .IsUnique()
+                .HasFilter("\"LogligId\" IS NOT NULL");
         });
 
         modelBuilder.Entity<Country>(entity =>
@@ -145,6 +162,23 @@ public class SwimmDbContext : DbContext
         modelBuilder.Entity<Relay>(entity =>
         {
             entity.ToTable("Relays");
+        });
+
+        // Ноги эстафеты (публичная reference-таблица, грант swimm_ro в миграции) —
+        // структурное членство «эстафета → пловцы», см. RelayMember.
+        modelBuilder.Entity<RelayMember>(entity =>
+        {
+            entity.ToTable("RelayMembers");
+
+            entity.HasOne(e => e.Relay)
+                .WithMany(r => r.Members)
+                .HasForeignKey(e => e.RelayId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Swimmer)
+                .WithMany()
+                .HasForeignKey(e => e.SwimmerId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Style>(entity =>
@@ -534,6 +568,67 @@ public class SwimmDbContext : DbContext
                 @"""Visibility"" IN ('private', 'public')");
         });
 
+        // Публикации личного медиа в группы (этап 2 media-visibility-model) — заявки/решения,
+        // таблица с личными данными, БЕЗ grant swimm_ro (читается сервисами через RW-контекст).
+        modelBuilder.Entity<UserMediaPublication>(entity =>
+        {
+            entity.ToTable("Sys_UserMediaPublications");
+
+            entity.HasOne(e => e.Media)
+                .WithMany()
+                .HasForeignKey(e => e.UserMediaId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.HubGroup)
+                .WithMany()
+                .HasForeignKey(e => e.HubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.DecidedBy)
+                .WithMany()
+                .HasForeignKey(e => e.DecidedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasCheckConstraint(
+                "CK_UserMediaPublications_Level",
+                @"""Level"" IN ('members', 'public')");
+
+            entity.HasCheckConstraint(
+                "CK_UserMediaPublications_Status",
+                @"""Status"" IN ('pending', 'approved', 'rejected')");
+        });
+
+        // Реакции пользователей (❤ на медиа / 🎉 на заплыв) — Sys_-таблица БЕЗ grant swimm_ro:
+        // публичные счётчики отдаются агрегатами через RW-контекст, сырые строки наружу не идут.
+        modelBuilder.Entity<UserReaction>(entity =>
+        {
+            entity.ToTable("Sys_UserReactions");
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Media)
+                .WithMany()
+                .HasForeignKey(e => e.MediaId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.ResultRecord)
+                .WithMany()
+                .HasForeignKey(e => e.ResultId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Дискриминатор: like → MediaId NOT NULL, congrats → ResultId NOT NULL.
+            entity.HasCheckConstraint(
+                "CK_UserReactions_Kind",
+                @"(""Kind"" = 'like'     AND ""MediaId""  IS NOT NULL AND ""ResultId"" IS NULL) OR " +
+                @"(""Kind"" = 'congrats' AND ""ResultId"" IS NOT NULL AND ""MediaId""  IS NULL)");
+
+            // Partial unique indexes (одна реакция на юзера+цель) + счётные индексы по цели —
+            // вручную в миграции через migrationBuilder.Sql (UX_UserReactions_Like/Congrats).
+        });
+
         // --- Группы (SwimHub) ---
 
         modelBuilder.Entity<HubGroup>(entity =>
@@ -630,6 +725,23 @@ public class SwimmDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.SwimmerId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // Аудит ручных мутаций админки (фаза 7.4) — Sys_-таблица, БЕЗ grant swimm_ro.
+        // Actor денормализован (без FK на Sys_AppUsers), чтобы запись переживала удаление юзера.
+        modelBuilder.Entity<AdminAudit>(entity =>
+        {
+            entity.ToTable("Sys_AdminAudit");
+            entity.HasIndex(e => e.CreatedAt);                       // лента «новые сверху»
+            entity.HasIndex(e => new { e.EntityType, e.EntityId });  // история по объекту
+            entity.HasIndex(e => e.Action);                          // фильтр по типу действия
+        });
+
+        // «Развязанные» пары дедупа (админ подтвердил «не дубли») — Sys_-таблица, БЕЗ grant swimm_ro.
+        modelBuilder.Entity<DedupIgnoredPair>(entity =>
+        {
+            entity.ToTable("Sys_DedupIgnoredPairs");
+            entity.HasIndex(e => new { e.EntityType, e.IdA, e.IdB }).IsUnique();
         });
 
         // Заявки на официальный статус группы (право/личные данные) — Sys_-таблица, БЕЗ grant swimm_ro.

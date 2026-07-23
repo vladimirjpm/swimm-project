@@ -25,6 +25,7 @@ public class HubGroupsController : ControllerBase
     private readonly IHubGroupPermissionService _permissions;
     private readonly IResultRepository _results;
     private readonly IHubGroupMediaService _media;
+    private readonly IUserMediaPublicationService _publications;
 
     private const string CacheControlValue = "public, max-age=60";
     private static readonly TimeSpan PayloadTtl = TimeSpan.FromMinutes(5);
@@ -32,8 +33,10 @@ public class HubGroupsController : ControllerBase
     public HubGroupsController(
         IHubGroupPublicRepository groups, ICacheService cache, ISettingsService settings,
         IHubGroupTrainingRepository trainings, IHubGroupPermissionService permissions,
-        IResultRepository results, IHubGroupMediaService media)
+        IResultRepository results, IHubGroupMediaService media,
+        IUserMediaPublicationService publications)
     {
+        _publications = publications;
         _groups = groups;
         _cache = cache;
         _settings = settings;
@@ -101,6 +104,19 @@ public class HubGroupsController : ControllerBase
                 // Публичная галерея (TrainingId == null) — через SwimmDbContext (не read-реплику):
                 // у Sys_HubGroupMedia нет grant swimm_ro (см. SwimmDbContext.OnModelCreating).
                 dto.Gallery = await _media.GetGalleryAsync(dto.Id);
+                // Одобренные public-публикации участников — тоже часть публичной витрины
+                // (утверждённая модель видимости: public = «видно любому посетителю»).
+                // Id отрицательный: ключи HubGroupMedia и Sys_UserMediaPublications из разных
+                // последовательностей, минус исключает коллизию и метит источник «публикация».
+                var publishedPublic = await _publications.GetApprovedForGroupAsync(dto.Id, "public");
+                dto.Gallery.AddRange(publishedPublic.Select(p => new HubGroupMediaDto
+                {
+                    Id = -p.Id,
+                    MediaType = p.MediaType,
+                    SourceType = p.SourceType,
+                    Url = p.Url,
+                    Caption = p.ResultLabel,
+                }));
                 // Лента хайлайтов шапки — строго после заполнения Gallery (video/photo берутся из неё).
                 dto.Highlights = HubGroupHighlightsBuilder.Build(dto);
                 return dto;
@@ -262,5 +278,75 @@ public class HubGroupsController : ControllerBase
 
         await _cache.InvalidateAllAsync();
         return NoContent();
+    }
+
+    /* — Публикации личного медиа участников (этап 2 media-visibility-model) — */
+
+    /// <summary>Inbox модерации публикаций (pending + approved). Только управляющие группой.</summary>
+    [HttpGet("/api/hub-groups/{id:int}/media/publications")]
+    [Authorize]
+    public async Task<IActionResult> GetPublicationsInbox(int id)
+    {
+        var userId = CurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var perms = await _permissions.GetPermissionsAsync(id, userId.Value, User.IsInRole("Admin"));
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanEdit) return Forbid();
+
+        return Ok(await _publications.GetForGroupAsync(id));
+    }
+
+    /// <summary>
+    /// Решение по заявке: approve=true → опубликовать, false → отклонить/снять с публикации.
+    /// </summary>
+    [HttpPost("/api/hub-groups/{id:int}/media/publications/{publicationId:int}/decision")]
+    [Authorize]
+    [AutoValidateAntiforgeryToken]
+    public async Task<IActionResult> DecidePublication(int id, int publicationId, [FromBody] PublicationDecisionRequest request)
+    {
+        var userId = CurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var perms = await _permissions.GetPermissionsAsync(id, userId.Value, User.IsInRole("Admin"));
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanEdit) return Forbid();
+
+        var ok = await _publications.DecideAsync(id, publicationId, request.Approve, userId.Value);
+        if (!ok) return NotFound(new { error = "Publication not found" });
+
+        // Approved public-публикации входят в кэшируемый payload страницы группы (Gallery/Highlights).
+        await _cache.InvalidateAllAsync();
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Одобренные публикации участников: level=public — любому посетителю; level=members —
+    /// той же аудитории, что members-медиа (активный участник-аккаунт или CanEdit).
+    /// </summary>
+    [HttpGet("/api/hub-groups/{slug}/media/published")]
+    public async Task<IActionResult> GetPublishedMedia(string slug, [FromQuery] string level = "public")
+    {
+        if (string.IsNullOrWhiteSpace(slug) || slug.Length > 120)
+            return BadRequest("slug is required");
+
+        level = level.Trim().ToLowerInvariant();
+        if (level != "public" && level != "members")
+            return BadRequest(new { error = "level must be 'public' or 'members'" });
+
+        var groupId = await _trainings.ResolveGroupIdBySlugAsync(slug);
+        if (groupId is null) return NotFound();
+
+        if (level == "members")
+        {
+            var userId = CurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            var perms = await _permissions.GetPermissionsAsync(groupId.Value, userId.Value, User.IsInRole("Admin"));
+            var isMember = await _trainings.IsActiveAccountMemberAsync(groupId.Value, userId.Value);
+            if (!perms.CanEdit && !isMember) return Forbid();
+        }
+
+        return Ok(await _publications.GetApprovedForGroupAsync(groupId.Value, level));
     }
 }

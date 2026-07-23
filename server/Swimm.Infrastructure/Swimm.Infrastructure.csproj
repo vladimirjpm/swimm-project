@@ -11,6 +11,12 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- internal-хелперы (LogligClient: NormalizeGender/MapStyleName/ParseTimeToMilliseconds) видны юнит-тестам -->
+    <InternalsVisibleTo Include="Swimm.Tests" />
   </ItemGroup>
 
   <PropertyGroup>

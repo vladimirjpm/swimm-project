@@ -4,14 +4,15 @@ import { useAppSelector } from '../../store/store';
 import { useFavoritesContext } from '../../hooks/favorites-context';
 import { useLoginModal } from '../components/login-modal/login-modal-context';
 import { useAthleteCareer, AthleteCareer } from '../../hooks/useAthleteCareer';
-import { useUserMedia, UserMediaDto } from '../../hooks/useUserMedia';
+import { useUserMedia, useMyMediaPublications, UserMediaDto } from '../../hooks/useUserMedia';
+import { useLogligStatus } from '../../hooks/useLogligStatus';
 import Helper from '../../utils/helpers/data-helper'
 import { HelperMedia } from '../../utils/helpers';
 import UI_ClubIcon from '../components/mix/club-icon/club-icon';
 import UI_NormativeLevelIcon from '../components/mix/normative-level-icon/normative-level-icon';
 import UI_MedalIcon from '../components/mix/medal-icon/medal-icon';
 import UI_PositionBadge from '../components/mix/position-badge/position-badge';
-import UI_DateIcon from '../components/mix/date-icon/date-icon';
+import ResultRowDateInfo from '../results-table/components/result-row-date-info';
 import UI_PoolIcon from '../components/mix/pool-icon/pool-icon';
 import UI_SwimmerTimeCell from '../components/mix/swimmer-time-cell/swimmer-time-cell';
 import UI_FlagEmoji from '../components/mix/flag-icon/flag-icon';
@@ -96,6 +97,24 @@ function SportsmenDetails() {
   // Гость (фаза 4.5): вместо звезды/сердечка и «Моих ссылок» — компактный CTA «войти».
   const showGuestCta = !isAuthenticated && swimmerId != null;
 
+  // Медиа пловца (2A) — один хук на карточку, используется и в MyMediaSection,
+  // и для иконки «есть видео» на строках результатов (только owner-view).
+  const userMedia = useUserMedia(swimmerId);
+  // Loglig ID (docs/loglig-id-plan.md, шаг 6 — хвост): статус привязки + краудсорс-предложение.
+  const logligStatus = useLogligStatus(swimmerId);
+  const mediaResultIds = useMemo(
+    () => new Set(userMedia.media.filter((m) => typeof m.result_id === 'number').map((m) => m.result_id as number)),
+    [userMedia.media]
+  );
+
+  // Просмотр уже добавленного медиа на строке (иконка play → onOpenMedia). Добавление
+  // медиа с публичных страниц убрано (docs/tasks/public-pages-media-cleanup-sonnet.md) —
+  // единственная точка входа для добавления теперь client/media.html.
+  const [openMediaResultId, setOpenMediaResultId] = useState<number | null>(null);
+  useEffect(() => {
+    setOpenMediaResultId(null);
+  }, [filters.selected_name]);
+
   const base = import.meta.env.BASE_URL;
   const gender = firstResult.event_style_gender || 'female';
   // alpha-3 из данных (ISR…) конвертирует сам UI_FlagEmoji; дефолт — Израиль.
@@ -131,7 +150,7 @@ function SportsmenDetails() {
                   <button
                     type="button"
                     onClick={() => toggleFavoriteSwimmer(swimmerId!)}
-                    title={isFav ? 'Убрать из избранного' : 'Добавить в избранное'}
+                    title={isFav ? 'Remove from favorites' : 'Add to favorites'}
                     aria-pressed={isFav}
                     className="w-8 h-8 rounded-full inline-flex items-center justify-center leading-none hover:scale-110 transition-transform"
                     style={{ background: 'rgba(255,255,255,0.9)', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}
@@ -143,7 +162,7 @@ function SportsmenDetails() {
                   <button
                     type="button"
                     onClick={() => setMeBySwimmer(swimmerId!)}
-                    title={isMe ? 'Это я — снять отметку' : 'Отметить: это я'}
+                    title={isMe ? 'This is me — unmark' : 'Mark: this is me'}
                     aria-pressed={isMe}
                     className="w-8 h-8 rounded-full inline-flex items-center justify-center leading-none hover:scale-110 transition-transform"
                     style={{ background: isMe ? '#fff6da' : 'rgba(255,255,255,0.75)', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}
@@ -166,6 +185,13 @@ function SportsmenDetails() {
                     <path d="M12 21s-7.5-4.6-10-9.3C.4 8.3 2 5 5.2 5c2 0 3.3 1.1 4.1 2.3C10.1 6.1 11.4 5 13.4 5 16.6 5 18.2 8.3 16.6 11.7 14.1 16.4 12 21 12 21z" />
                   </svg>
                 </button>
+              )}
+              {swimmerId != null && (
+                <LogligSuggestBadge
+                  status={logligStatus.status}
+                  isAuthenticated={isAuthenticated}
+                  suggest={logligStatus.suggest}
+                />
               )}
             </div>
             <div className='flex-1 min-w-0 flex flex-col gap-1.5 items-end'>
@@ -217,6 +243,7 @@ function SportsmenDetails() {
                 styleLen={firstResult.event_style_len}
                 poolType={firstResult.pool_type}
                 isMasters={Helper.isResultMasters(isMastersSource, firstResult.event_style_age)}
+                normativeAgeGroup={firstResult.levelInfo.normativeAgeGroup}
                 progressPercent={firstResult.levelInfo.progressToNextLevel}
                 nextTime={firstResult.levelInfo.nextTime}
               />
@@ -306,7 +333,13 @@ function SportsmenDetails() {
           {scope === 'competition' && allSwimmerResults.length > 0 && (
             <div className="p-4 flex-1 min-h-0 overflow-y-auto">
               <h2 className="text-[15px] font-extrabold mb-3" style={{ color: 'var(--theme-primary)' }}>All results</h2>
-              <TopResultsTabs sortedBestResults={allSwimmerResults} isMastersSource={isMastersSource} isAwardSource={isAwardSource} />
+              <TopResultsTabs
+                sortedBestResults={allSwimmerResults}
+                isMastersSource={isMastersSource}
+                isAwardSource={isAwardSource}
+                mediaResultIds={mediaResultIds}
+                onOpenMedia={setOpenMediaResultId}
+              />
             </div>
           )}
 
@@ -315,12 +348,122 @@ function SportsmenDetails() {
 
           {/* «Мои ссылки» — личное owner-only медиа (2A), видно только залогиненному. */}
           {isAuthenticated && swimmerId != null && (
-            <MyMediaSection swimmerId={swimmerId} />
+            <MyMediaSection
+              swimmerId={swimmerId}
+              userMedia={userMedia}
+              allSwimmerResults={allSwimmerResults}
+              openResultId={openMediaResultId}
+              onOpenHandled={() => setOpenMediaResultId(null)}
+            />
           )}
 
           {/* Гость (фаза 4.5): вместо звёзд/«Моих ссылок» — один компактный CTA. */}
           {showGuestCta && <GuestFavoritesCta onSignIn={openLoginModal} />}
       </div>
+    </div>
+  );
+}
+
+// Loglig ID (docs/loglig-id-plan.md, шаг 6 — хвост): бейдж статуса привязки либо кнопка
+// краудсорс-предложения с инлайн-полем. Гость без статуса/при Rejected не видит ничего —
+// не плодим CTA логина рядом.
+function LogligSuggestBadge({
+  status,
+  isAuthenticated,
+  suggest,
+}: {
+  status: string | null;
+  isAuthenticated: boolean;
+  suggest: (input: string) => Promise<{ ok: boolean; error?: string }>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  if (status === 'Verified') {
+    return (
+      <span
+        title="Профиль на loglig.com подтверждён"
+        className="inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold"
+        style={{ background: 'rgba(255,255,255,0.9)', color: 'var(--theme-primary)' }}
+      >
+        loglig ✓
+      </span>
+    );
+  }
+
+  if (status === 'Suggested') {
+    return (
+      <span
+        className="inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold"
+        style={{ background: 'rgba(255,255,255,0.75)', color: '#6b7280' }}
+      >
+        loglig: на проверке
+      </span>
+    );
+  }
+
+  if (!isAuthenticated) return null;
+
+  const handleSubmit = async () => {
+    setError(null);
+    setSubmitting(true);
+    const res = await suggest(input);
+    setSubmitting(false);
+    if (res.ok) {
+      setOpen(false);
+      setInput('');
+    } else {
+      setError(res.error ?? 'Не удалось отправить предложение');
+    }
+  };
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold hover:opacity-90"
+        style={{ background: 'rgba(255,255,255,0.9)', color: 'var(--theme-mode-text-secondary)' }}
+      >
+        Предложить loglig-профиль
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1 rounded-lg p-1.5" style={{ background: 'rgba(255,255,255,0.9)' }}>
+      <div className="flex gap-1">
+        <input
+          type="text"
+          value={input}
+          autoFocus
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+          placeholder="ссылка на карточку loglig.com"
+          className="w-[150px] min-w-0 rounded px-1.5 py-1 text-[10px]"
+          style={{ border: '1px solid var(--theme-mode-border)' }}
+        />
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={submitting || !input.trim()}
+          className="shrink-0 rounded px-1.5 py-1 text-[10px] font-bold text-white disabled:opacity-50"
+          style={{ background: 'var(--theme-primary)' }}
+        >
+          Отправить
+        </button>
+        <button
+          type="button"
+          onClick={() => { setOpen(false); setInput(''); setError(null); }}
+          className="shrink-0 rounded px-1.5 py-1 text-[10px] font-bold"
+          style={{ background: 'var(--theme-mode-surface-alt)', color: 'var(--theme-mode-text-secondary)' }}
+        >
+          Отмена
+        </button>
+      </div>
+      {error && <div className="text-[9px]" style={{ color: '#e23b5a' }}>{error}</div>}
     </div>
   );
 }
@@ -373,6 +516,7 @@ function AllTimeBests({ career }: { career: AthleteCareer }) {
       time: b.time,
       international_points: b.points,
       date: b.date,
+      competition: b.competition,
       pool_type: b.pool,
       // Каждая строка all-time — из СВОЕГО соревнования, поэтому award-eligibility
       // берём по-строчно (b.isAward), а не общим флагом на весь список.
@@ -387,7 +531,7 @@ function AllTimeBests({ career }: { career: AthleteCareer }) {
     <div className="p-4 flex-1 min-h-0 overflow-y-auto">
       <h2 className="text-[15px] font-extrabold mb-3" style={{ color: 'var(--theme-primary)' }}>Best times by style</h2>
       {rows.length > 0 ? (
-        <ResultsTable results={rows} isMastersSource={isMastersOverall} isAwardSource={false} />
+        <ResultsTable results={rows} isMastersSource={isMastersOverall} isAwardSource={false} showCompetition />
       ) : (
         <div className="text-[var(--theme-mode-text-muted)] italic">—</div>
       )}
@@ -398,14 +542,65 @@ function AllTimeBests({ career }: { career: AthleteCareer }) {
 // «Мои ссылки» (2A): личное owner-only медиа пловца. Видно только залогиненному владельцу
 // (проверка isAuthenticated делается в родителе). Рендер: youtube/vimeo → лайтбокс
 // UI_SwimmerGallery (никогда сырой URL в iframe), other → внешняя ссылка noopener/noreferrer.
-function MyMediaSection({ swimmerId }: { swimmerId: number }) {
-  const { media, loading, add, remove } = useUserMedia(swimmerId);
-  const [url, setUrl] = useState('');
-  const [otherKind, setOtherKind] = useState<'image' | 'video'>('video');
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+// Хук useUserMedia поднят в SportsmenDetails (один запрос на карточку, нужен и для иконок
+// на строках результатов) — сюда приходит уже готовый объект хука.
+function MyMediaSection({
+  swimmerId,
+  userMedia,
+  allSwimmerResults,
+  openResultId,
+  onOpenHandled,
+}: {
+  swimmerId: number;
+  userMedia: ReturnType<typeof useUserMedia>;
+  allSwimmerResults: any[];
+  openResultId: number | null;
+  onOpenHandled: () => void;
+}) {
+  const { media, loading, remove } = userMedia;
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  // Публикации в группы (этап 3): статусы заявок + панель «поделиться» для одного медиа.
+  const { publications, submit: submitPublication, withdraw: withdrawPublication } = useMyMediaPublications();
+  const [publishMediaId, setPublishMediaId] = useState<number | null>(null);
+  const [pubGroupId, setPubGroupId] = useState<number | ''>('');
+  const [pubLevel, setPubLevel] = useState<'members' | 'public'>('members');
+  const [pubSubmitting, setPubSubmitting] = useState(false);
+  const [pubError, setPubError] = useState<string | null>(null);
+  // Куда МОЖНО подать выбранное медиа — сервер отдаёт только группы, где я член/админ
+  // и пловец медиа в ростере (не предлагаем группы, где подача всё равно откажет).
+  const [publishTargets, setPublishTargets] = useState<{ id: number; name: string }[] | null>(null);
+  useEffect(() => {
+    if (publishMediaId == null) { setPublishTargets(null); return; }
+    let alive = true;
+    setPublishTargets(null);
+    fetch(`/api/me/media/${publishMediaId}/publish-targets`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: { id: number; name: string }[]) => { if (alive) setPublishTargets(list); })
+      .catch(() => { if (alive) setPublishTargets([]); });
+    return () => { alive = false; };
+  }, [publishMediaId]);
+
+  const handlePublish = async () => {
+    if (publishMediaId == null || pubGroupId === '') return;
+    setPubError(null);
+    setPubSubmitting(true);
+    const res = await submitPublication(publishMediaId, pubGroupId, pubLevel);
+    setPubSubmitting(false);
+    if (res.ok) {
+      setPublishMediaId(null);
+      setPubGroupId('');
+    } else {
+      setPubError(res.error ?? 'Could not submit the request');
+    }
+  };
+
+  const pubStatusLabel: Record<string, string> = {
+    pending: 'pending review',
+    approved: 'published',
+    rejected: 'rejected',
+  };
 
   // Только youtube/vimeo идут в лайтбокс — эти элементы и их порядок в gallery
   // соответствуют lightboxIndex, которым мы кликаем.
@@ -415,28 +610,6 @@ function MyMediaSection({ swimmerId }: { swimmerId: number }) {
       .map((m) => ({ type: 'video', sourceType: m.source_type, url: m.url })),
     [media]
   );
-
-  const detectSourceType = (value: string): 'youtube' | 'vimeo' | 'other' => {
-    if (HelperMedia.extractYoutubeId(value)) return 'youtube';
-    if (HelperMedia.extractVimeoId(value)) return 'vimeo';
-    return 'other';
-  };
-
-  const handleAdd = async () => {
-    const trimmed = url.trim();
-    if (!trimmed) return;
-    setFormError(null);
-    setSubmitting(true);
-    const sourceType = detectSourceType(trimmed);
-    const mediaType: 'image' | 'video' = sourceType === 'other' ? otherKind : 'video';
-    const result = await add({ swimmer_id: swimmerId, media_type: mediaType, source_type: sourceType, url: trimmed });
-    setSubmitting(false);
-    if (result) {
-      setUrl('');
-    } else {
-      setFormError('Не удалось добавить ссылку — проверьте формат URL');
-    }
-  };
 
   const handleDelete = async (id: number) => {
     await remove(id);
@@ -448,50 +621,54 @@ function MyMediaSection({ swimmerId }: { swimmerId: number }) {
     if (idx >= 0) setLightboxIndex(idx);
   };
 
-  return (
-    <div className="p-4 border-t" style={{ borderColor: 'var(--theme-mode-border)' }}>
-      <h2 className="text-[15px] font-extrabold mb-3" style={{ color: 'var(--theme-primary)' }}>Мои ссылки</h2>
+  // Клик по иконке «есть видео» на строке результата (см. onOpenMedia в ResultsTable) —
+  // отдельный лайтбокс ТОЛЬКО из медиа этого заплыва (не всего списка пловца).
+  const [rowGallery, setRowGallery] = useState<GalleryItem[] | null>(null);
+  useEffect(() => {
+    if (openResultId == null) return;
+    const items = media
+      .filter((m) => m.result_id === openResultId && (m.source_type === 'youtube' || m.source_type === 'vimeo'))
+      .map((m): GalleryItem => ({ type: 'video', sourceType: m.source_type, url: m.url }));
+    if (items.length > 0) setRowGallery(items);
+    onOpenHandled();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openResultId, media]);
 
-      {/* Форма добавления */}
-      <div className="flex flex-col gap-2 mb-3">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://youtube.com/... или https://vimeo.com/... или другая ссылка"
-            className="flex-1 min-w-0 rounded-lg px-3 py-2 text-sm"
-            style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
-          />
-          <button
-            type="button"
-            onClick={handleAdd}
-            disabled={submitting || !url.trim()}
-            className="shrink-0 rounded-lg px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
-            style={{ background: 'var(--theme-primary)' }}
-          >
-            Добавить
-          </button>
-        </div>
-        {detectSourceType(url) === 'other' && url.trim() && (
-          <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--theme-mode-text-muted)' }}>
-            <span>Тип:</span>
-            <label className="flex items-center gap-1">
-              <input type="radio" checked={otherKind === 'video'} onChange={() => setOtherKind('video')} /> видео
-            </label>
-            <label className="flex items-center gap-1">
-              <input type="radio" checked={otherKind === 'image'} onChange={() => setOtherKind('image')} /> фото
-            </label>
-          </div>
-        )}
-        {formError && <div className="text-xs" style={{ color: '#e23b5a' }}>{formError}</div>}
+  // Чип у привязанного к заплыву элемента в списке — по совпадению result_id со строкой карточки.
+  const resultChipLabel = (item: UserMediaDto): string | null => {
+    if (item.result_id == null) return null;
+    const row = allSwimmerResults.find((r) => r.id === item.result_id);
+    return row ? `${row.event_style_len}m ${row.event_style_name}` : 'swim';
+  };
+
+  return (
+    <div className="border-t" style={{ borderColor: 'var(--theme-mode-border)' }}>
+      {/* Свёрнуто по умолчанию — попап пловца не растёт в высоту (запрос Влада);
+          добавление медиа убрано с публичных страниц (docs/tasks/public-pages-media-cleanup-sonnet.md) —
+          единственная точка входа теперь client/media.html, здесь только просмотр/удаление/публикация. */}
+      <details className="p-4">
+      <summary
+        className="cursor-pointer select-none list-none text-[15px] font-extrabold"
+        style={{ color: 'var(--theme-primary)' }}
+      >
+        My links{!loading && media.length > 0 ? ` (${media.length})` : ''}
+      </summary>
+      <div className="mt-1 mb-2">
+        <a
+          href="./media.html"
+          className="text-xs font-semibold underline"
+          style={{ color: 'var(--theme-mode-text-secondary)' }}
+        >
+          Manage in My media →
+        </a>
       </div>
+      <div className="mt-3">
 
       {/* Список */}
       {loading ? (
-        <div className="text-xs italic" style={{ color: 'var(--theme-mode-text-muted)' }}>Загрузка…</div>
+        <div className="text-xs italic" style={{ color: 'var(--theme-mode-text-muted)' }}>Loading…</div>
       ) : media.length === 0 ? (
-        <div className="text-xs italic" style={{ color: 'var(--theme-mode-text-muted)' }}>Пока нет ссылок</div>
+        <div className="text-xs italic" style={{ color: 'var(--theme-mode-text-muted)' }}>No links yet</div>
       ) : (
         <ul className="grid grid-cols-3 gap-2">
           {media.map((item) => {
@@ -502,11 +679,25 @@ function MyMediaSection({ swimmerId }: { swimmerId: number }) {
                 <button
                   type="button"
                   onClick={() => setConfirmDeleteId(item.id)}
-                  title="Удалить"
+                  title="Delete"
                   className="absolute top-1 right-1 z-10 w-5 h-5 rounded-full inline-flex items-center justify-center text-xs font-bold text-white"
                   style={{ background: 'rgba(0,0,0,0.55)' }}
                 >
                   ×
+                </button>
+
+                {/* Подача в группу (этап 3): открывает панель публикации под сеткой. */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPublishMediaId(publishMediaId === item.id ? null : item.id);
+                    setPubError(null);
+                  }}
+                  title="Share with a group"
+                  className="absolute top-1 left-1 z-10 w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px] font-bold text-white"
+                  style={{ background: publishMediaId === item.id ? 'var(--theme-primary)' : 'rgba(0,0,0,0.55)' }}
+                >
+                  ↗
                 </button>
 
                 {isEmbeddable ? (
@@ -527,14 +718,23 @@ function MyMediaSection({ swimmerId }: { swimmerId: number }) {
                     {thumb ? (
                       <img src={thumb} alt="" className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-xs underline" style={{ color: 'var(--theme-mode-text-muted)' }}>ссылка</span>
+                      <span className="text-xs underline" style={{ color: 'var(--theme-mode-text-muted)' }}>link</span>
                     )}
                   </a>
                 )}
 
+                {resultChipLabel(item) && (
+                  <div
+                    className="absolute bottom-1 left-1 z-10 max-w-[calc(100%-8px)] truncate rounded px-1.5 py-0.5 text-[9px] font-bold text-white"
+                    style={{ background: 'rgba(0,0,0,0.55)' }}
+                  >
+                    {resultChipLabel(item)}
+                  </div>
+                )}
+
                 {confirmDeleteId === item.id && (
                   <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1 text-center p-1" style={{ background: 'rgba(0,0,0,0.75)' }}>
-                    <span className="text-[10px] text-white">Удалить?</span>
+                    <span className="text-[10px] text-white">Delete?</span>
                     <div className="flex gap-1">
                       <button
                         type="button"
@@ -561,17 +761,113 @@ function MyMediaSection({ swimmerId }: { swimmerId: number }) {
         </ul>
       )}
 
+      {/* Панель публикации выбранного медиа + статусы её заявок. */}
+      {publishMediaId != null && (
+        <div className="mt-3 flex flex-col gap-2 rounded-[10px] p-2.5" style={{ background: 'var(--theme-mode-surface-alt)' }}>
+          <div className="text-xs font-bold" style={{ color: 'var(--theme-mode-text-secondary)' }}>
+            Share with a group
+          </div>
+          {publishTargets != null && publishTargets.length === 0 && (
+            <div className="text-[10px]" style={{ color: 'var(--theme-mode-text-muted)' }}>
+              No eligible groups — the swimmer must be in the group's roster and you must be a member.
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={pubGroupId}
+              onChange={(e) => setPubGroupId(e.target.value === '' ? '' : Number(e.target.value))}
+              className="rounded-lg px-2 py-1.5 text-xs"
+              style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
+            >
+              <option value="">— group —</option>
+              {(publishTargets ?? []).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+            <select
+              value={pubLevel}
+              onChange={(e) => setPubLevel(e.target.value as 'members' | 'public')}
+              className="rounded-lg px-2 py-1.5 text-xs"
+              style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
+            >
+              <option value="members">group members</option>
+              <option value="public">public (visible to everyone)</option>
+            </select>
+            <button
+              type="button"
+              onClick={handlePublish}
+              disabled={pubSubmitting || pubGroupId === ''}
+              className="rounded-lg px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+              style={{ background: 'var(--theme-primary)' }}
+            >
+              Подать
+            </button>
+          </div>
+          {pubError && <div className="text-[10px]" style={{ color: '#e23b5a' }}>{pubError}</div>}
+
+          {/* Заявки этого медиа */}
+          {publications.filter((p) => p.user_media_id === publishMediaId).length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {publications.filter((p) => p.user_media_id === publishMediaId).map((p) => (
+                <span
+                  key={p.id}
+                  className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                  style={{
+                    background: 'var(--theme-mode-input-bg)',
+                    color: p.status === 'approved' ? 'var(--theme-primary)'
+                      : p.status === 'rejected' ? '#e23b5a' : 'var(--theme-mode-text-secondary)',
+                    border: '1px solid var(--theme-mode-border)',
+                  }}
+                >
+                  {p.hub_group_name} · {pubStatusLabel[p.status] ?? p.status}{p.status === 'approved' && p.level === 'public' ? ' (everyone)' : ''}
+                  <button
+                    type="button"
+                    title="Withdraw"
+                    onClick={() => withdrawPublication(p.user_media_id, p.hub_group_id)}
+                    className="leading-none opacity-60 hover:opacity-100"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      </div>
+      </details>
+
+      {/* Лайтбокс списка «Мои ссылки» — вне <details>, работает и при свёрнутой секции. */}
       <UI_SwimmerGallery
         gallery={lightboxItems}
         openIndex={lightboxIndex}
         onClose={() => setLightboxIndex(null)}
       />
+
+      {/* Лайтбокс иконки строки — только видео конкретного заплыва. */}
+      {rowGallery && (
+        <UI_SwimmerGallery
+          gallery={rowGallery}
+          openIndex={0}
+          onClose={() => setRowGallery(null)}
+        />
+      )}
     </div>
   );
 }
 
 // Компонент табов для Training/Competition
-function TopResultsTabs({ sortedBestResults, isMastersSource, isAwardSource }: { sortedBestResults: any[]; isMastersSource: boolean; isAwardSource: boolean }) {
+function TopResultsTabs({
+  sortedBestResults,
+  isMastersSource,
+  isAwardSource,
+  mediaResultIds,
+  onOpenMedia,
+}: {
+  sortedBestResults: any[];
+  isMastersSource: boolean;
+  isAwardSource: boolean;
+  mediaResultIds?: Set<number>;
+  onOpenMedia?: (resultId: number) => void;
+}) {
   // Разделяем результаты на training и competition
   const trainingResults = useMemo(() => {
     return sortedBestResults.filter(r => !!r.training?.trainingId);
@@ -590,7 +886,15 @@ function TopResultsTabs({ sortedBestResults, isMastersSource, isAwardSource }: {
 
   // Если нет masters — показываем все результаты без табов
   if (!hasMasters) {
-    return <ResultsTable results={sortedBestResults} isMastersSource={isMastersSource} isAwardSource={isAwardSource} />;
+    return (
+      <ResultsTable
+        results={sortedBestResults}
+        isMastersSource={isMastersSource}
+        isAwardSource={isAwardSource}
+        mediaResultIds={mediaResultIds}
+        onOpenMedia={onOpenMedia}
+      />
+    );
   }
 
   const currentResults = activeTab === 'training' ? trainingResults : competitionResults;
@@ -619,7 +923,13 @@ function TopResultsTabs({ sortedBestResults, isMastersSource, isAwardSource }: {
 
       {/* Карточки результатов */}
       {currentResults.length > 0 ? (
-        <ResultsTable results={currentResults} isMastersSource={isMastersSource} isAwardSource={isAwardSource} />
+        <ResultsTable
+          results={currentResults}
+          isMastersSource={isMastersSource}
+          isAwardSource={isAwardSource}
+          mediaResultIds={mediaResultIds}
+          onOpenMedia={onOpenMedia}
+        />
       ) : (
         <div className="text-[var(--theme-mode-text-muted)] italic p-4">No {activeTab} results</div>
       )}
@@ -640,7 +950,22 @@ const formatDayMonthYear = (date?: string): string => {
 // Строка результата в 2 линии (design_handoff_athlete_card §5):
 // линия 1 — место/возраст, картинка стиля с дистанцией, время;
 // линия 2 — сплиты/очки/дата слева, дуга уровня справа.
-function ResultsTable({ results, isMastersSource, isAwardSource }: { results: any[]; isMastersSource: boolean; isAwardSource: boolean }) {
+function ResultsTable({
+  results,
+  isMastersSource,
+  isAwardSource,
+  mediaResultIds,
+  onOpenMedia,
+  showCompetition,
+}: {
+  results: any[];
+  isMastersSource: boolean;
+  isAwardSource: boolean;
+  mediaResultIds?: Set<number>;
+  onOpenMedia?: (resultId: number) => void;
+  /** Название соревнования рядом с датой — только там, где строки реально смешивают разные соревнования (all-time) */
+  showCompetition?: boolean;
+}) {
   const base = import.meta.env.BASE_URL;
 
   return (
@@ -654,6 +979,12 @@ function ResultsTable({ results, isMastersSource, isAwardSource }: { results: an
         // По-строчный флаг (all-time может смешивать разные соревнования) с фолбэком
         // на общий isAwardSource (одно соревнование — таб «это соревнование»).
         const rowIsAward = res.is_award ?? isAwardSource ?? false;
+
+        // Иконка «есть видео» — только для строк с DB id заплыва (статические источники
+        // его не имеют, см. Footguns задания). Добавление медиа с этой страницы убрано —
+        // остаётся только просмотр уже привязанного медиа.
+        const rowId = typeof res.id === 'number' ? res.id : null;
+        const hasMedia = rowId != null && !!mediaResultIds?.has(rowId);
 
         return (
           <li
@@ -714,9 +1045,31 @@ function ResultsTable({ results, isMastersSource, isAwardSource }: { results: an
                   </div>
                 )}
                 <div className="mt-px" style={{ color: 'var(--theme-mode-text-secondary)' }}>
-                  <UI_DateIcon styleType="row-style-1" date={res.date} className="justify-start" fontClassName="text-[11px]" />
+                  <ResultRowDateInfo
+                    date={res.date}
+                    competition={res.competition}
+                    showCompetition={showCompetition}
+                    className="justify-start"
+                  />
                 </div>
               </div>
+
+              {/* Медиа заплыва (2A): иконка «есть видео» — только просмотр уже загруженного
+                  медиа (owner-view). Добавление медиа с этой страницы убрано (см. задание). */}
+              {hasMedia && (
+                <button
+                  type="button"
+                  onClick={() => onOpenMedia?.(rowId!)}
+                  title="Open video"
+                  className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full transition-opacity hover:opacity-80"
+                  style={{ background: 'var(--theme-primary)' }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="#fff">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </button>
+              )}
+
               {levelInfo?.currentLevel ? (
                 <UI_NormativeLevelIcon
                   levelName={levelInfo.currentLevel}

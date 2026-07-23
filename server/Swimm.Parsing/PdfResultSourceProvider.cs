@@ -49,8 +49,8 @@ public class PdfResultSourceProvider : IResultSourceProvider
         var json = JsonSerializer.Serialize(results);
 
         var summaries = results
-            .GroupBy(r => (r.Competition, r.Date))
-            .Select(g => new ParsedCompetitionSummary(g.Key.Competition, g.Key.Date, g.Count()))
+            .GroupBy(r => (r.Competition, r.Date, r.PoolType))
+            .Select(g => new ParsedCompetitionSummary(g.Key.Competition, g.Key.Date, g.Count(), g.Key.PoolType))
             .OrderBy(s => s.Date, StringComparer.Ordinal)
             .ToList();
 

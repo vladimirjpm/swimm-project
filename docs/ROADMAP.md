@@ -237,6 +237,17 @@
 **Критерий приёмки:** юзер добавил YouTube-ссылку к заплыву → видит её сам; после
 переключения в public её видят все; админ может скрыть.
 
+- ◐ 5.5. (2026-07-22) Личные медиа реализованы как **My media v3** (swim-centric):
+  страница `client/.../my-media-project` (`media.html`), `GET /api/me/swims` (заплывы
+  favorite-пловцов по сезонам + медиа + реакции ❤/🎉), add media только на своём заплыве,
+  сегменты All/With video/Without video. Закоммичено (`c60796d…a944147`). Публичный
+  показ public-медиа (5.3) и админ-модерация (5.4) ещё НЕ сделаны.
+- ✅ 5.6. (2026-07-22) **Эстафеты видны всем ногам** — сущность `RelayMembers` (структурное
+  членство эстафета→пловцы вместо текста `Relay.SwimmersName`), импорт заполняет из
+  `item.RelaySwimmers`, `/api/me/swims` включает эстафеты по членству. Бэкфилл старых данных
+  `dotnet run -- --backfill-relay-members [--apply]`. Закоммичено (`cf5d7ec`, `f362f6b`,
+  `93317d8` — фикс FK-падения чистки сирот).
+
 ## Фаза 6 — Автозабор данных с isr.org.il
 
 **Цель:** новые соревнования обнаруживаются и затягиваются с
@@ -262,6 +273,17 @@ https://isr.org.il/competitions.asp полуавтоматически (чело
   loglig-iframe → явные ошибки в админке (LastError у строки, 502 у sync).
   Тесты — на снапшотах живого HTML в `Swimm.Tests/Fixtures/Discovery` (сеть в тестах
   запрещена).
+
+- ◐ 6.5. (2026-07-22, НЕ закоммичено) **Штамп `Competition.OrgCompId` + кросс-линк
+  Competitions↔Discovery.** Раньше `OrgCompId` не проставлялся при импорте нигде (ни PDF,
+  ни discovery) — связь Discovery↔Competitions держалась только на имени+дате. Теперь:
+  compID протянут через очередь импорта (`DiscoveryController.Import` → `ImportJobQueue` →
+  `ImportBackgroundService` → `JsonImportService.ImportAsync(orgCompId)`), штампуется
+  «первичному» соревнованию (OrgCompId уникален). Разовый бэкфилл для старых импортов —
+  CLI `--backfill-discovery-orgcompid` (dry-run + `--apply`). Связь строк со справочником
+  видна прямо в объединённой странице `/Admin/Competitions` (стадии OnSite/Imported/DbOnly).
+  Discovery и старый справочник объединены в одну страницу 2026-07 (см.
+  `docs/admin-pages/competitions.md`).
 
 **Критерий приёмки:** новое соревнование на isr.org.il появляется во «входящих» без участия
 человека; импорт — в два клика.

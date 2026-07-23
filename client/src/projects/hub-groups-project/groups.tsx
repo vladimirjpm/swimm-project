@@ -10,12 +10,43 @@ import { GalleryItem } from '../../utils/interfaces/results';
 import { HelperMedia } from '../../utils/helpers';
 import { useCurrentIdentity, useHubGroupMembership, useMyHubGroups } from './use-my-hub-groups';
 import type {
-  HubGroupDetails, HubGroupLink, HubGroupListItem, HubGroupMediaItem, HubGroupMember,
-  HubGroupMemberMediaItem, HubGroupStanding,
+  GroupPublicationItem, HubGroupDetails, HubGroupLink, HubGroupListItem, HubGroupMediaItem,
+  HubGroupMember, HubGroupMemberMediaItem, HubGroupStanding,
 } from './types';
 
 const GROUP_DISCLAIMER =
-  'Состав ведётся создателем группы и не является официальной заявкой клуба или федерации.';
+  'The roster is maintained by the group creator and is not an official club or federation entry.';
+
+// Тот же паттерн antiforgery-токена, что в use-my-hub-groups.ts (там не экспортирован —
+// дублируем локально, чтобы не трогать файл, который правит параллельный агент).
+let cachedPublicationsToken: string | null = null;
+
+async function fetchPublicationsAntiforgeryToken(): Promise<string | null> {
+  if (cachedPublicationsToken) return cachedPublicationsToken;
+  try {
+    const r = await fetch('/api/antiforgery/token', { credentials: 'include' });
+    if (!r.ok) return null;
+    const data = await r.json();
+    cachedPublicationsToken = data.token ?? null;
+    return cachedPublicationsToken;
+  } catch {
+    return null;
+  }
+}
+
+async function publicationsApiFetch(url: string, init?: RequestInit): Promise<Response> {
+  const method = (init?.method ?? 'GET').toUpperCase();
+  if (method === 'GET') return fetch(url, { credentials: 'include', ...init });
+
+  const token = await fetchPublicationsAntiforgeryToken();
+  const headers: Record<string, string> = { ...(init?.headers as Record<string, string> | undefined) };
+  if (token) headers['X-XSRF-TOKEN'] = token;
+  if (init?.body) headers['Content-Type'] = 'application/json';
+
+  const r = await fetch(url, { credentials: 'include', ...init, headers });
+  if (!r.ok) cachedPublicationsToken = null;
+  return r;
+}
 
 // Страница групп (HubGroups, фазы 3–4): список публичных групп + страница группы
 // с участниками, «рекордами группы» и последними заплывами. Виртуальная группа
@@ -23,8 +54,8 @@ const GROUP_DISCLAIMER =
 
 const ROLE_LABEL: Record<HubGroupMember['role'], string | null> = {
   member: null,
-  captain: 'капитан',
-  coach: 'тренер',
+  captain: 'captain',
+  coach: 'coach',
 };
 
 const LINK_LABEL: Record<string, string> = {
@@ -125,7 +156,7 @@ function GroupsList({ groups, favorites }: { groups: HubGroupListItem[]; favorit
           Groups
         </h1>
         <p className="mt-5 max-w-[560px] text-[14.5px] leading-[1.55] text-[#e2f0fc]/[0.82] lg:text-[18px] lg:leading-[1.6]">
-          Тренировочные группы: состав, рекорды группы и свежие заплывы участников.
+          Training groups: rosters, group records and recent swims.
         </p>
       </section>
 
@@ -140,7 +171,7 @@ function GroupsList({ groups, favorites }: { groups: HubGroupListItem[]; favorit
               slug: 'favorites',
               name: favorites.name,
               name_en: favorites.name_en,
-              description: 'Пловцы из твоего избранного — как личная группа',
+              description: 'Swimmers from your favorites — as a personal group',
               icon_url: null,
               location: null,
               club_name: null,
@@ -193,8 +224,8 @@ function JoinButton({ group }: { group: HubGroupDetails }) {
   };
 
   const label = membership
-    ? (isPending ? 'Заявка отправлена — отменить' : 'Выйти из группы')
-    : (group.join_policy === 'approval' ? 'Подать заявку' : 'Вступить в группу');
+    ? (isPending ? 'Request sent — cancel' : 'Leave group')
+    : (group.join_policy === 'approval' ? 'Request to join' : 'Join group');
 
   return (
     <button
@@ -392,8 +423,247 @@ function MembersReviews({ group }: { group: HubGroupDetails }) {
   );
 }
 
+/** Подпись тайла публикации — swimmer_name (+ result_label, если есть). */
+function publicationCaption(item: GroupPublicationItem): string | null {
+  const parts = [item.swimmer_name, item.result_label].filter(Boolean) as string[];
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+function publicationsLightbox(items: GroupPublicationItem[]) {
+  const lightboxItems = items.filter((g) => g.media_type !== 'album');
+  return {
+    lightboxGalleryItems: lightboxItems.map((g): GalleryItem => ({
+      type: g.media_type === 'video' ? 'video' : 'image',
+      sourceType: g.source_type === 'album' ? undefined : (g.source_type as GalleryItem['sourceType']),
+      url: g.url,
+    })),
+    indexById: new Map(lightboxItems.map((g, i) => [g.id, i])),
+  };
+}
+
+/**
+ * «From members» (public-слой публикаций): одобренные public-публикации участников,
+ * доступно всем (включая анонимов) — под Gallery. Пустой список → секция не рендерится.
+ */
+function FromMembersGallery({ group }: { group: HubGroupDetails }) {
+  const [items, setItems] = useState<GroupPublicationItem[]>([]);
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (group.is_virtual || !group.slug) { setItems([]); return; }
+    let alive = true;
+    fetch(`/api/hub-groups/${encodeURIComponent(group.slug)}/media/published?level=public`)
+      .then((r) => (r.ok ? (r.json() as Promise<GroupPublicationItem[]>) : []))
+      .then((data) => { if (alive) setItems(data); })
+      .catch(() => { if (alive) setItems([]); });
+    return () => { alive = false; };
+  }, [group.slug, group.is_virtual]);
+
+  const { lightboxGalleryItems, indexById } = useMemo(() => publicationsLightbox(items), [items]);
+
+  if (items.length === 0) return null;
+
+  return (
+    <div id="from-members" className="hp-card-std rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]" aria-label="From members">
+      <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">From members</h2>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+        {items.map((item) => (
+          <GalleryTile
+            key={item.id}
+            item={{
+              id: item.id, media_type: item.media_type, source_type: item.source_type,
+              url: item.url, caption: publicationCaption(item),
+            }}
+            onClick={item.media_type === 'album' ? undefined : () => setOpenIndex(indexById.get(item.id) ?? 0)}
+          />
+        ))}
+      </div>
+      <UI_SwimmerGallery
+        gallery={lightboxGalleryItems}
+        openIndex={openIndex}
+        onClose={() => setOpenIndex(null)}
+      />
+    </div>
+  );
+}
+
+/**
+ * Публикации участников members-слоя — рендерится ВНУТРИ members-секции, после тренерских
+ * разборов; fetch делается только когда members-секция вообще доступна (та же логика,
+ * что у MembersReviews — авторизован + группа реальная).
+ */
+function MembersPublications({ group }: { group: HubGroupDetails }) {
+  const { isAuthenticated } = useCurrentIdentity();
+  const [items, setItems] = useState<GroupPublicationItem[]>([]);
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated || group.is_virtual || group.id <= 0) { setItems([]); return; }
+    let alive = true;
+    fetch(`/api/hub-groups/${encodeURIComponent(group.slug)}/media/published?level=members`, { credentials: 'include' })
+      .then((r) => (r.ok ? (r.json() as Promise<GroupPublicationItem[]>) : []))
+      .then((data) => { if (alive) setItems(data); })
+      .catch(() => { if (alive) setItems([]); });
+    return () => { alive = false; };
+  }, [isAuthenticated, group.slug, group.is_virtual, group.id]);
+
+  const { lightboxGalleryItems, indexById } = useMemo(() => publicationsLightbox(items), [items]);
+
+  if (items.length === 0) return null;
+
+  return (
+    <div id="members-publications" className="hp-card-std rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]" aria-label="Members publications">
+      <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">From members</h2>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+        {items.map((item) => (
+          <GalleryTile
+            key={item.id}
+            item={{
+              id: item.id, media_type: item.media_type, source_type: item.source_type,
+              url: item.url, caption: publicationCaption(item),
+            }}
+            onClick={item.media_type === 'album' ? undefined : () => setOpenIndex(indexById.get(item.id) ?? 0)}
+          />
+        ))}
+      </div>
+      <UI_SwimmerGallery
+        gallery={lightboxGalleryItems}
+        openIndex={openIndex}
+        onClose={() => setOpenIndex(null)}
+      />
+    </div>
+  );
+}
+
+const PUBLICATION_LEVEL_LABEL: Record<GroupPublicationItem['level'], string> = {
+  public: 'public',
+  members: 'members',
+};
+
+/**
+ * Карточка «Заявки на публикацию» — inbox модерации для управляющих (CanEdit).
+ * Признак «я управляю группой» — тот же источник, что у TrainingsLink (isAdmin || moй список групп).
+ * После решения — рефетч inbox и обоих published-списков (bump reloadKey наверх).
+ */
+function PublicationsInbox({ group, onDecided }: { group: HubGroupDetails; onDecided: () => void }) {
+  const { isAuthenticated, isAdmin } = useCurrentIdentity();
+  const { groups: myGroups } = useMyHubGroups(isAuthenticated);
+  const manages = isAdmin || myGroups.some((g) => g.id === group.id);
+
+  const [items, setItems] = useState<GroupPublicationItem[]>([]);
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const reload = React.useCallback(async () => {
+    if (!manages || group.is_virtual || group.id <= 0) { setItems([]); return; }
+    try {
+      const r = await fetch(`/api/hub-groups/${group.id}/media/publications`, { credentials: 'include' });
+      setItems(r.ok ? await r.json() : []);
+    } catch {
+      setItems([]);
+    }
+  }, [manages, group.id, group.is_virtual]);
+
+  useEffect(() => { reload(); }, [reload]);
+
+  if (!manages || items.length === 0) return null;
+
+  const decide = async (publicationId: number, approve: boolean) => {
+    setBusyId(publicationId);
+    try {
+      const r = await publicationsApiFetch(`/api/hub-groups/${group.id}/media/publications/${publicationId}/decision`, {
+        method: 'POST',
+        body: JSON.stringify({ approve }),
+      });
+      if (r.ok) {
+        await reload();
+        onDecided();
+      }
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const badgeCls = 'hp-mono rounded-[6px] border border-[#7dd3fc]/40 px-[6px] py-[2px] text-[10px] font-extrabold text-[#7dd3fc]';
+  const statusCls: Record<GroupPublicationItem['status'], string> = {
+    pending: 'text-[#ffca7a]',
+    approved: 'text-[#38ef8f]',
+    rejected: 'text-[#ef5350]',
+  };
+
+  return (
+    <div id="publications-inbox" className="hp-card-std rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]" aria-label="Publications inbox">
+      <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">Publication requests</h2>
+      <div className="flex flex-col gap-2">
+        {items.map((item) => {
+          let domain = item.url;
+          try { domain = new URL(item.url).hostname; } catch { /* оставляем как есть */ }
+          return (
+            <div key={item.id} className="flex flex-wrap items-center gap-3 rounded-[10px] border border-[#7dd3fc]/15 p-2">
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                className="hp-mono shrink-0 text-[12px] font-extrabold text-[#7dd3fc] no-underline hover:underline"
+              >
+                {domain} ↗
+              </a>
+              <div className="min-w-0 flex-1">
+                {item.swimmer_name && (
+                  <p className="m-0 truncate text-[13px] font-extrabold text-[#f3f8fd]">{item.swimmer_name}</p>
+                )}
+                {item.result_label && (
+                  <p className="m-0 truncate text-[11.5px] text-[#cbe0f0]/70">{item.result_label}</p>
+                )}
+                <p className="m-0 truncate text-[11px] text-[#cbe0f0]/50">{item.owner_email}</p>
+              </div>
+              <span className={badgeCls}>{PUBLICATION_LEVEL_LABEL[item.level]}</span>
+              <span className={`hp-mono text-[10.5px] font-extrabold uppercase ${statusCls[item.status]}`}>
+                {item.status}
+              </span>
+              <div className="flex shrink-0 gap-2">
+                {item.status === 'pending' && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={busyId === item.id}
+                      onClick={() => decide(item.id, true)}
+                      className="hp-mono rounded-[8px] bg-[#38ef8f] px-3 py-[6px] text-[11.5px] font-extrabold text-[#04101f] hover:brightness-110 disabled:opacity-50"
+                    >
+                      Опубликовать
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busyId === item.id}
+                      onClick={() => decide(item.id, false)}
+                      className="hp-mono rounded-[8px] border border-[#ef5350]/50 px-3 py-[6px] text-[11.5px] font-extrabold text-[#ef5350] hover:bg-[#ef5350]/10 disabled:opacity-50"
+                    >
+                      Отклонить
+                    </button>
+                  </>
+                )}
+                {item.status === 'approved' && (
+                  <button
+                    type="button"
+                    disabled={busyId === item.id}
+                    onClick={() => decide(item.id, false)}
+                    className="hp-mono rounded-[8px] border border-[#ffca7a]/50 px-3 py-[6px] text-[11.5px] font-extrabold text-[#ffca7a] hover:bg-[#ffca7a]/10 disabled:opacity-50"
+                  >
+                    Снять
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function GroupDetails({ group }: { group: HubGroupDetails }) {
   const [showAllBests, setShowAllBests] = useState(false);
+  // Бампится после решения в inbox — форсирует рефетч обоих published-списков (key-ремаунт).
+  const [publicationsReloadKey, setPublicationsReloadKey] = useState(0);
   const bests = showAllBests ? group.bests : group.bests.slice(0, BESTS_PREVIEW_COUNT);
 
   const cellCls = 'px-3 py-2 text-left text-[13px] text-[#e2f0fc]/[0.85]';
@@ -456,7 +726,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
               {group.location}
             </span>
           )}
-          {group.club_name && <span>Клуб: {group.club_name}</span>}
+          {group.club_name && <span>Club: {group.club_name}</span>}
           <span>
             {group.members.length} · swimmers
           </span>
@@ -473,7 +743,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
           <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">Members</h2>
           {group.members.length === 0 ? (
             <p className="text-[13px] text-[#cbe0f0]/60">
-              {group.is_virtual ? 'В избранном пока нет пловцов — жми сердечки на результатах.' : 'Состав пока не заполнен.'}
+              {group.is_virtual ? 'No swimmers in favorites yet — tap the hearts on results.' : 'The roster is empty for now.'}
             </p>
           ) : (
             <ul className="m-0 flex list-none flex-col gap-[10px] p-0">
@@ -515,7 +785,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
               )}
             </div>
             {group.standings.length === 0 || group.standings.every((s) => s.swims === 0) ? (
-              <p className="text-[13px] text-[#cbe0f0]/60">В этом сезоне заплывов нет.</p>
+              <p className="text-[13px] text-[#cbe0f0]/60">No swims this season.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
@@ -573,7 +843,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
               Group records
             </h2>
             {group.bests.length === 0 ? (
-              <p className="text-[13px] text-[#cbe0f0]/60">У участников пока нет зачтённых результатов.</p>
+              <p className="text-[13px] text-[#cbe0f0]/60">No counted results yet.</p>
             ) : (
               <>
                 <div className="overflow-x-auto">
@@ -631,8 +901,17 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
           {/* Галерея группы */}
           <GroupGallery gallery={group.gallery} />
 
+          {/* From members (public-публикации участников) — под Gallery */}
+          <FromMembersGallery key={`from-members-${publicationsReloadKey}`} group={group} />
+
           {/* 🔒 Разборы (members-медиа) — рендерится только участникам */}
           <MembersReviews group={group} />
+
+          {/* Публикации участников (members-слой) — после тренерских разборов */}
+          <MembersPublications key={`members-publications-${publicationsReloadKey}`} group={group} />
+
+          {/* Заявки на публикацию — видят только управляющие */}
+          <PublicationsInbox group={group} onDecided={() => setPublicationsReloadKey((k) => k + 1)} />
 
           {/* Последние заплывы */}
           <div className={cardCls} aria-label="Recent swims">
@@ -640,7 +919,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
               Recent swims
             </h2>
             {group.recent_results.length === 0 ? (
-              <p className="text-[13px] text-[#cbe0f0]/60">Заплывов пока нет.</p>
+              <p className="text-[13px] text-[#cbe0f0]/60">No swims yet.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
@@ -705,7 +984,7 @@ function Groups() {
           // favorites — авторизованный эндпоинт с тем же контрактом
           const url = slug === 'favorites' ? '/api/hub-groups/favorites' : `/api/hub-groups/${encodeURIComponent(slug)}`;
           const r = await fetch(url, { credentials: 'include' });
-          if (!r.ok) throw new Error(r.status === 404 ? 'Группа не найдена' : `Ошибка загрузки (${r.status})`);
+          if (!r.ok) throw new Error(r.status === 404 ? 'Group not found' : `Failed to load (${r.status})`);
           const data: HubGroupDetails = await r.json();
           if (!cancelled) setDetails(data);
         } else {
@@ -714,7 +993,7 @@ function Groups() {
             // 401 для незалогиненного — норма, карточка избранного просто не показывается
             fetch('/api/hub-groups/favorites', { credentials: 'include' }).catch(() => null),
           ]);
-          if (!listR.ok) throw new Error(`Ошибка загрузки (${listR.status})`);
+          if (!listR.ok) throw new Error(`Failed to load (${listR.status})`);
           const list: HubGroupListItem[] = await listR.json();
           const fav: HubGroupDetails | null = favR && favR.ok ? await favR.json() : null;
           if (!cancelled) {
@@ -723,7 +1002,7 @@ function Groups() {
           }
         }
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Ошибка загрузки');
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load');
       } finally {
         if (!cancelled) setLoading(false);
       }

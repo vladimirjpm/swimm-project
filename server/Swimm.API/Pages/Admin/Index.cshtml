@@ -8,8 +8,8 @@
 <!-- Stats -->
 <div class="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-4 mb-6" id="stats-grid"></div>
 
-<!-- Attention (сироты, спорные дубли) — рендерится только если сводка ненулевая -->
-<div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 mb-6 hidden" id="attention-grid"></div>
+<!-- Статус данных (дубли пловцов/клубов, Loglig, Discovery) -->
+<div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 mb-6" id="status-grid"></div>
 
 <!-- Tabs -->
 <div class="flex gap-2 mb-4">
@@ -111,32 +111,61 @@
             </div>`).join('');
     }
 
-    // --- Требует внимания (сироты, спорные дубли) ---
-    async function loadAttention() {
-        const a = await api(`${API}/swimmers/attention-summary`);
-        const grid = document.getElementById('attention-grid');
+    // --- Статус данных (дубли пловцов/клубов, Loglig, Discovery) ---
+    function statusCard(href, value, label, sublines, color) {
+        const subHtml = sublines.map(s => `<div class="text-xs text-[#90a4ae] mt-1">${s}</div>`).join('');
+        return `
+            <a href="${href}" class="bg-white/[.07] rounded-[10px] p-5 text-center block no-underline hover:bg-white/[.1] transition-colors">
+                <div class="text-3xl font-bold" style="color:${color}">${value}</div>
+                <div class="text-sm text-[#90a4ae] mt-1">${label}</div>
+                ${subHtml}
+            </a>`;
+    }
+
+    async function loadStatus() {
+        const s = await api(`${API}/dashboard/status`);
+        const grid = document.getElementById('status-grid');
         const cards = [];
-        if (a.orphans > 0) {
-            cards.push(`
-                <a href="/Admin/Swimmers" class="bg-white/[.07] rounded-[10px] p-5 text-center block no-underline hover:bg-white/[.1] transition-colors">
-                    <div class="text-3xl font-bold" style="color:#ffa726">${a.orphans}</div>
-                    <div class="text-sm text-[#90a4ae] mt-1">Сироты — карточки без единой связи, можно массово удалить</div>
-                </a>`);
+
+        // Swimmers: спорные дубли крупно, уверенные + сироты мелко
+        {
+            const sw = s.swimmers;
+            const zero = sw.unsureCandidates === 0 && sw.sureCandidates === 0 && sw.orphans === 0;
+            const sub = [];
+            if (sw.sureCandidates > 0) sub.push(`уверенных: ${sw.sureCandidates}`);
+            if (sw.orphans > 0) sub.push(`сирот: ${sw.orphans}`);
+            cards.push(statusCard('/Admin/Swimmers', sw.unsureCandidates,
+                'Спорные дубли пловцов', sub, zero ? '#66bb6a' : '#ffa726'));
         }
-        if (a.sureCandidates > 0 || a.unsureCandidates > 0) {
-            const sureLine = a.sureCandidates > 0
-                ? `<div class="text-xs text-[#90a4ae] mt-1">уверенных: ${a.sureCandidates}</div>` : '';
-            cards.push(`
-                <a href="/Admin/Swimmers" class="bg-white/[.07] rounded-[10px] p-5 text-center block no-underline hover:bg-white/[.1] transition-colors">
-                    <div class="text-3xl font-bold" style="color:#ffa726">${a.unsureCandidates}</div>
-                    <div class="text-sm text-[#90a4ae] mt-1">Спорные дубли — разобрать глазами</div>
-                    ${sureLine}
-                </a>`);
+
+        // Clubs: спорные дубли крупно, уверенные мелко
+        {
+            const cl = s.clubs;
+            const zero = cl.unsureCandidates === 0 && cl.sureCandidates === 0;
+            const sub = cl.sureCandidates > 0 ? [`уверенных: ${cl.sureCandidates}`] : [];
+            cards.push(statusCard('/Admin/Clubs', cl.unsureCandidates,
+                'Спорные дубли клубов', sub, zero ? '#66bb6a' : '#ffa726'));
         }
-        if (cards.length) {
-            grid.innerHTML = cards.join('');
-            grid.classList.remove('hidden');
+
+        // Loglig: верифицировано крупно, не привязано мелко, ожидающие/отклонённые — пометки
+        {
+            const lg = s.loglig;
+            const sub = [`не привязано: ${lg.unlinked}`];
+            if (lg.suggested > 0) sub.push(`<span style="color:#ffee58">на проверке: ${lg.suggested}</span>`);
+            if (lg.rejected > 0) sub.push(`отклонено: ${lg.rejected}`);
+            cards.push(statusCard('/Admin/Swimmers/Loglig', lg.verified,
+                'Loglig ID привязано', sub, '#4fc3f7'));
         }
+
+        // Discovery: не загружено крупно, загружено мелко
+        {
+            const d = s.discovery;
+            cards.push(statusCard('/Admin/Competitions?stage=OnSite', d.new,
+                'Входящие — не загружено', [`загружено: ${d.imported}`],
+                d.new > 0 ? '#ffa726' : '#66bb6a'));
+        }
+
+        grid.innerHTML = cards.join('');
     }
 
     // --- Filters ---
@@ -418,7 +447,7 @@
 
     // --- Init ---
     try {
-        [allRoles] = await Promise.all([api(`${API}/roles`), loadStats(), loadAttention()]);
+        [allRoles] = await Promise.all([api(`${API}/roles`), loadStats(), loadStatus()]);
         populateRoleFilter();
         allUsers = await api(`${API}/users`);
         populateUserDatalist();
