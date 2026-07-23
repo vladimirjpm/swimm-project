@@ -63,6 +63,11 @@ public class DashboardStatusService(
 
         var discovery = new DashboardDiscoveryStatus(Imported: imported, New: newCount, Other: other);
 
-        return new DashboardStatusSummary(swimmers, clubs, loglig, discovery);
+        var media = new DashboardMediaStatus(
+            Total: await db.UserMedia.CountAsync(ct),
+            Broken: await db.UserMedia.CountAsync(m => m.LinkOk == false, ct),
+            Unchecked: await db.UserMedia.CountAsync(m => m.LinkCheckedAt == null, ct));
+
+        return new DashboardStatusSummary(swimmers, clubs, loglig, discovery, media);
     }
 }

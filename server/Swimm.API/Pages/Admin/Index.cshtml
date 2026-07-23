@@ -165,6 +165,15 @@
                 d.new > 0 ? '#ffa726' : '#66bb6a'));
         }
 
+        // Media: битые ссылки крупно, всего + непроверенные мелко
+        {
+            const m = s.media;
+            const sub = [`total: ${m.total}`];
+            if (m.unchecked > 0) sub.push(`unchecked: ${m.unchecked}`);
+            cards.push(statusCard('/Admin/Media', m.broken,
+                'Broken media links', sub, m.broken > 0 ? '#ffa726' : '#66bb6a'));
+        }
+
         grid.innerHTML = cards.join('');
     }
 

@@ -24,6 +24,7 @@
 | /Admin/HubGroupClubRequests | [hubgroupclubrequests.md](hubgroupclubrequests.md) | Заявки групп на статус клуба |
 | /Admin/Import | [import.md](import.md) | Импорт соревнований (JSON/PDF) и рекордов |
 | /Admin/ImportHistory | [importhistory.md](importhistory.md) | История импортов |
+| /Admin/Media | [media.md](media.md) | Проверка живости ссылок UserMedia (битые 404) |
 | /Admin/Users | [users.md](users.md) | Пользователи и сессии |
 | /Admin/Audit | [audit.md](audit.md) | Журнал ручных мутаций (аудит «кто/что/когда») |
 | /Admin/Db | [db.md](db.md) | Схема БД |

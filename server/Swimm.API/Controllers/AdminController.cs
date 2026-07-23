@@ -23,6 +23,7 @@ public class AdminController : ControllerBase
     private readonly IMemoryCache _cache;
     private readonly IAdminAuditService _audit;
     private readonly ICacheService _cacheService;
+    private readonly IUserMediaLinkChecker _linkChecker;
 
     public AdminController(
         IAdminRepository admin,
@@ -34,7 +35,8 @@ public class AdminController : ControllerBase
         IResultSourceProvider sourceProvider,
         IMemoryCache cache,
         IAdminAuditService audit,
-        ICacheService cacheService)
+        ICacheService cacheService,
+        IUserMediaLinkChecker linkChecker)
     {
         _admin = admin;
         _schema = schema;
@@ -46,6 +48,7 @@ public class AdminController : ControllerBase
         _cache = cache;
         _audit = audit;
         _cacheService = cacheService;
+        _linkChecker = linkChecker;
     }
 
     // ── Users ────────────────────────────────────────────────────────────────
@@ -161,6 +164,17 @@ public class AdminController : ControllerBase
         await _audit.LogAsync("cache.invalidate", "Cache", null,
             "Сброшен кэш агрегатов (пересчёт при следующем запросе)");
         return Ok(new { message = "Cache invalidated" });
+    }
+
+    // ── Media (здоровье ссылок, фаза 7.5) ───────────────────────────────────────
+
+    [HttpPost("media/check-links")]
+    public async Task<IActionResult> CheckMediaLinks(CancellationToken ct)
+    {
+        var report = await _linkChecker.CheckAllAsync(ct);
+        await _audit.LogAsync("media.link-check", "UserMedia", null,
+            $"Проверка ссылок медиа: всего {report.Checked}, битых {report.Broken}", report);
+        return Ok(report);
     }
 
     // ── Import ───────────────────────────────────────────────────────────────
