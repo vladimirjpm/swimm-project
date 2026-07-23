@@ -21,6 +21,7 @@ public class SwimmersAdminController : ControllerBase
     private readonly IDedupIgnoreService _ignore;
     private readonly ICacheService _cache;
     private readonly IAdminAuditService _audit;
+    private readonly IDataQualityService _quality;
     private readonly ILogger<SwimmersAdminController> _logger;
 
     public SwimmersAdminController(
@@ -29,6 +30,7 @@ public class SwimmersAdminController : ControllerBase
         IDedupIgnoreService ignore,
         ICacheService cache,
         IAdminAuditService audit,
+        IDataQualityService quality,
         ILogger<SwimmersAdminController> logger)
     {
         _dedup = dedup;
@@ -36,8 +38,14 @@ public class SwimmersAdminController : ControllerBase
         _ignore = ignore;
         _cache = cache;
         _audit = audit;
+        _quality = quality;
         _logger = logger;
     }
+
+    /// <summary>Deep-link выборки «здоровье данных» (T3b): filter=no-org-id|no-results, топ-200.</summary>
+    [HttpGet("quality")]
+    public async Task<IActionResult> GetQuality([FromQuery] string filter, CancellationToken ct)
+        => Ok(await _quality.GetSwimmerQualityAsync(filter, ct));
 
     public sealed record IgnorePairRequest(int IdA, int IdB);
 

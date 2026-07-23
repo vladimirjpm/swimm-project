@@ -14,9 +14,49 @@
     </script>
 }
 
-<div class="mb-4 flex items-center justify-end">
+<div class="mb-4 flex items-center justify-between">
+    <a href="@Url.Page("Index", new { tab = Model.Tab == "requests" ? null : "requests" })" class="admin-btn admin-btn-ghost">
+        @(Model.Tab == "requests" ? "Скрыть заявки на вступление" : "Заявки на вступление (pending)")
+    </a>
     <a href="@Url.Page("Edit")" class="admin-btn admin-btn-primary">+ Новая группа</a>
 </div>
+
+@if (Model.Tab == "requests")
+{
+    <div id="join-requests" class="admin-card mb-6 p-4">
+        <div class="mb-2 text-sm font-semibold text-admin-text">
+            Заявки на вступление (pending) — первые @Model.PendingRequests.Items.Count из @Model.PendingRequests.Total
+        </div>
+        @if (Model.PendingRequests.Items.Count == 0)
+        {
+            <div class="text-admin-text-muted italic py-4 text-center">Заявок нет.</div>
+        }
+        else
+        {
+            <div class="overflow-x-auto">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Группа</th>
+                            <th>Email</th>
+                            <th class="whitespace-nowrap">Подана</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in Model.PendingRequests.Items)
+                        {
+                            <tr>
+                                <td><a href="@Url.Page("Edit", new { id = r.HubGroupId })" class="text-admin-accent hover:underline">@r.HubGroupName</a></td>
+                                <td class="text-admin-text-muted">@(r.Email ?? "—")</td>
+                                <td class="whitespace-nowrap text-admin-text-muted">@r.JoinedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+}
 
 @if (Model.Groups.Count == 0)
 {
@@ -100,6 +140,12 @@ else
 
 @section Scripts {
     <script>
+        // Deep-link с дашборда (?tab=requests) — прокрутить к секции заявок.
+        document.addEventListener('DOMContentLoaded', () => {
+            const el = document.getElementById('join-requests');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+
         document.querySelectorAll('.hubgroup-delete-form').forEach(form => {
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();

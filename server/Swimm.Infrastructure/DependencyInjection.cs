@@ -176,6 +176,9 @@ public static class DependencyInjection
         services.AddScoped<IAdminAuditService, AdminAuditService>();
         services.AddScoped<IAdminAuditRepository, AdminAuditRepository>();
 
+        // Deep-link выборки «здоровье данных» дашборда (T3b, docs/tasks/dashboard-deeplinks-lists-sonnet.md)
+        services.AddScoped<IDataQualityService, DataQualityService>();
+
         return services;
     }
 }

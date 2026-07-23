@@ -57,6 +57,15 @@
     <div id="status-body" class="text-[13px] leading-relaxed"></div>
 </div>
 
+<details id="quality-wrap" class="mt-10 max-w-[900px]">
+    <summary id="quality-summary" class="cursor-pointer select-none text-sm font-semibold text-admin-text">Качество данных</summary>
+    <div class="mt-2 mb-2 flex flex-wrap gap-2 text-[12.5px]">
+        <button class="admin-btn admin-btn-ghost py-1 px-2.5" data-qfilter="no-swimmers">Без пловцов</button>
+        <button class="admin-btn admin-btn-ghost py-1 px-2.5" data-qfilter="no-country">Без страны</button>
+    </div>
+    <div id="quality-body" class="text-[13px] text-admin-text-muted">Выбери фильтр.</div>
+</details>
+
 <partial name="/Pages/Admin/Shared/_ConfirmDialog.cshtml" />
 
 @section Scripts {
@@ -272,6 +281,43 @@
             await load(true);
         } catch (e) { toast('Ошибка применения: ' + e.message, 6000); }
     });
+
+    // ── Качество данных (T3b, deep-link ?filter=no-swimmers|no-country): сворачиваемая секция,
+    // грузится лениво — только по deep-link или клику на заголовок/кнопку фильтра. ──
+    (function () {
+        const QAPI = '/api/admin/clubs/quality';
+        const wrap = document.getElementById('quality-wrap');
+        const body = document.getElementById('quality-body');
+
+        async function loadQuality(filter) {
+            body.textContent = 'Загружаю…';
+            try {
+                const r = await fetch(`${QAPI}?filter=${encodeURIComponent(filter)}`, { credentials: 'same-origin' });
+                const data = await r.json();
+                body.innerHTML = data.items.length === 0
+                    ? `<div class="italic py-2">Нет строк (показаны ${data.items.length} из ${data.total}).</div>`
+                    : `<div class="mb-1">Показаны ${data.items.length} из ${data.total}</div>
+                       <div class="overflow-x-auto"><table class="admin-table">
+                        <thead><tr><th>Id</th><th>Название</th><th>EN</th><th>CountryId</th></tr></thead>
+                        <tbody>${data.items.map(c => `
+                            <tr><td>${c.id}</td>
+                                <td dir="rtl" style="text-align:left"><a href="/Admin/Clubs/Edit?id=${c.id}" class="text-admin-accent hover:underline">${esc(c.name)}</a></td>
+                                <td>${esc(c.nameEn ?? '')}</td><td>${c.countryId ?? '—'}</td></tr>`).join('')}</tbody>
+                       </table></div>`;
+            } catch (e) { body.textContent = 'Ошибка: ' + e.message; }
+        }
+
+        document.querySelectorAll('[data-qfilter]').forEach(btn =>
+            btn.addEventListener('click', () => { wrap.open = true; loadQuality(btn.dataset.qfilter); }));
+
+        // Deep-link с дашборда: ?filter=no-swimmers|no-country — раскрыть и загрузить сразу.
+        const qf = qsFilter === 'no-swimmers' || qsFilter === 'no-country' ? qsFilter : null;
+        if (qf) {
+            wrap.open = true;
+            loadQuality(qf);
+            setTimeout(() => wrap.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+        }
+    })();
 
     load();
 })();

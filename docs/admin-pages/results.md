@@ -29,3 +29,12 @@
 
 Полноценный поиск результата (по соревнованию/пловцу) — сейчас только переход по Id.
 Правка времени НЕ пересчитывает рекорды (`Records` ведутся отдельно) — это отдельная задача.
+
+## Deep-link секция «Аномалии» (T3b)
+
+Под формой перехода — сворачиваемая секция `<details>`, грузится лениво (клик по
+заголовку или `?filter=fk-anomaly|empty-relay` — раскрывает и подсвечивает нужный блок)
+через `GET /api/admin/results/anomalies` (`ResultsAdminController` → `IDataQualityService`).
+Отдаёт `{ fkAnomalies: {total, items}, emptyRelays: {total, items} }`, топ-200 каждая,
+предикаты те же, что `DashboardStatusService.Results.FkAnomalies/EmptyRelays` (в проде
+ожидаемо пусто — FK держит целостность). Read-only; строка fk-аномалии линкует на Edit.

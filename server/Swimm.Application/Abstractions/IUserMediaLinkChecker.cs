@@ -13,4 +13,8 @@ public interface IUserMediaLinkChecker
 
     /// <summary>Список ссылок, помеченных битыми при последней проверке (LinkOk == false).</summary>
     Task<IReadOnlyList<BrokenMediaRowDto>> GetBrokenAsync(CancellationToken ct = default);
+
+    /// <summary>Ссылки, ещё не проверенные ни разу (LinkCheckedAt == null), топ-200 (T3b deep-link,
+    /// Admin/Media?filter=unchecked) — тот же предикат, что считает DashboardStatusService.Media.Unchecked.</summary>
+    Task<CappedListDto<BrokenMediaRowDto>> GetUncheckedAsync(CancellationToken ct = default);
 }

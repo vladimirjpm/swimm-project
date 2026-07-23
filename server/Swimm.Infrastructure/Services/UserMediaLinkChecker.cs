@@ -110,4 +110,23 @@ public class UserMediaLinkChecker(
                 m.LinkCheckedAt, m.LinkStatusCode, m.LinkError))
             .ToListAsync(ct);
     }
+
+    public async Task<CappedListDto<BrokenMediaRowDto>> GetUncheckedAsync(CancellationToken ct = default)
+    {
+        var q = db.UserMedia.AsNoTracking().Where(m => m.LinkCheckedAt == null);
+
+        var total = await q.CountAsync(ct);
+        var items = await q
+            .Include(m => m.User)
+            .Include(m => m.Swimmer)
+            .OrderBy(m => m.Id)
+            .Take(CappedListDto<object>.Cap)
+            .Select(m => new BrokenMediaRowDto(
+                m.Id, m.Url, m.User.Email, m.Swimmer.LastName + " " + m.Swimmer.FirstName,
+                m.MediaType, m.SourceType,
+                m.LinkCheckedAt, m.LinkStatusCode, m.LinkError))
+            .ToListAsync(ct);
+
+        return new CappedListDto<BrokenMediaRowDto>(total, items);
+    }
 }

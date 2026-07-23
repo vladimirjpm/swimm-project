@@ -169,4 +169,24 @@ public class UserMediaLinkCheckerTests
         Assert.Equal(404, row.LinkStatusCode);
         Assert.Equal("HTTP 404", row.LinkError);
     }
+
+    [Fact]
+    public async Task GetUncheckedAsync_OnlyReturnsLinksNeverChecked()
+    {
+        // T3b (deep-link «здоровье данных»): предикат LinkCheckedAt == null должен совпадать
+        // с DashboardStatusService.Media.Unchecked.
+        await using var db = CreateDb(nameof(GetUncheckedAsync_OnlyReturnsLinksNeverChecked));
+        var unchecked_ = Seed(db, "https://example.com/new.jpg", "image", "other");
+        var checkedOk = Seed(db, "https://example.com/ok.jpg", "image", "other");
+        checkedOk.LinkCheckedAt = DateTime.UtcNow;
+        checkedOk.LinkOk = true;
+        await db.SaveChangesAsync();
+
+        var checker = new UserMediaLinkChecker(db, new StubHttpClientFactory(new ThrowingFakeHandler()), NullLogger<UserMediaLinkChecker>.Instance);
+
+        var result = await checker.GetUncheckedAsync();
+
+        Assert.Equal(1, result.Total);
+        Assert.Equal(unchecked_.Id, Assert.Single(result.Items).Id);
+    }
 }

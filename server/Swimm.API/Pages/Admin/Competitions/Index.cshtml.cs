@@ -45,11 +45,14 @@ public class IndexModel : PageModel
 
     /// <summary>
     /// Deep-link алиас с дашборда: ignored → Stage=Ignored, discovery-new → Stage=OnSite
-    /// (только если Stage не задан явно явным параметром). Прочие значения (discovery-error,
-    /// no-org-comp-id, no-results) — T3b, игнорируются.
+    /// (только если Stage не задан явно явным параметром). Остальные значения (discovery-error,
+    /// no-org-comp-id, no-results) — T3b, идут в <see cref="QualityFilter"/> доп-WHERE'ом.
     /// </summary>
     [BindProperty(SupportsGet = true, Name = "filter")]
     public string? FilterAlias { get; set; }
+
+    /// <summary>Разобранный из FilterAlias качественный фильтр (T3b) — для шапки списка/ссылки «сбросить».</summary>
+    public string? QualityFilter { get; private set; }
 
     /// <summary>Показывать тестовую синтетику (SYNTH Meet…). По умолчанию скрыта.</summary>
     [BindProperty(SupportsGet = true, Name = "synth")]
@@ -86,7 +89,12 @@ public class IndexModel : PageModel
                 _ => Stage
             };
         }
-        var list = await _repo.GetUnifiedAsync(Search, CategoryKey, Year, Stage, ShowSynthetic, Month, PageNumber, PageSize);
+        QualityFilter = FilterAlias switch
+        {
+            "discovery-error" or "no-org-comp-id" or "no-results" => FilterAlias,
+            _ => null
+        };
+        var list = await _repo.GetUnifiedAsync(Search, CategoryKey, Year, Stage, ShowSynthetic, Month, PageNumber, PageSize, QualityFilter);
         Result = list.Page;
         MonthCounts = list.MonthCounts;
         Categories = await _repo.GetAllCategoriesAsync();

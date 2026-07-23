@@ -7,11 +7,11 @@
 
     // ВНИМАНИЕ: параметр пагинации — «p», НЕ «page» (page зарезервирован Razor Pages, ломает переходы).
     string PageUrl(int pg) =>
-        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, year = Model.Year, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = Model.Month, p = pg })!;
+        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, year = Model.Year, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = Model.Month, p = pg, filter = Model.QualityFilter })!;
 
     // Ссылка на месяц (сброс страницы на 1; повторный клик по активному — снять фильтр).
     string MonthUrl(int? m) =>
-        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, year = Model.Year, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = m })!;
+        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, year = Model.Year, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = m, filter = Model.QualityFilter })!;
 
     var monthNames = new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
@@ -77,6 +77,21 @@
     объединены. Действия входящих (Проверить/Затянуть/импорт, синхр. языки, скрыть) и CRUD
     справочника (изменить/удалить/создать) — здесь же.
 </div>
+
+@if (!string.IsNullOrEmpty(Model.QualityFilter))
+{
+    var label = Model.QualityFilter switch
+    {
+        "discovery-error" => "ошибка автозабора (discovery)",
+        "no-org-comp-id" => "без OrgCompId",
+        "no-results" => "без результатов",
+        _ => Model.QualityFilter
+    };
+    <div class="admin-card border-l-[3px] border-l-admin-warning bg-admin-warning/5 mb-4 flex items-center justify-between px-4 py-2 text-[13px]">
+        <span>Активный фильтр «здоровья данных»: <strong class="text-admin-text">@label</strong></span>
+        <a href="@Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, year = Model.Year, synth = Model.ShowSynthetic ? "true" : null, month = Model.Month })" class="admin-btn admin-btn-ghost py-1 px-2.5">сбросить ✕</a>
+    </div>
+}
 
 @{ var flash = TempData["Flash"] as string; }
 @if (!string.IsNullOrEmpty(flash))

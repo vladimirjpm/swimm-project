@@ -50,3 +50,13 @@ SwimmLinkCheck/1.0`, `AllowAutoRedirect = true` (дефолт). Параллел
 Фоновая/периодическая/инкрементальная проверка; удаление/правка медиа с этой
 страницы (только показ битых + ссылка наружу); ретраи/backoff/кэш результатов
 проверки.
+
+## Вкладки / deep-link фильтры (T3b)
+
+Три вкладки сверху страницы, переключаются query-параметром `?filter=` (обычная
+SSR-навигация, без JS-fetch): **broken-links** (по умолчанию — прежний вид + кнопка
+Check links now), **unchecked** (`LinkCheckedAt == null`, `IUserMediaLinkChecker.
+GetUncheckedAsync`, топ-200 + total), **moderation-pending** (`UserMediaPublication.
+Status == "pending"`, `IDataQualityService.GetModerationPendingAsync`, join
+Media/HubGroup/владелец, топ-200 + total). Все read-only; решения по публикациям
+принимают админы конкретных групп на странице группы — здесь approve/reject нет.

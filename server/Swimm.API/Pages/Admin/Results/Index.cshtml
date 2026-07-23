@@ -34,3 +34,72 @@
         Эстафетные строки этой формой не правятся.
     </div>
 </div>
+
+<details id="anomalies-wrap" class="mt-8 max-w-[900px]">
+    <summary id="anomalies-summary" class="cursor-pointer select-none text-sm font-semibold text-admin-text">Аномалии</summary>
+    <div id="anomalies-body" class="mt-3 text-[13px] text-admin-text-muted">Не загружено — раскрой секцию.</div>
+</details>
+
+@section Scripts {
+<script>
+(function () {
+    const API = '/api/admin/results/anomalies';
+    // Deep-link фильтр с дашборда: ?filter=fk-anomaly|empty-relay — раскрыть секцию и подсветить нужную таблицу.
+    const qsFilter = new URLSearchParams(location.search).get('filter');
+    const highlight = qsFilter === 'fk-anomaly' ? 'fk' : qsFilter === 'empty-relay' ? 'relay' : null;
+
+    let loaded = false;
+    async function load() {
+        if (loaded) return;
+        loaded = true;
+        const body = document.getElementById('anomalies-body');
+        body.textContent = 'Загружаю…';
+        try {
+            const r = await fetch(API, { credentials: 'same-origin' });
+            const data = await r.json();
+            body.innerHTML = `
+                <div id="fk-block" class="mb-4">
+                    <div class="mb-1 font-semibold text-admin-text">FK-аномалии — показаны ${data.fkAnomalies.items.length} из ${data.fkAnomalies.total}</div>
+                    ${data.fkAnomalies.items.length === 0 ? '<div class="italic">Нет.</div>' : `
+                    <div class="overflow-x-auto"><table class="admin-table">
+                        <thead><tr><th>Result Id</th><th>Swimmer Id</th><th>Club Id</th><th>Competition Id</th></tr></thead>
+                        <tbody>${data.fkAnomalies.items.map(x => `
+                            <tr><td><a href="/Admin/Results/Edit?id=${x.resultId}" class="text-admin-accent hover:underline">${x.resultId}</a></td>
+                                <td>${x.swimmerId}</td><td>${x.clubId}</td><td>${x.competitionId}</td></tr>`).join('')}</tbody>
+                    </table></div>`}
+                </div>
+                <div id="relay-block">
+                    <div class="mb-1 font-semibold text-admin-text">Пустые эстафеты — показаны ${data.emptyRelays.items.length} из ${data.emptyRelays.total}</div>
+                    ${data.emptyRelays.items.length === 0 ? '<div class="italic">Нет.</div>' : `
+                    <div class="overflow-x-auto"><table class="admin-table">
+                        <thead><tr><th>Relay Id</th><th>Competition Id</th></tr></thead>
+                        <tbody>${data.emptyRelays.items.map(x => `
+                            <tr><td>${x.relayId}</td><td>${x.competitionId}</td></tr>`).join('')}</tbody>
+                    </table></div>`}
+                </div>`;
+            if (highlight) {
+                const el = document.getElementById(highlight === 'fk' ? 'fk-block' : 'relay-block');
+                if (el) {
+                    el.style.outline = '2px solid var(--color-admin-accent, #4fc3f7)';
+                    el.style.outlineOffset = '4px';
+                    setTimeout(() => { el.style.outline = ''; el.style.outlineOffset = ''; }, 2000);
+                }
+            }
+        } catch (e) {
+            body.textContent = 'Ошибка: ' + e.message;
+            loaded = false;
+        }
+    }
+
+    document.getElementById('anomalies-wrap').addEventListener('toggle', (e) => {
+        if (e.target.open) load();
+    });
+
+    if (highlight) {
+        document.getElementById('anomalies-wrap').open = true;
+        load();
+        document.getElementById('anomalies-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+})();
+</script>
+}

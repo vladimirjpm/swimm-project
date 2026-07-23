@@ -3,60 +3,160 @@
 @{
     ViewData["Title"] = "Media";
     ViewData["PageSubtitle"] = "Health of external UserMedia links (YouTube/Vimeo/images)";
+
+    (string Key, string Label) TabDef(string key, string label) => (key, label);
+    var tabs = new[] { TabDef("broken-links", "Broken links"), TabDef("unchecked", "Unchecked"), TabDef("moderation-pending", "Moderation pending") };
 }
 
-<div class="mb-4 flex items-center justify-between">
-    <div class="text-admin-text-muted">
-        Broken links: <strong class="text-admin-text">@Model.Broken.Count</strong>
-    </div>
-    <button id="btn-check-links" class="admin-btn admin-btn-primary" onclick="checkLinks()">Check links now</button>
+<!-- Вкладки (deep-link с дашборда: ?filter=unchecked|moderation-pending; broken-links — вид по умолчанию) -->
+<div class="mb-4 flex flex-wrap items-center gap-2">
+    @foreach (var t in tabs)
+    {
+        <a href="@Url.Page("Index", new { filter = t.Key })"
+           class="@(Model.View == t.Key ? "admin-btn admin-btn-primary" : "admin-btn admin-btn-ghost") py-1 px-2.5">@t.Label</a>
+    }
+    @if (Model.View == "broken-links")
+    {
+        <button id="btn-check-links" class="admin-btn admin-btn-primary ml-auto" onclick="checkLinks()">Check links now</button>
+    }
 </div>
 
-@if (Model.Broken.Count == 0)
+@if (Model.View == "broken-links")
 {
-    <div class="admin-card text-center text-admin-text-muted italic py-10">
-        No broken media links.
+    <div class="mb-3 text-admin-text-muted">
+        Broken links: <strong class="text-admin-text">@Model.Broken.Count</strong>
     </div>
+
+    if (Model.Broken.Count == 0)
+    {
+        <div class="admin-card text-center text-admin-text-muted italic py-10">
+            No broken media links.
+        </div>
+    }
+    else
+    {
+        <div class="overflow-x-auto">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Url</th>
+                        <th>Owner</th>
+                        <th>Swimmer</th>
+                        <th>Type</th>
+                        <th class="whitespace-nowrap">Checked</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var m in Model.Broken)
+                    {
+                        <tr>
+                            <td class="max-w-[360px] truncate">
+                                <a href="@m.Url" target="_blank" rel="noopener noreferrer" class="text-admin-accent hover:underline">@m.Url</a>
+                            </td>
+                            <td class="whitespace-nowrap text-admin-text-muted">@m.OwnerEmail</td>
+                            <td class="whitespace-nowrap">@m.SwimmerName</td>
+                            <td class="whitespace-nowrap text-admin-text-muted">@m.MediaType / @m.SourceType</td>
+                            <td class="whitespace-nowrap text-admin-text-muted">
+                                @(m.LinkCheckedAt is { } checkedAt ? checkedAt.ToString("dd/MM/yyyy HH:mm:ss") : "—")
+                            </td>
+                            <td class="text-xs text-admin-text-muted">
+                                @(m.LinkStatusCode is { } code ? $"HTTP {code}" : "")
+                                @if (!string.IsNullOrEmpty(m.LinkError))
+                                {
+                                    <div>@m.LinkError</div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+else if (Model.View == "unchecked")
+{
+    <div class="mb-3 text-admin-text-muted">
+        Показаны первые @Model.Unchecked.Items.Count из @Model.Unchecked.Total непроверенных.
+    </div>
+
+    if (Model.Unchecked.Items.Count == 0)
+    {
+        <div class="admin-card text-center text-admin-text-muted italic py-10">Непроверенных ссылок нет.</div>
+    }
+    else
+    {
+        <div class="overflow-x-auto">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Url</th>
+                        <th>Owner</th>
+                        <th>Swimmer</th>
+                        <th>Type</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var m in Model.Unchecked.Items)
+                    {
+                        <tr>
+                            <td class="max-w-[360px] truncate">
+                                <a href="@m.Url" target="_blank" rel="noopener noreferrer" class="text-admin-accent hover:underline">@m.Url</a>
+                            </td>
+                            <td class="whitespace-nowrap text-admin-text-muted">@m.OwnerEmail</td>
+                            <td class="whitespace-nowrap">@m.SwimmerName</td>
+                            <td class="whitespace-nowrap text-admin-text-muted">@m.MediaType / @m.SourceType</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 }
 else
 {
-    <div class="overflow-x-auto">
-        <table class="admin-table">
-            <thead>
-                <tr>
-                    <th>Url</th>
-                    <th>Owner</th>
-                    <th>Swimmer</th>
-                    <th>Type</th>
-                    <th class="whitespace-nowrap">Checked</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var m in Model.Broken)
-                {
-                    <tr>
-                        <td class="max-w-[360px] truncate">
-                            <a href="@m.Url" target="_blank" rel="noopener noreferrer" class="text-admin-accent hover:underline">@m.Url</a>
-                        </td>
-                        <td class="whitespace-nowrap text-admin-text-muted">@m.OwnerEmail</td>
-                        <td class="whitespace-nowrap">@m.SwimmerName</td>
-                        <td class="whitespace-nowrap text-admin-text-muted">@m.MediaType / @m.SourceType</td>
-                        <td class="whitespace-nowrap text-admin-text-muted">
-                            @(m.LinkCheckedAt is { } checkedAt ? checkedAt.ToString("dd/MM/yyyy HH:mm:ss") : "—")
-                        </td>
-                        <td class="text-xs text-admin-text-muted">
-                            @(m.LinkStatusCode is { } code ? $"HTTP {code}" : "")
-                            @if (!string.IsNullOrEmpty(m.LinkError))
-                            {
-                                <div>@m.LinkError</div>
-                            }
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+    <div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-4 text-[0.85rem] text-admin-text-muted leading-relaxed">
+        Read-only обзор. Решения по заявкам (одобрить/отклонить) принимают админы конкретных групп
+        на странице группы — здесь кнопок нет.
     </div>
+    <div class="mb-3 text-admin-text-muted">
+        Показаны первые @Model.ModerationPending.Items.Count из @Model.ModerationPending.Total заявок.
+    </div>
+
+    if (Model.ModerationPending.Items.Count == 0)
+    {
+        <div class="admin-card text-center text-admin-text-muted italic py-10">Заявок на модерацию нет.</div>
+    }
+    else
+    {
+        <div class="overflow-x-auto">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Url</th>
+                        <th>Type</th>
+                        <th>Группа</th>
+                        <th>Владелец</th>
+                        <th class="whitespace-nowrap">Подано</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in Model.ModerationPending.Items)
+                    {
+                        <tr>
+                            <td class="max-w-[360px] truncate">
+                                <a href="@p.Url" target="_blank" rel="noopener noreferrer" class="text-admin-accent hover:underline">@p.Url</a>
+                            </td>
+                            <td class="whitespace-nowrap text-admin-text-muted">@p.MediaType</td>
+                            <td class="whitespace-nowrap">@p.HubGroupName</td>
+                            <td class="whitespace-nowrap text-admin-text-muted">@(p.OwnerEmail ?? "—")</td>
+                            <td class="whitespace-nowrap text-admin-text-muted">@p.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 }
 
 @section Scripts {

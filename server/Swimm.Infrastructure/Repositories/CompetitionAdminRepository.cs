@@ -61,7 +61,8 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
     }
 
     public async Task<UnifiedCompetitionList> GetUnifiedAsync(
-        string? search, string? categoryKey, int? year, string? stage, bool showSynthetic, int? month, int page, int pageSize)
+        string? search, string? categoryKey, int? year, string? stage, bool showSynthetic, int? month, int page, int pageSize,
+        string? qualityFilter = null)
     {
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 20;
@@ -147,6 +148,19 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         // 3) Фильтр по стадии (если задан).
         if (!string.IsNullOrWhiteSpace(stage) && Enum.TryParse<CompetitionStage>(stage, ignoreCase: true, out var st))
             unified = unified.Where(u => u.Stage == st).ToList();
+
+        // 3b) T3b deep-link: доп. фильтр «здоровье данных» (те же предикаты, что DashboardStatusService).
+        // Многодневное событие свёрнуто в одну строку — «нет OrgCompId»/«нет результатов» проверяем
+        // по любому дню/сумме дней события, а не только по «голове».
+        unified = qualityFilter switch
+        {
+            "discovery-error" => unified.Where(u => u.Site?.LastError != null).ToList(),
+            "no-org-comp-id" => unified.Where(u => u.Db != null && (
+                u.Db.Single != null ? u.Db.Single.OrgCompId == null : u.Db.Days.Any(d => d.OrgCompId == null))).ToList(),
+            "no-results" => unified.Where(u => u.Db != null && (
+                u.Db.Single != null ? u.Db.Single.ResultCount == 0 : u.Db.TotalResultCount == 0)).ToList(),
+            _ => unified
+        };
 
         // 4) Счётчики по месяцам (под текущими фильтрами, но ДО фильтра по месяцу — для кнопок).
         var monthCounts = new int[12];

@@ -20,6 +20,7 @@ public class ClubsAdminController : ControllerBase
     private readonly IClubMergeService _merge;
     private readonly IDedupIgnoreService _ignore;
     private readonly IAdminAuditService _audit;
+    private readonly IDataQualityService _quality;
     private readonly ILogger<ClubsAdminController> _logger;
 
     public ClubsAdminController(
@@ -27,14 +28,21 @@ public class ClubsAdminController : ControllerBase
         IClubMergeService merge,
         IDedupIgnoreService ignore,
         IAdminAuditService audit,
+        IDataQualityService quality,
         ILogger<ClubsAdminController> logger)
     {
         _dedup = dedup;
         _merge = merge;
         _ignore = ignore;
         _audit = audit;
+        _quality = quality;
         _logger = logger;
     }
+
+    /// <summary>Deep-link выборки «здоровье данных» (T3b): filter=no-swimmers|no-country, топ-200.</summary>
+    [HttpGet("quality")]
+    public async Task<IActionResult> GetQuality([FromQuery] string filter, CancellationToken ct)
+        => Ok(await _quality.GetClubQualityAsync(filter, ct));
 
     public sealed record IgnorePairRequest(int IdA, int IdB);
 

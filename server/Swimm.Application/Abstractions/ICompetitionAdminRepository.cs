@@ -24,8 +24,12 @@ public interface ICompetitionAdminRepository
     /// (Name начинается с «SYNTH »). <paramref name="month"/> (1–12, null — все) фильтрует по месяцу;
     /// результат несёт счётчики по всем 12 месяцам (без учёта самого month-фильтра) для кнопок.
     /// </summary>
+    /// <param name="qualityFilter">T3b deep-link: discovery-error | no-org-comp-id | no-results —
+    /// доп. WHERE поверх остальных фильтров (те же предикаты, что считает DashboardStatusService).
+    /// Неизвестное значение/null — не фильтрует.</param>
     Task<UnifiedCompetitionList> GetUnifiedAsync(
-        string? search, string? categoryKey, int? year, string? stage, bool showSynthetic, int? month, int page, int pageSize);
+        string? search, string? categoryKey, int? year, string? stage, bool showSynthetic, int? month, int page, int pageSize,
+        string? qualityFilter = null);
 
     /// <summary>Полные данные для формы Edit (включая URL-ы результатов). null — не найдено.</summary>
     Task<CompetitionEditDto?> GetByIdAsync(int id);
