@@ -48,6 +48,14 @@ public static class AdminNav
 public record PageHeaderModel(string Title, string? Subtitle = null);
 
 /// <summary>
+/// Модель для partial Shared/_Pagination — единый блок «← Назад · Страница X из Y · Вперёд →».
+/// URL соседних страниц каждый список считает сам (параметры фильтров разные): передаётся
+/// готовая ссылка либо null (край/недоступно → неактивная кнопка). Блок не рендерится при
+/// <c>TotalPages &lt;= 1</c>.
+/// </summary>
+public record PaginationModel(int Page, int TotalPages, string? PrevUrl, string? NextUrl);
+
+/// <summary>
 /// Модель для partial Shared/_StatusBadge.
 /// Variant: success | danger | warning | info | neutral.
 /// </summary>

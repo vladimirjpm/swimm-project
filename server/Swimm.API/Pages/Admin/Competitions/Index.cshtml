@@ -324,28 +324,10 @@ else
         </table>
     </div>
 
-    @if (Model.Result.TotalPages > 1)
-    {
-        <div class="flex items-center gap-3 mt-4">
-            @if (Model.Result.HasPrev)
-            {
-                <a href="@PageUrl(Model.Result.Page - 1)" class="admin-btn admin-btn-ghost">← Назад</a>
-            }
-            else
-            {
-                <span class="admin-btn admin-btn-ghost opacity-40 cursor-not-allowed">← Назад</span>
-            }
-            <span class="text-xs text-admin-text-muted">Страница @Model.Result.Page из @Model.Result.TotalPages</span>
-            @if (Model.Result.HasNext)
-            {
-                <a href="@PageUrl(Model.Result.Page + 1)" class="admin-btn admin-btn-ghost">Вперёд →</a>
-            }
-            else
-            {
-                <span class="admin-btn admin-btn-ghost opacity-40 cursor-not-allowed">Вперёд →</span>
-            }
-        </div>
-    }
+    <partial name="/Pages/Admin/Shared/_Pagination.cshtml"
+             model='new Swimm.API.Pages.Admin.Shared.PaginationModel(Model.Result.Page, Model.Result.TotalPages,
+                        Model.Result.HasPrev ? PageUrl(Model.Result.Page - 1) : null,
+                        Model.Result.HasNext ? PageUrl(Model.Result.Page + 1) : null)' />
 }
 
 <!-- Превью «затянутого» PDF перед импортом (перенос из /Admin/Discovery) -->

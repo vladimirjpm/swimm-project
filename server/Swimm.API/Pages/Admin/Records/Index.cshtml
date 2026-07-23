@@ -204,20 +204,10 @@
             </table>
         </div>
 
-        @if (Model.Records.TotalPages > 1)
-        {
-            <div class="flex items-center gap-3 mt-4">
-                @if (Model.Records.HasPrev)
-                { <a href="@RecordsPageUrl(Model.Records.Page - 1)" class="admin-btn admin-btn-ghost">← Назад</a> }
-                else
-                { <span class="admin-btn admin-btn-ghost opacity-40 cursor-not-allowed">← Назад</span> }
-                <span class="text-xs text-admin-text-muted">Страница @Model.Records.Page из @Model.Records.TotalPages</span>
-                @if (Model.Records.HasNext)
-                { <a href="@RecordsPageUrl(Model.Records.Page + 1)" class="admin-btn admin-btn-ghost">Вперёд →</a> }
-                else
-                { <span class="admin-btn admin-btn-ghost opacity-40 cursor-not-allowed">Вперёд →</span> }
-            </div>
-        }
+        <partial name="/Pages/Admin/Shared/_Pagination.cshtml"
+                 model='new Swimm.API.Pages.Admin.Shared.PaginationModel(Model.Records.Page, Model.Records.TotalPages,
+                            Model.Records.HasPrev ? RecordsPageUrl(Model.Records.Page - 1) : null,
+                            Model.Records.HasNext ? RecordsPageUrl(Model.Records.Page + 1) : null)' />
     }
 }
 else
@@ -351,20 +341,10 @@ else
             </table>
         </div>
 
-        @if (Model.Standards.TotalPages > 1)
-        {
-            <div class="flex items-center gap-3 mt-4">
-                @if (Model.Standards.HasPrev)
-                { <a href="@StandardsPageUrl(Model.Standards.Page - 1)" class="admin-btn admin-btn-ghost">← Назад</a> }
-                else
-                { <span class="admin-btn admin-btn-ghost opacity-40 cursor-not-allowed">← Назад</span> }
-                <span class="text-xs text-admin-text-muted">Страница @Model.Standards.Page из @Model.Standards.TotalPages</span>
-                @if (Model.Standards.HasNext)
-                { <a href="@StandardsPageUrl(Model.Standards.Page + 1)" class="admin-btn admin-btn-ghost">Вперёд →</a> }
-                else
-                { <span class="admin-btn admin-btn-ghost opacity-40 cursor-not-allowed">Вперёд →</span> }
-            </div>
-        }
+        <partial name="/Pages/Admin/Shared/_Pagination.cshtml"
+                 model='new Swimm.API.Pages.Admin.Shared.PaginationModel(Model.Standards.Page, Model.Standards.TotalPages,
+                            Model.Standards.HasPrev ? StandardsPageUrl(Model.Standards.Page - 1) : null,
+                            Model.Standards.HasNext ? StandardsPageUrl(Model.Standards.Page + 1) : null)' />
     }
 }
 

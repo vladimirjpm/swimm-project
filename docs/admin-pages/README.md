@@ -36,3 +36,8 @@ layout `_Layout.cshtml`, сайдбар — `Shared/AdminUi.cs` (массив `A
 (JS шлёт заголовок `X-XSRF-TOKEN` из `_csrfToken`). В Development работает
 DevAdminBypass (синтетический админ без логина). CSS — общий Tailwind-бандл
 `wwwroot/css/admin.min.css` (`npm run css:build` при новых классах).
+
+Пагинация списков — общий партиал `Shared/_Pagination.cshtml` (модель
+`PaginationModel(Page, TotalPages, PrevUrl, NextUrl)`; URL соседних страниц
+считает сам список, т.к. параметры фильтров у всех разные). Используется на
+Competitions, Records, Audit.

@@ -81,27 +81,8 @@ else
         </table>
     </div>
 
-    <div class="mt-4 flex items-center justify-between">
-        <div class="text-admin-text-muted text-sm">
-            Стр. @Model.Result.Page из @Model.Result.TotalPages
-        </div>
-        <div class="flex gap-2">
-            @if (Model.Result.HasPrev)
-            {
-                <a href="@Model.PageUrl(Model.Result.Page - 1)" class="admin-btn admin-btn-ghost">← Назад</a>
-            }
-            else
-            {
-                <span class="admin-btn admin-btn-ghost opacity-40 cursor-not-allowed">← Назад</span>
-            }
-            @if (Model.Result.HasNext)
-            {
-                <a href="@Model.PageUrl(Model.Result.Page + 1)" class="admin-btn admin-btn-ghost">Вперёд →</a>
-            }
-            else
-            {
-                <span class="admin-btn admin-btn-ghost opacity-40 cursor-not-allowed">Вперёд →</span>
-            }
-        </div>
-    </div>
+    <partial name="/Pages/Admin/Shared/_Pagination.cshtml"
+             model='new Swimm.API.Pages.Admin.Shared.PaginationModel(Model.Result.Page, Model.Result.TotalPages,
+                        Model.Result.HasPrev ? Model.PageUrl(Model.Result.Page - 1) : null,
+                        Model.Result.HasNext ? Model.PageUrl(Model.Result.Page + 1) : null)' />
 }
