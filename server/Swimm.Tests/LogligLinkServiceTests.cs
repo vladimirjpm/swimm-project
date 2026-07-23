@@ -270,6 +270,27 @@ public class LogligLinkServiceTests
         Assert.All(byName, r => Assert.Equal("כהן", r.LastName));
     }
 
+    [Fact]
+    public async Task ListAsync_FiltersBySuggestedAndRejected()
+    {
+        await using var db = CreateDb(nameof(ListAsync_FiltersBySuggestedAndRejected));
+        db.Swimmers.AddRange(
+            S("כהן", "נועה", 2017, status: "Suggested", logligId: 1),
+            S("לוי", "דן", 2016, status: "Rejected", logligId: 2),
+            S("כהן", "יובל", 2015));
+        await db.SaveChangesAsync();
+
+        var service = Service(db);
+
+        var suggested = await service.ListAsync(null, "suggested", 50, CancellationToken.None);
+        Assert.Single(suggested);
+        Assert.Equal("Suggested", suggested[0].Status);
+
+        var rejected = await service.ListAsync(null, "rejected", 50, CancellationToken.None);
+        Assert.Single(rejected);
+        Assert.Equal("Rejected", rejected[0].Status);
+    }
+
     // ── RunBatchAsync (шаг 7) ─────────────────────────────────────────────────
 
     private static ResultRecord R(int swimmerId) => new()

@@ -43,6 +43,14 @@ public class IndexModel : PageModel
     [BindProperty(SupportsGet = true, Name = "stage")]
     public string? Stage { get; set; }
 
+    /// <summary>
+    /// Deep-link алиас с дашборда: ignored → Stage=Ignored, discovery-new → Stage=OnSite
+    /// (только если Stage не задан явно явным параметром). Прочие значения (discovery-error,
+    /// no-org-comp-id, no-results) — T3b, игнорируются.
+    /// </summary>
+    [BindProperty(SupportsGet = true, Name = "filter")]
+    public string? FilterAlias { get; set; }
+
     /// <summary>Показывать тестовую синтетику (SYNTH Meet…). По умолчанию скрыта.</summary>
     [BindProperty(SupportsGet = true, Name = "synth")]
     public bool ShowSynthetic { get; set; }
@@ -69,6 +77,15 @@ public class IndexModel : PageModel
     public async Task OnGetAsync()
     {
         if (PageNumber < 1) PageNumber = 1;
+        if (string.IsNullOrEmpty(Stage))
+        {
+            Stage = FilterAlias switch
+            {
+                "ignored" => "Ignored",
+                "discovery-new" => "OnSite",
+                _ => Stage
+            };
+        }
         var list = await _repo.GetUnifiedAsync(Search, CategoryKey, Year, Stage, ShowSynthetic, Month, PageNumber, PageSize);
         Result = list.Page;
         MonthCounts = list.MonthCounts;

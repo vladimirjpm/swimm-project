@@ -20,6 +20,8 @@
         <option value="">Все</option>
         <option value="unlinked">Непривязанные</option>
         <option value="linked">Привязанные</option>
+        <option value="suggested">На проверке</option>
+        <option value="rejected">Отклонённые</option>
     </select>
     <button id="btn-search" class="admin-btn admin-btn-primary cursor-pointer rounded-md px-4 py-2 text-[13px] font-semibold">Найти</button>
     <button id="btn-batch" class="cursor-pointer rounded-md border border-admin-border px-3 py-2 text-[13px] text-admin-text-muted"
@@ -56,6 +58,14 @@
     const logligCardUrl = (id) => `${LOGLIG_HOST}/Players/Details/${id}?seasonId=${LOGLIG_SEASON}`;
     let rows = [];
     let searchConfigured = true; // уточняется запросом GET config при загрузке
+
+    // Deep-link фильтр из дашборда: ?filter=loglig-unlinked|loglig-pending|loglig-rejected
+    (function applyDeepLinkFilter() {
+        const qsFilter = new URLSearchParams(location.search).get('filter');
+        const map = { 'loglig-unlinked': 'unlinked', 'loglig-pending': 'suggested', 'loglig-rejected': 'rejected' };
+        const status = map[qsFilter];
+        if (status) document.getElementById('status').value = status;
+    })();
 
     async function apiJson(url, opts = {}) {
         opts.headers = { 'X-XSRF-TOKEN': _csrfToken, ...(opts.headers ?? {}) };

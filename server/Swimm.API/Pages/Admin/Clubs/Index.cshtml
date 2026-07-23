@@ -66,6 +66,10 @@
     let data = null;
     let dryRunOkPairs = null; // пары, прошедшие dry-run без конфликтов/ошибок — только их можно merge'ить
 
+    // Deep-link фильтр из дашборда: ?filter=dedup-unsure|dedup-sure
+    const qsFilter = new URLSearchParams(location.search).get('filter');
+    let dedupFilter = qsFilter === 'dedup-sure' ? 'sure' : qsFilter === 'dedup-unsure' ? 'unsure' : null;
+
     async function apiJson(url, opts = {}) {
         opts.headers = { 'X-XSRF-TOKEN': _csrfToken, ...(opts.headers ?? {}) };
         const res = await fetch(url, { credentials: 'same-origin', ...opts });
@@ -92,12 +96,24 @@
 
     function render() {
         const tbody = document.getElementById('cand-body');
-        const cands = data.candidates;
+        const allCands = data.candidates;
+        const cands = dedupFilter === 'sure' ? allCands.filter(c => c.sure)
+            : dedupFilter === 'unsure' ? allCands.filter(c => !c.sure)
+            : allCands;
         document.getElementById('empty-msg').classList.toggle('hidden', cands.length > 0);
-        document.getElementById('info').textContent =
-            `Реальных клубов: ${data.realClubs}; кандидатов: ${cands.length} (уверенных ${cands.filter(c => c.sure).length})`;
+        document.getElementById('info').innerHTML =
+            `Реальных клубов: ${data.realClubs}; кандидатов: ${cands.length}${dedupFilter ? ` из ${allCands.length}` : ''} (уверенных ${allCands.filter(c => c.sure).length})`
+            + (dedupFilter ? ` <button id="btn-clear-filter" class="ml-2 cursor-pointer rounded px-2 py-0.5 text-xs border border-admin-border text-admin-text-muted hover:text-admin-text">показать все ✕</button>` : '');
+        if (dedupFilter) {
+            document.getElementById('btn-clear-filter').addEventListener('click', () => {
+                dedupFilter = null;
+                render();
+            });
+        }
 
-        tbody.innerHTML = cands.map((c, i) => `
+        tbody.innerHTML = cands.map((c) => {
+            const i = allCands.indexOf(c);
+            return `
             <tr class="border-b border-white/[.04] hover:bg-white/[.03]">
                 <td class="py-2 px-3"><input type="checkbox" class="pair-cb cursor-pointer" data-i="${i}"></td>
                 <td class="py-2 px-3" dir="rtl" style="text-align:left">
@@ -111,7 +127,8 @@
                 <td class="py-2 px-3 text-[#90a4ae]">${esc(heuristicLabel(c))}</td>
                 <td class="py-2 px-3">${sureBadge(c.sure)}</td>
                 <td class="py-2 px-3"><button class="pair-hide cursor-pointer text-[#546e7a] hover:text-[#ef9a9a]" data-i="${i}" title="Не дубли — скрыть пару навсегда">✕</button></td>
-            </tr>`).join('');
+            </tr>`;
+        }).join('');
 
         // Любое изменение выбора инвалидирует прошлый dry-run
         [...document.querySelectorAll('.pair-cb')].forEach(cb =>

@@ -71,6 +71,11 @@
     let data = null;
     let dryRunOkPairs = null; // пары, прошедшие dry-run — только их можно применить
 
+    // Deep-link фильтр из дашборда: ?filter=dedup-unsure|dedup-sure|orphans
+    const qsFilter = new URLSearchParams(location.search).get('filter');
+    let dedupFilter = qsFilter === 'dedup-sure' ? 'sure' : qsFilter === 'dedup-unsure' ? 'unsure' : null;
+    const scrollToOrphans = qsFilter === 'orphans';
+
     async function apiJson(url, opts = {}) {
         opts.headers = { 'X-XSRF-TOKEN': _csrfToken, ...(opts.headers ?? {}) };
         const res = await fetch(url, { credentials: 'same-origin', ...opts });
@@ -82,14 +87,26 @@
 
     function render() {
         const tbody = document.getElementById('cand-body');
-        const cands = data.candidates;
+        const allCands = data.candidates;
+        const cands = dedupFilter === 'sure' ? allCands.filter(c => c.sure)
+            : dedupFilter === 'unsure' ? allCands.filter(c => !c.sure)
+            : allCands;
         document.getElementById('empty-msg').classList.toggle('hidden', cands.length > 0);
-        document.getElementById('info').textContent =
-            `Реальных пловцов: ${data.realSwimmers}; кандидатов: ${cands.length} (уверенных ${cands.filter(c => c.sure).length}); сирот: ${data.orphans.length}`;
+        document.getElementById('info').innerHTML =
+            `Реальных пловцов: ${data.realSwimmers}; кандидатов: ${cands.length}${dedupFilter ? ` из ${allCands.length}` : ''} (уверенных ${allCands.filter(c => c.sure).length}); сирот: ${data.orphans.length}`
+            + (dedupFilter ? ` <button id="btn-clear-filter" class="ml-2 cursor-pointer rounded px-2 py-0.5 text-xs border border-admin-border text-admin-text-muted hover:text-admin-text">показать все ✕</button>` : '');
+        if (dedupFilter) {
+            document.getElementById('btn-clear-filter').addEventListener('click', () => {
+                dedupFilter = null;
+                render();
+            });
+        }
 
-        tbody.innerHTML = cands.map((c, i) => `
+        tbody.innerHTML = cands.map((c, i) => {
+            const dataI = allCands.indexOf(c);
+            return `
             <tr class="border-b border-white/[.04] hover:bg-white/[.03]">
-                <td class="py-2 px-3"><input type="checkbox" class="pair-cb cursor-pointer" data-i="${i}"></td>
+                <td class="py-2 px-3"><input type="checkbox" class="pair-cb cursor-pointer" data-i="${dataI}"></td>
                 <td class="py-2 px-3" dir="rtl" style="text-align:left">${esc(c.canonicalName)} <span class="text-[#546e7a]">#${c.canonicalId}</span></td>
                 <td class="py-2 px-3" dir="rtl" style="text-align:left">${esc(c.duplicateName)} <span class="text-[#546e7a]">#${c.duplicateId}</span></td>
                 <td class="py-2 px-3 text-[#90a4ae]">${c.birthYear || '—'}</td>
@@ -99,8 +116,9 @@
                 <td class="py-2 px-3">${c.sure
                     ? '<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold bg-[rgba(102,187,106,0.2)] text-[#66bb6a]">уверенная</span>'
                     : '<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold bg-[rgba(255,213,79,0.15)] text-[#ffd54f]">спорная</span>'}</td>
-                <td class="py-2 px-3"><button class="pair-hide cursor-pointer text-[#546e7a] hover:text-[#ef9a9a]" data-i="${i}" title="Не дубли — скрыть пару навсегда">✕</button></td>
-            </tr>`).join('');
+                <td class="py-2 px-3"><button class="pair-hide cursor-pointer text-[#546e7a] hover:text-[#ef9a9a]" data-i="${dataI}" title="Не дубли — скрыть пару навсегда">✕</button></td>
+            </tr>`;
+        }).join('');
 
         // «Не дубли»: пара уходит в Sys_DedupIgnoredPairs и больше не всплывает.
         [...document.querySelectorAll('.pair-hide')].forEach(btn =>
@@ -139,6 +157,13 @@
             document.getElementById('plan-card').classList.add('hidden');
             render();
             await loadIgnored();
+            if (scrollToOrphans) {
+                const el = document.getElementById('orphans');
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.style.outline = '2px solid var(--color-admin-accent, #4fc3f7)';
+                el.style.outlineOffset = '4px';
+                setTimeout(() => { el.style.outline = ''; el.style.outlineOffset = ''; }, 1500);
+            }
         } catch (e) { toast('Ошибка: ' + e.message, 5000); }
     }
 

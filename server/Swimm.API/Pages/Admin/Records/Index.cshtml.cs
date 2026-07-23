@@ -24,6 +24,14 @@ public class IndexModel : PageModel
     [BindProperty(SupportsGet = true, Name = "regionCode")]
     public string? RegionCode { get; set; }
 
+    /// <summary>
+    /// Deep-link алиас с дашборда: region=world|israel задаёт пару regionType/regionCode
+    /// одним параметром, только если явные regionType/regionCode не заданы. Неизвестное
+    /// значение игнорируется.
+    /// </summary>
+    [BindProperty(SupportsGet = true, Name = "region")]
+    public string? RegionAlias { get; set; }
+
     [BindProperty(SupportsGet = true, Name = "category")]
     public string? Category { get; set; }
 
@@ -53,6 +61,21 @@ public class IndexModel : PageModel
     {
         Tab = Tab == "standards" ? "standards" : "records";
         if (PageNumber < 1) PageNumber = 1;
+
+        if (string.IsNullOrEmpty(RegionType) && string.IsNullOrEmpty(RegionCode))
+        {
+            switch (RegionAlias)
+            {
+                case "world":
+                    RegionType = "world";
+                    RegionCode = "";
+                    break;
+                case "israel":
+                    RegionType = "country";
+                    RegionCode = "ISR";
+                    break;
+            }
+        }
 
         if (Tab == "standards")
             Standards = await _repo.GetStandardsAsync(new StandardFilter(Kind, Gender, PoolType, Style), PageNumber, PageSize);

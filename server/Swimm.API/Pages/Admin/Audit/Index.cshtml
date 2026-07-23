@@ -21,6 +21,15 @@
             }
         </select>
     </div>
+    <div class="flex flex-col gap-1">
+        <label class="text-xs text-admin-text-muted">Период</label>
+        <select name="period" class="admin-input">
+            <option value="" selected="@(string.IsNullOrEmpty(Model.Period))">Всё время</option>
+            <option value="24h" selected="@(Model.Period == "24h")">24 часа</option>
+            <option value="7d" selected="@(Model.Period == "7d")">7 дней</option>
+            <option value="30d" selected="@(Model.Period == "30d")">30 дней</option>
+        </select>
+    </div>
     <button type="submit" class="admin-btn admin-btn-primary">Найти</button>
     <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">Сброс</a>
     <div class="ml-auto self-center text-admin-text-muted">

@@ -20,4 +20,6 @@ public sealed record AdminAuditFilter(
     int? ActorUserId = null,
     string? Search = null,
     int Page = 1,
-    int PageSize = 30);
+    int PageSize = 30,
+    /// <summary>Нижняя граница CreatedAt (UTC) — deep-link фильтр по периоду (24h/7d/30d).</summary>
+    DateTime? SinceUtc = null);

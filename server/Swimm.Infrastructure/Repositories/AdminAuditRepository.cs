@@ -22,6 +22,8 @@ public class AdminAuditRepository(SwimmDbContext db) : IAdminAuditRepository
             q = q.Where(a => a.EntityType == filter.EntityType);
         if (filter.ActorUserId is int actorId)
             q = q.Where(a => a.ActorUserId == actorId);
+        if (filter.SinceUtc is DateTime sinceUtc)
+            q = q.Where(a => a.CreatedAt >= sinceUtc);
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var term = filter.Search.Trim();

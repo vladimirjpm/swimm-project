@@ -15,9 +15,14 @@ public class IndexModel : PageModel
 
     public IReadOnlyList<HubGroupAdminRowDto> Groups { get; private set; } = [];
 
+    /// <summary>Deep-link фильтр с дашборда: filter=official — только официальные группы.</summary>
+    [BindProperty(SupportsGet = true, Name = "filter")]
+    public string? Filter { get; set; }
+
     public async Task OnGetAsync()
     {
-        Groups = await _service.GetAllAsync();
+        var all = await _service.GetAllAsync();
+        Groups = Filter == "official" ? all.Where(g => g.IsOfficial).ToList() : all;
     }
 
     public async Task<IActionResult> OnPostDeleteAsync(int id)

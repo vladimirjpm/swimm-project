@@ -36,6 +36,7 @@ else
                     <th>Клуб</th>
                     <th class="text-right">Участников</th>
                     <th>Публичность</th>
+                    <th>Official</th>
                     <th>Обновлена</th>
                     <th></th>
                 </tr>
@@ -70,6 +71,16 @@ else
                             else
                             {
                                 <span class="admin-badge border-admin-border bg-admin-surface-hover text-admin-text-muted">private</span>
+                            }
+                        </td>
+                        <td>
+                            @if (g.IsOfficial)
+                            {
+                                <span class="admin-badge border-admin-success/30 bg-admin-success/15 text-admin-success">official</span>
+                            }
+                            else
+                            {
+                                <span class="text-admin-text-muted">—</span>
                             }
                         </td>
                         <td class="whitespace-nowrap text-admin-text-muted">@g.UpdatedAt.ToString("dd/MM/yyyy HH:mm")</td>

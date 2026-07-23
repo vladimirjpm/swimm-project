@@ -94,6 +94,23 @@ public class AdminAuditServiceTests
     }
 
     [Fact]
+    public async Task Query_FiltersBySinceUtc_ExcludesOlderRows()
+    {
+        await using var db = CreateDb(nameof(Query_FiltersBySinceUtc_ExcludesOlderRows));
+        var now = DateTime.UtcNow;
+        db.AdminAudits.AddRange(
+            new Swimm.Domain.Entities.AdminAudit { Action = "x", EntityType = "Y", Summary = "старая", CreatedAt = now.AddDays(-10) },
+            new Swimm.Domain.Entities.AdminAudit { Action = "x", EntityType = "Y", Summary = "недавняя", CreatedAt = now.AddHours(-1) });
+        await db.SaveChangesAsync();
+
+        var repo = new AdminAuditRepository(db);
+        var page = await repo.QueryAsync(new AdminAuditFilter(SinceUtc: now.AddDays(-1)));
+
+        Assert.Equal(1, page.TotalCount);
+        Assert.Equal("недавняя", page.Items[0].Summary);
+    }
+
+    [Fact]
     public async Task GetDistinctActions_ReturnsSortedUnique()
     {
         await using var db = CreateDb(nameof(GetDistinctActions_ReturnsSortedUnique));

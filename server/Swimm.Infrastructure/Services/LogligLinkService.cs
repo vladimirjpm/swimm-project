@@ -34,6 +34,8 @@ public class LogligLinkService(
         {
             "linked" => q.Where(s => s.LogligId != null),
             "unlinked" => q.Where(s => s.LogligId == null),
+            "suggested" => q.Where(s => s.LogligIdStatus == "Suggested"),
+            "rejected" => q.Where(s => s.LogligIdStatus == "Rejected"),
             _ => q
         };
 
