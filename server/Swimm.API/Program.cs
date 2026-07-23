@@ -36,6 +36,10 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddRazorPages();
+
+// Аудит админки (фаза 7.4): actor берётся из HTTP-контекста через ICurrentActor.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentActor, Swimm.API.Services.HttpCurrentActor>();
 builder.Services.AddHostedService<ImportBackgroundService>();
 
 // Rate limiting для чувствительных к перебору auth-эндпоинтов (login/register/forgot/reset).

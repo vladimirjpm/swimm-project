@@ -20,6 +20,7 @@ public class SwimmersAdminController : ControllerBase
     private readonly ISwimmerMergeService _merge;
     private readonly IDedupIgnoreService _ignore;
     private readonly ICacheService _cache;
+    private readonly IAdminAuditService _audit;
     private readonly ILogger<SwimmersAdminController> _logger;
 
     public SwimmersAdminController(
@@ -27,12 +28,14 @@ public class SwimmersAdminController : ControllerBase
         ISwimmerMergeService merge,
         IDedupIgnoreService ignore,
         ICacheService cache,
+        IAdminAuditService audit,
         ILogger<SwimmersAdminController> logger)
     {
         _dedup = dedup;
         _merge = merge;
         _ignore = ignore;
         _cache = cache;
+        _audit = audit;
         _logger = logger;
     }
 
@@ -45,15 +48,21 @@ public class SwimmersAdminController : ControllerBase
     {
         try { await _ignore.AddAsync(Swimm.Domain.Entities.DedupEntityType.Swimmer, request.IdA, request.IdB, ct); }
         catch (ArgumentException ex) { return BadRequest(new { error = ex.Message }); }
+        await _audit.LogAsync("swimmer.dedup-ignore", "Swimmer", $"{request.IdA},{request.IdB}",
+            $"Пара пловцов #{request.IdA}/#{request.IdB} помечена «не дубли»", ct: ct);
         return Ok();
     }
 
     /// <summary>Вернуть развязанную пару обратно в кандидаты.</summary>
     [HttpPost("dedup-ignore/remove")]
     public async Task<IActionResult> UnignorePair([FromBody] IgnorePairRequest request, CancellationToken ct)
-        => await _ignore.RemoveAsync(Swimm.Domain.Entities.DedupEntityType.Swimmer, request.IdA, request.IdB, ct)
-            ? Ok()
-            : NotFound(new { error = "Пара не найдена в списке развязанных" });
+    {
+        if (!await _ignore.RemoveAsync(Swimm.Domain.Entities.DedupEntityType.Swimmer, request.IdA, request.IdB, ct))
+            return NotFound(new { error = "Пара не найдена в списке развязанных" });
+        await _audit.LogAsync("swimmer.dedup-unignore", "Swimmer", $"{request.IdA},{request.IdB}",
+            $"Пара пловцов #{request.IdA}/#{request.IdB} возвращена в кандидаты", ct: ct);
+        return Ok();
+    }
 
     /// <summary>Список развязанных пар (для блока «Скрытые пары»).</summary>
     [HttpGet("dedup-ignore")]
@@ -86,10 +95,11 @@ public class SwimmersAdminController : ControllerBase
 
         if (request.Apply)
         {
-            _logger.LogWarning(
-                "Admin {User} применил merge пловцов: {Pairs}",
-                User.Identity?.Name ?? "?",
-                string.Join("; ", report.Pairs.Select(p => $"{p.CanonicalId}←{p.DuplicateId}:{p.Status}")));
+            var pairsText = string.Join("; ", report.Pairs.Select(p => $"{p.CanonicalId}←{p.DuplicateId}:{p.Status}"));
+            _logger.LogWarning("Admin {User} применил merge пловцов: {Pairs}", User.Identity?.Name ?? "?", pairsText);
+            await _audit.LogAsync("swimmer.merge", "Swimmer", null,
+                $"Склейка пловцов ({report.Pairs.Count} пар): {pairsText}",
+                new { report.Pairs }, ct);
             // Имена пловцов денормализованы в публичных выдачах — сбрасываем кэш целиком.
             await _cache.InvalidateAllAsync();
         }
@@ -108,9 +118,12 @@ public class SwimmersAdminController : ControllerBase
 
         if (report.Deleted > 0)
         {
-            _logger.LogWarning(
-                "Admin {User} удалил {Count} пловцов-сирот: {Ids}",
-                User.Identity?.Name ?? "?", report.Deleted, string.Join(",", report.DeletedIds));
+            var ids = string.Join(",", report.DeletedIds);
+            _logger.LogWarning("Admin {User} удалил {Count} пловцов-сирот: {Ids}",
+                User.Identity?.Name ?? "?", report.Deleted, ids);
+            await _audit.LogAsync("swimmer.orphans-delete", "Swimmer", null,
+                $"Удалено пловцов-сирот: {report.Deleted}",
+                new { report.Deleted, report.DeletedIds }, ct);
             await _cache.InvalidateAllAsync();
         }
 

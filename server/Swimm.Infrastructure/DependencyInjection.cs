@@ -159,6 +159,11 @@ public static class DependencyInjection
         // Сводка «Статус данных» для дашборда /Admin (docs/plans/admin-dashboard-status-cards-plan.md)
         services.AddScoped<IDashboardStatusService, DashboardStatusService>();
 
+        // Аудит ручных мутаций админки (фаза 7.4): запись «кто/что/когда» + чтение журнала.
+        // Actor приходит через ICurrentActor (реализация в API-слое поверх HttpContext).
+        services.AddScoped<IAdminAuditService, AdminAuditService>();
+        services.AddScoped<IAdminAuditRepository, AdminAuditRepository>();
+
         return services;
     }
 }

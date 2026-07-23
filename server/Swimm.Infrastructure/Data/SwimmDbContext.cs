@@ -68,6 +68,9 @@ public class SwimmDbContext : DbContext
     /* === Дедуп: «развязанные» пары (Sys_) === */
     public DbSet<DedupIgnoredPair> DedupIgnoredPairs => Set<DedupIgnoredPair>();
 
+    /* === Аудит ручных мутаций админки (фаза 7.4, Sys_) === */
+    public DbSet<AdminAudit> AdminAudits => Set<AdminAudit>();
+
     /* === Тренировки (приватные, Sys_) === */
     public DbSet<TrainingSession> TrainingSessions => Set<TrainingSession>();
     public DbSet<TrainingResult> TrainingResults => Set<TrainingResult>();
@@ -722,6 +725,16 @@ public class SwimmDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.SwimmerId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // Аудит ручных мутаций админки (фаза 7.4) — Sys_-таблица, БЕЗ grant swimm_ro.
+        // Actor денормализован (без FK на Sys_AppUsers), чтобы запись переживала удаление юзера.
+        modelBuilder.Entity<AdminAudit>(entity =>
+        {
+            entity.ToTable("Sys_AdminAudit");
+            entity.HasIndex(e => e.CreatedAt);                       // лента «новые сверху»
+            entity.HasIndex(e => new { e.EntityType, e.EntityId });  // история по объекту
+            entity.HasIndex(e => e.Action);                          // фильтр по типу действия
         });
 
         // «Развязанные» пары дедупа (админ подтвердил «не дубли») — Sys_-таблица, БЕЗ grant swimm_ro.

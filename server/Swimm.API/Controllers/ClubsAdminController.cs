@@ -19,17 +19,20 @@ public class ClubsAdminController : ControllerBase
     private readonly IClubDedupService _dedup;
     private readonly IClubMergeService _merge;
     private readonly IDedupIgnoreService _ignore;
+    private readonly IAdminAuditService _audit;
     private readonly ILogger<ClubsAdminController> _logger;
 
     public ClubsAdminController(
         IClubDedupService dedup,
         IClubMergeService merge,
         IDedupIgnoreService ignore,
+        IAdminAuditService audit,
         ILogger<ClubsAdminController> logger)
     {
         _dedup = dedup;
         _merge = merge;
         _ignore = ignore;
+        _audit = audit;
         _logger = logger;
     }
 
@@ -41,15 +44,21 @@ public class ClubsAdminController : ControllerBase
     {
         try { await _ignore.AddAsync(Swimm.Domain.Entities.DedupEntityType.Club, request.IdA, request.IdB, ct); }
         catch (ArgumentException ex) { return BadRequest(new { error = ex.Message }); }
+        await _audit.LogAsync("club.dedup-ignore", "Club", $"{request.IdA},{request.IdB}",
+            $"Пара клубов #{request.IdA}/#{request.IdB} помечена «не дубли»", ct: ct);
         return Ok();
     }
 
     /// <summary>Вернуть развязанную пару обратно в кандидаты.</summary>
     [HttpPost("dedup-ignore/remove")]
     public async Task<IActionResult> UnignorePair([FromBody] IgnorePairRequest request, CancellationToken ct)
-        => await _ignore.RemoveAsync(Swimm.Domain.Entities.DedupEntityType.Club, request.IdA, request.IdB, ct)
-            ? Ok()
-            : NotFound(new { error = "Пара не найдена в списке развязанных" });
+    {
+        if (!await _ignore.RemoveAsync(Swimm.Domain.Entities.DedupEntityType.Club, request.IdA, request.IdB, ct))
+            return NotFound(new { error = "Пара не найдена в списке развязанных" });
+        await _audit.LogAsync("club.dedup-unignore", "Club", $"{request.IdA},{request.IdB}",
+            $"Пара клубов #{request.IdA}/#{request.IdB} возвращена в кандидаты", ct: ct);
+        return Ok();
+    }
 
     /// <summary>Список развязанных пар (для блока «Скрытые пары»).</summary>
     [HttpGet("dedup-ignore")]
@@ -82,10 +91,11 @@ public class ClubsAdminController : ControllerBase
 
         if (request.Apply)
         {
-            _logger.LogWarning(
-                "Admin {User} применил merge клубов: {Pairs}",
-                User.Identity?.Name ?? "?",
-                string.Join("; ", report.Pairs.Select(p => $"{p.CanonicalId}←{p.DuplicateId}:{p.Status}")));
+            var pairsText = string.Join("; ", report.Pairs.Select(p => $"{p.CanonicalId}←{p.DuplicateId}:{p.Status}"));
+            _logger.LogWarning("Admin {User} применил merge клубов: {Pairs}", User.Identity?.Name ?? "?", pairsText);
+            await _audit.LogAsync("club.merge", "Club", null,
+                $"Склейка клубов ({report.Pairs.Count} пар): {pairsText}",
+                new { report.Pairs }, ct);
         }
 
         return Ok(report);

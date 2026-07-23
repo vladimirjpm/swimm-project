@@ -18,12 +18,15 @@ public class IndexModel : PageModel
     private const int PageSize = 20;
     private readonly ICompetitionAdminRepository _repo;
     private readonly IImportService _import;
+    private readonly IAdminAuditService _audit;
     private readonly ILogger<IndexModel> _logger;
 
-    public IndexModel(ICompetitionAdminRepository repo, IImportService import, ILogger<IndexModel> logger)
+    public IndexModel(ICompetitionAdminRepository repo, IImportService import,
+        IAdminAuditService audit, ILogger<IndexModel> logger)
     {
         _repo = repo;
         _import = import;
+        _audit = audit;
         _logger = logger;
     }
 
@@ -89,6 +92,10 @@ public class IndexModel : PageModel
             User.Identity?.Name ?? "?", deleted.CompetitionId, deleted.CompetitionName,
             deleted.Results, deleted.Relays, deleted.Galleries, deleted.ResultUrls, deleted.ImportHistory, deleted.Swimmers);
 
+        await _audit.LogAsync("competition.delete", "Competition", deleted.CompetitionId.ToString(),
+            $"Каскадно удалено соревнование «{deleted.CompetitionName}» ({deleted.Results} результатов)",
+            deleted);
+
         TempData["Flash"] = $"Соревнование «{deleted.CompetitionName}» удалено ({deleted.Results} результатов)";
         return RedirectToBackToList();
     }
@@ -108,6 +115,10 @@ public class IndexModel : PageModel
             "{Relays} эстафет, {Galleries} галерей, {ResultUrls} URL, {ImportHistory} записей истории, {Swimmers} пловцов-сирот",
             User.Identity?.Name ?? "?", deleted.CompetitionId, deleted.CompetitionName,
             deleted.Results, deleted.Relays, deleted.Galleries, deleted.ResultUrls, deleted.ImportHistory, deleted.Swimmers);
+
+        await _audit.LogAsync("competition.delete-event", "CompetitionEvent", eventId.ToString(),
+            $"Каскадно удалено многодневное событие «{deleted.CompetitionName}» ({deleted.Results} результатов)",
+            deleted);
 
         TempData["Flash"] = $"Событие «{deleted.CompetitionName}» удалено вместе со всеми днями ({deleted.Results} результатов)";
         return RedirectToBackToList();

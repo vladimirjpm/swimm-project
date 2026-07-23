@@ -22,6 +22,7 @@
 | /Admin/Import | [import.md](import.md) | Импорт соревнований (JSON/PDF) и рекордов |
 | /Admin/ImportHistory | [importhistory.md](importhistory.md) | История импортов |
 | /Admin/Users | [users.md](users.md) | Пользователи и сессии |
+| /Admin/Audit | [audit.md](audit.md) | Журнал ручных мутаций (аудит «кто/что/когда») |
 | /Admin/Db | [db.md](db.md) | Схема БД |
 | /Admin/Api | [api.md](api.md) | Каталог эндпоинтов + браузер данных |
 | /Admin/Settings | [settings.md](settings.md) | Параметры приложения (in-memory settings) |

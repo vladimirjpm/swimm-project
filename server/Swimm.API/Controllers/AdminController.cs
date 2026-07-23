@@ -21,6 +21,7 @@ public class AdminController : ControllerBase
     private readonly IResultRepository _results;
     private readonly IResultSourceProvider _sourceProvider;
     private readonly IMemoryCache _cache;
+    private readonly IAdminAuditService _audit;
 
     public AdminController(
         IAdminRepository admin,
@@ -30,7 +31,8 @@ public class AdminController : ControllerBase
         IImportJobQueue jobs,
         IResultRepository results,
         IResultSourceProvider sourceProvider,
-        IMemoryCache cache)
+        IMemoryCache cache,
+        IAdminAuditService audit)
     {
         _admin = admin;
         _schema = schema;
@@ -40,6 +42,7 @@ public class AdminController : ControllerBase
         _results = results;
         _sourceProvider = sourceProvider;
         _cache = cache;
+        _audit = audit;
     }
 
     // ── Users ────────────────────────────────────────────────────────────────
@@ -56,6 +59,9 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> AddRole(int userId, int roleId)
     {
         var result = await _admin.AddRoleAsync(userId, roleId);
+        if (result == RoleOperationResult.Ok)
+            await _audit.LogAsync("user.role-add", "AppUser", userId.ToString(),
+                $"Пользователю #{userId} выдана роль #{roleId}", new { userId, roleId });
         return result switch
         {
             RoleOperationResult.Ok => Ok(new { message = "Role added" }),
@@ -70,6 +76,9 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> RemoveRole(int userId, int roleId)
     {
         var ok = await _admin.RemoveRoleAsync(userId, roleId);
+        if (ok)
+            await _audit.LogAsync("user.role-remove", "AppUser", userId.ToString(),
+                $"У пользователя #{userId} снята роль #{roleId}", new { userId, roleId });
         return ok ? Ok(new { message = "Role removed" }) : NotFound(new { error = "Role assignment not found" });
     }
 
@@ -78,6 +87,9 @@ public class AdminController : ControllerBase
     {
         var ok = await _admin.SetUserActiveAsync(userId, request.IsActive);
         if (!ok) return NotFound(new { error = "User not found" });
+        await _audit.LogAsync("user.set-active", "AppUser", userId.ToString(),
+            $"Пользователь #{userId} {(request.IsActive ? "активирован" : "деактивирован")}",
+            new { userId, request.IsActive });
         return Ok(new { message = request.IsActive ? "User activated" : "User deactivated" });
     }
 
@@ -86,6 +98,8 @@ public class AdminController : ControllerBase
     {
         var ok = await _admin.ForceSignOutAsync(userId);
         if (!ok) return NotFound(new { error = "User not found" });
+        await _audit.LogAsync("user.force-signout", "AppUser", userId.ToString(),
+            $"Отозваны все сессии пользователя #{userId}", new { userId });
         return Ok(new { message = "All sessions revoked" });
     }
 
@@ -120,10 +134,12 @@ public class AdminController : ControllerBase
         => Ok(_settings.GetAll());
 
     [HttpPut("settings/{key}")]
-    public IActionResult UpdateSetting(string key, [FromBody] UpdateSettingRequest request)
+    public async Task<IActionResult> UpdateSetting(string key, [FromBody] UpdateSettingRequest request)
     {
         if (!_settings.Update(key, request.Value))
             return BadRequest(new { error = "Invalid key or value type mismatch" });
+        await _audit.LogAsync("setting.update", "Setting", key,
+            $"Настройка «{key}» изменена на «{request.Value}»", new { key, request.Value });
         return Ok(_settings.Get(key));
     }
 
