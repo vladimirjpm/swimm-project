@@ -439,6 +439,12 @@
     topTabCompetitions.addEventListener('click', () => setTopMode('competitions'));
     topTabRecords.addEventListener('click', () => setTopMode('records'));
 
+    // Deep-link с дашборда («Проверить апдейты» нашёл изменения): ?diff=records —
+    // сразу открываем таб «Рекорды». Дифф тут строится заново кнопкой Fetch нужного
+    // источника (дифф с дашборда — dry-run-превью, между страницами не переносится).
+    if (new URLSearchParams(location.search).get('diff') === 'records')
+        setTopMode('records');
+
     // --- Mode switcher (JSON | PDF) — источники соревнований ---
     const tabJson = document.getElementById('tab-json');
     const tabPdf = document.getElementById('tab-pdf');
