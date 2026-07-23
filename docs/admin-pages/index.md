@@ -1,13 +1,55 @@
 # /Admin — Dashboard
 
-Файлы: `Pages/Admin/Index.cshtml(.cs)`; API: `AdminController` (`/api/admin/*`),
-`SwimmersAdminController` (attention-summary).
+Файлы: `Pages/Admin/Index.cshtml(.cs)`; API: `AdminController` (`/api/admin/*`,
+включая `GET /api/admin/dashboard/status`), `DashboardStatusService` (DTO —
+`Swimm.Application/Dtos/DashboardStatusDtos.cs`).
 
-Что есть:
-- статистика (swimmers/results/competitions/clubs) — `#stats-grid`;
-- «Требует внимания» `#attention-grid` (скрыт при нулях): сироты и спорные дубли
-  пловцов из `GET /api/admin/swimmers/attention-summary`;
-- список пользователей с фильтрами (поиск/роль/статус), смена ролей.
+## Здоровье данных — вариант 1c (master–detail)
 
-План развития: постоянные карточки «Статус данных» (дубли swimmers/clubs, loglig
-привязки, discovery imported/new) — `docs/plans/admin-dashboard-status-cards-plan.md`.
+Один запрос `GET /api/admin/dashboard/status` (кэш 2 мин) → 7 переставляемых
+блоков-строк слева + системная строка внизу (вне reorder) + sticky-панель
+деталей выбранного блока справа (540px, top 24px). Блоки (дефолтный порядок):
+
+1. Пловцы → `/Admin/Swimmers`
+2. Клубы → `/Admin/Clubs`
+3. Соревнования → `/Admin/Competitions`
+4. Результаты → `/Admin/Results`
+5. Рекорды → `/Admin/Records` (карточка на каждый `recordSets[]`; кнопка
+   «Проверить апдейты» отрисована, но `disabled` — синхронный dry-run
+   импорта рекордов 2.6 добавит T4)
+6. Медиа → `/Admin/Media`
+7. Пользователи и группы → `/Admin/Users`
+
+Клик по строке блока выбирает его и открывает детали справа. Ручка «⠿» —
+drag-reorder (HTML5 draggable); блок, ставший первым, автоматически
+выбирается. Порядок сохраняется в `localStorage`, ключ
+`admin:dashboard:block-order` (массив ключей блоков). Нулевые метрики
+сворачиваются в чипы «✓ Название · 0» (флаг `COLLAPSE_ZERO` в скрипте
+страницы). Рекорд считается «устаревшим» (серым), если `lastUpdatedAt`
+старше `RECORDS_STALE_MONTHS` (по умолчанию 3) месяцев.
+
+Каждая метрика — ссылка на целевую админ-страницу с query-параметром
+`filter` (карта ссылок — в
+`!design_handoff/design_handoff_data_health_dashboard/README.md`, раздел
+«Контракт ссылок»; целевые страницы должны сами читать параметр — задача T3).
+
+Ниже строк — пунктирный плейсхолдер «＋ Кастом-карточка» (без функционала,
+задел под конфигурируемые SQL-счётчики) и системная строка (последний
+импорт/проверка медиа-ссылок/discovery-скан/действия аудита за 7 дней).
+
+Ниже дашборда — вкладка **Users**: список пользователей с фильтрами
+(поиск/роль/статус), панель деталей, смена ролей — без изменений.
+
+## Дизайн-референс
+
+`!design_handoff/design_handoff_data_health_dashboard/` — README (спецификация:
+блоки, метрики, deep-links, типографика) + `dashboard-data-health.dc.html`
+(HTML-прототип; реализован только вариант 1c, 1a/1b — для справки).
+
+## Пайплайн CSS
+
+`Pages/Admin/Index.cshtml` использует только Tailwind-токены темы админки
+(`admin-bg`, `admin-surface`, `admin-border`, `admin-accent`, `admin-success`,
+`admin-warning`, `admin-danger`, `admin-text[-muted]` — см. `Styles/admin.css`
+`@theme`). После правок Tailwind-классов — `cd server/Swimm.API && npm run
+css:build`, закоммитить `wwwroot/css/admin.min.css`.
