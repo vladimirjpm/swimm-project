@@ -9,6 +9,9 @@ public interface IUserMediaRepository
     /// <summary>null = Swimmer с таким id не найден.</summary>
     Task<UserMediaDto?> AddAsync(int userId, AddUserMediaRequest request);
 
+    /// <summary>Всего медиа у пользователя — для потолка анти-спама в контроллере.</summary>
+    Task<int> CountForUserAsync(int userId);
+
     Task<bool> RemoveAsync(int userId, int mediaId);
 
     /* Пикер привязки к заплыву (Add link, дизайн-бриф §6.3) — публичные данные результатов. */

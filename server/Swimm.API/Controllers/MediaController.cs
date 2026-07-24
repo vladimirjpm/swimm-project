@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Application.Validation;
@@ -68,7 +69,11 @@ public class MediaController : ControllerBase
         return Ok(await _mySwims.GetMySwimsAsync(userId.Value, season));
     }
 
+    /// <summary>Потолок медиа на пользователя — страховка от замусоривания таблицы ботом.</summary>
+    private const int MaxMediaPerUser = 500;
+
     [HttpPost]
+    [EnableRateLimiting("media")]
     public async Task<IActionResult> AddMedia([FromBody] AddUserMediaRequest request)
     {
         var userId = CurrentUserId();
@@ -76,6 +81,9 @@ public class MediaController : ControllerBase
 
         if (request.SwimmerId <= 0)
             return BadRequest(new { error = "swimmer_id is required" });
+
+        if (await _media.CountForUserAsync(userId.Value) >= MaxMediaPerUser)
+            return BadRequest(new { error = "media limit reached" });
 
         if (!MediaUrlValidator.TryValidate(request.MediaType, request.SourceType, request.Url, out var error))
             return BadRequest(new { error });
@@ -125,6 +133,7 @@ public class MediaController : ControllerBase
 
     /// <summary>Подать медиа в группу (level: members|public). Админ группы — сразу approved.</summary>
     [HttpPost("{id:int}/publications")]
+    [EnableRateLimiting("media")]
     public async Task<IActionResult> SubmitPublication(int id, [FromBody] SubmitPublicationRequest request)
     {
         var userId = CurrentUserId();

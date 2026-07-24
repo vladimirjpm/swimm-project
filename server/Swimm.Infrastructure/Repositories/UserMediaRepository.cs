@@ -85,6 +85,9 @@ public class UserMediaRepository : IUserMediaRepository
             })
             .ToListAsync();
 
+    public async Task<int> CountForUserAsync(int userId)
+        => await _db.UserMedia.CountAsync(m => m.UserId == userId);
+
     public async Task<UserMediaDto?> AddAsync(int userId, AddUserMediaRequest request)
     {
         var swimmerExists = await _db.Swimmers.AnyAsync(s => s.Id == request.SwimmerId);
