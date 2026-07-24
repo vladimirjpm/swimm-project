@@ -11,6 +11,9 @@ interface ResultsHeaderProps {
   /** Мобильный вид: развёрнуты ли все строки по умолчанию (level/pts/date) */
   showAllOpen?: boolean;
   onToggleShowAllOpen?: () => void;
+  /** Режим «добавление видео к заплыву» (тумблер в шапке — только для залогиненных) */
+  addVideoMode?: boolean;
+  onToggleAddVideoMode?: () => void;
 }
 
 const ResultsHeader: React.FC<ResultsHeaderProps> = ({
@@ -22,6 +25,8 @@ const ResultsHeader: React.FC<ResultsHeaderProps> = ({
   hasInternationalPoints,
   showAllOpen,
   onToggleShowAllOpen,
+  addVideoMode,
+  onToggleAddVideoMode,
 }) => {
   if (view === 'mobile') {
     return (
@@ -40,6 +45,21 @@ const ResultsHeader: React.FC<ResultsHeaderProps> = ({
           </label>
         )}
         */}
+        {/* Тумблер «Add video mode» — рендерим только когда колбэк передан (признак «залогинен») */}
+        {onToggleAddVideoMode && (
+          <button
+            type="button"
+            title="Add video mode"
+            onClick={onToggleAddVideoMode}
+            className={`absolute right-3 flex items-center justify-center w-7 h-7 rounded-full text-sm transition-colors ${
+              addVideoMode
+                ? 'bg-[var(--theme-primary)] text-[var(--theme-mode-accent-text)]'
+                : 'bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text-muted)]'
+            }`}
+          >
+            🎥
+          </button>
+        )}
       </div>
     );
   }
@@ -49,7 +69,22 @@ const ResultsHeader: React.FC<ResultsHeaderProps> = ({
     const lbl = 'text-[10px] font-extrabold uppercase tracking-[0.08em] text-[var(--theme-mode-text-muted)]';
     return (
       <div className="grid gap-[14px] px-6 py-[13px] items-center bg-[var(--theme-mode-surface-alt)] border-b border-[var(--theme-mode-border)] border-l-4 border-l-transparent" style={{ gridTemplateColumns: gridTemplate }}>
-        <div aria-hidden />
+        {onToggleAddVideoMode ? (
+          <button
+            type="button"
+            title="Add video mode"
+            onClick={onToggleAddVideoMode}
+            className={`flex items-center justify-center w-6 h-6 rounded-full text-xs transition-colors ${
+              addVideoMode
+                ? 'bg-[var(--theme-primary)] text-[var(--theme-mode-accent-text)]'
+                : 'bg-transparent text-[var(--theme-mode-text-muted)]'
+            }`}
+          >
+            🎥
+          </button>
+        ) : (
+          <div aria-hidden />
+        )}
         <div className={`${lbl} text-center`}>Pos</div>
         <div className={lbl}>Swimmer</div>
         {showClub && <div className={`${lbl} text-center`}>Club</div>}

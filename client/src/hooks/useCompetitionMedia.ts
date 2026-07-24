@@ -1,14 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { GalleryItem } from '../utils/interfaces/results';
+
+export interface UseCompetitionMediaResult {
+  byResultId: Map<number, GalleryItem[]>;
+  /** Перезапросить медиа для текущих параметров (напр. после добавления видео со строки). */
+  refresh: () => void;
+}
 
 /**
  * Видимое зрителю медиа заплывов соревнования/события (этап 4 media-visibility-model):
  * своё (владельцу) + одобренные публикации групп (public — всем, members — членам).
  * GET /api/media/results per-viewer, поэтому без общего кэша; аноним получает public-слой.
- * Возвращает map result_id → GalleryItem[] для подмешивания в res.gallery строк таблицы.
+ * Возвращает { byResultId, refresh } — map result_id → GalleryItem[] для подмешивания
+ * в res.gallery строк таблицы + ручной триггер повторной загрузки.
  */
-export function useCompetitionMedia(sourceParams?: Record<string, string>): Map<number, GalleryItem[]> {
+export function useCompetitionMedia(sourceParams?: Record<string, string>): UseCompetitionMediaResult {
   const [byResultId, setByResultId] = useState<Map<number, GalleryItem[]>>(() => new Map());
+  // Бампаем, чтобы форсировать перезапуск эффекта без изменения sourceParams.
+  const [refreshToken, setRefreshToken] = useState(0);
 
   const competitionId = sourceParams?.competitionId;
   const eventId = sourceParams?.eventId;
@@ -53,7 +62,11 @@ export function useCompetitionMedia(sourceParams?: Record<string, string>): Map<
     return () => {
       cancelled = true;
     };
-  }, [competitionId, eventId, groupSlug]);
+  }, [competitionId, eventId, groupSlug, refreshToken]);
 
-  return byResultId;
+  const refresh = useCallback(() => {
+    setRefreshToken((t) => t + 1);
+  }, []);
+
+  return { byResultId, refresh };
 }

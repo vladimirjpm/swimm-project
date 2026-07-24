@@ -22,6 +22,8 @@ import '../components/mix/text-effect/text-effect.css';
 import { useResultsLoadMode } from '../../hooks/useResultsLoadMode';
 import { useCompetitionMedia } from '../../hooks/useCompetitionMedia';
 import { buildResultsFilterParams, fetchResultsPage } from '../../utils/helpers/results-api';
+import AddLinkModal from '../my-media-project/components/add-link-modal';
+import { addUserMedia } from '../my-media-project/use-all-my-media';
 
 function ResultsTable() {
   const dispatch = useAppDispatch();
@@ -43,7 +45,16 @@ function ResultsTable() {
   const { openLoginModal } = useLoginModal();
 
   // Медиа заплывов, видимое зрителю (своё + одобренные публикации) — иконки видео на строках.
-  const mediaByResultId = useCompetitionMedia(selectedSource?.sourceParams);
+  const { byResultId: mediaByResultId, refresh: refreshMedia } = useCompetitionMedia(selectedSource?.sourceParams);
+
+  // Режим «добавить видео» (тумблер в шапке) — только локальный стейт, не persist, только залогиненным.
+  const [addVideoMode, setAddVideoMode] = useState(false);
+  // Заплыв, для которого сейчас открыт попап AddLinkModal (single-step)
+  const [addVideoFor, setAddVideoFor] = useState<{
+    resultId: number;
+    swimmerId: number;
+    contextLabel: React.ReactNode;
+  } | null>(null);
 
   // По title, а не по длине results: в paged-режиме первая страница с текущими фильтрами
   // может законно вернуть 0 строк — это "No results match", а не "источник не выбран".
@@ -322,7 +333,16 @@ function ResultsTable() {
           {/* Unified header (single view for all sizes) */}
           <div className="bg-[var(--theme-mode-surface-alt)] sticky top-0 z-10">
             <div className="hidden lg:block">
-              <ResultsHeader view="desktop" showClub={showClub} showEvent={showEvent} showPoolType={showPoolType} showDate={showDate} hasInternationalPoints={hasInternationalPoints} />
+              <ResultsHeader
+                view="desktop"
+                showClub={showClub}
+                showEvent={showEvent}
+                showPoolType={showPoolType}
+                showDate={showDate}
+                hasInternationalPoints={hasInternationalPoints}
+                addVideoMode={addVideoMode}
+                onToggleAddVideoMode={isAuthenticated ? () => setAddVideoMode((v) => !v) : undefined}
+              />
             </div>
             <div className="lg:hidden">
               <ResultsHeader
@@ -334,6 +354,8 @@ function ResultsTable() {
                 hasInternationalPoints={hasInternationalPoints}
                 showAllOpen={showAllOpen}
                 onToggleShowAllOpen={handleToggleShowAllOpen}
+                addVideoMode={addVideoMode}
+                onToggleAddVideoMode={isAuthenticated ? () => setAddVideoMode((v) => !v) : undefined}
               />
             </div>
           </div>
@@ -404,6 +426,26 @@ function ResultsTable() {
                 ? { ...res, gallery: [...(res.gallery ?? []), ...rowMedia] }
                 : res;
 
+              // Иконка «добавить видео» — только режим включён + числовой result id + не эстафета (п.4 таска)
+              const resultIdForVideo = typeof (res as any).id === 'number' ? (res as any).id : null;
+              const canAddVideo = addVideoMode && swimmerId != null && resultIdForVideo != null && !res.is_relay;
+              const onAddVideo = canAddVideo
+                ? () => {
+                    const swimmerLabel = `${res.first_name}${res.last_name ? ' ' + res.last_name : ''}`;
+                    setAddVideoFor({
+                      resultId: resultIdForVideo!,
+                      swimmerId: swimmerId!,
+                      contextLabel: (
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-bold">{swimmerLabel}</span>
+                          <span>{res.event_style_len}m {res.event_style_name} · {res.time}</span>
+                          <span className="opacity-70">{res.competition} · {res.date}</span>
+                        </div>
+                      ),
+                    });
+                  }
+                : undefined;
+
               return (
                 <React.Fragment key={index}>
                   <li
@@ -428,6 +470,7 @@ function ResultsTable() {
                       isRecordTime={isRecordTime}
                       isExpanded={isRowExpanded}
                       onToggleExpand={() => handleToggleRowExpand(resultKey, isRowExpanded)}
+                      onAddVideo={onAddVideo}
                       {...favoriteProps}
                     />
                   </li>
@@ -452,6 +495,7 @@ function ResultsTable() {
                       isAwardSource={isAwardSource}
                       isRecordHolder={isRecordHolder}
                       isRecordTime={isRecordTime}
+                      onAddVideo={onAddVideo}
                       {...favoriteProps}
                     />
                   </li>
@@ -485,6 +529,24 @@ function ResultsTable() {
         )}
 
       </div>
+
+      {addVideoFor && (
+        <AddLinkModal
+          swimmers={[]}
+          fixedResultId={addVideoFor.resultId}
+          initialSwimmerId={addVideoFor.swimmerId}
+          contextLabel={addVideoFor.contextLabel}
+          onClose={() => setAddVideoFor(null)}
+          onSave={async (input) => {
+            const item = await addUserMedia(input);
+            if (item) {
+              refreshMedia();
+              return true;
+            }
+            return false;
+          }}
+        />
+      )}
     </div>
   );
 }

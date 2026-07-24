@@ -57,6 +57,31 @@ function invalidateTokenCache() {
   cachedToken = null;
 }
 
+/**
+ * Standalone POST /api/me/media — вынесено из useAllMyMedia.add, чтобы можно было
+ * дёргать addUserMedia() и без всего хука (напр. со страницы результатов, где грузить
+ * всё медиа юзера не нужно). Хук использует эту же функцию и сам обновляет свой стейт.
+ */
+export async function addUserMedia(input: AddMediaInput): Promise<AllUserMediaDto | null> {
+  const token = await fetchAntiforgeryToken();
+  if (!token) return null;
+
+  try {
+    const r = await fetch('/api/me/media', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
+      body: JSON.stringify(input),
+    });
+
+    if (!r.ok) { invalidateTokenCache(); return null; }
+    return await r.json();
+  } catch {
+    invalidateTokenCache();
+    return null;
+  }
+}
+
 /** Год из dd/MM/yyyy — сезон карточки для фильтра Season. Без даты → null (только "All"). */
 export function seasonFromCompetitionDate(date?: string | null): string | null {
   if (!date) return null;
@@ -123,28 +148,11 @@ export function useAllMyMedia() {
 
   /** Add link, шаг 3: POST /api/me/media — новый элемент попадает в начало сетки. */
   const add = useCallback(async (input: AddMediaInput): Promise<AllUserMediaDto | null> => {
-    const token = await fetchAntiforgeryToken();
-    if (!token) return null;
-
-    try {
-      const r = await fetch('/api/me/media', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
-        body: JSON.stringify(input),
-      });
-
-      if (!r.ok) { invalidateTokenCache(); return null; }
-
-      const item: AllUserMediaDto = await r.json();
-      if (mountedRef.current) {
-        setMedia(prev => [item, ...prev]);
-      }
-      return item;
-    } catch {
-      invalidateTokenCache();
-      return null;
+    const item = await addUserMedia(input);
+    if (item && mountedRef.current) {
+      setMedia(prev => [item, ...prev]);
     }
+    return item;
   }, []);
 
   return { media, loading, remove, add, reload: load };

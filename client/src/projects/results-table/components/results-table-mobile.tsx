@@ -34,6 +34,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
   onTogglePrimary,
   isExpanded,
   onToggleExpand,
+  onAddVideo,
 }) => {
   const handleNameClick = () => {
     updateFilter({ selected_name: `${res.first_name}${res.last_name ? ' ' + res.last_name : ''}` });
@@ -70,6 +71,16 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
             onToggleFavorite={onToggleFavorite}
             showPrimary={false}
           />
+          {onAddVideo && (
+            <button
+              type="button"
+              title="Add video"
+              onClick={(e) => { e.stopPropagation(); onAddVideo(); }}
+              className="flex items-center justify-center w-5 h-5 text-xs leading-none text-[var(--theme-mode-text-muted)] hover:text-[var(--theme-primary)]"
+            >
+              🎥
+            </button>
+          )}
         </div>
 
         <div className="flex-1 flex flex-col gap-2">

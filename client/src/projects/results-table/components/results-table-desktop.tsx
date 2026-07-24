@@ -33,6 +33,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
   isFavorite,
   onToggleFavorite,
   onTogglePrimary,
+  onAddVideo,
 }) => {
   const handleNameClick = () => {
     updateFilter({ selected_name: `${res.first_name}${res.last_name ? ' ' + res.last_name : ''}` });
@@ -50,7 +51,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
       style={{ gridTemplateColumns: gridTemplate }}
     >
       {/* FAV / ME (ведущая колонка) */}
-      <div className="flex justify-center self-center">
+      <div className="flex flex-col items-center justify-center self-center gap-1">
         <UI_FavoriteControls
           swimmerId={res.swimmer_id}
           isFavorite={isFavorite}
@@ -58,6 +59,16 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
           onToggleFavorite={onToggleFavorite}
           showPrimary={false}
         />
+        {onAddVideo && (
+          <button
+            type="button"
+            title="Add video"
+            onClick={onAddVideo}
+            className="flex items-center justify-center w-4 h-4 text-[10px] leading-none text-[var(--theme-mode-text-muted)] hover:text-[var(--theme-primary)]"
+          >
+            🎥
+          </button>
+        )}
       </div>
 
       {/* POS */}
