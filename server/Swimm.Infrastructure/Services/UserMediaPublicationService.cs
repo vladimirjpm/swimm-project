@@ -209,13 +209,16 @@ public class UserMediaPublicationService : IUserMediaPublicationService
 
         // Скоуп: соревнование / все дни события (многодневные) / group-режим страницы
         // результатов (?group=slug — заплывы пловцов из ростера группы, соревнования разные).
-        IQueryable<UserMedia> mediaInScope = _db.UserMedia.AsNoTracking()
-            .Where(m => m.ResultId != null);
+        // Для competitionId/eventId включаем и медиа уровня «соревнование» (ResultId == null,
+        // CompetitionId задан) — таб Media шапки соревнования. Group-скоуп по-прежнему только
+        // заплывы (ResultId != null): без этого в ленту группы утекало бы личное
+        // swimmer-level медиа ростера, не привязанное ни к какому соревнованию.
+        IQueryable<UserMedia> mediaInScope = _db.UserMedia.AsNoTracking();
         mediaInScope = eventId != null
-            ? mediaInScope.Where(m => m.Competition!.EventId == eventId)
+            ? mediaInScope.Where(m => m.CompetitionId != null && m.Competition!.EventId == eventId)
             : competitionId != null
                 ? mediaInScope.Where(m => m.CompetitionId == competitionId)
-                : mediaInScope.Where(m => _db.HubGroupMembers.Any(gm =>
+                : mediaInScope.Where(m => m.ResultId != null && _db.HubGroupMembers.Any(gm =>
                     gm.SwimmerId == m.SwimmerId && gm.HubGroup!.Slug == groupSlug));
 
         // 1. Своё медиа — видно владельцу целиком (private в том числе).
@@ -225,7 +228,7 @@ public class UserMediaPublicationService : IUserMediaPublicationService
                 .Where(m => m.UserId == userId)
                 .Select(m => new VisibleResultMediaDto
                 {
-                    ResultId = m.ResultId!.Value,
+                    ResultId = m.ResultId,
                     MediaType = m.MediaType,
                     SourceType = m.SourceType,
                     Url = m.Url,
@@ -235,12 +238,11 @@ public class UserMediaPublicationService : IUserMediaPublicationService
         // 2. Одобренные публикации: public — всем; members — активным членам группы публикации.
         var published = await _db.UserMediaPublications.AsNoTracking()
             .Where(p => p.Status == UserMediaPublicationStatus.Approved
-                        && p.Media!.ResultId != null
                         && (eventId != null
-                            ? p.Media.Competition!.EventId == eventId
+                            ? p.Media!.CompetitionId != null && p.Media.Competition!.EventId == eventId
                             : competitionId != null
-                                ? p.Media.CompetitionId == competitionId
-                                : _db.HubGroupMembers.Any(gm =>
+                                ? p.Media!.CompetitionId == competitionId
+                                : p.Media!.ResultId != null && _db.HubGroupMembers.Any(gm =>
                                     gm.SwimmerId == p.Media.SwimmerId && gm.HubGroup!.Slug == groupSlug))
                         && (p.Level == UserMediaPublicationLevel.Public
                             || (userId != null && _db.HubGroupUserMembers.Any(um =>
@@ -248,7 +250,7 @@ public class UserMediaPublicationService : IUserMediaPublicationService
                                 && um.Status == HubGroupUserMemberStatus.Active))))
             .Select(p => new VisibleResultMediaDto
             {
-                ResultId = p.Media!.ResultId!.Value,
+                ResultId = p.Media!.ResultId,
                 MediaType = p.Media.MediaType,
                 SourceType = p.Media.SourceType,
                 Url = p.Media.Url,

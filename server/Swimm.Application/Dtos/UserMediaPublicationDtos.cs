@@ -49,8 +49,9 @@ public class SubmitPublicationRequest
 /// </summary>
 public class VisibleResultMediaDto
 {
+    /// <summary>null — медиа уровня «соревнование» (не привязано к заплыву).</summary>
     [JsonPropertyName("result_id")]
-    public long ResultId { get; set; }
+    public long? ResultId { get; set; }
 
     [JsonPropertyName("media_type")]
     public string MediaType { get; set; } = string.Empty;

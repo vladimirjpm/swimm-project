@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { GalleryItem } from '../utils/interfaces/results';
 
+export interface CompetitionMediaItem extends GalleryItem {
+  /** null — медиа уровня «соревнование» (не привязано к заплыву). */
+  result_id: number | null;
+}
+
 export interface UseCompetitionMediaResult {
   byResultId: Map<number, GalleryItem[]>;
+  /** Плоский список всего видимого медиа (включая competition-level) — таб Media, бейдж-счётчик. */
+  items: CompetitionMediaItem[];
   /** Перезапросить медиа для текущих параметров (напр. после добавления видео со строки). */
   refresh: () => void;
 }
@@ -16,6 +23,7 @@ export interface UseCompetitionMediaResult {
  */
 export function useCompetitionMedia(sourceParams?: Record<string, string>): UseCompetitionMediaResult {
   const [byResultId, setByResultId] = useState<Map<number, GalleryItem[]>>(() => new Map());
+  const [items, setItems] = useState<CompetitionMediaItem[]>([]);
   // Бампаем, чтобы форсировать перезапуск эффекта без изменения sourceParams.
   const [refreshToken, setRefreshToken] = useState(0);
 
@@ -29,6 +37,7 @@ export function useCompetitionMedia(sourceParams?: Record<string, string>): UseC
     const isNum = (v?: string) => !!v && /^\d+$/.test(v);
     if (!isNum(competitionId) && !isNum(eventId) && !groupSlug) {
       setByResultId(new Map());
+      setItems([]);
       return;
     }
 
@@ -41,22 +50,31 @@ export function useCompetitionMedia(sourceParams?: Record<string, string>): UseC
 
     fetch(`/api/media/results?${query}`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : []))
-      .then((list: { result_id: number; media_type: string; source_type: string; url: string }[]) => {
+      .then((list: { result_id: number | null; media_type: string; source_type: string; url: string }[]) => {
         if (cancelled) return;
         const map = new Map<number, GalleryItem[]>();
+        const flat: CompetitionMediaItem[] = [];
         for (const item of list) {
-          const arr = map.get(item.result_id) ?? [];
-          arr.push({
+          const gi: GalleryItem = {
             type: item.media_type === 'image' ? 'image' : 'video',
             sourceType: item.source_type as GalleryItem['sourceType'],
             url: item.url,
-          });
+          };
+          flat.push({ ...gi, result_id: item.result_id });
+          // competition-level медиа (result_id == null) в карту заплывов не попадает
+          if (item.result_id == null) continue;
+          const arr = map.get(item.result_id) ?? [];
+          arr.push(gi);
           map.set(item.result_id, arr);
         }
         setByResultId(map);
+        setItems(flat);
       })
       .catch(() => {
-        if (!cancelled) setByResultId(new Map());
+        if (!cancelled) {
+          setByResultId(new Map());
+          setItems([]);
+        }
       });
 
     return () => {
@@ -68,5 +86,5 @@ export function useCompetitionMedia(sourceParams?: Record<string, string>): UseC
     setRefreshToken((t) => t + 1);
   }, []);
 
-  return { byResultId, refresh };
+  return { byResultId, items, refresh };
 }
