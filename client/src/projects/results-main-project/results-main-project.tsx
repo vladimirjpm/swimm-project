@@ -19,6 +19,7 @@ import CompetitionHeader from './components/competition-header/competition-heade
 import CompetitionOverviewContent from './components/competition-header/competition-overview';
 import CompetitionClubs from './components/competition-header/competition-clubs';
 import CompetitionMedia from './components/competition-header/competition-media';
+import CompetitionRecords from './components/competition-header/competition-records';
 import { useCompetitionOverview } from './components/competition-header/use-competition-overview';
 import { useCompetitionAddMedia } from './components/competition-header/use-competition-add-media';
 import type { CompetitionTab } from './components/competition-header/types';
@@ -416,17 +417,7 @@ function ResultsMain() {
             addingMedia={addMedia.loadingSwimmers}
           />
         ) : (
-          /* records — контент следующим шагом */
-          <div
-            className="mt-4 flex min-h-[140px] items-center justify-center rounded-[14px] text-[13px] font-semibold"
-            style={{
-              border: '1px dashed var(--theme-mode-border-input)',
-              background: 'var(--theme-mode-surface)',
-              color: 'var(--theme-mode-text-muted)',
-            }}
-          >
-            Records — coming soon.
-          </div>
+          <CompetitionRecords overview={compOverview} />
         )
       ) : (
         <>
