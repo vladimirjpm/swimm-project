@@ -26,4 +26,7 @@ export interface FilterSelected {
   event_date?: string;
   // Recalculate positions across all days (best time per swimmer per event)
   is_recalculated?: boolean;
+  // Scope by viewer's swimmers (?filter= в URL, персональная полоса шапки соревнования):
+  // 'my' — primary favorite, 'favorites' — все избранные. Только залогиненному.
+  swimmer_scope?: 'all' | 'my' | 'favorites';
 }

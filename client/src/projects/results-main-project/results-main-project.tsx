@@ -269,6 +269,33 @@ function ResultsMain() {
     refresh: refreshCompMedia,
   });
 
+  // ?filter=my|favorites (НАВ-контракт): предустановка скоупа Swims из URL — один раз на маунт.
+  useEffect(() => {
+    if (groupSlug) return;
+    const f = new URLSearchParams(window.location.search).get('filter');
+    if (f === 'my' || f === 'favorites') {
+      dispatch(rootActions.updateState({ filterSelected: { ...filters, swimmer_scope: f } }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Персональная полоса → Swims со скоупом my|favorites (+ URL tab/filter).
+  const handleOpenSwimsScoped = useCallback((scope: 'my' | 'favorites') => {
+    dispatch(rootActions.updateState({ filterSelected: { ...filters, swimmer_scope: scope } }));
+    setCompTab('swims');
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', 'swims');
+    url.searchParams.set('filter', scope);
+    window.history.replaceState(null, '', url.toString());
+  }, [dispatch, filters]);
+
+  const clearSwimmerScope = useCallback(() => {
+    dispatch(rootActions.updateState({ filterSelected: { ...filters, swimmer_scope: 'all' } }));
+    const url = new URL(window.location.href);
+    url.searchParams.delete('filter');
+    window.history.replaceState(null, '', url.toString());
+  }, [dispatch, filters]);
+
   // Сброс selected_name при закрытии мобильного модала
   const handleMobileModalClose = useCallback(() => {
     dispatch(rootActions.updateState({
@@ -334,6 +361,7 @@ function ResultsMain() {
                       source={source}
                       onChangeClick={togglePanel}
                       changeOpen={panelOpen}
+                      onOpenSwimsScoped={handleOpenSwimsScoped}
                     />
                   )
                 : undefined
@@ -419,6 +447,32 @@ function ResultsMain() {
             {/* Центральная колонка — результаты (детали теперь попапом, поэтому полная ширина) */}
             {!isTraining && (
               <div className="results-table w-full lg:w-10/12 bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] rounded shadow">
+                {/* Активный скоуп «мои/избранные» (?filter=) — чип с крестиком.
+                    Только залогиненному: гостю скоуп не применяется (см. results-table). */}
+                {auth.isAuthenticated &&
+                  (filters.swimmer_scope === 'my' || filters.swimmer_scope === 'favorites') && (
+                  <div className="flex items-center gap-2 px-3 pt-2.5">
+                    <span
+                      className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold"
+                      style={{
+                        background: 'var(--theme-personal-badge-bg)',
+                        color: 'var(--theme-personal-accent)',
+                        border: '1px solid var(--theme-personal-border)',
+                      }}
+                    >
+                      {filters.swimmer_scope === 'my' ? '⭐ My swims' : '❤️ Favorites only'}
+                      <button
+                        type="button"
+                        onClick={clearSwimmerScope}
+                        className="cursor-pointer bg-transparent p-0 text-[12px] leading-none"
+                        style={{ color: 'inherit' }}
+                        aria-label="Show all swimmers"
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  </div>
+                )}
                 <ResultsTable />
               </div>
             )}

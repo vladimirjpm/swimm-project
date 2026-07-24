@@ -1,5 +1,6 @@
 import React from 'react';
 import CompetitionHeaderTop from './competition-header-top';
+import CompetitionPersonalStrip from './competition-personal-strip';
 import CompetitionTabs from './competition-tabs';
 import type { CompetitionHeaderProps } from './types';
 
@@ -17,11 +18,14 @@ export default function CompetitionHeader({
   source,
   onChangeClick,
   changeOpen,
+  onOpenSwimsScoped,
 }: CompetitionHeaderProps & {
   onAddMedia?: () => void;
   source?: import('../../../../utils/helpers/competition-source').CompetitionSource;
   onChangeClick?: () => void;
   changeOpen?: boolean;
+  /** Переход в Swims со скоупом my|favorites (персональная полоса). */
+  onOpenSwimsScoped?: (scope: 'my' | 'favorites') => void;
 }) {
   return (
     <div
@@ -36,8 +40,15 @@ export default function CompetitionHeader({
         onChangeClick={onChangeClick}
         changeOpen={changeOpen}
       />
-      {/* Персональная полоса (⭐ Имя / ❤️ Favorites / My media) — следующий модуль,
-          красится ТОЛЬКО токенами --theme-personal-* */}
+      {/* Персональная полоса (только залогиненному; красится токенами --theme-personal-*) */}
+      {onOpenSwimsScoped && (
+        <CompetitionPersonalStrip
+          overview={overview}
+          onOpenSwims={onOpenSwimsScoped}
+          onOpenMedia={() => onTabChange('media')}
+          onAddMedia={onAddMedia}
+        />
+      )}
       <CompetitionTabs
         overview={overview}
         activeTab={activeTab}

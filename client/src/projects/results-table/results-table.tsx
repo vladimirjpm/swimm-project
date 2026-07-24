@@ -91,6 +91,15 @@ function ResultsTable() {
     if (activityType === 'training' && !hasTraining) return false;
     if (activityType === 'competition' && hasTraining) return false;
 
+    // Скоуп «мои/избранные» (персональная полоса шапки соревнования, ?filter=).
+    // Гостю или без primary — скоуп молча не применяется (пустая таблица хуже).
+    const scope = filters.swimmer_scope;
+    if (scope === 'my' && isAuthenticated && primarySwimmerId != null) {
+      if (res.swimmer_id !== primarySwimmerId) return false;
+    } else if (scope === 'favorites' && isAuthenticated && favoriteSwimmerIds.size > 0) {
+      if (res.swimmer_id == null || !favoriteSwimmerIds.has(res.swimmer_id)) return false;
+    }
+
     // Фильтр по позиции (месту)
     const posFilter = position_filter || 'top';
     if (posFilter === 'podium') {
@@ -115,7 +124,7 @@ function ResultsTable() {
       )) &&
       (club === 'all' || res.club === club)
     );
-  }), [sourceResults, filters]);
+  }), [sourceResults, filters, isAuthenticated, primarySwimmerId, favoriteSwimmerIds]);
 
   // Вычисляем наивысший уровень из базовых результатов и пушим в store
   useEffect(() => {
