@@ -17,7 +17,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <div className="mb-2 text-[14px] font-extrabold">{children}</div>;
 }
 
-function ClubsTable({ clubs, onOpenClubs }: { clubs: OverviewClub[]; onOpenClubs?: () => void }) {
+function ClubsTable({ clubs, onOpenClub }: { clubs: OverviewClub[]; onOpenClub?: (club: string) => void }) {
   return (
     <table className="w-full border-collapse text-[12.5px]">
       <thead>
@@ -33,8 +33,8 @@ function ClubsTable({ clubs, onOpenClubs }: { clubs: OverviewClub[]; onOpenClubs
           <tr key={c.club} className="border-t" style={{ borderColor: 'var(--theme-mode-border)' }}>
             <td className="py-1.5 pr-2 font-bold" style={{ color: 'var(--theme-mode-text-muted)' }}>{i + 1}</td>
             <td className="py-1.5 pr-2 font-bold" dir="auto">
-              {onOpenClubs ? (
-                <button type="button" onClick={onOpenClubs} className="bg-transparent p-0 font-bold hover:underline" style={{ color: 'inherit' }}>
+              {onOpenClub ? (
+                <button type="button" onClick={() => onOpenClub(c.club)} className="cursor-pointer bg-transparent p-0 font-bold hover:underline" style={{ color: 'inherit' }}>
                   {c.club}
                 </button>
               ) : c.club}
@@ -53,9 +53,13 @@ interface Props {
   loading: boolean;
   /** Переход в другой таб (линки «Open … tab →», клик по клубу). */
   onOpenTab(tab: 'swims' | 'clubs' | 'media'): void;
+  /** Диплинк на конкретный заплыв (best swim, строки рекордов). */
+  onOpenSwim?(swim: { result_id: number | null; style_name: string; distance: string }): void;
+  /** Drill-down клуба: таб Clubs с выбранным клубом. */
+  onOpenClub?(club: string): void;
 }
 
-export default function CompetitionOverviewContent({ overview, loading, onOpenTab }: Props) {
+export default function CompetitionOverviewContent({ overview, loading, onOpenTab, onOpenSwim, onOpenClub }: Props) {
   if (!overview) {
     return (
       <div className="mt-4 flex min-h-[140px] items-center justify-center rounded-[14px] text-[13px] font-semibold"
@@ -92,10 +96,11 @@ export default function CompetitionOverviewContent({ overview, loading, onOpenTa
                 <span style={{ color: 'var(--theme-mode-text-muted)' }}> · Day {best.day_number}</span>
               )}
             </div>
-            <button type="button" onClick={() => onOpenTab('swims')}
+            <button type="button"
+              onClick={() => (onOpenSwim ? onOpenSwim(best) : onOpenTab('swims'))}
               className="mt-2 bg-transparent p-0 text-[12px] font-bold hover:underline"
               style={{ color: 'var(--theme-primary)' }}>
-              Open Swims tab →
+              Open this swim →
             </button>
           </div>
         )}
@@ -115,7 +120,15 @@ export default function CompetitionOverviewContent({ overview, loading, onOpenTa
           <div className="rounded-[12px] p-4" style={cardStyle}>
             <SectionTitle>New records</SectionTitle>
             {overview.records.map((r, i) => (
-              <div key={i} className="border-t py-1.5 text-[12.5px] font-bold first:border-t-0" style={{ borderColor: 'var(--theme-mode-border)' }} dir="auto">
+              <div
+                key={i}
+                className={`border-t py-1.5 text-[12.5px] font-bold first:border-t-0 ${
+                  onOpenSwim && r.result_id != null ? 'cursor-pointer hover:underline' : ''
+                }`}
+                style={{ borderColor: 'var(--theme-mode-border)' }}
+                dir="auto"
+                onClick={onOpenSwim && r.result_id != null ? () => onOpenSwim(r) : undefined}
+              >
                 {r.distance}m {r.style_name} — {r.time} · {r.holder_name}
                 {r.day_number != null && <span style={{ color: 'var(--theme-mode-text-muted)' }}> · Day {r.day_number}</span>}
               </div>
@@ -144,7 +157,7 @@ export default function CompetitionOverviewContent({ overview, loading, onOpenTa
         {overview.top_clubs.length > 0 && (
           <div className="rounded-[12px] p-4" style={cardStyle}>
             <SectionTitle>Top clubs</SectionTitle>
-            <ClubsTable clubs={overview.top_clubs} onOpenClubs={() => onOpenTab('clubs')} />
+            <ClubsTable clubs={overview.top_clubs} onOpenClub={onOpenClub} />
             <button type="button" onClick={() => onOpenTab('clubs')}
               className="mt-2 bg-transparent p-0 text-[12px] font-bold hover:underline"
               style={{ color: 'var(--theme-primary)' }}>

@@ -195,6 +195,27 @@ function ResultsTable() {
   // displayResults = sortedResults (recalculation уже применён в sourceResults)
   const displayResults = sortedResults;
 
+  // Диплинк на заплыв (?swim=<resultId>, НАВ-контракт шапки соревнования):
+  // после появления строк скроллим к строке и подсвечиваем её на несколько секунд.
+  const highlightedSwimRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    const swim = new URLSearchParams(window.location.search).get('swim');
+    if (!swim || highlightedSwimRef.current === swim || displayResults.length === 0) return;
+    // Таймер НЕ отменяем в cleanup: смена ссылки displayResults на быстрых
+    // ре-рендерах после переключения таба гасила бы его до срабатывания;
+    // повторные срабатывания гейтит highlightedSwimRef.
+    setTimeout(() => {
+      if (highlightedSwimRef.current === swim) return;
+      const els = Array.from(document.querySelectorAll(`[data-result-id="${CSS.escape(swim)}"]`));
+      const el = els.find((e) => (e as HTMLElement).offsetParent !== null) as HTMLElement | undefined;
+      if (!el) return;
+      highlightedSwimRef.current = swim;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('swim-deeplink-highlight');
+      setTimeout(() => el.classList.remove('swim-deeplink-highlight'), 4000);
+    }, 300);
+  }, [displayResults]);
+
   const getResultKey = (res: any) =>
     [
       res.date,
@@ -458,6 +479,7 @@ function ResultsTable() {
               return (
                 <React.Fragment key={index}>
                   <li
+                    data-result-id={resForRow.id ?? undefined}
                     className={`lg:hidden flex flex-col gap-2 px-3 py-2 rounded border-l-4 border-b border-b-[var(--theme-mode-border-row)] ${isPrimary ? 'border-l-[#f5b800] bg-[var(--theme-mode-me-highlight)]' : `border-l-transparent ${Helper.getGenderBgClass(rowGender)}`}`}
                   >
                     <ResultsTableMobile
@@ -485,6 +507,7 @@ function ResultsTable() {
                   </li>
 
                   <li
+                    data-result-id={resForRow.id ?? undefined}
                     className={`hidden lg:grid ${isPrimary ? '' : Helper.getGenderBgClass(rowGender)}`}
                   >
                     <ResultsTableDesktop

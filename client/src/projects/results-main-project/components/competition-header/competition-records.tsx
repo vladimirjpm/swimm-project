@@ -5,7 +5,13 @@ import type { CompetitionOverview } from './types';
 // рендерится только когда список непуст). Строка: бейдж вида + событие+время +
 // пловец·клуб + Day N (НАВ-контракт: диплинк на заплыв — следующий шаг).
 
-export default function CompetitionRecords({ overview }: { overview: CompetitionOverview | null }) {
+export default function CompetitionRecords({
+  overview,
+  onOpenSwim,
+}: {
+  overview: CompetitionOverview | null;
+  onOpenSwim?(swim: { result_id: number | null; style_name: string; distance: string }): void;
+}) {
   const records = overview?.records ?? [];
 
   return (
@@ -27,8 +33,11 @@ export default function CompetitionRecords({ overview }: { overview: Competition
         records.map((r, i) => (
           <div
             key={i}
-            className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t py-2.5 first:border-t-0"
+            className={`flex flex-wrap items-center gap-x-3 gap-y-1 border-t py-2.5 first:border-t-0 ${
+              onOpenSwim && r.result_id != null ? 'cursor-pointer hover:underline' : ''
+            }`}
             style={{ borderColor: 'var(--theme-mode-border)' }}
+            onClick={onOpenSwim && r.result_id != null ? () => onOpenSwim(r) : undefined}
           >
             <span
               className="rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide"

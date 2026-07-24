@@ -290,6 +290,67 @@ function ResultsMain() {
     window.history.replaceState(null, '', url.toString());
   }, [dispatch, filters]);
 
+  // Диплинк на заплыв из Overview/Records: Swims + пресет фильтров под дисциплину
+  // (иначе строку срежут дефолты style/position) + ?swim= для скролла/подсветки.
+  const handleOpenSwim = useCallback(
+    (swim: { result_id: number | null; style_name: string; distance: string }) => {
+      if (swim.result_id == null) return;
+      dispatch(rootActions.updateState({
+        filterSelected: {
+          ...filters,
+          style_name: swim.style_name,
+          style_len: Number(swim.distance) || 0,
+          gender: 'all',
+          age: 'all',
+          club: 'all',
+          selected_name: 'all',
+          position_filter: 'all',
+          event_date: 'all',
+          swimmer_scope: 'all',
+        },
+      }));
+      setCompTab('swims');
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', 'swims');
+      url.searchParams.set('swim', String(swim.result_id));
+      window.history.replaceState(null, '', url.toString());
+    },
+    [dispatch, filters],
+  );
+
+  // Drill-down клуба: из Overview → таб Clubs с выбранным клубом (?club=);
+  // из карточки клуба → Swims с фильтром по клубу.
+  const handleOpenClub = useCallback((club: string) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('club', club);
+    url.searchParams.set('tab', 'clubs');
+    window.history.replaceState(null, '', url.toString());
+    setCompTab('clubs');
+  }, []);
+
+  const handleOpenSwimsForClub = useCallback((club: string) => {
+    // Остальные фильтры сбрасываем: юзер хочет ВСЕ заплывы клуба, а дефолтный
+    // стиль (freestyle/50) срезал бы список до пары строк.
+    dispatch(rootActions.updateState({
+      filterSelected: {
+        ...filters,
+        club,
+        selected_name: 'all',
+        swimmer_scope: 'all',
+        style_name: '',
+        style_len: 0,
+        gender: 'all',
+        age: 'all',
+        position_filter: 'all',
+        event_date: 'all',
+      },
+    }));
+    setCompTab('swims');
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', 'swims');
+    window.history.replaceState(null, '', url.toString());
+  }, [dispatch, filters]);
+
   const clearSwimmerScope = useCallback(() => {
     dispatch(rootActions.updateState({ filterSelected: { ...filters, swimmer_scope: 'all' } }));
     const url = new URL(window.location.href);
@@ -405,9 +466,11 @@ function ResultsMain() {
             overview={compOverview}
             loading={compOverviewLoading}
             onOpenTab={handleCompTabChange}
+            onOpenSwim={handleOpenSwim}
+            onOpenClub={handleOpenClub}
           />
         ) : compTab === 'clubs' ? (
-          <CompetitionClubs sourceParams={compSourceParams} />
+          <CompetitionClubs sourceParams={compSourceParams} onOpenSwimsForClub={handleOpenSwimsForClub} />
         ) : compTab === 'media' ? (
           <CompetitionMedia
             items={compMediaItems}
@@ -417,7 +480,7 @@ function ResultsMain() {
             addingMedia={addMedia.loadingSwimmers}
           />
         ) : (
-          <CompetitionRecords overview={compOverview} />
+          <CompetitionRecords overview={compOverview} onOpenSwim={handleOpenSwim} />
         )
       ) : (
         <>

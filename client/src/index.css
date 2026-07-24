@@ -141,6 +141,14 @@
   --status-live-border: rgba(61, 220, 151, 0.45);
 }
 
+/* Подсветка строки заплыва по диплинку ?swim= (шапка соревнования, НАВ-контракт) */
+.swim-deeplink-highlight {
+  outline: 2px solid var(--theme-personal-border);
+  outline-offset: -2px;
+  background: var(--theme-personal-bg) !important;
+  transition: background 0.4s ease, outline-color 0.4s ease;
+}
+
 /*body {
   background-image: linear-gradient(var(--body-bg-overlay), var(--body-bg-overlay)), url('/images/mix/bg-2.jpg');
   background-size: cover;
