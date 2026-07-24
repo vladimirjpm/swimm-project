@@ -505,6 +505,49 @@ public class ResultRepositoryTests
     }
 
     [Fact]
+    public async Task GetPaged_RelayRow_CarriesMemberSwimmerIds()
+    {
+        // Страж относительно docs/relays.md (чек-лист п.3): /api/results обязан отдавать
+        // состав ног member_swimmer_ids — клиентские скоупы my/favorites и персональная
+        // полоса матчат эстафету по нему, а не по SwimmerId владельца строки.
+        // Регресс без этого поля: 4X50 комплекс терялся из ?filter=favorites (0875c1c).
+        await using var db = CreateDb(nameof(GetPaged_RelayRow_CarriesMemberSwimmerIds));
+        var style = new Style { Name = "freestyle" };
+        var comp = new Competition
+        {
+            Name = "Relay Meet", Country = new Country { CountryCode = "ISR", CountryName = "ISR" },
+            Date = "01/01/2024", PoolType = "50m", IsMasters = false
+        };
+        var owner = new Swimmer { LastName = "Owner", FirstName = "O", LastNameEn = "Owner", FirstNameEn = "O", BirthYear = 2000 };
+        var leg2 = new Swimmer { LastName = "Leg", FirstName = "L", LastNameEn = "Leg", FirstNameEn = "L", BirthYear = 2001 };
+        var club = new Club { Name = "C", NameEn = "C" };
+        var relay = new Relay { TeamName = "Team", SwimmersName = "O Owner, L Leg" };
+        db.AddRange(style, comp, owner, leg2, club, relay);
+        await db.SaveChangesAsync();
+        db.RelayMembers.AddRange(
+            new RelayMember { RelayId = relay.Id, SwimmerId = owner.Id, LegOrder = 1 },
+            new RelayMember { RelayId = relay.Id, SwimmerId = leg2.Id, LegOrder = 2 });
+        db.Results.Add(new ResultRecord
+        {
+            CompetitionId = comp.Id, SwimmerId = owner.Id, ClubId = club.Id, StyleId = style.Id,
+            RelayId = relay.Id, Distance = "4X50", Gender = "male",
+            CompetitionDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            TimeOriginal = "2:00.00", AgeGroup = "Open", EventStyleAge = "4X50 freestyle Open", Position = 1
+        });
+        await db.SaveChangesAsync();
+        var repo = new ResultRepository(db, NoCache());
+
+        var (items, _, _) = await repo.GetPagedAsync(new ResultFilter { CompetitionId = comp.Id }, 1, 10);
+
+        var row = Assert.Single(items);
+        Assert.True(row.IsRelay);
+        Assert.NotNull(row.MemberSwimmerIds);
+        // Нога-не-владелец обязана присутствовать — по ней клиент матчит эстафету.
+        Assert.Contains(leg2.Id, row.MemberSwimmerIds!);
+        Assert.Contains(owner.Id, row.MemberSwimmerIds!);
+    }
+
+    [Fact]
     public async Task GetClubSummary_EmptyDb_ReturnsEmpty()
     {
         await using var db = CreateDb(nameof(GetClubSummary_EmptyDb_ReturnsEmpty));

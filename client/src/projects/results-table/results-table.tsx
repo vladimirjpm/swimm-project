@@ -93,15 +93,12 @@ function ResultsTable() {
 
     // Скоуп «мои/избранные» (персональная полоса шапки соревнования, ?filter=).
     // Гостю или без primary — скоуп молча не применяется (пустая таблица хуже).
-    // Эстафеты матчим по составу ног member_swimmer_ids, НЕ по владельцу строки
-    // (docs/relays.md: swimmer_id эстафеты — одна нога, остальные теряются).
+    // Матчинг — ТОЛЬКО через HelperSwimmer.resultBelongsTo* (эстафеты по составу ног).
     const scope = filters.swimmer_scope;
-    const matchesSwimmer = (id: number) =>
-      res.swimmer_id === id || (res.member_swimmer_ids?.includes(id) ?? false);
     if (scope === 'my' && isAuthenticated && primarySwimmerId != null) {
-      if (!matchesSwimmer(primarySwimmerId)) return false;
+      if (!HelperSwimmer.resultBelongsToSwimmer(res, primarySwimmerId)) return false;
     } else if (scope === 'favorites' && isAuthenticated && favoriteSwimmerIds.size > 0) {
-      if (![...favoriteSwimmerIds].some(matchesSwimmer)) return false;
+      if (!HelperSwimmer.resultBelongsToAny(res, favoriteSwimmerIds)) return false;
     }
 
     // Фильтр по позиции (месту)

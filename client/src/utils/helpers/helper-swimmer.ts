@@ -77,6 +77,25 @@ export default class HelperSwimmer {
   };
 
   /**
+   * ЕДИНСТВЕННОЕ правильное место матчинга «этот заплыв принадлежит пловцу N» по id.
+   * Эстафеты матчатся по составу ног member_swimmer_ids, НЕ по swimmer_id владельца
+   * строки — у эстафеты swimmer_id это одна нога, остальные теряются (docs/relays.md,
+   * чек-лист п.3; репро-баг: 4X50 комплекс Сабины пропадал из ?filter=favorites).
+   * Новый фильтр/счётчик по пловцу — зови это, не сравнивай swimmer_id сам.
+   */
+  static resultBelongsToSwimmer(res: Result, swimmerId: number): boolean {
+    return res.swimmer_id === swimmerId || (res.member_swimmer_ids?.includes(swimmerId) ?? false);
+  }
+
+  /** То же для набора пловцов (скоуп favorites и т.п.). */
+  static resultBelongsToAny(res: Result, swimmerIds: Iterable<number>): boolean {
+    for (const id of swimmerIds) {
+      if (HelperSwimmer.resultBelongsToSwimmer(res, id)) return true;
+    }
+    return false;
+  }
+
+  /**
    * Все результаты спортсмена по имени (включая эстафеты, где он участник).
    */
   static filterResultsByName(results: Result[], selectedName: string): Result[] {

@@ -3,6 +3,7 @@ import { useAppSelector } from '../../../../store/store';
 import { useFavoritesContext } from '../../../../hooks/favorites-context';
 import type { AllUserMediaDto } from '../../../my-media-project/use-all-my-media';
 import { HelperMedia } from '../../../../utils/helpers';
+import HelperSwimmer from '../../../../utils/helpers/helper-swimmer';
 import type { CompetitionOverview } from './types';
 
 // Персональная полоса шапки соревнования (design_handoff_competition_overview):
@@ -63,10 +64,8 @@ export default function CompetitionPersonalStrip({ overview, onOpenSwims, onOpen
   if (!isAuthenticated) return null;
 
   const results = selectedSource?.results ?? [];
-  // Эстафеты матчим по составу ног member_swimmer_ids, не по владельцу строки
-  // (docs/relays.md) — иначе «My swims — N» теряет эстафеты чужих ног.
-  const matches = (r: any, id: number) =>
-    r.swimmer_id === id || (r.member_swimmer_ids?.includes(id) ?? false);
+  // Матчинг — только через HelperSwimmer.resultBelongsToSwimmer (эстафеты по составу ног)
+  const matches = (r: any, id: number) => HelperSwimmer.resultBelongsToSwimmer(r, id);
   const mySwims = primarySwimmerId != null
     ? results.filter((r: any) => matches(r, primarySwimmerId))
     : [];

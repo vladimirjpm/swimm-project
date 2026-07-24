@@ -51,6 +51,12 @@ freestyle-эстафета (где он первая нога), но не medley
 - **Клиент** (`results-table`, `my-media-project`) — матчит пловца к эстафете по
   `member_swimmer_ids`, не по владельцу строки. Поля строки: `is_relay`,
   `relay_swimmers` / `relay_swimmers_name`, `relay_team_name`.
+  **Канон:** матчинг «заплыв ↔ пловец по id» делается ТОЛЬКО через
+  `HelperSwimmer.resultBelongsToSwimmer` / `resultBelongsToAny`
+  (`client/src/utils/helpers/helper-swimmer.ts`) — новый фильтр/счётчик не должен
+  сравнивать `swimmer_id` сам. `/api/results` отдаёт `member_swimmer_ids` на каждой
+  эстафетной строке (проекция `Relay.Members` в `ResultMapping`); контракт закреплён
+  тестом `GetPaged_RelayRow_CarriesMemberSwimmerIds` (`Swimm.Tests`).
 - **Медиа на эстафете** — привязано к строке (одна нога), т.е. к `SwimmerId` владельца.
   Но принадлежит всей команде: `UserMediaRepository.GetForUserAsync(userId, swimmerId)`
   при заданном `swimmerId` включает и медиа на relay-результатах, где `swimmerId` —
