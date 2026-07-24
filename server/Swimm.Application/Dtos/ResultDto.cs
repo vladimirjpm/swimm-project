@@ -140,6 +140,11 @@ public class ResultDto
     [JsonPropertyName("relay_swimmers_name")]
     public string? RelaySwimmersName { get; set; }
 
+    /// <summary>Состав ног эстафеты (RelayMembers) — клиент матчит пловца к эстафете по нему,
+    /// а не по владельцу строки (docs/relays.md). null для личных заплывов.</summary>
+    [JsonPropertyName("member_swimmer_ids")]
+    public List<int>? MemberSwimmerIds { get; set; }
+
     // relay_swimmers[] (структурный состав) ОТЛОЖЕН: в БД хранится только Relay.SwimmersName
     // (строка), структурированного массива нет — восстановить нельзя.
 

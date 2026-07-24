@@ -57,6 +57,11 @@ public static class ResultMapping
         IsRelay = r.RelayId != null,
         RelayTeamName = r.Relay != null ? r.Relay.TeamName : null,
         RelaySwimmersName = r.Relay != null ? r.Relay.SwimmersName : null,
+        // Членство ног — для клиентских скоупов my/favorites (docs/relays.md: матчить
+        // эстафету по RelayMembers, не по SwimmerId владельца строки)
+        MemberSwimmerIds = r.Relay != null
+            ? r.Relay.Members.Select(m => m.SwimmerId).ToList()
+            : null,
         Gallery = r.Gallery != null
             ? r.Gallery.Items.Select(i => new GalleryItemDto
             {

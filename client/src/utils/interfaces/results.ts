@@ -64,6 +64,9 @@ export interface ResultWrap {
     relay_team_name?: string;
     /** имена пловцов клуба */
     relay_swimmers_name?: string;
+    /** состав ног (RelayMembers) — матчить пловца к эстафете по нему, не по swimmer_id
+     *  владельца строки (docs/relays.md); null/отсутствует у личных заплывов */
+    member_swimmer_ids?: number[] | null;
 
     /** состав команды */
     relay_swimmers?: RelaySwimmer[];

@@ -63,13 +63,16 @@ export default function CompetitionPersonalStrip({ overview, onOpenSwims, onOpen
   if (!isAuthenticated) return null;
 
   const results = selectedSource?.results ?? [];
+  // Эстафеты матчим по составу ног member_swimmer_ids, не по владельцу строки
+  // (docs/relays.md) — иначе «My swims — N» теряет эстафеты чужих ног.
+  const matches = (r: any, id: number) =>
+    r.swimmer_id === id || (r.member_swimmer_ids?.includes(id) ?? false);
   const mySwims = primarySwimmerId != null
-    ? results.filter((r: any) => r.swimmer_id === primarySwimmerId)
+    ? results.filter((r: any) => matches(r, primarySwimmerId))
     : [];
-  const favSwims = results.filter(
-    (r: any) => r.swimmer_id != null && favoriteSwimmerIds.has(r.swimmer_id) && r.swimmer_id !== primarySwimmerId,
-  );
-  const favHere = new Set(favSwims.map((r: any) => r.swimmer_id)).size;
+  const favIds = [...favoriteSwimmerIds].filter((id) => id !== primarySwimmerId);
+  const favSwims = results.filter((r: any) => favIds.some((id) => matches(r, id)));
+  const favHere = favIds.filter((id) => results.some((r: any) => matches(r, id))).length;
 
   const primaryName =
     favorites.find((f) => f.swimmer_id === primarySwimmerId)?.swimmer_name ?? 'Me';
