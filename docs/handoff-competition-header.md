@@ -73,7 +73,8 @@
    - ✅ Медиа-галерея (v2): `GET /api/swimmers/{id}/media` (`GetVisibleForSwimmerAsync` — те же
      правила видимости, 4 теста), секция Media на странице (грид + лайтбокс). ✅ Ссылки в
      overview (best swim/medalist) + попап SportsmenDetails.
-   - TODO-доводка: favorite/⭐-«это я» на странице, мобильная/dark пиксельная доводка.
+   - ✅ favorite/⭐-«это я» (v2): `FavoriteControls` в hero по swimmer_id (favorites-context);
+     гость → ❤ открывает логин. TODO-доводка: мобильная/dark пиксельная доводка.
 3. ~~**Add media edge**~~ ✅ СДЕЛАНО: `use-competition-add-media.tsx` теперь мёржит
    пловцов из `/api/me/media` + `/api/me/favorites` (параллельный fetch, дедуп по
    swimmer_id; медиа → hint 'has media', фавориты → 'favorite'). Юзер без медиа, но с
