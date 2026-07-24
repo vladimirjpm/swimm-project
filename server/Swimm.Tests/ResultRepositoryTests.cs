@@ -514,4 +514,268 @@ public class ResultRepositoryTests
 
         Assert.Empty(summary);
     }
+
+    // ── GetCompetitionOverviewAsync ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Многодневное событие (EventId=1, 2 Competition-дня) для тестов Summary/Days:
+    /// день 1 — 4 строки (2 личных клуба-A + 1 эстафета клуба-A + 1 личная псевдоклуба),
+    /// день 2 — 2 строки (личные, клуб-B). Итого: result_count=6, swimmer_count=4 (личные
+    /// s1,s2,s4,s5 — эстафетный s3 не в счёте), club_count=2 (clubA, clubB — псевдоклуб не в счёте).
+    /// </summary>
+    private static async Task<int> SeedOverviewFixtureAsync(SwimmReadDbContext db)
+    {
+        var style = new Style { Name = "freestyle" };
+        var clubA = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var clubB = new Club { Name = "Beta", NameEn = "Beta" };
+        var pseudoClub = new Club { Name = "Unattached", NameEn = "Unattached", IsPseudo = true };
+        var compA = new Competition
+        {
+            Name = "Meet", Country = new Country { CountryCode = "ISR", CountryName = "ISR" },
+            Date = "01/01/2024", PoolType = "50m", EventId = 1, DayNumber = 1
+        };
+        var compB = new Competition
+        {
+            Name = "Meet", Country = new Country { CountryCode = "ISR", CountryName = "ISR" },
+            Date = "02/01/2024", PoolType = "50m", EventId = 1, DayNumber = 2
+        };
+        var s1 = new Swimmer { LastName = "Aaa", FirstName = "A", LastNameEn = "Aaa", FirstNameEn = "A", BirthYear = 2000 };
+        var s2 = new Swimmer { LastName = "Bbb", FirstName = "B", LastNameEn = "Bbb", FirstNameEn = "B", BirthYear = 2000 };
+        var s3 = new Swimmer { LastName = "Ccc", FirstName = "C", LastNameEn = "Ccc", FirstNameEn = "C", BirthYear = 2000 };
+        var s4 = new Swimmer { LastName = "Ddd", FirstName = "D", LastNameEn = "Ddd", FirstNameEn = "D", BirthYear = 2000 };
+        var s5 = new Swimmer { LastName = "Eee", FirstName = "E", LastNameEn = "Eee", FirstNameEn = "E", BirthYear = 2000 };
+        var relay = new Relay { TeamName = "Alpha Relay", SwimmersName = "C Ccc" };
+        db.AddRange(style, clubA, clubB, pseudoClub, compA, compB, s1, s2, s3, s4, s5, relay);
+        await db.SaveChangesAsync();
+
+        var date1 = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var date2 = new DateTime(2024, 1, 2, 0, 0, 0, DateTimeKind.Utc);
+        ResultRecord Row(int comp, DateTime date, int club, int swimmer, int? relayId = null) => new()
+        {
+            CompetitionId = comp, SwimmerId = swimmer, ClubId = club, StyleId = style.Id,
+            RelayId = relayId, Distance = relayId is null ? "100" : "4x100", Gender = "male",
+            CompetitionDate = date, TimeOriginal = "1:00.00", AgeGroup = "Open",
+            EventStyleAge = "100 freestyle Open"
+        };
+        // День 1: 4 строки.
+        db.Results.AddRange(
+            Row(compA.Id, date1, clubA.Id, s1.Id),
+            Row(compA.Id, date1, clubA.Id, s2.Id),
+            Row(compA.Id, date1, clubA.Id, s3.Id, relay.Id),
+            Row(compA.Id, date1, pseudoClub.Id, s4.Id));
+        // День 2: 2 строки.
+        db.Results.AddRange(
+            Row(compB.Id, date2, clubB.Id, s2.Id),
+            Row(compB.Id, date2, clubB.Id, s5.Id));
+        await db.SaveChangesAsync();
+        return 1; // EventId
+    }
+
+    [Fact]
+    public async Task Overview_EmptyDb_ReturnsEmptyDto()
+    {
+        await using var db = CreateDb(nameof(Overview_EmptyDb_ReturnsEmptyDto));
+        var repo = new ResultRepository(db, NoCache());
+
+        var overview = await repo.GetCompetitionOverviewAsync(new ResultFilter { CompetitionId = 999 });
+
+        Assert.Equal(0, overview.Summary.ResultCount);
+        Assert.Equal(0, overview.Summary.DayCount);
+        Assert.Equal(0, overview.Summary.SwimmerCount);
+        Assert.Equal(0, overview.Summary.ClubCount);
+        Assert.Empty(overview.Days);
+        Assert.Null(overview.BestSwim);
+        Assert.Null(overview.TopMedalist);
+        Assert.Empty(overview.TopClubs);
+        Assert.Empty(overview.Records);
+    }
+
+    [Fact]
+    public async Task Overview_Summary_CountsSwimmersClubsDaysResults()
+    {
+        await using var db = CreateDb(nameof(Overview_Summary_CountsSwimmersClubsDaysResults));
+        var eventId = await SeedOverviewFixtureAsync(db);
+        var repo = new ResultRepository(db, NoCache());
+
+        var overview = await repo.GetCompetitionOverviewAsync(new ResultFilter { EventId = eventId });
+
+        Assert.Equal(6, overview.Summary.ResultCount);
+        Assert.Equal(2, overview.Summary.DayCount);
+        Assert.Equal(4, overview.Summary.SwimmerCount);  // s1,s2,s4,s5 — эстафетный s3 не в счёте
+        Assert.Equal(2, overview.Summary.ClubCount);      // Alpha, Beta — псевдоклуб не в счёте
+    }
+
+    [Fact]
+    public async Task Overview_Days_OrderedWithPerDayCounts()
+    {
+        await using var db = CreateDb(nameof(Overview_Days_OrderedWithPerDayCounts));
+        var eventId = await SeedOverviewFixtureAsync(db);
+        var repo = new ResultRepository(db, NoCache());
+
+        var overview = await repo.GetCompetitionOverviewAsync(new ResultFilter { EventId = eventId });
+
+        Assert.Equal(2, overview.Days.Count);
+        var day1 = overview.Days[0];
+        var day2 = overview.Days[1];
+        Assert.Equal(1, day1.DayNumber);
+        Assert.Equal(4, day1.ResultCount);
+        Assert.Equal(2, day2.DayNumber);
+        Assert.Equal(2, day2.ResultCount);
+    }
+
+    [Fact]
+    public async Task Overview_BestSwim_MaxPointsWithTieBreaks()
+    {
+        await using var db = CreateDb(nameof(Overview_BestSwim_MaxPointsWithTieBreaks));
+        var style = new Style { Name = "freestyle" };
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var comp = new Competition
+        {
+            Name = "Meet", Country = new Country { CountryCode = "ISR", CountryName = "ISR" },
+            Date = "01/01/2024", PoolType = "50m"
+        };
+        var sFast = new Swimmer { LastName = "Fast", FirstName = "F", LastNameEn = "Fast", FirstNameEn = "F", BirthYear = 2000 };
+        var sSlow = new Swimmer { LastName = "Slow", FirstName = "S", LastNameEn = "Slow", FirstNameEn = "S", BirthYear = 2000 };
+        var sFail = new Swimmer { LastName = "Fail", FirstName = "X", LastNameEn = "Fail", FirstNameEn = "X", BirthYear = 2000 };
+        db.AddRange(style, club, comp, sFast, sSlow, sFail);
+        await db.SaveChangesAsync();
+
+        var date = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        // Равные очки (800), но sFast быстрее — должен победить по тай-брейку времени.
+        db.Results.AddRange(
+            new ResultRecord
+            {
+                CompetitionId = comp.Id, SwimmerId = sSlow.Id, ClubId = club.Id, StyleId = style.Id,
+                Distance = "100", Gender = "male", CompetitionDate = date, TimeOriginal = "1:00.00",
+                TimeMillisecond = 60000, InternationalPoints = 800, AgeGroup = "Open", EventStyleAge = "100 freestyle Open"
+            },
+            new ResultRecord
+            {
+                CompetitionId = comp.Id, SwimmerId = sFast.Id, ClubId = club.Id, StyleId = style.Id,
+                Distance = "100", Gender = "male", CompetitionDate = date, TimeOriginal = "0:55.00",
+                TimeMillisecond = 55000, InternationalPoints = 800, AgeGroup = "Open", EventStyleAge = "100 freestyle Open"
+            },
+            // Больше очков, но TimeFail — игнорируется.
+            new ResultRecord
+            {
+                CompetitionId = comp.Id, SwimmerId = sFail.Id, ClubId = club.Id, StyleId = style.Id,
+                Distance = "100", Gender = "male", CompetitionDate = date, TimeOriginal = "0:50.00",
+                TimeMillisecond = 50000, InternationalPoints = 900, TimeFail = true, AgeGroup = "Open",
+                EventStyleAge = "100 freestyle Open"
+            });
+        await db.SaveChangesAsync();
+        var repo = new ResultRepository(db, NoCache());
+
+        var overview = await repo.GetCompetitionOverviewAsync(new ResultFilter { CompetitionId = comp.Id });
+
+        Assert.NotNull(overview.BestSwim);
+        Assert.Equal(sFast.Id, overview.BestSwim!.SwimmerId);
+        Assert.Equal(800, overview.BestSwim.Points);
+    }
+
+    [Fact]
+    public async Task Overview_BestSwim_NullWhenNoPoints()
+    {
+        await using var db = CreateDb(nameof(Overview_BestSwim_NullWhenNoPoints));
+        var comp = await SeedResultAsync(db);
+        var repo = new ResultRepository(db, NoCache());
+
+        var overview = await repo.GetCompetitionOverviewAsync(new ResultFilter { CompetitionId = comp.CompetitionId });
+
+        Assert.Null(overview.BestSwim);
+    }
+
+    [Fact]
+    public async Task Overview_TopMedalist_CountsAndOrdering()
+    {
+        await using var db = CreateDb(nameof(Overview_TopMedalist_CountsAndOrdering));
+        var style = new Style { Name = "freestyle" };
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var comp = new Competition
+        {
+            Name = "Meet", Country = new Country { CountryCode = "ISR", CountryName = "ISR" },
+            Date = "01/01/2024", PoolType = "50m"
+        };
+        // s1: 1 золото + 1 серебро = 2 медали. s2: 2 золота = 2 медали (тай-брейк по золоту).
+        var s1 = new Swimmer { LastName = "Aaa", FirstName = "A", LastNameEn = "Aaa", FirstNameEn = "A", BirthYear = 2000 };
+        var s2 = new Swimmer { LastName = "Bbb", FirstName = "B", LastNameEn = "Bbb", FirstNameEn = "B", BirthYear = 2000 };
+        var s3 = new Swimmer { LastName = "Ccc", FirstName = "C", LastNameEn = "Ccc", FirstNameEn = "C", BirthYear = 2000 };
+        var relay = new Relay { TeamName = "Alpha Relay", SwimmersName = "C Ccc" };
+        db.AddRange(style, club, comp, s1, s2, s3, relay);
+        await db.SaveChangesAsync();
+
+        var date = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        ResultRecord Row(int swimmer, int? pos, bool timeFail = false, int? relayId = null) => new()
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer, ClubId = club.Id, StyleId = style.Id,
+            RelayId = relayId, Distance = "100", Gender = "male", CompetitionDate = date,
+            TimeOriginal = "1:00.00", TimeFail = timeFail, Position = pos, AgeGroup = "Open",
+            EventStyleAge = "100 freestyle Open"
+        };
+        db.Results.AddRange(
+            Row(s1.Id, 1), Row(s1.Id, 2),
+            Row(s2.Id, 1), Row(s2.Id, 1),
+            // Эстафетная "медаль" — не считается.
+            Row(s3.Id, 1, relayId: relay.Id),
+            // TimeFail на 1-м месте — не считается.
+            Row(s3.Id, 1, timeFail: true));
+        await db.SaveChangesAsync();
+        var repo = new ResultRepository(db, NoCache());
+
+        var overview = await repo.GetCompetitionOverviewAsync(new ResultFilter { CompetitionId = comp.Id });
+
+        Assert.NotNull(overview.TopMedalist);
+        Assert.Equal(s2.Id, overview.TopMedalist!.SwimmerId); // равенство медалей (2=2), больше золота
+        Assert.Equal(2, overview.TopMedalist.Gold);
+        Assert.Equal(0, overview.TopMedalist.Silver);
+    }
+
+    [Fact]
+    public async Task Overview_TopClubs_SplitByGender()
+    {
+        await using var db = CreateDb(nameof(Overview_TopClubs_SplitByGender));
+        var style = new Style { Name = "freestyle" };
+        var clubM = new Club { Name = "MenClub", NameEn = "MenClub" };
+        var clubW = new Club { Name = "WomenClub", NameEn = "WomenClub" };
+        var comp = new Competition
+        {
+            Name = "Meet", Country = new Country { CountryCode = "ISR", CountryName = "ISR" },
+            Date = "01/01/2024", PoolType = "50m", IsMasters = false
+        };
+        var sm = new Swimmer { LastName = "Mmm", FirstName = "M", LastNameEn = "Mmm", FirstNameEn = "M", BirthYear = 2000 };
+        var sw = new Swimmer { LastName = "Www", FirstName = "W", LastNameEn = "Www", FirstNameEn = "W", BirthYear = 2000 };
+        db.AddRange(style, clubM, clubW, comp, sm, sw);
+        db.ClubPointsRules.Add(new ClubPointsRule
+        {
+            Version = "test", Scope = "all", EffectiveFrom = new DateOnly(2000, 1, 1), DefaultPoints = 0,
+            Entries = [new ClubPointsRuleEntry { Place = 1, Points = 30 }]
+        });
+        await db.SaveChangesAsync();
+
+        var date = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        db.Results.AddRange(
+            new ResultRecord
+            {
+                CompetitionId = comp.Id, SwimmerId = sm.Id, ClubId = clubM.Id, StyleId = style.Id,
+                // Значения как в реальной БД Results.Gender: "male"/"female" (НЕ "M"/"F")
+                Distance = "100", Gender = "male", CompetitionDate = date, TimeOriginal = "1:00.00",
+                AgeGroup = "Open", EventStyleAge = "100 freestyle Open", Position = 1
+            },
+            new ResultRecord
+            {
+                CompetitionId = comp.Id, SwimmerId = sw.Id, ClubId = clubW.Id, StyleId = style.Id,
+                Distance = "100", Gender = "female", CompetitionDate = date, TimeOriginal = "1:00.00",
+                AgeGroup = "Open", EventStyleAge = "100 freestyle Open", Position = 1
+            });
+        await db.SaveChangesAsync();
+        var repo = new ResultRepository(db, NoCache());
+
+        var overview = await repo.GetCompetitionOverviewAsync(new ResultFilter { CompetitionId = comp.Id });
+
+        Assert.Equal(2, overview.TopClubs.Count);
+        var men = Assert.Single(overview.TopClubsMen);
+        Assert.Equal("MenClub", men.Club);
+        var women = Assert.Single(overview.TopClubsWomen);
+        Assert.Equal("WomenClub", women.Club);
+    }
 }

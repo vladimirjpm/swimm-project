@@ -16,4 +16,7 @@ public interface IResultRepository
     /// <summary>Сводка по клубам под фильтром-источником (очки/медали/пловцы) — серверный аналог
     /// клиентского getClubsSummary для paged-режима. Отсортирована по очкам убыв.</summary>
     Task<IReadOnlyList<ClubSummaryDto>> GetClubSummaryAsync(ResultFilter filter);
+    /// <summary>Дэшборд соревнования для таба Overview: сводка, дни, лучший заплыв, топ-клубы
+    /// (общий + по полу), топ-медалист. Источник тот же, что у результатов (competitionId/eventId).</summary>
+    Task<CompetitionOverviewDto> GetCompetitionOverviewAsync(ResultFilter filter);
 }

@@ -207,6 +207,43 @@ public class ResultsController : ControllerBase
     }
 
     /// <summary>
+    /// Дэшборд соревнования для таба Overview (сводка, дни, лучший заплыв, топ-клубы общий и
+    /// по полу, топ-медалист). Область = тот же источник, что у результатов:
+    /// competitionId (число или 'last') / eventId.
+    /// </summary>
+    [HttpGet("/api/competition-overview")]
+    public async Task<IActionResult> GetCompetitionOverview(
+        [FromQuery] string? competitionId,
+        [FromQuery] int? eventId)
+    {
+        int? competitionIdValue = null;
+        var latest = false;
+        if (!string.IsNullOrWhiteSpace(competitionId))
+        {
+            if (string.Equals(competitionId, "last", StringComparison.OrdinalIgnoreCase))
+                latest = true;
+            else if (int.TryParse(competitionId, out var parsed))
+                competitionIdValue = parsed;
+            else
+                return BadRequest("competitionId must be a number or 'last'");
+        }
+
+        if (competitionIdValue is null && !latest && eventId is null)
+            return BadRequest("competitionId or eventId is required");
+
+        var filter = new ResultFilter
+        {
+            CompetitionId = competitionIdValue,
+            Latest = latest,
+            EventId = eventId
+        };
+
+        return await this.CachedJson(_cache,
+            $"http:competition-overview:{filter.CompetitionId}:{filter.Latest}:{filter.EventId}",
+            () => _results.GetCompetitionOverviewAsync(filter), PayloadTtl, CacheControlValue);
+    }
+
+    /// <summary>
     /// Карьерные (all-time) данные спортсмена для карточки: соревнования, заплывы,
     /// сумма очков, медали, лучшие времена по стилям. Пловец не найден → нулевой DTO.
     /// </summary>

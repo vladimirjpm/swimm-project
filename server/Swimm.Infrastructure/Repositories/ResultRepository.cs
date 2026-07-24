@@ -300,6 +300,185 @@ public class ResultRepository : IResultRepository
         return summary;
     }
 
+    public async Task<CompetitionOverviewDto> GetCompetitionOverviewAsync(ResultFilter filter)
+    {
+        var key = $"competition-overview:{FilterCacheKey(filter)}";
+        var cached = await _cache.GetAsync<CompetitionOverviewDto>(key);
+        if (cached is not null)
+            return cached;
+
+        var query = await BuildFilteredQueryAsync(filter);
+        if (query is null)
+            return new CompetitionOverviewDto();
+
+        // Дни источника: для события — по одному на Competition-день, для однодневного — один.
+        var days = await query
+            .GroupBy(r => new
+            {
+                r.CompetitionId,
+                r.Competition.Date,
+                r.Competition.DayNumber,
+                r.Competition.SubName
+            })
+            .Select(g => new OverviewDayDto
+            {
+                CompetitionId = g.Key.CompetitionId,
+                Date = g.Key.Date,
+                DayNumber = g.Key.DayNumber,
+                SubName = g.Key.SubName,
+                ResultCount = g.Count()
+            })
+            .ToListAsync();
+        days = days
+            .OrderBy(d => d.DayNumber ?? int.MaxValue)
+            .ThenBy(d => ParseDayDate(d.Date))
+            .ToList();
+
+        var resultCount = days.Sum(d => d.ResultCount);
+        // Личные пловцы; эстафетные строки не раздувают счётчик участников.
+        var swimmerCount = await query.Where(r => r.RelayId == null)
+            .Select(r => r.SwimmerId).Distinct().CountAsync();
+        var clubCount = await query.Where(r => !r.Club.IsPseudo)
+            .Select(r => r.ClubId).Distinct().CountAsync();
+
+        // Лучший заплыв — максимум FINA-очков; тай-брейк по времени, затем Id (стабильность).
+        var bestSwim = await query
+            .Where(r => !r.TimeFail && r.InternationalPoints > 0)
+            .OrderByDescending(r => r.InternationalPoints)
+            .ThenBy(r => r.TimeMillisecond)
+            .ThenBy(r => r.Id)
+            .Select(r => new OverviewBestSwimDto
+            {
+                ResultId = r.Id,
+                SwimmerId = r.SwimmerId,
+                FirstName = r.Swimmer.FirstName,
+                LastName = r.Swimmer.LastName,
+                FirstNameEn = r.Swimmer.FirstNameEn,
+                LastNameEn = r.Swimmer.LastNameEn,
+                Club = r.Club.Name,
+                StyleName = r.Style.Name,
+                Distance = r.Distance,
+                Gender = r.Gender,
+                Time = r.TimeOriginal,
+                Points = r.InternationalPoints,
+                IsRelay = r.RelayId != null,
+                RelayTeamName = r.Relay != null ? r.Relay.TeamName : null,
+                DayNumber = r.Competition.DayNumber,
+                CompetitionId = r.CompetitionId
+            })
+            .FirstOrDefaultAsync();
+
+        // Топ-медалист: личные медали (эстафеты не в счёт), TimeFail медаль не даёт.
+        var medalRows = await query
+            .Where(r => r.RelayId == null && !r.TimeFail && r.Position != null && r.Position <= 3)
+            .Select(r => new
+            {
+                r.SwimmerId,
+                r.Swimmer.FirstName,
+                r.Swimmer.LastName,
+                r.Swimmer.FirstNameEn,
+                r.Swimmer.LastNameEn,
+                Club = r.Club.Name,
+                r.Position
+            })
+            .ToListAsync();
+        var topMedalist = medalRows
+            .GroupBy(r => r.SwimmerId)
+            .Select(g => new OverviewMedalistDto
+            {
+                SwimmerId = g.Key,
+                FirstName = g.First().FirstName,
+                LastName = g.First().LastName,
+                FirstNameEn = g.First().FirstNameEn,
+                LastNameEn = g.First().LastNameEn,
+                Club = g.First().Club,
+                Gold = g.Count(r => r.Position == 1),
+                Silver = g.Count(r => r.Position == 2),
+                Bronze = g.Count(r => r.Position == 3)
+            })
+            .OrderByDescending(m => m.Gold + m.Silver + m.Bronze)
+            .ThenByDescending(m => m.Gold)
+            .ThenByDescending(m => m.Silver)
+            .ThenBy(m => m.SwimmerId)
+            .FirstOrDefault();
+
+        // Клубный зачёт — переиспользуем GetClubSummaryAsync (свой кэш внутри);
+        // по полу — тот же расчёт с Gender-фильтром. Значения в Results.Gender —
+        // "male"/"female" (плюс "none"), НЕ "M"/"F" (это формат Swimmer.Gender).
+        var topClubs = (await GetClubSummaryAsync(filter)).Take(10).ToList();
+        var topClubsMen = (await GetClubSummaryAsync(CloneWithGender(filter, "male"))).Take(3).ToList();
+        var topClubsWomen = (await GetClubSummaryAsync(CloneWithGender(filter, "female"))).Take(3).ToList();
+
+        // Новые рекорды: сравнение личных заплывов с Records (country/ISR) — серверный
+        // аналог клиентского isRecordTime. Records ~1.7К строк, кэш 10 мин; кандидаты —
+        // минимальная проекция уже отфильтрованного источника.
+        var records = await GetIsraelRecordsAsync();
+        var candidateRows = await query
+            .Where(r => r.RelayId == null && !r.TimeFail && r.TimeMillisecond != null)
+            .Select(r => new RecordCandidateRow(
+                r.Id, r.SwimmerId, r.Swimmer.FirstName, r.Swimmer.LastName, r.Club.Name,
+                r.Style.Name, r.Distance, r.Gender, r.Competition.PoolType,
+                r.Swimmer.BirthYear, r.CompetitionDate, r.TimeMillisecond!.Value,
+                r.TimeOriginal, r.Competition.DayNumber, r.Competition.IsMasters))
+            .ToListAsync();
+        var newRecords = CompetitionRecordsDetector.Detect(records, candidateRows);
+
+        var overview = new CompetitionOverviewDto
+        {
+            Summary = new OverviewSummaryDto
+            {
+                ResultCount = resultCount,
+                DayCount = days.Count,
+                SwimmerCount = swimmerCount,
+                ClubCount = clubCount
+            },
+            Days = days,
+            BestSwim = bestSwim,
+            TopClubs = topClubs,
+            TopClubsMen = topClubsMen,
+            TopClubsWomen = topClubsWomen,
+            TopMedalist = topMedalist,
+            Records = newRecords
+        };
+
+        await _cache.SetAsync(key, overview, ResultsTtl);
+        return overview;
+    }
+
+    /// <summary>Рекорды Израиля (country/ISR, все категории) для детекции — кэш 10 мин.</summary>
+    private async Task<IReadOnlyList<Domain.Entities.Record>> GetIsraelRecordsAsync()
+    {
+        const string key = "records:country:ISR:all";
+        var cached = await _cache.GetAsync<IReadOnlyList<Domain.Entities.Record>>(key);
+        if (cached is not null)
+            return cached;
+
+        var records = await _db.Records.AsNoTracking()
+            .Where(r => r.RegionType == "country" && r.RegionCode == "ISR")
+            .ToListAsync();
+        await _cache.SetAsync<IReadOnlyList<Domain.Entities.Record>>(key, records, StaticHintsTtl);
+        return records;
+    }
+
+    /// <summary>Копия фильтра-источника с Gender — для клубного зачёта по полу.
+    /// Копируются только поля источника (как в /api/club-summary).</summary>
+    private static ResultFilter CloneWithGender(ResultFilter f, string gender) => new()
+    {
+        CompetitionId = f.CompetitionId,
+        Latest = f.Latest,
+        EventId = f.EventId,
+        Country = f.Country,
+        PoolType = f.PoolType,
+        DateFrom = f.DateFrom,
+        DateTo = f.DateTo,
+        Gender = gender
+    };
+
+    /// <summary>Дата дня dd/MM/yyyy → DateTime для сортировки; непарсимая → MaxValue (в конец).</summary>
+    private static DateTime ParseDayDate(string date)
+        => DateTime.TryParseExact(date, "dd/MM/yyyy", CultureInfo.InvariantCulture,
+               DateTimeStyles.None, out var d) ? d : DateTime.MaxValue;
+
     private static string? FirstNonEmpty(params string?[] values)
     {
         foreach (var v in values)
