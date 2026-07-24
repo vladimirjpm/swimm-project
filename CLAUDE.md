@@ -11,6 +11,10 @@ Keep this file the single source of agent guidance; other agents are pointed her
   стратегия кэша, бэклог рефакторинга. Сверяйся перед структурными изменениями.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — план работ по фазам (parsing-lib, рекорды в БД,
   масштаб/кэш, логин, галереи, isr.org.il, админка). Отмечай выполненные этапы.
+- [`docs/relays.md`](docs/relays.md) — **эстафеты**: модель `RelayMembers`, импорт/парсинг,
+  журнал фиксов, чек-лист отладки. Читай ПЕРВЫМ при любом баге эстафет.
+- [`docs/media-page.md`](docs/media-page.md) — **подсистема медиа / My media**: модель
+  `Sys_UserMedia`, API, потоки Add link, публикации, footguns. Читай при багах медиа.
 
 This file covers only what those don't: how to build, run, migrate, and test **in practice here**,
 plus repo-specific footguns.
