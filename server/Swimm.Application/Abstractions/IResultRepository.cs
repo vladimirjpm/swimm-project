@@ -13,6 +13,8 @@ public interface IResultRepository
     Task<IReadOnlyList<CompetitionSourceDto>> GetSourcesAsync(string? country = null);
     /// <summary>Карьерные (all-time) данные спортсмена по полному имени; null — пловец не найден.</summary>
     Task<AthleteCareerDto?> GetAthleteCareerAsync(string name);
+    /// <summary>Профиль спортсмена по id (для страницы пловца); null — не найден.</summary>
+    Task<SwimmerProfileDto?> GetSwimmerProfileAsync(int id);
     /// <summary>Сводка по клубам под фильтром-источником (очки/медали/пловцы) — серверный аналог
     /// клиентского getClubsSummary для paged-режима. Отсортирована по очкам убыв.</summary>
     Task<IReadOnlyList<ClubSummaryDto>> GetClubSummaryAsync(ResultFilter filter);

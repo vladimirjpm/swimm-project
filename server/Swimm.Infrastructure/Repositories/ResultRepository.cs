@@ -890,4 +890,55 @@ public class ResultRepository : IResultRepository
         await _cache.SetAsync(key, dto, TimeSpan.FromMinutes(5));
         return dto;
     }
+
+    public async Task<SwimmerProfileDto?> GetSwimmerProfileAsync(int id)
+    {
+        if (id <= 0) return null;
+
+        var key = $"swimmer-profile:{id}";
+        var cached = await _cache.GetAsync<SwimmerProfileDto>(key);
+        if (cached is not null) return cached;
+
+        var s = await _db.Swimmers.AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => new
+            {
+                x.Id,
+                x.FirstName, x.LastName,
+                x.FirstNameEn, x.LastNameEn,
+                x.BirthYear, x.Gender, x.Origin, x.AvatarUrl,
+                x.ClubId,
+                ClubName = x.Club != null ? x.Club.Name : null,
+                CountryCode = x.Country != null ? x.Country.CountryCode : null,
+                CountryName = x.Country != null ? x.Country.CountryName : null,
+            })
+            .FirstOrDefaultAsync();
+        if (s is null) return null;
+
+        // FullName для карьерного запроса и заголовка: приоритет RU, иначе EN.
+        var ru = $"{s.FirstName} {s.LastName}".Trim();
+        var en = $"{s.FirstNameEn} {s.LastNameEn}".Trim();
+        var fullName = ru.Length > 0 ? ru : en;
+
+        var dto = new SwimmerProfileDto
+        {
+            Id = s.Id,
+            FullName = fullName,
+            FirstName = s.FirstName,
+            LastName = s.LastName,
+            FirstNameEn = s.FirstNameEn,
+            LastNameEn = s.LastNameEn,
+            BirthYear = s.BirthYear,
+            Gender = s.Gender,
+            ClubId = s.ClubId,
+            ClubName = s.ClubName,
+            CountryCode = s.CountryCode,
+            CountryName = s.CountryName,
+            AvatarUrl = s.AvatarUrl,
+            Origin = s.Origin,
+        };
+
+        await _cache.SetAsync(key, dto, TimeSpan.FromMinutes(5));
+        return dto;
+    }
 }

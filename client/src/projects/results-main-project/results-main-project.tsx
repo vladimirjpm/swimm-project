@@ -258,6 +258,13 @@ function ResultsMain() {
   const { overview: compOverview, loading: compOverviewLoading } =
     useCompetitionOverview(!groupSlug && !isTraining ? compSourceParams : undefined);
 
+  // Ленивый Swims (design_handoff_competition_overview): в режиме соревнования тяжёлый
+  // фетч /api/results откладываем, пока не пришёл Overview (prefetch в фоне) или пока
+  // юзер не открыл таб Swims (таблица результатов и так рендерится только на нём). Вне
+  // режима соревнования (тренировки/группа/нет источника) — грузим сразу, как раньше.
+  const inCompetitionMode = !groupSlug && !!compSourceParams;
+  const canLoadResults = !inCompetitionMode || compTab === 'swims' || compOverview != null;
+
   // Таб Media: items уже включают competition-level медиа; счётчик таба = items.length.
   // Хук зовётся и здесь, и внутри results-table (per-viewer, без общего кэша — это ок).
   const compMediaSourceParams = !groupSlug && !isTraining ? compSourceParams : undefined;
@@ -424,6 +431,7 @@ function ResultsMain() {
               «Change ▾» внутри hero), оставляя себе только панель выбора.
               В остальных режимах (тренировки, нет источника) — встроенная шапка DDL. */}
           <DataSourceDDL
+            canLoadResults={canLoadResults}
             renderHeader={
               hasSource && !isTraining && compSourceParams
                 ? (togglePanel, panelOpen, source) => (

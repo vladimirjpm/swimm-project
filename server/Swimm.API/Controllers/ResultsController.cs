@@ -256,4 +256,16 @@ public class ResultsController : ControllerBase
             async () => await _results.GetAthleteCareerAsync(name) ?? new AthleteCareerDto(),
             PayloadTtl, CacheControlValue);
     }
+
+    /// <summary>
+    /// Профиль спортсмена по id для самостоятельной страницы пловца
+    /// (swimmer.html?swimmer=&lt;id&gt;). 404 — пловец не найден.
+    /// </summary>
+    [HttpGet("/api/swimmers/{id:int}")]
+    public async Task<IActionResult> GetSwimmerProfile(int id)
+    {
+        var dto = await _results.GetSwimmerProfileAsync(id);
+        if (dto is null) return NotFound();
+        return Ok(dto);
+    }
 }

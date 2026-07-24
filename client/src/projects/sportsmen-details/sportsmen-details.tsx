@@ -203,6 +203,16 @@ function SportsmenDetails() {
                 <UI_RecordCount swimmerName={filters.selected_name} />
                 <span>{firstResult.event_style_age} year ({firstResult.birth_year})</span>
               </div>
+              {/* Диплинк на самостоятельную страницу пловца (swimmer.html?swimmer=<id>). */}
+              {swimmerId != null && (
+                <a
+                  href={`./swimmer.html?swimmer=${swimmerId}`}
+                  className='text-[11px] font-bold hover:underline'
+                  style={{ color: 'var(--theme-primary)' }}
+                >
+                  Open full profile →
+                </a>
+              )}
               <div
                 dir='rtl'
                 className='flex items-center gap-2 rounded-full py-1 pl-3.5 pr-[5px] max-w-full'

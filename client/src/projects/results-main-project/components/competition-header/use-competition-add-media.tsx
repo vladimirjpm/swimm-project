@@ -1,12 +1,16 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import AddLinkModal, { AddLinkSwimmerOption } from '../../../my-media-project/components/add-link-modal';
 import { addUserMedia, AllUserMediaDto } from '../../../my-media-project/use-all-my-media';
+import type { FavoriteDto } from '../../../../hooks/useFavorites';
 import type { CompetitionOverview } from './types';
 
 // Оркестрация «Add media» для шапки соревнования (hero-кнопка + пустое состояние
 // таба Media) — общий флоу, чтобы обе точки входа открывали один и тот же попап.
-// Пловцы для пикера грузятся ЛЕНИВО (только по клику), из useAllMyMedia/GET /api/me/media
-// (media-page.md §5) — фаворитов здесь намеренно нет (см. отчёт о выполнении).
+// Пловцы для пикера грузятся ЛЕНИВО (только по клику) из ДВУХ источников и мёржатся
+// по swimmer_id: GET /api/me/media (media-page.md §5) + GET /api/me/favorites. Без
+// фаворитов юзер без единого медиа получал пустой список → Save становился no-op
+// (handoff-competition-header.md §3). Медиа приоритетнее (hint 'has media'), фавориты
+// добивают остальных (hint 'favorite').
 
 function isNumStr(v?: string): v is string {
   return !!v && /^\d+$/.test(v);
@@ -37,13 +41,28 @@ export function useCompetitionAddMedia({ sourceParams, overview, title, refresh 
     if (!canAdd || loadingSwimmers) return;
     setLoadingSwimmers(true);
     try {
-      const r = await fetch('/api/me/media', { credentials: 'include' });
-      const list: AllUserMediaDto[] = r.ok ? await r.json() : [];
+      const [mediaRes, favRes] = await Promise.all([
+        fetch('/api/me/media', { credentials: 'include' }),
+        fetch('/api/me/favorites', { credentials: 'include' }),
+      ]);
+      const mediaList: AllUserMediaDto[] = mediaRes.ok ? await mediaRes.json() : [];
+      const favList: FavoriteDto[] = favRes.ok ? await favRes.json() : [];
+
       const byId = new Map<number, AddLinkSwimmerOption>();
-      for (const m of list) {
+      // Медиа приоритетнее — заносим первыми, чтобы hint 'has media' не перебивался.
+      for (const m of mediaList) {
         if (!byId.has(m.swimmer_id)) {
           byId.set(m.swimmer_id, { id: m.swimmer_id, name: m.swimmer_name, hint: 'has media' });
         }
+      }
+      // Фавориты-пловцы добивают список (у кого ещё нет медиа).
+      for (const f of favList) {
+        if (f.target_type !== 'swimmer' || f.swimmer_id == null || byId.has(f.swimmer_id)) continue;
+        byId.set(f.swimmer_id, {
+          id: f.swimmer_id,
+          name: f.swimmer_name ?? `#${f.swimmer_id}`,
+          hint: 'favorite',
+        });
       }
       setSwimmers(Array.from(byId.values()));
     } finally {

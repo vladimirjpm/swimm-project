@@ -35,7 +35,7 @@ const FilterRecalculate: React.FC = () => {
         className={`fseg flex items-center gap-2 self-start ${
           isActive ? 'fseg-active' : ''
         }`}
-        title="Пересчитать позиции по лучшему результату за все дни"
+        title="Recalculate positions by best result across all days"
       >
         <span>🔄</span>
         <span>Combine All Results</span>

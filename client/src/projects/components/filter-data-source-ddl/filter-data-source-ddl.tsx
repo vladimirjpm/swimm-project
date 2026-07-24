@@ -127,9 +127,18 @@ interface DataSourceDDLProps {
     panelOpen: boolean,
     source: CompetitionSource,
   ) => React.ReactNode;
+  /**
+   * Ленивая загрузка Swims (design_handoff_competition_overview): в режиме соревнования
+   * дефолтный таб — Overview, а тяжёлый фетч результатов (`/api/results`, до N страниц)
+   * откладывается, пока не пришёл Overview или пока юзер не открыл таб Swims. Когда false,
+   * при выборе источника мы только «праймим» шапку (title/sourceParams/флаги из
+   * CompetitionSource), но не тянем результаты; фетч случится, когда флаг станет true.
+   * Undefined/true → прежнее поведение (грузим сразу). См. pendingSourceRef ниже.
+   */
+  canLoadResults?: boolean;
 }
 
-const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader }) => {
+const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResults = true }) => {
   const dispatch = useAppDispatch();
   const filters = useAppSelector((s) => s.filterSelected);
   // Выбранная строка — из store (title = имя источника): синхронизирует инстансы.
@@ -273,6 +282,34 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader }) => {
   const pagedFetchKey = (sourceParams: Record<string, string>, filterParams: Record<string, string>) =>
     JSON.stringify({ sourceParams, filterParams });
 
+  // Источник, у которого «зашита» шапка, но результаты ещё не загружены (ленивый Swims).
+  // Заполняется, когда canLoadResults=false на момент выбора; эффект ниже дотягивает
+  // результаты, как только флаг откроется (пришёл Overview / открыт таб Swims).
+  const pendingSourceRef = React.useRef<CompetitionSource | null>(null);
+
+  // «Прайм» шапки без результатов: title/sourceParams/флаги берём из CompetitionSource
+  // (/api/competitions), чтобы шапка соревнования и ✓ в списке появились сразу, а тяжёлый
+  // фетч /api/results отложился. is_masters известен из category; is_award/show_combine
+  // уточнятся, когда придут результаты (в loadSource). НЕ трогаем lastPagedFetchKeyRef,
+  // чтобы paged-эффект синхронизации, разблокировавшись, честно дотянул страницу 1.
+  const primeSource = (src: CompetitionSource) => {
+    const [k, v] = sourceUrlParam(src);
+    const sourceParams = { [k]: v };
+    lastPagedFetchKeyRef.current = null;
+    dispatch(
+      rootActions.updateState({
+        dataSourceSelected: {
+          results: [],
+          title: src.name,
+          is_masters: src.category === 'masters',
+          is_award: false,
+          sourceParams,
+          day_dates: src.day_dates,
+        },
+      }),
+    );
+  };
+
   // Загрузка результатов выбранного соревнования в store.
   // Флаги датасета (is_masters/is_award/show_combine) берём из самих результатов —
   // ResultDto несёт их денормализованно per-competition. category соревнования из /api/competitions
@@ -337,6 +374,7 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader }) => {
   const filtersKey = JSON.stringify(filters);
   React.useEffect(() => {
     if (mode !== 'paged') return;
+    if (!canLoadResults) return; // ленивый Swims: не тянем страницу, пока гейт закрыт
     const sourceParams = dataSourceSelected?.sourceParams;
     if (!sourceParams) return;
 
@@ -359,12 +397,31 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader }) => {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, dataSourceSelected?.sourceParams, filtersKey]);
+  }, [mode, canLoadResults, dataSourceSelected?.sourceParams, filtersKey]);
 
+  // Ленивый Swims (full-режим): дотягиваем отложенный источник, когда гейт открылся.
+  // В paged-режиме отложенный фетч делает эффект синхронизации выше (по sourceParams),
+  // поэтому здесь только full — иначе был бы двойной запрос.
+  React.useEffect(() => {
+    if (!canLoadResults || mode === 'paged') return;
+    const src = pendingSourceRef.current;
+    if (!src) return;
+    pendingSourceRef.current = null;
+    void loadSource(src);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canLoadResults, mode]);
+
+  // Выбор источника: если результаты грузить рано (Overview ещё не пришёл, таб не Swims) —
+  // «праймим» шапку и откладываем; иначе тянем сразу (прежнее поведение).
   const selectSource = (src: CompetitionSource) => {
     writeUrl({ source: src, season: seasonTouched ? season : null });
     setPanelOpen(false);
-    void loadSource(src);
+    if (canLoadResults) {
+      void loadSource(src);
+    } else {
+      pendingSourceRef.current = src;
+      primeSource(src);
+    }
   };
 
   // Инициализация из URL: ?category= (легаси ?cat=) активирует таб;
@@ -400,7 +457,14 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader }) => {
       setCat(target.category ?? 'all');
       if (!urlLoadTriggered) {
         urlLoadTriggered = true;
-        void loadSource(target);
+        // Ленивый Swims: на старте дефолт — таб Overview, поэтому обычно праймим шапку
+        // и откладываем результаты (эффект дотягивания сработает по гейту).
+        if (canLoadResults) {
+          void loadSource(target);
+        } else {
+          pendingSourceRef.current = target;
+          primeSource(target);
+        }
       }
       return;
     }
