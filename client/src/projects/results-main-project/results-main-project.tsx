@@ -270,25 +270,40 @@ function ResultsMain() {
     refresh: refreshCompMedia,
   });
 
+  // Скоуп my|favorites сужает до пары пловцов — остальные фильтры обнуляем,
+  // иначе дефолтный стиль (freestyle/50) легко оставляет пустую таблицу.
+  const scopedFilterReset = useCallback((base: typeof filters, scope: 'my' | 'favorites') => ({
+    ...base,
+    swimmer_scope: scope,
+    style_name: '',
+    style_len: 0,
+    gender: 'all',
+    age: 'all',
+    club: 'all',
+    selected_name: 'all',
+    position_filter: 'all' as const,
+    event_date: 'all',
+  }), []);
+
   // ?filter=my|favorites (НАВ-контракт): предустановка скоупа Swims из URL — один раз на маунт.
   useEffect(() => {
     if (groupSlug) return;
     const f = new URLSearchParams(window.location.search).get('filter');
     if (f === 'my' || f === 'favorites') {
-      dispatch(rootActions.updateState({ filterSelected: { ...filters, swimmer_scope: f } }));
+      dispatch(rootActions.updateState({ filterSelected: scopedFilterReset(filters, f) }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Персональная полоса → Swims со скоупом my|favorites (+ URL tab/filter).
   const handleOpenSwimsScoped = useCallback((scope: 'my' | 'favorites') => {
-    dispatch(rootActions.updateState({ filterSelected: { ...filters, swimmer_scope: scope } }));
+    dispatch(rootActions.updateState({ filterSelected: scopedFilterReset(filters, scope) }));
     setCompTab('swims');
     const url = new URL(window.location.href);
     url.searchParams.set('tab', 'swims');
     url.searchParams.set('filter', scope);
     window.history.replaceState(null, '', url.toString());
-  }, [dispatch, filters]);
+  }, [dispatch, filters, scopedFilterReset]);
 
   // Диплинк на заплыв из Overview/Records: Swims + пресет фильтров под дисциплину
   // (иначе строку срежут дефолты style/position) + ?swim= для скролла/подсветки.
