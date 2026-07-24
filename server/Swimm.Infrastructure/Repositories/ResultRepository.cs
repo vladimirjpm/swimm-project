@@ -402,6 +402,68 @@ public class ResultRepository : IResultRepository
             .ThenBy(m => m.SwimmerId)
             .FirstOrDefault();
 
+        // High Point Award: лучший по СУММЕ очков в каждом (возраст × пол), раздельно ♂/♀
+        // (design_handoff §High Point Award). Возраст = год соревнования − год рождения
+        // (израильская возрастная конвенция). Ничья по сумме → несколько наград (is_tie).
+        var hpRows = await query
+            .Where(r => r.RelayId == null && !r.TimeFail && r.InternationalPoints > 0
+                        && (r.Gender == "male" || r.Gender == "female")
+                        && r.Swimmer.BirthYear > 0)
+            .Select(r => new
+            {
+                r.SwimmerId,
+                r.Swimmer.FirstName,
+                r.Swimmer.LastName,
+                r.Swimmer.FirstNameEn,
+                r.Swimmer.LastNameEn,
+                Club = r.Club.Name,
+                r.Gender,
+                r.Swimmer.BirthYear,
+                Year = r.CompetitionDate.Year,
+                r.InternationalPoints
+            })
+            .ToListAsync();
+
+        // Сумма очков на (возраст, пол, пловец), затем max на (возраст, пол); ничья → все.
+        var highPointAwards = hpRows
+            .GroupBy(r => new { Age = r.Year - r.BirthYear, r.Gender, r.SwimmerId })
+            .Select(g => new
+            {
+                g.Key.Age,
+                g.Key.Gender,
+                g.Key.SwimmerId,
+                g.First().FirstName,
+                g.First().LastName,
+                g.First().FirstNameEn,
+                g.First().LastNameEn,
+                g.First().Club,
+                Points = g.Sum(r => r.InternationalPoints)
+            })
+            .Where(x => x.Age > 0)
+            .GroupBy(x => new { x.Age, x.Gender })
+            .SelectMany(g =>
+            {
+                var max = g.Max(x => x.Points);
+                var winners = g.Where(x => x.Points == max).ToList();
+                var tie = winners.Count > 1;
+                return winners.Select(w => new OverviewHighPointDto
+                {
+                    Age = g.Key.Age,
+                    Gender = g.Key.Gender,
+                    SwimmerId = w.SwimmerId,
+                    FirstName = w.FirstName,
+                    LastName = w.LastName,
+                    FirstNameEn = w.FirstNameEn,
+                    LastNameEn = w.LastNameEn,
+                    Club = w.Club,
+                    Points = w.Points,
+                    IsTie = tie
+                });
+            })
+            .OrderBy(a => a.Age)
+            .ThenBy(a => a.LastName)
+            .ToList();
+
         // Клубный зачёт — переиспользуем GetClubSummaryAsync (свой кэш внутри);
         // по полу — тот же расчёт с Gender-фильтром. Значения в Results.Gender —
         // "male"/"female" (плюс "none"), НЕ "M"/"F" (это формат Swimmer.Gender).
@@ -438,6 +500,7 @@ public class ResultRepository : IResultRepository
             TopClubsMen = topClubsMen,
             TopClubsWomen = topClubsWomen,
             TopMedalist = topMedalist,
+            HighPointAwards = highPointAwards,
             Records = newRecords
         };
 

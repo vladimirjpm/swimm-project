@@ -49,6 +49,9 @@ CompetitionHeader (rounded 14px, overflow hidden, box-shadow: var(--theme-mode-c
 - Заплыв/эстафета → `results_main.html?competitionId=X&tab=swims&…` с параметрами, открывающими нужный заплыв + предустановка фильтров (дистанция/стиль/heat) + скролл/подсветка строки.
 - **Новый параметр `filter`** (единый, расширяемый): `filter=my` (мои заплывы), `filter=favorites` (заплывы избранных). Swims читает его из URL и предустанавливает фильтр.
 
+## High Point Award
+Карточка в левой колонке (после New records): лучший по очкам в каждом возрасте возрастной группы, раздельно ♂/♀ (две колонки, кружки пола как в Top clubs Men/Women). Пример: группа 11–14 → 4+4 награды; при равенстве очков — несколько на возраст (бейдж «tie» accent-цветом персональных токенов). Строка: возраст-чип (bg color-mix(primary 12%), text primary) · имя → пловец · клуб → клуб · очки зелёным справа. Рендерится только если возрастная группа определена. Данные — из GET /api/competitions/{id}/overview.
+
 ## Interactions & Behavior
 - Табы — локальный toggle (паттерн GroupTabs), `?tab=` в URL, шапка не перезагружается.
 - Overview — дефолтный таб; результаты Swims грузятся в фоне ПОСЛЕ Overview (lazy).

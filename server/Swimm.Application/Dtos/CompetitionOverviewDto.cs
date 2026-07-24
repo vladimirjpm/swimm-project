@@ -22,6 +22,10 @@ public sealed class CompetitionOverviewDto
     [JsonPropertyName("top_clubs_women")] public IReadOnlyList<ClubSummaryDto> TopClubsWomen { get; init; } = [];
     /// <summary>Пловец с наибольшим числом медалей (личные заплывы, без эстафет).</summary>
     [JsonPropertyName("top_medalist")] public OverviewMedalistDto? TopMedalist { get; init; }
+    /// <summary>High Point Award: лучший по СУММЕ очков в каждом возрасте, раздельно ♂/♀
+    /// (design_handoff §High Point Award). Ничья по очкам → несколько на возраст (is_tie).
+    /// Пусто, если возраст не вычислим (нет года рождения).</summary>
+    [JsonPropertyName("high_point_awards")] public IReadOnlyList<OverviewHighPointDto> HighPointAwards { get; init; } = [];
     /// <summary>Новые рекорды, установленные на соревновании. v1: всегда пусто — серверного
     /// сравнения результата с Record ещё нет (у Record нет FK на Competition); контракт
     /// зарезервирован, таб Records скрывается при пустом списке.</summary>
@@ -77,6 +81,25 @@ public sealed class OverviewMedalistDto
     [JsonPropertyName("gold")] public int Gold { get; init; }
     [JsonPropertyName("silver")] public int Silver { get; init; }
     [JsonPropertyName("bronze")] public int Bronze { get; init; }
+}
+
+/// <summary>Одна награда High Point Award: лучший по сумме очков в (возраст × пол).</summary>
+public sealed class OverviewHighPointDto
+{
+    /// <summary>Возраст спортсмена (год соревнования − год рождения).</summary>
+    [JsonPropertyName("age")] public int Age { get; init; }
+    /// <summary>"male" | "female".</summary>
+    [JsonPropertyName("gender")] public string Gender { get; init; } = "";
+    [JsonPropertyName("swimmer_id")] public int SwimmerId { get; init; }
+    [JsonPropertyName("first_name")] public string FirstName { get; init; } = "";
+    [JsonPropertyName("last_name")] public string LastName { get; init; } = "";
+    [JsonPropertyName("first_name_en")] public string FirstNameEn { get; init; } = "";
+    [JsonPropertyName("last_name_en")] public string LastNameEn { get; init; } = "";
+    [JsonPropertyName("club")] public string Club { get; init; } = "";
+    /// <summary>Сумма international points по личным заплывам на соревновании.</summary>
+    [JsonPropertyName("points")] public int Points { get; init; }
+    /// <summary>true — ничья по очкам в этом (возраст × пол): наград несколько.</summary>
+    [JsonPropertyName("is_tie")] public bool IsTie { get; init; }
 }
 
 /// <summary>Зарезервированный контракт карточки рекорда (v1 не заполняется).</summary>

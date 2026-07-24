@@ -61,6 +61,21 @@ export interface OverviewMedalist {
   bronze: number;
 }
 
+/** Одна награда High Point Award (лучший по сумме очков в возраст × пол). */
+export interface OverviewHighPoint {
+  age: number;
+  /** "male" | "female" */
+  gender: string;
+  swimmer_id: number;
+  first_name: string;
+  last_name: string;
+  first_name_en: string;
+  last_name_en: string;
+  club: string;
+  points: number;
+  is_tie: boolean;
+}
+
 /** Зарезервированный контракт карточки рекорда (v1 сервер отдаёт пусто). */
 export interface OverviewRecord {
   kind: string;
@@ -82,6 +97,7 @@ export interface CompetitionOverview {
   top_clubs_men: OverviewClub[];
   top_clubs_women: OverviewClub[];
   top_medalist: OverviewMedalist | null;
+  high_point_awards: OverviewHighPoint[];
   records: OverviewRecord[];
 }
 

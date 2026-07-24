@@ -1,5 +1,5 @@
 import React from 'react';
-import type { CompetitionOverview, OverviewClub } from './types';
+import type { CompetitionOverview, OverviewClub, OverviewHighPoint } from './types';
 
 // Контент таба Overview, v1-каркас (grid 12: слева span-8, справа span-4; <lg — одна
 // колонка). Композиция — по design_handoff_competition_overview/README (вариант 1b);
@@ -45,6 +45,78 @@ function ClubsTable({ clubs, onOpenClub }: { clubs: OverviewClub[]; onOpenClub?:
         ))}
       </tbody>
     </table>
+  );
+}
+
+// High Point Award: лучший по сумме очков в каждом возрасте, раздельно ♂/♀
+// (design_handoff §High Point Award). Возраст-чип · имя (→ страница пловца) · клуб
+// (→ таб Clubs) · очки; при ничье — бейдж «tie».
+function HighPointColumn({
+  awards, gender, onOpenClub,
+}: { awards: OverviewHighPoint[]; gender: 'male' | 'female'; onOpenClub?: (club: string) => void }) {
+  const isMale = gender === 'male';
+  const circle: React.CSSProperties = isMale
+    ? { background: 'rgba(29,78,216,.12)', color: '#1d4ed8' }
+    : { background: 'rgba(190,24,93,.12)', color: '#be185d' };
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center gap-1.5 pb-1">
+        <span className="flex h-5 w-5 items-center justify-center rounded-full text-[12px] font-extrabold" style={circle}>
+          {isMale ? '♂' : '♀'}
+        </span>
+        <span className="text-[11px] font-extrabold uppercase tracking-[0.05em]" style={{ color: 'var(--theme-mode-text-muted)' }}>
+          {isMale ? 'Men' : 'Women'}
+        </span>
+      </div>
+      {awards.map((a, i) => (
+        <div
+          key={`${a.age}-${a.swimmer_id}-${i}`}
+          className="flex items-center gap-2.5 border-t py-1.5 text-[12.5px] font-bold first:border-t-0"
+          style={{ borderColor: 'var(--theme-mode-border)' }}
+        >
+          <span
+            className="w-[26px] shrink-0 rounded-[6px] py-0.5 text-center text-[11px] font-extrabold"
+            style={{ background: 'color-mix(in srgb, var(--theme-primary) 12%, transparent)', color: 'var(--theme-primary)' }}
+          >
+            {a.age}
+          </span>
+          <a href={`./swimmer.html?swimmer=${a.swimmer_id}`} className="min-w-0 truncate hover:underline" dir="auto" style={{ color: 'var(--theme-mode-text)' }}>
+            {a.first_name} {a.last_name}
+            {a.is_tie && <span className="ml-1 text-[10px] font-extrabold" style={{ color: 'var(--theme-personal-accent)' }}>tie</span>}
+          </a>
+          <span className="min-w-0 flex-1 truncate font-semibold" dir="auto" style={{ color: 'var(--theme-mode-text-secondary)' }}>
+            {onOpenClub ? (
+              <button type="button" onClick={() => onOpenClub(a.club)} className="cursor-pointer bg-transparent p-0 font-semibold hover:underline" style={{ color: 'inherit' }}>
+                {a.club}
+              </button>
+            ) : a.club}
+          </span>
+          <span className="shrink-0 font-extrabold" style={{ color: 'var(--theme-primary)' }}>{a.points}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function HighPointAward({ awards, onOpenClub }: { awards: OverviewHighPoint[]; onOpenClub?: (club: string) => void }) {
+  if (awards.length === 0) return null;
+  const men = awards.filter((a) => a.gender === 'male');
+  const women = awards.filter((a) => a.gender === 'female');
+  const ages = awards.map((a) => a.age);
+  const range = ages.length ? `ages ${Math.min(...ages)}–${Math.max(...ages)}` : '';
+  return (
+    <div className="rounded-[12px] p-4" style={cardStyle}>
+      <div className="mb-2 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+        <span className="text-[14px] font-extrabold">🏆 High Point Award</span>
+        <span className="text-[12px] font-semibold" style={{ color: 'var(--theme-mode-text-muted)' }}>
+          best by points per age · {range} · ties keep all
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-x-3.5 gap-y-2 sm:grid-cols-2">
+        {men.length > 0 && <HighPointColumn awards={men} gender="male" onOpenClub={onOpenClub} />}
+        {women.length > 0 && <HighPointColumn awards={women} gender="female" onOpenClub={onOpenClub} />}
+      </div>
+    </div>
   );
 }
 
@@ -152,6 +224,9 @@ export default function CompetitionOverviewContent({ overview, loading, onOpenTa
             ))}
           </div>
         )}
+
+        {/* High Point Award (после New records, левая колонка). */}
+        <HighPointAward awards={overview.high_point_awards} onOpenClub={onOpenClub} />
       </div>
 
       {/* Правая колонка */}

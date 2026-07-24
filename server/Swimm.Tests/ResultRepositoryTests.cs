@@ -821,4 +821,70 @@ public class ResultRepositoryTests
         var women = Assert.Single(overview.TopClubsWomen);
         Assert.Equal("WomenClub", women.Club);
     }
+
+    [Fact]
+    public async Task Overview_HighPointAward_SumsPointsPerAgeGenderWithTiesAndExclusions()
+    {
+        await using var db = CreateDb(nameof(Overview_HighPointAward_SumsPointsPerAgeGenderWithTiesAndExclusions));
+        var style = new Style { Name = "freestyle" };
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var comp = new Competition
+        {
+            Name = "Meet", Country = new Country { CountryCode = "ISR", CountryName = "ISR" },
+            Date = "01/01/2024", PoolType = "50m" // год 2024 → возраст = 2024 − BirthYear
+        };
+        // age 12 male: A (200+100=300) > B (250) → A выигрывает, без ничьи
+        var m12a = new Swimmer { LastName = "M12A", FirstName = "A", LastNameEn = "M12A", FirstNameEn = "A", BirthYear = 2012 };
+        var m12b = new Swimmer { LastName = "M12B", FirstName = "B", LastNameEn = "M12B", FirstNameEn = "B", BirthYear = 2012 };
+        // age 13 female: две по 400 → ничья (обе, is_tie=true)
+        var f13a = new Swimmer { LastName = "F13A", FirstName = "C", LastNameEn = "F13A", FirstNameEn = "C", BirthYear = 2011 };
+        var f13b = new Swimmer { LastName = "F13B", FirstName = "D", LastNameEn = "F13B", FirstNameEn = "D", BirthYear = 2011 };
+        // исключения: без года рождения; пол "none"
+        var noYear = new Swimmer { LastName = "NoYear", FirstName = "N", LastNameEn = "NoYear", FirstNameEn = "N", BirthYear = 0 };
+        var relaySw = new Swimmer { LastName = "Relay", FirstName = "R", LastNameEn = "Relay", FirstNameEn = "R", BirthYear = 2012 };
+        var relay = new Relay { TeamName = "Alpha Relay", SwimmersName = "R Relay" };
+        db.AddRange(style, club, comp, m12a, m12b, f13a, f13b, noYear, relaySw, relay);
+        await db.SaveChangesAsync();
+
+        var date = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        ResultRecord Row(int swimmer, string gender, int pts, int? relayId = null) => new()
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer, ClubId = club.Id, StyleId = style.Id,
+            RelayId = relayId, Distance = relayId is null ? "100" : "4x100", Gender = gender,
+            CompetitionDate = date, TimeOriginal = "1:00.00", AgeGroup = "Open",
+            EventStyleAge = "100 freestyle Open", InternationalPoints = pts
+        };
+        db.Results.AddRange(
+            Row(m12a.Id, "male", 200), Row(m12a.Id, "male", 100), // сумма 300
+            Row(m12b.Id, "male", 250),
+            Row(f13a.Id, "female", 400),
+            Row(f13b.Id, "female", 400),
+            Row(noYear.Id, "male", 999),          // без года рождения — исключён
+            Row(relaySw.Id, "male", 999, relay.Id)); // эстафета — исключена
+        await db.SaveChangesAsync();
+        var repo = new ResultRepository(db, NoCache());
+
+        var overview = await repo.GetCompetitionOverviewAsync(new ResultFilter { CompetitionId = comp.Id });
+        var awards = overview.HighPointAwards;
+
+        // Ожидаем 3 награды: age12 male (A), age13 female (два — ничья). noYear и эстафета исключены.
+        Assert.Equal(3, awards.Count);
+
+        var m12 = Assert.Single(awards, a => a.Age == 12 && a.Gender == "male");
+        Assert.Equal(m12a.Id, m12.SwimmerId);
+        Assert.Equal(300, m12.Points);
+        Assert.False(m12.IsTie);
+
+        var f13 = awards.Where(a => a.Age == 13 && a.Gender == "female").ToList();
+        Assert.Equal(2, f13.Count);
+        Assert.All(f13, a => Assert.Equal(400, a.Points));
+        Assert.All(f13, a => Assert.True(a.IsTie));
+        Assert.Contains(f13, a => a.SwimmerId == f13a.Id);
+        Assert.Contains(f13, a => a.SwimmerId == f13b.Id);
+
+        // m12b (250) не выиграл; noYear и relay не в наградах.
+        Assert.DoesNotContain(awards, a => a.SwimmerId == m12b.Id);
+        Assert.DoesNotContain(awards, a => a.SwimmerId == noYear.Id);
+        Assert.DoesNotContain(awards, a => a.SwimmerId == relaySw.Id);
+    }
 }
