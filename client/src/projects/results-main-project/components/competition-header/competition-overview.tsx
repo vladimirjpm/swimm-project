@@ -96,12 +96,22 @@ export default function CompetitionOverviewContent({ overview, loading, onOpenTa
                 <span style={{ color: 'var(--theme-mode-text-muted)' }}> · Day {best.day_number}</span>
               )}
             </div>
-            <button type="button"
-              onClick={() => (onOpenSwim ? onOpenSwim(best) : onOpenTab('swims'))}
-              className="mt-2 bg-transparent p-0 text-[12px] font-bold hover:underline"
-              style={{ color: 'var(--theme-primary)' }}>
-              Open this swim →
-            </button>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+              <button type="button"
+                onClick={() => (onOpenSwim ? onOpenSwim(best) : onOpenTab('swims'))}
+                className="bg-transparent p-0 text-[12px] font-bold hover:underline"
+                style={{ color: 'var(--theme-primary)' }}>
+                Open this swim →
+              </button>
+              {/* Диплинк на страницу пловца — только для личных заплывов (у эстафеты swimmer_id = «первый» ногой). */}
+              {!best.is_relay && best.swimmer_id > 0 && (
+                <a href={`./swimmer.html?swimmer=${best.swimmer_id}`}
+                  className="text-[12px] font-bold hover:underline"
+                  style={{ color: 'var(--theme-primary)' }}>
+                  View swimmer →
+                </a>
+              )}
+            </div>
           </div>
         )}
 
@@ -113,6 +123,13 @@ export default function CompetitionOverviewContent({ overview, loading, onOpenTa
               <span className="text-[12.5px] font-semibold" style={{ color: 'var(--theme-mode-text-muted)' }}> · {medalist.club}</span>
             </div>
             <div className="mt-1 text-[13px] font-bold">🥇 {medalist.gold} 🥈 {medalist.silver} 🥉 {medalist.bronze}</div>
+            {medalist.swimmer_id > 0 && (
+              <a href={`./swimmer.html?swimmer=${medalist.swimmer_id}`}
+                className="mt-2 inline-block text-[12px] font-bold hover:underline"
+                style={{ color: 'var(--theme-primary)' }}>
+                View profile →
+              </a>
+            )}
           </div>
         )}
 
