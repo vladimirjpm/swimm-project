@@ -4,6 +4,12 @@
 Здесь только то, чего не видно из дерева файлов: стек, конвенции, точки входа, footguns.
 Глобальные правила и backend — в корневом [`../CLAUDE.md`](../CLAUDE.md).
 
+**Доменные справочники (читай ПЕРВЫМ при багах этих подсистем — они и клиент, и сервер):**
+- [`../docs/relays.md`](../docs/relays.md) — эстафеты (`is_relay`/`relay_swimmers`/
+  `member_swimmer_ids`, членство через `RelayMembers`, чек-лист отладки).
+- [`../docs/media-page.md`](../docs/media-page.md) — My media / медиа (`media.html`,
+  Add link, `useUserMedia`/`useAllMyMedia`/`useCompetitionMedia`, публикации, footguns).
+
 ## Стек
 
 React 18 + TypeScript + **Vite** (не CRA, хотя следы CRA остались: `reportWebVitals`,
