@@ -1,5 +1,6 @@
 import React from 'react';
 import { buildResultsGridTemplate } from './types';
+import UI_AddVideoIcon from '../../components/mix/add-video-icon/add-video-icon';
 
 interface ResultsHeaderProps {
   view: 'mobile' | 'desktop' | '2xl';
@@ -51,13 +52,13 @@ const ResultsHeader: React.FC<ResultsHeaderProps> = ({
             type="button"
             title="Add video mode"
             onClick={onToggleAddVideoMode}
-            className={`absolute right-3 flex items-center justify-center w-7 h-7 rounded-full text-sm transition-colors ${
+            className={`absolute right-3 flex items-center justify-center w-7 h-7 rounded-full transition-colors ${
               addVideoMode
                 ? 'bg-[var(--theme-primary)] text-[var(--theme-mode-accent-text)]'
                 : 'bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text-muted)]'
             }`}
           >
-            🎥
+            <UI_AddVideoIcon size={16} />
           </button>
         )}
       </div>
@@ -74,13 +75,13 @@ const ResultsHeader: React.FC<ResultsHeaderProps> = ({
             type="button"
             title="Add video mode"
             onClick={onToggleAddVideoMode}
-            className={`flex items-center justify-center w-6 h-6 rounded-full text-xs transition-colors ${
+            className={`flex items-center justify-center w-6 h-6 rounded-full transition-colors ${
               addVideoMode
                 ? 'bg-[var(--theme-primary)] text-[var(--theme-mode-accent-text)]'
                 : 'bg-transparent text-[var(--theme-mode-text-muted)]'
             }`}
           >
-            🎥
+            <UI_AddVideoIcon size={14} />
           </button>
         ) : (
           <div aria-hidden />

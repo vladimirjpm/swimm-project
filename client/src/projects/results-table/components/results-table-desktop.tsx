@@ -12,6 +12,7 @@ import UI_FavoriteControls from '../../components/mix/favorite-controls/favorite
 import UI_PositionBadge from '../../components/mix/position-badge/position-badge';
 import UI_MedalIcon from '../../components/mix/medal-icon/medal-icon';
 import ResultRowDateInfo from './result-row-date-info';
+import UI_AddVideoIcon from '../../components/mix/add-video-icon/add-video-icon';
 
 const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
   res,
@@ -64,9 +65,9 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
             type="button"
             title="Add video"
             onClick={onAddVideo}
-            className="flex items-center justify-center w-4 h-4 text-[10px] leading-none text-[var(--theme-mode-text-muted)] hover:text-[var(--theme-primary)]"
+            className="flex items-center justify-center w-4 h-4 text-[var(--theme-mode-text-muted)] hover:text-[var(--theme-primary)]"
           >
-            🎥
+            <UI_AddVideoIcon size={14} />
           </button>
         )}
       </div>

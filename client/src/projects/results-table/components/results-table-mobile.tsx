@@ -11,6 +11,7 @@ import UI_FavoriteControls from '../../components/mix/favorite-controls/favorite
 import UI_PositionBadge from '../../components/mix/position-badge/position-badge';
 import { ResultsTableRowProps } from './types';
 import ResultRowDateInfo from './result-row-date-info';
+import UI_AddVideoIcon from '../../components/mix/add-video-icon/add-video-icon';
 
 const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
   res,
@@ -76,9 +77,9 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
               type="button"
               title="Add video"
               onClick={(e) => { e.stopPropagation(); onAddVideo(); }}
-              className="flex items-center justify-center w-5 h-5 text-xs leading-none text-[var(--theme-mode-text-muted)] hover:text-[var(--theme-primary)]"
+              className="flex items-center justify-center w-5 h-5 text-[var(--theme-mode-text-muted)] hover:text-[var(--theme-primary)]"
             >
-              🎥
+              <UI_AddVideoIcon size={15} />
             </button>
           )}
         </div>
