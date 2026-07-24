@@ -33,9 +33,12 @@ public partial class LogligClient : ILogligClient
         _seasonId = configuration.GetValue("Loglig:SeasonId", DefaultSeasonId);
     }
 
+    public string BuildPublicProfileUrl(int logligId) =>
+        $"{BaseUrl}/Players/Details/{logligId}?seasonId={_seasonId}";
+
     public async Task<LogligPlayerCard?> GetPlayerCardAsync(int logligId, CancellationToken ct = default)
     {
-        var url = $"{BaseUrl}/Players/Details/{logligId}?seasonId={_seasonId}";
+        var url = BuildPublicProfileUrl(logligId);
         try
         {
             var client = _httpClientFactory.CreateClient("loglig");

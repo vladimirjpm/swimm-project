@@ -40,6 +40,9 @@ public class LogligLinkServiceTests
     {
         public Task<LogligPlayerCard?> GetPlayerCardAsync(int logligId, CancellationToken ct = default)
             => Task.FromResult(cards.TryGetValue(logligId, out var card) ? card : null);
+
+        public string BuildPublicProfileUrl(int logligId)
+            => $"https://loglig.com:2053/Players/Details/{logligId}?seasonId=1715";
     }
 
     /// <summary>Фейк сверки: решение по id карточки, заданное словарём в тесте.</summary>

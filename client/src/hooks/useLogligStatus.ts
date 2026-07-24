@@ -47,8 +47,8 @@ export function extractLogligId(input: string): number | null {
  */
 export function useLogligStatus(swimmerId: number | null | undefined) {
   const [status, setStatus] = useState<string | null>(null);
-  // ID приходит только при Verified — для ссылки на публичную карточку loglig.com.
-  const [logligId, setLogligId] = useState<number | null>(null);
+  // Ссылка на публичную карточку (с сезоном) приходит только при Verified — собирает сервер.
+  const [profileUrl, setProfileUrl] = useState<string | null>(null);
 
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -58,19 +58,19 @@ export function useLogligStatus(swimmerId: number | null | undefined) {
 
   const refresh = useCallback(async () => {
     if (swimmerId == null) {
-      if (mountedRef.current) { setStatus(null); setLogligId(null); }
+      if (mountedRef.current) { setStatus(null); setProfileUrl(null); }
       return;
     }
     try {
       const r = await fetch(`/api/swimmers/${swimmerId}/loglig-status`, { credentials: 'include' });
-      if (!r.ok) { if (mountedRef.current) { setStatus(null); setLogligId(null); } return; }
+      if (!r.ok) { if (mountedRef.current) { setStatus(null); setProfileUrl(null); } return; }
       const data = await r.json();
       if (mountedRef.current) {
         setStatus(data.status ?? null);
-        setLogligId(typeof data.logligId === 'number' ? data.logligId : null);
+        setProfileUrl(typeof data.profileUrl === 'string' ? data.profileUrl : null);
       }
     } catch {
-      if (mountedRef.current) { setStatus(null); setLogligId(null); }
+      if (mountedRef.current) { setStatus(null); setProfileUrl(null); }
     }
   }, [swimmerId]);
 
@@ -109,5 +109,5 @@ export function useLogligStatus(swimmerId: number | null | undefined) {
     }
   }, [swimmerId]);
 
-  return { status, logligId, refresh, suggest };
+  return { status, profileUrl, refresh, suggest };
 }

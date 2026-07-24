@@ -6,9 +6,10 @@ public sealed record LogligSuggestResult(bool Accepted, string? Error);
 /// <summary>Итог ночной верификации предложений (для лога/мониторинга).</summary>
 public sealed record LogligSuggestionVerifyReport(int Checked, int Verified, int Rejected, int Skipped);
 
-/// <summary>Публичный статус привязки. LogligId отдаётся только при Verified (карточка
-/// loglig.com публична) — для Suggested/Rejected остаётся скрытым, как и аудит.</summary>
-public sealed record LogligStatusResult(string? Status, int? LogligId);
+/// <summary>Публичный статус привязки. ProfileUrl (ссылка на публичную карточку loglig.com
+/// с актуальным сезоном) заполняется только при Verified — для Suggested/Rejected null,
+/// как и аудит.</summary>
+public sealed record LogligStatusResult(string? Status, string? ProfileUrl);
 
 /// <summary>
 /// Краудсорс-привязка Loglig ID (docs/loglig-id-plan.md, шаг 6): залогиненный пользователь

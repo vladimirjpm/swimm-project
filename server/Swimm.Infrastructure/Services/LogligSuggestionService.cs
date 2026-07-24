@@ -74,10 +74,11 @@ public class LogligSuggestionService(
             .Select(s => new { s.LogligIdStatus, s.LogligId })
             .FirstOrDefaultAsync(ct);
 
-        // ID наружу — только у подтверждённой привязки (ссылка на публичную карточку).
-        return new LogligStatusResult(
-            row?.LogligIdStatus,
-            row?.LogligIdStatus == "Verified" ? row.LogligId : null);
+        // Ссылку наружу — только у подтверждённой привязки; URL с сезоном собирает клиент loglig.
+        var profileUrl = row is { LogligIdStatus: "Verified", LogligId: int id }
+            ? logligClient.BuildPublicProfileUrl(id)
+            : null;
+        return new LogligStatusResult(row?.LogligIdStatus, profileUrl);
     }
 
     public async Task<LogligSuggestionVerifyReport> VerifySuggestedAsync(CancellationToken ct = default)

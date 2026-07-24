@@ -32,12 +32,12 @@ public class LogligSuggestController(ILogligSuggestionService suggestions) : Con
     }
 
     /// <summary>Статус привязки для показа кнопки/бейджа. Публичный (без [Authorize]) —
-    /// статус + logligId только при Verified (ссылка на публичную карточку), без аудита;
-    /// не кэшируется (точечный дешёвый запрос).</summary>
+    /// статус + profileUrl только при Verified (ссылка на публичную карточку с сезоном),
+    /// без аудита; не кэшируется (точечный дешёвый запрос).</summary>
     [HttpGet("{id:int}/loglig-status")]
     public async Task<IActionResult> Status(int id, CancellationToken ct)
     {
         var result = await suggestions.GetStatusAsync(id, ct);
-        return Ok(new { status = result.Status, logligId = result.LogligId });
+        return Ok(new { status = result.Status, profileUrl = result.ProfileUrl });
     }
 }

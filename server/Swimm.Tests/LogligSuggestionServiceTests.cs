@@ -31,6 +31,9 @@ public class LogligSuggestionServiceTests
     {
         public Task<LogligPlayerCard?> GetPlayerCardAsync(int logligId, CancellationToken ct = default)
             => Task.FromResult(cards.TryGetValue(logligId, out var card) ? card : null);
+
+        public string BuildPublicProfileUrl(int logligId)
+            => $"https://loglig.com:2053/Players/Details/{logligId}?seasonId=1715";
     }
 
     private sealed class FakeMatchService(LogligMatchDecision decision) : ILogligMatchService
@@ -151,13 +154,13 @@ public class LogligSuggestionServiceTests
         var result = await Service(db).GetStatusAsync(s.Id);
 
         Assert.Equal("Verified", result.Status);
-        Assert.Equal(304199, result.LogligId);
+        Assert.Equal("https://loglig.com:2053/Players/Details/304199?seasonId=1715", result.ProfileUrl);
     }
 
     [Fact]
-    public async Task GetStatus_SuggestedSwimmer_HidesLogligId()
+    public async Task GetStatus_SuggestedSwimmer_HidesProfileUrl()
     {
-        await using var db = CreateDb(nameof(GetStatus_SuggestedSwimmer_HidesLogligId));
+        await using var db = CreateDb(nameof(GetStatus_SuggestedSwimmer_HidesProfileUrl));
         var s = S("ברנצב", "סבינה", 2017, "Suggested", 304199);
         db.Swimmers.Add(s);
         await db.SaveChangesAsync();
@@ -165,7 +168,7 @@ public class LogligSuggestionServiceTests
         var result = await Service(db).GetStatusAsync(s.Id);
 
         Assert.Equal("Suggested", result.Status);
-        Assert.Null(result.LogligId);
+        Assert.Null(result.ProfileUrl);
     }
 
     [Fact]
@@ -176,7 +179,7 @@ public class LogligSuggestionServiceTests
         var result = await Service(db).GetStatusAsync(999999);
 
         Assert.Null(result.Status);
-        Assert.Null(result.LogligId);
+        Assert.Null(result.ProfileUrl);
     }
 
     // ── VerifySuggestedAsync: ночной джоб ─────────────────────────────────────

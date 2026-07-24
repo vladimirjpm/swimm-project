@@ -189,7 +189,7 @@ function SportsmenDetails() {
               {swimmerId != null && (
                 <LogligSuggestBadge
                   status={logligStatus.status}
-                  logligId={logligStatus.logligId}
+                  profileUrl={logligStatus.profileUrl}
                   isAuthenticated={isAuthenticated}
                   suggest={logligStatus.suggest}
                 />
@@ -370,12 +370,12 @@ function SportsmenDetails() {
 // не плодим CTA логина рядом.
 function LogligSuggestBadge({
   status,
-  logligId,
+  profileUrl,
   isAuthenticated,
   suggest,
 }: {
   status: string | null;
-  logligId: number | null;
+  profileUrl: string | null;
   isAuthenticated: boolean;
   suggest: (input: string) => Promise<{ ok: boolean; error?: string }>;
 }) {
@@ -388,10 +388,10 @@ function LogligSuggestBadge({
     // Есть подтверждённый ID → бейдж ведёт на публичную карточку игрока loglig.com.
     const badgeClass = 'inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold';
     const badgeStyle = { background: 'rgba(255,255,255,0.9)', color: 'var(--theme-primary)' };
-    if (logligId != null) {
+    if (profileUrl != null) {
       return (
         <a
-          href={`https://loglig.com:2053/Players/Details/${logligId}`}
+          href={profileUrl}
           target="_blank"
           rel="noopener noreferrer"
           title="Open verified loglig.com profile"
