@@ -61,4 +61,12 @@ public interface IUserMediaPublicationService
     /// </summary>
     Task<List<VisibleResultMediaDto>> GetVisibleForResultsAsync(
         int? competitionId, int? eventId, string? groupSlug, int? userId);
+
+    /// <summary>
+    /// Всё видимое зрителю userId (null = аноним) медиа КОНКРЕТНОГО пловца — для галереи на
+    /// странице пловца (swimmer.html): своё (любое, вкл. private) + approved public (всем) +
+    /// approved members (только активным членам группы публикации). Скоуп — по SwimmerId
+    /// (любой уровень привязки: заплыв/соревнование/swimmer-level).
+    /// </summary>
+    Task<List<VisibleResultMediaDto>> GetVisibleForSwimmerAsync(int swimmerId, int? userId);
 }

@@ -265,6 +265,49 @@ public class UserMediaPublicationService : IUserMediaPublicationService
             .ToList();
     }
 
+    public async Task<List<VisibleResultMediaDto>> GetVisibleForSwimmerAsync(int swimmerId, int? userId)
+    {
+        if (swimmerId <= 0) return [];
+
+        // Скоуп — всё медиа пловца (любой уровень привязки). Правила видимости те же, что и в
+        // GetVisibleForResultsAsync: своё (любое) + approved public (всем) + approved members
+        // (активным членам группы публикации). Отличие только в скоупе (по SwimmerId, не по
+        // соревнованию), поэтому логику намеренно дублируем минимально, не размывая контракт.
+        var mine = userId == null
+            ? []
+            : await _db.UserMedia.AsNoTracking()
+                .Where(m => m.SwimmerId == swimmerId && m.UserId == userId)
+                .Select(m => new VisibleResultMediaDto
+                {
+                    ResultId = m.ResultId,
+                    MediaType = m.MediaType,
+                    SourceType = m.SourceType,
+                    Url = m.Url,
+                })
+                .ToListAsync();
+
+        var published = await _db.UserMediaPublications.AsNoTracking()
+            .Where(p => p.Status == UserMediaPublicationStatus.Approved
+                        && p.Media!.SwimmerId == swimmerId
+                        && (p.Level == UserMediaPublicationLevel.Public
+                            || (userId != null && _db.HubGroupUserMembers.Any(um =>
+                                um.HubGroupId == p.HubGroupId && um.UserId == userId
+                                && um.Status == HubGroupUserMemberStatus.Active))))
+            .Select(p => new VisibleResultMediaDto
+            {
+                ResultId = p.Media!.ResultId,
+                MediaType = p.Media.MediaType,
+                SourceType = p.Media.SourceType,
+                Url = p.Media.Url,
+            })
+            .ToListAsync();
+
+        return mine.Concat(published)
+            .GroupBy(v => new { v.ResultId, v.Url })
+            .Select(g => g.First())
+            .ToList();
+    }
+
     public async Task<bool> DecideAsync(int hubGroupId, int publicationId, bool approve, int decidedByUserId)
     {
         var entity = await _db.UserMediaPublications

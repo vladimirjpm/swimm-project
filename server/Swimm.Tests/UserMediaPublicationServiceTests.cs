@@ -428,4 +428,71 @@ public class UserMediaPublicationServiceTests
 
         Assert.Empty(await service.GetPublishTargetsAsync(stranger.Id, media.Id));
     }
+
+    // ── Набор 3 — GetVisibleForSwimmerAsync (галерея страницы пловца) ─────────
+
+    [Fact]
+    public async Task GetVisibleForSwimmer_Anonymous_SeesApprovedPublicOnly()
+    {
+        await using var db = CreateDb(nameof(GetVisibleForSwimmer_Anonymous_SeesApprovedPublicOnly));
+        var (owner, swimmer, group, media) = await SeedBasicAsync(db);
+        var service = new UserMediaPublicationService(db);
+
+        var submit = await service.SubmitAsync(owner.Id, media.Id,
+            new SubmitPublicationRequest { HubGroupId = group.Id, Level = "public" }, isGroupPrivileged: false);
+        Assert.True(submit.Success);
+        // Пока pending — аноним НЕ видит.
+        Assert.Empty(await service.GetVisibleForSwimmerAsync(swimmer.Id, null));
+
+        await service.DecideAsync(group.Id, submit.Publication!.Id, approve: true, decidedByUserId: owner.Id);
+
+        var visible = await service.GetVisibleForSwimmerAsync(swimmer.Id, null);
+        Assert.Equal(media.Url, Assert.Single(visible).Url);
+    }
+
+    [Fact]
+    public async Task GetVisibleForSwimmer_MembersLevel_HiddenFromAnonVisibleToActiveMember()
+    {
+        await using var db = CreateDb(nameof(GetVisibleForSwimmer_MembersLevel_HiddenFromAnonVisibleToActiveMember));
+        var (owner, swimmer, group, media) = await SeedBasicAsync(db);
+        var service = new UserMediaPublicationService(db);
+
+        var submit = await service.SubmitAsync(owner.Id, media.Id,
+            new SubmitPublicationRequest { HubGroupId = group.Id, Level = "members" }, isGroupPrivileged: false);
+        await service.DecideAsync(group.Id, submit.Publication!.Id, approve: true, decidedByUserId: owner.Id);
+
+        // Аноним members-медиа не видит…
+        Assert.Empty(await service.GetVisibleForSwimmerAsync(swimmer.Id, null));
+        // …а активный член группы (owner) — видит (как своё И как members-публикацию).
+        var forMember = await service.GetVisibleForSwimmerAsync(swimmer.Id, owner.Id);
+        Assert.Equal(media.Url, Assert.Single(forMember).Url);
+
+        // Посторонний залогиненный (не член группы) — не видит.
+        var stranger = NewUser("outsider@example.com");
+        db.AppUsers.Add(stranger);
+        await db.SaveChangesAsync();
+        Assert.Empty(await service.GetVisibleForSwimmerAsync(swimmer.Id, stranger.Id));
+    }
+
+    [Fact]
+    public async Task GetVisibleForSwimmer_Owner_SeesOwnUnpublishedPrivateMedia()
+    {
+        await using var db = CreateDb(nameof(GetVisibleForSwimmer_Owner_SeesOwnUnpublishedPrivateMedia));
+        var (owner, swimmer, _, media) = await SeedBasicAsync(db);
+        var service = new UserMediaPublicationService(db);
+
+        // Никаких публикаций — владелец всё равно видит своё приватное медиа.
+        Assert.Equal(media.Url, Assert.Single(await service.GetVisibleForSwimmerAsync(swimmer.Id, owner.Id)).Url);
+        // Аноним — ничего.
+        Assert.Empty(await service.GetVisibleForSwimmerAsync(swimmer.Id, null));
+    }
+
+    [Fact]
+    public async Task GetVisibleForSwimmer_UnknownSwimmer_Empty()
+    {
+        await using var db = CreateDb(nameof(GetVisibleForSwimmer_UnknownSwimmer_Empty));
+        var service = new UserMediaPublicationService(db);
+        Assert.Empty(await service.GetVisibleForSwimmerAsync(999999, null));
+        Assert.Empty(await service.GetVisibleForSwimmerAsync(0, null));
+    }
 }

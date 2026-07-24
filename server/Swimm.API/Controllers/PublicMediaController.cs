@@ -53,4 +53,16 @@ public class PublicMediaController : ControllerBase
 
         return Ok(await _publications.GetVisibleForResultsAsync(competitionId, eventId, group, userId));
     }
+
+    /// <summary>
+    /// Видимое зрителю медиа пловца — галерея на странице пловца (swimmer.html?swimmer=id).
+    /// Аноним — только approved public; залогиненный — плюс своё и members своих групп.
+    /// </summary>
+    [HttpGet("/api/swimmers/{id:int}/media")]
+    public async Task<IActionResult> GetForSwimmer(int id)
+    {
+        var raw = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        int? userId = int.TryParse(raw, out var uid) ? uid : null;
+        return Ok(await _publications.GetVisibleForSwimmerAsync(id, userId));
+    }
 }

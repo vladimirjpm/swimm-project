@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import '../../index.css';
 import { useTheme } from '../../hooks/useTheme';
 import { useMode } from '../../hooks/useMode';
@@ -8,7 +8,11 @@ import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import UI_ClubIcon from '../components/mix/club-icon/club-icon';
 import UI_FlagEmoji from '../components/mix/flag-icon/flag-icon';
 import UI_MedalIcon from '../components/mix/medal-icon/medal-icon';
+import UI_SwimmerGallery from '../components/mix/swimmer-gallery/swimmer-gallery';
+import { HelperMedia } from '../../utils/helpers';
+import { GalleryItem } from '../../utils/interfaces/results';
 import { useSwimmerProfile, SwimmerProfile } from './use-swimmer-profile';
+import { useSwimmerMedia } from './use-swimmer-media';
 
 // Самостоятельная страница пловца (swimmer.html?swimmer=<id>). Профиль тянется по id
 // (/api/swimmers/{id}), карьера all-time — по полному имени (useAthleteCareer, тот же
@@ -98,6 +102,53 @@ function StatTile({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+function MediaTile({ item, onClick }: { item: GalleryItem; onClick: () => void }) {
+  const thumb = HelperMedia.resolveThumbUrl(item.type, item.sourceType ?? 'other', item.url ?? '');
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group relative aspect-video overflow-hidden rounded-[12px] border"
+      style={{ borderColor: 'var(--theme-mode-border)', background: 'var(--theme-mode-surface)' }}
+    >
+      {thumb ? (
+        <img src={thumb} alt="" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-[28px]" style={{ color: 'var(--theme-mode-text-muted)' }}>
+          {item.type === 'image' ? '🖼' : '▶'}
+        </div>
+      )}
+      {item.type === 'video' && (
+        <span className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.15)' }}>
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </span>
+        </span>
+      )}
+    </button>
+  );
+}
+
+function MediaGallery({ swimmerId }: { swimmerId: number }) {
+  const media = useSwimmerMedia(swimmerId);
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  if (media.length === 0) return null; // пусто — секцию не показываем (аноним видит только public)
+
+  return (
+    <div className="rounded-[12px] p-4" style={cardStyle}>
+      <SectionTitle>Media</SectionTitle>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {media.map((item, idx) => (
+          <MediaTile key={`${item.url}-${idx}`} item={item} onClick={() => setOpenIndex(idx)} />
+        ))}
+      </div>
+      <UI_SwimmerGallery gallery={media} openIndex={openIndex} onClose={() => setOpenIndex(null)} popupSize="lg" />
+    </div>
+  );
+}
+
 function SwimmerContent({ profile }: { profile: SwimmerProfile }) {
   const career = useAthleteCareer(profile.fullName);
   const hasCareer = career.races > 0;
@@ -164,6 +215,9 @@ function SwimmerContent({ profile }: { profile: SwimmerProfile }) {
           </div>
         )}
       </div>
+
+      {/* Галерея видимого медиа пловца (пусто → секция скрыта). */}
+      <MediaGallery swimmerId={profile.id} />
     </div>
   );
 }
