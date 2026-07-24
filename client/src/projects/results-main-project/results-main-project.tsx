@@ -316,20 +316,29 @@ function ResultsMain() {
         /* Селектор соревнований: шапка/панель, единый для всех брейкпоинтов
             (mobile — bottom sheet из «Change», design_handoff_selector_all) */
         <div className="relative w-full z-40 max-md:px-2 max-md:pt-2 md:-mx-4 md:w-auto">
-          <DataSourceDDL />
-          {/* Шапка соревнования: hero + табы (Overview дефолт). Селектор выше пока
-              остаётся отдельным блоком; складывание «Change» внутрь hero — следующий шаг. */}
-          {hasSource && !isTraining && compSourceParams && (
-            <CompetitionHeader
-              title={selectedSource?.title ?? ''}
-              sourceParams={compSourceParams}
-              overview={compOverview}
-              activeTab={compTab}
-              onTabChange={handleCompTabChange}
-              mediaCount={compMediaItems.length}
-              onAddMedia={auth.isAuthenticated && addMedia.canAdd ? addMedia.openModal : undefined}
-            />
-          )}
+          {/* Одна шапка: в режиме соревнования DDL рендерит НАШУ шапку (hero + табы,
+              «Change ▾» внутри hero), оставляя себе только панель выбора.
+              В остальных режимах (тренировки, нет источника) — встроенная шапка DDL. */}
+          <DataSourceDDL
+            renderHeader={
+              hasSource && !isTraining && compSourceParams
+                ? (togglePanel, panelOpen, source) => (
+                    <CompetitionHeader
+                      title={selectedSource?.title ?? ''}
+                      sourceParams={compSourceParams}
+                      overview={compOverview}
+                      activeTab={compTab}
+                      onTabChange={handleCompTabChange}
+                      mediaCount={compMediaItems.length}
+                      onAddMedia={auth.isAuthenticated && addMedia.canAdd ? addMedia.openModal : undefined}
+                      source={source}
+                      onChangeClick={togglePanel}
+                      changeOpen={panelOpen}
+                    />
+                  )
+                : undefined
+            }
+          />
         </div>
       )}
       {/* Add media (Competition header hero + пустое состояние таба Media) — единый модал */}

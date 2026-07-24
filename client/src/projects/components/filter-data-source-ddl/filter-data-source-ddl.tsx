@@ -115,7 +115,21 @@ const useIsMobile = () => {
 // по URL-параметрам должен только один инстанс.
 let urlLoadTriggered = false;
 
-const DataSourceDDL: React.FC = () => {
+interface DataSourceDDLProps {
+  /**
+   * Кастомная шапка вместо встроенной (шапка соревнования с табами,
+   * design_handoff_competition_overview): DDL отдаёт ей toggle панели и выбранный
+   * источник, а сам рендерит только дропдаун/шит выбора. Без выбранного источника
+   * игнорируется (панель открыта inline, как раньше).
+   */
+  renderHeader?: (
+    togglePanel: () => void,
+    panelOpen: boolean,
+    source: CompetitionSource,
+  ) => React.ReactNode;
+}
+
+const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader }) => {
   const dispatch = useAppDispatch();
   const filters = useAppSelector((s) => s.filterSelected);
   // Выбранная строка — из store (title = имя источника): синхронизирует инстансы.
@@ -889,6 +903,25 @@ const DataSourceDDL: React.FC = () => {
 
   // Без выбора — селектор открыт inline (deep-link ?category=, frame 7a)
   if (!selectedSourceObj) return panel(true);
+
+  // С выбором и кастомной шапкой (шапка соревнования) — встроенную не рисуем:
+  // рендерим header из пропа, ниже — тот же дропдаун/шит выбора.
+  if (renderHeader) {
+    return (
+      <div ref={wrapRef} className="relative">
+        {renderHeader(() => setPanelOpen((v) => !v), panelOpen, selectedSourceObj)}
+        {panelOpen && !isMobile && (
+          <div
+            className="dv-sel-panel-drop absolute left-0 right-0 z-20"
+            style={{ top: 'calc(100% + 10px)', filter: 'drop-shadow(0 18px 30px rgba(0,0,0,0.16))' }}
+          >
+            {panel(false)}
+          </div>
+        )}
+        {panelOpen && isMobile && sheet}
+      </div>
+    );
+  }
 
   // С выбором — компактная шапка соревнования; «Change» открывает панель поверх контента
   const seasonYear = parseDate(selectedSourceObj.date)?.getFullYear();

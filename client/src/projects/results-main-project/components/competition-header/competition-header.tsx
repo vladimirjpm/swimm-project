@@ -14,13 +14,28 @@ export default function CompetitionHeader({
   onTabChange,
   mediaCount,
   onAddMedia,
-}: CompetitionHeaderProps & { onAddMedia?: () => void }) {
+  source,
+  onChangeClick,
+  changeOpen,
+}: CompetitionHeaderProps & {
+  onAddMedia?: () => void;
+  source?: import('../../../../utils/helpers/competition-source').CompetitionSource;
+  onChangeClick?: () => void;
+  changeOpen?: boolean;
+}) {
   return (
     <div
       className="overflow-hidden rounded-[14px] md:rounded-t-none"
       style={{ boxShadow: 'var(--theme-mode-card-shadow)' }}
     >
-      <CompetitionHeaderTop title={title} overview={overview} onAddMedia={onAddMedia} />
+      <CompetitionHeaderTop
+        title={title}
+        overview={overview}
+        source={source}
+        onAddMedia={onAddMedia}
+        onChangeClick={onChangeClick}
+        changeOpen={changeOpen}
+      />
       {/* Персональная полоса (⭐ Имя / ❤️ Favorites / My media) — следующий модуль,
           красится ТОЛЬКО токенами --theme-personal-* */}
       <CompetitionTabs

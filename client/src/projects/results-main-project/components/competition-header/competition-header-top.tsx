@@ -1,4 +1,5 @@
 import React from 'react';
+import type { CompetitionSource } from '../../../../utils/helpers/competition-source';
 import type { CompetitionOverview } from './types';
 
 // Hero-модуль шапки соревнования (вариант 1b «Афиша»): фон var(--theme-primary),
@@ -9,8 +10,13 @@ import type { CompetitionOverview } from './types';
 interface Props {
   title: string;
   overview: CompetitionOverview | null;
+  /** Выбранный источник из селектора (bассейн/сезон/бейджи) — когда шапка живёт внутри DDL. */
+  source?: CompetitionSource;
   /** undefined — кнопку не рендерим (гость или проводка ещё не подключена). */
   onAddMedia?: () => void;
+  /** «Change ▾» — toggle панели селектора (проп DDL renderHeader). */
+  onChangeClick?: () => void;
+  changeOpen?: boolean;
 }
 
 function datesLabel(overview: CompetitionOverview | null): string | null {
@@ -21,7 +27,9 @@ function datesLabel(overview: CompetitionOverview | null): string | null {
   return first === last ? first : `${first} – ${last}`;
 }
 
-export default function CompetitionHeaderTop({ title, overview, onAddMedia }: Props) {
+export default function CompetitionHeaderTop({
+  title, overview, source, onAddMedia, onChangeClick, changeOpen,
+}: Props) {
   const dayCount = overview?.summary.day_count ?? 0;
   const dates = datesLabel(overview);
   const s = overview?.summary;
@@ -61,22 +69,40 @@ export default function CompetitionHeaderTop({ title, overview, onAddMedia }: Pr
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[12.5px] font-semibold opacity-90">
           {dates && <span>{dates}</span>}
+          {source?.pool_type && <span>{source.pool_type} pool</span>}
+          {source?.category === 'masters' && <span>Masters</span>}
           {s && s.swimmer_count > 0 && <span>Swimmers: {s.swimmer_count}</span>}
           {s && s.club_count > 0 && <span>Clubs: {s.club_count}</span>}
           {s && <span>Results so far: {s.result_count}</span>}
         </div>
       </div>
 
-      {onAddMedia && (
-        <button
-          type="button"
-          onClick={onAddMedia}
-          className="rounded-[10px] px-3.5 py-2 text-[12.5px] font-extrabold shadow-sm transition-opacity hover:opacity-90"
-          style={{ background: 'var(--theme-mode-accent-text)', color: 'var(--theme-primary-hover, var(--theme-primary))' }}
-        >
-          ＋ Add media
-        </button>
-      )}
+      <div className="flex shrink-0 items-center gap-2">
+        {onAddMedia && (
+          <button
+            type="button"
+            onClick={onAddMedia}
+            className="rounded-[10px] px-3.5 py-2 text-[12.5px] font-extrabold shadow-sm transition-opacity hover:opacity-90"
+            style={{ background: 'var(--theme-mode-accent-text)', color: 'var(--theme-primary-hover, var(--theme-primary))' }}
+          >
+            ＋ Add media
+          </button>
+        )}
+        {onChangeClick && (
+          <button
+            type="button"
+            onClick={onChangeClick}
+            className="flex min-h-[40px] cursor-pointer items-center gap-2 whitespace-nowrap rounded-[10px] px-[16px] text-[13px] font-extrabold"
+            style={{
+              background: 'rgba(255,255,255,0.16)',
+              border: '1px solid var(--theme-mode-header-btn-border)',
+              color: 'inherit',
+            }}
+          >
+            Change <span className="text-[10px]">{changeOpen ? '▴' : '▾'}</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }
