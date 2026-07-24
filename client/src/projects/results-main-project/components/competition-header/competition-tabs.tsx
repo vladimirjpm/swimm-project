@@ -1,0 +1,58 @@
+import React from 'react';
+import FilterRecalculate from '../../../components/filter-section/filter-recalculate';
+import type { CompetitionOverview, CompetitionTab } from './types';
+
+// Табы шапки соревнования (паттерн GroupTabs: primary + внутренний bg-black/10).
+// Overview | Swims N | Clubs N | Records N (только если рекорды есть) | Media N.
+// Справа (только ≥lg) — тогглер Combine All Results (перенесён из фильтров;
+// на мобиле остаётся в фильтрах Swims — решение дизайнера). Условия видимости
+// самого тогглера не меняются — FilterRecalculate сам решает, рендериться ли.
+
+interface Props {
+  overview: CompetitionOverview | null;
+  activeTab: CompetitionTab;
+  onTabChange(tab: CompetitionTab): void;
+  mediaCount: number | null;
+}
+
+export default function CompetitionTabs({ overview, activeTab, onTabChange, mediaCount }: Props) {
+  const tabs: { tab: CompetitionTab; label: string; count?: number | null }[] = [
+    { tab: 'overview', label: 'Overview' },
+    { tab: 'swims', label: 'Swims', count: overview?.summary.result_count },
+    { tab: 'clubs', label: 'Clubs', count: overview?.summary.club_count },
+    // Records — только когда рекорды есть (v1 сервер отдаёт пусто → таба нет)
+    ...(overview?.records.length
+      ? [{ tab: 'records' as const, label: 'Records', count: overview.records.length }]
+      : []),
+    { tab: 'media', label: 'Media', count: mediaCount },
+  ];
+
+  return (
+    <div style={{ background: 'var(--theme-primary)', color: 'var(--theme-mode-accent-text)' }}>
+      <div className="flex items-center gap-0.5 overflow-x-auto bg-black/10 px-4">
+        {tabs.map(({ tab, label, count }) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => onTabChange(tab)}
+            className={`shrink-0 border-b-[2.5px] bg-transparent px-3 pb-3 pt-[10px] text-[13px] font-bold ${
+              activeTab === tab ? 'opacity-100' : 'opacity-75 hover:opacity-100'
+            }`}
+            style={{
+              color: 'inherit',
+              borderBottomColor: activeTab === tab ? 'var(--theme-mode-accent-text)' : 'transparent',
+            }}
+          >
+            {label}
+            {count != null && count > 0 && (
+              <span className="ml-1 text-[11px] font-semibold opacity-70">{count}</span>
+            )}
+          </button>
+        ))}
+        <span className="ml-auto hidden shrink-0 items-center pb-1 lg:flex">
+          <FilterRecalculate />
+        </span>
+      </div>
+    </div>
+  );
+}

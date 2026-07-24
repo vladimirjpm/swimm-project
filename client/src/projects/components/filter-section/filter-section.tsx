@@ -56,7 +56,11 @@ const FilterSection: React.FC = () => {
       <FilterResetButton />
       <FilterSwimmingStyle />
       <FilterEventDate />
-      <FilterRecalculate />
+      {/* Combine All Results: на десктопе живёт в табах шапки соревнования
+          (design_handoff_competition_overview), в фильтрах остаётся только <lg */}
+      <div className="lg:hidden">
+        <FilterRecalculate />
+      </div>
       {/* <FilterDateDropdown /> */}
       <FilterNameDropdown />
       <FilterPositionButtons />

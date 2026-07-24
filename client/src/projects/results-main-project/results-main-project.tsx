@@ -15,8 +15,17 @@ import { useMode } from '../../hooks/useMode';
 import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import UI_ThemeDevTool from '../components/mix/theme-dev-tool/theme-dev-tool';
 import GroupHeader from './components/group-header/group-header';
+import CompetitionHeader from './components/competition-header/competition-header';
+import CompetitionOverviewContent from './components/competition-header/competition-overview';
+import CompetitionClubs from './components/competition-header/competition-clubs';
+import CompetitionMedia from './components/competition-header/competition-media';
+import { useCompetitionOverview } from './components/competition-header/use-competition-overview';
+import { useCompetitionAddMedia } from './components/competition-header/use-competition-add-media';
+import type { CompetitionTab } from './components/competition-header/types';
 import AppTopbar from '../components/app-topbar/app-topbar';
 import type { HubGroupDetails } from '../hub-groups-project/types';
+import { useAuth } from '../../hooks/useAuth';
+import { useCompetitionMedia } from '../../hooks/useCompetitionMedia';
 
 // === Вспомогательная функция ===
 function checkIsTraining(selectedSource: any, filters: any) {
@@ -217,6 +226,49 @@ function ResultsMain() {
 
   const trainingGroupError = groupError;
 
+  // === Шапка соревнования + табы (design_handoff_competition_overview, вариант 1b) ===
+  // Только вне группы и вне тренировок. ?tab=overview|swims|clubs|records|media в URL
+  // (в group-режиме ?tab= — свой, trainings/competitions, они не пересекаются).
+  const VALID_COMP_TABS: CompetitionTab[] = ['overview', 'swims', 'clubs', 'records', 'media'];
+  const [compTab, setCompTab] = useState<CompetitionTab>(() => {
+    const t = new URLSearchParams(window.location.search).get('tab') as CompetitionTab | null;
+    return !groupSlug && t && VALID_COMP_TABS.includes(t) ? t : 'overview';
+  });
+  const handleCompTabChange = useCallback((tab: CompetitionTab) => {
+    setCompTab(tab);
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', tab);
+    window.history.replaceState(null, '', url.toString());
+  }, []);
+
+  // sourceParams источника: из dataSourceSelected (paged) или из URL (full-режим их не пишет в стейт).
+  const compSourceParams = useMemo<Record<string, string> | undefined>(() => {
+    const sp = selectedSource?.sourceParams;
+    if (sp && (sp.competitionId || sp.eventId)) return sp;
+    const q = new URLSearchParams(window.location.search);
+    const competitionId = q.get('competitionId');
+    const eventId = q.get('eventId');
+    if (competitionId) return { competitionId };
+    if (eventId) return { eventId };
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSource]);
+
+  const { overview: compOverview, loading: compOverviewLoading } =
+    useCompetitionOverview(!groupSlug && !isTraining ? compSourceParams : undefined);
+
+  // Таб Media: items уже включают competition-level медиа; счётчик таба = items.length.
+  // Хук зовётся и здесь, и внутри results-table (per-viewer, без общего кэша — это ок).
+  const compMediaSourceParams = !groupSlug && !isTraining ? compSourceParams : undefined;
+  const { items: compMediaItems, refresh: refreshCompMedia } = useCompetitionMedia(compMediaSourceParams);
+  const auth = useAuth();
+  const addMedia = useCompetitionAddMedia({
+    sourceParams: compMediaSourceParams,
+    overview: compOverview,
+    title: selectedSource?.title ?? '',
+    refresh: refreshCompMedia,
+  });
+
   // Сброс selected_name при закрытии мобильного модала
   const handleMobileModalClose = useCallback(() => {
     dispatch(rootActions.updateState({
@@ -265,8 +317,23 @@ function ResultsMain() {
             (mobile — bottom sheet из «Change», design_handoff_selector_all) */
         <div className="relative w-full z-40 max-md:px-2 max-md:pt-2 md:-mx-4 md:w-auto">
           <DataSourceDDL />
+          {/* Шапка соревнования: hero + табы (Overview дефолт). Селектор выше пока
+              остаётся отдельным блоком; складывание «Change» внутрь hero — следующий шаг. */}
+          {hasSource && !isTraining && compSourceParams && (
+            <CompetitionHeader
+              title={selectedSource?.title ?? ''}
+              sourceParams={compSourceParams}
+              overview={compOverview}
+              activeTab={compTab}
+              onTabChange={handleCompTabChange}
+              mediaCount={compMediaItems.length}
+              onAddMedia={auth.isAuthenticated && addMedia.canAdd ? addMedia.openModal : undefined}
+            />
+          )}
         </div>
       )}
+      {/* Add media (Competition header hero + пустое состояние таба Media) — единый модал */}
+      {addMedia.modalNode}
 
       {/* Источник не выбран (deep-link ?category=): селектор выше открыт inline,
           область контента приглушена с подсказкой (CHANGES.md, frame 7a) */}
@@ -293,6 +360,37 @@ function ResultsMain() {
         >
           Select a competition above to see results
         </div>
+      ) : !groupSlug && !isTraining && compSourceParams && compTab !== 'swims' ? (
+        /* Не-Swims табы соревнования: контент под шапкой, фильтры/таблица не рендерятся */
+        compTab === 'overview' ? (
+          <CompetitionOverviewContent
+            overview={compOverview}
+            loading={compOverviewLoading}
+            onOpenTab={handleCompTabChange}
+          />
+        ) : compTab === 'clubs' ? (
+          <CompetitionClubs sourceParams={compSourceParams} />
+        ) : compTab === 'media' ? (
+          <CompetitionMedia
+            items={compMediaItems}
+            isAuthenticated={auth.isAuthenticated}
+            canAddMedia={addMedia.canAdd}
+            onAddMedia={addMedia.openModal}
+            addingMedia={addMedia.loadingSwimmers}
+          />
+        ) : (
+          /* records — контент следующим шагом */
+          <div
+            className="mt-4 flex min-h-[140px] items-center justify-center rounded-[14px] text-[13px] font-semibold"
+            style={{
+              border: '1px dashed var(--theme-mode-border-input)',
+              background: 'var(--theme-mode-surface)',
+              color: 'var(--theme-mode-text-muted)',
+            }}
+          >
+            Records — coming soon.
+          </div>
+        )
       ) : (
         <>
           {/* Контент страницы */}
