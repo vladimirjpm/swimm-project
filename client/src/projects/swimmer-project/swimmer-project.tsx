@@ -11,6 +11,8 @@ import UI_MedalIcon from '../components/mix/medal-icon/medal-icon';
 import UI_SwimmerGallery from '../components/mix/swimmer-gallery/swimmer-gallery';
 import { HelperMedia } from '../../utils/helpers';
 import { GalleryItem } from '../../utils/interfaces/results';
+import { useFavoritesContext } from '../../hooks/favorites-context';
+import { useLoginModal } from '../components/login-modal/login-modal-context';
 import { useSwimmerProfile, SwimmerProfile } from './use-swimmer-profile';
 import { useSwimmerMedia } from './use-swimmer-media';
 
@@ -31,6 +33,48 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
       style={{ color: 'var(--theme-mode-text-muted)' }}
     >
       {children}
+    </div>
+  );
+}
+
+// ❤ избранное + ⭐ «это я» (favorites, по swimmer_id). Гостю — ❤, открывающее логин.
+function FavoriteControls({ swimmerId }: { swimmerId: number }) {
+  const { isAuthenticated, primarySwimmerId, favoriteSwimmerIds, setMeBySwimmer, toggleFavoriteSwimmer } =
+    useFavoritesContext();
+  const { openLoginModal } = useLoginModal();
+
+  const btnBase =
+    'flex h-9 w-9 items-center justify-center rounded-full leading-none transition-transform hover:scale-110';
+
+  if (!isAuthenticated) {
+    return (
+      <button type="button" onClick={openLoginModal} title="Sign in to save favorites"
+        className={btnBase} style={{ background: 'rgba(255,255,255,0.9)', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa3af" strokeWidth="2">
+          <path d="M12 21s-7.5-4.6-10-9.3C.4 8.3 2 5 5.2 5c2 0 3.3 1.1 4.1 2.3C10.1 6.1 11.4 5 13.4 5 16.6 5 18.2 8.3 16.6 11.7 14.1 16.4 12 21 12 21z" />
+        </svg>
+      </button>
+    );
+  }
+
+  const isFav = favoriteSwimmerIds.has(swimmerId);
+  const isMe = swimmerId === primarySwimmerId;
+  return (
+    <div className="flex items-center gap-2">
+      <button type="button" onClick={() => toggleFavoriteSwimmer(swimmerId)}
+        title={isFav ? 'Remove from favorites' : 'Add to favorites'} aria-pressed={isFav}
+        className={btnBase} style={{ background: 'rgba(255,255,255,0.9)', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill={isFav ? '#e23b5a' : 'none'} stroke={isFav ? '#e23b5a' : '#9aa3af'} strokeWidth="2">
+          <path d="M12 21s-7.5-4.6-10-9.3C.4 8.3 2 5 5.2 5c2 0 3.3 1.1 4.1 2.3C10.1 6.1 11.4 5 13.4 5 16.6 5 18.2 8.3 16.6 11.7 14.1 16.4 12 21 12 21z" />
+        </svg>
+      </button>
+      <button type="button" onClick={() => setMeBySwimmer(swimmerId)}
+        title={isMe ? 'This is me — unmark' : 'Mark: this is me'} aria-pressed={isMe}
+        className={btnBase} style={{ background: isMe ? '#fff6da' : 'rgba(255,255,255,0.75)', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill={isMe ? '#f5b800' : 'none'} stroke={isMe ? '#d99a00' : '#9aa3af'} strokeWidth="1.8" strokeLinejoin="round">
+          <path d="M12 2.5l2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 21.3l-5.8 3.05 1.1-6.45-4.7-4.6 6.5-.95z" />
+        </svg>
+      </button>
     </div>
   );
 }
@@ -86,6 +130,10 @@ function Hero({ profile }: { profile: SwimmerProfile }) {
             </span>
           )}
         </div>
+      </div>
+      {/* ❤/⭐ — справа на десктопе, под мета на мобиле */}
+      <div className="sm:ml-auto">
+        <FavoriteControls swimmerId={profile.id} />
       </div>
     </div>
   );
