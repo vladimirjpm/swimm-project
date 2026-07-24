@@ -70,8 +70,10 @@
      `SportsmenDetails` ссылка «Open full profile →» (по `swimmer_id` строки).
    - Проверено вживую (API :5079): id=6415 → полный профиль+карьера (2 comp/4 races/449 pts/
      4 gold/best times), id=1 → 404 «Swimmer not found», консоль чистая.
-   - TODO-доводка: галерея медиа на странице, favorite/⭐-«это я», мобильная/dark пиксельная
-     доводка; шире развесить ссылки на страницу (results-строки, overview-медалист).
+   - ✅ Медиа-галерея (v2): `GET /api/swimmers/{id}/media` (`GetVisibleForSwimmerAsync` — те же
+     правила видимости, 4 теста), секция Media на странице (грид + лайтбокс). ✅ Ссылки в
+     overview (best swim/medalist) + попап SportsmenDetails.
+   - TODO-доводка: favorite/⭐-«это я» на странице, мобильная/dark пиксельная доводка.
 3. ~~**Add media edge**~~ ✅ СДЕЛАНО: `use-competition-add-media.tsx` теперь мёржит
    пловцов из `/api/me/media` + `/api/me/favorites` (параллельный fetch, дедуп по
    swimmer_id; медиа → hint 'has media', фавориты → 'favorite'). Юзер без медиа, но с
