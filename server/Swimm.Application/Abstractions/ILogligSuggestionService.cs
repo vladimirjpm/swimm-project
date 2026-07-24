@@ -6,6 +6,10 @@ public sealed record LogligSuggestResult(bool Accepted, string? Error);
 /// <summary>Итог ночной верификации предложений (для лога/мониторинга).</summary>
 public sealed record LogligSuggestionVerifyReport(int Checked, int Verified, int Rejected, int Skipped);
 
+/// <summary>Публичный статус привязки. LogligId отдаётся только при Verified (карточка
+/// loglig.com публична) — для Suggested/Rejected остаётся скрытым, как и аудит.</summary>
+public sealed record LogligStatusResult(string? Status, int? LogligId);
+
 /// <summary>
 /// Краудсорс-привязка Loglig ID (docs/loglig-id-plan.md, шаг 6): залогиненный пользователь
 /// предлагает ID (пишется как Suggested без синхронной проверки), ночной джоб верифицирует
@@ -20,7 +24,7 @@ public interface ILogligSuggestionService
     /// <summary>Проверить все Suggested-привязки (вызывается ночным джобом).</summary>
     Task<LogligSuggestionVerifyReport> VerifySuggestedAsync(CancellationToken ct = default);
 
-    /// <summary>Статус привязки для публичного показа (без LogligId и аудита). Null и для
-    /// несуществующего пловца — не палим существование.</summary>
-    Task<string?> GetStatusAsync(int swimmerId, CancellationToken ct = default);
+    /// <summary>Статус привязки для публичного показа (LogligId — только при Verified,
+    /// без аудита). Null-статус и для несуществующего пловца — не палим существование.</summary>
+    Task<LogligStatusResult> GetStatusAsync(int swimmerId, CancellationToken ct = default);
 }

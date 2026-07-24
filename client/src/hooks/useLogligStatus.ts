@@ -47,6 +47,8 @@ export function extractLogligId(input: string): number | null {
  */
 export function useLogligStatus(swimmerId: number | null | undefined) {
   const [status, setStatus] = useState<string | null>(null);
+  // ID приходит только при Verified — для ссылки на публичную карточку loglig.com.
+  const [logligId, setLogligId] = useState<number | null>(null);
 
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -56,16 +58,19 @@ export function useLogligStatus(swimmerId: number | null | undefined) {
 
   const refresh = useCallback(async () => {
     if (swimmerId == null) {
-      if (mountedRef.current) setStatus(null);
+      if (mountedRef.current) { setStatus(null); setLogligId(null); }
       return;
     }
     try {
       const r = await fetch(`/api/swimmers/${swimmerId}/loglig-status`, { credentials: 'include' });
-      if (!r.ok) { if (mountedRef.current) setStatus(null); return; }
+      if (!r.ok) { if (mountedRef.current) { setStatus(null); setLogligId(null); } return; }
       const data = await r.json();
-      if (mountedRef.current) setStatus(data.status ?? null);
+      if (mountedRef.current) {
+        setStatus(data.status ?? null);
+        setLogligId(typeof data.logligId === 'number' ? data.logligId : null);
+      }
     } catch {
-      if (mountedRef.current) setStatus(null);
+      if (mountedRef.current) { setStatus(null); setLogligId(null); }
     }
   }, [swimmerId]);
 
@@ -74,13 +79,13 @@ export function useLogligStatus(swimmerId: number | null | undefined) {
   }, [refresh]);
 
   const suggest = useCallback(async (input: string): Promise<{ ok: boolean; error?: string }> => {
-    if (swimmerId == null) return { ok: false, error: 'Пловец не найден' };
+    if (swimmerId == null) return { ok: false, error: 'Swimmer not found' };
 
     const logligId = extractLogligId(input);
-    if (logligId == null) return { ok: false, error: 'Не похоже на ссылку карточки loglig' };
+    if (logligId == null) return { ok: false, error: "Doesn't look like a loglig player card link" };
 
     const token = await fetchAntiforgeryToken();
-    if (!token) return { ok: false, error: 'Не удалось получить токен — попробуйте ещё раз' };
+    if (!token) return { ok: false, error: 'Could not get a token — please try again' };
 
     try {
       const r = await fetch(`/api/swimmers/${swimmerId}/loglig-suggest`, {
@@ -93,16 +98,16 @@ export function useLogligStatus(swimmerId: number | null | undefined) {
       if (!r.ok) {
         invalidateTokenCache();
         const data = await r.json().catch(() => ({}));
-        return { ok: false, error: data.error ?? 'Не удалось отправить предложение' };
+        return { ok: false, error: data.error ?? 'Failed to submit suggestion' };
       }
 
       if (mountedRef.current) setStatus('Suggested');
       return { ok: true };
     } catch {
       invalidateTokenCache();
-      return { ok: false, error: 'Не удалось отправить предложение' };
+      return { ok: false, error: 'Failed to submit suggestion' };
     }
   }, [swimmerId]);
 
-  return { status, refresh, suggest };
+  return { status, logligId, refresh, suggest };
 }

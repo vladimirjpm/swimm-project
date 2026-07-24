@@ -189,6 +189,7 @@ function SportsmenDetails() {
               {swimmerId != null && (
                 <LogligSuggestBadge
                   status={logligStatus.status}
+                  logligId={logligStatus.logligId}
                   isAuthenticated={isAuthenticated}
                   suggest={logligStatus.suggest}
                 />
@@ -369,10 +370,12 @@ function SportsmenDetails() {
 // не плодим CTA логина рядом.
 function LogligSuggestBadge({
   status,
+  logligId,
   isAuthenticated,
   suggest,
 }: {
   status: string | null;
+  logligId: number | null;
   isAuthenticated: boolean;
   suggest: (input: string) => Promise<{ ok: boolean; error?: string }>;
 }) {
@@ -382,12 +385,25 @@ function LogligSuggestBadge({
   const [submitting, setSubmitting] = useState(false);
 
   if (status === 'Verified') {
+    // Есть подтверждённый ID → бейдж ведёт на публичную карточку игрока loglig.com.
+    const badgeClass = 'inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold';
+    const badgeStyle = { background: 'rgba(255,255,255,0.9)', color: 'var(--theme-primary)' };
+    if (logligId != null) {
+      return (
+        <a
+          href={`https://loglig.com:2053/Players/Details/${logligId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open verified loglig.com profile"
+          className={`${badgeClass} hover:underline`}
+          style={badgeStyle}
+        >
+          loglig ✓
+        </a>
+      );
+    }
     return (
-      <span
-        title="Профиль на loglig.com подтверждён"
-        className="inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold"
-        style={{ background: 'rgba(255,255,255,0.9)', color: 'var(--theme-primary)' }}
-      >
+      <span title="Verified loglig.com profile" className={badgeClass} style={badgeStyle}>
         loglig ✓
       </span>
     );
@@ -399,7 +415,7 @@ function LogligSuggestBadge({
         className="inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold"
         style={{ background: 'rgba(255,255,255,0.75)', color: '#6b7280' }}
       >
-        loglig: на проверке
+        loglig: pending review
       </span>
     );
   }
@@ -415,7 +431,7 @@ function LogligSuggestBadge({
       setOpen(false);
       setInput('');
     } else {
-      setError(res.error ?? 'Не удалось отправить предложение');
+      setError(res.error ?? 'Failed to submit suggestion');
     }
   };
 
@@ -427,7 +443,7 @@ function LogligSuggestBadge({
         className="inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold hover:opacity-90"
         style={{ background: 'rgba(255,255,255,0.9)', color: 'var(--theme-mode-text-secondary)' }}
       >
-        Предложить loglig-профиль
+        Suggest loglig profile
       </button>
     );
   }
@@ -441,7 +457,7 @@ function LogligSuggestBadge({
           autoFocus
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
-          placeholder="ссылка на карточку loglig.com"
+          placeholder="loglig.com player card link"
           className="w-[150px] min-w-0 rounded px-1.5 py-1 text-[10px]"
           style={{ border: '1px solid var(--theme-mode-border)' }}
         />
@@ -452,7 +468,7 @@ function LogligSuggestBadge({
           className="shrink-0 rounded px-1.5 py-1 text-[10px] font-bold text-white disabled:opacity-50"
           style={{ background: 'var(--theme-primary)' }}
         >
-          Отправить
+          Submit
         </button>
         <button
           type="button"
@@ -460,7 +476,7 @@ function LogligSuggestBadge({
           className="shrink-0 rounded px-1.5 py-1 text-[10px] font-bold"
           style={{ background: 'var(--theme-mode-surface-alt)', color: 'var(--theme-mode-text-secondary)' }}
         >
-          Отмена
+          Cancel
         </button>
       </div>
       {error && <div className="text-[9px]" style={{ color: '#e23b5a' }}>{error}</div>}

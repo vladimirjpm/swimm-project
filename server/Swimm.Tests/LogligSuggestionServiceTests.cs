@@ -148,9 +148,24 @@ public class LogligSuggestionServiceTests
         db.Swimmers.Add(s);
         await db.SaveChangesAsync();
 
-        var status = await Service(db).GetStatusAsync(s.Id);
+        var result = await Service(db).GetStatusAsync(s.Id);
 
-        Assert.Equal("Verified", status);
+        Assert.Equal("Verified", result.Status);
+        Assert.Equal(304199, result.LogligId);
+    }
+
+    [Fact]
+    public async Task GetStatus_SuggestedSwimmer_HidesLogligId()
+    {
+        await using var db = CreateDb(nameof(GetStatus_SuggestedSwimmer_HidesLogligId));
+        var s = S("ברנצב", "סבינה", 2017, "Suggested", 304199);
+        db.Swimmers.Add(s);
+        await db.SaveChangesAsync();
+
+        var result = await Service(db).GetStatusAsync(s.Id);
+
+        Assert.Equal("Suggested", result.Status);
+        Assert.Null(result.LogligId);
     }
 
     [Fact]
@@ -158,9 +173,10 @@ public class LogligSuggestionServiceTests
     {
         await using var db = CreateDb(nameof(GetStatus_UnknownSwimmer_ReturnsNull));
 
-        var status = await Service(db).GetStatusAsync(999999);
+        var result = await Service(db).GetStatusAsync(999999);
 
-        Assert.Null(status);
+        Assert.Null(result.Status);
+        Assert.Null(result.LogligId);
     }
 
     // ── VerifySuggestedAsync: ночной джоб ─────────────────────────────────────

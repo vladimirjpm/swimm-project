@@ -31,12 +31,13 @@ public class LogligSuggestController(ILogligSuggestionService suggestions) : Con
         return result.Accepted ? Ok(result) : BadRequest(new { error = result.Error });
     }
 
-    /// <summary>Статус привязки для показа кнопки/бейджа. Публичный (без [Authorize]) — только
-    /// статус, без LogligId и аудита; не кэшируется (точечный дешёвый запрос).</summary>
+    /// <summary>Статус привязки для показа кнопки/бейджа. Публичный (без [Authorize]) —
+    /// статус + logligId только при Verified (ссылка на публичную карточку), без аудита;
+    /// не кэшируется (точечный дешёвый запрос).</summary>
     [HttpGet("{id:int}/loglig-status")]
     public async Task<IActionResult> Status(int id, CancellationToken ct)
     {
-        var status = await suggestions.GetStatusAsync(id, ct);
-        return Ok(new { status });
+        var result = await suggestions.GetStatusAsync(id, ct);
+        return Ok(new { status = result.Status, logligId = result.LogligId });
     }
 }

@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
 using Swimm.Domain.Entities;
@@ -23,20 +23,20 @@ public class LogligSuggestionService(
     public async Task<LogligSuggestResult> SuggestAsync(int swimmerId, int logligId, int userId, CancellationToken ct = default)
     {
         if (logligId <= 0)
-            return new LogligSuggestResult(false, "Некорректный loglig ID");
+            return new LogligSuggestResult(false, "Invalid loglig ID");
 
         var swimmer = await db.Swimmers.FindAsync([swimmerId], ct);
         if (swimmer is null)
-            return new LogligSuggestResult(false, "Пловец не найден");
+            return new LogligSuggestResult(false, "Swimmer not found");
 
         switch (swimmer.LogligIdStatus)
         {
             case "Verified":
-                return new LogligSuggestResult(false, "Пловец уже привязан");
+                return new LogligSuggestResult(false, "Swimmer is already linked");
             case "Suggested":
-                return new LogligSuggestResult(false, "Предложение уже ожидает проверки");
+                return new LogligSuggestResult(false, "A suggestion is already pending review");
             case "Rejected" when swimmer.LogligId == logligId:
-                return new LogligSuggestResult(false, "Этот loglig ID уже был отклонён для этого пловца");
+                return new LogligSuggestResult(false, "This loglig ID was already rejected for this swimmer");
         }
 
         var holderError = await FreeRejectedHolderAsync(logligId, swimmerId, ct);
@@ -58,7 +58,7 @@ public class LogligSuggestionService(
         {
             // Гонка на уникальном индексе LogligId.
             db.Entry(swimmer).State = EntityState.Unchanged;
-            return new LogligSuggestResult(false, $"loglig ID {logligId} уже привязан к другому пловцу");
+            return new LogligSuggestResult(false, $"loglig ID {logligId} is already linked to another swimmer");
         }
 
         logger.LogInformation(
@@ -67,11 +67,18 @@ public class LogligSuggestionService(
         return new LogligSuggestResult(true, null);
     }
 
-    public async Task<string?> GetStatusAsync(int swimmerId, CancellationToken ct = default) =>
-        await db.Swimmers.AsNoTracking()
+    public async Task<LogligStatusResult> GetStatusAsync(int swimmerId, CancellationToken ct = default)
+    {
+        var row = await db.Swimmers.AsNoTracking()
             .Where(s => s.Id == swimmerId)
-            .Select(s => s.LogligIdStatus)
+            .Select(s => new { s.LogligIdStatus, s.LogligId })
             .FirstOrDefaultAsync(ct);
+
+        // ID наружу — только у подтверждённой привязки (ссылка на публичную карточку).
+        return new LogligStatusResult(
+            row?.LogligIdStatus,
+            row?.LogligIdStatus == "Verified" ? row.LogligId : null);
+    }
 
     public async Task<LogligSuggestionVerifyReport> VerifySuggestedAsync(CancellationToken ct = default)
     {
@@ -165,7 +172,7 @@ public class LogligSuggestionService(
             return null;
 
         if (holder.LogligIdStatus != "Rejected")
-            return $"loglig ID {logligId} уже привязан к другому пловцу";
+            return $"loglig ID {logligId} is already linked to another swimmer";
 
         holder.LogligId = null;
         holder.LogligIdStatus = null;
