@@ -27,7 +27,15 @@ public class UserMediaRepository : IUserMediaRepository
             .Where(m => m.UserId == userId);
 
         if (swimmerId != null)
-            query = query.Where(m => m.SwimmerId == swimmerId.Value);
+            // Эстафетное медиа принадлежит всей команде, а привязано к владельцу строки
+            // (одна нога). Поэтому карточка пловца видит и своё медиа, и медиа на эстафетах,
+            // где он — участник по RelayMembers (см. docs/relays.md). Owner-фильтр (UserId)
+            // сохраняется — чужое медиа не подтягивается.
+            query = query.Where(m =>
+                m.SwimmerId == swimmerId.Value
+                || (m.ResultRecord != null && m.ResultRecord.RelayId != null
+                    && _db.RelayMembers.Any(rm =>
+                        rm.RelayId == m.ResultRecord.RelayId && rm.SwimmerId == swimmerId.Value)));
 
         return await query
             .OrderByDescending(m => m.CreatedAt)

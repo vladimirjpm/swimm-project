@@ -362,6 +362,64 @@ public class UserMediaRepositoryTests
         Assert.Equal(competition.Id, dto.CompetitionId);
     }
 
+    // ── Тест: медиа эстафеты видно НЕ-владельцу строки (по RelayMembers) ─────
+
+    [Fact]
+    public async Task GetForUser_RelayMedia_SurfacesForCoMemberSwimmer()
+    {
+        // Баг (docs/relays.md): медиа эстафеты привязано к владельцу строки (одна нога),
+        // а принадлежит всей команде. Карточка ноги-не-владельца обязана его показать.
+        await using var db = CreateDb(nameof(GetForUser_RelayMedia_SurfacesForCoMemberSwimmer));
+        var (user, owner) = await SeedAsync(db);          // owner — первая нога, владелец строки
+        var coMember = await SeedSecondSwimmerAsync(db);  // co-нога той же эстафеты
+        var outsider = new Swimmer
+        {
+            LastName = "Чужой", FirstName = "Не", LastNameEn = "Outsider", FirstNameEn = "No",
+            BirthYear = 2002
+        };
+        db.Swimmers.Add(outsider);
+        var competition = await SeedCompetitionAsync(db);
+        var club = new Club { Name = "RelayClub", NameEn = "RelayClub" };
+        var style = new Style { Name = "medley" };
+        db.Clubs.Add(club);
+        db.Styles.Add(style);
+        await db.SaveChangesAsync();
+
+        var relay = new Relay { TeamName = "Team", SwimmersName = "Owner, Co" };
+        db.Relays.Add(relay);
+        await db.SaveChangesAsync();
+        relay.Members.Add(new RelayMember { RelayId = relay.Id, SwimmerId = owner.Id, LegOrder = 1 });
+        relay.Members.Add(new RelayMember { RelayId = relay.Id, SwimmerId = coMember.Id, LegOrder = 2 });
+        await db.SaveChangesAsync();
+
+        var relayResult = new ResultRecord
+        {
+            SwimmerId = owner.Id, CompetitionId = competition.Id, ClubId = club.Id, StyleId = style.Id,
+            Distance = "4X50", Gender = "male", CompetitionDate = DateTime.UtcNow, Position = 1,
+            TimeMillisecond = 215000, RelayId = relay.Id,
+        };
+        db.Results.Add(relayResult);
+        await db.SaveChangesAsync();
+
+        var repo = new UserMediaRepository(db);
+        var request = YoutubeRequest(owner.Id);   // привязка к владельцу строки (валидация AddAsync)
+        request.ResultId = relayResult.Id;
+        var media = await repo.AddAsync(user.Id, request);
+        Assert.NotNull(media);
+
+        // co-нога видит медиа эстафеты, хотя media.SwimmerId = владелец
+        var forCoMember = await repo.GetForUserAsync(user.Id, coMember.Id);
+        Assert.Contains(forCoMember, m => m.Id == media!.Id);
+
+        // владелец видит по прямому пути
+        var forOwner = await repo.GetForUserAsync(user.Id, owner.Id);
+        Assert.Contains(forOwner, m => m.Id == media!.Id);
+
+        // посторонний (не член эстафеты) — не видит
+        var forOutsider = await repo.GetForUserAsync(user.Id, outsider.Id);
+        Assert.DoesNotContain(forOutsider, m => m.Id == media!.Id);
+    }
+
     // ── Тест: каскад — удаление Swimmer удаляет его UserMedia ───────────────
 
     [Fact]
