@@ -9,13 +9,568 @@
 <x-dc>
 <helmet>
 <meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 body{margin:0;background:#e9ebef;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#1a1a1a;}
 a{color:#059669;text-decoration:none;} a:hover{color:#047857;}
 @keyframes livePulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.45;transform:scale(.8);}}
+@keyframes caustics{0%{background-position:0 0,120px 60px;}100%{background-position:340px 180px,-220px -140px;}}
+@keyframes shimmer{0%{transform:translateX(-30%);}100%{transform:translateX(130%);}}
+@keyframes marquee{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
+@keyframes bob{0%,100%{transform:translateY(0);}50%{transform:translateY(-6px);}}
+@keyframes waterline{0%{background-position:0 0;}100%{background-position:200px 0;}}
 </style>
 </helmet>
-<section style="display:flex;flex-direction:column;gap:20px;padding:40px 40px 0;">
+<section style="display:flex;flex-direction:column;gap:24px;padding:40px 40px 0;">
+  <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;">
+    <span style="background:#1a1a1a;color:#fff;border-radius:8px;padding:4px 10px;font-size:13px;font-weight:800;">6</span>
+    <span style="font-size:15px;font-weight:800;">Эксперименты</span>
+    <span style="font-size:12.5px;color:#5b6470;font-weight:600;"><a href="#6a">6a</a> — «Лейн 8», вау-эффект под водой · <a href="#6b">6b</a> — «Стартовый сигнал», плакатная энергия</span>
+  </div>
+
+  <!-- ============ 6a: WOW · underwater ============ -->
+  <div id="6a" style="width:1440px;flex:none;display:flex;flex-direction:column;gap:10px;">
+    <div style="display:flex;align-items:baseline;gap:10px;"><span style="background:#1a1a1a;color:#fff;border-radius:7px;padding:3px 9px;font-size:12px;font-weight:800;">6a</span><span style="font-size:13px;font-weight:700;">Лейн 8 — вода, свет, стекло</span></div>
+    <div style="position:relative;border-radius:20px;overflow:hidden;background:linear-gradient(180deg,#062338 0%,#07344f 42%,#04202f 100%);color:#eaf6ff;font-family:'Space Grotesk',ui-sans-serif,system-ui,sans-serif;">
+      <span style="position:absolute;inset:0;pointer-events:none;opacity:.5;background-image:radial-gradient(ellipse 220px 90px at 20% 30%,rgba(120,225,255,.28),transparent 60%),radial-gradient(ellipse 300px 110px at 70% 70%,rgba(90,255,220,.2),transparent 60%);background-size:600px 340px,720px 420px;animation:caustics 26s linear infinite alternate;"></span>
+      <span style="position:absolute;left:0;right:0;top:0;height:2px;background:repeating-linear-gradient(90deg,rgba(120,225,255,.9) 0 22px,rgba(120,225,255,0) 22px 44px);animation:waterline 6s linear infinite;"></span>
+
+      <div style="position:relative;padding:34px 40px 26px;display:flex;flex-direction:column;gap:26px;">
+        <!-- title -->
+        <div style="display:flex;align-items:flex-end;gap:26px;flex-wrap:wrap;">
+          <div style="min-width:0;flex:1;">
+            <div style="display:flex;align-items:center;gap:10px;font-size:11px;font-weight:700;letter-spacing:.28em;text-transform:uppercase;color:#7fe3ff;">
+              <span style="width:26px;height:1px;background:#7fe3ff;"></span>25m · 16–19 feb 2026 · israel
+            </div>
+            <h2 dir="auto" style="margin:10px 0 0;font-size:44px;font-weight:700;line-height:1.02;letter-spacing:-.02em;">אליפות ישראל "ארנה" 8-11</h2>
+            <div style="margin-top:12px;position:relative;height:3px;border-radius:2px;overflow:hidden;background:rgba(127,227,255,.18);">
+              <span style="position:absolute;inset:0;width:34%;background:linear-gradient(90deg,transparent,#7fe3ff,transparent);animation:shimmer 3.4s ease-in-out infinite;"></span>
+            </div>
+          </div>
+          <div style="display:flex;gap:34px;align-items:flex-end;flex:none;">
+            <span style="display:flex;flex-direction:column;gap:2px;"><span style="font-size:34px;font-weight:700;line-height:1;">1143</span><span style="font-size:10.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#7fa8c4;">swimmers</span></span>
+            <span style="display:flex;flex-direction:column;gap:2px;"><span style="font-size:34px;font-weight:700;line-height:1;">61</span><span style="font-size:10.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#7fa8c4;">clubs</span></span>
+            <span style="display:flex;flex-direction:column;gap:2px;"><span style="font-size:34px;font-weight:700;line-height:1;">3029</span><span style="font-size:10.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#7fa8c4;">results</span></span>
+            <button style="border:1px solid rgba(127,227,255,.45);background:rgba(127,227,255,.12);color:#eaf6ff;border-radius:999px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;backdrop-filter:blur(6px);">Change ▾</button>
+          </div>
+        </div>
+
+        <!-- hero: best swims as lanes -->
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;">
+          <a href="#6a" style="position:relative;border-radius:16px;padding:22px 24px;color:inherit;overflow:hidden;background:linear-gradient(135deg,rgba(255,255,255,.13),rgba(255,255,255,.04));border:1px solid rgba(160,225,255,.28);backdrop-filter:blur(10px);display:flex;align-items:center;gap:22px;">
+            <span style="position:absolute;left:0;top:0;bottom:0;width:6px;background:repeating-linear-gradient(180deg,#7fe3ff 0 12px,#0a3b57 12px 24px);"></span>
+            <span style="flex:none;display:flex;flex-direction:column;align-items:center;animation:bob 5s ease-in-out infinite;">
+              <span style="font-size:64px;font-weight:700;line-height:.9;letter-spacing:-.03em;color:#7fe3ff;">303</span>
+              <span style="font-size:10px;font-weight:700;letter-spacing:.3em;text-transform:uppercase;color:#7fa8c4;">points</span>
+            </span>
+            <span dir="auto" style="min-width:0;display:flex;flex-direction:column;gap:5px;">
+              <span style="font-size:11px;font-weight:700;letter-spacing:.24em;text-transform:uppercase;color:#7fa8c4;">♂ fastest by points</span>
+              <span style="font-size:21px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">איתמר לידאי קלר</span>
+              <span style="font-size:13.5px;font-weight:500;color:#a8c6d8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">מכבי וייסגל רחובות</span>
+              <span style="font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em;">02:26.79</span>
+              <span style="font-size:12px;font-weight:500;color:#7fa8c4;">200m freestyle · day 3 · lane 4</span>
+            </span>
+          </a>
+          <a href="#6a" style="position:relative;border-radius:16px;padding:22px 24px;color:inherit;overflow:hidden;background:linear-gradient(135deg,rgba(255,255,255,.13),rgba(255,255,255,.04));border:1px solid rgba(255,175,225,.28);backdrop-filter:blur(10px);display:flex;align-items:center;gap:22px;">
+            <span style="position:absolute;left:0;top:0;bottom:0;width:6px;background:repeating-linear-gradient(180deg,#ff9ed8 0 12px,#0a3b57 12px 24px);"></span>
+            <span style="flex:none;display:flex;flex-direction:column;align-items:center;animation:bob 5s ease-in-out infinite .8s;">
+              <span style="font-size:64px;font-weight:700;line-height:.9;letter-spacing:-.03em;color:#ff9ed8;">346</span>
+              <span style="font-size:10px;font-weight:700;letter-spacing:.3em;text-transform:uppercase;color:#c9a5bb;">points</span>
+            </span>
+            <span dir="auto" style="min-width:0;display:flex;flex-direction:column;gap:5px;">
+              <span style="font-size:11px;font-weight:700;letter-spacing:.24em;text-transform:uppercase;color:#c9a5bb;">♀ fastest by points</span>
+              <span style="font-size:21px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">גולי נסאר</span>
+              <span style="font-size:13.5px;font-weight:500;color:#d8bccb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">הפועל אקווה נוף הגליל</span>
+              <span style="font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em;">00:34.10</span>
+              <span style="font-size:12px;font-weight:500;color:#c9a5bb;">50m butterfly · day 2 · lane 5</span>
+            </span>
+          </a>
+        </div>
+
+        <!-- lanes: high point award as pool lanes -->
+        <div style="display:flex;flex-direction:column;gap:0;border-radius:16px;overflow:hidden;border:1px solid rgba(160,225,255,.2);background:rgba(3,24,37,.5);">
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid rgba(160,225,255,.15);">
+            <span style="font-size:13px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:#7fe3ff;">high point award</span>
+            <span style="font-size:12px;color:#7fa8c4;">по очкам · каждый возраст</span>
+            <span style="flex:1;"></span>
+            <span style="font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#7fa8c4;">♂ &nbsp;·&nbsp; ♀</span>
+          </div>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 64px minmax(0,1fr);align-items:center;gap:0;border-bottom:1px solid rgba(160,225,255,.1);background:linear-gradient(90deg,rgba(127,227,255,.07),transparent 45%,rgba(255,158,216,.07));">
+            <a href="#6a" dir="auto" style="display:flex;align-items:center;gap:14px;padding:13px 20px;color:inherit;"><span style="font-size:26px;font-weight:700;color:#7fe3ff;min-width:64px;">284</span><span style="min-width:0;display:flex;flex-direction:column;"><span style="font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">יניר חבקה</span><span style="font-size:12px;color:#7fa8c4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">קאנטרי כפר ורדים</span></span></a>
+            <span style="text-align:center;font-size:12px;font-weight:700;letter-spacing:.1em;color:#a8c6d8;">0–8</span>
+            <a href="#6a" dir="auto" style="display:flex;align-items:center;justify-content:flex-end;gap:14px;padding:13px 20px;color:inherit;"><span style="min-width:0;display:flex;flex-direction:column;align-items:flex-end;"><span style="font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">רהף אבו ריא</span><span style="font-size:12px;color:#c9a5bb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">הפועל לב הגליל סחנין</span></span><span style="font-size:26px;font-weight:700;color:#ff9ed8;min-width:64px;text-align:right;">180</span></a>
+          </div>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 64px minmax(0,1fr);align-items:center;border-bottom:1px solid rgba(160,225,255,.1);background:linear-gradient(90deg,rgba(127,227,255,.07),transparent 45%,rgba(255,158,216,.07));">
+            <a href="#6a" dir="auto" style="display:flex;align-items:center;gap:14px;padding:13px 20px;color:inherit;"><span style="font-size:26px;font-weight:700;color:#7fe3ff;min-width:64px;">603</span><span style="min-width:0;display:flex;flex-direction:column;"><span style="font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">דניאל פוליאקוב</span><span style="font-size:12px;color:#7fa8c4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">הפועל בת ים</span></span></a>
+            <span style="text-align:center;font-size:12px;font-weight:700;letter-spacing:.1em;color:#a8c6d8;">9–10</span>
+            <a href="#6a" dir="auto" style="display:flex;align-items:center;justify-content:flex-end;gap:14px;padding:13px 20px;color:inherit;"><span style="min-width:0;display:flex;flex-direction:column;align-items:flex-end;"><span style="font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">ויקטוריה זכרוב</span><span style="font-size:12px;color:#c9a5bb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">הפועל דולפין נתניה</span></span><span style="font-size:26px;font-weight:700;color:#ff9ed8;min-width:64px;text-align:right;">711</span></a>
+          </div>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 64px minmax(0,1fr);align-items:center;background:linear-gradient(90deg,rgba(127,227,255,.07),transparent 45%,rgba(255,158,216,.07));">
+            <a href="#6a" dir="auto" style="display:flex;align-items:center;gap:14px;padding:13px 20px;color:inherit;"><span style="font-size:26px;font-weight:700;color:#7fe3ff;min-width:64px;">796</span><span style="min-width:0;display:flex;flex-direction:column;"><span style="font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">איתמר לידאי קלר</span><span style="font-size:12px;color:#7fa8c4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">מכבי וייסגל רחובות</span></span></a>
+            <span style="text-align:center;font-size:12px;font-weight:700;letter-spacing:.1em;color:#a8c6d8;">11–12</span>
+            <a href="#6a" dir="auto" style="display:flex;align-items:center;justify-content:flex-end;gap:14px;padding:13px 20px;color:inherit;"><span style="min-width:0;display:flex;flex-direction:column;align-items:flex-end;"><span style="font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">גולי נסאר</span><span style="font-size:12px;color:#c9a5bb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">הפועל אקווה נוף הגליל</span></span><span style="font-size:26px;font-weight:700;color:#ff9ed8;min-width:64px;text-align:right;">987</span></a>
+          </div>
+        </div>
+
+        <!-- bottom row: personal + clubs -->
+        <div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px;">
+          <sc-if value="{{ loggedIn }}" hint-placeholder-val="{{ true }}">
+          <div style="border-radius:16px;padding:18px 20px;background:linear-gradient(135deg,rgba(255,214,102,.16),rgba(255,214,102,.05));border:1px solid rgba(255,214,102,.35);display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <span dir="auto" style="font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#ffd666;">⭐ ברנצב ולדימיר</span>
+              <span style="flex:1;"></span>
+              <a href="./results_main.html?competitionId=42&tab=swims&filter=my" style="font-size:13px;font-weight:700;color:#ffd666;">my swims — 0 →</a>
+            </div>
+            <div style="display:flex;gap:18px;flex-wrap:wrap;">
+              <span style="display:flex;flex-direction:column;"><span style="font-size:24px;font-weight:700;">0</span><span style="font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#c8b483;">swims</span></span>
+              <span style="display:flex;flex-direction:column;"><span style="font-size:24px;font-weight:700;">1</span><span style="font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#c8b483;">favorite</span></span>
+              <span style="display:flex;flex-direction:column;"><span style="font-size:24px;font-weight:700;">8</span><span style="font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#c8b483;">my media</span></span>
+              <span style="flex:1;"></span>
+              <button style="align-self:center;border:1px solid rgba(255,214,102,.5);background:transparent;color:#ffd666;border-radius:999px;padding:8px 16px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;">＋ add video / photo</button>
+            </div>
+          </div>
+          </sc-if>
+          <div style="border-radius:16px;padding:18px 20px;background:rgba(3,24,37,.5);border:1px solid rgba(160,225,255,.2);display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:11px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:#7fe3ff;">top clubs</span><span style="flex:1;"></span><a href="#6a" style="font-size:12.5px;font-weight:700;color:#7fe3ff;">clubs →</a></div>
+            <a href="#6a" dir="auto" style="display:flex;align-items:center;gap:12px;padding:7px 0;border-top:1px solid rgba(160,225,255,.12);color:inherit;min-width:0;"><span style="flex:none;font-size:12px;color:#7fa8c4;width:14px;">1</span><span style="min-width:0;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">מכבי וייסגל רחובות</span><span style="flex:1;"></span><span style="flex:none;font-size:17px;font-weight:700;color:#7fe3ff;">2793</span></a>
+            <a href="#6a" dir="auto" style="display:flex;align-items:center;gap:12px;padding:7px 0;border-top:1px solid rgba(160,225,255,.12);color:inherit;min-width:0;"><span style="flex:none;font-size:12px;color:#7fa8c4;width:14px;">2</span><span style="min-width:0;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">מכבי חיפה</span><span style="flex:1;"></span><span style="flex:none;font-size:17px;font-weight:700;color:#7fe3ff;">2719</span></a>
+            <a href="#6a" dir="auto" style="display:flex;align-items:center;gap:12px;padding:7px 0;border-top:1px solid rgba(160,225,255,.12);color:inherit;min-width:0;"><span style="flex:none;font-size:12px;color:#7fa8c4;width:14px;">3</span><span style="min-width:0;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">מכבי קרית ביאליק</span><span style="flex:1;"></span><span style="flex:none;font-size:17px;font-weight:700;color:#7fe3ff;">2454</span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 6b: poster energy ============ -->
+  <div id="6b" style="width:1440px;flex:none;display:flex;flex-direction:column;gap:10px;">
+    <div style="display:flex;align-items:baseline;gap:10px;"><span style="background:#1a1a1a;color:#fff;border-radius:7px;padding:3px 9px;font-size:12px;font-weight:800;">6b</span><span style="font-size:13px;font-weight:700;">Стартовый сигнал — плакат, хлорный жёлтый, стикеры</span></div>
+    <div style="background:#0b0b0c;border:3px solid #0b0b0c;border-radius:6px;overflow:hidden;font-family:'Archivo Black',ui-sans-serif,system-ui,sans-serif;color:#0b0b0c;">
+      <!-- marquee -->
+      <div style="background:#e8ff2a;overflow:hidden;padding:7px 0;border-bottom:3px solid #0b0b0c;">
+        <div style="display:flex;width:200%;animation:marquee 22s linear infinite;">
+          <span style="width:50%;display:flex;gap:26px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap;">
+            <span>25m pool</span><span>★</span><span>1143 swimmers</span><span>★</span><span>61 clubs</span><span>★</span><span>3029 results</span><span>★</span><span>21 records</span><span>★</span><span>day 3 of 3</span><span>★</span>
+          </span>
+          <span style="width:50%;display:flex;gap:26px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap;">
+            <span>25m pool</span><span>★</span><span>1143 swimmers</span><span>★</span><span>61 clubs</span><span>★</span><span>3029 results</span><span>★</span><span>21 records</span><span>★</span><span>day 3 of 3</span><span>★</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- title block -->
+      <div style="background:#0b0b0c;color:#f4f4f0;padding:26px 30px 24px;display:flex;align-items:flex-end;gap:26px;flex-wrap:wrap;">
+        <div style="min-width:0;flex:1;">
+          <div style="font-size:12px;letter-spacing:.3em;text-transform:uppercase;color:#e8ff2a;">16—19 feb 2026 / israel</div>
+          <div dir="auto" style="margin-top:10px;font-size:52px;line-height:.92;letter-spacing:-.015em;text-transform:uppercase;">אליפות ישראל<br><span style="color:#e8ff2a;">"ארנה" 8-11</span></div>
+        </div>
+        <div style="display:flex;gap:10px;flex:none;">
+          <button style="background:#e8ff2a;color:#0b0b0c;border:3px solid #e8ff2a;border-radius:0;padding:13px 20px;font-size:13px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;box-shadow:6px 6px 0 #f4f4f0;font-family:inherit;">＋ add media</button>
+          <button style="background:transparent;color:#f4f4f0;border:3px solid #f4f4f0;border-radius:0;padding:13px 20px;font-size:13px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;font-family:inherit;">change ▾</button>
+        </div>
+      </div>
+
+      <!-- tabs as chunky blocks -->
+      <div style="background:#f4f4f0;display:flex;gap:0;border-top:3px solid #0b0b0c;border-bottom:3px solid #0b0b0c;">
+        <span style="padding:12px 22px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;background:#0b0b0c;color:#e8ff2a;">overview</span>
+        <span style="padding:12px 22px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;border-left:3px solid #0b0b0c;">swims <span style="color:#6b6b6b;">3029</span></span>
+        <span style="padding:12px 22px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;border-left:3px solid #0b0b0c;">clubs <span style="color:#6b6b6b;">61</span></span>
+        <span style="padding:12px 22px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;border-left:3px solid #0b0b0c;">records <span style="color:#6b6b6b;">21</span></span>
+        <span style="padding:12px 22px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;border-left:3px solid #0b0b0c;">media <span style="color:#6b6b6b;">8</span></span>
+      </div>
+
+      <!-- body -->
+      <div style="background:#f4f4f0;padding:22px;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:22px;">
+        <div style="display:flex;flex-direction:column;gap:22px;min-width:0;">
+          <!-- big numbers duel -->
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0;border:3px solid #0b0b0c;background:#fff;">
+            <a href="#6b" style="padding:18px;color:inherit;display:flex;flex-direction:column;gap:6px;min-width:0;border-right:3px solid #0b0b0c;">
+              <span style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#6b6b6b;">best by points ♂</span>
+              <span style="font-size:76px;line-height:.85;letter-spacing:-.04em;">303</span>
+              <span dir="auto" style="font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">איתמר לידאי קלר</span>
+              <span dir="auto" style="font-size:12.5px;font-family:ui-sans-serif,system-ui,sans-serif;font-weight:600;color:#6b6b6b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">מכבי וייסגל רחובות</span>
+              <span style="margin-top:2px;align-self:flex-start;background:#0b0b0c;color:#e8ff2a;padding:5px 10px;font-size:14px;font-variant-numeric:tabular-nums;">02:26.79</span>
+              <span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#6b6b6b;">200m free · day 3</span>
+            </a>
+            <a href="#6b" style="padding:18px;color:inherit;display:flex;flex-direction:column;gap:6px;min-width:0;background:#e8ff2a;">
+              <span style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#4a5200;">best by points ♀</span>
+              <span style="font-size:76px;line-height:.85;letter-spacing:-.04em;">346</span>
+              <span dir="auto" style="font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">גולי נסאר</span>
+              <span dir="auto" style="font-size:12.5px;font-family:ui-sans-serif,system-ui,sans-serif;font-weight:600;color:#4a5200;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">הפועל אקווה נוף הגליל</span>
+              <span style="margin-top:2px;align-self:flex-start;background:#0b0b0c;color:#e8ff2a;padding:5px 10px;font-size:14px;font-variant-numeric:tabular-nums;">00:34.10</span>
+              <span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#4a5200;">50m fly · day 2</span>
+            </a>
+          </div>
+
+          <!-- HPA as scoreboard -->
+          <div style="border:3px solid #0b0b0c;background:#fff;">
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:3px solid #0b0b0c;background:#0b0b0c;color:#f4f4f0;">
+              <span style="font-size:13px;letter-spacing:.16em;text-transform:uppercase;">high point award</span>
+              <span style="flex:1;"></span>
+              <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#e8ff2a;">points per age</span>
+            </div>
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) 70px minmax(0,1fr);align-items:stretch;">
+              <a href="#6b" dir="auto" style="display:flex;align-items:center;gap:12px;padding:12px 16px;color:inherit;border-bottom:1px solid #d8d8d2;min-width:0;"><span style="flex:none;font-size:24px;">284</span><span style="min-width:0;display:flex;flex-direction:column;"><span style="font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">יניר חבקה</span><span style="font-family:ui-sans-serif,system-ui,sans-serif;font-size:11.5px;font-weight:600;color:#6b6b6b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">קאנטרי כפר ורדים</span></span></a>
+              <span style="display:flex;align-items:center;justify-content:center;background:#e8ff2a;border-left:3px solid #0b0b0c;border-right:3px solid #0b0b0c;border-bottom:1px solid #0b0b0c;font-size:13px;">0–8</span>
+              <a href="#6b" dir="auto" style="display:flex;align-items:center;justify-content:flex-end;gap:12px;padding:12px 16px;color:inherit;border-bottom:1px solid #d8d8d2;min-width:0;"><span style="min-width:0;display:flex;flex-direction:column;align-items:flex-end;"><span style="font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">רהף אבו ריא</span><span style="font-family:ui-sans-serif,system-ui,sans-serif;font-size:11.5px;font-weight:600;color:#6b6b6b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">הפועל לב הגליל סחנין</span></span><span style="flex:none;font-size:24px;">180</span></a>
+
+              <a href="#6b" dir="auto" style="display:flex;align-items:center;gap:12px;padding:12px 16px;color:inherit;border-bottom:1px solid #d8d8d2;min-width:0;"><span style="flex:none;font-size:24px;">603</span><span style="min-width:0;display:flex;flex-direction:column;"><span style="font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">דניאל פוליאקוב</span><span style="font-family:ui-sans-serif,system-ui,sans-serif;font-size:11.5px;font-weight:600;color:#6b6b6b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">הפועל בת ים</span></span></a>
+              <span style="display:flex;align-items:center;justify-content:center;background:#e8ff2a;border-left:3px solid #0b0b0c;border-right:3px solid #0b0b0c;border-bottom:1px solid #0b0b0c;font-size:13px;">9–10</span>
+              <a href="#6b" dir="auto" style="display:flex;align-items:center;justify-content:flex-end;gap:12px;padding:12px 16px;color:inherit;border-bottom:1px solid #d8d8d2;min-width:0;"><span style="min-width:0;display:flex;flex-direction:column;align-items:flex-end;"><span style="font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">ויקטוריה זכרוב</span><span style="font-family:ui-sans-serif,system-ui,sans-serif;font-size:11.5px;font-weight:600;color:#6b6b6b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">הפועל דולפין נתניה</span></span><span style="flex:none;font-size:24px;">711</span></a>
+
+              <a href="#6b" dir="auto" style="display:flex;align-items:center;gap:12px;padding:12px 16px;color:inherit;min-width:0;"><span style="flex:none;font-size:24px;">796</span><span style="min-width:0;display:flex;flex-direction:column;"><span style="font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">איתמר לידאי קלר</span><span style="font-family:ui-sans-serif,system-ui,sans-serif;font-size:11.5px;font-weight:600;color:#6b6b6b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">מכבי וייסגל רחובות</span></span></a>
+              <span style="display:flex;align-items:center;justify-content:center;background:#e8ff2a;border-left:3px solid #0b0b0c;border-right:3px solid #0b0b0c;font-size:13px;">11–12</span>
+              <a href="#6b" dir="auto" style="display:flex;align-items:center;justify-content:flex-end;gap:12px;padding:12px 16px;color:inherit;min-width:0;"><span style="min-width:0;display:flex;flex-direction:column;align-items:flex-end;"><span style="font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">גולי נסאר</span><span style="font-family:ui-sans-serif,system-ui,sans-serif;font-size:11.5px;font-weight:600;color:#6b6b6b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">הפועל אקווה נוף הגליל</span></span><span style="flex:none;font-size:24px;">987</span></a>
+            </div>
+          </div>
+        </div>
+
+        <!-- right stack -->
+        <div style="display:flex;flex-direction:column;gap:22px;min-width:0;">
+          <sc-if value="{{ loggedIn }}" hint-placeholder-val="{{ true }}">
+          <div style="border:3px solid #0b0b0c;background:#0b0b0c;color:#f4f4f0;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:8px 8px 0 #e8ff2a;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <span dir="auto" style="background:#e8ff2a;color:#0b0b0c;padding:4px 9px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;transform:rotate(-2deg);">⭐ ברנצב ולדימיר</span>
+              <span style="flex:1;"></span>
+              <a href="./results_main.html?competitionId=42&tab=swims&filter=my" style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#e8ff2a;">my swims →</a>
+            </div>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;">
+              <span style="display:flex;flex-direction:column;"><span style="font-size:30px;line-height:1;">0</span><span style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#8a8a84;">swims</span></span>
+              <span style="display:flex;flex-direction:column;"><span style="font-size:30px;line-height:1;">1</span><span style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#8a8a84;">fav</span></span>
+              <span style="display:flex;flex-direction:column;"><span style="font-size:30px;line-height:1;">8</span><span style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#8a8a84;">media</span></span>
+            </div>
+            <button style="align-self:flex-start;background:#e8ff2a;color:#0b0b0c;border:none;padding:9px 14px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;font-family:inherit;">＋ add video / photo</button>
+          </div>
+          </sc-if>
+
+          <div style="border:3px solid #0b0b0c;background:#fff;">
+            <div style="padding:11px 14px;border-bottom:3px solid #0b0b0c;font-size:12px;letter-spacing:.16em;text-transform:uppercase;">most decorated</div>
+            <a href="#6b" dir="auto" style="display:flex;align-items:center;gap:12px;padding:12px 14px;color:inherit;border-bottom:1px solid #d8d8d2;min-width:0;">
+              <span style="flex:none;background:#e8ff2a;padding:3px 7px;font-size:11px;letter-spacing:.1em;">♂</span>
+              <span style="min-width:0;display:flex;flex-direction:column;"><span style="font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">דניאל פוליאקוב</span><span style="font-family:ui-sans-serif,system-ui,sans-serif;font-size:11.5px;font-weight:600;color:#6b6b6b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">הפועל בת ים</span></span>
+              <span style="flex:1;"></span><span style="flex:none;font-size:13px;white-space:nowrap;">🥇3</span>
+            </a>
+            <a href="#6b" dir="auto" style="display:flex;align-items:center;gap:12px;padding:12px 14px;color:inherit;min-width:0;">
+              <span style="flex:none;background:#e8ff2a;padding:3px 7px;font-size:11px;letter-spacing:.1em;">♀</span>
+              <span style="min-width:0;display:flex;flex-direction:column;"><span style="font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">יסניה לרין</span><span style="font-family:ui-sans-serif,system-ui,sans-serif;font-size:11.5px;font-weight:600;color:#6b6b6b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">מכבי נהריה</span></span>
+              <span style="flex:1;"></span><span style="flex:none;font-size:13px;white-space:nowrap;">🥇3</span>
+            </a>
+          </div>
+
+          <div style="border:3px solid #0b0b0c;background:#fff;">
+            <div style="padding:11px 14px;border-bottom:3px solid #0b0b0c;display:flex;align-items:center;gap:10px;"><span style="font-size:12px;letter-spacing:.16em;text-transform:uppercase;">top clubs</span><span style="flex:1;"></span><a href="#6b" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#0b0b0c;">clubs →</a></div>
+            <a href="#6b" dir="auto" style="display:flex;align-items:center;gap:10px;padding:10px 14px;color:inherit;border-bottom:1px solid #d8d8d2;min-width:0;"><span style="flex:none;font-size:14px;width:16px;">1</span><span style="min-width:0;font-family:ui-sans-serif,system-ui,sans-serif;font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">מכבי וייסגל רחובות</span><span style="flex:1;"></span><span style="flex:none;font-size:16px;">2793</span></a>
+            <a href="#6b" dir="auto" style="display:flex;align-items:center;gap:10px;padding:10px 14px;color:inherit;border-bottom:1px solid #d8d8d2;min-width:0;"><span style="flex:none;font-size:14px;width:16px;">2</span><span style="min-width:0;font-family:ui-sans-serif,system-ui,sans-serif;font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">מכבי חיפה</span><span style="flex:1;"></span><span style="flex:none;font-size:16px;">2719</span></a>
+            <a href="#6b" dir="auto" style="display:flex;align-items:center;gap:10px;padding:10px 14px;color:inherit;min-width:0;"><span style="flex:none;font-size:14px;width:16px;">3</span><span style="min-width:0;font-family:ui-sans-serif,system-ui,sans-serif;font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">מכבי קרית ביאליק</span><span style="flex:1;"></span><span style="flex:none;font-size:16px;">2454</span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:14px;padding:40px 40px 0;">
+  <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;">
+    <span style="background:#1a1a1a;color:#fff;border-radius:8px;padding:4px 10px;font-size:13px;font-weight:800;">5</span>
+    <span style="font-size:15px;font-weight:800;">Экран 1920 — предложение по ширине</span>
+    <span style="font-size:12.5px;color:#5b6470;font-weight:600;">собрано по коду: app-topbar.tsx · competition-header-top/tabs.tsx · competition-overview.tsx · overview-shared.tsx · index.css (competition-blue, light)</span>
+  </div>
+  <div style="font-size:12.5px;font-weight:600;color:#5b6470;line-height:1.6;max-width:1180px;">
+    <b>Сейчас в коде:</b> ни у шапки, ни у Overview нет контейнера — <code>CompetitionHeader</code> и <code>&lt;div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-12"&gt;</code> тянутся на всю ширину окна, тогда как таблицы результатов уже ограничены <code>lg:max-w-[1180px] lg:mx-auto</code> (results-table.tsx, normative-*.tsx) → на 1920 шапка и Overview шире таблиц.<br>
+    <b>Предложение (диff):</b> один контейнер на страницу — <code>max-w-[1440px] mx-auto px-6</code>; фоны topbar / hero / tabs остаются край-в-край (внутрь них — тот же контейнер). Сетка Overview: <code>lg:grid-cols-12</code> оставить, но правую колонку зажать <code>xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_380px]</code>; 1024–1440 → 8+4, &lt;1024 → одна колонка (как сейчас <code>grid-cols-1</code>).
+  </div>
+  <div id="5a" style="width:1920px;flex:none;background:#f5f5f7;border:1px solid #dfe3ea;border-radius:14px;overflow:hidden;">
+    <div style="background:#09213c;">
+      <div style="max-width:1440px;margin:0 auto;padding:0 24px;height:46px;display:flex;align-items:center;justify-content:space-between;gap:16px;">
+        <span style="display:flex;align-items:center;gap:8px;flex:none;">
+          <span style="width:26px;height:26px;border-radius:8px;background:#0466c8;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;">S</span>
+          <span style="font-size:11px;font-weight:900;letter-spacing:.22em;color:#fff;">SWIM<span style="color:#0466c8;">HUB</span></span>
+        </span>
+        <span style="display:flex;align-items:center;gap:24px;">
+          <span style="height:46px;display:flex;align-items:center;font-size:13px;font-weight:700;color:rgba(255,255,255,.62);">Home</span>
+          <span style="height:46px;display:flex;align-items:center;font-size:13px;font-weight:700;color:rgba(255,255,255,.62);">Competitions</span>
+          <span style="height:46px;display:flex;align-items:center;font-size:13px;font-weight:700;color:rgba(255,255,255,.62);">Groups</span>
+          <span style="height:46px;display:flex;align-items:center;font-size:13px;font-weight:700;color:rgba(255,255,255,.62);">Normatives</span>
+          <span style="height:46px;display:flex;align-items:center;font-size:13px;font-weight:700;color:rgba(255,255,255,.62);">Records</span>
+          <span style="height:46px;display:flex;align-items:center;font-size:13px;font-weight:700;color:rgba(255,255,255,.62);">About</span>
+        </span>
+        <span style="display:flex;align-items:center;gap:8px;flex:none;">
+          <span style="width:30px;height:30px;border-radius:50%;background:#0466c8;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:900;">V</span>
+          <span style="font-size:12px;font-weight:700;color:#fff;">Vladimir Barentsev</span>
+          <span style="font-size:9px;color:#0466c8;">▾</span>
+        </span>
+      </div>
+    </div>
+    <div style="background:#0466c8;color:#fff;">
+      <div style="max-width:1440px;margin:0 auto;padding:14px 24px;display:flex;flex-wrap:wrap;align-items:center;gap:14px;">
+        <span style="width:64px;height:64px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:16px;font-size:30px;border:1px solid color-mix(in srgb,#fff 35%,transparent);background:color-mix(in srgb,#fff 20%,transparent);">🏆</span>
+        <div style="min-width:0;flex:1;">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+            <span dir="auto" style="font-size:26px;font-weight:900;line-height:1.15;">אליפות ישראל "ארנה" לגילאי 8-11 חורף 2026</span>
+            <span style="border:1px solid color-mix(in srgb,#fff 40%,transparent);background:color-mix(in srgb,#fff 15%,transparent);border-radius:999px;padding:2px 8px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;">3 Days</span>
+          </div>
+          <div style="margin-top:4px;display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;font-size:12.5px;font-weight:600;opacity:.9;">
+            <span>16/02/2026 – 19/02/2026</span><span>25m pool</span><span>Swimmers: 1143</span><span>Clubs: 61</span><span>Results so far: 3029</span>
+          </div>
+        </div>
+        <div style="display:flex;flex:none;align-items:center;gap:8px;">
+          <button style="border:none;border-radius:10px;padding:8px 14px;font-size:12.5px;font-weight:800;background:#fff;color:#0353a4;cursor:pointer;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.05);">＋ Add media</button>
+          <button style="min-height:40px;display:flex;align-items:center;gap:8px;border-radius:10px;padding:0 16px;font-size:13px;font-weight:800;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.4);color:#fff;cursor:pointer;white-space:nowrap;">Change <span style="font-size:10px;">▾</span></button>
+        </div>
+      </div>
+    </div>
+    <div style="background:#fff;border-bottom:1px solid #eef1f6;">
+      <div style="max-width:1440px;margin:0 auto;padding:12px 24px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr);gap:12px;">
+        <div style="background:#fffdf6;border:1px solid rgba(212,175,55,.45);border-radius:10px;padding:11px 13px;display:flex;flex-direction:column;gap:5px;">
+          <span dir="auto" style="align-self:flex-start;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800;background:rgba(212,175,55,.18);color:#8a6d1a;">⭐ ברנצב ולדימיר</span>
+          <span style="font-size:12.5px;font-weight:600;color:#5b6470;">No swims here yet</span>
+          <a href="#5a" style="font-size:13px;font-weight:800;color:#8a6d1a;">My swims here — 0 →</a>
+        </div>
+        <div style="background:#fffdf6;border:1px solid rgba(212,175,55,.45);border-radius:10px;padding:11px 13px;display:flex;flex-direction:column;gap:5px;">
+          <span style="align-self:flex-start;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800;background:rgba(212,175,55,.18);color:#8a6d1a;">❤️ Favorites</span>
+          <span style="font-size:12.5px;font-weight:600;color:#5b6470;">4 swims by 1 swimmer</span>
+          <a href="#5a" style="font-size:13px;font-weight:800;color:#8a6d1a;">My favorites here — 1 →</a>
+        </div>
+        <div style="background:#fffdf6;border:1px solid rgba(212,175,55,.45);border-radius:10px;padding:11px 13px;display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800;background:rgba(212,175,55,.18);color:#8a6d1a;white-space:nowrap;">My media — 8</span>
+            <span style="flex:1;"></span>
+            <button style="border:1px solid rgba(212,175,55,.45);background:#fff;color:#8a6d1a;border-radius:8px;padding:5px 11px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;">＋ Add video / photo</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,72px);gap:8px;">
+            <span style="height:44px;border-radius:7px;border:1px solid rgba(212,175,55,.45);background:repeating-linear-gradient(45deg,#f0ead6,#f0ead6 7px,#f7f2e2 7px,#f7f2e2 14px);"></span>
+            <span style="height:44px;border-radius:7px;border:1px solid rgba(212,175,55,.45);background:repeating-linear-gradient(45deg,#f0ead6,#f0ead6 7px,#f7f2e2 7px,#f7f2e2 14px);"></span>
+            <span style="height:44px;border-radius:7px;border:1px solid rgba(212,175,55,.45);background:repeating-linear-gradient(45deg,#f0ead6,#f0ead6 7px,#f7f2e2 7px,#f7f2e2 14px);"></span>
+            <span style="height:44px;border-radius:7px;border:1px solid rgba(212,175,55,.45);background:repeating-linear-gradient(45deg,#f0ead6,#f0ead6 7px,#f7f2e2 7px,#f7f2e2 14px);"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="background:#0466c8;color:#fff;">
+      <div style="background:rgba(0,0,0,.1);">
+        <div style="max-width:1440px;margin:0 auto;padding:0 16px;display:flex;align-items:center;gap:2px;">
+          <span style="border-bottom:2.5px solid #fff;padding:10px 12px 12px;font-size:13px;font-weight:700;">Overview</span>
+          <span style="border-bottom:2.5px solid transparent;padding:10px 12px 12px;font-size:13px;font-weight:700;opacity:.75;">Swims <span style="font-size:11px;font-weight:600;opacity:.7;">3029</span></span>
+          <span style="border-bottom:2.5px solid transparent;padding:10px 12px 12px;font-size:13px;font-weight:700;opacity:.75;">Clubs <span style="font-size:11px;font-weight:600;opacity:.7;">61</span></span>
+          <span style="border-bottom:2.5px solid transparent;padding:10px 12px 12px;font-size:13px;font-weight:700;opacity:.75;">Records <span style="font-size:11px;font-weight:600;opacity:.7;">21</span></span>
+          <span style="border-bottom:2.5px solid transparent;padding:10px 12px 12px;font-size:13px;font-weight:700;opacity:.75;">Media <span style="font-size:11px;font-weight:600;opacity:.7;">8</span></span>
+          <span style="flex:1;"></span>
+          <span style="display:flex;align-items:center;gap:8px;padding-bottom:4px;font-size:12.5px;font-weight:700;">Combine All Results
+            <span style="width:34px;height:19px;border-radius:999px;background:rgba(255,255,255,.35);position:relative;display:inline-block;"><span style="position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;"></span></span>
+          </span>
+        </div>
+      </div>
+    </div>
+    <div style="max-width:1440px;margin:0 auto;padding:16px 24px 28px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 380px;gap:12px;align-items:start;">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="background:#fff;color:#1a1a1a;border:1px solid transparent;box-shadow:0 1px 2px rgba(0,0,0,.05);border-radius:12px;padding:16px;display:flex;flex-direction:column;">
+          <div style="margin-bottom:8px;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;">
+            <span style="font-size:14px;font-weight:800;">Best swim of the competition</span>
+            <span style="font-size:12px;font-weight:600;color:#aab0bd;">by points · ♂ / ♀</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:12px;">
+            <div style="border:1px solid #d6e0da;border-radius:10px;padding:12px;display:flex;flex-direction:column;min-width:0;flex:1;"><div style="display:flex;align-items:center;gap:7px;"><span style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;background:rgba(29,78,216,.12);color:#1d4ed8;">♂</span><span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#aab0bd;">Men</span></div>
+        <div style="margin-top:9px;display:flex;align-items:center;gap:12px;min-width:0;">
+          <div style="flex:none;width:74px;height:74px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:color-mix(in srgb,#0466c8 12%,transparent);border:2px solid color-mix(in srgb,#0466c8 35%,transparent);">
+            <span style="font-size:24px;font-weight:900;line-height:1;color:#0466c8;">303</span>
+            <span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#0466c8;">points</span>
+          </div>
+          <div dir="auto" style="min-width:0;display:flex;flex-direction:column;gap:3px;">
+            <span style="font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">איתמר לידאי קלר</span>
+            <span style="font-size:12.5px;font-weight:600;color:#5b6470;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">מכבי וייסגל רחובות</span>
+            <span style="font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;">02:26.79</span>
+            <span style="font-size:11.5px;font-weight:600;color:#aab0bd;">200m freestyle · Day 3</span>
+          </div>
+        </div></div>
+            <div style="border:1px solid #d6e0da;border-radius:10px;padding:12px;display:flex;flex-direction:column;min-width:0;flex:1;"><div style="display:flex;align-items:center;gap:7px;"><span style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;background:rgba(190,24,93,.12);color:#be185d;">♀</span><span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#aab0bd;">Women</span></div>
+        <div style="margin-top:9px;display:flex;align-items:center;gap:12px;min-width:0;">
+          <div style="flex:none;width:74px;height:74px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:color-mix(in srgb,#0466c8 12%,transparent);border:2px solid color-mix(in srgb,#0466c8 35%,transparent);">
+            <span style="font-size:24px;font-weight:900;line-height:1;color:#0466c8;">346</span>
+            <span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#0466c8;">points</span>
+          </div>
+          <div dir="auto" style="min-width:0;display:flex;flex-direction:column;gap:3px;">
+            <span style="font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">גולי נסאר</span>
+            <span style="font-size:12.5px;font-weight:600;color:#5b6470;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">הפועל אקווה נוף הגליל</span>
+            <span style="font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;">00:34.10</span>
+            <span style="font-size:11.5px;font-weight:600;color:#aab0bd;">50m butterfly · Day 2</span>
+          </div>
+        </div></div>
+          </div>
+        </div>
+        <div style="background:#fff;color:#1a1a1a;border:1px solid transparent;box-shadow:0 1px 2px rgba(0,0,0,.05);border-radius:12px;padding:16px;display:flex;flex-direction:column;">
+          <div style="margin-bottom:8px;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;">
+            <span style="font-size:14px;font-weight:800;">New records</span>
+            <span style="font-size:12px;font-weight:600;color:#aab0bd;">21</span>
+            <span style="flex:1;"></span>
+            <a href="#5a" style="font-size:12px;font-weight:700;color:#0466c8;">Records tab →</a>
+          </div>
+          <a href="#5a" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid #eef1f6;color:#1a1a1a;">
+            <span dir="auto" style="min-width:0;display:flex;flex-direction:column;"><span style="font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">אניה גוסטמלסקי</span><span style="font-size:12px;font-weight:600;color:#5b6470;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">מכבי עולם המים</span></span>
+            <span style="flex:1;"></span>
+            <span style="flex:none;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:800;background:color-mix(in srgb,#0466c8 12%,transparent);color:#0466c8;">45–49</span>
+            <span style="flex:none;font-size:13px;font-weight:700;white-space:nowrap;">50m backstroke — <span style="font-variant-numeric:tabular-nums;">00:31.47</span></span>
+          </a>
+          <a href="#5a" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid #eef1f6;color:#1a1a1a;">
+            <span dir="auto" style="min-width:0;display:flex;flex-direction:column;"><span style="font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">יהונתן קופלב</span><span style="font-size:12px;font-weight:600;color:#5b6470;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">מכבי עולם המים</span></span>
+            <span style="flex:1;"></span>
+            <span style="flex:none;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:800;background:color-mix(in srgb,#0466c8 12%,transparent);color:#0466c8;">35–39</span>
+            <span style="flex:none;font-size:13px;font-weight:700;white-space:nowrap;">100m freestyle — <span style="font-variant-numeric:tabular-nums;">00:54.24</span></span>
+          </a>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="background:#fff;color:#1a1a1a;border:1px solid transparent;box-shadow:0 1px 2px rgba(0,0,0,.05);border-radius:12px;padding:16px;display:flex;flex-direction:column;">
+          <div style="margin-bottom:8px;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;">
+            <span style="font-size:14px;font-weight:800;">Most decorated</span>
+            <span style="font-size:12px;font-weight:600;color:#aab0bd;">by medals · ♂ / ♀</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:12px;">
+            <div style="border:1px solid #d6e0da;border-radius:10px;padding:12px;display:flex;flex-direction:column;min-width:0;flex:1;"><div style="display:flex;align-items:center;gap:7px;"><span style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;background:rgba(29,78,216,.12);color:#1d4ed8;">♂</span><span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#aab0bd;">Men</span></div>
+        <div style="margin-top:9px;display:flex;align-items:center;gap:10px;min-width:0;">
+          <span style="width:36px;height:36px;flex:none;border-radius:50%;border:1px solid #eef1f6;background:#fafbfd;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#5b6470;">BY</span>
+          <div dir="auto" style="min-width:0;display:flex;flex-direction:column;gap:2px;">
+            <span style="font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">דניאל פוליאקוב</span>
+            <span style="font-size:12.5px;font-weight:600;color:#5b6470;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">הפועל בת ים</span>
+          </div>
+        </div>
+        <span style="margin-top:9px;align-self:flex-start;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:800;background:color-mix(in srgb,#0466c8 12%,transparent);color:#0466c8;white-space:nowrap;">🥇3 🥈0 🥉0</span></div>
+            <div style="border:1px solid #d6e0da;border-radius:10px;padding:12px;display:flex;flex-direction:column;min-width:0;flex:1;"><div style="display:flex;align-items:center;gap:7px;"><span style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;background:rgba(190,24,93,.12);color:#be185d;">♀</span><span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#aab0bd;">Women</span></div>
+        <div style="margin-top:9px;display:flex;align-items:center;gap:10px;min-width:0;">
+          <span style="width:36px;height:36px;flex:none;border-radius:50%;border:1px solid #eef1f6;background:#fafbfd;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#5b6470;">NA</span>
+          <div dir="auto" style="min-width:0;display:flex;flex-direction:column;gap:2px;">
+            <span style="font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">יסניה לרין</span>
+            <span style="font-size:12.5px;font-weight:600;color:#5b6470;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">מכבי נהריה</span>
+          </div>
+        </div>
+        <span style="margin-top:9px;align-self:flex-start;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:800;background:color-mix(in srgb,#0466c8 12%,transparent);color:#0466c8;white-space:nowrap;">🥇3 🥈0 🥉0</span></div>
+          </div>
+        </div>
+        <div style="background:#fff;color:#1a1a1a;border:1px solid transparent;box-shadow:0 1px 2px rgba(0,0,0,.05);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;">
+            <span style="font-size:14px;font-weight:800;">🏆 High Point Award</span>
+            <span style="font-size:12px;font-weight:600;color:#aab0bd;">ISR-style · очки</span>
+          </div>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 54px minmax(0,1fr);gap:8px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#aab0bd;">
+            <span style="color:#1d4ed8;">♂ Men</span><span style="text-align:center;">Age</span><span style="text-align:right;color:#be185d;">Women ♀</span>
+          </div>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 54px minmax(0,1fr);align-items:stretch;gap:8px;">
+          <a href="#5a" style="display:flex;align-items:center;gap:9px;border-radius:9px;padding:8px 10px;color:#1a1a1a;background:rgba(29,78,216,.06);">
+            <span style="width:26px;height:26px;flex:none;border-radius:50%;border:1px solid #eef1f6;background:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#5b6470;">KV</span>
+            <span dir="auto" style="min-width:0;display:flex;flex-direction:column;"><span style="font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">יניר חבקה</span><span style="font-size:11.5px;font-weight:600;color:#5b6470;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">קאנטרי כפר ורדים</span></span>
+            <span style="flex:1;"></span><span style="flex:none;font-size:16px;font-weight:900;color:#0466c8;">284</span>
+          </a>
+          <span style="display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#5b6470;">0–8</span>
+          <a href="#5a" style="display:flex;align-items:center;gap:9px;border-radius:9px;padding:8px 10px;color:#1a1a1a;background:rgba(190,24,93,.06);">
+            <span style="flex:none;font-size:16px;font-weight:900;color:#0466c8;">180</span><span style="flex:1;"></span>
+            <span dir="auto" style="min-width:0;display:flex;flex-direction:column;align-items:flex-end;"><span style="font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">רהף אבו ריא</span><span style="font-size:11.5px;font-weight:600;color:#5b6470;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">הפועל לב הגליל סחנין</span></span>
+            <span style="width:26px;height:26px;flex:none;border-radius:50%;border:1px solid #eef1f6;background:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#5b6470;">LG</span>
+          </a>
+        </div>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 54px minmax(0,1fr);align-items:stretch;gap:8px;">
+          <a href="#5a" style="display:flex;align-items:center;gap:9px;border-radius:9px;padding:8px 10px;color:#1a1a1a;background:rgba(29,78,216,.06);">
+            <span style="width:26px;height:26px;flex:none;border-radius:50%;border:1px solid #eef1f6;background:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#5b6470;">BY</span>
+            <span dir="auto" style="min-width:0;display:flex;flex-direction:column;"><span style="font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">דניאל פוליאקוב</span><span style="font-size:11.5px;font-weight:600;color:#5b6470;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">הפועל בת ים</span></span>
+            <span style="flex:1;"></span><span style="flex:none;font-size:16px;font-weight:900;color:#0466c8;">603</span>
+          </a>
+          <span style="display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#5b6470;">9–10</span>
+          <a href="#5a" style="display:flex;align-items:center;gap:9px;border-radius:9px;padding:8px 10px;color:#1a1a1a;background:rgba(190,24,93,.06);">
+            <span style="flex:none;font-size:16px;font-weight:900;color:#0466c8;">711</span><span style="flex:1;"></span>
+            <span dir="auto" style="min-width:0;display:flex;flex-direction:column;align-items:flex-end;"><span style="font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">ויקטוריה זכרוב</span><span style="font-size:11.5px;font-weight:600;color:#5b6470;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">הפועל דולפין נתניה</span></span>
+            <span style="width:26px;height:26px;flex:none;border-radius:50%;border:1px solid #eef1f6;background:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#5b6470;">DN</span>
+          </a>
+        </div>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 54px minmax(0,1fr);align-items:stretch;gap:8px;">
+          <a href="#5a" style="display:flex;align-items:center;gap:9px;border-radius:9px;padding:8px 10px;color:#1a1a1a;background:rgba(29,78,216,.06);">
+            <span style="width:26px;height:26px;flex:none;border-radius:50%;border:1px solid #eef1f6;background:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#5b6470;">WR</span>
+            <span dir="auto" style="min-width:0;display:flex;flex-direction:column;"><span style="font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">איתמר לידאי קלר</span><span style="font-size:11.5px;font-weight:600;color:#5b6470;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">מכבי וייסגל רחובות</span></span>
+            <span style="flex:1;"></span><span style="flex:none;font-size:16px;font-weight:900;color:#0466c8;">796</span>
+          </a>
+          <span style="display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#5b6470;">11–12</span>
+          <a href="#5a" style="display:flex;align-items:center;gap:9px;border-radius:9px;padding:8px 10px;color:#1a1a1a;background:rgba(190,24,93,.06);">
+            <span style="flex:none;font-size:16px;font-weight:900;color:#0466c8;">987</span><span style="flex:1;"></span>
+            <span dir="auto" style="min-width:0;display:flex;flex-direction:column;align-items:flex-end;"><span style="font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">גולי נסאר</span><span style="font-size:11.5px;font-weight:600;color:#5b6470;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">הפועל אקווה נוף הגליל</span></span>
+            <span style="width:26px;height:26px;flex:none;border-radius:50%;border:1px solid #eef1f6;background:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#5b6470;">NG</span>
+          </a>
+        </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="background:#fff;color:#1a1a1a;border:1px solid transparent;box-shadow:0 1px 2px rgba(0,0,0,.05);border-radius:12px;padding:16px;display:flex;flex-direction:column;">
+          <div style="margin-bottom:8px;font-size:14px;font-weight:800;">Summary</div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12.5px;font-weight:600;color:#5b6470;"><span>Results so far</span><span style="font-weight:800;color:#1a1a1a;">3029</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid #eef1f6;font-size:12.5px;font-weight:600;color:#5b6470;"><span>Days</span><span style="font-weight:800;color:#1a1a1a;">3</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid #eef1f6;font-size:12.5px;font-weight:600;color:#5b6470;"><span>Swimmers</span><span style="font-weight:800;color:#1a1a1a;">1143</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid #eef1f6;font-size:12.5px;font-weight:600;color:#5b6470;"><span>Clubs</span><span style="font-weight:800;color:#1a1a1a;">61</span></div>
+        </div>
+        <div style="background:#fff;color:#1a1a1a;border:1px solid transparent;box-shadow:0 1px 2px rgba(0,0,0,.05);border-radius:12px;padding:16px;display:flex;flex-direction:column;">
+          <div style="margin-bottom:8px;display:flex;align-items:baseline;gap:10px;"><span style="font-size:14px;font-weight:800;">Top clubs</span><span style="flex:1;"></span><a href="#5a" style="font-size:12px;font-weight:700;color:#0466c8;">Clubs tab →</a></div>
+          <div style="display:flex;align-items:center;gap:8px;padding-bottom:4px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#aab0bd;"><span style="width:14px;">#</span><span>Club</span><span style="flex:1;"></span><span>Medals</span><span style="width:46px;text-align:right;">Rating</span></div>
+          <a href="#5a" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #eef1f6;color:#1a1a1a;font-size:12.5px;font-weight:700;min-width:0;">
+          <span style="width:14px;flex:none;font-weight:700;color:#aab0bd;">1</span>
+          <span dir="auto" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">מכבי וייסגל רחובות</span>
+          <span style="flex:1;"></span><span style="flex:none;white-space:nowrap;font-weight:600;">🥇17 🥈6 🥉15</span>
+          <span style="flex:none;width:46px;text-align:right;font-weight:800;color:#0466c8;">2793</span></a>
+          <a href="#5a" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #eef1f6;color:#1a1a1a;font-size:12.5px;font-weight:700;min-width:0;">
+          <span style="width:14px;flex:none;font-weight:700;color:#aab0bd;">2</span>
+          <span dir="auto" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">מכבי חיפה</span>
+          <span style="flex:1;"></span><span style="flex:none;white-space:nowrap;font-weight:600;">🥇8 🥈11 🥉10</span>
+          <span style="flex:none;width:46px;text-align:right;font-weight:800;color:#0466c8;">2719</span></a>
+          <a href="#5a" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #eef1f6;color:#1a1a1a;font-size:12.5px;font-weight:700;min-width:0;">
+          <span style="width:14px;flex:none;font-weight:700;color:#aab0bd;">3</span>
+          <span dir="auto" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">מכבי קרית ביאליק</span>
+          <span style="flex:1;"></span><span style="flex:none;white-space:nowrap;font-weight:600;">🥇13 🥈7 🥉10</span>
+          <span style="flex:none;width:46px;text-align:right;font-weight:800;color:#0466c8;">2454</span></a>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr);gap:12px;">
+          <div style="background:#fff;color:#1a1a1a;border:1px solid transparent;box-shadow:0 1px 2px rgba(0,0,0,.05);border-radius:12px;padding:16px;display:flex;flex-direction:column;min-width:0;">
+            <div style="margin-bottom:6px;font-size:13px;font-weight:800;">Top clubs · Men ♂</div>
+            <div style="display:flex;align-items:center;gap:8px;padding-bottom:4px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#aab0bd;"><span style="width:14px;">#</span><span>Club</span><span style="flex:1;"></span><span style="width:46px;text-align:right;">Rating</span></div>
+            <a href="#5a" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #eef1f6;color:#1a1a1a;font-size:12.5px;font-weight:700;min-width:0;">
+          <span style="width:14px;flex:none;font-weight:700;color:#aab0bd;">1</span>
+          <span dir="auto" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">מכבי וייסגל רחובות</span>
+          <span style="flex:1;"></span>
+          <span style="flex:none;width:46px;text-align:right;font-weight:800;color:#0466c8;">2220</span></a>
+            <a href="#5a" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #eef1f6;color:#1a1a1a;font-size:12.5px;font-weight:700;min-width:0;">
+          <span style="width:14px;flex:none;font-weight:700;color:#aab0bd;">2</span>
+          <span dir="auto" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">הפועל דולפין נתניה</span>
+          <span style="flex:1;"></span>
+          <span style="flex:none;width:46px;text-align:right;font-weight:800;color:#0466c8;">1615</span></a>
+            <a href="#5a" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #eef1f6;color:#1a1a1a;font-size:12.5px;font-weight:700;min-width:0;">
+          <span style="width:14px;flex:none;font-weight:700;color:#aab0bd;">3</span>
+          <span dir="auto" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">מכבי חיפה</span>
+          <span style="flex:1;"></span>
+          <span style="flex:none;width:46px;text-align:right;font-weight:800;color:#0466c8;">1533</span></a>
+          </div>
+          <div style="background:#fff;color:#1a1a1a;border:1px solid transparent;box-shadow:0 1px 2px rgba(0,0,0,.05);border-radius:12px;padding:16px;display:flex;flex-direction:column;min-width:0;">
+            <div style="margin-bottom:6px;font-size:13px;font-weight:800;">Top clubs · Women ♀</div>
+            <div style="display:flex;align-items:center;gap:8px;padding-bottom:4px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#aab0bd;"><span style="width:14px;">#</span><span>Club</span><span style="flex:1;"></span><span style="width:46px;text-align:right;">Rating</span></div>
+            <a href="#5a" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #eef1f6;color:#1a1a1a;font-size:12.5px;font-weight:700;min-width:0;">
+          <span style="width:14px;flex:none;font-weight:700;color:#aab0bd;">1</span>
+          <span dir="auto" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">מכבי חיפה</span>
+          <span style="flex:1;"></span>
+          <span style="flex:none;width:46px;text-align:right;font-weight:800;color:#0466c8;">1186</span></a>
+            <a href="#5a" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #eef1f6;color:#1a1a1a;font-size:12.5px;font-weight:700;min-width:0;">
+          <span style="width:14px;flex:none;font-weight:700;color:#aab0bd;">2</span>
+          <span dir="auto" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">הפועל תל אביב</span>
+          <span style="flex:1;"></span>
+          <span style="flex:none;width:46px;text-align:right;font-weight:800;color:#0466c8;">943</span></a>
+            <a href="#5a" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #eef1f6;color:#1a1a1a;font-size:12.5px;font-weight:700;min-width:0;">
+          <span style="width:14px;flex:none;font-weight:700;color:#aab0bd;">3</span>
+          <span dir="auto" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">מכבי קרית ביאליק</span>
+          <span style="flex:1;"></span>
+          <span style="flex:none;width:46px;text-align:right;font-weight:800;color:#0466c8;">932</span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="max-width:1440px;margin:0 auto 14px;padding:0 24px;display:flex;align-items:center;gap:10px;font-size:11.5px;font-weight:700;color:#aab0bd;">
+      <span style="flex:1;height:1px;background:#dfe3ea;"></span><span>контейнер 1440 · px-6 · фоны topbar/hero/tabs — край-в-край</span><span style="flex:1;height:1px;background:#dfe3ea;"></span>
+    </div>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:20px;padding:0 40px;">
   <div style="display:flex;align-items:baseline;gap:12px;">
     <span style="background:#1a1a1a;color:#fff;border-radius:8px;padding:4px 10px;font-size:13px;font-weight:800;">4</span>
     <span style="font-size:15px;font-weight:800;">Утверждённая пара</span>
