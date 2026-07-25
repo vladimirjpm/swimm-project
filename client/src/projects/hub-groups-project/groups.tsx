@@ -8,6 +8,7 @@ import UI_FlagEmoji from '../components/mix/flag-icon/flag-icon';
 import UI_SwimmerGallery from '../components/mix/swimmer-gallery/swimmer-gallery';
 import { GalleryItem } from '../../utils/interfaces/results';
 import { HelperMedia } from '../../utils/helpers';
+import { routes, parseRoute } from '../../utils/routes';
 import { useCurrentIdentity, useHubGroupMembership, useMyHubGroups } from './use-my-hub-groups';
 import type {
   GroupPublicationItem, HubGroupDetails, HubGroupLink, HubGroupListItem, HubGroupMediaItem,
@@ -166,7 +167,7 @@ function GroupsList({ groups, favorites }: { groups: HubGroupListItem[]; favorit
       >
         {favorites && (
           <GroupCard
-            href="./groups.html?group=favorites"
+            href={routes.group('favorites')}
             group={{
               slug: 'favorites',
               name: favorites.name,
@@ -181,7 +182,7 @@ function GroupsList({ groups, favorites }: { groups: HubGroupListItem[]; favorit
           />
         )}
         {groups.map((g) => (
-          <GroupCard key={g.slug} group={g} href={`./groups.html?group=${encodeURIComponent(g.slug)}`} />
+          <GroupCard key={g.slug} group={g} href={routes.group(g.slug)} />
         ))}
         {groups.length === 0 && !favorites && (
           <p className="col-span-full py-10 text-center text-[14px] text-[#cbe0f0]/60">
@@ -259,7 +260,7 @@ function TrainingsLink({ group }: { group: HubGroupDetails }) {
 
   return (
     <a
-      href={`./results_main.html?group=${encodeURIComponent(group.slug)}&tab=trainings`}
+      href={`${routes.groupResults(group.slug)}?tab=trainings`}
       className="hp-mono shrink-0 rounded-[10px] border border-[#38bdf8]/50 bg-[rgba(56,189,248,0.1)] px-4 py-2 text-[13px] font-extrabold text-[#7dd3fc] no-underline hover:bg-[rgba(56,189,248,0.18)]"
       title="Private — visible to the group owner and admins only"
     >
@@ -675,7 +676,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
   return (
     <>
       <section className="relative px-5 pt-[26px] lg:px-16 lg:pt-[46px]">
-        <a href="./groups.html" className="text-[13px] font-extrabold text-[#7dd3fc] no-underline hover:underline">
+        <a href={routes.groupsList()} className="text-[13px] font-extrabold text-[#7dd3fc] no-underline hover:underline">
           ← All groups
         </a>
 
@@ -700,7 +701,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
           <div className="ml-auto flex shrink-0 items-center gap-2">
             {!group.is_virtual && group.id > 0 && (
               <a
-                href={`./results_main.html?group=${encodeURIComponent(group.slug)}`}
+                href={routes.groupResults(group.slug)}
                 className="hp-mono shrink-0 rounded-[10px] border border-[#7dd3fc]/40 bg-[rgba(125,211,252,0.08)] px-4 py-2 text-[13px] font-extrabold text-[#7dd3fc] no-underline hover:bg-[rgba(125,211,252,0.16)]"
               >
                 Competitions →
@@ -967,7 +968,8 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
 // ── Корневой компонент страницы ──────────────────────────────────────────────
 
 function Groups() {
-  const slug = useMemo(() => new URLSearchParams(window.location.search).get('group'), []);
+  // Страница группы: /groups/{slug}; ?group= — легаси-фоллбек.
+  const slug = useMemo(() => parseRoute().groupSlug ?? new URLSearchParams(window.location.search).get('group'), []);
 
   const [groups, setGroups] = useState<HubGroupListItem[]>([]);
   const [favorites, setFavorites] = useState<HubGroupDetails | null>(null);
@@ -1026,7 +1028,7 @@ function Groups() {
       {!loading && error && (
         <div className="px-5 pt-10 lg:px-16">
           <p className="text-[15px] font-bold text-[#ef5350]">{error}</p>
-          <a href="./groups.html" className="mt-2 inline-block text-[13px] font-extrabold text-[#7dd3fc] no-underline hover:underline">
+          <a href={routes.groupsList()} className="mt-2 inline-block text-[13px] font-extrabold text-[#7dd3fc] no-underline hover:underline">
             ← All groups
           </a>
         </div>

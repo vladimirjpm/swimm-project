@@ -27,6 +27,7 @@ import AppTopbar from '../components/app-topbar/app-topbar';
 import type { HubGroupDetails } from '../hub-groups-project/types';
 import { useAuth } from '../../hooks/useAuth';
 import { useCompetitionMedia } from '../../hooks/useCompetitionMedia';
+import { parseRoute } from '../../utils/routes';
 
 // === Вспомогательная функция ===
 function checkIsTraining(selectedSource: any, filters: any) {
@@ -136,8 +137,9 @@ function ResultsMain() {
   // Единый ХАБ группы: ?group=<slug>[&tab=trainings|competitions] (default competitions).
   // Competitions — публичные результаты ростера (заужение /api/results на HubGroupMembers),
   // Trainings — приватный Sys_-источник (доступ решает сервер: владелец/админ/участник-аккаунт).
+  // Идентичность — из чистого пути (/groups/{slug}/results); ?group= — легаси-фоллбек.
   const groupParams = new URLSearchParams(window.location.search);
-  const groupSlug = groupParams.get('group');
+  const groupSlug = parseRoute().groupSlug ?? groupParams.get('group');
   const [groupTab, setGroupTab] = useState<'trainings' | 'competitions'>(
     groupParams.get('tab') === 'trainings' ? 'trainings' : 'competitions',
   );
@@ -247,7 +249,7 @@ function ResultsMain() {
     const sp = selectedSource?.sourceParams;
     if (sp && (sp.competitionId || sp.eventId)) return sp;
     const q = new URLSearchParams(window.location.search);
-    const competitionId = q.get('competitionId');
+    const competitionId = parseRoute().competitionId ?? q.get('competitionId');
     const eventId = q.get('eventId');
     if (competitionId) return { competitionId };
     if (eventId) return { eventId };

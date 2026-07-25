@@ -6,6 +6,7 @@ import {
 } from '../../../store/store';
 import { ActivityType } from '../../../utils/interfaces/filter-selected';
 import { useResultsLoadMode } from '../../../hooks/useResultsLoadMode';
+import { parseRoute } from '../../../utils/routes';
 
 const FilterActivity: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -28,7 +29,7 @@ const FilterActivity: React.FC = () => {
 
   // Хаб группы (?group=) — активность переключается только табами в шапке; этот фильтр
   // дублировал их и конфликтовал (табы меняют источник данных, фильтр — только activity_type).
-  const isGroupHub = new URLSearchParams(window.location.search).has('group');
+  const isGroupHub = parseRoute().groupSlug != null || new URLSearchParams(window.location.search).has('group');
 
   // Paged-режим — только competition (сервер тренировок не отдаёт), тумблер скрыт (контракт 3.2 §5).
   // Иначе — если нет training записей — не показываем фильтр.

@@ -28,6 +28,16 @@ npm --prefix client run build      # prebuild авто-генерит club-icons
   `results_main.html` → `src/pages/results-main-page.tsx`, `home/about/competitions/groups.html` →
   соответствующие `src/pages/*-page.tsx`. **SPA-роутера нет** — «страницы» это отдельные html,
   а переключение экранов внутри страницы — через Redux-state.
+- **Чистые URL (rewrite, не .html наружу).** Снаружи адреса выглядят как `/groups/{slug}`,
+  `/groups/{slug}/results`, `/competitions/{id}`, `/swimmers/{id}`, `/results`, `/my-media` —
+  физический html подставляет rewrite. Контракт в **одном месте** — [`src/utils/routes.ts`](src/utils/routes.ts):
+  `routes.*()` генерят ссылки, `parseRoute()` достаёт идентичность из `location.pathname`.
+  **Правило: в путь — только идентичность ресурса; вид (`tab`,`filter`,`club`,`swim`,`eventId`,
+  `cat`,`season`) остаётся в query.** Три синхронных зеркала контракта — держи их вместе:
+  `routes.ts` (клиент), `cleanUrlRewrite` в [`vite.config.js`](vite.config.js) (dev),
+  rewrite-middleware в `server/Swimm.API/Program.cs` перед `UseStaticFiles` (прод).
+  Читая идентичность в компоненте — бери `parseRoute()`, с легаси-фоллбеком на `?group=`/`?swimmer=`
+  (старьё было до прода, редиректов нет). Новые ссылки строй ТОЛЬКО через `routes.*()`, не хардкодь `.html`.
 - Инициализацию, нужную каждой странице (напр. `RecordsHelper.warmUp()`), добавляй в точку
   входа конкретной страницы — правка только `index.tsx` до `results_main.html` не доедет.
 

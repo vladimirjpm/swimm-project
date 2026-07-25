@@ -7,8 +7,8 @@ import {
   CompetitionSource,
   parseDate,
   dateLabel,
-  sourceUrlParam,
 } from '../../utils/helpers/competition-source';
+import { routes } from '../../utils/routes';
 
 type CompetitionLink = {
   href: string;
@@ -20,32 +20,32 @@ type CompetitionLink = {
 
 const PAGES: CompetitionLink[] = [
   {
-    href: './results_main.html?competitionId=last',
+    href: routes.competition('last'),
     title: 'Latest meet',
     subtitle: 'Свежие результаты последнего соревнования',
     badge: '● LIVE',
     live: true,
   },
   {
-    href: './results_main.html?category=young8_11',
+    href: `${routes.results()}?category=young8_11`,
     title: 'Young 8–11',
     subtitle: 'Youth competitions, ages 8–11',
     badge: '8-11',
   },
   {
-    href: './results_main.html?category=junior',
+    href: `${routes.results()}?category=junior`,
     title: 'Junior',
     subtitle: 'Junior competitions, ages 11–15',
     badge: '11-15',
   },
   {
-    href: './results_main.html?category=masters',
+    href: `${routes.results()}?category=masters`,
     title: 'Masters',
     subtitle: 'Masters meets incl. Dolphin, ages 21+',
     badge: 'М',
   },
   {
-    href: './results_main.html?category=all',
+    href: `${routes.results()}?category=all`,
     title: 'All results',
     subtitle: 'Every competition in one list',
     badge: '∀',
@@ -108,8 +108,9 @@ function MeetsSection() {
       </h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:gap-[18px]">
         {visible.map((src) => {
-          const [key, val] = sourceUrlParam(src);
-          const href = `./results_main.html?${key}=${val}`;
+          const href = src.kind === 'event'
+            ? `${routes.results()}?eventId=${src.id}`
+            : routes.competition(src.id);
           return (
             <a
               key={`${src.kind}:${src.id}`}

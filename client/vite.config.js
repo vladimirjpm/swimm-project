@@ -19,11 +19,47 @@ const swimmProjectPrefixRewrite = () => ({
   },
 });
 
+// Dev-паритет к серверному rewrite (server/Swimm.API/Program.cs): чистые URL → html.
+// Держать в синхроне с ним и с client/src/utils/routes.ts.
+const cleanUrlRewrite = () => ({
+  name: 'clean-url-rewrite',
+  configureServer(server) {
+    const resolve = (pathname) => {
+      const seg = pathname.split('/').filter(Boolean);
+      if (seg.length === 1) {
+        return { results: '/results_main.html', competitions: '/competitions.html',
+          groups: '/groups.html', 'my-media': '/media.html', about: '/about.html' }[seg[0]] ?? null;
+      }
+      if (seg.length >= 2) {
+        if (seg[0] === 'competitions') return '/results_main.html';
+        if (seg[0] === 'swimmers') return '/swimmer.html';
+        if (seg[0] === 'groups') return seg[2] === 'results' ? '/results_main.html' : '/groups.html';
+      }
+      return null;
+    };
+    server.middlewares.use((req, _res, next) => {
+      const url = req.url;
+      if (typeof url === 'string') {
+        const qIdx = url.indexOf('?');
+        const pathname = qIdx === -1 ? url : url.slice(0, qIdx);
+        const query = qIdx === -1 ? '' : url.slice(qIdx);
+        // Только «чистые» пути без расширения в последнем сегменте.
+        const lastSeg = pathname.slice(pathname.lastIndexOf('/') + 1);
+        if (!lastSeg.includes('.') && !pathname.startsWith('/@') && !pathname.startsWith('/api') && !pathname.startsWith('/auth')) {
+          const html = resolve(pathname);
+          if (html) req.url = html + query;
+        }
+      }
+      next();
+    });
+  },
+});
+
 export default defineConfig(({ command }) => ({
   // In dev we serve at '/', but we also accept '/swimm-project/*' via middleware.
   // In production builds we use relative paths so the same dist works on Azure and GH Pages.
   base: command === 'serve' ? '/' : './',
-  plugins: [react(), tailwindcss(), swimmProjectPrefixRewrite()],
+  plugins: [react(), tailwindcss(), swimmProjectPrefixRewrite(), cleanUrlRewrite()],
   // Dev-прокси на API (Swimm.API, http://localhost:5078): относительные запросы клиента
   // (/api/*, /auth/*) уходят на бэкенд как same-origin — куки и antiforgery работают без CORS.
   // В проде клиент раздаётся самим API (wwwroot), поэтому те же относительные пути валидны.

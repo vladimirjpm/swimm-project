@@ -390,6 +390,63 @@ app.Use(async (context, next) =>
     await next();
 });
 
+// Чистые URL → физический html в wwwroot (контракт синхронен с client/src/utils/routes.ts).
+// Меняем ТОЛЬКО Request.Path, поэтому UseStaticFiles ниже отдаёт нужный файл, а в адресной
+// строке браузера остаётся чистый путь; клиент читает идентичность из location.pathname.
+// Query-строка сохраняется автоматически (её не трогаем).
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value ?? string.Empty;
+
+    // Пропускаем API/служебные ветки и любые запросы к реальным файлам (есть расширение).
+    var lastSeg = path.AsSpan(path.LastIndexOf('/') + 1);
+    var hasExtension = lastSeg.Contains('.');
+    if (!hasExtension
+        && !path.StartsWith("/api", StringComparison.OrdinalIgnoreCase)
+        && !path.StartsWith("/auth", StringComparison.OrdinalIgnoreCase)
+        && !path.StartsWith("/admin", StringComparison.OrdinalIgnoreCase))
+    {
+        var rewrite = ResolveCleanUrl(path);
+        if (rewrite is not null)
+            context.Request.Path = rewrite;
+    }
+
+    await next();
+
+    // Локальная функция: чистый путь → html-файл (null = не наш маршрут).
+    static string? ResolveCleanUrl(string path)
+    {
+        // Нормализуем завершающий слэш (кроме корня).
+        var p = path.Length > 1 ? path.TrimEnd('/') : path;
+        var seg = p.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        return seg.Length switch
+        {
+            0 => null, // корень отдаёт UseDefaultFiles (home.html)
+            1 => seg[0] switch
+            {
+                "results" => "/results_main.html",
+                "competitions" => "/competitions.html",
+                "groups" => "/groups.html",
+                "swimmers" => "/results_main.html", // /swimmers без id — пусть падает штатно
+                "my-media" => "/media.html",
+                "about" => "/about.html",
+                _ => null,
+            },
+            >= 2 => seg[0] switch
+            {
+                "competitions" => "/results_main.html",              // /competitions/{id}
+                "swimmers" => "/swimmer.html",                       // /swimmers/{id}
+                "groups" when seg.Length >= 3 && seg[2] == "results"
+                    => "/results_main.html",                         // /groups/{slug}/results
+                "groups" => "/groups.html",                          // /groups/{slug}
+                _ => null,
+            },
+            _ => null,
+        };
+    }
+});
+
 app.UseDefaultFiles(new DefaultFilesOptions
 {
     DefaultFileNames = new List<string> { "home.html", "index.html" }

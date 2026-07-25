@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useClubOptions, useCurrentIdentity, useHubGroupMedia, useMyHubGroupEdit, useMyHubGroups } from './use-my-hub-groups';
 import type { HubGroupInput, HubGroupLinkInput, HubGroupMediaInput, MyHubGroupRow } from './my-groups-types';
 import type { HubGroupMediaItem } from '../../utils/interfaces/results';
+import { routes } from '../../utils/routes';
 
 const DISCLAIMER =
   'Состав ведётся создателем группы и не является официальной заявкой клуба или федерации.';
@@ -732,7 +733,7 @@ export default function MyGroupsPanel() {
               <li key={g.id}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <a href={`./groups.html?group=${encodeURIComponent(g.slug)}`}
+                    <a href={routes.group(g.slug)}
                       className="truncate text-[14px] font-extrabold text-[#f3f8fd] no-underline hover:underline">
                       {g.name}
                     </a>

@@ -15,6 +15,7 @@ import { useFavoritesContext } from '../../hooks/favorites-context';
 import { useLoginModal } from '../components/login-modal/login-modal-context';
 import { useSwimmerProfile, SwimmerProfile } from './use-swimmer-profile';
 import { useSwimmerMedia } from './use-swimmer-media';
+import { parseRoute } from '../../utils/routes';
 
 // Самостоятельная страница пловца (swimmer.html?swimmer=<id>). Профиль тянется по id
 // (/api/swimmers/{id}), карьера all-time — по полному имени (useAthleteCareer, тот же
@@ -275,7 +276,9 @@ function SwimmerProject() {
   useMode();
 
   const swimmerId = useMemo<number | null>(() => {
-    const raw = new URLSearchParams(window.location.search).get('swimmer');
+    const fromPath = parseRoute().swimmerId; // /swimmers/{id}
+    if (fromPath != null) return fromPath;
+    const raw = new URLSearchParams(window.location.search).get('swimmer'); // легаси-фоллбек
     const n = raw != null ? Number(raw) : NaN;
     return Number.isFinite(n) && n > 0 ? n : null;
   }, []);

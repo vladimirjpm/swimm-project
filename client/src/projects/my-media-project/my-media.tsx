@@ -10,6 +10,7 @@ import { useMySwims, MySwimDto, SwimMediaDto, seasonLabel, toggleLike, toggleChe
 import { useMyMediaModeration } from './use-my-media-moderation';
 import AppTopbar from '../components/app-topbar/app-topbar';
 import UI_SwimmerGallery from '../components/mix/swimmer-gallery/swimmer-gallery';
+import { routes } from '../../utils/routes';
 import { GalleryItem } from '../../utils/interfaces/results';
 import MediaCard from './components/media-card';
 import AddLinkModal, { AddLinkSwimmerOption } from './components/add-link-modal';
@@ -332,7 +333,7 @@ function MyMediaContent() {
             <span className="hp-mono whitespace-nowrap rounded-[8px] border border-[#7dd3fc] bg-[rgba(125,211,252,0.14)] px-3 py-[5px] text-[12px] font-extrabold text-[#7dd3fc]">
               Media
             </span>
-            <a href="./groups.html" className="hp-mono whitespace-nowrap rounded-[8px] border border-[rgba(125,211,252,0.3)] px-3 py-[5px] text-[12px] font-extrabold text-[rgba(125,211,252,0.6)] no-underline">
+            <a href={routes.groupsList()} className="hp-mono whitespace-nowrap rounded-[8px] border border-[rgba(125,211,252,0.3)] px-3 py-[5px] text-[12px] font-extrabold text-[rgba(125,211,252,0.6)] no-underline">
               My groups ↗
             </a>
             <span
@@ -514,7 +515,7 @@ function MyMediaContent() {
                 <p className="mx-auto mt-2 max-w-[380px] text-[13px] leading-[1.5] text-[rgba(203,224,240,0.6)]">
                   Add a swimmer to favorites — their swims will appear here and you can attach videos.
                 </p>
-                <a href="./results_main.html" className="hp-mono mt-[18px] inline-block rounded-[10px] border-none bg-[#38ef8f] px-5 py-[10px] text-[13px] font-extrabold text-[#04101f] no-underline">
+                <a href={routes.results()} className="hp-mono mt-[18px] inline-block rounded-[10px] border-none bg-[#38ef8f] px-5 py-[10px] text-[13px] font-extrabold text-[#04101f] no-underline">
                   Find swimmers →
                 </a>
               </div>

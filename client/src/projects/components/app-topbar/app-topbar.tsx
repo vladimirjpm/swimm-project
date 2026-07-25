@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import LoginModal from '../login-modal/login-modal';
+import { routes } from '../../../utils/routes';
 
 /**
  * AppTopbar — глобальная полоса навигации + auth (design_handoff_topbar/README.md).
@@ -25,17 +26,17 @@ export interface AppTopbarProps {
 
 /** Пункты навигации. Normatives/Records — страниц НЕ существует, рендерим span. */
 const NAV_LINKS: { label: string; href?: string; key?: TopbarActivePage }[] = [
-  { label: 'Home', href: './home.html', key: 'home' },
-  { label: 'Competitions', href: './competitions.html', key: 'competitions' },
-  { label: 'Groups', href: './groups.html', key: 'groups' },
+  { label: 'Home', href: routes.home(), key: 'home' },
+  { label: 'Competitions', href: routes.competitionsList(), key: 'competitions' },
+  { label: 'Groups', href: routes.groupsList(), key: 'groups' },
   { label: 'Normatives' },
   { label: 'Records' },
-  { label: 'About', href: './about.html', key: 'about' },
+  { label: 'About', href: routes.about(), key: 'about' },
 ];
 
 function TopbarLogo() {
   return (
-    <a href="./home.html" className="flex shrink-0 items-center gap-2 no-underline">
+    <a href={routes.home()} className="flex shrink-0 items-center gap-2 no-underline">
       <span className="flex h-[26px] w-[26px] items-center justify-center rounded-[8px] bg-[var(--theme-topbar-accent)] text-[13px] font-black text-[var(--theme-topbar-accent-text)]">
         S
       </span>
@@ -192,7 +193,7 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
       </button>
       {userMenuOpen && (
         <div className="absolute right-0 top-[40px] w-[210px] rounded-[12px] border border-[color-mix(in_srgb,var(--theme-topbar-text)_18%,transparent)] bg-[var(--theme-topbar-bg)] p-1.5 shadow-[0_18px_44px_rgba(0,0,0,0.45)]">
-          <a href="./media.html" className={dropdownItemClass}>
+          <a href={routes.myMedia()} className={dropdownItemClass}>
             My media
           </a>
           {onLogout ? (
@@ -271,7 +272,7 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
                 <span className="truncate text-[13px] font-extrabold text-[var(--theme-topbar-text)]">{userName}</span>
               </div>
               <a
-                href="./media.html"
+                href={routes.myMedia()}
                 className="block rounded-[10px] px-4 py-[10px] text-[14px] font-extrabold text-[var(--theme-topbar-text)] no-underline transition-colors hover:bg-[color-mix(in_srgb,var(--theme-topbar-accent)_16%,transparent)]"
               >
                 My media

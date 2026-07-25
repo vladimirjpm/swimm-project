@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import LoginModal from '../../components/login-modal/login-modal';
+import { routes } from '../../../utils/routes';
 
 type ActivePage = 'home' | 'competitions' | 'groups';
 
 export function SwimHubLogo() {
   return (
-    <a href="./home.html" className="flex items-center gap-3 no-underline">
+    <a href={routes.home()} className="flex items-center gap-3 no-underline">
       <span className="flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-[linear-gradient(140deg,#38bdf8,#0369a1)] text-[14px] font-black text-[#06263f] lg:h-9 lg:w-9 lg:rounded-[11px] lg:text-[17px]">
         S
       </span>
@@ -18,12 +19,12 @@ export function SwimHubLogo() {
 }
 
 const NAV_LINKS: { label: string; href?: string; key?: ActivePage }[] = [
-  { label: 'Home', href: './home.html', key: 'home' },
-  { label: 'Competitions', href: './competitions.html', key: 'competitions' },
-  { label: 'Groups', href: './groups.html', key: 'groups' },
+  { label: 'Home', href: routes.home(), key: 'home' },
+  { label: 'Competitions', href: routes.competitionsList(), key: 'competitions' },
+  { label: 'Groups', href: routes.groupsList(), key: 'groups' },
   { label: 'Normatives' },
   { label: 'Records' },
-  { label: 'About', href: './about.html' },
+  { label: 'About', href: routes.about() },
 ];
 
 function MenuItem({
@@ -162,7 +163,7 @@ function HomeHeader({ active }: { active: ActivePage }) {
             </button>
             {userMenuOpen && (
               <div className="absolute right-0 top-[42px] z-40 w-[220px] rounded-[16px] border border-[#7dd3fc]/35 bg-[rgba(4,16,32,0.94)] p-2 shadow-[0_28px_60px_rgba(2,10,24,0.7)] backdrop-blur-[18px]">
-                <a href="./media.html" className={dropdownItemClass}>
+                <a href={routes.myMedia()} className={dropdownItemClass}>
                   My media
                 </a>
                 <a href={logoutHref} className={dropdownItemClass}>
@@ -197,7 +198,7 @@ function HomeHeader({ active }: { active: ActivePage }) {
       {menuOpen && (
         <div className="hp-menu-panel absolute left-3 right-3 top-[66px] z-40 rounded-[20px] border border-[#7dd3fc]/35 bg-[rgba(4,16,32,0.92)] p-[10px] shadow-[0_28px_60px_rgba(2,10,24,0.7)] backdrop-blur-[18px] lg:hidden">
           <MenuItem
-            href="./competitions.html"
+            href={routes.competitionsList()}
             label="Competitions"
             onSelect={closeMenu}
             trailing={
@@ -217,7 +218,7 @@ function HomeHeader({ active }: { active: ActivePage }) {
             }
           />
           <MenuItem
-            href="./about.html"
+            href={routes.about()}
             label="About"
             onSelect={closeMenu}
             trailing={<span className="text-[17px] font-bold text-[#7dd3fc]">→</span>}
@@ -242,7 +243,7 @@ function HomeHeader({ active }: { active: ActivePage }) {
                     <span className="truncate text-[14px] font-extrabold text-[#f3f8fd]">{userName}</span>
                   </div>
                   <a
-                    href="./media.html"
+                    href={routes.myMedia()}
                     className="block rounded-[13px] px-4 py-[12px] text-[15px] font-extrabold text-[#f3f8fd] no-underline transition-colors hover:bg-[rgba(56,189,248,0.12)]"
                   >
                     My media

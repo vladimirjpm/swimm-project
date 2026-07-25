@@ -8,6 +8,7 @@ import { useUserMedia, useMyMediaPublications, UserMediaDto } from '../../hooks/
 import { useLogligStatus } from '../../hooks/useLogligStatus';
 import Helper from '../../utils/helpers/data-helper'
 import { HelperMedia } from '../../utils/helpers';
+import { routes } from '../../utils/routes';
 import UI_ClubIcon from '../components/mix/club-icon/club-icon';
 import UI_NormativeLevelIcon from '../components/mix/normative-level-icon/normative-level-icon';
 import UI_MedalIcon from '../components/mix/medal-icon/medal-icon';
@@ -206,7 +207,7 @@ function SportsmenDetails() {
               {/* Диплинк на самостоятельную страницу пловца (swimmer.html?swimmer=<id>). */}
               {swimmerId != null && (
                 <a
-                  href={`./swimmer.html?swimmer=${swimmerId}`}
+                  href={routes.swimmer(swimmerId)}
                   className='text-[11px] font-bold hover:underline'
                   style={{ color: 'var(--theme-primary)' }}
                 >
@@ -681,7 +682,7 @@ function MyMediaSection({
       </summary>
       <div className="mt-1 mb-2">
         <a
-          href="./media.html"
+          href={routes.myMedia()}
           className="text-xs font-semibold underline"
           style={{ color: 'var(--theme-mode-text-secondary)' }}
         >

@@ -1,5 +1,6 @@
 import React from 'react';
 import type { GroupTab } from './types';
+import { routes } from '../../../../utils/routes';
 
 // Нижний модуль шапки: Overview/Members/Records — ссылки на обзорную groups.html (↗),
 // Competitions / 🔒Trainings — локальный toggle (единственное место переключения
@@ -24,7 +25,7 @@ export default function GroupTabs({ slug, activeTab, onTabChange }: GroupTabsPro
         {OVERVIEW_TABS.map((t) => (
           <a
             key={t.label}
-            href={`./groups.html?group=${encodeURIComponent(slug)}${t.anchor}`}
+            href={`${routes.group(slug)}${t.anchor}`}
             className="border-b-[2.5px] border-transparent px-3 pb-3 pt-[10px] text-[13px] font-bold no-underline opacity-75 hover:opacity-100"
             style={{ color: 'inherit' }}
           >

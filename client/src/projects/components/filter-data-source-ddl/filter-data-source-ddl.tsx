@@ -7,6 +7,7 @@ import {
   useAppSelector,
 } from '../../../store/store';
 import { Result } from '../../../utils/interfaces/results';
+import { routes, parseRoute } from '../../../utils/routes';
 import { ResultsPaging } from '../../../store/store';
 import {
   RESULTS_CATEGORIES,
@@ -85,16 +86,19 @@ const writeUrl = (
 ) => {
   const params = new URLSearchParams(window.location.search);
   ['category', 'cat', 'competitionId', 'eventId'].forEach((k) => params.delete(k));
+  // Идентичность соревнования уходит в путь (/competitions/{id}); eventId и категория —
+  // это фасеты вида, остаются в query на /results.
+  let pathname = routes.results();
   if (patch.source) {
-    const [k, v] = sourceUrlParam(patch.source);
-    params.set(k, v);
+    if (patch.source.kind === 'event') params.set('eventId', String(patch.source.id));
+    else pathname = routes.competition(patch.source.id);
   } else if (patch.category) {
     params.set('category', patch.category);
   }
   if (patch.season != null) params.set('season', String(patch.season));
   else params.delete('season');
   const qs = params.toString();
-  window.history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
+  window.history.replaceState(null, '', qs ? `${pathname}?${qs}` : pathname);
 };
 
 // Брейкпоинт дропдаун ↔ bottom sheet: <640px (Tailwind sm)
@@ -441,7 +445,7 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
       setSeasonTouched(true);
     }
 
-    const competitionId = params.get('competitionId');
+    const competitionId = parseRoute().competitionId ?? params.get('competitionId');
     const eventId = params.get('eventId');
 
     let target: CompetitionSource | undefined;
