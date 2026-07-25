@@ -31,14 +31,25 @@ const FilterRecalculate: React.FC = () => {
     <div className="flex flex-col">
       <button
         type="button"
+        role="switch"
+        aria-checked={isActive}
         onClick={toggle}
-        className={`fseg flex items-center gap-2 self-start ${
-          isActive ? 'fseg-active' : ''
-        }`}
+        className="flex items-center gap-2 self-start bg-transparent p-0 text-[13px] font-bold"
+        style={{ color: 'var(--theme-mode-text)' }}
         title="Recalculate positions by best result across all days"
       >
         <span>🔄</span>
         <span>Combine All Results</span>
+        {/* Тоггл-свитч: бегунок влево (off) / вправо (on). */}
+        <span
+          className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+          style={{ background: isActive ? 'var(--theme-primary)' : 'var(--theme-mode-border)' }}
+        >
+          <span
+            className="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"
+            style={{ transform: isActive ? 'translateX(18px)' : 'translateX(2px)' }}
+          />
+        </span>
       </button>
     </div>
     ) : null

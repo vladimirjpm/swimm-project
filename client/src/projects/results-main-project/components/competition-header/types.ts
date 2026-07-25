@@ -64,6 +64,8 @@ export interface OverviewMedalist {
 /** Одна награда High Point Award (лучший по сумме очков в возраст × пол). */
 export interface OverviewHighPoint {
   age: number;
+  /** Masters: возрастная группа как в фильтрах ("25-29"); пусто для не-masters. */
+  age_group: string;
   /** "male" | "female" */
   gender: string;
   swimmer_id: number;
@@ -84,6 +86,9 @@ export interface OverviewRecord {
   gender: string;
   time: string;
   holder_name: string;
+  swimmer_id: number;
+  /** Возрастная группа держателя ("25-29"); пусто, если нет в данных. */
+  age_group: string;
   club: string | null;
   day_number: number | null;
   result_id: number | null;
@@ -93,10 +98,14 @@ export interface CompetitionOverview {
   summary: OverviewSummary;
   days: OverviewDay[];
   best_swim: OverviewBestSwim | null;
+  best_swim_male: OverviewBestSwim | null;
+  best_swim_female: OverviewBestSwim | null;
   top_clubs: OverviewClub[];
   top_clubs_men: OverviewClub[];
   top_clubs_women: OverviewClub[];
   top_medalist: OverviewMedalist | null;
+  top_medalist_male: OverviewMedalist | null;
+  top_medalist_female: OverviewMedalist | null;
   high_point_awards: OverviewHighPoint[];
   records: OverviewRecord[];
 }

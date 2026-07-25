@@ -23,7 +23,8 @@ public sealed record RecordCandidateRow(
     int TimeMilliseconds,
     string TimeOriginal,
     int? DayNumber,
-    bool IsMasters);
+    bool IsMasters,
+    string AgeGroup);
 
 /// <summary>
 /// Детекция «новых рекордов» соревнования: результат быстрее (или равен) действующему
@@ -79,6 +80,8 @@ public static class CompetitionRecordsDetector
                 Gender = b.Row.Gender,
                 Time = b.Row.TimeOriginal,
                 HolderName = $"{b.Row.FirstName} {b.Row.LastName}".Trim(),
+                SwimmerId = b.Row.SwimmerId,
+                AgeGroup = b.Row.AgeGroup,
                 Club = b.Row.Club,
                 DayNumber = b.Row.DayNumber,
                 ResultId = b.Row.ResultId

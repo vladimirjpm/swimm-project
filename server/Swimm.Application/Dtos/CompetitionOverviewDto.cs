@@ -16,12 +16,18 @@ public sealed class CompetitionOverviewDto
     [JsonPropertyName("days")] public IReadOnlyList<OverviewDayDto> Days { get; init; } = [];
     /// <summary>Лучший заплыв соревнования — максимум FINA-очков; null, если очков нет ни у кого.</summary>
     [JsonPropertyName("best_swim")] public OverviewBestSwimDto? BestSwim { get; init; }
+    /// <summary>Лучший заплыв среди мужчин / женщин (design_handoff вариант 4, ♂/♀). null — нет данных.</summary>
+    [JsonPropertyName("best_swim_male")] public OverviewBestSwimDto? BestSwimMale { get; init; }
+    [JsonPropertyName("best_swim_female")] public OverviewBestSwimDto? BestSwimFemale { get; init; }
     /// <summary>Клубный зачёт, топ-10 (полный — таб Clubs / /api/club-summary).</summary>
     [JsonPropertyName("top_clubs")] public IReadOnlyList<ClubSummaryDto> TopClubs { get; init; } = [];
     [JsonPropertyName("top_clubs_men")] public IReadOnlyList<ClubSummaryDto> TopClubsMen { get; init; } = [];
     [JsonPropertyName("top_clubs_women")] public IReadOnlyList<ClubSummaryDto> TopClubsWomen { get; init; } = [];
     /// <summary>Пловец с наибольшим числом медалей (личные заплывы, без эстафет).</summary>
     [JsonPropertyName("top_medalist")] public OverviewMedalistDto? TopMedalist { get; init; }
+    /// <summary>Топ-медалист среди мужчин / женщин (design_handoff вариант 4, ♂/♀). null — нет данных.</summary>
+    [JsonPropertyName("top_medalist_male")] public OverviewMedalistDto? TopMedalistMale { get; init; }
+    [JsonPropertyName("top_medalist_female")] public OverviewMedalistDto? TopMedalistFemale { get; init; }
     /// <summary>High Point Award: лучший по СУММЕ очков в каждом возрасте, раздельно ♂/♀
     /// (design_handoff §High Point Award). Ничья по очкам → несколько на возраст (is_tie).
     /// Пусто, если возраст не вычислим (нет года рождения).</summary>
@@ -86,8 +92,10 @@ public sealed class OverviewMedalistDto
 /// <summary>Одна награда High Point Award: лучший по сумме очков в (возраст × пол).</summary>
 public sealed class OverviewHighPointDto
 {
-    /// <summary>Возраст спортсмена (год соревнования − год рождения).</summary>
+    /// <summary>Возраст спортсмена (год соревнования − год рождения). Для masters = 0.</summary>
     [JsonPropertyName("age")] public int Age { get; init; }
+    /// <summary>Masters: возрастная группа как в фильтрах ("25-29"); пусто для не-masters.</summary>
+    [JsonPropertyName("age_group")] public string AgeGroup { get; init; } = "";
     /// <summary>"male" | "female".</summary>
     [JsonPropertyName("gender")] public string Gender { get; init; } = "";
     [JsonPropertyName("swimmer_id")] public int SwimmerId { get; init; }
@@ -111,6 +119,10 @@ public sealed class OverviewRecordDto
     [JsonPropertyName("gender")] public string Gender { get; init; } = "";
     [JsonPropertyName("time")] public string Time { get; init; } = "";
     [JsonPropertyName("holder_name")] public string HolderName { get; init; } = "";
+    /// <summary>Id пловца-держателя — для группировки рекордов по спортсмену на клиенте.</summary>
+    [JsonPropertyName("swimmer_id")] public int SwimmerId { get; init; }
+    /// <summary>Возрастная группа держателя ("25-29"); пусто, если нет в данных.</summary>
+    [JsonPropertyName("age_group")] public string AgeGroup { get; init; } = "";
     [JsonPropertyName("club")] public string? Club { get; init; }
     [JsonPropertyName("day_number")] public int? DayNumber { get; init; }
     [JsonPropertyName("result_id")] public long? ResultId { get; init; }
