@@ -80,6 +80,21 @@ public class ResultDto
     [JsonPropertyName("position_age_group")]
     public int? PositionAgeGroup { get; set; }
 
+    /// <summary>Место в объединённом зачёте дисциплины по всему событию («Combine All Results»).
+    /// Заполнено только у соревнований с ShowCombineAllResults; null — режим не применим или
+    /// заплыв незачтён. Клиенту нужны ОБА места: объединённое — крупной медалью, протокольное
+    /// (<see cref="Position"/>) — маленьким бейджем внахлёст (results-table-desktop.tsx).</summary>
+    [JsonPropertyName("combined_place")]
+    public int? CombinedPlace { get; set; }
+
+    /// <summary>Этот заплыв — лучший у пловца в дисциплине за событие.</summary>
+    [JsonPropertyName("is_best_result")]
+    public bool? IsBestResult { get; set; }
+
+    /// <summary>Лучшее время пловца в этой дисциплине за событие, мс.</summary>
+    [JsonPropertyName("best_time_ms")]
+    public int? BestTimeMs { get; set; }
+
     [JsonPropertyName("heat")]
     public int Heat { get; set; }
 
