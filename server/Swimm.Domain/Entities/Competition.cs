@@ -70,4 +70,18 @@ public class Competition
   /// FK-констрейнт создан raw SQL в миграции — не смоделирован в EF (alternate key требует NOT NULL).
   /// </summary>
   public int? OrgCompId { get; set; }
+
+  // ── Правила очков (Э0 — только привязка, расчёт не читает) ─────────────────
+
+  /// <summary>Правило клубных очков, привязанное вручную. null — подбор по дате и scope.</summary>
+  public int? PointRuleClubsId { get; set; }
+
+  [ForeignKey(nameof(PointRuleClubsId))]
+  public PointRuleClubs? PointRuleClubs { get; set; }
+
+  /// <summary>Правило очков пловца (High Point). null — legacy-расчёт по FINA.</summary>
+  public int? PointRuleSwimmersId { get; set; }
+
+  [ForeignKey(nameof(PointRuleSwimmersId))]
+  public PointRuleSwimmers? PointRuleSwimmers { get; set; }
 }

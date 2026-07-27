@@ -409,14 +409,14 @@ public class ResultRepositoryTests
         var s1 = new Swimmer { LastName = "Aaa", FirstName = "A", LastNameEn = "Aaa", FirstNameEn = "A", BirthYear = 2000 };
         var s2 = new Swimmer { LastName = "Bbb", FirstName = "B", LastNameEn = "Bbb", FirstNameEn = "B", BirthYear = 2000 };
         db.AddRange(style, clubA, clubB, comp, s1, s2);
-        db.ClubPointsRules.Add(new ClubPointsRule
+        db.PointRulesClubs.Add(new PointRuleClubs
         {
             Version = "test", Scope = "all", EffectiveFrom = new DateOnly(2000, 1, 1), DefaultPoints = 0,
             Entries =
             [
-                new ClubPointsRuleEntry { Place = 1, Points = 30 },
-                new ClubPointsRuleEntry { Place = 2, Points = 28 },
-                new ClubPointsRuleEntry { Place = 3, Points = 26 },
+                new PointRuleClubsEntry { Place = 1, Points = 30 },
+                new PointRuleClubsEntry { Place = 2, Points = 28 },
+                new PointRuleClubsEntry { Place = 3, Points = 26 },
             ]
         });
         await db.SaveChangesAsync();
@@ -478,10 +478,10 @@ public class ResultRepositoryTests
         // ключ уходит на Relay.TeamName, как в клиентском getClubsSummary.
         var emptyClub = new Club { Name = "", NameEn = "" };
         db.AddRange(style, comp, swimmer, relay, emptyClub);
-        db.ClubPointsRules.Add(new ClubPointsRule
+        db.PointRulesClubs.Add(new PointRuleClubs
         {
             Version = "test", Scope = "all", EffectiveFrom = new DateOnly(2000, 1, 1), DefaultPoints = 0,
-            Entries = [new ClubPointsRuleEntry { Place = 1, Points = 30 }]
+            Entries = [new PointRuleClubsEntry { Place = 1, Points = 30 }]
         });
         await db.SaveChangesAsync();
 
@@ -788,10 +788,10 @@ public class ResultRepositoryTests
         var sm = new Swimmer { LastName = "Mmm", FirstName = "M", LastNameEn = "Mmm", FirstNameEn = "M", BirthYear = 2000 };
         var sw = new Swimmer { LastName = "Www", FirstName = "W", LastNameEn = "Www", FirstNameEn = "W", BirthYear = 2000 };
         db.AddRange(style, clubM, clubW, comp, sm, sw);
-        db.ClubPointsRules.Add(new ClubPointsRule
+        db.PointRulesClubs.Add(new PointRuleClubs
         {
             Version = "test", Scope = "all", EffectiveFrom = new DateOnly(2000, 1, 1), DefaultPoints = 0,
-            Entries = [new ClubPointsRuleEntry { Place = 1, Points = 30 }]
+            Entries = [new PointRuleClubsEntry { Place = 1, Points = 30 }]
         });
         await db.SaveChangesAsync();
 

@@ -252,7 +252,7 @@ public class ResultRepository : IResultRepository
             .ToListAsync();
 
         // Правила очков грузим целиком (их единицы), применяем в памяти — как в сезонном зачёте.
-        var rules = await _db.ClubPointsRules.AsNoTracking()
+        var rules = await _db.PointRulesClubs.AsNoTracking()
             .Include(r => r.Entries)
             .ToListAsync();
 
@@ -266,7 +266,7 @@ public class ResultRepository : IResultRepository
 
             // Очки: те же правила, что на клиенте; эстафета удваивает (fix relay club points).
             // timeFail НЕ гейтит (паритет с клиентским getPoints, который смотрит только на место).
-            var basePoints = ClubPointsScoring.PointsFor(
+            var basePoints = PointRulesClubsScoring.PointsFor(
                 rules, r.Position, timeFail: false, r.IsMasters, DateOnly.FromDateTime(r.CompetitionDate));
             var points = r.IsRelay ? basePoints * 2 : basePoints;
 

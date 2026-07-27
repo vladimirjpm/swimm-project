@@ -26,7 +26,7 @@ public class ClubPointsRepository : IClubPointsRepository
         if (cached is not null)
             return cached;
 
-        var rules = await _db.ClubPointsRules
+        var rules = await _db.PointRulesClubs
             .AsNoTracking()
             .Include(r => r.Entries)
             .OrderBy(r => r.Id)

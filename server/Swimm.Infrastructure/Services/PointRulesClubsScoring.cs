@@ -3,19 +3,19 @@ using Swimm.Domain.Entities;
 namespace Swimm.Infrastructure.Services;
 
 /// <summary>
-/// Чистый расчёт клубных очков за место по правилам <see cref="ClubPointsRule"/> —
+/// Чистый расчёт клубных очков за место по правилам <see cref="PointRuleClubs"/> —
 /// выделен из <c>HubGroupPublicRepository</c> ради юнит-тестируемости (сезонный зачёт 8.5).
 /// Логика подбора правила зеркалит клиентский <c>club-points-helper.ts</c>: при равенстве
 /// дат вступления scope-специфичное правило (masters/non-masters) важнее общего "all".
 /// </summary>
-public static class ClubPointsScoring
+public static class PointRulesClubsScoring
 {
     /// <summary>
     /// Очки за один заплыв. Незачтённое время (<paramref name="timeFail"/>) или отсутствие/
     /// некорректное место → 0. Правило выбирается по дате соревнования и области.
     /// </summary>
     public static int PointsFor(
-        IReadOnlyCollection<ClubPointsRule> rules, int? position, bool timeFail, bool isMasters, DateOnly date)
+        IReadOnlyCollection<PointRuleClubs> rules, int? position, bool timeFail, bool isMasters, DateOnly date)
     {
         if (timeFail || position is null || position < 1) return 0;
 
@@ -28,7 +28,7 @@ public static class ClubPointsScoring
     }
 
     /// <summary>Действующее на дату правило нужной области (masters/non-masters), fallback на "all".</summary>
-    public static ClubPointsRule? SelectRule(IReadOnlyCollection<ClubPointsRule> rules, bool isMasters, DateOnly date)
+    public static PointRuleClubs? SelectRule(IReadOnlyCollection<PointRuleClubs> rules, bool isMasters, DateOnly date)
     {
         var scope = isMasters ? "masters" : "non-masters";
         return rules

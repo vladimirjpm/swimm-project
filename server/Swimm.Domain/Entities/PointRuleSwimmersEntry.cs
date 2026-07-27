@@ -4,9 +4,9 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Swimm.Domain.Entities;
 
 /// <summary>
-/// Строка шкалы клубных очков: место → количество очков для конкретного правила.
+/// Строка шкалы очков пловца: место → количество очков для конкретного правила.
 /// </summary>
-public class PointRuleClubsEntry
+public class PointRuleSwimmersEntry
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -22,5 +22,5 @@ public class PointRuleClubsEntry
     public int Points { get; set; }
 
     [ForeignKey(nameof(RuleId))]
-    public PointRuleClubs Rule { get; set; } = null!;
+    public PointRuleSwimmers Rule { get; set; } = null!;
 }

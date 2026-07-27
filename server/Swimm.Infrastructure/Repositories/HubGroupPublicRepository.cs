@@ -229,7 +229,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
         await FillStandingsAsync(db, dto, swimmerIds, seasonStart);
     }
 
-    /// <summary>Сезонный зачёт: очки за место по правилам ClubPointsRule + медали за сезон.</summary>
+    /// <summary>Сезонный зачёт: очки за место по правилам PointRuleClubs + медали за сезон.</summary>
     private static async Task FillStandingsAsync(
         SwimmDbContext db, HubGroupDetailsDto dto, List<int> swimmerIds, DateTime seasonStart)
     {
@@ -250,7 +250,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             .ToListAsync();
 
         // Правила очков грузим целиком (их единицы) и применяем в памяти.
-        var rules = await db.ClubPointsRules.AsNoTracking()
+        var rules = await db.PointRulesClubs.AsNoTracking()
             .Include(r => r.Entries)
             .ToListAsync();
 
@@ -275,7 +275,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                     Silvers = rows.Count(r => !r.TimeFail && r.Position == 2),
                     Bronzes = rows.Count(r => !r.TimeFail && r.Position == 3),
                     ClubPoints = rows.Sum(r =>
-                        ClubPointsScoring.PointsFor(
+                        PointRulesClubsScoring.PointsFor(
                             rules, r.Position, r.TimeFail, r.IsMasters, DateOnly.FromDateTime(r.CompetitionDate))),
                     BestFina = rows.Count > 0 ? rows.Max(r => r.InternationalPoints) : 0
                 };

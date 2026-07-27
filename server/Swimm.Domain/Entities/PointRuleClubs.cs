@@ -6,7 +6,7 @@ namespace Swimm.Domain.Entities;
 /// <summary>
 /// Правило начисления клубных очков: версия, область применения, шкала мест.
 /// </summary>
-public class ClubPointsRule
+public class PointRuleClubs
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -34,5 +34,5 @@ public class ClubPointsRule
     public int? MaxScoringPlace { get; set; }
 
     /// <summary>Строки шкалы: место → очки.</summary>
-    public ICollection<ClubPointsRuleEntry> Entries { get; set; } = [];
+    public ICollection<PointRuleClubsEntry> Entries { get; set; } = [];
 }

@@ -34,9 +34,11 @@ public class SwimmDbContext : DbContext
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<CategoryCompetition> CategoryCompetitions => Set<CategoryCompetition>();
 
-    /* === Клубные очки === */
-    public DbSet<ClubPointsRule> ClubPointsRules => Set<ClubPointsRule>();
-    public DbSet<ClubPointsRuleEntry> ClubPointsRuleEntries => Set<ClubPointsRuleEntry>();
+    /* === Правила очков (клубные + пловца, Э0) === */
+    public DbSet<PointRuleClubs> PointRulesClubs => Set<PointRuleClubs>();
+    public DbSet<PointRuleClubsEntry> PointRulesClubsEntries => Set<PointRuleClubsEntry>();
+    public DbSet<PointRuleSwimmers> PointRulesSwimmers => Set<PointRuleSwimmers>();
+    public DbSet<PointRuleSwimmersEntry> PointRulesSwimmersEntries => Set<PointRuleSwimmersEntry>();
 
     /* === Результаты === */
     public DbSet<ResultRecord> Results => Set<ResultRecord>();
@@ -104,6 +106,18 @@ public class SwimmDbContext : DbContext
                 .WithMany(ev => ev.Days)
                 .HasForeignKey(e => e.EventId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Правила очков (Э0): удаление используемого правила должно падать (Restrict),
+            // а не молча переводить соревнования на другую шкалу (SetNull).
+            entity.HasOne(e => e.PointRuleClubs)
+                .WithMany()
+                .HasForeignKey(e => e.PointRuleClubsId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.PointRuleSwimmers)
+                .WithMany()
+                .HasForeignKey(e => e.PointRuleSwimmersId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<CompetitionEvent>(entity =>
@@ -252,11 +266,11 @@ public class SwimmDbContext : DbContext
             }).IsUnique();
         });
 
-        // --- Правила клубных очков ---
+        // --- Правила очков: клубные (PointRulesClubs*) ---
 
-        modelBuilder.Entity<ClubPointsRule>(entity =>
+        modelBuilder.Entity<PointRuleClubs>(entity =>
         {
-            entity.ToTable("ClubPointsRules");
+            entity.ToTable("PointRulesClubs");
             entity.HasIndex(e => e.Version).IsUnique();
 
             entity.HasMany(e => e.Entries)
@@ -265,7 +279,7 @@ public class SwimmDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasData(
-                new ClubPointsRule
+                new PointRuleClubs
                 {
                     Id = 1,
                     Version = "2025.01",
@@ -275,7 +289,7 @@ public class SwimmDbContext : DbContext
                     DefaultPoints = 0,
                     MaxScoringPlace = 24
                 },
-                new ClubPointsRule
+                new PointRuleClubs
                 {
                     Id = 2,
                     Version = "2025.01-masters",
@@ -288,51 +302,70 @@ public class SwimmDbContext : DbContext
             );
         });
 
-        modelBuilder.Entity<ClubPointsRuleEntry>(entity =>
+        modelBuilder.Entity<PointRuleClubsEntry>(entity =>
         {
-            entity.ToTable("ClubPointsRuleEntries");
+            entity.ToTable("PointRulesClubsEntries");
             entity.HasIndex(e => new { e.RuleId, e.Place }).IsUnique();
 
             // Seed: правило 1 — шкала 24 мест (israelская система)
             entity.HasData(
-                new ClubPointsRuleEntry { Id =  1, RuleId = 1, Place =  1, Points = 30 },
-                new ClubPointsRuleEntry { Id =  2, RuleId = 1, Place =  2, Points = 28 },
-                new ClubPointsRuleEntry { Id =  3, RuleId = 1, Place =  3, Points = 26 },
-                new ClubPointsRuleEntry { Id =  4, RuleId = 1, Place =  4, Points = 24 },
-                new ClubPointsRuleEntry { Id =  5, RuleId = 1, Place =  5, Points = 23 },
-                new ClubPointsRuleEntry { Id =  6, RuleId = 1, Place =  6, Points = 22 },
-                new ClubPointsRuleEntry { Id =  7, RuleId = 1, Place =  7, Points = 21 },
-                new ClubPointsRuleEntry { Id =  8, RuleId = 1, Place =  8, Points = 20 },
-                new ClubPointsRuleEntry { Id =  9, RuleId = 1, Place =  9, Points = 19 },
-                new ClubPointsRuleEntry { Id = 10, RuleId = 1, Place = 10, Points = 18 },
-                new ClubPointsRuleEntry { Id = 11, RuleId = 1, Place = 11, Points = 16 },
-                new ClubPointsRuleEntry { Id = 12, RuleId = 1, Place = 12, Points = 15 },
-                new ClubPointsRuleEntry { Id = 13, RuleId = 1, Place = 13, Points = 14 },
-                new ClubPointsRuleEntry { Id = 14, RuleId = 1, Place = 14, Points = 13 },
-                new ClubPointsRuleEntry { Id = 15, RuleId = 1, Place = 15, Points = 12 },
-                new ClubPointsRuleEntry { Id = 16, RuleId = 1, Place = 16, Points = 11 },
-                new ClubPointsRuleEntry { Id = 17, RuleId = 1, Place = 17, Points = 10 },
-                new ClubPointsRuleEntry { Id = 18, RuleId = 1, Place = 18, Points =  9 },
-                new ClubPointsRuleEntry { Id = 19, RuleId = 1, Place = 19, Points =  8 },
-                new ClubPointsRuleEntry { Id = 20, RuleId = 1, Place = 20, Points =  7 },
-                new ClubPointsRuleEntry { Id = 21, RuleId = 1, Place = 21, Points =  5 },
-                new ClubPointsRuleEntry { Id = 22, RuleId = 1, Place = 22, Points =  3 },
-                new ClubPointsRuleEntry { Id = 23, RuleId = 1, Place = 23, Points =  2 },
-                new ClubPointsRuleEntry { Id = 24, RuleId = 1, Place = 24, Points =  1 },
+                new PointRuleClubsEntry { Id =  1, RuleId = 1, Place =  1, Points = 30 },
+                new PointRuleClubsEntry { Id =  2, RuleId = 1, Place =  2, Points = 28 },
+                new PointRuleClubsEntry { Id =  3, RuleId = 1, Place =  3, Points = 26 },
+                new PointRuleClubsEntry { Id =  4, RuleId = 1, Place =  4, Points = 24 },
+                new PointRuleClubsEntry { Id =  5, RuleId = 1, Place =  5, Points = 23 },
+                new PointRuleClubsEntry { Id =  6, RuleId = 1, Place =  6, Points = 22 },
+                new PointRuleClubsEntry { Id =  7, RuleId = 1, Place =  7, Points = 21 },
+                new PointRuleClubsEntry { Id =  8, RuleId = 1, Place =  8, Points = 20 },
+                new PointRuleClubsEntry { Id =  9, RuleId = 1, Place =  9, Points = 19 },
+                new PointRuleClubsEntry { Id = 10, RuleId = 1, Place = 10, Points = 18 },
+                new PointRuleClubsEntry { Id = 11, RuleId = 1, Place = 11, Points = 16 },
+                new PointRuleClubsEntry { Id = 12, RuleId = 1, Place = 12, Points = 15 },
+                new PointRuleClubsEntry { Id = 13, RuleId = 1, Place = 13, Points = 14 },
+                new PointRuleClubsEntry { Id = 14, RuleId = 1, Place = 14, Points = 13 },
+                new PointRuleClubsEntry { Id = 15, RuleId = 1, Place = 15, Points = 12 },
+                new PointRuleClubsEntry { Id = 16, RuleId = 1, Place = 16, Points = 11 },
+                new PointRuleClubsEntry { Id = 17, RuleId = 1, Place = 17, Points = 10 },
+                new PointRuleClubsEntry { Id = 18, RuleId = 1, Place = 18, Points =  9 },
+                new PointRuleClubsEntry { Id = 19, RuleId = 1, Place = 19, Points =  8 },
+                new PointRuleClubsEntry { Id = 20, RuleId = 1, Place = 20, Points =  7 },
+                new PointRuleClubsEntry { Id = 21, RuleId = 1, Place = 21, Points =  5 },
+                new PointRuleClubsEntry { Id = 22, RuleId = 1, Place = 22, Points =  3 },
+                new PointRuleClubsEntry { Id = 23, RuleId = 1, Place = 23, Points =  2 },
+                new PointRuleClubsEntry { Id = 24, RuleId = 1, Place = 24, Points =  1 },
                 // Seed: правило 2 — Masters, шкала 12 мест
-                new ClubPointsRuleEntry { Id = 25, RuleId = 2, Place =  1, Points = 12 },
-                new ClubPointsRuleEntry { Id = 26, RuleId = 2, Place =  2, Points = 11 },
-                new ClubPointsRuleEntry { Id = 27, RuleId = 2, Place =  3, Points = 10 },
-                new ClubPointsRuleEntry { Id = 28, RuleId = 2, Place =  4, Points =  9 },
-                new ClubPointsRuleEntry { Id = 29, RuleId = 2, Place =  5, Points =  8 },
-                new ClubPointsRuleEntry { Id = 30, RuleId = 2, Place =  6, Points =  7 },
-                new ClubPointsRuleEntry { Id = 31, RuleId = 2, Place =  7, Points =  6 },
-                new ClubPointsRuleEntry { Id = 32, RuleId = 2, Place =  8, Points =  5 },
-                new ClubPointsRuleEntry { Id = 33, RuleId = 2, Place =  9, Points =  4 },
-                new ClubPointsRuleEntry { Id = 34, RuleId = 2, Place = 10, Points =  3 },
-                new ClubPointsRuleEntry { Id = 35, RuleId = 2, Place = 11, Points =  2 },
-                new ClubPointsRuleEntry { Id = 36, RuleId = 2, Place = 12, Points =  1 }
+                new PointRuleClubsEntry { Id = 25, RuleId = 2, Place =  1, Points = 12 },
+                new PointRuleClubsEntry { Id = 26, RuleId = 2, Place =  2, Points = 11 },
+                new PointRuleClubsEntry { Id = 27, RuleId = 2, Place =  3, Points = 10 },
+                new PointRuleClubsEntry { Id = 28, RuleId = 2, Place =  4, Points =  9 },
+                new PointRuleClubsEntry { Id = 29, RuleId = 2, Place =  5, Points =  8 },
+                new PointRuleClubsEntry { Id = 30, RuleId = 2, Place =  6, Points =  7 },
+                new PointRuleClubsEntry { Id = 31, RuleId = 2, Place =  7, Points =  6 },
+                new PointRuleClubsEntry { Id = 32, RuleId = 2, Place =  8, Points =  5 },
+                new PointRuleClubsEntry { Id = 33, RuleId = 2, Place =  9, Points =  4 },
+                new PointRuleClubsEntry { Id = 34, RuleId = 2, Place = 10, Points =  3 },
+                new PointRuleClubsEntry { Id = 35, RuleId = 2, Place = 11, Points =  2 },
+                new PointRuleClubsEntry { Id = 36, RuleId = 2, Place = 12, Points =  1 }
             );
+        });
+
+        // --- Правила очков: пловца (PointRulesSwimmers*, Э0 — схема без данных) ---
+
+        modelBuilder.Entity<PointRuleSwimmers>(entity =>
+        {
+            entity.ToTable("PointRulesSwimmers");
+            entity.HasIndex(e => e.Version).IsUnique();
+
+            entity.HasMany(e => e.Entries)
+                .WithOne(e => e.Rule)
+                .HasForeignKey(e => e.RuleId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PointRuleSwimmersEntry>(entity =>
+        {
+            entity.ToTable("PointRulesSwimmersEntries");
+            entity.HasIndex(e => new { e.RuleId, e.Place }).IsUnique();
         });
 
         // --- Таблица результатов ---
