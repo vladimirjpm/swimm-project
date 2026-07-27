@@ -280,7 +280,7 @@ public class ResultRepository : IResultRepository
             // дисциплины (по всему событию), а не по месту внутри своего заплыва/дня.
             // Раньше здесь всегда стояло протокольное Position, из-за чего Overview
             // на combine-all соревнованиях показывал очки не той системы (план Э2).
-            var place = EffectivePlace(r.ShowCombine, r.Position, r.CombinedPlace);
+            var place = EffectivePlace(filter.Combined && r.ShowCombine, r.Position, r.CombinedPlace);
             var points = PointRulesClubsScoring.RelayPointsFor(rule, place, r.TimeFail, r.IsRelay);
 
             map.TryGetValue(club, out var e);
@@ -399,7 +399,7 @@ public class ResultRepository : IResultRepository
                 r.Swimmer.LastNameEn,
                 Club = r.Club.Name,
                 r.Gender,
-                Position = r.Competition.ShowCombineAllResults
+                Position = filter.Combined && r.Competition.ShowCombineAllResults
                     ? (r.CombinedPlace ?? r.Position)
                     : r.Position
             })
@@ -441,7 +441,7 @@ public class ResultRepository : IResultRepository
                         && r.Swimmer.BirthYear > 0
                         // combine-all: дисциплина зачитывается один раз — по лучшему заплыву,
                         // иначе повторный старт удваивал бы вклад в сумму FINA.
-                        && (!r.Competition.ShowCombineAllResults || r.IsBestResult != false))
+                        && (!filter.Combined || !r.Competition.ShowCombineAllResults || r.IsBestResult != false))
             .Select(r => new
             {
                 r.SwimmerId,
@@ -589,8 +589,10 @@ public class ResultRepository : IResultRepository
     }
 
     /// <summary>
-    /// Место, по которому идёт зачёт. У соревнований с ShowCombineAllResults это объединённое
-    /// место дисциплины по всему событию (Combine All Results), у остальных — протокольное.
+    /// Место, по которому идёт зачёт. Объединённое место дисциплины по всему событию берётся,
+    /// когда включён тоггл «Combine All Results» И соревнование это поддерживает; иначе —
+    /// протокольное. Overview обязан следовать за тогглом, иначе его цифры расходятся с
+    /// таблицей результатов на том же экране.
     /// Фоллбек на протокольное, если объединённое ещё не рассчитано: приблизительный зачёт
     /// лучше внезапно обнулившегося (пересчёт — dotnet run -- --recalc-combined).
     /// </summary>
@@ -608,7 +610,9 @@ public class ResultRepository : IResultRepository
         PoolType = f.PoolType,
         DateFrom = f.DateFrom,
         DateTo = f.DateTo,
-        Gender = gender
+        Gender = gender,
+        // Без этого зачёт по полу игнорировал бы тоггл и расходился с общим.
+        Combined = f.Combined
     };
 
     /// <summary>Дата дня dd/MM/yyyy → DateTime для сортировки; непарсимая → MaxValue (в конец).</summary>
@@ -697,7 +701,10 @@ public class ResultRepository : IResultRepository
         $"{f.StyleName}:{f.Distance}:{f.Gender}:{f.PoolType}:{f.Country}" +
         $":{f.DateFrom:yyyyMMdd}:{f.DateTo:yyyyMMdd}:{f.Competition}:{f.EventId}:{f.CompetitionId}:{f.Latest}:{f.Name}:{f.Club}" +
         $":{f.BirthYearFrom}:{f.BirthYearTo}:{f.AgeGroup}:{f.PositionMax}:{f.PositionKeepUnranked}:{f.EventDate:yyyyMMdd}" +
-        $":{(f.SwimmerIds is { Count: > 0 } ids ? string.Join(",", ids.OrderBy(x => x)) : "")}";
+        $":{(f.SwimmerIds is { Count: > 0 } ids ? string.Join(",", ids.OrderBy(x => x)) : "")}" +
+        // Combined меняет сами цифры агрегатов — без него включённый и выключенный тоггл
+        // делили бы один кэш и отдавали одинаковый ответ.
+        $":{f.Combined}";
 
     private static string ResultsCacheKey(ResultFilter f, int page, int pageSize) =>
         $"results:{FilterCacheKey(f)}:{page}:{pageSize}";

@@ -176,7 +176,8 @@ public class ResultsController : ControllerBase
         [FromQuery] string? country,
         [FromQuery] string? poolType,
         [FromQuery] DateTime? dateFrom,
-        [FromQuery] DateTime? dateTo)
+        [FromQuery] DateTime? dateTo,
+        [FromQuery] bool? combined)
     {
         int? competitionIdValue = null;
         var latest = false;
@@ -198,11 +199,12 @@ public class ResultsController : ControllerBase
             Country = string.IsNullOrWhiteSpace(country) ? null : country.Trim().ToUpperInvariant(),
             PoolType = poolType,
             DateFrom = dateFrom,
-            DateTo = dateTo
+            DateTo = dateTo,
+            Combined = combined == true
         };
 
         return await this.CachedJson(_cache,
-            $"http:club-summary:{filter.CompetitionId}:{filter.Latest}:{filter.EventId}:{filter.Country}:{filter.PoolType}:{filter.DateFrom:yyyyMMdd}:{filter.DateTo:yyyyMMdd}",
+            $"http:club-summary:{filter.CompetitionId}:{filter.Latest}:{filter.EventId}:{filter.Country}:{filter.PoolType}:{filter.DateFrom:yyyyMMdd}:{filter.DateTo:yyyyMMdd}:{filter.Combined}",
             () => _results.GetClubSummaryAsync(filter), PayloadTtl, CacheControlValue);
     }
 
@@ -212,9 +214,13 @@ public class ResultsController : ControllerBase
     /// competitionId (число или 'last') / eventId.
     /// </summary>
     [HttpGet("/api/competition-overview")]
+    /// <param name="combined">Считать по объединённым местам «Combine All Results»
+    /// (тоггл на клиенте). null/0 — по протокольным, как в таблице с выключенным тогглом.
+    /// Действует только у соревнований с ShowCombineAllResults.</param>
     public async Task<IActionResult> GetCompetitionOverview(
         [FromQuery] string? competitionId,
-        [FromQuery] int? eventId)
+        [FromQuery] int? eventId,
+        [FromQuery] bool? combined)
     {
         int? competitionIdValue = null;
         var latest = false;
@@ -235,11 +241,12 @@ public class ResultsController : ControllerBase
         {
             CompetitionId = competitionIdValue,
             Latest = latest,
-            EventId = eventId
+            EventId = eventId,
+            Combined = combined == true
         };
 
         return await this.CachedJson(_cache,
-            $"http:competition-overview:{filter.CompetitionId}:{filter.Latest}:{filter.EventId}",
+            $"http:competition-overview:{filter.CompetitionId}:{filter.Latest}:{filter.EventId}:{filter.Combined}",
             () => _results.GetCompetitionOverviewAsync(filter), PayloadTtl, CacheControlValue);
     }
 
