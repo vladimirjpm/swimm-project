@@ -108,6 +108,24 @@ public class ResultRecord
 
     public int InternationalPoints { get; set; }
 
+    // ── Объединённый зачёт «Combine All Results» ────────────────────────────
+    // Заполняется ТОЛЬКО у соревнований с Competition.ShowCombineAllResults; у остальных null.
+    // Считается сервером (CombinedPlaceCalculator) в границах события, чтобы клиенту не
+    // требовался весь датасет — иначе тоггл недоступен в постраничном режиме.
+
+    /// <summary>Место в общем зачёте дисциплины по ВСЕМУ событию: пловцы дисциплины
+    /// ранжируются по лучшему времени поверх дней и заплывов. null — не рассчитывалось
+    /// или заплыв незачтён.</summary>
+    public int? CombinedPlace { get; set; }
+
+    /// <summary>Этот заплыв — лучший у пловца в данной дисциплине за событие.
+    /// Нужен, потому что повторы дисциплины реально встречаются (замер 2026-07-27:
+    /// 9 групп, обычно валидный заплыв + DNS/DSQ в другой день).</summary>
+    public bool? IsBestResult { get; set; }
+
+    /// <summary>Лучшее время пловца в этой дисциплине за событие, мс.</summary>
+    public int? BestTimeMs { get; set; }
+
     [MaxLength(500)]
     public string? Note { get; set; }
 }
