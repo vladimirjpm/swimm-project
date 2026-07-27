@@ -6,7 +6,7 @@ namespace Swimm.Domain.Entities;
 /// <summary>
 /// Правило начисления клубных очков: версия, область применения, шкала мест.
 /// </summary>
-public class PointRuleClubs
+public class PointRuleClubs : IPointRule
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]

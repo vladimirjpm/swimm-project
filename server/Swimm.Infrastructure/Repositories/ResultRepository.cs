@@ -247,6 +247,7 @@ public class ResultRepository : IResultRepository
                 r.TimeFail,
                 IsRelay = r.RelayId != null,
                 IsMasters = r.Competition.IsMasters,
+                RuleId = r.Competition.PointRuleClubsId,
                 r.CompetitionDate
             })
             .ToListAsync();
@@ -264,11 +265,13 @@ public class ResultRepository : IResultRepository
             var club = FirstNonEmpty(r.ClubName, r.RelayTeamName, r.ClubNameEn);
             if (club is null) continue;
 
-            // Очки: те же правила, что на клиенте; эстафета удваивает (fix relay club points).
-            // timeFail НЕ гейтит (паритет с клиентским getPoints, который смотрит только на место).
-            var basePoints = PointRulesClubsScoring.PointsFor(
-                rules, r.Position, timeFail: false, r.IsMasters, DateOnly.FromDateTime(r.CompetitionDate));
-            var points = r.IsRelay ? basePoints * 2 : basePoints;
+            // Правило: привязка соревнования важнее подбора по дате (см. CompetitionRuleResolver).
+            // Эстафетный множитель берётся из правила (был хардкод *2).
+            // timeFail НЕ гейтит (паритет с клиентским getPoints, который смотрит только на место)
+            // — расхождение с сезонным зачётом, чинится отдельно (план §7.6).
+            var rule = CompetitionRuleResolver.Resolve(
+                rules, r.RuleId, r.IsMasters, DateOnly.FromDateTime(r.CompetitionDate));
+            var points = PointRulesClubsScoring.RelayPointsFor(rule, r.Position, timeFail: false, r.IsRelay);
 
             map.TryGetValue(club, out var e);
             e.Swimmers ??= new HashSet<string>();

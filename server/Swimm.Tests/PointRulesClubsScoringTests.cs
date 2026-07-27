@@ -150,4 +150,101 @@ public class PointRulesClubsScoringTests
         Assert.Null(entry);
         Assert.Equal(1, rule.DefaultPoints);
     }
+
+    // --- Э1: выбор правила под соревнование (CompetitionRuleResolver) ---
+
+    /// <summary>Правила с Id — резолвер выбирает между ними по привязке/дате/scope.</summary>
+    private static PointRuleClubs IdRule(
+        int id, string scope, string effectiveFrom, bool manualOnly = false,
+        int relayMultiplier = 2, params (int place, int pts)[] scale) => new()
+    {
+        Id = id,
+        Version = $"v{id}",
+        Scope = scope,
+        EffectiveFrom = DateOnly.Parse(effectiveFrom),
+        DefaultPoints = 0,
+        MaxScoringPlace = 24,
+        ManualOnly = manualOnly,
+        RelayMultiplier = relayMultiplier,
+        Entries = scale.Select(s => new PointRuleClubsEntry { Place = s.place, Points = s.pts }).ToList(),
+    };
+
+    [Fact]
+    public void Resolve_PinnedRule_BeatsDateAndScope()
+    {
+        var rules = new[]
+        {
+            IdRule(1, "all",     "2025-01-01", scale: (1, 30)),
+            IdRule(2, "masters", "2025-01-01", scale: (1, 12)),
+        };
+
+        // Masters-соревнование, но привязано правило 1 — привязка сильнее scope.
+        var rule = CompetitionRuleResolver.Resolve(rules, pinnedRuleId: 1, isMasters: true, new DateOnly(2026, 3, 1));
+
+        Assert.Equal(1, rule!.Id);
+        Assert.Equal(30, PointRulesClubsScoring.PointsFor(rule, position: 1, timeFail: false));
+    }
+
+    [Fact]
+    public void Resolve_NoPin_FallsBackToDateAndScope()
+    {
+        var rules = new[]
+        {
+            IdRule(1, "all",     "2025-01-01", scale: (1, 30)),
+            IdRule(2, "masters", "2025-01-01", scale: (1, 12)),
+        };
+
+        Assert.Equal(2, CompetitionRuleResolver.Resolve(rules, null, isMasters: true,  new DateOnly(2026, 3, 1))!.Id);
+        Assert.Equal(1, CompetitionRuleResolver.Resolve(rules, null, isMasters: false, new DateOnly(2026, 3, 1))!.Id);
+    }
+
+    [Fact]
+    public void Resolve_ManualOnlyRule_NeverWinsAutoSelection()
+    {
+        // Реальный сценарий: правило для ручной привязки заведено со свежей датой и scope "all".
+        // Без флага ManualOnly оно перехватило бы ВСЕ непривязанные соревнования, включая
+        // masters (свежая дата бьёт scope) — именно так однажды поехали цифры.
+        var rules = new[]
+        {
+            IdRule(1, "all",     "2025-01-01", scale: (1, 30)),
+            IdRule(2, "masters", "2025-01-01", scale: (1, 12)),
+            IdRule(3, "all",     "2026-01-01", manualOnly: true, scale: (1, 40)),
+        };
+
+        Assert.Equal(2, CompetitionRuleResolver.Resolve(rules, null, isMasters: true,  new DateOnly(2026, 3, 1))!.Id);
+        Assert.Equal(1, CompetitionRuleResolver.Resolve(rules, null, isMasters: false, new DateOnly(2026, 3, 1))!.Id);
+    }
+
+    [Fact]
+    public void Resolve_ManualOnlyRule_StillUsableWhenPinned()
+    {
+        var rules = new[] { IdRule(1, "all", "2025-01-01", scale: (1, 30)),
+                            IdRule(3, "all", "2026-01-01", manualOnly: true, scale: (1, 40)) };
+
+        var rule = CompetitionRuleResolver.Resolve(rules, pinnedRuleId: 3, isMasters: false, new DateOnly(2026, 3, 1));
+
+        Assert.Equal(3, rule!.Id);
+        Assert.Equal(40, PointRulesClubsScoring.PointsFor(rule, position: 1, timeFail: false));
+    }
+
+    [Fact]
+    public void Resolve_PinToMissingRule_FallsBackInsteadOfNothing()
+    {
+        // FK указывает на правило, которого нет в загруженном наборе: приблизительный зачёт
+        // лучше пустого.
+        var rules = new[] { IdRule(1, "all", "2025-01-01", scale: (1, 30)) };
+
+        Assert.Equal(1, CompetitionRuleResolver.Resolve(rules, pinnedRuleId: 99, isMasters: false, new DateOnly(2026, 3, 1))!.Id);
+    }
+
+    [Fact]
+    public void RelayPointsFor_UsesRuleMultiplier_NotHardcodedTwo()
+    {
+        var doubled = IdRule(1, "all", "2025-01-01", relayMultiplier: 2, scale: (1, 30));
+        var flat    = IdRule(2, "all", "2025-01-01", relayMultiplier: 1, scale: (1, 30));
+
+        Assert.Equal(60, PointRulesClubsScoring.RelayPointsFor(doubled, 1, timeFail: false, isRelay: true));
+        Assert.Equal(30, PointRulesClubsScoring.RelayPointsFor(doubled, 1, timeFail: false, isRelay: false));
+        Assert.Equal(30, PointRulesClubsScoring.RelayPointsFor(flat,    1, timeFail: false, isRelay: true));
+    }
 }

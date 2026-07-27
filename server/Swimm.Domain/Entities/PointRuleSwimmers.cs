@@ -7,7 +7,7 @@ namespace Swimm.Domain.Entities;
 /// Правило начисления очков пловца (High Point Swimmer): версия, область применения,
 /// источник очков, шкала мест. Э0 — только схема, расчёт не реализован (см. Э1–Э2.5).
 /// </summary>
-public class PointRuleSwimmers
+public class PointRuleSwimmers : IPointRule
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]

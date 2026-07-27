@@ -245,7 +245,8 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                 TimeFail = r.TimeFail,
                 InternationalPoints = r.InternationalPoints,
                 CompetitionDate = r.CompetitionDate,
-                IsMasters = r.Competition.IsMasters
+                IsMasters = r.Competition.IsMasters,
+                RuleId = r.Competition.PointRuleClubsId
             })
             .ToListAsync();
 
@@ -274,9 +275,12 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                     Golds = rows.Count(r => !r.TimeFail && r.Position == 1),
                     Silvers = rows.Count(r => !r.TimeFail && r.Position == 2),
                     Bronzes = rows.Count(r => !r.TimeFail && r.Position == 3),
+                    // Правило: привязка соревнования важнее подбора по дате (CompetitionRuleResolver).
                     ClubPoints = rows.Sum(r =>
                         PointRulesClubsScoring.PointsFor(
-                            rules, r.Position, r.TimeFail, r.IsMasters, DateOnly.FromDateTime(r.CompetitionDate))),
+                            CompetitionRuleResolver.Resolve(
+                                rules, r.RuleId, r.IsMasters, DateOnly.FromDateTime(r.CompetitionDate)),
+                            r.Position, r.TimeFail)),
                     BestFina = rows.Count > 0 ? rows.Max(r => r.InternationalPoints) : 0
                 };
             })
@@ -294,6 +298,8 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
         public int InternationalPoints { get; init; }
         public DateTime CompetitionDate { get; init; }
         public bool IsMasters { get; init; }
+        /// <summary>Правило клубных очков, привязанное к соревнованию; null — подбор по дате.</summary>
+        public int? RuleId { get; init; }
     }
 
     private static List<HubGroupPublicLinkDto> ParseLinks(string? json)
