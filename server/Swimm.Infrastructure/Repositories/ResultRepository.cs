@@ -267,11 +267,13 @@ public class ResultRepository : IResultRepository
 
             // Правило: привязка соревнования важнее подбора по дате (см. CompetitionRuleResolver).
             // Эстафетный множитель берётся из правила (был хардкод *2).
-            // timeFail НЕ гейтит (паритет с клиентским getPoints, который смотрит только на место)
-            // — расхождение с сезонным зачётом, чинится отдельно (план §7.6).
+            // TimeFail (DSQ/незачтённое время) очков НЕ приносит — как в сезонном зачёте групп
+            // и как считаются медали. Раньше здесь стояло timeFail: false ради паритета с
+            // клиентским getPoints, и один и тот же заплыв давал клубу очки на странице
+            // соревнования, но не давал в сезонном зачёте (план §7.6).
             var rule = CompetitionRuleResolver.Resolve(
                 rules, r.RuleId, r.IsMasters, DateOnly.FromDateTime(r.CompetitionDate));
-            var points = PointRulesClubsScoring.RelayPointsFor(rule, r.Position, timeFail: false, r.IsRelay);
+            var points = PointRulesClubsScoring.RelayPointsFor(rule, r.Position, r.TimeFail, r.IsRelay);
 
             map.TryGetValue(club, out var e);
             e.Swimmers ??= new HashSet<string>();
