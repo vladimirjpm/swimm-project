@@ -33,6 +33,14 @@ public class PointRuleClubs
     /// <summary>Максимальное место, за которое начисляются очки (null = без ограничения).</summary>
     public int? MaxScoringPlace { get; set; }
 
+    /// <summary>Множитель очков за эстафету (регламент бугрим п.17: «ניקוד כפול»).
+    /// Заменяет хардкод basePoints * 2 в ResultRepository.</summary>
+    public int RelayMultiplier { get; set; } = 2;
+
+    /// <summary>Правило участвует только в явной привязке к соревнованию и никогда —
+    /// в подборе по дате/scope (см. PointRuleSwimmers.ManualOnly).</summary>
+    public bool ManualOnly { get; set; }
+
     /// <summary>Строки шкалы: место → очки.</summary>
     public ICollection<PointRuleClubsEntry> Entries { get; set; } = [];
 }

@@ -52,6 +52,23 @@ public class PointRuleSwimmers
     /// <summary>Минимум заплывов для попадания в зачёт; null — без ограничения.</summary>
     public int? MinSwims { get; set; }
 
+    /// <summary>Очки за УСТАНОВЛЕННЫЙ возрастной рекорд. Замещают очки за место, а не
+    /// складываются с ними («כולל הניקוד עבור מדליית הזהב»). null — рекорды не влияют.</summary>
+    public int? RecordPoints { get; set; }
+
+    /// <summary>Очки за ПОВТОРЕНИЕ возрастного рекорда (время в точности равно). Тоже
+    /// замещают очки за место. null — повторение не выделяется.</summary>
+    public int? RecordTiePoints { get; set; }
+
+    /// <summary>Считать только финальные заплывы (регламент бугрим, п.16). Признака типа
+    /// заплыва в данных пока НЕТ — до его появления флаг ни на что не влияет.</summary>
+    public bool FinalsOnly { get; set; }
+
+    /// <summary>Правило участвует только в явной привязке к соревнованию и никогда —
+    /// в подборе по дате/scope. Без этого свежее правило со scope "all" перехватывало бы
+    /// все непривязанные соревнования, включая masters.</summary>
+    public bool ManualOnly { get; set; }
+
     /// <summary>Строки шкалы: место → очки.</summary>
     public ICollection<PointRuleSwimmersEntry> Entries { get; set; } = [];
 }
