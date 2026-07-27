@@ -5,7 +5,7 @@ using Swimm.Domain.Entities;
 
 namespace Swimm.Tests;
 
-/// <summary>Тесты чистого детектора «новых рекордов» соревнования (образец — ClubPointsScoringTests).</summary>
+/// <summary>Тесты чистого детектора «новых рекордов» соревнования (образец — PointRulesClubsScoringTests).</summary>
 public class CompetitionRecordsDetectorTests
 {
     private static Record Rec(string category, string ageKey, string time,
@@ -19,9 +19,10 @@ public class CompetitionRecordsDetectorTests
 
     private static RecordCandidateRow Row(int timeMs, int? birthYear = 2016, string time = "00:40.00",
         string style = "backstroke", string distance = "50", string gender = "male", string pool = "50m",
-        bool isMasters = false, long resultId = 1) => new(
+        bool isMasters = false, long resultId = 1, string ageGroup = "") => new(
         resultId, 100, "First", "Last", "Club", style, distance, gender, pool,
-        birthYear, new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Utc), timeMs, time, 1, isMasters);
+        birthYear, new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Utc), timeMs, time, 1, isMasters,
+        ageGroup);
 
     [Fact]
     public void BeatsAgeRecord_ByComputedAge()
