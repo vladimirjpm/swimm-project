@@ -244,6 +244,8 @@ public class ResultRepository : IResultRepository
                 RelayTeamName = r.Relay != null ? r.Relay.TeamName : null,
                 LastName = r.Swimmer.LastName,
                 r.Position,
+                r.CombinedPlace,
+                ShowCombine = r.Competition.ShowCombineAllResults,
                 r.TimeFail,
                 IsRelay = r.RelayId != null,
                 IsMasters = r.Competition.IsMasters,
@@ -273,16 +275,22 @@ public class ResultRepository : IResultRepository
             // соревнования, но не давал в сезонном зачёте (план §7.6).
             var rule = CompetitionRuleResolver.Resolve(
                 rules, r.RuleId, r.IsMasters, DateOnly.FromDateTime(r.CompetitionDate));
-            var points = PointRulesClubsScoring.RelayPointsFor(rule, r.Position, r.TimeFail, r.IsRelay);
+
+            // Соревнование объявлено объединённым → зачёт идёт по объединённому месту
+            // дисциплины (по всему событию), а не по месту внутри своего заплыва/дня.
+            // Раньше здесь всегда стояло протокольное Position, из-за чего Overview
+            // на combine-all соревнованиях показывал очки не той системы (план Э2).
+            var place = EffectivePlace(r.ShowCombine, r.Position, r.CombinedPlace);
+            var points = PointRulesClubsScoring.RelayPointsFor(rule, place, r.TimeFail, r.IsRelay);
 
             map.TryGetValue(club, out var e);
             e.Swimmers ??= new HashSet<string>();
             e.Points += points;
             if (points > 0) e.Successful += 1;
             if (!string.IsNullOrWhiteSpace(r.LastName)) e.Swimmers.Add(r.LastName.Trim());
-            if (r.Position == 1) e.Gold += 1;
-            else if (r.Position == 2) e.Silver += 1;
-            else if (r.Position == 3) e.Bronze += 1;
+            if (place == 1) e.Gold += 1;
+            else if (place == 2) e.Silver += 1;
+            else if (place == 3) e.Bronze += 1;
             map[club] = e;
         }
 
@@ -378,8 +386,10 @@ public class ResultRepository : IResultRepository
         var bestSwimFemale = await BestSwimProjection(query.Where(r => r.Gender == "female")).FirstOrDefaultAsync();
 
         // Топ-медалист: личные медали (эстафеты не в счёт), TimeFail медаль не даёт.
+        // При combine-all медаль определяется объединённым местом дисциплины — иначе на
+        // одной странице «золото» по протоколу заплыва, а очки клубу по общему зачёту.
         var medalRows = await query
-            .Where(r => r.RelayId == null && !r.TimeFail && r.Position != null && r.Position <= 3)
+            .Where(r => r.RelayId == null && !r.TimeFail)
             .Select(r => new
             {
                 r.SwimmerId,
@@ -389,8 +399,11 @@ public class ResultRepository : IResultRepository
                 r.Swimmer.LastNameEn,
                 Club = r.Club.Name,
                 r.Gender,
-                r.Position
+                Position = r.Competition.ShowCombineAllResults
+                    ? (r.CombinedPlace ?? r.Position)
+                    : r.Position
             })
+            .Where(r => r.Position != null && r.Position <= 3)
             .ToListAsync();
 
         // Топ-медалист общий и по полу (design_handoff вариант 4). gender == null → без фильтра.
@@ -425,7 +438,10 @@ public class ResultRepository : IResultRepository
         var hpRows = await query
             .Where(r => r.RelayId == null && !r.TimeFail && r.InternationalPoints > 0
                         && (r.Gender == "male" || r.Gender == "female")
-                        && r.Swimmer.BirthYear > 0)
+                        && r.Swimmer.BirthYear > 0
+                        // combine-all: дисциплина зачитывается один раз — по лучшему заплыву,
+                        // иначе повторный старт удваивал бы вклад в сумму FINA.
+                        && (!r.Competition.ShowCombineAllResults || r.IsBestResult != false))
             .Select(r => new
             {
                 r.SwimmerId,
@@ -571,6 +587,15 @@ public class ResultRepository : IResultRepository
         await _cache.SetAsync<IReadOnlyList<Domain.Entities.Record>>(key, records, StaticHintsTtl);
         return records;
     }
+
+    /// <summary>
+    /// Место, по которому идёт зачёт. У соревнований с ShowCombineAllResults это объединённое
+    /// место дисциплины по всему событию (Combine All Results), у остальных — протокольное.
+    /// Фоллбек на протокольное, если объединённое ещё не рассчитано: приблизительный зачёт
+    /// лучше внезапно обнулившегося (пересчёт — dotnet run -- --recalc-combined).
+    /// </summary>
+    private static int? EffectivePlace(bool showCombineAllResults, int? position, int? combinedPlace)
+        => showCombineAllResults ? combinedPlace ?? position : position;
 
     /// <summary>Копия фильтра-источника с Gender — для клубного зачёта по полу.
     /// Копируются только поля источника (как в /api/club-summary).</summary>
