@@ -20,6 +20,7 @@ public static class AdminNav
         new("Categories", "tag", "/Admin/Categories", "Data"),
         new("Styles", "waves", "/Admin/Styles", "Data"),
         new("Records", "award", "/Admin/Records", "Data"),
+        new("Points rules", "calculator", "/Admin/PointsRules", "Data"),
         new("HubGroups", "users", "/Admin/HubGroups", "Data"),
         new("Club requests", "inbox", "/Admin/HubGroupClubRequests", "Data"),
         new("Import", "download", "/Admin/Import", "Data"),

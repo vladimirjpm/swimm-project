@@ -1,0 +1,213 @@
+@page
+@model Swimm.API.Pages.Admin.PointsRules.EditModel
+@{
+    var kindTitle = Swimm.API.Pages.Admin.PointsRules.PointRulesKindParser.Title(Model.RuleKind);
+    ViewData["Title"] = Model.IsNew ? $"Новое правило · {kindTitle}" : $"Правило · {kindTitle}";
+    ViewData["PageSubtitle"] = Model.IsNew ? null : $"#{Model.Id} · {Model.Existing?.Version}";
+
+    var flash = TempData["Flash"] as string;
+    var kind = Model.Kind;
+    var used = Model.Existing?.CompetitionCount ?? 0;
+}
+
+<div class="max-w-[720px] mx-auto">
+
+    <div class="mb-4">
+        <a href="@Url.Page("Index", new { kind })" class="admin-btn admin-btn-ghost">← К списку</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5 py-3 px-4 mb-4 text-sm text-admin-danger">
+            @Model.Error
+        </div>
+    }
+
+    @if (used > 0)
+    {
+        <div class="admin-card border-l-[3px] border-l-admin-warning bg-admin-warning/5 py-3 px-4 mb-4 text-xs text-admin-text-muted leading-relaxed">
+            Правило привязано к <strong class="text-admin-text">@used</strong> соревнованиям — правка
+            немедленно меняет их очки. Если нужна новая шкала на новый сезон, лучше
+            <a href="@Url.Page("Edit", new { kind, cloneFrom = Model.Id })" class="text-admin-accent hover:underline">клонировать версию</a>.
+        </div>
+    }
+
+    <form method="post" asp-page-handler="Save" class="admin-card mb-5">
+        <input type="hidden" asp-for="Id" />
+        <input type="hidden" asp-for="Kind" />
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Версия <span class="text-admin-danger">*</span></span>
+                <input asp-for="Input.Version" class="admin-input font-mono" autocomplete="off"
+                       placeholder="2026.01" required />
+                <span class="text-xs text-admin-text-muted/70">Уникальна в пределах вида правил.</span>
+            </label>
+
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Действует с <span class="text-admin-danger">*</span></span>
+                <input asp-for="Input.EffectiveFrom" type="date" class="admin-input" required />
+            </label>
+
+            <label class="flex flex-col gap-1 sm:col-span-2">
+                <span class="text-xs text-admin-text-muted">Описание</span>
+                <input asp-for="Input.Description" class="admin-input" autocomplete="off"
+                       placeholder="Регламент 2026, взрослые" />
+            </label>
+
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Scope</span>
+                <select asp-for="Input.Scope" class="admin-input">
+                    <option value="all">all — любые соревнования</option>
+                    <option value="masters">masters</option>
+                    <option value="non-masters">non-masters</option>
+                </select>
+            </label>
+
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Очки вне шкалы (default)</span>
+                <input asp-for="Input.DefaultPoints" type="number" class="admin-input" />
+            </label>
+
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Максимальное место с очками</span>
+                <input asp-for="Input.MaxScoringPlace" type="number" min="1" class="admin-input" placeholder="пусто = без ограничения" />
+            </label>
+
+            @if (Model.IsClubs)
+            {
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">Множитель эстафеты</span>
+                    <input asp-for="Input.RelayMultiplier" type="number" min="1" class="admin-input" />
+                </label>
+            }
+        </div>
+
+        <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none mt-4">
+            <input asp-for="Input.ManualOnly" class="w-4 h-4 cursor-pointer" />
+            <span class="text-admin-text">Только по явной привязке (manual)</span>
+        </label>
+        <div class="text-[11px] text-admin-text-muted mt-1">
+            Без этого флага правило перехватывает все непривязанные соревнования своего scope, действующие с указанной даты.
+        </div>
+
+        @if (!Model.IsClubs)
+        {
+            <div class="mt-6 pt-5 border-t border-admin-border">
+                <h2 class="text-sm font-semibold text-admin-text mb-3">Расчёт High Point</h2>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <label class="flex flex-col gap-1">
+                        <span class="text-xs text-admin-text-muted">Источник очков</span>
+                        <select asp-for="Input.PointsSource" class="admin-input">
+                            <option value="placement">placement — по шкале мест</option>
+                            <option value="fina">fina — сумма international points</option>
+                        </select>
+                    </label>
+
+                    <label class="flex flex-col gap-1">
+                        <span class="text-xs text-admin-text-muted">Номинации (group by)</span>
+                        <select asp-for="Input.GroupBy" class="admin-input">
+                            <option value="age">age — по возрасту</option>
+                            <option value="age-group">age-group — по возрастной группе</option>
+                            <option value="none">none — общий зачёт</option>
+                        </select>
+                    </label>
+
+                    <label class="flex flex-col gap-1">
+                        <span class="text-xs text-admin-text-muted">Считать лучших заплывов</span>
+                        <input asp-for="Input.CountBestSwims" type="number" min="1" class="admin-input" placeholder="пусто = все" />
+                    </label>
+
+                    <label class="flex flex-col gap-1">
+                        <span class="text-xs text-admin-text-muted">Минимум заплывов для зачёта</span>
+                        <input asp-for="Input.MinSwims" type="number" min="1" class="admin-input" placeholder="пусто = без ограничения" />
+                    </label>
+
+                    <label class="flex flex-col gap-1">
+                        <span class="text-xs text-admin-text-muted">Очки за возрастной рекорд</span>
+                        <input asp-for="Input.RecordPoints" type="number" min="0" class="admin-input" placeholder="пусто = рекорды не влияют" />
+                    </label>
+
+                    <label class="flex flex-col gap-1">
+                        <span class="text-xs text-admin-text-muted">Очки за повторение рекорда</span>
+                        <input asp-for="Input.RecordTiePoints" type="number" min="0" class="admin-input" placeholder="пусто = не выделяется" />
+                    </label>
+                </div>
+
+                <div class="text-[11px] text-admin-text-muted mt-2 leading-relaxed">
+                    Очки за рекорд <strong class="text-admin-text">замещают</strong> очки за место (берётся большее), а не складываются с ними.
+                </div>
+
+                <div class="flex flex-wrap gap-x-6 gap-y-2 mt-4">
+                    <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+                        <input asp-for="Input.SplitByGender" class="w-4 h-4 cursor-pointer" />
+                        <span class="text-admin-text">Раздельный зачёт по полу</span>
+                    </label>
+                    <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+                        <input asp-for="Input.IncludeRelays" class="w-4 h-4 cursor-pointer" />
+                        <span class="text-admin-text">Учитывать эстафеты</span>
+                    </label>
+                    <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+                        <input asp-for="Input.FinalsOnly" class="w-4 h-4 cursor-pointer" />
+                        <span class="text-admin-text">Только финалы</span>
+                    </label>
+                </div>
+                <div class="text-[11px] text-admin-text-muted mt-1 leading-relaxed">
+                    «Только финалы» пока ни на что не влияет: признака типа заплыва в данных нет,
+                    клиенту отдаётся пометка, что зачёт идёт по всем заплывам.
+                </div>
+            </div>
+        }
+
+        <div class="mt-6 pt-5 border-t border-admin-border">
+            <h2 class="text-sm font-semibold text-admin-text mb-1">Шкала «место → очки»</h2>
+            <p class="text-[11px] text-admin-text-muted mb-2 leading-relaxed">
+                Либо очки подряд с первого места — <code class="font-mono text-admin-text">30, 28, 26, 24</code>,
+                либо построчно <code class="font-mono text-admin-text">место = очки</code>, если шкала с пропусками.
+                Пустая шкала = всем местам начисляется «очки вне шкалы».
+            </p>
+            <textarea asp-for="Input.Scale" rows="4" class="admin-input font-mono" spellcheck="false"
+                      placeholder="30, 28, 26, 24, 23, 22"></textarea>
+        </div>
+
+        <div class="mt-5 flex gap-3">
+            <button type="submit" class="admin-btn admin-btn-primary">
+                @(Model.IsNew ? "Создать" : "Сохранить")
+            </button>
+            <a href="@Url.Page("Index", new { kind })" class="admin-btn admin-btn-ghost">Отмена</a>
+        </div>
+    </form>
+
+    @if (!Model.IsNew && Model.Existing != null)
+    {
+        <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5">
+            <h2 class="text-sm font-semibold text-admin-danger mb-1">Опасная зона — удаление</h2>
+            @if (used > 0)
+            {
+                <p class="text-xs text-admin-text-muted leading-relaxed">
+                    На правило ссылаются <strong class="text-admin-text">@used</strong> соревнований —
+                    удаление недоступно, пока привязка не снята в /Admin/Competitions.
+                </p>
+            }
+            else
+            {
+                <p class="text-xs text-admin-text-muted leading-relaxed mb-4">
+                    Правило не привязано ни к одному соревнованию. <strong class="text-admin-danger">Действие необратимо.</strong>
+                </p>
+                <form method="post" asp-page-handler="Delete">
+                    <input type="hidden" asp-for="Id" />
+                    <input type="hidden" asp-for="Kind" />
+                    <button type="submit" class="admin-btn admin-btn-danger">Удалить безвозвратно</button>
+                </form>
+            }
+        </div>
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}
