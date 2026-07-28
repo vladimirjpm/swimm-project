@@ -78,8 +78,25 @@ public static class CombinedPlaceCalculator
     }
 
     /// <summary>Ключ дисциплины — как <c>buildEventKey</c> на клиенте.</summary>
-    public static string EventKeyOf(int styleId, string distance, string poolType, string gender, string eventStyleAge)
-        => string.Join('|', styleId, distance ?? "", poolType ?? "", gender ?? "", eventStyleAge ?? "");
+    /// <summary>
+    /// Ключ дисциплины. Последняя ось — КАТЕГОРИЯ ЗАПЛЫВА, если она известна
+    /// (<paramref name="eventCategory"/>), иначе возраст пловца — как было до появления
+    /// категории.
+    ///
+    /// Почему категория, а не возраст: в открытом заплыве («- Men») плывут вместе люди
+    /// разных возрастов, и объединённый зачёт должен ранжировать их в ОДНОЙ таблице,
+    /// а не резать по годам. И наоборот — паралимпийская программа («- Men Para») не должна
+    /// смешиваться с основной, хотя возраст там встречается тот же.
+    ///
+    /// Фоллбек на возраст обязателен: у строк, импортированных до появления поля,
+    /// категория null, и без фоллбека все возрасты сводного соревнования (8–11) схлопнулись
+    /// бы в один зачёт.
+    /// </summary>
+    public static string EventKeyOf(
+        int styleId, string distance, string poolType, string gender,
+        string? eventCategory, string eventStyleAge)
+        => string.Join('|', styleId, distance ?? "", poolType ?? "", gender ?? "",
+            string.IsNullOrWhiteSpace(eventCategory) ? eventStyleAge ?? "" : eventCategory);
 
     private static bool IsScorable(Row r) => !r.TimeFail && r.TimeMilliseconds is > 0;
 }

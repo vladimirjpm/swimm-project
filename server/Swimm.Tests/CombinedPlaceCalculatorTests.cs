@@ -117,8 +117,43 @@ public class CombinedPlaceCalculatorTests
     [Fact]
     public void EventKeyOf_MatchesClientBuildEventKey()
     {
-        // Клиентский buildEventKey склеивает стиль|дистанцию|бассейн|пол|возрастную группу.
-        Assert.Equal("1|50|50m|male|10", CombinedPlaceCalculator.EventKeyOf(1, "50", "50m", "male", "10"));
-        Assert.Equal("1|50|50m|male|", CombinedPlaceCalculator.EventKeyOf(1, "50", "50m", "male", ""));
+        // Клиентский buildEventKey склеивает стиль|дистанцию|бассейн|пол|(категорию ?? возраст).
+        Assert.Equal("1|50|50m|male|10", CombinedPlaceCalculator.EventKeyOf(1, "50", "50m", "male", null, "10"));
+        Assert.Equal("1|50|50m|male|", CombinedPlaceCalculator.EventKeyOf(1, "50", "50m", "male", null, ""));
+    }
+
+    /// <summary>
+    /// Категория заплыва важнее возраста пловца: в открытом заплыве («- Men») плывут разные
+    /// возрасты и ранжируются ОДНОЙ таблицей, а паралимпийская программа («- Men Para») идёт
+    /// отдельно от основной, хотя возраст там встречается тот же.
+    /// </summary>
+    [Fact]
+    public void EventKeyOf_PrefersCategoryOverAge()
+    {
+        // Разный возраст, одна категория → один зачёт.
+        Assert.Equal(
+            CombinedPlaceCalculator.EventKeyOf(1, "50", "50m", "male", "open", "29"),
+            CombinedPlaceCalculator.EventKeyOf(1, "50", "50m", "male", "open", "17"));
+
+        // Тот же возраст, разные категории → разные зачёты (para не смешивается с open).
+        Assert.NotEqual(
+            CombinedPlaceCalculator.EventKeyOf(1, "50", "50m", "male", "open", "49"),
+            CombinedPlaceCalculator.EventKeyOf(1, "50", "50m", "male", "para", "49"));
+    }
+
+    /// <summary>
+    /// Фоллбек на возраст обязателен: у строк, импортированных до появления категории, она
+    /// null, и без фоллбека все возрасты сводного соревнования (8–11) схлопнулись бы в один
+    /// зачёт вместо зачёта по каждому возрасту.
+    /// </summary>
+    [Fact]
+    public void EventKeyOf_FallsBackToAgeWhenCategoryMissing()
+    {
+        Assert.NotEqual(
+            CombinedPlaceCalculator.EventKeyOf(1, "50", "50m", "male", null, "10"),
+            CombinedPlaceCalculator.EventKeyOf(1, "50", "50m", "male", null, "11"));
+        Assert.Equal(
+            CombinedPlaceCalculator.EventKeyOf(1, "50", "50m", "male", "", "10"),
+            CombinedPlaceCalculator.EventKeyOf(1, "50", "50m", "male", null, "10"));
     }
 }

@@ -34,6 +34,7 @@ public static class ResultMapping
         Distance = r.Distance,
         Gender = r.Gender,
         EventStyleAge = r.EventStyleAge,
+        EventCategory = r.EventCategory,
         PoolType = r.Competition.PoolType,
         Position = r.Position,
         PositionAgeGroup = r.PositionAgeGroup,

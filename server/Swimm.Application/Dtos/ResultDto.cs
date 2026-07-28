@@ -71,6 +71,14 @@ public class ResultDto
     [JsonPropertyName("event_style_age")]
     public string EventStyleAge { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Категория заплыва из протокола: open / para / mix / возрастная («17», «25-29»).
+    /// null — данные импортированы до появления поля. В отличие от event_style_age НЕ
+    /// производна от года рождения: в одном открытом заплыве плывут разные возрасты.
+    /// </summary>
+    [JsonPropertyName("event_category")]
+    public string? EventCategory { get; set; }
+
     [JsonPropertyName("pool_type")]
     public string PoolType { get; set; } = string.Empty;
 

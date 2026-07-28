@@ -69,6 +69,7 @@ public class CompetitionRecalculationService : ICompetitionRecalculationService
                 r.Distance,
                 r.Gender,
                 r.EventStyleAge,
+                r.EventCategory,
                 PoolType = r.Competition.PoolType,
                 r.TimeMillisecond,
                 r.TimeFail
@@ -81,7 +82,7 @@ public class CompetitionRecalculationService : ICompetitionRecalculationService
             .Select(r => new CombinedPlaceCalculator.Row(
                 r.Id,
                 r.SwimmerId,
-                CombinedPlaceCalculator.EventKeyOf(r.StyleId, r.Distance, r.PoolType, r.Gender, r.EventStyleAge),
+                CombinedPlaceCalculator.EventKeyOf(r.StyleId, r.Distance, r.PoolType, r.Gender, r.EventCategory, r.EventStyleAge),
                 r.TimeMillisecond,
                 r.TimeFail))
             .ToList());
