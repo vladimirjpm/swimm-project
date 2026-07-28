@@ -61,7 +61,14 @@ public sealed class LogligBatchBackgroundService : BackgroundService
                 _logger.LogWarning(ex, "Loglig batch (фон): прогон не удался");
             }
 
-            await Task.Delay(IdleCheck, stoppingToken).ConfigureAwait(false);
+            try
+            {
+                await Task.Delay(IdleCheck, stoppingToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                break; // остановка сервиса — штатный выход
+            }
         }
     }
 }

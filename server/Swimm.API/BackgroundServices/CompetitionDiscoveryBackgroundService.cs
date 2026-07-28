@@ -58,7 +58,14 @@ public sealed class CompetitionDiscoveryBackgroundService : BackgroundService
                 _logger.LogWarning(ex, "Discovery (фон): синхронизация не удалась");
             }
 
-            await Task.Delay(IdleCheck, stoppingToken).ConfigureAwait(false);
+            try
+            {
+                await Task.Delay(IdleCheck, stoppingToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                break; // остановка сервиса — штатный выход
+            }
         }
     }
 }

@@ -62,7 +62,14 @@ public sealed class LogligSuggestionVerificationBackgroundService : BackgroundSe
                 _logger.LogWarning(ex, "Loglig verify (фон): проверка предложений не удалась");
             }
 
-            await Task.Delay(IdleCheck, stoppingToken).ConfigureAwait(false);
+            try
+            {
+                await Task.Delay(IdleCheck, stoppingToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                break; // остановка сервиса — штатный выход
+            }
         }
     }
 }
