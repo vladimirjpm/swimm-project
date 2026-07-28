@@ -423,11 +423,38 @@ public class IsrOrgAgeRecordsParser : IFormatParser
         }
 
         // ===== Pass 4: Build results =====
+        // Дистанцию/стиль решаем ОДИН РАЗ НА БЛОК, а не построчно. Метка объединённой
+        // ячейки центрирована по вертикали по паре блоков (мужской + женский), поэтому
+        // построчный выбор «ближайший маркер по Y» ошибается на краю, когда блоки разной
+        // длины: у женского 800 нет возраста 10, у мужского есть 11 — и крайняя строка
+        // оказывается ближе к маркеру СОСЕДНЕЙ дистанции. Так уезжали female 800/10
+        // (на самом деле 400) и female 1500/11 (на самом деле 800).
+        // Границу блока даёт возрастная последовательность: внутри блока возраст идёт
+        // ISR, 18, 17 … 10, а новый блок начинается там, где она рестартует.
+        var dataRows = parsedRows.Where(p => p.HasTime).ToList();
+        var blockOf = AssignBlocks(dataRows);
+        var blockChannel = new Dictionary<int, (string dist, string style, bool isRelay)>();
+
+        foreach (var grp in dataRows.Select((pr, i) => (pr, block: blockOf[i])).GroupBy(x => x.block))
+        {
+            var rows = grp.Select(x => x.pr).ToList();
+            // Представитель блока: строка, ближайшая к его вертикальному центру.
+            double centerY = (rows.First().YCenter + rows.Last().YCenter) / 2.0;
+            var mid = rows[rows.Count / 2];
+
+            var (d, dRelay) = ResolveChannel(centerY, fwdDist[mid.Index], bwdDist[mid.Index]);
+            var (s, sRelay) = ResolveChannel(centerY, fwdStyle[mid.Index], bwdStyle[mid.Index]);
+            blockChannel[grp.Key] = (d, s, dRelay || sRelay);
+
+            Log($"  BLOCK[{grp.Key}]: rows {rows.First().Index}..{rows.Last().Index}, " +
+                $"centerY={centerY:F0} -> dist={d}, style={s}, relay={dRelay || sRelay}");
+        }
+
         var completedResults = new List<Result>();
 
-        foreach (var pr in parsedRows)
+        for (int di = 0; di < dataRows.Count; di++)
         {
-            if (!pr.HasTime) continue;
+            var pr = dataRows[di];
 
             var time = TimeRx.Match(pr.TimeRaw).Value;
             var date = DateRx.IsMatch(pr.DateRaw) ? DateRx.Match(pr.DateRaw).Value : "";
@@ -437,13 +464,7 @@ public class IsrOrgAgeRecordsParser : IFormatParser
             // Gender: nearest marker
             string gender = DetermineGender(pr.YCenter, genderMarkers);
 
-            // Dist: resolve from forward/backward sweep independently
-            var (distance, distIsRelay) = ResolveChannel(pr.YCenter, fwdDist[pr.Index], bwdDist[pr.Index]);
-
-            // Style: resolve from forward/backward sweep independently
-            var (style, styleIsRelay) = ResolveChannel(pr.YCenter, fwdStyle[pr.Index], bwdStyle[pr.Index]);
-
-            bool isRelay = distIsRelay || styleIsRelay;
+            var (distance, style, isRelay) = blockChannel[blockOf[di]];
 
             Log($"    -> RESULT: dist={distance}, style={style}, gender={gender}, age={ageCategory}, " +
                 $"time={time}, name='{swimmerName}', club='{club}', relay={isRelay}");
@@ -466,6 +487,43 @@ public class IsrOrgAgeRecordsParser : IFormatParser
             yield return r;
 
         Log($"Parse complete. Total results: {completedResults.Count}");
+    }
+
+    /// <summary>
+    /// Режет строки данных на блоки по возрастной последовательности: внутри блока
+    /// возраст убывает (ISR/bogrim, затем 18, 17 … 10), поэтому блок начинается там,
+    /// где последовательность рестартует — встретился ISR/bogrim или возраст не меньше
+    /// предыдущего. Возвращает номер блока для каждой строки (по позиции в списке).
+    /// </summary>
+    private static int[] AssignBlocks(List<ParsedRow> dataRows)
+    {
+        var result = new int[dataRows.Count];
+        int block = 0;
+        int? prevAge = null;
+        bool prevWasHeadCategory = false;
+
+        for (int i = 0; i < dataRows.Count; i++)
+        {
+            var age = ExtractAgeCategory(dataRows[i].AgeRaw);
+            bool isHeadCategory = age is "israel" or "adults_m" or "adults_f";
+            bool isNumeric = int.TryParse(age, out var ageNum);
+
+            if (i > 0)
+            {
+                bool restart =
+                    // ISR/bogrim открывает блок — но не когда их несколько подряд в шапке блока
+                    (isHeadCategory && !prevWasHeadCategory)
+                    // возраст перестал убывать
+                    || (isNumeric && prevAge.HasValue && ageNum >= prevAge.Value);
+                if (restart) block++;
+            }
+
+            result[i] = block;
+            prevAge = isNumeric ? ageNum : null;
+            prevWasHeadCategory = isHeadCategory;
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -846,7 +904,7 @@ public class IsrOrgAgeRecordsParser : IFormatParser
     /// <summary>
     /// Extract age category from the age column value.
     /// </summary>
-    private string ExtractAgeCategory(string ageVal)
+    private static string ExtractAgeCategory(string ageVal)
     {
         if (string.IsNullOrWhiteSpace(ageVal)) return "";
         if (ContainsAny(ageVal, HebrewIsrael, HebrewIsraelRev))

@@ -1,6 +1,8 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Swimm.Parsing.Parsers;
 using Swimm.Parsing.Parsers.IsrOrgAgeRecords;
 using Xunit;
@@ -61,5 +63,56 @@ public class IsrOrgAgeRecordsBlockLabelTests
             .Select(g => $"{g.Key} x{g.Count()}")
             .ToList();
         Assert.True(dupes.Count == 0, "Дубли блоков: " + string.Join(", ", dupes));
+    }
+
+    /// <summary>
+    /// Краевой дефект: метка объединённой ячейки центрирована по паре блоков
+    /// (мужской + женский), поэтому построчный выбор «ближайший маркер по Y» ошибался,
+    /// когда блоки разной длины — крайняя строка уезжала в соседнюю дистанцию
+    /// (female 800/10 на самом деле 400, female 1500/11 на самом деле 800).
+    /// Дистанция решается один раз на блок, границы блока — по возрастной
+    /// последовательности (см. AssignBlocks).
+    ///
+    /// Инвариант общий, а не про конкретные строки: внутри блока
+    /// (пол × дистанция × стиль) времена не могут отличаться от медианы в разы —
+    /// заехавшая из соседней дистанции строка даёт именно такой выброс.
+    /// </summary>
+    [Theory]
+    [InlineData("isr-age-records-50m.pdf", "50m")]
+    [InlineData("isr-age-records-25m.pdf", "25m")]
+    public void BoundaryRow_StaysInItsOwnDistanceBlock(string fixture, string poolType)
+    {
+        var path = Fixture(fixture);
+        using var fs = File.OpenRead(path);
+        var parser = new IsrOrgAgeRecordsParser();
+        var results = parser
+            .Parse(new ParseRequest(fs, Path.GetFileName(path), PoolType: poolType))
+            .ToList();
+
+        // mix-эстафеты в БД не попадают (провайдер берёт только male/female) и в PDF
+        // размечены беднее — из инварианта исключены сознательно.
+        var outliers = results
+            .Where(r => r.EventStyleGender is "male" or "female")
+            .Select(r => (r, secs: ParseSeconds(r.Time)))
+            .Where(x => x.secs > 0)
+            .GroupBy(x => (x.r.EventStyleGender, x.r.EventStyleLen, x.r.EventStyleName))
+            .SelectMany(g =>
+            {
+                var median = g.Select(x => x.secs).OrderBy(s => s).ElementAt(g.Count() / 2);
+                return g
+                    .Where(x => x.secs < median * 0.6 || x.secs > median * 1.7)
+                    .Select(x => $"{g.Key} age={x.r.EventStyleAge}: {x.secs:F2}s (медиана {median:F2})");
+            })
+            .ToList();
+
+        Assert.True(outliers.Count == 0, "Строки, заехавшие из соседнего блока: " + string.Join("; ", outliers));
+    }
+
+    private static double ParseSeconds(string time)
+    {
+        var m = Regex.Match(time.Trim(), @"^(?:(\d+):)?(\d+)\.(\d+)$");
+        if (!m.Success) return 0;
+        var minutes = m.Groups[1].Success ? int.Parse(m.Groups[1].Value) : 0;
+        return minutes * 60 + int.Parse(m.Groups[2].Value) + double.Parse("0." + m.Groups[3].Value, CultureInfo.InvariantCulture);
     }
 }
