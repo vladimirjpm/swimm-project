@@ -17,11 +17,18 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
 {
     private readonly SwimmDbContext _db;
     private readonly ICacheService _cache;
+    private readonly ICompetitionRecalculationService? _recalc;
 
-    public CompetitionAdminRepository(SwimmDbContext db, ICacheService cache)
+    /// <param name="recalc">
+    /// Пересчёт материализованных величин (объединённые места) при смене
+    /// <c>ShowCombineAllResults</c>. Необязателен: null — пересчёт пропускается (тесты).
+    /// </param>
+    public CompetitionAdminRepository(SwimmDbContext db, ICacheService cache,
+        ICompetitionRecalculationService? recalc = null)
     {
         _db = db;
         _cache = cache;
+        _recalc = recalc;
     }
 
     public async Task<PagedResult<CompetitionRowDto>> GetPagedAsync(string? search, string? categoryKey, int? year, int page, int pageSize, int? orgCompId = null)
@@ -457,10 +464,26 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                     "Удалите их перед сменой или очисткой OrgCompId.");
         }
 
+        // Объединённые места считаются только у соревнований с этим флагом. Включили задним
+        // числом — строки остались с пустым CombinedPlace, и тоггл на клиенте показал бы
+        // пустую таблицу; выключили — значения обязаны обнулиться, иначе останутся от
+        // прошлой жизни (docs/points-rules-per-competition-plan.md §3.4).
+        var combineChanged = comp.ShowCombineAllResults != input.ShowCombineAllResults;
+
         Apply(comp, input);
         await ApplyCountryAsync(comp, input.Country);
         var save = await SaveAsync(comp);
         if (save.Success) await SyncCategoriesAsync(comp.Id, input.CategoryKeys);
+
+        if (save.Success && combineChanged && _recalc is not null)
+        {
+            // Соревнование уже сохранено — сбой пересчёта не должен отменять правку формы.
+            // Аварийный прогон: `dotnet run -- --recalc-combined`.
+            try { await _recalc.RecalculateCompetitionAsync(comp.Id); }
+            catch (Exception) { /* лог не нужен: аварийный прогон закрывает случай */ }
+            await _cache.InvalidateAllAsync();
+        }
+
         return save;
     }
 
