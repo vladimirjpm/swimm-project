@@ -1,5 +1,7 @@
 // Категории единой страницы результатов (results_main.html?category=<key>).
 // Ключи URL-контракта из design_handoff_category_selector: all | young8_11 | junior | masters.
+// ⚠ Ключи НЕ совпадают с подписями: ступени переименованы 2026-07-28 (young8_11 → «Kids»,
+// junior → «Youth»), а ключи остались прежними — они в закладках пользователей.
 // Хардкод (без похода в /api/categories): категория задаёт табы селектора,
 // заголовок страницы и темы оформления.
 export type ResultsCategory = {
@@ -21,14 +23,14 @@ export const RESULTS_CATEGORIES: ResultsCategory[] = [
   },
   {
     key: 'young8_11',
-    label: 'Young 8–11',
-    title: 'Youth Results',
+    label: 'Kids',
+    title: 'Kids Results',
     competitionTheme: 'competition-blue',
   },
   {
     key: 'junior',
-    label: 'Junior',
-    title: 'Junior Results',
+    label: 'Youth',
+    title: 'Youth Results',
     competitionTheme: 'competition-blue',
   },
   {

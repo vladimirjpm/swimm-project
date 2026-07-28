@@ -524,21 +524,24 @@ function ResultsMain() {
         <>
           {/* Контент страницы */}
           <div className="flex flex-col lg:flex-row gap-4 mt-4">
-            {/* Левая колонка — фильтры (только десктоп) */}
+            {/* Левая колонка — фильтры (только десктоп).
+                Ширина фиксированная, а не доля (было lg:w-2/12): после ограничения страницы
+                до 1440px доля давала ~240px, и «Стиль» с «Дистанцией» переставали помещаться
+                в строку. Таблица занимает остаток через flex-1. */}
             {!isTraining && (
-              <div className="filter-section w-full lg:w-2/12 hidden lg:block">
+              <div className="filter-section w-full lg:w-[340px] lg:shrink-0 hidden lg:block">
                 <FilterSection />
               </div>
             )}
             {isTraining && (
-              <div className="filter-trainig-section w-full lg:w-2/12 hidden lg:block">
+              <div className="filter-trainig-section w-full lg:w-[340px] lg:shrink-0 hidden lg:block">
                 <FilterTrainigSection />
               </div>
             )}
 
             {/* Центральная колонка — результаты (детали теперь попапом, поэтому полная ширина) */}
             {!isTraining && (
-              <div className="results-table w-full lg:w-10/12 bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] rounded shadow">
+              <div className="results-table w-full lg:flex-1 lg:min-w-0 bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] rounded shadow">
                 {/* Активный скоуп «мои/избранные» (?filter=) — чип с крестиком.
                     Только залогиненному: гостю скоуп не применяется (см. results-table). */}
                 {auth.isAuthenticated &&
@@ -569,7 +572,7 @@ function ResultsMain() {
               </div>
             )}
             {isTraining && (
-              <div className="w-full lg:w-10/12 bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] p-0 md:p-4 rounded shadow">
+              <div className="w-full lg:flex-1 lg:min-w-0 bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] p-0 md:p-4 rounded shadow">
                 <TrainingTable />
               </div>
             )}

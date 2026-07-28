@@ -217,10 +217,13 @@ public class SwimmDbContext : DbContext
             entity.HasIndex(e => e.Key).IsUnique();
 
             entity.HasData(
-                new Category { Id = 1, Key = "results-main",       Name = "Main Results", DisplayOrder = 1 },
-                new Category { Id = 2, Key = "results-masters",    Name = "Masters",      DisplayOrder = 2, Badge = "M" },
-                new Category { Id = 3, Key = "results-youth-team",    Name = "Youth Results",  DisplayOrder = 3, Badge = "Y" },
-                new Category { Id = 4, Key = "results-junior-results", Name = "Junior Results", DisplayOrder = 4, Badge = "J" }
+                // Возрастные ступени (2026-07-28): 8–11 Kids, 11–14 Youth, בוגרים Juniors,
+                // мастерс Masters. Ключи исторические и с подписями НЕ совпадают — они в URL
+                // (?category=) и в закладках пользователей, поэтому не переименовывались.
+                new Category { Id = 1, Key = "results-main",           Name = "Juniors", DisplayOrder = 1, Badge = "J" },
+                new Category { Id = 2, Key = "results-masters",        Name = "Masters", DisplayOrder = 2, Badge = "M" },
+                new Category { Id = 3, Key = "results-youth-team",     Name = "Kids",    DisplayOrder = 3, Badge = "K" },
+                new Category { Id = 4, Key = "results-junior-results", Name = "Youth",   DisplayOrder = 4, Badge = "Y" }
             );
         });
 
