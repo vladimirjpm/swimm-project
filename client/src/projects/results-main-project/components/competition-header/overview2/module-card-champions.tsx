@@ -118,7 +118,7 @@ function MedalistPanel({ medalists, gender, onOpenClub }: {
         <span className="text-[11px] font-extrabold tracking-[0.05em]" style={GENDER_CIRCLE[gender]}>
           {gender === 'male' ? '♂' : '♀'} MOST DECORATED
         </span>
-        <span className="flex min-w-0 flex-col gap-y-0.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3">
+        <span className="flex min-w-0 flex-col gap-y-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2.5">
           {medalists.map((m) => (
             <UI_SwimmerNameCell
               key={m.swimmer_id}
