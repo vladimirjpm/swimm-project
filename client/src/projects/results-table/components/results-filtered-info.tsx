@@ -30,7 +30,7 @@ function ResultsFilteredInfo({
   showEvent,
 }: ResultsFilteredInfoProps) {
   return (
-    <div className="show-filtered-data mb-4 lg:max-w-[1180px] lg:mx-auto">
+    <div className="show-filtered-data mb-4">
       <div className="flex items-stretch bg-[var(--theme-mode-surface)] rounded-[14px] shadow-sm px-2 py-4">
         {/* Date */}
         <div className={`${COL} ${DIV}`}>

@@ -369,7 +369,7 @@ function ResultsTable() {
           />
         )}
         
-        <div className="max-h-[650px] overflow-y-auto border border-[var(--theme-mode-border)] rounded-2xl shadow-sm lg:max-w-[1180px] lg:mx-auto" >
+        <div className="max-h-[650px] overflow-y-auto border border-[var(--theme-mode-border)] rounded-2xl shadow-sm" >
           {/* Unified header (single view for all sizes) */}
           <div className="bg-[var(--theme-mode-surface-alt)] sticky top-0 z-10">
             <div className="hidden lg:block">

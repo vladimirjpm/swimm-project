@@ -5,6 +5,7 @@ import type { AllUserMediaDto } from '../../../my-media-project/use-all-my-media
 import { HelperMedia } from '../../../../utils/helpers';
 import HelperSwimmer from '../../../../utils/helpers/helper-swimmer';
 import type { CompetitionOverview } from './types';
+import { PAGE_CONTAINER } from '../../../../utils/layout';
 
 // Персональная полоса шапки соревнования (design_handoff_competition_overview):
 // ⭐ primary favorite (мои заплывы здесь) · ❤️ Favorites · My media. ТОЛЬКО залогиненному —
@@ -89,10 +90,9 @@ export default function CompetitionPersonalStrip({ overview, onOpenSwims, onOpen
   if (primarySwimmerId == null && favHere === 0 && myMedia.length === 0) return null;
 
   return (
-    <div
-      className="flex gap-2 overflow-x-auto px-3 py-2.5 lg:grid lg:grid-cols-[1fr_1fr_1.4fr]"
-      style={{ background: 'var(--theme-mode-surface)' }}
-    >
+    // Фон полосы — край-в-край; карточки в общем контейнере (handoff v2, 5a).
+    <div style={{ background: 'var(--theme-mode-surface)' }}>
+    <div className={`${PAGE_CONTAINER} flex gap-2 overflow-x-auto py-2.5 lg:grid lg:grid-cols-[1fr_1fr_1.4fr]`}>
       {/* ⭐ Primary favorite */}
       {primarySwimmerId != null && (
         <button
@@ -192,6 +192,7 @@ export default function CompetitionPersonalStrip({ overview, onOpenSwims, onOpen
           </span>
         )}
       </div>
+    </div>
     </div>
   );
 }

@@ -1,0 +1,141 @@
+/* Overview 2 (design_handoff_competition_overview2, варианты 9d/9f) — мозаика модулей.
+   ВСЕ цвета — производные от одного тем-токена на модуль (--theme-module-*),
+   см. MODULE-COLORS.md: правишь 5 hex в теме — перекрашивается всё.
+   Фолбэки = палитра competition-blue из handoff, пока токены не заведены в тему. */
+
+.ov2-module--clubs     { --m: var(--theme-module-clubs, #0466c8); }
+.ov2-module--records   { --m: var(--theme-module-records, #6d28d9); }
+.ov2-module--champions { --m: var(--theme-module-champions, #b45309); }
+.ov2-module--hpa       { --m: var(--theme-module-hpa, #0f766e); }
+.ov2-module--media     { --m: var(--theme-module-media, #be185d); }
+/* Favorites — шестой модуль, красится золотыми персональными токенами (та же семантика,
+   что персональная полоса): цвет модуля = --theme-personal-accent. */
+.ov2-module--favorites { --m: var(--theme-personal-accent, #8a6d1a); }
+
+.ov2-module {
+  --m-surface: var(--theme-mode-surface, #fff);
+  --m-solid: var(--m);
+  --m-on-solid: var(--theme-mode-accent-text, #fff);
+  --m-fill: color-mix(in srgb, var(--m) 13%, var(--m-surface));
+  --m-hover: color-mix(in srgb, var(--m) 6%, var(--m-surface));
+  --m-chip: color-mix(in srgb, var(--m) 12%, var(--m-surface));
+  --m-hairline: color-mix(in srgb, var(--m) 20%, var(--m-surface));
+  --m-stripe-a: color-mix(in srgb, var(--m) 24%, var(--m-surface));
+  --m-stripe-b: color-mix(in srgb, var(--m) 8%, var(--m-surface));
+}
+
+/* ---------- Плитка модуля (9d) ---------- */
+.ov2-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 56px;
+  padding: 11px 13px;
+  border: none;
+  border-radius: 11px;
+  background: var(--m-surface);
+  color: var(--theme-mode-text, #1a1a1a);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  min-width: 0;
+}
+.ov2-tile:hover { background: var(--m-hover); }
+
+.ov2-tile__bar { flex: none; width: 3px; height: 26px; border-radius: 2px; background: var(--m-solid); }
+.ov2-tile__medal {
+  flex: none; width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--m-chip); color: var(--m-solid);
+  font-size: 13px; font-weight: 900;
+}
+.ov2-tile__label {
+  font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--m-solid);
+}
+.ov2-tile__name {
+  font-size: 13.5px; font-weight: 800; color: var(--theme-mode-text, #1a1a1a);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ov2-tile__sub {
+  font-size: 11px; font-weight: 600; color: var(--theme-mode-text-secondary, #5b6470);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ov2-tile__chevron { flex: none; font-size: 14px; font-weight: 800; color: var(--m-solid); }
+
+/* Активная плитка: заливка + полоса 4px во всю высоту + залитый медальон + язычок-ромб.
+   Активность обозначена не только цветом (доступность): полоса, медальон, язычок. */
+.ov2-tile[aria-selected="true"] { background: var(--m-fill); }
+/* Палочка остаётся В ПОТОКЕ невидимой (иначе контент съезжает влево),
+   полосу 4px на всю высоту рисует ::before поверх. */
+.ov2-tile[aria-selected="true"] .ov2-tile__bar { visibility: hidden; }
+.ov2-tile[aria-selected="true"]::before {
+  content: ""; position: absolute; inset: 0 auto 0 0; width: 4px;
+  background: var(--m-solid); border-radius: 11px;
+}
+.ov2-tile[aria-selected="true"] .ov2-tile__medal { background: var(--m-solid); color: var(--m-on-solid); }
+.ov2-tile[aria-selected="true"]::after {
+  content: ""; position: absolute; width: 18px; height: 18px;
+  background: var(--m-solid); transform: rotate(45deg); border-radius: 3px;
+  top: 50%; right: -9px; margin-top: -9px; z-index: 2;
+}
+
+/* ---------- Мобайл 9f (<lg): аккордеон ---------- */
+@media (max-width: 1023px) {
+  /* язычок активной плитки смотрит вниз — на карточку под плиткой */
+  .ov2-tile[aria-selected="true"]::after {
+    top: auto; right: auto; bottom: -8px; left: 50%; margin: 0 0 0 -8px;
+    width: 16px; height: 16px;
+  }
+  /* активный таб сжимает плитку в шапку: кружок + название модуля, 52px */
+  .ov2-tile { min-height: 44px; }
+  .ov2-tile[aria-selected="true"] { min-height: 52px; padding-top: 9px; padding-bottom: 9px; }
+  /* На мобиле боковой полосы нет (9f); палочка невидима, но остаётся в потоке —
+     медальоны активной и неактивных плиток стоят на одной вертикали. */
+  .ov2-tile[aria-selected="true"]::before { display: none; }
+  .ov2-tile[aria-selected="true"] .ov2-tile__name,
+  .ov2-tile[aria-selected="true"] .ov2-tile__sub { display: none; }
+  .ov2-tile[aria-selected="true"] .ov2-tile__label { font-size: 12px; }
+  .ov2-tile[aria-selected="true"] .ov2-tile__chevron { transform: rotate(90deg); }
+}
+
+/* Лого клуба — полосатый плейсхолдер в цвете модуля, если логотипа нет */
+.ov2-logo {
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9.5px; font-weight: 900; color: var(--m-solid);
+  background: repeating-linear-gradient(45deg,
+    var(--m-stripe-a), var(--m-stripe-a) 4px,
+    var(--m-stripe-b) 4px, var(--m-stripe-b) 8px);
+  overflow: hidden;
+}
+.ov2-tile[aria-selected="true"] .ov2-tile__medal.ov2-logo { background: var(--m-solid); color: var(--m-on-solid); }
+
+/* ---------- Большая карточка модуля ---------- */
+.ov2-card {
+  background: var(--m-surface);
+  color: var(--theme-mode-text, #1a1a1a);
+  border: 1px solid var(--theme-mode-border, #eef1f6);
+  border-left: 3px solid var(--m-solid);
+  border-radius: 12px;
+  box-shadow: var(--theme-mode-card-shadow, 0 1px 2px rgba(0, 0, 0, .05));
+  padding: 16px 18px;
+}
+.ov2-card__title { font-size: 17px; font-weight: 900; color: var(--m-solid); }
+.ov2-card__value { font-weight: 900; color: var(--m-solid); font-variant-numeric: tabular-nums; }
+.ov2-card__link { font-size: 12px; font-weight: 700; color: var(--m-solid); }
+.ov2-card__chip {
+  border-radius: 999px; padding: 2px 9px; font-size: 11.5px; font-weight: 800;
+  background: var(--m-chip); color: var(--m-solid); white-space: nowrap;
+}
+/* «Витрина» лидера (правая колонка карточки Clubs/Records) */
+.ov2-card__hero {
+  min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: 10px; padding: 20px 18px 18px; border-radius: 12px;
+  color: var(--theme-mode-text, #1a1a1a);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--m) 12%, transparent),
+    color-mix(in srgb, var(--m) 3%, transparent));
+  border: 1px solid color-mix(in srgb, var(--m) 18%, transparent);
+}

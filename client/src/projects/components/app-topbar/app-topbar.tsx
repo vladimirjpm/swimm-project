@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import LoginModal from '../login-modal/login-modal';
 import { routes } from '../../../utils/routes';
+import { PAGE_CONTAINER } from '../../../utils/layout';
 
 /**
  * AppTopbar — глобальная полоса навигации + auth (design_handoff_topbar/README.md).
@@ -218,7 +219,8 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
   return (
     // Полоса остаётся LTR и на RTL-страницах (правило хендоффа).
     <header dir="ltr" className="sticky top-0 z-50 bg-[var(--theme-topbar-bg)]">
-      <div className="flex h-[46px] items-center justify-between gap-4 px-4 lg:px-8">
+      {/* Фон полосы — край-в-край; содержимое в общем контейнере (handoff v2, 5a). */}
+      <div className={`${PAGE_CONTAINER} flex h-[46px] items-center justify-between gap-4`}>
         <TopbarLogo />
 
         <nav className="hidden items-center gap-6 md:flex" aria-label="Main">

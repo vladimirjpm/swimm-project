@@ -1,6 +1,7 @@
 import React from 'react';
 import type { CompetitionSource } from '../../../../utils/helpers/competition-source';
 import type { CompetitionOverview } from './types';
+import { PAGE_CONTAINER } from '../../../../utils/layout';
 
 // Hero-модуль шапки соревнования (вариант 1b «Афиша»): фон var(--theme-primary),
 // текст var(--theme-mode-accent-text) (правило парных токенов). Слева identity
@@ -35,10 +36,9 @@ export default function CompetitionHeaderTop({
   const s = overview?.summary;
 
   return (
-    <div
-      className="flex flex-wrap items-center gap-3.5 px-5 pb-3.5 pt-3.5"
-      style={{ background: 'var(--theme-primary)', color: 'var(--theme-mode-accent-text)' }}
-    >
+    // Фон hero — край-в-край; содержимое ограничено общим контейнером (handoff v2, 5a).
+    <div style={{ background: 'var(--theme-primary)', color: 'var(--theme-mode-accent-text)' }}>
+    <div className={`${PAGE_CONTAINER} flex flex-wrap items-center gap-3.5 pb-3.5 pt-3.5`}>
       {/* Иконка-плейсхолдер 64px (моб. — 44px), как у группы без icon_url */}
       <span
         className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] border text-[22px] md:h-16 md:w-16 md:text-[30px]"
@@ -103,6 +103,7 @@ export default function CompetitionHeaderTop({
           </button>
         )}
       </div>
+    </div>
     </div>
   );
 }
