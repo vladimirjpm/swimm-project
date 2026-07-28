@@ -285,7 +285,11 @@ public class JsonImportService : IImportService
                         ShowCombineAllResults = showCombine,
                         EventId = targetEvent?.Id,
                         SubName = targetEvent != null ? (item.Competition ?? string.Empty) : null,
-                        DayNumber = targetEvent != null ? nextDayNumber++ : null
+                        DayNumber = targetEvent != null ? nextDayNumber++ : null,
+                        // Э5: правила очков из формы импорта. null = «Авто» (подбор по дате
+                        // и типу). Ставится каждому дню — правило живёт у соревнования, не у события.
+                        PointRuleClubsId = eventOptions?.PointRuleClubsId,
+                        PointRuleSwimmersId = eventOptions?.PointRuleSwimmersId
                     };
                     _db.Competitions.Add(competition);
                     await _db.SaveChangesAsync();

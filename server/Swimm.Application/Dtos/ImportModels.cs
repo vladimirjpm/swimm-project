@@ -21,7 +21,21 @@ namespace Swimm.Application.Dtos;
 /// Как и раньше, действует существующая защита медиа: строки с UserMedia/HubGroupMedia не
 /// удаляются, а идут в счётчик SkippedWithMedia.
 /// </param>
-public sealed record ImportEventOptions(int? EventId, string? NewEventName, bool OverwriteExisting = false, bool DeleteMissing = false);
+/// <param name="PointRuleClubsId">
+/// Правило клубных очков для создаваемых соревнований (Э5). null — «Авто»: правило
+/// подберётся по дате и типу (<c>CompetitionRuleResolver</c>), как и раньше. Проставляется
+/// КАЖДОМУ созданному дню: правило хранится у соревнования, а не у события.
+/// Существующие соревнования при переимпорте не трогаются — привязка меняется только
+/// осознанно, на /Admin/Competitions.
+/// </param>
+/// <param name="PointRuleSwimmersId">То же для правила High Point.</param>
+public sealed record ImportEventOptions(
+    int? EventId,
+    string? NewEventName,
+    bool OverwriteExisting = false,
+    bool DeleteMissing = false,
+    int? PointRuleClubsId = null,
+    int? PointRuleSwimmersId = null);
 
 public class ImportResult
 {

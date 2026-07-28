@@ -207,6 +207,44 @@
             </div>
         </div>
 
+        <!-- Правила начисления очков (shared, Э5) -->
+        <div id="rules-section" class="mb-6">
+            <div class="text-sm text-admin-text mb-2">
+                Правила начисления очков
+                <span class="text-admin-text-muted text-xs">
+                    (проставляются каждому создаваемому соревнованию; «Авто» — подбор по дате и типу,
+                    кроме правил с пометкой <strong class="text-admin-text">manual</strong>)
+                </span>
+            </div>
+            <div class="flex flex-wrap gap-3 items-end">
+                <div>
+                    <label class="block text-xs text-admin-text-muted mb-1">Клубные очки</label>
+                    <select id="rule-clubs" class="admin-input min-w-[280px]">
+                        <option value="">— Авто (по дате и типу) —</option>
+                        @foreach (var r in Model.ClubRules)
+                        {
+                            <option value="@r.Id">@r.Version · @r.Scope · с @r.EffectiveFrom.ToString("dd/MM/yyyy")@(r.ManualOnly ? " · manual" : "")</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-admin-text-muted mb-1">High Point</label>
+                    <select id="rule-swimmers" class="admin-input min-w-[280px]">
+                        <option value="">— Авто (по дате и типу) —</option>
+                        @foreach (var r in Model.SwimmerRules)
+                        {
+                            <option value="@r.Id">@r.Version · @r.Scope · с @r.EffectiveFrom.ToString("dd/MM/yyyy")@(r.ManualOnly ? " · manual" : "")</option>
+                        }
+                    </select>
+                </div>
+                <a href="/Admin/PointsRules" class="admin-btn admin-btn-ghost py-2 px-3 mb-[2px]">Правила →</a>
+            </div>
+            <div class="text-xs text-admin-text-muted mt-1.5">
+                Переимпорт существующего соревнования привязку не меняет — она правится на
+                <a href="/Admin/Competitions" class="text-admin-accent hover:underline">/Admin/Competitions</a>.
+            </div>
+        </div>
+
         <!-- Actions -->
         <div class="flex gap-3 mb-6">
             <button id="btn-upload"
@@ -531,6 +569,16 @@
         return {};
     }
 
+    // Правила очков (Э5): пустое значение = «Авто», поле в запрос не кладём.
+    function getSelectedRuleOptions() {
+        const opts = {};
+        const clubs = document.getElementById('rule-clubs')?.value;
+        const swimmers = document.getElementById('rule-swimmers')?.value;
+        if (clubs) opts.pointRuleClubsId = Number(clubs);
+        if (swimmers) opts.pointRuleSwimmersId = Number(swimmers);
+        return opts;
+    }
+
     function resetEventSelectAfterImport() {
         loadEvents();
         if (eventSelect.value === '__new__') {
@@ -692,6 +740,10 @@
             if (getOverwriteExisting()) form.append('overwriteExisting', 'true');
             if (getDeleteMissing()) form.append('deleteMissing', 'true');
 
+            const ruleOpts = getSelectedRuleOptions();
+            if (ruleOpts.pointRuleClubsId) form.append('pointRuleClubsId', String(ruleOpts.pointRuleClubsId));
+            if (ruleOpts.pointRuleSwimmersId) form.append('pointRuleSwimmersId', String(ruleOpts.pointRuleSwimmersId));
+
             const res = await fetch('/api/admin/import', { method: 'POST', credentials: 'same-origin', headers: { 'X-XSRF-TOKEN': _csrfToken }, body: form });
             const queued = await res.json();
             if (!res.ok) throw new Error(queued.error || `HTTP ${res.status}`);
@@ -835,7 +887,8 @@
         try {
             const body = {
                 previewId: pdfPreviewId, categoryKeys: getSelectedCategories(),
-                overwriteExisting: getOverwriteExisting(), deleteMissing: getDeleteMissing(), ...getSelectedEventOptions()
+                overwriteExisting: getOverwriteExisting(), deleteMissing: getDeleteMissing(),
+                ...getSelectedEventOptions(), ...getSelectedRuleOptions()
             };
             const queued = await api('/api/admin/import-parsed', {
                 method: 'POST',

@@ -187,7 +187,9 @@ public class AdminController : ControllerBase
         [FromForm] int? eventId,
         [FromForm] string? newEventName,
         [FromForm] bool overwriteExisting = false,
-        [FromForm] bool deleteMissing = false)
+        [FromForm] bool deleteMissing = false,
+        [FromForm] int? pointRuleClubsId = null,
+        [FromForm] int? pointRuleSwimmersId = null)
     {
         if (file == null || file.Length == 0)
             return BadRequest(new { error = "No file uploaded" });
@@ -205,9 +207,13 @@ public class AdminController : ControllerBase
             return BadRequest(new { error = "File content is not valid JSON (must start with '{' or '[')." });
 
         // Привязка к многодневному событию (опционально): existing eventId XOR newEventName.
+        // Правила очков (Э5) тоже едут здесь: null = «Авто», подбор по дате и типу.
         ImportEventOptions? eventOptions = null;
-        if (eventId.HasValue || !string.IsNullOrWhiteSpace(newEventName) || overwriteExisting)
-            eventOptions = new ImportEventOptions(eventId, newEventName, overwriteExisting, deleteMissing);
+        if (eventId.HasValue || !string.IsNullOrWhiteSpace(newEventName) || overwriteExisting
+            || pointRuleClubsId.HasValue || pointRuleSwimmersId.HasValue)
+            eventOptions = new ImportEventOptions(
+                eventId, newEventName, overwriteExisting, deleteMissing,
+                pointRuleClubsId, pointRuleSwimmersId);
 
         var jobId = _jobs.Enqueue(data, file.FileName, categories, eventOptions);
         return Accepted(new { jobId });
@@ -306,8 +312,11 @@ public class AdminController : ControllerBase
         _cache.Remove(key);
 
         ImportEventOptions? eventOptions = null;
-        if (request.EventId.HasValue || !string.IsNullOrWhiteSpace(request.NewEventName) || request.OverwriteExisting)
-            eventOptions = new ImportEventOptions(request.EventId, request.NewEventName, request.OverwriteExisting, request.DeleteMissing);
+        if (request.EventId.HasValue || !string.IsNullOrWhiteSpace(request.NewEventName) || request.OverwriteExisting
+            || request.PointRuleClubsId.HasValue || request.PointRuleSwimmersId.HasValue)
+            eventOptions = new ImportEventOptions(
+                request.EventId, request.NewEventName, request.OverwriteExisting, request.DeleteMissing,
+                request.PointRuleClubsId, request.PointRuleSwimmersId);
 
         var jobId = _jobs.Enqueue(
             Encoding.UTF8.GetBytes(entry.Parsed.ResultsJson),
@@ -451,5 +460,8 @@ public class AdminController : ControllerBase
     public record SetActiveRequest(bool IsActive);
     public record UpdateSettingRequest(string Value);
     public record UpdateCompetitionRequest(bool IsAward, bool ShowCombineAllResults, string[]? Categories);
-    public record ImportParsedRequest(Guid PreviewId, string[]? CategoryKeys, int? EventId, string? NewEventName, bool OverwriteExisting = false, bool DeleteMissing = false);
+    public record ImportParsedRequest(
+        Guid PreviewId, string[]? CategoryKeys, int? EventId, string? NewEventName,
+        bool OverwriteExisting = false, bool DeleteMissing = false,
+        int? PointRuleClubsId = null, int? PointRuleSwimmersId = null);
 }
