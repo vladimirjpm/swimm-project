@@ -123,10 +123,59 @@
             </label>
         </div>
 
-        <div class="mt-5 flex gap-3">
+        <!-- ── Правила начисления очков (Э4) ──────────────────────────────────── -->
+        <div class="mt-6 pt-5 border-t border-admin-border">
+            <h2 class="text-sm font-semibold text-admin-text mb-1">Правила начисления очков</h2>
+            <p class="text-[11px] text-admin-text-muted mb-3 leading-relaxed">
+                «Авто» — правило подбирается по дате и типу соревнования (masters/обычное), кроме
+                правил с пометкой <strong class="text-admin-text">manual</strong>: те работают только
+                по явной привязке. Список правил — <a href="/Admin/PointsRules" class="text-admin-accent hover:underline">Points rules</a>.
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">Клубные очки</span>
+                    <select asp-for="Input.PointRuleClubsId" class="admin-input">
+                        <option value="">— Авто (по дате и типу) —</option>
+                        @foreach (var r in Model.ClubRules)
+                        {
+                            <option value="@r.Id">@r.Version · @r.Scope · с @r.EffectiveFrom.ToString("dd/MM/yyyy")@(r.ManualOnly ? " · manual" : "")</option>
+                        }
+                    </select>
+                </label>
+
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">High Point</span>
+                    <select asp-for="Input.PointRuleSwimmersId" class="admin-input">
+                        <option value="">— Авто (по дате и типу) —</option>
+                        @foreach (var r in Model.SwimmerRules)
+                        {
+                            <option value="@r.Id">@r.Version · @r.Scope · с @r.EffectiveFrom.ToString("dd/MM/yyyy")@(r.ManualOnly ? " · manual" : "")</option>
+                        }
+                    </select>
+                    @if (Model.SwimmerRules.Count == 0)
+                    {
+                        <span class="text-[11px] text-admin-warning">
+                            Правил High Point ещё нет — зачёт считает legacy-ветка. Заведите правило на
+                            <a href="/Admin/PointsRules?kind=swimmers" class="underline">Points rules</a>.
+                        </span>
+                    }
+                </label>
+            </div>
+        </div>
+
+        <div class="mt-5 flex flex-wrap gap-3">
             <button type="submit" class="admin-btn admin-btn-primary">
                 @(Model.IsNew ? "Создать" : "Сохранить")
             </button>
+            @if (Model.Existing?.EventId != null && Model.Existing.EventDayCount > 1)
+            {
+                <button type="submit" asp-page-handler="ApplyRulesToEvent" class="admin-btn admin-btn-ghost"
+                        formnovalidate
+                        onclick="return confirm('Проставить выбранные правила очков всем @Model.Existing.EventDayCount дням события? Остальные поля формы не сохранятся.');">
+                    Проставить правила всем дням события (@Model.Existing.EventDayCount)
+                </button>
+            }
             <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">Отмена</a>
         </div>
     </form>

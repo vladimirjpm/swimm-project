@@ -46,6 +46,23 @@ public interface ICompetitionAdminRepository
     /// <summary>Обновить основные поля. null-возврат Success=false с текстом при конфликте/отсутствии.</summary>
     Task<CompetitionSaveResult> UpdateAsync(int id, CompetitionInputDto input);
 
+    // ── Привязка правил очков (Э4) ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Соревнования для массовой привязки правил: все дни, а не свёрнутые события —
+    /// правило хранится у каждого дня отдельно. Фильтры: сезон (год), <paramref name="scope"/>
+    /// (<c>all</c> | <c>masters</c> | <c>non-masters</c>) и «только без привязки»
+    /// (нет ни клубного правила, ни правила пловца). Синтетика (SYNTH…) исключена.
+    /// </summary>
+    Task<IReadOnlyList<CompetitionRuleRowDto>> GetForRuleAssignmentAsync(int? year, string scope, bool onlyUnassigned);
+
+    /// <summary>Проставить правила выбранным соревнованиям. Возвращает число изменённых строк
+    /// либо текст ошибки (несуществующее правило).</summary>
+    Task<CompetitionSaveResult> AssignRulesAsync(CompetitionRuleAssignmentDto assignment);
+
+    /// <summary>Id всех дней события (включая «голову»), по возрастанию DayNumber.</summary>
+    Task<IReadOnlyList<int>> GetEventDayIdsAsync(int eventId);
+
     // ── CompetitionResultUrls (связь по OrgCompId) ─────────────────────────────
 
     /// <summary>Добавить URL результатов. Требует заданного OrgCompId; проверяет уникальность (OrgCompId, Culture).</summary>

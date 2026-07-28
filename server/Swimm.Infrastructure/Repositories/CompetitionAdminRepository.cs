@@ -391,6 +391,11 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             EventId = c.EventId,
             EventName = c.Event?.Name,
             DayNumber = c.DayNumber,
+            PointRuleClubsId = c.PointRuleClubsId,
+            PointRuleSwimmersId = c.PointRuleSwimmersId,
+            EventDayCount = c.EventId == null
+                ? 1
+                : await _db.Competitions.CountAsync(x => x.EventId == c.EventId),
             ResultCount = await _db.Results.CountAsync(r => r.CompetitionId == c.Id),
             CategoryKeys = await _db.CategoryCompetitions
                 .AsNoTracking()
@@ -538,6 +543,8 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         comp.IsMasters = input.CategoryKeys.Contains(Category.MastersKey);
         comp.IsAward = input.IsAward;
         comp.ShowCombineAllResults = input.ShowCombineAllResults;
+        comp.PointRuleClubsId = input.PointRuleClubsId;
+        comp.PointRuleSwimmersId = input.PointRuleSwimmersId;
     }
 
     /// <summary>
@@ -632,6 +639,94 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 return $"OrgCompId={org} уже занят другим соревнованием";
         }
 
+        return await ValidateRuleIdsAsync(input.PointRuleClubsId, input.PointRuleSwimmersId);
+    }
+
+    /// <summary>Правила должны существовать: FK RESTRICT иначе даст DbUpdateException/500.</summary>
+    private async Task<string?> ValidateRuleIdsAsync(int? clubsRuleId, int? swimmersRuleId)
+    {
+        if (clubsRuleId is int cid && !await _db.PointRulesClubs.AnyAsync(r => r.Id == cid))
+            return $"Правило клубных очков #{cid} не найдено";
+
+        if (swimmersRuleId is int sid && !await _db.PointRulesSwimmers.AnyAsync(r => r.Id == sid))
+            return $"Правило High Point #{sid} не найдено";
+
         return null;
     }
+
+    // ── Привязка правил очков (Э4) ─────────────────────────────────────────────
+
+    public async Task<IReadOnlyList<CompetitionRuleRowDto>> GetForRuleAssignmentAsync(
+        int? year, string scope, bool onlyUnassigned)
+    {
+        // Дни, а не свёрнутые события: правило хранится у каждого дня отдельно, и в выборке
+        // «без привязки» один непривязанный день события не должен прятаться за головой.
+        var q = _db.Competitions.AsNoTracking().Where(c => !c.Name.StartsWith("SYNTH "));
+
+        if (year is int y)
+            q = q.Where(c => c.Date.EndsWith(y.ToString()));
+
+        q = scope switch
+        {
+            "masters" => q.Where(c => c.IsMasters),
+            "non-masters" => q.Where(c => !c.IsMasters),
+            _ => q
+        };
+
+        if (onlyUnassigned)
+            q = q.Where(c => c.PointRuleClubsId == null && c.PointRuleSwimmersId == null);
+
+        var rows = await q
+            .OrderByDescending(c => c.Date.Substring(6, 4))
+            .ThenByDescending(c => c.Date.Substring(3, 2))
+            .ThenByDescending(c => c.Date.Substring(0, 2))
+            .ThenBy(c => c.Id)
+            .Select(c => new CompetitionRuleRowDto
+            {
+                Id = c.Id,
+                Name = c.Name,
+                SubName = c.SubName,
+                Date = c.Date,
+                IsMasters = c.IsMasters,
+                ClubsRuleVersion = c.PointRuleClubs != null ? c.PointRuleClubs.Version : null,
+                SwimmersRuleVersion = c.PointRuleSwimmers != null ? c.PointRuleSwimmers.Version : null
+            })
+            .ToListAsync();
+
+        return rows;
+    }
+
+    public async Task<CompetitionSaveResult> AssignRulesAsync(CompetitionRuleAssignmentDto assignment)
+    {
+        if (!assignment.SetClubs && !assignment.SetSwimmers)
+            return CompetitionSaveResult.Fail("Не выбрано ни одно правило для простановки");
+
+        var ids = assignment.CompetitionIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return CompetitionSaveResult.Fail("Не выбрано ни одного соревнования");
+
+        var error = await ValidateRuleIdsAsync(
+            assignment.SetClubs ? assignment.ClubsRuleId : null,
+            assignment.SetSwimmers ? assignment.SwimmersRuleId : null);
+        if (error != null) return CompetitionSaveResult.Fail(error);
+
+        var comps = await _db.Competitions.Where(c => ids.Contains(c.Id)).ToListAsync();
+        foreach (var comp in comps)
+        {
+            if (assignment.SetClubs) comp.PointRuleClubsId = assignment.ClubsRuleId;
+            if (assignment.SetSwimmers) comp.PointRuleSwimmersId = assignment.SwimmersRuleId;
+        }
+
+        await _db.SaveChangesAsync();
+        await _cache.InvalidateAllAsync();
+        // Id в результате нет — это массовая операция; число изменённых строк отдаём через Id.
+        return CompetitionSaveResult.Ok(comps.Count);
+    }
+
+    public async Task<IReadOnlyList<int>> GetEventDayIdsAsync(int eventId) =>
+        await _db.Competitions.AsNoTracking()
+            .Where(c => c.EventId == eventId)
+            .OrderBy(c => c.DayNumber)
+            .Select(c => c.Id)
+            .ToListAsync();
 }

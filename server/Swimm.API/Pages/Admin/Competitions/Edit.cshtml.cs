@@ -13,12 +13,21 @@ public class EditModel : PageModel
 {
     private readonly ICompetitionAdminRepository _repo;
     private readonly IImportService _import;
+    private readonly IPointRulesAdminRepository _rules;
+    private readonly IAdminAuditService _audit;
     private readonly ILogger<EditModel> _logger;
 
-    public EditModel(ICompetitionAdminRepository repo, IImportService import, ILogger<EditModel> logger)
+    public EditModel(
+        ICompetitionAdminRepository repo,
+        IImportService import,
+        IPointRulesAdminRepository rules,
+        IAdminAuditService audit,
+        ILogger<EditModel> logger)
     {
         _repo = repo;
         _import = import;
+        _rules = rules;
+        _audit = audit;
         _logger = logger;
     }
 
@@ -46,6 +55,10 @@ public class EditModel : PageModel
     /// <summary>Все категории (чекбоксы формы).</summary>
     public IReadOnlyList<CategoryTagDto> AllCategories { get; private set; } = [];
 
+    /// <summary>Правила очков для селектов привязки (Э4).</summary>
+    public IReadOnlyList<PointRuleRowDto> ClubRules { get; private set; } = [];
+    public IReadOnlyList<PointRuleRowDto> SwimmerRules { get; private set; } = [];
+
     /// <summary>Ошибка валидации мутации — показывается в форме.</summary>
     public string? Error { get; private set; }
 
@@ -62,11 +75,15 @@ public class EditModel : PageModel
         public bool ShowCombineAllResults { get; set; }
         /// <summary>Выбранные категории (IsMasters выводится из категории Masters).</summary>
         public List<string> CategoryKeys { get; set; } = [];
+        /// <summary>Правило клубных очков; null — «Авто» (подбор по дате и типу).</summary>
+        public int? PointRuleClubsId { get; set; }
+        /// <summary>Правило High Point; null — «Авто».</summary>
+        public int? PointRuleSwimmersId { get; set; }
     }
 
     public async Task<IActionResult> OnGetAsync()
     {
-        AllCategories = await _repo.GetAllCategoriesAsync();
+        await LoadLookupsAsync();
         if (!IsNew)
         {
             Existing = await _repo.GetByIdAsync(Id!.Value);
@@ -78,7 +95,7 @@ public class EditModel : PageModel
 
     public async Task<IActionResult> OnPostSaveAsync()
     {
-        AllCategories = await _repo.GetAllCategoriesAsync();
+        await LoadLookupsAsync();
         var input = ToInput(Input);
         var result = IsNew
             ? await _repo.CreateAsync(input)
@@ -99,7 +116,7 @@ public class EditModel : PageModel
     {
         if (IsNew) return RedirectToPage("Index");
 
-        AllCategories = await _repo.GetAllCategoriesAsync();
+        await LoadLookupsAsync();
         Existing = await _repo.GetByIdAsync(Id!.Value);
         if (Existing == null) return RedirectToPage("Index");
 
@@ -139,7 +156,7 @@ public class EditModel : PageModel
     {
         if (IsNew) return RedirectToPage("Index");
 
-        AllCategories = await _repo.GetAllCategoriesAsync();
+        await LoadLookupsAsync();
         Existing = await _repo.GetByIdAsync(Id!.Value);
         if (Existing == null) return RedirectToPage("Index");
 
@@ -164,6 +181,61 @@ public class EditModel : PageModel
         return RedirectToPage("Index");
     }
 
+    /// <summary>
+    /// Проставить выбранные в форме правила очков всем дням события (Э4). Правило хранится
+    /// у каждого дня отдельно, а регламент у события один — руками это N однотипных правок.
+    /// Остальные поля формы НЕ сохраняются: операция точечная, про правила.
+    /// </summary>
+    public async Task<IActionResult> OnPostApplyRulesToEventAsync()
+    {
+        if (IsNew) return RedirectToPage("Index");
+
+        await LoadLookupsAsync();
+        Existing = await _repo.GetByIdAsync(Id!.Value);
+        if (Existing == null) return RedirectToPage("Index");
+
+        if (Existing.EventId is not int eventId)
+        {
+            Error = "Соревнование не входит в многодневное событие.";
+            Input = ToForm(Existing);
+            return Page();
+        }
+
+        var dayIds = await _repo.GetEventDayIdsAsync(eventId);
+        var result = await _repo.AssignRulesAsync(new CompetitionRuleAssignmentDto
+        {
+            CompetitionIds = dayIds,
+            SetClubs = true,
+            ClubsRuleId = Input.PointRuleClubsId,
+            SetSwimmers = true,
+            SwimmersRuleId = Input.PointRuleSwimmersId
+        });
+
+        if (!result.Success)
+        {
+            Error = result.Error;
+            Input = ToForm(Existing);
+            return Page();
+        }
+
+        // Id в результате массовой операции — число изменённых строк.
+        await _audit.LogAsync("competition.assign-rules", "CompetitionEvent", eventId.ToString(),
+            $"Правила очков проставлены всем дням события #{eventId}: клубное={Describe(Input.PointRuleClubsId)}, " +
+            $"High Point={Describe(Input.PointRuleSwimmersId)} ({result.Id} дней)");
+
+        TempData["Flash"] = $"Правила проставлены дням события: {result.Id}";
+        return RedirectToPage("Edit", new { id = Id });
+    }
+
+    private static string Describe(int? ruleId) => ruleId is int id ? $"#{id}" : "авто";
+
+    private async Task LoadLookupsAsync()
+    {
+        AllCategories = await _repo.GetAllCategoriesAsync();
+        ClubRules = await _rules.GetAllAsync(PointRuleKind.Clubs);
+        SwimmerRules = await _rules.GetAllAsync(PointRuleKind.Swimmers);
+    }
+
     private static CompetitionForm ToForm(CompetitionEditDto d) => new()
     {
         Name = d.Name,
@@ -174,7 +246,9 @@ public class EditModel : PageModel
         OrgCompId = d.OrgCompId,
         IsAward = d.IsAward,
         ShowCombineAllResults = d.ShowCombineAllResults,
-        CategoryKeys = d.CategoryKeys
+        CategoryKeys = d.CategoryKeys,
+        PointRuleClubsId = d.PointRuleClubsId,
+        PointRuleSwimmersId = d.PointRuleSwimmersId
     };
 
     private static CompetitionInputDto ToInput(CompetitionForm f) => new()
@@ -187,6 +261,8 @@ public class EditModel : PageModel
         OrgCompId = f.OrgCompId,
         IsAward = f.IsAward,
         ShowCombineAllResults = f.ShowCombineAllResults,
-        CategoryKeys = f.CategoryKeys ?? []
+        CategoryKeys = f.CategoryKeys ?? [],
+        PointRuleClubsId = f.PointRuleClubsId,
+        PointRuleSwimmersId = f.PointRuleSwimmersId
     };
 }
