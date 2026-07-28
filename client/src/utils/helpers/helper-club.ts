@@ -31,11 +31,14 @@ export default class HelperClub {
       }
     >();
 
-    // Сначала подсчитываем очки для всех результатов
+    // Очки берём из ответа сервера (Э6): он единственный знает, какое правило привязано к
+    // соревнованию. Локальный расчёт подбирал правило по дате и на manual-правилах давал
+    // другую сумму, чем зачёт в Overview (event 7: 1673 против 1568).
+    // ClubPointsHelper остаётся ФОЛЛБЕКОМ для старых статических источников без club_points.
     const resultsWithPoints = await Promise.all(
       results.map(async (item) => ({
         item,
-        clubPoints: await ClubPointsHelper.getPointsForResult(item)
+        clubPoints: item.club_points ?? await ClubPointsHelper.getPointsForResult(item)
       }))
     );
 

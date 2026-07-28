@@ -60,6 +60,8 @@ public class ResultRepository : IResultRepository
             .Select(ResultMapping.ToDto)
             .ToListAsync();
 
+        await ApplyClubPointsAsync(items);
+
         // hasMore — из total; расхождение возможно только в пределах TTL кэша (2 мин), как и раньше.
         var hasMore = (page - 1) * pageSize + items.Count < total;
 
@@ -1277,6 +1279,47 @@ public class ResultRepository : IResultRepository
         await _cache.SetAsync(key, dto, TimeSpan.FromMinutes(5));
         return dto;
     }
+
+    /// <summary>
+    /// Э6: проставляет клубные очки строкам страницы. Считает СЕРВЕР, а не клиент — клиент не
+    /// видит привязку соревнования к правилу и подбирал его по дате, из-за чего на manual-правиле
+    /// расходился с зачётом (docs/competition-overview-cards.md, раздел Top clubs).
+    ///
+    /// Правил единицы — грузим целиком и применяем в памяти, как в GetClubSummaryAsync;
+    /// шкала правила это JOIN на Entries, тянуть его в SQL-проекцию каждой строки незачем.
+    /// Даты берём из DTO (строка dd/MM/yyyy) — того же источника, что видит клиент.
+    /// </summary>
+    private async Task ApplyClubPointsAsync(List<ResultDto> items)
+    {
+        if (items.Count == 0) return;
+
+        var rules = await _db.PointRulesClubs.AsNoTracking()
+            .Include(r => r.Entries)
+            .ToListAsync();
+
+        foreach (var item in items)
+        {
+            var date = ParseCompetitionDate(item.Date);
+            var rule = CompetitionRuleResolver.Resolve(rules, item.PointRuleClubsId, item.IsMasters, date);
+
+            item.ClubPoints = PointRulesClubsScoring.RelayPointsFor(
+                rule, item.Position, item.TimeFail, item.IsRelay);
+
+            // Объединённые очки есть только там, где есть объединённое место: тоггл на клиенте
+            // переключает поле, а не запускает пересчёт.
+            item.CombinedClubPoints = item.CombinedPlace is null
+                ? null
+                : PointRulesClubsScoring.RelayPointsFor(
+                    rule, item.CombinedPlace, item.TimeFail, item.IsRelay);
+        }
+    }
+
+    /// <summary>Дата соревнования из DTO (dd/MM/yyyy). Неразобранная — сегодня: правило по дате
+    /// не подберётся «из прошлого», а привязка по Id всё равно важнее.</summary>
+    private static DateOnly ParseCompetitionDate(string? date) =>
+        DateOnly.TryParseExact(date, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)
+            ? d
+            : DateOnly.FromDateTime(DateTime.UtcNow);
 
     /// <summary>
     /// Одна медаль в зачёте «Most decorated»: личная или эстафетная (у эстафетной строка

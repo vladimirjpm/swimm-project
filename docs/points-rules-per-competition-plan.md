@@ -282,7 +282,25 @@ legacy-ветка байт-в-байт как сейчас. `OverviewHighPointDt
 (`JsonImportService` + PDF-пайплайн). Для многодневки — на каждый импортируемый день.
 Обновить `docs/admin-pages/import.md`.
 
-### Э6. Клиент: убрать локальный расчёт (см. §6)
+### Э6. Клиент: убрать локальный расчёт — ВЫПОЛНЕНО 2026-07-28
+Сделано; правила показа — раздел Top clubs в
+[`docs/competition-overview-cards.md`](competition-overview-cards.md). Уточнения по факту:
+- `ResultDto` += `club_points` и `combined_club_points`. Очки пловца (`swimmer_points`)
+  НЕ добавлены: их никто не показывает, а корректное значение зависит от агрегатов по
+  пловцу (CountBestSwims/MinSwims) и индекса рекордов — «очками за одну строку» это не
+  выражается. High Point считается целиком на сервере в своей карточке.
+- Очки считаются в памяти после материализации страницы (`ApplyClubPointsAsync`), без
+  колонок в БД и миграции из §3.4: правил единицы, страница максимум 500 строк, а
+  денормализация потребовала бы пересчёта при каждой правке правила.
+- Id привязанного правила едет в DTO под `[JsonIgnore]` — наружу не отдаётся.
+- Локальный расчёт клиента (`club-points-helper`, `recalculatePositions`) НЕ удалён, а
+  оставлен ФОЛЛБЕКОМ для старых статических источников без новых полей. Точка переключения
+  одна — `applyCombinedPositions`.
+- Тесты: `ResultClubPointsTests` (5 кейсов), всего 752/752. Прокликано вживую: очки в
+  строках приходят с сервера (запроса к `/api/club-points` больше нет), тоггл переключает
+  места на объединённые, таб Clubs сходится с Overview.
+
+### Э6 (исходная формулировка)
 `ResultDto` += `club_points`, `combined_place`, `combined_club_points`, `swimmer_points`,
 `combined_swimmer_points`. `club-points-helper.ts` теряет расчётную часть,
 `results-table.tsx` / `results-table-2xl.tsx` / `sportsmen-details.tsx` перестают вызывать

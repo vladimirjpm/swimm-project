@@ -136,3 +136,36 @@ function isInvalidTime(res: Result): boolean {
     ['DQ', 'DNS', 'DNF', 'DSQ'].includes(String(res.time).toUpperCase())
   );
 }
+
+// ─── Единая точка тоггла «Combine All Results» (Э6) ──────────────────
+
+/**
+ * Возвращает результаты с местами объединённого зачёта — то, что показывает тоггл
+ * «Combine All Results». Оригинальное место остаётся в `position_original`.
+ *
+ * Источник мест по умолчанию — СЕРВЕР (`combined_place`): он считает по всему событию,
+ * а клиент видит только загруженные страницы, поэтому в paged-режиме его пересчёт мог
+ * давать места по подмножеству. Локальный `recalculatePositions` остаётся фоллбеком для
+ * старых статических источников, где поля ещё нет.
+ *
+ * Соревнования без объединённого зачёта (`ShowCombineAllResults = false`) получают от
+ * сервера `combined_place = null` — тогда строка сохраняет протокольное место.
+ */
+export function applyCombinedPositions(results: Result[]): Result[] {
+  if (!results || results.length === 0) return [];
+
+  const fromServer = results.some((r) => r.combined_place != null);
+  if (!fromServer) {
+    return recalculatePositions(results).map((r) => ({
+      ...r,
+      position_original: r.position,
+      position: r.position_recalc,
+    })) as Result[];
+  }
+
+  return results.map((r) => ({
+    ...r,
+    position_original: r.position,
+    position: r.combined_place ?? r.position,
+  })) as Result[];
+}
