@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -66,6 +66,30 @@ public class IsrOrgParser : IFormatParser
     }
 
     public string GetDebugLog() => IsrOrgCompetitionParser.GetDebugLog();
+
+    /// <summary>
+    /// Категория заплыва из заголовка протокола — то, что нельзя вывести из года рождения
+    /// пловца. <c>EventStyleAge</c>/<c>AgeGroup</c> для этого не годятся: они считаются по
+    /// возрасту и категорию затирают (у «50m Freestyle - Men Para» оставался возраст 49).
+    ///
+    /// Нормализация: <c>open</c> — взрослые Men/Women, <c>para</c> — паралимпийская
+    /// программа, <c>mix</c> — смешанная, <c>U</c>+число — юниорская («U17»), возраст или
+    /// группа — как в ивритских протоколах («12», «25-29»).
+    /// </summary>
+    internal static string? NormalizeEventCategory(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        var v = raw.Trim();
+
+        if (v.Equals("para", StringComparison.OrdinalIgnoreCase)) return "para";
+        if (v.Equals("open", StringComparison.OrdinalIgnoreCase)) return "open";
+        if (v.StartsWith("mix", StringComparison.OrdinalIgnoreCase)) return "mix";
+
+        // Юниорские заголовки приходят как "U17" либо уже как "17" (ParseEnCategory срезает U).
+        // Различить «U17 Boys» и ивритский «גיל 17» по одному числу нельзя, и не нужно:
+        // в обоих случаях это возрастная категория заплыва с этим числом.
+        return v.TrimStart('U', 'u');
+    }
 
     private static int DetermineAge(int eventYear, int birthYear, string? eventStyleAge)
     {
@@ -155,7 +179,8 @@ public class IsrOrgParser : IFormatParser
                     IsRelay: rHe.IsRelay ?? false,
                     RelayTeamName: rHe.RelayTeamName,
                     RelaySwimmersName: null,
-                    RelaySwimmers: rHe.RelaySwimmers
+                    RelaySwimmers: rHe.RelaySwimmers,
+                    EventCategory: NormalizeEventCategory(comp.EventStyleAge)
                 );
             }
         }
@@ -287,7 +312,8 @@ public class IsrOrgParser : IFormatParser
                     IsRelay: rHe.IsRelay ?? rEn.IsRelay ?? false,
                     RelayTeamName: rHe.RelayTeamName ?? rEn.RelayTeamName,
                     RelaySwimmersName: null,
-                    RelaySwimmers: rHe.RelaySwimmers ?? rEn.RelaySwimmers
+                    RelaySwimmers: rHe.RelaySwimmers ?? rEn.RelaySwimmers,
+                    EventCategory: NormalizeEventCategory(compEn.EventStyleAge)
                 );
             }
         }
@@ -335,7 +361,8 @@ public class IsrOrgParser : IFormatParser
             IsRelay: true,
             RelayTeamName: rHe.RelayTeamName ?? rHe.Club,
             RelaySwimmersName: swimmerNames,
-            RelaySwimmers: rHe.RelaySwimmers
+            RelaySwimmers: rHe.RelaySwimmers,
+            EventCategory: NormalizeEventCategory(comp.EventStyleAge)
         );
     }
 
@@ -383,7 +410,8 @@ public class IsrOrgParser : IFormatParser
             IsRelay: true,
             RelayTeamName: rHe.RelayTeamName ?? rEn.RelayTeamName ?? rHe.Club,
             RelaySwimmersName: swimmerNames,
-            RelaySwimmers: relaySwimmers
+            RelaySwimmers: relaySwimmers,
+            EventCategory: NormalizeEventCategory(compEn.EventStyleAge)
         );
     }
 }

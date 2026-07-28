@@ -115,6 +115,39 @@ public class IsrOrgCompetitionParserMaccabiahRealPdfTests
         Assert.True(wrongGender.Count == 0, "Женские события с чужим полом: " + string.Join(", ", wrongGender));
     }
 
+    /// <summary>
+    /// Категория заплыва из заголовка доезжает до модели импорта. Без неё три разных заплыва
+    /// протокола — «50m Freestyle - Men», «- U17 Boys» и «- Men Para» — сливались в одну
+    /// дисциплину «50 freestyle male», где оказывалось три первых места, и Para-пловцы
+    /// приносили клубам золото наравне с основной программой. AgeGroup/EventStyleAge для
+    /// этого не годятся: IsrOrgParser считает их по году рождения и категорию затирает
+    /// (у Itsik Iaich оставался возраст 49 и группа «45-49»).
+    /// </summary>
+    [Fact]
+    public void HeMode_EventCategory_SurvivesMappingToImportModel()
+    {
+        using var fs = File.OpenRead(PdfPath);
+        var comps = IsrOrgCompetitionParser.ParseCompetitions(fs, "he").ToList();
+        var results = IsrOrgParser.MapHebrewOnly(
+            comps, "ISR", isMastersFile: false, isAward: false, poolOverride: null).ToList();
+
+        var free50Male = results
+            .Where(r => r.EventStyleName == "freestyle" && r.EventStyleLen == "50"
+                        && r.EventStyleGender == "male" && !string.IsNullOrEmpty(r.Time))
+            .ToList();
+
+        // Ровно три категории в одной дисциплине — по одной на каждый заплыв протокола.
+        var categories = free50Male.Select(r => r.EventCategory).Distinct().OrderBy(x => x).ToList();
+        Assert.Equal(new[] { "17", "open", "para" }, categories);
+
+        var iaich = Assert.Single(free50Male, r => r.LastName == "Iaich");
+        Assert.Equal("para", iaich.EventCategory);
+        Assert.Equal("49", iaich.EventStyleAge);   // возраст остаётся возрастом
+
+        Assert.Equal("open", Assert.Single(free50Male, r => r.LastName == "CHERUTI").EventCategory);
+        Assert.Equal("17", Assert.Single(free50Male, r => r.LastName == "STRIMOVSKY").EventCategory);
+    }
+
     private static string HePdfPath =>
         Path.Combine(AppContext.BaseDirectory, "Fixtures", "Parsing", "Maccabiah-2026_IL_HE.pdf");
 

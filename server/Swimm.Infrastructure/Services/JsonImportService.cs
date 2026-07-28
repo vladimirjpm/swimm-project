@@ -523,6 +523,7 @@ public class JsonImportService : IImportService
                     Gender = item.EventStyleGender ?? string.Empty,
                     AgeGroup = item.AgeGroup ?? string.Empty,
                     EventStyleAge = item.EventStyleAge ?? string.Empty,
+                    EventCategory = string.IsNullOrWhiteSpace(item.EventCategory) ? null : item.EventCategory,
                     Position = item.Position,
                     PositionAgeGroup = item.PositionAgeGroup,
                     Heat = item.Heat ?? 0,
@@ -796,6 +797,7 @@ public class JsonImportService : IImportService
         old.CompetitionDate = incoming.CompetitionDate;
         old.AgeGroup = incoming.AgeGroup;
         old.EventStyleAge = incoming.EventStyleAge;
+        old.EventCategory = incoming.EventCategory;
         old.Position = incoming.Position;
         old.PositionAgeGroup = incoming.PositionAgeGroup;
         old.TimeMillisecond = incoming.TimeMillisecond;
@@ -1596,6 +1598,11 @@ public class ResultJsonItem
 
     [JsonPropertyName("event_style_age")]
     public string? EventStyleAge { get; set; }
+
+    /// <summary>Категория заплыва из заголовка протокола: open / para / mix / "17" / "25-29".
+    /// В отличие от age_group и event_style_age НЕ производна от года рождения пловца.</summary>
+    [JsonPropertyName("event_category")]
+    public string? EventCategory { get; set; }
 
     [JsonPropertyName("pool_type")]
     public string? PoolType { get; set; }
