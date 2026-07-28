@@ -17,15 +17,23 @@ namespace Swimm.Infrastructure.Services;
 public class JsonImportService : IImportService
 {
     private readonly SwimmDbContext _db;
+    private readonly ICompetitionRecalculationService? _recalc;
     private readonly ICacheService _cache;
 
     private static readonly string[] ClearableTables =
         ["Results", "GalleryItems", "Galleries", "Relays", "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "CompetitionEvents", "Countries"];
 
-    public JsonImportService(SwimmDbContext db, ICacheService cache)
+    /// <param name="recalc">
+    /// Пересчёт материализованных величин соревнования (объединённые места). Необязателен:
+    /// null — пересчёт пропускается. Так тесты импорта, которым он не нужен, продолжают
+    /// конструировать сервис двумя аргументами; в приложении его подставляет DI.
+    /// </param>
+    public JsonImportService(SwimmDbContext db, ICacheService cache,
+        ICompetitionRecalculationService? recalc = null)
     {
         _db    = db;
         _cache = cache;
+        _recalc = recalc;
     }
 
     public string[] GetClearableTables() => ClearableTables;
@@ -739,6 +747,38 @@ public class JsonImportService : IImportService
         }
 
         await tx.CommitAsync();
+
+        // Объединённые места материализованы в строках результатов, а импорт их меняет:
+        // без пересчёта тоггл «Combine All Results» показал бы пустоту у свежих соревнований
+        // (docs/points-rules-per-competition-plan.md §3.4 — главный риск материализации).
+        // Считается по СОБЫТИЮ целиком, поэтому одного дня многодневки достаточно.
+        var recalculatedRows = 0;
+        if (_recalc is not null && touchedCompetitionKeys.Count > 0)
+        {
+            var touchedIds = touchedCompetitionKeys
+                .Select(k => competitionCache[k].Id)
+                .Distinct()
+                .ToList();
+
+            // Импорт уже закоммичен — упасть на пересчёте нельзя, иначе загруженные результаты
+            // откатятся из-за производной величины. Ошибку показываем в логе импорта:
+            // починить можно прогоном `dotnet run -- --recalc-combined`.
+            try
+            {
+                foreach (var compId in touchedIds)
+                    recalculatedRows += await _recalc.RecalculateCompetitionAsync(compId);
+
+                if (recalculatedRows > 0)
+                    diagnosticLog.Add($"Combine All Results: пересчитано строк — {recalculatedRows}");
+            }
+            catch (Exception ex)
+            {
+                diagnosticLog.Add(
+                    $"Combine All Results: пересчёт не удался ({ex.GetType().Name}: {ex.Message}). " +
+                    "Импорт сохранён; выполните `dotnet run -- --recalc-combined`.");
+            }
+        }
+
         await _cache.InvalidateAllAsync();
 
         // insertedCount — реально вставленные строки resultBatch (после того как сматченные
