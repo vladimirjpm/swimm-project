@@ -64,7 +64,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
               />
             )}
           </div>
-          {showAge && <UI_AgeLabel age={res.event_style_age} isMasters={isMastersResult} ageGroup={res.age_group} />}
+          {showAge && <UI_AgeLabel age={res.event_style_age} eventCategory={res.event_category} isMasters={isMastersResult} ageGroup={res.age_group} />}
           <UI_FavoriteControls
             swimmerId={res.swimmer_id}
             isFavorite={isFavorite}

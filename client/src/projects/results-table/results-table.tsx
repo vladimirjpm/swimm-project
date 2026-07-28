@@ -84,6 +84,11 @@ function ResultsTable() {
     
     // Фильтр по дате события
     if (event_date && event_date !== 'all' && res.date !== event_date) return false;
+
+    // Фильтр по категории (программе) заплыва. У строк, импортированных до появления
+    // event_category, оно пустое — такие в выборку по конкретной категории не попадают.
+    const catFilter = filters.event_category;
+    if (catFilter && catFilter !== 'all' && (res.event_category ?? '') !== catFilter) return false;
     
     // Фильтр по training/competition
     const hasTraining = !!res.training?.trainingId;
