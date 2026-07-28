@@ -15,6 +15,9 @@ Keep this file the single source of agent guidance; other agents are pointed her
   журнал фиксов, чек-лист отладки. Читай ПЕРВЫМ при любом баге эстафет.
 - [`docs/media-page.md`](docs/media-page.md) — **подсистема медиа / My media**: модель
   `Sys_UserMedia`, API, потоки Add link, публикации, footguns. Читай при багах медиа.
+- [`docs/competition-overview-cards.md`](docs/competition-overview-cards.md) — **карточки
+  Overview соревнования**: что считает каждая (Top clubs, Best swim, Most decorated, High
+  Point…), правила медалей/очков и чек-лист «цифра выглядит неправильно».
 
 This file covers only what those don't: how to build, run, migrate, and test **in practice here**,
 plus repo-specific footguns.

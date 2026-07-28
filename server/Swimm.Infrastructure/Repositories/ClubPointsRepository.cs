@@ -26,8 +26,15 @@ public class ClubPointsRepository : IClubPointsRepository
         if (cached is not null)
             return cached;
 
+        // ManualOnly-правила НЕ отдаём: они существуют только для явной привязки к
+        // соревнованию и в автоподборе не участвуют (CompetitionRuleResolver). Клиент
+        // подбирает правило сам — по дате и scope, привязки он не знает, — и, увидев
+        // manual-правило, брал самое свежее по дате вместо привязанного. Симптом:
+        // очки клуба в табе Swims не сходились с Overview (1673 против 1568 на event 7,
+        // правило 2026.01-youth-11-14 вместо привязанного 2025.01).
         var rules = await _db.PointRulesClubs
             .AsNoTracking()
+            .Where(r => !r.ManualOnly)
             .Include(r => r.Entries)
             .OrderBy(r => r.Id)
             .ToListAsync();
