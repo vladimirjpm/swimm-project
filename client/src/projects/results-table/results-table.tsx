@@ -341,10 +341,14 @@ function ResultsTable() {
           showPoolType={showPoolType}
           showEvent={showEvent}
         />      
+        {/* Бассейн берём фактический (poolTypeDisplay, как у masters-карточки ниже), а не
+            сырой filters.pool_type: по умолчанию он 'all', а при 'all' карточка отдавала
+            первый попавшийся ключ — 25m — и на 50-метровом соревновании показывала рекорды
+            короткого бассейна. */}
         {!isMastersSource && (
           <NormativeAgeRecords
             gender={filters.gender}
-            poolType={filters.pool_type}
+            poolType={poolTypeDisplay}
             styleName={filters.style_name}
             styleLen={filters.style_len}
             age={filters.age}
