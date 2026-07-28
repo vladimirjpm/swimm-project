@@ -76,19 +76,35 @@ public class IsrOrgParser : IFormatParser
     /// программа, <c>mix</c> — смешанная, <c>U</c>+число — юниорская («U17»), возраст или
     /// группа — как в ивритских протоколах («12», «25-29»).
     /// </summary>
-    internal static string? NormalizeEventCategory(string? raw)
+    internal static string? NormalizeEventCategory(string? raw, string? gender = null)
     {
         if (string.IsNullOrWhiteSpace(raw)) return null;
         var v = raw.Trim();
 
         if (v.Equals("para", StringComparison.OrdinalIgnoreCase)) return "para";
-        if (v.Equals("open", StringComparison.OrdinalIgnoreCase)) return "open";
-        if (v.StartsWith("mix", StringComparison.OrdinalIgnoreCase)) return "mix";
 
         // Юниорские заголовки приходят как "U17" либо уже как "17" (ParseEnCategory срезает U).
         // Различить «U17 Boys» и ивритский «גיל 17» по одному числу нельзя, и не нужно:
         // в обоих случаях это возрастная категория заплыва с этим числом.
-        return v.TrimStart('U', 'u');
+        var age = v.Equals("open", StringComparison.OrdinalIgnoreCase)
+            ? "open"
+            : v.TrimStart('U', 'u');
+
+        // Смешанные заплывы: пол в них "none" (ParseEnCategory), а возрастная часть остаётся
+        // своя — «MIX 18-99» и «MIX U17» это РАЗНЫЕ программы. Поэтому префикс, а не просто
+        // "mix": иначе две программы схлопнулись бы в одну категорию.
+        bool isMix = v.StartsWith("mix", StringComparison.OrdinalIgnoreCase)
+                     || string.Equals(gender, "none", StringComparison.OrdinalIgnoreCase)
+                     || (gender?.StartsWith("mix", StringComparison.OrdinalIgnoreCase) ?? false);
+        if (isMix)
+        {
+            var mixAge = v.StartsWith("mix", StringComparison.OrdinalIgnoreCase)
+                ? v[3..].Trim().TrimStart('U', 'u')
+                : age;
+            return string.IsNullOrEmpty(mixAge) || mixAge == "open" ? "mix" : $"mix-{mixAge}";
+        }
+
+        return age;
     }
 
     private static int DetermineAge(int eventYear, int birthYear, string? eventStyleAge)
@@ -180,7 +196,7 @@ public class IsrOrgParser : IFormatParser
                     RelayTeamName: rHe.RelayTeamName,
                     RelaySwimmersName: null,
                     RelaySwimmers: rHe.RelaySwimmers,
-                    EventCategory: NormalizeEventCategory(comp.EventStyleAge)
+                    EventCategory: NormalizeEventCategory(comp.EventStyleAge, comp.EventStyleGender)
                 );
             }
         }
@@ -313,7 +329,7 @@ public class IsrOrgParser : IFormatParser
                     RelayTeamName: rHe.RelayTeamName ?? rEn.RelayTeamName,
                     RelaySwimmersName: null,
                     RelaySwimmers: rHe.RelaySwimmers ?? rEn.RelaySwimmers,
-                    EventCategory: NormalizeEventCategory(compEn.EventStyleAge)
+                    EventCategory: NormalizeEventCategory(compEn.EventStyleAge, compEn.EventStyleGender)
                 );
             }
         }
@@ -362,7 +378,7 @@ public class IsrOrgParser : IFormatParser
             RelayTeamName: rHe.RelayTeamName ?? rHe.Club,
             RelaySwimmersName: swimmerNames,
             RelaySwimmers: rHe.RelaySwimmers,
-            EventCategory: NormalizeEventCategory(comp.EventStyleAge)
+            EventCategory: NormalizeEventCategory(comp.EventStyleAge, comp.EventStyleGender)
         );
     }
 
@@ -411,7 +427,7 @@ public class IsrOrgParser : IFormatParser
             RelayTeamName: rHe.RelayTeamName ?? rEn.RelayTeamName ?? rHe.Club,
             RelaySwimmersName: swimmerNames,
             RelaySwimmers: relaySwimmers,
-            EventCategory: NormalizeEventCategory(compEn.EventStyleAge)
+            EventCategory: NormalizeEventCategory(compEn.EventStyleAge, compEn.EventStyleGender)
         );
     }
 }
