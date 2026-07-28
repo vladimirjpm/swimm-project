@@ -108,6 +108,28 @@ public sealed class OverviewHighPointDto
     [JsonPropertyName("points")] public int Points { get; init; }
     /// <summary>true — ничья по очкам в этом (возраст × пол): наград несколько.</summary>
     [JsonPropertyName("is_tie")] public bool IsTie { get; init; }
+
+    /// <summary>
+    /// Версия правила, по которому посчитаны очки ("2026.01-youth-11-14"), или null —
+    /// правило не привязано и работает прежний расчёт по сумме international points.
+    /// Клиенту нужно, чтобы подписать источник очков: «5/3/2/1 за место» и «сумма FINA» —
+    /// разные величины, и без подписи цифры выглядят необъяснимо разными.
+    /// </summary>
+    [JsonPropertyName("rule_version")] public string? RuleVersion { get; init; }
+
+    /// <summary>
+    /// Подпись номинации, если она НЕ возрастная: возрастная группа masters ("25-29") или
+    /// один кубок на пол у «бугрим» (GroupBy = none). Позволяет карточке High Point
+    /// показывать произвольную номинацию, а не только возраст.
+    /// </summary>
+    [JsonPropertyName("group_label")] public string? GroupLabel { get; init; }
+
+    /// <summary>
+    /// Правило требует считать только финалы, но признака типа заплыва в данных ещё нет —
+    /// расчёт идёт по всем заплывам (§8.B.3 плана, вариант 3). Клиенту стоит показать
+    /// сноску «по всем заплывам», чтобы расхождение с официальным кубком не выглядело багом.
+    /// </summary>
+    [JsonPropertyName("finals_only_unavailable")] public bool FinalsOnlyUnavailable { get; init; }
 }
 
 /// <summary>Зарезервированный контракт карточки рекорда (v1 не заполняется).</summary>

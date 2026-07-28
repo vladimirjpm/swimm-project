@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
 
@@ -132,7 +132,7 @@ public static class CompetitionRecordsDetector
         => distance.EndsWith('m') ? distance[..^1] : distance;
 
     /// <summary>"35.64" | "02:45.46" | "1:02:45.46" → миллисекунды; мусор → null.</summary>
-    internal static int? ParseTimeToMs(string? time)
+    public static int? ParseTimeToMs(string? time)
     {
         if (string.IsNullOrWhiteSpace(time)) return null;
         var parts = time.Trim().Split(':');

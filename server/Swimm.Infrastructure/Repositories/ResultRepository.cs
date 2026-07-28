@@ -435,8 +435,13 @@ public class ResultRepository : IResultRepository
         // High Point Award: лучший по СУММЕ очков в каждом (возраст × пол), раздельно ♂/♀
         // (design_handoff §High Point Award). Возраст = год соревнования − год рождения
         // (израильская возрастная конвенция). Ничья по сумме → несколько наград (is_tie).
+        // InternationalPoints > 0 в выборку НЕ входит: правило может считать очки за место
+        // (§8.A), где FINA-очков может не быть вовсе. Legacy-ветка ниже накладывает это
+        // условие в памяти, чтобы её результат остался байт-в-байт прежним.
+        // Эстафеты пока исключены на уровне запроса: IncludeRelays у всех правил false —
+        // вопрос «идут ли эстафеты в зачёт пловца» в плане открыт (§8.2).
         var hpRows = await query
-            .Where(r => r.RelayId == null && !r.TimeFail && r.InternationalPoints > 0
+            .Where(r => r.RelayId == null && !r.TimeFail
                         && (r.Gender == "male" || r.Gender == "female")
                         && r.Swimmer.BirthYear > 0
                         // combine-all: дисциплина зачитывается один раз — по лучшему заплыву,
@@ -455,9 +460,33 @@ public class ResultRepository : IResultRepository
                 Year = r.CompetitionDate.Year,
                 r.AgeGroup,
                 IsMasters = r.Competition.IsMasters,
-                r.InternationalPoints
+                r.InternationalPoints,
+                // Э2.5: поля для расчёта по правилу. Место берём объединённое, если
+                // соревнование его считает и тоггл включён — иначе место в заплыве.
+                Place = filter.Combined && r.Competition.ShowCombineAllResults && r.CombinedPlace != null
+                    ? r.CombinedPlace
+                    : r.Position,
+                RuleId = r.Competition.PointRuleSwimmersId,
+                r.CompetitionDate,
+                // Для бонуса за возрастной рекорд (§8.A: 13 за установленный, 8 за повторённый).
+                StyleName = r.Style.Name,
+                r.Distance,
+                PoolType = r.Competition.PoolType,
+                r.TimeMillisecond
             })
             .ToListAsync();
+
+        // Правило High Point: привязка соревнования важнее подбора по дате (CompetitionRuleResolver).
+        // Правил единицы — грузим целиком и применяем в памяти, как в клубном зачёте.
+        var swimmerRules = await _db.PointRulesSwimmers.AsNoTracking()
+            .Include(r => r.Entries)
+            .ToListAsync();
+
+        var hpRule = hpRows.Count == 0 ? null : CompetitionRuleResolver.Resolve(
+            swimmerRules,
+            hpRows.Select(r => r.RuleId).FirstOrDefault(id => id != null),
+            hpRows.Any(r => r.IsMasters),
+            DateOnly.FromDateTime(hpRows.Min(r => r.CompetitionDate)));
 
         // Masters: корзина — возрастная ГРУППА ("25-29", как в фильтрах), топ-5 по очкам на пол.
         // Не-masters: корзина — отдельный возраст (год − год рождения), все возрасты по порядку.
@@ -467,7 +496,10 @@ public class ResultRepository : IResultRepository
         var isMastersOverview = hpRows.Any(r => r.IsMasters);
 
         // Сумма очков пловца в (корзина × пол), затем max по корзине; ничья по сумме → все.
+        // Legacy-ветка (правило не привязано): та же логика, что была до Э2.5, включая
+        // условие InternationalPoints > 0 — оно перенесено сюда из SQL-запроса.
         var perSwimmer = hpRows
+            .Where(r => r.InternationalPoints > 0)
             .Where(r => isMastersOverview ? !string.IsNullOrEmpty(r.AgeGroup) : (r.Year - r.BirthYear) > 0)
             .GroupBy(r => new
             {
@@ -524,6 +556,90 @@ public class ResultRepository : IResultRepository
         var highPointAwards = isMastersOverview
             ? winners.OrderBy(a => AgeGroupLow(a.AgeGroup)).ThenBy(a => a.LastName).ToList()
             : winners.OrderBy(a => a.Age).ThenBy(a => a.LastName).ToList();
+
+        // Э2.5: если соревнованию привязано правило — счёт по нему, а не по зашитой
+        // FINA-сумме. Именно ради этого правило и заведено: у возрастных соревнований очки
+        // за место плюс замещающий бонус за возрастной рекорд, у «бугрим» — сумма FINA с
+        // одним кубком на пол (§8.A / §8.B.1 плана). Legacy-ветка выше остаётся для
+        // соревнований без привязки.
+        if (hpRule is not null)
+        {
+            var byId = hpRows
+                .GroupBy(r => r.SwimmerId)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            // Бонус за возрастной рекорд начисляется, только если правило его задаёт.
+            // Индекс строим по той же оси, что и CompetitionRecordsDetector:
+            // gender|pool|style|distance|category|ageKey, где category — age или masters.
+            var recordIndex = new Dictionary<string, int>();
+            if (hpRule.RecordPoints is not null || hpRule.RecordTiePoints is not null)
+            {
+                foreach (var rec in await GetIsraelRecordsAsync())
+                {
+                    if (rec.Category is not ("age" or "masters")) continue;
+                    var ms = CompetitionRecordsDetector.ParseTimeToMs(rec.Time);
+                    if (ms is null) continue;
+                    var dist = rec.Distance.EndsWith('m') ? rec.Distance[..^1] : rec.Distance;
+                    var recKey = $"{rec.Gender}|{rec.PoolType}|{rec.Style}|{dist}|{rec.Category}|{rec.AgeKey}";
+                    if (!recordIndex.TryGetValue(recKey, out var cur) || ms.Value < cur)
+                        recordIndex[recKey] = ms.Value;
+                }
+            }
+
+            RecordStatus RecordStatusOf(int age, string gender, string pool, string style,
+                string distance, string ageGroup, bool isMasters, int? timeMs)
+            {
+                if (recordIndex.Count == 0 || timeMs is null or <= 0) return RecordStatus.None;
+                var category = isMasters ? "masters" : "age";
+                var ageKey = isMasters ? ageGroup : age.ToString();
+                if (!recordIndex.TryGetValue($"{gender}|{pool}|{style}|{distance}|{category}|{ageKey}", out var recMs))
+                    return RecordStatus.None;
+                if (timeMs.Value < recMs) return RecordStatus.Broken;
+                return timeMs.Value == recMs ? RecordStatus.Tied : RecordStatus.None;
+            }
+
+            var ruleWinners = PointRulesSwimmersScoring.Winners(hpRule, hpRows
+                .Select(r => new SwimmerHighPointRow(
+                    SwimmerId: r.SwimmerId,
+                    Gender: r.Gender,
+                    Age: r.Year - r.BirthYear,
+                    AgeGroup: r.AgeGroup,
+                    Place: r.Place,
+                    InternationalPoints: r.InternationalPoints,
+                    IsRelay: false,
+                    TimeFail: false,
+                    Record: RecordStatusOf(r.Year - r.BirthYear, r.Gender, r.PoolType, r.StyleName,
+                        r.Distance, r.AgeGroup, r.IsMasters, r.TimeMillisecond)))
+                .ToList());
+
+            highPointAwards = ruleWinners
+                .Select(w =>
+                {
+                    var src = byId[w.SwimmerId];
+                    return new OverviewHighPointDto
+                    {
+                        // GroupBy=age-group подаёт номинацию как группу (карточка показывает
+                        // её вместо возраста) — так же, как в masters-ветке legacy.
+                        Age = hpRule.GroupBy == "age" ? w.Age : 0,
+                        AgeGroup = hpRule.GroupBy == "age" ? "" : w.Bucket,
+                        Gender = w.Gender,
+                        SwimmerId = w.SwimmerId,
+                        FirstName = src.FirstName,
+                        LastName = src.LastName,
+                        FirstNameEn = src.FirstNameEn,
+                        LastNameEn = src.LastNameEn,
+                        Club = src.Club,
+                        Points = w.Points,
+                        IsTie = w.IsTie,
+                        RuleVersion = hpRule.Version,
+                        GroupLabel = hpRule.GroupBy == "age" ? null : w.Bucket,
+                        FinalsOnlyUnavailable = hpRule.FinalsOnly
+                    };
+                })
+                .OrderBy(a => a.AgeGroup.Length > 0 ? AgeGroupLow(a.AgeGroup) : a.Age)
+                .ThenBy(a => a.LastName)
+                .ToList();
+        }
 
         // Клубный зачёт — переиспользуем GetClubSummaryAsync (свой кэш внутри);
         // по полу — тот же расчёт с Gender-фильтром. Значения в Results.Gender —
