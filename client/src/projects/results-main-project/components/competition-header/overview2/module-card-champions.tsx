@@ -114,7 +114,9 @@ function MedalistPanel({ medalists, gender, onOpenClub }: {
       className="flex min-w-0 items-center gap-2.5 rounded-[10px] p-2.5 text-left"
       style={{ background: PANEL_BG[gender] }}
     >
-      <span className="min-w-0 flex flex-col">
+      {/* gap-y на всей колонке, а не только между именами: иконка клуба выше строки текста
+          и без отступа наезжала на заголовок «MOST DECORATED». */}
+      <span className="min-w-0 flex flex-col gap-y-1.5">
         <span className="text-[11px] font-extrabold tracking-[0.05em]" style={GENDER_CIRCLE[gender]}>
           {gender === 'male' ? '♂' : '♀'} MOST DECORATED
         </span>
