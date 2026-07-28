@@ -107,11 +107,14 @@ function MedalistPanel({ medalists, gender, onOpenClub }: {
   const top = medalists[0];
   const relayMedals = Math.max(...medalists.map((m) => m.relay_medals ?? 0));
 
+  // Панель выравнивается по ВЕРХУ (items-start): у ♂ и ♀ разное число награждённых при
+  // ничьей, и при центрировании заголовки соседних панелей вставали на разной высоте.
+
   return (
     <button
       type="button"
       onClick={() => onOpenClub?.(top.club)}
-      className="flex min-w-0 items-center gap-2.5 rounded-[10px] p-2.5 text-left"
+      className="flex min-w-0 items-start gap-2.5 rounded-[10px] p-2.5 text-left"
       style={{ background: PANEL_BG[gender] }}
     >
       {/* gap-y на всей колонке, а не только между именами: иконка клуба выше строки текста
