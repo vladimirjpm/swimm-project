@@ -23,11 +23,16 @@ public sealed class CompetitionOverviewDto
     [JsonPropertyName("top_clubs")] public IReadOnlyList<ClubSummaryDto> TopClubs { get; init; } = [];
     [JsonPropertyName("top_clubs_men")] public IReadOnlyList<ClubSummaryDto> TopClubsMen { get; init; } = [];
     [JsonPropertyName("top_clubs_women")] public IReadOnlyList<ClubSummaryDto> TopClubsWomen { get; init; } = [];
-    /// <summary>Пловец с наибольшим числом медалей (личные заплывы, без эстафет).</summary>
-    [JsonPropertyName("top_medalist")] public OverviewMedalistDto? TopMedalist { get; init; }
-    /// <summary>Топ-медалист среди мужчин / женщин (design_handoff вариант 4, ♂/♀). null — нет данных.</summary>
-    [JsonPropertyName("top_medalist_male")] public OverviewMedalistDto? TopMedalistMale { get; init; }
-    [JsonPropertyName("top_medalist_female")] public OverviewMedalistDto? TopMedalistFemale { get; init; }
+    /// <summary>
+    /// Самые титулованные пловцы соревнования: личные медали ПЛЮС эстафетные (эстафетная
+    /// медаль засчитывается каждому участнику по <c>RelayMembers</c>, а не владельцу строки).
+    /// Порядок — сначала по золоту, затем серебру, затем бронзе (не по сумме наград).
+    /// При полном равенстве набора отдаются ВСЕ — как в High Point Award.
+    /// </summary>
+    [JsonPropertyName("top_medalists")] public IReadOnlyList<OverviewMedalistDto> TopMedalists { get; init; } = [];
+    /// <summary>То же среди мужчин / женщин (design_handoff вариант 4, ♂/♀).</summary>
+    [JsonPropertyName("top_medalists_male")] public IReadOnlyList<OverviewMedalistDto> TopMedalistsMale { get; init; } = [];
+    [JsonPropertyName("top_medalists_female")] public IReadOnlyList<OverviewMedalistDto> TopMedalistsFemale { get; init; } = [];
     /// <summary>High Point Award: лучший по СУММЕ очков в каждом возрасте, раздельно ♂/♀
     /// (design_handoff §High Point Award). Ничья по очкам → несколько на возраст (is_tie).
     /// Пусто, если возраст не вычислим (нет года рождения).</summary>
@@ -87,6 +92,10 @@ public sealed class OverviewMedalistDto
     [JsonPropertyName("gold")] public int Gold { get; init; }
     [JsonPropertyName("silver")] public int Silver { get; init; }
     [JsonPropertyName("bronze")] public int Bronze { get; init; }
+    /// <summary>Сколько из медалей — эстафетные (для подписи «в т.ч. эстафеты»).</summary>
+    [JsonPropertyName("relay_medals")] public int RelayMedals { get; init; }
+    /// <summary>true — тот же набор медалей ещё у кого-то, награда делится.</summary>
+    [JsonPropertyName("is_tie")] public bool IsTie { get; init; }
 }
 
 /// <summary>Одна награда High Point Award: лучший по сумме очков в (возраст × пол).</summary>

@@ -385,10 +385,13 @@ public class ResultRepository : IResultRepository
         var bestSwimMale = await BestSwimProjection(query.Where(r => r.Gender == "male")).FirstOrDefaultAsync();
         var bestSwimFemale = await BestSwimProjection(query.Where(r => r.Gender == "female")).FirstOrDefaultAsync();
 
-        // Топ-медалист: личные медали (эстафеты не в счёт), TimeFail медаль не даёт.
+        // Медальный зачёт: личные заплывы + эстафеты. TimeFail медаль не даёт.
         // При combine-all медаль определяется объединённым местом дисциплины — иначе на
         // одной странице «золото» по протоколу заплыва, а очки клубу по общему зачёту.
-        var medalRows = await query
+        // Проекция — в анонимный тип, маппинг в MedalRow уже в памяти: фильтр по месту стоит
+        // ПОСЛЕ проекции, а обращение к свойству record'а EF перевести в SQL не может
+        // (InMemory-провайдер это не ловит — он считает всё клиентски).
+        var personalMedals = (await query
             .Where(r => r.RelayId == null && !r.TimeFail)
             .Select(r => new
             {
@@ -404,33 +407,101 @@ public class ResultRepository : IResultRepository
                     : r.Position
             })
             .Where(r => r.Position != null && r.Position <= 3)
-            .ToListAsync();
+            .ToListAsync())
+            .Select(r => new MedalRow(
+                r.SwimmerId, r.FirstName, r.LastName, r.FirstNameEn, r.LastNameEn,
+                r.Club, r.Gender, r.Position, false));
 
-        // Топ-медалист общий и по полу (design_handoff вариант 4). gender == null → без фильтра.
-        OverviewMedalistDto? BuildMedalist(string? gender) => medalRows
-            .Where(r => gender == null || r.Gender == gender)
-            .GroupBy(r => r.SwimmerId)
-            .Select(g => new OverviewMedalistDto
+        // Эстафетная медаль принадлежит ВСЕЙ команде — разворачиваем строку на ноги через
+        // RelayMembers (docs/relays.md: считать по владельцу строки — классический баг, медаль
+        // получил бы только якорь). Пол берём у самого пловца: эстафеты бывают смешанные,
+        // и Gender строки результата для разбивки ♂/♀ не годится.
+        var relayMedals = (await query
+            .Where(r => r.RelayId != null && !r.TimeFail)
+            .Select(r => new
             {
-                SwimmerId = g.Key,
-                FirstName = g.First().FirstName,
-                LastName = g.First().LastName,
-                FirstNameEn = g.First().FirstNameEn,
-                LastNameEn = g.First().LastNameEn,
-                Club = g.First().Club,
-                Gold = g.Count(r => r.Position == 1),
-                Silver = g.Count(r => r.Position == 2),
-                Bronze = g.Count(r => r.Position == 3)
+                r.RelayId,
+                Club = r.Club.Name,
+                Position = filter.Combined && r.Competition.ShowCombineAllResults
+                    ? (r.CombinedPlace ?? r.Position)
+                    : r.Position
             })
-            .OrderByDescending(m => m.Gold + m.Silver + m.Bronze)
-            .ThenByDescending(m => m.Gold)
-            .ThenByDescending(m => m.Silver)
-            .ThenBy(m => m.SwimmerId)
-            .FirstOrDefault();
+            .Where(r => r.Position != null && r.Position <= 3)
+            .Join(_db.RelayMembers.AsNoTracking(),
+                r => r.RelayId, m => m.RelayId,
+                (r, m) => new
+                {
+                    m.SwimmerId,
+                    m.Swimmer.FirstName,
+                    m.Swimmer.LastName,
+                    m.Swimmer.FirstNameEn,
+                    m.Swimmer.LastNameEn,
+                    r.Club,
+                    m.Swimmer.Gender,
+                    r.Position
+                })
+            .ToListAsync())
+            .Select(r => new MedalRow(
+                r.SwimmerId, r.FirstName, r.LastName, r.FirstNameEn, r.LastNameEn,
+                r.Club, r.Gender, r.Position, true));
 
-        var topMedalist = BuildMedalist(null);
-        var topMedalistMale = BuildMedalist("male");
-        var topMedalistFemale = BuildMedalist("female");
+        var medalRows = personalMedals.Concat(relayMedals).ToList();
+
+        // Топ-медалисты общие и по полу (design_handoff вариант 4). gender == null → без фильтра.
+        // Порядок — золото → серебро → бронза, а НЕ по сумме наград: три бронзы не выше одного
+        // золота. Отдаём всех с идентичным набором (ничья), как в High Point Award.
+        IReadOnlyList<OverviewMedalistDto> BuildMedalists(string? gender)
+        {
+            var ranked = medalRows
+                .Where(r => gender == null || r.Gender == gender)
+                .GroupBy(r => r.SwimmerId)
+                .Select(g => new OverviewMedalistDto
+                {
+                    SwimmerId = g.Key,
+                    FirstName = g.First().FirstName,
+                    LastName = g.First().LastName,
+                    FirstNameEn = g.First().FirstNameEn,
+                    LastNameEn = g.First().LastNameEn,
+                    Club = g.First().Club,
+                    Gold = g.Count(r => r.Position == 1),
+                    Silver = g.Count(r => r.Position == 2),
+                    Bronze = g.Count(r => r.Position == 3),
+                    RelayMedals = g.Count(r => r.IsRelay)
+                })
+                .OrderByDescending(m => m.Gold)
+                .ThenByDescending(m => m.Silver)
+                .ThenByDescending(m => m.Bronze)
+                .ThenBy(m => m.SwimmerId)
+                .ToList();
+
+            if (ranked.Count == 0) return [];
+
+            var top = ranked[0];
+            var winners = ranked
+                .Where(m => m.Gold == top.Gold && m.Silver == top.Silver && m.Bronze == top.Bronze)
+                .ToList();
+
+            return winners.Count == 1
+                ? winners
+                : winners.Select(m => new OverviewMedalistDto
+                {
+                    SwimmerId = m.SwimmerId,
+                    FirstName = m.FirstName,
+                    LastName = m.LastName,
+                    FirstNameEn = m.FirstNameEn,
+                    LastNameEn = m.LastNameEn,
+                    Club = m.Club,
+                    Gold = m.Gold,
+                    Silver = m.Silver,
+                    Bronze = m.Bronze,
+                    RelayMedals = m.RelayMedals,
+                    IsTie = true
+                }).ToList();
+        }
+
+        var topMedalists = BuildMedalists(null);
+        var topMedalistsMale = BuildMedalists("male");
+        var topMedalistsFemale = BuildMedalists("female");
 
         // High Point Award: лучший по СУММЕ очков в каждом (возраст × пол), раздельно ♂/♀
         // (design_handoff §High Point Award). Возраст = год соревнования − год рождения
@@ -683,9 +754,9 @@ public class ResultRepository : IResultRepository
             TopClubs = topClubs,
             TopClubsMen = topClubsMen,
             TopClubsWomen = topClubsWomen,
-            TopMedalist = topMedalist,
-            TopMedalistMale = topMedalistMale,
-            TopMedalistFemale = topMedalistFemale,
+            TopMedalists = topMedalists,
+            TopMedalistsMale = topMedalistsMale,
+            TopMedalistsFemale = topMedalistsFemale,
             HighPointAwards = highPointAwards,
             Records = newRecords
         };
@@ -1206,4 +1277,20 @@ public class ResultRepository : IResultRepository
         await _cache.SetAsync(key, dto, TimeSpan.FromMinutes(5));
         return dto;
     }
+
+    /// <summary>
+    /// Одна медаль в зачёте «Most decorated»: личная или эстафетная (у эстафетной строка
+    /// развёрнута на каждую ногу через RelayMembers). <paramref name="Gender"/> — пол самого
+    /// пловца, а не строки результата: эстафеты бывают смешанные.
+    /// </summary>
+    private sealed record MedalRow(
+        int SwimmerId,
+        string FirstName,
+        string LastName,
+        string FirstNameEn,
+        string LastNameEn,
+        string Club,
+        string? Gender,
+        int? Position,
+        bool IsRelay);
 }

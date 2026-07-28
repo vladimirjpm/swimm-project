@@ -628,7 +628,7 @@ public class ResultRepositoryTests
         Assert.Equal(0, overview.Summary.ClubCount);
         Assert.Empty(overview.Days);
         Assert.Null(overview.BestSwim);
-        Assert.Null(overview.TopMedalist);
+        Assert.Empty(overview.TopMedalists);
         Assert.Empty(overview.TopClubs);
         Assert.Empty(overview.Records);
     }
@@ -758,7 +758,7 @@ public class ResultRepositoryTests
         db.Results.AddRange(
             Row(s1.Id, 1), Row(s1.Id, 2),
             Row(s2.Id, 1), Row(s2.Id, 1),
-            // Эстафетная "медаль" — не считается.
+            // Эстафетная медаль: у relay нет RelayMembers → никому не достаётся.
             Row(s3.Id, 1, relayId: relay.Id),
             // TimeFail на 1-м месте — не считается.
             Row(s3.Id, 1, timeFail: true));
@@ -767,10 +767,13 @@ public class ResultRepositoryTests
 
         var overview = await repo.GetCompetitionOverviewAsync(new ResultFilter { CompetitionId = comp.Id });
 
-        Assert.NotNull(overview.TopMedalist);
-        Assert.Equal(s2.Id, overview.TopMedalist!.SwimmerId); // равенство медалей (2=2), больше золота
-        Assert.Equal(2, overview.TopMedalist.Gold);
-        Assert.Equal(0, overview.TopMedalist.Silver);
+        // Эстафетная медаль ТЕПЕРЬ засчитывается — но s3 в RelayMembers не заведён,
+        // а медаль принадлежит составу ног, не владельцу строки: у s3 медалей нет.
+        var top = Assert.Single(overview.TopMedalists);
+        Assert.Equal(s2.Id, top.SwimmerId); // 2 золота против 1 золота + 1 серебра у s1
+        Assert.Equal(2, top.Gold);
+        Assert.Equal(0, top.Silver);
+        Assert.False(top.IsTie);
     }
 
     [Fact]
