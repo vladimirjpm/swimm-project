@@ -12,7 +12,14 @@ namespace Swimm.Infrastructure.Repositories;
 /// сбрасывает кэш целиком. Эстафетные строки (RelayId != null) не редактируются: их состав
 /// живёт в RelayMembers, а переназначение пловца тут разорвало бы связь.
 /// </summary>
-public class ResultAdminRepository(SwimmDbContext db, ICacheService cache) : IResultAdminRepository
+/// <param name="recalc">
+/// Пересчёт объединённых мест соревнования: правка времени/дисквалификации меняет порядок
+/// в общем зачёте. Необязателен — null пропускает пересчёт (тесты).
+/// </param>
+public class ResultAdminRepository(
+    SwimmDbContext db,
+    ICacheService cache,
+    ICompetitionRecalculationService? recalc = null) : IResultAdminRepository
 {
     public async Task<ResultEditDto?> GetByIdAsync(long id, CancellationToken ct = default)
     {
@@ -109,6 +116,15 @@ public class ResultAdminRepository(SwimmDbContext db, ICacheService cache) : IRe
         catch (DbUpdateException ex)
         {
             return ResultSaveResult.Fail($"Не удалось сохранить: {ex.InnerException?.Message ?? ex.Message}");
+        }
+
+        // Объединённое место — производная от времени: исправили опечатку в протоколе, а
+        // порядок в общем зачёте дисциплины остался бы от старого значения. Правка уже
+        // сохранена, поэтому сбой пересчёта её не отменяет (аварийно — `--recalc-combined`).
+        if (recalc is not null)
+        {
+            try { await recalc.RecalculateCompetitionAsync(r.CompetitionId, ct); }
+            catch (Exception) { /* починка — прогоном CLI */ }
         }
 
         await cache.InvalidateAllAsync();

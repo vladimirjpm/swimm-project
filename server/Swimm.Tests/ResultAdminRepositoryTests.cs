@@ -28,6 +28,23 @@ public class ResultAdminRepositoryTests
 
     private static ResultAdminRepository Repo(SwimmDbContext db) => new(db, new NullCache());
 
+    /// <summary>Шпион пересчёта: сам расчёт использует ExecuteUpdate и на InMemory не работает,
+    /// поэтому проверяем факт вызова.</summary>
+    private sealed class RecalcSpy : ICompetitionRecalculationService
+    {
+        public List<int> Calls { get; } = [];
+        public bool Throw { get; init; }
+
+        public Task<int> RecalculateCompetitionAsync(int competitionId, CancellationToken ct = default)
+        {
+            Calls.Add(competitionId);
+            if (Throw) throw new InvalidOperationException("boom");
+            return Task.FromResult(2);
+        }
+
+        public Task<int> RecalculateAllCombinedAsync(CancellationToken ct = default) => Task.FromResult(0);
+    }
+
     /// <summary>Кладёт один индивидуальный результат, возвращает его Id + ключевые сущности.</summary>
     private static async Task<(long resultId, int swimmerId, int clubId)> SeedResult(
         SwimmDbContext db, int? timeMs = 62340)
@@ -185,5 +202,41 @@ public class ResultAdminRepositoryTests
             SwimmerId = swimmer.Id, ClubId = club.Id, Distance = "4x100", Gender = "male"
         });
         Assert.False(res.Success);
+    }
+
+    [Fact]
+    public async Task Update_TriggersCombinedRecalculation()
+    {
+        // Объединённое место — производная от времени: исправили опечатку в протоколе,
+        // а порядок в общем зачёте остался бы от старого значения.
+        await using var db = CreateDb(nameof(Update_TriggersCombinedRecalculation));
+        var (id, _, _) = await SeedResult(db);
+        var spy = new RecalcSpy();
+        var repo = new ResultAdminRepository(db, new NullCache(), spy);
+
+        var dto = (await repo.GetByIdAsync(id))!;
+        var input = BaseInput(dto);
+        input.TimeText = "01:01.00";
+        var res = await repo.UpdateAsync(id, input);
+
+        Assert.True(res.Success);
+        var compId = (await db.Results.AsNoTracking().FirstAsync(r => r.Id == id)).CompetitionId;
+        Assert.Equal([compId], spy.Calls);
+    }
+
+    [Fact]
+    public async Task Update_SurvivesRecalculationFailure()
+    {
+        await using var db = CreateDb(nameof(Update_SurvivesRecalculationFailure));
+        var (id, _, _) = await SeedResult(db);
+        var repo = new ResultAdminRepository(db, new NullCache(), new RecalcSpy { Throw = true });
+
+        var dto = (await repo.GetByIdAsync(id))!;
+        var input = BaseInput(dto);
+        input.TimeText = "01:02.00";
+        var res = await repo.UpdateAsync(id, input);
+
+        Assert.True(res.Success);
+        Assert.Equal(62000, (await db.Results.AsNoTracking().FirstAsync(r => r.Id == id)).TimeMillisecond);
     }
 }
