@@ -579,6 +579,23 @@
         return opts;
     }
 
+    // Правило почти всегда выбирают из существующих, поэтому «Авто» — повод переспросить:
+    // молча уехавший автоподбор потом всплывает расхождением очков. Не блокируем: правила
+    // может ещё не быть в БД (протокол приходит раньше регламента).
+    function confirmAutoRules() {
+        const missing = [];
+        if (!document.getElementById('rule-clubs')?.value) missing.push('«Клубные очки»');
+        if (!document.getElementById('rule-swimmers')?.value) missing.push('«High Point»');
+        if (missing.length === 0) return true;
+
+        return confirm(
+            `Правило ${missing.join(' и ')} не выбрано — соревнование получит автоподбор по дате и типу.
+
+` +
+            'Продолжить импорт?'
+        );
+    }
+
     function resetEventSelectAfterImport() {
         loadEvents();
         if (eventSelect.value === '__new__') {
@@ -723,6 +740,7 @@
 
     btnUpload.addEventListener('click', async () => {
         if (!selectedFile) return;
+        if (!confirmAutoRules()) return;
         btnUpload.disabled = true;
         progress.classList.remove('hidden');
         resultDiv.classList.add('hidden');
@@ -880,6 +898,7 @@
 
     btnImportPdf.addEventListener('click', async () => {
         if (!pdfPreviewId) return;
+        if (!confirmAutoRules()) return;
         btnImportPdf.disabled = true;
         progress.classList.remove('hidden');
         resultDiv.classList.add('hidden');
