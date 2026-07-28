@@ -82,6 +82,21 @@ public static class IsrOrgCompetitionParser
     private const string EnStylePattern =
         @"Freestyle|Backstroke|Breaststroke|Butterfly|Individual\s+Medley|Medley";
 
+    private static Regex? _headerEnCategoryInHE;
+    // Индивидуальный EN-заголовок, где правая часть — КАТЕГОРИЯ без возраста:
+    // "50m Freestyle - Men", "100m Butterfly - Women", "50m Freestyle - Men Para".
+    // HeaderRxENinHE такие не берёт — он требует возраст ("U17 Girls"), а у взрослых
+    // и Para его в протоколе просто нет. Из-за этого в Маккабиаде терялись 39 событий
+    // из 91: их строки прилипали к предыдущему событию и получали чужие стиль,
+    // дистанцию и пол (женская сотня баттерфляем уезжала в "100m Butterfly - U17 Boys",
+    // а Para-заплывы — в "4X100m Medley Relay - Men").
+    // Работает как ФОЛЛБЕК после HeaderRxENinHE, чтобы не менять разбор заголовков
+    // с возрастом. Стиль ограничен EnStylePattern — правая часть тут «любая», и без
+    // этого regex начал бы хватать обычные строки таблицы.
+    private static Regex HeaderEnCategoryInHE => _headerEnCategoryInHE ??= new Regex(
+        @"^(?<len>\d+)m?\s+(?<style>" + EnStylePattern + @")\s*-\s*(?<cat>[A-Za-z][A-Za-z0-9\s-]*)$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     private static Regex? _headerEnNoGenderInHE;
     private static Regex HeaderEnNoGenderInHE => _headerEnNoGenderInHE ??= new Regex(
         @"^(?<len>\d+)m?\s+(?<style>" + EnStylePattern + @")$",
@@ -953,6 +968,48 @@ public static class IsrOrgCompetitionParser
                         );
                         Log($"  -> NEW EVENT (EN-in-HE): {current.Event}, gender={genderNorm}");
                         continue;
+                    }
+
+                    // Тот же EN-заголовок, но категория без возраста ("- Men" / "- Women" /
+                    // "- Men Para"). Пол и возраст разбирает ParseEnCategory — она же служит
+                    // эстафетам и уже умеет Para (возраст "para", чтобы Men и Men Para не
+                    // схлопнулись в одно событие).
+                    var enCatHead = HeaderEnCategoryInHE.Match(raw);
+                    if (enCatHead.Success)
+                    {
+                        var (genderCat, ageCat) = ParseEnCategory(enCatHead.Groups["cat"].Value);
+                        if (genderCat != "none" || ageCat is "open" or "para")
+                        {
+                            var styleCat = HebrewTextHelper.NormalizeStyleName(
+                                enCatHead.Groups["style"].Value.Trim().ToLowerInvariant());
+
+                            Log($"  -> MATCH HeaderEN-category-in-HE: len={enCatHead.Groups["len"].Value}, " +
+                                $"style={styleCat}, gender={genderCat}, age={ageCat}");
+
+                            pendingEventLen = null;
+                            currentIsRelay = false;
+                            currentRelayLegs = 0;
+
+                            if (current != null) yield return current;
+
+                            var nextCat = i + 1 < lines.Count ? lines[i + 1].Trim() : string.Empty;
+                            var dmCat = Regex.Match(nextCat, @"\d{2}/\d{2}/\d{4}");
+
+                            current = new IsrOrgCompetitionResult(
+                                Competition: lines[0].Trim(),
+                                AgeGroup: ageCat,
+                                Date: dmCat.Success ? dmCat.Value : dat_relay,
+                                Event: raw,
+                                EventStyleName: styleCat,
+                                EventStyleLen: enCatHead.Groups["len"].Value,
+                                EventStyleGender: genderCat,
+                                EventStyleAge: ageCat,
+                                PoolType: "25m",
+                                Results: new List<IsrOrgResult>()
+                            );
+                            Log($"  -> NEW EVENT (EN-category-in-HE): {current.Event}, gender={genderCat}, age={ageCat}");
+                            continue;
+                        }
                     }
 
                     // Интернациональная эстафета Маккабиады: заголовок целиком на английском,

@@ -70,6 +70,51 @@ public class IsrOrgCompetitionParserMaccabiahRealPdfTests
         Assert.True(withNames >= 62, $"Expected at least 62/64 relay rows with reconstructed names, got {withNames}");
     }
 
+    /// <summary>
+    /// Регрессия: EN-заголовок, где правая часть — категория БЕЗ возраста
+    /// ("50m Freestyle - Men", "100m Butterfly - Women", "50m Freestyle - Men Para").
+    /// HeaderRxENinHE требует возраст ("U17 Girls"), которого у взрослых и Para в
+    /// протоколе нет, поэтому парсер видел лишь 52 события из 91: строки 39 потерянных
+    /// заплывов прилипали к предыдущему событию и получали чужие стиль, дистанцию и пол
+    /// (женская сотня баттерфляем уезжала в "100m Butterfly - U17 Boys", а Para-заплывы
+    /// Itsik Iaich — в "4X100m Medley Relay - Men", где 00:31.93 выглядело эстафетным
+    /// временем и порождало ложные рекорды). Разбирает их HeaderEnCategoryInHE
+    /// + ParseEnCategory.
+    /// </summary>
+    [Fact]
+    public void HeMode_AdultAndParaHeaders_BecomeTheirOwnEvents()
+    {
+        using var fs = File.OpenRead(PdfPath);
+        var comps = IsrOrgCompetitionParser.ParseCompetitions(fs, "he").ToList();
+
+        Assert.Equal(91, comps.Count);
+        Assert.Equal(915, comps.Sum(c => c.Results.Count));
+
+        // Para — отдельные события, не схлопнутые со взрослыми "- Men".
+        var para = comps.Where(c => c.Event.EndsWith("Men Para", StringComparison.OrdinalIgnoreCase)).ToList();
+        Assert.NotEmpty(para);
+        Assert.All(para, c => Assert.Equal("para", c.EventStyleAge));
+
+        var freePara50 = Assert.Single(comps, c => c.Event == "50m Freestyle - Men Para");
+        Assert.Equal("freestyle", freePara50.EventStyleName);
+        Assert.Equal("50", freePara50.EventStyleLen);
+        Assert.Equal("male", freePara50.EventStyleGender);
+        Assert.Contains(freePara50.Results, r => r.Time == "00:31.95" && r.LastName == "Iaich");
+
+        // Женские заплывы взрослых больше не попадают в мужские U17-события.
+        var fly100Women = Assert.Single(comps, c => c.Event == "100m Butterfly - Women");
+        Assert.Equal("female", fly100Women.EventStyleGender);
+        Assert.Contains(fly100Women.Results, r => r.LastName == "MOSHKOVITCH");
+
+        var wrongGender = comps
+            .Where(c => c.Event.Contains("Women", StringComparison.OrdinalIgnoreCase)
+                        || c.Event.Contains("Girls", StringComparison.OrdinalIgnoreCase))
+            .Where(c => c.EventStyleGender != "female")
+            .Select(c => c.Event)
+            .ToList();
+        Assert.True(wrongGender.Count == 0, "Женские события с чужим полом: " + string.Join(", ", wrongGender));
+    }
+
     private static string HePdfPath =>
         Path.Combine(AppContext.BaseDirectory, "Fixtures", "Parsing", "Maccabiah-2026_IL_HE.pdf");
 
