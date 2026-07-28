@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -179,6 +179,7 @@ public static class DependencyInjection
 
         // Deep-link выборки «здоровье данных» дашборда (T3b, docs/tasks/dashboard-deeplinks-lists-sonnet.md)
         services.AddScoped<IDataQualityService, DataQualityService>();
+        services.AddScoped<ISuspectResultService, SuspectResultService>();
 
         return services;
     }

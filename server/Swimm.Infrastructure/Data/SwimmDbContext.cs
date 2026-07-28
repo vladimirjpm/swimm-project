@@ -415,6 +415,12 @@ public class SwimmDbContext : DbContext
                 .HasForeignKey(r => r.CountryId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            // Помеченных строк единицы на сотни тысяч — частичный индекс, чтобы выборка
+            // «что подозрительно» не делала seq scan и не раздувала индекс пустыми ключами.
+            entity.HasIndex(r => r.SuspectReason)
+                .HasDatabaseName("IX_Results_SuspectReason")
+                .HasFilter("\"SuspectReason\" IS NOT NULL");
+
             entity.HasCheckConstraint("CK_Results_Heat_NonNegative", "\"Heat\" >= 0");
             entity.HasCheckConstraint("CK_Results_Lane_NonNegative", "\"Lane\" >= 0");
             entity.HasCheckConstraint("CK_Results_InternationalPoints_NonNegative", "\"InternationalPoints\" >= 0");

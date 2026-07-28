@@ -84,7 +84,8 @@
   }
 
   /* Затемнение под <dialog> подтверждения (::backdrop нельзя выразить утилитой в разметке). */
-  #admin-confirm::backdrop {
+  #admin-confirm::backdrop,
+  #quality-modal::backdrop {
     background: rgb(0 0 0 / 0.65);
   }
 }

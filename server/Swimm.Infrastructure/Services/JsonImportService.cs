@@ -805,6 +805,17 @@ public class JsonImportService : IImportService
         old.TimeFailNote = incoming.TimeFailNote;
         old.InternationalPoints = incoming.InternationalPoints;
         old.Note = incoming.Note;
+
+        // Пометки качества: АВТОМАТИЧЕСКУЮ сбрасываем — данные строки только что
+        // перезаписаны из файла, и прежний вердикт мог устареть; её вернёт следующий
+        // прогон «Проверить качество». РУЧНУЮ сохраняем: решение человека «эта строка
+        // врёт» — факт о данных, иначе после каждого переимпорта пришлось бы
+        // перепроверять всё заново (см. ISuspectResultService).
+        if (!old.SuspectIsManual)
+        {
+            old.SuspectReason = null;
+            old.SuspectNote = null;
+        }
     }
 
     /// <summary>

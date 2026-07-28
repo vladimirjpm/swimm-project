@@ -228,6 +228,12 @@ else
                             <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(u.Site != null ? System.Net.WebUtility.HtmlEncode(u.Site.Venue ?? "—") + LangBadges(u.Site.Languages) : "—")</td>
                             <td class="text-right tabular-nums">@ev.TotalResultCount</td>
                             <td class="text-right whitespace-nowrap" onclick="event.stopPropagation()">
+                                @if (ev.TotalResultCount > 0)
+                                {
+                                    <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 quality-btn"
+                                            data-event-id="@ev.EventId" data-title="@ev.EventName"
+                                            title="Проверить достоверность результатов">Качество</button>
+                                }
                                 @Html.Raw(u.Site != null ? SiteActions(u.Site, imported: true) : "")
                                 <form method="post" asp-page-handler="DeleteEvent"
                                       asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
@@ -303,6 +309,12 @@ else
                             <td class="text-right tabular-nums">@c.ResultCount</td>
                             <td class="text-right whitespace-nowrap">
                                 <a href="/Admin/Competitions/Edit?id=@c.Id" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
+                                @if (c.ResultCount > 0)
+                                {
+                                    <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 quality-btn"
+                                            data-competition-id="@c.Id" data-title="@c.Name"
+                                            title="Проверить достоверность результатов">Качество</button>
+                                }
                                 @Html.Raw(u.Site != null ? SiteActions(u.Site, imported: true) : "")
                                 <form method="post" asp-page-handler="Delete"
                                       asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
@@ -385,6 +397,34 @@ else
         <button id="btn-cancel-preview" class="cursor-pointer rounded-md border border-admin-border px-4 py-2 text-[13px] text-admin-text-muted">Отмена</button>
     </div>
 </div>
+
+@* Качество результатов: список помеченных строк + прогон проверок. Пометка НЕ скрывает
+   и НЕ удаляет заплыв — он остаётся в протоколе, но выпадает из детекции рекордов. *@
+<dialog id="quality-modal"
+        class="m-auto w-[min(56rem,calc(100vw-2rem))] rounded-lg border border-admin-border bg-admin-surface p-0 text-admin-text shadow-xl shadow-black/50">
+    <div class="p-5">
+        <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+                <h2 class="text-base font-semibold text-white">Качество результатов</h2>
+                <div id="quality-title" class="mt-0.5 truncate text-sm text-admin-text-muted"></div>
+            </div>
+            <button type="button" id="quality-close" class="admin-btn admin-btn-ghost py-1 px-2.5">Закрыть</button>
+        </div>
+
+        <p class="mt-3 text-[12px] text-admin-text-muted">
+            Проверка ищет ошибки самого протокола — то, что не лечится переимпортом.
+            Помеченный заплыв остаётся в результатах, но не участвует в рекордах.
+            Ручные решения переживают переимпорт, автоматические пересчитываются заново.
+        </p>
+
+        <div class="mt-3 flex items-center gap-3">
+            <button type="button" id="quality-scan" class="admin-btn admin-btn-primary py-1 px-3">Проверить</button>
+            <span id="quality-stats" class="text-[12px] text-admin-text-muted"></span>
+        </div>
+
+        <div id="quality-body" class="mt-4 max-h-[60vh] overflow-y-auto"></div>
+    </div>
+</dialog>
 
 @section Scripts {
     <script>
@@ -607,6 +647,126 @@ else
                     document.getElementById('preview-card').classList.add('hidden');
                 } catch (e) { toast('Ошибка импорта: ' + e.message, 6000); }
             });
+        })();
+
+        // ── Проверка качества результатов (SuspectResultsAdminController) ────────
+        // Ищет ошибки САМОГО источника — то, что парсером не лечится: протокол напечатан
+        // так, как напечатан (эталон — 00:32.59 на 100 м баттерфляем у Маккабиады-2026).
+        // Помеченная строка остаётся в результатах, но выпадает из детекции рекордов.
+        (function () {
+            const API = '/api/admin/suspect-results';
+            const dlg = document.getElementById('quality-modal');
+            const body = document.getElementById('quality-body');
+            const titleEl = document.getElementById('quality-title');
+            const statsEl = document.getElementById('quality-stats');
+            const scanBtn = document.getElementById('quality-scan');
+            let scope = null; // { eventId } | { competitionId }
+
+            const REASONS = {
+                time_vs_distance: 'Быстрее мирового рекорда',
+                relay_time_in_individual: 'Время отрезка, не дистанции',
+                time_outlier: 'Выброс по времени',
+                gender_mismatch: 'Пол не совпадает',
+                duplicate_swim: 'Повтор дисциплины за день',
+                manual: 'Помечено вручную'
+            };
+
+            function esc(s) {
+                return String(s ?? '').replace(/[&<>"']/g, c =>
+                    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            }
+
+            async function api(url, opts = {}) {
+                opts.headers = { 'X-XSRF-TOKEN': _csrfToken, ...(opts.headers ?? {}) };
+                const res = await fetch(url, { credentials: 'same-origin', ...opts });
+                let data = null;
+                try { data = await res.json(); } catch { /* пустое тело */ }
+                if (!res.ok) throw new Error(data?.error ?? `${res.status} ${res.statusText}`);
+                return data;
+            }
+
+            const qs = () => scope.eventId
+                ? `eventId=${scope.eventId}`
+                : `competitionId=${scope.competitionId}`;
+
+            function render(rows) {
+                if (!rows.length) {
+                    body.innerHTML = '<div class="text-sm text-admin-text-muted py-6 text-center">'
+                        + 'Подозрительных результатов нет.</div>';
+                    return;
+                }
+                body.innerHTML = `
+                    <table class="admin-table w-full text-sm">
+                        <thead><tr>
+                            <th>Пловец</th><th>Дисциплина</th><th class="text-right">Время</th>
+                            <th>Причина</th><th></th>
+                        </tr></thead>
+                        <tbody>${rows.map(r => `
+                            <tr>
+                                <td>
+                                    <div class="font-medium">${esc(r.swimmerName)}</div>
+                                    <div class="text-[11px] text-admin-text-muted">${esc(r.club)}</div>
+                                </td>
+                                <td class="whitespace-nowrap">${esc(r.distance)} ${esc(r.styleName)}
+                                    <span class="text-admin-text-muted">· ${esc(r.gender)}</span></td>
+                                <td class="text-right tabular-nums font-semibold">${esc(r.time)}</td>
+                                <td>
+                                    <span class="inline-block py-0.5 px-1.5 rounded text-[10px] font-semibold
+                                        ${r.isManual ? 'bg-admin-accent/15 text-admin-accent' : 'bg-admin-warning/15 text-admin-warning'}">
+                                        ${esc(REASONS[r.reason] ?? r.reason)}${r.isManual ? ' (вручную)' : ''}</span>
+                                    <div class="text-[11px] text-admin-text-muted mt-0.5">${esc(r.note ?? '')}</div>
+                                </td>
+                                <td class="text-right whitespace-nowrap">
+                                    <button type="button" class="admin-btn admin-btn-ghost py-1 px-2 quality-clear"
+                                            data-id="${r.resultId}" title="Строка в порядке — снять пометку">Снять</button>
+                                </td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>`;
+            }
+
+            body.addEventListener('click', async (e) => {
+                const btn = e.target.closest('.quality-clear');
+                if (!btn) return;
+                btn.disabled = true;
+                try {
+                    await api(`${API}/${btn.dataset.id}/manual`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ flagged: false, note: null })
+                    });
+                    render(await api(`${API}?${qs()}`));
+                    toast('Пометка снята — повторная проверка её не вернёт');
+                } catch (err) { btn.disabled = false; toast('Ошибка: ' + err.message, 6000); }
+            });
+
+            scanBtn.addEventListener('click', async () => {
+                scanBtn.disabled = true;
+                const prev = scanBtn.textContent;
+                scanBtn.textContent = 'Проверяю…';
+                try {
+                    const r = await api(`${API}/scan?${qs()}`, { method: 'POST' });
+                    statsEl.textContent = `просмотрено ${r.scanned}, помечено ${r.flagged}, `
+                        + `снято ${r.cleared}, ручных решений сохранено ${r.manualKept}`;
+                    render(r.rows);
+                } catch (err) { toast('Ошибка проверки: ' + err.message, 6000); }
+                finally { scanBtn.disabled = false; scanBtn.textContent = prev; }
+            });
+
+            document.querySelectorAll('.quality-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    scope = btn.dataset.eventId
+                        ? { eventId: Number(btn.dataset.eventId) }
+                        : { competitionId: Number(btn.dataset.competitionId) };
+                    titleEl.textContent = btn.dataset.title || 'Качество результатов';
+                    statsEl.textContent = '';
+                    body.innerHTML = '<div class="text-sm text-admin-text-muted py-6 text-center">Загружаю…</div>';
+                    dlg.showModal();
+                    try { render(await api(`${API}?${qs()}`)); }
+                    catch (err) { body.innerHTML = `<div class="text-sm text-admin-danger py-6 text-center">${esc(err.message)}</div>`; }
+                });
+            });
+
+            document.getElementById('quality-close').addEventListener('click', () => dlg.close());
         })();
     </script>
 }

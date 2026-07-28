@@ -536,8 +536,13 @@ public class ResultRepository : IResultRepository
         // аналог клиентского isRecordTime. Records ~1.7К строк, кэш 10 мин; кандидаты —
         // минимальная проекция уже отфильтрованного источника.
         var records = await GetIsraelRecordsAsync();
+        // SuspectReason != null — строка помечена как недостоверная (ошибка источника,
+        // напр. 00:32.59 на 100 м баттерфляем в протоколе Маккабиады). Такие в рекорды
+        // не берём: иначе они «бьют» национальный рекорд. Из результатов соревнования
+        // при этом НЕ убираются — заплыв был, время в протоколе есть.
         var candidateRows = await query
-            .Where(r => r.RelayId == null && !r.TimeFail && r.TimeMillisecond != null)
+            .Where(r => r.RelayId == null && !r.TimeFail && r.TimeMillisecond != null
+                        && r.SuspectReason == null)
             .Select(r => new RecordCandidateRow(
                 r.Id, r.SwimmerId, r.Swimmer.FirstName, r.Swimmer.LastName, r.Club.Name,
                 r.Style.Name, r.Distance, r.Gender, r.Competition.PoolType,
