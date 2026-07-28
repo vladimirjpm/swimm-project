@@ -67,15 +67,25 @@ public class CompetitionRecordsDetectorTests
     }
 
     [Fact]
-    public void OpenAndNationalKeys_Matched()
+    public void OpenKey_MatchedRegardlessOfAge()
     {
-        // open (AgeKey="") и национальный ключ (AgeKey="ISR") проверяются независимо от возраста.
-        var records = new[] { Rec("open", "", "41.00"), Rec("age", "ISR", "42.00") };
+        // open (AgeKey="") проверяется независимо от возраста — там и живёт национальный рекорд.
+        var records = new[] { Rec("open", "", "41.00") };
         var result = CompetitionRecordsDetector.Detect(records, [Row(40_000, birthYear: null)]);
 
-        Assert.Equal(2, result.Count);
-        Assert.Contains(result, r => r.Kind == "Open record");
-        Assert.Contains(result, r => r.Kind == "National record");
+        var dto = Assert.Single(result);
+        Assert.Equal("Open record", dto.Kind);
+    }
+
+    [Fact]
+    public void LegacyNationalKey_Ignored()
+    {
+        // Ось ("age","ISR") — набор legacy-RecordsSeeder, который импортом не обновлялся и
+        // протух вместе с ошибками старого парсера: заплыв 41.93 на 50 спине «бил» там
+        // национальный 53.60 (время стометровки, заехавшее в полтинник). Ось убрана —
+        // такие записи, даже если сид их воскресит, больше не дают рекордов.
+        var records = new[] { Rec("age", "ISR", "42.00") };
+        Assert.Empty(CompetitionRecordsDetector.Detect(records, [Row(40_000, birthYear: null)]));
     }
 
     [Fact]

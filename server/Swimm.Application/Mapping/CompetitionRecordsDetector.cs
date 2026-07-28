@@ -92,8 +92,13 @@ public static class CompetitionRecordsDetector
     /// <summary>Категории/AgeKey, по которым заплыв может побить рекорд.</summary>
     private static IEnumerable<(string Category, string AgeKey)> CandidateKeys(RecordCandidateRow row)
     {
+        // Национальный рекорд живёт ровно в одном месте — category="open" (туда его кладёт
+        // IsrOrgAgeRecordsSourceProvider для строк с Note="National Record").
+        // Ось ("age","ISR") была у legacy-RecordsSeeder и импортом НЕ обновлялась: набор
+        // протух вместе с ошибками старого парсера и давал ложные рекорды (заплыв 41.93 на
+        // 50 спине бил «национальный» 53.60 — время стометровки, заехавшее в полтинник).
+        // Данные вычищены, ось убрана, чтобы прогон сида не воскресил ловушку.
         yield return ("open", "");
-        yield return ("age", "ISR"); // национальный ключ внутри age-таблицы (сид isr.org.il)
 
         if (row.BirthYear is null) yield break;
         var age = row.CompetitionDate.Year - row.BirthYear.Value;
@@ -115,7 +120,6 @@ public static class CompetitionRecordsDetector
     {
         "open" => "Open record",
         "masters" => $"Masters {rec.AgeKey}",
-        "age" when rec.AgeKey == "ISR" => "National record",
         "age" => $"Age {rec.AgeKey} record",
         _ => rec.Category
     };
