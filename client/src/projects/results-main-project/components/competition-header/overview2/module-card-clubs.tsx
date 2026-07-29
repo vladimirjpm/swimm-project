@@ -1,7 +1,7 @@
 import React from 'react';
 import type { CompetitionOverview, OverviewClub } from '../types';
 import { GENDER_CIRCLE } from '../overview-shared';
-import { initials } from './module-defs';
+import UI_ClubIcon from '../../../../components/mix/club-icon/club-icon';
 
 // Карточка модуля Top clubs (9d): слева топ-5 + ♂/♀ топ-3, справа витрина клуба-чемпиона.
 // Реализация по спеке dc.html секция 9d (sc-if is9dClubs, композиция 1:1).
@@ -107,7 +107,11 @@ export default function ModuleCardClubs({ overview, onOpenTab, onOpenClub }: Pro
             className="flex h-24 w-24 flex-none items-center justify-center rounded-full"
             style={{ background: 'var(--m-surface)', border: '2px solid color-mix(in srgb, var(--m) 30%, transparent)', boxShadow: '0 6px 18px color-mix(in srgb, var(--m) 14%, transparent)' }}
           >
-            <span className="ov2-logo h-[76px] w-[76px] text-[15px]">{initials(leader.club)}</span>
+            {/* Лого клуба-чемпиона; UI_ClubIcon сам падает на no-club.png, полосатый
+                плейсхолдер с инициалами остаётся подложкой. */}
+            <span className="ov2-logo h-[76px] w-[76px] text-[15px]">
+              <UI_ClubIcon clubName={leader.club} iconWidth="full" />
+            </span>
           </span>
           <span dir="auto" className="text-[17px] font-black leading-[1.25] text-wrap-pretty">{leader.club}</span>
           <span className="flex items-baseline justify-center gap-1.5">
