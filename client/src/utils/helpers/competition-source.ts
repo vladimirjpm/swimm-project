@@ -10,7 +10,7 @@ export type CompetitionSource = {
   date_end?: string | null;
   pool_type: string;
   /** Канонический таб; null — только «All» + кастомные табы по categories. */
-  category: 'young8_11' | 'junior' | 'masters' | null;
+  category: 'young8_11' | 'junior' | 'adults' | 'masters' | null;
   /** Полное членство — сырые Category.Key из БД (включая кастомные, напр. result-maccabiah). */
   categories?: string[];
   status: 'live' | 'upcoming' | 'done';

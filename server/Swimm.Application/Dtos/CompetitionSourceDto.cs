@@ -39,7 +39,8 @@ public sealed class CompetitionSourceDto
     [JsonPropertyName("show_combine_all_results")]
     public bool ShowCombineAllResults { get; init; }
 
-    /// <summary>Канонический таб селектора: "young8_11" | "junior" | "masters" | null.
+    /// <summary>Канонический таб селектора: "young8_11" (Kids) | "junior" (Youth) |
+    /// "adults" (Juniors/בוגרים) | "masters" | null.
     /// Из реального членства (CategoryCompetitions): masters (is_masters/results-masters) >
     /// results-youth-team > results-junior-results/results-main. null — ни в одной из
     /// канонических (кастомная категория или без категории): клиент показывает такое

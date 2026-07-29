@@ -960,8 +960,8 @@ public class ResultRepository : IResultRepository
 
         // Категория для селектора — из РЕАЛЬНОГО членства (CategoryCompetitions, те же
         // чекбоксы, что в админке), а не эвристики по возрасту: соревнование может быть
-        // одновременно в Youth Results и Junior Results, поэтому приоритет
-        // masters > youth-team (young8_11) > junior-results/main (junior).
+        // в нескольких категориях сразу, поэтому приоритет
+        // masters > youth-team (Kids) > junior-results (Youth) > main (Juniors/בוגרים).
         var categoryKeysByCompetition = await _db.CategoryCompetitions.AsNoTracking()
             .Select(cc => new { cc.CompetitionId, cc.Category.Key })
             .ToListAsync();
@@ -987,10 +987,14 @@ public class ResultRepository : IResultRepository
         // result-maccabiah или вовсе без категории): клиент покажет его в «All» и в табах
         // кастомных категорий по списку Categories, но НЕ в Junior. Раньше здесь был
         // фоллбек «всё прочее = junior», из-за которого в Junior падала вся синтетика.
+        // Канонические ключи табов исторические и с подписями НЕ совпадают (ступени
+        // переименованы 2026-07-28): young8_11 = «Kids», junior = «Youth», adults = «Juniors».
+        // Ключи в URL (?category=) и в закладках, поэтому не переименовывались.
         static string? CategoryFor(bool isMasters, HashSet<string>? keys) =>
             isMasters || keys?.Contains("results-masters") == true ? "masters"
             : keys?.Contains("results-youth-team") == true ? "young8_11"
-            : keys?.Contains("results-junior-results") == true || keys?.Contains("results-main") == true ? "junior"
+            : keys?.Contains("results-junior-results") == true ? "junior"
+            : keys?.Contains("results-main") == true ? "adults"
             : null;
 
         // Полное членство (сырые Category.Key) — для табов кастомных категорий на клиенте.

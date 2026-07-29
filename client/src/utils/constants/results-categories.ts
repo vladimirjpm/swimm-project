@@ -34,6 +34,14 @@ export const RESULTS_CATEGORIES: ResultsCategory[] = [
     competitionTheme: 'competition-blue',
   },
   {
+    // בוגרים (взрослые). Ключ 'adults', а не 'juniors': тот отличался бы от соседнего
+    // 'junior' одной буквой, и опечатка в URL молча уводила бы на другую категорию.
+    key: 'adults',
+    label: 'Juniors',
+    title: 'Juniors Results',
+    competitionTheme: 'competition-blue',
+  },
+  {
     key: 'masters',
     label: 'Masters',
     title: 'Masters Results',

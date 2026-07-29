@@ -35,10 +35,11 @@ export default class CategoryHelper {
   private static readonly CANONICAL_TO_DB_KEY: Record<string, string> = {
     young8_11: 'results-youth-team',
     junior: 'results-junior-results',
+    adults: 'results-main',
     masters: 'results-masters',
   };
 
-  /** Системные ключи БД, уже покрытые статичными табами (results-main живёт под 'junior').
+  /** Системные ключи БД, уже покрытые статичными табами (results-main — таб 'adults').
    *  Всё, чего здесь нет, — кастомная категория (result-maccabiah и т.п.): отдельный таб. */
   static readonly SYSTEM_DB_KEYS: ReadonlySet<string> = new Set([
     'results-main',
