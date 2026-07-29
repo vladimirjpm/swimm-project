@@ -100,6 +100,15 @@
   --theme-personal-border: rgba(212, 175, 55, 0.45);
   --theme-personal-accent: #8a6d1a;            /* бейджи, стрелки, PB */
   --theme-personal-badge-bg: rgba(212, 175, 55, 0.18);
+  /* Плитка соревнования 11c (design_handoff_competition_overview3): живёт на --theme-primary,
+     поэтому корпус/буква — производные от парного --theme-mode-accent-text, а полоса и лента
+     возраста — от surface/primary. Перекрасить плитку per-theme = поправить эти 6 токенов. */
+  --theme-comp-tile-bg: color-mix(in srgb, var(--theme-mode-accent-text) 20%, transparent);
+  --theme-comp-tile-border: color-mix(in srgb, var(--theme-mode-accent-text) 35%, transparent);
+  --theme-comp-tile-letter: var(--theme-mode-accent-text);
+  --theme-comp-tile-strip-bg: color-mix(in srgb, var(--theme-mode-surface) 92%, transparent);
+  --theme-comp-tile-age-bg: var(--theme-mode-surface);
+  --theme-comp-tile-age-text: var(--theme-primary);
   /* Статусный цвет LIVE: зависит от режима, НЕ от контекста Training/Competition
      (см. design_handoff_category_selector/README.md) */
   --status-live: #148253;
@@ -146,6 +155,17 @@
   --theme-personal-border: rgba(212, 175, 55, 0.4);
   --theme-personal-accent: #e3c15c;
   --theme-personal-badge-bg: rgba(212, 175, 55, 0.16);
+  /* Плитка соревнования в dark: surface здесь тёмный, а плитка лежит на насыщенном
+     --theme-primary — полоса и лента возраста строятся от светлого --theme-mode-accent-text,
+     иначе тёмная лента с тёмно-синим текстом (пара primary на surface) нечитаема. */
+  --theme-comp-tile-bg: color-mix(in srgb, var(--theme-mode-accent-text) 16%, transparent);
+  --theme-comp-tile-border: color-mix(in srgb, var(--theme-mode-accent-text) 40%, transparent);
+  --theme-comp-tile-letter: var(--theme-mode-accent-text);
+  --theme-comp-tile-strip-bg: color-mix(in srgb, var(--theme-mode-accent-text) 14%, transparent);
+  /* Лента возраста — почти сплошная светлая подложка + primary-текст: полупрозрачная
+     заливка поверх primary давала белым по средне-синему всего ~3.4:1. */
+  --theme-comp-tile-age-bg: color-mix(in srgb, var(--theme-mode-accent-text) 88%, transparent);
+  --theme-comp-tile-age-text: var(--theme-primary);
   --status-live: #3ddc97;
   --status-live-bg: rgba(61, 220, 151, 0.10);
   --status-live-border: rgba(61, 220, 151, 0.45);

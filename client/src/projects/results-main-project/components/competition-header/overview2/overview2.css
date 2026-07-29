@@ -111,6 +111,9 @@
   overflow: hidden;
 }
 .ov2-tile[aria-selected="true"] .ov2-tile__medal.ov2-logo { background: var(--m-solid); color: var(--m-on-solid); }
+/* Реальный логотип клуба заполняет круг целиком (handoff v3: круг фикс. размера, cover) */
+.ov2-logo > div, .ov2-logo img { width: 100%; height: 100%; }
+.ov2-logo img { object-fit: cover; }
 
 /* ---------- Большая карточка модуля ---------- */
 .ov2-card {

@@ -10,6 +10,7 @@ import ModuleCardChampions from './module-card-champions';
 import ModuleCardHpa from './module-card-hpa';
 import ModuleCardMedia from './module-card-media';
 import ModuleCardFavorites from './module-card-favorites';
+import UI_ClubIcon from '../../../../components/mix/club-icon/club-icon';
 import './overview2.css';
 
 // Таб Overview 2 (design_handoff_competition_overview2, вариант 9d десктоп + 9f мобайл):
@@ -115,7 +116,11 @@ export default function CompetitionOverview2({
     medal: React.ReactNode; medalIsLogo?: boolean; name: React.ReactNode; sub?: React.ReactNode;
   }> = {
     clubs: {
-      medal: leaderClub ? initials(leaderClub.club) : '—',
+      // Лого клуба-лидера кругом (handoff v3): UI_ClubIcon сам падает на no-club.png,
+      // без клуба остаётся полосатый плейсхолдер с инициалами.
+      medal: leaderClub
+        ? <UI_ClubIcon clubName={leaderClub.club} iconWidth="full" />
+        : '—',
       medalIsLogo: true,
       name: leaderClub?.club ?? '—',
       sub: leaderClub ? `${leaderClub.points} · ${overview.summary.club_count} clubs` : undefined,

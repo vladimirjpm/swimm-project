@@ -52,5 +52,54 @@ export const monthLabel = (src: CompetitionSource): string => {
   return d ? `${MONTHS_FULL[d.getMonth()]} ${d.getFullYear()}` : '';
 };
 
+// --- Плитка соревнования (design_handoff_competition_overview3, вариант 11c) ---
+// Данных для плитки в /api/competitions нет — выводим эвристикой из категории, даты и
+// названия. Слот, который не удалось определить, НЕ рендерится (см. COMPETITION-TILE.md).
+
+export type CompetitionTileData = {
+  /** 'K' — детские ступени, 'M' — masters, '' — группа не определена. */
+  letter: 'K' | 'M' | '';
+  /** Возрастная лента: '8-11' | '11-14'; null — ленты нет. */
+  ageGroup: string | null;
+  /** '❄️' зима / '☀️' лето; null — сезон не определён. */
+  season: '❄️' | '☀️' | null;
+  /** Тип соревнования = чемпионат → кубок в полосе. */
+  isChampionship: boolean;
+};
+
+/** Возрастная лента по канонической категории: только детские ступени. */
+const AGE_GROUP_BY_CATEGORY: Record<string, string> = {
+  young8_11: '8-11',
+  junior: '11-14',
+};
+
+// Слово-маркер важнее даты: «Winter Championship» в апреле — всё-таки зимний чемпионат.
+const WINTER_RX = /winter|חורף/i;
+const SUMMER_RX = /summer|קיץ/i;
+const CHAMPIONSHIP_RX = /championship|champ\b|אליפות/i;
+
+export function competitionTileData(src: CompetitionSource | undefined | null): CompetitionTileData {
+  const name = src?.name ?? '';
+  const category = src?.category ?? null;
+
+  let season: CompetitionTileData['season'] = null;
+  if (WINTER_RX.test(name)) season = '❄️';
+  else if (SUMMER_RX.test(name)) season = '☀️';
+  else {
+    const d = src ? parseDate(src.date) : null;
+    if (d) {
+      const m = d.getMonth() + 1; // 1..12
+      season = m >= 11 || m <= 3 ? '❄️' : '☀️';
+    }
+  }
+
+  return {
+    letter: category === 'masters' ? 'M' : category ? 'K' : '',
+    ageGroup: category ? AGE_GROUP_BY_CATEGORY[category] ?? null : null,
+    season,
+    isChampionship: CHAMPIONSHIP_RX.test(name),
+  };
+}
+
 export const sourceUrlParam = (src: CompetitionSource): [string, string] =>
   src.kind === 'event' ? ['eventId', String(src.id)] : ['competitionId', String(src.id)];
