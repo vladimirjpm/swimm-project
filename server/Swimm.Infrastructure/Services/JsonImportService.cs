@@ -17,15 +17,23 @@ namespace Swimm.Infrastructure.Services;
 public class JsonImportService : IImportService
 {
     private readonly SwimmDbContext _db;
+    private readonly ICompetitionRecalculationService? _recalc;
     private readonly ICacheService _cache;
 
     private static readonly string[] ClearableTables =
         ["Results", "GalleryItems", "Galleries", "Relays", "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "CompetitionEvents", "Countries"];
 
-    public JsonImportService(SwimmDbContext db, ICacheService cache)
+    /// <param name="recalc">
+    /// Пересчёт материализованных величин соревнования (объединённые места). Необязателен:
+    /// null — пересчёт пропускается. Так тесты импорта, которым он не нужен, продолжают
+    /// конструировать сервис двумя аргументами; в приложении его подставляет DI.
+    /// </param>
+    public JsonImportService(SwimmDbContext db, ICacheService cache,
+        ICompetitionRecalculationService? recalc = null)
     {
         _db    = db;
         _cache = cache;
+        _recalc = recalc;
     }
 
     public string[] GetClearableTables() => ClearableTables;
@@ -285,7 +293,11 @@ public class JsonImportService : IImportService
                         ShowCombineAllResults = showCombine,
                         EventId = targetEvent?.Id,
                         SubName = targetEvent != null ? (item.Competition ?? string.Empty) : null,
-                        DayNumber = targetEvent != null ? nextDayNumber++ : null
+                        DayNumber = targetEvent != null ? nextDayNumber++ : null,
+                        // Э5: правила очков из формы импорта. null = «Авто» (подбор по дате
+                        // и типу). Ставится каждому дню — правило живёт у соревнования, не у события.
+                        PointRuleClubsId = eventOptions?.PointRuleClubsId,
+                        PointRuleSwimmersId = eventOptions?.PointRuleSwimmersId
                     };
                     _db.Competitions.Add(competition);
                     await _db.SaveChangesAsync();
@@ -523,6 +535,7 @@ public class JsonImportService : IImportService
                     Gender = item.EventStyleGender ?? string.Empty,
                     AgeGroup = item.AgeGroup ?? string.Empty,
                     EventStyleAge = item.EventStyleAge ?? string.Empty,
+                    EventCategory = string.IsNullOrWhiteSpace(item.EventCategory) ? null : item.EventCategory,
                     Position = item.Position,
                     PositionAgeGroup = item.PositionAgeGroup,
                     Heat = item.Heat ?? 0,
@@ -734,6 +747,38 @@ public class JsonImportService : IImportService
         }
 
         await tx.CommitAsync();
+
+        // Объединённые места материализованы в строках результатов, а импорт их меняет:
+        // без пересчёта тоггл «Combine All Results» показал бы пустоту у свежих соревнований
+        // (docs/points-rules-per-competition-plan.md §3.4 — главный риск материализации).
+        // Считается по СОБЫТИЮ целиком, поэтому одного дня многодневки достаточно.
+        var recalculatedRows = 0;
+        if (_recalc is not null && touchedCompetitionKeys.Count > 0)
+        {
+            var touchedIds = touchedCompetitionKeys
+                .Select(k => competitionCache[k].Id)
+                .Distinct()
+                .ToList();
+
+            // Импорт уже закоммичен — упасть на пересчёте нельзя, иначе загруженные результаты
+            // откатятся из-за производной величины. Ошибку показываем в логе импорта:
+            // починить можно прогоном `dotnet run -- --recalc-combined`.
+            try
+            {
+                foreach (var compId in touchedIds)
+                    recalculatedRows += await _recalc.RecalculateCompetitionAsync(compId);
+
+                if (recalculatedRows > 0)
+                    diagnosticLog.Add($"Combine All Results: пересчитано строк — {recalculatedRows}");
+            }
+            catch (Exception ex)
+            {
+                diagnosticLog.Add(
+                    $"Combine All Results: пересчёт не удался ({ex.GetType().Name}: {ex.Message}). " +
+                    "Импорт сохранён; выполните `dotnet run -- --recalc-combined`.");
+            }
+        }
+
         await _cache.InvalidateAllAsync();
 
         // insertedCount — реально вставленные строки resultBatch (после того как сматченные
@@ -796,6 +841,7 @@ public class JsonImportService : IImportService
         old.CompetitionDate = incoming.CompetitionDate;
         old.AgeGroup = incoming.AgeGroup;
         old.EventStyleAge = incoming.EventStyleAge;
+        old.EventCategory = incoming.EventCategory;
         old.Position = incoming.Position;
         old.PositionAgeGroup = incoming.PositionAgeGroup;
         old.TimeMillisecond = incoming.TimeMillisecond;
@@ -805,6 +851,17 @@ public class JsonImportService : IImportService
         old.TimeFailNote = incoming.TimeFailNote;
         old.InternationalPoints = incoming.InternationalPoints;
         old.Note = incoming.Note;
+
+        // Пометки качества: АВТОМАТИЧЕСКУЮ сбрасываем — данные строки только что
+        // перезаписаны из файла, и прежний вердикт мог устареть; её вернёт следующий
+        // прогон «Проверить качество». РУЧНУЮ сохраняем: решение человека «эта строка
+        // врёт» — факт о данных, иначе после каждого переимпорта пришлось бы
+        // перепроверять всё заново (см. ISuspectResultService).
+        if (!old.SuspectIsManual)
+        {
+            old.SuspectReason = null;
+            old.SuspectNote = null;
+        }
     }
 
     /// <summary>
@@ -1585,6 +1642,11 @@ public class ResultJsonItem
 
     [JsonPropertyName("event_style_age")]
     public string? EventStyleAge { get; set; }
+
+    /// <summary>Категория заплыва из заголовка протокола: open / para / mix / "17" / "25-29".
+    /// В отличие от age_group и event_style_age НЕ производна от года рождения пловца.</summary>
+    [JsonPropertyName("event_category")]
+    public string? EventCategory { get; set; }
 
     [JsonPropertyName("pool_type")]
     public string? PoolType { get; set; }

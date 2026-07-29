@@ -9,8 +9,12 @@ namespace Swimm.Application.Abstractions;
 /// </summary>
 public interface ICompetitionDiscoveryProvider
 {
-    /// <summary>Список соревнований (competitions.asp). finished=true — завершённые, false — предстоящие.</summary>
-    Task<IReadOnlyList<DiscoveredListItem>> FetchListAsync(bool finished, CancellationToken ct = default);
+    /// <summary>
+    /// Список соревнований (competitions.asp). finished=true — завершённые, false — предстоящие.
+    /// year — сезон сайта (cYear); null = текущий.
+    /// </summary>
+    Task<IReadOnlyList<DiscoveredListItem>> FetchListAsync(
+        bool finished, int? year = null, CancellationToken ct = default);
 
     /// <summary>Детальная страница (comp.asp?compID=): площадка, loglig-id результатов.</summary>
     Task<DiscoveredDetails> FetchDetailsAsync(int orgCompId, CancellationToken ct = default);

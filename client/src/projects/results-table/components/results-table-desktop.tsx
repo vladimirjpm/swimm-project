@@ -89,7 +89,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
             />
           )}
         </div>
-        {showAge && <UI_AgeLabel age={res.event_style_age} isMasters={isMastersResult} ageGroup={res.age_group} className="items-center text-[var(--theme-mode-text-muted)] [&>div]:text-[9px] [&>div]:mt-0 [&>div]:font-bold [&_span]:text-[9px] [&_span]:font-bold" />}
+        {showAge && <UI_AgeLabel age={res.event_style_age} eventCategory={res.event_category} isMasters={isMastersResult} ageGroup={res.age_group} className="items-center text-[var(--theme-mode-text-muted)] [&>div]:text-[9px] [&>div]:mt-0 [&>div]:font-bold [&_span]:text-[9px] [&_span]:font-bold" />}
       </div>
 
       {/* SWIMMER */}

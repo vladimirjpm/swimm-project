@@ -1,0 +1,88 @@
+/* Competition tile (вариант 11c) — плитка соревнования в шапке.
+   Все цвета — через токены; добавить в КАЖДУЮ тему в client/src/index.css
+   (light и dark, парные, контраст ≥ 4.5:1). Значения ниже — текущий макет. */
+
+:root {
+  /* корпус плитки — живёт на --theme-primary (hero) */
+  --theme-comp-tile-bg:        color-mix(in srgb, var(--theme-mode-accent-text) 20%, transparent);
+  --theme-comp-tile-border:    color-mix(in srgb, var(--theme-mode-accent-text) 35%, transparent);
+  --theme-comp-tile-letter:    var(--theme-mode-accent-text);
+
+  /* верхняя полоса значков (сезон + кубок) */
+  --theme-comp-tile-strip-bg:  color-mix(in srgb, var(--theme-mode-surface) 92%, transparent);
+
+  /* нижняя лента возрастной группы */
+  --theme-comp-tile-age-bg:    var(--theme-mode-surface);
+  --theme-comp-tile-age-text:  var(--theme-primary);
+}
+
+.comp-tile {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--theme-comp-tile-border);
+  background: var(--theme-comp-tile-bg);
+  width: 66px;
+  height: 80px;
+}
+
+.comp-tile__icons {          /* сверху: сезон (мелкий) + кубок (крупный) */
+  height: 26px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  line-height: 1;
+  background: var(--theme-comp-tile-strip-bg);
+}
+.comp-tile__season { font-size: 12px; }   /* ❄️ зима / ☀️ лето */
+.comp-tile__cup    { font-size: 20px; }   /* 🏆 только если чемпионат */
+
+.comp-tile__letter {         /* центр: K (детские группы) / M (мастерс) */
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--theme-comp-tile-letter);
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.comp-tile__age {            /* снизу: возрастная группа, напр. 8-11 / 11-14 */
+  height: 20px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--theme-comp-tile-age-bg);
+  color: var(--theme-comp-tile-age-text);
+  font-size: 11.5px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* Размеры: компактный десктоп (мастер-детейл 7a) и мобайл (<640px) */
+.comp-tile--sm { width: 58px; height: 70px; border-radius: 14px; }
+.comp-tile--sm .comp-tile__icons  { height: 23px; gap: 4px; }
+.comp-tile--sm .comp-tile__season { font-size: 11px; }
+.comp-tile--sm .comp-tile__cup    { font-size: 17px; }
+.comp-tile--sm .comp-tile__letter { font-size: 24px; }
+.comp-tile--sm .comp-tile__age    { height: 18px; font-size: 10.5px; }
+
+.comp-tile--xs { width: 52px; height: 62px; border-radius: 12px; }
+.comp-tile--xs .comp-tile__icons  { height: 21px; gap: 4px; }
+.comp-tile--xs .comp-tile__season { font-size: 10px; }
+.comp-tile--xs .comp-tile__cup    { font-size: 16px; }
+.comp-tile--xs .comp-tile__letter { font-size: 21px; }
+.comp-tile--xs .comp-tile__age    { height: 17px; font-size: 10px; }
+
+/* Без возрастной группы (мастерс, открытый старт) — ленты нет, плитка ниже */
+.comp-tile--no-age { height: 64px; }
+.comp-tile--no-age.comp-tile--sm { height: 56px; }
+.comp-tile--no-age.comp-tile--xs { height: 48px; }
+
+/* Без кубка (не чемпионат) — в полосе только сезон, выравнивание по центру сохраняется */

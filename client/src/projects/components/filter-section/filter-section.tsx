@@ -13,6 +13,7 @@ import FilterAge from './filter-age';
 import FilterSwimmingStyle from './filter-swimming-style';
 import FilterClub from './filter-club';
 import FilterEventDate from './filter-event-date';
+import FilterEventCategory from './filter-event-category';
 import FilterRecalculate from './filter-recalculate';
 import { getFilterData } from './filter-types';
 
@@ -56,6 +57,7 @@ const FilterSection: React.FC = () => {
       <FilterResetButton />
       <FilterSwimmingStyle />
       <FilterEventDate />
+      <FilterEventCategory />
       {/* Combine All Results: на десктопе живёт в табах шапки соревнования
           (design_handoff_competition_overview), в фильтрах остаётся только <lg */}
       <div className="lg:hidden">

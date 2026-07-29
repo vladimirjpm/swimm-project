@@ -1,6 +1,7 @@
 import React from 'react';
 import FilterRecalculate from '../../../components/filter-section/filter-recalculate';
 import type { CompetitionOverview, CompetitionTab } from './types';
+import { PAGE_CONTAINER } from '../../../../utils/layout';
 
 // Табы шапки соревнования (паттерн GroupTabs: primary + внутренний bg-black/10).
 // Overview | Swims N | Clubs N | Records N (только если рекорды есть) | Media N.
@@ -28,8 +29,10 @@ export default function CompetitionTabs({ overview, activeTab, onTabChange, medi
   ];
 
   return (
+    // Фон табов — край-в-край; сами табы в общем контейнере (handoff v2, 5a).
     <div style={{ background: 'var(--theme-primary)', color: 'var(--theme-mode-accent-text)' }}>
-      <div className="flex items-center gap-0.5 overflow-x-auto bg-black/10 px-4">
+      <div className="bg-black/10">
+      <div className={`${PAGE_CONTAINER} flex items-center gap-0.5 overflow-x-auto`}>
         {tabs.map(({ tab, label, count }) => (
           <button
             key={tab}
@@ -52,6 +55,7 @@ export default function CompetitionTabs({ overview, activeTab, onTabChange, medi
         <span className="ml-auto hidden shrink-0 items-center pb-1 lg:flex">
           <FilterRecalculate />
         </span>
+      </div>
       </div>
     </div>
   );

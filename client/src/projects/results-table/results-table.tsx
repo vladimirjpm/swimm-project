@@ -15,7 +15,7 @@ import ResultsHeader from './components/results-header';
 import ResultsFilteredInfo from './components/results-filtered-info';
 import { TOP_N_POSITIONS } from '../../utils/constants/filter-constants';
 import HelperSwimmer from '../../utils/helpers/helper-swimmer';
-import { recalculatePositions } from '../../utils/helpers/recalculate-positions';
+import { applyCombinedPositions } from '../../utils/helpers/recalculate-positions';
 import NormativeAgeRecords from './components/normative-age-records';
 import NormativeMastersRecords from './components/normative-masters-records';
 import '../components/mix/text-effect/text-effect.css';
@@ -67,13 +67,10 @@ function ResultsTable() {
   const sourceResults = useMemo(() => {
     const raw = selectedSource.results ?? [];
     if (!isRecalculated) return raw;
-    // Пересчитываем и подменяем position (оригинал → position_original)
-    const recalced = recalculatePositions(raw);
-    return recalced.map(r => ({
-      ...r,
-      position_original: r.position,      // сохраняем оригинал для отображения
-      position: r.position_recalc,         // подменяем position — все фильтры и club points будут работать с ним
-    }));
+    // Места объединённого зачёта считает сервер (combined_place); локальный пересчёт —
+    // фоллбек для статических источников. position подменяется, чтобы фильтры и сортировка
+    // работали с выбранным местом; оригинал остаётся в position_original.
+    return applyCombinedPositions(raw);
   }, [selectedSource, isRecalculated]);
 
   // Базовая фильтрация (все фильтры, КРОМЕ level_filter)
@@ -84,6 +81,11 @@ function ResultsTable() {
     
     // Фильтр по дате события
     if (event_date && event_date !== 'all' && res.date !== event_date) return false;
+
+    // Фильтр по категории (программе) заплыва. У строк, импортированных до появления
+    // event_category, оно пустое — такие в выборку по конкретной категории не попадают.
+    const catFilter = filters.event_category;
+    if (catFilter && catFilter !== 'all' && (res.event_category ?? '') !== catFilter) return false;
     
     // Фильтр по training/competition
     const hasTraining = !!res.training?.trainingId;
@@ -249,17 +251,23 @@ function ResultsTable() {
     setExpandedOverrides((prev) => ({ ...prev, [key]: !currentlyExpanded }));
   };
 
+  // Очки клуба (Э6): считает сервер и кладёт в club_points / combined_club_points —
+  // клиент только выбирает поле по тоггл'у «Combine All Results». Локальный расчёт
+  // остаётся ФОЛЛБЕКОМ для старых статических источников, где полей ещё нет: он не знает
+  // привязку соревнования к правилу и на manual-правилах расходится с зачётом.
   const [clubPointsByKey, setClubPointsByKey] = useState<Record<string, number>>({});
 
   useEffect(() => {
     let cancelled = false;
 
     const loadClubPoints = async () => {
-      const pointsMap = await ClubPointsHelper.getPointsMapForResults(
-        sortedResults,
-        getResultKey
-      );
+      const legacyRows = sortedResults.filter((r) => r.club_points === undefined);
+      if (legacyRows.length === 0) {
+        if (!cancelled) setClubPointsByKey({});
+        return;
+      }
 
+      const pointsMap = await ClubPointsHelper.getPointsMapForResults(legacyRows, getResultKey);
       if (cancelled) return;
       setClubPointsByKey(pointsMap);
     };
@@ -270,6 +278,14 @@ function ResultsTable() {
       cancelled = true;
     };
   }, [sortedResults]);
+
+  /** Очки строки: серверные (с учётом тоггла) → фоллбек на локальный расчёт. */
+  const clubPointsOf = (res: any): number | undefined => {
+    if (res.club_points === undefined) return clubPointsByKey[getResultKey(res)];
+    return isRecalculated && res.combined_club_points != null
+      ? res.combined_club_points
+      : res.club_points;
+  };
 
   // Определяем уникальные значения
   const uniqueClubs = new Set(displayResults.map(r => r.club));
@@ -341,10 +357,14 @@ function ResultsTable() {
           showPoolType={showPoolType}
           showEvent={showEvent}
         />      
+        {/* Бассейн берём фактический (poolTypeDisplay, как у masters-карточки ниже), а не
+            сырой filters.pool_type: по умолчанию он 'all', а при 'all' карточка отдавала
+            первый попавшийся ключ — 25m — и на 50-метровом соревновании показывала рекорды
+            короткого бассейна. */}
         {!isMastersSource && (
           <NormativeAgeRecords
             gender={filters.gender}
-            poolType={filters.pool_type}
+            poolType={poolTypeDisplay}
             styleName={filters.style_name}
             styleLen={filters.style_len}
             age={filters.age}
@@ -360,7 +380,7 @@ function ResultsTable() {
           />
         )}
         
-        <div className="max-h-[650px] overflow-y-auto border border-[var(--theme-mode-border)] rounded-2xl shadow-sm lg:max-w-[1180px] lg:mx-auto" >
+        <div className="max-h-[650px] overflow-y-auto border border-[var(--theme-mode-border)] rounded-2xl shadow-sm" >
           {/* Unified header (single view for all sizes) */}
           <div className="bg-[var(--theme-mode-surface-alt)] sticky top-0 z-10">
             <div className="hidden lg:block">
@@ -392,7 +412,7 @@ function ResultsTable() {
           </div>
           <ul>
             {displayResults.map((res, index) => {
-              const clubPoints = clubPointsByKey[getResultKey(res)];
+              const clubPoints = clubPointsOf(res);
               const isMaster = Helper.isResultMasters(isMastersSource, res.event_style_age);
               const resolvedGender = Helper.resolveGender(res.event_style_gender);
               // Пол для мягкой заливки строки — из названия события (поля gender в данных нет)

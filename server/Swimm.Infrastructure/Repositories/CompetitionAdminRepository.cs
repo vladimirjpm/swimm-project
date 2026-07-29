@@ -1,4 +1,4 @@
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
@@ -17,11 +17,18 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
 {
     private readonly SwimmDbContext _db;
     private readonly ICacheService _cache;
+    private readonly ICompetitionRecalculationService? _recalc;
 
-    public CompetitionAdminRepository(SwimmDbContext db, ICacheService cache)
+    /// <param name="recalc">
+    /// Пересчёт материализованных величин (объединённые места) при смене
+    /// <c>ShowCombineAllResults</c>. Необязателен: null — пересчёт пропускается (тесты).
+    /// </param>
+    public CompetitionAdminRepository(SwimmDbContext db, ICacheService cache,
+        ICompetitionRecalculationService? recalc = null)
     {
         _db = db;
         _cache = cache;
+        _recalc = recalc;
     }
 
     public async Task<PagedResult<CompetitionRowDto>> GetPagedAsync(string? search, string? categoryKey, int? year, int page, int pageSize, int? orgCompId = null)
@@ -61,15 +68,17 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
     }
 
     public async Task<UnifiedCompetitionList> GetUnifiedAsync(
-        string? search, string? categoryKey, int? year, string? stage, bool showSynthetic, int? month, int page, int pageSize,
-        string? qualityFilter = null)
+        string? search, string? categoryKey, int? season, string? stage, bool showSynthetic, int? month, int page, int pageSize,
+        string? qualityFilter = null, string? kind = null)
     {
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 20;
 
         // 1) БД-сторона: все «головы» под фильтрами (без пагинации — мержим и режем в памяти).
         // На admin-масштабе (~1.5k соревнований) это приемлемо; при росте — вынести в БД-пагинацию.
-        var heads = FilteredHeads(search, categoryKey, year);
+        // Сезон (сен–авг) не фильтруем в SQL: Date лежит текстом, а строки с сайта всё равно
+        // фильтруются в памяти — один предикат по SortDate ниже для обеих сторон.
+        var heads = FilteredHeads(search, categoryKey, year: null);
         // Тестовая синтетика (SYNTH Meet…) по умолчанию скрыта — её сотни и она забивает список.
         if (!showSynthetic)
             heads = heads.Where(c => !c.Name.StartsWith("SYNTH "));
@@ -124,11 +133,11 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             else
             {
                 // Только на сайте: в БД соревнования нет. Фильтры БД-стороны применяем и здесь:
-                // category — исключает (у discovery нет категорий); search/year — по имени/датам.
+                // category — исключает (у discovery нет категорий); search — по имени.
+                // Сезон — общим предикатом ниже, вместе с БД-строками.
                 if (!string.IsNullOrWhiteSpace(categoryKey)) continue;
                 if (!string.IsNullOrWhiteSpace(search) &&
                     d.Name.IndexOf(search.Trim(), StringComparison.OrdinalIgnoreCase) < 0) continue;
-                if (year is int yy && d.DateStart.Year != yy && d.DateEnd.Year != yy) continue;
 
                 unified.Add(new UnifiedCompetitionRowDto
                 {
@@ -144,6 +153,17 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             {
                 Stage = CompetitionStage.DbOnly, Db = row, SortDate = RowDate(row)
             });
+
+        // 2b) Фильтр по сезону (сен–авг) — один предикат на обе стороны, по дате строки.
+        if (season is int s)
+            unified = unified.Where(u => u.SortDate.Year > 1 && SeasonOf(u.SortDate) == s).ToList();
+
+        // 2c) Признак «чемпионат Израиля» — по названию любой стороны строки (у входящих других
+        // признаков нет). Считаем всегда: он и фильтр «Тип», и иконка 🏆 в списке.
+        foreach (var u in unified)
+            u.IsChampionship = IsChampionshipRow(u);
+        if (string.Equals(kind, "champ", StringComparison.OrdinalIgnoreCase))
+            unified = unified.Where(u => u.IsChampionship).ToList();
 
         // 3) Фильтр по стадии (если задан).
         if (!string.IsNullOrWhiteSpace(stage) && Enum.TryParse<CompetitionStage>(stage, ignoreCase: true, out var st))
@@ -178,6 +198,42 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         return new UnifiedCompetitionList(
             new PagedResult<UnifiedCompetitionRowDto>(pageItems, total, page, pageSize), monthCounts);
     }
+
+    /// <summary>
+    /// Чемпионат = чемпионат ИЗРАИЛЯ: «אליפות ישראל» (или английское Israel + Championship).
+    /// Слова проверяются по отдельности, а не подстрокой «אליפות ישראל»: между ними бывает
+    /// вставлен спонсор — «אליפות "ארנה" ישראל», «אליפות arena ישראל» (на реальных данных
+    /// 2026-07-29 подстрока дала 39 из 42). Клубные/городские «אליפות מכבי», «אליפות חדרה»
+    /// сюда НЕ попадают — это и есть смысл фильтра. Отборочные «מוקדמות אליפות … ישראל»
+    /// попадают: они часть того же чемпионата.
+    /// Отдельного признака в данных нет: у входящих с сайта, кроме имени и даты, ничего и нет,
+    /// а категории (Kids/Youth/Masters…) — про возраст, не про ранг.
+    /// </summary>
+    public static bool IsChampionship(string? name) =>
+        !string.IsNullOrEmpty(name)
+        && ((name.Contains("אליפות", StringComparison.Ordinal)
+                && name.Contains("ישראל", StringComparison.Ordinal))
+            || (name.Contains("championship", StringComparison.OrdinalIgnoreCase)
+                && name.Contains("israel", StringComparison.OrdinalIgnoreCase)));
+
+    /// <summary>
+    /// Чемпионат ли строка объединённого списка. Если соревнование есть в БД — источник истины
+    /// ФЛАГ <c>Competition.IsChampionship</c> (галка на Edit), эвристика по названию для таких
+    /// строк не применяется: снятая руками галка не должна возвращаться сама.
+    /// Эвристика остаётся только для строк «только на сайте» — их в БД ещё нет, флага негде взять.
+    /// </summary>
+    private static bool IsChampionshipRow(UnifiedCompetitionRowDto u) =>
+        u.Db != null
+            // У одиночной строки флаги живут в Single (на самом CompetitionRowDto они
+            // заполняются только для «головы» многодневного события).
+            ? u.Db.Single?.IsChampionship ?? u.Db.IsChampionship
+            : IsChampionship(u.Site?.Name);
+
+    /// <summary>
+    /// Сезон плавания по дате: сентябрь–август, называется годом окончания (окт-2024 → 2025).
+    /// Совпадает с cYear на isr.org.il (проверено на списке cYear=2025: окт-2024 … авг-2025).
+    /// </summary>
+    public static int SeasonOf(DateTime date) => date.Month >= 9 ? date.Year + 1 : date.Year;
 
     /// <summary>Дата строки для сортировки: одиночное — своя дата, событие — дата первого дня.
     /// Date хранится текстом «дд/ММ/гггг»; непарсибельное → MinValue (уедет вниз списка).</summary>
@@ -280,6 +336,8 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                     // Флаг на шапке — только если он у всех дней (обычно так и есть).
                     IsMasters = days.All(d => d.IsMasters),
                     IsAward = days.All(d => d.IsAward),
+                    // Чемпионат — если хоть один день помечен: регламент у события один.
+                    IsChampionship = days.Any(d => d.IsChampionship),
                     ShowCombineAllResults = days.All(d => d.ShowCombineAllResults),
                 };
             }
@@ -321,6 +379,31 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             .Select(c => new CategoryTagDto { Key = c.Key, Name = c.Name, Badge = c.Badge })
             .ToListAsync();
 
+    public async Task<IReadOnlyList<int>> GetAvailableSeasonsAsync()
+    {
+        // Обе стороны объединённого списка: справочник (Date текстом «дд/ММ/гггг») и строки с сайта.
+        var dates = await _db.Competitions.AsNoTracking()
+            .Where(c => c.Date.Length == 10)
+            .Select(c => c.Date)
+            .Distinct()
+            .ToListAsync();
+        var seasons = dates
+            .Select(d => DateTime.TryParseExact(d, "dd/MM/yyyy",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var dt) ? (DateTime?)dt : null)
+            .Where(dt => dt.HasValue)
+            .Select(dt => SeasonOf(dt!.Value))
+            .ToList();
+
+        var siteDates = await _db.DiscoveredCompetitions.AsNoTracking()
+            .Select(d => d.DateStart)
+            .Distinct()
+            .ToListAsync();
+        seasons.AddRange(siteDates.Select(SeasonOf));
+
+        return seasons.Distinct().OrderByDescending(s => s).ToList();
+    }
+
     public async Task<IReadOnlyList<int>> GetAvailableYearsAsync()
     {
         // Date хранится текстом «дд/ММ/гггг» (длина 10) — год всегда последние 4 символа.
@@ -348,7 +431,10 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         OrgCompId = c.OrgCompId,
         IsMasters = c.IsMasters,
         IsAward = c.IsAward,
+        IsChampionship = c.IsChampionship,
         ShowCombineAllResults = c.ShowCombineAllResults,
+        PointRuleClubsId = c.PointRuleClubsId,
+        PointRuleSwimmersId = c.PointRuleSwimmersId,
         EventId = c.EventId,
         EventName = c.Event != null ? c.Event.Name : null,
         DayNumber = c.DayNumber,
@@ -387,10 +473,16 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             OrgCompId = c.OrgCompId,
             IsMasters = c.IsMasters,
             IsAward = c.IsAward,
+            IsChampionship = c.IsChampionship,
             ShowCombineAllResults = c.ShowCombineAllResults,
             EventId = c.EventId,
             EventName = c.Event?.Name,
             DayNumber = c.DayNumber,
+            PointRuleClubsId = c.PointRuleClubsId,
+            PointRuleSwimmersId = c.PointRuleSwimmersId,
+            EventDayCount = c.EventId == null
+                ? 1
+                : await _db.Competitions.CountAsync(x => x.EventId == c.EventId),
             ResultCount = await _db.Results.CountAsync(r => r.CompetitionId == c.Id),
             CategoryKeys = await _db.CategoryCompetitions
                 .AsNoTracking()
@@ -452,10 +544,26 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                     "Удалите их перед сменой или очисткой OrgCompId.");
         }
 
+        // Объединённые места считаются только у соревнований с этим флагом. Включили задним
+        // числом — строки остались с пустым CombinedPlace, и тоггл на клиенте показал бы
+        // пустую таблицу; выключили — значения обязаны обнулиться, иначе останутся от
+        // прошлой жизни (docs/points-rules-per-competition-plan.md §3.4).
+        var combineChanged = comp.ShowCombineAllResults != input.ShowCombineAllResults;
+
         Apply(comp, input);
         await ApplyCountryAsync(comp, input.Country);
         var save = await SaveAsync(comp);
         if (save.Success) await SyncCategoriesAsync(comp.Id, input.CategoryKeys);
+
+        if (save.Success && combineChanged && _recalc is not null)
+        {
+            // Соревнование уже сохранено — сбой пересчёта не должен отменять правку формы.
+            // Аварийный прогон: `dotnet run -- --recalc-combined`.
+            try { await _recalc.RecalculateCompetitionAsync(comp.Id); }
+            catch (Exception) { /* лог не нужен: аварийный прогон закрывает случай */ }
+            await _cache.InvalidateAllAsync();
+        }
+
         return save;
     }
 
@@ -537,7 +645,10 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         // IsMasters — производный от членства в категории Masters (галочки в форме нет).
         comp.IsMasters = input.CategoryKeys.Contains(Category.MastersKey);
         comp.IsAward = input.IsAward;
+        comp.IsChampionship = input.IsChampionship;
         comp.ShowCombineAllResults = input.ShowCombineAllResults;
+        comp.PointRuleClubsId = input.PointRuleClubsId;
+        comp.PointRuleSwimmersId = input.PointRuleSwimmersId;
     }
 
     /// <summary>
@@ -632,6 +743,140 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 return $"OrgCompId={org} уже занят другим соревнованием";
         }
 
+        return await ValidateRuleIdsAsync(input.PointRuleClubsId, input.PointRuleSwimmersId);
+    }
+
+    /// <summary>Правила должны существовать: FK RESTRICT иначе даст DbUpdateException/500.</summary>
+    private async Task<string?> ValidateRuleIdsAsync(int? clubsRuleId, int? swimmersRuleId)
+    {
+        if (clubsRuleId is int cid && !await _db.PointRulesClubs.AnyAsync(r => r.Id == cid))
+            return $"Правило клубных очков #{cid} не найдено";
+
+        if (swimmersRuleId is int sid && !await _db.PointRulesSwimmers.AnyAsync(r => r.Id == sid))
+            return $"Правило High Point #{sid} не найдено";
+
         return null;
     }
+
+    // ── Привязка правил очков (Э4) ─────────────────────────────────────────────
+
+    public async Task<IReadOnlyList<CompetitionRuleRowDto>> GetForRuleAssignmentAsync(
+        int? year, string scope, bool onlyUnassigned)
+    {
+        // Дни, а не свёрнутые события: правило хранится у каждого дня отдельно, и в выборке
+        // «без привязки» один непривязанный день события не должен прятаться за головой.
+        var q = _db.Competitions.AsNoTracking().Where(c => !c.Name.StartsWith("SYNTH "));
+
+        if (year is int y)
+            q = q.Where(c => c.Date.EndsWith(y.ToString()));
+
+        q = scope switch
+        {
+            "masters" => q.Where(c => c.IsMasters),
+            "non-masters" => q.Where(c => !c.IsMasters),
+            _ => q
+        };
+
+        if (onlyUnassigned)
+            q = q.Where(c => c.PointRuleClubsId == null && c.PointRuleSwimmersId == null);
+
+        var rows = await q
+            .OrderByDescending(c => c.Date.Substring(6, 4))
+            .ThenByDescending(c => c.Date.Substring(3, 2))
+            .ThenByDescending(c => c.Date.Substring(0, 2))
+            .ThenBy(c => c.Id)
+            .Select(c => new CompetitionRuleRowDto
+            {
+                Id = c.Id,
+                Name = c.Name,
+                SubName = c.SubName,
+                Date = c.Date,
+                IsMasters = c.IsMasters,
+                ClubsRuleVersion = c.PointRuleClubs != null ? c.PointRuleClubs.Version : null,
+                SwimmersRuleVersion = c.PointRuleSwimmers != null ? c.PointRuleSwimmers.Version : null
+            })
+            .ToListAsync();
+
+        return rows;
+    }
+
+    public async Task<CompetitionSaveResult> AssignRulesAsync(CompetitionRuleAssignmentDto assignment)
+    {
+        if (!assignment.SetClubs && !assignment.SetSwimmers)
+            return CompetitionSaveResult.Fail("Не выбрано ни одно правило для простановки");
+
+        var ids = assignment.CompetitionIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return CompetitionSaveResult.Fail("Не выбрано ни одного соревнования");
+
+        var error = await ValidateRuleIdsAsync(
+            assignment.SetClubs ? assignment.ClubsRuleId : null,
+            assignment.SetSwimmers ? assignment.SwimmersRuleId : null);
+        if (error != null) return CompetitionSaveResult.Fail(error);
+
+        var comps = await _db.Competitions.Where(c => ids.Contains(c.Id)).ToListAsync();
+        foreach (var comp in comps)
+        {
+            if (assignment.SetClubs) comp.PointRuleClubsId = assignment.ClubsRuleId;
+            if (assignment.SetSwimmers) comp.PointRuleSwimmersId = assignment.SwimmersRuleId;
+        }
+
+        await _db.SaveChangesAsync();
+        await _cache.InvalidateAllAsync();
+        // Id в результате нет — это массовая операция; число изменённых строк отдаём через Id.
+        return CompetitionSaveResult.Ok(comps.Count);
+    }
+
+    public async Task<CompetitionSaveResult> QuickUpdateAsync(CompetitionQuickEditDto input)
+    {
+        var target = await _db.Competitions.AsNoTracking()
+            .Where(c => c.Id == input.CompetitionId)
+            .Select(c => new { c.Id, c.EventId })
+            .FirstOrDefaultAsync();
+        if (target == null)
+            return CompetitionSaveResult.Fail($"Соревнование #{input.CompetitionId} не найдено");
+
+        // Регламент у многодневного события один → правим все дни, а не только «голову».
+        var dayIds = target.EventId is int ev
+            ? await GetEventDayIdsAsync(ev)
+            : [target.Id];
+
+        var changed = 0;
+        foreach (var id in dayIds)
+        {
+            // Идём через полноценный UpdateAsync: он тянет за собой валидацию уникальности,
+            // синк категорий, пересчёт объединённых мест при смене Combine и сброс кэша.
+            // Имя/дата/страна/OrgCompId у дней разные — забираем текущие значения дня.
+            var current = await GetByIdAsync(id);
+            if (current == null) continue;
+
+            var result = await UpdateAsync(id, new CompetitionInputDto
+            {
+                Name = current.Name,
+                SubName = current.SubName,
+                Date = current.Date,
+                Country = current.Country,
+                OrgCompId = current.OrgCompId,
+                PoolType = input.PoolType,
+                IsAward = input.IsAward,
+                IsChampionship = input.IsChampionship,
+                ShowCombineAllResults = input.ShowCombineAllResults,
+                CategoryKeys = input.CategoryKeys,
+                PointRuleClubsId = input.PointRuleClubsId,
+                PointRuleSwimmersId = input.PointRuleSwimmersId
+            });
+            // Первая же ошибка — наружу: молча применить «половину дней» хуже, чем сказать.
+            if (!result.Success) return result;
+            changed++;
+        }
+
+        return CompetitionSaveResult.Ok(changed);
+    }
+
+    public async Task<IReadOnlyList<int>> GetEventDayIdsAsync(int eventId) =>
+        await _db.Competitions.AsNoTracking()
+            .Where(c => c.EventId == eventId)
+            .OrderBy(c => c.DayNumber)
+            .Select(c => c.Id)
+            .ToListAsync();
 }

@@ -9,7 +9,7 @@
 <div class="max-w-[820px] mx-auto">
 
     <div class="mb-4 flex items-center gap-3">
-        <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">← К списку</a>
+        <a href="@Model.BackLink" class="admin-btn admin-btn-ghost">← К списку</a>
         @if (!Model.IsNew && Model.Existing != null)
         {
             <span class="text-xs text-admin-text-muted">
@@ -30,7 +30,7 @@
     }
 
     <!-- ── Основные поля ─────────────────────────────────────────────────────── -->
-    <form method="post" asp-page-handler="Save" class="admin-card mb-5">
+    <form method="post" asp-page-handler="Save" asp-route-back="@Model.BackUrl" class="admin-card mb-5">
         <input type="hidden" asp-for="Id" />
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -117,16 +117,70 @@
                 <input asp-for="Input.IsAward" class="w-4 h-4 cursor-pointer" />
                 <span class="text-admin-text">Awards</span>
             </label>
+            <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none"
+                   title="Чемпионат Израиля (אליפות ישראל): 🏆 в списке админки, в плитке и фильтр «только чемпионаты» на клиенте">
+                <input asp-for="Input.IsChampionship" class="w-4 h-4 cursor-pointer" />
+                <span class="text-admin-text">🏆 Чемпионат Израиля</span>
+            </label>
             <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
                 <input asp-for="Input.ShowCombineAllResults" class="w-4 h-4 cursor-pointer" />
                 <span class="text-admin-text">Combine all results</span>
             </label>
         </div>
 
-        <div class="mt-5 flex gap-3">
+        <!-- ── Правила начисления очков (Э4) ──────────────────────────────────── -->
+        <div class="mt-6 pt-5 border-t border-admin-border">
+            <h2 class="text-sm font-semibold text-admin-text mb-1">Правила начисления очков</h2>
+            <p class="text-[11px] text-admin-text-muted mb-3 leading-relaxed">
+                «Авто» — правило подбирается по дате и типу соревнования (masters/обычное), кроме
+                правил с пометкой <strong class="text-admin-text">manual</strong>: те работают только
+                по явной привязке. Список правил — <a href="/Admin/PointsRules" class="text-admin-accent hover:underline">Points rules</a>.
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">Клубные очки</span>
+                    <select asp-for="Input.PointRuleClubsId" class="admin-input">
+                        <option value="">— Авто (по дате и типу) —</option>
+                        @foreach (var r in Model.ClubRules)
+                        {
+                            <option value="@r.Id">@r.Version · @r.Scope · с @r.EffectiveFrom.ToString("dd/MM/yyyy")@(r.ManualOnly ? " · manual" : "")</option>
+                        }
+                    </select>
+                </label>
+
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">High Point</span>
+                    <select asp-for="Input.PointRuleSwimmersId" class="admin-input">
+                        <option value="">— Авто (по дате и типу) —</option>
+                        @foreach (var r in Model.SwimmerRules)
+                        {
+                            <option value="@r.Id">@r.Version · @r.Scope · с @r.EffectiveFrom.ToString("dd/MM/yyyy")@(r.ManualOnly ? " · manual" : "")</option>
+                        }
+                    </select>
+                    @if (Model.SwimmerRules.Count == 0)
+                    {
+                        <span class="text-[11px] text-admin-warning">
+                            Правил High Point ещё нет — зачёт считает legacy-ветка. Заведите правило на
+                            <a href="/Admin/PointsRules?kind=swimmers" class="underline">Points rules</a>.
+                        </span>
+                    }
+                </label>
+            </div>
+        </div>
+
+        <div class="mt-5 flex flex-wrap gap-3">
             <button type="submit" class="admin-btn admin-btn-primary">
                 @(Model.IsNew ? "Создать" : "Сохранить")
             </button>
+            @if (Model.Existing?.EventId != null && Model.Existing.EventDayCount > 1)
+            {
+                <button type="submit" asp-page-handler="ApplyRulesToEvent" asp-route-back="@Model.BackUrl"
+                        class="admin-btn admin-btn-ghost" formnovalidate
+                        onclick="return confirm('Проставить выбранные правила очков всем @Model.Existing.EventDayCount дням события? Остальные поля формы не сохранятся.');">
+                    Проставить правила всем дням события (@Model.Existing.EventDayCount)
+                </button>
+            }
             <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">Отмена</a>
         </div>
     </form>
@@ -164,7 +218,7 @@
                                        class="text-admin-accent hover:underline" title="@u.Url">@u.Url</a>
                                 </td>
                                 <td class="text-right">
-                                    <form method="post" asp-page-handler="DeleteUrl" class="inline">
+                                    <form method="post" asp-page-handler="DeleteUrl" asp-route-back="@Model.BackUrl" class="inline">
                                         <input type="hidden" asp-for="Id" />
                                         <input type="hidden" name="urlId" value="@u.Id" />
                                         <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
@@ -182,7 +236,7 @@
 
             @if (Model.Existing.OrgCompId != null)
             {
-                <form method="post" asp-page-handler="AddUrl" class="flex flex-wrap items-end gap-3">
+                <form method="post" asp-page-handler="AddUrl" asp-route-back="@Model.BackUrl" class="flex flex-wrap items-end gap-3">
                     <input type="hidden" asp-for="Id" />
                     <label class="flex flex-col gap-1">
                         <span class="text-xs text-admin-text-muted">Culture</span>
@@ -205,7 +259,7 @@
                 связанными эстафетами, галереями и записями истории импорта. URL-ы результатов (по OrgCompId) тоже удалятся,
                 если этот OrgCompId больше нигде не используется. <strong class="text-admin-danger">Действие необратимо.</strong>
             </p>
-            <form method="post" asp-page-handler="Delete" class="flex flex-wrap items-end gap-3">
+            <form method="post" asp-page-handler="Delete" asp-route-back="@Model.BackUrl" class="flex flex-wrap items-end gap-3">
                 <input type="hidden" asp-for="Id" />
                 <label class="flex flex-col gap-1 flex-1 min-w-[260px]">
                     <span class="text-xs text-admin-text-muted">

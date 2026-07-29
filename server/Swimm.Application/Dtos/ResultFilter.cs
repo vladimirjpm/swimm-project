@@ -36,4 +36,12 @@ public class ResultFilter
 
     /// <summary>Ограничение по ростеру группы (HubGroups «Competitions» tab) — null = без ограничения.</summary>
     public List<int>? SwimmerIds { get; set; }
+
+    /// <summary>
+    /// Считать агрегаты по объединённым местам «Combine All Results» (тоггл на клиенте):
+    /// место в общем зачёте дисциплины по всему событию вместо места внутри своего заплыва.
+    /// false — как в таблице с выключенным тогглом. Действует только у соревнований
+    /// с <c>ShowCombineAllResults</c>: у остальных объединённых мест попросту нет.
+    /// </summary>
+    public bool Combined { get; set; }
 }

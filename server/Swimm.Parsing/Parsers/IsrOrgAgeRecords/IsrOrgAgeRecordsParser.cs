@@ -78,7 +78,7 @@ public class IsrOrgAgeRecordsParser : IFormatParser
     private const string HebrewSachyan = "\u05D4\u05E9\u05D7\u05D9\u05D9\u05DF";   // ?????? (??????)
     private const string HebrewSachyanRev = "\u05DF\u05D9\u05D9\u05D7\u05E9\u05D4"; // ?????? (??????, ??????)
 
-    // Multi-word header: "????" � ?????? ????? ?????????? ?????????
+    // Multi-word header: "????" � ?????? ????? ?????????? ?????????
     // Original: \u05D4\u05E9\u05D9\u05D0  Reversed: \u05D0\u05D9\u05E9\u05D4
     private const string HebrewHaShi = "\u05D4\u05E9\u05D9\u05D0";       // ???? (??????, ? ?????????)
     private const string HebrewHaShiRev = "\u05D0\u05D9\u05E9\u05D4";   // ???? ? ???????? ???????
@@ -266,39 +266,47 @@ public class IsrOrgAgeRecordsParser : IFormatParser
                 detectedGender = ResolveGender(genderRaw);
             }
 
-            // Dist/style detection (always, independent of gender)
-            if (!hasTime)
+            // Dist/style detection (always, independent of gender).
+            // Обычно метка блока ("100 מ׳ גב") — отдельная строка без времени. Но объединённая
+            // ячейка центрируется по вертикали, и её токены иногда попадают в Y-группу СТРОКИ
+            // ДАННЫХ (реальный случай: длинный бассейн, "100 מ׳" приклеилось к строке 01:16.07,
+            // а "גב" осталось отдельной строкой). Тогда маркер дистанции терялся целиком и весь
+            // блок 100 м на спине разбирали соседние блоки 50 и 200. Поэтому в строках СО
+            // временем метку тоже читаем — но только по строгому шаблону, чтобы не принять за
+            // метку случайно затёкшее в колонку слово.
+            if (!string.IsNullOrWhiteSpace(distRaw) && (!hasTime || LooksLikeDistanceLabel(distRaw)))
             {
-                if (!string.IsNullOrWhiteSpace(distRaw))
+                var relay = Regex.Match(distRaw, @"(\d+)\s*[xX]\s*(\d+)");
+                if (relay.Success)
                 {
-                    var relay = Regex.Match(distRaw, @"(\d+)\s*[xX]\s*(\d+)");
-                    if (relay.Success)
-                    {
-                        detectedDist = $"{relay.Groups[1].Value}X{relay.Groups[2].Value}";
-                        detectedIsRelay = true;
-                    }
-                    else
-                    {
-                        var num = Regex.Match(distRaw, @"\d+");
-                        if (num.Success) detectedDist = num.Value;
-                    }
+                    detectedDist = $"{relay.Groups[1].Value}X{relay.Groups[2].Value}";
+                    detectedIsRelay = true;
+                }
+                else
+                {
+                    var num = Regex.Match(distRaw, @"\d+");
+                    if (num.Success) detectedDist = num.Value;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(styleRaw))
+            {
+                bool isRelayLabel = ContainsAny(styleRaw, HebrewShlichim, HebrewShlichot, HebrewShlichimRev, HebrewShlichotRev);
+                var clean = styleRaw;
+                if (isRelayLabel)
+                {
+                    foreach (var mk in new[] { HebrewShlichim, HebrewShlichot, HebrewShlichimRev, HebrewShlichotRev })
+                        clean = clean.Replace(mk, "");
+                    clean = clean.Trim();
                 }
 
-                if (!string.IsNullOrWhiteSpace(styleRaw))
+                var s = NormalizeStyleHe(clean);
+                // В строке со временем метку стиля принимаем, только если она распозналась
+                // в канонический стиль (иначе это затёкшее в колонку слово из данных).
+                if (!string.IsNullOrEmpty(s) && (!hasTime || IsCanonicalStyle(s)))
                 {
-                    if (ContainsAny(styleRaw, HebrewShlichim, HebrewShlichot, HebrewShlichimRev, HebrewShlichotRev))
-                    {
-                        var clean = styleRaw;
-                        foreach (var mk in new[] { HebrewShlichim, HebrewShlichot, HebrewShlichimRev, HebrewShlichotRev })
-                            clean = clean.Replace(mk, "");
-                        detectedStyle = NormalizeStyleHe(clean.Trim());
-                        detectedIsRelay = true;
-                    }
-                    else
-                    {
-                        var s = NormalizeStyleHe(styleRaw);
-                        if (!string.IsNullOrEmpty(s)) detectedStyle = s;
-                    }
+                    detectedStyle = s;
+                    if (isRelayLabel) detectedIsRelay = true;
                 }
             }
 
@@ -415,11 +423,38 @@ public class IsrOrgAgeRecordsParser : IFormatParser
         }
 
         // ===== Pass 4: Build results =====
+        // Дистанцию/стиль решаем ОДИН РАЗ НА БЛОК, а не построчно. Метка объединённой
+        // ячейки центрирована по вертикали по паре блоков (мужской + женский), поэтому
+        // построчный выбор «ближайший маркер по Y» ошибается на краю, когда блоки разной
+        // длины: у женского 800 нет возраста 10, у мужского есть 11 — и крайняя строка
+        // оказывается ближе к маркеру СОСЕДНЕЙ дистанции. Так уезжали female 800/10
+        // (на самом деле 400) и female 1500/11 (на самом деле 800).
+        // Границу блока даёт возрастная последовательность: внутри блока возраст идёт
+        // ISR, 18, 17 … 10, а новый блок начинается там, где она рестартует.
+        var dataRows = parsedRows.Where(p => p.HasTime).ToList();
+        var blockOf = AssignBlocks(dataRows);
+        var blockChannel = new Dictionary<int, (string dist, string style, bool isRelay)>();
+
+        foreach (var grp in dataRows.Select((pr, i) => (pr, block: blockOf[i])).GroupBy(x => x.block))
+        {
+            var rows = grp.Select(x => x.pr).ToList();
+            // Представитель блока: строка, ближайшая к его вертикальному центру.
+            double centerY = (rows.First().YCenter + rows.Last().YCenter) / 2.0;
+            var mid = rows[rows.Count / 2];
+
+            var (d, dRelay) = ResolveChannel(centerY, fwdDist[mid.Index], bwdDist[mid.Index]);
+            var (s, sRelay) = ResolveChannel(centerY, fwdStyle[mid.Index], bwdStyle[mid.Index]);
+            blockChannel[grp.Key] = (d, s, dRelay || sRelay);
+
+            Log($"  BLOCK[{grp.Key}]: rows {rows.First().Index}..{rows.Last().Index}, " +
+                $"centerY={centerY:F0} -> dist={d}, style={s}, relay={dRelay || sRelay}");
+        }
+
         var completedResults = new List<Result>();
 
-        foreach (var pr in parsedRows)
+        for (int di = 0; di < dataRows.Count; di++)
         {
-            if (!pr.HasTime) continue;
+            var pr = dataRows[di];
 
             var time = TimeRx.Match(pr.TimeRaw).Value;
             var date = DateRx.IsMatch(pr.DateRaw) ? DateRx.Match(pr.DateRaw).Value : "";
@@ -429,13 +464,7 @@ public class IsrOrgAgeRecordsParser : IFormatParser
             // Gender: nearest marker
             string gender = DetermineGender(pr.YCenter, genderMarkers);
 
-            // Dist: resolve from forward/backward sweep independently
-            var (distance, distIsRelay) = ResolveChannel(pr.YCenter, fwdDist[pr.Index], bwdDist[pr.Index]);
-
-            // Style: resolve from forward/backward sweep independently
-            var (style, styleIsRelay) = ResolveChannel(pr.YCenter, fwdStyle[pr.Index], bwdStyle[pr.Index]);
-
-            bool isRelay = distIsRelay || styleIsRelay;
+            var (distance, style, isRelay) = blockChannel[blockOf[di]];
 
             Log($"    -> RESULT: dist={distance}, style={style}, gender={gender}, age={ageCategory}, " +
                 $"time={time}, name='{swimmerName}', club='{club}', relay={isRelay}");
@@ -458,6 +487,43 @@ public class IsrOrgAgeRecordsParser : IFormatParser
             yield return r;
 
         Log($"Parse complete. Total results: {completedResults.Count}");
+    }
+
+    /// <summary>
+    /// Режет строки данных на блоки по возрастной последовательности: внутри блока
+    /// возраст убывает (ISR/bogrim, затем 18, 17 … 10), поэтому блок начинается там,
+    /// где последовательность рестартует — встретился ISR/bogrim или возраст не меньше
+    /// предыдущего. Возвращает номер блока для каждой строки (по позиции в списке).
+    /// </summary>
+    private static int[] AssignBlocks(List<ParsedRow> dataRows)
+    {
+        var result = new int[dataRows.Count];
+        int block = 0;
+        int? prevAge = null;
+        bool prevWasHeadCategory = false;
+
+        for (int i = 0; i < dataRows.Count; i++)
+        {
+            var age = ExtractAgeCategory(dataRows[i].AgeRaw);
+            bool isHeadCategory = age is "israel" or "adults_m" or "adults_f";
+            bool isNumeric = int.TryParse(age, out var ageNum);
+
+            if (i > 0)
+            {
+                bool restart =
+                    // ISR/bogrim открывает блок — но не когда их несколько подряд в шапке блока
+                    (isHeadCategory && !prevWasHeadCategory)
+                    // возраст перестал убывать
+                    || (isNumeric && prevAge.HasValue && ageNum >= prevAge.Value);
+                if (restart) block++;
+            }
+
+            result[i] = block;
+            prevAge = isNumeric ? ageNum : null;
+            prevWasHeadCategory = isHeadCategory;
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -838,7 +904,7 @@ public class IsrOrgAgeRecordsParser : IFormatParser
     /// <summary>
     /// Extract age category from the age column value.
     /// </summary>
-    private string ExtractAgeCategory(string ageVal)
+    private static string ExtractAgeCategory(string ageVal)
     {
         if (string.IsNullOrWhiteSpace(ageVal)) return "";
         if (ContainsAny(ageVal, HebrewIsrael, HebrewIsraelRev))
@@ -851,6 +917,19 @@ public class IsrOrgAgeRecordsParser : IFormatParser
         if (numMatch.Success) return numMatch.Value;
         return ageVal;
     }
+
+    /// <summary>
+    /// Строгий шаблон метки дистанции: только число (или "4x100") и, возможно, "מ׳".
+    /// Нужен, чтобы читать метку блока из строки, в Y-группу которой она затекла.
+    /// </summary>
+    private static bool LooksLikeDistanceLabel(string distRaw)
+    {
+        var t = distRaw.Replace(HebrewMeter, "").Replace(HebrewMeterRev, "").Trim();
+        return t.Length > 0 && Regex.IsMatch(t, @"^\d+\s*([xX]\s*\d+)?$");
+    }
+
+    private static bool IsCanonicalStyle(string style) =>
+        style is "freestyle" or "backstroke" or "breaststroke" or "butterfly" or "individual_medley";
 
     private static string NormalizeStyleHe(string styleHe)
     {

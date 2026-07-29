@@ -41,7 +41,7 @@ public sealed class CompetitionDiscoveryBackgroundService : BackgroundService
                     if (DateTime.UtcNow - lastRun >= TimeSpan.FromHours(intervalHours))
                     {
                         var discovery = scope.ServiceProvider.GetRequiredService<ICompetitionDiscoveryService>();
-                        var result = await discovery.SyncAsync(stoppingToken);
+                        var result = await discovery.SyncAsync(year: null, stoppingToken); // фон тянет только текущий сезон
                         lastRun = DateTime.UtcNow;
                         _logger.LogInformation(
                             "Discovery (фон): на сайте {Total}, новых {Added}", result.TotalOnSite, result.Added);
@@ -58,7 +58,14 @@ public sealed class CompetitionDiscoveryBackgroundService : BackgroundService
                 _logger.LogWarning(ex, "Discovery (фон): синхронизация не удалась");
             }
 
-            await Task.Delay(IdleCheck, stoppingToken).ConfigureAwait(false);
+            try
+            {
+                await Task.Delay(IdleCheck, stoppingToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                break; // остановка сервиса — штатный выход
+            }
         }
     }
 }

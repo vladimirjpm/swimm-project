@@ -409,14 +409,14 @@ public class ResultRepositoryTests
         var s1 = new Swimmer { LastName = "Aaa", FirstName = "A", LastNameEn = "Aaa", FirstNameEn = "A", BirthYear = 2000 };
         var s2 = new Swimmer { LastName = "Bbb", FirstName = "B", LastNameEn = "Bbb", FirstNameEn = "B", BirthYear = 2000 };
         db.AddRange(style, clubA, clubB, comp, s1, s2);
-        db.ClubPointsRules.Add(new ClubPointsRule
+        db.PointRulesClubs.Add(new PointRuleClubs
         {
             Version = "test", Scope = "all", EffectiveFrom = new DateOnly(2000, 1, 1), DefaultPoints = 0,
             Entries =
             [
-                new ClubPointsRuleEntry { Place = 1, Points = 30 },
-                new ClubPointsRuleEntry { Place = 2, Points = 28 },
-                new ClubPointsRuleEntry { Place = 3, Points = 26 },
+                new PointRuleClubsEntry { Place = 1, Points = 30 },
+                new PointRuleClubsEntry { Place = 2, Points = 28 },
+                new PointRuleClubsEntry { Place = 3, Points = 26 },
             ]
         });
         await db.SaveChangesAsync();
@@ -478,10 +478,10 @@ public class ResultRepositoryTests
         // ключ уходит на Relay.TeamName, как в клиентском getClubsSummary.
         var emptyClub = new Club { Name = "", NameEn = "" };
         db.AddRange(style, comp, swimmer, relay, emptyClub);
-        db.ClubPointsRules.Add(new ClubPointsRule
+        db.PointRulesClubs.Add(new PointRuleClubs
         {
             Version = "test", Scope = "all", EffectiveFrom = new DateOnly(2000, 1, 1), DefaultPoints = 0,
-            Entries = [new ClubPointsRuleEntry { Place = 1, Points = 30 }]
+            Entries = [new PointRuleClubsEntry { Place = 1, Points = 30 }]
         });
         await db.SaveChangesAsync();
 
@@ -628,7 +628,7 @@ public class ResultRepositoryTests
         Assert.Equal(0, overview.Summary.ClubCount);
         Assert.Empty(overview.Days);
         Assert.Null(overview.BestSwim);
-        Assert.Null(overview.TopMedalist);
+        Assert.Empty(overview.TopMedalists);
         Assert.Empty(overview.TopClubs);
         Assert.Empty(overview.Records);
     }
@@ -758,7 +758,7 @@ public class ResultRepositoryTests
         db.Results.AddRange(
             Row(s1.Id, 1), Row(s1.Id, 2),
             Row(s2.Id, 1), Row(s2.Id, 1),
-            // Эстафетная "медаль" — не считается.
+            // Эстафетная медаль: у relay нет RelayMembers → никому не достаётся.
             Row(s3.Id, 1, relayId: relay.Id),
             // TimeFail на 1-м месте — не считается.
             Row(s3.Id, 1, timeFail: true));
@@ -767,10 +767,13 @@ public class ResultRepositoryTests
 
         var overview = await repo.GetCompetitionOverviewAsync(new ResultFilter { CompetitionId = comp.Id });
 
-        Assert.NotNull(overview.TopMedalist);
-        Assert.Equal(s2.Id, overview.TopMedalist!.SwimmerId); // равенство медалей (2=2), больше золота
-        Assert.Equal(2, overview.TopMedalist.Gold);
-        Assert.Equal(0, overview.TopMedalist.Silver);
+        // Эстафетная медаль ТЕПЕРЬ засчитывается — но s3 в RelayMembers не заведён,
+        // а медаль принадлежит составу ног, не владельцу строки: у s3 медалей нет.
+        var top = Assert.Single(overview.TopMedalists);
+        Assert.Equal(s2.Id, top.SwimmerId); // 2 золота против 1 золота + 1 серебра у s1
+        Assert.Equal(2, top.Gold);
+        Assert.Equal(0, top.Silver);
+        Assert.False(top.IsTie);
     }
 
     [Fact]
@@ -788,10 +791,10 @@ public class ResultRepositoryTests
         var sm = new Swimmer { LastName = "Mmm", FirstName = "M", LastNameEn = "Mmm", FirstNameEn = "M", BirthYear = 2000 };
         var sw = new Swimmer { LastName = "Www", FirstName = "W", LastNameEn = "Www", FirstNameEn = "W", BirthYear = 2000 };
         db.AddRange(style, clubM, clubW, comp, sm, sw);
-        db.ClubPointsRules.Add(new ClubPointsRule
+        db.PointRulesClubs.Add(new PointRuleClubs
         {
             Version = "test", Scope = "all", EffectiveFrom = new DateOnly(2000, 1, 1), DefaultPoints = 0,
-            Entries = [new ClubPointsRuleEntry { Place = 1, Points = 30 }]
+            Entries = [new PointRuleClubsEntry { Place = 1, Points = 30 }]
         });
         await db.SaveChangesAsync();
 
@@ -886,5 +889,139 @@ public class ResultRepositoryTests
         Assert.DoesNotContain(awards, a => a.SwimmerId == m12b.Id);
         Assert.DoesNotContain(awards, a => a.SwimmerId == noYear.Id);
         Assert.DoesNotContain(awards, a => a.SwimmerId == relaySw.Id);
+    }
+
+    /// <summary>
+    /// Э2.5: у соревнования привязано правило High Point — счёт идёт по нему, а не по
+    /// зашитой сумме FINA-очков. Здесь возрастная шкала §8.A (1→5, 2→3, 3→2, 4→1), поэтому
+    /// побеждает не тот, у кого больше международных очков, а тот, кто выше по местам.
+    /// </summary>
+    [Fact]
+    public async Task Overview_HighPointAward_UsesPinnedRuleInsteadOfFinaPoints()
+    {
+        await using var db = CreateDb(nameof(Overview_HighPointAward_UsesPinnedRuleInsteadOfFinaPoints));
+
+        var rule = new PointRuleSwimmers
+        {
+            Version = "2026.01-youth", Scope = "non-masters", PointsSource = "placement",
+            GroupBy = "age", SplitByGender = true, MaxScoringPlace = 4, DefaultPoints = 0,
+            EffectiveFrom = new DateOnly(2020, 1, 1), ManualOnly = true,
+            Entries =
+            [
+                new PointRuleSwimmersEntry { Place = 1, Points = 5 },
+                new PointRuleSwimmersEntry { Place = 2, Points = 3 },
+                new PointRuleSwimmersEntry { Place = 3, Points = 2 },
+                new PointRuleSwimmersEntry { Place = 4, Points = 1 },
+            ]
+        };
+        db.Add(rule);
+        await db.SaveChangesAsync();
+
+        var style = new Style { Name = "freestyle" };
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var comp = new Competition
+        {
+            Name = "Meet", Country = new Country { CountryCode = "ISR", CountryName = "ISR" },
+            Date = "01/01/2024", PoolType = "50m",
+            PointRuleSwimmersId = rule.Id
+        };
+        // Оба 12 лет. У «золотого» меньше FINA-очков, но два первых места (5+5=10);
+        // у соперника больше FINA-очков, но четвёртые места (1+1=2).
+        var gold = new Swimmer { LastName = "Gold", FirstName = "G", LastNameEn = "Gold", FirstNameEn = "G", BirthYear = 2012 };
+        var finaKing = new Swimmer { LastName = "Fina", FirstName = "F", LastNameEn = "Fina", FirstNameEn = "F", BirthYear = 2012 };
+        db.AddRange(style, club, comp, gold, finaKing);
+        await db.SaveChangesAsync();
+
+        var date = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        ResultRecord Row(int swimmer, int place, int fina) => new()
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer, ClubId = club.Id, StyleId = style.Id,
+            Distance = "100", Gender = "male", CompetitionDate = date, TimeOriginal = "1:00.00",
+            AgeGroup = "Open", EventStyleAge = "100 freestyle Open",
+            Position = place, InternationalPoints = fina
+        };
+        db.Results.AddRange(
+            Row(gold.Id, 1, 100), Row(gold.Id, 1, 100),        // по правилу 10, по FINA 200
+            Row(finaKing.Id, 4, 900), Row(finaKing.Id, 4, 900)); // по правилу 2, по FINA 1800
+        await db.SaveChangesAsync();
+
+        var repo = new ResultRepository(db, NoCache());
+        var awards = (await repo.GetCompetitionOverviewAsync(
+            new ResultFilter { CompetitionId = comp.Id })).HighPointAwards;
+
+        var winner = Assert.Single(awards);
+        Assert.Equal(gold.Id, winner.SwimmerId);   // legacy-расчёт назвал бы finaKing
+        Assert.Equal(10, winner.Points);
+        Assert.Equal(12, winner.Age);
+        Assert.Equal("male", winner.Gender);
+        Assert.False(winner.IsTie);
+        Assert.Equal("2026.01-youth", winner.RuleVersion);
+        Assert.Null(winner.GroupLabel);            // GroupBy=age — номинация это возраст
+    }
+
+    /// <summary>
+    /// Э2.5, §8.A: за установленный возрастной рекорд начисляется 13 очков вместо очков за
+    /// место — «כולל הניקוד עבור מדליית הזהב», то есть замещение, а не сложение. Рекорд
+    /// считается независимо от места: заплыв бывает сводным, и 12-летний с рекордом для
+    /// 12 лет может проиграть более старшему.
+    /// </summary>
+    [Fact]
+    public async Task Overview_HighPointAward_RecordBonusReplacesPlacePoints()
+    {
+        await using var db = CreateDb(nameof(Overview_HighPointAward_RecordBonusReplacesPlacePoints));
+
+        var rule = new PointRuleSwimmers
+        {
+            Version = "2026.01-youth", Scope = "non-masters", PointsSource = "placement",
+            GroupBy = "age", SplitByGender = true, MaxScoringPlace = 4, DefaultPoints = 0,
+            RecordPoints = 13, RecordTiePoints = 8,
+            EffectiveFrom = new DateOnly(2020, 1, 1), ManualOnly = true,
+            Entries = [new PointRuleSwimmersEntry { Place = 1, Points = 5 },
+                       new PointRuleSwimmersEntry { Place = 2, Points = 3 }]
+        };
+        db.Add(rule);
+        // Возрастной рекорд для 12 лет: 1:00.00 в 50-метровом бассейне.
+        db.Add(new Swimm.Domain.Entities.Record
+        {
+            RegionType = "country", RegionCode = "ISR", Category = "age", AgeKey = "12",
+            Gender = "male", PoolType = "50m", Style = "freestyle", Distance = "100m",
+            Time = "1:00.00"
+        });
+        await db.SaveChangesAsync();
+
+        var style = new Style { Name = "freestyle" };
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var comp = new Competition
+        {
+            Name = "Meet", Country = new Country { CountryCode = "ISR", CountryName = "ISR" },
+            Date = "01/01/2024", PoolType = "50m", PointRuleSwimmersId = rule.Id
+        };
+        // Рекордсмен финишировал ВТОРЫМ (3 очка за место), но выбил рекорд → 13.
+        var breaker = new Swimmer { LastName = "Breaker", FirstName = "B", LastNameEn = "Breaker", FirstNameEn = "B", BirthYear = 2012 };
+        // Победитель заплыва — рекорд не тронул, остаётся при 5 очках за место.
+        var champ = new Swimmer { LastName = "Champ", FirstName = "C", LastNameEn = "Champ", FirstNameEn = "C", BirthYear = 2012 };
+        db.AddRange(style, club, comp, breaker, champ);
+        await db.SaveChangesAsync();
+
+        var date = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        ResultRecord Row(int swimmer, int place, int ms) => new()
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer, ClubId = club.Id, StyleId = style.Id,
+            Distance = "100", Gender = "male", CompetitionDate = date, TimeOriginal = "1:00.00",
+            AgeGroup = "Open", EventStyleAge = "100 freestyle Open",
+            Position = place, TimeMillisecond = ms, InternationalPoints = 0
+        };
+        db.Results.AddRange(
+            Row(breaker.Id, 2, 59_000),   // быстрее рекорда 60 000 → 13 очков
+            Row(champ.Id, 1, 61_000));    // медленнее рекорда → 5 очков за первое место
+        await db.SaveChangesAsync();
+
+        var repo = new ResultRepository(db, NoCache());
+        var awards = (await repo.GetCompetitionOverviewAsync(
+            new ResultFilter { CompetitionId = comp.Id })).HighPointAwards;
+
+        var winner = Assert.Single(awards);
+        Assert.Equal(breaker.Id, winner.SwimmerId);
+        Assert.Equal(13, winner.Points);   // 13, а НЕ 13 + 3
     }
 }

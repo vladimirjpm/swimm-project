@@ -219,9 +219,10 @@ namespace Swimm.Infrastructure.Migrations
                         new
                         {
                             Id = 1,
+                            Badge = "J",
                             DisplayOrder = 1,
                             Key = "results-main",
-                            Name = "Main Results"
+                            Name = "Juniors"
                         },
                         new
                         {
@@ -234,18 +235,18 @@ namespace Swimm.Infrastructure.Migrations
                         new
                         {
                             Id = 3,
-                            Badge = "Y",
+                            Badge = "K",
                             DisplayOrder = 3,
                             Key = "results-youth-team",
-                            Name = "Youth Results"
+                            Name = "Kids"
                         },
                         new
                         {
                             Id = 4,
-                            Badge = "J",
+                            Badge = "Y",
                             DisplayOrder = 4,
                             Key = "results-junior-results",
-                            Name = "Junior Results"
+                            Name = "Youth"
                         });
                 });
 
@@ -309,346 +310,6 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("Clubs", (string)null);
                 });
 
-            modelBuilder.Entity("Swimm.Domain.Entities.ClubPointsRule", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("DefaultPoints")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
-
-                    b.Property<DateOnly>("EffectiveFrom")
-                        .HasColumnType("date");
-
-                    b.Property<int?>("MaxScoringPlace")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Scope")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("Version")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Version")
-                        .IsUnique();
-
-                    b.ToTable("ClubPointsRules", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            DefaultPoints = 0,
-                            Description = "Israeli swimming club points system starting Jan 2025",
-                            EffectiveFrom = new DateOnly(2025, 1, 1),
-                            MaxScoringPlace = 24,
-                            Scope = "all",
-                            Version = "2025.01"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            DefaultPoints = 0,
-                            Description = "Masters club points system (places 1-12)",
-                            EffectiveFrom = new DateOnly(2025, 1, 1),
-                            MaxScoringPlace = 12,
-                            Scope = "masters",
-                            Version = "2025.01-masters"
-                        });
-                });
-
-            modelBuilder.Entity("Swimm.Domain.Entities.ClubPointsRuleEntry", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("Place")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Points")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("RuleId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RuleId", "Place")
-                        .IsUnique();
-
-                    b.ToTable("ClubPointsRuleEntries", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Place = 1,
-                            Points = 30,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Place = 2,
-                            Points = 28,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Place = 3,
-                            Points = 26,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Place = 4,
-                            Points = 24,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 5,
-                            Place = 5,
-                            Points = 23,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 6,
-                            Place = 6,
-                            Points = 22,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 7,
-                            Place = 7,
-                            Points = 21,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 8,
-                            Place = 8,
-                            Points = 20,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 9,
-                            Place = 9,
-                            Points = 19,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 10,
-                            Place = 10,
-                            Points = 18,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 11,
-                            Place = 11,
-                            Points = 16,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 12,
-                            Place = 12,
-                            Points = 15,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 13,
-                            Place = 13,
-                            Points = 14,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 14,
-                            Place = 14,
-                            Points = 13,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 15,
-                            Place = 15,
-                            Points = 12,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 16,
-                            Place = 16,
-                            Points = 11,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 17,
-                            Place = 17,
-                            Points = 10,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 18,
-                            Place = 18,
-                            Points = 9,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 19,
-                            Place = 19,
-                            Points = 8,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 20,
-                            Place = 20,
-                            Points = 7,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 21,
-                            Place = 21,
-                            Points = 5,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 22,
-                            Place = 22,
-                            Points = 3,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 23,
-                            Place = 23,
-                            Points = 2,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 24,
-                            Place = 24,
-                            Points = 1,
-                            RuleId = 1
-                        },
-                        new
-                        {
-                            Id = 25,
-                            Place = 1,
-                            Points = 12,
-                            RuleId = 2
-                        },
-                        new
-                        {
-                            Id = 26,
-                            Place = 2,
-                            Points = 11,
-                            RuleId = 2
-                        },
-                        new
-                        {
-                            Id = 27,
-                            Place = 3,
-                            Points = 10,
-                            RuleId = 2
-                        },
-                        new
-                        {
-                            Id = 28,
-                            Place = 4,
-                            Points = 9,
-                            RuleId = 2
-                        },
-                        new
-                        {
-                            Id = 29,
-                            Place = 5,
-                            Points = 8,
-                            RuleId = 2
-                        },
-                        new
-                        {
-                            Id = 30,
-                            Place = 6,
-                            Points = 7,
-                            RuleId = 2
-                        },
-                        new
-                        {
-                            Id = 31,
-                            Place = 7,
-                            Points = 6,
-                            RuleId = 2
-                        },
-                        new
-                        {
-                            Id = 32,
-                            Place = 8,
-                            Points = 5,
-                            RuleId = 2
-                        },
-                        new
-                        {
-                            Id = 33,
-                            Place = 9,
-                            Points = 4,
-                            RuleId = 2
-                        },
-                        new
-                        {
-                            Id = 34,
-                            Place = 10,
-                            Points = 3,
-                            RuleId = 2
-                        },
-                        new
-                        {
-                            Id = 35,
-                            Place = 11,
-                            Points = 2,
-                            RuleId = 2
-                        },
-                        new
-                        {
-                            Id = 36,
-                            Place = 12,
-                            Points = 1,
-                            RuleId = 2
-                        });
-                });
-
             modelBuilder.Entity("Swimm.Domain.Entities.Competition", b =>
                 {
                     b.Property<int>("Id")
@@ -674,6 +335,9 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<bool>("IsAward")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsChampionship")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsMasters")
                         .HasColumnType("boolean");
 
@@ -683,6 +347,12 @@ namespace Swimm.Infrastructure.Migrations
                         .HasColumnType("character varying(300)");
 
                     b.Property<int?>("OrgCompId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("PointRuleClubsId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("PointRuleSwimmersId")
                         .HasColumnType("integer");
 
                     b.Property<string>("PoolType")
@@ -702,6 +372,10 @@ namespace Swimm.Infrastructure.Migrations
                     b.HasIndex("CountryId");
 
                     b.HasIndex("EventId");
+
+                    b.HasIndex("PointRuleClubsId");
+
+                    b.HasIndex("PointRuleSwimmersId");
 
                     b.HasIndex("Name", "Date", "PoolType")
                         .IsUnique();
@@ -1344,6 +1018,454 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("NormativeStandards", (string)null);
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.PointRuleClubs", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("DefaultPoints")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("ManualOnly")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("MaxScoringPlace")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RelayMultiplier")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Version")
+                        .IsUnique();
+
+                    b.ToTable("PointRulesClubs", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            DefaultPoints = 0,
+                            Description = "Israeli swimming club points system starting Jan 2025",
+                            EffectiveFrom = new DateOnly(2025, 1, 1),
+                            ManualOnly = false,
+                            MaxScoringPlace = 24,
+                            RelayMultiplier = 2,
+                            Scope = "all",
+                            Version = "2025.01"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            DefaultPoints = 0,
+                            Description = "Masters club points system (places 1-12)",
+                            EffectiveFrom = new DateOnly(2025, 1, 1),
+                            ManualOnly = false,
+                            MaxScoringPlace = 12,
+                            RelayMultiplier = 2,
+                            Scope = "masters",
+                            Version = "2025.01-masters"
+                        });
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.PointRuleClubsEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Place")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RuleId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RuleId", "Place")
+                        .IsUnique();
+
+                    b.ToTable("PointRulesClubsEntries", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Place = 1,
+                            Points = 30,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Place = 2,
+                            Points = 28,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Place = 3,
+                            Points = 26,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Place = 4,
+                            Points = 24,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Place = 5,
+                            Points = 23,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Place = 6,
+                            Points = 22,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Place = 7,
+                            Points = 21,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 8,
+                            Place = 8,
+                            Points = 20,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 9,
+                            Place = 9,
+                            Points = 19,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 10,
+                            Place = 10,
+                            Points = 18,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 11,
+                            Place = 11,
+                            Points = 16,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 12,
+                            Place = 12,
+                            Points = 15,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 13,
+                            Place = 13,
+                            Points = 14,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 14,
+                            Place = 14,
+                            Points = 13,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 15,
+                            Place = 15,
+                            Points = 12,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 16,
+                            Place = 16,
+                            Points = 11,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 17,
+                            Place = 17,
+                            Points = 10,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 18,
+                            Place = 18,
+                            Points = 9,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 19,
+                            Place = 19,
+                            Points = 8,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 20,
+                            Place = 20,
+                            Points = 7,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 21,
+                            Place = 21,
+                            Points = 5,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 22,
+                            Place = 22,
+                            Points = 3,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 23,
+                            Place = 23,
+                            Points = 2,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 24,
+                            Place = 24,
+                            Points = 1,
+                            RuleId = 1
+                        },
+                        new
+                        {
+                            Id = 25,
+                            Place = 1,
+                            Points = 12,
+                            RuleId = 2
+                        },
+                        new
+                        {
+                            Id = 26,
+                            Place = 2,
+                            Points = 11,
+                            RuleId = 2
+                        },
+                        new
+                        {
+                            Id = 27,
+                            Place = 3,
+                            Points = 10,
+                            RuleId = 2
+                        },
+                        new
+                        {
+                            Id = 28,
+                            Place = 4,
+                            Points = 9,
+                            RuleId = 2
+                        },
+                        new
+                        {
+                            Id = 29,
+                            Place = 5,
+                            Points = 8,
+                            RuleId = 2
+                        },
+                        new
+                        {
+                            Id = 30,
+                            Place = 6,
+                            Points = 7,
+                            RuleId = 2
+                        },
+                        new
+                        {
+                            Id = 31,
+                            Place = 7,
+                            Points = 6,
+                            RuleId = 2
+                        },
+                        new
+                        {
+                            Id = 32,
+                            Place = 8,
+                            Points = 5,
+                            RuleId = 2
+                        },
+                        new
+                        {
+                            Id = 33,
+                            Place = 9,
+                            Points = 4,
+                            RuleId = 2
+                        },
+                        new
+                        {
+                            Id = 34,
+                            Place = 10,
+                            Points = 3,
+                            RuleId = 2
+                        },
+                        new
+                        {
+                            Id = 35,
+                            Place = 11,
+                            Points = 2,
+                            RuleId = 2
+                        },
+                        new
+                        {
+                            Id = 36,
+                            Place = 12,
+                            Points = 1,
+                            RuleId = 2
+                        });
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.PointRuleSwimmers", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("CountBestSwims")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DefaultPoints")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("FinalsOnly")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("GroupBy")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<bool>("IncludeRelays")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ManualOnly")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("MaxScoringPlace")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("MinSwims")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PointsSource")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int?>("RecordPoints")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("RecordTiePoints")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<bool>("SplitByGender")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Version")
+                        .IsUnique();
+
+                    b.ToTable("PointRulesSwimmers", (string)null);
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.PointRuleSwimmersEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Place")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RuleId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RuleId", "Place")
+                        .IsUnique();
+
+                    b.ToTable("PointRulesSwimmersEntries", (string)null);
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.Record", b =>
                 {
                     b.Property<int>("Id")
@@ -1491,7 +1613,13 @@ namespace Swimm.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<int?>("BestTimeMs")
+                        .HasColumnType("integer");
+
                     b.Property<int>("ClubId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("CombinedPlace")
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("CompetitionDate")
@@ -1505,6 +1633,10 @@ namespace Swimm.Infrastructure.Migrations
 
                     b.Property<string>("Distance")
                         .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("EventCategory")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
@@ -1527,6 +1659,9 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int>("InternationalPoints")
                         .HasColumnType("integer");
 
+                    b.Property<bool?>("IsBestResult")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("Lane")
                         .HasColumnType("integer");
 
@@ -1545,6 +1680,17 @@ namespace Swimm.Infrastructure.Migrations
 
                     b.Property<int>("StyleId")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("SuspectIsManual")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("SuspectNote")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("SuspectReason")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
 
                     b.Property<int>("SwimmerId")
                         .HasColumnType("integer");
@@ -1580,6 +1726,10 @@ namespace Swimm.Infrastructure.Migrations
                     b.HasIndex("GalleryId");
 
                     b.HasIndex("RelayId");
+
+                    b.HasIndex("SuspectReason")
+                        .HasDatabaseName("IX_Results_SuspectReason")
+                        .HasFilter("\"SuspectReason\" IS NOT NULL");
 
                     b.HasIndex("SwimmerId");
 
@@ -2292,17 +2442,6 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("Country");
                 });
 
-            modelBuilder.Entity("Swimm.Domain.Entities.ClubPointsRuleEntry", b =>
-                {
-                    b.HasOne("Swimm.Domain.Entities.ClubPointsRule", "Rule")
-                        .WithMany("Entries")
-                        .HasForeignKey("RuleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Rule");
-                });
-
             modelBuilder.Entity("Swimm.Domain.Entities.Competition", b =>
                 {
                     b.HasOne("Swimm.Domain.Entities.Country", "Country")
@@ -2314,9 +2453,23 @@ namespace Swimm.Infrastructure.Migrations
                         .HasForeignKey("EventId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Swimm.Domain.Entities.PointRuleClubs", "PointRuleClubs")
+                        .WithMany()
+                        .HasForeignKey("PointRuleClubsId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Swimm.Domain.Entities.PointRuleSwimmers", "PointRuleSwimmers")
+                        .WithMany()
+                        .HasForeignKey("PointRuleSwimmersId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Country");
 
                     b.Navigation("Event");
+
+                    b.Navigation("PointRuleClubs");
+
+                    b.Navigation("PointRuleSwimmers");
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.GalleryItem", b =>
@@ -2516,6 +2669,28 @@ namespace Swimm.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Competition");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.PointRuleClubsEntry", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.PointRuleClubs", "Rule")
+                        .WithMany("Entries")
+                        .HasForeignKey("RuleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Rule");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.PointRuleSwimmersEntry", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.PointRuleSwimmers", "Rule")
+                        .WithMany("Entries")
+                        .HasForeignKey("RuleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Rule");
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.RelayMember", b =>
@@ -2815,11 +2990,6 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("Competitions");
                 });
 
-            modelBuilder.Entity("Swimm.Domain.Entities.ClubPointsRule", b =>
-                {
-                    b.Navigation("Entries");
-                });
-
             modelBuilder.Entity("Swimm.Domain.Entities.CompetitionEvent", b =>
                 {
                     b.Navigation("Days");
@@ -2837,6 +3007,16 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("Members");
 
                     b.Navigation("UserMembers");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.PointRuleClubs", b =>
+                {
+                    b.Navigation("Entries");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.PointRuleSwimmers", b =>
+                {
+                    b.Navigation("Entries");
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.Relay", b =>

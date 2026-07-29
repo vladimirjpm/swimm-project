@@ -31,6 +31,14 @@ export interface ResultWrap {
     event_style_len: string;
     event_style_gender: string;
     event_style_age: string;
+    /**
+     * Категория заплыва из протокола: 'open' | 'para' | 'mix' | возрастная ('17', '25-29').
+     * null/undefined — данные импортированы до появления поля.
+     *
+     * В отличие от event_style_age НЕ производна от года рождения: в открытом заплыве
+     * плывут разные возрасты, а паралимпийская программа идёт отдельно от основной.
+     */
+    event_category?: string | null;
     pool_type: '25' | '50' | '25m' | '50m';
     /*individual data*/
     swimmer_id?: number;
@@ -51,6 +59,28 @@ export interface ResultWrap {
     time_fail_note: string | null;
     international_points: number;
     note?:string;
+
+    /**
+     * Клубные очки за заплыв — считает СЕРВЕР по правилу соревнования (Э6).
+     * Клиент их только показывает: он не видит привязку соревнования к правилу и,
+     * подбирая правило по дате, расходился с зачётом. Может отсутствовать у старых
+     * статических источников — тогда работает локальный фоллбек (ClubPointsHelper).
+     */
+    club_points?: number;
+
+    /** Клубные очки по объединённому месту дисциплины («Combine All Results»).
+     *  null/undefined — соревнование объединённый зачёт не считает. */
+    combined_club_points?: number | null;
+
+    /** Место в объединённом зачёте дисциплины по всему событию (считает сервер). */
+    combined_place?: number | null;
+
+    /** Протокольное место, сохранённое при включённом тоггле «Combine All Results»:
+     *  в position тогда лежит объединённое (см. applyCombinedPositions). */
+    position_original?: number | null;
+
+    /** Этот заплыв — лучший у пловца в дисциплине за событие (считает сервер). */
+    is_best_result?: boolean | null;
 
     /* training-specific data */
     training?: TrainingInfo;

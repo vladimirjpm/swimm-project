@@ -34,9 +34,17 @@ public static class ResultMapping
         Distance = r.Distance,
         Gender = r.Gender,
         EventStyleAge = r.EventStyleAge,
+        EventCategory = r.EventCategory,
         PoolType = r.Competition.PoolType,
         Position = r.Position,
         PositionAgeGroup = r.PositionAgeGroup,
+        CombinedPlace = r.CombinedPlace,
+        // Очки не считаются здесь: шкала правила — это JOIN на Entries, в SQL-проекцию его
+        // тянуть незачем. Проекция несёт лишь Id правила, а очки проставляются в памяти
+        // (ResultRepository.ApplyClubPoints) — правил единицы, страница максимум 500 строк.
+        PointRuleClubsId = r.Competition.PointRuleClubsId,
+        IsBestResult = r.IsBestResult,
+        BestTimeMs = r.BestTimeMs,
         Heat = r.Heat,
         Lane = r.Lane,
         SwimmerId = r.SwimmerId,

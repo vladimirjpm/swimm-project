@@ -24,14 +24,22 @@ export default class CategoryHelper {
   private static cachedCategories: CategoryApiDto[] | null = null;
   private static loadPromise: Promise<CategoryApiDto[]> | null = null;
 
-  /** Канонический ключ клиента (results-categories.ts) → Category.Key в БД. 'all' — синтетика, в БД её нет. */
+  /**
+   * Канонический ключ клиента (results-categories.ts) → Category.Key в БД. 'all' — синтетика,
+   * в БД её нет.
+   *
+   * ⚠ Имена ключей исторические и НЕ совпадают с подписями (2026-07-28 ступени переименованы):
+   *   young8_11 → «Kids» (8–11),  junior → «Youth» (11–14),  results-main → «Juniors» (בוגרים).
+   * Ключи оставлены как есть: они в URL (?category=) и в закладках пользователей.
+   */
   private static readonly CANONICAL_TO_DB_KEY: Record<string, string> = {
     young8_11: 'results-youth-team',
     junior: 'results-junior-results',
+    adults: 'results-main',
     masters: 'results-masters',
   };
 
-  /** Системные ключи БД, уже покрытые статичными табами (results-main живёт под 'junior').
+  /** Системные ключи БД, уже покрытые статичными табами (results-main — таб 'adults').
    *  Всё, чего здесь нет, — кастомная категория (result-maccabiah и т.п.): отдельный таб. */
   static readonly SYSTEM_DB_KEYS: ReadonlySet<string> = new Set([
     'results-main',
@@ -79,10 +87,10 @@ export default class CategoryHelper {
   /** Резервные категории на случай ошибки загрузки (совпадают с сидом БД). */
   private static getFallbackCategories(): CategoryApiDto[] {
     return [
-      { key: 'results-main', name: 'Main Results', badge: null, display_order: 1 },
+      { key: 'results-main', name: 'Juniors', badge: 'J', display_order: 1 },
       { key: 'results-masters', name: 'Masters', badge: 'M', display_order: 2 },
-      { key: 'results-youth-team', name: 'Youth Results', badge: 'Y', display_order: 3 },
-      { key: 'results-junior-results', name: 'Junior Results', badge: 'J', display_order: 4 },
+      { key: 'results-youth-team', name: 'Kids', badge: 'K', display_order: 3 },
+      { key: 'results-junior-results', name: 'Youth', badge: 'Y', display_order: 4 },
     ];
   }
 

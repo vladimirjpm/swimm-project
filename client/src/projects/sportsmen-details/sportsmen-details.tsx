@@ -20,7 +20,7 @@ import UI_FlagEmoji from '../components/mix/flag-icon/flag-icon';
 import UI_RecordCount from '../components/mix/record-count/record-count';
 import UI_SwimmerGallery from '../components/mix/swimmer-gallery/swimmer-gallery';
 import { GalleryItem } from '../../utils/interfaces/results';
-import { recalculatePositions } from '../../utils/helpers/recalculate-positions';
+import { applyCombinedPositions } from '../../utils/helpers/recalculate-positions';
 
 /** "15/02/2026" → "Feb 2026" (для подписи сегмента-переключателя). */
 const formatMonthYear = (date?: string): string => {
@@ -75,12 +75,8 @@ function SportsmenDetails() {
   const effectiveResults = useMemo(() => {
     const raw = selectedSource.results ?? [];
     if (!isRecalculated) return raw;
-    const recalced = recalculatePositions(raw);
-    return recalced.map(r => ({
-      ...r,
-      position_original: r.position,
-      position: r.position_recalc,
-    }));
+    // Места объединённого зачёта — с сервера (combined_place), фоллбек — локальный пересчёт.
+    return applyCombinedPositions(raw);
   }, [selectedSource, isRecalculated]);
 
   const sortedBestResults = Helper.getBestResultsByStyle(effectiveResults, filters.selected_name, isMastersSource);

@@ -71,6 +71,14 @@ public class ResultDto
     [JsonPropertyName("event_style_age")]
     public string EventStyleAge { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Категория заплыва из протокола: open / para / mix / возрастная («17», «25-29»).
+    /// null — данные импортированы до появления поля. В отличие от event_style_age НЕ
+    /// производна от года рождения: в одном открытом заплыве плывут разные возрасты.
+    /// </summary>
+    [JsonPropertyName("event_category")]
+    public string? EventCategory { get; set; }
+
     [JsonPropertyName("pool_type")]
     public string PoolType { get; set; } = string.Empty;
 
@@ -79,6 +87,39 @@ public class ResultDto
 
     [JsonPropertyName("position_age_group")]
     public int? PositionAgeGroup { get; set; }
+
+    /// <summary>Место в объединённом зачёте дисциплины по всему событию («Combine All Results»).
+    /// Заполнено только у соревнований с ShowCombineAllResults; null — режим не применим или
+    /// заплыв незачтён. Клиенту нужны ОБА места: объединённое — крупной медалью, протокольное
+    /// (<see cref="Position"/>) — маленьким бейджем внахлёст (results-table-desktop.tsx).</summary>
+    [JsonPropertyName("combined_place")]
+    public int? CombinedPlace { get; set; }
+
+    /// <summary>
+    /// Клубные очки за этот заплыв по правилу СОРЕВНОВАНИЯ (Э6). Считает сервер — клиенту
+    /// больше не нужно ни знать шкалу, ни угадывать правило по дате: он не видит привязки
+    /// соревнования к правилу и на manual-правилах расходился с зачётом (см.
+    /// docs/competition-overview-cards.md, раздел Top clubs).
+    /// Учитывает множитель эстафеты; TimeFail (DSQ) даёт 0.
+    /// </summary>
+    [JsonPropertyName("club_points")]
+    public int ClubPoints { get; set; }
+
+    /// <summary>
+    /// Клубные очки по ОБЪЕДИНЁННОМУ месту дисциплины (тоггл «Combine All Results»).
+    /// null — соревнование объединённый зачёт не считает (нет <see cref="CombinedPlace"/>).
+    /// Тоггл переключает, какое поле показывать, а не запускает пересчёт на клиенте.
+    /// </summary>
+    [JsonPropertyName("combined_club_points")]
+    public int? CombinedClubPoints { get; set; }
+
+    /// <summary>Этот заплыв — лучший у пловца в дисциплине за событие.</summary>
+    [JsonPropertyName("is_best_result")]
+    public bool? IsBestResult { get; set; }
+
+    /// <summary>Лучшее время пловца в этой дисциплине за событие, мс.</summary>
+    [JsonPropertyName("best_time_ms")]
+    public int? BestTimeMs { get; set; }
 
     [JsonPropertyName("heat")]
     public int Heat { get; set; }
@@ -133,6 +174,14 @@ public class ResultDto
 
     [JsonPropertyName("is_relay")]
     public bool IsRelay { get; set; }
+
+    /// <summary>
+    /// Правило клубных очков, привязанное к соревнованию (null — подбор по дате и типу).
+    /// Наружу не отдаётся: нужно только серверу, чтобы посчитать <see cref="ClubPoints"/>
+    /// после материализации страницы — правило резолвится в памяти, как в клубном зачёте.
+    /// </summary>
+    [JsonIgnore]
+    public int? PointRuleClubsId { get; set; }
 
     [JsonPropertyName("relay_team_name")]
     public string? RelayTeamName { get; set; }

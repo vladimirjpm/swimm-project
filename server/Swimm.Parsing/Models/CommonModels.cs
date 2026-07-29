@@ -34,7 +34,20 @@ public record Result(
     [property: JsonPropertyName("is_relay")] bool? IsRelay,
     [property: JsonPropertyName("relay_team_name")] string? RelayTeamName,
     [property: JsonPropertyName("relay_swimmers_name")] string? RelaySwimmersName,
-    [property: JsonPropertyName("relay_swimmers")] List<RelaySwimmer>? RelaySwimmers
+    [property: JsonPropertyName("relay_swimmers")] List<RelaySwimmer>? RelaySwimmers,
+
+    /// <summary>
+    /// Категория заплыва, как она напечатана в заголовке протокола: <c>open</c> (Men/Women),
+    /// <c>U17</c>, <c>para</c>, <c>mix</c>, либо возраст/группа ивритских протоколов
+    /// («12», «25-29»). null — категория неизвестна.
+    ///
+    /// Отдельно от <c>EventStyleAge</c>/<c>AgeGroup</c>, потому что те производны от ГОДА
+    /// РОЖДЕНИЯ пловца и категорию затирают: у Itsik Iaich из «50m Freestyle - Men Para»
+    /// оставался только возраст 49 и группа «45-49». Без категории три разных заплыва
+    /// протокола («Men», «U17 Boys», «Men Para») сливались в одну дисциплину «50 freestyle
+    /// male», где оказывалось три первых места.
+    /// </summary>
+    [property: JsonPropertyName("event_category")] string? EventCategory = null
 );
 
 public record RelaySwimmer(

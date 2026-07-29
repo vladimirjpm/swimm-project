@@ -1,0 +1,183 @@
+@page
+@model Swimm.API.Pages.Admin.Competitions.AssignRulesModel
+@{
+    ViewData["Title"] = "Привязка правил очков";
+    ViewData["PageSubtitle"] = "Массовая простановка правил клубного зачёта и High Point соревнованиям";
+
+    var flash = TempData["Flash"] as string;
+}
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 4000));
+    </script>
+}
+
+<div class="max-w-[960px] mx-auto">
+
+    <div class="mb-4 flex flex-wrap gap-2">
+        <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">← К соревнованиям</a>
+        <a href="/Admin/PointsRules" class="admin-btn admin-btn-ghost">Правила очков</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5 py-3 px-4 mb-4 text-sm text-admin-danger">
+            @Model.Error
+        </div>
+    }
+
+    <!-- ── Фильтры выборки ────────────────────────────────────────────────────── -->
+    <form method="get" class="admin-card mb-4">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Сезон</span>
+                <select asp-for="Year" class="admin-input">
+                    <option value="">— все —</option>
+                    @foreach (var y in Model.Years)
+                    {
+                        <option value="@y">@y</option>
+                    }
+                </select>
+            </label>
+
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Тип</span>
+                <select asp-for="Scope" class="admin-input">
+                    <option value="all">все</option>
+                    <option value="masters">только masters</option>
+                    <option value="non-masters">только обычные</option>
+                </select>
+            </label>
+
+            <label class="inline-flex items-end gap-2 text-sm cursor-pointer select-none pb-2">
+                <input asp-for="OnlyUnassigned" class="w-4 h-4 cursor-pointer" />
+                <span class="text-admin-text">Только без привязки</span>
+            </label>
+        </div>
+
+        <div class="mt-4">
+            <button type="submit" class="admin-btn admin-btn-primary">Показать</button>
+        </div>
+        <p class="mt-3 text-xs text-admin-text-muted leading-relaxed">
+            Список — по <strong class="text-admin-text">дням</strong>, а не по свёрнутым событиям:
+            правило хранится у каждого дня отдельно. Синтетика (SYNTH…) не показывается.
+        </p>
+    </form>
+
+    <!-- ── Выборка + применение ───────────────────────────────────────────────── -->
+    <form method="post" asp-page-handler="Apply"
+          asp-route-year="@Model.Year" asp-route-scope="@Model.Scope" asp-route-unassigned="@Model.OnlyUnassigned">
+
+        <div class="admin-card mb-4">
+            <h2 class="text-sm font-semibold text-admin-text mb-3">Что проставить отмеченным</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">Клубные очки</span>
+                    <select asp-for="ClubsChoice" class="admin-input">
+                        <option value="keep">— не менять —</option>
+                        <option value="auto">Авто (снять привязку)</option>
+                        @foreach (var r in Model.ClubRules)
+                        {
+                            <option value="@r.Id">@r.Version · @r.Scope@(r.ManualOnly ? " · manual" : "")</option>
+                        }
+                    </select>
+                </label>
+
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-admin-text-muted">High Point</span>
+                    <select asp-for="SwimmersChoice" class="admin-input">
+                        <option value="keep">— не менять —</option>
+                        <option value="auto">Авто (снять привязку)</option>
+                        @foreach (var r in Model.SwimmerRules)
+                        {
+                            <option value="@r.Id">@r.Version · @r.Scope@(r.ManualOnly ? " · manual" : "")</option>
+                        }
+                    </select>
+                </label>
+            </div>
+
+            <div class="mt-4 flex flex-wrap items-center gap-3">
+                <button type="submit" class="admin-btn admin-btn-danger"
+                        onclick="return confirm('Проставить правила отмеченным соревнованиям? Очки в публичных выдачах изменятся сразу.');">
+                    Применить к отмеченным
+                </button>
+                <span class="text-xs text-admin-text-muted">Отмечено: <strong id="sel-count" class="text-admin-text">0</strong></span>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th class="w-10"><input type="checkbox" id="check-all" class="cursor-pointer" title="Отметить все" /></th>
+                        <th class="w-16 text-right">#</th>
+                        <th>Соревнование</th>
+                        <th>Дата</th>
+                        <th>Клубные очки</th>
+                        <th>High Point</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Rows.Count == 0)
+                    {
+                        <tr><td colspan="6" class="text-admin-text-muted py-6 text-center text-sm">Под фильтры ничего не попало.</td></tr>
+                    }
+                    @foreach (var r in Model.Rows)
+                    {
+                        <tr>
+                            <td><input type="checkbox" name="Selected" value="@r.Id" class="row-check cursor-pointer" /></td>
+                            <td class="text-right tabular-nums text-admin-text-muted">@r.Id</td>
+                            <td>
+                                <a href="@Url.Page("Edit", new { id = r.Id })" class="text-admin-accent hover:underline">@r.Name</a>
+                                @if (!string.IsNullOrEmpty(r.SubName))
+                                {
+                                    <span class="text-admin-text-muted text-xs"> · @r.SubName</span>
+                                }
+                                @if (r.IsMasters)
+                                {
+                                    <span class="ml-1.5 admin-badge border-admin-border text-admin-text-muted">masters</span>
+                                }
+                            </td>
+                            <td class="tabular-nums whitespace-nowrap">@r.Date</td>
+                            <td class="font-mono text-xs">
+                                @if (r.ClubsRuleVersion is null)
+                                {
+                                    <span class="text-admin-text-muted">авто</span>
+                                }
+                                else
+                                {
+                                    <span class="text-admin-text">@r.ClubsRuleVersion</span>
+                                }
+                            </td>
+                            <td class="font-mono text-xs">
+                                @if (r.SwimmersRuleVersion is null)
+                                {
+                                    <span class="text-admin-text-muted">авто</span>
+                                }
+                                else
+                                {
+                                    <span class="text-admin-text">@r.SwimmersRuleVersion</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+
+<script>
+    (() => {
+        const all = document.getElementById('check-all');
+        const rows = [...document.querySelectorAll('.row-check')];
+        const counter = document.getElementById('sel-count');
+        const refresh = () => { counter.textContent = rows.filter(c => c.checked).length; };
+
+        all?.addEventListener('change', () => { rows.forEach(c => c.checked = all.checked); refresh(); });
+        rows.forEach(c => c.addEventListener('change', refresh));
+        refresh();
+    })();
+</script>

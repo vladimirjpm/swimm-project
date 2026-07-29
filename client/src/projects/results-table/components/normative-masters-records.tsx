@@ -218,7 +218,7 @@ function NormativeMastersRecords({ gender, poolType, styleName, styleLen, age }:
   if (!rendered) return null;
 
   // Та же ширина/центровка, что у таблицы результатов.
-  return <div className="lg:max-w-[1180px] lg:mx-auto">{rendered}</div>;
+  return <>{rendered}</>;
 }
 
 export default NormativeMastersRecords;

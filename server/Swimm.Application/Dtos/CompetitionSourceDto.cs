@@ -36,10 +36,16 @@ public sealed class CompetitionSourceDto
     [JsonPropertyName("is_award")]
     public bool IsAward { get; init; }
 
+    /// <summary>Чемпионат Израиля (ручной флаг Competition.IsChampionship; у события — хотя бы
+    /// один день). Клиент рисует 🏆 и фильтрует по нему в селекторе соревнования.</summary>
+    [JsonPropertyName("is_championship")]
+    public bool IsChampionship { get; init; }
+
     [JsonPropertyName("show_combine_all_results")]
     public bool ShowCombineAllResults { get; init; }
 
-    /// <summary>Канонический таб селектора: "young8_11" | "junior" | "masters" | null.
+    /// <summary>Канонический таб селектора: "young8_11" (Kids) | "junior" (Youth) |
+    /// "adults" (Juniors/בוגרים) | "masters" | null.
     /// Из реального членства (CategoryCompetitions): masters (is_masters/results-masters) >
     /// results-youth-team > results-junior-results/results-main. null — ни в одной из
     /// канонических (кастомная категория или без категории): клиент показывает такое

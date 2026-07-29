@@ -1,0 +1,86 @@
+@page
+@using Swimm.Application.Dtos
+@model Swimm.API.Pages.Admin.PointsRules.IndexModel
+@{
+    ViewData["Title"] = "Points rules";
+    ViewData["PageSubtitle"] = "Правила начисления очков: клубный зачёт и High Point";
+
+    var flash = TempData["Flash"] as string;
+    var kind = Model.Kind;
+}
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}
+
+<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div class="flex gap-2">
+        @foreach (var (slug, title) in new[] { ("clubs", "Клубные очки"), ("swimmers", "High Point") })
+        {
+            <a href="@Url.Page("Index", new { kind = slug })"
+               class="admin-btn import-tab @(kind == slug ? "import-tab-active" : "")">@title</a>
+        }
+    </div>
+    <a href="@Url.Page("Edit", new { kind })" class="admin-btn admin-btn-primary">+ Новое правило</a>
+</div>
+
+<div class="admin-card border-l-[3px] border-l-admin-accent bg-admin-accent/5 py-3 px-4 mb-4 text-xs text-admin-text-muted leading-relaxed">
+    Соревнование берёт правило по <strong class="text-admin-text">явной привязке</strong>
+    (/Admin/Competitions); если привязки нет — подбирается действующее на дату правило нужного
+    scope, кроме помеченных <strong class="text-admin-text">manual</strong>. Правки видны сразу:
+    после сохранения кэш очков сбрасывается.
+</div>
+
+<div class="overflow-x-auto">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th class="w-16 text-right">#</th>
+                <th>Версия</th>
+                <th>Scope</th>
+                <th>Действует с</th>
+                <th>Описание</th>
+                <th class="text-right">Мест в шкале</th>
+                <th class="text-right">Соревнований</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Rules.Count == 0)
+            {
+                <tr>
+                    <td colspan="8" class="text-admin-text-muted py-6 text-center text-sm">
+                        Правил пока нет — очки считает legacy-ветка расчёта.
+                    </td>
+                </tr>
+            }
+            @foreach (var r in Model.Rules)
+            {
+                <tr>
+                    <td class="text-right tabular-nums text-admin-text-muted">@r.Id</td>
+                    <td>
+                        <a href="@Url.Page("Edit", new { kind, id = r.Id })" class="text-admin-accent hover:underline font-medium font-mono">@r.Version</a>
+                        @if (r.ManualOnly)
+                        {
+                            <span class="ml-1.5 admin-badge border-admin-warning/30 bg-admin-warning/15 text-admin-warning"
+                                  title="Только по явной привязке — в автоподборе по дате не участвует">manual</span>
+                        }
+                    </td>
+                    <td class="font-mono text-xs text-admin-text-muted">@r.Scope</td>
+                    <td class="tabular-nums">@r.EffectiveFrom.ToString("dd/MM/yyyy")</td>
+                    <td class="text-admin-text-muted text-xs max-w-[320px]">@r.Description</td>
+                    <td class="text-right tabular-nums">@r.EntryCount</td>
+                    <td class="text-right tabular-nums">@r.CompetitionCount</td>
+                    <td class="text-right whitespace-nowrap">
+                        <a href="@Url.Page("Edit", new { kind, id = r.Id })" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
+                        <a href="@Url.Page("Edit", new { kind, cloneFrom = r.Id })" class="admin-btn admin-btn-ghost py-1 px-2.5"
+                           title="Создать новую версию на основе этой">Клонировать</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

@@ -16,7 +16,7 @@ import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import UI_ThemeDevTool from '../components/mix/theme-dev-tool/theme-dev-tool';
 import GroupHeader from './components/group-header/group-header';
 import CompetitionHeader from './components/competition-header/competition-header';
-import CompetitionOverviewContent from './components/competition-header/competition-overview';
+import CompetitionOverview2 from './components/competition-header/overview2/competition-overview2';
 import CompetitionClubs from './components/competition-header/competition-clubs';
 import CompetitionMedia from './components/competition-header/competition-media';
 import CompetitionRecords from './components/competition-header/competition-records';
@@ -28,6 +28,7 @@ import type { HubGroupDetails } from '../hub-groups-project/types';
 import { useAuth } from '../../hooks/useAuth';
 import { useCompetitionMedia } from '../../hooks/useCompetitionMedia';
 import { parseRoute } from '../../utils/routes';
+import { PAGE_CONTAINER } from '../../utils/layout';
 
 // === Вспомогательная функция ===
 function checkIsTraining(selectedSource: any, filters: any) {
@@ -241,6 +242,8 @@ function ResultsMain() {
     setCompTab(tab);
     const url = new URL(window.location.href);
     url.searchParams.set('tab', tab);
+    // ?panel= принадлежит только Overview (активный модуль мозаики).
+    if (tab !== 'overview') url.searchParams.delete('panel');
     window.history.replaceState(null, '', url.toString());
   }, []);
 
@@ -311,6 +314,7 @@ function ResultsMain() {
     const url = new URL(window.location.href);
     url.searchParams.set('tab', 'swims');
     url.searchParams.set('filter', scope);
+    url.searchParams.delete('panel');
     window.history.replaceState(null, '', url.toString());
   }, [dispatch, filters, scopedFilterReset]);
 
@@ -400,11 +404,13 @@ function ResultsMain() {
   );
 
   return (
-    <div className="dolphine-training md:p-4 pt-safe pb-safe min-h-screen bg-[var(--theme-mode-page-bg)]">
+    // Горизонтальных паддингов у корня НЕТ (handoff v2, 5a): полосы-фоны идут
+    // край-в-край, ширину держит PAGE_CONTAINER внутри полос и вокруг контента.
+    <div className="dolphine-training md:py-4 pt-safe pb-safe min-h-screen bg-[var(--theme-mode-page-bg)]">
       {/* Топбар full-bleed: гасим паддинги корня, чтобы полоса шла от края до края
           и шапка селектора/группы прижималась к ней слитным блоком (без зазора).
           sticky — на обёртке: внутри неё sticky самого топбара некуда «липнуть». */}
-      <div className="sticky top-0 z-50 md:-m-4 md:mb-0">
+      <div className="sticky top-0 z-50 md:-mt-4">
         <AppTopbar />
       </div>
       {/* Переключатель Light/Dark (fixed внизу-справа) */}
@@ -416,7 +422,7 @@ function ResultsMain() {
           Overview/Members/Records — ссылки на обзорную groups.html; Competitions/Trainings —
           локальный toggle (единственное место переключения активности, см. FilterActivity). */}
       {groupSlug ? (
-        <div className="relative w-full z-40 max-md:px-2 max-md:pt-2 md:-mx-4 md:w-auto">
+        <div className="relative w-full z-40 max-md:px-2 max-md:pt-2">
           <GroupHeader
             slug={groupSlug}
             group={groupInfo}
@@ -428,7 +434,7 @@ function ResultsMain() {
       ) : (
         /* Селектор соревнований: шапка/панель, единый для всех брейкпоинтов
             (mobile — bottom sheet из «Change», design_handoff_selector_all) */
-        <div className="relative w-full z-40 max-md:px-2 max-md:pt-2 md:-mx-4 md:w-auto">
+        <div className="relative w-full z-40 max-md:px-2 max-md:pt-2">
           {/* Одна шапка: в режиме соревнования DDL рендерит НАШУ шапку (hero + табы,
               «Change ▾» внутри hero), оставляя себе только панель выбора.
               В остальных режимах (тренировки, нет источника) — встроенная шапка DDL. */}
@@ -459,6 +465,10 @@ function ResultsMain() {
       {/* Add media (Competition header hero + пустое состояние таба Media) — единый модал */}
       {addMedia.modalNode}
 
+      {/* Контент страницы — в общем контейнере (handoff v2, 5a): Overview, табы
+          соревнования, фильтры и таблицы результатов держат одну ширину. */}
+      <div className={PAGE_CONTAINER}>
+
       {/* Источник не выбран (deep-link ?category=): селектор выше открыт inline,
           область контента приглушена с подсказкой (CHANGES.md, frame 7a) */}
       {trainingGroupError ? (
@@ -487,12 +497,15 @@ function ResultsMain() {
       ) : !groupSlug && !isTraining && compSourceParams && compTab !== 'swims' ? (
         /* Не-Swims табы соревнования: контент под шапкой, фильтры/таблица не рендерятся */
         compTab === 'overview' ? (
-          <CompetitionOverviewContent
+          <CompetitionOverview2
             overview={compOverview}
             loading={compOverviewLoading}
+            mediaItems={compMediaItems}
             onOpenTab={handleCompTabChange}
             onOpenSwim={handleOpenSwim}
             onOpenClub={handleOpenClub}
+            onOpenSwimsScoped={handleOpenSwimsScoped}
+            onAddMedia={auth.isAuthenticated && addMedia.canAdd ? addMedia.openModal : undefined}
           />
         ) : compTab === 'clubs' ? (
           <CompetitionClubs sourceParams={compSourceParams} onOpenSwimsForClub={handleOpenSwimsForClub} />
@@ -511,21 +524,24 @@ function ResultsMain() {
         <>
           {/* Контент страницы */}
           <div className="flex flex-col lg:flex-row gap-4 mt-4">
-            {/* Левая колонка — фильтры (только десктоп) */}
+            {/* Левая колонка — фильтры (только десктоп).
+                Ширина фиксированная, а не доля (было lg:w-2/12): после ограничения страницы
+                до 1440px доля давала ~240px, и «Стиль» с «Дистанцией» переставали помещаться
+                в строку. Таблица занимает остаток через flex-1. */}
             {!isTraining && (
-              <div className="filter-section w-full lg:w-2/12 hidden lg:block">
+              <div className="filter-section w-full lg:w-[340px] lg:shrink-0 hidden lg:block">
                 <FilterSection />
               </div>
             )}
             {isTraining && (
-              <div className="filter-trainig-section w-full lg:w-2/12 hidden lg:block">
+              <div className="filter-trainig-section w-full lg:w-[340px] lg:shrink-0 hidden lg:block">
                 <FilterTrainigSection />
               </div>
             )}
 
             {/* Центральная колонка — результаты (детали теперь попапом, поэтому полная ширина) */}
             {!isTraining && (
-              <div className="results-table w-full lg:w-10/12 bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] rounded shadow">
+              <div className="results-table w-full lg:flex-1 lg:min-w-0 bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] rounded shadow">
                 {/* Активный скоуп «мои/избранные» (?filter=) — чип с крестиком.
                     Только залогиненному: гостю скоуп не применяется (см. results-table). */}
                 {auth.isAuthenticated &&
@@ -556,7 +572,7 @@ function ResultsMain() {
               </div>
             )}
             {isTraining && (
-              <div className="w-full lg:w-10/12 bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] p-0 md:p-4 rounded shadow">
+              <div className="w-full lg:flex-1 lg:min-w-0 bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] p-0 md:p-4 rounded shadow">
                 <TrainingTable />
               </div>
             )}
@@ -579,6 +595,7 @@ function ResultsMain() {
           </MobileSportsmenModal>
         </>
       )}
+      </div>
     </div>
   );
 }

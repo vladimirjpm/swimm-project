@@ -17,9 +17,11 @@
 | /Admin/Competitions | [competitions.md](competitions.md) | Соревнования: справочник БД + входящие isr.org.il одним списком (CRUD + импорт) |
 | /Admin/Results | [results.md](results.md) | Ручная правка отдельного результата (опечатки протокола) |
 | /Admin/Competitions/MoveResults | [competitions-moveresults.md](competitions-moveresults.md) | Массовый перенос результатов между соревнованиями (склейка дублей) |
+| /Admin/Competitions/AssignRules | [competitions.md](competitions.md#привязка-правил-очков-э4) | Массовая привязка правил очков к соревнованиям |
 | /Admin/Categories | [categories.md](categories.md) | Категории соревнований (бейджи) |
 | /Admin/Styles | [styles.md](styles.md) | Справочник стилей плавания (CRUD, посевные защищены) |
 | /Admin/Records | [records.md](records.md) | Рекорды и нормативы уровней |
+| /Admin/PointsRules | [pointsrules.md](pointsrules.md) | Правила начисления очков: клубный зачёт и High Point (CRUD, шкалы, клонирование версий) |
 | /Admin/HubGroups | [hubgroups.md](hubgroups.md) | Группы SwimHub |
 | /Admin/HubGroupClubRequests | [hubgroupclubrequests.md](hubgroupclubrequests.md) | Заявки групп на статус клуба |
 | /Admin/Import | [import.md](import.md) | Импорт соревнований (JSON/PDF) и рекордов |

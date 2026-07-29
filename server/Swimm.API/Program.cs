@@ -154,6 +154,19 @@ if (args.Contains("--migrate"))
     return;
 }
 
+// Пересчёт объединённых мест «Combine All Results» во всех соревнованиях с этим флагом:
+//   dotnet run -- --recalc-combined
+// Нужен разово после миграции (бэкфилл) и как аварийная кнопка, если материализованные
+// значения разошлись с результатами.
+if (args.Contains("--recalc-combined"))
+{
+    using var scope = app.Services.CreateScope();
+    var svc = scope.ServiceProvider.GetRequiredService<ICompetitionRecalculationService>();
+    var updated = await svc.RecalculateAllCombinedAsync();
+    Console.WriteLine($"Combine All Results: пересчитано строк — {updated}");
+    return;
+}
+
 // Одноразовый сид рекордов/нормативов из легаси JS-файлов клиента:
 //   dotnet run -- --seed-records <путь к client/public/data> [--force]
 // --force заменяет содержимое таблиц целиком (иначе непустые таблицы — отказ).

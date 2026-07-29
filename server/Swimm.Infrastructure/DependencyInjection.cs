@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -58,6 +58,7 @@ public static class DependencyInjection
         services.AddScoped<ICompetitionAdminRepository, CompetitionAdminRepository>();
         services.AddScoped<ICategoryAdminRepository, CategoryAdminRepository>();
         services.AddScoped<IStyleAdminRepository, StyleAdminRepository>();
+        services.AddScoped<IPointRulesAdminRepository, PointRulesAdminRepository>();
         services.AddScoped<IResultAdminRepository, ResultAdminRepository>();
         services.AddScoped<IResultTransferService, ResultTransferService>();
         services.AddScoped<IClubAdminRepository, ClubAdminRepository>();
@@ -73,6 +74,7 @@ public static class DependencyInjection
         services.AddScoped<IHubGroupUserService, HubGroupUserService>();
         services.AddScoped<IHubGroupClubRequestAdminService, HubGroupClubRequestAdminService>();
         services.AddScoped<IClubPointsRepository, ClubPointsRepository>();
+        services.AddScoped<ICompetitionRecalculationService, CompetitionRecalculationService>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
 
         // Локальный вход (email + пароль)
@@ -178,6 +180,7 @@ public static class DependencyInjection
 
         // Deep-link выборки «здоровье данных» дашборда (T3b, docs/tasks/dashboard-deeplinks-lists-sonnet.md)
         services.AddScoped<IDataQualityService, DataQualityService>();
+        services.AddScoped<ISuspectResultService, SuspectResultService>();
 
         return services;
     }

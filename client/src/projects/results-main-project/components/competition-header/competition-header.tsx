@@ -40,14 +40,17 @@ export default function CompetitionHeader({
         onChangeClick={onChangeClick}
         changeOpen={changeOpen}
       />
-      {/* Персональная полоса (только залогиненному; красится токенами --theme-personal-*) */}
+      {/* Персональная полоса (только залогиненному; красится токенами --theme-personal-*).
+          В мобайле её нет (handoff v3, 9f) — её роль выполняет таб-модуль Favorites. */}
       {onOpenSwimsScoped && (
-        <CompetitionPersonalStrip
-          overview={overview}
-          onOpenSwims={onOpenSwimsScoped}
-          onOpenMedia={() => onTabChange('media')}
-          onAddMedia={onAddMedia}
-        />
+        <div className="hidden lg:block">
+          <CompetitionPersonalStrip
+            overview={overview}
+            onOpenSwims={onOpenSwimsScoped}
+            onOpenMedia={() => onTabChange('media')}
+            onAddMedia={onAddMedia}
+          />
+        </div>
       )}
       <CompetitionTabs
         overview={overview}

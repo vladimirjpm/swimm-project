@@ -38,15 +38,20 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
         _configuration = configuration;
     }
 
-    public async Task<IReadOnlyList<DiscoveredListItem>> FetchListAsync(bool finished, CancellationToken ct = default)
+    public async Task<IReadOnlyList<DiscoveredListItem>> FetchListAsync(
+        bool finished, int? year = null, CancellationToken ct = default)
     {
-        // Без cYear сайт отдаёт текущий сезон; isFinish разделяет прошедшие/будущие.
-        var url = $"{ListUrl}?cMonth=0&cType=0&cMode=0&isFinish={(finished ? "true" : "false")}";
-        var html = await GetStringAsync(url, $"list-{(finished ? "finished" : "upcoming")}", ct);
+        // Без cYear сайт отдаёт текущий сезон; cYear=<год> — прошлый (2025 = сезон 24/25 и т.д.).
+        // isFinish разделяет прошедшие/будущие.
+        var yearPart = year.HasValue ? $"cYear={year.Value.ToString(CultureInfo.InvariantCulture)}&" : "";
+        var url = $"{ListUrl}?{yearPart}cMonth=0&cType=0&cMode=0&isFinish={(finished ? "true" : "false")}";
+        var suffix = year.HasValue ? $"-{year.Value}" : "";
+        var html = await GetStringAsync(url, $"list-{(finished ? "finished" : "upcoming")}{suffix}", ct);
         var items = ParseList(html);
         if (items.Count == 0 && finished)
             throw new InvalidOperationException(
-                "isr.org.il/competitions.asp: не распознано ни одной строки — вёрстка сайта изменилась? " +
+                $"isr.org.il/competitions.asp{(year.HasValue ? $"?cYear={year}" : "")}: не распознано ни одной " +
+                "строки — вёрстка сайта изменилась (или в этом сезоне нет завершённых соревнований)? " +
                 "Проверь снапшот (Discovery:SnapshotDir) и регэкспы IsrOrgDiscoveryProvider.");
         return items;
     }

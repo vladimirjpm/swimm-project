@@ -26,17 +26,25 @@ const PAGES: CompetitionLink[] = [
     badge: '● LIVE',
     live: true,
   },
+  // Ступени: Kids 8–11, Youth 11–14, Juniors (בוגרים). Ключи в href исторические и с
+  // подписями не совпадают — они в закладках пользователей (см. results-categories.ts).
   {
     href: `${routes.results()}?category=young8_11`,
-    title: 'Young 8–11',
-    subtitle: 'Youth competitions, ages 8–11',
+    title: 'Kids',
+    subtitle: 'Competitions for ages 8–11',
     badge: '8-11',
   },
   {
     href: `${routes.results()}?category=junior`,
-    title: 'Junior',
-    subtitle: 'Junior competitions, ages 11–15',
-    badge: '11-15',
+    title: 'Youth',
+    subtitle: 'Competitions for ages 11–14',
+    badge: '11-14',
+  },
+  {
+    href: `${routes.results()}?category=adults`,
+    title: 'Juniors',
+    subtitle: 'Israeli championship competitions',
+    badge: 'J',
   },
   {
     href: `${routes.results()}?category=masters`,

@@ -1,6 +1,7 @@
 // Типы модульной шапки соревнования (design_handoff_competition_overview, вариант 1b).
 // DTO зеркалят server/Swimm.Application/Dtos/CompetitionOverviewDto.cs (snake_case).
 
+// 'overview' — мастер-детейл с цветными модулями (design_handoff_competition_overview2, 9d/9f).
 export type CompetitionTab = 'overview' | 'swims' | 'clubs' | 'records' | 'media';
 
 export interface OverviewSummary {
@@ -59,6 +60,10 @@ export interface OverviewMedalist {
   gold: number;
   silver: number;
   bronze: number;
+  /** Сколько из медалей эстафетные (медаль эстафеты идёт каждому участнику). */
+  relay_medals: number;
+  /** true — такой же набор медалей ещё у кого-то: награда делится. */
+  is_tie: boolean;
 }
 
 /** Одна награда High Point Award (лучший по сумме очков в возраст × пол). */
@@ -103,9 +108,10 @@ export interface CompetitionOverview {
   top_clubs: OverviewClub[];
   top_clubs_men: OverviewClub[];
   top_clubs_women: OverviewClub[];
-  top_medalist: OverviewMedalist | null;
-  top_medalist_male: OverviewMedalist | null;
-  top_medalist_female: OverviewMedalist | null;
+  /** Самые титулованные: при равном наборе медалей — все, а не первый попавшийся. */
+  top_medalists: OverviewMedalist[];
+  top_medalists_male: OverviewMedalist[];
+  top_medalists_female: OverviewMedalist[];
   high_point_awards: OverviewHighPoint[];
   records: OverviewRecord[];
 }

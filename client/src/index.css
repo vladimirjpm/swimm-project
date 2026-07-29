@@ -6,6 +6,16 @@
    ручной переключатель режима. См. useMode.ts / mode-toggle. */
 @custom-variant dark (&:where([data-mode="dark"], [data-mode="dark"] *));
 
+/* Tailwind v4 @theme маппинг для цветов модулей Overview (design_handoff_competition_overview2/
+   MODULE-COLORS.md) — доступно как text-module-clubs / bg-module-media/12 и т.д. */
+@theme inline {
+  --color-module-clubs: var(--theme-module-clubs);
+  --color-module-records: var(--theme-module-records);
+  --color-module-champions: var(--theme-module-champions);
+  --color-module-hpa: var(--theme-module-hpa);
+  --color-module-media: var(--theme-module-media);
+}
+
 .table-caption{
   display: table-caption;
 }
@@ -90,6 +100,15 @@
   --theme-personal-border: rgba(212, 175, 55, 0.45);
   --theme-personal-accent: #8a6d1a;            /* бейджи, стрелки, PB */
   --theme-personal-badge-bg: rgba(212, 175, 55, 0.18);
+  /* Плитка соревнования 11c (design_handoff_competition_overview3): живёт на --theme-primary,
+     поэтому корпус/буква — производные от парного --theme-mode-accent-text, а полоса и лента
+     возраста — от surface/primary. Перекрасить плитку per-theme = поправить эти 6 токенов. */
+  --theme-comp-tile-bg: color-mix(in srgb, var(--theme-mode-accent-text) 20%, transparent);
+  --theme-comp-tile-border: color-mix(in srgb, var(--theme-mode-accent-text) 35%, transparent);
+  --theme-comp-tile-letter: var(--theme-mode-accent-text);
+  --theme-comp-tile-strip-bg: color-mix(in srgb, var(--theme-mode-surface) 92%, transparent);
+  --theme-comp-tile-age-bg: var(--theme-mode-surface);
+  --theme-comp-tile-age-text: var(--theme-primary);
   /* Статусный цвет LIVE: зависит от режима, НЕ от контекста Training/Competition
      (см. design_handoff_category_selector/README.md) */
   --status-live: #148253;
@@ -136,6 +155,17 @@
   --theme-personal-border: rgba(212, 175, 55, 0.4);
   --theme-personal-accent: #e3c15c;
   --theme-personal-badge-bg: rgba(212, 175, 55, 0.16);
+  /* Плитка соревнования в dark: surface здесь тёмный, а плитка лежит на насыщенном
+     --theme-primary — полоса и лента возраста строятся от светлого --theme-mode-accent-text,
+     иначе тёмная лента с тёмно-синим текстом (пара primary на surface) нечитаема. */
+  --theme-comp-tile-bg: color-mix(in srgb, var(--theme-mode-accent-text) 16%, transparent);
+  --theme-comp-tile-border: color-mix(in srgb, var(--theme-mode-accent-text) 40%, transparent);
+  --theme-comp-tile-letter: var(--theme-mode-accent-text);
+  --theme-comp-tile-strip-bg: color-mix(in srgb, var(--theme-mode-accent-text) 14%, transparent);
+  /* Лента возраста — почти сплошная светлая подложка + primary-текст: полупрозрачная
+     заливка поверх primary давала белым по средне-синему всего ~3.4:1. */
+  --theme-comp-tile-age-bg: color-mix(in srgb, var(--theme-mode-accent-text) 88%, transparent);
+  --theme-comp-tile-age-text: var(--theme-primary);
   --status-live: #3ddc97;
   --status-live-bg: rgba(61, 220, 151, 0.10);
   --status-live-border: rgba(61, 220, 151, 0.45);
@@ -185,6 +215,14 @@
   --btn-training-text: #ffffff;
   --btn-competition-bg: #10b981;      /* emerald */
   --btn-competition-text: #ffffff;
+
+  /* Модули Overview (design_handoff_competition_overview2/MODULE-COLORS.md):
+     clubs = --theme-primary темы, остальные 4 — общий разнесённый по тону набор. */
+  --theme-module-clubs: #5b5fc7;
+  --theme-module-records: #7c3aed;
+  --theme-module-champions: #b45309;
+  --theme-module-hpa: #0e7490;
+  --theme-module-media: #db2777;
 }
 
 /* Training Theme: NexaVerse (тёмная) */
@@ -209,6 +247,13 @@
   --btn-training-text: #ffffff;
   --btn-competition-bg: #2dd4bf;      /* cyan accent */
   --btn-competition-text: #0a2239;
+
+  /* Модули Overview: clubs = --theme-primary темы, остальные 4 — общий набор. */
+  --theme-module-clubs: #1a5f7a;
+  --theme-module-records: #7c3aed;
+  --theme-module-champions: #b45309;
+  --theme-module-hpa: #0e7490;
+  --theme-module-media: #db2777;
 }
 
 /* Training Theme: Ocean Blue */
@@ -233,6 +278,13 @@
   --btn-training-text: #ffffff;
   --btn-competition-bg: #00b4d8;      /* cyan */
   --btn-competition-text: #ffffff;
+
+  /* Модули Overview: clubs = --theme-primary темы, остальные 4 — общий набор. */
+  --theme-module-clubs: #0077b6;
+  --theme-module-records: #7c3aed;
+  --theme-module-champions: #b45309;
+  --theme-module-hpa: #0e7490;
+  --theme-module-media: #db2777;
 }
 
 /* ----------------------------------------
@@ -262,6 +314,13 @@
   --btn-training-text: #ffffff;
   --btn-competition-bg: #10b981;      /* emerald */
   --btn-competition-text: #ffffff;
+
+  /* Модули Overview: значения из design_handoff_competition_overview2/module-colors.css. */
+  --theme-module-clubs: #10b981;
+  --theme-module-records: #7c3aed;
+  --theme-module-champions: #b45309;
+  --theme-module-hpa: #0e7490;
+  --theme-module-media: #db2777;
 }
 
 /* Competition Theme: Blue (coolors.co palette) */
@@ -287,6 +346,13 @@
   --btn-training-text: #ffffff;
   --btn-competition-bg: #0466c8;      /* bright blue */
   --btn-competition-text: #ffffff;
+
+  /* Модули Overview: значения из design_handoff_competition_overview2/module-colors.css (макет). */
+  --theme-module-clubs: #0466c8;
+  --theme-module-records: #6d28d9;
+  --theme-module-champions: #b45309;
+  --theme-module-hpa: #0f766e;
+  --theme-module-media: #be185d;
 }
 
 /* Competition Theme: Warm (sage & coral palette) */
@@ -312,6 +378,14 @@
   --btn-training-text: #426a5a;
   --btn-competition-bg: #7fb685;      /* sage green */
   --btn-competition-text: #ffffff;
+
+  /* Модули Overview: clubs — --theme-primary-hover (сам --theme-primary #7fb685
+     на белой поверхности даёт контраст ~2.1:1, ниже требуемых 4.5:1). */
+  --theme-module-clubs: #426a5a;
+  --theme-module-records: #7c3aed;
+  --theme-module-champions: #b45309;
+  --theme-module-hpa: #0e7490;
+  --theme-module-media: #db2777;
 }
 
 /* Competition Theme: Dark */
@@ -336,6 +410,78 @@
   --btn-training-text: #a7f3d0;
   --btn-competition-bg: #34d399;      /* emerald light */
   --btn-competition-text: #022c22;
+
+  /* Модули Overview: clubs — тёмно-зелёный (--theme-primary #34d399 на белой
+     поверхности даёт контраст ~1.6:1, ниже требуемых 4.5:1). */
+  --theme-module-clubs: #065f46;
+  --theme-module-records: #7c3aed;
+  --theme-module-champions: #b45309;
+  --theme-module-hpa: #0e7490;
+  --theme-module-media: #db2777;
+}
+
+/* ----------------------------------------
+   МОДУЛИ OVERVIEW: dark-вариант (data-mode="dark" на <html>)
+   Правило парных токенов: те же оттенки, светлее и менее насыщенные, контраст
+   solid(m) на --theme-mode-surface (тёмная поверхность) ≥ 4.5:1.
+   См. design_handoff_competition_overview2/MODULE-COLORS.md.
+   ---------------------------------------- */
+:root[data-mode="dark"][data-theme="training"],
+:root[data-mode="dark"][data-theme="training-dashboard"] {
+  --theme-module-clubs: #a5b4fc;
+  --theme-module-records: #a78bfa;
+  --theme-module-champions: #e0a256;
+  --theme-module-hpa: #4dbfae;
+  --theme-module-media: #f472a6;
+}
+
+:root[data-mode="dark"][data-theme="training-nexaverse"] {
+  --theme-module-clubs: #2dd4bf;
+  --theme-module-records: #a78bfa;
+  --theme-module-champions: #e0a256;
+  --theme-module-hpa: #4dbfae;
+  --theme-module-media: #f472a6;
+}
+
+:root[data-mode="dark"][data-theme="training-ocean"] {
+  --theme-module-clubs: #00b4d8;
+  --theme-module-records: #a78bfa;
+  --theme-module-champions: #e0a256;
+  --theme-module-hpa: #4dbfae;
+  --theme-module-media: #f472a6;
+}
+
+:root[data-mode="dark"][data-theme="competition"],
+:root[data-mode="dark"][data-theme="competition-emerald"] {
+  --theme-module-clubs: #34d399;
+  --theme-module-records: #a78bfa;
+  --theme-module-champions: #e0a256;
+  --theme-module-hpa: #4dbfae;
+  --theme-module-media: #f472a6;
+}
+
+:root[data-mode="dark"][data-theme="competition-blue"] {
+  --theme-module-clubs: #64a8f5;
+  --theme-module-records: #a78bfa;
+  --theme-module-champions: #e0a256;
+  --theme-module-hpa: #4dbfae;
+  --theme-module-media: #f472a6;
+}
+
+:root[data-mode="dark"][data-theme="competition-warm"] {
+  --theme-module-clubs: #7fb685;
+  --theme-module-records: #a78bfa;
+  --theme-module-champions: #e0a256;
+  --theme-module-hpa: #4dbfae;
+  --theme-module-media: #f472a6;
+}
+
+:root[data-mode="dark"][data-theme="competition-dark"] {
+  --theme-module-clubs: #34d399;
+  --theme-module-records: #a78bfa;
+  --theme-module-champions: #e0a256;
+  --theme-module-hpa: #4dbfae;
+  --theme-module-media: #f472a6;
 }
 
 /* ========================================

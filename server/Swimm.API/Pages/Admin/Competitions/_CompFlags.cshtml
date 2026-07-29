@@ -5,6 +5,10 @@
     {
         <span class="admin-badge border-admin-warning/30 bg-admin-warning/15 text-admin-warning">Awards</span>
     }
+    @if (Model.IsChampionship)
+    {
+        <span class="admin-badge border-admin-accent/30 bg-admin-accent/15 text-admin-accent">🏆 Чемпионат</span>
+    }
     @if (Model.ShowCombineAllResults)
     {
         <span class="admin-badge border-admin-border bg-admin-surface-hover text-admin-text-muted">Combine</span>

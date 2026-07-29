@@ -5,7 +5,7 @@ using Swimm.Domain.Entities;
 
 namespace Swimm.Tests;
 
-/// <summary>Тесты чистого детектора «новых рекордов» соревнования (образец — ClubPointsScoringTests).</summary>
+/// <summary>Тесты чистого детектора «новых рекордов» соревнования (образец — PointRulesClubsScoringTests).</summary>
 public class CompetitionRecordsDetectorTests
 {
     private static Record Rec(string category, string ageKey, string time,
@@ -19,9 +19,10 @@ public class CompetitionRecordsDetectorTests
 
     private static RecordCandidateRow Row(int timeMs, int? birthYear = 2016, string time = "00:40.00",
         string style = "backstroke", string distance = "50", string gender = "male", string pool = "50m",
-        bool isMasters = false, long resultId = 1) => new(
+        bool isMasters = false, long resultId = 1, string ageGroup = "") => new(
         resultId, 100, "First", "Last", "Club", style, distance, gender, pool,
-        birthYear, new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Utc), timeMs, time, 1, isMasters);
+        birthYear, new DateTime(2026, 7, 15, 0, 0, 0, DateTimeKind.Utc), timeMs, time, 1, isMasters,
+        ageGroup);
 
     [Fact]
     public void BeatsAgeRecord_ByComputedAge()
@@ -66,15 +67,25 @@ public class CompetitionRecordsDetectorTests
     }
 
     [Fact]
-    public void OpenAndNationalKeys_Matched()
+    public void OpenKey_MatchedRegardlessOfAge()
     {
-        // open (AgeKey="") и национальный ключ (AgeKey="ISR") проверяются независимо от возраста.
-        var records = new[] { Rec("open", "", "41.00"), Rec("age", "ISR", "42.00") };
+        // open (AgeKey="") проверяется независимо от возраста — там и живёт национальный рекорд.
+        var records = new[] { Rec("open", "", "41.00") };
         var result = CompetitionRecordsDetector.Detect(records, [Row(40_000, birthYear: null)]);
 
-        Assert.Equal(2, result.Count);
-        Assert.Contains(result, r => r.Kind == "Open record");
-        Assert.Contains(result, r => r.Kind == "National record");
+        var dto = Assert.Single(result);
+        Assert.Equal("Open record", dto.Kind);
+    }
+
+    [Fact]
+    public void LegacyNationalKey_Ignored()
+    {
+        // Ось ("age","ISR") — набор legacy-RecordsSeeder, который импортом не обновлялся и
+        // протух вместе с ошибками старого парсера: заплыв 41.93 на 50 спине «бил» там
+        // национальный 53.60 (время стометровки, заехавшее в полтинник). Ось убрана —
+        // такие записи, даже если сид их воскресит, больше не дают рекордов.
+        var records = new[] { Rec("age", "ISR", "42.00") };
+        Assert.Empty(CompetitionRecordsDetector.Detect(records, [Row(40_000, birthYear: null)]));
     }
 
     [Fact]

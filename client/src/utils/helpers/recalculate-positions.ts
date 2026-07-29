@@ -81,13 +81,25 @@ export function recalculatePositions(results: Result[]): ResultWithRecalc[] {
 
 // ─── Вспомогательные ─────────────────────────────────────────────────
 
+/**
+ * Ключ дисциплины. Последняя ось — КАТЕГОРИЯ ЗАПЛЫВА, если она известна, иначе возраст
+ * пловца (как было до появления поля). Держать синхронно с серверным
+ * CombinedPlaceCalculator.EventKeyOf — иначе объединённые места на клиенте и сервере
+ * разойдутся.
+ *
+ * Почему категория: в открытом заплыве («- Men») плывут разные возрасты и ранжируются
+ * одной таблицей, а паралимпийская программа («- Men Para») не должна смешиваться с
+ * основной, хотя возраст там встречается тот же. Фоллбек на возраст обязателен: у старых
+ * строк категории нет, и без него все возрасты сводного соревнования (8–11) схлопнулись бы
+ * в один зачёт.
+ */
 function buildEventKey(res: Result): string {
   return [
     res.event_style_name ?? '',
     res.event_style_len ?? '',
     res.pool_type ?? '',
     res.event_style_gender ?? '',
-    res.event_style_age ?? '',
+    res.event_category || res.event_style_age || '',
   ].join('|');
 }
 
@@ -123,4 +135,37 @@ function isInvalidTime(res: Result): boolean {
     (res.time_fail as any) === 'true' ||
     ['DQ', 'DNS', 'DNF', 'DSQ'].includes(String(res.time).toUpperCase())
   );
+}
+
+// ─── Единая точка тоггла «Combine All Results» (Э6) ──────────────────
+
+/**
+ * Возвращает результаты с местами объединённого зачёта — то, что показывает тоггл
+ * «Combine All Results». Оригинальное место остаётся в `position_original`.
+ *
+ * Источник мест по умолчанию — СЕРВЕР (`combined_place`): он считает по всему событию,
+ * а клиент видит только загруженные страницы, поэтому в paged-режиме его пересчёт мог
+ * давать места по подмножеству. Локальный `recalculatePositions` остаётся фоллбеком для
+ * старых статических источников, где поля ещё нет.
+ *
+ * Соревнования без объединённого зачёта (`ShowCombineAllResults = false`) получают от
+ * сервера `combined_place = null` — тогда строка сохраняет протокольное место.
+ */
+export function applyCombinedPositions(results: Result[]): Result[] {
+  if (!results || results.length === 0) return [];
+
+  const fromServer = results.some((r) => r.combined_place != null);
+  if (!fromServer) {
+    return recalculatePositions(results).map((r) => ({
+      ...r,
+      position_original: r.position,
+      position: r.position_recalc,
+    })) as Result[];
+  }
+
+  return results.map((r) => ({
+    ...r,
+    position_original: r.position,
+    position: r.combined_place ?? r.position,
+  })) as Result[];
 }

@@ -59,4 +59,7 @@ public sealed class UnifiedCompetitionRowDto
 
     /// <summary>Ключ сортировки по дате (для единого date-desc порядка списка).</summary>
     public DateTime SortDate { get; set; }
+
+    /// <summary>Чемпионат Израиля (по названию любой стороны строки) — иконка 🏆 и фильтр «Тип».</summary>
+    public bool IsChampionship { get; set; }
 }
