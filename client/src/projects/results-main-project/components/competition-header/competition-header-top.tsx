@@ -69,21 +69,18 @@ export default function CompetitionHeaderTop({
         <CompetitionTile {...tile} />
 
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1
-              // dir="auto" делает ивритский заголовок RTL — это правильно для порядка слов,
-              // но выравнивание тянет вправо: в шапке заголовок всегда прижат к началу строки.
-              className="m-0 min-w-0 text-left text-[19px] font-black leading-tight md:text-[26px]"
-              style={{ textWrap: 'pretty' } as React.CSSProperties}
-              dir="auto"
-            >
-              {title}
-            </h1>
-            {/* Бейдж: рядом с названием на десктопе, в начале меты — на мобайле */}
-            {dayCount > 1 && <span className="hidden sm:inline-flex">{daysBadge}</span>}
-          </div>
+          <h1
+            // dir="auto" делает ивритский заголовок RTL — это правильно для порядка слов,
+            // но выравнивание тянет вправо: в шапке заголовок всегда прижат к началу строки.
+            className="m-0 min-w-0 text-left text-[19px] font-black leading-tight md:text-[26px]"
+            style={{ textWrap: 'pretty' } as React.CSSProperties}
+            dir="auto"
+          >
+            {title}
+          </h1>
+          {/* Бейдж «N Days» — всегда в начале меты (одна версия на десктоп и мобайл) */}
           <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[12.5px] font-semibold opacity-90">
-            {dayCount > 1 && <span className="sm:hidden">{daysBadge}</span>}
+            {dayCount > 1 && daysBadge}
             {meta.map((m) => (
               <span key={m} className="whitespace-nowrap">{m}</span>
             ))}
