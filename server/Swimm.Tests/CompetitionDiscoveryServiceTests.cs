@@ -17,8 +17,15 @@ public class CompetitionDiscoveryServiceTests
         public List<DiscoveredListItem> Finished { get; } = [];
         public List<DiscoveredListItem> Upcoming { get; } = [];
 
-        public Task<IReadOnlyList<DiscoveredListItem>> FetchListAsync(bool finished, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<DiscoveredListItem>>(finished ? Finished : Upcoming);
+        /// <summary>Сезон последнего запроса — проверяем, что cYear доезжает до провайдера.</summary>
+        public int? LastYear { get; private set; }
+
+        public Task<IReadOnlyList<DiscoveredListItem>> FetchListAsync(
+            bool finished, int? year = null, CancellationToken ct = default)
+        {
+            LastYear = year;
+            return Task.FromResult<IReadOnlyList<DiscoveredListItem>>(finished ? Finished : Upcoming);
+        }
 
         public Task<DiscoveredDetails> FetchDetailsAsync(int orgCompId, CancellationToken ct = default)
             => Task.FromResult(new DiscoveredDetails("N", "V", 123, 1));
@@ -63,6 +70,22 @@ public class CompetitionDiscoveryServiceTests
         var updated = await db.DiscoveredCompetitions.SingleAsync(d => d.OrgCompId == 100);
         Assert.Equal("Новое имя", updated.Name);
         Assert.Equal(DiscoveredCompetitionStatus.Ignored, updated.Status);
+    }
+
+    [Fact]
+    public async Task Sync_PassesSeasonYearToProvider()
+    {
+        await using var db = CreateDb(nameof(Sync_PassesSeasonYearToProvider));
+        var provider = new FakeProvider();
+        provider.Finished.Add(Item(300, "Сезон 24/25", "2025-03-01"));
+        var svc = CreateService(db, provider);
+
+        await svc.SyncAsync();
+        Assert.Null(provider.LastYear); // без аргумента — текущий сезон сайта
+
+        var past = await svc.SyncAsync(2025);
+        Assert.Equal(2025, provider.LastYear);
+        Assert.Equal(1, past.TotalOnSite);
     }
 
     [Fact]

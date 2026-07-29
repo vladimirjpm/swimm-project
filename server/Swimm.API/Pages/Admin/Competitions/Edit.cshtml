@@ -9,7 +9,7 @@
 <div class="max-w-[820px] mx-auto">
 
     <div class="mb-4 flex items-center gap-3">
-        <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">← К списку</a>
+        <a href="@Model.BackLink" class="admin-btn admin-btn-ghost">← К списку</a>
         @if (!Model.IsNew && Model.Existing != null)
         {
             <span class="text-xs text-admin-text-muted">
@@ -30,7 +30,7 @@
     }
 
     <!-- ── Основные поля ─────────────────────────────────────────────────────── -->
-    <form method="post" asp-page-handler="Save" class="admin-card mb-5">
+    <form method="post" asp-page-handler="Save" asp-route-back="@Model.BackUrl" class="admin-card mb-5">
         <input type="hidden" asp-for="Id" />
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -117,6 +117,11 @@
                 <input asp-for="Input.IsAward" class="w-4 h-4 cursor-pointer" />
                 <span class="text-admin-text">Awards</span>
             </label>
+            <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none"
+                   title="Чемпионат Израиля (אליפות ישראל): 🏆 в списке админки, в плитке и фильтр «только чемпионаты» на клиенте">
+                <input asp-for="Input.IsChampionship" class="w-4 h-4 cursor-pointer" />
+                <span class="text-admin-text">🏆 Чемпионат Израиля</span>
+            </label>
             <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
                 <input asp-for="Input.ShowCombineAllResults" class="w-4 h-4 cursor-pointer" />
                 <span class="text-admin-text">Combine all results</span>
@@ -170,8 +175,8 @@
             </button>
             @if (Model.Existing?.EventId != null && Model.Existing.EventDayCount > 1)
             {
-                <button type="submit" asp-page-handler="ApplyRulesToEvent" class="admin-btn admin-btn-ghost"
-                        formnovalidate
+                <button type="submit" asp-page-handler="ApplyRulesToEvent" asp-route-back="@Model.BackUrl"
+                        class="admin-btn admin-btn-ghost" formnovalidate
                         onclick="return confirm('Проставить выбранные правила очков всем @Model.Existing.EventDayCount дням события? Остальные поля формы не сохранятся.');">
                     Проставить правила всем дням события (@Model.Existing.EventDayCount)
                 </button>
@@ -213,7 +218,7 @@
                                        class="text-admin-accent hover:underline" title="@u.Url">@u.Url</a>
                                 </td>
                                 <td class="text-right">
-                                    <form method="post" asp-page-handler="DeleteUrl" class="inline">
+                                    <form method="post" asp-page-handler="DeleteUrl" asp-route-back="@Model.BackUrl" class="inline">
                                         <input type="hidden" asp-for="Id" />
                                         <input type="hidden" name="urlId" value="@u.Id" />
                                         <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
@@ -231,7 +236,7 @@
 
             @if (Model.Existing.OrgCompId != null)
             {
-                <form method="post" asp-page-handler="AddUrl" class="flex flex-wrap items-end gap-3">
+                <form method="post" asp-page-handler="AddUrl" asp-route-back="@Model.BackUrl" class="flex flex-wrap items-end gap-3">
                     <input type="hidden" asp-for="Id" />
                     <label class="flex flex-col gap-1">
                         <span class="text-xs text-admin-text-muted">Culture</span>
@@ -254,7 +259,7 @@
                 связанными эстафетами, галереями и записями истории импорта. URL-ы результатов (по OrgCompId) тоже удалятся,
                 если этот OrgCompId больше нигде не используется. <strong class="text-admin-danger">Действие необратимо.</strong>
             </p>
-            <form method="post" asp-page-handler="Delete" class="flex flex-wrap items-end gap-3">
+            <form method="post" asp-page-handler="Delete" asp-route-back="@Model.BackUrl" class="flex flex-wrap items-end gap-3">
                 <input type="hidden" asp-for="Id" />
                 <label class="flex flex-col gap-1 flex-1 min-w-[260px]">
                     <span class="text-xs text-admin-text-muted">

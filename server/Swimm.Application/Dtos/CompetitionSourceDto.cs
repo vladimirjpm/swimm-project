@@ -36,6 +36,11 @@ public sealed class CompetitionSourceDto
     [JsonPropertyName("is_award")]
     public bool IsAward { get; init; }
 
+    /// <summary>Чемпионат Израиля (ручной флаг Competition.IsChampionship; у события — хотя бы
+    /// один день). Клиент рисует 🏆 и фильтрует по нему в селекторе соревнования.</summary>
+    [JsonPropertyName("is_championship")]
+    public bool IsChampionship { get; init; }
+
     [JsonPropertyName("show_combine_all_results")]
     public bool ShowCombineAllResults { get; init; }
 

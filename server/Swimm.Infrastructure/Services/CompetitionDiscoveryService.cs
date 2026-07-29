@@ -19,11 +19,12 @@ public class CompetitionDiscoveryService(
 {
     private readonly DiscoveryCompetitionMatcher matcher = new(db);
 
-    public async Task<DiscoverySyncResult> SyncAsync(CancellationToken ct = default)
+    public async Task<DiscoverySyncResult> SyncAsync(int? year = null, CancellationToken ct = default)
     {
-        // Завершённые + предстоящие текущего сезона (2 запроса, провайдер сам держит паузу).
-        var finished = await provider.FetchListAsync(finished: true, ct);
-        var upcoming = await provider.FetchListAsync(finished: false, ct);
+        // Завершённые + предстоящие сезона (2 запроса, провайдер сам держит паузу).
+        // year=null — текущий сезон сайта; иначе прошлый (cYear).
+        var finished = await provider.FetchListAsync(finished: true, year, ct);
+        var upcoming = await provider.FetchListAsync(finished: false, year, ct);
         var items = finished.Concat(upcoming)
             .GroupBy(i => i.OrgCompId)
             .Select(g => g.First())
@@ -66,8 +67,8 @@ public class CompetitionDiscoveryService(
 
         await db.SaveChangesAsync(ct);
         logger.LogInformation(
-            "Discovery sync: на сайте {Total}, добавлено {Added}, обновлено {Updated}",
-            result.TotalOnSite, result.Added, result.Updated);
+            "Discovery sync (сезон {Season}): на сайте {Total}, добавлено {Added}, обновлено {Updated}",
+            year?.ToString() ?? "текущий", result.TotalOnSite, result.Added, result.Updated);
         return result;
     }
 

@@ -9,8 +9,11 @@ namespace Swimm.Application.Abstractions;
 /// </summary>
 public interface ICompetitionDiscoveryService
 {
-    /// <summary>Обновить «входящие» со списка сайта (завершённые + предстоящие).</summary>
-    Task<DiscoverySyncResult> SyncAsync(CancellationToken ct = default);
+    /// <summary>
+    /// Обновить «входящие» со списка сайта (завершённые + предстоящие).
+    /// year — сезон сайта (cYear), null = текущий; прошлые сезоны тянутся тем же путём.
+    /// </summary>
+    Task<DiscoverySyncResult> SyncAsync(int? year = null, CancellationToken ct = default);
 
     /// <summary>Все обнаруженные, новые сверху; статус imported дополняется матчем по дате+имени.</summary>
     Task<IReadOnlyList<DiscoveredCompetitionDto>> GetAllAsync(CancellationToken ct = default);

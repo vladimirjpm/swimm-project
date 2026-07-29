@@ -36,6 +36,13 @@ public class Competition
   public bool IsAward { get; set; }
 
   /// <summary>
+  /// Чемпионат Израиля (אליפות ישראל). Ставится вручную на /Admin/Competitions/Edit;
+  /// при добавлении колонки проставлен бэкфиллом по названию. Даёт 🏆 в списке админки,
+  /// в плитке соревнования и фильтр «только чемпионаты» в селекторе на клиенте.
+  /// </summary>
+  public bool IsChampionship { get; set; }
+
+  /// <summary>
   /// Признак: отображать объединённую таблицу всех результатов (без разбивки по полу/возрасту).
   /// </summary>
   public bool ShowCombineAllResults { get; set; }

@@ -28,6 +28,7 @@ import {
   dateLabel,
   monthLabel,
   sourceUrlParam,
+  isChampionshipSource,
 } from '../../../utils/helpers/competition-source';
 
 // ── Категорийный селектор соревнований ──────────────────────────────────────
@@ -156,6 +157,8 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
   const [season, setSeason] = React.useState<number | 'all' | null>(null);
   const [seasonTouched, setSeasonTouched] = React.useState(false);
   const [archiveOpen, setArchiveOpen] = React.useState(false);
+  // Тумблер «🏆 Championships» — показывать только чемпионаты Израиля.
+  const [champOnly, setChampOnly] = React.useState(false);
   // Панель поверх контента при выбранном соревновании (кнопка «Change» в шапке)
   const [panelOpen, setPanelOpen] = React.useState(false);
   // Мобильное меню категорий (вариант 9b: строка «Category: … ▾» вместо табов)
@@ -538,7 +541,12 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
   const matchesSearch = (s: CompetitionSource) =>
     !search.trim() || s.name.toLowerCase().includes(search.trim().toLowerCase());
 
-  const visible = sources.filter((s) => inCat(s) && inSeason(s) && matchesSearch(s));
+  const isChamp = (s: CompetitionSource) => isChampionshipSource(s);
+
+  const visible = sources.filter(
+    (s) => inCat(s) && inSeason(s) && matchesSearch(s) && (!champOnly || isChamp(s)),
+  );
+  const champCount = sources.filter((s) => inCat(s) && inSeason(s) && matchesSearch(s) && isChamp(s)).length;
   const nowItems = visible.filter((s) => s.status !== 'done');
   const doneItems = visible.filter((s) => s.status === 'done');
   const archivedItems = doneItems.filter((s) => isArchived(s, now));
@@ -581,6 +589,11 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
           {sel && (
             <span className="shrink-0 text-sm font-black" style={{ color: 'var(--theme-primary)' }}>
               ✓
+            </span>
+          )}
+          {isChamp(s) && (
+            <span className="shrink-0 text-sm" title="Israeli championship" aria-label="Israeli championship">
+              🏆
             </span>
           )}
           <span
@@ -794,6 +807,33 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
       </select>
     ) : null;
 
+  // Тумблер «только чемпионаты Израиля» (on/off), рядом с поиском и сезоном.
+  const champToggle = (
+    <button
+      type="button"
+      onClick={() => setChampOnly((v) => !v)}
+      aria-pressed={champOnly}
+      title="Show Israeli championships only"
+      className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-[13px] font-bold whitespace-nowrap max-sm:min-h-[44px] max-sm:justify-center"
+      style={
+        champOnly
+          ? {
+              background: 'var(--theme-primary)',
+              color: 'var(--theme-mode-accent-text)',
+              border: '1px solid var(--theme-primary)',
+            }
+          : {
+              background: 'var(--theme-mode-input-bg)',
+              color: 'var(--theme-mode-text-secondary)',
+              border: '1px solid var(--theme-mode-border-input)',
+            }
+      }
+    >
+      🏆 Championships{' '}
+      <span style={{ fontWeight: 600, opacity: champOnly ? 0.75 : 0.6 }}>{champCount}</span>
+    </button>
+  );
+
   const listBody = (
     <>
       {!loaded && (
@@ -891,6 +931,7 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
       <div className="mb-3.5 sm:hidden">{categoryRow}</div>
       <div className="mb-[18px] flex gap-2.5 max-sm:flex-col">
         {searchBox}
+        {champToggle}
         {seasonSelect}
       </div>
       {listBody}
@@ -936,6 +977,7 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
         <div className="px-4 pb-3">{categoryRow}</div>
         <div className="flex flex-col gap-2 px-4 pb-3">
           {searchBox}
+          {champToggle}
           {seasonSelect}
         </div>
         <div className="min-h-0 overflow-y-auto px-4 pb-3">{listBody}</div>

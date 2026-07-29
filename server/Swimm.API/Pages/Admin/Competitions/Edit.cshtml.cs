@@ -36,6 +36,22 @@ public class EditModel : PageModel
 
     public bool IsNew => Id is null or 0;
 
+    /// <summary>
+    /// Куда возвращаться по «← К списку» и после удаления: URL списка с его фильтрами/страницей
+    /// (кладёт Index в ссылки «Изменить»). Только локальный URL — открытый редирект недопустим.
+    /// </summary>
+    [BindProperty(SupportsGet = true, Name = "back")]
+    public string? BackUrl { get; set; }
+
+    public string BackLink =>
+        !string.IsNullOrEmpty(BackUrl) && Url.IsLocalUrl(BackUrl) ? BackUrl : Url.Page("Index")!;
+
+    /// <summary>Редирект к списку — с сохранением фильтров, откуда пришли.</summary>
+    private IActionResult RedirectToList() => Redirect(BackLink);
+
+    /// <summary>Редирект на саму форму — back тащим дальше, иначе «К списку» забудет фильтры.</summary>
+    private IActionResult RedirectToSelf(int? id) => RedirectToPage("Edit", new { id, back = BackUrl });
+
     [BindProperty]
     public CompetitionForm Input { get; set; } = new();
 
@@ -72,6 +88,8 @@ public class EditModel : PageModel
         public string Country { get; set; } = "";
         public int? OrgCompId { get; set; }
         public bool IsAward { get; set; }
+        /// <summary>Чемпионат Израиля — ручной флаг (галка в форме).</summary>
+        public bool IsChampionship { get; set; }
         public bool ShowCombineAllResults { get; set; }
         /// <summary>Выбранные категории (IsMasters выводится из категории Masters).</summary>
         public List<string> CategoryKeys { get; set; } = [];
@@ -87,7 +105,7 @@ public class EditModel : PageModel
         if (!IsNew)
         {
             Existing = await _repo.GetByIdAsync(Id!.Value);
-            if (Existing == null) return RedirectToPage("Index");
+            if (Existing == null) return RedirectToList();
             Input = ToForm(Existing);
         }
         return Page();
@@ -109,16 +127,16 @@ public class EditModel : PageModel
         }
 
         TempData["Flash"] = IsNew ? "Соревнование создано" : "Изменения сохранены";
-        return RedirectToPage("Edit", new { id = result.Id });
+        return RedirectToSelf(result.Id);
     }
 
     public async Task<IActionResult> OnPostAddUrlAsync()
     {
-        if (IsNew) return RedirectToPage("Index");
+        if (IsNew) return RedirectToList();
 
         await LoadLookupsAsync();
         Existing = await _repo.GetByIdAsync(Id!.Value);
-        if (Existing == null) return RedirectToPage("Index");
+        if (Existing == null) return RedirectToList();
 
         if (Existing.OrgCompId is not int orgCompId)
         {
@@ -136,29 +154,29 @@ public class EditModel : PageModel
         }
 
         TempData["Flash"] = "URL добавлен";
-        return RedirectToPage("Edit", new { id = Id });
+        return RedirectToSelf(Id);
     }
 
     public async Task<IActionResult> OnPostDeleteUrlAsync(int urlId)
     {
-        if (IsNew) return RedirectToPage("Index");
+        if (IsNew) return RedirectToList();
 
         // Удаляем URL только в рамках текущего соревнования (по его OrgCompId), а не по «голому» urlId.
         Existing = await _repo.GetByIdAsync(Id!.Value);
-        if (Existing?.OrgCompId is not int orgCompId) return RedirectToPage("Edit", new { id = Id });
+        if (Existing?.OrgCompId is not int orgCompId) return RedirectToSelf(Id);
 
         await _repo.RemoveResultUrlAsync(urlId, orgCompId);
         TempData["Flash"] = "URL удалён";
-        return RedirectToPage("Edit", new { id = Id });
+        return RedirectToSelf(Id);
     }
 
     public async Task<IActionResult> OnPostDeleteAsync()
     {
-        if (IsNew) return RedirectToPage("Index");
+        if (IsNew) return RedirectToList();
 
         await LoadLookupsAsync();
         Existing = await _repo.GetByIdAsync(Id!.Value);
-        if (Existing == null) return RedirectToPage("Index");
+        if (Existing == null) return RedirectToList();
 
         // Каскадное удаление деструктивно → требуем точный ввод названия.
         if (!string.Equals(ConfirmName?.Trim(), Existing.Name.Trim(), StringComparison.Ordinal))
@@ -169,7 +187,7 @@ public class EditModel : PageModel
         }
 
         var deleted = await _import.DeleteCompetitionAsync(Id!.Value);
-        if (deleted == null) return RedirectToPage("Index");
+        if (deleted == null) return RedirectToList();
 
         _logger.LogWarning(
             "Admin {User} каскадно удалил соревнование #{Id} «{Name}»: {Results} результатов, " +
@@ -178,7 +196,7 @@ public class EditModel : PageModel
             deleted.Results, deleted.Relays, deleted.Galleries, deleted.ResultUrls, deleted.ImportHistory, deleted.Swimmers);
 
         TempData["Flash"] = $"Соревнование «{deleted.CompetitionName}» удалено ({deleted.Results} результатов)";
-        return RedirectToPage("Index");
+        return RedirectToList();
     }
 
     /// <summary>
@@ -188,11 +206,11 @@ public class EditModel : PageModel
     /// </summary>
     public async Task<IActionResult> OnPostApplyRulesToEventAsync()
     {
-        if (IsNew) return RedirectToPage("Index");
+        if (IsNew) return RedirectToList();
 
         await LoadLookupsAsync();
         Existing = await _repo.GetByIdAsync(Id!.Value);
-        if (Existing == null) return RedirectToPage("Index");
+        if (Existing == null) return RedirectToList();
 
         if (Existing.EventId is not int eventId)
         {
@@ -224,7 +242,7 @@ public class EditModel : PageModel
             $"High Point={Describe(Input.PointRuleSwimmersId)} ({result.Id} дней)");
 
         TempData["Flash"] = $"Правила проставлены дням события: {result.Id}";
-        return RedirectToPage("Edit", new { id = Id });
+        return RedirectToSelf(Id);
     }
 
     private static string Describe(int? ruleId) => ruleId is int id ? $"#{id}" : "авто";
@@ -245,6 +263,7 @@ public class EditModel : PageModel
         Country = d.Country,
         OrgCompId = d.OrgCompId,
         IsAward = d.IsAward,
+        IsChampionship = d.IsChampionship,
         ShowCombineAllResults = d.ShowCombineAllResults,
         CategoryKeys = d.CategoryKeys,
         PointRuleClubsId = d.PointRuleClubsId,
@@ -260,6 +279,7 @@ public class EditModel : PageModel
         Country = f.Country,
         OrgCompId = f.OrgCompId,
         IsAward = f.IsAward,
+        IsChampionship = f.IsChampionship,
         ShowCombineAllResults = f.ShowCombineAllResults,
         CategoryKeys = f.CategoryKeys ?? [],
         PointRuleClubsId = f.PointRuleClubsId,

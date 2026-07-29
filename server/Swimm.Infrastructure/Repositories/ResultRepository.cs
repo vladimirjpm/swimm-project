@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -931,6 +931,8 @@ public class ResultRepository : IResultRepository
                 PoolType = _db.Competitions.Where(c => c.EventId == e.Id).Select(c => c.PoolType).FirstOrDefault(),
                 IsMasters = _db.Competitions.Any(c => c.EventId == e.Id && c.IsMasters),
                 IsAward = _db.Competitions.Any(c => c.EventId == e.Id && c.IsAward),
+                // Чемпионат — если помечен хотя бы один день события.
+                IsChampionship = _db.Competitions.Any(c => c.EventId == e.Id && c.IsChampionship),
                 ShowCombine = !_db.Competitions.Any(c => c.EventId == e.Id && !c.ShowCombineAllResults),
                 ResultCount = _db.Results.Count(r => r.Competition.EventId == e.Id),
                 DayDates = _db.Competitions.Where(c => c.EventId == e.Id).Select(c => c.Date).ToList(),
@@ -952,6 +954,7 @@ public class ResultRepository : IResultRepository
                 c.PoolType,
                 c.IsMasters,
                 c.IsAward,
+                c.IsChampionship,
                 c.ShowCombineAllResults,
                 Country = c.Country != null ? c.Country.CountryCode : "",
                 ResultCount = _db.Results.Count(r => r.CompetitionId == c.Id)
@@ -1042,6 +1045,7 @@ public class ResultRepository : IResultRepository
                 PoolType = e.PoolType ?? "",
                 IsMasters = e.IsMasters,
                 IsAward = e.IsAward,
+                IsChampionship = e.IsChampionship,
                 ShowCombineAllResults = e.ShowCombine,
                 Category = CategoryFor(e.IsMasters, categoryKeysByEvent.GetValueOrDefault(e.Id)),
                 Categories = CategoriesFor(categoryKeysByEvent.GetValueOrDefault(e.Id)),
@@ -1064,6 +1068,7 @@ public class ResultRepository : IResultRepository
                 PoolType = c.PoolType,
                 IsMasters = c.IsMasters,
                 IsAward = c.IsAward,
+                IsChampionship = c.IsChampionship,
                 ShowCombineAllResults = c.ShowCombineAllResults,
                 Category = CategoryFor(c.IsMasters, categoryKeysMap.GetValueOrDefault(c.Id)),
                 Categories = CategoriesFor(categoryKeysMap.GetValueOrDefault(c.Id)),

@@ -152,6 +152,20 @@ public class CompetitionAdminRepositoryTests
         Assert.Equal(5, withSynth.Page.TotalCount);
         Assert.Contains(withSynth.Page.Items, u => u.Db?.Single?.Name == "SYNTH Meet 0001");
 
+        // Фильтр по сезону (сен–авг, по году окончания): 2026 = imported/onSite/ignored,
+        // «PDF only comp» (01.01.2020) — сезон 2020. Работает и по строкам с сайта.
+        var season2026 = await repo.GetUnifiedAsync(null, null, 2026, null, showSynthetic: false, month: null, 1, 20);
+        Assert.Equal(3, season2026.Page.TotalCount);
+        var season2020 = await repo.GetUnifiedAsync(null, null, 2020, null, showSynthetic: false, month: null, 1, 20);
+        Assert.Equal(1, season2020.Page.TotalCount);
+        Assert.Equal("PDF only comp", season2020.Page.Items[0].Db!.Single!.Name);
+
+        // Список сезонов для селекта — из обеих сторон, по убыванию.
+        var seasons = await repo.GetAvailableSeasonsAsync();
+        Assert.Equal(seasons.OrderByDescending(s => s), seasons);
+        Assert.Contains(2026, seasons);
+        Assert.Contains(2020, seasons);
+
         // T3b qualityFilter: no-org-comp-id — только «PDF only comp» (без OrgCompId).
         var noOrgCompId = await repo.GetUnifiedAsync(null, null, null, null, showSynthetic: false, month: null, 1, 20, qualityFilter: "no-org-comp-id");
         Assert.Equal(1, noOrgCompId.Page.TotalCount);
@@ -188,4 +202,91 @@ public class CompetitionAdminRepositoryTests
         Assert.Equal(1, result.Page.TotalCount);
         Assert.Equal("Errored comp", result.Page.Items[0].Site!.Name);
     }
+
+    [Fact]
+    public async Task GetUnified_KindChamp_KeepsChampionshipsFromBothSides()
+    {
+        await using var db = CreateDb(nameof(GetUnified_KindChamp_KeepsChampionshipsFromBothSides));
+        // У соревнований БД решает ФЛАГ, а не название.
+        db.Competitions.Add(new Competition { Id = 1, Name = "אליפות ישראל קיץ 2026", Date = "05/07/2026", PoolType = "50m", IsChampionship = true });
+        db.Competitions.Add(new Competition { Id = 2, Name = "Israel Championship 2026", Date = "06/07/2026", PoolType = "50m", IsChampionship = true });
+        db.Competitions.Add(new Competition { Id = 3, Name = "ליגה מספר 6", Date = "07/07/2026", PoolType = "50m" });
+        // Название «чемпионское», но галка снята руками — в фильтр попадать НЕ должно.
+        db.Competitions.Add(new Competition { Id = 4, Name = "אליפות ישראל ישנה", Date = "10/07/2026", PoolType = "50m", IsChampionship = false });
+        db.DiscoveredCompetitions.AddRange(
+            new DiscoveredCompetition
+            {
+                // Спонсор между словами — подстрокой «אליפות ישראל» такое не поймать.
+                Id = 10, OrgCompId = 900, Name = "מוקדמות אליפות \"ארנה\" ישראל קיץ 2026",
+                DateStart = new DateTime(2026, 7, 8, 0, 0, 0, DateTimeKind.Utc),
+                DateEnd = new DateTime(2026, 7, 8, 0, 0, 0, DateTimeKind.Utc), Status = "new"
+            },
+            new DiscoveredCompetition
+            {
+                Id = 11, OrgCompId = 901, Name = "ליגה מס 4",
+                DateStart = new DateTime(2026, 7, 9, 0, 0, 0, DateTimeKind.Utc),
+                DateEnd = new DateTime(2026, 7, 9, 0, 0, 0, DateTimeKind.Utc), Status = "new"
+            });
+        await db.SaveChangesAsync();
+
+        var repo = new CompetitionAdminRepository(db, NoCache());
+        var all = await repo.GetUnifiedAsync(null, null, null, null, showSynthetic: false, month: null, 1, 20);
+        Assert.Equal(6, all.Page.TotalCount);
+
+        // Чемпионат Израиля: два помеченных флагом из БД + строка «только на сайте», где флага
+        // взять негде и работает эвристика по названию. Лига и снятая галка отсеяны.
+        var champs = await repo.GetUnifiedAsync(null, null, null, null, showSynthetic: false, month: null, 1, 20, kind: "champ");
+        Assert.Equal(3, champs.Page.TotalCount);
+        var champNames = champs.Page.Items.Select(u => u.Db?.Single?.Name ?? u.Site!.Name).ToList();
+        Assert.DoesNotContain(champNames, n => n.StartsWith("ליגה"));
+        Assert.DoesNotContain(champNames, n => n == "אליפות ישראל ישנה");
+        // Счётчики месяцев считаются уже под фильтром.
+        Assert.Equal(3, champs.MonthCounts[6]);
+    }
+
+    [Fact]
+    public async Task QuickUpdate_AppliesToAllDaysOfEvent()
+    {
+        await using var db = CreateDb(nameof(QuickUpdate_AppliesToAllDaysOfEvent));
+        db.CompetitionEvents.Add(new CompetitionEvent { Id = 5, Name = "Событие" });
+        db.Competitions.AddRange(
+            new Competition { Id = 1, Name = "День 1", Date = "01/07/2026", PoolType = "25m", EventId = 5, DayNumber = 1 },
+            new Competition { Id = 2, Name = "День 2", Date = "02/07/2026", PoolType = "25m", EventId = 5, DayNumber = 2 },
+            // Чужое соревнование — не должно зацепить.
+            new Competition { Id = 3, Name = "Другое", Date = "03/07/2026", PoolType = "25m" });
+        await db.SaveChangesAsync();
+
+        var repo = new CompetitionAdminRepository(db, NoCache());
+        var result = await repo.QuickUpdateAsync(new CompetitionQuickEditDto
+        {
+            CompetitionId = 2, // открыли панель у второго дня — применяется всё равно ко всем
+            PoolType = "50m",
+            IsAward = true,
+            IsChampionship = true,
+            ShowCombineAllResults = true
+        });
+
+        Assert.True(result.Success);
+        Assert.Equal(2, result.Id); // Id = число изменённых дней
+        var days = await db.Competitions.Where(c => c.EventId == 5).ToListAsync();
+        Assert.All(days, d =>
+        {
+            Assert.Equal("50m", d.PoolType);
+            Assert.True(d.IsAward);
+            Assert.True(d.IsChampionship);
+            Assert.True(d.ShowCombineAllResults);
+        });
+        var other = await db.Competitions.SingleAsync(c => c.Id == 3);
+        Assert.Equal("25m", other.PoolType);
+        Assert.False(other.IsChampionship);
+    }
+
+    /// <summary>Граница сезона — сентябрь: он уже относится к следующему (как cYear на isr.org.il).</summary>
+    [Theory]
+    [InlineData("2024-08-31", 2024)]
+    [InlineData("2024-09-01", 2025)]
+    [InlineData("2024-10-10", 2025)]
+    [InlineData("2025-08-31", 2025)]
+    public void SeasonOf_SeptemberStartsNextSeason(string iso, int expected) =>
+        Assert.Equal(expected, CompetitionAdminRepository.SeasonOf(DateTime.Parse(iso)));
 }

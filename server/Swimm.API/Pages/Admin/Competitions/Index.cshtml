@@ -1,4 +1,4 @@
-@page
+﻿@page
 @using Swimm.Application.Dtos
 @model Swimm.API.Pages.Admin.Competitions.IndexModel
 @{
@@ -7,16 +7,22 @@
 
     // ВНИМАНИЕ: параметр пагинации — «p», НЕ «page» (page зарезервирован Razor Pages, ломает переходы).
     string PageUrl(int pg) =>
-        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, year = Model.Year, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = Model.Month, p = pg, filter = Model.QualityFilter })!;
+        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = Model.Month, p = pg, filter = Model.QualityFilter })!;
 
     // Ссылка на месяц (сброс страницы на 1; повторный клик по активному — снять фильтр).
     string MonthUrl(int? m) =>
-        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, year = Model.Year, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = m, filter = Model.QualityFilter })!;
+        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = m, filter = Model.QualityFilter })!;
 
     var monthNames = new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
+    // Текущее состояние списка (фильтры + страница) — уезжает в Edit параметром back,
+    // чтобы «← К списку» и редиректы после сохранения возвращали ровно сюда.
+    var backParam = Uri.EscapeDataString(PageUrl(Model.Result.Page));
+    string EditUrl(int id) => $"/Admin/Competitions/Edit?id={id}&back={backParam}";
+
     var hasFilters = !string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.CategoryKey)
-        || Model.Year != null || !string.IsNullOrEmpty(Model.Stage) || Model.Month != null;
+        || Model.Season != null || !string.IsNullOrEmpty(Model.Stage) || Model.Month != null
+        || !string.IsNullOrEmpty(Model.Kind);
 
     (string Text, string Cls) StageBadge(CompetitionStage s) => s switch
     {
@@ -89,7 +95,7 @@
     };
     <div class="admin-card border-l-[3px] border-l-admin-warning bg-admin-warning/5 mb-4 flex items-center justify-between px-4 py-2 text-[13px]">
         <span>Активный фильтр «здоровья данных»: <strong class="text-admin-text">@label</strong></span>
-        <a href="@Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, year = Model.Year, synth = Model.ShowSynthetic ? "true" : null, month = Model.Month })" class="admin-btn admin-btn-ghost py-1 px-2.5">сбросить ✕</a>
+        <a href="@Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, synth = Model.ShowSynthetic ? "true" : null, month = Model.Month })" class="admin-btn admin-btn-ghost py-1 px-2.5">сбросить ✕</a>
     </div>
 }
 
@@ -103,6 +109,17 @@
 
 <div class="mb-4 flex flex-wrap items-center gap-3">
     <button id="btn-sync" class="admin-btn admin-btn-primary cursor-pointer">Проверить сейчас</button>
+    @{ var thisYear = DateTime.UtcNow.Year; }
+    <label class="text-[12.5px] text-admin-text-muted flex items-center gap-1.5">
+        Сезон на сайте
+        <select id="sync-year" class="admin-input py-1">
+            <option value="">текущий</option>
+            @for (var y = thisYear; y >= 2010; y--)
+            {
+                <option value="@y">@($"{y - 1}/{y % 100:00}")</option>
+            }
+        </select>
+    </label>
     <span id="sync-info" class="text-[12.5px] text-admin-text-muted"></span>
     <a href="/Admin/Competitions/AssignRules" class="admin-btn admin-btn-ghost ml-auto">Правила очков</a>
     <a href="/Admin/Competitions/MoveResults" class="admin-btn admin-btn-ghost">Перенос результатов</a>
@@ -110,7 +127,7 @@
 </div>
 
 <!-- Фильтры -->
-<form method="get" class="admin-card flex flex-wrap items-end gap-3 px-4 py-3 mb-4">
+<form method="get" id="filters-form" class="admin-card flex flex-wrap items-end gap-3 px-4 py-3 mb-4">
     <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
         Поиск по названию
         <input name="q" value="@Model.Search" autocomplete="off" class="admin-input w-72" placeholder="Название или подзаголовок…" />
@@ -136,16 +153,27 @@
         </select>
     </label>
     <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
-        Сезон
-        <select name="year" class="admin-input">
+        Тип
+        <select name="kind" class="admin-input">
             <option value="">Все</option>
-            @foreach (var y in Model.Years)
+            <option value="champ" selected="@(Model.Kind == "champ")">чемпионат Израиля</option>
+        </select>
+    </label>
+    <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+        Сезон
+        <select name="season" class="admin-input">
+            <option value="">Все</option>
+            @foreach (var s in Model.Seasons)
             {
-                <option value="@y" selected="@(y == Model.Year)">@y</option>
+                <option value="@s" selected="@(s == Model.Season)">@($"{s - 1}/{s % 100:00}")</option>
             }
         </select>
     </label>
     <input type="hidden" name="month" value="@Model.Month" />
+    @if (!string.IsNullOrEmpty(Model.QualityFilter))
+    {
+        <input type="hidden" name="filter" value="@Model.QualityFilter" />
+    }
     <label class="flex items-center gap-2 text-[13px] text-admin-text-muted self-center mt-3.5">
         <input type="checkbox" name="synth" value="true" checked="@Model.ShowSynthetic" class="cursor-pointer" />
         показать синтетику (SYNTH)
@@ -193,6 +221,7 @@ else
             <thead>
                 <tr>
                     <th>Стадия</th>
+                    <th title="Чемпионат Израиля" class="w-6"></th>
                     <th>Название</th>
                     <th>Дата</th>
                     <th>Бассейн</th>
@@ -206,13 +235,17 @@ else
                 @foreach (var u in Model.Result.Items)
                 {
                     var badge = StageBadge(u.Stage);
+                    // Ключ строки: у события — по EventId, у одиночного — по Id, у сайтовой — по DiscoveredId.
+                    var rowKey = u.Db is { IsEvent: true } evk
+                        ? $"e{evk.EventId}"
+                        : u.Db?.Single is { } ck ? $"c{ck.Id}" : $"s{u.Site!.DiscoveredId}";
                     @if (u.Db is { IsEvent: true } ev)
                     {
-                        <!-- Многодневное событие: заголовок + разворачиваемые дни -->
-                        <tr id="evhead-@ev.EventId" class="cursor-pointer hover:bg-admin-surface-hover select-none" onclick="toggleEvent(@ev.EventId)">
+                        <!-- Многодневное событие: заголовок (дни и действия — в панели) -->
+                        <tr id="evhead-@ev.EventId">
                             <td><span class="inline-block py-0.5 px-2 rounded text-xs font-semibold @badge.Cls">@badge.Text</span></td>
+                            <td class="text-center">@(u.IsChampionship ? "🏆" : "")</td>
                             <td>
-                                <svg id="chev-@ev.EventId" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-3.5 h-3.5 inline-block transition-transform text-admin-text-muted"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
                                 <span class="font-medium text-admin-text">@ev.EventName</span>
                                 <span class="ml-1.5 inline-block py-0.5 px-1.5 rounded text-[10px] font-semibold bg-admin-success/15 text-admin-success">@ev.DayCount @DaysWord(ev.DayCount)</span>
                                 @await Html.PartialAsync("/Pages/Admin/Competitions/_CompCategories.cshtml", ev.Categories)
@@ -222,23 +255,18 @@ else
                             <td class="text-admin-text-muted">
                                 @if (u.Site is { } es)
                                 {
-                                    <a href="https://isr.org.il/comp.asp?compID=@es.OrgCompId" target="_blank" rel="noopener" class="text-admin-accent hover:underline" onclick="event.stopPropagation()">@es.OrgCompId ↗</a>
+                                    <a href="https://isr.org.il/comp.asp?compID=@es.OrgCompId" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@es.OrgCompId ↗</a>
                                 }
                                 else { <text>—</text> }
                             </td>
                             <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(u.Site != null ? System.Net.WebUtility.HtmlEncode(u.Site.Venue ?? "—") + LangBadges(u.Site.Languages) : "—")</td>
                             <td class="text-right tabular-nums">@ev.TotalResultCount</td>
-                            <td class="text-right whitespace-nowrap" onclick="event.stopPropagation()">
-                                @if (ev.TotalResultCount > 0)
-                                {
-                                    <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 quality-btn"
-                                            data-event-id="@ev.EventId" data-title="@ev.EventName"
-                                            title="Проверить достоверность результатов">Качество</button>
-                                }
-                                @Html.Raw(u.Site != null ? SiteActions(u.Site, imported: true) : "")
+                            <td class="text-right whitespace-nowrap">
+                                <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 row-toggle"
+                                        data-key="@rowKey" aria-expanded="false">▸ Открыть</button>
                                 <form method="post" asp-page-handler="DeleteEvent"
                                       asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                      asp-route-year="@Model.Year" asp-route-stage="@Model.Stage"
+                                      asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-stage="@Model.Stage"
                                       asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
                                       class="inline comp-delete-form" data-kind="event" data-name="@ev.EventName" data-days="@ev.DayCount" data-rows="@ev.TotalResultCount">
                                     <input type="hidden" name="eventId" value="@ev.EventId" />
@@ -246,50 +274,15 @@ else
                                 </form>
                             </td>
                         </tr>
-                        @foreach (var d in ev.Days)
-                        {
-                            <tr class="event-day-@ev.EventId hidden event-group">
-                                <td></td>
-                                <td>
-                                    <span class="text-admin-text-muted/60 mr-1">↳</span>
-                                    <a href="/Admin/Competitions/Edit?id=@d.Id" class="text-admin-accent hover:underline">День @(d.DayNumber?.ToString() ?? "?")</a>
-                                    @if (!string.IsNullOrEmpty(d.SubName))
-                                    {
-                                        <div class="pl-4 text-[11px] text-admin-text-muted truncate max-w-[280px]" title="@d.SubName">@d.SubName</div>
-                                    }
-                                </td>
-                                <td class="whitespace-nowrap text-admin-text-muted">@(string.IsNullOrEmpty(d.Date) ? "—" : d.Date)</td>
-                                <td>@(string.IsNullOrEmpty(d.PoolType) ? "—" : d.PoolType)</td>
-                                <td class="text-admin-text-muted">
-                                    @if (d.OrgCompId is int doc)
-                                    {
-                                        <a href="https://isr.org.il/comp.asp?compID=@doc" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@doc ↗</a>
-                                    }
-                                    else { <text>—</text> }
-                                </td>
-                                <td>@await Html.PartialAsync("/Pages/Admin/Competitions/_CompFlags.cshtml", d)</td>
-                                <td class="text-right tabular-nums">@d.ResultCount</td>
-                                <td class="text-right whitespace-nowrap">
-                                    <a href="/Admin/Competitions/Edit?id=@d.Id" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
-                                    <form method="post" asp-page-handler="Delete"
-                                          asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                          asp-route-year="@Model.Year" asp-route-stage="@Model.Stage"
-                                          asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
-                                          class="inline comp-delete-form" data-kind="day" data-name="День @(d.DayNumber?.ToString() ?? "?")" data-rows="@d.ResultCount">
-                                        <input type="hidden" name="id" value="@d.Id" />
-                                        <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
-                                    </form>
-                                </td>
-                            </tr>
-                        }
                     }
                     else if (u.Db?.Single is { } c)
                     {
                         <!-- Одиночное соревнование (импортировано или только в БД) -->
                         <tr>
                             <td><span class="inline-block py-0.5 px-2 rounded text-xs font-semibold @badge.Cls">@badge.Text</span></td>
+                            <td class="text-center">@(u.IsChampionship ? "🏆" : "")</td>
                             <td>
-                                <a href="/Admin/Competitions/Edit?id=@c.Id" class="text-admin-accent hover:underline font-medium">@c.Name</a>
+                                <a href="@EditUrl(c.Id)" class="text-admin-accent hover:underline font-medium">@c.Name</a>
                                 @if (!string.IsNullOrEmpty(c.SubName))
                                 {
                                     <div class="text-[11px] text-admin-text-muted truncate max-w-[280px]" title="@c.SubName">@c.SubName</div>
@@ -309,17 +302,11 @@ else
                             <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(u.Site != null ? System.Net.WebUtility.HtmlEncode(u.Site.Venue ?? "—") + LangBadges(u.Site.Languages) : "—")</td>
                             <td class="text-right tabular-nums">@c.ResultCount</td>
                             <td class="text-right whitespace-nowrap">
-                                <a href="/Admin/Competitions/Edit?id=@c.Id" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
-                                @if (c.ResultCount > 0)
-                                {
-                                    <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 quality-btn"
-                                            data-competition-id="@c.Id" data-title="@c.Name"
-                                            title="Проверить достоверность результатов">Качество</button>
-                                }
-                                @Html.Raw(u.Site != null ? SiteActions(u.Site, imported: true) : "")
+                                <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 row-toggle"
+                                        data-key="@rowKey" aria-expanded="false">▸ Открыть</button>
                                 <form method="post" asp-page-handler="Delete"
                                       asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                      asp-route-year="@Model.Year" asp-route-stage="@Model.Stage"
+                                      asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-stage="@Model.Stage"
                                       asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
                                       class="inline comp-delete-form" data-kind="single" data-name="@c.Name" data-rows="@c.ResultCount">
                                     <input type="hidden" name="id" value="@c.Id" />
@@ -333,6 +320,7 @@ else
                         <!-- Только на сайте (в БД ещё нет) -->
                         <tr>
                             <td><span class="inline-block py-0.5 px-2 rounded text-xs font-semibold @badge.Cls">@badge.Text</span></td>
+                            <td class="text-center">@(u.IsChampionship ? "🏆" : "")</td>
                             <td dir="rtl" style="text-align:left">
                                 <a class="text-admin-accent hover:underline" href="https://isr.org.il/comp.asp?compID=@s.OrgCompId" target="_blank" rel="noopener">@s.Name ↗</a>
                                 @if (!string.IsNullOrEmpty(s.LastError))
@@ -345,9 +333,159 @@ else
                             <td class="text-admin-text-muted">@s.OrgCompId</td>
                             <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(System.Net.WebUtility.HtmlEncode(s.Venue ?? "—") + LangBadges(s.Languages))</td>
                             <td class="text-right text-admin-text-muted">—</td>
-                            <td class="text-right whitespace-nowrap">@Html.Raw(SiteActions(s, imported: false))</td>
+                            <td class="text-right whitespace-nowrap">
+                                <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 row-toggle"
+                                        data-key="@rowKey" aria-expanded="false">▸ Открыть</button>
+                            </td>
                         </tr>
                     }
+
+                    // Раскрывающаяся панель строки: действия + дни события + быстрая правка.
+                    var head = u.Db?.Single ?? (u.Db?.Days.Count > 0 ? u.Db.Days[0] : null);
+                    var rowTitle = u.Db?.Single?.Name ?? u.Db?.EventName ?? u.Site?.Name ?? "";
+                    var rowResults = u.Db?.Single?.ResultCount ?? u.Db?.TotalResultCount ?? 0;
+                    <tr id="panel-@rowKey" class="row-panel hidden">
+                        <td colspan="9" class="bg-admin-surface-hover/40 p-4">
+                            <div class="flex flex-wrap items-center gap-2">
+                                @if (head != null)
+                                {
+                                    <a href="@EditUrl(head.Id)" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
+                                }
+                                @if (rowResults > 0 && u.Db is { } dbq)
+                                {
+                                    <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 quality-btn"
+                                            data-event-id="@(dbq.IsEvent ? dbq.EventId?.ToString() : null)"
+                                            data-competition-id="@(dbq.IsEvent ? null : dbq.Single?.Id.ToString())"
+                                            data-title="@rowTitle"
+                                            title="Проверить достоверность результатов">Качество</button>
+                                }
+                                @Html.Raw(u.Site != null ? SiteActions(u.Site, imported: u.Db != null) : "")
+                            </div>
+
+                            @if (u.Db is { IsEvent: true } evp)
+                            {
+                                <div class="mt-3 rounded-md border border-admin-border">
+                                    <table class="admin-table m-0">
+                                        <tbody>
+                                            @foreach (var d in evp.Days)
+                                            {
+                                                <tr>
+                                                    <td class="w-40">
+                                                        <a href="@EditUrl(d.Id)" class="text-admin-accent hover:underline">День @(d.DayNumber?.ToString() ?? "?")</a>
+                                                        @if (!string.IsNullOrEmpty(d.SubName))
+                                                        {
+                                                            <div class="text-[11px] text-admin-text-muted truncate max-w-[280px]" title="@d.SubName">@d.SubName</div>
+                                                        }
+                                                    </td>
+                                                    <td class="whitespace-nowrap text-admin-text-muted">@(string.IsNullOrEmpty(d.Date) ? "—" : d.Date)</td>
+                                                    <td>@(string.IsNullOrEmpty(d.PoolType) ? "—" : d.PoolType)</td>
+                                                    <td class="text-admin-text-muted">
+                                                        @if (d.OrgCompId is int doc)
+                                                        {
+                                                            <a href="https://isr.org.il/comp.asp?compID=@doc" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@doc ↗</a>
+                                                        }
+                                                        else { <text>—</text> }
+                                                    </td>
+                                                    <td>@await Html.PartialAsync("/Pages/Admin/Competitions/_CompFlags.cshtml", d)</td>
+                                                    <td class="text-right tabular-nums">@d.ResultCount</td>
+                                                    <td class="text-right whitespace-nowrap">
+                                                        <a href="@EditUrl(d.Id)" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
+                                                        <form method="post" asp-page-handler="Delete"
+                                                              asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
+                                                              asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-stage="@Model.Stage"
+                                                              asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
+                                                              class="inline comp-delete-form" data-kind="day" data-name="День @(d.DayNumber?.ToString() ?? "?")" data-rows="@d.ResultCount">
+                                                            <input type="hidden" name="id" value="@d.Id" />
+                                                            <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+
+                            @if (head != null)
+                            {
+                                @* Быстрая правка: только поля, общие для всех дней события. Имя/дата/страна — на Edit. *@
+                                <form method="post" asp-page-handler="QuickSave"
+                                      asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
+                                      asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-stage="@Model.Stage"
+                                      asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
+                                      class="mt-3">
+                                    <input type="hidden" name="id" value="@head.Id" />
+                                    @{
+                                        var selectedKeys = (u.Db!.IsEvent ? u.Db.Categories : head.Categories).Select(x => x.Key).ToHashSet();
+                                        var poolType = (u.Db.IsEvent ? u.Db.PoolType : head.PoolType) ?? "";
+                                    }
+                                    <div class="mb-2 text-xs text-admin-text-muted">
+                                        Категории
+                                        @if (u.Db.IsEvent)
+                                        {
+                                            <span class="text-admin-warning">· сохранение применится ко всем дням события (@u.Db.DayCount)</span>
+                                        }
+                                    </div>
+                                    <div class="flex flex-wrap gap-x-5 gap-y-2">
+                                        @foreach (var cat in Model.Categories)
+                                        {
+                                            <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+                                                <input type="checkbox" name="categoryKeys" value="@cat.Key"
+                                                       checked="@selectedKeys.Contains(cat.Key)" class="w-4 h-4 cursor-pointer" />
+                                                <span class="text-admin-text">@(!string.IsNullOrEmpty(cat.Badge) ? cat.Badge + " " : "")@cat.Name</span>
+                                            </label>
+                                        }
+                                    </div>
+                                    <div class="mt-3 flex flex-wrap gap-x-6 gap-y-2">
+                                        <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+                                            <input type="checkbox" name="isAward" value="true" checked="@(u.Db.IsEvent ? u.Db.IsAward : head.IsAward)" class="w-4 h-4 cursor-pointer" />
+                                            <span class="text-admin-text">Awards</span>
+                                        </label>
+                                        <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+                                            <input type="checkbox" name="isChampionship" value="true" checked="@(u.Db.IsEvent ? u.Db.IsChampionship : head.IsChampionship)" class="w-4 h-4 cursor-pointer" />
+                                            <span class="text-admin-text">🏆 Чемпионат Израиля</span>
+                                        </label>
+                                        <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+                                            <input type="checkbox" name="showCombineAllResults" value="true" checked="@(u.Db.IsEvent ? u.Db.ShowCombineAllResults : head.ShowCombineAllResults)" class="w-4 h-4 cursor-pointer" />
+                                            <span class="text-admin-text">Combine all results</span>
+                                        </label>
+                                    </div>
+                                    <div class="mt-3 flex flex-wrap items-end gap-3">
+                                        <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+                                            Тип бассейна
+                                            <select name="poolType" class="admin-input">
+                                                @foreach (var pt in Model.PoolTypeOptions)
+                                                {
+                                                    <option value="@pt" selected="@(pt == poolType)">@pt</option>
+                                                }
+                                            </select>
+                                        </label>
+                                        <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+                                            Клубные очки
+                                            <select name="pointRuleClubsId" class="admin-input">
+                                                <option value="">Авто (по дате и типу)</option>
+                                                @foreach (var r in Model.ClubRules)
+                                                {
+                                                    <option value="@r.Id" selected="@(r.Id == head.PointRuleClubsId)">@r.Version</option>
+                                                }
+                                            </select>
+                                        </label>
+                                        <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+                                            High Point
+                                            <select name="pointRuleSwimmersId" class="admin-input">
+                                                <option value="">Авто (по дате и типу)</option>
+                                                @foreach (var r in Model.SwimmerRules)
+                                                {
+                                                    <option value="@r.Id" selected="@(r.Id == head.PointRuleSwimmersId)">@r.Version</option>
+                                                }
+                                            </select>
+                                        </label>
+                                        <button type="submit" class="admin-btn admin-btn-primary">Сохранить</button>
+                                    </div>
+                                </form>
+                            }
+                        </td>
+                    </tr>
                 }
             </tbody>
         </table>
@@ -437,14 +575,47 @@ else
                 .ToDictionary(u => u.Site!.DiscoveredId.ToString(),
                     u => new { name = u.Site!.Name, languages = u.Site!.Languages })));
 
-        // Разворачивание/сворачивание дней многодневного события (как в /Admin/Competitions).
-        function toggleEvent(eventId) {
-            document.querySelectorAll('.event-day-' + eventId).forEach(tr => tr.classList.toggle('hidden'));
-            const chev = document.getElementById('chev-' + eventId);
-            if (chev) chev.classList.toggle('rotate-90');
-            const head = document.getElementById('evhead-' + eventId);
-            if (head) head.classList.toggle('event-group');
-        }
+        // Фильтры: выбор в селекте/чекбоксе сразу уходит в URL (сабмит формы) — чтобы кнопка
+        // «назад» и возврат со страницы соревнования приводили ровно к тому же списку.
+        // Пустые поля из query выкидываем (disabled не сериализуется) — URL остаётся читаемым.
+        (function () {
+            const form = document.getElementById('filters-form');
+            if (!form) return;
+            form.addEventListener('submit', () => {
+                form.querySelectorAll('input[name], select[name]').forEach(el => {
+                    if (el.type === 'checkbox') { if (!el.checked) el.disabled = true; }
+                    else if (el.value === '') el.disabled = true;
+                });
+                // Смена фильтров = новая выборка: страницу пагинации сбрасываем (p не в форме).
+            });
+            form.querySelectorAll('select, input[type=checkbox]').forEach(el =>
+                el.addEventListener('change', () => form.requestSubmit()));
+        })();
+
+        // Одна панель на строку: действия + дни события + быстрая правка. Состояние открытых
+        // строк переживает перезагрузку (после сохранения страница редиректится) — sessionStorage.
+        (function () {
+            const KEY = 'admin-competitions-open-rows';
+            const open = new Set(JSON.parse(sessionStorage.getItem(KEY) || '[]'));
+
+            const apply = (btn, isOpen) => {
+                const panel = document.getElementById('panel-' + btn.dataset.key);
+                if (!panel) return;
+                panel.classList.toggle('hidden', !isOpen);
+                btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                btn.textContent = isOpen ? '▾ Закрыть' : '▸ Открыть';
+            };
+
+            document.querySelectorAll('.row-toggle').forEach(btn => {
+                if (open.has(btn.dataset.key)) apply(btn, true);
+                btn.addEventListener('click', () => {
+                    const isOpen = btn.getAttribute('aria-expanded') !== 'true';
+                    apply(btn, isOpen);
+                    isOpen ? open.add(btn.dataset.key) : open.delete(btn.dataset.key);
+                    sessionStorage.setItem(KEY, JSON.stringify([...open]));
+                });
+            });
+        })();
 
         // Подтверждение каскадного удаления (одиночное / день / всё событие) — как в /Admin/Competitions.
         document.querySelectorAll('.comp-delete-form').forEach(form => {
@@ -489,12 +660,22 @@ else
 
             document.getElementById('btn-sync').addEventListener('click', async () => {
                 const btn = document.getElementById('btn-sync');
+                const year = document.getElementById('sync-year').value;
                 btn.disabled = true;
-                info.textContent = 'Проверяю сайт…';
+                info.textContent = year ? `Проверяю сезон ${year} на сайте…` : 'Проверяю сайт…';
                 try {
-                    const r = await apiJson(`${API}/sync`, { method: 'POST' });
+                    const r = await apiJson(`${API}/sync${year ? `?year=${encodeURIComponent(year)}` : ''}`, { method: 'POST' });
                     info.textContent = `На сайте: ${r.totalOnSite}, новых: ${r.added}, обновлено: ${r.updated}. Обновляю…`;
-                    location.reload();
+                    // После забора прошлого сезона сразу показываем его — иначе новые строки
+                    // тонут в общем списке на 19 страницах.
+                    if (year) {
+                        const u = new URL(location.href);
+                        u.searchParams.set('season', year);
+                        u.searchParams.delete('p');
+                        location.href = u.toString();
+                    } else {
+                        location.reload();
+                    }
                 } catch (e) { info.textContent = ''; toast('Ошибка: ' + e.message, 5000); btn.disabled = false; }
             });
 

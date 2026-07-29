@@ -18,14 +18,16 @@ public class IndexModel : PageModel
     private const int PageSize = 20;
     private readonly ICompetitionAdminRepository _repo;
     private readonly IImportService _import;
+    private readonly IPointRulesAdminRepository _rules;
     private readonly IAdminAuditService _audit;
     private readonly ILogger<IndexModel> _logger;
 
     public IndexModel(ICompetitionAdminRepository repo, IImportService import,
-        IAdminAuditService audit, ILogger<IndexModel> logger)
+        IPointRulesAdminRepository rules, IAdminAuditService audit, ILogger<IndexModel> logger)
     {
         _repo = repo;
         _import = import;
+        _rules = rules;
         _audit = audit;
         _logger = logger;
     }
@@ -36,8 +38,13 @@ public class IndexModel : PageModel
     [BindProperty(SupportsGet = true, Name = "cat")]
     public string? CategoryKey { get; set; }
 
-    [BindProperty(SupportsGet = true, Name = "year")]
-    public int? Year { get; set; }
+    /// <summary>Сезон (сен–авг) по году окончания: 2025 = 24/25. Совпадает с cYear на isr.org.il.</summary>
+    [BindProperty(SupportsGet = true, Name = "season")]
+    public int? Season { get; set; }
+
+    /// <summary>Тип соревнования: «champ» — только чемпионаты (по названию), пусто — все.</summary>
+    [BindProperty(SupportsGet = true, Name = "kind")]
+    public string? Kind { get; set; }
 
     /// <summary>Фильтр по стадии: OnSite | Imported | DbOnly | Ignored (пусто — все).</summary>
     [BindProperty(SupportsGet = true, Name = "stage")]
@@ -75,7 +82,13 @@ public class IndexModel : PageModel
 
     public IReadOnlyList<CategoryTagDto> Categories { get; private set; } = [];
 
-    public IReadOnlyList<int> Years { get; private set; } = [];
+    /// <summary>Сезоны для фильтра — из справочника И из строк с сайта (прошлые сезоны автозабора).</summary>
+    public IReadOnlyList<int> Seasons { get; private set; } = [];
+
+    /// <summary>Правила очков и типы бассейна — для селектов панели быстрой правки строки.</summary>
+    public IReadOnlyList<PointRuleRowDto> ClubRules { get; private set; } = [];
+    public IReadOnlyList<PointRuleRowDto> SwimmerRules { get; private set; } = [];
+    public IReadOnlyList<string> PoolTypeOptions => Swimm.Application.Constants.PoolTypes.All;
 
     public async Task OnGetAsync()
     {
@@ -94,11 +107,51 @@ public class IndexModel : PageModel
             "discovery-error" or "no-org-comp-id" or "no-results" => FilterAlias,
             _ => null
         };
-        var list = await _repo.GetUnifiedAsync(Search, CategoryKey, Year, Stage, ShowSynthetic, Month, PageNumber, PageSize, QualityFilter);
+        var list = await _repo.GetUnifiedAsync(Search, CategoryKey, Season, Stage, ShowSynthetic, Month, PageNumber, PageSize, QualityFilter, Kind);
         Result = list.Page;
         MonthCounts = list.MonthCounts;
         Categories = await _repo.GetAllCategoriesAsync();
-        Years = await _repo.GetAvailableYearsAsync();
+        Seasons = await _repo.GetAvailableSeasonsAsync();
+        ClubRules = await _rules.GetAllAsync(PointRuleKind.Clubs);
+        SwimmerRules = await _rules.GetAllAsync(PointRuleKind.Swimmers);
+    }
+
+    /// <summary>
+    /// Быстрая правка из раскрытой панели строки: бассейн, флаги, категории, правила очков —
+    /// сразу всем дням события (регламент у события один). Имя/дата/страна правятся на Edit.
+    /// </summary>
+    public async Task<IActionResult> OnPostQuickSaveAsync(int id, string poolType,
+        bool isAward, bool isChampionship, bool showCombineAllResults,
+        List<string>? categoryKeys, int? pointRuleClubsId, int? pointRuleSwimmersId)
+    {
+        var result = await _repo.QuickUpdateAsync(new CompetitionQuickEditDto
+        {
+            CompetitionId = id,
+            PoolType = poolType ?? "",
+            IsAward = isAward,
+            IsChampionship = isChampionship,
+            ShowCombineAllResults = showCombineAllResults,
+            CategoryKeys = categoryKeys ?? [],
+            PointRuleClubsId = pointRuleClubsId,
+            PointRuleSwimmersId = pointRuleSwimmersId
+        });
+
+        if (!result.Success)
+        {
+            TempData["Flash"] = $"Не сохранено: {result.Error}";
+            return RedirectToBackToList();
+        }
+
+        // Id в результате — число изменённых дней.
+        await _audit.LogAsync("competition.quick-edit", "Competition", id.ToString(),
+            $"Быстрая правка из списка (#{id}): бассейн={poolType}, awards={isAward}, " +
+            $"чемпионат={isChampionship}, combine={showCombineAllResults}, " +
+            $"категории=[{string.Join(",", categoryKeys ?? [])}], дней изменено: {result.Id}");
+
+        TempData["Flash"] = result.Id > 1
+            ? $"Сохранено, применено ко всем дням события: {result.Id}"
+            : "Сохранено";
+        return RedirectToBackToList();
     }
 
     /// <summary>Каскадное удаление одного соревнования (одиночного или отдельного дня события).</summary>
@@ -153,7 +206,7 @@ public class IndexModel : PageModel
     private IActionResult RedirectToBackToList() =>
         RedirectToPage("Index", new
         {
-            q = Search, cat = CategoryKey, year = Year, stage = Stage,
+            q = Search, cat = CategoryKey, season = Season, kind = Kind, stage = Stage,
             synth = ShowSynthetic ? "true" : null, month = Month, p = PageNumber
         });
 }

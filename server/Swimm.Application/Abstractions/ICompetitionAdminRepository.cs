@@ -27,9 +27,13 @@ public interface ICompetitionAdminRepository
     /// <param name="qualityFilter">T3b deep-link: discovery-error | no-org-comp-id | no-results —
     /// доп. WHERE поверх остальных фильтров (те же предикаты, что считает DashboardStatusService).
     /// Неизвестное значение/null — не фильтрует.</param>
+    /// <param name="season">Сезон (сен–авг) по году окончания: 2025 = сезон 24/25. Применяется
+    /// и к БД-строкам, и к строкам с сайта. null — все.</param>
+    /// <param name="kind">«champ» — только чемпионаты Израиля (по названию: אליפות + ישראל).
+    /// null/пусто — все.</param>
     Task<UnifiedCompetitionList> GetUnifiedAsync(
-        string? search, string? categoryKey, int? year, string? stage, bool showSynthetic, int? month, int page, int pageSize,
-        string? qualityFilter = null);
+        string? search, string? categoryKey, int? season, string? stage, bool showSynthetic, int? month, int page, int pageSize,
+        string? qualityFilter = null, string? kind = null);
 
     /// <summary>Полные данные для формы Edit (включая URL-ы результатов). null — не найдено.</summary>
     Task<CompetitionEditDto?> GetByIdAsync(int id);
@@ -37,14 +41,24 @@ public interface ICompetitionAdminRepository
     /// <summary>Все категории (для чекбоксов формы), по DisplayOrder.</summary>
     Task<IReadOnlyList<CategoryTagDto>> GetAllCategoriesAsync();
 
-    /// <summary>Годы (сезоны), встречающиеся в Date соревнований, по убыванию — для фильтра списка.</summary>
+    /// <summary>Годы, встречающиеся в Date соревнований, по убыванию — для фильтра /AssignRules.</summary>
     Task<IReadOnlyList<int>> GetAvailableYearsAsync();
+
+    /// <summary>Сезоны (сен–авг, по году окончания) из Date соревнований И дат строк с сайта,
+    /// по убыванию — для фильтра объединённого списка.</summary>
+    Task<IReadOnlyList<int>> GetAvailableSeasonsAsync();
 
     /// <summary>Создать. Ошибки уникальности (Name+Date+PoolType, OrgCompId) возвращаются в результате.</summary>
     Task<CompetitionSaveResult> CreateAsync(CompetitionInputDto input);
 
     /// <summary>Обновить основные поля. null-возврат Success=false с текстом при конфликте/отсутствии.</summary>
     Task<CompetitionSaveResult> UpdateAsync(int id, CompetitionInputDto input);
+
+    /// <summary>
+    /// Быстрая правка из списка: общие поля (бассейн, флаги, категории, правила очков)
+    /// применяются ко ВСЕМ дням события. Id в результате — число изменённых дней.
+    /// </summary>
+    Task<CompetitionSaveResult> QuickUpdateAsync(CompetitionQuickEditDto input);
 
     // ── Привязка правил очков (Э4) ─────────────────────────────────────────────
 

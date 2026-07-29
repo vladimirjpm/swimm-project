@@ -51,11 +51,15 @@ public class DiscoveryAdminController : ControllerBase
         => Ok(await _discovery.GetAllAsync(ct));
 
     [HttpPost("sync")]
-    public async Task<IActionResult> Sync(CancellationToken ct)
+    public async Task<IActionResult> Sync([FromQuery] int? year, CancellationToken ct = default)
     {
+        // year — сезон isr.org.il (cYear); null = текущий. Ограничение — здравый диапазон,
+        // чтобы случайный ?year=1 не гонял чужой прод впустую.
+        if (year is not null and (< 2000 or > 2100))
+            return BadRequest(new { error = "Сезон вне диапазона 2000–2100." });
         try
         {
-            return Ok(await _discovery.SyncAsync(ct));
+            return Ok(await _discovery.SyncAsync(year, ct));
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException)
         {
