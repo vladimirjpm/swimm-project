@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Domain;
 using Swimm.Infrastructure.Data;
 
 namespace Swimm.Infrastructure.Repositories;
@@ -20,8 +21,8 @@ public class MySwimsRepository : IMySwimsRepository
         _db = db;
     }
 
-    /// <summary>Стартовый год сезона (сентябрь–август) для даты.</summary>
-    private static int SeasonOf(DateTime d) => d.Month >= 9 ? d.Year : d.Year - 1;
+    /// <summary>Стартовый год сезона (сентябрь–август) для даты. Общий календарь — <see cref="SeasonMath"/>.</summary>
+    private static int SeasonOf(DateTime d) => SeasonMath.StartYearOf(d);
 
     public async Task<MySwimsResponseDto> GetMySwimsAsync(int userId, int? season)
     {
@@ -59,14 +60,13 @@ public class MySwimsRepository : IMySwimsRepository
             .Distinct()
             .ToListAsync();
         response.Seasons = yearMonths
-            .Select(ym => ym.Month >= 9 ? ym.Year : ym.Year - 1)
+            .Select(ym => SeasonMath.StartYearOf(new DateTime(ym.Year, ym.Month, 1)))
             .Distinct()
             .OrderByDescending(y => y)
             .ToList();
 
-        // CompetitionDate — timestamp WITHOUT time zone → Kind обязан быть Unspecified.
-        var seasonStart = new DateTime(response.Season, 9, 1, 0, 0, 0, DateTimeKind.Unspecified);
-        var seasonEnd = seasonStart.AddYears(1);
+        // CompetitionDate — timestamp WITHOUT time zone → Kind обязан быть Unspecified (см. SeasonMath).
+        var (seasonStart, seasonEnd) = SeasonMath.RangeOf(response.Season);
 
         // 3. Заплывы сезона. Эстафеты приходят и по членству (RelayMembers), а не только
         //    по «владельцу» строки: строка привязана к одной ноге, но принадлежит всем.

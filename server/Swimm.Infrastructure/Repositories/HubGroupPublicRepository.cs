@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
+using Swimm.Domain;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Services;
@@ -161,11 +162,10 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
     /// <summary>Общие агрегаты страницы: последние заплывы, рекорды группы и сезонный зачёт.</summary>
     private static async Task FillAggregatesAsync(SwimmDbContext db, HubGroupDetailsDto dto, List<int> swimmerIds)
     {
-        // Сезон = израильский плавательный: с 1 сентября последнего прошедшего сентября по сегодня.
-        var today = DateTime.Today;
-        var seasonStartYear = today.Month >= 9 ? today.Year : today.Year - 1;
-        var seasonStart = new DateTime(seasonStartYear, 9, 1);
-        dto.SeasonLabel = $"{seasonStartYear}/{(seasonStartYear + 1) % 100:D2}";
+        // Сезон = израильский плавательный (1 сен – 31 авг); общий календарь — SeasonMath.
+        var seasonStartYear = SeasonMath.StartYearOf(DateTime.Today);
+        var seasonStart = SeasonMath.StartOf(seasonStartYear);
+        dto.SeasonLabel = SeasonMath.Label(seasonStartYear);
 
         if (swimmerIds.Count == 0) return;
 

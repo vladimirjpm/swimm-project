@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
+using Swimm.Domain;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Services;
@@ -232,8 +233,10 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
     /// <summary>
     /// Сезон плавания по дате: сентябрь–август, называется годом окончания (окт-2024 → 2025).
     /// Совпадает с cYear на isr.org.il (проверено на списке cYear=2025: окт-2024 … авг-2025).
+    /// ⚠ Это нумерация ФЕДЕРАЦИИ — на 1 больше публичной (год начала), которой пользуются
+    /// страницы спортсмена и клуба. Обе живут в <see cref="SeasonMath"/>, смешивать нельзя.
     /// </summary>
-    public static int SeasonOf(DateTime date) => date.Month >= 9 ? date.Year + 1 : date.Year;
+    public static int SeasonOf(DateTime date) => SeasonMath.FederationYearOf(date);
 
     /// <summary>Дата строки для сортировки: одиночное — своя дата, событие — дата первого дня.
     /// Date хранится текстом «дд/ММ/гггг»; непарсибельное → MinValue (уедет вниз списка).</summary>
