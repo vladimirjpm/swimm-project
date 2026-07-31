@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Swimm.Parsing.Models;
 using Swimm.Parsing.Helpers;
 
@@ -335,6 +336,36 @@ public class IsrOrgParser : IFormatParser
         }
     }
 
+    private static readonly Regex AgeBandRx = new(@"^\s*(\d{1,2})\s*-\s*(\d{1,2})\s*$", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Возраст ЭСТАФЕТНОЙ строки — это возрастная полоса заплыва из заголовка протокола
+    /// («11-12»), а НЕ возраст первой ноги.
+    ///
+    /// Зачем: команда стартует в категории целиком, а <c>RelaySwimmers.First()</c> — просто
+    /// тот, кого протокол напечатал первым. До 2026-07-31 отсюда бралcя возраст, поэтому
+    /// строки ОДНОГО заплыва «בנות 11-12» получали то 11, то 12 — в зависимости от порядка
+    /// ног. Клиентский <c>isRecordTime</c> сравнивал «11» с рекордом возраста 11 (02:15.73)
+    /// вместо возраста 12 (01:58.55) и вешал «NEW RECORD» на четвёртое место, пока победитель
+    /// заплыва оставался без бейджа. Тот же разнобой дробил один заплыв на два ключа
+    /// объединённого зачёта (<c>CombinedPlaceCalculator.EventKeyOf</c> включает EventStyleAge).
+    ///
+    /// Только ДЕТСКИЕ полосы (верхняя граница ≤ 18): у masters возраст обязан остаться числом —
+    /// на нём держится masters-логика (<c>isResultMasters</c>, диапазонные ключи рекордов),
+    /// а полосу «25-29» она бы прочитала как NaN.
+    /// </summary>
+    internal static string RelayEventAge(string? headerAge, int firstSwimmerAge)
+    {
+        if (!string.IsNullOrWhiteSpace(headerAge))
+        {
+            var m = AgeBandRx.Match(headerAge);
+            if (m.Success && int.TryParse(m.Groups[2].Value, out var upper) && upper <= 18)
+                return headerAge.Trim();
+        }
+
+        return firstSwimmerAge.ToString();
+    }
+
     private static Result CreateRelayResult(
         IsrOrgResult rHe, IsrOrgCompetitionResult comp, string country,
         int eventYear, bool isMastersFile, bool isAward,
@@ -357,7 +388,7 @@ public class IsrOrgParser : IFormatParser
             EventStyleName: comp.EventStyleName,
             EventStyleLen: comp.EventStyleLen,
             EventStyleGender: comp.EventStyleGender,
-            EventStyleAge: swimmerAge.ToString(),
+            EventStyleAge: RelayEventAge(comp.EventStyleAge, swimmerAge),
             PoolType: poolOverride ?? comp.PoolType,
             Position: rHe.Position is int pi ? pi : null,
             Heat: rHe.Heat,
@@ -406,7 +437,7 @@ public class IsrOrgParser : IFormatParser
             EventStyleName: compEn.EventStyleName,
             EventStyleLen: compEn.EventStyleLen,
             EventStyleGender: compEn.EventStyleGender,
-            EventStyleAge: swimmerAge.ToString(),
+            EventStyleAge: RelayEventAge(compEn.EventStyleAge, swimmerAge),
             PoolType: poolOverride ?? compEn.PoolType,
             Position: rEn.Position is int pi ? pi : null,
             Heat: rEn.Heat,
