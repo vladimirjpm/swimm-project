@@ -7,7 +7,10 @@ services:
       POSTGRES_USER: swimm
       POSTGRES_PASSWORD: swimm_local_dev
     ports:
-      - "5432:5432"
+      # Хост-порт 5445 (легко запомнить): 5432 и 5433 заняты контейнерами других
+      # проектов на этой машине (analyst_db, local-dev_db). Внутри контейнера порт
+      # остаётся 5432 — поэтому `docker exec swimm-postgres psql …` работает без изменений.
+      - "5445:5432"
     volumes:
       - swimm-pgdata:/var/lib/postgresql/data
 

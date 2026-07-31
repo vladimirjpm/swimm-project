@@ -119,7 +119,7 @@ dotnet run --project server/Swimm.API -- --migrate
 dotnet run --project server/Swimm.API
 
 # PostgreSQL:
-docker compose up -d   # postgres:16, порт 5432
+docker compose up -d   # postgres:16, хост-порт 5445 (внутри контейнера 5432)
 
 # Google OAuth:  server/Swimm.API/appsettings.Development.json  (gitignored)
 ```

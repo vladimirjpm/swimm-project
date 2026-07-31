@@ -94,7 +94,13 @@ were removed; anything they styled either became Tailwind utility classes inline
 
 ## Database (local)
 
-Local Postgres runs in Docker (`swimm-postgres`, db `swimm`, owner `swimm`/`swimm_local_dev`):
+Local Postgres runs in Docker (`swimm-postgres`, db `swimm`, owner `swimm`/`swimm_local_dev`).
+
+⚠️ **Хост-порт — `5445`, не дефолтный 5432** (5432/5433 заняты контейнерами других проектов
+на машине Влада). Внутри контейнера порт обычный 5432, поэтому `docker exec … psql` работает
+как раньше, а вот подключения **с хоста** (DBeaver/pgAdmin, `psql -h localhost`, строки
+подключения) должны идти на 5445. Источник правды — `ports:` в `server/docker-compose.yml`;
+локальные строки подключения в `server/Swimm.API/appsettings.json` уже на 5445.
 
 ```bash
 docker compose -f server/docker-compose.yml up -d

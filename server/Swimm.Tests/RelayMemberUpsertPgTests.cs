@@ -15,7 +15,7 @@ namespace Swimm.Tests;
 public class RelayMemberUpsertPgTests
 {
     private const string Conn =
-        "Host=localhost;Port=5432;Database=swimm;Username=swimm;Password=swimm_local_dev";
+        "Host=localhost;Port=5445;Database=swimm;Username=swimm;Password=swimm_local_dev";
 
     private static SwimmDbContext? TryCreate()
     {
