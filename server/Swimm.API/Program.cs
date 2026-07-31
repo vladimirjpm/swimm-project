@@ -442,6 +442,7 @@ app.Use(async (context, next) =>
                 "competitions" => "/competitions.html",
                 "groups" => "/groups.html",
                 "swimmers" => "/results_main.html", // /swimmers без id — пусть падает штатно
+                "clubs" => "/results_main.html",     // /clubs без id — пусть падает штатно
                 "my-media" => "/media.html",
                 "about" => "/about.html",
                 _ => null,
@@ -450,6 +451,7 @@ app.Use(async (context, next) =>
             {
                 "competitions" => "/results_main.html",              // /competitions/{id}
                 "swimmers" => "/swimmer.html",                       // /swimmers/{id}
+                "clubs" => "/club.html",                             // /clubs/{id}
                 "groups" when seg.Length >= 3 && seg[2] == "results"
                     => "/results_main.html",                         // /groups/{slug}/results
                 "groups" => "/groups.html",                          // /groups/{slug}

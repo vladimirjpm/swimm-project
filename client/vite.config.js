@@ -28,11 +28,12 @@ const cleanUrlRewrite = () => ({
       const seg = pathname.split('/').filter(Boolean);
       if (seg.length === 1) {
         return { results: '/results_main.html', competitions: '/competitions.html',
-          groups: '/groups.html', 'my-media': '/media.html', about: '/about.html' }[seg[0]] ?? null;
+          groups: '/groups.html', clubs: '/results_main.html', 'my-media': '/media.html', about: '/about.html' }[seg[0]] ?? null;
       }
       if (seg.length >= 2) {
         if (seg[0] === 'competitions') return '/results_main.html';
         if (seg[0] === 'swimmers') return '/swimmer.html';
+        if (seg[0] === 'clubs') return '/club.html';
         if (seg[0] === 'groups') return seg[2] === 'results' ? '/results_main.html' : '/groups.html';
       }
       return null;
@@ -83,6 +84,7 @@ export default defineConfig(({ command }) => ({
         groups: resolve(__dirname, 'groups.html'),
         media: resolve(__dirname, 'media.html'),
         swimmer: resolve(__dirname, 'swimmer.html'),
+        club: resolve(__dirname, 'club.html'),
       },
       output: {
         entryFileNames: '[name].js',
