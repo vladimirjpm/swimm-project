@@ -13,6 +13,8 @@
 |---|---|---|---|
 | [azure-deploy-plan.md](azure-deploy-plan.md) | деплой на Azure: App Service + Flexible PG, один origin | «Хостинг» | **6** (§3): судьба Static Web App, какая главная, порядок миграций, ветка-триггер, регион, данные с нуля или дамп |
 | [entity-pages-plan.md](entity-pages-plan.md) | публичные страницы спортсмена и клуба | 10 | **3** (§4): суммировать ли очки клуба за сезон, поле логотипа в БД, страница у псевдоклубов |
+| [club-page-model.md](club-page-model.md) | **модель данных страницы клуба** по макету «1b Deep»: зачёт = размеченное соревнование, `ClubCompetitionStanding` | 10 | 0 — решения приняты 2026-08-01 (§6) |
+| [club-page-plan.md](club-page-plan.md) | **план реализации страницы клуба** K0–K6 + кто делает / что делегируем | 10 | 0 |
 | [records-all-countries-plan.md](records-all-countries-plan.md) | рекорды всех стран + рейтинг + head-to-head | 11 | **3** (§7): все страны или подмножество, расхождение кодов страны, колонка `TimeMs` |
 
 Хендоффы к фазе 10: [спортсмен](../design-handoff-athlete-page.md) ·
