@@ -107,6 +107,20 @@ export default class CategoryHelper {
     return cat ? { name: cat.name, badge: cat.badge } : null;
   }
 
+  /**
+   * Бейдж категории СИНХРОННО — для мест, где await невозможен (чистые хелперы вроде
+   * `competitionTileData`). Живые данные, если `/api/categories` уже загружен; иначе тот же
+   * fallback, что и у асинхронного пути (он совпадает с сидом БД, см. getFallbackCategories).
+   * null — канонического ключа нет в БД (синтетический 'all').
+   */
+  static getBadgeByCanonicalKeySync(canonicalKey: string): string | null {
+    const dbKey = this.CANONICAL_TO_DB_KEY[canonicalKey];
+    if (!dbKey) return null;
+
+    const categories = this.cachedCategories ?? this.getFallbackCategories();
+    return categories.find((c) => c.key === dbKey)?.badge ?? null;
+  }
+
   /** Все канонические ключи разом (для предзагрузки списка табов одним запросом). */
   static async getCanonicalMap(): Promise<Record<string, CategoryDisplay>> {
     const categories = await this.loadCategories();
