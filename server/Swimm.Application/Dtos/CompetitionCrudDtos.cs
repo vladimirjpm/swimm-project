@@ -112,6 +112,12 @@ public sealed class CompetitionEditDto
     /// <summary>Ключи категорий, в которых состоит соревнование (для предвыбора чекбоксов).</summary>
     public List<string> CategoryKeys { get; set; } = [];
 
+    /// <summary>
+    /// Ручное переопределение роли в КЛУБНОМ ЗАЧЁТЕ: winter | summer | openwater | none.
+    /// null — «Авто»: роль выводится из IsChampionship + PoolType (25м → зима, 50м → лето).
+    /// </summary>
+    public string? StandingKindOverride { get; set; }
+
     /// <summary>Явная привязка к правилу клубных очков; null — правило подбирается по дате и типу (Э4).</summary>
     public int? PointRuleClubsId { get; set; }
 
@@ -146,6 +152,12 @@ public sealed class CompetitionInputDto
     public bool ShowCombineAllResults { get; set; }
     /// <summary>Выбранные категории. IsMasters у соревнования выводится из членства в категории Masters.</summary>
     public List<string> CategoryKeys { get; set; } = [];
+
+    /// <summary>
+    /// Ручное переопределение роли в КЛУБНОМ ЗАЧЁТЕ: winter | summer | openwater | none.
+    /// null — «Авто»: роль выводится из IsChampionship + PoolType (25м → зима, 50м → лето).
+    /// </summary>
+    public string? StandingKindOverride { get; set; }
 
     /// <summary>Привязка к правилу клубных очков; null — «Авто» (подбор по дате и типу).</summary>
     public int? PointRuleClubsId { get; set; }

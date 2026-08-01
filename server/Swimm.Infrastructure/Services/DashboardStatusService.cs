@@ -1,7 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
+using Swimm.Domain;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -165,7 +167,59 @@ public class DashboardStatusService(
             DiscoveryNew: newCount,
             DiscoveryIgnored: ignored,
             DiscoveryErrors: errors,
-            NoOrgCompId: noOrgCompId);
+            NoOrgCompId: noOrgCompId,
+            DuplicateStandings: await CountDuplicateStandingsAsync(ct));
+    }
+
+    /// <summary>
+    /// Дубли клубного зачёта: (сезон × зачётная группа × ❄/☀) должен давать НЕ БОЛЬШЕ одного
+    /// соревнования — у возрастной группы за сезон один зимний чемпионат и один летний.
+    /// Уникальным индексом это не выразить (сезон производен от даты, группа лежит в M:N),
+    /// поэтому проверяем данными. Ненулевой счётчик значит, что у какого-то соревнования
+    /// неверно стоит IsChampionship или PoolType, — чинить надо там.
+    /// Пропуск (чемпионат отменили) — норма и здесь не считается.
+    /// </summary>
+    private async Task<int> CountDuplicateStandingsAsync(CancellationToken ct)
+    {
+        var rows = await db.Competitions.AsNoTracking()
+            .Where(c => c.IsChampionship || c.StandingKindOverride != null)
+            .Select(c => new
+            {
+                c.Id,
+                c.Date,
+                c.EventId,
+                c.IsChampionship,
+                c.PoolType,
+                c.StandingKindOverride,
+                Categories = db.CategoryCompetitions
+                    .Where(cc => cc.CompetitionId == c.Id)
+                    .Select(cc => cc.Category.Key)
+                    .ToList(),
+            })
+            .ToListAsync(ct);
+
+        var seen = new HashSet<(int Season, string Kind, string Group)>();
+        var duplicates = 0;
+        // Зачётная единица — событие целиком, поэтому дни одного события не считаются дублями.
+        var countedUnits = new HashSet<string>();
+
+        foreach (var c in rows)
+        {
+            var kind = StandingKinds.Resolve(c.IsChampionship, c.PoolType, c.StandingKindOverride);
+            if (kind is null) continue;
+            if (!DateTime.TryParseExact(c.Date, "dd/MM/yyyy",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var date)) continue;
+
+            var season = SeasonMath.StartYearOf(date);
+            foreach (var key in c.Categories.Where(Category.ReservedKeys.Contains))
+            {
+                var unit = $"{c.EventId?.ToString() ?? "c" + c.Id}|{season}|{kind}|{key}";
+                if (!countedUnits.Add(unit)) continue;   // другой день того же события
+                if (!seen.Add((season, kind, key))) duplicates++;
+            }
+        }
+        return duplicates;
     }
 
     private async Task<DashboardResultStatus> BuildResultsAsync(CancellationToken ct)

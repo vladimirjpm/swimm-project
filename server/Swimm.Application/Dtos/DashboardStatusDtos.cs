@@ -1,4 +1,4 @@
-namespace Swimm.Application.Dtos;
+﻿namespace Swimm.Application.Dtos;
 
 /// <summary>Сводный статус данных для дашборда /Admin (docs/plans/admin-dashboard-health-2-plan.md):
 /// блоки пловцы/клубы/соревнования/результаты/рекорды/медиа/юзеры-группы/система. Один запрос
@@ -41,7 +41,14 @@ public sealed record DashboardCompetitionStatus(
     /// <summary>DiscoveredCompetition.LastError != null.</summary>
     int DiscoveryErrors,
     /// <summary>Competition.OrgCompId == null.</summary>
-    int NoOrgCompId);
+    int NoOrgCompId,
+    /// <summary>
+    /// Дубли клубного зачёта: два чемпионата одной зачётной группы одного вида (❄/☀)
+    /// в одном сезоне. В реальности такого не бывает — если счётчик не ноль, ошибка не в
+    /// зачёте, а во флагах самого соревнования (IsChampionship / PoolType).
+    /// См. docs/plans/club-page-model.md §2.1.
+    /// </summary>
+    int DuplicateStandings);
 
 /// <summary>Блок «Результаты»: провалы времени, FK-аномалии (сторож), эстафеты без состава.</summary>
 public sealed record DashboardResultStatus(

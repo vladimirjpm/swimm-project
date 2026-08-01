@@ -1,4 +1,4 @@
-@page
+﻿@page
 @model Swimm.API.Pages.Admin.Competitions.EditModel
 @{
     ViewData["Title"] = Model.IsNew ? "Новое соревнование" : "Редактирование соревнования";
@@ -126,6 +126,27 @@
                 <input asp-for="Input.ShowCombineAllResults" class="w-4 h-4 cursor-pointer" />
                 <span class="text-admin-text">Combine all results</span>
             </label>
+        </div>
+
+        <!-- ── Клубный зачёт сезона (K6) ───────────────────────────────────────── -->
+        <div class="mt-5">
+            <label class="block text-[11px] font-semibold uppercase tracking-wide text-admin-text-muted mb-1">
+                Роль в клубном зачёте
+            </label>
+            <select asp-for="Input.StandingKindOverride" class="admin-input w-full max-w-xs">
+                <option value="">Авто — @Model.DerivedStandingKindLabel</option>
+                <option value="winter">❄ Зимний чемпионат</option>
+                <option value="summer">☀ Летний чемпионат</option>
+                <option value="openwater">🌊 Открытая вода</option>
+                <option value="none">Не идёт в зачёт</option>
+            </select>
+            <div class="text-[11px] text-admin-text-muted mt-1.5 leading-relaxed">
+                Обычно менять не нужно: роль выводится сама из галки <strong class="text-admin-text">🏆 Чемпионат</strong>
+                и типа бассейна — <strong class="text-admin-text">25м → зимний</strong>,
+                <strong class="text-admin-text">50м → летний</strong>. Проверено на всех чемпионатах в базе,
+                исключений нет. Поле нужно для случаев вне этого правила — прежде всего открытой воды,
+                где бассейна нет. Зачёт рисует грид «сезон × группа» на странице клуба.
+            </div>
         </div>
 
         <!-- ── Правила начисления очков (Э4) ──────────────────────────────────── -->

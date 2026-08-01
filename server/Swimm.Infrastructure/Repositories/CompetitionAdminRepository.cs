@@ -481,6 +481,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             EventId = c.EventId,
             EventName = c.Event?.Name,
             DayNumber = c.DayNumber,
+            StandingKindOverride = c.StandingKindOverride,
             PointRuleClubsId = c.PointRuleClubsId,
             PointRuleSwimmersId = c.PointRuleSwimmersId,
             EventDayCount = c.EventId == null
@@ -650,6 +651,10 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         comp.IsAward = input.IsAward;
         comp.IsChampionship = input.IsChampionship;
         comp.ShowCombineAllResults = input.ShowCombineAllResults;
+        // Пустая строка из формы = «Авто» (null), иначе мусор поехал бы в БД.
+        comp.StandingKindOverride = string.IsNullOrWhiteSpace(input.StandingKindOverride)
+            ? null
+            : input.StandingKindOverride.Trim();
         comp.PointRuleClubsId = input.PointRuleClubsId;
         comp.PointRuleSwimmersId = input.PointRuleSwimmersId;
     }

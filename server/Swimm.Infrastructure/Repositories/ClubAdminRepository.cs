@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Infrastructure.Data;
@@ -23,7 +23,14 @@ public class ClubAdminRepository(SwimmDbContext db, ICacheService cache) : IClub
             Name = c.Name,
             NameEn = c.NameEn,
             IsPseudo = c.IsPseudo,
-            ResultCount = await db.Results.AsNoTracking().CountAsync(r => r.ClubId == id, ct)
+            ResultCount = await db.Results.AsNoTracking().CountAsync(r => r.ClubId == id, ct),
+            MergedIntoId = c.MergedIntoId,
+            MergedIntoName = c.MergedIntoId == null
+                ? null
+                : await db.Clubs.AsNoTracking()
+                    .Where(x => x.Id == c.MergedIntoId)
+                    .Select(x => x.Name)
+                    .FirstOrDefaultAsync(ct)
         };
     }
 

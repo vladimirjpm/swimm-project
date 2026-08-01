@@ -1,4 +1,4 @@
-@page
+﻿@page
 @model Swimm.API.Pages.Admin.IndexModel
 @{
     ViewData["Title"] = "Dashboard";
@@ -176,6 +176,7 @@
                 metrics: [
                     { v: co.discoveryNew, label: 'Входящие не загружено', sub: 'discovery: new', tone: 'warn', href: '/Admin/Competitions?filter=discovery-new' },
                     { v: co.discoveryErrors, label: 'Discovery с ошибкой', sub: 'LastError != null', tone: 'danger', href: '/Admin/Competitions?filter=discovery-error' },
+                    { v: co.duplicateStandings, label: 'Дубль клубного зачёта', sub: 'два ❄ или ☀ у группы за сезон — ошибка в 🏆/бассейне', tone: 'danger', href: '/Admin/Competitions?kind=champ' },
                     { v: co.noOrgCompId, label: 'Без OrgCompId', sub: 'долг бэкфилла', tone: 'gray', href: '/Admin/Competitions?filter=no-org-comp-id' },
                     { v: co.total - co.withResults, label: 'Без результатов', sub: 'импорт упал/забыт', tone: 'warn', href: '/Admin/Competitions?filter=no-results' },
                     { v: co.discoveryIgnored, label: 'Ignored', sub: '', tone: 'gray', chip: true, href: '/Admin/Competitions?filter=ignored' },

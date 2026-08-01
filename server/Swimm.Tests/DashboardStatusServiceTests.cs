@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -490,5 +490,94 @@ public class DashboardStatusServiceTests
         var second = await service.GetStatusAsync(CancellationToken.None);
 
         Assert.Equal(0, second.Swimmers.Total); // из кэша, БД изменилась, но число не изменилось
+    }
+
+    // ── Дубль клубного зачёта (K6) ──────────────────────────────────────────
+
+    private static Competition Champ(string date, string pool, string name = "Champ", int? eventId = null, int? day = null) =>
+        new() { Name = name, Date = date, PoolType = pool, IsChampionship = true, EventId = eventId, DayNumber = day };
+
+    [Fact]
+    public async Task DuplicateStandings_TwoWinterChampionshipsOfSameGroup_AreCounted()
+    {
+        // Двух зимних чемпионатов одной группы за сезон быть не может: если такое есть,
+        // ошибка во флагах соревнования (IsChampionship / PoolType), а не в зачёте.
+        await using var db = CreateDb(nameof(DuplicateStandings_TwoWinterChampionshipsOfSameGroup_AreCounted));
+        var kids = new Category { Key = "results-kids-team", Name = "Kids", DisplayOrder = 1 };
+        var a = Champ("15/02/2026", "25m", "A");
+        var b = Champ("20/02/2026", "25m", "B");
+        db.AddRange(kids, a, b);
+        await db.SaveChangesAsync();
+        db.AddRange(
+            new CategoryCompetition { CategoryId = kids.Id, CompetitionId = a.Id },
+            new CategoryCompetition { CategoryId = kids.Id, CompetitionId = b.Id });
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).GetStatusAsync(CancellationToken.None);
+
+        Assert.Equal(1, result.Competitions.DuplicateStandings);
+    }
+
+    [Fact]
+    public async Task DuplicateStandings_WinterAndSummer_AreNotDuplicates()
+    {
+        // Норма: у группы за сезон ОДИН зимний (25м) и ОДИН летний (50м).
+        await using var db = CreateDb(nameof(DuplicateStandings_WinterAndSummer_AreNotDuplicates));
+        var kids = new Category { Key = "results-kids-team", Name = "Kids", DisplayOrder = 1 };
+        var winter = Champ("15/02/2026", "25m", "W");
+        var summer = Champ("20/07/2026", "50m", "S");
+        db.AddRange(kids, winter, summer);
+        await db.SaveChangesAsync();
+        db.AddRange(
+            new CategoryCompetition { CategoryId = kids.Id, CompetitionId = winter.Id },
+            new CategoryCompetition { CategoryId = kids.Id, CompetitionId = summer.Id });
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).GetStatusAsync(CancellationToken.None);
+
+        Assert.Equal(0, result.Competitions.DuplicateStandings);
+    }
+
+    [Fact]
+    public async Task DuplicateStandings_DaysOfOneEvent_AreNotDuplicates()
+    {
+        // Зачётная единица — СОБЫТИЕ целиком; три дня чемпионата это один зачёт.
+        await using var db = CreateDb(nameof(DuplicateStandings_DaysOfOneEvent_AreNotDuplicates));
+        var kids = new Category { Key = "results-kids-team", Name = "Kids", DisplayOrder = 1 };
+        var ev = new CompetitionEvent { Name = "Champ" };
+        db.AddRange(kids, ev);
+        await db.SaveChangesAsync();
+        var d1 = Champ("15/02/2026", "25m", "D1", ev.Id, 1);
+        var d2 = Champ("16/02/2026", "25m", "D2", ev.Id, 2);
+        db.AddRange(d1, d2);
+        await db.SaveChangesAsync();
+        db.AddRange(
+            new CategoryCompetition { CategoryId = kids.Id, CompetitionId = d1.Id },
+            new CategoryCompetition { CategoryId = kids.Id, CompetitionId = d2.Id });
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).GetStatusAsync(CancellationToken.None);
+
+        Assert.Equal(0, result.Competitions.DuplicateStandings);
+    }
+
+    [Fact]
+    public async Task DuplicateStandings_CustomCategory_IsIgnored()
+    {
+        // Кастомная категория (result-maccabiah) зачёта не образует вовсе.
+        await using var db = CreateDb(nameof(DuplicateStandings_CustomCategory_IsIgnored));
+        var custom = new Category { Key = "result-maccabiah", Name = "Maccabiah", DisplayOrder = 9 };
+        var a = Champ("15/02/2026", "25m", "A");
+        var b = Champ("20/02/2026", "25m", "B");
+        db.AddRange(custom, a, b);
+        await db.SaveChangesAsync();
+        db.AddRange(
+            new CategoryCompetition { CategoryId = custom.Id, CompetitionId = a.Id },
+            new CategoryCompetition { CategoryId = custom.Id, CompetitionId = b.Id });
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).GetStatusAsync(CancellationToken.None);
+
+        Assert.Equal(0, result.Competitions.DuplicateStandings);
     }
 }
