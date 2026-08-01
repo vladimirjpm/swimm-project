@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Domain;
@@ -132,7 +132,9 @@ public class ClubPublicRepository : IClubPublicRepository
                 LastNameEn = s.LastNameEn,
                 FirstNameEn = s.FirstNameEn,
                 BirthYear = s.BirthYear,
-                Age = seasonYear - s.BirthYear,
+                // Год рождения бывает не заполнен (BirthYear = 0) — тогда возраста нет,
+                // иначе получалось «age 2025» (сезон минус ноль).
+                Age = s.BirthYear > 0 ? seasonYear - s.BirthYear : null,
                 Gender = s.Gender == "F" ? "female" : s.Gender == "M" ? "male" : s.Gender,
                 Competitions = c.Competitions,
                 Swims = c.Swims

@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace Swimm.Application.Dtos;
 
@@ -23,9 +23,13 @@ public sealed class ClubRosterItemDto
     [JsonPropertyName("birth_year")]
     public int BirthYear { get; set; }
 
-    /// <summary>Возраст В СЕЗОНЕ (сезон - BirthYear) — НЕ зачётная группа Category.</summary>
+    /// <summary>
+    /// Возраст В СЕЗОНЕ (сезон - BirthYear) — НЕ зачётная группа Category.
+    /// null — год рождения не заполнен (в базе такие есть: 5 из 153 у клуба 438).
+    /// Без этого возраст выходил равным номеру сезона («age 2025»).
+    /// </summary>
     [JsonPropertyName("age")]
-    public int Age { get; set; }
+    public int? Age { get; set; }
 
     /// <summary>male | female | null (Swimmer.Gender не заполнен).</summary>
     [JsonPropertyName("gender")]
