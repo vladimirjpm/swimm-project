@@ -8,11 +8,19 @@ namespace Swimm.Infrastructure.Services;
 public class CompetitionRecalculationService : ICompetitionRecalculationService
 {
     private readonly SwimmDbContext _db;
+    private readonly IClubStandingService _clubStandings;
 
-    public CompetitionRecalculationService(SwimmDbContext db) => _db = db;
+    public CompetitionRecalculationService(SwimmDbContext db, IClubStandingService clubStandings)
+    {
+        _db = db;
+        _clubStandings = clubStandings;
+    }
 
     public async Task<int> RecalculateCompetitionAsync(int competitionId, CancellationToken ct = default)
     {
+        // Клубный зачёт материализован и обязан пересчитываться вместе с объединёнными местами:
+        // он от них зависит (Combine All Results меняет место, по которому идут очки).
+        // Порядок важен — сначала места, потом зачёт; вызов ниже, после ApplyCombined/Clear.
         var comp = await _db.Competitions.AsNoTracking()
             .Where(c => c.Id == competitionId)
             .Select(c => new { c.Id, c.EventId, c.ShowCombineAllResults })
@@ -30,9 +38,12 @@ public class CompetitionRecalculationService : ICompetitionRecalculationService
         var anyCombined = await _db.Competitions.AsNoTracking()
             .AnyAsync(c => competitionIds.Contains(c.Id) && c.ShowCombineAllResults, ct);
 
-        return anyCombined
+        var updated = anyCombined
             ? await ApplyCombinedAsync(competitionIds, ct)
             : await ClearCombinedAsync(competitionIds, ct);
+
+        await _clubStandings.RebuildForCompetitionAsync(comp.Id, ct);
+        return updated;
     }
 
     public async Task<int> RecalculateAllCombinedAsync(CancellationToken ct = default)

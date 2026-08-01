@@ -43,6 +43,9 @@ public class SwimmDbContext : DbContext
     /* === Результаты === */
     public DbSet<ResultRecord> Results => Set<ResultRecord>();
 
+    /* === Клубный зачёт соревнования (материализованный; страница клуба, Фаза 10) === */
+    public DbSet<ClubCompetitionStanding> ClubCompetitionStandings => Set<ClubCompetitionStanding>();
+
     /* === Рекорды и нормативы (фаза 2) === */
     public DbSet<Record> Records => Set<Record>();
     public DbSet<NormativeStandard> NormativeStandards => Set<NormativeStandard>();
@@ -195,6 +198,24 @@ public class SwimmDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        // Материализованный клубный зачёт соревнования (страница клуба, Фаза 10).
+        // Cascade с обеих сторон намеренно: строка зачёта — производная, без своего
+        // соревнования или клуба смысла не имеет и должна уходить вместе с ними.
+        modelBuilder.Entity<ClubCompetitionStanding>(entity =>
+        {
+            entity.ToTable("ClubCompetitionStandings");
+
+            entity.HasOne(e => e.Competition)
+                .WithMany()
+                .HasForeignKey(e => e.CompetitionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Club)
+                .WithMany()
+                .HasForeignKey(e => e.ClubId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<Style>(entity =>
         {
             entity.ToTable("Styles");
@@ -217,13 +238,15 @@ public class SwimmDbContext : DbContext
             entity.HasIndex(e => e.Key).IsUnique();
 
             entity.HasData(
-                // Возрастные ступени (2026-07-28): 8–11 Kids, 11–14 Youth, בוגרים Juniors,
-                // мастерс Masters. Ключи исторические и с подписями НЕ совпадают — они в URL
-                // (?category=) и в закладках пользователей, поэтому не переименовывались.
-                new Category { Id = 1, Key = "results-main",           Name = "Juniors", DisplayOrder = 1, Badge = "J" },
-                new Category { Id = 2, Key = "results-masters",        Name = "Masters", DisplayOrder = 2, Badge = "M" },
-                new Category { Id = 3, Key = "results-youth-team",     Name = "Kids",    DisplayOrder = 3, Badge = "K" },
-                new Category { Id = 4, Key = "results-junior-results", Name = "Youth",   DisplayOrder = 4, Badge = "Y" }
+                // Возрастная лестница (2026-07-31): ילדים 8–11 Kids, צעירים 11–14 Young,
+                // נוער Juniors, בוגרים Adults, мастерс Masters. Ключи приведены к подписям
+                // (миграция CategoryLadderRenameAndHebrew) — старые ?category= уводятся
+                // алиасами в results-categories.ts.
+                new Category { Id = 3, Key = "results-kids-team",      Name = "Kids",    NameHe = "ילדים",  DisplayOrder = 1, Badge = "K" },
+                new Category { Id = 4, Key = "results-youth-team",     Name = "Young",   NameHe = "צעירים", DisplayOrder = 2, Badge = "Y" },
+                new Category { Id = 1, Key = "results-junior-results", Name = "Juniors", NameHe = "נוער",   DisplayOrder = 3, Badge = "J" },
+                new Category { Id = 7, Key = "results-main",           Name = "Adults",  NameHe = "בוגרים", DisplayOrder = 4, Badge = "A" },
+                new Category { Id = 2, Key = "results-masters",        Name = "Masters", NameHe = "מסטרס",  DisplayOrder = 5, Badge = "M" }
             );
         });
 
@@ -285,7 +308,7 @@ public class SwimmDbContext : DbContext
                 new PointRuleClubs
                 {
                     Id = 1,
-                    Version = "2025.01",
+                    Version = "30pt.24pl.2025.01",
                     EffectiveFrom = new DateOnly(2025, 1, 1),
                     Description = "Israeli swimming club points system starting Jan 2025",
                     Scope = "all",
@@ -295,7 +318,7 @@ public class SwimmDbContext : DbContext
                 new PointRuleClubs
                 {
                     Id = 2,
-                    Version = "2025.01-masters",
+                    Version = "12pt.12pl.2025.01",
                     EffectiveFrom = new DateOnly(2025, 1, 1),
                     Description = "Masters club points system (places 1-12)",
                     Scope = "masters",

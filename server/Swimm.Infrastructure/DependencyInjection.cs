@@ -74,6 +74,7 @@ public static class DependencyInjection
         services.AddScoped<IHubGroupUserService, HubGroupUserService>();
         services.AddScoped<IHubGroupClubRequestAdminService, HubGroupClubRequestAdminService>();
         services.AddScoped<IClubPointsRepository, ClubPointsRepository>();
+        services.AddScoped<IClubStandingService, ClubStandingService>();
         services.AddScoped<ICompetitionRecalculationService, CompetitionRecalculationService>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
 

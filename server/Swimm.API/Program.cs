@@ -167,6 +167,19 @@ if (args.Contains("--recalc-combined"))
     return;
 }
 
+// Пересчёт материализованного клубного зачёта во всех соревнованиях:
+//   dotnet run -- --rebuild-club-standings
+// Нужен разово после миграции (бэкфилл истории) и как аварийная кнопка, если зачёты
+// разошлись с результатами. Штатно таблица поддерживается на шве пересчёта соревнования.
+if (args.Contains("--rebuild-club-standings"))
+{
+    using var scope = app.Services.CreateScope();
+    var svc = scope.ServiceProvider.GetRequiredService<IClubStandingService>();
+    var rows = await svc.RebuildAllAsync();
+    Console.WriteLine($"Клубный зачёт: строк в таблице — {rows}");
+    return;
+}
+
 // Одноразовый сид рекордов/нормативов из легаси JS-файлов клиента:
 //   dotnet run -- --seed-records <путь к client/public/data> [--force]
 // --force заменяет содержимое таблиц целиком (иначе непустые таблицы — отказ).
