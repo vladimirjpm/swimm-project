@@ -9,6 +9,12 @@ import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import ClubHero from './components/club-hero';
 import ClubFilters from './components/club-filters';
 import ClubGrid from './components/club-grid';
+import ClubStandings from './components/club-standings';
+import ClubTimeline from './components/club-timeline';
+import ClubTopSwimmers from './components/club-top-swimmers';
+import ClubSwimmers from './components/club-swimmers';
+import ClubRecords from './components/club-records';
+import ClubCoaches from './components/club-coaches';
 
 /**
  * Страница клуба (Фаза 10, план docs/plans/club-page-plan.md, этап K5).
@@ -77,8 +83,21 @@ function ClubProject() {
               }
             />
 
-            {/* Остальные карточки (Standings, Timeline, Top swimmers, Swimmers, Record wall,
-                Coaches) добавляются сюда же — страница это массив независимых блоков. */}
+            <ClubStandings standings={data.standings} />
+            <ClubTimeline timeline={data.timeline} />
+            <ClubTopSwimmers swimmers={data.top_swimmers} />
+
+            {/* Ростер и рекорды — отдельные пагинируемые эндпоинты (K4.2), им нужен
+                уже-резолвленный clubId (гарантирован здесь: data загрузился только для
+                непустого clubId). */}
+            {clubId != null && (
+              <>
+                <ClubSwimmers clubId={clubId} season={scope.season} />
+                <ClubRecords clubId={clubId} />
+              </>
+            )}
+
+            <ClubCoaches />
           </>
         )}
       </main>
