@@ -51,6 +51,8 @@ export interface ResultWrap {
     last_name_en: string;
     first_name_en: string;
     birth_year: number;
+    /** Id клуба — для ссылки на /clubs/{id}. Опционален: у статических источников его нет. */
+    club_id?: number;
     club: string;
     club_en: string;
     time: string;

@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -903,6 +903,7 @@ public class ResultRepository : IResultRepository
                 .ToArrayAsync(),
 
             "club" => await _db.Clubs
+                .Where(c => c.MergedIntoId == null)   // склеенные в подсказки фильтра не идут
                 .Where(c => prefix.Length == 0 || c.Name.StartsWith(prefix) || c.NameEn.StartsWith(prefix))
                 .Select(c => c.Name)
                 .Where(n => n.Length > 0)

@@ -145,6 +145,16 @@ public class SwimmDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.CountryId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Мягкий merge: склеенный клуб не удаляется, а ссылается на приёмника.
+            // Restrict — приёмника нельзя удалить, пока на него ссылаются склеенные:
+            // иначе ссылка повисла бы и /clubs/{старый id} снова отдавал бы 404.
+            entity.HasOne(e => e.MergedInto)
+                .WithMany()
+                .HasForeignKey(e => e.MergedIntoId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => e.MergedIntoId);
         });
 
         modelBuilder.Entity<Swimmer>(entity =>

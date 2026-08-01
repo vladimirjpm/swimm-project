@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
@@ -113,6 +113,7 @@ public class HubGroupAdminService : IHubGroupAdminService
     public async Task<IReadOnlyList<ClubOptionDto>> GetClubOptionsAsync()
     {
         return await _db.Clubs.AsNoTracking()
+            .Where(c => c.MergedIntoId == null)   // склеенные в выпадашку не предлагаем
             .OrderBy(c => c.Name)
             .Select(c => new ClubOptionDto { Id = c.Id, Name = c.Name })
             .ToListAsync();

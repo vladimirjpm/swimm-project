@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -98,19 +98,21 @@ public class DashboardStatusService(
     {
         var clubReport = await clubDedup.FindCandidatesAsync(ct);
 
-        var total = await db.Clubs.AsNoTracking().CountAsync(ct);
-        var pseudo = await db.Clubs.AsNoTracking().CountAsync(c => c.IsPseudo, ct);
+        // Склеенные клубы (MergedIntoId) в статистику не входят: строка осталась только
+        // ради живых ссылок на старый Id, как клуб она больше не существует.
+        var total = await db.Clubs.AsNoTracking().CountAsync(c => c.MergedIntoId == null, ct);
+        var pseudo = await db.Clubs.AsNoTracking().CountAsync(c => c.IsPseudo && c.MergedIntoId == null, ct);
 
         // Клуб без пловцов: нет Swimmer.ClubId == club.Id и нет ResultRecord.ClubId == club.Id.
         // Псевдоклубы и SYNTH-клубы исключены (не «настоящие» клубы, не считаем дырой).
         var noSwimmers = await db.Clubs.AsNoTracking()
-            .Where(c => !c.IsPseudo && !c.Name.StartsWith("SYNTH"))
+            .Where(c => !c.IsPseudo && !c.Name.StartsWith("SYNTH") && c.MergedIntoId == null)
             .Where(c => !db.Swimmers.Any(s => s.ClubId == c.Id))
             .Where(c => !db.Results.Any(r => r.ClubId == c.Id))
             .CountAsync(ct);
 
         var noCountry = await db.Clubs.AsNoTracking()
-            .CountAsync(c => c.CountryId == null && !c.IsPseudo, ct);
+            .CountAsync(c => c.CountryId == null && !c.IsPseudo && c.MergedIntoId == null, ct);
 
         var clubRequestsPending = await db.HubGroupClubRequests.AsNoTracking()
             .CountAsync(r => r.Status == HubGroupClubRequestStatus.Pending, ct);

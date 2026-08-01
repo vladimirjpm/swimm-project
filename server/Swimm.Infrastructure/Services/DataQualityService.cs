@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
@@ -41,11 +41,13 @@ public class DataQualityService(SwimmDbContext db) : IDataQualityService
     {
         IQueryable<Club> q = filter switch
         {
+            // Склеенные клубы пусты по определению — в «дырах данных» им не место.
             "no-swimmers" => db.Clubs.AsNoTracking()
-                .Where(c => !c.IsPseudo && !c.Name.StartsWith("SYNTH"))
+                .Where(c => !c.IsPseudo && !c.Name.StartsWith("SYNTH") && c.MergedIntoId == null)
                 .Where(c => !db.Swimmers.Any(s => s.ClubId == c.Id))
                 .Where(c => !db.Results.Any(r => r.ClubId == c.Id)),
-            "no-country" => db.Clubs.AsNoTracking().Where(c => c.CountryId == null && !c.IsPseudo),
+            "no-country" => db.Clubs.AsNoTracking()
+                .Where(c => c.CountryId == null && !c.IsPseudo && c.MergedIntoId == null),
             _ => db.Clubs.AsNoTracking().Where(_ => false)
         };
 

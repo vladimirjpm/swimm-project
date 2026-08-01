@@ -152,9 +152,11 @@ public class JsonImportService : IImportService
             await _db.Competitions.AsNoTracking().ToListAsync(),
             c => c.Name, c => c.SubName, c => c.Date, c => c.PoolType);
 
-        // Clubs: AsNoTracking — we only read their IDs
+        // Clubs: AsNoTracking — we only read their IDs.
+        // Склеенные (MergedIntoId) в кэш НЕ попадают: иначе импорт нашёл бы дубль по имени
+        // и повесил новые результаты на клуб, которого уже нет, — merge молча откатился бы.
         var clubCache = new Dictionary<string, Club>();
-        foreach (var c in await _db.Clubs.AsNoTracking().ToListAsync())
+        foreach (var c in await _db.Clubs.AsNoTracking().Where(c => c.MergedIntoId == null).ToListAsync())
             clubCache.TryAdd($"{c.Name}|{c.NameEn}", c);
 
         // Swimmers: tracked — EnrichSwimmerFromResult modifies them, changes saved in batch.

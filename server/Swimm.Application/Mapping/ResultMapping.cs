@@ -53,6 +53,7 @@ public static class ResultMapping
         LastNameEn = r.Swimmer.LastNameEn,
         FirstNameEn = r.Swimmer.FirstNameEn,
         BirthYear = r.Swimmer.BirthYear,
+        ClubId = r.ClubId,
         ClubName = r.Club.Name,
         ClubNameEn = r.Club.NameEn,
         TimeMillisecond = r.TimeMillisecond,

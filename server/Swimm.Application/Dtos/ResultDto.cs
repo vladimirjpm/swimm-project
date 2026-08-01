@@ -145,6 +145,14 @@ public class ResultDto
     [JsonPropertyName("birth_year")]
     public int BirthYear { get; set; }
 
+    /// <summary>
+    /// Id клуба. Нужен, чтобы клуб был ССЫЛКОЙ на свою страницу (<c>/clubs/{id}</c>), а не
+    /// строкой: имена не уникальны, а после merge дублей строки-имена остаются одинаковыми.
+    /// Читается из готового FK <c>ResultRecord.ClubId</c> — лишнего JOIN не добавляет.
+    /// </summary>
+    [JsonPropertyName("club_id")]
+    public int ClubId { get; set; }
+
     [JsonPropertyName("club")]
     public string ClubName { get; set; } = string.Empty;
 

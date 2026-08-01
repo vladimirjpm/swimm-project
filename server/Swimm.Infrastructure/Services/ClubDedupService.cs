@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -38,7 +38,10 @@ public class ClubDedupService(SwimmDbContext db) : IClubDedupService
         // ставится импортом по справочнику Countries) и пустое название — технический
         // «клуб без клуба» (результаты, где клуб не был указан в протоколе).
         var rawClubs = await db.Clubs.AsNoTracking()
-            .Where(c => !c.Name.StartsWith("SYNTH") && !c.IsPseudo && c.Name.Trim() != "")
+            // Склеенные (MergedIntoId) исключены: их связи давно переехали на приёмника,
+            // предлагать их в кандидаты — значит склеивать пустышку второй раз.
+            .Where(c => !c.Name.StartsWith("SYNTH") && !c.IsPseudo && c.Name.Trim() != ""
+                        && c.MergedIntoId == null)
             .Select(c => new { c.Id, c.Name, c.NameEn })
             .ToListAsync(ct);
         var realClubIds = rawClubs.Select(c => c.Id).ToList();
