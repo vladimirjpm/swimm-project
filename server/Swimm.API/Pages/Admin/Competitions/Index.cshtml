@@ -262,6 +262,16 @@ else
                             <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(u.Site != null ? System.Net.WebUtility.HtmlEncode(u.Site.Venue ?? "—") + LangBadges(u.Site.Languages) : "—")</td>
                             <td class="text-right tabular-nums">@ev.TotalResultCount</td>
                             <td class="text-right whitespace-nowrap">
+                                @* Проверка качества вынесена в саму строку (раньше жила только в
+                                   раскрытой панели и потому не попадалась на глаза): после импорта
+                                   её нужно нажимать вручную — автозапуска нет. *@
+                                @if (ev.TotalResultCount > 0)
+                                {
+                                    <button type="button" class="admin-btn admin-btn-primary py-1 px-2.5 quality-btn"
+                                            data-event-id="@ev.EventId"
+                                            data-title="@ev.EventName"
+                                            title="Проверить достоверность результатов">⚑ Качество</button>
+                                }
                                 <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 row-toggle"
                                         data-key="@rowKey" aria-expanded="false">▸ Открыть</button>
                                 <form method="post" asp-page-handler="DeleteEvent"
@@ -302,6 +312,14 @@ else
                             <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(u.Site != null ? System.Net.WebUtility.HtmlEncode(u.Site.Venue ?? "—") + LangBadges(u.Site.Languages) : "—")</td>
                             <td class="text-right tabular-nums">@c.ResultCount</td>
                             <td class="text-right whitespace-nowrap">
+                                @* См. комментарий у события: кнопка вынесена из панели в строку. *@
+                                @if (c.ResultCount > 0)
+                                {
+                                    <button type="button" class="admin-btn admin-btn-primary py-1 px-2.5 quality-btn"
+                                            data-competition-id="@c.Id"
+                                            data-title="@c.Name"
+                                            title="Проверить достоверность результатов">⚑ Качество</button>
+                                }
                                 <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 row-toggle"
                                         data-key="@rowKey" aria-expanded="false">▸ Открыть</button>
                                 <form method="post" asp-page-handler="Delete"
@@ -353,11 +371,11 @@ else
                                 }
                                 @if (rowResults > 0 && u.Db is { } dbq)
                                 {
-                                    <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 quality-btn"
+                                    <button type="button" class="admin-btn admin-btn-primary py-1 px-2.5 quality-btn"
                                             data-event-id="@(dbq.IsEvent ? dbq.EventId?.ToString() : null)"
                                             data-competition-id="@(dbq.IsEvent ? null : dbq.Single?.Id.ToString())"
                                             data-title="@rowTitle"
-                                            title="Проверить достоверность результатов">Качество</button>
+                                            title="Проверить достоверность результатов">⚑ Проверить качество</button>
                                 }
                                 @Html.Raw(u.Site != null ? SiteActions(u.Site, imported: u.Db != null) : "")
                             </div>

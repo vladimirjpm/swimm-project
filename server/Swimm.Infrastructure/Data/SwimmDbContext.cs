@@ -50,6 +50,10 @@ public class SwimmDbContext : DbContext
     public DbSet<Record> Records => Set<Record>();
     public DbSet<NormativeStandard> NormativeStandards => Set<NormativeStandard>();
 
+    /* === Качество рекордов (Sys_): реестр спорных записей + сверка с протоколами === */
+    public DbSet<RecordIssue> RecordIssues => Set<RecordIssue>();
+    public DbSet<RecordVerification> RecordVerifications => Set<RecordVerification>();
+
     /* === Импорт === */
     public DbSet<ImportHistory> ImportHistory => Set<ImportHistory>();
     public DbSet<DiscoveredCompetition> DiscoveredCompetitions => Set<DiscoveredCompetition>();
@@ -290,6 +294,35 @@ public class SwimmDbContext : DbContext
             }).IsUnique();
             // Горячий путь клиента/кэша — выборка региона (± категории).
             entity.HasIndex(e => new { e.RegionType, e.RegionCode, e.Category });
+        });
+
+        // Реестр спорных записей справочника рекордов (docs/plans/records-quality-plan.md).
+        // Sys_-таблица: это НАША внутренняя кухня, а не данные федерации — публичной роли
+        // swimm_ro она не нужна. Ошибки источника мы не чиним, а помечаем здесь.
+        modelBuilder.Entity<RecordIssue>(entity =>
+        {
+            entity.ToTable("Sys_RecordIssues");
+            // Ключ претензии — ось рекорда ПЛЮС оспариваемое время: одна и та же клетка
+            // лестницы может попасть в реестр повторно, когда рекорд сменится.
+            entity.HasIndex(e => new
+            {
+                e.RegionType, e.RegionCode, e.Category, e.AgeKey,
+                e.Gender, e.PoolType, e.Style, e.Distance, e.FlaggedTime
+            }).IsUnique();
+            entity.HasIndex(e => e.Status);
+        });
+
+        // Сверка рекордов с нашими протоколами. Одна строка на рекорд, каскад от Records:
+        // сверка бессмысленна без своего рекорда.
+        modelBuilder.Entity<RecordVerification>(entity =>
+        {
+            entity.ToTable("Sys_RecordVerifications");
+            entity.HasKey(e => e.RecordId);
+            entity.HasOne(e => e.Record)
+                .WithOne()
+                .HasForeignKey<RecordVerification>(e => e.RecordId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(e => e.Found);
         });
 
         modelBuilder.Entity<NormativeStandard>(entity =>

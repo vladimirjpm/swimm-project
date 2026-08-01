@@ -191,7 +191,7 @@
                     { v: re.emptyRelays, label: 'Эстафеты без участников', sub: 'Relay без RelayMember', tone: 'warn', href: '/Admin/Results?filter=empty-relay' },
                 ],
             },
-            buildRecordsBlock(s.recordSets || []),
+            buildRecordsBlock(s.recordSets || [], s.recordQuality || null),
             {
                 key: 'media', title: 'Медиа', href: '/Admin/Media',
                 heroValue: fmtN(me.total),
@@ -230,7 +230,7 @@
         return ms > RECORDS_STALE_MONTHS * 30.4 * 24 * 3600 * 1000;
     }
 
-    function buildRecordsBlock(recordSets) {
+    function buildRecordsBlock(recordSets, quality) {
         const metrics = recordSets.map(rs => {
             const stale = isRecordSetStale(rs);
             return {
@@ -241,12 +241,41 @@
                 href: recordSetHref(rs),
             };
         });
+        // Качество справочника: спорные записи + сверка с нашими протоколами.
+        // ⚠ «Не найдено» НЕ означает ошибку источника — протоколы загружены не за все годы,
+        // поэтому тон серый (нейтральный), а не warning. Формулировку не «улучшать».
+        if (quality) {
+            metrics.push({
+                v: quality.issuesOpen, label: 'Спорные записи',
+                sub: quality.issuesTotal > quality.issuesOpen
+                    ? `открытых из ${fmtN(quality.issuesTotal)} · ошибки источника не чиним`
+                    : 'ошибки источника не чиним, а помечаем',
+                tone: 'warn', href: '/Admin/Records?filter=issues',
+            });
+            metrics.push({
+                v: quality.found - quality.foundWrongDate, label: 'Подтверждены протоколом',
+                sub: 'нашёлся заплыв с этим временем и в этот день',
+                tone: 'info', href: '/Admin/Records',
+            });
+            metrics.push({
+                // Время встречается часто, поэтому совпадение без даты — слабый сигнал,
+                // а не подтверждение: скорее всего это чужой заплыв с тем же временем.
+                v: quality.foundWrongDate, label: 'Время совпало, дата другая',
+                sub: 'слабое совпадение — смотреть глазами',
+                tone: 'gray', href: '/Admin/Records',
+            });
+            metrics.push({
+                v: quality.notFound, label: 'Не найдены в протоколах',
+                sub: 'данные загружены не за все годы — это НЕ баг',
+                tone: 'gray', href: '/Admin/Records',
+            });
+        }
         return {
             key: 'records', title: 'Рекорды', href: '/Admin/Records',
             heroValue: fmtN(recordSets.reduce((a, r) => a + r.count, 0)),
             heroSubs: recordSets.map(recordSetTitle).join(' · ') || 'нет наборов',
             metrics,
-            extraDetailHtml: renderRecordsCheck(),
+            extraDetailHtml: renderRecordsCheck() + renderRecordQuality(quality),
         };
     }
 
@@ -284,6 +313,54 @@
                 class="admin-btn admin-btn-primary text-sm ${running ? 'opacity-50 cursor-not-allowed' : ''}">${running ? 'Проверяю…' : 'Проверить апдейты'}</button>
             ${recCheck.status !== 'idle' ? `<div class="mt-2">${rows}</div>` : ''}
             ${summary ? `<div class="mt-1.5">${summary}</div>` : ''}</div>`;
+    }
+
+    // --- Качество рекордов: сверка с протоколами + реестр спорных записей ---
+    // docs/plans/records-quality-plan.md. Ошибки федерации НЕ чиним: наша копия обязана
+    // совпадать с источником, иначе следующий импорт вернёт всё назад.
+    let recVerify = { status: 'idle', text: '' };
+
+    function renderRecordQuality(q) {
+        if (!q) return '';
+        const issues = (q.issues || []).map(i => `
+            <div class="py-1 border-t border-admin-border/60">
+                <div class="text-[12px] text-admin-text">
+                    <span class="font-semibold">${esc(i.style)} ${esc(i.distance)}</span>
+                    · ${esc(i.poolType)} · ${esc(i.gender === 'female' ? '♀' : '♂')}
+                    · ${esc(i.category)}${i.ageKey ? ' ' + esc(i.ageKey) : ''}
+                    <span class="text-admin-warning font-semibold ml-1">${esc(i.flaggedTime)}</span>
+                </div>
+                <div class="text-[11px] text-admin-text-muted line-clamp-2">${esc(i.note)}</div>
+            </div>`).join('');
+        const running = recVerify.status === 'running';
+        return `<div class="mt-4 pt-3 border-t border-admin-border">
+            <div class="text-[12px] font-semibold text-admin-text mb-1">Сверка с протоколами</div>
+            <div class="text-[11px] text-admin-text-muted mb-2">
+                Последняя сверка: ${q.lastCheckedAt ? esc(fmtDT(q.lastCheckedAt)) : 'не запускалась'}.
+                «Не найдено» — это не ошибка справочника: у нас загружены не все годы.
+            </div>
+            <button id="btn-verify-records" ${running ? 'disabled' : ''}
+                class="admin-btn text-sm ${running ? 'opacity-50 cursor-not-allowed' : ''}">${running ? 'Сверяю…' : 'Сверить с протоколами'}</button>
+            ${recVerify.text ? `<div class="mt-1.5 text-[12px] text-admin-text-muted">${esc(recVerify.text)}</div>` : ''}
+            ${issues ? `<div class="mt-3"><div class="text-[12px] font-semibold text-admin-text mb-1">Спорные записи (open)</div>${issues}</div>` : ''}
+        </div>`;
+    }
+
+    async function verifyRecords() {
+        recVerify = { status: 'running', text: '' };
+        renderRows();
+        try {
+            const res = await fetch('/api/admin/records/verify', {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'X-XSRF-TOKEN': _csrfToken }
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+            recVerify = { status: 'done', text: `Проверено ${data.checked}: найдено ${data.found}, не найдено ${data.notFound}${data.foundWrongDate ? `, с другой датой ${data.foundWrongDate}` : ''}. Перезагрузите страницу, чтобы обновить счётчики.` };
+        } catch (e) {
+            recVerify = { status: 'done', text: `Ошибка: ${e.message}` };
+        }
+        renderRows();
     }
 
     async function checkRecordUpdates() {
@@ -451,6 +528,8 @@
     document.getElementById('dash-detail').addEventListener('click', (e) => {
         if (e.target.closest('#btn-check-records') && recCheck.status !== 'running')
             checkRecordUpdates();
+        if (e.target.closest('#btn-verify-records') && recVerify.status !== 'running')
+            verifyRecords();
     });
 
     // --- Filters ---

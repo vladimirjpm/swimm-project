@@ -166,6 +166,7 @@ public static class DependencyInjection
         services.AddScoped<ILogligSuggestionService, LogligSuggestionService>();
 
         // Сводка «Статус данных» для дашборда /Admin (docs/plans/admin-dashboard-status-cards-plan.md)
+        services.AddScoped<IRecordQualityService, RecordQualityService>();
         services.AddScoped<IDashboardStatusService, DashboardStatusService>();
 
         // Здоровье ссылок UserMedia (фаза 7.5): on-demand проверка живости по кнопке /Admin/Media.

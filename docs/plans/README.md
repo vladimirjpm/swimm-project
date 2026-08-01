@@ -17,6 +17,8 @@
 | [club-page-model.md](club-page-model.md) | **модель данных страницы клуба** по макету «1b Deep»: зачёт = размеченное соревнование, `ClubCompetitionStanding` | 10 | 0 — решения приняты 2026-08-01 (§6) |
 | [club-page-plan.md](club-page-plan.md) | **план реализации страницы клуба** K0–K6 + кто делает / что делегируем | 10 | 0 |
 | [records-all-countries-plan.md](records-all-countries-plan.md) | рекорды всех стран + рейтинг + head-to-head | 11 | **3** (§7): все страны или подмножество, расхождение кодов страны, колонка `TimeMs` |
+| [import-quality-autoscan-plan.md](import-quality-autoscan-plan.md) | **необязательный**: гонять проверку качества результатов автоматически в конце импорта (сейчас — только кнопкой) + карта всех слоёв проверки данных | — | 0 |
+| [records-quality-plan.md](records-quality-plan.md) | **реестр спорных официальных рекордов**: ошибки федерации не чиним, а помечаем; автопроверки + первый баг RQ-1 | после 11 (нужны все годы) | **1** (§4): отдельная таблица `Sys_RecordIssues` или колонки в `Records` |
 
 Хендоффы к фазе 10: [спортсмен](../design-handoff-athlete-page.md) ·
 [клуб](../design-handoff-club-page.md).

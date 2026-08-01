@@ -180,6 +180,23 @@ if (args.Contains("--rebuild-club-standings"))
     return;
 }
 
+// Сверка справочника рекордов с нашими протоколами:
+//   dotnet run -- --verify-records
+// То же самое, что кнопка «Сверить с протоколами» на дашборде; отдельный флаг нужен, чтобы
+// гонять сверку после массового переимпорта протоколов, не заходя в админку.
+// ⚠ «Не найдено» — не ошибка справочника: протоколы загружены не за все годы
+// (docs/plans/records-quality-plan.md).
+if (args.Contains("--verify-records"))
+{
+    using var scope = app.Services.CreateScope();
+    var svc = scope.ServiceProvider.GetRequiredService<IRecordQualityService>();
+    var report = await svc.VerifyAllAsync();
+    Console.WriteLine(
+        $"Рекорды сверены: {report.Checked} · найдено {report.Found} · не найдено {report.NotFound} " +
+        $"· с другой датой {report.FoundWrongDate}");
+    return;
+}
+
 // Одноразовый сид рекордов/нормативов из легаси JS-файлов клиента:
 //   dotnet run -- --seed-records <путь к client/public/data> [--force]
 // --force заменяет содержимое таблиц целиком (иначе непустые таблицы — отказ).

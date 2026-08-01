@@ -19,6 +19,7 @@ public class DashboardStatusService(
     SwimmDbContext db,
     ISwimmerDedupService swimmerDedup,
     IClubDedupService clubDedup,
+    IRecordQualityService recordQuality,
     IMemoryCache cache) : IDashboardStatusService
 {
     private const string CacheKey = "dashboard:status";
@@ -45,11 +46,16 @@ public class DashboardStatusService(
         var competitions = await BuildCompetitionsAsync(ct);
         var results = await BuildResultsAsync(ct);
         var recordSets = await BuildRecordSetsAsync(ct);
+        // Качество рекордов: сверка с протоколами + реестр спорных записей
+        // (docs/plans/records-quality-plan.md).
+        var recordQualitySummary = await recordQuality.GetSummaryAsync(ct: ct);
         var media = await BuildMediaAsync(ct);
         var usersGroups = await BuildUsersGroupsAsync(ct);
         var system = await BuildSystemAsync(ct);
 
-        return new DashboardStatusSummary(swimmers, clubs, competitions, results, recordSets, media, usersGroups, system);
+        return new DashboardStatusSummary(
+            swimmers, clubs, competitions, results, recordSets, recordQualitySummary,
+            media, usersGroups, system);
     }
 
     private async Task<DashboardSwimmerStatus> BuildSwimmersAsync(CancellationToken ct)

@@ -9,6 +9,9 @@
 
     string RecordsTabUrl() => Url.Page("Index", new { tab = "records" })!;
     string StandardsTabUrl() => Url.Page("Index", new { tab = "standards" })!;
+    string IssuesTabUrl() => Url.Page("Index", new { tab = "issues" })!;
+
+    string IssuesPageUrl(int p) => Url.Page("Index", new { tab = "issues", status = Model.IssueStatus, page = p })!;
 
     string RecordsPageUrl(int p) => Url.Page("Index", new
     {
@@ -40,9 +43,167 @@
        class="px-3 py-2 text-sm font-medium border-b-2 -mb-px @(Model.Tab == "standards" ? "border-admin-accent text-admin-accent" : "border-transparent text-admin-text-muted hover:text-admin-text")">
         Standards
     </a>
+    <a href="@IssuesTabUrl()"
+       class="px-3 py-2 text-sm font-medium border-b-2 -mb-px @(Model.Tab == "issues" ? "border-admin-accent text-admin-accent" : "border-transparent text-admin-text-muted hover:text-admin-text")">
+        Спорные записи
+    </a>
 </div>
 
-@if (Model.Tab == "records")
+@if (Model.Tab == "issues")
+{
+    <div class="admin-card px-4 py-3 mb-4 text-sm text-admin-text-muted">
+        Ошибки официальных файлов федерации мы <strong class="text-admin-text">не чиним</strong>:
+        наша копия обязана совпадать с источником, иначе следующий импорт молча вернёт всё назад,
+        а расхождение с их сайтом будет выглядеть как наш баг. Здесь такие записи
+        <strong class="text-admin-text">помечаем</strong> и копим список для федерации.
+        Правила и разбор — <code>docs/plans/records-quality-plan.md</code>.
+    </div>
+
+    <form method="get" class="admin-card flex flex-wrap items-end gap-3 px-4 py-3 mb-4">
+        <input type="hidden" name="tab" value="issues" />
+        <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+            Статус
+            <select name="status" class="admin-input" onchange="this.form.submit()">
+                <option value="">Все</option>
+                @foreach (var st in Model.IssueStatuses)
+                {
+                    <option value="@st" selected="@(st == Model.IssueStatus)">@st</option>
+                }
+            </select>
+        </label>
+        <a href="@IssuesTabUrl()" class="admin-btn admin-btn-ghost">Сброс</a>
+        <button type="button" class="admin-btn admin-btn-primary ml-auto" onclick="toggleAddIssue()">+ Новая запись</button>
+    </form>
+
+    <div id="add-issue-panel" class="admin-card hidden px-4 py-3 mb-4">
+        <div class="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Region type
+                <select id="ni-regionType" class="admin-input">
+                    @foreach (var rt in Model.RegionTypes) { <option value="@rt" selected="@(rt == "country")">@rt</option> }
+                </select>
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Region code
+                <input id="ni-regionCode" class="admin-input" value="ISR" />
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Category
+                <select id="ni-category" class="admin-input">
+                    @foreach (var c in Model.RecordCategories) { <option value="@c">@c</option> }
+                </select>
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Age key
+                <input id="ni-ageKey" class="admin-input" placeholder="(пусто) / 10 / 25-29" />
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Gender
+                <select id="ni-gender" class="admin-input">
+                    <option value="male">male</option>
+                    <option value="female">female</option>
+                </select>
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Pool
+                <select id="ni-poolType" class="admin-input">
+                    <option value="25m">25m</option>
+                    <option value="50m">50m</option>
+                </select>
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Style
+                <select id="ni-style" class="admin-input">
+                    @foreach (var st in styles) { <option value="@st">@st</option> }
+                </select>
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Distance
+                <input id="ni-distance" class="admin-input" placeholder="50m" />
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Оспариваемое время
+                <input id="ni-flaggedTime" class="admin-input" placeholder="34.08" />
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Причина
+                <select id="ni-reason" class="admin-input">
+                    @foreach (var r in Model.IssueReasons) { <option value="@r">@r</option> }
+                </select>
+            </label>
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5 col-span-2 lg:col-span-4">Обоснование
+                <input id="ni-note" class="admin-input" placeholder="почему запись спорная — с доказательствами" />
+            </label>
+        </div>
+        <div class="mt-3 flex gap-2">
+            <button type="button" class="admin-btn admin-btn-primary" onclick="createIssue()">Создать</button>
+            <button type="button" class="admin-btn admin-btn-ghost" onclick="toggleAddIssue()">Отмена</button>
+        </div>
+    </div>
+
+    <div class="mb-3 text-xs text-admin-text-muted">Всего: <strong class="text-admin-text">@Model.Issues.TotalCount</strong></div>
+
+    @if (Model.Issues.Items.Count == 0)
+    {
+        <div class="admin-card text-center text-admin-text-muted italic py-10">Спорных записей нет.</div>
+    }
+    else
+    {
+        <div class="overflow-x-auto">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>ID</th><th>Ось</th><th>Время</th><th>Причина</th><th>Статус</th>
+                        <th>Обоснование</th><th>Заведено</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var i in Model.Issues.Items)
+                    {
+                        <tr id="iss-row-@i.Id">
+                            <td class="text-admin-text-muted">@i.Id</td>
+                            <td class="whitespace-nowrap text-admin-text-muted">
+                                @i.RegionType@(string.IsNullOrEmpty(i.RegionCode) ? "" : $" · {i.RegionCode}")
+                                · @i.Category@(string.IsNullOrEmpty(i.AgeKey) ? "" : $" {i.AgeKey}")
+                                · @i.Gender · @i.PoolType
+                                <br />@i.Style @i.Distance
+                            </td>
+                            <td class="whitespace-nowrap">
+                                <strong>@i.FlaggedTime</strong>
+                                @if (!i.RecordStillCurrent)
+                                {
+                                    @* Ключ реестра включает время: рекорд с тех пор сменился,
+                                       претензия относится к истории, а не к текущей строке. *@
+                                    <div class="text-[11px] text-admin-text-muted">рекорд с тех пор сменился</div>
+                                }
+                            </td>
+                            <td>
+                                <select class="admin-input w-44" data-field="reason">
+                                    @foreach (var r in Model.IssueReasons)
+                                    {
+                                        <option value="@r" selected="@(r == i.Reason)">@r</option>
+                                    }
+                                </select>
+                            </td>
+                            <td>
+                                <select class="admin-input w-36" data-field="status">
+                                    @foreach (var st in Model.IssueStatuses)
+                                    {
+                                        <option value="@st" selected="@(st == i.Status)">@st</option>
+                                    }
+                                </select>
+                            </td>
+                            <td><textarea class="admin-input w-96 h-16" data-field="note">@i.Note</textarea></td>
+                            <td class="whitespace-nowrap text-admin-text-muted text-xs">
+                                @i.CreatedAt.ToString("dd/MM/yyyy")<br />@i.CreatedBy
+                            </td>
+                            <td class="whitespace-nowrap text-right">
+                                <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5" onclick="saveIssue(@i.Id)">Save</button>
+                                <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5" onclick="deleteIssue(@i.Id)">Del</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <partial name="/Pages/Admin/Shared/_Pagination.cshtml"
+                 model='new Swimm.API.Pages.Admin.Shared.PaginationModel(Model.Issues.Page, Model.Issues.TotalPages,
+                            Model.Issues.HasPrev ? IssuesPageUrl(Model.Issues.Page - 1) : null,
+                            Model.Issues.HasNext ? IssuesPageUrl(Model.Issues.Page + 1) : null)' />
+    }
+}
+else if (Model.Tab == "records")
 {
     <form method="get" class="admin-card flex flex-wrap items-end gap-3 px-4 py-3 mb-4">
         <input type="hidden" name="tab" value="records" />
@@ -196,6 +357,17 @@
                             <td><input class="admin-input w-24" data-field="recordDate" value="@r.RecordDate" /></td>
                             <td class="whitespace-nowrap text-right">
                                 <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5" onclick="saveRecord(@r.Id)">Save</button>
+                                @{
+                                    var axisJson = System.Text.Json.JsonSerializer.Serialize(new
+                                    {
+                                        regionType = r.RegionType, regionCode = r.RegionCode, category = r.Category,
+                                        ageKey = r.AgeKey, gender = r.Gender, poolType = r.PoolType,
+                                        style = r.Style, distance = r.Distance
+                                    });
+                                }
+                                <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5"
+                                        title="Пометить спорной (рекорд при этом не меняется)"
+                                        onclick='flagRecord(@r.Id, @Html.Raw(axisJson))'>⚑</button>
                                 <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5" onclick="deleteRecord(@r.Id)">Del</button>
                             </td>
                         </tr>
@@ -352,6 +524,7 @@ else
     <script>
         function toggleAddRecord() { document.getElementById('add-record-panel').classList.toggle('hidden'); }
         function toggleAddStandard() { document.getElementById('add-standard-panel').classList.toggle('hidden'); }
+        function toggleAddIssue() { document.getElementById('add-issue-panel').classList.toggle('hidden'); }
 
         function rowField(rowId, field) {
             return document.querySelector(`#${rowId} [data-field="${field}"]`);
@@ -403,6 +576,80 @@ else
                     }),
                 });
                 location.reload();
+            } catch (e) {
+                toast('Ошибка: ' + e.message, 4000);
+            }
+        }
+
+        // --- Спорные записи (реестр Sys_RecordIssues) ---
+        // ⚠ Рекорд при этом НЕ правится: наша копия обязана совпадать с файлом федерации.
+        async function saveIssue(id) {
+            const row = 'iss-row-' + id;
+            try {
+                await api(`/api/admin/record-issues/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        status: rowField(row, 'status').value,
+                        reason: rowField(row, 'reason').value,
+                        note: rowField(row, 'note').value,
+                    }),
+                });
+                toast('Сохранено');
+            } catch (e) {
+                toast('Ошибка: ' + e.message, 4000);
+            }
+        }
+
+        async function deleteIssue(id) {
+            const ok = await adminConfirm({ title: 'Удалить запись реестра?', confirmText: 'Удалить', danger: true });
+            if (!ok) return;
+            try {
+                await api(`/api/admin/record-issues/${id}`, { method: 'DELETE' });
+                document.getElementById('iss-row-' + id)?.remove();
+                toast('Запись удалена');
+            } catch (e) {
+                toast('Ошибка: ' + e.message, 4000);
+            }
+        }
+
+        async function createIssue() {
+            const val = idSuffix => document.getElementById('ni-' + idSuffix).value;
+            try {
+                await api('/api/admin/record-issues', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        regionType: val('regionType'), regionCode: val('regionCode'), category: val('category'),
+                        ageKey: val('ageKey'), gender: val('gender'), poolType: val('poolType'), style: val('style'),
+                        distance: val('distance'), flaggedTime: val('flaggedTime'),
+                        reason: val('reason'), note: val('note'),
+                    }),
+                });
+                location.reload();
+            } catch (e) {
+                toast('Ошибка: ' + e.message, 4000);
+            }
+        }
+
+        // Кнопка «⚑» в таблице рекордов: заводит претензию на ЭТУ ось с ТЕКУЩИМ временем
+        // (время берётся из поля строки — если его отредактировали, но не сохранили, метка
+        // всё равно уйдёт на то значение, которое видит админ).
+        async function flagRecord(id, axis) {
+            const time = rowField('rec-row-' + id, 'time').value;
+            const ok = await adminConfirm({
+                title: 'Пометить запись спорной?',
+                message: `${axis.style} ${axis.distance} · ${axis.poolType} · ${time}. Сам рекорд не изменится — обоснование допишете во вкладке «Спорные записи».`,
+                confirmText: 'Пометить',
+            });
+            if (!ok) return;
+            try {
+                await api('/api/admin/record-issues', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...axis, flaggedTime: time, reason: 'manual' }),
+                });
+                toast('Помечено — допишите обоснование во вкладке «Спорные записи»', 4000);
             } catch (e) {
                 toast('Ошибка: ' + e.message, 4000);
             }

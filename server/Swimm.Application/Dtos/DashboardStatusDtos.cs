@@ -9,6 +9,7 @@ public sealed record DashboardStatusSummary(
     DashboardCompetitionStatus Competitions,
     DashboardResultStatus Results,
     IReadOnlyList<DashboardRecordSetStatus> RecordSets,
+    RecordQualitySummary RecordQuality,
     DashboardMediaStatus Media,
     DashboardUsersGroupsStatus UsersGroups,
     DashboardSystemStatus System);

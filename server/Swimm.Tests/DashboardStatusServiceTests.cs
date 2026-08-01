@@ -67,6 +67,7 @@ public class DashboardStatusServiceTests
         new(db,
             new FakeSwimmerDedupService(swimmerReport ?? SwimmerReport(0, 0, 0)),
             new FakeClubDedupService(clubReport ?? ClubReport(0, 0)),
+            new RecordQualityService(db),
             cache ?? new MemoryCache(new MemoryCacheOptions()));
 
     [Fact]

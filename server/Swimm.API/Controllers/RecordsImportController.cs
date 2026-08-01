@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -19,16 +19,31 @@ public class RecordsImportController : ControllerBase
 {
     private readonly IReadOnlyDictionary<string, IRecordSourceProvider> _providers;
     private readonly IRecordDiffService _diffService;
+    private readonly IRecordQualityService _quality;
 
-    public RecordsImportController(IEnumerable<IRecordSourceProvider> providers, IRecordDiffService diffService)
+    public RecordsImportController(
+        IEnumerable<IRecordSourceProvider> providers,
+        IRecordDiffService diffService,
+        IRecordQualityService quality)
     {
         _providers = providers.ToDictionary(p => p.Source, StringComparer.OrdinalIgnoreCase);
         _diffService = diffService;
+        _quality = quality;
     }
 
     [HttpGet("source-status")]
     public async Task<IActionResult> GetSourceStatus()
         => Ok(await _diffService.GetSourceStatusAsync());
+
+    /// <summary>
+    /// Сверка справочника рекордов с нашими протоколами (docs/plans/records-quality-plan.md).
+    /// Пересчитывает Sys_RecordVerifications целиком.
+    ///
+    /// ⚠ «Не найдено» — не приговор источнику: протоколы загружены не за все годы.
+    /// </summary>
+    [HttpPost("verify")]
+    public async Task<IActionResult> Verify()
+        => Ok(await _quality.VerifyAllAsync(HttpContext.RequestAborted));
 
     [HttpPost("fetch")]
     [RequestSizeLimit(20 * 1024 * 1024)]
