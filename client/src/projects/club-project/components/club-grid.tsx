@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import type { ClubGridCell, ClubGridYear } from '../../../hooks/useClubOverview';
 
 /**
@@ -27,7 +27,7 @@ interface Props {
 function ClubGrid({ grid, currentSeason, onPickStanding, selectedCompetitionId }: Props) {
   if (grid.length === 0) {
     return (
-      <section className="deep-card mb-4">
+      <section className="deep-card h-full">
         <div className="deep-card-title">Season × Group</div>
         <div className="mt-3 text-[13px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
           No club standings yet
@@ -40,15 +40,15 @@ function ClubGrid({ grid, currentSeason, onPickStanding, selectedCompetitionId }
   const brightest = currentSeason ?? Math.max(...grid.map((y) => y.season));
 
   return (
-    <section className="deep-card mb-4">
+    <section className="deep-card h-full">
       <div className="deep-card-title">Season × Group</div>
       <div className="deep-card-sub mt-1">Rank in each championship · higher bar = better place</div>
 
       <div className="mt-4 flex flex-col gap-6">
         {grid.map((year) => (
-          <div key={year.season} className="flex gap-5">
+          <div key={year.season} className="flex gap-3 sm:gap-5">
             <div
-              className="w-[74px] shrink-0 text-[22px] leading-none"
+              className="w-[44px] shrink-0 text-[13px] leading-none sm:w-[74px] sm:text-[22px]"
               style={{ fontFamily: 'var(--deep-font-display)', color: 'var(--deep-text-faint)' }}
             >
               {year.label}
@@ -61,7 +61,7 @@ function ClubGrid({ grid, currentSeason, onPickStanding, selectedCompetitionId }
                 </div>
               ) : (
                 year.rows.map((row) => (
-                  <div key={row.group_key} className="flex flex-wrap items-center gap-3">
+                  <div key={row.group_key} className="flex items-start gap-3">
                     <span
                       className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-black"
                       style={{ background: 'var(--deep-accent-chip)', color: 'var(--deep-accent)' }}
@@ -69,12 +69,16 @@ function ClubGrid({ grid, currentSeason, onPickStanding, selectedCompetitionId }
                       {row.badge ?? row.group_name.slice(0, 1)}
                     </span>
                     <span
-                      className="w-[104px] shrink-0 truncate text-[12px] font-extrabold"
+                      className="w-[68px] shrink-0 truncate pt-0.5 text-[12px] font-extrabold sm:w-[92px]"
                       style={{ color: 'var(--deep-text-mute)' }}
                     >
                       {row.group_name}
                     </span>
 
+                    {/* Линии чемпионатов — ОДНА ПОД ДРУГОЙ (CARDS.md §3: «[сегменты][❄ #3] /
+                        [сегменты][☀ #2]»), а не в ряд: так карточка живёт в половине ширины
+                        и ранги ❄/☀ читаются столбиком. */}
+                    <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <StandingLine
                       icon="❄"
                       kind="winter"
@@ -99,6 +103,7 @@ function ClubGrid({ grid, currentSeason, onPickStanding, selectedCompetitionId }
                       selected={selectedCompetitionId === row.open_water?.competition_id}
                       onPick={onPickStanding}
                     />
+                    </div>
                   </div>
                 ))
               )}
@@ -134,7 +139,7 @@ function StandingLine({
     <button
       type="button"
       onClick={() => onPick(cell.competition_id)}
-      className="flex items-center gap-2 rounded-lg px-2 py-1"
+      className="flex w-full items-center gap-2 rounded-lg px-2 py-1"
       style={{
         background: selected ? 'var(--deep-accent-soft)' : 'transparent',
         border: `1px solid ${selected ? 'var(--deep-accent-border)' : 'transparent'}`,

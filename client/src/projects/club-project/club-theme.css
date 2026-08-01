@@ -1,4 +1,4 @@
-/* Swimm — Deep / Deep Light. Полный набор токенов + рецепты.
+﻿/* Swimm — Deep / Deep Light. Полный набор токенов + рецепты.
    Подключение: класс .theme-deep или .theme-deep-light на корне страницы (или карточки).
    Компоненты используют ТОЛЬКО var(--deep-*) — тогда любая карточка работает в обеих темах
    и переносится на другие страницы без правок. */
@@ -140,3 +140,11 @@
 .deep-record-tile { position: relative; border-radius: var(--deep-radius-tile); padding: 14px 16px; }
 .deep-record-tile--m { background: var(--deep-male-soft); border: 1px solid var(--deep-male-border); }
 .deep-record-tile--f { background: var(--deep-female-soft); border: 1px solid var(--deep-female-border); }
+
+/* ── Мобайл (CARDS.md «Мобайл (390)») ────────────────────────────────────────
+   Сегменты ранга мельче: 5×7 вместо 8×10. Без этого строка грида (кружок группы +
+   название + 10 сегментов + подпись) не влезает в 375px и тянет горизонтальный
+   скролл всей страницы. Длина полосы остаётся пропорциональной месту. */
+@media (max-width: 640px) {
+  .deep-rank-seg { width: 5px; height: 7px; }
+}

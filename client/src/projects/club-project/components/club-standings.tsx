@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import type { ClubStandingsTable } from '../../../hooks/useClubOverview';
 
 /**
@@ -25,7 +25,7 @@ function seasonLabel(season: number): string {
 function ClubStandings({ standings }: Props) {
   if (!standings) {
     return (
-      <section className="deep-card mb-4">
+      <section className="deep-card h-full">
         <div className="deep-card-title">Standings</div>
         <div className="mt-3 text-[13px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
           No standings yet
@@ -37,7 +37,7 @@ function ClubStandings({ standings }: Props) {
   const icon = standings.kind ? KIND_ICON[standings.kind] ?? '' : '';
 
   return (
-    <section className="deep-card mb-4">
+    <section className="deep-card h-full">
       <div className="deep-card-title">Standings</div>
       <div className="deep-card-sub mt-1">
         {icon && `${icon} · `}

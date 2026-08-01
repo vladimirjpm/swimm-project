@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import '../../index.css';
 import './club-theme.css';
 import { useMode } from '../../hooks/useMode';
@@ -74,16 +74,24 @@ function ClubProject() {
               onGroup={(group) => setScope((s) => ({ ...s, group, standingCompetitionId: null }))}
             />
 
-            <ClubGrid
-              grid={data.grid}
-              currentSeason={scope.season}
-              selectedCompetitionId={data.standings?.competition_id ?? null}
-              onPickStanding={(competitionId) =>
-                setScope((s) => ({ ...s, standingCompetitionId: competitionId }))
-              }
-            />
+            {/* Грид и таблица зачёта — пара: клик по линии слева меняет таблицу справа,
+                поэтому на десктопе они стоят рядом по половине ширины.
+                Порог 960px, а не стандартный lg (1024): строке грида нужно ~525px
+                (кружок группы + название + две линии чемпионатов по 10 сегментов),
+                таблице ~380px — вдвоём они помещаются уже с 960. Уже — одна колонка. */}
+            <div className="mb-4 grid grid-cols-1 items-start gap-4 min-[960px]:grid-cols-2">
+              <ClubGrid
+                grid={data.grid}
+                currentSeason={scope.season}
+                selectedCompetitionId={data.standings?.competition_id ?? null}
+                onPickStanding={(competitionId) =>
+                  setScope((s) => ({ ...s, standingCompetitionId: competitionId }))
+                }
+              />
 
-            <ClubStandings standings={data.standings} />
+              <ClubStandings standings={data.standings} />
+            </div>
+
             <ClubTimeline timeline={data.timeline} />
             <ClubTopSwimmers swimmers={data.top_swimmers} />
 
