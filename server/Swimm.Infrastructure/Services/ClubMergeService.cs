@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
@@ -62,6 +62,12 @@ public class ClubMergeService(SwimmDbContext db, ICacheService cache, IClubStand
         // Каноны, получившие официальную группу от дубля в ЭТОМ вызове (см. movedFavs).
         var gotOfficial = new HashSet<int>();
 
+        // Зачётные единицы, где у ДУБЛЕЙ есть строки в материализованном зачёте. Собираем
+        // ДО переноса результатов: после него связь «клуб → соревнование» уже не найти,
+        // а пересчёта только по соревнованиям канона оказалось мало (2026-08-01: после
+        // склейки 68 дублей три строки исчезнувших клубов пережили merge).
+        var standingUnits = new HashSet<int>();
+
         foreach (var pair in pairs)
         {
             var res = new ClubMergePairResult { CanonicalId = pair.CanonicalId, DuplicateId = pair.DuplicateId };
@@ -115,6 +121,12 @@ public class ClubMergeService(SwimmDbContext db, ICacheService cache, IClubStand
             }
 
             // --- Перенос связей ---
+
+            foreach (var unitId in await db.ClubCompetitionStandings.AsNoTracking()
+                         .Where(s => s.ClubId == duplicate.Id)
+                         .Select(s => s.CompetitionId)
+                         .ToListAsync(ct))
+                standingUnits.Add(unitId);
 
             var results = await db.Results.Where(r => r.ClubId == duplicate.Id).ToListAsync(ct);
             foreach (var r in results) r.ClubId = canonical.Id;
@@ -182,11 +194,16 @@ public class ClubMergeService(SwimmDbContext db, ICacheService cache, IClubStand
 
         await db.SaveChangesAsync(ct); // один SaveChanges = одна транзакция
 
-        // Материализованный клубный зачёт помнит места ИСЧЕЗНУВШЕГО клуба — пересчитываем
-        // соревнования канона (результаты дубля уже переехали на него, значит его список
-        // соревнований покрывает и унаследованные).
+        // Материализованный клубный зачёт помнит места ИСЧЕЗНУВШЕГО клуба — пересчитываем.
+        // ДВА прохода, и оба нужны:
+        //   1) зачёты, где стоял сам дубль (собраны выше, до переноса) — иначе его место
+        //      остаётся висеть в таблице;
+        //   2) соревнования канона — у него изменились очки и состав.
         if (anyMerged)
         {
+            foreach (var unitId in standingUnits)
+                await standings.RebuildForCompetitionAsync(unitId, ct);
+
             foreach (var id in report.Pairs.Where(p => p.Status == "merged").Select(p => p.CanonicalId).Distinct())
                 await standings.RebuildForClubAsync(id, ct);
         }

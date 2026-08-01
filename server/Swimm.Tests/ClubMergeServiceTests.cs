@@ -29,8 +29,9 @@ public class ClubMergeServiceTests
     private sealed class StandingSpy : IClubStandingService
     {
         public List<int> RebuiltClubs { get; } = [];
+        public List<int> RebuiltCompetitions { get; } = [];
         public Task<int> RebuildForCompetitionAsync(int competitionId, CancellationToken ct = default)
-            => Task.FromResult(0);
+        { RebuiltCompetitions.Add(competitionId); return Task.FromResult(0); }
         public Task<int> RebuildAllAsync(CancellationToken ct = default) => Task.FromResult(0);
         public Task<int> RebuildForClubAsync(int clubId, CancellationToken ct = default)
         { RebuiltClubs.Add(clubId); return Task.FromResult(0); }
@@ -277,6 +278,33 @@ public class ClubMergeServiceTests
             .MergeAsync([new ClubMergePair(canon.Id, dup.Id)], dryRun: false);
 
         Assert.Equal([canon.Id], spy.RebuiltClubs);
+    }
+
+    [Fact]
+    public async Task Merge_AlsoRebuildsStandingsWhereDuplicateStood()
+    {
+        // Пересчёта только по соревнованиям канона мало: 2026-08-01 после склейки 68 дублей
+        // ТРИ строки исчезнувших клубов пережили merge и остались висеть в зачёте.
+        // Единицы зачёта дубля собираются ДО переноса результатов — потом связь не найти.
+        await using var db = CreateDb(nameof(Merge_AlsoRebuildsStandingsWhereDuplicateStood));
+        var canon = new Club { Name = "A" };
+        var dup = new Club { Name = "B" };
+        var comp = new Competition { Name = "Meet", Date = "01/06/2026", PoolType = "25m" };
+        db.AddRange(canon, dup, comp);
+        await db.SaveChangesAsync();
+        db.Add(new ClubCompetitionStanding
+        {
+            CompetitionId = comp.Id, ClubId = dup.Id, Rank = 3,
+            Points = 10, Gold = 1, Silver = 0, Bronze = 0,
+            SwimmerCount = 2, ScoringSwims = 2, SwimCount = 2,
+        });
+        await db.SaveChangesAsync();
+
+        var spy = new StandingSpy();
+        await new ClubMergeService(db, new FakeCache(), spy)
+            .MergeAsync([new ClubMergePair(canon.Id, dup.Id)], dryRun: false);
+
+        Assert.Equal([comp.Id], spy.RebuiltCompetitions);
     }
 
     [Fact]
