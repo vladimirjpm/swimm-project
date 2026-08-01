@@ -2,7 +2,7 @@
  * CategoryHelper - живые данные категорий соревнований (name/badge) с сервера
  *
  * Источник правды — /api/categories (таблица Categories в БД, см. Admin/Categories).
- * Ключи категорий соревнований (young8_11/junior/masters/all) остаются client-only
+ * Ключи категорий соревнований (kids8_11/young11_14/juniors/adults/masters/all) остаются client-only
  * и заданы в results-categories.ts — CategoryHelper только подтягивает актуальные
  * name/badge для отображения, не подменяет сам URL-контракт категорий.
  */
@@ -28,22 +28,24 @@ export default class CategoryHelper {
    * Канонический ключ клиента (results-categories.ts) → Category.Key в БД. 'all' — синтетика,
    * в БД её нет.
    *
-   * ⚠ Имена ключей исторические и НЕ совпадают с подписями (2026-07-28 ступени переименованы):
-   *   young8_11 → «Kids» (8–11),  junior → «Youth» (11–14),  results-main → «Juniors» (בוגרים).
-   * Ключи оставлены как есть: они в URL (?category=) и в закладках пользователей.
+   * Возрастная лестница (2026-07-31): Kids 8–11 → Young 11–14 → Juniors → Adults → Masters.
+   * Старые ключи табов (young8_11, junior) уводит LEGACY_CATEGORY_ALIASES до того, как
+   * значение доедет сюда.
    */
   private static readonly CANONICAL_TO_DB_KEY: Record<string, string> = {
-    young8_11: 'results-youth-team',
-    junior: 'results-junior-results',
+    kids8_11: 'results-kids-team',
+    young11_14: 'results-youth-team',
+    juniors: 'results-junior-results',
     adults: 'results-main',
     masters: 'results-masters',
   };
 
-  /** Системные ключи БД, уже покрытые статичными табами (results-main — таб 'adults').
+  /** Системные ключи БД, уже покрытые статичными табами (см. CANONICAL_TO_DB_KEY).
    *  Всё, чего здесь нет, — кастомная категория (result-maccabiah и т.п.): отдельный таб. */
   static readonly SYSTEM_DB_KEYS: ReadonlySet<string> = new Set([
     'results-main',
     'results-masters',
+    'results-kids-team',
     'results-youth-team',
     'results-junior-results',
   ]);
@@ -87,15 +89,16 @@ export default class CategoryHelper {
   /** Резервные категории на случай ошибки загрузки (совпадают с сидом БД). */
   private static getFallbackCategories(): CategoryApiDto[] {
     return [
-      { key: 'results-main', name: 'Juniors', badge: 'J', display_order: 1 },
-      { key: 'results-masters', name: 'Masters', badge: 'M', display_order: 2 },
-      { key: 'results-youth-team', name: 'Kids', badge: 'K', display_order: 3 },
-      { key: 'results-junior-results', name: 'Youth', badge: 'Y', display_order: 4 },
+      { key: 'results-kids-team', name: 'Kids', badge: 'K', display_order: 1 },
+      { key: 'results-youth-team', name: 'Young', badge: 'Y', display_order: 2 },
+      { key: 'results-junior-results', name: 'Juniors', badge: 'J', display_order: 3 },
+      { key: 'results-main', name: 'Adults', badge: 'A', display_order: 4 },
+      { key: 'results-masters', name: 'Masters', badge: 'M', display_order: 5 },
     ];
   }
 
   /**
-   * name/badge для канонического ключа клиента ('young8_11' | 'junior' | 'masters').
+   * name/badge для канонического ключа клиента ('kids8_11' | 'young11_14' | 'masters' | …).
    * null — категории нет в БД (напр. синтетический 'all').
    */
   static async getByCanonicalKey(canonicalKey: string): Promise<CategoryDisplay | null> {

@@ -4,6 +4,7 @@ import { Enums } from '../../../utils/interfaces/enums';
 import PopupContentNormative from './popup-content-normative';
 import PopupContentHtml from './popup-content-html';
 import PopupContentSwimmerRecords from './popup-content-swimmer-records';
+import PopupContentClubPoints from './popup-content-club-points';
 
 const Popup: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -16,6 +17,7 @@ const Popup: React.FC = () => {
     [Enums.PopupType.normative]: <PopupContentNormative />,
     [Enums.PopupType.html]: <PopupContentHtml />,
     [Enums.PopupType.swimmerRecords]: <PopupContentSwimmerRecords />,
+    [Enums.PopupType.clubPoints]: <PopupContentClubPoints />,
   };
 
   const close = React.useCallback(() => {

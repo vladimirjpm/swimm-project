@@ -41,27 +41,40 @@ export default function CompetitionOverview2({
 }: Props) {
   const { isAuthenticated, primarySwimmerId, favoriteSwimmerIds } = useFavoritesContext();
 
+  // Ненаградное соревнование (лига, отбор): места в протоколе есть, награждения нет.
+  // Всё медальное гасится ПРОПСАМИ существующих карточек, а не отдельными компонентами.
+  const hasAwards = overview?.has_awards ?? true;
+
   // --- какие модули видимы (пустые скрываются по-отдельности) ---
   const visible = useMemo(() => {
     const set = new Set<ModuleKey>();
     if (!overview) return set;
     if (overview.top_clubs.length) set.add('clubs');
     if (overview.records.length) set.add('records');
-    if (overview.best_swim || overview.best_swim_male || overview.best_swim_female
-      || overview.top_medalists?.length || overview.top_medalists_male?.length
-      || overview.top_medalists_female?.length) set.add('champions');
+    // Без награждения карточку Champions держит только Best swim: медалисты в ней скрыты,
+    // и модуль из одних медалистов оказался бы пустым.
+    const hasBestSwim = !!(overview.best_swim || overview.best_swim_male || overview.best_swim_female);
+    const hasMedalists = !!(overview.top_medalists?.length || overview.top_medalists_male?.length
+      || overview.top_medalists_female?.length);
+    if (hasBestSwim || (hasAwards && hasMedalists)) set.add('champions');
     if (overview.high_point_awards.length) set.add('hpa');
     if (mediaItems.length) set.add('media');
     if (isAuthenticated && (primarySwimmerId != null || favoriteSwimmerIds.size > 0)) set.add('favorites');
     return set;
-  }, [overview, mediaItems.length, isAuthenticated, primarySwimmerId, favoriteSwimmerIds]);
+  }, [overview, hasAwards, mediaItems.length, isAuthenticated, primarySwimmerId, favoriteSwimmerIds]);
+
+  // Модули, которые видны, но не открываются: High Point без награждения не разыгрывается.
+  const isDisabled = useCallback((m: ModuleKey) => m === 'hpa' && !hasAwards, [hasAwards]);
 
   const modules = MODULE_ORDER.filter((m) => visible.has(m));
 
   // --- state активного модуля + синк с ?panel= ---
   const [active, setActive] = useState<ModuleKey | null>(readPanelFromUrl);
+  // Дефолт и диплинк ?panel= не должны упираться в выключенный модуль — иначе карточка пустая.
   const effective: ModuleKey | null =
-    active && visible.has(active) ? active : modules[0] ?? null;
+    active && visible.has(active) && !isDisabled(active)
+      ? active
+      : modules.find((m) => !isDisabled(m)) ?? null;
 
   const handleSelect = useCallback((m: ModuleKey) => {
     setActive(m);
@@ -136,9 +149,10 @@ export default function CompetitionOverview2({
       sub: champion ? `max points · ${champion.gender === 'male' ? '♂' : '♀'}` : undefined,
     },
     hpa: {
-      medal: hpaRange || '—',
-      name: `${overview.high_point_awards.length} awards`,
-      sub: 'each age · ♂ / ♀',
+      // Без награждения плитка гасится: обещать «12 awards» там, где наград нет, нельзя.
+      medal: hasAwards ? (hpaRange || '—') : '—',
+      name: hasAwards ? `${overview.high_point_awards.length} awards` : 'Not contested',
+      sub: hasAwards ? 'each age · ♂ / ♀' : 'no awards at this competition',
     },
     media: {
       medal: mediaItems.length,
@@ -155,11 +169,28 @@ export default function CompetitionOverview2({
   const renderCard = (m: ModuleKey) => {
     switch (m) {
       case 'clubs':
-        return <ModuleCardClubs overview={overview} onOpenTab={onOpenTab} onOpenClub={onOpenClub} />;
+        // Без награждения — голый зачёт очков: ни медалей, ни шкалы правила, ни ♂/♀.
+        return (
+          <ModuleCardClubs
+            overview={overview}
+            onOpenTab={onOpenTab}
+            onOpenClub={onOpenClub}
+            showMedals={hasAwards}
+            showPointsRule={hasAwards}
+            showGenderPanels={hasAwards}
+          />
+        );
       case 'records':
         return <ModuleCardRecords overview={overview} onOpenTab={onOpenTab} onOpenSwim={onOpenSwim} />;
       case 'champions':
-        return <ModuleCardChampions overview={overview} onOpenSwim={onOpenSwim} onOpenClub={onOpenClub} />;
+        return (
+          <ModuleCardChampions
+            overview={overview}
+            onOpenSwim={onOpenSwim}
+            onOpenClub={onOpenClub}
+            showMostDecorated={hasAwards}
+          />
+        );
       case 'hpa':
         return <ModuleCardHpa overview={overview} onOpenClub={onOpenClub} />;
       case 'media':
@@ -185,7 +216,15 @@ export default function CompetitionOverview2({
   };
 
   const tile = (m: ModuleKey) => (
-    <ModuleTile key={m} module={m} active={m === effective} onSelect={handleSelect} {...tileProps[m]} />
+    <ModuleTile
+      key={m}
+      module={m}
+      active={m === effective}
+      onSelect={handleSelect}
+      disabled={isDisabled(m)}
+      disabledReason="No awards at this competition — High Point is not contested"
+      {...tileProps[m]}
+    />
   );
 
   return (

@@ -18,7 +18,8 @@ public class Category
     /// логику — админка должна их защищать.</summary>
     public static readonly IReadOnlySet<string> ReservedKeys = new HashSet<string>
     {
-        "results-main", "results-masters", "results-youth-team", "results-junior-results"
+        "results-main", "results-masters", "results-kids-team", "results-youth-team",
+        "results-junior-results"
     };
 
     [Key]
@@ -32,6 +33,12 @@ public class Category
     /// <summary>Человекочитаемое название категории.</summary>
     [MaxLength(100)]
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>Название на иврите (ילדים / צעירים / נוער / בוגרים). Заполнено в БД, но публичным
+    /// клиентом пока не используется — UI сайта английский (см. корневой CLAUDE.md).
+    /// null — перевод не задан.</summary>
+    [MaxLength(100)]
+    public string? NameHe { get; set; }
 
     /// <summary>Короткая метка для бейджей (буква/эмодзи, напр. «J» для Junior). Рендерится как
     /// обычный текст (не HTML) — без риска XSS.</summary>

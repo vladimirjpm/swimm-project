@@ -163,7 +163,7 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
   const [panelOpen, setPanelOpen] = React.useState(false);
   // Мобильное меню категорий (вариант 9b: строка «Category: … ▾» вместо табов)
   const [catMenuOpen, setCatMenuOpen] = React.useState(false);
-  // name/badge категорий из /api/categories (БД). Ключи: канонические ('young8_11' и т.п.,
+  // name/badge категорий из /api/categories (БД). Ключи: канонические ('kids8_11' и т.п.,
   // маппинг внутри CategoryHelper) + сырые ключи кастомных категорий (result-maccabiah…).
   // Пусто до первой загрузки — тогда используется статичный RESULTS_CATEGORIES.label.
   const [liveCategoryLabels, setLiveCategoryLabels] = React.useState<Record<string, CategoryDisplay>>({});

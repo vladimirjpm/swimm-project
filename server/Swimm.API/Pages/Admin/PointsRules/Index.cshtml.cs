@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Domain.Entities;
 
 namespace Swimm.API.Pages.Admin.PointsRules;
 
@@ -14,8 +15,13 @@ namespace Swimm.API.Pages.Admin.PointsRules;
 public class IndexModel : PageModel
 {
     private readonly IPointRulesAdminRepository _repo;
+    private readonly IAdminAuditService _audit;
 
-    public IndexModel(IPointRulesAdminRepository repo) => _repo = repo;
+    public IndexModel(IPointRulesAdminRepository repo, IAdminAuditService audit)
+    {
+        _repo = repo;
+        _audit = audit;
+    }
 
     /// <summary>"clubs" | "swimmers" — активный таб (по умолчанию клубный).</summary>
     [BindProperty(SupportsGet = true)]
@@ -25,10 +31,102 @@ public class IndexModel : PageModel
 
     public IReadOnlyList<PointRuleRowDto> Rules { get; private set; } = [];
 
+    /// <summary>Соревнования каждого правила (Id правила → строки панели). Рендерятся сразу,
+    /// панель просто скрыта: правил единицы, отдельный AJAX-эндпоинт того не стоит.</summary>
+    public IReadOnlyDictionary<int, IReadOnlyList<PointRuleCompetitionRowDto>> Competitions
+    { get; private set; } = new Dictionary<int, IReadOnlyList<PointRuleCompetitionRowDto>>();
+
     public async Task OnGetAsync()
     {
         Kind = PointRulesKindParser.ToSlug(RuleKind);
         Rules = await _repo.GetAllAsync(RuleKind);
+
+        var byRule = new Dictionary<int, IReadOnlyList<PointRuleCompetitionRowDto>>();
+        foreach (var rule in Rules.Where(r => r.CompetitionCount > 0))
+            byRule[rule.Id] = await _repo.GetCompetitionsAsync(RuleKind, rule.Id);
+        Competitions = byRule;
+    }
+
+    /// <summary>Строка формы перепривязки: соревнование → выбранное правило (пусто — снять привязку).</summary>
+    public class ReassignRow
+    {
+        public int CompetitionId { get; set; }
+        public int? RuleId { get; set; }
+    }
+
+    /// <summary>
+    /// Кнопки проверки в строке панели: «Проверено вручную» (сверено с официальным протоколом)
+    /// и «Принято как верное» (официальных очков нет). Состояния взаимоисключающие; повторный
+    /// клик по текущему снимает отметку. Ставится всем дням события, на расчёт не влияет.
+    /// </summary>
+    public async Task<IActionResult> OnPostToggleVerifiedAsync(
+        int ruleId, int verifyCompetitionId, string verifiedKind)
+    {
+        var kindSlug = PointRulesKindParser.ToSlug(RuleKind);
+        var result = await _repo.ToggleVerifiedAsync(
+            RuleKind, verifyCompetitionId, verifiedKind, User.Identity?.Name);
+
+        if (!result.Success)
+        {
+            TempData["Flash"] = $"Не сохранено: {result.Error}";
+            return RedirectToPage("Index", new { kind = kindSlug });
+        }
+
+        var nowVerified = result.Id == 1;
+        var label = verifiedKind switch
+        {
+            PointsVerifiedKinds.Accepted => "принято как верное (официальных очков нет)",
+            PointsVerifiedKinds.Mismatch => "расходится с официальными (ошибка у организатора, верны наши)",
+            _ => "сверено с официальным протоколом"
+        };
+
+        await _audit.LogAsync("pointrule.verify", "Competition", verifyCompetitionId.ToString(),
+            $"Ручная проверка очков ({kindSlug}, правило #{ruleId}) у соревнования #{verifyCompetitionId}: " +
+            (nowVerified ? label : "отметка снята"));
+
+        TempData["Flash"] = nowVerified
+            ? verifiedKind switch
+            {
+                PointsVerifiedKinds.Accepted => "Принято как верное",
+                PointsVerifiedKinds.Mismatch => "Отмечено расхождение с официальными",
+                _ => "Отмечено как проверенное"
+            }
+            : "Отметка снята";
+        return RedirectToPage("Index", new { kind = kindSlug });
+    }
+
+    /// <summary>
+    /// Сохранение панели «Соревнования»: меняет правило у выбранных соревнований (у многодневных —
+    /// всем дням) и возвращает на список, чтобы счётчики в верхней таблице пересчитались.
+    /// </summary>
+    public async Task<IActionResult> OnPostReassignAsync(int ruleId, List<ReassignRow>? rows)
+    {
+        var kindSlug = PointRulesKindParser.ToSlug(RuleKind);
+        var items = (rows ?? [])
+            .Select(r => new PointRuleReassignItem(r.CompetitionId, r.RuleId))
+            .ToList();
+
+        var result = await _repo.ReassignCompetitionsAsync(RuleKind, items);
+
+        if (!result.Success)
+        {
+            TempData["Flash"] = $"Не сохранено: {result.Error}";
+            return RedirectToPage("Index", new { kind = kindSlug });
+        }
+
+        if (result.Id == 0)
+        {
+            TempData["Flash"] = "Изменений не было";
+            return RedirectToPage("Index", new { kind = kindSlug });
+        }
+
+        await _audit.LogAsync("pointrule.reassign",
+            RuleKind == PointRuleKind.Clubs ? "PointRuleClubs" : "PointRuleSwimmers",
+            ruleId.ToString(),
+            $"Перепривязка из панели правила #{ruleId} ({kindSlug}): изменено соревнований: {result.Id}");
+
+        TempData["Flash"] = $"Привязка обновлена: {result.Id} соревнований";
+        return RedirectToPage("Index", new { kind = kindSlug });
     }
 }
 

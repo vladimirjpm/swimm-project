@@ -23,7 +23,59 @@ public sealed class PointRuleRowDto
 
     /// <summary>Соревнований с явной привязкой к этому правилу (FK). Пока > 0 — удалять нельзя.</summary>
     public int CompetitionCount { get; set; }
+
+    /// <summary>Из них сверено с официальным протоколом.</summary>
+    public int VerifiedCount { get; set; }
+
+    /// <summary>Из них принято как верное (официальных очков нет).</summary>
+    public int AcceptedCount { get; set; }
+
+    /// <summary>Из них расходятся с официальными (ошибка у организатора, верны наши).</summary>
+    public int MismatchCount { get; set; }
 }
+
+/// <summary>
+/// Строка панели «Соревнования правила» на /Admin/PointsRules: одно логическое соревнование
+/// (многодневное событие — одной строкой) + текущая привязка к правилу своего вида.
+/// </summary>
+public sealed class PointRuleCompetitionRowDto
+{
+    /// <summary>Id «головы» — первого дня события либо самого соревнования. Смена правила
+    /// применяется ко всем дням события (регламент у события один).</summary>
+    public int Id { get; set; }
+
+    public int? EventId { get; set; }
+    public string Name { get; set; } = "";
+
+    /// <summary>Дата первого дня (dd/MM/yyyy).</summary>
+    public string Date { get; set; } = "";
+
+    /// <summary>Дней в событии (1 — однодневное).</summary>
+    public int DayCount { get; set; }
+
+    public int ResultCount { get; set; }
+    public bool IsMasters { get; set; }
+
+    /// <summary>Id соревнования на isr.org.il (у «головы»); null — не сопоставлено с сайтом.</summary>
+    public int? OrgCompId { get; set; }
+
+    /// <summary>Когда очки ЭТОГО вида были вручную проверены; null — не проверялось.</summary>
+    public DateTime? VerifiedAt { get; set; }
+
+    /// <summary>Кто проверил (логин админа).</summary>
+    public string? VerifiedBy { get; set; }
+
+    /// <summary>Итог проверки: <c>official</c> (сверено с протоколом) | <c>accepted</c>
+    /// (официальных нет, принято как верное) | <c>mismatch</c> (официальные есть, но в них
+    /// ошибка — верны наши) | null (не проверялось).</summary>
+    public string? VerifiedKind { get; set; }
+
+    /// <summary>Текущее правило нужного вида; null — привязки нет (автоподбор по дате).</summary>
+    public int? RuleId { get; set; }
+}
+
+/// <summary>Одна перепривязка из панели: соревнование → правило (null — снять, вернуть автоподбор).</summary>
+public sealed record PointRuleReassignItem(int CompetitionId, int? RuleId);
 
 /// <summary>Строка шкалы «место → очки».</summary>
 public sealed class PointRuleEntryDto

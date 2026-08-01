@@ -27,11 +27,30 @@ public class PointRulesAdminRepository(SwimmDbContext db, ICacheService cache) :
     {
         if (kind == PointRuleKind.Clubs)
         {
-            var usage = await db.Competitions.AsNoTracking()
+            // Считаем логические соревнования, а не строки-дни: у многодневного события
+            // правило записано в каждый день, но в списке это одно соревнование — иначе
+            // счётчик расходится с панелью «Соревнования».
+            var usageRows = await db.Competitions.AsNoTracking()
                 .Where(c => c.PointRuleClubsId != null)
-                .GroupBy(c => c.PointRuleClubsId!.Value)
-                .Select(g => new { RuleId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.RuleId, x => x.Count);
+                .Select(c => new
+                {
+                    RuleId = c.PointRuleClubsId!.Value,
+                    LogicalId = c.EventId ?? -c.Id,
+                    VerifiedKind = c.ClubPointsVerifiedKind
+                })
+                .ToListAsync();
+
+            var usage = usageRows
+                .GroupBy(x => x.RuleId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.LogicalId).Distinct().Count());
+
+            // Отмечено — если отмечен хотя бы один день события (отметка ставится всем дням сразу).
+            var verified = CountByKind(usageRows.Select(x => (x.RuleId, x.LogicalId, x.VerifiedKind)),
+                PointsVerifiedKinds.Official);
+            var accepted = CountByKind(usageRows.Select(x => (x.RuleId, x.LogicalId, x.VerifiedKind)),
+                PointsVerifiedKinds.Accepted);
+            var mismatch = CountByKind(usageRows.Select(x => (x.RuleId, x.LogicalId, x.VerifiedKind)),
+                PointsVerifiedKinds.Mismatch);
 
             var rules = await db.PointRulesClubs.AsNoTracking()
                 .Select(r => new { r.Id, r.Version, r.Scope, r.EffectiveFrom, r.Description, r.ManualOnly, EntryCount = r.Entries.Count })
@@ -47,17 +66,35 @@ public class PointRulesAdminRepository(SwimmDbContext db, ICacheService cache) :
                     Description = r.Description,
                     ManualOnly = r.ManualOnly,
                     EntryCount = r.EntryCount,
-                    CompetitionCount = usage.GetValueOrDefault(r.Id)
+                    CompetitionCount = usage.GetValueOrDefault(r.Id),
+                    VerifiedCount = verified.GetValueOrDefault(r.Id),
+                    AcceptedCount = accepted.GetValueOrDefault(r.Id),
+                    MismatchCount = mismatch.GetValueOrDefault(r.Id)
                 })
                 .OrderByDescending(r => r.EffectiveFrom).ThenBy(r => r.Version)
                 .ToList();
         }
 
-        var usageS = await db.Competitions.AsNoTracking()
+        var usageRowsS = await db.Competitions.AsNoTracking()
             .Where(c => c.PointRuleSwimmersId != null)
-            .GroupBy(c => c.PointRuleSwimmersId!.Value)
-            .Select(g => new { RuleId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.RuleId, x => x.Count);
+            .Select(c => new
+            {
+                RuleId = c.PointRuleSwimmersId!.Value,
+                LogicalId = c.EventId ?? -c.Id,
+                VerifiedKind = c.SwimmersPointsVerifiedKind
+            })
+            .ToListAsync();
+
+        var usageS = usageRowsS
+            .GroupBy(x => x.RuleId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.LogicalId).Distinct().Count());
+
+        var verifiedS = CountByKind(usageRowsS.Select(x => (x.RuleId, x.LogicalId, x.VerifiedKind)),
+            PointsVerifiedKinds.Official);
+        var acceptedS = CountByKind(usageRowsS.Select(x => (x.RuleId, x.LogicalId, x.VerifiedKind)),
+            PointsVerifiedKinds.Accepted);
+        var mismatchS = CountByKind(usageRowsS.Select(x => (x.RuleId, x.LogicalId, x.VerifiedKind)),
+            PointsVerifiedKinds.Mismatch);
 
         var rulesS = await db.PointRulesSwimmers.AsNoTracking()
             .Select(r => new { r.Id, r.Version, r.Scope, r.EffectiveFrom, r.Description, r.ManualOnly, EntryCount = r.Entries.Count })
@@ -73,10 +110,202 @@ public class PointRulesAdminRepository(SwimmDbContext db, ICacheService cache) :
                 Description = r.Description,
                 ManualOnly = r.ManualOnly,
                 EntryCount = r.EntryCount,
-                CompetitionCount = usageS.GetValueOrDefault(r.Id)
+                CompetitionCount = usageS.GetValueOrDefault(r.Id),
+                VerifiedCount = verifiedS.GetValueOrDefault(r.Id),
+                AcceptedCount = acceptedS.GetValueOrDefault(r.Id),
+                MismatchCount = mismatchS.GetValueOrDefault(r.Id)
             })
             .OrderByDescending(r => r.EffectiveFrom).ThenBy(r => r.Version)
             .ToList();
+    }
+
+    /// <summary>Сколько логических соревнований правила помечено данным итогом проверки.</summary>
+    private static Dictionary<int, int> CountByKind(
+        IEnumerable<(int RuleId, int LogicalId, string? VerifiedKind)> rows, string wanted) =>
+        rows.GroupBy(x => x.RuleId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.GroupBy(x => x.LogicalId).Count(day => day.Any(x => x.VerifiedKind == wanted)));
+
+    // ── Панель «Соревнования правила» (перепривязка на месте) ──────────────────
+
+    public async Task<IReadOnlyList<PointRuleCompetitionRowDto>> GetCompetitionsAsync(
+        PointRuleKind kind, int ruleId)
+    {
+        var q = db.Competitions.AsNoTracking();
+        q = kind == PointRuleKind.Clubs
+            ? q.Where(c => c.PointRuleClubsId == ruleId)
+            : q.Where(c => c.PointRuleSwimmersId == ruleId);
+
+        var days = await q
+            .Select(c => new
+            {
+                c.Id,
+                c.EventId,
+                c.Name,
+                EventName = c.Event != null ? c.Event.Name : null,
+                c.Date,
+                c.IsMasters,
+                c.OrgCompId,
+                VerifiedAt = kind == PointRuleKind.Clubs ? c.ClubPointsVerifiedAt : c.SwimmersPointsVerifiedAt,
+                VerifiedBy = kind == PointRuleKind.Clubs ? c.ClubPointsVerifiedBy : c.SwimmersPointsVerifiedBy,
+                VerifiedKind = kind == PointRuleKind.Clubs ? c.ClubPointsVerifiedKind : c.SwimmersPointsVerifiedKind
+            })
+            .ToListAsync();
+
+        if (days.Count == 0) return [];
+
+        var dayIds = days.Select(d => d.Id).ToList();
+        var resultCounts = await db.Results.AsNoTracking()
+            .Where(r => dayIds.Contains(r.CompetitionId))
+            .GroupBy(r => r.CompetitionId)
+            .Select(g => new { CompetitionId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.CompetitionId, x => x.Count);
+
+        // Дата хранится строкой dd/MM/yyyy — сортируем по разобранной дате, а не лексикографически.
+        static DateOnly? ParseDate(string? raw) =>
+            DateOnly.TryParseExact(raw, "dd/MM/yyyy", out var d) ? d : null;
+
+        return days
+            .GroupBy(d => d.EventId ?? -d.Id)
+            .Select(g =>
+            {
+                var head = g.OrderBy(d => ParseDate(d.Date) ?? DateOnly.MaxValue).ThenBy(d => d.Id).First();
+                return new PointRuleCompetitionRowDto
+                {
+                    Id = head.Id,
+                    EventId = head.EventId,
+                    Name = head.EventId != null ? head.EventName ?? head.Name : head.Name,
+                    Date = head.Date,
+                    DayCount = g.Count(),
+                    ResultCount = g.Sum(d => resultCounts.GetValueOrDefault(d.Id)),
+                    IsMasters = head.IsMasters,
+                    // У многодневки OrgCompId проставлен не каждому дню — берём первый непустой.
+                    OrgCompId = g.Select(d => d.OrgCompId).FirstOrDefault(x => x != null),
+                    // Отметка ставится всем дням сразу; берём первую заполненную — на случай,
+                    // если дни добавили уже после сверки.
+                    VerifiedAt = g.Select(d => d.VerifiedAt).FirstOrDefault(x => x != null),
+                    VerifiedBy = g.Select(d => d.VerifiedBy).FirstOrDefault(x => x != null),
+                    VerifiedKind = g.Select(d => d.VerifiedKind).FirstOrDefault(x => x != null),
+                    RuleId = ruleId
+                };
+            })
+            .OrderByDescending(r => ParseDate(r.Date) ?? DateOnly.MinValue)
+            .ThenBy(r => r.Name)
+            .ToList();
+    }
+
+    public async Task<PointRuleSaveResult> ReassignCompetitionsAsync(
+        PointRuleKind kind, IReadOnlyList<PointRuleReassignItem> items)
+    {
+        if (items.Count == 0) return PointRuleSaveResult.Ok(0);
+
+        // Целевые правила должны существовать — иначе FK оборвёт сохранение без объяснений.
+        var targetIds = items.Where(i => i.RuleId != null).Select(i => i.RuleId!.Value).Distinct().ToList();
+        if (targetIds.Count > 0)
+        {
+            var known = kind == PointRuleKind.Clubs
+                ? await db.PointRulesClubs.Where(r => targetIds.Contains(r.Id)).Select(r => r.Id).ToListAsync()
+                : await db.PointRulesSwimmers.Where(r => targetIds.Contains(r.Id)).Select(r => r.Id).ToListAsync();
+
+            var missing = targetIds.Except(known).ToList();
+            if (missing.Count > 0)
+                return PointRuleSaveResult.Fail($"Правило #{missing[0]} не найдено");
+        }
+
+        var headIds = items.Select(i => i.CompetitionId).Distinct().ToList();
+        var heads = await db.Competitions.AsNoTracking()
+            .Where(c => headIds.Contains(c.Id))
+            .Select(c => new { c.Id, c.EventId })
+            .ToListAsync();
+
+        var changed = 0;
+        foreach (var item in items)
+        {
+            var head = heads.FirstOrDefault(h => h.Id == item.CompetitionId);
+            if (head == null) continue;
+
+            // Регламент у многодневного события один → правило проставляется всем его дням.
+            var dayIds = head.EventId is int ev
+                ? await db.Competitions.Where(c => c.EventId == ev).Select(c => c.Id).ToListAsync()
+                : [head.Id];
+
+            var days = await db.Competitions.Where(c => dayIds.Contains(c.Id)).ToListAsync();
+            var touched = false;
+
+            foreach (var day in days)
+            {
+                if (kind == PointRuleKind.Clubs)
+                {
+                    if (day.PointRuleClubsId == item.RuleId) continue;
+                    day.PointRuleClubsId = item.RuleId;
+                }
+                else
+                {
+                    if (day.PointRuleSwimmersId == item.RuleId) continue;
+                    day.PointRuleSwimmersId = item.RuleId;
+                }
+                touched = true;
+            }
+
+            if (touched) changed++;
+        }
+
+        if (changed == 0) return PointRuleSaveResult.Ok(0);
+
+        await db.SaveChangesAsync();
+        await cache.InvalidateAllAsync();
+        return PointRuleSaveResult.Ok(changed);
+    }
+
+    public async Task<PointRuleSaveResult> ToggleVerifiedAsync(
+        PointRuleKind kind, int competitionId, string verifiedKind, string? user)
+    {
+        if (!PointsVerifiedKinds.IsKnown(verifiedKind))
+            return PointRuleSaveResult.Fail($"Неизвестный итог проверки «{verifiedKind}»");
+
+        var head = await db.Competitions.AsNoTracking()
+            .Where(c => c.Id == competitionId)
+            .Select(c => new { c.Id, c.EventId })
+            .FirstOrDefaultAsync();
+        if (head == null) return PointRuleSaveResult.Fail($"Соревнование #{competitionId} не найдено");
+
+        // Сверяют соревнование целиком, а не отдельный день — отметка идёт всем дням события.
+        var days = head.EventId is int ev
+            ? await db.Competitions.Where(c => c.EventId == ev).ToListAsync()
+            : await db.Competitions.Where(c => c.Id == head.Id).ToListAsync();
+
+        // Состояния взаимоисключающие: повторный клик по текущему снимает отметку,
+        // клик по другому — переключает на него (а не добавляет второе).
+        var current = kind == PointRuleKind.Clubs
+            ? days.Select(d => d.ClubPointsVerifiedKind).FirstOrDefault(k => k != null)
+            : days.Select(d => d.SwimmersPointsVerifiedKind).FirstOrDefault(k => k != null);
+
+        var clearing = current == verifiedKind;
+
+        var now = clearing ? (DateTime?)null : DateTime.UtcNow;
+        var by = clearing ? null : user;
+        var mark = clearing ? null : verifiedKind;
+
+        foreach (var day in days)
+        {
+            if (kind == PointRuleKind.Clubs)
+            {
+                day.ClubPointsVerifiedAt = now;
+                day.ClubPointsVerifiedBy = by;
+                day.ClubPointsVerifiedKind = mark;
+            }
+            else
+            {
+                day.SwimmersPointsVerifiedAt = now;
+                day.SwimmersPointsVerifiedBy = by;
+                day.SwimmersPointsVerifiedKind = mark;
+            }
+        }
+
+        await db.SaveChangesAsync();
+        // Кэш не трогаем: отметка админская, в публичные выдачи не попадает.
+        return PointRuleSaveResult.Ok(now == null ? 0 : 1);
     }
 
     public async Task<PointRuleEditDto?> GetByIdAsync(PointRuleKind kind, int id)

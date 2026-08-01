@@ -64,7 +64,11 @@ function esc(s) {
 
 async function api(url, opts = {}) {
     opts.headers = { 'X-XSRF-TOKEN': _csrfToken, ...(opts.headers ?? {}) };
-    const res = await fetch(url, { credentials: 'same-origin', ...opts });
+    // no-store: некоторые публичные GET (напр. /api/categories) отдают Cache-Control:
+    // public, max-age=300 для сайта — админке это мешает: только что созданная категория
+    // не появляется в чек-листах, пока не истечёт браузерный кэш вкладки (сервер тут ни
+    // при чём, запрос до него не доходит). opts.cache позволяет переопределить точечно.
+    const res = await fetch(url, { credentials: 'same-origin', cache: 'no-store', ...opts });
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     return res.json();
 }

@@ -50,6 +50,26 @@ export interface OverviewClub {
   bronze: number;
 }
 
+/** Строка шкалы правила клубных очков: место → очки. */
+export interface ClubPointsRuleEntry {
+  place: number;
+  points: number;
+}
+
+/** Правило клубных очков, применённое к этому зачёту (overview.club_points_rules). */
+export interface ClubPointsRule {
+  version: string;
+  description: string | null;
+  /** 'all' | 'masters' | 'non-masters'. */
+  scope: string;
+  /** 'yyyy-MM-dd'. */
+  effective_from: string;
+  default_points: number;
+  max_scoring_place: number | null;
+  relay_multiplier: number;
+  points_by_place: ClubPointsRuleEntry[];
+}
+
 export interface OverviewMedalist {
   swimmer_id: number;
   first_name: string;
@@ -101,11 +121,22 @@ export interface OverviewRecord {
 
 export interface CompetitionOverview {
   summary: OverviewSummary;
+  /**
+   * Наградное ли соревнование (Competition.IsAward). У ненаградных (лиги, отборы) места в
+   * протоколе есть, а медалей нет — Overview прячет всё медальное: Most decorated, медали
+   * в клубном зачёте, High Point. Сами расчёты сервер отдаёт всегда, флаг влияет на показ.
+   */
+  has_awards: boolean;
   days: OverviewDay[];
   best_swim: OverviewBestSwim | null;
   best_swim_male: OverviewBestSwim | null;
   best_swim_female: OverviewBestSwim | null;
   top_clubs: OverviewClub[];
+  /** Правила, по которым посчитан клубный зачёт (обычно одно) — попап «How points are scored». */
+  club_points_rules: ClubPointsRule[];
+  /** Итог ручной проверки очков: 'official' | 'accepted' | 'mismatch' | null (не проверялось
+   *  либо в выборке смешаны разные итоги). */
+  club_points_verified: string | null;
   top_clubs_men: OverviewClub[];
   top_clubs_women: OverviewClub[];
   /** Самые титулованные: при равном наборе медалей — все, а не первый попавшийся. */

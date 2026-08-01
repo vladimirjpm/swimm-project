@@ -64,11 +64,16 @@ export default class HelperClub {
       // Используем вычисленные очки из системы начисления
       entry.points += clubPoints;
 
-      if (item.last_name) {
-        entry.swimmerSet.add(item.last_name.trim());
+      // Пловец — по swimmer_id; фамилия только фоллбек для старых статических источников,
+      // где id нет. По одной фамилии однофамильцы клуба схлопывались в одного пловца.
+      const swimmerKey = item.swimmer_id != null
+        ? `id:${item.swimmer_id}`
+        : `n:${item.first_name?.trim() ?? ''}|${item.last_name?.trim() ?? ''}`;
+      if (swimmerKey !== 'n:|') {
+        entry.swimmerSet.add(swimmerKey);
       }
 
-      // Считаем успешные результаты (те, за которые начислены очки)
+      // successfulCount — заплывы, ПРИНЁСШИЕ очки, а не все заплывы клуба (в UI — «scoring swims»)
       if (clubPoints > 0) {
         entry.successfulCount += 1;
       }

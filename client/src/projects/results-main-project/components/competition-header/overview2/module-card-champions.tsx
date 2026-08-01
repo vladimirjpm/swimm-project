@@ -13,11 +13,16 @@ import UI_SwimmerNameCell from '../../../../components/mix/swimmer-name-cell/swi
 //                    RelayMembers), порядок золото → серебро → бронза (не по сумме),
 //                    при одинаковом наборе медалей показываются ВСЕ.
 // Сам расчёт — на сервере (ResultRepository.GetCompetitionOverviewAsync); здесь только показ.
+//
+// Most decorated выключается пропсом showMostDecorated — у ненаградного соревнования медалей
+// нет, а Best swim остаётся: он считается по FINA-очкам и от награждения не зависит.
 
 interface Props {
   overview: CompetitionOverview;
   onOpenSwim?(swim: { result_id: number | null; style_name: string; distance: string }): void;
   onOpenClub?(club: string): void;
+  /** Показывать панели Most decorated. false — ненаградное соревнование (медалей нет). */
+  showMostDecorated?: boolean;
 }
 
 const PANEL_BG: Record<'male' | 'female', string> = {
@@ -155,11 +160,13 @@ function MedalistPanel({ medalists, gender, onOpenClub }: {
   );
 }
 
-export default function ModuleCardChampions({ overview, onOpenSwim, onOpenClub }: Props) {
+export default function ModuleCardChampions({
+  overview, onOpenSwim, onOpenClub, showMostDecorated = true,
+}: Props) {
   const bestSwimMale = resolveBestSwim(overview, 'male');
   const bestSwimFemale = resolveBestSwim(overview, 'female');
-  const medalistsMale = resolveMedalists(overview, 'male');
-  const medalistsFemale = resolveMedalists(overview, 'female');
+  const medalistsMale = showMostDecorated ? resolveMedalists(overview, 'male') : [];
+  const medalistsFemale = showMostDecorated ? resolveMedalists(overview, 'female') : [];
 
   if (!bestSwimMale && !bestSwimFemale && !medalistsMale.length && !medalistsFemale.length) return null;
 
@@ -168,7 +175,7 @@ export default function ModuleCardChampions({ overview, onOpenSwim, onOpenClub }
       <div className="mb-3 flex items-baseline gap-2.5">
         <span className="ov2-card__title">Champions</span>
         <span className="text-[12px] font-semibold" style={{ color: 'var(--theme-mode-text-muted)' }}>
-          Best swim · Most decorated · ♂ / ♀
+          {showMostDecorated ? 'Best swim · Most decorated · ♂ / ♀' : 'Best swim · ♂ / ♀'}
         </span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

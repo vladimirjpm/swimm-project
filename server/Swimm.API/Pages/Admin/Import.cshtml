@@ -504,8 +504,11 @@
     tabPdf.addEventListener('click', () => setMode('pdf'));
 
     // Категории для привязки на импорте (мультиселект).
+    // cache: 'no-store' — /api/categories отдаёт Cache-Control: public, max-age=300 (рассчитан
+    // на публичный сайт); без этого только что добавленная категория не появлялась бы здесь,
+    // пока не истечёт браузерный кэш вкладки.
     const catList = document.getElementById('cat-list');
-    fetch('/api/categories', { credentials: 'same-origin' })
+    fetch('/api/categories', { credentials: 'same-origin', cache: 'no-store' })
         .then(r => r.ok ? r.json() : [])
         .then(cats => {
             if (!Array.isArray(cats) || cats.length === 0) { catList.textContent = 'нет категорий'; return; }

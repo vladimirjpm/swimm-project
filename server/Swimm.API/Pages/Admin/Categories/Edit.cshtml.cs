@@ -31,6 +31,7 @@ public class EditModel : PageModel
     {
         public string Key { get; set; } = "";
         public string Name { get; set; } = "";
+        public string? NameHe { get; set; }
         public string? Badge { get; set; }
         public int DisplayOrder { get; set; }
     }
@@ -85,6 +86,7 @@ public class EditModel : PageModel
     {
         Key = d.Key,
         Name = d.Name,
+        NameHe = d.NameHe,
         Badge = d.Badge,
         DisplayOrder = d.DisplayOrder
     };
@@ -93,6 +95,7 @@ public class EditModel : PageModel
     {
         Key = f.Key,
         Name = f.Name,
+        NameHe = f.NameHe,
         Badge = f.Badge,
         DisplayOrder = f.DisplayOrder
     };

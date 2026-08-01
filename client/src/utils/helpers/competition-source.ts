@@ -12,7 +12,7 @@ export type CompetitionSource = {
   date_end?: string | null;
   pool_type: string;
   /** Канонический таб; null — только «All» + кастомные табы по categories. */
-  category: 'young8_11' | 'junior' | 'adults' | 'masters' | null;
+  category: 'kids8_11' | 'young11_14' | 'juniors' | 'adults' | 'masters' | null;
   /** Полное членство — сырые Category.Key из БД (включая кастомные, напр. result-maccabiah). */
   categories?: string[];
   status: 'live' | 'upcoming' | 'done';
@@ -78,8 +78,8 @@ export type CompetitionTileData = {
 
 /** Возрастная лента по канонической категории: только детские ступени. */
 const AGE_GROUP_BY_CATEGORY: Record<string, string> = {
-  young8_11: '8-11',
-  junior: '11-14',
+  kids8_11: '8-11',
+  young11_14: '11-14',
 };
 
 // Слово-маркер важнее даты: «Winter Championship» в апреле — всё-таки зимний чемпионат.

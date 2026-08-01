@@ -791,7 +791,10 @@ else
                 document.getElementById('event-name').classList.toggle('hidden', !multiDay);
 
                 try {
-                    const cats = await fetch('/api/categories', { credentials: 'same-origin' }).then(r => r.json());
+                    // cache: 'no-store' — иначе только что созданная категория не появится
+                    // здесь до истечения браузерного кэша вкладки (Cache-Control: public,
+                    // max-age=300 у /api/categories рассчитан на публичный сайт).
+                    const cats = await fetch('/api/categories', { credentials: 'same-origin', cache: 'no-store' }).then(r => r.json());
                     document.getElementById('preview-categories').innerHTML = cats.map(c =>
                         `<label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" value="${esc(c.key)}" class="disc-cat cursor-pointer"> ${esc(c.name)}</label>`
                     ).join('');

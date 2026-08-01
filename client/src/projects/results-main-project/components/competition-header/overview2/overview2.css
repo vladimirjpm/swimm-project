@@ -43,6 +43,12 @@
 }
 .ov2-tile:hover { background: var(--m-hover); }
 
+/* Плитка модуля, который на этом соревновании не разыгрывается (ненаградный протокол →
+   High Point). Оставляем видимой, но гасим и запрещаем клик: исчезнувшая плитка читается
+   как «не загрузилось», а погашенная — как «здесь этого нет». */
+.ov2-tile--disabled { opacity: .45; cursor: not-allowed; }
+.ov2-tile--disabled:hover { background: var(--m-surface); }
+
 .ov2-tile__bar { flex: none; width: 3px; height: 26px; border-radius: 2px; background: var(--m-solid); }
 .ov2-tile__medal {
   flex: none; width: 34px; height: 34px; border-radius: 50%;

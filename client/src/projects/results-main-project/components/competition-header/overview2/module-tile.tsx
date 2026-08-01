@@ -9,6 +9,11 @@ interface Props {
   module: ModuleKey;
   active: boolean;
   onSelect(module: ModuleKey): void;
+  /** Плитка видна, но не открывается (ненаградное соревнование → High Point не разыгрывается).
+   *  Не прячем совсем: пропавший модуль читается как «данные не загрузились». */
+  disabled?: boolean;
+  /** Причина недоступности — тултип и aria-description. */
+  disabledReason?: string;
   /** Содержимое медальона: число, возраст «8–11», эмодзи или инициалы лого. */
   medal: React.ReactNode;
   /** Медальон — лого клуба (полосатый плейсхолдер вместо чипа). */
@@ -19,14 +24,19 @@ interface Props {
   sub?: React.ReactNode;
 }
 
-export default function ModuleTile({ module, active, onSelect, medal, medalIsLogo, name, sub }: Props) {
+export default function ModuleTile({
+  module, active, onSelect, medal, medalIsLogo, name, sub, disabled, disabledReason,
+}: Props) {
   return (
     <button
       type="button"
       role="tab"
       aria-selected={active}
-      className={`ov2-module ov2-module--${module} ov2-tile`}
-      onClick={() => onSelect(module)}
+      aria-disabled={disabled || undefined}
+      disabled={disabled}
+      title={disabled ? disabledReason : undefined}
+      className={`ov2-module ov2-module--${module} ov2-tile${disabled ? ' ov2-tile--disabled' : ''}`}
+      onClick={() => { if (!disabled) onSelect(module); }}
     >
       <span className="ov2-tile__bar" />
       <span className={`ov2-tile__medal${medalIsLogo ? ' ov2-logo' : ''}`}>{medal}</span>
