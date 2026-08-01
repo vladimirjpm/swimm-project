@@ -20,7 +20,10 @@ Keep this file the single source of agent guidance; other agents are pointed her
   `Sys_UserMedia`, API, потоки Add link, публикации, footguns. Читай при багах медиа.
 - [`docs/competition-overview-cards.md`](docs/competition-overview-cards.md) — **карточки
   Overview соревнования**: что считает каждая (Top clubs, Best swim, Most decorated, High
-  Point…), правила медалей/очков и чек-лист «цифра выглядит неправильно».
+  Point…), правила медалей/очков и чек-лист «цифра выглядит неправильно». Там же —
+  **«Почему у одного соревнования ДВА набора мест»**: протокольные места официальные
+  (медали дают за каждый день), Combine All Results — сравнительный вид. Читай перед
+  любым расчётом мест, медалей или очков.
 
 This file covers only what those don't: how to build, run, migrate, and test **in practice here**,
 plus repo-specific footguns.
