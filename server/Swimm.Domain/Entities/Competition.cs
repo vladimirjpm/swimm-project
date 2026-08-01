@@ -86,9 +86,71 @@ public class Competition
   [ForeignKey(nameof(PointRuleClubsId))]
   public PointRuleClubs? PointRuleClubs { get; set; }
 
+  /// <summary>
+  /// Ручное переопределение роли соревнования в КЛУБНОМ ЗАЧЁТЕ сезона:
+  /// <c>winter</c> | <c>summer</c> | <c>openwater</c> | <c>none</c> (явно исключить).
+  /// null — обычный случай: роль выводится сама из <see cref="IsChampionship"/> +
+  /// <see cref="PoolType"/> (25m → зимний ❄, 50m → летний ☀).
+  ///
+  /// Правило проверено на всех 23 чемпионатах в БД (2026-08-01): 12 в 25м — январь/февраль,
+  /// 11 в 50м — июль/август, исключений нет. Поле заведено под будущие исключения — прежде
+  /// всего открытую воду, где бассейна нет вовсе. Подробности — docs/plans/club-page-model.md §2.1.
+  /// </summary>
+  [MaxLength(20)]
+  public string? StandingKindOverride { get; set; }
+
   /// <summary>Правило очков пловца (High Point). null — legacy-расчёт по FINA.</summary>
   public int? PointRuleSwimmersId { get; set; }
 
   [ForeignKey(nameof(PointRuleSwimmersId))]
   public PointRuleSwimmers? PointRuleSwimmers { get; set; }
+
+  // ── Ручная сверка очков (админская отметка, на публику не влияет) ──────────
+
+  /// <summary>
+  /// Когда админ вручную проверил КЛУБНЫЙ зачёт этого соревнования. null — не проверялся.
+  /// Отметка ставится на /Admin/PointsRules, нужна чтобы не перепроверять дважды и
+  /// на расчёт очков не влияет. Чем именно кончилась проверка — в
+  /// <see cref="ClubPointsVerifiedKind"/>.
+  /// </summary>
+  public DateTime? ClubPointsVerifiedAt { get; set; }
+
+  /// <summary>Кто поставил отметку клубного зачёта (логин админа).</summary>
+  [MaxLength(200)]
+  public string? ClubPointsVerifiedBy { get; set; }
+
+  /// <summary>Итог проверки клубного зачёта: см. <see cref="PointsVerifiedKinds"/>.
+  /// null — не проверялся.</summary>
+  [MaxLength(20)]
+  public string? ClubPointsVerifiedKind { get; set; }
+
+  /// <summary>Когда вручную проверен HIGH POINT этого соревнования. См. <see cref="ClubPointsVerifiedAt"/>.</summary>
+  public DateTime? SwimmersPointsVerifiedAt { get; set; }
+
+  /// <summary>Кто поставил отметку High Point (логин админа).</summary>
+  [MaxLength(200)]
+  public string? SwimmersPointsVerifiedBy { get; set; }
+
+  /// <summary>Итог проверки High Point: см. <see cref="PointsVerifiedKinds"/>. null — не проверялся.</summary>
+  [MaxLength(20)]
+  public string? SwimmersPointsVerifiedKind { get; set; }
+}
+
+/// <summary>
+/// Итог ручной проверки очков соревнования (<see cref="Competition.ClubPointsVerifiedKind"/>).
+/// Состояния взаимоисключающие: «сверено с официальным протоколом» и «официальных очков нет,
+/// принято как верное после проверки» — разные степени доверия к цифре.
+/// </summary>
+public static class PointsVerifiedKinds
+{
+    /// <summary>Сверено с официальным протоколом организатора — цифры совпали.</summary>
+    public const string Official = "official";
+
+    /// <summary>Официальных очков не публиковали; проверено вручную и принято как верное.</summary>
+    public const string Accepted = "accepted";
+
+    /// <summary>Официальные очки есть, но в них ошибка: сверено вручную, верны наши.</summary>
+    public const string Mismatch = "mismatch";
+
+    public static bool IsKnown(string? kind) => kind is Official or Accepted or Mismatch;
 }

@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Swimm.API.Http;
 using Swimm.Application.Abstractions;
 
@@ -21,15 +21,47 @@ namespace Swimm.API.Controllers;
 public class ClubsPublicController : ControllerBase
 {
     private readonly IClubPublicRepository _clubs;
+    private readonly IClubOverviewRepository _overview;
     private readonly ICacheService _cache;
 
     private const string CacheControlValue = "public, max-age=60";
+    private const int DefaultGridSeasons = 3;
+    private const int MaxGridSeasons = 20;
     private static readonly TimeSpan PayloadTtl = TimeSpan.FromMinutes(5);
 
-    public ClubsPublicController(IClubPublicRepository clubs, ICacheService cache)
+    public ClubsPublicController(
+        IClubPublicRepository clubs, IClubOverviewRepository overview, ICacheService cache)
     {
         _clubs = clubs;
+        _overview = overview;
         _cache = cache;
+    }
+
+    /// <summary>
+    /// Сборный ответ страницы клуба: Hero, фильтры, грид «сезон × группа», таблица зачёта,
+    /// история и топ пловцов. Ростер и рекорды — отдельными эндпоинтами ниже.
+    /// </summary>
+    [HttpGet("/api/clubs/{id:int}/overview")]
+    public async Task<IActionResult> GetOverview(
+        int id,
+        [FromQuery] int? season = null,
+        [FromQuery] string? group = null,
+        [FromQuery] int gridSeasons = DefaultGridSeasons,
+        [FromQuery(Name = "standing")] int? standingCompetitionId = null)
+    {
+        // Верхняя граница — не каприз: сезонов 20+ и число растёт, а грид при «все сезоны»
+        // отдаёт по строке на каждую зачётную группу каждого сезона.
+        if (gridSeasons < 1) gridSeasons = 1;
+        if (gridSeasons > MaxGridSeasons) gridSeasons = MaxGridSeasons;
+
+        var resolvedId = await _clubs.ResolveClubIdAsync(id);
+        if (resolvedId == null) return NotFound();
+
+        return await this.CachedJson(_cache,
+            $"http:clubs:{resolvedId}:overview:{season?.ToString() ?? "all"}:{group ?? "all"}:{gridSeasons}:{standingCompetitionId?.ToString() ?? "auto"}",
+            () => _overview.GetOverviewAsync(
+                resolvedId.Value, id, season, group, gridSeasons, standingCompetitionId),
+            PayloadTtl, CacheControlValue);
     }
 
     /// <summary>Ростер клуба: пагинация + фильтры пол/возраст/сезон.</summary>
