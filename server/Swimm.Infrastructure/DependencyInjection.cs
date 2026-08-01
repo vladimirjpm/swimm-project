@@ -62,6 +62,7 @@ public static class DependencyInjection
         services.AddScoped<IResultAdminRepository, ResultAdminRepository>();
         services.AddScoped<IResultTransferService, ResultTransferService>();
         services.AddScoped<IClubAdminRepository, ClubAdminRepository>();
+        services.AddScoped<IClubPublicRepository, ClubPublicRepository>();
         services.AddScoped<IUserFavoriteRepository, UserFavoriteRepository>();
         services.AddScoped<IUserMediaRepository, UserMediaRepository>();
         services.AddScoped<IMySwimsRepository, MySwimsRepository>();
