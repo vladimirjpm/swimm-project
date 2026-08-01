@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
@@ -28,6 +28,64 @@ public class ClubDedupServiceTests
             Swimmer = s, Competition = comp, Style = st, Distance = distance,
             Club = c, Gender = "male", CompetitionDate = new DateTime(2026, 6, 1)
         };
+
+    // ── Эвристика 0: одинаковое имя у разных Id ──────────────────────────────
+
+    [Fact]
+    public async Task SameNameHeuristic_PairsIdenticalNames_Sure()
+    {
+        // Реальный случай (2026-08-01): 65 групп, 68 дублей, 7793 результата — следы
+        // второго импорта, где тот же клуб завёлся заново уже с NameEn.
+        // До этой эвристики они не находились вовсе: суффикс требует хвоста, а
+        // левенштейн совпадающие имена явно пропускает.
+        await using var db = CreateDb(nameof(SameNameHeuristic_PairsIdenticalNames_Sure));
+        var big = new Club { Name = "הפועל דולפין נתניה" };
+        var small = new Club { Name = "הפועל דולפין נתניה", NameEn = "Hapoel Dolphin Netanya" };
+        var comp = NewCompetition();
+        var style = new Style { Name = "Freestyle" };
+        var s1 = new Swimmer { LastName = "A", FirstName = "A", BirthYear = 2010 };
+        var s2 = new Swimmer { LastName = "B", FirstName = "B", BirthYear = 2010 };
+        db.AddRange(big, small, comp, style, s1, s2);
+        db.Results.AddRange(
+            NewResult(s1, big, comp, style),
+            NewResult(s2, big, comp, style, "100"),
+            NewResult(s1, small, comp, style, "200"));
+        await db.SaveChangesAsync();
+
+        var report = await new ClubDedupService(db).FindCandidatesAsync();
+
+        var cand = Assert.Single(report.Candidates);
+        Assert.Equal("same-name", cand.Heuristic);
+        Assert.True(cand.Sure);
+        Assert.Equal(big.Id, cand.CanonicalId);      // канон — у кого больше результатов
+        Assert.Equal(small.Id, cand.DuplicateId);
+    }
+
+    [Fact]
+    public async Task SameNameHeuristic_ThreeIds_AllCollapseIntoOneCanonical()
+    {
+        // הפועל ירושלים живёт под ТРЕМЯ Id — все дубли должны уехать в один канон,
+        // иначе merge упадёт на «цепочке склеек».
+        await using var db = CreateDb(nameof(SameNameHeuristic_ThreeIds_AllCollapseIntoOneCanonical));
+        var a = new Club { Name = "הפועל ירושלים" };
+        var b = new Club { Name = "הפועל ירושלים" };
+        var c = new Club { Name = "הפועל ירושלים" };
+        var comp = NewCompetition();
+        var style = new Style { Name = "Freestyle" };
+        var sw = new Swimmer { LastName = "A", FirstName = "A", BirthYear = 2010 };
+        db.AddRange(a, b, c, comp, style, sw);
+        db.Results.AddRange(
+            NewResult(sw, a, comp, style),
+            NewResult(sw, a, comp, style, "100"),
+            NewResult(sw, b, comp, style, "200"));
+        await db.SaveChangesAsync();
+
+        var report = await new ClubDedupService(db).FindCandidatesAsync();
+
+        Assert.Equal(2, report.Candidates.Count);
+        Assert.All(report.Candidates, x => Assert.Equal(a.Id, x.CanonicalId));
+        Assert.Equal([b.Id, c.Id], report.Candidates.Select(x => x.DuplicateId).OrderBy(x => x));
+    }
 
     // ── Эвристика 1: мусорный суффикс ────────────────────────────────────────
 

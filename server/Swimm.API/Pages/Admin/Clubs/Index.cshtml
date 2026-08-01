@@ -1,4 +1,4 @@
-@page
+﻿@page
 @model Swimm.API.Pages.Admin.Clubs.IndexModel
 @{
     ViewData["Title"] = "Clubs";
@@ -6,7 +6,8 @@
 }
 
 <div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
-    Кандидаты ищутся по трём эвристикам: мусорный хвост парсера (<code>suffix</code>), общие
+    Кандидаты ищутся по четырём эвристикам: полностью совпадающее имя у разных Id
+    (<code>same-name</code>), мусорный хвост парсера (<code>suffix</code>), общие
     пловцы между клубами (<code>swimmers</code>), опечатка в названии (<code>levenshtein</code>).
     Отметь пары → <b>Dry-run</b> покажет план без изменений; <b>Merge выбранные</b> —
     необратимо: связи дубля перевешиваются на канонический клуб.
@@ -90,6 +91,7 @@
 
     function heuristicLabel(c) {
         switch (c.heuristic) {
+            case 'same-name': return 'Одинаковое имя';
             case 'suffix': return 'Мусорный хвост';
             case 'swimmers': return `Общие пловцы (${c.sharedSwimmers})`;
             case 'levenshtein': return 'Опечатка';
