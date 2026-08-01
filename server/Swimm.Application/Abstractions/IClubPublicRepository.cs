@@ -29,8 +29,29 @@ public interface IClubPublicRepository
         int resolvedClubId, int page, int pageSize, string? gender, int? ageFrom, int? ageTo, int? season);
 
     /// <summary>
-    /// Клубные рекорды: лучшее время по оси стиль×дистанция×бассейн×пол среди Results.ClubId
-    /// клуба. <paramref name="poolType"/> — "25m"/"50m" фильтр, null — обе оси бассейна.
+    /// Season best: заплывы пловцов клуба, которые в этом сезоне ЛУЧШИЕ ПО СТРАНЕ в своём
+    /// слоте (стиль × дистанция × бассейн × пол × возрастная ступень). Лидер считается по
+    /// ВСЕЙ базе, а не внутри клуба, — поэтому карточка отвечает «наши первые в Израиле»,
+    /// а не «наше лучшее».
+    ///
+    /// ⚠ «Первый в Израиле» = первый среди ИМПОРТИРОВАННОГО: в ответе есть
+    /// <c>Meets</c> — сколько соревнований вошло в расчёт, и UI обязан это показать.
+    ///
+    /// <paramref name="season"/> — год начала сезона (SeasonMath); null — ТЕКУЩИЙ сезон.
+    /// «За всё время» карточка не показывает сознательно. <paramref name="poolType"/> —
+    /// "25m"/"50m", null — оба.
+    ///
+    /// Официальный справочник рекордов — отдельно, см. <see cref="GetRecordWallAsync"/>.
     /// </summary>
-    Task<ClubRecordsDto> GetRecordsAsync(int resolvedClubId, string? poolType);
+    Task<ClubSeasonBestDto> GetSeasonBestAsync(int resolvedClubId, string? poolType, int? season);
+
+    /// <summary>
+    /// Стена официальных рекордов клуба: строки таблицы <c>Records</c> (нац./возрастные/
+    /// мастерс/мировые, импорт с isr.org.il и World Aquatics), числящиеся за этим клубом.
+    ///
+    /// ⚠ Связь только по НАЗВАНИЮ клуба (у Record нет ClubId/SwimmerId) — точное совпадение
+    /// или название + суффикс источника; учитываются и имена склеенных дублей.
+    /// <paramref name="poolType"/> — "25m"/"50m", null — оба.
+    /// </summary>
+    Task<ClubRecordWallDto> GetRecordWallAsync(int resolvedClubId, string? poolType);
 }

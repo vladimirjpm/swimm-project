@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ClubGroupTile, ClubSeasonOption } from '../../../hooks/useClubOverview';
+import { groupAgeRange } from './club-groups';
 
 /**
  * Глобальные фильтры страницы клуба: сезон и зачётная группа.
@@ -98,7 +99,7 @@ function GroupTile({
     >
       <div className="flex items-center gap-2">
         <span
-          className="flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-[14px] font-black"
           style={{ background: 'var(--deep-accent-chip)', color: 'var(--deep-accent)' }}
         >
           {tile.badge ?? tile.name.slice(0, 1)}
@@ -106,8 +107,14 @@ function GroupTile({
         <span className="text-[12.5px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
           {tile.name}
         </span>
+        {groupAgeRange(tile.name) && (
+          <span className="text-[11px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
+            {groupAgeRange(tile.name)}
+          </span>
+        )}
       </div>
-      <div className="mt-2 flex gap-3 text-[11px] font-bold">
+      {/* Ряд рангов выровнен по тексту, а не по медальону: отступ = ширина медальона (32) + gap (8). */}
+      <div className="mt-2 ml-10 flex gap-3 text-[11px] font-bold">
         <RankHint icon="❄" rank={tile.winter_rank} />
         <RankHint icon="☀" rank={tile.summer_rank} />
         <RankHint icon="🌊" rank={tile.open_water_rank} />

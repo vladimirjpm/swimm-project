@@ -49,6 +49,12 @@ public class ClubPublicRepository : IClubPublicRepository
         // либо из текущего календарного сезона (SeasonMath).
         var seasonYear = season ?? SeasonMath.CurrentStartYear();
 
+        // ⚠ Возраст в сезоне = сколько исполняется в году ОКОНЧАНИЯ сезона
+        // (SeasonMath.AgeInSeason): сезон 2025/26 → возраст по 2026 году. Здесь считается
+        // тот же год явно, потому что фильтр по возрасту должен переводиться в SQL —
+        // границы возраста разворачиваются в границы BirthYear (ниже).
+        var ageYear = seasonYear + 1;
+
         var query = _read.Swimmers.AsNoTracking().Where(s => s.ClubId == resolvedClubId);
 
         if (!string.IsNullOrWhiteSpace(gender))
@@ -64,10 +70,10 @@ public class ClubPublicRepository : IClubPublicRepository
             query = query.Where(s => s.Gender == word || s.Gender == letter);
         }
 
-        // age = seasonYear - BirthYear ⇒ границы возраста переводим в границы BirthYear,
+        // age = ageYear - BirthYear ⇒ границы возраста переводим в границы BirthYear,
         // чтобы фильтр остался переводимым в SQL (без клиентской пост-фильтрации).
-        if (ageFrom.HasValue) query = query.Where(s => s.BirthYear <= seasonYear - ageFrom.Value);
-        if (ageTo.HasValue) query = query.Where(s => s.BirthYear >= seasonYear - ageTo.Value);
+        if (ageFrom.HasValue) query = query.Where(s => s.BirthYear <= ageYear - ageFrom.Value);
+        if (ageTo.HasValue) query = query.Where(s => s.BirthYear >= ageYear - ageTo.Value);
 
         var total = await query.CountAsync();
 
@@ -134,7 +140,7 @@ public class ClubPublicRepository : IClubPublicRepository
                 BirthYear = s.BirthYear,
                 // Год рождения бывает не заполнен (BirthYear = 0) — тогда возраста нет,
                 // иначе получалось «age 2025» (сезон минус ноль).
-                Age = s.BirthYear > 0 ? seasonYear - s.BirthYear : null,
+                Age = SeasonMath.AgeInSeason(seasonYear, s.BirthYear),
                 Gender = s.Gender == "F" ? "female" : s.Gender == "M" ? "male" : s.Gender,
                 Competitions = c.Competitions,
                 Swims = c.Swims
@@ -151,55 +157,220 @@ public class ClubPublicRepository : IClubPublicRepository
         };
     }
 
-    public async Task<ClubRecordsDto> GetRecordsAsync(int resolvedClubId, string? poolType)
+    public async Task<ClubSeasonBestDto> GetSeasonBestAsync(int resolvedClubId, string? poolType, int? season)
     {
-        // Ось и группировка скопированы с «рекордов группы» (HubGroupPublicRepository,
-        // FillAggregatesAsync) — фаза 8.3. Отличия: фильтр по ClubId вместо списка пловцов,
-        // плюс исключение SuspectReason (помеченные ошибки протокола не должны становиться
-        // «рекордом клуба» — у групп этого фильтра нет, это их долг, но здесь делаем сразу верно).
+        // Карточка всегда про ОДИН сезон (решение Влада 2026-08-01): «Season 2025/26 Best».
+        // Глобальный фильтр сезона страницы она не слушает — иначе при «all seasons»
+        // название врало бы, а плитка возраста теряла бы смысл (в 2019-м пловцу было 8,
+        // сейчас 15 — «лучшее в 10 лет за всю историю» это уже рекорд клуба, не сезон).
+        var seasonYear = season ?? SeasonMath.CurrentStartYear();
+        var range = SeasonMath.RangeOf(seasonYear);
+
+        // ⚠ Выборка НЕ по клубу: лидер сезона определяется по ВСЕЙ базе, и только потом
+        // остаются слоты, где первый — пловец этого клуба (решение Влада 2026-08-01).
+        // Исключение SuspectReason обязательно: помеченная ошибка протокола не должна
+        // делать клуб «первым в стране».
         var query = _read.Results.AsNoTracking()
-            .Where(r => r.ClubId == resolvedClubId
-                        && r.TimeMillisecond != null
+            .Where(r => r.TimeMillisecond != null
                         && !r.TimeFail
                         && r.RelayId == null
-                        && r.SuspectReason == null);
+                        && r.SuspectReason == null
+                        && r.CompetitionDate >= range.Start
+                        && r.CompetitionDate < range.EndExclusive);
 
-        // ⚠ 25m и 50m — разные рекорды: PoolType всегда часть ключа группировки (ниже),
+        // ⚠ 25m и 50m — разные времена: PoolType всегда часть ключа секции,
         // фильтр тут лишь сужает выборку под конкретный бассейн.
         if (!string.IsNullOrWhiteSpace(poolType))
             query = query.Where(r => r.Competition.PoolType == poolType);
 
-        var bests = await query
-            .GroupBy(r => new { StyleName = r.Style.Name, r.Distance, r.Competition.PoolType, r.Gender })
-            .Select(g => g
-                // При равенстве времени — более ранний заплыв.
-                .OrderBy(r => r.TimeMillisecond)
-                .ThenBy(r => r.CompetitionDate)
-                .Select(r => new ClubBestDto
-                {
-                    StyleName = g.Key.StyleName,
-                    Distance = g.Key.Distance,
-                    PoolType = g.Key.PoolType,
-                    Gender = g.Key.Gender,
-                    TimeOriginal = r.TimeOriginal,
-                    TimeMs = r.TimeMillisecond,
-                    SwimmerId = r.SwimmerId,
-                    SwimmerName = (r.Swimmer.LastName + " " + r.Swimmer.FirstName).Trim(),
-                    SwimmerNameEn = (r.Swimmer.LastNameEn + " " + r.Swimmer.FirstNameEn).Trim(),
-                    CompetitionName = r.Competition.Name,
-                    Date = r.Competition.Date,
-                    Points = r.InternationalPoints
-                })
-                .First())
+        // Возраст нужен на строку, поэтому лидеров считаем в памяти: за сезон это ~16 тысяч
+        // заплывов по всем клубам — приемлемо, ответ кэшируется.
+        var rows = await query
+            .Select(r => new
+            {
+                StyleName = r.Style.Name,
+                r.Distance,
+                r.Competition.PoolType,
+                r.Gender,
+                r.TimeOriginal,
+                r.TimeMillisecond,
+                r.SwimmerId,
+                r.ClubId,
+                SwimmerName = (r.Swimmer.LastName + " " + r.Swimmer.FirstName).Trim(),
+                SwimmerNameEn = (r.Swimmer.LastNameEn + " " + r.Swimmer.FirstNameEn).Trim(),
+                CompetitionName = r.Competition.Name,
+                Date = r.Competition.Date,
+                r.CompetitionDate,
+                r.InternationalPoints,
+                r.Swimmer.BirthYear
+            })
             .ToListAsync();
 
-        var ordered = bests
-            .OrderBy(b => b.StyleName)
-            .ThenBy(b => b.Distance.Length)
-            .ThenBy(b => b.Distance)
-            .ThenBy(b => b.Gender)
+        // Сколько соревнований вошло в расчёт — эту цифру карточка обязана показать:
+        // «первый в Израиле» у нас значит «первый среди того, что импортировано», а
+        // юниорских и взрослых чемпионатов в базе может не быть вовсе.
+        var meets = rows.Select(r => r.CompetitionName + "|" + r.Date).Distinct().Count();
+
+        // Слот = дисциплина × возрастная ступень. В каждом слоте оставляем ОДНОГО лидера
+        // страны; при равенстве времени — более ранний заплыв.
+        // Возраст берётся ПО СЕЗОНУ (SeasonMath.AgeInSeason), а не по дате заплыва.
+        var leaders = rows
+            .Select(r => new { Row = r, Age = AgeBucket(SeasonMath.AgeInSeason(seasonYear, r.BirthYear)) })
+            .GroupBy(x => new
+            {
+                x.Row.StyleName, x.Row.Distance, x.Row.PoolType, x.Row.Gender, AgeKey = x.Age.Key
+            })
+            .Select(g => g
+                .OrderBy(x => x.Row.TimeMillisecond)
+                .ThenBy(x => x.Row.CompetitionDate)
+                .First())
+            // …и только те слоты, где лидер — пловец этого клуба.
+            .Where(x => x.Row.ClubId == resolvedClubId)
             .ToList();
 
-        return new ClubRecordsDto { Data = ordered };
+        var groups = leaders
+            .GroupBy(x => new { x.Row.StyleName, x.Row.Distance, x.Row.PoolType, x.Row.Gender })
+            .Select(g => new ClubSeasonBestGroupDto
+            {
+                StyleName = g.Key.StyleName,
+                Distance = g.Key.Distance,
+                PoolType = g.Key.PoolType,
+                Gender = g.Key.Gender,
+                // Слот уже единственный на ступень — лидер отобран выше.
+                Items = g
+                    .Select(x => new ClubBestDto
+                    {
+                        StyleName = g.Key.StyleName,
+                        Distance = g.Key.Distance,
+                        PoolType = g.Key.PoolType,
+                        Gender = g.Key.Gender,
+                        TimeOriginal = x.Row.TimeOriginal,
+                        TimeMs = x.Row.TimeMillisecond,
+                        SwimmerId = x.Row.SwimmerId,
+                        SwimmerName = x.Row.SwimmerName,
+                        SwimmerNameEn = x.Row.SwimmerNameEn,
+                        CompetitionName = x.Row.CompetitionName,
+                        Date = x.Row.Date,
+                        Points = x.Row.InternationalPoints,
+                        AgeKey = x.Age.Key,
+                        AgeLabel = x.Age.Label,
+                        AgeOrder = x.Age.Order
+                    })
+                    .OrderBy(b => b.AgeOrder)
+                    .ToList()
+            })
+            .OrderBy(g => g.StyleName)
+            .ThenBy(g => g.Distance.Length)
+            .ThenBy(g => g.Distance)
+            .ThenBy(g => g.PoolType)
+            .ThenBy(g => g.Gender)
+            .ToList();
+
+        return new ClubSeasonBestDto
+        {
+            Season = seasonYear,
+            SeasonLabel = SeasonMath.Label(seasonYear),
+            Total = groups.Sum(g => g.Items.Count),
+            Meets = meets,
+            Data = groups
+        };
+    }
+
+    /// <summary>
+    /// Возрастная ступень — по устройству таблиц федерации: до 18 включительно каждый год
+    /// отдельно, 19–24 «adults», 25+ мастерс пятилетками (25-29, 30-34, …).
+    ///
+    /// На вход идёт возраст В СЕЗОНЕ (<see cref="SeasonMath.AgeInSeason"/>), одинаковый для
+    /// всех стартов сезона, а не возраст на день заплыва. null — год рождения не заполнен;
+    /// такие заплывы уходят в ступень «n/a» и стоят последними, а не выкидываются: иначе
+    /// лучшее время могло бы молча исчезнуть из карточки.
+    /// </summary>
+    private static (string Key, string Label, int Order) AgeBucket(int? seasonAge)
+    {
+        if (seasonAge is not int age) return ("n/a", "age n/a", 999);
+
+        if (age <= 18) return (age.ToString(), $"age {age}", age);
+        if (age <= 24) return ("adults", "adults", 100);
+
+        var from = (age - 25) / 5 * 5 + 25;
+        return ($"{from}-{from + 4}", $"masters {from}-{from + 4}", 100 + from);
+    }
+
+    /// <summary>Порядок категорий в стене: сперва абсолютные, потом возрастные, потом мастерс.</summary>
+    private static int CategoryOrder(string category) => category switch
+    {
+        "open" => 0,
+        "age" => 1,
+        "junior" => 2,
+        "masters" => 3,
+        _ => 4
+    };
+
+    public async Task<ClubRecordWallDto> GetRecordWallAsync(int resolvedClubId, string? poolType)
+    {
+        // Имена, под которыми клуб мог попасть в справочник рекордов: своё + названия всех
+        // склеенных в него дублей (merge физически переносит результаты, но СТРОКИ в Records
+        // остаются с историческим написанием).
+        var nameRows = await _read.Clubs.AsNoTracking()
+            .Where(c => c.Id == resolvedClubId || c.MergedIntoId == resolvedClubId)
+            .Select(c => new { c.Name, c.NameEn })
+            .ToListAsync();
+
+        var names = nameRows
+            .SelectMany(c => new[] { c.Name, c.NameEn })
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (names.Count == 0)
+            return new ClubRecordWallDto();
+
+        // ⚠ Связь рекорда с клубом — ТОЛЬКО по названию: у Record нет ни ClubId, ни SwimmerId
+        // (см. Record.cs, «3 оси»). Точное совпадение + вариант с суффиксом («… לאומית»,
+        // «… אולימפית» — в источнике к названию клуба дописывают площадку/статус старта).
+        // Префикс безопаснее «содержит»: «הפועל דולפין נתניה» не подтянет нахарийский
+        // «הפועל דולפין נהריה», а вот подстрока подтянула бы чужие клубы с этим же словом.
+        //
+        // Фильтрация в памяти сознательно: строк в Records ~1.9к на всю базу, а перевести
+        // «любое из N названий как префикс» в SQL без склейки OR-ов нельзя. Ответ кэшируется.
+        var candidates = await _read.Records.AsNoTracking()
+            .Where(r => r.Club != null && r.Club != "")
+            .Select(r => new
+            {
+                r.RegionType, r.RegionCode, r.Category, r.AgeKey, r.Gender,
+                r.PoolType, r.Style, r.Distance, r.Time, r.HolderName, r.Club, r.RecordDate
+            })
+            .ToListAsync();
+
+        var matched = candidates
+            .Where(r => string.IsNullOrWhiteSpace(poolType) || r.PoolType == poolType)
+            .Where(r => names.Any(n =>
+                string.Equals(r.Club, n, StringComparison.OrdinalIgnoreCase) ||
+                r.Club!.StartsWith(n + " ", StringComparison.OrdinalIgnoreCase)))
+            .Select(r => new ClubOfficialRecordDto
+            {
+                RegionType = r.RegionType,
+                RegionCode = r.RegionCode,
+                Category = r.Category,
+                AgeKey = r.AgeKey,
+                Gender = r.Gender,
+                PoolType = r.PoolType,
+                Style = r.Style,
+                Distance = r.Distance,
+                Time = r.Time,
+                HolderName = r.HolderName ?? "",
+                Club = r.Club!,
+                RecordDate = r.RecordDate ?? ""
+            })
+            .OrderBy(r => CategoryOrder(r.Category))
+            .ThenBy(r => r.AgeKey.Length)
+            .ThenBy(r => r.AgeKey)
+            .ThenBy(r => r.Style)
+            .ThenBy(r => r.Distance.Length)
+            .ThenBy(r => r.Distance)
+            .ThenBy(r => r.Gender)
+            .ToList();
+
+        return new ClubRecordWallDto { MatchedNames = names, Data = matched };
     }
 }

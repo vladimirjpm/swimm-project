@@ -1,5 +1,6 @@
 ﻿import React from 'react';
 import type { ClubGridCell, ClubGridYear } from '../../../hooks/useClubOverview';
+import { groupAgeRange } from './club-groups';
 
 /**
  * ⭐ Season × Group grid — главная карточка страницы клуба.
@@ -61,18 +62,26 @@ function ClubGrid({ grid, currentSeason, onPickStanding, selectedCompetitionId }
                 </div>
               ) : (
                 year.rows.map((row) => (
-                  <div key={row.group_key} className="flex items-start gap-3">
+                  // Медальон и подпись центрируются по всей высоте строки (линий зачётов
+                  // может быть от одной до трёх), а не липнут к её верху.
+                  <div key={row.group_key} className="flex items-center gap-3">
                     <span
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-black"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[14px] font-black"
                       style={{ background: 'var(--deep-accent-chip)', color: 'var(--deep-accent)' }}
                     >
                       {row.badge ?? row.group_name.slice(0, 1)}
                     </span>
+                    {/* Ширина больше прежней (68/92): в подпись входит и возрастная лента. */}
                     <span
-                      className="w-[68px] shrink-0 truncate pt-0.5 text-[12px] font-extrabold sm:w-[92px]"
+                      className="w-[86px] shrink-0 truncate text-[12px] font-extrabold sm:w-[112px]"
                       style={{ color: 'var(--deep-text-mute)' }}
                     >
                       {row.group_name}
+                      {groupAgeRange(row.group_name) && (
+                        <span className="ml-1.5" style={{ color: 'var(--deep-text-faint)' }}>
+                          {groupAgeRange(row.group_name)}
+                        </span>
+                      )}
                     </span>
 
                     {/* Линии чемпионатов — ОДНА ПОД ДРУГОЙ (CARDS.md §3: «[сегменты][❄ #3] /

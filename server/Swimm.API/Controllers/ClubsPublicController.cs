@@ -91,9 +91,14 @@ public class ClubsPublicController : ControllerBase
             PayloadTtl, CacheControlValue);
     }
 
-    /// <summary>Клубные рекорды: ось стиль×дистанция×бассейн×пол. pool — опциональный фильтр 25m/50m.</summary>
-    [HttpGet("/api/clubs/{id:int}/records")]
-    public async Task<IActionResult> GetRecords(int id, [FromQuery] string? pool = null)
+    /// <summary>
+    /// Season best: лучшие времена клуба за ОДИН сезон, разложенные по возрастным ступеням
+    /// внутри дисциплины (по нашим протоколам). pool — фильтр 25m/50m, season — год начала
+    /// сезона; без него берётся ТЕКУЩИЙ сезон (карточка сознательно не умеет «за всё время»).
+    /// </summary>
+    [HttpGet("/api/clubs/{id:int}/season-best")]
+    public async Task<IActionResult> GetSeasonBest(
+        int id, [FromQuery] string? pool = null, [FromQuery] int? season = null)
     {
         if (pool != null && pool != "25m" && pool != "50m")
             return BadRequest("pool must be '25m' or '50m'");
@@ -102,8 +107,27 @@ public class ClubsPublicController : ControllerBase
         if (resolvedId == null) return NotFound();
 
         return await this.CachedJson(_cache,
-            $"http:clubs:{resolvedId}:records:{pool ?? "all"}",
-            () => _clubs.GetRecordsAsync(resolvedId.Value, pool),
+            $"http:clubs:{resolvedId}:season-best:{pool ?? "all"}:{season?.ToString() ?? "cur"}",
+            () => _clubs.GetSeasonBestAsync(resolvedId.Value, pool, season),
+            PayloadTtl, CacheControlValue);
+    }
+
+    /// <summary>
+    /// Стена официальных рекордов клуба (таблица Records: нац./возрастные/мастерс/мировые).
+    /// Сезона тут нет сознательно: рекорд действует, пока его не побили, а не «в сезоне».
+    /// </summary>
+    [HttpGet("/api/clubs/{id:int}/record-wall")]
+    public async Task<IActionResult> GetRecordWall(int id, [FromQuery] string? pool = null)
+    {
+        if (pool != null && pool != "25m" && pool != "50m")
+            return BadRequest("pool must be '25m' or '50m'");
+
+        var resolvedId = await _clubs.ResolveClubIdAsync(id);
+        if (resolvedId == null) return NotFound();
+
+        return await this.CachedJson(_cache,
+            $"http:clubs:{resolvedId}:record-wall:{pool ?? "all"}",
+            () => _clubs.GetRecordWallAsync(resolvedId.Value, pool),
             PayloadTtl, CacheControlValue);
     }
 }

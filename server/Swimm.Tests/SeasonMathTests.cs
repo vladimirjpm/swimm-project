@@ -1,4 +1,4 @@
-using Swimm.Domain;
+﻿using Swimm.Domain;
 using Xunit;
 
 namespace Swimm.Tests;
@@ -59,5 +59,25 @@ public class SeasonMathTests
         Assert.True(SeasonMath.IsInSeason(new DateTime(2026, 8, 31), 2025));
         Assert.False(SeasonMath.IsInSeason(new DateTime(2026, 9, 1), 2025));
         Assert.False(SeasonMath.IsInSeason(new DateTime(2025, 8, 31), 2025));
+    }
+
+    [Fact]
+    public void AgeInSeason_CountsByEndYear_SoAutumnAndSpringMatch()
+    {
+        // Правило Влада 2026-08-01: возраст в сезоне = сколько исполняется в году ОКОНЧАНИЯ
+        // сезона. Пловец 2017 г.р. в сезоне 2025/26 — «9 лет» и на декабрьском старте 2025,
+        // и на февральском 2026. Считать по году заплыва нельзя: старты одного человека
+        // разъехались бы по ступеням 8 и 9.
+        Assert.Equal(9, SeasonMath.AgeInSeason(2025, 2017));
+        Assert.Equal(10, SeasonMath.AgeInSeason(2025, 2016));
+        Assert.Equal(9, SeasonMath.AgeInSeason(2024, 2016));
+    }
+
+    [Fact]
+    public void AgeInSeason_NullWhenBirthYearMissingOrAbsurd()
+    {
+        // BirthYear = 0 в базе есть; без этой проверки получалось «age 2026».
+        Assert.Null(SeasonMath.AgeInSeason(2025, 0));
+        Assert.Null(SeasonMath.AgeInSeason(2025, 2030));
     }
 }

@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
@@ -128,15 +128,17 @@ public class ClubPublicRepositoryTests
         using var db = CreateDb(nameof(Roster_FiltersByAge_UsingGivenSeason));
         var club = new Club { Name = "Alpha", NameEn = "Alpha" };
         db.Add(club);
-        db.Add(MakeSwimmer(club, "Young", "One", 2015)); // возраст в сезоне 2025 = 10
-        db.Add(MakeSwimmer(club, "Old", "One", 2010));   // возраст в сезоне 2025 = 15
+        // Возраст в сезоне = год ОКОНЧАНИЯ сезона минус год рождения (SeasonMath.AgeInSeason):
+        // сезон 2025/26 считается по 2026 году.
+        db.Add(MakeSwimmer(club, "Young", "One", 2015)); // возраст в сезоне 2025/26 = 11
+        db.Add(MakeSwimmer(club, "Old", "One", 2010));   // возраст в сезоне 2025/26 = 16
         await db.SaveChangesAsync();
 
-        var result = await Repo(db).GetRosterAsync(club.Id, 1, 50, gender: null, ageFrom: 10, ageTo: 10, season: 2025);
+        var result = await Repo(db).GetRosterAsync(club.Id, 1, 50, gender: null, ageFrom: 11, ageTo: 11, season: 2025);
 
         var row = Assert.Single(result.Data);
         Assert.Equal("Young", row.LastNameEn);
-        Assert.Equal(10, row.Age);
+        Assert.Equal(11, row.Age);
     }
 
     [Fact]
@@ -148,10 +150,11 @@ public class ClubPublicRepositoryTests
         db.Add(MakeSwimmer(club, "Swimmer", "One", 2000));
         await db.SaveChangesAsync();
 
-        // season=2020 передан явно — возраст обязан считаться от него, а не от сегодняшней даты.
+        // season=2020 передан явно — возраст обязан считаться от него, а не от сегодняшней
+        // даты. Сезон 2020/21 → возраст по 2021 году: 2021 - 2000 = 21.
         var result = await Repo(db).GetRosterAsync(club.Id, 1, 50, gender: null, ageFrom: null, ageTo: null, season: 2020);
 
-        Assert.Equal(20, Assert.Single(result.Data).Age);
+        Assert.Equal(21, Assert.Single(result.Data).Age);
     }
 
     [Fact]
@@ -208,12 +211,96 @@ public class ClubPublicRepositoryTests
         Assert.Equal(1, row.Swims);
     }
 
-    /* ─────────────────────────── Рекорды ─────────────────────────── */
+    /* ────────── Season best: «наши первые в Израиле» за сезон ────────── */
 
     [Fact]
-    public async Task Records_25mAnd50m_AreDifferentRows()
+    public async Task SeasonBest_KeepsOnlySlotsWhereClubSwimmerLeadsTheCountry()
     {
-        using var db = CreateDb(nameof(Records_25mAnd50m_AreDifferentRows));
+        using var db = CreateDb(nameof(SeasonBest_KeepsOnlySlotsWhereClubSwimmerLeadsTheCountry));
+        var ours = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var rival = new Club { Name = "Beta", NameEn = "Beta" };
+        var ourKid = MakeSwimmer(ours, "Ours", "One", 2016);      // 10 лет в 2026
+        var rivalKid = MakeSwimmer(rival, "Rival", "One", 2016);  // тот же возраст
+        db.AddRange(ours, rival, ourKid, rivalKid);
+        var comp = MakeCompetition("25m");
+        db.AddRange(comp, FreestyleStyle());
+        await db.SaveChangesAsync();
+
+        // Слот один (25м, freestyle, 100, male, age 10) — и в нём быстрее чужой пловец.
+        db.AddRange(
+            Swim(comp, rival, rivalKid, new DateTime(2026, 2, 15), timeMs: 55_000),
+            Swim(comp, ours, ourKid, new DateTime(2026, 2, 15), timeMs: 60_000));
+        await db.SaveChangesAsync();
+
+        var result = await Repo(db).GetSeasonBestAsync(ours.Id, poolType: null, season: 2025);
+
+        // Наше время лучшее в клубе, но НЕ лучшее в стране — карточка молчит.
+        Assert.Empty(result.Data);
+        Assert.Equal(0, result.Total);
+
+        // У соперника тот же слот — лидерский, значит его карточка его покажет.
+        var rivalCard = await Repo(db).GetSeasonBestAsync(rival.Id, poolType: null, season: 2025);
+        Assert.Equal(55_000, Assert.Single(Assert.Single(rivalCard.Data).Items).TimeMs);
+    }
+
+    [Fact]
+    public async Task SeasonBest_AgeStepsAreSeparateSlots_SoAKidLeadsEvenIfAdultIsFaster()
+    {
+        using var db = CreateDb(nameof(SeasonBest_AgeStepsAreSeparateSlots_SoAKidLeadsEvenIfAdultIsFaster));
+        var ours = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var rival = new Club { Name = "Beta", NameEn = "Beta" };
+        var ourKid = MakeSwimmer(ours, "Kid", "One", 2016);        // 10 лет
+        var rivalAdult = MakeSwimmer(rival, "Adult", "One", 2003); // 23 года, быстрее всех
+        db.AddRange(ours, rival, ourKid, rivalAdult);
+        var comp = MakeCompetition("25m");
+        db.AddRange(comp, FreestyleStyle());
+        await db.SaveChangesAsync();
+
+        db.AddRange(
+            Swim(comp, rival, rivalAdult, new DateTime(2026, 2, 15), timeMs: 37_260),
+            Swim(comp, ours, ourKid, new DateTime(2026, 2, 15), timeMs: 60_000));
+        await db.SaveChangesAsync();
+
+        var result = await Repo(db).GetSeasonBestAsync(ours.Id, poolType: null, season: 2025);
+
+        // Возраст — часть слота, поэтому взрослый чужого клуба ребёнка не перекрывает.
+        var tile = Assert.Single(Assert.Single(result.Data).Items);
+        Assert.Equal("10", tile.AgeKey);
+        Assert.Equal("age 10", tile.AgeLabel);
+        Assert.Equal(60_000, tile.TimeMs);
+    }
+
+    [Fact]
+    public async Task SeasonBest_AgeIsTakenFromSeason_NotFromSwimDate()
+    {
+        using var db = CreateDb(nameof(SeasonBest_AgeIsTakenFromSeason_NotFromSwimDate));
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        // 2017 г.р.: в 2026 исполняется 9 ⇒ в сезоне 2025/26 он «age 9» на ЛЮБОМ старте,
+        // включая декабрьский 2025 (правило Влада 2026-08-01). По дате заплыва вышло бы 8.
+        var swimmer = MakeSwimmer(club, "Swimmer", "One", 2017);
+        db.AddRange(club, swimmer);
+        var december = MakeCompetition("25m", date: "10/12/2025");
+        var february = MakeCompetition("25m", date: "15/02/2026");
+        db.AddRange(december, february, FreestyleStyle());
+        await db.SaveChangesAsync();
+
+        db.AddRange(
+            Swim(december, club, swimmer, new DateTime(2025, 12, 10), timeMs: 60_000),
+            Swim(february, club, swimmer, new DateTime(2026, 2, 15), timeMs: 58_000));
+        await db.SaveChangesAsync();
+
+        var section = Assert.Single((await Repo(db).GetSeasonBestAsync(club.Id, null, 2025)).Data);
+
+        // Оба старта в одной ступени, поэтому плитка одна — с лучшим из двух времён.
+        var tile = Assert.Single(section.Items);
+        Assert.Equal("9", tile.AgeKey);
+        Assert.Equal(58_000, tile.TimeMs);
+    }
+
+    [Fact]
+    public async Task SeasonBest_25mAnd50m_AreSeparateSlots()
+    {
+        using var db = CreateDb(nameof(SeasonBest_25mAnd50m_AreSeparateSlots));
         var club = new Club { Name = "Alpha", NameEn = "Alpha" };
         var swimmer = MakeSwimmer(club, "Swimmer", "One", 2010);
         db.AddRange(club, swimmer);
@@ -227,21 +314,52 @@ public class ClubPublicRepositoryTests
             Swim(comp50, club, swimmer, new DateTime(2026, 2, 15), timeMs: 58_000));
         await db.SaveChangesAsync();
 
-        var both = await Repo(db).GetRecordsAsync(club.Id, poolType: null);
+        var both = await Repo(db).GetSeasonBestAsync(club.Id, poolType: null, season: 2025);
         Assert.Equal(2, both.Data.Count);
-        Assert.Contains(both.Data, r => r.PoolType == "25m" && r.TimeMs == 55_000);
-        Assert.Contains(both.Data, r => r.PoolType == "50m" && r.TimeMs == 58_000);
+        Assert.Contains(both.Data, g => g.PoolType == "25m" && g.Items[0].TimeMs == 55_000);
+        Assert.Contains(both.Data, g => g.PoolType == "50m" && g.Items[0].TimeMs == 58_000);
 
-        var only25 = await Repo(db).GetRecordsAsync(club.Id, poolType: "25m");
-        var row = Assert.Single(only25.Data);
-        Assert.Equal("25m", row.PoolType);
-        Assert.Equal(55_000, row.TimeMs);
+        var only25 = await Repo(db).GetSeasonBestAsync(club.Id, poolType: "25m", season: 2025);
+        var section = Assert.Single(only25.Data);
+        Assert.Equal("25m", section.PoolType);
+        Assert.Equal(55_000, Assert.Single(section.Items).TimeMs);
     }
 
     [Fact]
-    public async Task Records_ExcludeTimeFail_Relays_And_SuspectReason()
+    public async Task SeasonBest_MastersInFiveYearBands_UnknownBirthYearLast()
     {
-        using var db = CreateDb(nameof(Records_ExcludeTimeFail_Relays_And_SuspectReason));
+        using var db = CreateDb(nameof(SeasonBest_MastersInFiveYearBands_UnknownBirthYearLast));
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var m45 = MakeSwimmer(club, "Masters", "One", 1981);   // 45 лет в 2026
+        var m47 = MakeSwimmer(club, "Masters", "Two", 1979);   // 47 — та же пятилетка
+        var m52 = MakeSwimmer(club, "Masters", "Three", 1974); // 52 — следующая
+        var unknown = MakeSwimmer(club, "NoYear", "One", 0);   // год рождения не заполнен
+        db.AddRange(club, m45, m47, m52, unknown);
+        var comp = MakeCompetition("25m");
+        db.AddRange(comp, FreestyleStyle());
+        await db.SaveChangesAsync();
+
+        db.AddRange(
+            Swim(comp, club, m45, new DateTime(2026, 2, 15), timeMs: 40_000),
+            Swim(comp, club, m47, new DateTime(2026, 2, 15), timeMs: 39_000),
+            Swim(comp, club, m52, new DateTime(2026, 2, 15), timeMs: 41_000),
+            Swim(comp, club, unknown, new DateTime(2026, 2, 15), timeMs: 42_000));
+        await db.SaveChangesAsync();
+
+        var section = Assert.Single((await Repo(db).GetSeasonBestAsync(club.Id, null, 2025)).Data);
+
+        var band45 = section.Items.Single(i => i.AgeKey == "45-49");
+        Assert.Equal(39_000, band45.TimeMs); // 45 и 47 в одной пятилетке — берём быстрейшего
+        Assert.Equal("masters 45-49", band45.AgeLabel);
+        Assert.Contains(section.Items, i => i.AgeKey == "50-54");
+        // Без года рождения заплыв не выбрасывается, а уходит в конец ступенью «n/a».
+        Assert.Equal("n/a", section.Items[^1].AgeKey);
+    }
+
+    [Fact]
+    public async Task SeasonBest_ExcludeTimeFail_Relays_And_SuspectReason()
+    {
+        using var db = CreateDb(nameof(SeasonBest_ExcludeTimeFail_Relays_And_SuspectReason));
         var club = new Club { Name = "Alpha", NameEn = "Alpha" };
         var swimmerFail = MakeSwimmer(club, "Fail", "One", 2010);
         var swimmerRelay = MakeSwimmer(club, "Relay", "One", 2010);
@@ -254,7 +372,7 @@ public class ClubPublicRepositoryTests
         await db.SaveChangesAsync();
 
         // Три «испорченных» строки нарочно БЫСТРЕЕ валидной — если фильтр не сработает,
-        // рекордом станет одна из них, а не единственная валидная запись.
+        // лидером страны станет одна из них (все пловцы одного возраста, слот общий).
         db.AddRange(
             Swim(comp, club, swimmerFail, new DateTime(2026, 2, 15), timeMs: 50_000, timeFail: true),
             Swim(comp, club, swimmerRelay, new DateTime(2026, 2, 15), timeMs: 51_000, relayId: relay.Id),
@@ -262,17 +380,17 @@ public class ClubPublicRepositoryTests
             Swim(comp, club, swimmerValid, new DateTime(2026, 2, 15), timeMs: 60_000));
         await db.SaveChangesAsync();
 
-        var result = await Repo(db).GetRecordsAsync(club.Id, poolType: null);
+        var section = Assert.Single((await Repo(db).GetSeasonBestAsync(club.Id, null, 2025)).Data);
 
-        var row = Assert.Single(result.Data);
+        var row = Assert.Single(section.Items);
         Assert.Equal(swimmerValid.Id, row.SwimmerId);
         Assert.Equal(60_000, row.TimeMs);
     }
 
     [Fact]
-    public async Task Records_TieBreak_EarlierSwimWins()
+    public async Task SeasonBest_TieBreak_EarlierSwimWins()
     {
-        using var db = CreateDb(nameof(Records_TieBreak_EarlierSwimWins));
+        using var db = CreateDb(nameof(SeasonBest_TieBreak_EarlierSwimWins));
         var club = new Club { Name = "Alpha", NameEn = "Alpha" };
         var earlier = MakeSwimmer(club, "Earlier", "One", 2010);
         var later = MakeSwimmer(club, "Later", "One", 2010);
@@ -286,10 +404,118 @@ public class ClubPublicRepositoryTests
             Swim(comp, club, earlier, new DateTime(2026, 2, 10), timeMs: 55_000)); // то же время, раньше дата
         await db.SaveChangesAsync();
 
-        var result = await Repo(db).GetRecordsAsync(club.Id, poolType: null);
+        var section = Assert.Single((await Repo(db).GetSeasonBestAsync(club.Id, null, 2025)).Data);
 
-        var row = Assert.Single(result.Data);
-        Assert.Equal(earlier.Id, row.SwimmerId);
+        Assert.Equal(earlier.Id, Assert.Single(section.Items).SwimmerId);
+    }
+
+    [Fact]
+    public async Task SeasonBest_KeepsOnlySwimsOfThatSeason_AndReportsSeasonAndMeets()
+    {
+        using var db = CreateDb(nameof(SeasonBest_KeepsOnlySwimsOfThatSeason_AndReportsSeasonAndMeets));
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var swimmer = MakeSwimmer(club, "Swimmer", "One", 2010);
+        db.AddRange(club, swimmer);
+        var compOld = MakeCompetition("25m", date: "15/02/2025");
+        var compNew = MakeCompetition("25m", date: "15/02/2026");
+        db.AddRange(compOld, compNew, FreestyleStyle());
+        await db.SaveChangesAsync();
+
+        // Сезон = 1 сентября — 31 августа (SeasonMath): 15/02/2026 лежит в сезоне 2025,
+        // а 15/02/2025 — в сезоне 2024. Быстрейший заплыв нарочно в ЧУЖОМ сезоне.
+        db.AddRange(
+            Swim(compOld, club, swimmer, new DateTime(2025, 2, 15), timeMs: 50_000),
+            Swim(compNew, club, swimmer, new DateTime(2026, 2, 15), timeMs: 60_000));
+        await db.SaveChangesAsync();
+
+        var season2025 = await Repo(db).GetSeasonBestAsync(club.Id, poolType: null, season: 2025);
+        Assert.Equal(2025, season2025.Season);
+        Assert.Equal("2025/26", season2025.SeasonLabel);
+        // Сколько стартов вошло в расчёт — карточка обязана это показать: «первый в
+        // Израиле» у нас значит «первый среди импортированного».
+        Assert.Equal(1, season2025.Meets);
+        Assert.Equal(60_000, Assert.Single(Assert.Single(season2025.Data).Items).TimeMs);
+
+        // Прошлый сезон доступен явным параметром; «за всё время» карточка не умеет.
+        var season2024 = await Repo(db).GetSeasonBestAsync(club.Id, poolType: null, season: 2024);
+        Assert.Equal(50_000, Assert.Single(Assert.Single(season2024.Data).Items).TimeMs);
+    }
+
+    /* ─────────────── Стена официальных рекордов ─────────────── */
+
+    // Полное имя типа: Xunit.Record тоже видно в этом файле.
+    private static Swimm.Domain.Entities.Record OfficialRecord(
+        string club, string category = "age", string ageKey = "10",
+        string poolType = "25m", string regionType = "country", string regionCode = "ISR") => new()
+    {
+        RegionType = regionType,
+        RegionCode = regionCode,
+        Category = category,
+        AgeKey = ageKey,
+        Gender = "female",
+        PoolType = poolType,
+        Style = "freestyle",
+        Distance = "100m",
+        Time = "01:00.00",
+        HolderName = "Holder",
+        Club = club
+    };
+
+    [Fact]
+    public async Task RecordWall_MatchesClubName_ExactAndWithSourceSuffix()
+    {
+        using var db = CreateDb(nameof(RecordWall_MatchesClubName_ExactAndWithSourceSuffix));
+        var club = new Club { Name = "Hapoel Dolphin Netanya", NameEn = "Dolphin Netanya" };
+        db.Add(club);
+        db.AddRange(
+            OfficialRecord("Hapoel Dolphin Netanya"),                    // точное имя
+            OfficialRecord("Hapoel Dolphin Netanya Olympic", ageKey: "11"), // имя + суффикс источника
+            OfficialRecord("Hapoel Dolphin Nahariya", ageKey: "12"));    // другой клуб — не наш
+        await db.SaveChangesAsync();
+
+        var wall = await Repo(db).GetRecordWallAsync(club.Id, poolType: null);
+
+        Assert.Equal(2, wall.Data.Count);
+        Assert.DoesNotContain(wall.Data, r => r.Club.Contains("Nahariya"));
+        Assert.Contains("Hapoel Dolphin Netanya", wall.MatchedNames);
+    }
+
+    [Fact]
+    public async Task RecordWall_IncludesNamesOfMergedDuplicates()
+    {
+        using var db = CreateDb(nameof(RecordWall_IncludesNamesOfMergedDuplicates));
+        var canonical = new Club { Name = "Alpha", NameEn = "Alpha" };
+        db.Add(canonical);
+        await db.SaveChangesAsync();
+        // Дубль склеен в канон: результаты переехали, а строки Records остались с его именем.
+        db.Add(new Club { Name = "Alpha Old", NameEn = "Alpha Old", MergedIntoId = canonical.Id });
+        db.Add(OfficialRecord("Alpha Old"));
+        await db.SaveChangesAsync();
+
+        var wall = await Repo(db).GetRecordWallAsync(canonical.Id, poolType: null);
+
+        Assert.Equal("Alpha Old", Assert.Single(wall.Data).Club);
+    }
+
+    [Fact]
+    public async Task RecordWall_FiltersByPool_AndOrdersOpenBeforeAgeBeforeMasters()
+    {
+        using var db = CreateDb(nameof(RecordWall_FiltersByPool_AndOrdersOpenBeforeAgeBeforeMasters));
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        db.Add(club);
+        db.AddRange(
+            OfficialRecord("Alpha", category: "masters", ageKey: "25-29"),
+            OfficialRecord("Alpha", category: "age", ageKey: "10"),
+            OfficialRecord("Alpha", category: "open", ageKey: ""),
+            OfficialRecord("Alpha", category: "age", ageKey: "11", poolType: "50m"));
+        await db.SaveChangesAsync();
+
+        var all = await Repo(db).GetRecordWallAsync(club.Id, poolType: null);
+        Assert.Equal(["open", "age", "age", "masters"], all.Data.Select(r => r.Category).ToArray());
+
+        var only25 = await Repo(db).GetRecordWallAsync(club.Id, poolType: "25m");
+        Assert.Equal(3, only25.Data.Count);
+        Assert.All(only25.Data, r => Assert.Equal("25m", r.PoolType));
     }
 
     /* ──────────────────────── Резолв клуба ──────────────────────── */

@@ -54,4 +54,23 @@ public static class SeasonMath
 
     /// <summary>Дата принадлежит сезону <paramref name="startYear"/>.</summary>
     public static bool IsInSeason(DateTime date, int startYear) => StartYearOf(date) == startYear;
+
+    /// <summary>
+    /// Возраст пловца В СЕЗОНЕ: сколько ему исполняется в году ОКОНЧАНИЯ сезона. Один и тот
+    /// же на все старты сезона — так считает федерация (правило Влада 2026-08-01).
+    ///
+    /// ⚠ Это НЕ возраст на день заплыва: в сезоне 2025/26 старт декабря 2025 у пловца,
+    /// которому в 2026 исполняется 9, идёт как «9 лет». Считать «год заплыва минус год
+    /// рождения» нельзя — осенние и весенние старты одного человека разъедутся по двум
+    /// возрастным ступеням.
+    ///
+    /// null — год рождения не заполнен (в базе такие есть, <c>BirthYear = 0</c>).
+    /// </summary>
+    public static int? AgeInSeason(int startYear, int birthYear)
+    {
+        if (birthYear <= 0) return null;
+
+        var age = startYear + 1 - birthYear;
+        return age > 0 ? age : null;
+    }
 }

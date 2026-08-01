@@ -14,6 +14,7 @@ import ClubTimeline from './components/club-timeline';
 import ClubTopSwimmers from './components/club-top-swimmers';
 import ClubSwimmers from './components/club-swimmers';
 import ClubRecords from './components/club-records';
+import ClubRecordWall from './components/club-record-wall';
 import ClubCoaches from './components/club-coaches';
 
 /**
@@ -92,18 +93,30 @@ function ClubProject() {
               <ClubStandings standings={data.standings} />
             </div>
 
-            <ClubTimeline timeline={data.timeline} />
-            <ClubTopSwimmers swimmers={data.top_swimmers} />
-
             {/* Ростер и рекорды — отдельные пагинируемые эндпоинты (K4.2), им нужен
                 уже-резолвленный clubId (гарантирован здесь: data загрузился только для
                 непустого clubId). */}
             {clubId != null && (
               <>
-                <ClubSwimmers clubId={clubId} season={scope.season} />
-                <ClubRecords clubId={clubId} />
+                {/* Люди клуба парой: слева выжимка «кто тащит», справа полный ростер. */}
+                <div className="mb-4 grid grid-cols-1 items-start gap-4 min-[960px]:grid-cols-2">
+                  <ClubTopSwimmers swimmers={data.top_swimmers} />
+                  <ClubSwimmers clubId={clubId} season={scope.season} />
+                </div>
+
+                {/* Времена парой: Season best — наши протоколы за ТЕКУЩИЙ сезон по возрастным
+                    ступеням (глобальный фильтр сезона не слушает — см. club-records.tsx),
+                    Record wall — официальный справочник рекордов (сезона у него нет).
+                    Данные разные, форма общая — club-record-card.tsx. */}
+                <div className="mb-4 grid grid-cols-1 items-start gap-4 min-[960px]:grid-cols-2">
+                  <ClubRecords clubId={clubId} />
+                  <ClubRecordWall clubId={clubId} />
+                </div>
               </>
             )}
+
+            {/* История соревнований — длинный хвост, поэтому внизу страницы. */}
+            <ClubTimeline timeline={data.timeline} />
 
             <ClubCoaches />
           </>

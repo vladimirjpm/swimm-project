@@ -423,7 +423,9 @@ public class ClubOverviewRepository : IClubOverviewRepository
                     LastNameEn = r.LastNameEn,
                     FirstNameEn = r.FirstNameEn,
                     Gender = NormalizeGender(r.Gender),
-                    Age = r.BirthYear > 0 ? seasonForAge - r.BirthYear : null,
+                    // Возраст В СЕЗОНЕ (год окончания сезона минус год рождения), один на
+                    // все старты сезона — единый источник правила в SeasonMath.AgeInSeason.
+                    Age = SeasonMath.AgeInSeason(seasonForAge, r.BirthYear),
                 };
             }
 

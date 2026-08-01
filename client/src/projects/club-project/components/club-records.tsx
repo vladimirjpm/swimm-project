@@ -1,107 +1,124 @@
 import React, { useState } from 'react';
-import { useClubRecords } from '../../../hooks/useClubRecords';
+import { useClubSeasonBest, type ClubSeasonBestGroup } from '../../../hooks/useClubSeasonBest';
 import { routes } from '../../../utils/routes';
+import { ClubRecordCard, type PoolFilter } from './club-record-card';
 
 /**
- * Record wall — лучшие времена клуба по оси стиль×дистанция×бассейн×пол
- * (CARDS.md §5, club-page-cards-sonnet.md §4.5). ЕДИНСТВЕННАЯ карточка с локальным фильтром
- * (25м и 50м физически несравнимы — README «Модель страницы»); остальные карточки читают
- * только глобальный скоуп.
+ * Season best — заплывы пловцов клуба, которые в этом сезоне ЛУЧШИЕ ПО СТРАНЕ в своём слоте
+ * (дисциплина × бассейн × пол × возрастная ступень). Лидер считается по всей базе, а не
+ * внутри клуба: карточка отвечает «наши первые в Израиле», а не «наше лучшее».
+ *
+ * Ступени — как в таблицах федерации: до 18 лет каждый год отдельно, «adults» 19–24 одной
+ * ступенью, мастерс пятилетками. Без ступеней слот забирал бы самый быстрый пловец страны
+ * любого возраста, и дети не попадали бы в карточку никогда.
+ *
+ * ⚠ Два обязательства перед читателем, которые нельзя потерять:
+ *  • карточка про ОДИН сезон и глобальный фильтр сезона страницы не слушает
+ *    (решение Влада 2026-08-01);
+ *  • «первый в Израиле» = первый среди ИМПОРТИРОВАННОГО, поэтому под заголовком стоит
+ *    число стартов, вошедших в расчёт. Не убирать: юниорских и взрослых чемпионатов в
+ *    базе может не быть вовсе, и лидерство по этим ступеням будет считаться по остаткам.
+ *
+ * Официальные рекорды (нац./возрастные/мастерс/мировые) — соседняя карточка
+ * `club-record-wall.tsx`; общая у них форма (`club-record-card.tsx`), но не содержимое.
  */
 
 interface Props {
   clubId: number;
 }
 
-type PoolFilter = 'all' | '25m' | '50m';
+/** Заголовок секции: «50m breaststroke · 25M · ♀». */
+function groupTitle(g: ClubSeasonBestGroup): string {
+  // Style.Name из БД сырой (individual_medley) — только косметика показа.
+  const style = g.style_name.replace(/_/g, ' ');
+  const pool = g.pool_type ? ` · ${g.pool_type.toUpperCase()}` : '';
+  return `${g.distance}m ${style}${pool}`;
+}
 
 function ClubRecords({ clubId }: Props) {
   const [pool, setPool] = useState<PoolFilter>('all');
-  const { data, loading } = useClubRecords(clubId, pool === 'all' ? null : pool);
+  const { groups, seasonLabel, total, meets, loading } = useClubSeasonBest(
+    clubId,
+    pool === 'all' ? null : pool,
+  );
 
   return (
-    <section className="deep-card mb-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="deep-card-title">Record wall</div>
-          <div className="deep-card-sub mt-1">Best times by discipline</div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <span className="deep-count-badge">
-            <b>{data.length}</b> RECORDS
-          </span>
-          <div className="deep-seg">
-            {(['all', '25m', '50m'] as PoolFilter[]).map((p) => (
-              <button
-                key={p}
-                type="button"
-                className={pool === p ? 'active' : ''}
-                onClick={() => setPool(p)}
+    <ClubRecordCard
+      title={seasonLabel ? `Season ${seasonLabel} best` : 'Season best'}
+      subtitle={`Club swimmers ranked #1 in Israel this season · among ${meets} meets in our database`}
+      count={total}
+      countLabel="#1 IN IL"
+      pool={pool}
+      onPool={setPool}
+      isEmpty={groups.length === 0 && !loading}
+      emptyText="No national-best times this season"
+      // Секции сами задают внутреннюю сетку, поэтому внешняя не нужна.
+      plainBody
+    >
+      <div className="flex flex-col gap-4">
+        {groups.map((g) => (
+          <div key={`${g.style_name}-${g.distance}-${g.pool_type}-${g.gender}`}>
+            <div className="flex items-baseline gap-2">
+              <span
+                className="text-[12px] font-extrabold"
+                style={{ color: 'var(--deep-text)' }}
               >
-                {p === 'all' ? 'All' : p}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {data.length === 0 && !loading ? (
-        <div className="mt-4 text-[13px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
-          No records yet
-        </div>
-      ) : (
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {data.map((r) => {
-            const isFemale = r.gender === 'female';
-            // При «All» к дисциплине добавляется суффикс бассейна — иначе 25м и 50м тайлы
-            // одной дисциплины неотличимы (CARDS.md §5).
-            const poolSuffix = pool === 'all' && r.pool_type ? ` · ${r.pool_type.toUpperCase()}` : '';
-            const year = r.date ? r.date.slice(-4) : '';
-            return (
-              <a
-                key={`${r.style_name}-${r.distance}-${r.pool_type}-${r.gender}`}
-                href={routes.swimmer(r.swimmer_id)}
-                className={`deep-record-tile block no-underline ${
-                  isFemale ? 'deep-record-tile--f' : 'deep-record-tile--m'
-                }`}
+                {groupTitle(g)}
+              </span>
+              <span
+                className="text-[12px]"
+                style={{ color: g.gender === 'female' ? 'var(--deep-female)' : 'var(--deep-male)' }}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div
-                      className="truncate text-[11px] font-extrabold"
-                      style={{ color: 'var(--deep-text-mute)' }}
+                {g.gender === 'female' ? '♀' : '♂'}
+              </span>
+            </div>
+
+            {/* Ряд возрастных ступеней: по возрастанию возраста, «n/a» в конце. */}
+            <div className="mt-1.5 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {g.items.map((it) => (
+                <a
+                  key={it.age_key}
+                  href={routes.swimmer(it.swimmer_id)}
+                  className={`deep-record-tile block no-underline ${
+                    g.gender === 'female' ? 'deep-record-tile--f' : 'deep-record-tile--m'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span
+                      className="truncate text-[10.5px] font-black uppercase tracking-wide"
+                      style={{ color: 'var(--deep-accent)' }}
                     >
-                      {/* Style.Name из БД сырой (individual_medley) — только косметика показа. */}
-                      {r.distance}m {r.style_name.replace(/_/g, ' ')}
-                      {poolSuffix}
-                    </div>
-                    <div
-                      className="mt-1 text-[22px] leading-none tabular-nums"
-                      style={{ fontFamily: 'var(--deep-font-display)', color: 'var(--deep-text)' }}
+                      {it.age_label}
+                    </span>
+                    {/* Плитка попадает сюда, только если это первое время страны в слоте. */}
+                    <span
+                      className="shrink-0 text-[10px] font-black"
+                      style={{ color: 'var(--deep-gold)' }}
+                      title="Best time in Israel this season (among imported meets)"
                     >
-                      {r.time_original}
-                    </div>
+                      #1 IL
+                    </span>
                   </div>
-                  <span
-                    className="shrink-0 text-[13px]"
-                    style={{ color: isFemale ? 'var(--deep-female)' : 'var(--deep-male)' }}
+                  <div
+                    className="mt-1 text-[19px] leading-none tabular-nums"
+                    style={{ fontFamily: 'var(--deep-font-display)', color: 'var(--deep-text)' }}
                   >
-                    {isFemale ? '♀' : '♂'}
-                  </span>
-                </div>
-                <div className="mt-2 truncate text-[12px] font-bold" style={{ color: 'var(--deep-text)' }}>
-                  {r.swimmer_name}
-                </div>
-                <div className="text-[10.5px] font-bold" style={{ color: 'var(--deep-text-ghost)' }}>
-                  {year}
-                </div>
-              </a>
-            );
-          })}
-        </div>
-      )}
-    </section>
+                    {it.time_original}
+                  </div>
+                  <div
+                    className="mt-1.5 truncate text-[11.5px] font-bold"
+                    style={{ color: 'var(--deep-text)' }}
+                    title={it.swimmer_name}
+                  >
+                    {it.swimmer_name}
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </ClubRecordCard>
   );
 }
 
