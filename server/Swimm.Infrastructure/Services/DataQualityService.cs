@@ -81,9 +81,26 @@ public class DataQualityService(SwimmDbContext db) : IDataQualityService
                 db.Results.Where(res => res.RelayId == r.Id).Select(res => res.CompetitionId).FirstOrDefault()))
             .ToListAsync(ct);
 
+        // Без пола: шапка протокола пола не давала (смешанный заплыв), и у пловца его тоже
+        // нет. Эстафеты не в счёт — там пол команды и так не всегда определён.
+        var noGenderQuery = db.Results.AsNoTracking()
+            .Where(r => r.RelayId == null && (r.Gender == "" || r.Gender == "none"));
+
+        var noGenderTotal = await noGenderQuery.CountAsync(ct);
+        var noGenderItems = await noGenderQuery.OrderBy(r => r.Id).Take(Cap)
+            .Select(r => new ResultNoGenderRowDto(
+                r.Id, r.SwimmerId,
+                r.Swimmer != null ? (r.Swimmer.LastName + " " + r.Swimmer.FirstName).Trim() : "",
+                r.CompetitionId,
+                r.Competition != null ? r.Competition.Name : "",
+                r.Distance,
+                r.Style != null ? r.Style.Name : ""))
+            .ToListAsync(ct);
+
         return new ResultAnomaliesDto(
             new CappedListDto<ResultFkAnomalyRowDto>(fkTotal, fkItems),
-            new CappedListDto<EmptyRelayRowDto>(relayTotal, relayItems));
+            new CappedListDto<EmptyRelayRowDto>(relayTotal, relayItems),
+            new CappedListDto<ResultNoGenderRowDto>(noGenderTotal, noGenderItems));
     }
 
     public async Task<CappedListDto<ModerationPendingRowDto>> GetModerationPendingAsync(CancellationToken ct = default)

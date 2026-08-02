@@ -63,6 +63,11 @@
             sb.Append($"<button onclick=\"discPreview({s.DiscoveredId})\" class=\"{btn}\">Затянуть</button> ");
             sb.Append($"<button onclick=\"discStatus({s.DiscoveredId},'imported')\" class=\"{btn}\" title=\"Пометить импортированным вручную\">✓ имп.</button> ");
         }
+        // Уже импортированное тоже нужно уметь тянуть заново: протокол на сайте правят
+        // (дисквалификации, опечатки), да и наш парсер чинится — старым разбором остаются
+        // испорченные строки. Открывает то же превью, но с заранее взведённой перезаписью.
+        if (imported && finished)
+            sb.Append($"<button onclick=\"discPreview({s.DiscoveredId}, true)\" class=\"{btn}\" title=\"Скачать протокол заново и перезаписать результаты\">Перезатянуть</button> ");
         if (finished && string.IsNullOrEmpty(s.Languages))
             sb.Append($"<button onclick=\"discSyncLangs({s.DiscoveredId}, this)\" class=\"{btn}\" title=\"Скачать HE+EN пару и дозаполнить англ. имена пловцов\">Синхр. языки</button> ");
         else if (s.Languages == "he")
@@ -242,7 +247,8 @@ else
                     @if (u.Db is { IsEvent: true } ev)
                     {
                         <!-- Многодневное событие: заголовок (дни и действия — в панели) -->
-                        <tr id="evhead-@ev.EventId">
+                        @* data-disc-id — якорь для бейджа «затянуто» после успешного импорта. *@
+                        <tr id="evhead-@ev.EventId" data-disc-id="@(u.Site?.DiscoveredId)">
                             <td><span class="inline-block py-0.5 px-2 rounded text-xs font-semibold @badge.Cls">@badge.Text</span></td>
                             <td class="text-center">@(u.IsChampionship ? "🏆" : "")</td>
                             <td>
@@ -288,7 +294,7 @@ else
                     else if (u.Db?.Single is { } c)
                     {
                         <!-- Одиночное соревнование (импортировано или только в БД) -->
-                        <tr>
+                        <tr data-disc-id="@(u.Site?.DiscoveredId)">
                             <td><span class="inline-block py-0.5 px-2 rounded text-xs font-semibold @badge.Cls">@badge.Text</span></td>
                             <td class="text-center">@(u.IsChampionship ? "🏆" : "")</td>
                             <td>
@@ -336,7 +342,7 @@ else
                     else if (u.Site is { } s)
                     {
                         <!-- Только на сайте (в БД ещё нет) -->
-                        <tr>
+                        <tr data-disc-id="@s.DiscoveredId">
                             <td><span class="inline-block py-0.5 px-2 rounded text-xs font-semibold @badge.Cls">@badge.Text</span></td>
                             <td class="text-center">@(u.IsChampionship ? "🏆" : "")</td>
                             <td dir="rtl" style="text-align:left">
@@ -555,6 +561,23 @@ else
     </div>
 </div>
 
+@* Ход затягивания: закреплённая панель справа внизу. Раньше шаги уходили в тост, который
+   гаснет через несколько секунд — а затягивание идёт минуты (скачивание PDF, парсинг,
+   фоновый job), и админ терял из виду, чем всё кончилось. Панель живёт до закрытия,
+   переживает перезагрузку страницы (sessionStorage) и сама показывает итог. *@
+<div id="pull-panel"
+     class="fixed bottom-4 right-4 z-50 hidden w-[min(24rem,calc(100vw-2rem))] rounded-lg border border-admin-border bg-admin-surface p-4 text-admin-text shadow-xl shadow-black/50">
+    <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+            <h2 class="text-sm font-semibold text-white">Затягивание</h2>
+            <div id="pull-name" class="mt-0.5 truncate text-[12px] text-admin-text-muted" dir="rtl" style="text-align:left"></div>
+        </div>
+        <button type="button" id="pull-close" class="admin-btn admin-btn-ghost py-1 px-2.5" title="Закрыть">✕</button>
+    </div>
+    <ol id="pull-steps" class="mt-3 space-y-1.5 text-[12.5px]"></ol>
+    <div id="pull-footer" class="mt-3 hidden text-[12px] text-admin-text-muted"></div>
+</div>
+
 @* Качество результатов: список помеченных строк + прогон проверок. Пометка НЕ скрывает
    и НЕ удаляет заплыв — он остаётся в протоколе, но выпадает из детекции рекордов. *@
 <dialog id="quality-modal"
@@ -660,6 +683,156 @@ else
             });
         });
 
+        // ── Панель хода затягивания ─────────────────────────────────────────────
+        // Затягивание идёт минуты и в несколько шагов (скачать PDF → распарсить → превью →
+        // фоновый job импорта), а тост живёт секунды и не переживает перезагрузку. Панель
+        // держит шаги на экране, опрашивает job до конца и после успеха обновляет таблицу,
+        // помечая строку бейджем «затянуто».
+        window.pullPanel = (function () {
+            const PENDING_KEY = 'pullPending';  // job, за которым следим (переживает F5)
+            const DONE_KEY = 'pullDone';        // итог, который надо показать после reload
+
+            const panel = document.getElementById('pull-panel');
+            const nameEl = document.getElementById('pull-name');
+            const stepsEl = document.getElementById('pull-steps');
+            const footerEl = document.getElementById('pull-footer');
+            let steps = [];  // [{ text, state: 'run'|'ok'|'fail'|'wait' }]
+
+            const ICON = {
+                run: '<span class="text-admin-accent">●</span>',
+                ok: '<span class="text-admin-success">✓</span>',
+                fail: '<span class="text-[#ef9a9a]">✕</span>',
+                wait: '<span class="text-admin-text-muted">○</span>',
+            };
+
+            function render() {
+                stepsEl.innerHTML = steps.map(s => `
+                    <li class="flex gap-2 ${s.state === 'fail' ? 'text-[#ef9a9a]' : s.state === 'wait' ? 'text-admin-text-muted' : ''}">
+                        <span class="w-3.5 shrink-0">${ICON[s.state] ?? ''}</span>
+                        <span class="min-w-0">${s.text}</span>
+                    </li>`).join('');
+            }
+
+            function open(name) {
+                steps = [];
+                nameEl.textContent = name ?? '';
+                footerEl.classList.add('hidden');
+                footerEl.textContent = '';
+                panel.classList.remove('hidden');
+                render();
+            }
+
+            /// Новый шаг «в работе»; предыдущий незакрытый считаем успешным.
+            function step(text) {
+                const last = steps[steps.length - 1];
+                if (last && last.state === 'run') last.state = 'ok';
+                steps.push({ text, state: 'run' });
+                render();
+            }
+
+            function finish(state, text) {
+                const last = steps[steps.length - 1];
+                if (last && last.state === 'run') last.state = state === 'fail' ? 'fail' : 'ok';
+                if (text) steps.push({ text, state });
+                render();
+            }
+
+            function footer(html) {
+                footerEl.innerHTML = html;
+                footerEl.classList.remove('hidden');
+            }
+
+            document.getElementById('pull-close').addEventListener('click', () => {
+                panel.classList.add('hidden');
+                sessionStorage.removeItem(PENDING_KEY);
+            });
+
+            // Бейдж на строке: вешаем в ячейку стадии, рядом с «импортировано».
+            function markRow(discId) {
+                const row = document.querySelector(`tr[data-disc-id="${discId}"]`);
+                if (!row) return false;
+                const cell = row.querySelector('td');
+                if (cell && !cell.querySelector('.pulled-badge')) {
+                    cell.insertAdjacentHTML('beforeend',
+                        '<span class="pulled-badge ml-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase bg-admin-success/20 text-admin-success">затянуто</span>');
+                }
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return true;
+            }
+
+            // Опрос job'а. Импорт идёт в фоне, поэтому единственный честный признак конца —
+            // состояние job'а, а не ответ на POST /import (он лишь ставит в очередь).
+            async function watch(jobId, discId, name) {
+                sessionStorage.setItem(PENDING_KEY, JSON.stringify({ jobId, discId, name }));
+                const deadline = Date.now() + 10 * 60 * 1000;
+                let running = false;
+
+                while (Date.now() < deadline) {
+                    await new Promise(r => setTimeout(r, 1500));
+                    let s;
+                    try {
+                        s = await fetch(`/api/admin/import/status/${jobId}`, { credentials: 'same-origin' })
+                            .then(r => r.ok ? r.json() : null);
+                    } catch { continue; } // сеть моргнула — пробуем дальше
+                    if (!s) continue;
+
+                    if (s.state === 'running' && !running) { running = true; step('Импортирую результаты…'); }
+
+                    if (s.state === 'completed') {
+                        const r = s.result ?? {};
+                        sessionStorage.removeItem(PENDING_KEY);
+                        sessionStorage.setItem(DONE_KEY, JSON.stringify({
+                            discId, name, created: r.created ?? 0, total: r.totalRows ?? 0,
+                            skipped: r.skipped ?? 0, errors: r.errors ?? 0
+                        }));
+                        finish('ok', 'Готово. Обновляю таблицу…');
+                        setTimeout(() => location.reload(), 700);
+                        return;
+                    }
+                    if (s.state === 'failed') {
+                        sessionStorage.removeItem(PENDING_KEY);
+                        finish('fail', `Импорт не прошёл: ${esc(s.error ?? 'причина неизвестна')}`);
+                        footer('Подробности — в <a class="text-admin-accent hover:underline" href="/Admin/ImportHistory">Import History</a>.');
+                        return;
+                    }
+                }
+
+                finish('fail', 'Жду слишком долго — статус смотри в Import History.');
+            }
+
+            // После reload: показать итог и повесить бейдж; если job ещё шёл — продолжить опрос.
+            function restore() {
+                const done = sessionStorage.getItem(DONE_KEY);
+                if (done) {
+                    sessionStorage.removeItem(DONE_KEY);
+                    const d = JSON.parse(done);
+                    open(d.name);
+                    steps = [{ text: `Затянуто: создано ${d.created} из ${d.total}`, state: 'ok' }];
+                    if (d.skipped) steps.push({ text: `пропущено ${d.skipped}`, state: 'wait' });
+                    if (d.errors) steps.push({ text: `ошибок ${d.errors}`, state: 'fail' });
+                    render();
+                    if (!markRow(d.discId)) {
+                        footer('Строка не видна при текущих фильтрах — сбрось их, чтобы увидеть её со стадией «импортировано».');
+                    } else {
+                        footer('Дальше стоит нажать <b>⚑ Качество</b> — автозапуска проверки нет.');
+                    }
+                    return;
+                }
+
+                const pending = sessionStorage.getItem(PENDING_KEY);
+                if (pending) {
+                    const p = JSON.parse(pending);
+                    open(p.name);
+                    step('Импорт продолжается в фоне…');
+                    watch(p.jobId, p.discId, p.name);
+                }
+            }
+
+            return { open, step, finish, footer, watch, restore };
+        })();
+
+        pullPanel.restore();
+
         // ── Действия Discovery (перенос из /Admin/Discovery; после мутаций перезагружаем SSR) ──
         (function () {
             const API = '/api/admin/discovery';
@@ -722,17 +895,32 @@ else
                 setTimeout(() => location.reload(), 1500); // дать прочитать итог перед перезагрузкой
             };
 
-            window.discPreview = async function (id) {
+            // repull=true («Перезатянуть») — то же превью, но с заранее взведённой перезаписью:
+            // намерение уже выражено кликом, второй раз спрашивать незачем.
+            window.discPreview = async function (id, repull) {
                 const name = discName(id);
-                toast('Скачиваю и парсю PDF…', 4000);
+                pullPanel.open(name);
+                pullPanel.step(repull
+                    ? 'Скачиваю протокол заново и разбираю…'
+                    : 'Скачиваю PDF с isr.org.il и разбираю…');
                 try {
                     const p = await apiJson(`${API}/${id}/preview`, { method: 'POST' });
                     preview = { previewId: p.previewId, id, name };
-                    await showPreview(p, name);
-                } catch (e) { toast('Ошибка: ' + e.message, 6000); }
+                    await showPreview(p, name, repull);
+                    pullPanel.finish('ok', `Распознано результатов: ${p.resultCount}`);
+                    pullPanel.step('Жду: проверь превью и нажми «Импортировать»');
+                    pullPanel.footer(
+                        repull && p.existingCompetitionId
+                            ? 'Перезапись существующих результатов уже включена. Превью живёт 15 минут.'
+                            : repull
+                                ? 'Совпадения с существующим соревнованием НЕ найдено — импорт создаст новое. Проверь дату и название.'
+                                : 'Превью живёт 15 минут.');
+                } catch (e) {
+                    pullPanel.finish('fail', `Не удалось разобрать: ${esc(e.message)}`);
+                }
             };
 
-            async function showPreview(p, name) {
+            async function showPreview(p, name, repull) {
                 document.getElementById('preview-card').classList.remove('hidden');
                 document.getElementById('preview-title').textContent = `Превью: ${name}`;
                 document.getElementById('preview-summary').innerHTML =
@@ -788,6 +976,13 @@ else
                 overwriteDeleteWarning.classList.add('hidden');
                 overwriteCb.onchange = updateDeleteMissingVisibility;
                 deleteMissingCb.onchange = updateOverwriteDeleteWarning;
+
+                // «Перезатянуть»: взводим перезапись сразу. «Удалять лишние» НЕ трогаем —
+                // это отдельное решение, оно удаляет строки из БД.
+                if (repull && p.existingCompetitionId) {
+                    overwriteCb.checked = true;
+                    updateDeleteMissingVisibility();
+                }
 
                 // Список существующих событий (второй день дописывается к первому).
                 const eventSelect = document.getElementById('event-select');
@@ -845,10 +1040,12 @@ else
                             deleteMissing: document.getElementById('overwrite-existing-cb').checked && document.getElementById('delete-missing-cb').checked
                         })
                     });
-                    toast(`Импорт поставлен в очередь (job ${r.jobId}) — статус в Import History`, 6000);
+                    const { id: discId, name } = preview;
                     preview = null;
                     document.getElementById('preview-card').classList.add('hidden');
-                } catch (e) { toast('Ошибка импорта: ' + e.message, 6000); }
+                    pullPanel.step('Импорт поставлен в очередь…');
+                    pullPanel.watch(r.jobId, discId, name);
+                } catch (e) { pullPanel.finish('fail', `Импорт не запустился: ${esc(e.message)}`); }
             });
         })();
 

@@ -161,6 +161,48 @@ public class DataQualityServiceTests
     }
 
     [Fact]
+    public async Task GetResultAnomalies_NoGender_ExcludesRelays()
+    {
+        // Пол пуст у личного результата (смешанный заплыв, пол пловца неизвестен) — это
+        // дыра в данных. У эстафеты пола нет по определению — её в список тащить незачем.
+        await using var db = CreateDb(nameof(GetResultAnomalies_NoGender_ExcludesRelays));
+        var club = new Club { Name = "Club" };
+        var style = new Style { Name = "Freestyle" };
+        var swimmer = new Swimmer { LastName = "A", FirstName = "A", BirthYear = 2012 };
+        var comp = new Competition { Name = "Comp", Date = "01/01/2026", PoolType = "25m" };
+        db.Clubs.Add(club); db.Styles.Add(style); db.Swimmers.Add(swimmer); db.Competitions.Add(comp);
+        var relay = new Relay();
+        db.Relays.Add(relay);
+        await db.SaveChangesAsync();
+
+        var noGender = new ResultRecord
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer.Id, ClubId = club.Id, StyleId = style.Id,
+            Gender = "", Distance = "200", CompetitionDate = DateTime.UtcNow
+        };
+        db.Results.Add(noGender);
+        db.Results.Add(new ResultRecord
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer.Id, ClubId = club.Id, StyleId = style.Id,
+            Gender = "male", Distance = "50", CompetitionDate = DateTime.UtcNow
+        });
+        db.Results.Add(new ResultRecord
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer.Id, ClubId = club.Id, StyleId = style.Id,
+            RelayId = relay.Id, Gender = "", Distance = "4X50", CompetitionDate = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var result = await new DataQualityService(db).GetResultAnomaliesAsync();
+
+        Assert.Equal(1, result.NoGender.Total);
+        var row = Assert.Single(result.NoGender.Items);
+        Assert.Equal(noGender.Id, row.ResultId);
+        Assert.Equal("A A", row.SwimmerName);
+        Assert.Equal("200", row.Distance);
+    }
+
+    [Fact]
     public async Task GetModerationPending_OnlyPendingStatus()
     {
         await using var db = CreateDb(nameof(GetModerationPending_OnlyPendingStatus));

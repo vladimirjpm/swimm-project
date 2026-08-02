@@ -97,6 +97,7 @@ Application → реализация в Infrastructure → регистраци�
 | `IRecordSourceProvider` *(новый)* | импорт из существующих JS/JSON + парсеры `IsrOrgAgeRecords`/`IsrOrgMastersRecords`/`WorldRecords` | автообновление рекордов из веба |
 | `IImportService` | `JsonImportService` | принимает `ParsedCompetition` DTO от любого провайдера, а не только JSON-файл |
 | `IEmailSender` | `LoggingEmailSender` (dev) | SMTP/Resend в проде |
+| `IDataCheck` *(новый, фаза Д3)* | проверки данных живут россыпью: `DataQualityService`, `SuspectResultDetector`, `SwimmerDedupService`, `RecordQualityService` | единый реестр проверок с severity, историей и одной страницей `/Admin/Health`; существующие сервисы — адаптеры. См. [data-integrity.md](data-integrity.md) |
 
 Контракт всех провайдеров: возвращают **общий DTO** (`ParsedCompetition` / `ParsedRecordSet`
 в Application), никогда не пишут в БД сами. Пишет только `IImportService` — единая точка
@@ -143,6 +144,9 @@ Application → реализация в Infrastructure → регистраци�
 6. Дублированные `using` в `Program.cs` (Swimm.API) — косметика.
 7. `Gallery`/`GalleryItem` (импортные медиа заплыва) НЕ смешивать с `Sys_UserMedia`
    (пользовательские ссылки) — это разные вещи по владению и приватности.
+8. Соревнование сопоставляется с источником по названию (`Name+Date+PoolType`), хотя
+   `OrgCompId` уже есть в БД — из-за этого переимпорт создаёт дубликаты событий.
+   Фаза Д2 в [data-integrity.md](data-integrity.md).
 
 ## 8. Конвенции для вайб-кодинга (чтобы агент делал правильно с первого раза)
 
@@ -154,3 +158,8 @@ Application → реализация в Infrastructure → регистраци�
 - Комментарии — RU-проза, идентификаторы — EN (стиль репо).
 - Всё security-чувствительное (auth, роли, antiforgery) — читать `auth`-раздел корневого
   CLAUDE.md; инварианты не ослаблять.
+- Всё, что касается достоверности данных (новая проверка, предикат «дыры», правка импорта
+  или парсера) — читать [data-integrity.md](data-integrity.md) и записывать решение туда.
+  Два правила оттуда нарушаются чаще всего: предикат живёт в ОДНОМ месте (копия = будущий
+  инцидент), и поля ключа upsert (`ResultMatcher.KeyOfPersisted`) менять нельзя — иначе
+  следующий переимпорт наплодит дубликаты.

@@ -32,9 +32,17 @@
 
 ## Deep-link секция «Аномалии» (T3b)
 
+> Общая картина проверок данных, инварианты и чек-лист «вижу кривые данные» —
+> [docs/data-integrity.md](../data-integrity.md). Эта секция — одна из его витрин.
+
 Под формой перехода — сворачиваемая секция `<details>`, грузится лениво (клик по
-заголовку или `?filter=fk-anomaly|empty-relay` — раскрывает и подсвечивает нужный блок)
-через `GET /api/admin/results/anomalies` (`ResultsAdminController` → `IDataQualityService`).
-Отдаёт `{ fkAnomalies: {total, items}, emptyRelays: {total, items} }`, топ-200 каждая,
-предикаты те же, что `DashboardStatusService.Results.FkAnomalies/EmptyRelays` (в проде
-ожидаемо пусто — FK держит целостность). Read-only; строка fk-аномалии линкует на Edit.
+заголовку или `?filter=fk-anomaly|empty-relay|no-gender` — раскрывает и подсвечивает нужный
+блок) через `GET /api/admin/results/anomalies` (`ResultsAdminController` → `IDataQualityService`).
+Отдаёт `{ fkAnomalies, emptyRelays, noGender }` — по `{total, items}`, топ-200 каждая;
+предикаты FK/эстафет те же, что `DashboardStatusService.Results.FkAnomalies/EmptyRelays`
+(в проде ожидаемо пусто — FK держит целостность). Read-only; строки линкуют на Edit.
+
+**`noGender`** — личные результаты с пустым полом. Появляются законно: в шапке протокола
+пола нет (смешанный заплыв «שומרי שבת», см. [import.md](import.md)), а у пловца он неизвестен —
+подставлять наугад нельзя. Лечится так: проставить пол пловцу и переимпортировать протокол.
+Эстафеты исключены — там пола нет по определению.

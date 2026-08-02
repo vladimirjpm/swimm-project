@@ -534,7 +534,7 @@ public class JsonImportService : IImportService
                     Gallery = gallery,  // EF Core inserts Gallery + GalleryItems and sets GalleryId
                     CompetitionDate = ParseDate(item.Date),
                     Distance = item.EventStyleLen ?? string.Empty,
-                    Gender = item.EventStyleGender ?? string.Empty,
+                    Gender = ResolveResultGender(item.EventStyleGender, swimmer, item.IsRelay == true),
                     AgeGroup = item.AgeGroup ?? string.Empty,
                     EventStyleAge = item.EventStyleAge ?? string.Empty,
                     EventCategory = string.IsNullOrWhiteSpace(item.EventCategory) ? null : item.EventCategory,
@@ -1034,9 +1034,34 @@ public class JsonImportService : IImportService
     /// Gender (из event_style_gender), ClubId (FK на клуб) и CountryId (FK на страну).
     /// Обновляет только пустые поля — не перезаписывает уже заполненные.
     /// </summary>
+    /// <summary>
+    /// Пол заплыва, у которого его нет в шапке протокола («none» — смешанные заплывы вроде
+    /// «שומרי שבת»), берём с самого пловца: его пол известен по другим заплывам. Если и там
+    /// пусто — оставляем пустым, такие строки видны в «дырах данных» (Admin/Results).
+    ///
+    /// ⚠ ЭСТАФЕТЫ ИСКЛЮЧЕНЫ. У команды нет одного пола (в миксе плывут и мальчики, и
+    /// девочки), а «владелец» строки — просто первая нога. Плюс <c>Gender</c> входит в ключ
+    /// upsert (<see cref="ResultMatcher.KeyOfPersisted"/>): подменив его, переимпорт перестал
+    /// бы узнавать свои же строки и на каждом прогоне плодил бы дубликаты эстафет.
+    /// </summary>
+    private static string ResolveResultGender(string? eventGender, Swimmer swimmer, bool isRelay)
+    {
+        if (isRelay) return eventGender ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(eventGender) && !IsUnknownGender(eventGender))
+            return eventGender;
+        return swimmer.Gender ?? string.Empty;
+    }
+
+    private static bool IsUnknownGender(string? gender) =>
+        string.IsNullOrWhiteSpace(gender)
+        || gender.Equals("none", StringComparison.OrdinalIgnoreCase)
+        || gender.Equals("mix", StringComparison.OrdinalIgnoreCase);
+
     private static void EnrichSwimmerFromResult(Swimmer swimmer, string? gender, Club? club, Country? country)
     {
-        if (string.IsNullOrEmpty(swimmer.Gender) && !string.IsNullOrWhiteSpace(gender))
+        // «none»/«mix» — это отсутствие пола в шапке, а не пол пловца: записав его в Swimmer,
+        // мы бы навсегда испортили карточку человека из-за одного смешанного заплыва.
+        if (string.IsNullOrEmpty(swimmer.Gender) && !IsUnknownGender(gender))
             swimmer.Gender = gender;
 
         // Псевдоклуб (страна/сборная) — не «клуб пловца»; страна уходит в CountryId ниже.

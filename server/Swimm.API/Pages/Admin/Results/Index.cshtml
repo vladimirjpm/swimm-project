@@ -46,7 +46,9 @@
     const API = '/api/admin/results/anomalies';
     // Deep-link фильтр с дашборда: ?filter=fk-anomaly|empty-relay — раскрыть секцию и подсветить нужную таблицу.
     const qsFilter = new URLSearchParams(location.search).get('filter');
-    const highlight = qsFilter === 'fk-anomaly' ? 'fk' : qsFilter === 'empty-relay' ? 'relay' : null;
+    const highlight = qsFilter === 'fk-anomaly' ? 'fk'
+        : qsFilter === 'empty-relay' ? 'relay'
+        : qsFilter === 'no-gender' ? 'nogender' : null;
 
     let loaded = false;
     async function load() {
@@ -68,7 +70,7 @@
                                 <td>${x.swimmerId}</td><td>${x.clubId}</td><td>${x.competitionId}</td></tr>`).join('')}</tbody>
                     </table></div>`}
                 </div>
-                <div id="relay-block">
+                <div id="relay-block" class="mb-4">
                     <div class="mb-1 font-semibold text-admin-text">Пустые эстафеты — показаны ${data.emptyRelays.items.length} из ${data.emptyRelays.total}</div>
                     ${data.emptyRelays.items.length === 0 ? '<div class="italic">Нет.</div>' : `
                     <div class="overflow-x-auto"><table class="admin-table">
@@ -76,9 +78,24 @@
                         <tbody>${data.emptyRelays.items.map(x => `
                             <tr><td>${x.relayId}</td><td>${x.competitionId}</td></tr>`).join('')}</tbody>
                     </table></div>`}
+                </div>
+                <div id="nogender-block">
+                    <div class="mb-1 font-semibold text-admin-text">Без пола — показаны ${data.noGender.items.length} из ${data.noGender.total}</div>
+                    <div class="mb-1">В шапке протокола пола не было (смешанный заплыв, напр. «שומרי שבת»),
+                        и у пловца он тоже неизвестен. Проставь пол пловцу — результаты подхватят его при переимпорте.</div>
+                    ${data.noGender.items.length === 0 ? '<div class="italic">Нет.</div>' : `
+                    <div class="overflow-x-auto"><table class="admin-table">
+                        <thead><tr><th>Result Id</th><th>Пловец</th><th>Соревнование</th><th>Дисциплина</th></tr></thead>
+                        <tbody>${data.noGender.items.map(x => `
+                            <tr><td><a href="/Admin/Results/Edit?id=${x.resultId}" class="text-admin-accent hover:underline">${x.resultId}</a></td>
+                                <td dir="rtl" style="text-align:left"><a href="/Admin/Swimmers/Edit?id=${x.swimmerId}" class="text-admin-accent hover:underline">${esc(x.swimmerName)}</a></td>
+                                <td dir="rtl" style="text-align:left">${esc(x.competitionName)}</td>
+                                <td>${esc(x.distance)} ${esc(x.styleName)}</td></tr>`).join('')}</tbody>
+                    </table></div>`}
                 </div>`;
             if (highlight) {
-                const el = document.getElementById(highlight === 'fk' ? 'fk-block' : 'relay-block');
+                const el = document.getElementById(
+                    highlight === 'fk' ? 'fk-block' : highlight === 'relay' ? 'relay-block' : 'nogender-block');
                 if (el) {
                     el.style.outline = '2px solid var(--color-admin-accent, #4fc3f7)';
                     el.style.outlineOffset = '4px';

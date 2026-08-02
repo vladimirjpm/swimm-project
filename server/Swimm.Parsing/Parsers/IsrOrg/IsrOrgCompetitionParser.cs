@@ -47,6 +47,26 @@ public static class IsrOrgCompetitionParser
         @"^(?<len>\d+)\s+(?<style>[֐-׿\s]+)$",
         RegexOptions.Compiled);
 
+    // Заголовок с ТЕКСТОВОЙ категорией вместо «пол + возраст»: «200 חופשי - שומרי שבת
+    // מוקדמות צעירים» (заплывы для соблюдающих субботу — поплыв смешанный, пола в шапке нет).
+    // Ни HeaderRxHE (ждёт пол+возраст), ни HeaderRxHESimple (не допускает дефис) такое не
+    // берут, и до 2026-08-02 строка молча игнорировалась: событие не менялось, а результаты
+    // дописывались в предыдущий заплыв — 200 вольным оказались в эстафете 4X50 комплексом.
+    // Работает ФОЛЛБЕКОМ после HeaderRxHE, поэтому обычные «- בנים 13-14» сюда не доходят.
+    private static Regex? _headerRxHECategory;
+    private static Regex HeaderRxHECategory => _headerRxHECategory ??= new Regex(
+        @"^(?<len>\d+)\s+(?<style>[֐-׿\s]+?)\s*-\s*(?<cat>[֐-׿][֐-׿\s""׳'\-]*)$",
+        RegexOptions.Compiled);
+
+    // То же для эстафеты: «4X50 מעורב שליחים מיקס - שומרי שבת מוקדמות צעירים».
+    private static Regex? _relayHeaderRxHECategory;
+    private static Regex RelayHeaderRxHECategory => _relayHeaderRxHECategory ??= new Regex(
+        @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)\s+(?<style>[֐-׿\s]+?)\s+" +
+        "שליח(?:ים|ות)?\\s*" +
+        "(?:" + HebrewMix + "|" + HebrewMixReversed + ")?\\s*" +
+        @"-\s*(?<cat>[֐-׿][֐-׿\s""׳'\-]*)$",
+        RegexOptions.Compiled);
+
     private static Regex GenderAgeLineRxHE => _genderAgeLineRxHE ??= new Regex(
         @"^(?<gender>" +
         GenderPatternOriginal + "|" + GenderPatternReversed +
@@ -149,6 +169,27 @@ public static class IsrOrgCompetitionParser
     // Разбор правой части EN-заголовка ("U17 Girls" / "Women" / "MIX 18-99" /
     // "Men Para") в нормализованные пол и возраст. Para/open без числа → возраст
     // "para"/"open" (чтобы Men и Men Para не схлопнулись в одно событие).
+    /// <summary>
+    /// Текстовая категория ивритского заголовка → стабильный ключ для EventCategory.
+    /// Сейчас известна одна — «שומרי שבת» (заплывы для соблюдающих субботу). Хвост вроде
+    /// «מוקדמות צעירים» — это название соревнования, в ключ его тащить незачем.
+    /// Неизвестная категория → null: событие всё равно создаётся (стиль, дистанция и дата
+    /// разбираются верно), просто без пометки программы.
+    /// </summary>
+    /// <summary>
+    /// Похожа ли (уже нормализованная) строка на заголовок нового заплыва — любой из
+    /// известных форм. Нужна там, где разбор эстафеты сканирует строки вперёд: без этой
+    /// проверки эстафета с недобранным составом съедает следующее событие целиком.
+    /// </summary>
+    private static bool IsAnyEventHeaderHE(string line) =>
+        RelayHeaderRxHE.IsMatch(line) || RelayHeaderRxHE2.IsMatch(line)
+        || RelayHeaderRxHECategory.IsMatch(line)
+        || HeaderRxHE.IsMatch(line) || HeaderRxHECategory.IsMatch(line)
+        || HeaderRxHESimple.IsMatch(line);
+
+    private static string? HeCategoryToken(string cat) =>
+        cat.Contains("שומרי שבת", StringComparison.Ordinal) ? "shabbat" : null;
+
     private static (string gender, string age) ParseEnCategory(string cat)
     {
         cat = Regex.Replace(cat.Trim(), @"\s+", " ");
@@ -745,8 +786,7 @@ public static class IsrOrgCompetitionParser
 
                 if (pendingRelayResult != null && pendingSwimmers != null && current != null)
                 {
-                    bool isNewHeader = RelayHeaderRxHE.IsMatch(line) || RelayHeaderRxHE2.IsMatch(line) ||
-                                       headerRx.IsMatch(line) || (isHE && HeaderRxHESimple.IsMatch(line));
+                    bool isNewHeader = headerRx.IsMatch(line) || (isHE && IsAnyEventHeaderHE(line));
                     bool isNewTeam = RelayTeamLineRxHE.IsMatch(line);
 
                     if (!isNewHeader && !isNewTeam && pendingSwimmers.Count < currentRelayLegs)
@@ -1099,6 +1139,45 @@ public static class IsrOrgCompetitionParser
                         continue;
                     }
 
+                    // Эстафета с текстовой категорией вместо пола+возраста («- שומרי שבת …»).
+                    var rmCat = RelayHeaderRxHECategory.Match(line);
+                    if (rmCat.Success)
+                    {
+                        int legs = int.Parse(rmCat.Groups["legs"].Value);
+                        int legLen = int.Parse(rmCat.Groups["len"].Value);
+                        var catToken = HeCategoryToken(rmCat.Groups["cat"].Value.Trim());
+                        Log($"  -> MATCH RelayHeader (текстовая категория): legs={legs}, len={legLen}, cat={catToken ?? "—"}");
+
+                        pendingEventLen = null;
+                        currentIsRelay = true;
+                        currentRelayLegs = legs;
+                        if (current != null) yield return current;
+
+                        var nextCat = i + 1 < lines.Count ? lines[i + 1].Trim() : string.Empty;
+                        var dateCatParts = nextCat.Split(' ');
+                        var dateCat = dateCatParts.Length > 1 ? dateCatParts[1] : string.Empty;
+                        if (!Regex.IsMatch(dateCat, @"^\d{2}/\d{2}/\d{4}$")) dateCat = dat_relay;
+
+                        var styleHeCat = rmCat.Groups["style"].Value.Trim();
+                        var styleNormCat = HebrewTextHelper.NormalizeStyleName(
+                            HebrewTextHelper.StyleMapHE.GetValueOrDefault(styleHeCat, styleHeCat));
+
+                        current = new IsrOrgCompetitionResult(
+                            Competition: HebrewTextHelper.NormalizeHebrewLine(lines[0].Trim()),
+                            AgeGroup: string.Empty,       // в шапке возраста нет
+                            Date: dateCat,
+                            Event: line,
+                            EventStyleName: styleNormCat,
+                            EventStyleLen: $"{legs}X{legLen}",
+                            EventStyleGender: "none",     // поплыв смешанный, пол берётся с пловца
+                            EventStyleAge: catToken ?? string.Empty,
+                            PoolType: "25m",
+                            Results: new List<IsrOrgResult>()
+                        );
+                        Log($"  -> NEW RELAY EVENT (текстовая категория): {current.Event}");
+                        continue;
+                    }
+
                     if (Regex.IsMatch(line, @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)\s+(?<style>.+?)\s+שליח(?:ים|ות)?\s*$"))
                     {
                         var mm = Regex.Match(line, @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)\s+(?<style>.+?)\s+שליח(?:ים|ות)?\s*$");
@@ -1348,8 +1427,47 @@ public static class IsrOrgCompetitionParser
                     continue;
                 }
 
+                // Личный заплыв с текстовой категорией («200 חופשי - שומרי שבת מוקדמות צעירים»).
+                // Только для известного стиля: иначе шаблон подберёт любую строку с дефисом.
                 if (isHE)
                 {
+                    var catMatch = HeaderRxHECategory.Match(line);
+                    if (catMatch.Success)
+                    {
+                        var styleHeRaw = catMatch.Groups["style"].Value.Trim();
+                        if (HebrewTextHelper.StyleMapHE.TryGetValue(styleHeRaw, out var styleMapped))
+                        {
+                            var catToken = HeCategoryToken(catMatch.Groups["cat"].Value.Trim());
+                            Log($"  -> MATCH HeaderCategory: len={catMatch.Groups["len"].Value}, style={styleHeRaw}, cat={catToken ?? "—"}");
+
+                            pendingEventLen = null;
+                            currentIsRelay = false;
+                            currentRelayLegs = 0;
+                            if (current != null) yield return current;
+
+                            var nextCat = i + 1 < lines.Count ? lines[i + 1].Trim() : string.Empty;
+                            var dateCatParts = nextCat.Split(' ');
+                            var dateCat = dateCatParts.Length > 1 ? dateCatParts[1] : string.Empty;
+                            if (!Regex.IsMatch(dateCat, @"^\d{2}/\d{2}/\d{4}$")) dateCat = dat_relay;
+
+                            current = new IsrOrgCompetitionResult(
+                                Competition: HebrewTextHelper.NormalizeHebrewLine(lines[0].Trim()),
+                                AgeGroup: string.Empty,       // в шапке возраста нет
+                                Date: dateCat,
+                                Event: line,
+                                EventStyleName: HebrewTextHelper.NormalizeStyleName(styleMapped),
+                                EventStyleLen: catMatch.Groups["len"].Value,
+                                EventStyleGender: "none",     // поплыв смешанный, пол берётся с пловца
+                                EventStyleAge: catToken ?? string.Empty,
+                                PoolType: "25m",
+                                Results: new List<IsrOrgResult>()
+                            );
+                            Log($"  -> NEW EVENT (текстовая категория): {current.Event}");
+                            continue;
+                        }
+                        Log($"  -> HeaderCategory REJECTED (неизвестный стиль '{styleHeRaw}')");
+                    }
+
                     var simpleMatch = HeaderRxHESimple.Match(line);
                     if (simpleMatch.Success)
                     {
@@ -1408,6 +1526,15 @@ public static class IsrOrgCompetitionParser
                         {
                             var sRaw = lines[k].Trim();
                             var sLine = HebrewTextHelper.NormalizeHebrewLine(sRaw);
+
+                            // Состав недобран, а началось следующее событие — дальше не идём:
+                            // иначе заголовок и результаты чужого заплыва уедут в эстафету
+                            // (год рождения в строке результата выглядит как год ноги).
+                            if (IsAnyEventHeaderHE(sLine))
+                            {
+                                Log($"  -> Состав эстафеты оборван новым заголовком: '{sLine}'");
+                                break;
+                            }
 
                             if (Regex.IsMatch(sLine, @"\b\d{4}\b"))
                             {
