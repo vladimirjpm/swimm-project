@@ -12,7 +12,8 @@ public sealed record SuspectCandidateRow(
     int? TimeMilliseconds,
     DateTime CompetitionDate,
     bool IsRelay,
-    bool TimeFail);
+    bool TimeFail,
+    string? AgeGroup);
 
 /// <summary>Вердикт по одной строке: код причины + человекочитаемое пояснение.</summary>
 public sealed record SuspectVerdict(long ResultId, string Reason, string Note);
@@ -119,8 +120,13 @@ public static class SuspectResultDetector
                 $"{Fmt(ms)} на {row.Distance} м — похоже на время отрезка {meters / 2} м, а не всей дистанции");
         }
 
-        // 3. Выброс относительно своего заплыва.
-        foreach (var grp in timed.GroupBy(r => (r.StyleName, r.Distance, r.Gender)))
+        // 3. Выброс относительно своей дисциплины В СВОЕЙ возрастной ступени.
+        //    AgeGroup в ключе обязателен: на детской лиге в одной дисциплине плывут и
+        //    восьмилетки (медиана ~59 с), и семнадцатилетние (~30 с). Без ступени медиану
+        //    задают младшие, и победители старшей группы становятся «выбросами» — 2026-08-02
+        //    так пометились 25.25 и 26.03 на 50 вольным при медиане 43.53 по всем 93 строкам.
+        //    Ошибки протокола, ради которых правило и живёт, выбиваются и внутри ступени.
+        foreach (var grp in timed.GroupBy(r => (r.StyleName, r.Distance, r.Gender, r.AgeGroup)))
         {
             if (grp.Count() < MinRowsForMedian) continue;
             var sorted = grp.Select(r => r.TimeMilliseconds!.Value).OrderBy(x => x).ToList();
@@ -128,8 +134,9 @@ public static class SuspectResultDetector
             foreach (var row in grp)
             {
                 if (row.TimeMilliseconds!.Value >= median * OutlierFactor) continue;
+                var scope = string.IsNullOrWhiteSpace(row.AgeGroup) ? "дисциплины" : $"ступени {row.AgeGroup}";
                 Flag(row, SuspectReasons.TimeOutlier,
-                    $"{Fmt(row.TimeMilliseconds.Value)} против медианы заплыва {Fmt(median)} — быстрее, чем физически правдоподобно");
+                    $"{Fmt(row.TimeMilliseconds.Value)} против медианы {scope} {Fmt(median)} — быстрее, чем физически правдоподобно");
             }
         }
 
