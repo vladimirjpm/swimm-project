@@ -63,6 +63,16 @@
     <div class="mt-2 mb-2 flex flex-wrap gap-2 text-[12.5px]">
         <button class="admin-btn admin-btn-ghost py-1 px-2.5" data-qfilter="no-swimmers">Без пловцов</button>
         <button class="admin-btn admin-btn-ghost py-1 px-2.5" data-qfilter="no-country">Без страны</button>
+        <button id="btn-del-empty" class="hidden cursor-pointer rounded-md bg-admin-danger/20 border border-admin-danger/50 px-2.5 py-1 font-semibold text-[#ef9a9a]">
+            Удалить все пустые
+        </button>
+    </div>
+    <div class="mb-2 text-[12.5px] text-admin-text-muted leading-relaxed">
+        <b>Без пловцов</b> — клубы, у которых нет ни пловцов, ни результатов: как правило мусор
+        парсера («фамилия + клуб»). Merge им не поможет (склеивать нечего), поэтому здесь есть
+        «✕» — удалить. Склеенные клубы в список не попадают: их строки-надгробия держат старые
+        ссылки <code>/clubs/{id}</code>, удалять их нельзя. <b>Без страны</b> — клубы живые,
+        им нужно проставить страну, а не удалять.
     </div>
     <div id="quality-body" class="text-[13px] text-admin-text-muted">Выбери фильтр.</div>
 </details>
@@ -290,24 +300,75 @@
         const QAPI = '/api/admin/clubs/quality';
         const wrap = document.getElementById('quality-wrap');
         const body = document.getElementById('quality-body');
+        const delAllBtn = document.getElementById('btn-del-empty');
 
         async function loadQuality(filter) {
             body.textContent = 'Загружаю…';
             try {
                 const r = await fetch(`${QAPI}?filter=${encodeURIComponent(filter)}`, { credentials: 'same-origin' });
                 const data = await r.json();
+                // Удалять предлагаем только в no-swimmers: там строки пусты по определению
+                // (0 пловцов и 0 результатов). В no-country клубы живые — им нужна страна, не нож.
+                const canDelete = filter === 'no-swimmers';
                 body.innerHTML = data.items.length === 0
                     ? `<div class="italic py-2">Нет строк (показаны ${data.items.length} из ${data.total}).</div>`
                     : `<div class="mb-1">Показаны ${data.items.length} из ${data.total}</div>
                        <div class="overflow-x-auto"><table class="admin-table">
-                        <thead><tr><th>Id</th><th>Название</th><th>EN</th><th>CountryId</th></tr></thead>
+                        <thead><tr><th>Id</th><th>Название</th><th>EN</th><th>CountryId</th>${canDelete ? '<th></th>' : ''}</tr></thead>
                         <tbody>${data.items.map(c => `
-                            <tr><td>${c.id}</td>
+                            <tr data-club="${c.id}"><td>${c.id}</td>
                                 <td dir="rtl" style="text-align:left"><a href="/Admin/Clubs/Edit?id=${c.id}" class="text-admin-accent hover:underline">${esc(c.name)}</a></td>
-                                <td>${esc(c.nameEn ?? '')}</td><td>${c.countryId ?? '—'}</td></tr>`).join('')}</tbody>
+                                <td>${esc(c.nameEn ?? '')}</td><td>${c.countryId ?? '—'}</td>${canDelete
+                                    ? `<td><button class="club-del cursor-pointer text-[#546e7a] hover:text-[#ef9a9a]" data-id="${c.id}" data-name="${esc(c.name)}" title="Удалить пустой клуб">✕</button></td>`
+                                    : ''}</tr>`).join('')}</tbody>
                        </table></div>`;
+
+                if (canDelete) [...body.querySelectorAll('.club-del')].forEach(btn =>
+                    btn.addEventListener('click', () => deleteEmpty(btn, filter)));
+
+                // «Удалить все» — только в no-swimmers и только когда есть что удалять.
+                // Считает по data.total: сервер чистит ВЕСЬ список, а не видимые топ-200.
+                delAllBtn.classList.toggle('hidden', !canDelete || data.total === 0);
+                delAllBtn.textContent = `Удалить все пустые (${data.total})`;
+                delAllBtn.dataset.total = data.total;
             } catch (e) { body.textContent = 'Ошибка: ' + e.message; }
         }
+
+        async function deleteEmpty(btn, filter) {
+            const id = btn.dataset.id;
+            const ok = await adminConfirm({
+                title: 'Удалить пустой клуб?',
+                message: `«${btn.dataset.name}» (#${id}) будет удалён из справочника НЕОБРАТИМО. Это безопасно только потому, что на клубе нет ни пловцов, ни результатов — сервер перепроверит это ещё раз.`,
+                confirmText: 'Удалить',
+                danger: true,
+            });
+            if (!ok) return;
+            try {
+                await apiJson(`${API}/${id}`, { method: 'DELETE' });
+                toast(`Клуб #${id} удалён`, 3000);
+                await loadQuality(filter);
+            } catch (e) { toast('Ошибка: ' + e.message, 6000); }
+        }
+
+        delAllBtn.addEventListener('click', async () => {
+            const total = +delAllBtn.dataset.total || 0;
+            const ok = await adminConfirm({
+                title: 'Удалить все пустые клубы?',
+                message: `Будут удалены ВСЕ ${total} клуб(ов) без пловцов и результатов — НЕОБРАТИМО. Клубы с избранным или заявкой на статус останутся, сервер их пропустит и покажет причину.`,
+                confirmText: 'Удалить все',
+                danger: true,
+                requireText: 'удалить',
+            });
+            if (!ok) return;
+            try {
+                const res = await apiJson(`${API}/delete-empty`, { method: 'POST' });
+                toast(`Удалено ${res.deleted.length}, пропущено ${res.skipped.length}`, 5000);
+                await loadQuality('no-swimmers');
+                // После перерисовки списка — иначе loadQuality затрёт отчёт.
+                if (res.skipped.length) body.insertAdjacentHTML('afterbegin',
+                    `<div class="mb-2 text-[#ef9a9a]">Пропущены:<br>${res.skipped.map(esc).join('<br>')}</div>`);
+            } catch (e) { toast('Ошибка: ' + e.message, 6000); }
+        });
 
         document.querySelectorAll('[data-qfilter]').forEach(btn =>
             btn.addEventListener('click', () => { wrap.open = true; loadQuality(btn.dataset.qfilter); }));

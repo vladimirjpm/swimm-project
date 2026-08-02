@@ -14,4 +14,18 @@ public interface IClubAdminRepository
 
     /// <summary>Обновить имя/флаги клуба. Пустое имя — ошибка.</summary>
     Task<ClubSaveResult> UpdateAsync(int id, ClubInputDto input, CancellationToken ct = default);
+
+    /// <summary>
+    /// Удалить пустой клуб — мусор парсера из фильтра «Без пловцов» (0 пловцов И 0 результатов).
+    /// Предикат перепроверяется на сервере: склеенный, псевдо- или непустой клуб удалить нельзя
+    /// (склеенные — надгробия для старых ссылок `/clubs/{id}`, их удаление ломает историю).
+    /// </summary>
+    Task<ClubDeleteResult> DeleteEmptyAsync(int id, CancellationToken ct = default);
+
+    /// <summary>
+    /// Пакетная чистка: удалить все пустые клубы (весь список фильтра «Без пловцов», не только
+    /// видимые топ-200). Каждый проходит ту же полную проверку; непрошедшие попадают в Skipped,
+    /// остальные удаляются одной транзакцией.
+    /// </summary>
+    Task<ClubBulkDeleteResult> DeleteAllEmptyAsync(CancellationToken ct = default);
 }
