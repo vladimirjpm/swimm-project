@@ -148,12 +148,18 @@ public class SwimmerDedupService(SwimmDbContext db) : ISwimmerDedupService
     }
 
     /// <summary>Критерий сироты — единственное место, где он живёт (Решение 1 в задаче B2).
-    /// Ничего не ссылается: ни результаты, ни группы (админ/пользовательские), ни избранное,
-    /// ни медиа, ни тренировки, ни привязанный аккаунт. Синтетика (SYNTH-) исключена заранее.</summary>
+    /// Ничего не ссылается: ни результаты, ни ноги эстафет, ни группы (админ/пользовательские),
+    /// ни избранное, ни медиа, ни тренировки, ни привязанный аккаунт. Синтетика (SYNTH-)
+    /// исключена заранее.
+    ///
+    /// ⚠ RelayMembers обязателен: ребёнок может плавать ТОЛЬКО эстафеты и не иметь ни одного
+    /// личного результата — без этой проверки он выглядел сиротой (2026-08-02: 102 из 109).
+    /// Удаление отбивал FK RESTRICT, но полагаться на это нельзя.</summary>
     private IQueryable<Swimm.Domain.Entities.Swimmer> OrphanQuery() =>
         db.Swimmers.AsNoTracking()
             .Where(s => s.SwimmerOrgId == null || !s.SwimmerOrgId.StartsWith("SYNTH-"))
             .Where(s => !db.Results.Any(r => r.SwimmerId == s.Id)
+                && !db.RelayMembers.Any(m => m.SwimmerId == s.Id)
                 && !db.HubGroupMembers.Any(m => m.SwimmerId == s.Id)
                 && !db.HubGroupUserMembers.Any(m => m.SwimmerId == s.Id)
                 && !db.UserFavorites.Any(f => f.SwimmerId == s.Id)

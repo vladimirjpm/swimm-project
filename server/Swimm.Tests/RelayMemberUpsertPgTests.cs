@@ -1,16 +1,22 @@
 using Microsoft.EntityFrameworkCore;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
+using Swimm.Infrastructure.Services;
 using Xunit;
 
 namespace Swimm.Tests;
 
 /// <summary>
-/// PG-специфичная регрессия для чистки пловцов-сирот при импорте. FK RelayMember→Swimmer
-/// стоит Restrict: пловца, оставшегося ногой эстафеты (RelayMember) без индивидуальных
-/// результатов, НЕЛЬЗЯ удалить как сироту — иначе импорт падает «An error occurred while
-/// saving the entity changes». Фильтр сиротства должен учитывать RelayMembers. InMemory FK
-/// Restrict не enforce'ит (баг там невидим) → тест против реального Postgres, пропуск если недоступен.
+/// PG-специфичная регрессия для чистки пловцов-сирот. FK RelayMember→Swimmer стоит Restrict:
+/// пловца, оставшегося ногой эстафеты (RelayMember) без индивидуальных результатов, НЕЛЬЗЯ
+/// удалить как сироту — иначе импорт падает «An error occurred while saving the entity changes».
+/// Критерий сиротства должен учитывать RelayMembers. InMemory FK Restrict не enforce'ит
+/// (баг там невидим) → тест против реального Postgres, пропуск если недоступен.
+///
+/// Проверяем РАБОЧИЙ критерий — через SwimmerDedupService.DeleteOrphansAsync (единственная
+/// публичная дверь к OrphanQuery). Раньше здесь лежала инлайновая копия предиката: она была
+/// «правильной» сама по себе и потому не заметила, что в сервисе проверки RelayMembers нет
+/// (2026-08-02: 102 живых эстафетчика в списке сирот). Копию предиката не возвращать.
 /// </summary>
 public class RelayMemberUpsertPgTests
 {
@@ -49,19 +55,16 @@ public class RelayMemberUpsertPgTests
                     ctx.Swimmers.Where(s => s.Id == sid).ExecuteDeleteAsync());
             }
 
-            // (2) Исправленный фильтр сиротства (с проверкой RelayMembers) НЕ считает его сиротой.
+            // (2) Сервис сиротой его не считает. Ids передаём явно — иначе прогон вычистил бы
+            // всех настоящих сирот рабочей базы (тест ходит в неё, а не в песочницу).
             await using (var ctx = new SwimmDbContext(new DbContextOptionsBuilder<SwimmDbContext>().UseNpgsql(Conn).Options))
             {
-                var wouldDelete = await ctx.Swimmers
-                    .Where(s => s.Id == sid)
-                    .Where(s => !ctx.Results.Any(r => r.SwimmerId == s.Id)
-                        && !ctx.RelayMembers.Any(m => m.SwimmerId == s.Id)   // guard, добавленный в фикс
-                        && !ctx.HubGroupMembers.Any(m => m.SwimmerId == s.Id)
-                        && !ctx.UserFavorites.Any(f => f.SwimmerId == s.Id)
-                        && !ctx.UserMedia.Any(m => m.SwimmerId == s.Id)
-                        && !ctx.AppUsers.Any(u => u.SwimmerId == s.Id))
-                    .AnyAsync();
-                Assert.False(wouldDelete, "пловец-нога не должен попадать под удаление сирот");
+                var report = await new SwimmerDedupService(ctx).DeleteOrphansAsync([sid]);
+
+                Assert.Equal(0, report.Deleted);
+                Assert.Contains(sid, report.SkippedIds);
+                Assert.True(await ctx.Swimmers.AnyAsync(s => s.Id == sid),
+                    "пловец-нога не должен попадать под удаление сирот");
             }
         }
         finally
