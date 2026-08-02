@@ -90,3 +90,58 @@ public class IsrOrgCompetitionParserShabbatHeaderTests
         Assert.Equal("13", ev.EventStyleAge);
     }
 }
+
+/// <summary>
+/// Регресс: разбор состава эстафеты не должен «съедать» следующую команду.
+///
+/// Скан ищет ноги вперёд до нужного количества. Если у команды в её блоке ног меньше
+/// (перенос имени на две строки), он уходил в блок СЛЕДУЮЩЕЙ команды, забирал оттуда пловца
+/// и перепрыгивал через её строку — команда пропадала молча, а у первой оказывалась чужая нога.
+///
+/// Найдено ретро-аудитом 2026-08-03 на соревновании 1511 (compID 6599): парсер давал 45
+/// эстафетных строк вместо 48, а в БД у команды на 3-м месте четвёртой ногой стояла пловчиха
+/// из команды на 4-м.
+/// </summary>
+public class IsrOrgRelayTeamSwallowTests
+{
+    private static readonly string[] Page =
+    {
+        "ןופצ זוחמ 2025 ףרוח םיאליגה תופילא תומדקומ",
+        "16/02/2025 - 16/02/2025",
+        "תואצות",
+        "11-10 תונב - םיחילש ישפוח 4X50",
+        "16/02/2025 09:15",
+        // Команда A: в блоке всего ТРИ ноги (четвёртая в протоколе не пропечаталась).
+        "3 םוקימ 02:23.77 הילצרה ינב 5 2",
+        "םש םש יטרפ הדיל",
+        "2014 המענ ןמטכיל",
+        "2014 הירוא ריפכ",
+        "2014 המלא ׳ץיבולקסח",
+        // Команда B — её строка НЕ должна быть проглочена сканом состава команды A.
+        "4 םוקימ 02:31.01 תרצנ יבכמ 6 1",
+        "םש םש יטרפ הדיל",
+        "2014 רונ חאבר",
+        "2014 אלח ףיס ובא",
+        "2014 אניתסירכ ןארבו׳ג",
+        "2014 הסאמ הראשב",
+    };
+
+    [Fact]
+    public void RelayLegScan_StopsAtNextTeam_BothTeamsParsed()
+    {
+        var ev = Assert.Single(IsrOrgCompetitionParser.ParseLines(new List<string[]> { Page }, "HE"));
+
+        Assert.Equal(2, ev.Results.Count);
+        Assert.Contains(ev.Results, r => r.Position != null && (int)r.Position == 3);
+        Assert.Contains(ev.Results, r => r.Position != null && (int)r.Position == 4);
+
+        // У команды A — свои три ноги, чужую она не забрала.
+        var teamA = ev.Results.Single(r => r.Position != null && (int)r.Position == 3);
+        Assert.Equal(3, teamA.RelaySwimmers?.Count);
+        Assert.DoesNotContain(teamA.RelaySwimmers!, s => s.LastName.Contains("רבאח"));
+
+        // У команды B — её собственный полный состав.
+        var teamB = ev.Results.Single(r => r.Position != null && (int)r.Position == 4);
+        Assert.Equal(4, teamB.RelaySwimmers?.Count);
+    }
+}
