@@ -783,7 +783,9 @@ else
                         sessionStorage.removeItem(PENDING_KEY);
                         sessionStorage.setItem(DONE_KEY, JSON.stringify({
                             discId, name, created: r.created ?? 0, total: r.totalRows ?? 0,
-                            skipped: r.skipped ?? 0, errors: r.errors ?? 0
+                            skipped: r.skipped ?? 0, errors: r.errors ?? 0,
+                            // Сверка с файлом (Д1): главный признак того, что импорт лёг верно.
+                            recon: r.reconciliation ?? '', reconBad: r.reconciliationMismatches ?? 0
                         }));
                         finish('ok', 'Готово. Обновляю таблицу…');
                         setTimeout(() => location.reload(), 700);
@@ -810,8 +812,15 @@ else
                     steps = [{ text: `Затянуто: создано ${d.created} из ${d.total}`, state: 'ok' }];
                     if (d.skipped) steps.push({ text: `пропущено ${d.skipped}`, state: 'wait' });
                     if (d.errors) steps.push({ text: `ошибок ${d.errors}`, state: 'fail' });
+                    // Сверка с файлом важнее счётчиков: она отвечает на вопрос «легло ли верно».
+                    if (d.recon) steps.push({ text: esc(d.recon), state: d.reconBad ? 'fail' : 'ok' });
                     render();
-                    if (!markRow(d.discId)) {
+
+                    const rowFound = markRow(d.discId);
+                    if (d.reconBad) {
+                        footer('Данные разошлись с протоколом. Разбор — <code>docs/data-integrity.md</code> §8; '
+                             + 'чаще всего лечится повторным «Перезатянуть» с галкой «удалять лишние».');
+                    } else if (!rowFound) {
                         footer('Строка не видна при текущих фильтрах — сбрось их, чтобы увидеть её со стадией «импортировано».');
                     } else {
                         footer('Дальше стоит нажать <b>⚑ Качество</b> — автозапуска проверки нет.');

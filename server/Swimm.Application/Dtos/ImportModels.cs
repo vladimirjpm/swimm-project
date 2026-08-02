@@ -57,6 +57,14 @@ public class ImportResult
     public int Deleted { get; set; }
     /// <summary>Исчезнувшие результаты, НЕ удалённые из-за навешанного UserMedia/HubGroupMedia — разберитесь руками.</summary>
     public int SkippedWithMedia { get; set; }
+
+    /* === Сверка с файлом (Д1, docs/data-integrity.md) === */
+
+    /// <summary>Человекочитаемый итог сверки «файл против БД» — показывается в панели затягивания.</summary>
+    public string Reconciliation { get; set; } = string.Empty;
+
+    /// <summary>Заплывов, где число строк в файле и в БД не совпало. &gt;0 — разбираться.</summary>
+    public int ReconciliationMismatches { get; set; }
 }
 
 /// <summary>Существующее (по ключу (Name|SubName)|Date|PoolType) соревнование, найденное для дня из превью.</summary>

@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -196,6 +197,11 @@ public class JsonImportService : IImportService
         var deleteMissing = overwriteExisting && (eventOptions?.DeleteMissing ?? false);
 
         int created = 0, skipped = 0, errors = 0;
+
+        // Сверка Д1: что обещал файл. Копим в цикле, а не пересобираем потом из items —
+        // иначе пришлось бы повторить логику резолва соревнования и стиля второй копией
+        // (правило 1 в docs/data-integrity.md: предикат живёт в одном месте).
+        var expectedByEvent = new Dictionary<(int CompetitionId, string EventKey), int>();
         var errorMessages = new List<string>();
         // Batch of ResultRecords to insert at once at the end
         var resultBatch = new List<ResultRecord>(items.Count);
@@ -362,6 +368,12 @@ public class JsonImportService : IImportService
                         verifiedNewCompetitions.Add(competition.Id);
                     }
                 }
+
+                // Сверка Д1: строка файла учтена как ожидаемая. Считаем ДО остальных шагов —
+                // если строка дальше упадёт с ошибкой, расхождение это и покажет.
+                (int CompetitionId, string EventKey) reconKey = (competition.Id, ImportReconciler.EventKey(
+                    styleName, item.EventStyleLen, item.IsRelay == true, item.EventCategory));
+                expectedByEvent[reconKey] = expectedByEvent.GetValueOrDefault(reconKey) + 1;
 
                 // 4. Club
                 var clubName = (item.Club ?? string.Empty).Trim();
@@ -781,6 +793,57 @@ public class JsonImportService : IImportService
             }
         }
 
+        // Сверка с файлом (Д1, docs/data-integrity.md). Как и пересчёт выше — ПОСЛЕ коммита
+        // и в try/catch: прибор не имеет права уронить уже загруженные результаты.
+        var reconciliationSummary = "";
+        var reconciliationMismatches = 0;
+        try
+        {
+            var competitionIds = expectedByEvent.Keys.Select(k => k.CompetitionId).Distinct().ToList();
+            if (competitionIds.Count > 0)
+            {
+                var actualRaw = await _db.Results.AsNoTracking()
+                    .Where(r => competitionIds.Contains(r.CompetitionId))
+                    .Select(r => new
+                    {
+                        r.CompetitionId,
+                        StyleName = r.Style != null ? r.Style.Name : "",
+                        r.Distance,
+                        IsRelay = r.RelayId != null,
+                        r.EventCategory
+                    })
+                    .ToListAsync();
+
+                var actualByEvent = actualRaw
+                    .GroupBy(r => (r.CompetitionId, Key: ImportReconciler.EventKey(
+                        r.StyleName, r.Distance, r.IsRelay, r.EventCategory)))
+                    .ToDictionary(g => (g.Key.CompetitionId, g.Key.Key), g => g.Count());
+
+                var rows = ImportReconciler.Build(expectedByEvent, actualByEvent);
+                var stamp = DateTime.UtcNow;
+
+                _db.ImportReconciliations.AddRange(rows.Select(r => new ImportReconciliation
+                {
+                    CompetitionId = r.CompetitionId,
+                    ImportedAt = stamp,
+                    ImportFileName = fileName ?? "unknown.json",
+                    EventKey = r.EventKey,
+                    ExpectedRows = r.Expected,
+                    ActualRows = r.Actual,
+                    Status = r.Status
+                }));
+                await _db.SaveChangesAsync();
+
+                reconciliationMismatches = rows.Count(r => r.EventKey.Length > 0 && r.IsMismatch);
+                reconciliationSummary = ImportReconciler.Describe(rows);
+                diagnosticLog.Add(reconciliationSummary);
+            }
+        }
+        catch (Exception ex)
+        {
+            diagnosticLog.Add($"Сверка с файлом не выполнена ({ex.GetType().Name}: {ex.Message}). Импорт сохранён.");
+        }
+
         await _cache.InvalidateAllAsync();
 
         // insertedCount — реально вставленные строки resultBatch (после того как сматченные
@@ -805,6 +868,8 @@ public class JsonImportService : IImportService
             Inserted = insertedCount,
             Deleted = deletedCount,
             SkippedWithMedia = skippedWithMediaCount,
+            Reconciliation = reconciliationSummary,
+            ReconciliationMismatches = reconciliationMismatches,
             Message = message
         };
         }

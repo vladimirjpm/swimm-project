@@ -56,6 +56,7 @@ public class SwimmDbContext : DbContext
 
     /* === Импорт === */
     public DbSet<ImportHistory> ImportHistory => Set<ImportHistory>();
+    public DbSet<ImportReconciliation> ImportReconciliations => Set<ImportReconciliation>();
     public DbSet<DiscoveredCompetition> DiscoveredCompetitions => Set<DiscoveredCompetition>();
 
     /* === Фавориты и медиа пользователей === */
@@ -510,6 +511,24 @@ public class SwimmDbContext : DbContext
             entity.ToTable("Sys_ImportHistory");
             entity.HasIndex(e => e.CompetitionId);
             entity.HasIndex(e => e.ImportDate);
+
+            entity.HasOne(e => e.Competition)
+                .WithMany()
+                .HasForeignKey(e => e.CompetitionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Сверка импорта (Д1): журнал «файл обещал N, в БД оказалось M» по каждому заплыву.
+        modelBuilder.Entity<ImportReconciliation>(entity =>
+        {
+            entity.ToTable("Sys_ImportReconciliation");
+            entity.HasIndex(e => e.CompetitionId);
+            entity.HasIndex(e => e.ImportedAt);
+            // Частичный индекс: расхождения — то, что спрашивают у таблицы чаще всего,
+            // а их на порядки меньше, чем успешных строк сверки.
+            entity.HasIndex(e => e.Status)
+                .HasFilter("\"Status\" = 'mismatch'")
+                .HasDatabaseName("IX_Sys_ImportReconciliation_Mismatch");
 
             entity.HasOne(e => e.Competition)
                 .WithMany()
