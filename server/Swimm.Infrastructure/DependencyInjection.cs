@@ -78,6 +78,7 @@ public static class DependencyInjection
         services.AddScoped<IClubPointsRepository, ClubPointsRepository>();
         services.AddScoped<IClubStandingService, ClubStandingService>();
         services.AddScoped<ICompetitionRecalculationService, CompetitionRecalculationService>();
+        services.AddScoped<IImportAuditService, ImportAuditService>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
 
         // Локальный вход (email + пароль)

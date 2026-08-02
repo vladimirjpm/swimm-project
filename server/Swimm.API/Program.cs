@@ -246,6 +246,50 @@ if (args.Contains("--seed-dolphin-training"))
     return;
 }
 
+// Ретро-сверка загруженных протоколов с источником (docs/data-integrity.md, фаза Д1):
+//   dotnet run -- --audit-imports [--id <discoveredId>] [--limit N]
+// Качает протокол заново, парсит ТЕКУЩИМ парсером и сравнивает с БД. Диагноз, а не лечение:
+// результаты не меняются, пишется только журнал сверки. Ходит в чужой прод — с паузами,
+// поэтому первый прогон удобно делать на одной записи (--id или --limit 1).
+if (args.Contains("--audit-imports"))
+{
+    using var scope = app.Services.CreateScope();
+    var audit = scope.ServiceProvider.GetRequiredService<IImportAuditService>();
+
+    int? Arg(string name)
+    {
+        var i = Array.IndexOf(args, name) + 1;
+        return i > 0 && i < args.Length && int.TryParse(args[i], out var v) ? v : null;
+    }
+
+    var reports = Arg("--id") is int oneId
+        ? [await audit.AuditDiscoveredAsync(oneId)]
+        : await audit.AuditAllAsync(Arg("--limit"));
+
+    foreach (var r in reports)
+    {
+        Console.WriteLine($"\n#{r.DiscoveredId} (compID {r.OrgCompId}) «{r.Name}»");
+        if (r.Error != null) { Console.WriteLine($"  ОШИБКА: {r.Error}"); continue; }
+
+        foreach (var d in r.Days)
+        {
+            if (d.CompetitionId == null)
+            {
+                Console.WriteLine($"  {d.Date}: дня нет в БД (файл обещает {d.ExpectedRows} строк)");
+                continue;
+            }
+            var verdict = d.Mismatches.Count == 0 ? "сошлось" : $"РАСХОЖДЕНИЙ {d.Mismatches.Count}";
+            Console.WriteLine($"  {d.Date} → comp {d.CompetitionId} «{d.CompetitionName}»: файл {d.ExpectedRows}, БД {d.ActualRows} — {verdict}");
+            foreach (var m in d.Mismatches)
+                Console.WriteLine($"      {m.EventKey}: файл {m.ExpectedRows}, БД {m.ActualRows}");
+        }
+    }
+
+    var bad = reports.Count(r => r.HasProblems);
+    Console.WriteLine($"\nИтог: проверено {reports.Count}, с проблемами {bad}. Журнал — Sys_ImportReconciliation (ImportFileName начинается с 'audit:').");
+    return;
+}
+
 // Разовая синхронизация «входящих» автозабора isr.org.il (фаза 6) и выход:
 //   dotnet run -- --discovery-sync
 if (args.Contains("--discovery-sync"))

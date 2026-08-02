@@ -30,6 +30,26 @@ public class ImportReconcilerTests
     }
 
     [Fact]
+    public void EventKeyCoarse_IgnoresCategory()
+    {
+        // Ретро-аудит: колонка EventCategory появилась 2026-07-28, у старых импортов она
+        // пустая. Полным ключом такое соревнование выглядело бы сплошным расхождением
+        // (первый прогон аудита: 348 строк «не сошлись» при полном совпадении по сути).
+        Assert.Equal(
+            ImportReconciler.EventKeyCoarse("freestyle", "100", false),
+            ImportReconciler.EventKeyCoarse("freestyle", "100", false));
+
+        Assert.NotEqual(
+            ImportReconciler.EventKey("freestyle", "100", false, "12"),
+            ImportReconciler.EventKey("freestyle", "100", false, null));
+
+        // При этом «уехало в чужой заплыв» грубый ключ ловит по-прежнему.
+        Assert.NotEqual(
+            ImportReconciler.EventKeyCoarse("freestyle", "200", false),
+            ImportReconciler.EventKeyCoarse("individual_medley", "4X50", true));
+    }
+
+    [Fact]
     public void Build_AllMatch_NoMismatches()
     {
         var expected = Map((1, "freestyle|50|0|12", 30), (1, "freestyle|4X50|1|mix-12", 4));
