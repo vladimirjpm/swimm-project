@@ -89,11 +89,16 @@ export default function CompetitionClubs({ sourceParams, onOpenSwimsForClub }: P
     (isCombined ? r.combined_club_points ?? r.club_points : r.club_points) ?? 0;
 
   const clubSwimmers = useMemo(() => {
-    const bySwimmer = new Map<string, { name: string; swims: number; gold: number; silver: number; bronze: number; bestPts: number }>();
+    // ⚠ У эстафеты «участник» — это КОМАНДА, а имя команды равно названию клуба, поэтому
+    // все эстафеты клуба схлопываются в одну строку с названием клуба. Без пометки она
+    // читается как пловец-фантом («кто этот пловец с именем клуба на 8 заплывов?»).
+    // Бейдж «relay» тут такой же, как на вкладке Points.
+    const bySwimmer = new Map<string, { name: string; swims: number; gold: number; silver: number; bronze: number; bestPts: number; isRelay: boolean }>();
     for (const r of clubRows) {
       const name = entrantOf(r);
-      const e = bySwimmer.get(name) ?? { name, swims: 0, gold: 0, silver: 0, bronze: 0, bestPts: 0 };
+      const e = bySwimmer.get(name) ?? { name, swims: 0, gold: 0, silver: 0, bronze: 0, bestPts: 0, isRelay: false };
       e.swims += 1;
+      if (r.is_relay) e.isRelay = true;
       const pos = placeOf(r);
       if (pos === 1) e.gold += 1;
       else if (pos === 2) e.silver += 1;
@@ -251,7 +256,15 @@ export default function CompetitionClubs({ sourceParams, onOpenSwimsForClub }: P
                 <tbody>
                   {clubSwimmers.map((s) => (
                     <tr key={s.name} className="border-t" style={{ borderColor: 'var(--theme-mode-border)' }}>
-                      <td className="py-1.5 pr-2 font-bold" dir="auto">{s.name}</td>
+                      <td className="py-1.5 pr-2 font-bold" dir="auto">
+                        {s.name}
+                        {s.isRelay && (
+                          <span className="ml-1.5 rounded-full px-1.5 py-px text-[9.5px] font-extrabold uppercase tracking-wide"
+                            style={{ background: ROW_SELECTED_BG, color: 'var(--theme-primary)' }}>
+                            relay
+                          </span>
+                        )}
+                      </td>
                       <td className="py-1.5 pr-2">{s.swims}</td>
                       <td className="py-1.5 pr-2 whitespace-nowrap">
                         {s.gold > 0 && `🥇${s.gold} `}
