@@ -65,18 +65,14 @@ public class ImportAuditService(
         if (items.Count == 0)
             return new ImportAuditReport(discoveredId, row.OrgCompId, row.Name, "Файл распознан, но строк нет", []);
 
-        // 2. Дни БД: от штампа OrgCompId к соревнованию, от него — ко всем дням события.
-        var stamped = await db.Competitions.AsNoTracking().FirstOrDefaultAsync(c => c.OrgCompId == row.OrgCompId, ct);
-        if (stamped == null)
+        // 2. Дни БД — тем же резолвом, что и импорт (CompetitionIdentity): иначе аудит
+        // отчитывался бы про одни дни, а переимпорт писал в другие.
+        var dbDays = await CompetitionIdentity.ResolveDaysAsync(db, row.OrgCompId, ct);
+        if (dbDays.Count == 0)
             return new ImportAuditReport(discoveredId, row.OrgCompId, row.Name,
-                "В БД нет соревнования со штампом этого OrgCompId — сверять не с чем", []);
+                "В БД нет соревнования со штампом этого compID — сверять не с чем", []);
 
-        var dbDays = stamped.EventId is int eventId
-            ? await db.Competitions.AsNoTracking().Where(c => c.EventId == eventId).ToListAsync(ct)
-            : [stamped];
-        var dbByDate = dbDays
-            .GroupBy(c => c.Date)
-            .ToDictionary(g => g.Key, g => g.First());
+        var dbByDate = ImportCompetitionMatcher.BuildDateIndex(dbDays, c => c.Date);
 
         // 3. Ожидаемое из файла — той же функцией, что штатная сверка импорта.
         var expectedByDay = items

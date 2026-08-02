@@ -153,6 +153,19 @@ public class JsonImportService : IImportService
             await _db.Competitions.AsNoTracking().ToListAsync(),
             c => c.Name, c => c.SubName, c => c.Date, c => c.PoolType);
 
+        // Идентичность по штампу сайта (Д2, docs/data-integrity.md). Если импорт знает compID,
+        // сначала ищем СВОИ дни по дате внутри связанного соревнования/события, и только потом
+        // падаем на матчинг по имени. Штамп живёт либо на одиночном соревновании
+        // (Competition.OrgCompId — альтернативный ключ), либо на событии (CompetitionEvent.OrgCompId).
+        var linkedDaysByDate = new Dictionary<string, Competition>();
+        if (orgCompId is int linkOrgCompId)
+        {
+            var linkedDays = await CompetitionIdentity.ResolveDaysAsync(_db, linkOrgCompId);
+            linkedDaysByDate = ImportCompetitionMatcher.BuildDateIndex(linkedDays, c => c.Date);
+            if (linkedDaysByDate.Count > 0)
+                diagnosticLog.Add($"Идентичность: compID {linkOrgCompId} → {linkedDaysByDate.Count} день(дней) в БД, матчинг по дате");
+        }
+
         // Clubs: AsNoTracking — we only read their IDs.
         // Склеенные (MergedIntoId) в кэш НЕ попадают: иначе импорт нашёл бы дубль по имени
         // и повесил новые результаты на клуб, которого уже нет, — merge молча откатился бы.
@@ -288,6 +301,13 @@ public class JsonImportService : IImportService
                 // приходит из файла в сыром виде ("25"/"25m") — сравнивать нужно нормализованное с
                 // нормализованным, иначе тот же промах мимо кэша, что и с Name/SubName.
                 var compKey = ImportCompetitionMatcher.Key(displayName, item.Date ?? string.Empty, NormalizePoolType(item.PoolType));
+
+                // Д2: день, привязанный к тому же compID, узнаём ПО ДАТЕ — даже если название
+                // разошлось. Кладём находку в кэш под именным ключом, чтобы весь дальнейший
+                // цикл (upsert-пометка, категории, touched) работал как обычно.
+                if (linkedDaysByDate.TryGetValue(item.Date ?? string.Empty, out var linkedDay))
+                    competitionCache.TryAdd(compKey, linkedDay);
+
                 if (!competitionCache.TryGetValue(compKey, out var competition))
                 {
                     competition = new Competition
@@ -742,6 +762,21 @@ public class JsonImportService : IImportService
                 {
                     primary.OrgCompId = oc;
                     await _db.SaveChangesAsync();
+                }
+            }
+
+            // Д2: штамп ещё и на СОБЫТИИ — иначе у многодневки идентичность есть только у
+            // первого дня (AK на Competition.OrgCompId уникален, трём дням его не раздать),
+            // и переимпорт снова искал бы дни 2–3 по названию.
+            var stampEventId = primary.EventId ?? competitionCache[touchedCompetitionKeys[0]].EventId;
+            if (stampEventId is int evId)
+            {
+                var ev = await _db.CompetitionEvents.FirstOrDefaultAsync(e => e.Id == evId);
+                if (ev != null && ev.OrgCompId != oc)
+                {
+                    ev.OrgCompId = oc;
+                    await _db.SaveChangesAsync();
+                    diagnosticLog.Add($"Идентичность: событие {evId} помечено compID {oc}");
                 }
             }
         }

@@ -131,6 +131,9 @@ public class SwimmDbContext : DbContext
         modelBuilder.Entity<CompetitionEvent>(entity =>
         {
             entity.ToTable("CompetitionEvents");
+            // Штамп сайта на событии (Д2). Индекс НЕ уникальный: одному событию могут
+            // соответствовать две записи Discovery (6621 и 6622 → один и тот же протокол).
+            entity.HasIndex(e => e.OrgCompId);
         });
 
         modelBuilder.Entity<CompetitionResultUrl>(entity =>
