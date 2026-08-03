@@ -85,6 +85,10 @@ public static class DependencyInjection
         // IDataCheck — добавить новую значит добавить строку сюда, ничего больше не трогая.
         services.AddScoped<IDataCheckRunner, DataCheckRunner>();
         services.AddScoped<IDataCheck, ExactDuplicateCheck>();
+        services.AddScoped<IDataCheck, UpsertKeyCollisionCheck>();
+        services.AddScoped<IDataCheck, RelayGenderFromLegCheck>();
+        services.AddScoped<IDataCheck, DuplicateEventDayCheck>();
+        services.AddScoped<IDataCheck, EmptyCompetitionCheck>();
         services.AddScoped<IDataCheck, RelayDistanceWithoutRelayCheck>();
         services.AddScoped<IDataCheck, FkAnomalyCheck>();
         services.AddScoped<IDataCheck, ReconciliationMismatchCheck>();
