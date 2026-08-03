@@ -75,6 +75,7 @@ function ClubRecordWall({ clubId }: Props) {
           // Style в Records — сырой ключ (individual_medley), это только косметика.
           secondLine={`${r.distance} ${r.style.replace(/_/g, ' ')} · ${r.pool_type.toUpperCase()}`}
           time={r.time}
+          quality={r.issue_reason ? { kind: 'record', reason: r.issue_reason } : null}
           name={r.holder_name}
           footnote={r.record_date || '—'}
         />

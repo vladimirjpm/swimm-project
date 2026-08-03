@@ -1,6 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
+using Swimm.Domain.Entities;
 using Swimm.Domain;
 using Swimm.Infrastructure.Data;
 
@@ -362,7 +364,8 @@ public class ClubPublicRepository : IClubPublicRepository
                 Time = r.Time,
                 HolderName = r.HolderName ?? "",
                 Club = r.Club!,
-                RecordDate = r.RecordDate ?? ""
+                RecordDate = r.RecordDate ?? "",
+                IssueReason = null,   // проставляется ниже по реестру претензий
             })
             .OrderBy(r => CategoryOrder(r.Category))
             .ThenBy(r => r.AgeKey.Length)
@@ -372,6 +375,32 @@ public class ClubPublicRepository : IClubPublicRepository
             .ThenBy(r => r.Distance)
             .ThenBy(r => r.Gender)
             .ToList();
+
+        // Метка «запись оспаривается» — тот же реестр и тот же ключ, что у публичного API
+        // рекордов (RecordIssueKey): иначе значок был бы на одной странице и пропадал на другой.
+        var open = await _read.RecordIssues.AsNoTracking()
+            .Where(i => i.Status == RecordIssueStatuses.Open
+                     || i.Status == RecordIssueStatuses.Reported
+                     || i.Status == RecordIssueStatuses.Accepted)
+            .Select(i => new
+            {
+                i.RegionType, i.RegionCode, i.Category, i.AgeKey, i.Gender,
+                i.PoolType, i.Style, i.Distance, i.FlaggedTime, i.Reason
+            })
+            .ToListAsync();
+
+        if (open.Count > 0)
+        {
+            var byKey = new Dictionary<string, string>();
+            foreach (var i in open)
+                byKey[RecordIssueKey.Of(i.RegionType, i.RegionCode, i.Category, i.AgeKey,
+                    i.Gender, i.PoolType, i.Style, i.Distance, i.FlaggedTime)] = i.Reason;
+
+            foreach (var r in matched)
+                r.IssueReason = byKey.GetValueOrDefault(RecordIssueKey.Of(
+                    r.RegionType, r.RegionCode, r.Category, r.AgeKey,
+                    r.Gender, r.PoolType, r.Style, r.Distance, r.Time));
+        }
 
         return new ClubRecordWallDto { MatchedNames = names, Data = matched };
     }

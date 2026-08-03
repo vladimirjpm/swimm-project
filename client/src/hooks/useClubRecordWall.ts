@@ -26,6 +26,8 @@ export interface ClubOfficialRecord {
   distance: string;
   /** Строкой как в источнике — миллисекунд в Records нет. */
   time: string;
+  /** Открытая претензия к записи справочника (И11 для рекордов). null — не оспаривается. */
+  issue_reason?: string | null;
   holder_name: string;
   club: string;
   record_date: string;

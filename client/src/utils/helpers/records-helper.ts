@@ -32,6 +32,8 @@ interface RecordDto {
   style: string;
   distance: string;
   time: string;
+  /** Открытая претензия к записи справочника; null — не оспаривается. */
+  issue_reason?: string | null;
   holder_name?: string | null;
   club?: string | null;
   holder_country?: string | null;
@@ -53,6 +55,7 @@ interface NormativeStandardDto {
 
 export interface OpenRecordCell {
   time: string;
+  issue_reason?: string | null;
   name: string | null;
   country?: string | null;
   record_date?: string | null;
@@ -64,6 +67,7 @@ export type OpenRecordsTree = {
 
 export interface AgeRecordCell {
   time: string;
+  issue_reason?: string | null;
   name: string | null;
   club?: string | null;
   country?: string | null;
@@ -154,6 +158,7 @@ export default class RecordsHelper {
         tree.normatives[g][p][rec.style][rec.distance] ??= {};
         tree.normatives[g][p][rec.style][rec.distance][kind] = {
           time: rec.time,
+          issue_reason: rec.issue_reason ?? null,
           name: rec.holder_name ?? null,
           country: rec.holder_country,
           record_date: rec.record_date,
@@ -181,6 +186,7 @@ export default class RecordsHelper {
         tree.normatives[g][p][rec.style][rec.distance] ??= {};
         tree.normatives[g][p][rec.style][rec.distance][rec.age_key] = {
           time: rec.time,
+          issue_reason: rec.issue_reason ?? null,
           name: rec.holder_name ?? null,
           club: rec.club,
           country: rec.holder_country,

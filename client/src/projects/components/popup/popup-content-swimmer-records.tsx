@@ -3,6 +3,7 @@ import { useAppSelector } from '../../../store/store';
 import { SwimmerRecord } from '../../../utils/helpers/helper-normative';
 import UI_SwimmStyleIcon from '../mix/swimm-style-icon/swimm-style-icon';
 import UI_PoolIcon from '../mix/pool-icon/pool-icon';
+import UI_SwimTime from '../mix/swim-time/swim-time';
 
 interface PopupData {
   swimmerName: string;
@@ -62,7 +63,12 @@ const PopupContentSwimmerRecords: React.FC = () => {
                   />
                 </td>
                 <td className="px-3 py-1.5 border font-medium">{rec.ageKey}</td>
-                <td className="px-3 py-1.5 border font-bold">{rec.time}</td>
+                <td className="px-3 py-1.5 border font-bold">
+                  <UI_SwimTime
+                    time={rec.time}
+                    quality={rec.issueReason ? { kind: 'record', reason: rec.issueReason } : null}
+                  />
+                </td>
                 <td className="px-3 py-1.5 border text-gray-600">{rec.club}</td>
                 <td className="px-3 py-1.5 border text-gray-500">{rec.recordDate}</td>
               </tr>

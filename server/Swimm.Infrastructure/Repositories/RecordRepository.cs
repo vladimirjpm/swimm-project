@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
+using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
 namespace Swimm.Infrastructure.Repositories;
@@ -64,9 +66,46 @@ public class RecordRepository : IRecordRepository
             })
             .ToListAsync();
 
+        // Метка «запись оспаривается» (docs/plans/records-quality-plan.md). Отдельным запросом,
+        // а не JOIN: претензий десятки на 1.9к рекордов, а ключ сопоставления — 8 осей ПЛЮС
+        // время, что в SQL-джойне читалось бы куда хуже, чем словарь в памяти.
+        var issues = await OpenIssuesAsync();
+        foreach (var r in records)
+            r.IssueReason = issues.GetValueOrDefault(RecordIssueKey.Of(
+                r.RegionType, r.RegionCode, r.Category, r.AgeKey,
+                r.Gender, r.PoolType, r.Style, r.Distance, r.Time));
+
         await _cache.SetAsync(cacheKey, (IReadOnlyList<RecordDto>)records, CacheTtl);
 
         return records;
+    }
+
+    /// <summary>
+    /// Открытые претензии по ключу «оси + время». Закрытые (<c>rejected</c> — разобрались,
+    /// запись верна; <c>fixed-by-source</c> — федерация уже исправила) метку не дают: иначе
+    /// значок висел бы вечно и обесценился.
+    /// </summary>
+    private async Task<Dictionary<string, string>> OpenIssuesAsync()
+    {
+        var open = await _db.RecordIssues.AsNoTracking()
+            .Where(i => i.Status == RecordIssueStatuses.Open
+                     || i.Status == RecordIssueStatuses.Reported
+                     || i.Status == RecordIssueStatuses.Accepted)
+            .Select(i => new
+            {
+                i.RegionType, i.RegionCode, i.Category, i.AgeKey, i.Gender,
+                i.PoolType, i.Style, i.Distance, i.FlaggedTime, i.Reason
+            })
+            .ToListAsync();
+
+        var map = new Dictionary<string, string>();
+        foreach (var i in open)
+        {
+            var key = RecordIssueKey.Of(i.RegionType, i.RegionCode, i.Category, i.AgeKey,
+                i.Gender, i.PoolType, i.Style, i.Distance, i.FlaggedTime);
+            map[key] = i.Reason;
+        }
+        return map;
     }
 
     public async Task<IReadOnlyList<NormativeStandardDto>> GetStandardsAsync(string? kind = null, string? country = null)

@@ -233,6 +233,13 @@ public sealed class ClubOfficialRecordDto
     [JsonPropertyName("time")]
     public string Time { get; set; } = "";
 
+    /// <summary>
+    /// Открытая претензия к записи справочника (<c>Sys_RecordIssues</c>): код причины,
+    /// null — не оспаривается. Источник не правим, помечаем.
+    /// </summary>
+    [JsonPropertyName("issue_reason")]
+    public string? IssueReason { get; set; }
+
     /// <summary>Держатель; у эстафет — четыре имени через запятую.</summary>
     [JsonPropertyName("holder_name")]
     public string HolderName { get; set; } = "";

@@ -1,4 +1,5 @@
 import React from 'react';
+import UI_SwimTime, { SwimQuality } from '../../components/mix/swim-time/swim-time';
 
 /**
  * Общая карточка «стена времён» — оболочка + плитка, на которых собраны ОБЕ карточки
@@ -95,9 +96,11 @@ interface TileProps {
   footnote: string;
   /** Если задан — плитка становится ссылкой (у официальных рекордов ссылки нет). */
   href?: string;
+  /** Качество времени (И11). Для официальных рекордов — kind='record'. */
+  quality?: SwimQuality | null;
 }
 
-function ClubRecordTile({ gender, topLine, topTone, secondLine, time, name, footnote, href }: TileProps) {
+function ClubRecordTile({ gender, topLine, topTone, secondLine, time, name, footnote, href, quality }: TileProps) {
   const isFemale = gender === 'female';
   const className = `deep-record-tile ${isFemale ? 'deep-record-tile--f' : 'deep-record-tile--m'}`;
 
@@ -128,7 +131,7 @@ function ClubRecordTile({ gender, topLine, topTone, secondLine, time, name, foot
         className="mt-1 text-[22px] leading-none tabular-nums"
         style={{ fontFamily: 'var(--deep-font-display)', color: 'var(--deep-text)' }}
       >
-        {time}
+        <UI_SwimTime time={time} quality={quality} />
       </div>
 
       <div className="mt-2 truncate text-[12px] font-bold" style={{ color: 'var(--deep-text)' }} title={name}>

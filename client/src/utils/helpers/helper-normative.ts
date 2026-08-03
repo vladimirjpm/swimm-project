@@ -375,6 +375,7 @@ export default class HelperNormative {
                     distance,
                     ageKey,
                     time: record.time,
+                    issueReason: record.issue_reason ?? null,
                     club: record.club,
                     recordDate: record.record_date,
                     isMasters,
@@ -401,6 +402,8 @@ export interface SwimmerRecord {
   distance: string;
   ageKey: string;
   time: string;
+  /** Открытая претензия к записи справочника (И11 для рекордов). */
+  issueReason?: string | null;
   club: string;
   recordDate: string;
   isMasters: boolean;
