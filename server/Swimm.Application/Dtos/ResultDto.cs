@@ -79,6 +79,16 @@ public class ResultDto
     [JsonPropertyName("event_category")]
     public string? EventCategory { get; set; }
 
+    /// <summary>
+    /// Заплыв помечен как недостоверный: ошибка САМОГО протокола (docs/data-integrity.md).
+    /// Строка остаётся в результатах — мы не переписываем протокол, — но клиент обязан
+    /// показать это глазом, иначе бессмыслица вроде 200 вольным за 1:53 у 13-летнего
+    /// выглядит как достижение и получает бейдж рекорда.
+    /// null — строка в порядке.
+    /// </summary>
+    [JsonPropertyName("suspect_reason")]
+    public string? SuspectReason { get; set; }
+
     [JsonPropertyName("pool_type")]
     public string PoolType { get; set; } = string.Empty;
 

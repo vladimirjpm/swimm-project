@@ -41,6 +41,24 @@
         return (n % 10) switch { 1 => "день", >= 2 and <= 4 => "дня", _ => "дней" };
     }
 
+    // Состояние проверки качества у строки. Три состояния, и «не проверялось» — отдельное:
+    // пустой список без отметки о прогоне читался бы как «всё чисто», хотя никто не смотрел.
+    //   есть помеченные  → оранжевый бейдж с числом (работа);
+    //   проверено, пусто → зелёная галочка с датой прогона;
+    //   не проверялось   → ничего, чтобы не создавать ложного успокоения.
+    static string QualityBadge(DateTime? scannedAt, int suspectCount)
+    {
+        if (suspectCount > 0)
+            return $"<span class=\"inline-block mr-1 py-0.5 px-1.5 rounded text-[10px] font-bold bg-admin-warning/15 text-admin-warning\" " +
+                   $"title=\"Помеченных недостоверными строк: {suspectCount}\">⚑ {suspectCount}</span>";
+
+        if (scannedAt is { } at)
+            return $"<span class=\"inline-block mr-1 py-0.5 px-1.5 rounded text-[10px] font-bold bg-admin-success/15 text-admin-success\" " +
+                   $"title=\"Проверено {at.ToLocalTime():dd.MM.yyyy HH:mm} — подозрительных строк нет\">✓</span>";
+
+        return "";
+    }
+
     // Бейджи языков загруженных PDF (he — синий, en — фиолетовый).
     static string LangBadges(string? languages)
     {
@@ -273,6 +291,7 @@ else
                                    её нужно нажимать вручную — автозапуска нет. *@
                                 @if (ev.TotalResultCount > 0)
                                 {
+                                    @Html.Raw(QualityBadge(ev.QualityScannedAt, ev.SuspectCount))
                                     <button type="button" class="admin-btn admin-btn-primary py-1 px-2.5 quality-btn"
                                             data-event-id="@ev.EventId"
                                             data-title="@ev.EventName"
@@ -321,6 +340,7 @@ else
                                 @* См. комментарий у события: кнопка вынесена из панели в строку. *@
                                 @if (c.ResultCount > 0)
                                 {
+                                    @Html.Raw(QualityBadge(c.QualityScannedAt, c.SuspectCount))
                                     <button type="button" class="admin-btn admin-btn-primary py-1 px-2.5 quality-btn"
                                             data-competition-id="@c.Id"
                                             data-title="@c.Name"

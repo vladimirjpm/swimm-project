@@ -142,6 +142,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
           firstLineClassName="text-[21px] font-bold tabular-nums tracking-tight flex justify-start"
           secondLineClassName="text-xs justify-start"
           isRecordHolder={isRecordTime}
+          isSuspect={!!res.suspect_reason}
         />
       </div>
 

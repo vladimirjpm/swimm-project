@@ -12,6 +12,12 @@ interface UI_SwimmerTimeCellProps {
   secondLineClassName?: string;
   className?: string;
   isRecordHolder?: boolean;
+  /**
+   * Заплыв помечен админом как ошибка протокола (`suspect_reason`). Строку не прячем —
+   * протокол напечатан так, как напечатан, — но время подаём как спорное, иначе
+   * бессмыслица читается как достижение.
+   */
+  isSuspect?: boolean;
 }
 
 const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
@@ -23,6 +29,7 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
   secondLineClassName = 'text-xs',
   className = '',
   isRecordHolder = false,
+  isSuspect = false,
 }) => {
   const [splitOpen, setSplitOpen] = useState(false);
 
@@ -48,6 +55,16 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
             style={{ background: 'linear-gradient(135deg,#f0b429,#c8860a)', boxShadow: '0 2px 8px rgba(200,134,10,0.45)' }}
           >
             ★ NEW RECORD
+          </span>
+        </div>
+      )}
+      {isSuspect && (
+        <div className="mb-1 flex justify-start">
+          <span
+            className="inline-flex items-center gap-1 rounded-[7px] border border-current px-1.5 py-0.5 text-[8.5px] font-extrabold tracking-wide text-amber-600 dark:text-amber-400"
+            title="Время не сходится с остальным протоколом — вероятно, ошибка в самом протоколе. Мы не правим источник, а помечаем."
+          >
+            ⚠ CHECK SOURCE
           </span>
         </div>
       )}

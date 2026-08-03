@@ -90,6 +90,19 @@ public class SuspectResultServiceSearchTests
     }
 
     [Fact]
+    public async Task Scan_StampsCompetition_SoEmptyListIsNotConfusedWithNeverChecked()
+    {
+        // «Проверили и чисто» и «никто не смотрел» — разные вещи. Без отметки список
+        // соревнований не мог бы покрасить первое зелёным, а второе оставить нейтральным.
+        await using var db = await SeedAsync(nameof(Scan_StampsCompetition_SoEmptyListIsNotConfusedWithNeverChecked));
+        Assert.Null((await db.Competitions.SingleAsync()).QualityScannedAt);
+
+        await new SuspectResultService(db, new NullCache()).ScanAsync(null, 1527);
+
+        Assert.NotNull((await db.Competitions.SingleAsync()).QualityScannedAt);
+    }
+
+    [Fact]
     public async Task ManualFlag_ThenSearch_ShowsRowAsAlreadyFlagged()
     {
         await using var db = await SeedAsync(nameof(ManualFlag_ThenSearch_ShowsRowAsAlreadyFlagged));

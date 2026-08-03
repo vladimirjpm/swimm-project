@@ -428,8 +428,12 @@ function ResultsTable() {
                 age: res.event_style_age,
                 isMasters: isMaster,
               };
-              const isRecordHolder = Helper.isRecordHolder({ swimmerName, ...recordParams });
-              const isRecordTime = Helper.isRecordTime({ time: res.time, ...recordParams });
+              // Заплыв, помеченный админом как ошибка протокола, НЕ носит бейдж рекорда:
+              // иначе бессмыслица (200 вольным за 1:53 у 13-летнего) выглядит достижением.
+              // Строку при этом не прячем — протокол напечатан так, как напечатан.
+              const isSuspect = !!res.suspect_reason;
+              const isRecordHolder = !isSuspect && Helper.isRecordHolder({ swimmerName, ...recordParams });
+              const isRecordTime = !isSuspect && Helper.isRecordTime({ time: res.time, ...recordParams });
               const levelInfo = Helper.getNormativeLevelInfo({
                 gender: genderForRecord,
                 poolType: Helper.resolvePoolType(res.pool_type),

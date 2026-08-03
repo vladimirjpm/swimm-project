@@ -333,6 +333,12 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                     Days = days,
                     DayCount = days.Count,
                     TotalResultCount = days.Sum(d => d.ResultCount),
+                    SuspectCount = days.Sum(d => d.SuspectCount),
+                    // Событие проверено, только если проверены ВСЕ дни; показываем самый
+                    // старый прогон — по нему видно, не устарела ли проверка.
+                    QualityScannedAt = days.All(d => d.QualityScannedAt != null)
+                        ? days.Min(d => d.QualityScannedAt)
+                        : null,
                     DateRange = FormatDateRange(days),
                     PoolType = days[0].PoolType,
                     Country = days[0].Country,
@@ -444,7 +450,9 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         ResultCount = _db.Results.Count(r => r.CompetitionId == c.Id),
         ResultUrlCount = c.OrgCompId != null
             ? _db.CompetitionResultUrls.Count(u => u.OrgCompId == c.OrgCompId)
-            : 0
+            : 0,
+        QualityScannedAt = c.QualityScannedAt,
+        SuspectCount = _db.Results.Count(r => r.CompetitionId == c.Id && r.SuspectReason != null)
     };
 
     /// <summary>«дд/ММ/гггг – дд/ММ/гггг» по дням события (или один день, если даты совпали).</summary>

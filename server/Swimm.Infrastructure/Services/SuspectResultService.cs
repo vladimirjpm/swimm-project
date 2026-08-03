@@ -63,6 +63,14 @@ public class SuspectResultService(SwimmDbContext db, ICacheService cache) : ISus
             }
         }
 
+        // Отметка «проверка была». Без неё пустой список неотличим от «никто не смотрел»,
+        // и в списке соревнований нечего было бы красить зелёным.
+        var scanStamp = DateTime.UtcNow;
+        var scannedCompetitions = eventId is { } eid
+            ? await db.Competitions.Where(c => c.EventId == eid).ToListAsync(ct)
+            : await db.Competitions.Where(c => c.Id == competitionId).ToListAsync(ct);
+        foreach (var c in scannedCompetitions) c.QualityScannedAt = scanStamp;
+
         await db.SaveChangesAsync(ct);
         // Рекорды в шапке соревнования считаются с учётом пометок — сбрасываем кэш.
         await cache.InvalidateAllAsync();

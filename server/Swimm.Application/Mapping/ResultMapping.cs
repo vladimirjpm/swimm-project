@@ -35,6 +35,7 @@ public static class ResultMapping
         Gender = r.Gender,
         EventStyleAge = r.EventStyleAge,
         EventCategory = r.EventCategory,
+        SuspectReason = r.SuspectReason,
         PoolType = r.Competition.PoolType,
         Position = r.Position,
         PositionAgeGroup = r.PositionAgeGroup,

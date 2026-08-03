@@ -38,6 +38,14 @@ public sealed class CompetitionListItemDto : ICompetitionFlags
     public int? DayNumber { get; set; }
     public int ResultCount { get; set; }
     public int ResultUrlCount { get; set; }
+
+    /// <summary>
+    /// Когда в последний раз гоняли проверку качества. null — не гоняли; это НЕ «ошибок нет».
+    /// </summary>
+    public DateTime? QualityScannedAt { get; set; }
+
+    /// <summary>Помеченных недостоверными строк сейчас (авто + ручные).</summary>
+    public int SuspectCount { get; set; }
     /// <summary>Привязанное правило клубных очков; null — «Авто» (для панели быстрой правки).</summary>
     public int? PointRuleClubsId { get; set; }
     /// <summary>Привязанное правило High Point; null — «Авто».</summary>
@@ -72,6 +80,13 @@ public sealed class CompetitionRowDto : ICompetitionFlags
     public string? Country { get; set; }
     public int DayCount { get; set; }
     public int TotalResultCount { get; set; }
+
+    /// <summary>Проверка качества по СОБЫТИЮ: самый старый прогон среди дней (null — хоть
+    /// один день не проверялся, значит событие целиком считать проверенным нельзя).</summary>
+    public DateTime? QualityScannedAt { get; set; }
+
+    /// <summary>Помеченных строк по всем дням события.</summary>
+    public int SuspectCount { get; set; }
     /// <summary>Дни события по возрастанию DayNumber (для раскрытия строки).</summary>
     public List<CompetitionListItemDto> Days { get; set; } = [];
 
