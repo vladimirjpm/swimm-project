@@ -36,11 +36,21 @@
 > [docs/data-integrity.md](../data-integrity.md). Эта секция — одна из его витрин.
 
 Под формой перехода — сворачиваемая секция `<details>`, грузится лениво (клик по
-заголовку или `?filter=fk-anomaly|empty-relay|no-gender` — раскрывает и подсвечивает нужный
-блок) через `GET /api/admin/results/anomalies` (`ResultsAdminController` → `IDataQualityService`).
-Отдаёт `{ fkAnomalies, emptyRelays, noGender }` — по `{total, items}`, топ-200 каждая;
+заголовку или `?filter=fk-anomaly|empty-relay|no-gender|duplicate-exact` — раскрывает и
+подсвечивает нужный блок) через `GET /api/admin/results/anomalies`
+(`ResultsAdminController` → `IDataQualityService`).
+Отдаёт `{ fkAnomalies, emptyRelays, noGender, exactDuplicates }` — по `{total, items}`, топ-200 каждая;
 предикаты FK/эстафет те же, что `DashboardStatusService.Results.FkAnomalies/EmptyRelays`
 (в проде ожидаемо пусто — FK держит целостность). Read-only; строки линкуют на Edit.
+
+**`exactDuplicates`** (инвариант И10) — строки, где совпадает ВСЁ: соревнование, пловец,
+дисциплина, заплыв, дорожка, время. Так не бывает — дорожку в заплыве занимает один пловец
+один раз, значит это след импорта (2026-08-03: 5 таких строк, инцидент И-7). Лечится
+переимпортом с «удалять лишние»: ключ upsert включает заплыв и дорожку, поэтому копии
+схлопываются. Повтор дисциплины с **разным** временем законен (предварительные/финал,
+перезаплыв) и сюда не попадает — его отдельно метит правило `duplicate_swim`, которому как
+раз нужно разное время. Группировка идёт по составному ключу с вычисляемым `RelayId != null`;
+перевод в SQL стережёт `DataQualityPgTests` (на InMemory такая поломка невидима).
 
 **`noGender`** — личные результаты с пустым полом. Появляются законно: в шапке протокола
 пола нет (смешанный заплыв «שומרי שבת», см. [import.md](import.md)), а у пловца он неизвестен —

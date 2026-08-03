@@ -31,12 +31,24 @@ public sealed record ResultNoGenderRowDto(
     long ResultId, int SwimmerId, string SwimmerName, int CompetitionId,
     string CompetitionName, string Distance, string StyleName);
 
-/// <summary>Сводка аномалий Results (Admin/Results, секция «Аномалии»): FK, пустые эстафеты
-/// и строки без пола — каждая выборка капнута отдельно.</summary>
+/// <summary>
+/// Точный дубликат строки результата (инвариант И10): совпадают соревнование, пловец,
+/// дисциплина, заплыв, дорожка и время. Физически невозможен — одну дорожку в одном заплыве
+/// занимает один пловец один раз. Повтор дисциплины с РАЗНЫМ временем законен
+/// (предварительные/финал, перезаплыв) и сюда не попадает.
+/// </summary>
+public sealed record ResultDuplicateRowDto(
+    long ResultId, int Copies, int SwimmerId, string SwimmerName,
+    int CompetitionId, string CompetitionName, string StyleName, string Distance,
+    int Heat, int Lane, string Time);
+
+/// <summary>Сводка аномалий Results (Admin/Results, секция «Аномалии»): FK, пустые эстафеты,
+/// строки без пола и точные дубликаты — каждая выборка капнута отдельно.</summary>
 public sealed record ResultAnomaliesDto(
     CappedListDto<ResultFkAnomalyRowDto> FkAnomalies,
     CappedListDto<EmptyRelayRowDto> EmptyRelays,
-    CappedListDto<ResultNoGenderRowDto> NoGender);
+    CappedListDto<ResultNoGenderRowDto> NoGender,
+    CappedListDto<ResultDuplicateRowDto> ExactDuplicates);
 
 /// <summary>Строка заявки на публикацию медиа в ожидании решения админа группы (read-only список,
 /// Admin/Media?filter=moderation-pending). Решения принимают админы конкретных групп — здесь только обзор.</summary>

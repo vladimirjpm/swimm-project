@@ -97,10 +97,55 @@ public class DataQualityService(SwimmDbContext db) : IDataQualityService
                 r.Style != null ? r.Style.Name : ""))
             .ToListAsync(ct);
 
+        // И10: точный дубликат — совпадает всё, включая заплыв, дорожку и время. Одну дорожку
+        // в одном заплыве занимает один пловец один раз, поэтому такое всегда след импорта
+        // (найдено 2026-08-03: 5 строк, инцидент И-7). Повтор дисциплины с РАЗНЫМ временем —
+        // законен (предварительные/финал, перезаплыв) и сюда не попадает; его отдельно метит
+        // правило duplicate_swim в проверке качества.
+        var dupGroups = db.Results.AsNoTracking()
+            .GroupBy(r => new
+            {
+                r.CompetitionId, r.SwimmerId, r.StyleId, r.Distance,
+                r.Heat, r.Lane, r.TimeOriginal, IsRelay = r.RelayId != null
+            })
+            .Where(g => g.Count() > 1);
+
+        var dupTotal = await dupGroups.CountAsync(ct);
+        var dupKeys = await dupGroups
+            .Select(g => new { FirstId = g.Min(x => x.Id), Copies = g.Count() })
+            .OrderBy(x => x.FirstId)
+            .Take(Cap)
+            .ToListAsync(ct);
+
+        var dupIds = dupKeys.Select(k => k.FirstId).ToList();
+        var dupRows = await db.Results.AsNoTracking()
+            .Where(r => dupIds.Contains(r.Id))
+            .Select(r => new
+            {
+                r.Id,
+                r.SwimmerId,
+                SwimmerName = r.Swimmer != null ? (r.Swimmer.LastName + " " + r.Swimmer.FirstName).Trim() : "",
+                r.CompetitionId,
+                CompetitionName = r.Competition != null ? r.Competition.Name : "",
+                StyleName = r.Style != null ? r.Style.Name : "",
+                r.Distance, r.Heat, r.Lane, r.TimeOriginal
+            })
+            .ToListAsync(ct);
+
+        var copiesById = dupKeys.ToDictionary(k => k.FirstId, k => k.Copies);
+        var dupItems = dupRows
+            .OrderBy(r => r.Id)
+            .Select(r => new ResultDuplicateRowDto(
+                r.Id, copiesById.GetValueOrDefault(r.Id), r.SwimmerId, r.SwimmerName,
+                r.CompetitionId, r.CompetitionName, r.StyleName, r.Distance,
+                r.Heat, r.Lane, r.TimeOriginal))
+            .ToList();
+
         return new ResultAnomaliesDto(
             new CappedListDto<ResultFkAnomalyRowDto>(fkTotal, fkItems),
             new CappedListDto<EmptyRelayRowDto>(relayTotal, relayItems),
-            new CappedListDto<ResultNoGenderRowDto>(noGenderTotal, noGenderItems));
+            new CappedListDto<ResultNoGenderRowDto>(noGenderTotal, noGenderItems),
+            new CappedListDto<ResultDuplicateRowDto>(dupTotal, dupItems));
     }
 
     public async Task<CappedListDto<ModerationPendingRowDto>> GetModerationPendingAsync(CancellationToken ct = default)

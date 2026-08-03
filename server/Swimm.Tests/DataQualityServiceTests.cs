@@ -203,6 +203,44 @@ public class DataQualityServiceTests
     }
 
     [Fact]
+    public async Task GetResultAnomalies_ExactDuplicates_OnlyIdenticalRows()
+    {
+        // И10: одну дорожку в одном заплыве занимает один пловец один раз, поэтому полное
+        // совпадение — всегда след импорта. Повтор дисциплины с РАЗНЫМ временем законен
+        // (предварительные/финал) и находкой быть не должен.
+        await using var db = CreateDb(nameof(GetResultAnomalies_ExactDuplicates_OnlyIdenticalRows));
+        var club = new Club { Name = "Club" };
+        var style = new Style { Name = "Freestyle" };
+        var swimmer = new Swimmer { LastName = "Коэн", FirstName = "Таль", BirthYear = 2012 };
+        var comp = new Competition { Name = "Meet", Date = "01/01/2026", PoolType = "25m" };
+        db.AddRange(club, style, swimmer, comp);
+        await db.SaveChangesAsync();
+
+        ResultRecord Row(string time, int heat, int lane) => new()
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer.Id, ClubId = club.Id, StyleId = style.Id,
+            Distance = "50", Gender = "male", Heat = heat, Lane = lane,
+            TimeOriginal = time, CompetitionDate = new DateTime(2026, 1, 1)
+        };
+
+        // Точный дубль (три копии одной строки).
+        db.Results.AddRange(Row("00:30.00", 1, 4), Row("00:30.00", 1, 4), Row("00:30.00", 1, 4));
+        // Законный повтор: та же дисциплина, другой заплыв и другое время — не находка.
+        db.Results.Add(Row("00:29.50", 2, 5));
+        await db.SaveChangesAsync();
+
+        var result = await new DataQualityService(db).GetResultAnomaliesAsync();
+
+        Assert.Equal(1, result.ExactDuplicates.Total);
+        var row = Assert.Single(result.ExactDuplicates.Items);
+        Assert.Equal(3, row.Copies);
+        Assert.Equal("Коэн Таль", row.SwimmerName);
+        Assert.Equal("00:30.00", row.Time);
+        Assert.Equal(1, row.Heat);
+        Assert.Equal(4, row.Lane);
+    }
+
+    [Fact]
     public async Task GetModerationPending_OnlyPendingStatus()
     {
         await using var db = CreateDb(nameof(GetModerationPending_OnlyPendingStatus));
