@@ -6,8 +6,10 @@ using Microsoft.AspNetCore.RateLimiting;
 using Swimm.API.BackgroundServices;
 using Swimm.API.Security;
 using Swimm.API.Services;
+using Microsoft.EntityFrameworkCore;
 using Swimm.Application;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Dtos;
 using Swimm.Infrastructure;
 using Swimm.Parsing;
 
@@ -287,6 +289,59 @@ if (args.Contains("--audit-imports"))
 
     var bad = reports.Count(r => r.HasProblems);
     Console.WriteLine($"\nИтог: проверено {reports.Count}, с проблемами {bad}. Журнал — Sys_ImportReconciliation (ImportFileName начинается с 'audit:').");
+    return;
+}
+
+// Переимпорт протокола из Discovery без админки (docs/data-integrity.md, чек-лист §8):
+//   dotnet run -- --repull <discoveredId> [--delete-missing]
+// Тот же путь, что кнопка «Перезатянуть»: качаем HE-протокол, парсим, импортируем с
+// перезаписью. --delete-missing дополнительно удаляет строки, которых нет в файле (дубликаты
+// и следы старых разборов) — по умолчанию ВЫКЛЮЧЕНО, как и в UI: удаление отдельное решение.
+if (args.Contains("--repull"))
+{
+    var idIndex = Array.IndexOf(args, "--repull") + 1;
+    if (idIndex >= args.Length || !int.TryParse(args[idIndex], out var discoveredId))
+    {
+        Console.Error.WriteLine("Usage: dotnet run -- --repull <discoveredId> [--delete-missing]");
+        Environment.Exit(1);
+        return;
+    }
+
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<Swimm.Infrastructure.Data.SwimmDbContext>();
+    var discovery = scope.ServiceProvider.GetRequiredService<ICompetitionDiscoveryProvider>();
+    var source = scope.ServiceProvider.GetRequiredService<IResultSourceProvider>();
+    var importer = scope.ServiceProvider.GetRequiredService<IImportService>();
+
+    var row = await db.DiscoveredCompetitions.AsNoTracking().FirstOrDefaultAsync(d => d.Id == discoveredId);
+    if (row?.LogligId is not int logligId)
+    {
+        Console.Error.WriteLine($"Запись #{discoveredId} не найдена или без LogligId");
+        Environment.Exit(1);
+        return;
+    }
+
+    Console.WriteLine($"Качаю протокол loglig {logligId} для «{row.Name}» (compID {row.OrgCompId})…");
+    var pdf = await discovery.FetchResultsPdfAsync(logligId, "he-IL");
+    using var pdfStream = new MemoryStream(pdf);
+    var parsed = await source.ParseAsync(new ResultSourceRequest(
+        pdfStream, $"isrorg-{row.OrgCompId}-loglig-{logligId}-he.pdf", "IsrOrg", Language: "he"));
+    Console.WriteLine($"Распознано строк: {parsed.ResultCount}");
+
+    var deleteMissing = args.Contains("--delete-missing");
+    using var json = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(parsed.ResultsJson));
+    var result = await importer.ImportAsync(
+        json, $"isrorg-{row.OrgCompId}-loglig-{logligId}-he.pdf", null,
+        new ImportEventOptions(null, null, OverwriteExisting: true, DeleteMissing: deleteMissing),
+        row.OrgCompId);
+
+    Console.WriteLine($"\n{result.Message}");
+    Console.WriteLine(result.Reconciliation);
+    foreach (var line in result.DiagnosticLog.Where(l =>
+                 l.Contains("Идентичность") || l.Contains("Upsert") || l.Contains("Сверка")))
+        Console.WriteLine("  " + line);
+    if (result.ErrorMessages.Count > 0)
+        Console.WriteLine("ОШИБКИ: " + string.Join("; ", result.ErrorMessages.Take(5)));
     return;
 }
 
