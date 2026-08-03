@@ -80,6 +80,7 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
                     existing.Message = item.Message;
                     existing.Details = item.Details;
                     existing.Link = item.Link;
+                    existing.PublicLink = item.PublicLink;
                     existing.Severity = (int)check.Severity;
                 }
                 else
@@ -93,6 +94,7 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
                         Message = item.Message,
                         Details = item.Details,
                         Link = item.Link,
+                        PublicLink = item.PublicLink,
                         FirstSeenAt = run.StartedAt,
                         LastSeenAt = run.StartedAt
                     });
@@ -216,5 +218,6 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
 
     private static DataCheckFindingDto ToDto(DataCheckFinding f) =>
         new(f.Id, f.CheckId, (DataCheckSeverity)f.Severity, f.EntityType, f.EntityId,
-            f.Message, f.Details, f.Link, f.FirstSeenAt, f.LastSeenAt, f.Resolution, f.Note);
+            f.Message, f.Details, f.Link, f.FirstSeenAt, f.LastSeenAt, f.Resolution, f.Note,
+            f.PublicLink);
 }

@@ -66,7 +66,8 @@ public sealed class UpsertKeyCollisionCheck(SwimmDbContext db) : IDataCheck
                 "Result", (int)r.Id,
                 $"{r.SwimmerName} · {r.Distance} {r.StyleName} · заплыв {r.Heat}/{r.Lane} — строк {copies.GetValueOrDefault(r.Id)}",
                 $"{r.CompetitionName} (#{r.CompetitionId})",
-                $"/Admin/Results/Edit?id={r.Id}"))
+                $"/Admin/Results/Edit?id={r.Id}",
+                PublicRoutes.Competition(r.CompetitionId)))
             .ToList());
     }
 }
@@ -111,7 +112,8 @@ public sealed class RelayGenderFromLegCheck(SwimmDbContext db) : IDataCheck
                 "Result", (int)r.Id,
                 $"{r.ClubName} · {r.Distance} — помечена {r.Gender}, состав смешанный",
                 $"{r.CompetitionName} (#{r.CompetitionId})",
-                $"/Admin/Results/Edit?id={r.Id}"))
+                $"/Admin/Results/Edit?id={r.Id}",
+                PublicRoutes.Competition(r.CompetitionId)))
             .ToList());
     }
 }
@@ -145,7 +147,9 @@ public sealed class DuplicateEventDayCheck(SwimmDbContext db) : IDataCheck
                 "CompetitionEvent", d.EventId,
                 $"событие #{d.EventId}: дата {d.Date} у соревнований {string.Join(", ", d.Ids)}",
                 null,
-                "/Admin/Competitions"))
+                "/Admin/Competitions",
+                // На публичной стороне события нет — ведём на первый из спорных дней.
+                PublicRoutes.Competition(d.Ids.First())))
             .ToList());
     }
 }
@@ -171,7 +175,8 @@ public sealed class EmptyCompetitionCheck(SwimmDbContext db) : IDataCheck
 
         return new DataCheckOutcome(empty.Count, empty
             .Select(c => new DataCheckItem(
-                "Competition", c.Id, $"{c.Name} · {c.Date}", null, $"/Admin/Competitions/Edit?id={c.Id}"))
+                "Competition", c.Id, $"{c.Name} · {c.Date}", null, $"/Admin/Competitions/Edit?id={c.Id}",
+                PublicRoutes.Competition(c.Id)))
             .ToList());
     }
 }

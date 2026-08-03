@@ -26,7 +26,8 @@ public sealed class ExactDuplicateCheck(IDataQualityService quality) : IDataChec
                 "Result", (int)r.ResultId,
                 $"{r.SwimmerName} · {r.Distance} {r.StyleName} · {r.Time} — копий {r.Copies}",
                 $"{r.CompetitionName} (#{r.CompetitionId}), заплыв {r.Heat}, дорожка {r.Lane}",
-                $"/Admin/Results/Edit?id={r.ResultId}"))
+                $"/Admin/Results/Edit?id={r.ResultId}",
+                PublicRoutes.Competition(r.CompetitionId)))
             .ToList());
     }
 }
@@ -64,7 +65,8 @@ public sealed class RelayDistanceWithoutRelayCheck(SwimmDbContext db) : IDataChe
                 "Result", (int)r.Id,
                 $"{r.SwimmerName} · дистанция {r.Distance} без эстафеты",
                 $"{r.CompetitionName} (#{r.CompetitionId})",
-                $"/Admin/Results/Edit?id={r.Id}"))
+                $"/Admin/Results/Edit?id={r.Id}",
+                PublicRoutes.Competition(r.CompetitionId)))
             .ToList());
     }
 }
@@ -87,7 +89,8 @@ public sealed class NoGenderCheck(IDataQualityService quality) : IDataCheck
                 "Result", (int)r.ResultId,
                 $"{r.SwimmerName} · {r.Distance} {r.StyleName}",
                 $"{r.CompetitionName} (#{r.CompetitionId})",
-                $"/Admin/Swimmers/Edit?id={r.SwimmerId}"))
+                $"/Admin/Swimmers/Edit?id={r.SwimmerId}",
+                PublicRoutes.Competition(r.CompetitionId)))
             .ToList());
     }
 }
@@ -108,7 +111,8 @@ public sealed class FkAnomalyCheck(IDataQualityService quality) : IDataCheck
                 "Result", (int)r.ResultId,
                 $"результат #{r.ResultId}: пловец {r.SwimmerId}, клуб {r.ClubId}",
                 $"соревнование #{r.CompetitionId}",
-                $"/Admin/Results/Edit?id={r.ResultId}"))
+                $"/Admin/Results/Edit?id={r.ResultId}",
+                PublicRoutes.Competition(r.CompetitionId)))
             .ToList());
     }
 }
@@ -129,7 +133,8 @@ public sealed class EmptyRelayCheck(IDataQualityService quality) : IDataCheck
                 "Relay", r.RelayId,
                 $"эстафета #{r.RelayId} без состава",
                 $"соревнование #{r.CompetitionId}",
-                null))
+                null,
+                PublicRoutes.Competition(r.CompetitionId)))
             .ToList());
     }
 }

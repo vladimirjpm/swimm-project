@@ -19,7 +19,8 @@ public sealed class SwimmerOrphanCheck(ISwimmerDedupService dedup) : IDataCheck
         return new DataCheckOutcome(report.Orphans.Count, report.Orphans
             .Take(50)
             .Select(o => new DataCheckItem(
-                "Swimmer", o.Id, $"{o.Name} ({o.BirthYear})", o.Club, $"/Admin/Swimmers/Edit?id={o.Id}"))
+                "Swimmer", o.Id, $"{o.Name} ({o.BirthYear})", o.Club, $"/Admin/Swimmers/Edit?id={o.Id}",
+                PublicRoutes.Swimmer(o.Id)))
             .ToList());
     }
 }
@@ -42,7 +43,9 @@ public sealed class SwimmerDedupCheck(ISwimmerDedupService dedup) : IDataCheck
                 "Swimmer", c.CanonicalId,
                 $"{c.CanonicalName} #{c.CanonicalId} ← #{c.DuplicateId} {c.DuplicateName}",
                 $"год {c.BirthYear}, расстояние имён {c.Distance}, {c.CanonicalResults} vs {c.DuplicateResults} результатов",
-                "/Admin/Swimmers?filter=dedup-sure"))
+                "/Admin/Swimmers?filter=dedup-sure",
+                // Ведём на КАНОН: перед merge смотрят его заплывы, а не дубля.
+                PublicRoutes.Swimmer(c.CanonicalId)))
             .ToList());
     }
 }
@@ -65,7 +68,8 @@ public sealed class ClubDedupCheck(IClubDedupService dedup) : IDataCheck
                 "Club", c.CanonicalId,
                 $"{c.CanonicalName} #{c.CanonicalId} ({c.CanonicalResults}) ← #{c.DuplicateId} ({c.DuplicateResults})",
                 $"эвристика {c.Heuristic}",
-                "/Admin/Clubs?filter=dedup-sure"))
+                "/Admin/Clubs?filter=dedup-sure",
+                PublicRoutes.Club(c.CanonicalId)))
             .ToList());
     }
 }
@@ -82,7 +86,8 @@ public sealed class EmptyClubCheck(IDataQualityService quality) : IDataCheck
     {
         var res = await quality.GetClubQualityAsync("no-swimmers", ct);
         return new DataCheckOutcome(res.Total, res.Items
-            .Select(c => new DataCheckItem("Club", c.Id, c.Name, c.NameEn, $"/Admin/Clubs/Edit?id={c.Id}"))
+            .Select(c => new DataCheckItem("Club", c.Id, c.Name, c.NameEn, $"/Admin/Clubs/Edit?id={c.Id}",
+                PublicRoutes.Club(c.Id)))
             .ToList());
     }
 }
@@ -123,7 +128,8 @@ public sealed class ReconciliationMismatchCheck(SwimmDbContext db) : IDataCheck
                 "Competition", r.CompetitionId,
                 $"{names.GetValueOrDefault(r.CompetitionId, $"#{r.CompetitionId}")}: файл {r.ExpectedRows}, БД {r.ActualRows}",
                 $"сверка от {r.ImportedAt:dd.MM.yyyy HH:mm}, файл {r.ImportFileName}",
-                $"/Admin/Competitions?q={r.CompetitionId}"))
+                $"/Admin/Competitions?q={r.CompetitionId}",
+                PublicRoutes.Competition(r.CompetitionId)))
             .ToList());
     }
 }

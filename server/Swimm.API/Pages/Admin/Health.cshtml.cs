@@ -9,7 +9,20 @@ namespace Swimm.API.Pages.Admin;
 /// не блокировал рендер: проверки ходят в БД десятками запросов.
 /// </summary>
 [Authorize(Roles = "Admin")]
-public class HealthModel : PageModel
+public class HealthModel(IConfiguration config, IWebHostEnvironment env) : PageModel
 {
-    public void OnGet() { }
+    /// <summary>
+    /// База для ссылок «смотреть на сайте». В проде клиент лежит на том же origin, что и
+    /// админка, поэтому пусто = относительные ссылки. В Development клиент крутится на своём
+    /// Vite-порту, и по умолчанию это :5173 — иначе ссылка вела бы в админку, где публичных
+    /// страниц нет. Переопределяется настройкой <c>PublicSite:BaseUrl</c> (без завершающего «/»).
+    ///
+    /// Хранить базу в самой находке нельзя: dev-адрес осел бы в БД и уехал в прод.
+    /// </summary>
+    public string PublicSiteBaseUrl { get; private set; } = "";
+
+    public void OnGet() =>
+        PublicSiteBaseUrl = (config["PublicSite:BaseUrl"]
+            ?? (env.IsDevelopment() ? "http://localhost:5173" : ""))
+            .TrimEnd('/');
 }

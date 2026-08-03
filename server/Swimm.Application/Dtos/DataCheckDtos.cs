@@ -17,8 +17,16 @@ public static class DataCheckResolutions
 /// Одна находка проверки. <paramref name="EntityId"/> вместе с <paramref name="EntityType"/>
 /// и Id проверки образуют ключ, по которому находка узнаётся между прогонами.
 /// </summary>
+/// <param name="Link">Куда идти ЧИНИТЬ — страница админки.</param>
+/// <param name="PublicLink">
+/// Куда идти СМОТРЕТЬ — публичная страница сайта, глазами на живые данные. Только
+/// относительный путь по контракту <c>client/src/utils/routes.ts</c> («/competitions/{id}»,
+/// «/swimmers/{id}»): базу подставляет страница при отрисовке, иначе dev-адрес осел бы в БД
+/// и уехал в прод.
+/// </param>
 public sealed record DataCheckItem(
-    string EntityType, int? EntityId, string Message, string? Details = null, string? Link = null);
+    string EntityType, int? EntityId, string Message, string? Details = null, string? Link = null,
+    string? PublicLink = null);
 
 /// <summary>Результат одной проверки: сколько всего и что именно (список капнут).</summary>
 public sealed record DataCheckOutcome(int Total, IReadOnlyList<DataCheckItem> Items)
@@ -35,7 +43,8 @@ public sealed record DataCheckRunDto(
 public sealed record DataCheckFindingDto(
     int Id, string CheckId, DataCheckSeverity Severity, string EntityType, int? EntityId,
     string Message, string? Details, string? Link,
-    DateTime FirstSeenAt, DateTime LastSeenAt, string? Resolution, string? Note);
+    DateTime FirstSeenAt, DateTime LastSeenAt, string? Resolution, string? Note,
+    string? PublicLink = null);
 
 /// <summary>Находки одной проверки + её описание (для страницы /Admin/Health).</summary>
 /// <param name="Total">

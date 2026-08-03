@@ -33,6 +33,9 @@
 <script>
 (function () {
     const API = '/api/admin/data-checks';
+    // База публичного сайта: пусто = тот же origin (прод), в dev — Vite на своём порту.
+    // Сами находки хранят только относительный путь (контракт client/src/utils/routes.ts).
+    const PUBLIC_BASE = @Html.Raw(Json.Serialize(Model.PublicSiteBaseUrl));
     const SEV = { 2: ['Ошибка', 'bg-admin-danger/20 text-[#ef9a9a]'],
                   1: ['Предупреждение', 'bg-admin-warning/15 text-admin-warning'],
                   0: ['Инфо', 'bg-white/[.08] text-admin-text-muted'] };
@@ -67,7 +70,10 @@
             <td class="align-top">${f.link ? `<a href="${esc(f.link)}" class="text-admin-accent hover:underline">${esc(f.message)}</a>` : esc(f.message)}
                 ${f.details ? `<div class="text-[11px] text-admin-text-muted">${esc(f.details)}</div>` : ''}
                 ${accepted && f.note ? `<div class="text-[11px] text-admin-text-muted">принято: ${esc(f.note)}</div>` : ''}</td>
-            <td class="align-top whitespace-nowrap text-[11px] text-admin-text-muted">с ${new Date(f.firstSeenAt).toLocaleDateString('ru-RU')}</td>
+            <td class="align-top whitespace-nowrap text-[11px] text-admin-text-muted">
+                ${f.publicLink ? `<a href="${esc(PUBLIC_BASE + f.publicLink)}" target="_blank" rel="noopener"
+                    class="text-admin-accent hover:underline" title="Открыть публичную страницу — посмотреть глазами">на сайте ↗</a><br>` : ''}
+                с ${new Date(f.firstSeenAt).toLocaleDateString('ru-RU')}</td>
             <td class="align-top text-right whitespace-nowrap">
                 ${accepted
                     ? `<button class="admin-btn admin-btn-ghost py-1 px-2 finding-reopen" data-id="${f.id}">Вернуть</button>`

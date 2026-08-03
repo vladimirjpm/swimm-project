@@ -87,6 +87,14 @@ public class DataCheckFinding
     [MaxLength(300)]
     public string? Link { get; set; }
 
+    /// <summary>
+    /// Куда идти смотреть глазами — относительный путь публичной страницы
+    /// (контракт client/src/utils/routes.ts). Именно относительный: базу подставляет
+    /// страница, иначе dev-адрес осел бы в данных.
+    /// </summary>
+    [MaxLength(300)]
+    public string? PublicLink { get; set; }
+
     public DateTime FirstSeenAt { get; set; } = DateTime.UtcNow;
     public DateTime LastSeenAt { get; set; } = DateTime.UtcNow;
 
