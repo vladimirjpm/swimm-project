@@ -152,6 +152,20 @@ public class DashboardStatusServiceTests
     }
 
     [Fact]
+    public async Task GetStatusAsync_OldRunsWithoutStates_ReadAsNeverRan()
+    {
+        // Сразу после миграции AddDataCheckStates: прогоны в истории есть, состояний ещё нет.
+        // Показать дату старого прогона с нулями значило бы соврать «всё чисто».
+        await using var db = CreateDb(nameof(GetStatusAsync_OldRunsWithoutStates_ReadAsNeverRan));
+        var service = CreateService(db, dataChecks: new FakeDataCheckRunner(Run()));
+
+        var checks = (await service.GetStatusAsync(CancellationToken.None)).Checks;
+
+        Assert.Null(checks.LastRunAt);
+        Assert.Null(checks.LastRunTrigger);
+    }
+
+    [Fact]
     public async Task GetStatusAsync_FallsBackToLiveCount_WhenCheckFailed()
     {
         // Упавшая проверка отдаёт мусорный Total — доверять ему нельзя.

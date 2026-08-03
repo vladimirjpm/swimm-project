@@ -88,6 +88,11 @@ public class DashboardStatusService(
     private static DashboardChecksStatus BuildChecks(
         DataCheckRunDto? lastRun, IReadOnlyList<DataCheckStateDto> states)
     {
+        // Прогоны в истории есть, а состояний нет — значит все они прошли ДО появления
+        // Sys_DataCheckStates (миграция AddDataCheckStates). Показать их дату с нулями значило
+        // бы соврать «всё чисто»: считать нам пока просто нечего.
+        if (states.Count == 0) lastRun = null;
+
         int Sum(DataCheckSeverity s) => states
             .Where(x => x.Severity == s && !x.Failed)
             .Sum(x => x.Total);
