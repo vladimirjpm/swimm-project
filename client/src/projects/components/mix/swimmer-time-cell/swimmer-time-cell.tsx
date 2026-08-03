@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import '../text-effect/text-effect.css';
-import UI_SuspectBadge from '../suspect-badge/suspect-badge';
+import UI_SwimTime, { SwimQuality } from '../swim-time/swim-time';
 
 const TIME_SPLIT_SEPARATOR = '›';
 
@@ -14,11 +14,10 @@ interface UI_SwimmerTimeCellProps {
   className?: string;
   isRecordHolder?: boolean;
   /**
-   * Заплыв помечен админом как ошибка протокола (`suspect_reason`). Строку не прячем —
-   * протокол напечатан так, как напечатан, — но время подаём как спорное, иначе
-   * бессмыслица читается как достижение.
+   * Качество времени (docs/plans/swim-time-quality-everywhere-plan.md). null — всё в порядке.
+   * Значок и объяснение рисует `UI_SwimTime` — единственный шов вывода времени.
    */
-  isSuspect?: boolean;
+  quality?: SwimQuality | null;
 }
 
 const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
@@ -30,7 +29,7 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
   secondLineClassName = 'text-xs',
   className = '',
   isRecordHolder = false,
-  isSuspect = false,
+  quality = null,
 }) => {
   const [splitOpen, setSplitOpen] = useState(false);
 
@@ -59,17 +58,12 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
           </span>
         </div>
       )}
-      {isSuspect && (
-        <div className="mb-1 flex justify-start">
-          <UI_SuspectBadge />
-        </div>
-      )}
       {formattedTimeSplit ? (
         <div
           className={`${firstLineClassName} flex items-center gap-1 cursor-pointer select-none`}
           onClick={handleToggle}
         >
-          {time}
+          <UI_SwimTime time={time} quality={quality} />
           {time_fail && <span className="text-red-500 ml-1">*</span>}
           <span
             className={`theme-text-muted transition-transform duration-200 ${splitOpen ? 'rotate-180' : ''}`}
@@ -78,7 +72,7 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
         </div>
       ) : (
         <div className={firstLineClassName}>
-          {time}
+          <UI_SwimTime time={time} quality={quality} />
           {time_fail && <span className="text-red-500 ml-1">*</span>}
         </div>
       )}

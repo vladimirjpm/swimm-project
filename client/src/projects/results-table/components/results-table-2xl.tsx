@@ -112,7 +112,7 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
           time_fail_note={res.time_fail_note}
           firstLineClassName="text-xl font-bold tabular-nums"
           isRecordHolder={isRecordTime}
-          isSuspect={!!res.suspect_reason}
+          quality={res.suspect_reason ? { kind: 'protocol', reason: res.suspect_reason } : null}
         />
       </div>
 

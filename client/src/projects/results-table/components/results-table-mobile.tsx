@@ -126,7 +126,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
                 secondLineClassName="text-xs justify-center"
                 className="text-right"
                 isRecordHolder={isRecordTime}
-          isSuspect={!!res.suspect_reason}
+          quality={res.suspect_reason ? { kind: 'protocol', reason: res.suspect_reason } : null}
               />
               {showEvent && (
                 <UI_SwimmStyleIcon
