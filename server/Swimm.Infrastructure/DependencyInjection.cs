@@ -6,6 +6,7 @@ using Swimm.Application.Abstractions;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Repositories;
 using Swimm.Infrastructure.Services;
+using Swimm.Infrastructure.Services.DataChecks;
 
 namespace Swimm.Infrastructure;
 
@@ -79,6 +80,20 @@ public static class DependencyInjection
         services.AddScoped<IClubStandingService, ClubStandingService>();
         services.AddScoped<ICompetitionRecalculationService, CompetitionRecalculationService>();
         services.AddScoped<IImportAuditService, ImportAuditService>();
+
+        // Реестр проверок данных (Д3, docs/data-integrity.md). Проверки регистрируются как
+        // IDataCheck — добавить новую значит добавить строку сюда, ничего больше не трогая.
+        services.AddScoped<IDataCheckRunner, DataCheckRunner>();
+        services.AddScoped<IDataCheck, ExactDuplicateCheck>();
+        services.AddScoped<IDataCheck, RelayDistanceWithoutRelayCheck>();
+        services.AddScoped<IDataCheck, FkAnomalyCheck>();
+        services.AddScoped<IDataCheck, ReconciliationMismatchCheck>();
+        services.AddScoped<IDataCheck, NoGenderCheck>();
+        services.AddScoped<IDataCheck, EmptyRelayCheck>();
+        services.AddScoped<IDataCheck, SwimmerDedupCheck>();
+        services.AddScoped<IDataCheck, ClubDedupCheck>();
+        services.AddScoped<IDataCheck, SwimmerOrphanCheck>();
+        services.AddScoped<IDataCheck, EmptyClubCheck>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
 
         // Локальный вход (email + пароль)

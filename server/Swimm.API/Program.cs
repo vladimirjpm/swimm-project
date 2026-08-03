@@ -292,6 +292,29 @@ if (args.Contains("--audit-imports"))
     return;
 }
 
+// Прогон реестра проверок данных (то же, что кнопка на /Admin/Health):
+//   dotnet run -- --check-data
+// Читающий: ставит диагноз и пишет находки, ничего не чинит.
+if (args.Contains("--check-data"))
+{
+    using var scope = app.Services.CreateScope();
+    var runner = scope.ServiceProvider.GetRequiredService<IDataCheckRunner>();
+
+    var run = await runner.RunAllAsync("manual");
+    Console.WriteLine($"Прогон #{run.Id}: ошибок {run.ErrorCount}, предупреждений {run.WarningCount}, " +
+                      $"инфо {run.InfoCount}, закрыто {run.FixedCount}\n");
+
+    foreach (var g in await runner.GetCurrentAsync())
+    {
+        var mark = g.OpenCount == 0 ? "✓" : g.Severity == DataCheckSeverity.Error ? "!!" : " !";
+        Console.WriteLine($"{mark} {g.Title} — открыто {g.OpenCount}" +
+                          (g.AcceptedCount > 0 ? $", принято {g.AcceptedCount}" : "") + $"  [{g.CheckId}]");
+        foreach (var f in g.Findings.Where(f => f.Resolution == null).Take(5))
+            Console.WriteLine($"      {f.Message}");
+    }
+    return;
+}
+
 // Склейка клубов с ОДИНАКОВЫМ именем из консоли (эвристика same-name — «уверенная»):
 //   dotnet run -- --merge-same-name-clubs [--apply]
 // Без --apply это dry-run. Нужен после ивритских переимпортов: пока матчинг клуба шёл по

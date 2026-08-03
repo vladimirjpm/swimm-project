@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Domain.Entities;
 
 namespace Swimm.Infrastructure.Data;
@@ -57,6 +57,8 @@ public class SwimmDbContext : DbContext
     /* === Импорт === */
     public DbSet<ImportHistory> ImportHistory => Set<ImportHistory>();
     public DbSet<ImportReconciliation> ImportReconciliations => Set<ImportReconciliation>();
+    public DbSet<DataCheckRun> DataCheckRuns => Set<DataCheckRun>();
+    public DbSet<DataCheckFinding> DataCheckFindings => Set<DataCheckFinding>();
     public DbSet<DiscoveredCompetition> DiscoveredCompetitions => Set<DiscoveredCompetition>();
 
     /* === Фавориты и медиа пользователей === */
@@ -519,6 +521,25 @@ public class SwimmDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.CompetitionId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Реестр проверок данных (Д3).
+        modelBuilder.Entity<DataCheckRun>(entity =>
+        {
+            entity.ToTable("Sys_DataCheckRuns");
+            entity.HasIndex(e => e.StartedAt);
+        });
+
+        modelBuilder.Entity<DataCheckFinding>(entity =>
+        {
+            entity.ToTable("Sys_DataCheckFindings");
+            // Ключ находки между прогонами — по нему её узнают и сохраняют решение.
+            entity.HasIndex(e => new { e.CheckId, e.EntityType, e.EntityId });
+            // Открытые и принятые — то, что спрашивают у таблицы всегда; починенных со
+            // временем станет на порядки больше, поэтому частичный индекс.
+            entity.HasIndex(e => e.Resolution)
+                .HasFilter("\"Resolution\" IS NULL OR \"Resolution\" = 'accepted'")
+                .HasDatabaseName("IX_Sys_DataCheckFindings_Open");
         });
 
         // Сверка импорта (Д1): журнал «файл обещал N, в БД оказалось M» по каждому заплыву.

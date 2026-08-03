@@ -203,6 +203,25 @@ public class DataQualityServiceTests
     }
 
     [Fact]
+    public async Task GetClubQuality_NoSwimmers_ExcludesMergeTargets()
+    {
+        // Приёмник склейки без своих результатов формально пуст, но удалить его нельзя —
+        // в списке «Без пловцов» это невыполнимая задача, висящая вечно.
+        await using var db = CreateDb(nameof(GetClubQuality_NoSwimmers_ExcludesMergeTargets));
+        var target = new Club { Name = "Приёмник" };
+        var junk = new Club { Name = "Мусор" };
+        db.AddRange(target, junk);
+        await db.SaveChangesAsync();
+        db.Clubs.Add(new Club { Name = "Дубль", MergedIntoId = target.Id });
+        await db.SaveChangesAsync();
+
+        var result = await new DataQualityService(db).GetClubQualityAsync("no-swimmers");
+
+        Assert.Equal(1, result.Total);
+        Assert.Equal(junk.Id, Assert.Single(result.Items).Id);
+    }
+
+    [Fact]
     public async Task GetResultAnomalies_ExactDuplicates_OnlyIdenticalRows()
     {
         // И10: одну дорожку в одном заплыве занимает один пловец один раз, поэтому полное

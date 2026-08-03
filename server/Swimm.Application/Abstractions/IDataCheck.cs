@@ -1,0 +1,59 @@
+using Swimm.Application.Dtos;
+
+namespace Swimm.Application.Abstractions;
+
+/// <summary>
+/// Одна проверка данных (docs/data-integrity.md, фаза Д3). Единая абстракция вместо россыпи:
+/// до неё проверки жили в семи разных сервисах, у каждого свой UI, свой запуск и никакой
+/// истории.
+///
+/// Существующие сервисы НЕ переписываются — поверх них пишутся адаптеры. Реестр даёт то,
+/// чего не было ни у одного: единый прогон, severity, история и одно место для человека.
+///
+/// Проверка обязана быть ЧИТАЮЩЕЙ: она ставит диагноз, лечение — отдельное осознанное
+/// действие (переимпорт, merge, кнопка в админке).
+/// </summary>
+public interface IDataCheck
+{
+    /// <summary>Стабильный идентификатор вида <c>results.exact-duplicate</c>. По нему
+    /// склеиваются находки между прогонами, поэтому переименование = потеря истории.</summary>
+    string Id { get; }
+
+    /// <summary>Заголовок для человека.</summary>
+    string Title { get; }
+
+    /// <summary>Что именно ищет и почему это плохо — показывается рядом со списком.</summary>
+    string Description { get; }
+
+    /// <summary>Насколько это серьёзно: Error — испорченные данные, Warning — подозрительно,
+    /// Info — есть что почистить.</summary>
+    DataCheckSeverity Severity { get; }
+
+    /// <summary>Запуск. Возвращает найденное; пустой список = всё в порядке.</summary>
+    Task<DataCheckOutcome> RunAsync(CancellationToken ct = default);
+}
+
+/// <summary>
+/// Прогон всех проверок и работа с находками (docs/data-integrity.md, фаза Д3).
+/// </summary>
+public interface IDataCheckRunner
+{
+    /// <summary>Прогнать все зарегистрированные проверки и записать результат.</summary>
+    Task<DataCheckRunDto> RunAllAsync(string trigger, CancellationToken ct = default);
+
+    /// <summary>Текущие находки (незакрытые + принятые), сгруппированные по проверке.</summary>
+    Task<IReadOnlyList<DataCheckGroupDto>> GetCurrentAsync(CancellationToken ct = default);
+
+    /// <summary>История прогонов, свежие первыми.</summary>
+    Task<IReadOnlyList<DataCheckRunDto>> GetHistoryAsync(int limit = 20, CancellationToken ct = default);
+
+    /// <summary>
+    /// «Принято как есть»: находка неустранима (ошибка в протоколе федерации, особенность
+    /// данных). Переживает следующие прогоны — иначе решение пришлось бы принимать заново
+    /// каждый раз, как это уже сделано для ручных пометок качества результатов.
+    /// </summary>
+    Task<bool> AcceptAsync(int findingId, string? note, CancellationToken ct = default);
+
+    /// <summary>Вернуть принятую находку в работу.</summary>
+    Task<bool> ReopenAsync(int findingId, CancellationToken ct = default);
+}

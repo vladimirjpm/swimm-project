@@ -44,6 +44,10 @@ public class DataQualityService(SwimmDbContext db) : IDataQualityService
             // Склеенные клубы пусты по определению — в «дырах данных» им не место.
             "no-swimmers" => db.Clubs.AsNoTracking()
                 .Where(c => !c.IsPseudo && !c.Name.StartsWith("SYNTH") && c.MergedIntoId == null)
+                // Приёмник склейки без своих результатов формально пуст, но удалить его нельзя
+                // (в него склеены другие) — он висел бы в списке вечно как невыполнимая задача.
+                // Предсказано в docs/admin-pages/clubs.md, случилось 2026-08-03 с двумя клубами.
+                .Where(c => !db.Clubs.Any(x => x.MergedIntoId == c.Id))
                 .Where(c => !db.Swimmers.Any(s => s.ClubId == c.Id))
                 .Where(c => !db.Results.Any(r => r.ClubId == c.Id)),
             "no-country" => db.Clubs.AsNoTracking()
