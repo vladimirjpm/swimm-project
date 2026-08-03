@@ -23,6 +23,8 @@ export interface ClubSeasonBestItem {
   pool_type: string | null;
   gender: string;
   time_original: string;
+  /** Ошибка протокола (И11). null — заплыв в порядке. */
+  suspect_reason?: string | null;
   time_ms: number | null;
   swimmer_id: number;
   swimmer_name: string;

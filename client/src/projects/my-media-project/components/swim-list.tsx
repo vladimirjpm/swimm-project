@@ -4,6 +4,7 @@ import { fetchPublishTargets, PublishTargetDto } from '../use-all-my-media';
 import { MySwimDto, SwimMediaDto } from '../use-my-swims';
 import { STATUS_COLORS, CardStatus, derivedCardStatus, hpCardCls } from './status-styles';
 import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
+import UI_SwimTime from '../../components/mix/swim-time/swim-time';
 
 // Список заплывов, сгруппированный по соревнованиям — ядро My media v3
 // (README design_handoff_my_swims_v3,1 §7). Desktop: строки с фикс. колонками
@@ -257,7 +258,14 @@ function SwimRow({ swim, showSwimmerName, swimmerName, cb }: {
             <span className="hp-mono ml-1 rounded-[5px] border border-[rgba(125,211,252,0.4)] px-1.5 py-[1px] text-[9px] font-extrabold text-[#7dd3fc]">RELAY</span>
           )}
         </span>
-        <span className="hp-mono w-[84px] shrink-0 text-[13.5px] font-extrabold text-[#7dd3fc]">{swim.time_fail ? 'DSQ' : swim.time}</span>
+        <span className="hp-mono w-[84px] shrink-0 text-[13.5px] font-extrabold text-[#7dd3fc]">
+          {swim.time_fail ? 'DSQ' : (
+            <UI_SwimTime
+              time={swim.time}
+              quality={swim.suspect_reason ? { kind: 'protocol', reason: swim.suspect_reason } : null}
+            />
+          )}
+        </span>
         <span className="hp-mono w-[92px] shrink-0 text-[10.5px] text-[rgba(203,224,240,0.45)]">{swim.date}</span>
         <span className="w-[52px] shrink-0">
           <CheerChip swim={swim} emphasized={swim.is_pb} onToggle={() => cb.onToggleCheer(swim)} />
@@ -313,7 +321,14 @@ function SwimRow({ swim, showSwimmerName, swimmerName, cb }: {
             </span>
           )}
           <span className="mt-0.5 flex items-center gap-2">
-            <span className="hp-mono text-[12px] font-extrabold text-[#7dd3fc]">{swim.time_fail ? 'DSQ' : swim.time}</span>
+            <span className="hp-mono text-[12px] font-extrabold text-[#7dd3fc]">
+              {swim.time_fail ? 'DSQ' : (
+                <UI_SwimTime
+                  time={swim.time}
+                  quality={swim.suspect_reason ? { kind: 'protocol', reason: swim.suspect_reason } : null}
+                />
+              )}
+            </span>
             <span className="text-[10px] text-[rgba(203,224,240,0.45)]">
               {swim.place != null ? `#${swim.place}` : ''}{swim.points > 0 ? ` · ${swim.points} pts` : ''}
             </span>

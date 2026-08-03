@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useClubSeasonBest, type ClubSeasonBestGroup } from '../../../hooks/useClubSeasonBest';
 import { routes } from '../../../utils/routes';
 import { ClubRecordCard, type PoolFilter } from './club-record-card';
+import UI_SwimTime from '../../components/mix/swim-time/swim-time';
 
 /**
  * Season best — заплывы пловцов клуба, которые в этом сезоне ЛУЧШИЕ ПО СТРАНЕ в своём слоте
@@ -103,7 +104,10 @@ function ClubRecords({ clubId }: Props) {
                     className="mt-1 text-[19px] leading-none tabular-nums"
                     style={{ fontFamily: 'var(--deep-font-display)', color: 'var(--deep-text)' }}
                   >
-                    {it.time_original}
+                    <UI_SwimTime
+                      time={it.time_original}
+                      quality={it.suspect_reason ? { kind: 'protocol', reason: it.suspect_reason } : null}
+                    />
                   </div>
                   <div
                     className="mt-1.5 truncate text-[11.5px] font-bold"

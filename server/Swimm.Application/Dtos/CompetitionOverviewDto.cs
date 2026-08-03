@@ -103,6 +103,8 @@ public sealed class OverviewBestSwimDto
     [JsonPropertyName("distance")] public string Distance { get; init; } = "";
     [JsonPropertyName("gender")] public string Gender { get; init; } = "";
     [JsonPropertyName("time")] public string Time { get; init; } = "";
+    /// <summary>Инвариант И11: время идёт вместе с качеством (docs/data-integrity.md).</summary>
+    [JsonPropertyName("suspect_reason")] public string? SuspectReason { get; init; }
     [JsonPropertyName("international_points")] public int Points { get; init; }
     [JsonPropertyName("is_relay")] public bool IsRelay { get; init; }
     [JsonPropertyName("relay_team_name")] public string? RelayTeamName { get; init; }
@@ -214,6 +216,7 @@ public sealed class OverviewRecordDto
     [JsonPropertyName("distance")] public string Distance { get; init; } = "";
     [JsonPropertyName("gender")] public string Gender { get; init; } = "";
     [JsonPropertyName("time")] public string Time { get; init; } = "";
+    [JsonPropertyName("suspect_reason")] public string? SuspectReason { get; init; }
     [JsonPropertyName("holder_name")] public string HolderName { get; init; } = "";
     /// <summary>Id пловца-держателя — для группировки рекордов по спортсмену на клиенте.</summary>
     [JsonPropertyName("swimmer_id")] public int SwimmerId { get; init; }

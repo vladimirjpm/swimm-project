@@ -208,6 +208,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                     PoolType = g.Key.PoolType,
                     Gender = g.Key.Gender,
                     TimeOriginal = r.TimeOriginal,
+                    SuspectReason = r.SuspectReason,
                     TimeMillisecond = r.TimeMillisecond,
                     SwimmerId = r.SwimmerId,
                     SwimmerName = (r.Swimmer.LastName + " " + r.Swimmer.FirstName).Trim(),

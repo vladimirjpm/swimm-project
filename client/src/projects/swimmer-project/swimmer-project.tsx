@@ -16,6 +16,7 @@ import { useLoginModal } from '../components/login-modal/login-modal-context';
 import { useSwimmerProfile, SwimmerProfile } from './use-swimmer-profile';
 import { useSwimmerMedia } from './use-swimmer-media';
 import { parseRoute } from '../../utils/routes';
+import UI_SwimTime from '../components/mix/swim-time/swim-time';
 
 // Самостоятельная страница пловца (swimmer.html?swimmer=<id>). Профиль тянется по id
 // (/api/swimmers/{id}), карьера all-time — по полному имени (useAthleteCareer, тот же
@@ -253,7 +254,12 @@ function SwimmerContent({ profile }: { profile: SwimmerProfile }) {
                       {b.points} pts
                     </span>
                   )}
-                  <span className="font-mono font-extrabold" style={{ color: 'var(--theme-primary)' }}>{b.time}</span>
+                  <span className="font-mono font-extrabold" style={{ color: 'var(--theme-primary)' }}>
+                    <UI_SwimTime
+                      time={b.time}
+                      quality={b.suspect_reason ? { kind: 'protocol', reason: b.suspect_reason } : null}
+                    />
+                  </span>
                 </span>
               </div>
             ))}

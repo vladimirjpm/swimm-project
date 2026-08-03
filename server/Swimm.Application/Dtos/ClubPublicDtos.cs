@@ -84,6 +84,10 @@ public sealed class ClubBestDto
     [JsonPropertyName("time_original")]
     public string TimeOriginal { get; set; } = "";
 
+    /// <summary>Инвариант И11: DTO со временем несёт и качество. null — заплыв в порядке.</summary>
+    [JsonPropertyName("suspect_reason")]
+    public string? SuspectReason { get; set; }
+
     [JsonPropertyName("time_ms")]
     public int? TimeMs { get; set; }
 

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import type { CompetitionOverview, OverviewRecord } from '../types';
 import { initials } from './module-defs';
+import UI_SwimTime from '../../../../components/mix/swim-time/swim-time';
 
 // Карточка модуля New records (9d): слева рекордсмены (сгруппированы по holder_name,
 // чипы «N rec»), справа витрина лидера (больше всего рекордов).
@@ -171,7 +172,12 @@ export default function ModuleCardRecords({ overview, onOpenTab, onOpenSwim }: P
                   {rec.distance} {rec.style_name}
                 </span>
                 <span className="flex-1" />
-                <span className="text-[13px] font-black tabular-nums">{rec.time}</span>
+                <span className="text-[13px] font-black tabular-nums">
+                  <UI_SwimTime
+                    time={rec.time}
+                    quality={rec.suspect_reason ? { kind: 'protocol', reason: rec.suspect_reason } : null}
+                  />
+                </span>
               </span>
             ))}
           </span>

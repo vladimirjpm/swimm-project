@@ -94,6 +94,7 @@ public class MySwimsRepository : IMySwimsRepository
                 Place = r.Position,
                 Points = r.InternationalPoints,
                 Time = r.TimeOriginal,
+                SuspectReason = r.SuspectReason,
                 TimeFail = r.TimeFail,
             })
             .ToListAsync();

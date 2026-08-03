@@ -3,6 +3,7 @@ import type { CompetitionOverview, OverviewBestSwim, OverviewMedalist } from '..
 import { GENDER_CIRCLE } from '../overview-shared';
 import { initials } from './module-defs';
 import UI_SwimmerNameCell from '../../../../components/mix/swimmer-name-cell/swimmer-name-cell';
+import UI_SwimTime from '../../../../components/mix/swim-time/swim-time';
 
 // Карточка модуля Champions (9d): Best swim ♂/♀ (медальон-очки 74px) + Most decorated ♂/♀.
 // Реализация по спеке dc.html секция 9d (sc-if is9dBest, композиция 1:1).
@@ -80,7 +81,10 @@ function BestSwimPanel({ swim, gender, onOpenSwim }: {
           className="min-w-0"
         />
         <span className="text-[15px] font-extrabold tabular-nums" style={{ color: 'var(--theme-mode-text)' }}>
-          {swim.time}{' '}
+          <UI_SwimTime
+            time={swim.time}
+            quality={swim.suspect_reason ? { kind: 'protocol', reason: swim.suspect_reason } : null}
+          />{' '}
           <span className="text-[11.5px] font-semibold" style={{ color: 'var(--theme-mode-text-muted)' }}>
             {swim.distance}m {swim.style_name}
           </span>

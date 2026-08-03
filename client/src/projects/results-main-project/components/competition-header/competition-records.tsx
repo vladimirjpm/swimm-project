@@ -1,5 +1,6 @@
 import React from 'react';
 import type { CompetitionOverview } from './types';
+import UI_SwimTime from '../../../components/mix/swim-time/swim-time';
 
 // Таб Records: рекорды, установленные на соревновании (overview.records; сам таб
 // рендерится только когда список непуст). Строка: бейдж вида + событие+время +
@@ -49,7 +50,11 @@ export default function CompetitionRecords({
               {r.kind}
             </span>
             <span className="text-[13px] font-extrabold">
-              {r.distance}m {r.style_name} — {r.time}
+              {r.distance}m {r.style_name} —{' '}
+              <UI_SwimTime
+                time={r.time}
+                quality={r.suspect_reason ? { kind: 'protocol', reason: r.suspect_reason } : null}
+              />
             </span>
             <span className="text-[12.5px] font-semibold" dir="auto" style={{ color: 'var(--theme-mode-text-secondary)' }}>
               {r.holder_name}

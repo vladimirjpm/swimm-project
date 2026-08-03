@@ -14,6 +14,7 @@ import type {
   GroupPublicationItem, HubGroupDetails, HubGroupLink, HubGroupListItem, HubGroupMediaItem,
   HubGroupMember, HubGroupMemberMediaItem, HubGroupStanding,
 } from './types';
+import UI_SwimTime from '../components/mix/swim-time/swim-time';
 
 const GROUP_DISCLAIMER =
   'The roster is maintained by the group creator and is not an official club or federation entry.';
@@ -873,7 +874,10 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
                           </td>
                           <td className={cellCls}>{b.pool_type ?? '—'}</td>
                           <td className={`${cellCls} hp-mono whitespace-nowrap font-extrabold text-[#7dd3fc]`}>
-                            {b.time_original}
+                            <UI_SwimTime
+                              time={b.time_original}
+                              quality={b.suspect_reason ? { kind: 'protocol', reason: b.suspect_reason } : null}
+                            />
                           </td>
                           <td className={cellCls}>{b.swimmer_name || b.swimmer_name_en}</td>
                           <td className={`${cellCls} max-w-[220px]`}>

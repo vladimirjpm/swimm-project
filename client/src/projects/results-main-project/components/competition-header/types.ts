@@ -32,6 +32,8 @@ export interface OverviewBestSwim {
   distance: string;
   gender: string;
   time: string;
+  /** Ошибка протокола (И11). null — заплыв в порядке. */
+  suspect_reason?: string | null;
   international_points: number;
   is_relay: boolean;
   relay_team_name: string | null;
@@ -110,6 +112,8 @@ export interface OverviewRecord {
   distance: string;
   gender: string;
   time: string;
+  /** Ошибка протокола (И11). У рекорда почти всегда null: помеченные заплывы рекордов не бьют. */
+  suspect_reason?: string | null;
   holder_name: string;
   swimmer_id: number;
   /** Возрастная группа держателя ("25-29"); пусто, если нет в данных. */

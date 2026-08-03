@@ -1047,6 +1047,7 @@ function ResultsTable({
               <div className="flex-1" />
               <UI_SwimmerTimeCell
                 time={res.time}
+                quality={res.suspect_reason ? { kind: 'protocol', reason: res.suspect_reason } : null}
                 time_split={res.time_split}
                 time_fail={res.time_fail}
                 time_fail_note={res.time_fail_note}

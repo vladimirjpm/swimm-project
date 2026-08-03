@@ -89,6 +89,7 @@ public class UserMediaRepository : IUserMediaRepository
                 Distance = r.Distance,
                 Style = r.Style.Name,
                 Time = r.TimeOriginal,
+                SuspectReason = r.SuspectReason,
                 Date = r.Competition.Date,
             })
             .ToListAsync();
