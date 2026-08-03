@@ -83,6 +83,34 @@ public class SuspectResultService(SwimmDbContext db, ICacheService cache) : ISus
                 r.SuspectReason!, r.SuspectIsManual, r.SuspectNote))
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<SuspectRowDto>> SearchAsync(
+        int? eventId, int? competitionId, string query, int limit = 30, CancellationToken ct = default)
+    {
+        var q = (query ?? "").Trim().ToLower();
+        if (q.Length < 2) return [];
+
+        // ToLower().Contains, а не EF.Functions.ILike: последний живёт только в Npgsql, и
+        // тест на InMemory-провайдере писать было бы не на чем. Индексов тут всё равно нет —
+        // выборка идёт внутри одного соревнования, это сотни строк.
+        //
+        // Пустой Reason у непомеченной строки: DTO общий с помеченными, и «пусто» здесь
+        // читается однозначно — строка ещё не разобрана.
+        return await Scope(eventId, competitionId)
+            .Where(r =>
+                (r.Swimmer.LastName + " " + r.Swimmer.FirstName).ToLower().Contains(q) ||
+                r.Club.Name.ToLower().Contains(q) ||
+                (r.TimeOriginal ?? "").ToLower().Contains(q) ||
+                r.Distance.ToLower().Contains(q))
+            .OrderBy(r => r.CompetitionDate).ThenBy(r => r.Id)
+            .Take(limit)
+            .Select(r => new SuspectRowDto(
+                r.Id, r.CompetitionId, r.CompetitionDate,
+                (r.Swimmer.FirstName + " " + r.Swimmer.LastName).Trim(),
+                r.Club.Name, r.Style.Name, r.Distance, r.Gender, r.TimeOriginal,
+                r.SuspectReason ?? "", r.SuspectIsManual, r.SuspectNote))
+            .ToListAsync(ct);
+    }
+
     public async Task<bool> SetManualAsync(
         long resultId, bool flagged, string? note, CancellationToken ct = default)
     {

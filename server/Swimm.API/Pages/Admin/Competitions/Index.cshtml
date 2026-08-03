@@ -602,6 +602,17 @@ else
             <span id="quality-stats" class="text-[12px] text-admin-text-muted"></span>
         </div>
 
+        @* Ручная пометка. Нужна потому, что правила ловят не всё: ошибка протокола бывает
+           медленнее рекорда и не нарушает ни одного порога — её видит только человек,
+           знающий пловца (200 вольным за 1:53 при стольнике 1:05). *@
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+            <input type="search" id="quality-search" placeholder="Пометить вручную: имя, клуб, время или дистанция"
+                   class="admin-input py-1 px-2 text-[13px] w-[22rem] max-w-full" />
+            <button type="button" id="quality-search-btn" class="admin-btn admin-btn-ghost py-1 px-3">Найти</button>
+            <span id="quality-search-hint" class="text-[11px] text-admin-text-muted"></span>
+        </div>
+
+        <div id="quality-found" class="mt-3"></div>
         <div id="quality-body" class="mt-4 max-h-[60vh] overflow-y-auto"></div>
     </div>
 </dialog>
@@ -1145,6 +1156,67 @@ else
                     </table>`;
             }
 
+            // ── Ручная пометка: найти строку и пометить ──────────────────────────────
+            const searchInput = document.getElementById('quality-search');
+            const searchBtn = document.getElementById('quality-search-btn');
+            const searchHint = document.getElementById('quality-search-hint');
+            const foundEl = document.getElementById('quality-found');
+
+            function renderFound(rows) {
+                if (!rows.length) {
+                    foundEl.innerHTML = '<div class="text-[12px] text-admin-text-muted">Ничего не нашлось.</div>';
+                    return;
+                }
+                foundEl.innerHTML = `
+                    <table class="admin-table w-full text-[13px]">
+                        <tbody>${rows.map(r => `
+                            <tr>
+                                <td>${esc(r.swimmerName)} <span class="text-admin-text-muted">· ${esc(r.club)}</span></td>
+                                <td class="whitespace-nowrap">${esc(r.distance)} ${esc(r.styleName)}</td>
+                                <td class="text-right tabular-nums font-semibold">${esc(r.time)}</td>
+                                <td class="text-right whitespace-nowrap">
+                                    ${r.reason
+                                        ? '<span class="text-[11px] text-admin-text-muted">уже помечено</span>'
+                                        : `<button type="button" class="admin-btn admin-btn-ghost py-1 px-2 quality-flag"
+                                                data-id="${r.resultId}">Пометить</button>`}
+                                </td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>`;
+            }
+
+            async function runSearch() {
+                const q = searchInput.value.trim();
+                if (q.length < 2) { searchHint.textContent = 'Минимум 2 символа'; return; }
+                searchHint.textContent = 'Ищу…';
+                try {
+                    const rows = await api(`${API}/search?${qs()}&q=${encodeURIComponent(q)}`);
+                    searchHint.textContent = `найдено ${rows.length}`;
+                    renderFound(rows);
+                } catch (err) { searchHint.textContent = 'Ошибка: ' + err.message; }
+            }
+
+            searchBtn.addEventListener('click', runSearch);
+            searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); runSearch(); } });
+
+            foundEl.addEventListener('click', async (e) => {
+                const btn = e.target.closest('.quality-flag');
+                if (!btn) return;
+                // Заметка обязательна: пометка без причины через полгода неотличима от случайного клика.
+                const note = prompt('Почему строка недостоверна? (попадёт в аудит и в список)');
+                if (note === null || !note.trim()) return;
+                btn.disabled = true;
+                try {
+                    await api(`${API}/${btn.dataset.id}/manual`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ flagged: true, note: note.trim() })
+                    });
+                    render(await api(`${API}?${qs()}`));
+                    await runSearch();
+                    toast('Помечено вручную — переимпорт и повторная проверка это сохранят');
+                } catch (err) { btn.disabled = false; toast('Ошибка: ' + err.message, 6000); }
+            });
+
             body.addEventListener('click', async (e) => {
                 const btn = e.target.closest('.quality-clear');
                 if (!btn) return;
@@ -1179,6 +1251,9 @@ else
                         : { competitionId: Number(btn.dataset.competitionId) };
                     titleEl.textContent = btn.dataset.title || 'Качество результатов';
                     statsEl.textContent = '';
+                    searchInput.value = '';
+                    searchHint.textContent = '';
+                    foundEl.innerHTML = '';
                     body.innerHTML = '<div class="text-sm text-admin-text-muted py-6 text-center">Загружаю…</div>';
                     dlg.showModal();
                     try { render(await api(`${API}?${qs()}`)); }

@@ -61,6 +61,21 @@ public class SuspectResultsAdminController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// Поиск строки внутри скоупа, чтобы пометить её вручную. Автоматика ловит не всё:
+    /// ошибка протокола может быть медленнее рекорда и не нарушать ни одного правила —
+    /// её видит только человек, знающий пловца.
+    /// </summary>
+    [HttpGet("search")]
+    public async Task<IActionResult> Search(
+        [FromQuery] int? eventId, [FromQuery] int? competitionId, [FromQuery] string? q)
+    {
+        if (eventId is null && competitionId is null)
+            return BadRequest(new { error = "Нужен eventId или competitionId" });
+
+        return Ok(await _service.SearchAsync(eventId, competitionId, q ?? "", ct: HttpContext.RequestAborted));
+    }
+
     public sealed record ManualFlagRequest(bool Flagged, string? Note);
 
     /// <summary>Ручная пометка/снятие одной строки — переживает переимпорт и повторный скан.</summary>
