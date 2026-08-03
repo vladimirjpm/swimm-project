@@ -12,7 +12,26 @@ public sealed record DashboardStatusSummary(
     RecordQualitySummary RecordQuality,
     DashboardMediaStatus Media,
     DashboardUsersGroupsStatus UsersGroups,
-    DashboardSystemStatus System);
+    DashboardSystemStatus System,
+    DashboardChecksStatus Checks);
+
+/// <summary>
+/// Блок «Проверки данных» — сводка реестра (docs/data-integrity.md, Д3). Дашборд НЕ гоняет
+/// проверки сам: он показывает итог последнего прогона и ведёт на /Admin/Health.
+/// </summary>
+/// <param name="LastRunAt">null — реестр ни разу не гонялся; тогда нули ничего не значат
+/// и страница обязана сказать «прогонов не было», а не «всё чисто».</param>
+public sealed record DashboardChecksStatus(
+    DateTime? LastRunAt, string? LastRunTrigger,
+    int Errors, int Warnings, int Infos,
+    /// <summary>Проверок, упавших на последнем прогоне: их числа недостоверны.</summary>
+    int FailedChecks,
+    /// <summary>Проверки с ненулевым результатом, тяжёлые первыми — для панели деталей.</summary>
+    IReadOnlyList<DashboardCheckLine> Lines);
+
+/// <summary>Строка сводки: одна проверка и сколько она нашла на последнем прогоне.</summary>
+public sealed record DashboardCheckLine(
+    string CheckId, DataCheckSeverity Severity, int Total, bool Failed);
 
 /// <summary>Блок «Пловцы»: происхождение записей, дедуп-кандидаты, привязка Loglig ID,
 /// пловцы без результатов/OrgId.</summary>

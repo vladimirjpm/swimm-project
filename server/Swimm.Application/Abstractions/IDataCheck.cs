@@ -48,6 +48,14 @@ public interface IDataCheckRunner
     Task<IReadOnlyList<DataCheckRunDto>> GetHistoryAsync(int limit = 20, CancellationToken ct = default);
 
     /// <summary>
+    /// Итог последнего прогона по каждой проверке (полные числа, без среза списка) + сам
+    /// последний прогон. Дашборд берёт свои счётчики отсюда, чтобы не считать то же самое
+    /// второй раз и не расходиться в цифрах с /Admin/Health. Пусто — реестр ни разу не гонялся.
+    /// </summary>
+    Task<(DataCheckRunDto? LastRun, IReadOnlyList<DataCheckStateDto> States)> GetStateAsync(
+        CancellationToken ct = default);
+
+    /// <summary>
     /// «Принято как есть»: находка неустранима (ошибка в протоколе федерации, особенность
     /// данных). Переживает следующие прогоны — иначе решение пришлось бы принимать заново
     /// каждый раз, как это уже сделано для ручных пометок качества результатов.

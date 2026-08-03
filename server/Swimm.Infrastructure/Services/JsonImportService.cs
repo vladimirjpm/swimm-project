@@ -20,6 +20,7 @@ public class JsonImportService : IImportService
     private readonly SwimmDbContext _db;
     private readonly ICompetitionRecalculationService? _recalc;
     private readonly ICacheService _cache;
+    private readonly IDataCheckRunner? _checks;
 
     private static readonly string[] ClearableTables =
         ["Results", "GalleryItems", "Galleries", "Relays", "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "CompetitionEvents", "Countries"];
@@ -29,12 +30,19 @@ public class JsonImportService : IImportService
     /// null — пересчёт пропускается. Так тесты импорта, которым он не нужен, продолжают
     /// конструировать сервис двумя аргументами; в приложении его подставляет DI.
     /// </param>
+    /// <param name="checks">
+    /// Реестр проверок данных (Д5, решение Р13): гоняется в конце импорта, чтобы человеку не
+    /// приходилось догадываться открыть /Admin/Health. Необязателен по той же причине, что и
+    /// <paramref name="recalc"/> — тестам импорта он не нужен.
+    /// </param>
     public JsonImportService(SwimmDbContext db, ICacheService cache,
-        ICompetitionRecalculationService? recalc = null)
+        ICompetitionRecalculationService? recalc = null,
+        IDataCheckRunner? checks = null)
     {
         _db    = db;
         _cache = cache;
         _recalc = recalc;
+        _checks = checks;
     }
 
     public string[] GetClearableTables() => ClearableTables;
@@ -902,6 +910,38 @@ public class JsonImportService : IImportService
             diagnosticLog.Add($"Сверка с файлом не выполнена ({ex.GetType().Name}: {ex.Message}). Импорт сохранён.");
         }
 
+        // Прогон всех проверок данных (Д5, решение Р13). После коммита и в try/catch — прибор
+        // не имеет права уронить уже загруженные результаты. Гоняем ВСЕ, а не только связанные
+        // с этим соревнованием: импорт трогает и справочники (клубы, пловцы), а на 30к строк
+        // это секунды. Запускается последним — чтобы ReconciliationMismatchCheck увидел строки
+        // сверки, записанные выше.
+        var dataChecksSummary = "";
+        var dataCheckErrors = 0;
+        var dataCheckWarnings = 0;
+        if (_checks is not null)
+        {
+            try
+            {
+                // Импорт натащил в трекер десятки тысяч сущностей; всё уже сохранено и
+                // закоммичено, а DetectChanges на них стоил бы дороже самих проверок.
+                _db.ChangeTracker.Clear();
+
+                var run = await _checks.RunAllAsync("import");
+                dataCheckErrors = run.ErrorCount;
+                dataCheckWarnings = run.WarningCount;
+                dataChecksSummary = run.ErrorCount == 0 && run.WarningCount == 0
+                    ? "Проверки данных: чисто."
+                    : $"Проверки данных: ошибок — {run.ErrorCount}, предупреждений — {run.WarningCount}.";
+                diagnosticLog.Add(dataChecksSummary);
+            }
+            catch (Exception ex)
+            {
+                diagnosticLog.Add(
+                    $"Проверки данных не выполнены ({ex.GetType().Name}: {ex.Message}). " +
+                    "Импорт сохранён; прогнать вручную — /Admin/Health или `dotnet run -- --check-data`.");
+            }
+        }
+
         await _cache.InvalidateAllAsync();
 
         // insertedCount — реально вставленные строки resultBatch (после того как сматченные
@@ -928,6 +968,9 @@ public class JsonImportService : IImportService
             SkippedWithMedia = skippedWithMediaCount,
             Reconciliation = reconciliationSummary,
             ReconciliationMismatches = reconciliationMismatches,
+            DataChecks = dataChecksSummary,
+            DataCheckErrors = dataCheckErrors,
+            DataCheckWarnings = dataCheckWarnings,
             Message = message
         };
         }

@@ -63,11 +63,15 @@ public class DashboardStatusServiceTests
         SwimmDbContext db,
         SwimmerDedupReport? swimmerReport = null,
         ClubDedupReport? clubReport = null,
-        IMemoryCache? cache = null) =>
+        IMemoryCache? cache = null,
+        IDataCheckRunner? dataChecks = null) =>
         new(db,
             new FakeSwimmerDedupService(swimmerReport ?? SwimmerReport(0, 0, 0)),
             new FakeClubDedupService(clubReport ?? ClubReport(0, 0)),
             new RecordQualityService(db),
+            // Реестр без единой проверки: состояний нет → дашборд считает метрики вживую,
+            // как до Д3. Ровно то, что нужно тестам «старых» счётчиков.
+            dataChecks ?? new DataCheckRunner(db, []),
             cache ?? new MemoryCache(new MemoryCacheOptions()));
 
     [Fact]
@@ -85,6 +89,105 @@ public class DashboardStatusServiceTests
         Assert.Equal(3, result.Swimmers.Orphans);
         Assert.Equal(1, result.Clubs.SureCandidates);
         Assert.Equal(4, result.Clubs.UnsureCandidates);
+    }
+
+    /// <summary>Реестр-заглушка с готовыми состояниями — дашборд обязан брать числа отсюда.</summary>
+    private sealed class FakeDataCheckRunner(DataCheckRunDto? lastRun, params DataCheckStateDto[] states)
+        : IDataCheckRunner
+    {
+        public Task<(DataCheckRunDto? LastRun, IReadOnlyList<DataCheckStateDto> States)> GetStateAsync(
+            CancellationToken ct = default) =>
+            Task.FromResult<(DataCheckRunDto?, IReadOnlyList<DataCheckStateDto>)>((lastRun, states));
+
+        public Task<DataCheckRunDto> RunAllAsync(string trigger, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public Task<IReadOnlyList<DataCheckGroupDto>> GetCurrentAsync(CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public Task<IReadOnlyList<DataCheckRunDto>> GetHistoryAsync(int limit = 20, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public Task<bool> AcceptAsync(int findingId, string? note, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public Task<bool> ReopenAsync(int findingId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+    }
+
+    private static DataCheckStateDto State(string checkId, DataCheckSeverity severity, int total, bool failed = false) =>
+        new(checkId, severity, total, Math.Min(total, 50), failed, 7, new DateTime(2026, 8, 3, 10, 0, 0, DateTimeKind.Utc));
+
+    private static DataCheckRunDto Run() =>
+        new(7, new DateTime(2026, 8, 3, 10, 0, 0, DateTimeKind.Utc), null, "import", 0, 0, 0, 0);
+
+    [Fact]
+    public async Task GetStatusAsync_TakesMetricsFromRegistry_NotFromItsOwnCount()
+    {
+        // Смысл перевода на реестр: одно число в двух местах. Дедуп-отчёт говорит «2 уверенных»,
+        // реестр — «5»; дашборд обязан показать реестровое, иначе он разойдётся с /Admin/Health.
+        await using var db = CreateDb(nameof(GetStatusAsync_TakesMetricsFromRegistry_NotFromItsOwnCount));
+        var service = CreateService(db,
+            swimmerReport: SwimmerReport(orphans: 3, sure: 2, unsure: 5),
+            dataChecks: new FakeDataCheckRunner(Run(),
+                State("swimmers.dedup-sure", DataCheckSeverity.Warning, 5),
+                State("swimmers.orphans", DataCheckSeverity.Info, 11)));
+
+        var result = await service.GetStatusAsync(CancellationToken.None);
+
+        Assert.Equal(5, result.Swimmers.SureCandidates);
+        Assert.Equal(11, result.Swimmers.Orphans);
+        // «Неуверенных» проверки в реестре нет — они по-прежнему считаются вживую.
+        Assert.Equal(5, result.Swimmers.UnsureCandidates);
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_FallsBackToLiveCount_WhenCheckNeverRan()
+    {
+        // Новая база: реестр пуст. Показать 0 значило бы соврать «всё чисто».
+        await using var db = CreateDb(nameof(GetStatusAsync_FallsBackToLiveCount_WhenCheckNeverRan));
+        var service = CreateService(db, swimmerReport: SwimmerReport(orphans: 3, sure: 2, unsure: 0));
+
+        var result = await service.GetStatusAsync(CancellationToken.None);
+
+        Assert.Equal(2, result.Swimmers.SureCandidates);
+        Assert.Equal(3, result.Swimmers.Orphans);
+        Assert.Null(result.Checks.LastRunAt);
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_FallsBackToLiveCount_WhenCheckFailed()
+    {
+        // Упавшая проверка отдаёт мусорный Total — доверять ему нельзя.
+        await using var db = CreateDb(nameof(GetStatusAsync_FallsBackToLiveCount_WhenCheckFailed));
+        var service = CreateService(db,
+            swimmerReport: SwimmerReport(orphans: 3, sure: 2, unsure: 0),
+            dataChecks: new FakeDataCheckRunner(Run(),
+                State("swimmers.orphans", DataCheckSeverity.Info, 999, failed: true)));
+
+        var result = await service.GetStatusAsync(CancellationToken.None);
+
+        Assert.Equal(3, result.Swimmers.Orphans);
+        Assert.Equal(1, result.Checks.FailedChecks);
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_ChecksBlock_SumsBySeverity_AndKeepsFullTotals()
+    {
+        // Суммируем по СОСТОЯНИЯМ проверок, а не по счётчикам прогона: в прогоне лежат числа
+        // записанных находок (срез 50), здесь нужны полные.
+        await using var db = CreateDb(nameof(GetStatusAsync_ChecksBlock_SumsBySeverity_AndKeepsFullTotals));
+        var service = CreateService(db, dataChecks: new FakeDataCheckRunner(Run(),
+            State("a.error", DataCheckSeverity.Error, 2),
+            State("b.warning", DataCheckSeverity.Warning, 8071),
+            State("c.info", DataCheckSeverity.Info, 4),
+            State("d.clean", DataCheckSeverity.Error, 0)));
+
+        var checks = (await service.GetStatusAsync(CancellationToken.None)).Checks;
+
+        Assert.Equal(2, checks.Errors);
+        Assert.Equal(8071, checks.Warnings);
+        Assert.Equal(4, checks.Infos);
+        Assert.Equal("import", checks.LastRunTrigger);
+        // Чистые проверки в строки не попадают — в сводке нужны те, где есть работа.
+        Assert.Equal(3, checks.Lines.Count);
+        Assert.Equal("a.error", checks.Lines[0].CheckId);     // severity важнее количества
     }
 
     [Fact]

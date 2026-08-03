@@ -300,7 +300,8 @@ if (args.Contains("--check-data"))
     using var scope = app.Services.CreateScope();
     var runner = scope.ServiceProvider.GetRequiredService<IDataCheckRunner>();
 
-    var run = await runner.RunAllAsync("manual");
+    // Триггер отдельный от кнопки: в истории видно, откуда прогон (manual / cli / import).
+    var run = await runner.RunAllAsync("cli");
     Console.WriteLine($"Прогон #{run.Id}: ошибок {run.ErrorCount}, предупреждений {run.WarningCount}, " +
                       $"инфо {run.InfoCount}, закрыто {run.FixedCount}\n");
 
@@ -410,6 +411,7 @@ if (args.Contains("--repull"))
 
     Console.WriteLine($"\n{result.Message}");
     Console.WriteLine(result.Reconciliation);
+    if (result.DataChecks.Length > 0) Console.WriteLine(result.DataChecks);
     foreach (var line in result.DiagnosticLog.Where(l =>
                  l.Contains("Идентичность") || l.Contains("Upsert") || l.Contains("Сверка")))
         Console.WriteLine("  " + line);

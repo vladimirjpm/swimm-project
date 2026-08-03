@@ -59,6 +59,7 @@ public class SwimmDbContext : DbContext
     public DbSet<ImportReconciliation> ImportReconciliations => Set<ImportReconciliation>();
     public DbSet<DataCheckRun> DataCheckRuns => Set<DataCheckRun>();
     public DbSet<DataCheckFinding> DataCheckFindings => Set<DataCheckFinding>();
+    public DbSet<DataCheckState> DataCheckStates => Set<DataCheckState>();
     public DbSet<DiscoveredCompetition> DiscoveredCompetitions => Set<DiscoveredCompetition>();
 
     /* === Фавориты и медиа пользователей === */
@@ -529,6 +530,9 @@ public class SwimmDbContext : DbContext
             entity.ToTable("Sys_DataCheckRuns");
             entity.HasIndex(e => e.StartedAt);
         });
+
+        // Итог последнего прогона по каждой проверке — источник счётчиков дашборда.
+        modelBuilder.Entity<DataCheckState>(entity => entity.ToTable("Sys_DataCheckStates"));
 
         modelBuilder.Entity<DataCheckFinding>(entity =>
         {

@@ -33,12 +33,15 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
             .ToListAsync(ct);
         var storedByKey = stored.ToDictionary(Key);
 
+        var states = await db.DataCheckStates.ToDictionaryAsync(s => s.CheckId, ct);
+
         var seen = new HashSet<string>();
         int errors = 0, warnings = 0, infos = 0;
 
         foreach (var check in checks)
         {
             DataCheckOutcome outcome;
+            var failed = false;
             try
             {
                 outcome = await check.RunAsync(ct);
@@ -46,9 +49,25 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
             catch (Exception ex)
             {
                 // Упавшая проверка — сама по себе находка: молчать о ней хуже всего.
+                failed = true;
                 outcome = new DataCheckOutcome(1, [new DataCheckItem(
                     "Check", null, $"проверка не выполнилась: {ex.GetType().Name}: {ex.Message}")]);
             }
+
+            // Полное число живёт здесь: список находок капнут, и по нему счётчик дашборда
+            // недосчитался бы (проверка на 8071 находку кладёт 50).
+            if (!states.TryGetValue(check.Id, out var state))
+            {
+                state = new DataCheckState { CheckId = check.Id };
+                db.DataCheckStates.Add(state);
+                states[check.Id] = state;
+            }
+            state.Severity = (int)check.Severity;
+            state.Total = outcome.Total;
+            state.Shown = outcome.Items.Count;
+            state.Failed = failed;
+            state.LastRunId = run.Id;
+            state.LastRunAt = run.StartedAt;
 
             foreach (var item in outcome.Items)
             {
@@ -115,6 +134,7 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
             .ToListAsync(ct);
 
         var byCheck = findings.GroupBy(f => f.CheckId).ToDictionary(g => g.Key, g => g.ToList());
+        var states = await db.DataCheckStates.AsNoTracking().ToDictionaryAsync(s => s.CheckId, ct);
 
         // Показываем ВСЕ зарегистрированные проверки, даже пустые: «проверка есть и она
         // молчит» — полезная информация, отличная от «проверки нет».
@@ -122,11 +142,13 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
             .Select(c =>
             {
                 var items = byCheck.GetValueOrDefault(c.Id, []);
+                var state = states.GetValueOrDefault(c.Id);
                 return new DataCheckGroupDto(
                     c.Id, c.Title, c.Description, c.Severity,
                     items.Count(f => f.Resolution == null),
                     items.Count(f => f.Resolution == DataCheckResolutions.Accepted),
-                    items.Select(ToDto).ToList());
+                    items.Select(ToDto).ToList(),
+                    state?.Total, state?.LastRunAt, state?.Failed ?? false);
             })
             .OrderByDescending(g => g.OpenCount > 0)
             .ThenByDescending(g => g.Severity)
@@ -138,6 +160,21 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
         (await db.DataCheckRuns.AsNoTracking()
             .OrderByDescending(r => r.Id).Take(limit).ToListAsync(ct))
         .Select(ToDto).ToList();
+
+    public async Task<(DataCheckRunDto? LastRun, IReadOnlyList<DataCheckStateDto> States)> GetStateAsync(
+        CancellationToken ct = default)
+    {
+        var lastRun = await db.DataCheckRuns.AsNoTracking()
+            .OrderByDescending(r => r.Id).FirstOrDefaultAsync(ct);
+
+        var states = (await db.DataCheckStates.AsNoTracking().ToListAsync(ct))
+            .Select(s => new DataCheckStateDto(
+                s.CheckId, (DataCheckSeverity)s.Severity, s.Total, s.Shown, s.Failed,
+                s.LastRunId, s.LastRunAt))
+            .ToList();
+
+        return (lastRun is null ? null : ToDto(lastRun), states);
+    }
 
     public async Task<bool> AcceptAsync(int findingId, string? note, CancellationToken ct = default)
     {

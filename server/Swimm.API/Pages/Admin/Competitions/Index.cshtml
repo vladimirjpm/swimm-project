@@ -785,7 +785,10 @@ else
                             discId, name, created: r.created ?? 0, total: r.totalRows ?? 0,
                             skipped: r.skipped ?? 0, errors: r.errors ?? 0,
                             // Сверка с файлом (Д1): главный признак того, что импорт лёг верно.
-                            recon: r.reconciliation ?? '', reconBad: r.reconciliationMismatches ?? 0
+                            recon: r.reconciliation ?? '', reconBad: r.reconciliationMismatches ?? 0,
+                            // Прогон реестра проверок (Д5): гоняется автоматически в конце импорта.
+                            checks: r.dataChecks ?? '', checkErr: r.dataCheckErrors ?? 0,
+                            checkWarn: r.dataCheckWarnings ?? 0
                         }));
                         finish('ok', 'Готово. Обновляю таблицу…');
                         setTimeout(() => location.reload(), 700);
@@ -814,12 +817,20 @@ else
                     if (d.errors) steps.push({ text: `ошибок ${d.errors}`, state: 'fail' });
                     // Сверка с файлом важнее счётчиков: она отвечает на вопрос «легло ли верно».
                     if (d.recon) steps.push({ text: esc(d.recon), state: d.reconBad ? 'fail' : 'ok' });
+                    // Проверки данных прогоняются сами (Д5) — показываем итог тут же.
+                    if (d.checks) steps.push({
+                        text: esc(d.checks),
+                        state: d.checkErr ? 'fail' : (d.checkWarn ? 'wait' : 'ok')
+                    });
                     render();
 
                     const rowFound = markRow(d.discId);
                     if (d.reconBad) {
                         footer('Данные разошлись с протоколом. Разбор — <code>docs/data-integrity.md</code> §8; '
                              + 'чаще всего лечится повторным «Перезатянуть» с галкой «удалять лишние».');
+                    } else if (d.checkErr || d.checkWarn) {
+                        footer('Проверки данных нашли, что разобрать — '
+                             + '<a class="text-admin-accent hover:underline" href="/Admin/Health">Health</a>.');
                     } else if (!rowFound) {
                         footer('Строка не видна при текущих фильтрах — сбрось их, чтобы увидеть её со стадией «импортировано».');
                     } else {

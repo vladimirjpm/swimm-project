@@ -173,6 +173,65 @@ public class DataCheckRunnerTests
         Assert.Equal(0, groups[1].OpenCount);
     }
 
+    /// <summary>Проверка, нашедшая много, а положившая в список мало (срез на 50).</summary>
+    private sealed class TruncatingCheck(string id, int total, int shown) : IDataCheck
+    {
+        public string Id => id;
+        public string Title => "Проверка со срезом";
+        public string Description => "—";
+        public DataCheckSeverity Severity => DataCheckSeverity.Warning;
+
+        public Task<DataCheckOutcome> RunAsync(CancellationToken ct = default) =>
+            Task.FromResult(new DataCheckOutcome(total,
+                Enumerable.Range(1, shown).Select(i => new DataCheckItem("Result", i, "находка")).ToList()));
+    }
+
+    [Fact]
+    public async Task State_KeepsFullTotal_EvenWhenFindingListTruncated()
+    {
+        // Ради этого состояние и заведено: по таблице находок полное число не восстановить,
+        // а дашборд должен показывать 8071, а не 50.
+        await using var db = CreateDb(nameof(State_KeepsFullTotal_EvenWhenFindingListTruncated));
+        var runner = new DataCheckRunner(db, [new TruncatingCheck("test.truncated", total: 8071, shown: 50)]);
+        await runner.RunAllAsync("manual");
+
+        var (lastRun, states) = await runner.GetStateAsync();
+
+        var state = Assert.Single(states);
+        Assert.Equal(8071, state.Total);
+        Assert.Equal(50, state.Shown);
+        Assert.False(state.Failed);
+        Assert.Equal(lastRun!.Id, state.LastRunId);
+
+        // И то же самое видно на /Admin/Health — «показано 50 из 8071».
+        var group = Assert.Single(await runner.GetCurrentAsync());
+        Assert.Equal(8071, group.Total);
+        Assert.Equal(50, group.Findings.Count);
+    }
+
+    [Fact]
+    public async Task State_MarksFailedCheck()
+    {
+        // Упавшая проверка: её Total ничего не значит, и потребитель должен это видеть.
+        await using var db = CreateDb(nameof(State_MarksFailedCheck));
+        var runner = new DataCheckRunner(db, [new FakeCheck("test.broken") { Throws = true }]);
+        await runner.RunAllAsync("manual");
+
+        var (_, states) = await runner.GetStateAsync();
+        Assert.True(Assert.Single(states).Failed);
+    }
+
+    [Fact]
+    public async Task State_IsEmpty_BeforeFirstRun()
+    {
+        // Ни одного прогона — потребитель обязан отличить это от «всё чисто».
+        await using var db = CreateDb(nameof(State_IsEmpty_BeforeFirstRun));
+        var (lastRun, states) = await new DataCheckRunner(db, [new FakeCheck("test.check")]).GetStateAsync();
+
+        Assert.Null(lastRun);
+        Assert.Empty(states);
+    }
+
     [Fact]
     public async Task History_NewestFirst()
     {

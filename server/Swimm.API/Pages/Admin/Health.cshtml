@@ -85,6 +85,10 @@
                     <span class="font-semibold text-admin-text">${esc(g.title)}</span>
                     <span class="${g.openCount ? 'font-bold text-admin-text' : 'text-admin-text-muted'}">${g.openCount}</span>
                     ${g.acceptedCount ? `<span class="text-[11px] text-admin-text-muted">+${g.acceptedCount} принято</span>` : ''}
+                    ${g.total != null && g.total > g.findings.length
+                        ? `<span class="text-[11px] text-admin-warning" title="Список находок обрезан — полное число известно из последнего прогона">показано ${g.findings.length} из ${g.total}</span>`
+                        : ''}
+                    ${g.failed ? '<span class="text-[11px] text-admin-danger">проверка упала</span>' : ''}
                     ${clean ? '<span class="text-[11px] text-admin-success">чисто</span>' : ''}
                     <code class="ml-auto text-[10px] text-admin-text-muted/70">${esc(g.checkId)}</code>
                 </summary>

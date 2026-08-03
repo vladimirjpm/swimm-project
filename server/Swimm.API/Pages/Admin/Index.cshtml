@@ -146,6 +146,7 @@
               me = s.media, ug = s.usersGroups;
 
         return [
+            buildChecksBlock(s.checks || null),
             {
                 key: 'swimmers', title: 'Пловцы', href: '/Admin/Swimmers',
                 heroValue: fmtN(sw.total),
@@ -212,6 +213,44 @@
                 ],
             },
         ];
+    }
+
+    // Блок «Проверки данных» — сводка реестра (docs/data-integrity.md, Д3). Дашборд НЕ считает
+    // это сам: числа берутся из последнего прогона, потому дата прогона стоит на видном месте.
+    // Прогонов не было — говорим об этом прямо: нули тут читались бы как «всё чисто».
+    function buildChecksBlock(c) {
+        const neverRan = !c || !c.lastRunAt;
+        const open = neverRan ? 0 : c.errors + c.warnings + c.infos;
+
+        const metrics = neverRan ? [] : [
+            { v: c.errors, label: 'Ошибки', sub: 'испорченные данные', tone: 'danger', href: '/Admin/Health' },
+            { v: c.warnings, label: 'Предупреждения', sub: 'подозрительно — смотреть глазами', tone: 'warn', href: '/Admin/Health' },
+            { v: c.infos, label: 'Инфо', sub: 'есть что почистить', tone: 'gray', href: '/Admin/Health' },
+        ];
+        if (!neverRan && c.failedChecks) {
+            metrics.push({ v: c.failedChecks, label: 'Проверки упали', sub: 'их числа недостоверны', tone: 'danger', href: '/Admin/Health' });
+        }
+
+        // Разбивка по проверкам — только в панели деталей: в строке она не поместится.
+        const lines = (c && c.lines || []).map(l =>
+            `<a href="/Admin/Health" class="flex items-baseline gap-3 py-1.5 px-2 no-underline hover:bg-admin-surface-hover rounded-md">
+                <span class="w-14 text-right text-[13px] font-bold ${l.failed ? TONE_CLS.danger : TONE_CLS[['gray', 'warn', 'danger'][l.severity]]}">${l.failed ? '—' : fmtN(l.total)}</span>
+                <span class="flex-1 min-w-0 font-mono text-[11px] text-admin-text-muted">${esc(l.checkId)}</span>
+                ${l.failed ? '<span class="text-admin-danger text-[11px]">не выполнилась</span>' : ''}
+            </a>`).join('');
+
+        return {
+            key: 'checks', title: 'Проверки данных', href: '/Admin/Health',
+            heroValue: neverRan ? '—' : fmtN(open),
+            // esc не нужен: renderDashDetail экранирует heroSubs сам.
+            heroSubs: neverRan
+                ? 'прогонов не было — открой /Admin/Health и нажми «Прогнать»'
+                : `прогон ${fmtDT(c.lastRunAt)} · ${c.lastRunTrigger || ''}`,
+            metrics,
+            extraDetailHtml: lines
+                ? `<div class="mt-3 text-admin-text-muted/70 text-[11px] uppercase tracking-wide px-2">По проверкам</div>${lines}`
+                : '',
+        };
     }
 
     // Заголовок набора рекордов: world → «World», country/ISR → «Israel», иначе «type:code».

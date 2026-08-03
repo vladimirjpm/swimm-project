@@ -20,9 +20,27 @@ public class DashboardStatusService(
     ISwimmerDedupService swimmerDedup,
     IClubDedupService clubDedup,
     IRecordQualityService recordQuality,
+    IDataCheckRunner dataChecks,
     IMemoryCache cache) : IDashboardStatusService
 {
     private const string CacheKey = "dashboard:status";
+
+    /// <summary>
+    /// Метрики, у которых в реестре проверок (Д3) есть проверка один-в-один. Дашборд берёт
+    /// число ОТТУДА, а не считает второй раз: две страницы, считающие одно и то же разным
+    /// кодом, рано или поздно разойдутся, и тогда непонятно, какой верить.
+    ///
+    /// Цена решения: это картина последнего прогона, а не «прямо сейчас» — поэтому дашборд
+    /// показывает рядом время прогона. Если проверка ещё ни разу не гонялась, метрика
+    /// считается по-старому вживую (иначе новая база показывала бы обнадёживающие нули).
+    /// </summary>
+    private Dictionary<string, DataCheckStateDto> _states = [];
+
+    private async Task<int> FromRegistryAsync(string checkId, Func<Task<int>> live) =>
+        _states.TryGetValue(checkId, out var s) && !s.Failed ? s.Total : await live();
+
+    private int FromRegistry(string checkId, Func<int> live) =>
+        _states.TryGetValue(checkId, out var s) && !s.Failed ? s.Total : live();
 
     /// <summary>Префикс синтетических SwimmerOrgId, проставляемых при импорте без реального ID
     /// федерации (см. SwimmerDedupService/dedup-report.sql) — исключаются из «живых» счётчиков.</summary>
@@ -41,6 +59,11 @@ public class DashboardStatusService(
 
     private async Task<DashboardStatusSummary> BuildAsync(CancellationToken ct)
     {
+        // Реестр читается ПЕРВЫМ: его числа подставляются в блоки ниже.
+        var (lastRun, states) = await dataChecks.GetStateAsync(ct);
+        _states = states.ToDictionary(s => s.CheckId);
+        var checks = BuildChecks(lastRun, states);
+
         var swimmers = await BuildSwimmersAsync(ct);
         var clubs = await BuildClubsAsync(ct);
         var competitions = await BuildCompetitionsAsync(ct);
@@ -55,7 +78,36 @@ public class DashboardStatusService(
 
         return new DashboardStatusSummary(
             swimmers, clubs, competitions, results, recordSets, recordQualitySummary,
-            media, usersGroups, system);
+            media, usersGroups, system, checks);
+    }
+
+    /// <summary>
+    /// Сводка реестра проверок. Считается ПО СОСТОЯНИЯМ проверок, а не по счётчикам прогона:
+    /// в прогоне лежат числа записанных находок (список капнут на 50), а здесь нужны полные.
+    /// </summary>
+    private static DashboardChecksStatus BuildChecks(
+        DataCheckRunDto? lastRun, IReadOnlyList<DataCheckStateDto> states)
+    {
+        int Sum(DataCheckSeverity s) => states
+            .Where(x => x.Severity == s && !x.Failed)
+            .Sum(x => x.Total);
+
+        var lines = states
+            .Where(s => s.Total > 0 || s.Failed)
+            .OrderByDescending(s => s.Failed)
+            .ThenByDescending(s => s.Severity)
+            .ThenByDescending(s => s.Total)
+            .Select(s => new DashboardCheckLine(s.CheckId, s.Severity, s.Total, s.Failed))
+            .ToList();
+
+        return new DashboardChecksStatus(
+            LastRunAt: lastRun?.StartedAt,
+            LastRunTrigger: lastRun?.Trigger,
+            Errors: Sum(DataCheckSeverity.Error),
+            Warnings: Sum(DataCheckSeverity.Warning),
+            Infos: Sum(DataCheckSeverity.Info),
+            FailedChecks: states.Count(s => s.Failed),
+            Lines: lines);
     }
 
     private async Task<DashboardSwimmerStatus> BuildSwimmersAsync(CancellationToken ct)
@@ -94,9 +146,12 @@ public class DashboardStatusService(
             OriginIsr: originIsr,
             OriginLocal: originLocal,
             Synthetic: synthetic,
-            SureCandidates: swimmerReport.Candidates.Count(c => c.Sure),
+            // Уверенные дубли и сироты живут в реестре (swimmers.dedup-sure / swimmers.orphans);
+            // «неуверенных» проверки нет — они сознательно не заведены как находка, поэтому
+            // считаются вживую по тому же отчёту.
+            SureCandidates: FromRegistry("swimmers.dedup-sure", () => swimmerReport.Candidates.Count(c => c.Sure)),
             UnsureCandidates: swimmerReport.Candidates.Count(c => !c.Sure),
-            Orphans: swimmerReport.Orphans.Count,
+            Orphans: FromRegistry("swimmers.orphans", () => swimmerReport.Orphans.Count),
             NoOrgId: noOrgId,
             NoResults: noResults,
             Loglig: loglig);
@@ -113,11 +168,12 @@ public class DashboardStatusService(
 
         // Клуб без пловцов: нет Swimmer.ClubId == club.Id и нет ResultRecord.ClubId == club.Id.
         // Псевдоклубы и SYNTH-клубы исключены (не «настоящие» клубы, не считаем дырой).
-        var noSwimmers = await db.Clubs.AsNoTracking()
+        // Из реестра (clubs.empty), пока он не гонялся — вживую.
+        var noSwimmers = await FromRegistryAsync("clubs.empty", () => db.Clubs.AsNoTracking()
             .Where(c => !c.IsPseudo && !c.Name.StartsWith("SYNTH") && c.MergedIntoId == null)
             .Where(c => !db.Swimmers.Any(s => s.ClubId == c.Id))
             .Where(c => !db.Results.Any(r => r.ClubId == c.Id))
-            .CountAsync(ct);
+            .CountAsync(ct));
 
         var noCountry = await db.Clubs.AsNoTracking()
             .CountAsync(c => c.CountryId == null && !c.IsPseudo && c.MergedIntoId == null, ct);
@@ -128,7 +184,7 @@ public class DashboardStatusService(
         return new DashboardClubStatus(
             Total: total,
             Pseudo: pseudo,
-            SureCandidates: clubReport.Candidates.Count(c => c.Sure),
+            SureCandidates: FromRegistry("clubs.dedup-sure", () => clubReport.Candidates.Count(c => c.Sure)),
             UnsureCandidates: clubReport.Candidates.Count(c => !c.Sure),
             NoSwimmers: noSwimmers,
             NoCountry: noCountry,
@@ -235,14 +291,15 @@ public class DashboardStatusService(
 
         // FK-аномалии — сторож: в проде БД держит FK, ожидаемо 0. InMemory-провайдер их не
         // проверяет, поэтому в тестах можно завести «битую» строку напрямую.
+        // Обе метрики есть в реестре (results.fk-anomaly / relays.empty) — берём оттуда.
         var swimmerIds = db.Swimmers.AsNoTracking().Select(s => s.Id);
         var clubIds = db.Clubs.AsNoTracking().Select(c => c.Id);
-        var fkAnomalies = await db.Results.AsNoTracking()
+        var fkAnomalies = await FromRegistryAsync("results.fk-anomaly", () => db.Results.AsNoTracking()
             .Where(r => !swimmerIds.Contains(r.SwimmerId) || !clubIds.Contains(r.ClubId))
-            .CountAsync(ct);
+            .CountAsync(ct));
 
-        var emptyRelays = await db.Relays.AsNoTracking()
-            .CountAsync(r => !db.RelayMembers.Any(rm => rm.RelayId == r.Id), ct);
+        var emptyRelays = await FromRegistryAsync("relays.empty", () => db.Relays.AsNoTracking()
+            .CountAsync(r => !db.RelayMembers.Any(rm => rm.RelayId == r.Id), ct));
 
         return new DashboardResultStatus(
             Total: total,

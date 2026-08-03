@@ -65,6 +65,17 @@ public class ImportResult
 
     /// <summary>Заплывов, где число строк в файле и в БД не совпало. &gt;0 — разбираться.</summary>
     public int ReconciliationMismatches { get; set; }
+
+    /* === Прогон реестра проверок (Д5, решение Р13) === */
+
+    /// <summary>Человекочитаемый итог прогона всех проверок данных; пусто — прогон не делался.</summary>
+    public string DataChecks { get; set; } = string.Empty;
+
+    /// <summary>Открытых находок уровня Error после импорта.</summary>
+    public int DataCheckErrors { get; set; }
+
+    /// <summary>Открытых находок уровня Warning после импорта.</summary>
+    public int DataCheckWarnings { get; set; }
 }
 
 /// <summary>Существующее (по ключу (Name|SubName)|Date|PoolType) соревнование, найденное для дня из превью.</summary>
