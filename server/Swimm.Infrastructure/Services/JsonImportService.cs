@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -409,6 +409,29 @@ public class JsonImportService : IImportService
                 if (!clubCache.TryGetValue(clubKey, out var club))
                 {
                     club = await _db.Clubs.FirstOrDefaultAsync(c => c.Name == clubName && c.NameEn == clubNameEn);
+
+                    // Фоллбек по ОДНОМУ имени. Ивритский протокол не приносит NameEn, а у
+                    // канонического клуба он заполнен (следствие двуязычного импорта), — по паре
+                    // Name|NameEn матч промахивается и рождается клуб-дубль. 2026-08-03 так
+                    // появилось 59 клубов на 5141 результат при переимпорте пяти протоколов.
+                    // Совпадение имени = «уверенный» дубль и в дедупе клубов (эвристика same-name),
+                    // так что матчить по имени безопаснее, чем плодить двойников.
+                    // Склеенные исключены: иначе результаты уедут на клуб, которого уже нет.
+                    club ??= await _db.Clubs
+                        .Where(c => c.MergedIntoId == null && c.Name == clubName)
+                        .OrderBy(c => c.Id)
+                        .FirstOrDefaultAsync();
+
+                    // Нашли по имени и у нас есть английское название, которого в БД нет —
+                    // дозаполняем (тот же приём, что «Синхр. языки»).
+                    if (club != null && clubNameEn.Length > 0 && string.IsNullOrWhiteSpace(club.NameEn))
+                    {
+                        var tracked = await _db.Clubs.FirstAsync(c => c.Id == club.Id);
+                        tracked.NameEn = clubNameEn;
+                        await _db.SaveChangesAsync();
+                        club = tracked;
+                    }
+
                     if (club == null)
                     {
                         club = new Club { Name = clubName, NameEn = clubNameEn, CountryId = country?.Id };

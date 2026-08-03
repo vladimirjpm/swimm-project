@@ -292,6 +292,56 @@ if (args.Contains("--audit-imports"))
     return;
 }
 
+// Склейка клубов с ОДИНАКОВЫМ именем из консоли (эвристика same-name — «уверенная»):
+//   dotnet run -- --merge-same-name-clubs [--apply]
+// Без --apply это dry-run. Нужен после ивритских переимпортов: пока матчинг клуба шёл по
+// паре Name|NameEn, каждый HE-протокол плодил двойника канонического клуба (инцидент И-9).
+if (args.Contains("--merge-same-name-clubs"))
+{
+    using var scope = app.Services.CreateScope();
+    var dedup = scope.ServiceProvider.GetRequiredService<IClubDedupService>();
+    var merge = scope.ServiceProvider.GetRequiredService<IClubMergeService>();
+
+    var report = await dedup.FindCandidatesAsync();
+    var pairs = report.Candidates
+        .Where(c => c.Heuristic == "same-name")
+        .Select(c => new ClubMergePair(c.CanonicalId, c.DuplicateId))
+        .ToList();
+
+    Console.WriteLine($"Пар с одинаковым именем: {pairs.Count}");
+    foreach (var c in report.Candidates.Where(c => c.Heuristic == "same-name"))
+        Console.WriteLine($"  #{c.CanonicalId} «{c.CanonicalName}» ({c.CanonicalResults}) ← #{c.DuplicateId} ({c.DuplicateResults})");
+
+    if (pairs.Count == 0) return;
+
+    var apply = args.Contains("--apply");
+    var result = await merge.MergeAsync(pairs, dryRun: !apply);
+    var bad = result.Pairs.Where(p => p.Status is not ("merged" or "dry-run")).ToList();
+    Console.WriteLine($"\n{(apply ? "Применено" : "Dry-run")}: пар {result.Pairs.Count}, проблемных {bad.Count}");
+    foreach (var p in bad)
+        Console.WriteLine($"  #{p.CanonicalId}←#{p.DuplicateId}: {p.Status} {string.Join("; ", p.Conflicts)}");
+    if (!apply) Console.WriteLine("Повтори с --apply, чтобы применить.");
+    return;
+}
+
+// Чистка пустых клубов из консоли (то же, что кнопка «Удалить все пустые» на /Admin/Clubs):
+//   dotnet run -- --delete-empty-clubs
+// Зовёт тот же сервис, что и кнопка, — предикат «пустого клуба» живёт в одном месте
+// (правило 1 в docs/data-integrity.md). Непрошедшие проверку печатаются с причиной.
+if (args.Contains("--delete-empty-clubs"))
+{
+    using var scope = app.Services.CreateScope();
+    var clubs = scope.ServiceProvider.GetRequiredService<IClubAdminRepository>();
+    var report = await clubs.DeleteAllEmptyAsync();
+
+    foreach (var c in report.Deleted)
+        Console.WriteLine($"удалён #{c.Id} «{c.Name}»");
+    foreach (var reason in report.Skipped)
+        Console.WriteLine($"пропущен: {reason}");
+    Console.WriteLine($"\nИтог: удалено {report.Deleted.Count}, пропущено {report.Skipped.Count}");
+    return;
+}
+
 // Переимпорт протокола из Discovery без админки (docs/data-integrity.md, чек-лист §8):
 //   dotnet run -- --repull <discoveredId> [--delete-missing]
 // Тот же путь, что кнопка «Перезатянуть»: качаем HE-протокол, парсим, импортируем с
