@@ -24,6 +24,7 @@ public class DiscoveryAdminController : ControllerBase
     private readonly IImportJobQueue _jobs;
     private readonly IImportService _import;
     private readonly IMemoryCache _cache;
+    private readonly IImportRecordPreviewService _recordPreview;
     private readonly ILogger<DiscoveryAdminController> _logger;
 
     public DiscoveryAdminController(
@@ -34,6 +35,7 @@ public class DiscoveryAdminController : ControllerBase
         IImportJobQueue jobs,
         IImportService import,
         IMemoryCache cache,
+        IImportRecordPreviewService recordPreview,
         ILogger<DiscoveryAdminController> logger)
     {
         _discovery = discovery;
@@ -43,6 +45,7 @@ public class DiscoveryAdminController : ControllerBase
         _jobs = jobs;
         _import = import;
         _cache = cache;
+        _recordPreview = recordPreview;
         _logger = logger;
     }
 
@@ -159,6 +162,10 @@ public class DiscoveryAdminController : ControllerBase
         var existingMatches = await _import.FindExistingCompetitionsAsync(parsed.Competitions);
         var existingCompetitionId = existingMatches.FirstOrDefault(m => m.ExistingCompetitionId != null)?.ExistingCompetitionId;
 
+        // Сколько рекордов побьёт файл (Б2). Считается ДО «Применить»: настоящий рекорд —
+        // событие редкое, а десяток разом почти всегда значит, что протокол разобрался неверно.
+        var recordPreview = await _recordPreview.AnalyzeAsync(parsed.ResultsJson, ct);
+
         return Ok(new
         {
             previewId,
@@ -168,7 +175,8 @@ public class DiscoveryAdminController : ControllerBase
             warnings = parsed.Warnings,
             languages,
             existingCompetitionId,
-            existingCompetitions = existingMatches
+            existingCompetitions = existingMatches,
+            recordPreview
         });
     }
 

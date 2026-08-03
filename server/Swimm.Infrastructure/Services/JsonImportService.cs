@@ -70,6 +70,25 @@ public class JsonImportService : IImportService
         return options;
     }
 
+    /// <summary>
+    /// Разбор того же JSON, что принимает <see cref="ImportAsync"/>, БЕЗ импорта — для
+    /// проверок на превью (напр. «сколько рекордов побьёт файл», Б2). Читается тем же
+    /// кодом и теми же опциями: иначе превью судило бы о других строках, чем те, что лягут
+    /// в БД. Оба формата, как в импорте: ResultWrap { results: [...] } и голый массив.
+    /// </summary>
+    internal static List<ResultJsonItem> DeserializeResultItems(string json)
+    {
+        var options = CreateLenientOptions();
+        try
+        {
+            var wrap = JsonSerializer.Deserialize<ResultWrap>(json, options);
+            if (wrap?.Results is { Count: > 0 }) return wrap.Results;
+        }
+        catch (JsonException) { /* не ResultWrap — пробуем массивом */ }
+
+        return JsonSerializer.Deserialize<List<ResultJsonItem>>(json, options) ?? [];
+    }
+
     public async Task<ImportResult> ImportAsync(Stream jsonStream, string? fileName = null, IReadOnlyCollection<string>? categoryKeys = null, ImportEventOptions? eventOptions = null, int? orgCompId = null)
     {
         var options = CreateLenientOptions();

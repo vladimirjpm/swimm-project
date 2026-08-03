@@ -546,6 +546,8 @@ else
     <div class="mb-2 text-sm font-semibold text-admin-text" id="preview-title"></div>
     <div id="preview-summary" class="mb-3 text-[13px] text-admin-text-muted"></div>
     <div id="preview-warnings" class="mb-3 hidden rounded-md border border-admin-danger/40 bg-admin-danger/10 p-3 text-[12.5px]"></div>
+    @* Сколько рекордов побьёт файл (Б2) — подсказка перед «Применить», не запрет. *@
+    <div id="preview-records" class="hidden"></div>
 
     <div class="mb-3">
         <div class="mb-1 text-[12px] font-semibold uppercase tracking-wide text-admin-text-muted">Категории</div>
@@ -971,6 +973,39 @@ else
                 }
             };
 
+            // «Сколько рекордов побьёт файл» — считается сервером ДО «Применить» (Б2).
+            // Настоящий рекорд редок: много рекордов разом почти всегда значит, что протокол
+            // разобрался неверно (эталон — 00:32.59 на 100 баттерфляем). Это ПОДСКАЗКА,
+            // а не запрет: импорт не блокируется, решает человек.
+            function renderRecordPreview(rp) {
+                const box = document.getElementById('preview-records');
+                if (!box) return;
+                if (!rp || (rp.count === 0 && !rp.error)) { box.classList.add('hidden'); return; }
+
+                if (rp.error) {
+                    box.className = 'mt-3 rounded border border-admin-border bg-admin-surface px-3 py-2 text-[12px] text-admin-text-muted';
+                    box.textContent = `Рекорды не проверены: ${rp.error}`;
+                    box.classList.remove('hidden');
+                    return;
+                }
+
+                // Порог «много» намеренно грубый: два-три рекорда на серьёзном старте — норма,
+                // десяток — почти наверняка разбор поехал.
+                const many = rp.count >= 5;
+                box.className = many
+                    ? 'mt-3 rounded border border-admin-danger/40 bg-admin-danger/10 px-3 py-2 text-[12px]'
+                    : 'mt-3 rounded border border-admin-warning/40 bg-admin-warning/10 px-3 py-2 text-[12px]';
+                box.innerHTML =
+                    `<div class="font-semibold">${many ? '⚠ ' : ''}Файл побьёт рекордов: ${rp.count}</div>` +
+                    (many ? '<div class="text-admin-text-muted">Столько рекордов сразу — обычно признак того, что протокол разобрался неверно. Стоит посмотреть глазами до «Применить».</div>' : '') +
+                    '<ul class="mt-1 list-disc pl-5">' + (rp.rows || []).map(r =>
+                        `<li dir="rtl" style="text-align:left">${esc(r.swimmerName)} · ${esc(r.distance)} ${esc(r.styleName)} · <b>${esc(r.time)}</b>`
+                        + ` <span class="text-admin-text-muted">(${esc(r.kind)}: ${esc(r.recordTime)} ${esc(r.recordHolder)})</span></li>`).join('') +
+                    '</ul>' +
+                    (rp.count > (rp.rows || []).length ? `<div class="text-admin-text-muted">…и ещё ${rp.count - rp.rows.length}</div>` : '');
+                box.classList.remove('hidden');
+            }
+
             async function showPreview(p, name, repull) {
                 document.getElementById('preview-card').classList.remove('hidden');
                 document.getElementById('preview-title').textContent = `Превью: ${name}`;
@@ -983,6 +1018,8 @@ else
                 const warn = document.getElementById('preview-warnings');
                 warn.classList.toggle('hidden', !(p.warnings?.length));
                 warn.innerHTML = (p.warnings ?? []).map(esc).join('<br>');
+
+                renderRecordPreview(p.recordPreview);
 
                 // Upsert-чекбокс — только когда превью нашло существующее соревнование по ключу Name|Date|PoolType.
                 const overwriteBlock = document.getElementById('overwrite-block');

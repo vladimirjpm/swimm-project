@@ -80,6 +80,7 @@ public static class DependencyInjection
         services.AddScoped<IClubStandingService, ClubStandingService>();
         services.AddScoped<ICompetitionRecalculationService, CompetitionRecalculationService>();
         services.AddScoped<IImportAuditService, ImportAuditService>();
+        services.AddScoped<IImportRecordPreviewService, ImportRecordPreviewService>();
 
         // Реестр проверок данных (Д3, docs/data-integrity.md). Проверки регистрируются как
         // IDataCheck — добавить новую значит добавить строку сюда, ничего больше не трогая.
