@@ -176,6 +176,81 @@ public class SuspectResultDetectorTests
         Assert.Empty(SuspectResultDetector.Detect(otherDays));
     }
 
+    /* ── Выброс относительно личных результатов (Б1) ───────────────────────────────
+     * Живой случай: 200 вольным за 01:53.09 (678 очков) у пловца, чей лучший результат
+     * тех же месяцев — 312 очков. Рекорда не бьёт, от медианы заплыва недалеко — ни одно
+     * из прежних правил его не видит. Порог 2.0 калиброван на живой базе: он даёт 5 находок
+     * на 26 тыс. заплывов, при 1.5 их было бы 20.
+     */
+    private static SuspectCandidateRow PointRow(long id, int points, DateTime? date = null, int swimmerId = 7)
+        => new(id, swimmerId, "freestyle", "200", "male", 113_090, date ?? Day1, false, false, "13-14", points);
+
+    private static IReadOnlyDictionary<int, IReadOnlyList<PersonalSwim>> History(params PersonalSwim[] swims)
+        => new Dictionary<int, IReadOnlyList<PersonalSwim>> { [7] = swims };
+
+    [Fact]
+    public void PersonalOutlier_TwiceOwnBest_Flagged()
+    {
+        var rows = new[] { PointRow(1, 678) };
+        var history = History(
+            new PersonalSwim(2, 312, Day1.AddDays(-8)),
+            new PersonalSwim(3, 290, Day1.AddDays(-30)),
+            new PersonalSwim(4, 275, Day1.AddDays(-60)));
+
+        var v = Assert.Single(SuspectResultDetector.Detect(rows, history));
+        Assert.Equal(SuspectReasons.PersonalOutlier, v.Reason);
+        Assert.Contains("312", v.Note);
+    }
+
+    [Fact]
+    public void PersonalOutlier_WithinOwnLevel_NotFlagged()
+    {
+        var rows = new[] { PointRow(1, 400) };
+        var history = History(
+            new PersonalSwim(2, 312, Day1.AddDays(-8)),
+            new PersonalSwim(3, 290, Day1.AddDays(-30)),
+            new PersonalSwim(4, 275, Day1.AddDays(-60)));
+
+        Assert.Empty(SuspectResultDetector.Detect(rows, history));
+    }
+
+    [Fact]
+    public void PersonalOutlier_OldSwimsOnly_NotFlagged()
+    {
+        // Подросток за год легально прибавляет 10–15%: сравнение с прошлогодним результатом
+        // ловило бы рост, а не ошибку. Поэтому окно ±120 дней.
+        var rows = new[] { PointRow(1, 678) };
+        var history = History(
+            new PersonalSwim(2, 312, Day1.AddDays(-400)),
+            new PersonalSwim(3, 290, Day1.AddDays(-420)),
+            new PersonalSwim(4, 275, Day1.AddDays(-450)));
+
+        Assert.Empty(SuspectResultDetector.Detect(rows, history));
+    }
+
+    [Fact]
+    public void PersonalOutlier_TooFewSwims_NotFlagged()
+    {
+        // По одному-двум стартам профиля нет: у новичка первый же удачный заплыв дал бы
+        // кратный выброс. Ровно так правило превратилось бы в крикуна.
+        var rows = new[] { PointRow(1, 678) };
+        var history = History(
+            new PersonalSwim(2, 312, Day1.AddDays(-8)),
+            new PersonalSwim(3, 290, Day1.AddDays(-30)));
+
+        Assert.Empty(SuspectResultDetector.Detect(rows, history));
+    }
+
+    [Fact]
+    public void PersonalOutlier_NoHistory_RuleSilent_OthersStillWork()
+    {
+        // Истории нет — правило молчит, но остальные проверки обязаны работать как раньше.
+        var rows = new[] { Row(1, 32_590) }.Concat(Field(10, 57_330, 65_690, 66_690, 67_020)).ToList();
+
+        var v = Assert.Single(SuspectResultDetector.Detect(rows, null), x => x.ResultId == 1);
+        Assert.Equal(SuspectReasons.TimeVsDistance, v.Reason);
+    }
+
     [Fact]
     public void OneRowGetsOneReason()
     {

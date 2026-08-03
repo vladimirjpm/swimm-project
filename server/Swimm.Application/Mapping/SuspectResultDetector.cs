@@ -13,7 +13,16 @@ public sealed record SuspectCandidateRow(
     DateTime CompetitionDate,
     bool IsRelay,
     bool TimeFail,
-    string? AgeGroup);
+    string? AgeGroup,
+    /// <summary>Очки FINA этого заплыва — единственная величина, сравнимая между стилями
+    /// и дистанциями. Нужны правилу «выброс относительно личных результатов».</summary>
+    int? Points = null);
+
+/// <summary>
+/// Заплыв пловца из его личной истории (для правила «выброс относительно себя»).
+/// Кладётся сервисом: истории нет в скоупе соревнования, она приходит из БД.
+/// </summary>
+public sealed record PersonalSwim(long ResultId, int Points, DateTime Date);
 
 /// <summary>Вердикт по одной строке: код причины + человекочитаемое пояснение.</summary>
 public sealed record SuspectVerdict(long ResultId, string Reason, string Note);
@@ -77,7 +86,35 @@ public static class SuspectResultDetector
     /// <summary>Минимум строк в заплыве, чтобы медиана вообще что-то значила.</summary>
     private const int MinRowsForMedian = 4;
 
-    public static List<SuspectVerdict> Detect(IReadOnlyCollection<SuspectCandidateRow> rows)
+    /* ── Правило «выброс относительно личных результатов» (Б1) ─────────────────────
+     * Калибровано на живой базе 2026-08-03 (26 тыс. личных заплывов, 3963 пловца).
+     *
+     * Метрика — очки FINA: единственное, что сравнимо между стилями и дистанциями.
+     * Сравниваем с ЛУЧШИМ личным заплывом, а не с медианой: у новичка медиана крошечная,
+     * и любой удачный старт даёт кратный выброс — по медиане с порогом 1.4 набиралось
+     * 1528 «находок», то есть чистый крик волком.
+     *
+     * Порог 2.0 против личного лучшего внутри окна ±120 дней даёт 5 находок на всю базу,
+     * и обе известные ошибки внутри: 00:32.59 на 100 баттерфляем (ratio 6.53) и
+     * 01:53.09 на 200 вольным (2.17). Для сравнения 1.5 дало бы 20 строк, 1.4 — 33;
+     * ослаблять будем по фактам, когда разберём эти пять.
+     *
+     * Окно нужно от подросткового прогресса: за год 13-летний легально прибавляет
+     * 10–15%, и сравнение с прошлогодним результатом ловило бы рост, а не ошибку.
+     */
+    private const double PersonalOutlierFactor = 2.0;
+    private const int PersonalWindowDays = 120;
+
+    /// <summary>Минимум своих заплывов в окне: по одному-двум профиль не построить.</summary>
+    private const int MinPersonalSwims = 3;
+
+    /// <param name="personalHistory">
+    /// Заплывы пловцов по их Id — своя история за пределами этого соревнования тоже.
+    /// null/пусто — правило «выброс относительно себя» просто не работает (остальные живут).
+    /// </param>
+    public static List<SuspectVerdict> Detect(
+        IReadOnlyCollection<SuspectCandidateRow> rows,
+        IReadOnlyDictionary<int, IReadOnlyList<PersonalSwim>>? personalHistory = null)
     {
         var verdicts = new Dictionary<long, SuspectVerdict>();
 
@@ -166,6 +203,31 @@ public static class SuspectResultDetector
             foreach (var row in grp)
                 Flag(row, SuspectReasons.DuplicateSwim,
                     $"дисциплина повторяется в один день с разным временем: {times}");
+        }
+
+        // 6. Выброс относительно СОБСТВЕННЫХ результатов пловца (Б1). Идёт последним:
+        //    правило самое мягкое из автоматических — оно про «так не плавают», а не про
+        //    «физически невозможно», и уступает место более надёжным причинам.
+        if (personalHistory is { Count: > 0 })
+        {
+            foreach (var row in timed)
+            {
+                if (row.Points is not > 0) continue;
+                if (!personalHistory.TryGetValue(row.SwimmerId, out var history)) continue;
+
+                var window = history
+                    .Where(h => h.ResultId != row.ResultId && h.Points > 0)
+                    .Where(h => Math.Abs((h.Date - row.CompetitionDate).TotalDays) <= PersonalWindowDays)
+                    .ToList();
+                if (window.Count < MinPersonalSwims) continue;
+
+                var best = window.Max(h => h.Points);
+                if (row.Points.Value < best * PersonalOutlierFactor) continue;
+
+                Flag(row, SuspectReasons.PersonalOutlier,
+                    $"{row.Points} очков против личного лучшего {best} за ±{PersonalWindowDays} дней "
+                    + $"({window.Count} заплывов) — вдвое выше собственного уровня");
+            }
         }
 
         return verdicts.Values.OrderBy(v => v.ResultId).ToList();
