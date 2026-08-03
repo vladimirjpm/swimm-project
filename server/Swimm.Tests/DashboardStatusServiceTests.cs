@@ -111,8 +111,10 @@ public class DashboardStatusServiceTests
             throw new NotSupportedException();
     }
 
-    private static DataCheckStateDto State(string checkId, DataCheckSeverity severity, int total, bool failed = false) =>
-        new(checkId, severity, total, Math.Min(total, 50), failed, 7, new DateTime(2026, 8, 3, 10, 0, 0, DateTimeKind.Utc));
+    private static DataCheckStateDto State(string checkId, DataCheckSeverity severity, int total,
+        bool failed = false, int accepted = 0) =>
+        new(checkId, severity, total, Math.Min(total, 50), failed, 7,
+            new DateTime(2026, 8, 3, 10, 0, 0, DateTimeKind.Utc), accepted);
 
     private static DataCheckRunDto Run() =>
         new(7, new DateTime(2026, 8, 3, 10, 0, 0, DateTimeKind.Utc), null, "import", 0, 0, 0, 0);
@@ -149,6 +151,27 @@ public class DashboardStatusServiceTests
         Assert.Equal(2, result.Swimmers.SureCandidates);
         Assert.Equal(3, result.Swimmers.Orphans);
         Assert.Null(result.Checks.LastRunAt);
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_AcceptedFindings_AreNotCountedAsWork()
+    {
+        // Живой случай: 42 находки relays.gender-conflict приняты как есть (Р16). Дашборд
+        // обязан показать столько же, сколько /Admin/Health в «открытых», иначе перевод на
+        // реестр не имеет смысла.
+        await using var db = CreateDb(nameof(GetStatusAsync_AcceptedFindings_AreNotCountedAsWork));
+        var service = CreateService(db,
+            swimmerReport: SwimmerReport(orphans: 0, sure: 0, unsure: 0),
+            dataChecks: new FakeDataCheckRunner(Run(),
+                State("relays.gender-conflict", DataCheckSeverity.Warning, total: 42, accepted: 42),
+                State("swimmers.dedup-sure", DataCheckSeverity.Warning, total: 5, accepted: 2)));
+
+        var result = await service.GetStatusAsync(CancellationToken.None);
+
+        Assert.Equal(3, result.Checks.Warnings);
+        Assert.Equal(3, result.Swimmers.SureCandidates);
+        // Полностью принятая проверка из строк сводки уходит — работы по ней нет.
+        Assert.Equal("swimmers.dedup-sure", Assert.Single(result.Checks.Lines).CheckId);
     }
 
     [Fact]

@@ -37,10 +37,10 @@ public class DashboardStatusService(
     private Dictionary<string, DataCheckStateDto> _states = [];
 
     private async Task<int> FromRegistryAsync(string checkId, Func<Task<int>> live) =>
-        _states.TryGetValue(checkId, out var s) && !s.Failed ? s.Total : await live();
+        _states.TryGetValue(checkId, out var s) && !s.Failed ? s.Open : await live();
 
     private int FromRegistry(string checkId, Func<int> live) =>
-        _states.TryGetValue(checkId, out var s) && !s.Failed ? s.Total : live();
+        _states.TryGetValue(checkId, out var s) && !s.Failed ? s.Open : live();
 
     /// <summary>Префикс синтетических SwimmerOrgId, проставляемых при импорте без реального ID
     /// федерации (см. SwimmerDedupService/dedup-report.sql) — исключаются из «живых» счётчиков.</summary>
@@ -93,16 +93,18 @@ public class DashboardStatusService(
         // бы соврать «всё чисто»: считать нам пока просто нечего.
         if (states.Count == 0) lastRun = null;
 
+        // Везде Open, а не Total: принятые как есть — это закрытое решение, а не работа.
+        // Иначе дашборд показывал бы 58 предупреждений там, где /Admin/Health говорит 16.
         int Sum(DataCheckSeverity s) => states
             .Where(x => x.Severity == s && !x.Failed)
-            .Sum(x => x.Total);
+            .Sum(x => x.Open);
 
         var lines = states
-            .Where(s => s.Total > 0 || s.Failed)
+            .Where(s => s.Open > 0 || s.Failed)
             .OrderByDescending(s => s.Failed)
             .ThenByDescending(s => s.Severity)
-            .ThenByDescending(s => s.Total)
-            .Select(s => new DashboardCheckLine(s.CheckId, s.Severity, s.Total, s.Failed))
+            .ThenByDescending(s => s.Open)
+            .Select(s => new DashboardCheckLine(s.CheckId, s.Severity, s.Open, s.Failed))
             .ToList();
 
         return new DashboardChecksStatus(

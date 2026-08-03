@@ -167,10 +167,19 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
         var lastRun = await db.DataCheckRuns.AsNoTracking()
             .OrderByDescending(r => r.Id).FirstOrDefaultAsync(ct);
 
+        // Принятые находки состояние не знает (оно про «что нашла проверка»), а потребителю
+        // нужно «что ещё требует работы» — иначе решения Р16-типа («не чиним») висели бы
+        // в счётчиках вечно.
+        var accepted = await db.DataCheckFindings.AsNoTracking()
+            .Where(f => f.Resolution == DataCheckResolutions.Accepted)
+            .GroupBy(f => f.CheckId)
+            .Select(g => new { CheckId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.CheckId, x => x.Count, ct);
+
         var states = (await db.DataCheckStates.AsNoTracking().ToListAsync(ct))
             .Select(s => new DataCheckStateDto(
                 s.CheckId, (DataCheckSeverity)s.Severity, s.Total, s.Shown, s.Failed,
-                s.LastRunId, s.LastRunAt))
+                s.LastRunId, s.LastRunAt, accepted.GetValueOrDefault(s.CheckId)))
             .ToList();
 
         return (lastRun is null ? null : ToDto(lastRun), states);

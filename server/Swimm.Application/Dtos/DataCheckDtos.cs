@@ -52,6 +52,15 @@ public sealed record DataCheckGroupDto(
 /// Итог последнего прогона одной проверки — то, чем дашборд заменяет собственные счётчики.
 /// Полное число находок, не обрезанное списком.
 /// </summary>
+/// <param name="Accepted">
+/// Находок, принятых как есть («ошибка федерации, не чиним»). Вычитается из <paramref name="Total"/>:
+/// иначе дашборд считал бы работой то, по чему решение уже принято, и расходился бы с
+/// /Admin/Health, где принятые в «открытых» не значатся.
+/// </param>
 public sealed record DataCheckStateDto(
     string CheckId, DataCheckSeverity Severity, int Total, int Shown, bool Failed,
-    int LastRunId, DateTime LastRunAt);
+    int LastRunId, DateTime LastRunAt, int Accepted = 0)
+{
+    /// <summary>Сколько ещё требует разбора. Не отрицательное: принятых не может быть больше найденного.</summary>
+    public int Open => Math.Max(0, Total - Accepted);
+}
