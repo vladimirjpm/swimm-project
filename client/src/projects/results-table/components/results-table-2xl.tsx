@@ -58,7 +58,7 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
             />
           )}
         </div>
-        {showAge && <UI_AgeLabel age={res.event_style_age} eventCategory={res.event_category} isMasters={isMastersResult} ageGroup={res.age_group} />}
+        {showAge && <UI_AgeLabel age={res.event_style_age} eventCategory={res.event_category} isRelay={res.is_relay} gender={res.event_style_gender} isMasters={isMastersResult} ageGroup={res.age_group} />}
       </div>
 
       <div className='flex flex-col col-span-3'>
