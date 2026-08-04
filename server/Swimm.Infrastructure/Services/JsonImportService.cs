@@ -203,6 +203,15 @@ public class JsonImportService : IImportService
         // Swimmers: tracked — EnrichSwimmerFromResult modifies them, changes saved in batch.
         // Второй индекс по EN-имени — фоллбек-матчинг для двуязычных/EN-протоколов
         // (Maccabiah-кейс: пловец известен под английским именем).
+        // Страж тёзок (инцидент И-11, docs/data-integrity.md). Ключ матчинга пловца —
+        // «фамилия|имя|годРождения», без клуба и без внешнего id, поэтому два ребёнка-тёзки
+        // одного года рождения склеивались в одну запись ВСЕГДА. Признак, что это разные
+        // люди: в ОДНОМ соревновании пловец не может выступать за два клуба.
+        //   seenClubInCompetition: (соревнование, пловец) → канонический клуб этого прогона;
+        //   namesakeByClub:        (соревнование, ключ имени, клуб) → выделенный тёзка.
+        var seenClubInCompetition = new Dictionary<(int CompetitionId, int SwimmerId), int>();
+        var namesakeByClub = new Dictionary<(int CompetitionId, string NameKey, int ClubId), Swimmer>();
+
         var swimmerCache = new Dictionary<string, Swimmer>();
         var swimmerCacheEn = new Dictionary<string, Swimmer>();
         foreach (var s in await _db.Swimmers.ToListAsync())
@@ -558,6 +567,41 @@ public class JsonImportService : IImportService
                     }
 
                     swimmerCache[swimmerKey] = swimmer;
+                }
+
+                // Страж тёзок: тот же пловец уже плыл в ЭТОМ соревновании за другой клуб —
+                // значит это другой человек с тем же именем и годом рождения (инцидент И-11).
+                // Сравниваем канонические клубы: у склеенных клубов остаётся «надгробие»
+                // (MergedIntoId), и без канонизации один и тот же клуб выглядел бы как два.
+                if (!isAnonymousSwimmer && item.IsRelay != true && club != null && swimmer.Id != 0)
+                {
+                    var canonicalClubId = club.MergedIntoId ?? club.Id;
+                    var namesakeKey = (competition.Id, swimmerKey, canonicalClubId);
+
+                    if (namesakeByClub.TryGetValue(namesakeKey, out var namesake))
+                    {
+                        swimmer = namesake;
+                    }
+                    else if (seenClubInCompetition.TryGetValue((competition.Id, swimmer.Id), out var seenClub)
+                             && seenClub != canonicalClubId)
+                    {
+                        swimmer = new Swimmer
+                        {
+                            LastName = item.LastName ?? string.Empty,
+                            FirstName = item.FirstName ?? string.Empty,
+                            LastNameEn = item.LastNameEn ?? string.Empty,
+                            FirstNameEn = item.FirstNameEn ?? string.Empty,
+                            BirthYear = item.BirthYear ?? 0
+                        };
+                        _db.Swimmers.Add(swimmer);
+                        await _db.SaveChangesAsync();
+                        namesakeByClub[namesakeKey] = swimmer;
+                        diagnosticLog.Add(
+                            $"Тёзки: '{item.LastName} {item.FirstName}' ({item.BirthYear}) выступают за разные клубы "
+                            + $"в одном соревновании — заведена отдельная запись #{swimmer.Id} для '{club.Name}'");
+                    }
+
+                    seenClubInCompetition[(competition.Id, swimmer.Id)] = canonicalClubId;
                 }
 
                 // Дополнение данных спортсмена из результата (Gender, ClubId, CountryId)

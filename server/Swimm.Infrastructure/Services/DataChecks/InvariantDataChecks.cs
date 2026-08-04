@@ -180,3 +180,70 @@ public sealed class EmptyCompetitionCheck(SwimmDbContext db) : IDataCheck
             .ToList());
     }
 }
+
+/// <summary>
+/// Один пловец за ДВА клуба в одном соревновании — почти всегда два разных человека,
+/// склеенных в одну запись (инцидент И-11). Ключ матчинга импорта — «фамилия|имя|год», без
+/// клуба и без внешнего id, поэтому тёзки одного года рождения склеиваются автоматически.
+///
+/// Смотрим по соревнованию, а не по дате: в один день бывают разные старты, а внутри одного
+/// соревнования пловец представляет ровно один клуб. Эстафеты исключены — там клуб стоит
+/// у строки команды, а ноги принадлежат разным людям.
+///
+/// ⚠ Диагноз, а не лечение: разделять пловцов надо руками, сверяясь с внешним источником
+/// (loglig), иначе есть риск разрезать по клубу того, кто просто сменил клуб.
+/// </summary>
+public sealed class SwimmerTwoClubsInCompetitionCheck(SwimmDbContext db) : IDataCheck
+{
+    public string Id => "swimmers.two-clubs-in-competition";
+    public string Title => "Пловец за два клуба в одном соревновании";
+    public string Description =>
+        "В одном соревновании у пловца результаты за разные клубы. Обычно это два тёзки одного "
+        + "года рождения, склеенные импортом в одну запись: их личные рекорды и карточка "
+        + "перемешаны. Разделять руками, сверяясь с loglig.";
+    public DataCheckSeverity Severity => DataCheckSeverity.Error;
+
+    public async Task<DataCheckOutcome> RunAsync(CancellationToken ct = default)
+    {
+        // Канонизируем клуб: у склеенного остаётся «надгробие» (MergedIntoId), и без этого
+        // один и тот же клуб выглядел бы как два.
+        var rows = await db.Results.AsNoTracking()
+            .Where(r => r.RelayId == null)
+            .Select(r => new
+            {
+                r.SwimmerId,
+                r.CompetitionId,
+                ClubId = r.Club.MergedIntoId ?? r.ClubId,
+                ClubName = r.Club.Name,
+                SwimmerName = (r.Swimmer.LastName + " " + r.Swimmer.FirstName).Trim(),
+                r.Swimmer.BirthYear,
+                CompetitionName = r.Competition.Name,
+                CompetitionDate = r.Competition.Date
+            })
+            .ToListAsync(ct);
+
+        var bad = rows
+            .GroupBy(x => new { x.SwimmerId, x.CompetitionId })
+            .Where(g => g.Select(x => x.ClubId).Distinct().Count() > 1)
+            .Select(g => new
+            {
+                g.Key.SwimmerId,
+                First = g.First(),
+                Clubs = string.Join(" | ", g.Select(x => x.ClubName).Distinct().OrderBy(n => n))
+            })
+            .OrderBy(x => x.SwimmerId)
+            .ToList();
+
+        if (bad.Count == 0) return DataCheckOutcome.Empty;
+
+        return new DataCheckOutcome(bad.Count, bad
+            .Take(50)
+            .Select(b => new DataCheckItem(
+                "Swimmer", b.SwimmerId,
+                $"{b.First.SwimmerName} ({b.First.BirthYear}): {b.Clubs}",
+                $"{b.First.CompetitionName} · {b.First.CompetitionDate}",
+                $"/Admin/Swimmers/Edit?id={b.SwimmerId}",
+                PublicRoutes.Swimmer(b.SwimmerId)))
+            .ToList());
+    }
+}

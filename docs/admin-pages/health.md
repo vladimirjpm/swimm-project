@@ -52,6 +52,7 @@ severity — 20 битых строк и 3 клуба без страны выг
 | `results.no-gender` | Warning | личный результат без пола (И2) |
 | `relays.empty` | Warning | эстафета без состава |
 | `swimmers.dedup-sure` | Warning | уверенные дубли пловцов |
+| `swimmers.two-clubs-in-competition` | Error | пловец за два клуба в одном соревновании = два тёзки, склеенные импортом (И-11) |
 | `clubs.dedup-sure` | Warning | уверенные дубли клубов (инцидент И-9) |
 | `swimmers.orphans` | Info | пловцы без единой связи (И5) |
 | `clubs.empty` | Info | клубы без пловцов и результатов |
