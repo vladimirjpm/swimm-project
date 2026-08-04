@@ -75,8 +75,17 @@
                             data-name="${esc(f.subjectName)}" title="Скопировать имя — искать в интернете">копировать</button>
                     ${f.fixKind === 'swimmer-gender' ? `
                         <span class="text-[11px] text-admin-text-muted">пол:</span>
-                        <button class="admin-btn admin-btn-ghost py-0.5 px-1.5 text-[11px] finding-gender" data-id="${f.id}" data-gender="male">♂</button>
-                        <button class="admin-btn admin-btn-ghost py-0.5 px-1.5 text-[11px] finding-gender" data-id="${f.id}" data-gender="female">♀</button>` : ''}
+                        <button class="py-0.5 px-2 rounded text-[12px] font-bold cursor-pointer border border-[#4fa8ff]/50
+                                       bg-[#4fa8ff]/15 text-[#4fa8ff] hover:bg-[#4fa8ff]/25 finding-gender"
+                                data-id="${f.id}" data-gender="male" title="Мужской">♂</button>
+                        <button class="py-0.5 px-2 rounded text-[12px] font-bold cursor-pointer border border-[#ff7ab8]/50
+                                       bg-[#ff7ab8]/15 text-[#ff7ab8] hover:bg-[#ff7ab8]/25 finding-gender"
+                                data-id="${f.id}" data-gender="female" title="Женский">♀</button>
+                        <span class="ml-2 text-[11px] text-admin-text-muted">loglig:</span>
+                        <input type="number" class="admin-input py-0.5 px-1.5 w-[7.5rem] text-[12px] finding-loglig-input"
+                               data-swimmer="${f.fixEntityId}" placeholder="id с loglig" />
+                        <button class="admin-btn admin-btn-ghost py-0.5 px-1.5 text-[11px] finding-loglig"
+                                data-swimmer="${f.fixEntityId}" title="Привязать пловца к карточке loglig">привязать</button>` : ''}
                 </div>` : ''}
                 ${accepted && f.note ? `<div class="text-[11px] text-admin-text-muted">принято: ${esc(f.note)}</div>` : ''}</td>
             <td class="align-top whitespace-nowrap text-[11px] text-admin-text-muted">
@@ -118,6 +127,8 @@
         document.querySelectorAll('.finding-copy').forEach(b => b.addEventListener('click', () => copyName(b)));
         document.querySelectorAll('.finding-gender').forEach(b =>
             b.addEventListener('click', () => fixGender(b.dataset.id, b.dataset.gender, b)));
+        document.querySelectorAll('.finding-loglig').forEach(b =>
+            b.addEventListener('click', () => setLoglig(b)));
     }
 
     // Имя субъекта отдельной кнопкой: его копируют, чтобы найти пловца в интернете.
@@ -150,6 +161,29 @@
             });
             toast(`Пол проставлен, строк поправлено: ${res.rows}. Прогони проверки, чтобы находка закрылась.`);
             await load();
+        } catch (e) { btn.disabled = false; toast('Ошибка: ' + e.message, 6000); }
+    }
+
+    // Привязка к loglig прямо отсюда: раз человек уже пошёл на loglig искать пол, id он
+    // видит там же. Используем ШТАТНЫЙ эндпоинт привязки (/api/admin/loglig/set) — он
+    // тянет карточку, сверяет год и клуб и пишет свой аудит; дублировать это в реестре
+    // значило бы завести вторую, расходящуюся реализацию.
+    async function setLoglig(btn) {
+        const input = btn.parentElement.querySelector('.finding-loglig-input');
+        const logligId = Number(input?.value);
+        if (!Number.isFinite(logligId) || logligId <= 0) { toast('Введите числовой id с loglig'); return; }
+
+        btn.disabled = true;
+        try {
+            const res = await api('/api/admin/loglig/set', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ swimmerId: Number(btn.dataset.swimmer), logligId })
+            });
+            // linked=false — доменный отказ (уже привязан, карточка недоступна), не HTTP-ошибка.
+            if (res && res.linked === false) { toast('Не привязано: ' + (res.error ?? 'причина неизвестна'), 6000); btn.disabled = false; return; }
+            toast(`Привязан loglig #${logligId}`);
+            input.value = '';
+            btn.disabled = false;
         } catch (e) { btn.disabled = false; toast('Ошибка: ' + e.message, 6000); }
     }
 
