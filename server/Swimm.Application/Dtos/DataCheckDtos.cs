@@ -3,6 +3,16 @@ namespace Swimm.Application.Dtos;
 /// <summary>Насколько серьёзна находка. Порядок важен: сортировка и счётчики идут по нему.</summary>
 public enum DataCheckSeverity { Info = 0, Warning = 1, Error = 2 }
 
+/// <summary>
+/// Виды точечных исправлений, доступных прямо из списка находок. Реестр остаётся читающим:
+/// он лишь показывает кнопку, а чинит отдельный эндпоинт со своим аудитом.
+/// </summary>
+public static class DataCheckFixKinds
+{
+    /// <summary>Проставить пол пловцу (и его строкам без пола) — находка `results.no-gender`.</summary>
+    public const string SwimmerGender = "swimmer-gender";
+}
+
 /// <summary>Чем закончилась находка. null в БД = ещё открыта.</summary>
 public static class DataCheckResolutions
 {
@@ -24,9 +34,16 @@ public static class DataCheckResolutions
 /// «/swimmers/{id}»): базу подставляет страница при отрисовке, иначе dev-адрес осел бы в БД
 /// и уехал в прод.
 /// </param>
+/// <param name="SubjectName">
+/// Имя субъекта отдельным полем — чтобы его можно было скопировать одним кликом. В Message
+/// оно вплавлено в текст, и выделять мышью из строки неудобно.
+/// </param>
+/// <param name="FixKind">Код точечного исправления из списка находок (напр. <c>swimmer-gender</c>).</param>
+/// <param name="FixEntityId">Id сущности, к которой применяется исправление.</param>
 public sealed record DataCheckItem(
     string EntityType, int? EntityId, string Message, string? Details = null, string? Link = null,
-    string? PublicLink = null);
+    string? PublicLink = null, string? SubjectName = null,
+    string? FixKind = null, int? FixEntityId = null);
 
 /// <summary>Результат одной проверки: сколько всего и что именно (список капнут).</summary>
 public sealed record DataCheckOutcome(int Total, IReadOnlyList<DataCheckItem> Items)
@@ -44,7 +61,8 @@ public sealed record DataCheckFindingDto(
     int Id, string CheckId, DataCheckSeverity Severity, string EntityType, int? EntityId,
     string Message, string? Details, string? Link,
     DateTime FirstSeenAt, DateTime LastSeenAt, string? Resolution, string? Note,
-    string? PublicLink = null);
+    string? PublicLink = null, string? SubjectName = null,
+    string? FixKind = null, int? FixEntityId = null);
 
 /// <summary>Находки одной проверки + её описание (для страницы /Admin/Health).</summary>
 /// <param name="Total">

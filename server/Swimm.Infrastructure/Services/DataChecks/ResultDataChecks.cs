@@ -90,7 +90,12 @@ public sealed class NoGenderCheck(IDataQualityService quality) : IDataCheck
                 $"{r.SwimmerName} · {r.Distance} {r.StyleName}",
                 $"{r.CompetitionName} (#{r.CompetitionId})",
                 $"/Admin/Swimmers/Edit?id={r.SwimmerId}",
-                PublicRoutes.Competition(r.CompetitionId)))
+                PublicRoutes.Competition(r.CompetitionId),
+                // Имя отдельно — его копируют, чтобы найти пловца в интернете; плюс якорь
+                // для кнопки «поставить пол» прямо из списка находок.
+                SubjectName: r.SwimmerName,
+                FixKind: DataCheckFixKinds.SwimmerGender,
+                FixEntityId: r.SwimmerId))
             .ToList());
     }
 }

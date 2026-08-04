@@ -50,6 +50,27 @@ public class DataChecksAdminController(IDataCheckRunner runner, IAdminAuditServi
         return Ok();
     }
 
+    public sealed record FixGenderRequest(string Gender);
+
+    /// <summary>
+    /// Проставить пол пловцу прямо из списка находок (`results.no-gender`). Правит и строки
+    /// результатов без пола: проверка смотрит именно на них, а Results.Gender заполняется на
+    /// импорте — иначе находка висела бы до переимпорта и кнопка выглядела бы сломанной.
+    /// </summary>
+    [HttpPost("{id:int}/fix-gender")]
+    public async Task<IActionResult> FixGender(int id, [FromBody] FixGenderRequest request, CancellationToken ct)
+    {
+        var rows = await runner.FixSwimmerGenderAsync(id, request.Gender, ct);
+        if (rows is null)
+            return BadRequest(new { error = "Находка не найдена, не поддерживает это исправление или пол задан неверно" });
+
+        await audit.LogAsync("datacheck.fix-gender", "DataCheckFinding", id.ToString(),
+            $"Находка #{id}: пол '{request.Gender}' проставлен пловцу; строк результата поправлено — {rows}",
+            new { findingId = id, request.Gender, rows }, ct);
+
+        return Ok(new { rows });
+    }
+
     /// <summary>Вернуть принятую находку в работу.</summary>
     [HttpPost("{id:int}/reopen")]
     public async Task<IActionResult> Reopen(int id, CancellationToken ct)

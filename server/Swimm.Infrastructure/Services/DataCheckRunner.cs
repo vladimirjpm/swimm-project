@@ -81,6 +81,9 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
                     existing.Details = item.Details;
                     existing.Link = item.Link;
                     existing.PublicLink = item.PublicLink;
+                    existing.SubjectName = item.SubjectName;
+                    existing.FixKind = item.FixKind;
+                    existing.FixEntityId = item.FixEntityId;
                     existing.Severity = (int)check.Severity;
                 }
                 else
@@ -95,6 +98,9 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
                         Details = item.Details,
                         Link = item.Link,
                         PublicLink = item.PublicLink,
+                        SubjectName = item.SubjectName,
+                        FixKind = item.FixKind,
+                        FixEntityId = item.FixEntityId,
                         FirstSeenAt = run.StartedAt,
                         LastSeenAt = run.StartedAt
                     });
@@ -199,6 +205,32 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
         return true;
     }
 
+    public async Task<int?> FixSwimmerGenderAsync(int findingId, string gender, CancellationToken ct = default)
+    {
+        if (gender is not ("male" or "female")) return null;
+
+        var f = await db.DataCheckFindings.FirstOrDefaultAsync(x => x.Id == findingId, ct);
+        if (f?.FixKind != DataCheckFixKinds.SwimmerGender || f.FixEntityId is not { } swimmerId)
+            return null;
+
+        var swimmer = await db.Swimmers.FirstOrDefaultAsync(s => s.Id == swimmerId, ct);
+        if (swimmer is null) return null;
+
+        swimmer.Gender = gender;
+
+        // И строки этого пловца, у которых пола нет: проверка смотрит именно на них, а
+        // Results.Gender заполняется на импорте — иначе находка висела бы до переимпорта.
+        // Трогаем ТОЛЬКО пустые: перезаписывать напечатанный в протоколе пол нельзя.
+        var rows = await db.Results
+            .Where(r => r.SwimmerId == swimmerId && r.RelayId == null
+                        && (r.Gender == null || r.Gender == "" || r.Gender == "none"))
+            .ToListAsync(ct);
+        foreach (var r in rows) r.Gender = gender;
+
+        await db.SaveChangesAsync(ct);
+        return rows.Count;
+    }
+
     public async Task<bool> ReopenAsync(int findingId, CancellationToken ct = default)
     {
         var f = await db.DataCheckFindings.FirstOrDefaultAsync(x => x.Id == findingId, ct);
@@ -219,5 +251,5 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
     private static DataCheckFindingDto ToDto(DataCheckFinding f) =>
         new(f.Id, f.CheckId, (DataCheckSeverity)f.Severity, f.EntityType, f.EntityId,
             f.Message, f.Details, f.Link, f.FirstSeenAt, f.LastSeenAt, f.Resolution, f.Note,
-            f.PublicLink);
+            f.PublicLink, f.SubjectName, f.FixKind, f.FixEntityId);
 }

@@ -62,6 +62,17 @@ public interface IDataCheckRunner
     /// </summary>
     Task<bool> AcceptAsync(int findingId, string? note, CancellationToken ct = default);
 
+    /// <summary>
+    /// Точечное исправление находки прямо из списка: проставить пол пловцу и его строкам,
+    /// у которых пола нет. Возвращает, сколько строк результата поправлено, либо null,
+    /// если находка не найдена или у неё нет такого исправления.
+    ///
+    /// Почему заодно правим и результаты: проверка смотрит на `Results.Gender`, а он
+    /// заполняется НА ИМПОРТЕ из пловца. Поставить пол только пловцу — значит оставить
+    /// находку висеть до переимпорта, то есть кнопка выглядела бы сломанной.
+    /// </summary>
+    Task<int?> FixSwimmerGenderAsync(int findingId, string gender, CancellationToken ct = default);
+
     /// <summary>Вернуть принятую находку в работу.</summary>
     Task<bool> ReopenAsync(int findingId, CancellationToken ct = default);
 }

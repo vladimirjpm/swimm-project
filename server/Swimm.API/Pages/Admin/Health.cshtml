@@ -69,6 +69,15 @@
         return `<tr class="${accepted ? 'opacity-60' : ''}">
             <td class="align-top">${f.link ? `<a href="${esc(f.link)}" class="text-admin-accent hover:underline">${esc(f.message)}</a>` : esc(f.message)}
                 ${f.details ? `<div class="text-[11px] text-admin-text-muted">${esc(f.details)}</div>` : ''}
+                ${f.subjectName ? `<div class="mt-1 flex items-center gap-1.5">
+                    <code class="rounded bg-white/[.06] px-1.5 py-0.5 text-[12px]" dir="auto">${esc(f.subjectName)}</code>
+                    <button class="admin-btn admin-btn-ghost py-0.5 px-1.5 text-[11px] finding-copy"
+                            data-name="${esc(f.subjectName)}" title="Скопировать имя — искать в интернете">копировать</button>
+                    ${f.fixKind === 'swimmer-gender' ? `
+                        <span class="text-[11px] text-admin-text-muted">пол:</span>
+                        <button class="admin-btn admin-btn-ghost py-0.5 px-1.5 text-[11px] finding-gender" data-id="${f.id}" data-gender="male">♂</button>
+                        <button class="admin-btn admin-btn-ghost py-0.5 px-1.5 text-[11px] finding-gender" data-id="${f.id}" data-gender="female">♀</button>` : ''}
+                </div>` : ''}
                 ${accepted && f.note ? `<div class="text-[11px] text-admin-text-muted">принято: ${esc(f.note)}</div>` : ''}</td>
             <td class="align-top whitespace-nowrap text-[11px] text-admin-text-muted">
                 ${f.publicLink ? `<a href="${esc(PUBLIC_BASE + f.publicLink)}" target="_blank" rel="noopener"
@@ -106,6 +115,42 @@
 
         document.querySelectorAll('.finding-accept').forEach(b => b.addEventListener('click', () => accept(b.dataset.id)));
         document.querySelectorAll('.finding-reopen').forEach(b => b.addEventListener('click', () => reopen(b.dataset.id)));
+        document.querySelectorAll('.finding-copy').forEach(b => b.addEventListener('click', () => copyName(b)));
+        document.querySelectorAll('.finding-gender').forEach(b =>
+            b.addEventListener('click', () => fixGender(b.dataset.id, b.dataset.gender, b)));
+    }
+
+    // Имя субъекта отдельной кнопкой: его копируют, чтобы найти пловца в интернете.
+    // Fallback через textarea — clipboard API недоступен без https на некоторых dev-хостах.
+    async function copyName(btn) {
+        const name = btn.dataset.name ?? '';
+        try {
+            await navigator.clipboard.writeText(name);
+        } catch {
+            const ta = document.createElement('textarea');
+            ta.value = name;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            ta.remove();
+        }
+        const prev = btn.textContent;
+        btn.textContent = 'скопировано';
+        setTimeout(() => { btn.textContent = prev; }, 1200);
+    }
+
+    // Проставить пол пловцу прямо из находки. Сервер правит и строки без пола — иначе
+    // находка осталась бы висеть до переимпорта и кнопка выглядела бы сломанной.
+    async function fixGender(id, gender, btn) {
+        btn.disabled = true;
+        try {
+            const res = await api(`${API}/${id}/fix-gender`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ gender })
+            });
+            toast(`Пол проставлен, строк поправлено: ${res.rows}. Прогони проверки, чтобы находка закрылась.`);
+            await load();
+        } catch (e) { btn.disabled = false; toast('Ошибка: ' + e.message, 6000); }
     }
 
     function renderHistory(history) {

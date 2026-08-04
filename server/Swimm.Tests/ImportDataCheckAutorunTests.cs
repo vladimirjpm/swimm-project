@@ -54,6 +54,8 @@ public class ImportDataCheckAutorunTests
             CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> AcceptAsync(int findingId, string? note, CancellationToken ct = default) =>
             throw new NotSupportedException();
+        public Task<int?> FixSwimmerGenderAsync(int findingId, string gender, CancellationToken ct = default) =>
+            throw new NotSupportedException();
         public Task<bool> ReopenAsync(int findingId, CancellationToken ct = default) =>
             throw new NotSupportedException();
     }
