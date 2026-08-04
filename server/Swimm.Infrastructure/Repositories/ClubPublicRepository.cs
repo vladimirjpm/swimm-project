@@ -396,10 +396,13 @@ public class ClubPublicRepository : IClubPublicRepository
                 byKey[RecordIssueKey.Of(i.RegionType, i.RegionCode, i.Category, i.AgeKey,
                     i.Gender, i.PoolType, i.Style, i.Distance, i.FlaggedTime)] = i.Reason;
 
-            foreach (var r in matched)
-                r.IssueReason = byKey.GetValueOrDefault(RecordIssueKey.Of(
-                    r.RegionType, r.RegionCode, r.Category, r.AgeKey,
-                    r.Gender, r.PoolType, r.Style, r.Distance, r.Time));
+            // Разнос по кумулятивной лестнице: претензия заведена на одну ступень, а то же
+            // достижение живёт и на соседних — иначе карточка ступени 11 без значка (RQ-1).
+            var axes = matched.Select((r, idx) => new RecordAxes(
+                idx, r.RegionType, r.RegionCode, r.Category, r.AgeKey,
+                r.Gender, r.PoolType, r.Style, r.Distance, r.Time, r.HolderName, r.RecordDate)).ToList();
+            foreach (var (index, reason) in RecordIssueSpreader.Resolve(axes, byKey))
+                matched[index].IssueReason = reason;
         }
 
         return new ClubRecordWallDto { MatchedNames = names, Data = matched };

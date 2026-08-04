@@ -70,10 +70,12 @@ public class RecordRepository : IRecordRepository
         // а не JOIN: претензий десятки на 1.9к рекордов, а ключ сопоставления — 8 осей ПЛЮС
         // время, что в SQL-джойне читалось бы куда хуже, чем словарь в памяти.
         var issues = await OpenIssuesAsync();
-        foreach (var r in records)
-            r.IssueReason = issues.GetValueOrDefault(RecordIssueKey.Of(
-                r.RegionType, r.RegionCode, r.Category, r.AgeKey,
-                r.Gender, r.PoolType, r.Style, r.Distance, r.Time));
+        var axes = records.Select((r, i) => new RecordAxes(
+            i, r.RegionType, r.RegionCode, r.Category, r.AgeKey,
+            r.Gender, r.PoolType, r.Style, r.Distance, r.Time, r.HolderName, r.RecordDate)).ToList();
+        var reasons = RecordIssueSpreader.Resolve(axes, issues);
+        foreach (var (index, reason) in reasons)
+            records[index].IssueReason = reason;
 
         await _cache.SetAsync(cacheKey, (IReadOnlyList<RecordDto>)records, CacheTtl);
 
