@@ -35,4 +35,10 @@ public interface ICompetitionDiscoveryService
 
     /// <summary>Записать/очистить LastError записи (диагностика «затянуть»/«синхр. языки» в админке).</summary>
     Task<bool> SetLastErrorAsync(int id, string? error, CancellationToken ct = default);
+
+    /// <summary>
+    /// Пометить/снять «у соревнования нет протокола» (PDF пуст). Отдельно от ошибки: ошибку
+    /// имеет смысл повторить, а пустой источник — повод больше не пытаться.
+    /// </summary>
+    Task<bool> SetEmptySourceAsync(int id, bool empty, string by, CancellationToken ct = default);
 }

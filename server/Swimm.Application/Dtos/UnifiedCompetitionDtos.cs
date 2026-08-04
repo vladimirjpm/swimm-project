@@ -38,6 +38,11 @@ public sealed class UnifiedSiteInfo
     /// <summary>Языки загруженных PDF: null | "he" | "en" | "he,en".</summary>
     public string? Languages { get; set; }
     public string? LastError { get; set; }
+
+    /// <summary>Протокола нет: PDF пуст (см. DiscoveredCompetition.EmptySourceAt). Не ошибка —
+    /// факт «тянуть нечего», поэтому строка помечается, а не прячется.</summary>
+    public DateTime? EmptySourceAt { get; set; }
+
     public int? LogligId { get; set; }
 }
 

@@ -113,7 +113,8 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             {
                 DiscoveredId = d.Id, OrgCompId = d.OrgCompId, Name = d.Name,
                 DateStart = d.DateStart, DateEnd = d.DateEnd, Venue = d.Venue,
-                Status = d.Status, Languages = d.Languages, LastError = d.LastError, LogligId = d.LogligId
+                Status = d.Status, Languages = d.Languages, LastError = d.LastError, LogligId = d.LogligId,
+                EmptySourceAt = d.EmptySourceAt
             };
 
             // Резолв к соревнованию: OrgCompId штампован → он; иначе матч по имени+дате.

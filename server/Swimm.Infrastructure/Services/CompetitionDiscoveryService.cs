@@ -165,6 +165,17 @@ public class CompetitionDiscoveryService(
         return true;
     }
 
+    public async Task<bool> SetEmptySourceAsync(int id, bool empty, string by, CancellationToken ct = default)
+    {
+        var row = await db.DiscoveredCompetitions.FirstOrDefaultAsync(d => d.Id == id, ct);
+        if (row is null) return false;
+
+        row.EmptySourceAt = empty ? DateTime.UtcNow : null;
+        row.EmptySourceBy = empty ? (by.Length > 200 ? by[..200] : by) : null;
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
     private static DiscoveredCompetitionDto ToDto(DiscoveredCompetition d, CompetitionMatch? matched) => new(
         d.Id, d.OrgCompId, d.Name, d.DateStart, d.DateEnd, d.Venue, d.LogligId,
         d.Status, d.DiscoveredAt, d.LastSeenAt, d.LastError, matched?.Name, matched?.CompetitionId, d.Languages);

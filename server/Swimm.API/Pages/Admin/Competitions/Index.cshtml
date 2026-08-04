@@ -91,6 +91,11 @@
         else if (s.Languages == "he")
             sb.Append("<span class=\"text-[11px] text-admin-text-muted\" title=\"Второй язык на loglig не найден\">только HE</span> ");
         sb.Append($"<a href=\"{api}/{s.DiscoveredId}/pdf\" class=\"{btn}\">PDF</a> ");
+        // Ручная пометка «нет протокола»: PDF на сайте бывает пустым (страница без единой
+        // строки), и без пометки строка выглядит обычной «новой» — её пробуют затянуть снова.
+        sb.Append(s.EmptySourceAt is null
+            ? $"<button onclick=\"discEmptySource({s.DiscoveredId}, true)\" class=\"{btn}\" title=\"Протокола нет: PDF пустой\">∅ нет протокола</button> "
+            : $"<button onclick=\"discEmptySource({s.DiscoveredId}, false)\" class=\"{btn}\" title=\"Снять пометку — протокол появился\">↺ протокол есть</button> ");
         if (!imported)
             sb.Append(s.Status == "ignored"
                 ? $"<button onclick=\"discStatus({s.DiscoveredId},'new')\" class=\"{btn}\">вернуть</button>"
@@ -363,7 +368,15 @@ else
                     {
                         <!-- Только на сайте (в БД ещё нет) -->
                         <tr data-disc-id="@s.DiscoveredId">
-                            <td><span class="inline-block py-0.5 px-2 rounded text-xs font-semibold @badge.Cls">@badge.Text</span></td>
+                            <td>
+                                <span class="inline-block py-0.5 px-2 rounded text-xs font-semibold @badge.Cls">@badge.Text</span>
+                                @* Протокола нет (PDF пустой) — чтобы не пробовать «Затянуть» снова. *@
+                                @if (s.EmptySourceAt is { } emptyAt)
+                                {
+                                    <span class="ml-1 inline-block py-0.5 px-1.5 rounded text-[10px] font-bold bg-white/[.08] text-admin-text-muted"
+                                          title="Протокола нет: PDF пустой (@emptyAt.ToLocalTime().ToString("dd.MM.yyyy"))">∅ нет протокола</span>
+                                }
+                            </td>
                             <td class="text-center">@(u.IsChampionship ? "🏆" : "")</td>
                             <td dir="rtl" style="text-align:left">
                                 <a class="text-admin-accent hover:underline" href="https://isr.org.il/comp.asp?compID=@s.OrgCompId" target="_blank" rel="noopener">@s.Name ↗</a>
@@ -928,6 +941,19 @@ else
                     await apiJson(`${API}/${id}/status`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ status })
+                    });
+                    location.reload();
+                } catch (e) { toast('Ошибка: ' + e.message); }
+            };
+
+            // «Нет протокола»: PDF на сайте пустой. Пометка ставится и автоматически — при
+            // разборе, который не нашёл ни одного соревнования, — но человек должен уметь
+            // поставить/снять её руками: файл могут выложить позже.
+            window.discEmptySource = async function (id, empty) {
+                try {
+                    await apiJson(`${API}/${id}/empty-source`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ empty })
                     });
                     location.reload();
                 } catch (e) { toast('Ошибка: ' + e.message); }

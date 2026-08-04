@@ -147,11 +147,23 @@ public class DiscoveryAdminController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
+            // «No competitions found in PDF» = у соревнования нет протокола (страница пустая).
+            // Это не сбой, который стоит повторить, а факт «тянуть нечего» — помечаем строку,
+            // чтобы её не пробовали затянуть снова и снова.
+            if (LooksLikeEmptySource(ex.Message))
+                await _discovery.SetEmptySourceAsync(id, true, "auto", ct);
             return BadRequest(new { error = ex.Message });
         }
 
         if (parsed.ResultCount == 0)
+        {
+            await _discovery.SetEmptySourceAsync(id, true, "auto", ct);
             return BadRequest(new { error = "Парсер не распознал ни одного результата — формат протокола изменился? (B4)" });
+        }
+
+        // Разобралось — значит протокол всё-таки есть: снимаем прежнюю пометку «пусто»
+        // (файл могли выложить позже, и строка не должна оставаться зачёркнутой навсегда).
+        await _discovery.SetEmptySourceAsync(id, false, "auto", ct);
 
         await _discovery.AddLanguagesAsync(id, languages, ct);
 
@@ -179,6 +191,30 @@ public class DiscoveryAdminController : ControllerBase
             recordPreview
         });
     }
+
+    public sealed record EmptySourceRequest(bool Empty);
+
+    /// <summary>
+    /// Пометить/снять вручную «у соревнования нет протокола». Нужно для случаев, когда PDF
+    /// пуст не навсегда или наоборот — админ знает, что протокола не будет.
+    /// </summary>
+    [HttpPost("{id:int}/empty-source")]
+    public async Task<IActionResult> SetEmptySource(int id, [FromBody] EmptySourceRequest request, CancellationToken ct = default)
+    {
+        var by = User.Identity?.Name ?? "admin";
+        if (!await _discovery.SetEmptySourceAsync(id, request.Empty, by, ct))
+            return NotFound(new { error = $"Строка входящих {id} не найдена" });
+
+        return Ok(new { id, request.Empty });
+    }
+
+    /// <summary>
+    /// Сообщения парсера, означающие «в файле ничего нет». Держим списком, а не подстрокой
+    /// «not found»: иначе под пометку попали бы сетевые и форматные сбои, которые надо повторять.
+    /// </summary>
+    private static bool LooksLikeEmptySource(string message) =>
+        message.Contains("No competitions found", StringComparison.OrdinalIgnoreCase)
+        || message.Contains("0 lines extracted", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>«Синхронизировать языки»: скачать оба PDF, склеить пару и дозаполнить
     /// EN/HE-имена пловцов в БД по уже импортированным результатам (без переимпорта).</summary>
