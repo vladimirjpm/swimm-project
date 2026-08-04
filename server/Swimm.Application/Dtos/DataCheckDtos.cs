@@ -57,12 +57,19 @@ public sealed record DataCheckRunDto(
     int ErrorCount, int WarningCount, int InfoCount, int FixedCount);
 
 /// <summary>Находка в том виде, в каком её видит человек.</summary>
+/// <param name="SubjectGender">
+/// ТЕКУЩИЙ пол субъекта — читается на выдаче, а не хранится в находке: находка обновляется
+/// только прогоном, и сохранённое значение врало бы сразу после исправления. Нужен, чтобы
+/// человек видел, что он уже проставил, а что нет.
+/// </param>
+/// <param name="SubjectLogligId">Текущая привязка к loglig — по той же причине живая.</param>
 public sealed record DataCheckFindingDto(
     int Id, string CheckId, DataCheckSeverity Severity, string EntityType, int? EntityId,
     string Message, string? Details, string? Link,
     DateTime FirstSeenAt, DateTime LastSeenAt, string? Resolution, string? Note,
     string? PublicLink = null, string? SubjectName = null,
-    string? FixKind = null, int? FixEntityId = null);
+    string? FixKind = null, int? FixEntityId = null,
+    string? SubjectGender = null, int? SubjectLogligId = null);
 
 /// <summary>Находки одной проверки + её описание (для страницы /Admin/Health).</summary>
 /// <param name="Total">

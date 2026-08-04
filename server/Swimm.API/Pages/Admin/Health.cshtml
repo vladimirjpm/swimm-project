@@ -73,19 +73,7 @@
                     <code class="rounded bg-white/[.06] px-1.5 py-0.5 text-[12px]" dir="auto">${esc(f.subjectName)}</code>
                     <button class="admin-btn admin-btn-ghost py-0.5 px-1.5 text-[11px] finding-copy"
                             data-name="${esc(f.subjectName)}" title="Скопировать имя — искать в интернете">копировать</button>
-                    ${f.fixKind === 'swimmer-gender' ? `
-                        <span class="text-[11px] text-admin-text-muted">пол:</span>
-                        <button class="py-0.5 px-2 rounded text-[12px] font-bold cursor-pointer border border-[#4fa8ff]/50
-                                       bg-[#4fa8ff]/15 text-[#4fa8ff] hover:bg-[#4fa8ff]/25 finding-gender"
-                                data-id="${f.id}" data-gender="male" title="Мужской">♂</button>
-                        <button class="py-0.5 px-2 rounded text-[12px] font-bold cursor-pointer border border-[#ff7ab8]/50
-                                       bg-[#ff7ab8]/15 text-[#ff7ab8] hover:bg-[#ff7ab8]/25 finding-gender"
-                                data-id="${f.id}" data-gender="female" title="Женский">♀</button>
-                        <span class="ml-2 text-[11px] text-admin-text-muted">loglig:</span>
-                        <input type="number" class="admin-input py-0.5 px-1.5 w-[7.5rem] text-[12px] finding-loglig-input"
-                               data-swimmer="${f.fixEntityId}" placeholder="id с loglig" />
-                        <button class="admin-btn admin-btn-ghost py-0.5 px-1.5 text-[11px] finding-loglig"
-                                data-swimmer="${f.fixEntityId}" title="Привязать пловца к карточке loglig">привязать</button>` : ''}
+                    ${f.fixKind === 'swimmer-gender' ? renderFixControls(f) : ''}
                 </div>` : ''}
                 ${accepted && f.note ? `<div class="text-[11px] text-admin-text-muted">принято: ${esc(f.note)}</div>` : ''}</td>
             <td class="align-top whitespace-nowrap text-[11px] text-admin-text-muted">
@@ -97,6 +85,41 @@
                     ? `<button class="admin-btn admin-btn-ghost py-1 px-2 finding-reopen" data-id="${f.id}">Вернуть</button>`
                     : `<button class="admin-btn admin-btn-ghost py-1 px-2 finding-accept" data-id="${f.id}">Принять</button>`}
             </td></tr>`;
+    }
+
+    // Проставленное должно быть ВИДНО: иначе после нажатия непонятно, что уже сделано, и
+    // человек жмёт по второму разу. Активный пол — залитая кнопка с галочкой, привязанный
+    // loglig — чип со ссылкой на карточку вместо поля ввода.
+    const GENDER_TONE = {
+        male:   { border: '#4fa8ff', label: '♂', title: 'Мужской' },
+        female: { border: '#ff7ab8', label: '♀', title: 'Женский' },
+    };
+
+    function genderButton(f, gender) {
+        const t = GENDER_TONE[gender];
+        const active = f.subjectGender === gender;
+        return `<button class="py-0.5 px-2 rounded text-[12px] font-bold cursor-pointer finding-gender
+                        ${active ? 'ring-1 ring-offset-0' : ''}"
+                    style="border:1px solid ${t.border}${active ? '' : '80'};
+                           background:${t.border}${active ? '' : '26'};
+                           color:${active ? '#0f1420' : t.border};"
+                    data-id="${f.id}" data-gender="${gender}" title="${t.title}">${active ? '✓ ' : ''}${t.label}</button>`;
+    }
+
+    function renderFixControls(f) {
+        return `
+            <span class="text-[11px] text-admin-text-muted">пол:</span>
+            ${genderButton(f, 'male')}
+            ${genderButton(f, 'female')}
+            <span class="ml-2 text-[11px] text-admin-text-muted">loglig:</span>
+            ${f.subjectLogligId
+                ? `<a href="https://loglig.com:2053/Players/Details/${f.subjectLogligId}" target="_blank" rel="noopener"
+                       class="rounded bg-admin-success/15 px-1.5 py-0.5 text-[11px] font-bold text-admin-success hover:underline"
+                       title="Пловец привязан — открыть карточку">✓ ${f.subjectLogligId} ↗</a>`
+                : `<input type="number" class="admin-input py-0.5 px-1.5 w-[7.5rem] text-[12px] finding-loglig-input"
+                          data-swimmer="${f.fixEntityId}" placeholder="id с loglig" />
+                   <button class="admin-btn admin-btn-ghost py-0.5 px-1.5 text-[11px] finding-loglig"
+                           data-swimmer="${f.fixEntityId}" title="Привязать пловца к карточке loglig">привязать</button>`}`;
     }
 
     function renderGroups(groups) {
@@ -182,8 +205,7 @@
             // linked=false — доменный отказ (уже привязан, карточка недоступна), не HTTP-ошибка.
             if (res && res.linked === false) { toast('Не привязано: ' + (res.error ?? 'причина неизвестна'), 6000); btn.disabled = false; return; }
             toast(`Привязан loglig #${logligId}`);
-            input.value = '';
-            btn.disabled = false;
+            await load();
         } catch (e) { btn.disabled = false; toast('Ошибка: ' + e.message, 6000); }
     }
 

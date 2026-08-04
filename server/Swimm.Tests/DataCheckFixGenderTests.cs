@@ -87,6 +87,41 @@ public class DataCheckFixGenderTests
     }
 
     [Fact]
+    public async Task CurrentGenderAndLogligId_AreVisibleInTheList()
+    {
+        // Проставленное должно быть видно сразу: иначе после нажатия непонятно, что уже
+        // сделано, и человек жмёт по второму разу. Значения ЖИВЫЕ — читаются на выдаче,
+        // а не берутся из находки: находку обновляет только прогон.
+        var (db, findingId, swimmerId) = await SeedAsync(nameof(CurrentGenderAndLogligId_AreVisibleInTheList));
+        await using var _ = db;
+
+        var runner = new DataCheckRunner(db, [new FakeNoGenderCheck()]);
+        await runner.FixSwimmerGenderAsync(findingId, "female");
+
+        var swimmer = await db.Swimmers.SingleAsync(s => s.Id == swimmerId);
+        swimmer.LogligId = 296445;
+        await db.SaveChangesAsync();
+
+        var finding = (await runner.GetCurrentAsync())
+            .SelectMany(g => g.Findings)
+            .Single(f => f.Id == findingId);
+
+        Assert.Equal("female", finding.SubjectGender);
+        Assert.Equal(296445, finding.SubjectLogligId);
+    }
+
+    /// <summary>Проверка-заглушка: реестр показывает находки только зарегистрированных проверок.</summary>
+    private sealed class FakeNoGenderCheck : Swimm.Application.Abstractions.IDataCheck
+    {
+        public string Id => "results.no-gender";
+        public string Title => "Результаты без пола";
+        public string Description => "—";
+        public DataCheckSeverity Severity => DataCheckSeverity.Warning;
+        public Task<DataCheckOutcome> RunAsync(CancellationToken ct = default) =>
+            Task.FromResult(DataCheckOutcome.Empty);
+    }
+
+    [Fact]
     public async Task RejectsGarbageGender()
     {
         var (db, findingId, _) = await SeedAsync(nameof(RejectsGarbageGender));

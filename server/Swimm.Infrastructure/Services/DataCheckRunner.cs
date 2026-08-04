@@ -144,6 +144,23 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
         var byCheck = findings.GroupBy(f => f.CheckId).ToDictionary(g => g.Key, g => g.ToList());
         var states = await db.DataCheckStates.AsNoTracking().ToDictionaryAsync(s => s.CheckId, ct);
 
+        // Живое состояние субъектов, у которых есть точечное исправление: пол и привязка к
+        // loglig. Читаем на выдаче, а НЕ храним в находке — находка обновляется только
+        // прогоном, и сохранённое значение врало бы сразу после нажатия кнопки: человек
+        // поправил, а список показывает старое.
+        var subjectIds = findings
+            .Where(f => f.FixKind == DataCheckFixKinds.SwimmerGender && f.FixEntityId != null)
+            .Select(f => f.FixEntityId!.Value)
+            .Distinct()
+            .ToList();
+
+        var subjects = subjectIds.Count == 0
+            ? []
+            : await db.Swimmers.AsNoTracking()
+                .Where(s => subjectIds.Contains(s.Id))
+                .Select(s => new { s.Id, s.Gender, s.LogligId })
+                .ToDictionaryAsync(s => s.Id, s => (s.Gender, s.LogligId), ct);
+
         // Показываем ВСЕ зарегистрированные проверки, даже пустые: «проверка есть и она
         // молчит» — полезная информация, отличная от «проверки нет».
         return checks
@@ -155,7 +172,7 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
                     c.Id, c.Title, c.Description, c.Severity,
                     items.Count(f => f.Resolution == null),
                     items.Count(f => f.Resolution == DataCheckResolutions.Accepted),
-                    items.Select(ToDto).ToList(),
+                    items.Select(f => ToDto(f, subjects)).ToList(),
                     state?.Total, state?.LastRunAt, state?.Failed ?? false);
             })
             .OrderByDescending(g => g.OpenCount > 0)
@@ -248,8 +265,18 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
     private static DataCheckRunDto ToDto(DataCheckRun r) =>
         new(r.Id, r.StartedAt, r.FinishedAt, r.Trigger, r.ErrorCount, r.WarningCount, r.InfoCount, r.FixedCount);
 
-    private static DataCheckFindingDto ToDto(DataCheckFinding f) =>
-        new(f.Id, f.CheckId, (DataCheckSeverity)f.Severity, f.EntityType, f.EntityId,
+    private static DataCheckFindingDto ToDto(
+        DataCheckFinding f,
+        IReadOnlyDictionary<int, (string? Gender, int? LogligId)>? subjects = null)
+    {
+        var subject = f.FixEntityId is { } id && subjects is not null && subjects.TryGetValue(id, out var v)
+            ? v
+            : default;
+
+        return new DataCheckFindingDto(
+            f.Id, f.CheckId, (DataCheckSeverity)f.Severity, f.EntityType, f.EntityId,
             f.Message, f.Details, f.Link, f.FirstSeenAt, f.LastSeenAt, f.Resolution, f.Note,
-            f.PublicLink, f.SubjectName, f.FixKind, f.FixEntityId);
+            f.PublicLink, f.SubjectName, f.FixKind, f.FixEntityId,
+            subject.Gender, subject.LogligId);
+    }
 }
