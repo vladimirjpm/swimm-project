@@ -110,6 +110,62 @@ public class DataCheckFixGenderTests
         Assert.Equal(296445, finding.SubjectLogligId);
     }
 
+    [Fact]
+    public async Task GenderOfTheRowWins_WhenSwimmerAlreadyHasOneButTheRowDoesNot()
+    {
+        // Пол пловца бывает известен из другого протокола, а спорная строка всё равно пустая.
+        // Галочка обязана показывать строку — иначе кнопка выглядит нажатой, а находка висит.
+        var (db, findingId, swimmerId) = await SeedAsync(
+            nameof(GenderOfTheRowWins_WhenSwimmerAlreadyHasOneButTheRowDoesNot));
+        await using var _ = db;
+
+        var swimmer = await db.Swimmers.SingleAsync(s => s.Id == swimmerId);
+        swimmer.Gender = "female";
+        await db.SaveChangesAsync();
+
+        var finding = (await new DataCheckRunner(db, [new FakeNoGenderCheck()]).GetCurrentAsync())
+            .SelectMany(g => g.Findings)
+            .Single(f => f.Id == findingId);
+
+        Assert.Null(finding.SubjectGender);
+    }
+
+    [Fact]
+    public async Task BulkFix_WritesKnownSwimmerGenderIntoRows_AndSkipsUnknown()
+    {
+        // Массовая кнопка не гадает: она лишь дописывает в строки тот пол, который у пловца
+        // уже есть. Пловец без пола остаётся человеку — иначе мы бы придумывали данные.
+        var (db, _, swimmerId) = await SeedAsync(nameof(BulkFix_WritesKnownSwimmerGenderIntoRows_AndSkipsUnknown));
+        await using var _d = db;
+
+        var unknown = new Swimmer { LastName = "כהן", FirstName = "טל", BirthYear = 2011, Gender = "" };
+        db.Swimmers.Add(unknown);
+        await db.SaveChangesAsync();
+        var known = await db.Swimmers.SingleAsync(s => s.Id == swimmerId);
+        known.Gender = "female";
+
+        var row = await db.Results.SingleAsync(r => r.Distance == "200");
+        db.Results.Add(new ResultRecord
+        {
+            CompetitionId = row.CompetitionId, SwimmerId = unknown.Id, ClubId = row.ClubId, StyleId = row.StyleId,
+            Distance = "50", Gender = "", TimeOriginal = "00:40.00", CompetitionDate = new DateTime(2025, 2, 1)
+        });
+        db.DataCheckFindings.Add(new DataCheckFinding
+        {
+            CheckId = "results.no-gender", Severity = 1, EntityType = "Result", EntityId = 3,
+            Message = "כהן טל · 50 freestyle",
+            FixKind = DataCheckFixKinds.SwimmerGender, FixEntityId = unknown.Id
+        });
+        await db.SaveChangesAsync();
+
+        var (findings, rows) = await new DataCheckRunner(db, []).FixAllKnownSwimmerGendersAsync();
+
+        Assert.Equal(1, findings);
+        Assert.Equal(1, rows);
+        Assert.Equal("female", (await db.Results.SingleAsync(r => r.Distance == "200")).Gender);
+        Assert.Equal("", (await db.Results.SingleAsync(r => r.Distance == "50")).Gender);
+    }
+
     /// <summary>Проверка-заглушка: реестр показывает находки только зарегистрированных проверок.</summary>
     private sealed class FakeNoGenderCheck : Swimm.Application.Abstractions.IDataCheck
     {

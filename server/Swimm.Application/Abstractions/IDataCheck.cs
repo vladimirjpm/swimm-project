@@ -73,6 +73,14 @@ public interface IDataCheckRunner
     /// </summary>
     Task<int?> FixSwimmerGenderAsync(int findingId, string gender, CancellationToken ct = default);
 
+    /// <summary>
+    /// Массовое исправление той же находки: у пловца пол уже известен (приехал из другого
+    /// протокола), а спорная строка пустая — тогда «правильный» ответ уже есть в базе и
+    /// кликать по каждой находке нечего. Правит ТОЛЬКО такие: где пол пловца задан.
+    /// Находки, где пол неизвестен и у пловца, остаются человеку.
+    /// </summary>
+    Task<(int Findings, int Rows)> FixAllKnownSwimmerGendersAsync(CancellationToken ct = default);
+
     /// <summary>Вернуть принятую находку в работу.</summary>
     Task<bool> ReopenAsync(int findingId, CancellationToken ct = default);
 }

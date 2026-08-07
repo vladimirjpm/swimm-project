@@ -71,6 +71,22 @@ public class DataChecksAdminController(IDataCheckRunner runner, IAdminAuditServi
         return Ok(new { rows });
     }
 
+    /// <summary>
+    /// Массово дописать пол в строки, где он известен у пловца. Не гадает: находки, где пол
+    /// неизвестен и у пловца, остаются человеку — их и надо разбирать руками.
+    /// </summary>
+    [HttpPost("fix-gender-all")]
+    public async Task<IActionResult> FixGenderAll(CancellationToken ct)
+    {
+        var (findings, rows) = await runner.FixAllKnownSwimmerGendersAsync(ct);
+
+        await audit.LogAsync("datacheck.fix-gender-all", "DataCheckFinding", null,
+            $"Массово проставлен пол по пловцам: пловцов — {findings}, строк результата — {rows}",
+            new { findings, rows }, ct);
+
+        return Ok(new { findings, rows });
+    }
+
     /// <summary>Вернуть принятую находку в работу.</summary>
     [HttpPost("{id:int}/reopen")]
     public async Task<IActionResult> Reopen(int id, CancellationToken ct)

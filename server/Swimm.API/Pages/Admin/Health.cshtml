@@ -122,6 +122,34 @@
                            data-swimmer="${f.fixEntityId}" title="Привязать пловца к карточке loglig">привязать</button>`}`;
     }
 
+    // Пол пловца часто уже известен — приехал из другого протокола, где заплыв не был
+    // смешанным. Тогда «правильный» ответ есть в базе, и кликать по каждой находке нечего:
+    // одна кнопка дописывает его в строки. Гадать за человека она не станет — находки, где
+    // пол неизвестен и у пловца, останутся в списке.
+    function bulkGenderButton(g) {
+        if (g.checkId !== 'results.no-gender' || !g.openCount) return '';
+        return `<div class="mt-2"><button id="btn-gender-all" class="admin-btn admin-btn-ghost py-1 px-2 text-[12px]"
+                    title="Дописать пол в строки тех находок, где пол пловца уже известен">
+                    проставить всем по полу пловца</button></div>`;
+    }
+
+    async function fixGenderAll(btn) {
+        btn.disabled = true;
+        try {
+            const res = await api(`${API}/fix-gender-all`, { method: 'POST' });
+            if (!res.rows) {
+                toast('Нечего проставлять: пол неизвестен и у пловцов — эти находки только руками');
+                btn.disabled = false;
+                return;
+            }
+            // Сразу гоним проверки: иначе поправленные находки висели бы до ручного прогона,
+            // и кнопка выглядела бы не сработавшей.
+            const data = await api(`${API}/run`, { method: 'POST' });
+            render(data);
+            toast(`Проставлено по ${res.findings} пловцам, строк — ${res.rows}; закрыто находок: ${data.run.fixedCount}`, 6000);
+        } catch (e) { btn.disabled = false; toast('Ошибка: ' + e.message, 6000); }
+    }
+
     function renderGroups(groups) {
         document.getElementById('groups').innerHTML = groups.map(g => {
             const [sevName, sevCls] = SEV[g.severity];
@@ -140,6 +168,7 @@
                     <code class="ml-auto text-[10px] text-admin-text-muted/70">${esc(g.checkId)}</code>
                 </summary>
                 <div class="mt-2 text-[12px]">${esc(g.description)}</div>
+                ${bulkGenderButton(g)}
                 ${g.findings.length ? `<div class="overflow-x-auto mt-2"><table class="admin-table w-full">
                     <tbody>${g.findings.map(findingRow).join('')}</tbody></table></div>` : ''}
             </details>`;
@@ -152,6 +181,8 @@
             b.addEventListener('click', () => fixGender(b.dataset.id, b.dataset.gender, b)));
         document.querySelectorAll('.finding-loglig').forEach(b =>
             b.addEventListener('click', () => setLoglig(b)));
+        const bulk = document.getElementById('btn-gender-all');
+        if (bulk) bulk.addEventListener('click', () => fixGenderAll(bulk));
     }
 
     // Имя субъекта отдельной кнопкой: его копируют, чтобы найти пловца в интернете.

@@ -161,6 +161,24 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
                 .Select(s => new { s.Id, s.Gender, s.LogligId })
                 .ToDictionaryAsync(s => s.Id, s => (s.Gender, s.LogligId), ct);
 
+        // Галочка «пол уже стоит» должна показывать ТО, на что смотрит проверка, — пол самой
+        // строки результата. Пол пловца бывает известен (пришёл из другого протокола), а
+        // строка всё равно пустая: тогда галочка по пловцу врёт — находка висит, а кнопка
+        // выглядит нажатой.
+        var resultIds = findings
+            .Where(f => f.FixKind == DataCheckFixKinds.SwimmerGender
+                        && f.EntityType == "Result" && f.EntityId != null)
+            .Select(f => (long)f.EntityId!.Value)
+            .Distinct()
+            .ToList();
+
+        var resultGenders = resultIds.Count == 0
+            ? []
+            : await db.Results.AsNoTracking()
+                .Where(r => resultIds.Contains(r.Id))
+                .Select(r => new { r.Id, r.Gender })
+                .ToDictionaryAsync(r => r.Id, r => r.Gender, ct);
+
         // Показываем ВСЕ зарегистрированные проверки, даже пустые: «проверка есть и она
         // молчит» — полезная информация, отличная от «проверки нет».
         return checks
@@ -172,7 +190,7 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
                     c.Id, c.Title, c.Description, c.Severity,
                     items.Count(f => f.Resolution == null),
                     items.Count(f => f.Resolution == DataCheckResolutions.Accepted),
-                    items.Select(f => ToDto(f, subjects)).ToList(),
+                    items.Select(f => ToDto(f, subjects, resultGenders)).ToList(),
                     state?.Total, state?.LastRunAt, state?.Failed ?? false);
             })
             .OrderByDescending(g => g.OpenCount > 0)
@@ -248,6 +266,35 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
         return rows.Count;
     }
 
+    public async Task<(int Findings, int Rows)> FixAllKnownSwimmerGendersAsync(CancellationToken ct = default)
+    {
+        var swimmerIds = await db.DataCheckFindings
+            .Where(f => f.Resolution == null && f.FixKind == DataCheckFixKinds.SwimmerGender
+                        && f.FixEntityId != null)
+            .Select(f => f.FixEntityId!.Value)
+            .Distinct()
+            .ToListAsync(ct);
+        if (swimmerIds.Count == 0) return (0, 0);
+
+        // Только те, у кого пол пловца УЖЕ известен: массово гадать за человека нельзя,
+        // здесь мы лишь дописываем в строки ответ, который в базе уже есть.
+        var known = await db.Swimmers
+            .Where(s => swimmerIds.Contains(s.Id) && (s.Gender == "male" || s.Gender == "female"))
+            .Select(s => new { s.Id, s.Gender })
+            .ToDictionaryAsync(s => s.Id, s => s.Gender!, ct);
+        if (known.Count == 0) return (0, 0);
+
+        var knownIds = known.Keys.ToList();
+        var rows = await db.Results
+            .Where(r => knownIds.Contains(r.SwimmerId) && r.RelayId == null
+                        && (r.Gender == null || r.Gender == "" || r.Gender == "none"))
+            .ToListAsync(ct);
+        foreach (var r in rows) r.Gender = known[r.SwimmerId];
+
+        await db.SaveChangesAsync(ct);
+        return (known.Count, rows.Count);
+    }
+
     public async Task<bool> ReopenAsync(int findingId, CancellationToken ct = default)
     {
         var f = await db.DataCheckFindings.FirstOrDefaultAsync(x => x.Id == findingId, ct);
@@ -267,16 +314,23 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
 
     private static DataCheckFindingDto ToDto(
         DataCheckFinding f,
-        IReadOnlyDictionary<int, (string? Gender, int? LogligId)>? subjects = null)
+        IReadOnlyDictionary<int, (string? Gender, int? LogligId)>? subjects = null,
+        IReadOnlyDictionary<long, string>? resultGenders = null)
     {
         var subject = f.FixEntityId is { } id && subjects is not null && subjects.TryGetValue(id, out var v)
             ? v
             : default;
 
+        // Для находок по строке результата пол берём со строки: именно он «не проставлен».
+        // Пол пловца оставляем запасным вариантом — он совпадает после нажатия кнопки.
+        var gender = f.EntityType == "Result" && resultGenders is not null && f.EntityId is { } rid
+            ? resultGenders.TryGetValue(rid, out var rg) && rg is not (null or "" or "none") ? rg : null
+            : subject.Gender;
+
         return new DataCheckFindingDto(
             f.Id, f.CheckId, (DataCheckSeverity)f.Severity, f.EntityType, f.EntityId,
             f.Message, f.Details, f.Link, f.FirstSeenAt, f.LastSeenAt, f.Resolution, f.Note,
             f.PublicLink, f.SubjectName, f.FixKind, f.FixEntityId,
-            subject.Gender, subject.LogligId);
+            gender, subject.LogligId);
     }
 }
