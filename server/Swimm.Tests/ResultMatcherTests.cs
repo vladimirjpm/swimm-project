@@ -44,7 +44,7 @@ public class ResultMatcherTests
         IReadOnlyList<ResultRecord> oldRows, IReadOnlyList<ResultRecord> newRows) =>
         ResultMatcher.Match(oldRows, newRows,
             ResultMatcher.KeyOfPersisted, ResultMatcher.KeyOfTransient,
-            ResultMatcher.SwimmerIdOfPersisted, ResultMatcher.SwimmerIdOfTransient);
+            ResultMatcher.DiscriminatorOfPersisted, ResultMatcher.DiscriminatorOfTransient);
 
     [Fact]
     public void SameKey_Matches()
@@ -196,6 +196,57 @@ public class ResultMatcherTests
         Assert.Contains(new2, result.Inserted);
         Assert.Contains(new3, result.Inserted);
         Assert.Empty(result.Deleted);
+    }
+
+    [Fact]
+    public void KeyCollision_TwoTeamsOfSameClub_MatchedByRoster_NotByOrder()
+    {
+        // Реальный случай (comp #1513, «הפועל עמק חפר»): две команды клуба в одной дисциплине,
+        // один и тот же пловец в обеих, heat/lane совпали. SwimmerId их не разводит — обе
+        // строки его. Различает состав, и матчер обязан идти по нему, а не по порядку в файле:
+        // иначе перестановка блоков в протоколе перекидывает время одной команды на другую.
+        var rosterA = "אלון בן, עומר ג׳יוסי, אור כהן, עומר דמתי";
+        var rosterB = "אלון בן, עומר ג׳יוסי, מריה גברילוב, אליס במירושניקו";
+
+        var oldA = Old(1, lane: 9, heat: 3, relayId: 3037, swimmerId: 8238);
+        oldA.Relay = new Relay { Id = 3037, TeamName = "הפועל עמק חפר", SwimmersName = rosterA };
+        var oldB = Old(2, lane: 9, heat: 3, relayId: 3089, swimmerId: 8238);
+        oldB.Relay = new Relay { Id = 3089, TeamName = "הפועל עמק חפר", SwimmersName = rosterB };
+
+        // В новом файле блоки идут в обратном порядке — FIFO дал бы перекрёстный матч.
+        var newB = New(lane: 9, heat: 3, isRelay: true, swimmerId: 8238, note: "B");
+        newB.Relay!.TeamName = "הפועל עמק חפר";
+        newB.Relay.SwimmersName = rosterB;
+        var newA = New(lane: 9, heat: 3, isRelay: true, swimmerId: 8238, note: "A");
+        newA.Relay!.TeamName = "הפועל עמק חפר";
+        newA.Relay.SwimmersName = rosterA;
+
+        var result = RunMatch([oldA, oldB], [newB, newA]);
+
+        Assert.Equal(2, result.Matched.Count);
+        Assert.Equal("A", result.Matched.Single(m => m.Old.Id == 1).New.Note);
+        Assert.Equal("B", result.Matched.Single(m => m.Old.Id == 2).New.Note);
+        Assert.Empty(result.Inserted);
+        Assert.Empty(result.Deleted);
+    }
+
+    [Fact]
+    public void KeyCollision_RosterUnknown_FallsBackToEncounterOrder()
+    {
+        // Состав не разобран (пусто с обеих сторон) — поведение прежнее, FIFO: фикс не должен
+        // ухудшать случай, где различать нечем.
+        var old1 = Old(1, lane: 5, relayId: 10, swimmerId: 77);
+        old1.Relay = new Relay { Id = 10 };
+        var old2 = Old(2, lane: 5, relayId: 11, swimmerId: 77);
+        old2.Relay = new Relay { Id = 11 };
+        var new1 = New(lane: 5, isRelay: true, swimmerId: 77, note: "first");
+        var new2 = New(lane: 5, isRelay: true, swimmerId: 77, note: "second");
+
+        var result = RunMatch([old1, old2], [new1, new2]);
+
+        Assert.Equal(2, result.Matched.Count);
+        Assert.Equal("first", result.Matched.Single(m => m.Old.Id == 1).New.Note);
+        Assert.Equal("second", result.Matched.Single(m => m.Old.Id == 2).New.Note);
     }
 
     [Fact]

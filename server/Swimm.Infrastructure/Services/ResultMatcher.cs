@@ -17,6 +17,17 @@ public readonly record struct ResultMatchKey(
     bool IsRelay);
 
 /// <summary>
+/// Вторичный дискриминатор — им разводятся строки ВНУТРИ коллизии ключа.
+///
+/// SwimmerId устойчив между переимпортами для уже именованной строки, но одного его мало:
+/// у клуба бывает две команды в одной дисциплине, и один и тот же пловец плывёт в обеих
+/// (comp #1513: «הפועל עמק חפר» 3037 и 3089, оба heat 3 lane 9, пловец 8238 в обеих) —
+/// тогда SwimmerId совпадает у ОБЕИХ строк и матч сваливался в FIFO, то есть в лотерею.
+/// Состав команды — то, чем эти строки различаются в самом протоколе.
+/// </summary>
+public readonly record struct ResultDiscriminator(int SwimmerId, string TeamKey);
+
+/// <summary>
 /// Результат матчинга старых (уже в БД) и новых (из импортируемого файла) строк результата.
 /// </summary>
 public sealed class ResultMatch<TOld, TNew>
@@ -75,8 +86,8 @@ public static class ResultMatcher
         IReadOnlyList<TNew> newRows,
         Func<TOld, ResultMatchKey> oldKeySelector,
         Func<TNew, ResultMatchKey> newKeySelector,
-        Func<TOld, int> oldSwimmerIdSelector,
-        Func<TNew, int> newSwimmerIdSelector)
+        Func<TOld, ResultDiscriminator> oldDiscriminatorSelector,
+        Func<TNew, ResultDiscriminator> newDiscriminatorSelector)
     {
         var result = new ResultMatch<TOld, TNew>();
 
@@ -112,10 +123,10 @@ public static class ResultMatcher
                 // поведение при отсутствии коллизии не меняется.
                 if (bucket.Count > 1)
                 {
-                    var newSwimmerId = newSwimmerIdSelector(@new);
+                    var newDiscriminator = newDiscriminatorSelector(@new);
                     for (var i = 0; i < bucket.Count; i++)
                     {
-                        if (!flags[i] && oldSwimmerIdSelector(bucket[i]) == newSwimmerId)
+                        if (!flags[i] && oldDiscriminatorSelector(bucket[i]) == newDiscriminator)
                         {
                             result.Matched.Add((bucket[i], @new));
                             flags[i] = true;
@@ -165,9 +176,26 @@ public static class ResultMatcher
     public static ResultMatchKey KeyOfTransient(ResultRecord r) =>
         new(r.CompetitionId, r.StyleId, r.Distance, r.Gender, r.Heat, r.Lane, r.Relay != null || r.RelayId != null);
 
-    /// <summary>SwimmerId старой строки — вторичный дискриминатор для доматча внутри коллизии ключа.</summary>
-    public static int SwimmerIdOfPersisted(ResultRecord r) => r.SwimmerId;
+    /// <summary>Дискриминатор старой строки — Relay подгружен через Include (см. JsonImportService).</summary>
+    public static ResultDiscriminator DiscriminatorOfPersisted(ResultRecord r) =>
+        new(r.SwimmerId, TeamKey(r.Relay));
 
-    /// <summary>SwimmerId новой строки — вторичный дискриминатор для доматча внутри коллизии ключа.</summary>
-    public static int SwimmerIdOfTransient(ResultRecord r) => r.SwimmerId;
+    /// <summary>Дискриминатор новой строки — Relay ещё навигация, Id у неё нет.</summary>
+    public static ResultDiscriminator DiscriminatorOfTransient(ResultRecord r) =>
+        new(r.SwimmerId, TeamKey(r.Relay));
+
+    /// <summary>
+    /// Состав команды как строка. Берём именно состав, а не TeamName: у двух команд одного
+    /// клуба название одинаковое, различаются они только людьми. Если состава нет (парсер не
+    /// разобрал) — ключ пустой, и строка доматчивается по FIFO, как было до этого.
+    /// </summary>
+    /// <remarks>
+    /// Берём текст состава из файла (<c>relay_swimmers_name</c>), а НЕ структурный
+    /// <c>Relay.Members</c>: у новой строки членство ещё не сохранено, и у только что
+    /// заведённого пловца SwimmerId = 0 — ключ по членам склеил бы все команды в одну.
+    /// </remarks>
+    private static string TeamKey(Relay? relay) =>
+        relay is null
+            ? string.Empty
+            : (relay.SwimmersName ?? relay.TeamName ?? string.Empty).Trim();
 }

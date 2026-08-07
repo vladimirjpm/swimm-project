@@ -731,7 +731,7 @@ public class JsonImportService : IImportService
             var match = ResultMatcher.Match(
                 oldRows, newRowsForComp,
                 ResultMatcher.KeyOfPersisted, ResultMatcher.KeyOfTransient,
-                ResultMatcher.SwimmerIdOfPersisted, ResultMatcher.SwimmerIdOfTransient);
+                ResultMatcher.DiscriminatorOfPersisted, ResultMatcher.DiscriminatorOfTransient);
 
             foreach (var (old, incoming) in match.Matched)
             {

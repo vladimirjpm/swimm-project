@@ -17,6 +17,11 @@ namespace Swimm.Infrastructure.Services.DataChecks;
 /// Матчер не зря берёт вторым дискриминатором SwimmerId, поэтому и проверка смотрит на
 /// ключ ВМЕСТЕ с пловцом: неразличимы лишь строки одного и того же человека. На живой базе
 /// таких 16 — и там есть на что посмотреть (одна строка NS, вторая с временем).
+///
+/// Дискриминатор матчера — не только пловец, но и состав команды (<see cref="ResultDiscriminator"/>):
+/// у клуба бывает две команды в одной дисциплине с одним и тем же пловцом в обеих, и такие
+/// строки матчер разводит. Проверка повторяет это правило — иначе она звала бы человека
+/// чинить то, что уже различимо.
 /// </summary>
 public sealed class UpsertKeyCollisionCheck(SwimmDbContext db) : IDataCheck
 {
@@ -35,7 +40,8 @@ public sealed class UpsertKeyCollisionCheck(SwimmDbContext db) : IDataCheck
             .GroupBy(r => new
             {
                 r.CompetitionId, r.StyleId, r.Distance, r.Gender,
-                r.Heat, r.Lane, IsRelay = r.RelayId != null, r.SwimmerId
+                r.Heat, r.Lane, IsRelay = r.RelayId != null, r.SwimmerId,
+                TeamKey = r.Relay != null ? (r.Relay.SwimmersName ?? r.Relay.TeamName ?? "") : ""
             })
             .Where(g => g.Count() > 1);
 
