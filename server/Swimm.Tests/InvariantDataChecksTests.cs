@@ -164,4 +164,35 @@ public class InvariantDataChecksTests
         Assert.Equal(1, outcome.Total);
         Assert.Contains("Пустое", Assert.Single(outcome.Items).Message);
     }
+
+    [Fact]
+    public async Task NoClubPointRule_FoundOnlyForCompetitionsWithResults()
+    {
+        // §9.3 плана правил очков: без привязки зачёт считается подбором по дате и «едет»
+        // при заведении новой версии правила. Пустое соревнование — не находка: считать
+        // там нечего, а про пустоту кричит competitions.empty.
+        await using var db = CreateDb(nameof(NoClubPointRule_FoundOnlyForCompetitionsWithResults));
+        var (comp, style, club, swimmer) = await SeedAsync(db);
+
+        var rule = new PointRuleClubs { Version = "2026.01", Scope = "all", EffectiveFrom = new DateOnly(2026, 1, 1) };
+        db.Add(rule);
+        var bound = new Competition { Name = "С правилом", Date = "03/06/2026", PoolType = "25m" };
+        var empty = new Competition { Name = "Пустое без правила", Date = "02/06/2026", PoolType = "25m" };
+        db.Competitions.AddRange(bound, empty);
+        await db.SaveChangesAsync();
+
+        bound.PointRuleClubsId = rule.Id;
+        ResultRecord Row(int competitionId) => new()
+        {
+            CompetitionId = competitionId, SwimmerId = swimmer.Id, ClubId = club.Id, StyleId = style.Id,
+            Distance = "50", Gender = "male", CompetitionDate = new DateTime(2026, 6, 1)
+        };
+        db.Results.AddRange(Row(comp.Id), Row(bound.Id));
+        await db.SaveChangesAsync();
+
+        var outcome = await new CompetitionWithoutClubPointRuleCheck(db).RunAsync();
+
+        Assert.Equal(1, outcome.Total);
+        Assert.Contains("Meet", Assert.Single(outcome.Items).Message);
+    }
 }

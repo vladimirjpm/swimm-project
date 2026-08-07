@@ -93,6 +93,57 @@ public sealed class EmptyClubCheck(IDataQualityService quality) : IDataCheck
 }
 
 /// <summary>
+/// Соревнование с результатами, но без привязанного правила клубных очков
+/// (docs/points-rules-per-competition-plan.md, §9.3).
+///
+/// Молчащий отказ: без FK зачёт уходит на страховочный подбор по дате и scope, а тот
+/// «едет» при заведении новой версии правила — цифры прошлого сезона меняются задним
+/// числом. Обнаружить это можно только по странным суммам Top Clubs, поэтому индикатор
+/// и просился в реестр.
+///
+/// Правило ПЛОВЦОВ сознательно не проверяем: «не привязано → legacy-расчёт по FINA» —
+/// легитимный режим (masters и Маккабиада живут так намеренно), и находка по каждому
+/// такому соревнованию была бы ложной тревогой.
+/// </summary>
+public sealed class CompetitionWithoutClubPointRuleCheck(SwimmDbContext db) : IDataCheck
+{
+    public string Id => "competitions.no-club-point-rule";
+    public string Title => "Соревнования без правила клубных очков";
+    public string Description =>
+        "У соревнования есть результаты, но не привязано правило клубных очков — зачёт считается " +
+        "страховочным подбором по дате, и новая версия правила сдвинет цифры задним числом. " +
+        "Проставляется на /Admin/Competitions/AssignRules (массово) или в форме соревнования.";
+    public DataCheckSeverity Severity => DataCheckSeverity.Warning;
+
+    public async Task<DataCheckOutcome> RunAsync(CancellationToken ct = default)
+    {
+        // Пустые соревнования пропускаем: считать там нечего, и про них уже кричит
+        // отдельная проверка competitions.empty — две находки на одну причину только шумят.
+        var rows = await db.Competitions.AsNoTracking()
+            .Where(c => c.PointRuleClubsId == null && db.Results.Any(r => r.CompetitionId == c.Id))
+            .Select(c => new
+            {
+                c.Id, c.Name, c.Date, c.IsMasters,
+                Rows = db.Results.Count(r => r.CompetitionId == c.Id)
+            })
+            .OrderByDescending(c => c.Rows)
+            .ToListAsync(ct);
+
+        if (rows.Count == 0) return DataCheckOutcome.Empty;
+
+        return new DataCheckOutcome(rows.Count, rows
+            .Take(50)
+            .Select(c => new DataCheckItem(
+                "Competition", c.Id,
+                c.Name,
+                $"{c.Date}, строк {c.Rows}" + (c.IsMasters ? ", masters" : ""),
+                $"/Admin/Competitions/Edit?id={c.Id}",
+                PublicRoutes.Competition(c.Id)))
+            .ToList());
+    }
+}
+
+/// <summary>
 /// Сверка импорта не сошлась (фаза Д1): в БД не то число строк, что в файле-протоколе.
 /// Берётся ПОСЛЕДНЯЯ сверка по каждому соревнованию — предыдущие уже неактуальны.
 /// </summary>
