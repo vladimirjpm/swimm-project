@@ -36,6 +36,7 @@ function readPanelFromUrl(): ModuleKey | null {
   return isModuleKey(p) ? p : null;
 }
 
+
 export default function CompetitionOverview2({
   overview, loading, mediaItems, onOpenTab, onOpenSwim, onOpenClub, onOpenSwimsScoped, onAddMedia,
 }: Props) {
@@ -70,27 +71,42 @@ export default function CompetitionOverview2({
 
   // --- state активного модуля + синк с ?panel= ---
   const [active, setActive] = useState<ModuleKey | null>(readPanelFromUrl);
-  // Дефолт и диплинк ?panel= не должны упираться в выключенный модуль — иначе карточка пустая.
-  const effective: ModuleKey | null =
-    active && visible.has(active) && !isDisabled(active)
-      ? active
-      : modules.find((m) => !isDisabled(m)) ?? null;
 
-  const handleSelect = useCallback((m: ModuleKey) => {
-    setActive(m);
-    const url = new URL(window.location.href);
-    url.searchParams.set('panel', m);
-    window.history.replaceState(null, '', url.toString());
-  }, []);
+  // Выбранный модуль засчитывается, только если он видим и не выключен: и диплинк
+  // ?panel=, и прошлый выбор не должны упираться в пустую карточку.
+  const chosen: ModuleKey | null =
+    active && visible.has(active) && !isDisabled(active) ? active : null;
 
-  // При уходе с таба ?panel= чистит results-main-project (см. handleCompTabChange).
+  // ДЕФОЛТ РАЗНЫЙ ПО МАКЕТАМ, и решает это CSS, а не JS-медиазапрос: оба макета всегда
+  // в DOM, видимость даёт брейкпоинт lg. Мобайл-аккордеон открытым по умолчанию не бывает
+  // (первая карточка отжимала бы остальные плитки за экран), а у мастер-детейла правая
+  // половина обязана что-то показывать — там дефолт остаётся первым доступным модулем.
+  const desktopActive: ModuleKey | null = chosen ?? modules.find((m) => !isDisabled(m)) ?? null;
+  const mobileActive: ModuleKey | null = chosen;
+
+  const selectDesktop = useCallback((m: ModuleKey) => setActive(m), []);
+  // В аккордеоне повторный тап по открытой плитке закрывает её — раз «всё закрыто»
+  // штатное состояние, в него надо уметь вернуться.
+  const selectMobile = useCallback(
+    (m: ModuleKey) => setActive((prev) => (prev === m ? null : m)),
+    [],
+  );
+
+  // ?panel= пишем ТОЛЬКО по явному выбору пользователя, а не по дефолту: какой макет
+  // сейчас на экране, JS тут не знает, и ссылка не должна обещать карточку, которой
+  // в мобайле не открыто. При уходе с таба параметр чистит results-main-project
+  // (см. handleCompTabChange).
   useEffect(() => {
-    if (effective && readPanelFromUrl() !== effective) {
-      const url = new URL(window.location.href);
-      url.searchParams.set('panel', effective);
-      window.history.replaceState(null, '', url.toString());
+    const url = new URL(window.location.href);
+    if (chosen) {
+      if (readPanelFromUrl() === chosen) return;
+      url.searchParams.set('panel', chosen);
+    } else {
+      if (!url.searchParams.has('panel')) return;
+      url.searchParams.delete('panel');
     }
-  }, [effective]);
+    window.history.replaceState(null, '', url.toString());
+  }, [chosen]);
 
   if (!overview) {
     return (
@@ -215,12 +231,12 @@ export default function CompetitionOverview2({
     }
   };
 
-  const tile = (m: ModuleKey) => (
+  const tile = (m: ModuleKey, activeKey: ModuleKey | null, onSelect: (m: ModuleKey) => void) => (
     <ModuleTile
       key={m}
       module={m}
-      active={m === effective}
-      onSelect={handleSelect}
+      active={m === activeKey}
+      onSelect={onSelect}
       disabled={isDisabled(m)}
       disabledReason="No awards at this competition — High Point is not contested"
       {...tileProps[m]}
@@ -237,19 +253,21 @@ export default function CompetitionOverview2({
           className="flex flex-col gap-0.5 rounded-[12px] p-0 overflow-visible"
           style={{ background: 'var(--theme-mode-border)' }}
         >
-          {modules.map(tile)}
+          {modules.map((m) => tile(m, desktopActive, selectDesktop))}
         </div>
         <div className="min-w-0">
-          {effective && <div className={`ov2-module ov2-module--${effective}`}>{renderCard(effective)}</div>}
+          {desktopActive && (
+            <div className={`ov2-module ov2-module--${desktopActive}`}>{renderCard(desktopActive)}</div>
+          )}
         </div>
       </div>
 
-      {/* Мобайл 9f: аккордеон — карточка ПОД своей плиткой */}
+      {/* Мобайл 9f: аккордеон — карточка ПОД своей плиткой; по умолчанию всё закрыто */}
       <div className="flex flex-col gap-1 lg:hidden" role="tablist" aria-label="Overview modules">
         {modules.map((m) => (
           <React.Fragment key={m}>
-            {tile(m)}
-            {m === effective && (
+            {tile(m, mobileActive, selectMobile)}
+            {m === mobileActive && (
               <div className={`ov2-module ov2-module--${m} mt-1 mb-1`}>{renderCard(m)}</div>
             )}
           </React.Fragment>
