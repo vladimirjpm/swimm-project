@@ -188,6 +188,19 @@
                     }
                 </label>
             </div>
+
+            <label class="mt-4 flex items-start gap-2">
+                <input asp-for="Input.ClubPointsDisabled" type="checkbox" class="mt-0.5" />
+                <span class="text-xs text-admin-text">
+                    Клубный зачёт не ведётся
+                    <span class="block text-[11px] text-admin-text-muted">
+                        Лига, товарищеский старт, отборочные — очки клубам тут никто не считает.
+                        Реестр перестаёт считать отсутствие правила пропуском
+                        (<a href="/Admin/Health" class="text-admin-accent hover:underline">Health</a>).
+                        На расчёт очков галочка не влияет.
+                    </span>
+                </span>
+            </label>
         </div>
 
         <div class="mt-5 flex flex-wrap gap-3">

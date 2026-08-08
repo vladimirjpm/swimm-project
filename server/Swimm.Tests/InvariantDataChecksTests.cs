@@ -195,4 +195,26 @@ public class InvariantDataChecksTests
         Assert.Equal(1, outcome.Total);
         Assert.Contains("Meet", Assert.Single(outcome.Items).Message);
     }
+
+    [Fact]
+    public async Task NoClubPointRule_SkipsCompetitionsWhereStandingsAreNotKept()
+    {
+        // Решение Р19: «зачёт не ведётся» — законное состояние (лиги, товарищеские старты).
+        // Без пометки проверка звала чинить их наравне с настоящими пропусками и кричала волком.
+        await using var db = CreateDb(nameof(NoClubPointRule_SkipsCompetitionsWhereStandingsAreNotKept));
+        var (comp, style, club, swimmer) = await SeedAsync(db);
+
+        comp.ClubPointsDisabled = true;
+        db.Results.Add(new ResultRecord
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer.Id, ClubId = club.Id, StyleId = style.Id,
+            Distance = "50", Gender = "male", CompetitionDate = new DateTime(2026, 6, 1)
+        });
+        await db.SaveChangesAsync();
+
+        var outcome = await new CompetitionWithoutClubPointRuleCheck(db).RunAsync();
+
+        Assert.Equal(0, outcome.Total);
+        Assert.Empty(outcome.Items);
+    }
 }

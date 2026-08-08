@@ -101,6 +101,10 @@ public sealed class EmptyClubCheck(IDataQualityService quality) : IDataCheck
 /// числом. Обнаружить это можно только по странным суммам Top Clubs, поэтому индикатор
 /// и просился в реестр.
 ///
+/// Соревнования с пометкой «клубный зачёт не ведётся» (<c>ClubPointsDisabled</c>) в находки
+/// не идут: лиги и товарищеские старты живут без зачёта законно, и до появления пометки
+/// проверка звала чинить их наравне с настоящими пропусками (решение Р19).
+///
 /// Правило ПЛОВЦОВ сознательно не проверяем: «не привязано → legacy-расчёт по FINA» —
 /// легитимный режим (masters и Маккабиада живут так намеренно), и находка по каждому
 /// такому соревнованию была бы ложной тревогой.
@@ -120,7 +124,8 @@ public sealed class CompetitionWithoutClubPointRuleCheck(SwimmDbContext db) : ID
         // Пустые соревнования пропускаем: считать там нечего, и про них уже кричит
         // отдельная проверка competitions.empty — две находки на одну причину только шумят.
         var rows = await db.Competitions.AsNoTracking()
-            .Where(c => c.PointRuleClubsId == null && db.Results.Any(r => r.CompetitionId == c.Id))
+            .Where(c => c.PointRuleClubsId == null && !c.ClubPointsDisabled
+                        && db.Results.Any(r => r.CompetitionId == c.Id))
             .Select(c => new
             {
                 c.Id, c.Name, c.Date, c.IsMasters,

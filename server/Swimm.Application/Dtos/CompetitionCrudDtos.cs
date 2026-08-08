@@ -16,6 +16,8 @@ public interface ICompetitionFlags
     /// <summary>Чемпионат Израиля (ручной флаг соревнования) — бейдж 🏆.</summary>
     bool IsChampionship { get; }
     bool ShowCombineAllResults { get; }
+    /// <summary>Клубный зачёт тут не ведётся (лига, товарищеский старт).</summary>
+    bool ClubPointsDisabled { get; }
 }
 
 /// <summary>Строка списка соревнований (Competitions/Index).</summary>
@@ -33,6 +35,8 @@ public sealed class CompetitionListItemDto : ICompetitionFlags
     /// <summary>Чемпионат Израиля (ручной флаг).</summary>
     public bool IsChampionship { get; set; }
     public bool ShowCombineAllResults { get; set; }
+    /// <summary>Клубный зачёт тут не ведётся — правило очков и не нужно.</summary>
+    public bool ClubPointsDisabled { get; set; }
     public int? EventId { get; set; }
     public string? EventName { get; set; }
     public int? DayNumber { get; set; }
@@ -96,6 +100,8 @@ public sealed class CompetitionRowDto : ICompetitionFlags
     /// <summary>Чемпионат Израиля (ручной флаг).</summary>
     public bool IsChampionship { get; set; }
     public bool ShowCombineAllResults { get; set; }
+    /// <summary>Клубный зачёт не ведётся — общий флаг дней события.</summary>
+    public bool ClubPointsDisabled { get; set; }
 
     /// <summary>Категории события = общие для всех дней.</summary>
     public List<CategoryTagDto> Categories { get; set; } = [];
@@ -139,6 +145,9 @@ public sealed class CompetitionEditDto
     /// <summary>Явная привязка к правилу High Point; null — подбор по дате и типу.</summary>
     public int? PointRuleSwimmersId { get; set; }
 
+    /// <summary>Клубный зачёт тут не ведётся — отличает «не надо» от «забыли привязать».</summary>
+    public bool ClubPointsDisabled { get; set; }
+
     /// <summary>Сколько дней у события (1 — одиночное соревнование). Для операции «проставить всем дням».</summary>
     public int EventDayCount { get; set; } = 1;
 }
@@ -179,6 +188,9 @@ public sealed class CompetitionInputDto
 
     /// <summary>Привязка к правилу High Point; null — «Авто».</summary>
     public int? PointRuleSwimmersId { get; set; }
+
+    /// <summary>Клубный зачёт тут не ведётся — правило не нужно, реестр не считает это пропуском.</summary>
+    public bool ClubPointsDisabled { get; set; }
 }
 
 /// <summary>
@@ -200,6 +212,8 @@ public sealed class CompetitionQuickEditDto
     public int? PointRuleClubsId { get; set; }
     /// <summary>Правило High Point; null — «Авто».</summary>
     public int? PointRuleSwimmersId { get; set; }
+    /// <summary>Клубный зачёт тут не ведётся (общее для всех дней события).</summary>
+    public bool ClubPointsDisabled { get; set; }
 }
 
 /// <summary>Результат мутации: успех + Id + сообщение об ошибке валидации (для показа в форме).</summary>

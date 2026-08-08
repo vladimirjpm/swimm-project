@@ -349,6 +349,9 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                     // Чемпионат — если хоть один день помечен: регламент у события один.
                     IsChampionship = days.Any(d => d.IsChampionship),
                     ShowCombineAllResults = days.All(d => d.ShowCombineAllResults),
+                    // «Не ведётся» у события = у ВСЕХ его дней: один день с зачётом делает
+                    // событие зачётным, иначе флаг соврал бы про остальные.
+                    ClubPointsDisabled = days.All(d => d.ClubPointsDisabled),
                 };
             }
             return new CompetitionRowDto { Single = h };
@@ -443,6 +446,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         IsAward = c.IsAward,
         IsChampionship = c.IsChampionship,
         ShowCombineAllResults = c.ShowCombineAllResults,
+        ClubPointsDisabled = c.ClubPointsDisabled,
         PointRuleClubsId = c.PointRuleClubsId,
         PointRuleSwimmersId = c.PointRuleSwimmersId,
         EventId = c.EventId,
@@ -493,6 +497,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             StandingKindOverride = c.StandingKindOverride,
             PointRuleClubsId = c.PointRuleClubsId,
             PointRuleSwimmersId = c.PointRuleSwimmersId,
+            ClubPointsDisabled = c.ClubPointsDisabled,
             EventDayCount = c.EventId == null
                 ? 1
                 : await _db.Competitions.CountAsync(x => x.EventId == c.EventId),
@@ -666,6 +671,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             : input.StandingKindOverride.Trim();
         comp.PointRuleClubsId = input.PointRuleClubsId;
         comp.PointRuleSwimmersId = input.PointRuleSwimmersId;
+        comp.ClubPointsDisabled = input.ClubPointsDisabled;
     }
 
     /// <summary>
@@ -880,7 +886,8 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 ShowCombineAllResults = input.ShowCombineAllResults,
                 CategoryKeys = input.CategoryKeys,
                 PointRuleClubsId = input.PointRuleClubsId,
-                PointRuleSwimmersId = input.PointRuleSwimmersId
+                PointRuleSwimmersId = input.PointRuleSwimmersId,
+                ClubPointsDisabled = input.ClubPointsDisabled
             });
             // Первая же ошибка — наружу: молча применить «половину дней» хуже, чем сказать.
             if (!result.Success) return result;

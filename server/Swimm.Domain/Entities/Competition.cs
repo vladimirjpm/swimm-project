@@ -109,6 +109,17 @@ public class Competition
   [MaxLength(20)]
   public string? StandingKindOverride { get; set; }
 
+  /// <summary>
+  /// Клубный зачёт на этом соревновании НЕ ВЕДЁТСЯ — очки клубам тут не считает никто
+  /// (лиги, товарищеские старты, отборочные). Отличает «правило не нужно» от «правило
+  /// забыли привязать»: в БД оба выглядели как <see cref="PointRuleClubsId"/> = null, и
+  /// проверка реестра не могла их различить (решение Р19, docs/data-integrity.md).
+  ///
+  /// Пометка, а не выключатель: расчёт очков она пока НЕ трогает — это отдельное решение,
+  /// меняющее цифры на публичных страницах.
+  /// </summary>
+  public bool ClubPointsDisabled { get; set; }
+
   /// <summary>Правило очков пловца (High Point). null — legacy-расчёт по FINA.</summary>
   public int? PointRuleSwimmersId { get; set; }
 

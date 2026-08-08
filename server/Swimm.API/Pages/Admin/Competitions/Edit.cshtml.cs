@@ -109,6 +109,8 @@ public class EditModel : PageModel
         public int? PointRuleClubsId { get; set; }
         /// <summary>Правило High Point; null — «Авто».</summary>
         public int? PointRuleSwimmersId { get; set; }
+        /// <summary>Клубный зачёт тут не ведётся — правило и не нужно.</summary>
+        public bool ClubPointsDisabled { get; set; }
     }
 
     public async Task<IActionResult> OnGetAsync()
@@ -280,7 +282,8 @@ public class EditModel : PageModel
         StandingKindOverride = d.StandingKindOverride,
         CategoryKeys = d.CategoryKeys,
         PointRuleClubsId = d.PointRuleClubsId,
-        PointRuleSwimmersId = d.PointRuleSwimmersId
+        PointRuleSwimmersId = d.PointRuleSwimmersId,
+        ClubPointsDisabled = d.ClubPointsDisabled
     };
 
     private static CompetitionInputDto ToInput(CompetitionForm f) => new()
@@ -297,6 +300,7 @@ public class EditModel : PageModel
         StandingKindOverride = f.StandingKindOverride,
         CategoryKeys = f.CategoryKeys ?? [],
         PointRuleClubsId = f.PointRuleClubsId,
-        PointRuleSwimmersId = f.PointRuleSwimmersId
+        PointRuleSwimmersId = f.PointRuleSwimmersId,
+        ClubPointsDisabled = f.ClubPointsDisabled
     };
 }

@@ -506,6 +506,11 @@ else
                                             <input type="checkbox" name="showCombineAllResults" value="true" checked="@(u.Db.IsEvent ? u.Db.ShowCombineAllResults : head.ShowCombineAllResults)" class="w-4 h-4 cursor-pointer" />
                                             <span class="text-admin-text">Combine all results</span>
                                         </label>
+                                        <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none"
+                                               title="Лига, товарищеский старт — очки клубам тут никто не считает. Реестр перестаёт требовать правило очков.">
+                                            <input type="checkbox" name="clubPointsDisabled" value="true" checked="@(u.Db.IsEvent ? u.Db.ClubPointsDisabled : head.ClubPointsDisabled)" class="w-4 h-4 cursor-pointer" />
+                                            <span class="text-admin-text">Клубный зачёт не ведётся</span>
+                                        </label>
                                     </div>
                                     <div class="mt-3 flex flex-wrap items-end gap-3">
                                         <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">

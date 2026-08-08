@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Swimm.Application.Abstractions;
@@ -122,7 +122,8 @@ public class IndexModel : PageModel
     /// </summary>
     public async Task<IActionResult> OnPostQuickSaveAsync(int id, string poolType,
         bool isAward, bool isChampionship, bool showCombineAllResults,
-        List<string>? categoryKeys, int? pointRuleClubsId, int? pointRuleSwimmersId)
+        List<string>? categoryKeys, int? pointRuleClubsId, int? pointRuleSwimmersId,
+        bool clubPointsDisabled = false)
     {
         var result = await _repo.QuickUpdateAsync(new CompetitionQuickEditDto
         {
@@ -133,7 +134,8 @@ public class IndexModel : PageModel
             ShowCombineAllResults = showCombineAllResults,
             CategoryKeys = categoryKeys ?? [],
             PointRuleClubsId = pointRuleClubsId,
-            PointRuleSwimmersId = pointRuleSwimmersId
+            PointRuleSwimmersId = pointRuleSwimmersId,
+            ClubPointsDisabled = clubPointsDisabled
         });
 
         if (!result.Success)
@@ -146,7 +148,8 @@ public class IndexModel : PageModel
         await _audit.LogAsync("competition.quick-edit", "Competition", id.ToString(),
             $"Быстрая правка из списка (#{id}): бассейн={poolType}, awards={isAward}, " +
             $"чемпионат={isChampionship}, combine={showCombineAllResults}, " +
-            $"категории=[{string.Join(",", categoryKeys ?? [])}], дней изменено: {result.Id}");
+            $"категории=[{string.Join(",", categoryKeys ?? [])}], " +
+            $"клубный зачёт={(clubPointsDisabled ? "не ведётся" : "ведётся")}, дней изменено: {result.Id}");
 
         TempData["Flash"] = result.Id > 1
             ? $"Сохранено, применено ко всем дням события: {result.Id}"
