@@ -2,6 +2,7 @@ import React from 'react';
 import CompetitionHeaderTop from './competition-header-top';
 import CompetitionPersonalStrip from './competition-personal-strip';
 import CompetitionTabs from './competition-tabs';
+import CombineBar from './combine-bar';
 import type { CompetitionHeaderProps } from './types';
 
 // Контейнер шапки соревнования (design_handoff_competition_overview, вариант 1b) —
@@ -58,6 +59,9 @@ export default function CompetitionHeader({
         onTabChange={onTabChange}
         mediaCount={mediaCount}
       />
+      {/* Combine All Results — полоса сразу под табами, перед контентом таба (handoff 12b).
+          Сама решает, рендериться ли (только там, где тумблер был доступен раньше). */}
+      <CombineBar />
     </div>
   );
 }

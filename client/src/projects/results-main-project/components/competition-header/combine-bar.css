@@ -1,0 +1,123 @@
+/* Combine All Results — полоса под табами (design_handoff_competition_overview_combine, 12b).
+   Цвета — ТОЛЬКО токены --theme-combine-* из index.css (light и dark), здесь ни одного hex,
+   кроме декоративных белых бликов/knob. Полоса целиком — один control role="switch". */
+
+.combine-bar {
+  position: relative;
+  overflow: hidden;
+  display: block;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--theme-combine-border);
+  background: var(--theme-combine-bg);
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+}
+
+.combine-bar__inner {
+  position: relative;
+  min-height: 44px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+/* Декоративный блик */
+.combine-bar__shimmer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 30%;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+  animation: combine-shimmer 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes combine-shimmer {
+  0% { transform: translateX(-30%); }
+  100% { transform: translateX(430%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .combine-bar__shimmer { display: none; animation: none; }
+}
+:root[data-mode="dark"] .combine-bar__shimmer {
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.10), transparent);
+}
+
+.combine-bar__icon {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--theme-combine-icon-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  box-shadow: 0 1px 6px rgba(247, 201, 72, 0.5);
+}
+
+.combine-bar__text {
+  min-width: 0;
+  flex: 1 1 260px;
+  display: flex;
+  flex-direction: column;
+}
+.combine-bar__title {
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--theme-combine-title);
+}
+.combine-bar__hint {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--theme-combine-text);
+}
+
+.combine-bar__state {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--theme-combine-text);
+}
+.combine-bar__toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--theme-combine-toggle-off);
+  transition: background-color 0.15s ease;
+}
+.combine-bar__toggle::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease;
+}
+/* Состояние On — от aria-checked самой полосы: один источник правды у control и у вида. */
+.combine-bar[aria-checked="true"] .combine-bar__toggle {
+  background: var(--theme-combine-toggle-on);
+}
+.combine-bar[aria-checked="true"] .combine-bar__toggle::after {
+  transform: translateX(20px);
+}
+
+@media (max-width: 639px) {
+  .combine-bar__icon { width: 32px; height: 32px; font-size: 15px; }
+  .combine-bar__title { font-size: 13.5px; }
+  .combine-bar__hint { font-size: 11.5px; }
+}

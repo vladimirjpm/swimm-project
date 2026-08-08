@@ -109,6 +109,15 @@
   --theme-comp-tile-strip-bg: color-mix(in srgb, var(--theme-mode-surface) 92%, transparent);
   --theme-comp-tile-age-bg: var(--theme-mode-surface);
   --theme-comp-tile-age-text: var(--theme-primary);
+  /* Полоса Combine All Results под табами (design_handoff_competition_overview_combine, 12b):
+     та же золотая гамма, что у персональной полосы (title↔bg — контраст ≥4.5). */
+  --theme-combine-bg: linear-gradient(90deg, #fff3c9, #fffdf6 60%);
+  --theme-combine-border: rgba(212, 175, 55, 0.5);
+  --theme-combine-title: #4a3800;
+  --theme-combine-text: #8a6d1a;                /* подпись и «Off» = --theme-personal-accent */
+  --theme-combine-icon-bg: linear-gradient(135deg, #ffe08a, #eab308);
+  --theme-combine-toggle-off: rgba(138, 109, 26, 0.3);
+  --theme-combine-toggle-on: #10b981;           /* success */
   /* Статусный цвет LIVE: зависит от режима, НЕ от контекста Training/Competition
      (см. design_handoff_category_selector/README.md) */
   --status-live: #148253;
@@ -166,6 +175,15 @@
      заливка поверх primary давала белым по средне-синему всего ~3.4:1. */
   --theme-comp-tile-age-bg: color-mix(in srgb, var(--theme-mode-accent-text) 88%, transparent);
   --theme-comp-tile-age-text: var(--theme-primary);
+  /* Combine-полоса в dark: тёплый тёмный фон (как --theme-personal-bg), текст светлеет —
+     тёмный #4a3800 на тёмном фоне нечитаем. */
+  --theme-combine-bg: linear-gradient(90deg, #2e2617, #241f16 60%);
+  --theme-combine-border: rgba(212, 175, 55, 0.4);
+  --theme-combine-title: #f5e2a8;
+  --theme-combine-text: #e3c15c;
+  --theme-combine-icon-bg: linear-gradient(135deg, #f7d979, #c8930f);
+  --theme-combine-toggle-off: rgba(227, 193, 92, 0.3);
+  --theme-combine-toggle-on: #3ddc97;
   --status-live: #3ddc97;
   --status-live-bg: rgba(61, 220, 151, 0.10);
   --status-live-border: rgba(61, 220, 151, 0.45);
