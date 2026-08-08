@@ -118,6 +118,15 @@
   --theme-combine-icon-bg: linear-gradient(135deg, #ffe08a, #eab308);
   --theme-combine-toggle-off: rgba(138, 109, 26, 0.3);
   --theme-combine-toggle-on: #10b981;           /* success */
+  /* Спорное время (И11) в «стене рекордов»: чип «Under review» + caution-лента карточки
+     (design_handoff_competition_overview_rec-warning, 13a). Янтарь — единственная семантика
+     «под проверкой», с медальным золотом --deep-gold не смешивается. */
+  --theme-flag-text: #b45309;
+  --theme-flag-chip-bg: rgba(245, 158, 11, 0.16);
+  --theme-flag-chip-border: rgba(245, 158, 11, 0.4);
+  --theme-flag-border: rgba(240, 180, 41, 0.55);
+  --theme-flag-tape-a: #f0b429;
+  --theme-flag-tape-b: #2a2416;
   /* Статусный цвет LIVE: зависит от режима, НЕ от контекста Training/Competition
      (см. design_handoff_category_selector/README.md) */
   --status-live: #148253;
@@ -184,6 +193,14 @@
   --theme-combine-icon-bg: linear-gradient(135deg, #f7d979, #c8930f);
   --theme-combine-toggle-off: rgba(227, 193, 92, 0.3);
   --theme-combine-toggle-on: #3ddc97;
+  /* Спорное время в dark: янтарь светлеет (на тёмной подложке #b45309 даёт ~3:1),
+     тёмная полоса ленты — светлее фона карточки, иначе лента сливается в сплошную. */
+  --theme-flag-text: #fbbf24;
+  --theme-flag-chip-bg: rgba(245, 158, 11, 0.18);
+  --theme-flag-chip-border: rgba(245, 158, 11, 0.45);
+  --theme-flag-border: rgba(240, 180, 41, 0.5);
+  --theme-flag-tape-a: #f0b429;
+  --theme-flag-tape-b: #3a3220;
   --status-live: #3ddc97;
   --status-live-bg: rgba(61, 220, 151, 0.10);
   --status-live-border: rgba(61, 220, 151, 0.45);

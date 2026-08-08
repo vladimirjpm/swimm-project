@@ -260,7 +260,11 @@ public class ClubPublicRepository : IClubPublicRepository
                         AgeLabel = x.Age.Label,
                         AgeOrder = x.Age.Order
                     })
-                    .OrderBy(b => b.AgeOrder)
+                    // От старших к младшим (решение Влада): «adults»/мастерс впереди, дети
+                    // дальше. «n/a» (нет года рождения, Order = 999) держим последним —
+                    // при обычном убывании он бы вылез в начало.
+                    .OrderBy(b => b.AgeKey == "n/a" ? 1 : 0)
+                    .ThenByDescending(b => b.AgeOrder)
                     .ToList()
             })
             .OrderBy(g => g.StyleName)

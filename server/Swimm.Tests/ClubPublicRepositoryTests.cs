@@ -357,6 +357,33 @@ public class ClubPublicRepositoryTests
     }
 
     [Fact]
+    public async Task SeasonBest_AgeStepsGoFromOldestToYoungest_UnknownStillLast()
+    {
+        using var db = CreateDb(nameof(SeasonBest_AgeStepsGoFromOldestToYoungest_UnknownStillLast));
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var kid = MakeSwimmer(club, "Kid", "One", 2016);      // 10 лет в сезоне 2025/26
+        var teen = MakeSwimmer(club, "Teen", "One", 2012);    // 14
+        var unknown = MakeSwimmer(club, "NoYear", "One", 0);  // год рождения не заполнен
+        db.AddRange(club, kid, teen, unknown);
+        var comp = MakeCompetition("25m");
+        db.AddRange(comp, FreestyleStyle());
+        await db.SaveChangesAsync();
+
+        db.AddRange(
+            Swim(comp, club, kid, new DateTime(2026, 2, 15), timeMs: 40_000),
+            Swim(comp, club, teen, new DateTime(2026, 2, 15), timeMs: 39_000),
+            Swim(comp, club, unknown, new DateTime(2026, 2, 15), timeMs: 42_000));
+        await db.SaveChangesAsync();
+
+        var section = Assert.Single((await Repo(db).GetSeasonBestAsync(club.Id, null, 2025)).Data);
+
+        // Старшие впереди младших…
+        Assert.Equal(new[] { "14", "10", "n/a" }, section.Items.Select(i => i.AgeKey).ToArray());
+        // …но «n/a» (Order = 999) остаётся в конце, а не вылезает вперёд при убывании.
+        Assert.Equal("n/a", section.Items[^1].AgeKey);
+    }
+
+    [Fact]
     public async Task SeasonBest_ExcludeTimeFail_Relays_And_SuspectReason()
     {
         using var db = CreateDb(nameof(SeasonBest_ExcludeTimeFail_Relays_And_SuspectReason));

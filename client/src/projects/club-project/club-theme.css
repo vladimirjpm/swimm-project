@@ -140,6 +140,22 @@
 .deep-record-tile { position: relative; border-radius: var(--deep-radius-tile); padding: 14px 16px; }
 .deep-record-tile--m { background: var(--deep-male-soft); border: 1px solid var(--deep-male-border); }
 .deep-record-tile--f { background: var(--deep-female-soft); border: 1px solid var(--deep-female-border); }
+/* Спорный рекорд (13a): янтарная рамка вместо гендерной + caution-ленты сверху и снизу.
+   Подложка ♀/♂, время, имя и дата не меняются — метка не должна маскировать сам рекорд.
+   Паддинг тела уменьшен на высоту лент, иначе плитка выше соседних в сетке. */
+.deep-record-tile--flagged { border-color: var(--theme-flag-border); overflow: hidden; padding: 0; }
+.deep-record-tile__body { padding: 12px 16px; }
+.deep-record-tile__tape {
+  display: block;
+  height: 7px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--theme-flag-tape-a) 0 9px,
+    var(--theme-flag-tape-b) 9px 18px
+  );
+  opacity: .9;
+  pointer-events: none;
+}
 
 /* ── Мобайл (CARDS.md «Мобайл (390)») ────────────────────────────────────────
    Сегменты ранга мельче: 5×7 вместо 8×10. Без этого строка грида (кружок группы +

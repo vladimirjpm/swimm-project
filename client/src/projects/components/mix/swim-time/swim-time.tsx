@@ -97,29 +97,54 @@ interface SwimTimeProps {
   quality?: SwimQuality | null;
   /** Классы на само время — типографика остаётся за вызывающим экраном. */
   className?: string;
+  /**
+   * Вид метки: 'icon' — значок ⚠ рядом со временем (по умолчанию, для строк и таблиц);
+   * 'chip' — подпись «⚠ Under review» (стена рекордов, вариант 13a): голый значок там
+   * не считывался, а места на подпись хватает. Объяснялка у обоих одна.
+   */
+  marker?: 'icon' | 'chip';
 }
 
-const UI_SwimTime: React.FC<SwimTimeProps> = ({ time, quality, className = '' }) => {
+const UI_SwimTime: React.FC<SwimTimeProps> = ({ time, quality, className = '', marker = 'icon' }) => {
   const [open, setOpen] = React.useState(false);
   if (!quality) return <span className={className}>{time}</span>;
+
+  // Карточки и строки раскрываются по клику — объяснялка не должна их трогать.
+  const openInfo = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setOpen(true);
+  };
 
   return (
     <>
       <span className={className}>{time}</span>
+      {marker === 'chip' ? (
+        <button
+          type="button"
+          onClick={openInfo}
+          aria-label={TITLE[quality.kind].en}
+          className="inline-flex shrink-0 items-center gap-[5px] whitespace-nowrap rounded-full px-[10px] py-[3px] text-[11px] font-extrabold leading-none hover:opacity-80"
+          style={{
+            background: 'var(--theme-flag-chip-bg)',
+            color: 'var(--theme-flag-text)',
+            border: '1px solid var(--theme-flag-chip-border)',
+          }}
+        >
+          <span aria-hidden="true">⚠</span>
+          Under review
+        </button>
+      ) : (
       <button
         type="button"
-        onClick={(e) => {
-          // Карточки и строки раскрываются по клику — объяснялка не должна их трогать.
-          e.stopPropagation();
-          setOpen(true);
-        }}
+        onClick={openInfo}
         aria-label="Quality warning"
-        // Значок, а не подпись: на компактных карточках (Record wall клуба) текста не хватит,
-        // а цвет самого времени уже занят тонами ступени рекорда.
+        // Значок, а не подпись: в строках и таблицах на подпись нет места.
         className="ml-1 align-middle text-[11px] leading-none text-amber-600 hover:opacity-80 dark:text-amber-400"
       >
         ⚠
       </button>
+      )}
       <UI_InfoPopup
         open={open}
         onClose={() => setOpen(false)}

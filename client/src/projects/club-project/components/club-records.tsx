@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { useClubSeasonBest, type ClubSeasonBestGroup } from '../../../hooks/useClubSeasonBest';
+import React, { useMemo, useState } from 'react';
+import { useClubSeasonBest, type ClubSeasonBestItem } from '../../../hooks/useClubSeasonBest';
 import { routes } from '../../../utils/routes';
-import { ClubRecordCard, type PoolFilter } from './club-record-card';
-import UI_SwimTime from '../../components/mix/swim-time/swim-time';
+import { ClubRecordCard, ClubRecordSection, ClubRecordTile, type PoolFilter } from './club-record-card';
+import { compareDiscipline, groupByAge } from './age-sections';
 
 /**
  * Season best — заплывы пловцов клуба, которые в этом сезоне ЛУЧШИЕ ПО СТРАНЕ в своём слоте
@@ -28,12 +28,12 @@ interface Props {
   clubId: number;
 }
 
-/** Заголовок секции: «50m breaststroke · 25M · ♀». */
-function groupTitle(g: ClubSeasonBestGroup): string {
+/** Подпись дисциплины на плитке: «50m breaststroke · 25M». */
+function tileDiscipline(it: ClubSeasonBestItem): string {
   // Style.Name из БД сырой (individual_medley) — только косметика показа.
-  const style = g.style_name.replace(/_/g, ' ');
-  const pool = g.pool_type ? ` · ${g.pool_type.toUpperCase()}` : '';
-  return `${g.distance}m ${style}${pool}`;
+  const style = it.style_name.replace(/_/g, ' ');
+  const pool = it.pool_type ? ` · ${it.pool_type.toUpperCase()}` : '';
+  return `${it.distance}m ${style}${pool}`;
 }
 
 function ClubRecords({ clubId }: Props) {
@@ -43,12 +43,31 @@ function ClubRecords({ clubId }: Props) {
     pool === 'all' ? null : pool,
   );
 
+  // Карточка режется по возрасту, а не по дисциплине (как Record wall): сервер отдаёт
+  // группы по дисциплинам, поэтому здесь их разворачиваем и пересобираем по ступеням.
+  const sections = useMemo(
+    () =>
+      groupByAge(
+        groups.flatMap((g) => g.items),
+        (it) => ({ ageKey: it.age_key }),
+      ).map((s) => ({
+        ...s,
+        items: [...s.items].sort((a, b) =>
+          compareDiscipline(
+            { style: a.style_name, distance: `${a.distance}m`, poolType: a.pool_type },
+            { style: b.style_name, distance: `${b.distance}m`, poolType: b.pool_type },
+          ),
+        ),
+      })),
+    [groups],
+  );
+
   return (
     <ClubRecordCard
       title={seasonLabel ? `Season ${seasonLabel} best` : 'Season best'}
       subtitle={`Club swimmers ranked #1 in Israel this season · among ${meets} meets in our database`}
       count={total}
-      countLabel="#1 IN IL"
+      countLabel="SB in IL"
       pool={pool}
       onPool={setPool}
       isEmpty={groups.length === 0 && !loading}
@@ -57,69 +76,24 @@ function ClubRecords({ clubId }: Props) {
       plainBody
     >
       <div className="flex flex-col gap-4">
-        {groups.map((g) => (
-          <div key={`${g.style_name}-${g.distance}-${g.pool_type}-${g.gender}`}>
-            <div className="flex items-baseline gap-2">
-              <span
-                className="text-[12px] font-extrabold"
-                style={{ color: 'var(--deep-text)' }}
-              >
-                {groupTitle(g)}
-              </span>
-              <span
-                className="text-[12px]"
-                style={{ color: g.gender === 'female' ? 'var(--deep-female)' : 'var(--deep-male)' }}
-              >
-                {g.gender === 'female' ? '♀' : '♂'}
-              </span>
-            </div>
-
-            {/* Ряд возрастных ступеней: по возрастанию возраста, «n/a» в конце. */}
-            <div className="mt-1.5 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {g.items.map((it) => (
-                <a
-                  key={it.age_key}
-                  href={routes.swimmer(it.swimmer_id)}
-                  className={`deep-record-tile block no-underline ${
-                    g.gender === 'female' ? 'deep-record-tile--f' : 'deep-record-tile--m'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <span
-                      className="truncate text-[10.5px] font-black uppercase tracking-wide"
-                      style={{ color: 'var(--deep-accent)' }}
-                    >
-                      {it.age_label}
-                    </span>
-                    {/* Плитка попадает сюда, только если это первое время страны в слоте. */}
-                    <span
-                      className="shrink-0 text-[10px] font-black"
-                      style={{ color: 'var(--deep-gold)' }}
-                      title="Best time in Israel this season (among imported meets)"
-                    >
-                      #1 IL
-                    </span>
-                  </div>
-                  <div
-                    className="mt-1 text-[19px] leading-none tabular-nums"
-                    style={{ fontFamily: 'var(--deep-font-display)', color: 'var(--deep-text)' }}
-                  >
-                    <UI_SwimTime
-                      time={it.time_original}
-                      quality={it.suspect_reason ? { kind: 'protocol', reason: it.suspect_reason } : null}
-                    />
-                  </div>
-                  <div
-                    className="mt-1.5 truncate text-[11.5px] font-bold"
-                    style={{ color: 'var(--deep-text)' }}
-                    title={it.swimmer_name}
-                  >
-                    {it.swimmer_name}
-                  </div>
-                </a>
-              ))}
-            </div>
-          </div>
+        {sections.map((section) => (
+          <ClubRecordSection key={section.key} label={section.label} count={section.items.length}>
+            {section.items.map((it) => (
+              <ClubRecordTile
+                key={`${it.style_name}-${it.distance}-${it.pool_type}-${it.gender}-${it.age_key}`}
+                gender={it.gender}
+                // Ступень «первый в Израиле» стоит там же, где в Record wall ступень рекорда.
+                topLine="SB IL"
+                topTone="var(--deep-gold)"
+                secondLine={tileDiscipline(it)}
+                time={it.time_original}
+                quality={it.suspect_reason ? { kind: 'protocol', reason: it.suspect_reason } : null}
+                name={it.swimmer_name}
+                footnote={it.date}
+                href={routes.swimmer(it.swimmer_id)}
+              />
+            ))}
+          </ClubRecordSection>
         ))}
       </div>
     </ClubRecordCard>

@@ -102,7 +102,12 @@ interface TileProps {
 
 function ClubRecordTile({ gender, topLine, topTone, secondLine, time, name, footnote, href, quality }: TileProps) {
   const isFemale = gender === 'female';
-  const className = `deep-record-tile ${isFemale ? 'deep-record-tile--f' : 'deep-record-tile--m'}`;
+  // Спорное время (13a): плитка получает янтарную рамку и caution-ленты, а метка у времени
+  // становится подписью «Under review» — на стене рекордов голый ⚠ не считывался.
+  const isFlagged = !!quality;
+  const className = `deep-record-tile ${isFemale ? 'deep-record-tile--f' : 'deep-record-tile--m'}${
+    isFlagged ? ' deep-record-tile--flagged' : ''
+  }`;
 
   const body = (
     <>
@@ -128,10 +133,15 @@ function ClubRecordTile({ gender, topLine, topTone, secondLine, time, name, foot
       )}
 
       <div
-        className="mt-1 text-[22px] leading-none tabular-nums"
+        className="mt-1 flex flex-wrap items-center gap-2.5"
         style={{ fontFamily: 'var(--deep-font-display)', color: 'var(--deep-text)' }}
       >
-        <UI_SwimTime time={time} quality={quality} />
+        <UI_SwimTime
+          time={time}
+          quality={quality}
+          marker="chip"
+          className="text-[22px] leading-none tabular-nums"
+        />
       </div>
 
       <div className="mt-2 truncate text-[12px] font-bold" style={{ color: 'var(--deep-text)' }} title={name}>
@@ -143,13 +153,48 @@ function ClubRecordTile({ gender, topLine, topTone, secondLine, time, name, foot
     </>
   );
 
+  // Ленты — декоративные (смысл несёт чип у времени), поэтому aria-hidden.
+  const content = isFlagged ? (
+    <>
+      <span className="deep-record-tile__tape" aria-hidden="true" />
+      <div className="deep-record-tile__body">{body}</div>
+      <span className="deep-record-tile__tape" aria-hidden="true" />
+    </>
+  ) : (
+    body
+  );
+
   return href ? (
     <a href={href} className={`${className} block no-underline`}>
-      {body}
+      {content}
     </a>
   ) : (
-    <div className={className}>{body}</div>
+    <div className={className}>{content}</div>
   );
 }
 
-export { ClubRecordCard, ClubRecordTile };
+/**
+ * Возрастная секция: заголовок ступени + сетка плиток. Обе карточки времён режутся
+ * по возрасту (age-sections.ts), поэтому раскладка секции общая — как и форма плитки.
+ */
+function ClubRecordSection({ label, count, children }: {
+  label: string;
+  count: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="flex items-baseline gap-2">
+        <span className="text-[12px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
+          {label}
+        </span>
+        <span className="text-[11px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
+          {count}
+        </span>
+      </div>
+      <div className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-2">{children}</div>
+    </div>
+  );
+}
+
+export { ClubRecordCard, ClubRecordTile, ClubRecordSection };
