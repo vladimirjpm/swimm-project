@@ -99,6 +99,7 @@ public static class DependencyInjection
         services.AddScoped<IDataCheck, ClubDedupCheck>();
         services.AddScoped<IDataCheck, SwimmerOrphanCheck>();
         services.AddScoped<IDataCheck, EmptyClubCheck>();
+        services.AddScoped<IDataCheck, MergedClubStillUsedCheck>();
         services.AddScoped<IDataCheck, SwimmerTwoClubsInCompetitionCheck>();
         services.AddScoped<IDataCheck, CompetitionWithoutClubPointRuleCheck>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();

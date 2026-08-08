@@ -106,6 +106,28 @@ public class ImportClubMatchingTests
     }
 
     [Fact]
+    public async Task MergedClubWithEmptyNameEn_NotReused_EvenOnExactMatch()
+    {
+        // Инцидент И-13. Надгробие с ПУСТЫМ NameEn + ивритский протокол (NameEn тоже пустой)
+        // = точное совпадение пары «Name|''». Фоллбек по имени склеенных отсекал, а точный
+        // матч — нет, и merge молча откатывался: 61 надгробие снова набрало 9848 результатов.
+        await using var db = CreateDb(nameof(MergedClubWithEmptyNameEn_NotReused_EvenOnExactMatch));
+        var canon = new Club { Name = "הפועל דולפין נתניה", NameEn = "Hapoel Dolphine Netanya" };
+        db.Clubs.Add(canon);
+        await db.SaveChangesAsync();
+        db.Clubs.Add(new Club { Name = "הפועל דולפין נתניה", NameEn = "", MergedIntoId = canon.Id });
+        await db.SaveChangesAsync();
+
+        await new JsonImportService(db, new NullCache())
+            .ImportAsync(ToStream(new[] { Item("הפועל דולפין נתניה") }));
+
+        // Результат обязан уехать в канон, а не в надгробие, и третий клуб не рождается.
+        var result = await db.Results.SingleAsync();
+        Assert.Equal(canon.Id, result.ClubId);
+        Assert.Equal(2, await db.Clubs.CountAsync());
+    }
+
+    [Fact]
     public async Task DifferentName_StillCreatesOwnClub()
     {
         await using var db = CreateDb(nameof(DifferentName_StillCreatesOwnClub));

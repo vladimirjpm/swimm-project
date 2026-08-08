@@ -189,3 +189,58 @@ public sealed class ReconciliationMismatchCheck(SwimmDbContext db) : IDataCheck
             .ToList());
     }
 }
+
+/// <summary>
+/// Ожившие надгробия: клуб склеен (<c>MergedIntoId</c>), но на нём снова висят результаты
+/// или пловцы.
+///
+/// Инцидент И-13. Merge — мягкий: строка дубля остаётся надгробием, чтобы ссылки на старый Id
+/// не гнили. Импорт склеенные исключал в фоллбеке по имени, но НЕ в точном матче по паре
+/// Name|NameEn — а у надгробия NameEn обычно пустой, как и в ивритском протоколе. Переимпорт
+/// попадал ровно в надгробие, и merge молча откатывался: страница канона теряла половину
+/// истории (клуб #438 показывал зимний чемпионат «Young» на сезон раньше — его зачёт уехал
+/// на надгробие #1291).
+///
+/// Своими силами страница клуба этого не покажет: она читает только канон, а данные лежат
+/// на невидимом клубе. Поэтому нужен именно сторож в реестре.
+/// </summary>
+public sealed class MergedClubStillUsedCheck(SwimmDbContext db) : IDataCheck
+{
+    public string Id => "clubs.merged-still-used";
+    public string Title => "Склеенные клубы с данными";
+    public string Description =>
+        "Клуб склеен в другой, но на нём снова есть результаты/пловцы — значит склейку что-то " +
+        "откатило (обычно переимпорт). Данные надо перевесить на канон и пересчитать зачёты.";
+    public DataCheckSeverity Severity => DataCheckSeverity.Error;
+
+    public async Task<DataCheckOutcome> RunAsync(CancellationToken ct = default)
+    {
+        var rows = await db.Clubs.AsNoTracking()
+            .Where(c => c.MergedIntoId != null)
+            .Select(c => new
+            {
+                c.Id,
+                c.Name,
+                c.MergedIntoId,
+                Results = db.Results.Count(r => r.ClubId == c.Id),
+                Swimmers = db.Swimmers.Count(s => s.ClubId == c.Id),
+                Standings = db.ClubCompetitionStandings.Count(s => s.ClubId == c.Id),
+            })
+            .Where(c => c.Results > 0 || c.Swimmers > 0 || c.Standings > 0)
+            .OrderByDescending(c => c.Results)
+            .ToListAsync(ct);
+
+        if (rows.Count == 0) return DataCheckOutcome.Empty;
+
+        return new DataCheckOutcome(rows.Count, rows
+            .Take(50)
+            .Select(c => new DataCheckItem(
+                "Club", c.Id,
+                $"#{c.Id} {c.Name} → канон #{c.MergedIntoId}",
+                $"результатов {c.Results}, пловцов {c.Swimmers}, строк зачёта {c.Standings}",
+                $"/Admin/Clubs/Edit?id={c.Id}",
+                // Ведём на КАНОН: смотреть надо страницу, которая теряет данные.
+                PublicRoutes.Club(c.MergedIntoId!.Value)))
+            .ToList());
+    }
+}

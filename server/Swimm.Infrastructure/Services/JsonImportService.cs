@@ -444,7 +444,12 @@ public class JsonImportService : IImportService
                 var clubKey = $"{clubName}|{clubNameEn}";
                 if (!clubCache.TryGetValue(clubKey, out var club))
                 {
-                    club = await _db.Clubs.FirstOrDefaultAsync(c => c.Name == clubName && c.NameEn == clubNameEn);
+                    // Склеенные исключены и ЗДЕСЬ, а не только в фоллбеке ниже: у надгробия
+                    // NameEn обычно пустой, ивритский протокол его тоже не приносит — точная
+                    // пара «Name|''» попадала прямо в склеенный клуб, и merge молча
+                    // откатывался (инцидент И-13: 61 надгробие снова с результатами).
+                    club = await _db.Clubs.FirstOrDefaultAsync(
+                        c => c.MergedIntoId == null && c.Name == clubName && c.NameEn == clubNameEn);
 
                     // Фоллбек по ОДНОМУ имени. Ивритский протокол не приносит NameEn, а у
                     // канонического клуба он заполнен (следствие двуязычного импорта), — по паре
