@@ -1,0 +1,83 @@
+/* Deep theme — выбранная цветовая база Swimm (клуб/атлет).
+   Пары dark ↔ light по правилу парных токенов из CLAUDE.md.
+   Правила использования:
+   - accent (cyan/teal) = CTA, активные табы, «мы» в зачёте, winter-чемпионат;
+   - gold = медали, #1 / rank-chip лидера, summer-чемпионат; больше нигде;
+   - male/female — только для рекорд-волла и ♂/♀ бейджей;
+   - glow-эффекты только у выбранного/текущего элемента (1 на карточку). */
+
+.theme-deep {
+  --deep-page-bg: #04182b;
+  --deep-hero-grad: linear-gradient(160deg, #062a4a 0%, #04182b 60%);
+  --deep-waterline: rgba(34,211,238,.14);      /* анимированные вертикали в hero */
+  --deep-card-bg: rgba(255,255,255,.05);
+  --deep-card-bg-raised: rgba(255,255,255,.04); /* вложенные тайлы */
+  --deep-card-border: rgba(255,255,255,.10);
+  --deep-divider: rgba(255,255,255,.07);
+  --deep-text: #ffffff;
+  --deep-text-mute: rgba(255,255,255,.55);
+  --deep-text-faint: rgba(255,255,255,.45);
+  --deep-accent: #22d3ee;
+  --deep-accent-hover: #67e8f9;
+  --deep-accent-ink: #04182b;                  /* текст на accent-кнопке */
+  --deep-accent-soft: rgba(34,211,238,.12);
+  --deep-accent-border: rgba(34,211,238,.4);
+  --deep-accent-glow: 0 0 22px rgba(34,211,238,.18);
+  --deep-accent-grad: linear-gradient(180deg, #22d3ee, #0e7490);
+  --deep-gold: #fbbf24;
+  --deep-gold-soft: rgba(251,191,36,.16);
+  --deep-gold-border: rgba(251,191,36,.4);
+  --deep-gold-grad: linear-gradient(180deg, #fbbf24, #b45309);
+  --deep-danger: #f87171;
+  --deep-danger-soft: rgba(248,113,113,.14);
+  --deep-male: #60a5fa;  --deep-male-soft: rgba(59,130,246,.08);  --deep-male-border: rgba(59,130,246,.3);
+  --deep-female: #f472b6; --deep-female-soft: rgba(236,72,153,.08); --deep-female-border: rgba(236,72,153,.3);
+}
+
+.theme-deep-light {
+  --deep-page-bg: #f4f9fc;
+  --deep-hero-grad: linear-gradient(160deg, #dceff7 0%, #f0f8fc 55%, #f4f9fc 100%);
+  --deep-waterline: rgba(14,116,144,.10);
+  --deep-card-bg: #ffffff;
+  --deep-card-bg-raised: #f9fbfd;
+  --deep-card-border: #e0ecf2;
+  --deep-divider: #eef4f8;
+  --deep-text: #04283e;
+  --deep-text-mute: #7b95a3;
+  --deep-text-faint: #9db0bb;
+  --deep-accent: #0e7490;
+  --deep-accent-hover: #0c6379;
+  --deep-accent-ink: #ffffff;
+  --deep-accent-soft: rgba(14,116,144,.07);
+  --deep-accent-border: rgba(14,116,144,.4);
+  --deep-accent-glow: 0 2px 10px rgba(8,60,84,.05);
+  --deep-accent-grad: linear-gradient(180deg, #0e7490, #0a4f61);
+  --deep-gold: #b17d11;                        /* контраст на светлом ≥ 4.5:1 */
+  --deep-gold-soft: rgba(217,164,32,.14);
+  --deep-gold-border: rgba(178,125,17,.35);
+  --deep-gold-grad: linear-gradient(180deg, #d9a420, #92600a);
+  --deep-danger: #b23b3b;
+  --deep-danger-soft: rgba(178,59,59,.08);
+  --deep-male: #1d4ed8;  --deep-male-soft: rgba(29,78,216,.05);  --deep-male-border: rgba(29,78,216,.2);
+  --deep-female: #be185d; --deep-female-soft: rgba(190,24,93,.04); --deep-female-border: rgba(190,24,93,.18);
+}
+
+/* Общие для обеих тем */
+.theme-deep, .theme-deep-light {
+  --deep-font-display: 'Archivo Black', sans-serif; /* только загловки-афиши и большие числа */
+  --deep-radius-card: 16px;
+  --deep-radius-tile: 14px;
+  --deep-radius-pill: 999px;
+}
+
+/* Классы-рецепты (для Клод-кода; в DC-макетах те же значения inline) */
+.deep-card { background: var(--deep-card-bg); border: 1px solid var(--deep-card-border); border-radius: var(--deep-radius-card); padding: 20px 22px; }
+.deep-card-title { font-family: var(--deep-font-display); font-size: 17px; color: var(--deep-text); }
+.deep-cta { background: var(--deep-accent); color: var(--deep-accent-ink); border: none; border-radius: 12px; font-weight: 900; }
+.deep-cta:hover { background: var(--deep-accent-hover); }
+.deep-pill { border-radius: var(--deep-radius-pill); font-weight: 800; border: 1px solid var(--deep-card-border); background: transparent; color: var(--deep-text-mute); }
+.deep-pill--active { background: var(--deep-accent); border-color: var(--deep-accent); color: var(--deep-accent-ink); }
+.deep-tile--selected { background: var(--deep-accent-soft); border: 1px solid var(--deep-accent-border); box-shadow: var(--deep-accent-glow); }
+.deep-chip-gold { background: var(--deep-gold-soft); border: 1px solid var(--deep-gold-border); color: var(--deep-gold); }
+.deep-chip-winter { background: var(--deep-accent-soft); border: 1px solid var(--deep-accent-border); color: var(--deep-accent); }
+.deep-chip-summer { background: var(--deep-gold-soft); border: 1px solid var(--deep-gold-border); color: var(--deep-gold); }
