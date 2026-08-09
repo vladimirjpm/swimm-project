@@ -11,12 +11,20 @@ import ClubAvatar from './club-avatar';
 
 interface Props {
   swimmers: ClubTopSwimmer[];
+  /** «2025/26» либо «all seasons» — за какой период сложены очки. */
+  scopeLabel: string;
 }
 
-function ClubTopSwimmers({ swimmers }: Props) {
+function ClubTopSwimmers({ swimmers, scopeLabel }: Props) {
   return (
     <section className="deep-card mb-4">
       <div className="deep-card-title">Top swimmers</div>
+      {/* Что именно за число справа: КЛУБНЫЕ очки по правилу соревнования (не FINA-очки
+          и не медали), и только за ЛИЧНЫЕ заплывы — эстафета лежит одной строкой на
+          одного из четвёрки, поэтому в личный зачёт не идёт (как в High Point). */}
+      <div className="deep-card-sub mt-1">
+        Club points from individual swims · {scopeLabel}
+      </div>
 
       {swimmers.length === 0 ? (
         <div className="mt-3 text-[13px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>

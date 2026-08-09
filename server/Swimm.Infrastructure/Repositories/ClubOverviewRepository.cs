@@ -376,7 +376,15 @@ public class ClubOverviewRepository : IClubOverviewRepository
     {
         if (scoped.Count == 0) return [];
 
-        var query = _read.Results.AsNoTracking().Where(r => r.ClubId == clubId);
+        // Эстафеты в ЛИЧНЫЙ зачёт не идут (решение Влада 2026-08-09, тот же принцип, что
+        // в правиле High Point: PointRulesSwimmers.IncludeRelays=false).
+        //
+        // Дело не только в принципе: эстафета лежит ОДНОЙ строкой Results, привязанной к
+        // одному из четвёрки (остальные — в RelayMembers). Значит удвоенные эстафетные очки
+        // целиком доставались тому, на кого строку записал импорт, а трое партнёров
+        // получали ноль. Проверено на клубе 438: у лидера сезона 2025/26 из 482 очков 264
+        // (55%) были эстафетными, и первое место он занимал только благодаря им.
+        var query = _read.Results.AsNoTracking().Where(r => r.ClubId == clubId && r.RelayId == null);
         if (season is int s)
         {
             var (start, endExclusive) = SeasonMath.RangeOf(s);

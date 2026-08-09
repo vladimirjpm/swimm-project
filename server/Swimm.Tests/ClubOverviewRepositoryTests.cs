@@ -294,6 +294,55 @@ public class ClubOverviewRepositoryTests
     }
 
     [Fact]
+    public async Task TopSwimmers_IgnoreRelays_BecauseRelayRowBelongsToOneOfFour()
+    {
+        // Эстафета лежит ОДНОЙ строкой Results, привязанной к одному из четвёрки, поэтому
+        // её очки доставались бы владельцу строки целиком, а трём партнёрам — ноль (и это
+        // решает импорт, а не заплыв). В личный зачёт эстафеты не идут — как и в правиле
+        // High Point (PointRulesSwimmers.IncludeRelays = false).
+        using var db = CreateDb(nameof(TopSwimmers_IgnoreRelays_BecauseRelayRowBelongsToOneOfFour));
+        var (us, kids) = await SeedAsync(db);
+        var comp = Championship("15/02/2026", "25m");
+        var rule = new PointRuleClubs
+        {
+            Version = "test.30", EffectiveFrom = new DateOnly(2025, 1, 1), Scope = "all",
+            DefaultPoints = 0, MaxScoringPlace = 24, RelayMultiplier = 2,
+            Entries = { new PointRuleClubsEntry { Place = 1, Points = 30 } }
+        };
+        db.AddRange(comp, rule);
+        db.Add(Standing(comp, us, rank: 1));
+        Link(db, kids, comp);
+
+        var swimmer = new Swimmer { LastName = "Cohen", FirstName = "Tal", LastNameEn = "Cohen", FirstNameEn = "Tal", BirthYear = 2012 };
+        db.Add(swimmer);
+        await db.SaveChangesAsync();
+        comp.PointRuleClubsId = rule.Id;
+
+        db.AddRange(
+            // личный заплыв: 1 место → 30
+            new ResultRecord
+            {
+                Competition = comp, Club = us, Swimmer = swimmer, StyleId = 100, Distance = "100",
+                Gender = "male", CompetitionDate = new DateTime(2026, 2, 15), Position = 1,
+                TimeMillisecond = 60_000, TimeOriginal = "60.00", InternationalPoints = 700
+            },
+            // эстафета того же пловца: 1 место, множитель 2 → 60, но в зачёт НЕ идёт
+            new ResultRecord
+            {
+                Competition = comp, Club = us, Swimmer = swimmer, StyleId = 100, Distance = "4X50",
+                Gender = "male", CompetitionDate = new DateTime(2026, 2, 15), Position = 1,
+                RelayId = 777, TimeMillisecond = 120_000, TimeOriginal = "120.00", InternationalPoints = 700
+            });
+        await db.SaveChangesAsync();
+
+        var dto = await Repo(db).GetOverviewAsync(us.Id, us.Id, null, null, 3, null);
+
+        var top = Assert.Single(dto!.TopSwimmers);
+        Assert.Equal(30, top.Points);   // 30 за личный заплыв, эстафетные 60 не добавились
+        Assert.Equal(1, top.Gold);      // и медаль эстафеты личной не считается
+    }
+
+    [Fact]
     public async Task UnknownClub_ReturnsNull()
     {
         using var db = CreateDb(nameof(UnknownClub_ReturnsNull));
