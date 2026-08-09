@@ -1,56 +1,34 @@
 import React from 'react';
-import type { ClubGroupTile, ClubSeasonOption } from '../../../hooks/useClubOverview';
+import type { ClubGroupTile } from '../../../hooks/useClubOverview';
 import { groupAgeRange } from './club-groups';
 
 /**
- * Глобальные фильтры страницы клуба: сезон и зачётная группа.
- * Это ЕДИНСТВЕННЫЙ блок фильтров на всю страницу — карточки читают выбранный скоуп
- * и своих фильтров не заводят (исключение — физический параметр вроде бассейна
- * у стены рекордов). См. design_handoff_club_page/README.md.
+ * Фильтр зачётных групп страницы клуба.
+ *
+ * Сезон отсюда УЕХАЛ в кольцевую карусель над табами (club-season-carousel.tsx,
+ * handoff filter-season 4c) — здесь остались только плитки групп, и те временно
+ * скрыты флагом ниже. Карточки по-прежнему своих фильтров не заводят: они читают
+ * общий скоуп (исключение — физический бассейн у стены рекордов).
  */
 
 interface Props {
-  seasons: ClubSeasonOption[];
   groups: ClubGroupTile[];
-  season: number | null;
   group: string | null;
-  onSeason: (season: number | null) => void;
   onGroup: (group: string | null) => void;
 }
 
-function ClubFilters({ seasons, groups, season, group, onSeason, onGroup }: Props) {
+/**
+ * Ряд плиток зачётных групп ВРЕМЕННО СКРЫТ (handoff club_tabs: «не рендерить, но не
+ * удалять»). Разметка и логика фильтра целы и включаются одним флагом — вернём по
+ * решению. Скоуп при этом остаётся: group=null = все группы.
+ */
+export const SHOW_GROUP_TILES = false;
+
+function ClubFilters({ groups, group, onGroup }: Props) {
   return (
     <section className="deep-card mb-4">
       <div className="flex flex-col gap-4">
-        <div>
-          <div className="deep-card-sub mb-2 uppercase tracking-wide">Season</div>
-          {/* Сезонов 20+ и их число растёт — ряд горизонтально скроллится, All закреплён. */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className={`deep-pill ${season === null ? 'deep-pill--active' : ''}`}
-              onClick={() => onSeason(null)}
-            >
-              All
-            </button>
-            <div className="deep-swipe-clip">
-              <div className="deep-swipe-row">
-                {seasons.map((s) => (
-                  <button
-                    key={s.season}
-                    type="button"
-                    className={`deep-pill ${season === s.season ? 'deep-pill--active' : ''}`}
-                    onClick={() => onSeason(s.season)}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {groups.length > 0 && (
+        {SHOW_GROUP_TILES && groups.length > 0 && (
           <div>
             <div className="deep-card-sub mb-2 uppercase tracking-wide">Group</div>
             <div className="flex items-center gap-2">

@@ -48,6 +48,27 @@
   --deep-seg-active-bg: #fff;
   --deep-seg-active-fg: #04182b;
   --deep-card-shadow: 0 8px 28px rgba(4,32,58,.22);
+  /* Табы страницы клуба (3a): подложка тёмного стекла + cyan-волосок сверху */
+  --deep-tabs-bg: rgba(0,0,0,.28);
+  --deep-tabs-hairline: rgba(34,211,238,.14);
+  --deep-tab-glow: 0 -6px 18px rgba(34,211,238,.18);
+  --deep-tab-text-glow: 0 0 12px rgba(34,211,238,.5);
+  /* «Папка» (TABS.md 3a folder-tab): активная плитка и панель контента — один
+     непрозрачный корпус, поэтому фон СПЛОШНОЙ, а не стекло: полупрозрачный давал бы
+     видимый шов на стыке. */
+  --deep-panel-bg: #0c2a3f;
+  --deep-panel-border: rgba(34,211,238,.5);
+  --deep-panel-glow: 0 0 18px rgba(34,211,238,.14);
+  /* Полоса сезонов (4c): подложка чуть светлее табов, свечение центра карусели */
+  --deep-strip-bg: rgba(0,0,0,.16);
+  --deep-wheel-glow: 0 0 16px rgba(34,211,238,.5);
+  --deep-wheel-glow-sm: 0 0 14px rgba(34,211,238,.5);
+  /* Соседи карусели гаснут к краям — своя лесенка, а не общие text-токены:
+     шаг между ступенями здесь мельче (.65 / .42 / .28). */
+  --deep-wheel-d1: rgba(255,255,255,.65);
+  --deep-wheel-d2: rgba(255,255,255,.42);
+  --deep-wheel-d3: rgba(255,255,255,.28);
+  --deep-wheel-off: rgba(255,255,255,.75);   /* центр, когда активен All */
 }
 
 .theme-deep-light {
@@ -95,6 +116,24 @@
   --deep-seg-active-bg: #0e7490;
   --deep-seg-active-fg: #fff;
   --deep-card-shadow: 0 2px 10px rgba(8,60,84,.05);
+  /* Табы в светлой теме: подложка — прохладный тон страницы, а не чёрное стекло
+     (0,0,0,.28 на белом даёт серую плашку и убивает контраст подписей). */
+  --deep-tabs-bg: #eaf3f8;
+  --deep-tabs-hairline: rgba(14,116,144,.18);
+  --deep-tab-glow: 0 -4px 14px rgba(8,60,84,.10);
+  --deep-tab-text-glow: none;
+  --deep-panel-bg: #ffffff;
+  --deep-panel-border: rgba(14,116,144,.45);
+  --deep-panel-glow: 0 2px 12px rgba(8,60,84,.08);
+  /* В светлой теме свечения нет: на белом «сияющий» текст читается как размытие,
+     роль «выбран» несут цвет-акцент и размер. */
+  --deep-strip-bg: #f0f6fa;
+  --deep-wheel-glow: none;
+  --deep-wheel-glow-sm: none;
+  --deep-wheel-d1: #5b7684;
+  --deep-wheel-d2: #8ea4b0;
+  --deep-wheel-d3: #b0c1cb;
+  --deep-wheel-off: #7b95a3;
 }
 
 .theme-deep, .theme-deep-light {
@@ -163,4 +202,243 @@
    скролл всей страницы. Длина полосы остаётся пропорциональной месту. */
 @media (max-width: 640px) {
   .deep-rank-seg { width: 5px; height: 7px; }
+}
+
+/* ── Табы страницы клуба (handoff club_tabs, вариант 3a) ─────────────────────
+   Карточки страницы разложены по пяти табам. Подложка и стекло — из тех же
+   deep-токенов, новых цветов вариант не вводит. Glow только у активной плитки
+   (правило темы: один glow на блок). */
+/* Обёртка «папки»: полоса плиток + сросшаяся с активной плиткой панель контента */
+.deep-folder { background: var(--deep-tabs-bg); border-radius: var(--deep-radius-card); }
+
+.deep-tabs {
+  /* Снизу 0: активная плитка стыкуется с панелью, зазора между ними быть не должно */
+  padding: 12px 14px 0;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+.deep-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  /* Низ прямой у ВСЕХ плиток, не только у активной: полоса плиток стоит вплотную к
+     панели, и скруглённые нижние углы неактивных давали засветы-«ушки» на стыке. */
+  border-radius: 13px 13px 0 0;
+  padding: 11px 13px;
+  text-align: left;
+  cursor: pointer;
+  background: var(--deep-card-bg-raised);
+  border: 1px solid var(--deep-card-border);
+  color: var(--deep-text-mute);
+}
+.deep-tab__head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.deep-tab__icon {
+  width: 24px; height: 24px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 999px;
+  background: var(--deep-accent-soft);
+  color: var(--deep-accent);
+  font-size: 13px;
+}
+.deep-tab__name {
+  font-family: var(--deep-font-display);
+  font-size: 12px;
+  letter-spacing: .04em;
+  color: var(--deep-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.deep-tab__sub { font-size: 10.5px; font-weight: 800; color: var(--deep-text-faint); }
+/* Активная плитка — язычок папки: снизу рамки нет, а -1px и z-index кладут её
+   ПОВЕРХ верхней рамки панели, чтобы шва не было видно. */
+.deep-tab--active {
+  background: var(--deep-panel-bg);
+  border: 1px solid var(--deep-panel-border);
+  border-bottom: none;
+  border-radius: 13px 13px 0 0;
+  margin-bottom: -1px;
+  position: relative;
+  z-index: 1;
+  box-shadow: var(--deep-tab-glow);
+}
+.deep-tab--active .deep-tab__icon { background: var(--deep-accent); color: var(--deep-accent-ink); }
+.deep-tab--active .deep-tab__name { color: var(--deep-accent); }
+.deep-tab--active .deep-tab__sub { color: var(--deep-accent); }
+
+/* Панель контента: тот же корпус, что у активной плитки */
+/* Карточки внутри панели держат свой mb-4; у последней он лишний — иначе снизу
+   двойной отступ (padding панели + margin карточки). */
+.deep-tabs-panel > *:last-child { margin-bottom: 0; }
+.deep-tabs-panel {
+  background: var(--deep-panel-bg);
+  border: 1px solid var(--deep-panel-border);
+  /* Верх прямой: панель стыкуется с полосой плиток по всей ширине, скруглённые
+     верхние углы отрывали её от язычка активной плитки. */
+  border-radius: 0 0 13px 13px;
+  box-shadow: var(--deep-panel-glow);
+  margin: 0 14px 14px;
+  padding: 14px;
+}
+
+/* Мобайл: та же пятёрка колонок, но иконка над подписью и без счётчиков.
+   Активная отбивается подчёркиванием, а не заливкой — заливка на 78px колонке
+   съедает подпись. */
+@media (max-width: 639px) {
+  .deep-tabs { padding: 8px 8px 0; gap: 4px; }
+  .deep-tabs-panel { margin: 8px; padding: 10px; }
+  .deep-tab {
+    align-items: center;
+    gap: 4px;
+    min-height: 48px;
+    padding: 7px 2px;
+    border: none;
+    background: transparent;
+    border-bottom: 2.5px solid transparent;
+    border-radius: 10px 10px 0 0;
+  }
+  .deep-tab__head { flex-direction: column; gap: 2px; }
+  .deep-tab__icon { width: auto; height: auto; background: none; font-size: 17px; }
+  .deep-tab__name { font-size: 9.5px; font-weight: 800; letter-spacing: 0; }
+  /* В мобайле «папки» нет: плитки-колонки узкие, язычок на 70px читается как артефакт.
+     Активную отбивает подчёркивание — поэтому корпус папки здесь снимается. */
+  .deep-tab--active {
+    background: transparent;
+    box-shadow: none;
+    border: none;
+    border-bottom: 2.5px solid var(--deep-accent);
+    border-radius: 10px 10px 0 0;
+    margin-bottom: 0;
+  }
+  .deep-tab--active .deep-tab__icon { background: none; color: var(--deep-accent); }
+  .deep-tab--active .deep-tab__name { color: var(--deep-accent); text-shadow: var(--deep-tab-text-glow); }
+}
+
+/* ── Полоса сезонов: кольцевая карусель (handoff filter-season, вариант 4c) ───
+   Выбранный сезон ВСЕГДА по центру, соседи симметрично (десктоп ±3, мобайл ±1),
+   лента закольцована — слоты не пустуют. Ширина слота фиксирована, чтобы ряд не
+   дёргался при смене цифр. Сколько соседей видно, решает CSS, а не JS-медиазапрос. */
+.deep-season-strip {
+  background: var(--deep-strip-bg);
+  border-top: 1px solid var(--deep-tabs-hairline);
+  border-radius: var(--deep-radius-card);
+  padding: 11px 22px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.deep-wheel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;          /* стрелки не липнут к крайним цифрам */
+  overflow: hidden;   /* уезжающий ряд не вылезает за полосу */
+}
+/* Ряд соседей + центр. Едет целиком: на каждом шаге key меняется, анимация
+   перезапускается — иначе два шага подряд проходят без движения. */
+.deep-wheel__row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+/* Проезд ряда делает transform + transition из компонента (см. club-season-carousel.tsx):
+   @keyframes тут не годятся — их перезапуск требует ремоунта, а ремоунт даёт рывок. */
+.deep-wheel__row { will-change: transform; }
+
+.deep-wheel__slot {
+  font-family: var(--deep-font-display);
+  width: 52px;
+  flex: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  transition: font-size .2s ease-out, color .2s ease-out;
+}
+/* Дальние соседи бледнее ближних — это и даёт «глубину» ленты */
+.deep-wheel__slot--d1 { font-size: 15px; color: var(--deep-wheel-d1); }
+.deep-wheel__slot--d2 { font-size: 13px; color: var(--deep-wheel-d2); }
+.deep-wheel__slot--d3 { font-size: 12px; color: var(--deep-wheel-d3); }
+/* Центр — кнопка: при активном All тап по нему выбирает этот сезон.
+   Ширина не 52px, как у слотов-соседей: цифра здесь вдвое крупнее и в слот соседа
+   физически не влезает, поэтому центр шире и с воздухом по бокам. */
+.deep-wheel__center {
+  min-width: 112px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 16px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+.deep-wheel__label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .14em;
+  color: var(--deep-text-faint);
+}
+.deep-wheel__value {
+  font-family: var(--deep-font-display);
+  font-size: 42px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--deep-accent);
+  text-shadow: var(--deep-wheel-glow);
+}
+/* All активен → подсветка уходит с центра: cyan-glow в полосе ровно один */
+/* ∞ («все сезоны») — глиф низкий и рядом с цифрами выглядит вдвое мельче, поэтому
+   кегль ему удваивают, а line-height подрезают, чтобы бокс не вырос. */
+.deep-wheel__value--inf { font-size: 84px; line-height: .5; }
+.deep-wheel__slot--all { line-height: .5; }
+.deep-wheel__slot--d1.deep-wheel__slot--all { font-size: 30px; }
+.deep-wheel__slot--d2.deep-wheel__slot--all { font-size: 26px; }
+.deep-wheel__slot--d3.deep-wheel__slot--all { font-size: 24px; }
+
+/* Режим All рисует в центре ∞ активным цветом, поэтому гашения центра больше нет
+   (класс --muted снят; --deep-wheel-off остаётся на случай возврата варианта). */
+
+.deep-wheel-nav {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 999px;
+  border: 1px solid var(--deep-card-border);
+  background: var(--deep-card-bg-raised);
+  color: var(--deep-text-mute);
+  cursor: pointer;
+  /* Хит-таргет ≥44px добирается прозрачным контуром, а сам круг остаётся 32px */
+  outline: 6px solid transparent;
+}
+.deep-wheel-nav:hover:not(:disabled) { color: var(--deep-text); }
+/* Край ленты: идти некуда — кнопка гаснет и не ловит курсор */
+.deep-wheel-nav:disabled { opacity: .35; cursor: default; }
+
+/* Спейсер справа шириной с All — иначе центр карусели уезжает влево */
+.deep-strip-side { width: 64px; flex: none; }
+
+@media (max-width: 639px) {
+  .deep-season-strip { padding: 9px 14px; gap: 6px; }
+  .deep-wheel { gap: 8px; }
+  .deep-wheel__slot { width: 44px; }
+  .deep-wheel__center { min-width: 88px; padding: 4px 10px; }
+  .deep-wheel__slot--d2, .deep-wheel__slot--d3 { display: none; }  /* мобайл: соседи ±1 */
+  .deep-wheel__slot--d1 { font-size: 13px; color: var(--deep-wheel-d2); }
+  .deep-wheel__label { font-size: 8.5px; }
+  .deep-wheel__value { font-size: 34px; text-shadow: var(--deep-wheel-glow-sm); }
+  .deep-wheel__value--inf { font-size: 68px; }
+  .deep-wheel__slot--d1.deep-wheel__slot--all { font-size: 26px; }
+  .deep-strip-side { width: 52px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deep-wheel__slot { transition: none; }
+  .deep-wheel__row { transition: none !important; }
 }
