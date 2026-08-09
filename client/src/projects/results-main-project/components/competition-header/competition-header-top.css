@@ -1,0 +1,17 @@
+/* Мобильная шапка соревнования (<640px), макет 14b. Цвета — только токены
+   --theme-title-champ-* из client/src/index.css (парные light/dark). */
+
+/* Заголовок-чемпионат: золото градиентом ПО ТЕКСТУ. У обычных стартов заголовок
+   остаётся белым (--theme-mode-accent-text), поэтому класс вешается по признаку
+   соревнования, а не всем подряд. */
+.comp-title--champ {
+  background: linear-gradient(
+    100deg,
+    var(--theme-title-champ-a),
+    var(--theme-title-champ-b) 45%,
+    var(--theme-title-champ-c)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}

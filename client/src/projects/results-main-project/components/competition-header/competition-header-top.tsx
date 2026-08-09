@@ -4,6 +4,7 @@ import { competitionTileData } from '../../../../utils/helpers/competition-sourc
 import type { CompetitionOverview } from './types';
 import { PAGE_CONTAINER } from '../../../../utils/layout';
 import CompetitionTile from './competition-tile';
+import './competition-header-top.css';
 
 // Hero-модуль шапки соревнования (вариант 1b «Афиша»): фон var(--theme-primary),
 // текст var(--theme-mode-accent-text) (правило парных токенов). Слева identity
@@ -59,12 +60,99 @@ export default function CompetitionHeaderTop({
     </span>
   );
 
+  // Мобайл (14b): мета ДВУМЯ строками — дни/даты и «пул · количества». На десктопе
+  // она остаётся одной лентой (см. meta выше), поэтому здесь свой набор, а не срез.
+  const metaFacts: string[] = [];
+  if (source?.pool_type) metaFacts.push(`${source.pool_type} pool`);
+  if (source?.category === 'masters') metaFacts.push('Masters');
+  if (s && s.swimmer_count > 0) metaFacts.push(`Swimmers: ${s.swimmer_count}`);
+  if (s && s.club_count > 0) metaFacts.push(`Clubs: ${s.club_count}`);
+  if (s) metaFacts.push(`Results: ${s.result_count}`);
+
+  // Заголовок чемпионата — золотом (14b); у обычных стартов остаётся белым.
+  const titleClass = tile.isChampionship ? ' comp-title--champ' : '';
+
+  const addMediaButton = (extraClass: string) => onAddMedia && (
+    <button
+      type="button"
+      onClick={onAddMedia}
+      className={extraClass}
+      style={{
+        background: 'var(--theme-mode-accent-text)',
+        color: 'var(--theme-primary-hover, var(--theme-primary))',
+      }}
+    >
+      ＋ Add media
+    </button>
+  );
+
+  const changeButton = (extraClass: string) => onChangeClick && (
+    <button
+      type="button"
+      onClick={onChangeClick}
+      className={extraClass}
+      style={{
+        background: 'rgba(255,255,255,0.16)',
+        border: '1px solid var(--theme-mode-header-btn-border)',
+        color: 'inherit',
+      }}
+    >
+      Change <span className="text-[10px]">{changeOpen ? '▴' : '▾'}</span>
+    </button>
+  );
+
   return (
     // Фон hero — край-в-край; содержимое ограничено общим контейнером (handoff v2, 5a).
     <div style={{ background: 'var(--theme-primary)', color: 'var(--theme-mode-accent-text)' }}>
-    {/* 10b: текстовый блок flex:1 1 300px, кнопки ml-auto → при сжатии кнопки уезжают
+    {/* Мобайл <640px (14b): колонка «плитка+заголовок → мета в две строки → кнопки».
+        Отдельная разметка, а не sm:-оверрайды: у мобайла другая СТРУКТУРА меты и кнопок,
+        и держать десктоп ≥640 нетронутым проще, когда он живёт своим блоком. */}
+    <div className={`${PAGE_CONTAINER} flex flex-col gap-2 pb-3 pt-3 sm:hidden`}>
+      <div className="flex items-center gap-3">
+        <CompetitionTile {...tile} size="xs" />
+        <h1
+          className="m-0 min-w-0 flex-1 text-left text-[23px] font-black"
+          style={{ lineHeight: 1.18, textWrap: 'pretty' } as React.CSSProperties}
+        >
+          {/* dir="auto" — только на тексте: на flex-строке он развернул бы саму раскладку. */}
+          <span dir="auto" className={`inline-block${titleClass}`}>{title}</span>
+        </h1>
+      </div>
+
+      <div className="flex flex-col gap-0.5 text-[12px] font-semibold" style={{ opacity: 0.92 }}>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          {dayCount > 1 && daysBadge}
+          {dates && <span className="whitespace-nowrap">{dates}</span>}
+        </div>
+        {metaFacts.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-1.5">
+            {metaFacts.map((m, i) => (
+              <span key={m} className="whitespace-nowrap">
+                {i > 0 && <span className="mr-1.5 opacity-70">·</span>}
+                {m}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Кнопки 36px по макету; тап-таргет ≥44px добирается паддингом строки (4+36+4). */}
+      {(onAddMedia || onChangeClick) && (
+        <div className="flex items-center gap-2 py-1">
+          {addMediaButton(
+            'flex h-9 items-center justify-center rounded-[9px] px-3 text-[12px] font-extrabold shadow-sm transition-opacity hover:opacity-90',
+          )}
+          {changeButton(
+            'flex h-9 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[9px] px-3 text-[12px] font-extrabold',
+          )}
+        </div>
+      )}
+    </div>
+
+    {/* Десктоп ≥640px — без изменений.
+        10b: текстовый блок flex:1 1 300px, кнопки ml-auto → при сжатии кнопки уезжают
         на свою строку, а не сдавливают заголовок в столбик (это был баг 10a). */}
-    <div className={`${PAGE_CONTAINER} flex flex-wrap items-center gap-3.5 pb-3.5 pt-3.5`}>
+    <div className={`${PAGE_CONTAINER} hidden flex-wrap items-center gap-3.5 pb-3.5 pt-3.5 sm:flex`}>
       <div className="flex min-w-0 flex-[1_1_300px] items-center gap-3">
         <CompetitionTile {...tile} />
 
@@ -88,31 +176,12 @@ export default function CompetitionHeaderTop({
         </div>
       </div>
 
-      {/* Мобайл: кнопки своей строкой, тап-таргет ≥44px */}
-      <div className="flex w-full shrink-0 items-center gap-2 sm:ml-auto sm:w-auto">
-        {onAddMedia && (
-          <button
-            type="button"
-            onClick={onAddMedia}
-            className="flex min-h-[44px] flex-1 items-center justify-center rounded-[10px] px-3.5 py-2 text-[12.5px] font-extrabold shadow-sm transition-opacity hover:opacity-90 sm:min-h-[40px] sm:flex-none"
-            style={{ background: 'var(--theme-mode-accent-text)', color: 'var(--theme-primary-hover, var(--theme-primary))' }}
-          >
-            ＋ Add media
-          </button>
+      <div className="ml-auto flex w-auto shrink-0 items-center gap-2">
+        {addMediaButton(
+          'flex min-h-[40px] flex-none items-center justify-center rounded-[10px] px-3.5 py-2 text-[12.5px] font-extrabold shadow-sm transition-opacity hover:opacity-90',
         )}
-        {onChangeClick && (
-          <button
-            type="button"
-            onClick={onChangeClick}
-            className="flex min-h-[44px] flex-1 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-[10px] px-[16px] text-[13px] font-extrabold sm:min-h-[40px] sm:flex-none"
-            style={{
-              background: 'rgba(255,255,255,0.16)',
-              border: '1px solid var(--theme-mode-header-btn-border)',
-              color: 'inherit',
-            }}
-          >
-            Change <span className="text-[10px]">{changeOpen ? '▴' : '▾'}</span>
-          </button>
+        {changeButton(
+          'flex min-h-[40px] flex-none cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-[10px] px-[16px] text-[13px] font-extrabold',
         )}
       </div>
     </div>

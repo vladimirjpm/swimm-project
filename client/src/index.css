@@ -118,6 +118,12 @@
   --theme-combine-icon-bg: linear-gradient(135deg, #ffe08a, #eab308);
   --theme-combine-toggle-off: rgba(138, 109, 26, 0.3);
   --theme-combine-toggle-on: #10b981;           /* success */
+  /* Золотой заголовок соревнования-чемпионата (макет 14b): градиент по тексту в hero.
+     Живёт на --theme-primary, поэтому светлое золото и в light, и в dark — фон шапки
+     насыщенный в обоих режимах (пара как у --theme-mode-accent-text). */
+  --theme-title-champ-a: #fff3c9;
+  --theme-title-champ-b: #ffe08a;
+  --theme-title-champ-c: #f7c948;
   /* Спорное время (И11) в «стене рекордов»: чип «Under review» + caution-лента карточки
      (design_handoff_competition_overview_rec-warning, 13a). Янтарь — единственная семантика
      «под проверкой», с медальным золотом --deep-gold не смешивается. */
@@ -193,6 +199,12 @@
   --theme-combine-icon-bg: linear-gradient(135deg, #f7d979, #c8930f);
   --theme-combine-toggle-off: rgba(227, 193, 92, 0.3);
   --theme-combine-toggle-on: #3ddc97;
+  /* Золотой заголовок чемпионата в dark: значения те же — заголовок лежит на
+     --theme-primary, который в dark не меняется, так что пара «золото на primary»
+     сохраняет контраст. */
+  --theme-title-champ-a: #fff3c9;
+  --theme-title-champ-b: #ffe08a;
+  --theme-title-champ-c: #f7c948;
   /* Спорное время в dark: янтарь светлеет (на тёмной подложке #b45309 даёт ~3:1),
      тёмная полоса ленты — светлее фона карточки, иначе лента сливается в сплошную. */
   --theme-flag-text: #fbbf24;
