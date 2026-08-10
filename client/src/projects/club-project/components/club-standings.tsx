@@ -1,5 +1,6 @@
 ﻿import React from 'react';
 import type { ClubStandingsTable } from '../../../hooks/useClubOverview';
+import { routes } from '../../../utils/routes';
 
 /**
  * Standings — детализация выбранного зачёта (клик по линии в гриде «сезон × группа», или
@@ -39,9 +40,22 @@ function ClubStandings({ standings }: Props) {
   return (
     <section className="deep-card h-full">
       <div className="deep-card-title">Standings</div>
-      <div className="deep-card-sub mt-1">
+      {/* Название соревнования обязательно: карточка показывает зачёт ОДНОГО старта
+          (в гриде слева он подсвечен), а без имени и даты видно только «Kids · 2025/26»,
+          и какой именно чемпионат раскрыт — непонятно. Имя ведёт на само соревнование. */}
+      <a
+        href={routes.competition(standings.competition_id)}
+        dir="auto"
+        className="mt-1 block truncate text-[13px] font-extrabold no-underline hover:underline"
+        style={{ color: 'var(--deep-accent)' }}
+        title={standings.competition_name}
+      >
+        {standings.competition_name}
+      </a>
+      <div className="deep-card-sub mt-0.5">
         {icon && `${icon} · `}
-        {standings.group_name ?? 'All groups'} · {seasonLabel(standings.season)} · {standings.club_count} clubs
+        {standings.group_name ?? 'All groups'} · {seasonLabel(standings.season)} · {standings.date} ·{' '}
+        {standings.club_count} clubs
       </div>
 
       <div className="mt-4 flex flex-col gap-2">
