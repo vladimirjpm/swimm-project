@@ -82,7 +82,17 @@
             </label>
 
             <label class="flex flex-col gap-1">
-                <span class="text-xs text-admin-text-muted">OrgCompId (ID у организатора)</span>
+                <span class="flex items-center gap-2 text-xs text-admin-text-muted">
+                    OrgCompId (ID у организатора)
+                    @if (Model.Existing.OrgCompId is int orgId)
+                    {
+                        @* Ссылка на карточку у организатора — та же, что в списке
+                           (Index.cshtml): со страницы правки чаще всего и надо свериться
+                           с источником, а до сих пор номер приходилось копировать руками. *@
+                        <a href="https://isr.org.il/comp.asp?compID=@orgId" target="_blank" rel="noopener"
+                           class="text-admin-accent hover:underline">isr.org.il ↗</a>
+                    }
+                </span>
                 <input asp-for="Input.OrgCompId" type="number" class="admin-input" autocomplete="off"
                        placeholder="напр. loglig competitionId" />
             </label>
@@ -232,7 +242,11 @@
                 }
                 else
                 {
-                    <text>Текущий OrgCompId: <strong class="text-admin-text">@Model.Existing.OrgCompId</strong>.</text>
+                    <text>
+                        Текущий OrgCompId:
+                        <a href="https://isr.org.il/comp.asp?compID=@Model.Existing.OrgCompId" target="_blank"
+                           rel="noopener" class="text-admin-accent hover:underline">@Model.Existing.OrgCompId ↗</a>.
+                    </text>
                 }
             </p>
 
