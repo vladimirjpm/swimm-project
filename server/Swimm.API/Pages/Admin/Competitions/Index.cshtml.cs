@@ -46,6 +46,16 @@ public class IndexModel : PageModel
     [BindProperty(SupportsGet = true, Name = "kind")]
     public string? Kind { get; set; }
 
+    /// <summary>
+    /// Вид спорта: пусто — только плавание (дефолт), «all» — всё, иначе конкретная дисциплина.
+    /// Артистическое плавание из списка прячем, но не удаляем — см. Disciplines.
+    /// </summary>
+    [BindProperty(SupportsGet = true, Name = "discipline")]
+    public string? Discipline { get; set; }
+
+    /// <summary>Сколько строк спрятал фильтр дисциплины — чип «скрыто N» над списком.</summary>
+    public int HiddenByDiscipline { get; private set; }
+
     /// <summary>Фильтр по стадии: OnSite | Imported | DbOnly | Ignored (пусто — все).</summary>
     [BindProperty(SupportsGet = true, Name = "stage")]
     public string? Stage { get; set; }
@@ -107,9 +117,10 @@ public class IndexModel : PageModel
             "discovery-error" or "no-org-comp-id" or "no-results" => FilterAlias,
             _ => null
         };
-        var list = await _repo.GetUnifiedAsync(Search, CategoryKey, Season, Stage, ShowSynthetic, Month, PageNumber, PageSize, QualityFilter, Kind);
+        var list = await _repo.GetUnifiedAsync(Search, CategoryKey, Season, Stage, ShowSynthetic, Month, PageNumber, PageSize, QualityFilter, Kind, Discipline);
         Result = list.Page;
         MonthCounts = list.MonthCounts;
+        HiddenByDiscipline = list.HiddenByDiscipline;
         Categories = await _repo.GetAllCategoriesAsync();
         Seasons = await _repo.GetAvailableSeasonsAsync();
         ClubRules = await _rules.GetAllAsync(PointRuleKind.Clubs);

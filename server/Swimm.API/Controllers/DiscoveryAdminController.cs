@@ -85,6 +85,13 @@ public class DiscoveryAdminController : ControllerBase
             ? Ok(new { ok = true })
             : BadRequest(new { error = "Запись не найдена или статус неизвестен" });
 
+    /// <summary>Правка вида спорта строки: эвристика по названию иногда промахивается.</summary>
+    [HttpPost("{id:int}/discipline")]
+    public async Task<IActionResult> SetDiscipline(int id, [FromBody] SetDisciplineRequest request, CancellationToken ct)
+        => await _discovery.SetDisciplineAsync(id, request.Discipline, ct)
+            ? Ok(new { ok = true })
+            : BadRequest(new { error = "Запись не найдена или дисциплина неизвестна" });
+
     /// <summary>Скачать PDF-протокол вручную (для существующего Import-флоу или глазами посмотреть).</summary>
     [HttpGet("{id:int}/pdf")]
     [IgnoreAntiforgeryToken] // GET-скачивание файла; мутаций нет
@@ -359,6 +366,8 @@ public class DiscoveryAdminController : ControllerBase
     private sealed record DiscoveryPreviewEntry(ParsedCompetition Parsed, string FileName, int DiscoveredId);
 
     public sealed record SetStatusRequest(string Status);
+
+    public sealed record SetDisciplineRequest(string Discipline);
 
     public sealed record DiscoveryImportRequest(
         Guid PreviewId,

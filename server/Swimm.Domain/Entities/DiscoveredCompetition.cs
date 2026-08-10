@@ -49,6 +49,14 @@ public class DiscoveredCompetition
     [MaxLength(20)]
     public string Status { get; set; } = DiscoveredCompetitionStatus.New;
 
+    /// <summary>
+    /// Вид спорта: swimming | artistic | other (см. <c>Disciplines</c> в Application).
+    /// Проставляется догадкой по названию при обнаружении и правится вручную в админке —
+    /// поэтому автозабор его НЕ перезаписывает у уже известных строк.
+    /// </summary>
+    [MaxLength(20)]
+    public string Discipline { get; set; } = "swimming";
+
     /// <summary>Языки, на которых PDF-протокол успешно загружался с loglig:
     /// null (не загружался) | "he" | "en" | "he,en". Заполняется при «затянуть» и
     /// «синхронизировать языки» — по нему админка показывает бэйджи и предлагает досинхронизацию.</summary>

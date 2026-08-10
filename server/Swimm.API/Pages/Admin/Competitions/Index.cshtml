@@ -7,11 +7,11 @@
 
     // ВНИМАНИЕ: параметр пагинации — «p», НЕ «page» (page зарезервирован Razor Pages, ломает переходы).
     string PageUrl(int pg) =>
-        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = Model.Month, p = pg, filter = Model.QualityFilter })!;
+        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, discipline = Model.Discipline, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = Model.Month, p = pg, filter = Model.QualityFilter })!;
 
     // Ссылка на месяц (сброс страницы на 1; повторный клик по активному — снять фильтр).
     string MonthUrl(int? m) =>
-        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = m, filter = Model.QualityFilter })!;
+        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, discipline = Model.Discipline, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = m, filter = Model.QualityFilter })!;
 
     var monthNames = new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
@@ -100,6 +100,14 @@
             sb.Append(s.Status == "ignored"
                 ? $"<button onclick=\"discStatus({s.DiscoveredId},'new')\" class=\"{btn}\">вернуть</button>"
                 : $"<button onclick=\"discStatus({s.DiscoveredId},'ignored')\" class=\"{btn}\" title=\"Скрыть\">✕</button>");
+
+        // Вид спорта — селектом прямо в строке: эвристика по названию иногда промахивается,
+        // и поправить её должно быть дешевле, чем разбираться, почему строка пропала.
+        var sel = "text-[11px] bg-transparent border border-admin-border rounded px-1 py-0.5 ml-1";
+        sb.Append($"<select onchange=\"discDiscipline({s.DiscoveredId}, this.value)\" class=\"{sel}\" title=\"Вид спорта\">");
+        foreach (var (value, label) in new[] { ("swimming", "плавание"), ("artistic", "артистич."), ("other", "прочее") })
+            sb.Append($"<option value=\"{value}\"{(s.Discipline == value ? " selected" : "")}>{label}</option>");
+        sb.Append("</select>");
         return sb.ToString();
     }
 }
@@ -123,7 +131,18 @@
     };
     <div class="admin-card border-l-[3px] border-l-admin-warning bg-admin-warning/5 mb-4 flex items-center justify-between px-4 py-2 text-[13px]">
         <span>Активный фильтр «здоровья данных»: <strong class="text-admin-text">@label</strong></span>
-        <a href="@Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, synth = Model.ShowSynthetic ? "true" : null, month = Model.Month })" class="admin-btn admin-btn-ghost py-1 px-2.5">сбросить ✕</a>
+        <a href="@Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, discipline = Model.Discipline, synth = Model.ShowSynthetic ? "true" : null, month = Model.Month })" class="admin-btn admin-btn-ghost py-1 px-2.5">сбросить ✕</a>
+    </div>
+}
+
+@* Скрытые фильтром дисциплины показываем счётчиком: молча пропавшие строки читаются
+   как потеря данных, а так видно и сколько их, и куда нажать. *@
+@if (Model.HiddenByDiscipline > 0)
+{
+    <div class="mb-3 text-[12px] text-admin-text-muted">
+        Скрыто фильтром дисциплины: <strong class="text-admin-text">@Model.HiddenByDiscipline</strong>
+        <a class="text-admin-accent hover:underline ml-1"
+           href="@Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, stage = Model.Stage, discipline = "all", synth = Model.ShowSynthetic ? "true" : null, month = Model.Month, filter = Model.QualityFilter })">показать все ↗</a>
     </div>
 }
 
@@ -185,6 +204,18 @@
         <select name="kind" class="admin-input">
             <option value="">Все</option>
             <option value="champ" selected="@(Model.Kind == "champ")">чемпионат Израиля</option>
+        </select>
+    </label>
+    <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
+        Дисциплина
+        @* Федерация проводит не только плавание: артистическое (שחייה אומנותית) во
+           входящих есть, а нам не нужно. Прячем ФИЛЬТРОМ с дефолтом, не удаляя строки —
+           понадобится, переключат на «все». *@
+        <select name="discipline" class="admin-input">
+            <option value="" selected="@(string.IsNullOrEmpty(Model.Discipline))">плавание</option>
+            <option value="artistic" selected="@(Model.Discipline == "artistic")">артистическое</option>
+            <option value="other" selected="@(Model.Discipline == "other")">прочее</option>
+            <option value="all" selected="@(Model.Discipline == "all")">все</option>
         </select>
     </label>
     <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
@@ -306,7 +337,7 @@ else
                                         data-key="@rowKey" aria-expanded="false">▸ Открыть</button>
                                 <form method="post" asp-page-handler="DeleteEvent"
                                       asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                      asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-stage="@Model.Stage"
+                                      asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-discipline="@Model.Discipline" asp-route-stage="@Model.Stage"
                                       asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
                                       class="inline comp-delete-form" data-kind="event" data-name="@ev.EventName" data-days="@ev.DayCount" data-rows="@ev.TotalResultCount">
                                     <input type="hidden" name="eventId" value="@ev.EventId" />
@@ -355,7 +386,7 @@ else
                                         data-key="@rowKey" aria-expanded="false">▸ Открыть</button>
                                 <form method="post" asp-page-handler="Delete"
                                       asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                      asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-stage="@Model.Stage"
+                                      asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-discipline="@Model.Discipline" asp-route-stage="@Model.Stage"
                                       asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
                                       class="inline comp-delete-form" data-kind="single" data-name="@c.Name" data-rows="@c.ResultCount">
                                     <input type="hidden" name="id" value="@c.Id" />
@@ -449,7 +480,7 @@ else
                                                         <a href="@EditUrl(d.Id)" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
                                                         <form method="post" asp-page-handler="Delete"
                                                               asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                                              asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-stage="@Model.Stage"
+                                                              asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-discipline="@Model.Discipline" asp-route-stage="@Model.Stage"
                                                               asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
                                                               class="inline comp-delete-form" data-kind="day" data-name="День @(d.DayNumber?.ToString() ?? "?")" data-rows="@d.ResultCount">
                                                             <input type="hidden" name="id" value="@d.Id" />
@@ -468,7 +499,7 @@ else
                                 @* Быстрая правка: только поля, общие для всех дней события. Имя/дата/страна — на Edit. *@
                                 <form method="post" asp-page-handler="QuickSave"
                                       asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                      asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-stage="@Model.Stage"
+                                      asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-discipline="@Model.Discipline" asp-route-stage="@Model.Stage"
                                       asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
                                       class="mt-3">
                                     <input type="hidden" name="id" value="@head.Id" />
@@ -954,6 +985,16 @@ else
             // «Нет протокола»: PDF на сайте пустой. Пометка ставится и автоматически — при
             // разборе, который не нашёл ни одного соревнования, — но человек должен уметь
             // поставить/снять её руками: файл могут выложить позже.
+            window.discDiscipline = async function (id, discipline) {
+                try {
+                    await apiJson(`${API}/${id}/discipline`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ discipline })
+                    });
+                    location.reload();
+                } catch (e) { toast('Ошибка: ' + e.message); }
+            };
+
             window.discEmptySource = async function (id, empty) {
                 try {
                     await apiJson(`${API}/${id}/empty-source`, {

@@ -78,6 +78,14 @@ public class Competition
   /// </summary>
   public int? OrgCompId { get; set; }
 
+  /// <summary>
+  /// Вид спорта: swimming | artistic | other (см. <c>Disciplines</c> в Application).
+  /// У нас пока только плавание, но федерация проводит и артистическое — признак нужен,
+  /// чтобы витрины могли его отделить, если такие протоколы когда-нибудь импортируют.
+  /// </summary>
+  [MaxLength(20)]
+  public string Discipline { get; set; } = "swimming";
+
   // ── Проверка качества результатов ──────────────────────────────────────────
 
   /// <summary>

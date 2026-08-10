@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
@@ -58,6 +59,10 @@ public class CompetitionDiscoveryService(
                     Name = item.Name,
                     DateStart = item.DateStart,
                     DateEnd = item.DateEnd,
+                    // Дисциплина — догадка по названию и ТОЛЬКО при первом обнаружении:
+                    // у известных строк её мог поправить админ, и повторный забор не должен
+                    // затирать ручное решение своим угадыванием.
+                    Discipline = Disciplines.GuessFromName(item.Name),
                     DiscoveredAt = now,
                     LastSeenAt = now
                 });
@@ -131,6 +136,22 @@ public class CompetitionDiscoveryService(
         var row = await db.DiscoveredCompetitions.FirstOrDefaultAsync(d => d.Id == id, ct);
         if (row is null) return false;
         row.Status = status;
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    /// <summary>
+    /// Ручная правка дисциплины входящей строки: эвристика по названию иногда промахивается
+    /// («סינכרו» без слова «אומנותית» и наоборот), и один клик должен это чинить, не трогая
+    /// саму строку. Автозабор эту правку не перетирает — он ставит дисциплину только новым.
+    /// </summary>
+    public async Task<bool> SetDisciplineAsync(int id, string discipline, CancellationToken ct = default)
+    {
+        if (!Disciplines.IsValid(discipline)) return false;
+
+        var row = await db.DiscoveredCompetitions.FirstOrDefaultAsync(d => d.Id == id, ct);
+        if (row is null) return false;
+        row.Discipline = discipline;
         await db.SaveChangesAsync(ct);
         return true;
     }

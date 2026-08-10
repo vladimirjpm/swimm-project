@@ -24,6 +24,10 @@ public interface ICompetitionDiscoveryService
     /// <summary>Сменить статус (new | imported | ignored). false — записи нет или статус неизвестен.</summary>
     Task<bool> SetStatusAsync(int id, string status, CancellationToken ct = default);
 
+    /// <summary>Ручная правка вида спорта строки (Disciplines). false — нет записи или
+    /// значение неизвестно.</summary>
+    Task<bool> SetDisciplineAsync(int id, string discipline, CancellationToken ct = default);
+
     /// <summary>Разовый CLI-бэкфилл всех Discovery-строк: проставляет OrgCompId сматченным
     /// (по имени+дате) соревнованиям, импортированным до появления штампа OrgCompId. dry-run
     /// при apply=false (БД не меняется, Action=WouldLink); apply=true пишет одним SaveChanges.</summary>

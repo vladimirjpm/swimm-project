@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
@@ -350,6 +351,9 @@ public class JsonImportService : IImportService
                     {
                         Name = displayName,
                         CountryId = country?.Id,
+                        // Дисциплина по названию: протоколов артистического мы не грузим,
+                        // но если такой файл однажды заедет — он не притворится плаванием.
+                        Discipline = Disciplines.GuessFromName(displayName),
                         Date = item.Date ?? string.Empty,
                         PoolType = NormalizePoolType(item.PoolType),
                         IsMasters = isMasters || (item.IsMasters ?? false),

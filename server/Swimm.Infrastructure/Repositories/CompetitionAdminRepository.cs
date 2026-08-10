@@ -70,7 +70,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
 
     public async Task<UnifiedCompetitionList> GetUnifiedAsync(
         string? search, string? categoryKey, int? season, string? stage, bool showSynthetic, int? month, int page, int pageSize,
-        string? qualityFilter = null, string? kind = null)
+        string? qualityFilter = null, string? kind = null, string? discipline = null)
     {
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 20;
@@ -104,6 +104,10 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             .Select(c => new { OrgCompId = c.OrgCompId!.Value, c.Id })
             .ToDictionaryAsync(c => c.OrgCompId, c => c.Id);
 
+        var disciplineByCompId = await _db.Competitions.AsNoTracking()
+            .Select(c => new { c.Id, c.Discipline })
+            .ToDictionaryAsync(c => c.Id, c => c.Discipline);
+
         var unified = new List<UnifiedCompetitionRowDto>(dbRows.Count + discovered.Count);
         var overlaidRows = new HashSet<CompetitionRowDto>();
 
@@ -114,7 +118,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 DiscoveredId = d.Id, OrgCompId = d.OrgCompId, Name = d.Name,
                 DateStart = d.DateStart, DateEnd = d.DateEnd, Venue = d.Venue,
                 Status = d.Status, Languages = d.Languages, LastError = d.LastError, LogligId = d.LogligId,
-                EmptySourceAt = d.EmptySourceAt
+                EmptySourceAt = d.EmptySourceAt, Discipline = d.Discipline
             };
 
             // Резолв к соревнованию: OrgCompId штампован → он; иначе матч по имени+дате.
@@ -160,6 +164,29 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         if (season is int s)
             unified = unified.Where(u => u.SortDate.Year > 1 && SeasonOf(u.SortDate) == s).ToList();
 
+        // 2b') Вид спорта строки + фильтр. Признак ХРАНИТСЯ (Competition.Discipline /
+        // DiscoveredCompetition.Discipline), здесь только читаем: по названию на лету не
+        // фильтруем сознательно — правило разъехалось бы по вьюхам, а промах распознавания
+        // нельзя было бы поправить на одной строке.
+        foreach (var u in unified)
+        {
+            var compId = u.Db?.Single?.Id ?? (u.Db?.Days.Count > 0 ? u.Db.Days[0].Id : (int?)null);
+            u.Discipline = compId is int id2 && disciplineByCompId.TryGetValue(id2, out var dsc)
+                ? dsc
+                : u.Site?.Discipline ?? Disciplines.Swimming;
+        }
+
+        // Пусто → только плавание: артистическое (~6% входящих) в список не идёт, но и не
+        // теряется — «all» показывает всё, счётчик скрытых уходит наверх.
+        var hiddenByDiscipline = 0;
+        if (!string.Equals(discipline, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            var wanted = Disciplines.IsValid(discipline) ? discipline! : Disciplines.Swimming;
+            var before = unified.Count;
+            unified = unified.Where(u => u.Discipline == wanted).ToList();
+            hiddenByDiscipline = before - unified.Count;
+        }
+
         // 2c) Признак «чемпионат Израиля» — по названию любой стороны строки (у входящих других
         // признаков нет). Считаем всегда: он и фильтр «Тип», и иконка 🏆 в списке.
         foreach (var u in unified)
@@ -198,7 +225,8 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         var total = unified.Count;
         var pageItems = unified.Skip((page - 1) * pageSize).Take(pageSize).ToList();
         return new UnifiedCompetitionList(
-            new PagedResult<UnifiedCompetitionRowDto>(pageItems, total, page, pageSize), monthCounts);
+            new PagedResult<UnifiedCompetitionRowDto>(pageItems, total, page, pageSize), monthCounts,
+            hiddenByDiscipline);
     }
 
     /// <summary>

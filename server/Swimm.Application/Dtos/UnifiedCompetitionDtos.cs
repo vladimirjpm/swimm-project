@@ -22,11 +22,17 @@ public sealed record UnifiedCompetitionList(
     PagedResult<UnifiedCompetitionRowDto> Page,
     /// <summary>Число соревнований в каждом месяце (индекс 0 = январь … 11 = декабрь) под текущими
     /// фильтрами, но БЕЗ фильтра по месяцу — чтобы на кнопках были полные счётчики.</summary>
-    IReadOnlyList<int> MonthCounts);
+    IReadOnlyList<int> MonthCounts,
+    /// <summary>Сколько строк спрятал фильтр дисциплины (артистическое плавание и прочее).
+    /// Показывается чипом «скрыто N»: молча пропавшие строки читаются как потеря данных.</summary>
+    int HiddenByDiscipline = 0);
 
 /// <summary>Discovery-сторона объединённой строки: данные с isr.org.il.</summary>
 public sealed class UnifiedSiteInfo
 {
+    /// <summary>Вид спорта строки с сайта (проставлен при обнаружении, правится в админке).</summary>
+    public string Discipline { get; set; } = "swimming";
+
     public int DiscoveredId { get; set; }
     public int OrgCompId { get; set; }
     public string Name { get; set; } = "";
@@ -67,4 +73,12 @@ public sealed class UnifiedCompetitionRowDto
 
     /// <summary>Чемпионат Израиля (по названию любой стороны строки) — иконка 🏆 и фильтр «Тип».</summary>
     public bool IsChampionship { get; set; }
+
+    /// <summary>
+    /// Вид спорта строки: swimming | artistic | other. У строки в БД берётся из
+    /// <c>Competition.Discipline</c>, у «только на сайте» — из
+    /// <c>Sys_DiscoveredCompetitions.Discipline</c>; и то и другое проставлено при
+    /// обнаружении/импорте, а не угадывается на каждый показ.
+    /// </summary>
+    public string Discipline { get; set; } = "swimming";
 }
