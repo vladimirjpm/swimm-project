@@ -22,7 +22,18 @@ public class ClubOverviewRepository : IClubOverviewRepository
 {
     private readonly SwimmReadDbContext _read;
 
-    public ClubOverviewRepository(SwimmReadDbContext read) => _read = read;
+    /// <summary>
+    /// Нужен ТОЛЬКО витрине Hero: рекорды и season best считает он (там же живёт матчинг
+    /// рекорда по названию клуба и отбор лидеров страны — дублировать это нельзя, разъедется).
+    /// Необязателен: без него плитки остаются нулями, а страница собирается как раньше.
+    /// </summary>
+    private readonly IClubPublicRepository? _clubs;
+
+    public ClubOverviewRepository(SwimmReadDbContext read, IClubPublicRepository? clubs = null)
+    {
+        _read = read;
+        _clubs = clubs;
+    }
 
     /// <summary>Строка зачёта клуба вместе с контекстом соревнования.</summary>
     private sealed record StandingRow(
@@ -110,6 +121,7 @@ public class ClubOverviewRepository : IClubOverviewRepository
             .ToList();
 
         dto.Kpi = BuildKpi(perCompetition);
+        await FillHeroTilesAsync(dto.Kpi, rows, resolvedClubId);
         dto.Groups = BuildGroupTiles(rows, season);
         dto.Grid = BuildGrid(rows, season, groupKey, gridSeasons);
         dto.Timeline = perCompetition
@@ -206,6 +218,48 @@ public class ClubOverviewRepository : IClubOverviewRepository
             }
         }
         return result;
+    }
+
+    /// <summary>
+    /// Плитки Hero (решение Влада 2026-08-09): чемпионаты и первые места — за ВСЮ историю
+    /// клуба, независимо от карусели сезонов; рекорды — действующие; season best — за
+    /// ВИТРИННЫЙ сезон (с последнего зимнего чемпионата, см. <see cref="ShowcaseSeason"/>).
+    ///
+    /// Скоуп у плиток разный намеренно: «чемпионатов за всю историю» — это про масштаб
+    /// клуба, а «лучших времён страны» — про то, как он плывёт сейчас; сводить их к одному
+    /// периоду значит потерять смысл одной из двух цифр. Поэтому в UI каждая плитка
+    /// подписана своим периодом.
+    /// </summary>
+    private async Task FillHeroTilesAsync(ClubKpiDto kpi, IReadOnlyList<StandingRow> rows, int clubId)
+    {
+        // Зачётная единица = соревнование, размеченное как ❄/☀/🌊 (club-page-model §0).
+        var championships = rows.Where(r => r.Kind is not null).ToList();
+        kpi.Championships = championships.Select(r => r.CompetitionId).Distinct().Count();
+        kpi.ChampionshipWins = championships
+            .Where(r => r.Rank == 1)
+            .Select(r => r.CompetitionId)
+            .Distinct()
+            .Count();
+
+        // Витринный сезон: последний ПРОШЕДШИЙ зимний чемпионат по всей базе, а не только
+        // по стартам этого клуба — граница общая для продукта.
+        var winterDates = await _read.Competitions.AsNoTracking()
+            .Where(c => c.IsChampionship)
+            .Select(c => new { c.Date, c.PoolType, c.StandingKindOverride })
+            .ToListAsync();
+
+        var showcaseStart = ShowcaseSeason.StartOf(
+            winterDates
+                .Where(c => StandingKinds.Resolve(true, c.PoolType, c.StandingKindOverride) == StandingKinds.Winter)
+                .Select(c => ParseDate(c.Date))
+                .Where(d => d != DateTime.MinValue),
+            DateTime.UtcNow);
+
+        kpi.ShowcaseSeasonFrom = showcaseStart.ToString("dd/MM/yyyy");
+
+        if (_clubs is null) return;
+        kpi.Records = (await _clubs.GetRecordWallAsync(clubId, null)).Data.Count;
+        kpi.SeasonBests = await _clubs.GetSeasonBestCountAsync(clubId, showcaseStart, DateTime.MaxValue);
     }
 
     /// <summary>KPI Hero. На вход — по ОДНОЙ строке на соревнование (см. схлопывание выше).</summary>

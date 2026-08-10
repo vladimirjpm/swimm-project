@@ -168,68 +168,8 @@ public class ClubPublicRepository : IClubPublicRepository
         var seasonYear = season ?? SeasonMath.CurrentStartYear();
         var range = SeasonMath.RangeOf(seasonYear);
 
-        // ⚠ Выборка НЕ по клубу: лидер сезона определяется по ВСЕЙ базе, и только потом
-        // остаются слоты, где первый — пловец этого клуба (решение Влада 2026-08-01).
-        // Исключение SuspectReason обязательно: помеченная ошибка протокола не должна
-        // делать клуб «первым в стране».
-        var query = _read.Results.AsNoTracking()
-            .Where(r => r.TimeMillisecond != null
-                        && !r.TimeFail
-                        && r.RelayId == null
-                        && r.SuspectReason == null
-                        && r.CompetitionDate >= range.Start
-                        && r.CompetitionDate < range.EndExclusive);
-
-        // ⚠ 25m и 50m — разные времена: PoolType всегда часть ключа секции,
-        // фильтр тут лишь сужает выборку под конкретный бассейн.
-        if (!string.IsNullOrWhiteSpace(poolType))
-            query = query.Where(r => r.Competition.PoolType == poolType);
-
-        // Возраст нужен на строку, поэтому лидеров считаем в памяти: за сезон это ~16 тысяч
-        // заплывов по всем клубам — приемлемо, ответ кэшируется.
-        var rows = await query
-            .Select(r => new
-            {
-                StyleName = r.Style.Name,
-                r.Distance,
-                r.Competition.PoolType,
-                r.Gender,
-                r.TimeOriginal,
-                r.SuspectReason,
-                r.TimeMillisecond,
-                r.SwimmerId,
-                r.ClubId,
-                SwimmerName = (r.Swimmer.LastName + " " + r.Swimmer.FirstName).Trim(),
-                SwimmerNameEn = (r.Swimmer.LastNameEn + " " + r.Swimmer.FirstNameEn).Trim(),
-                CompetitionName = r.Competition.Name,
-                Date = r.Competition.Date,
-                r.CompetitionDate,
-                r.InternationalPoints,
-                r.Swimmer.BirthYear
-            })
-            .ToListAsync();
-
-        // Сколько соревнований вошло в расчёт — эту цифру карточка обязана показать:
-        // «первый в Израиле» у нас значит «первый среди того, что импортировано», а
-        // юниорских и взрослых чемпионатов в базе может не быть вовсе.
-        var meets = rows.Select(r => r.CompetitionName + "|" + r.Date).Distinct().Count();
-
-        // Слот = дисциплина × возрастная ступень. В каждом слоте оставляем ОДНОГО лидера
-        // страны; при равенстве времени — более ранний заплыв.
-        // Возраст берётся ПО СЕЗОНУ (SeasonMath.AgeInSeason), а не по дате заплыва.
-        var leaders = rows
-            .Select(r => new { Row = r, Age = AgeBucket(SeasonMath.AgeInSeason(seasonYear, r.BirthYear)) })
-            .GroupBy(x => new
-            {
-                x.Row.StyleName, x.Row.Distance, x.Row.PoolType, x.Row.Gender, AgeKey = x.Age.Key
-            })
-            .Select(g => g
-                .OrderBy(x => x.Row.TimeMillisecond)
-                .ThenBy(x => x.Row.CompetitionDate)
-                .First())
-            // …и только те слоты, где лидер — пловец этого клуба.
-            .Where(x => x.Row.ClubId == resolvedClubId)
-            .ToList();
+        var (leaders, meets) = await LeadersAsync(
+            resolvedClubId, poolType, range.Start, range.EndExclusive, seasonYear);
 
         var groups = leaders
             .GroupBy(x => new { x.Row.StyleName, x.Row.Distance, x.Row.PoolType, x.Row.Gender })
@@ -283,6 +223,99 @@ public class ClubPublicRepository : IClubPublicRepository
             Data = groups
         };
     }
+
+    /// <summary>
+    /// Сколько слотов season best у клуба в ПРОИЗВОЛЬНОМ окне дат — для витрины Hero
+    /// (витринный сезон режется последним зимним чемпионатом, см. ShowcaseSeason).
+    /// Возраст всё равно считается по КАЛЕНДАРНОМУ сезону: возрастные ступени федерации
+    /// живут по нему, и подменять их витринной границей нельзя.
+    /// </summary>
+    public async Task<int> GetSeasonBestCountAsync(
+        int resolvedClubId, DateTime start, DateTime endExclusive)
+    {
+        var seasonYear = SeasonMath.StartYearOf(start);
+        var (leaders, _) = await LeadersAsync(resolvedClubId, null, start, endExclusive, seasonYear);
+        return leaders.Count;
+    }
+
+    /// <summary>
+    /// Слоты, где лидер страны — пловец этого клуба, плюс сколько стартов вошло в расчёт.
+    ///
+    /// ⚠ Выборка НЕ по клубу: лидер определяется по ВСЕЙ базе, и только потом остаются
+    /// слоты, где первый — наш (решение Влада 2026-08-01). Исключение SuspectReason
+    /// обязательно: помеченная ошибка протокола не должна делать клуб «первым в стране».
+    /// Эстафеты исключены — слот про личное время.
+    /// </summary>
+    private async Task<(List<LeaderRow> Leaders, int Meets)> LeadersAsync(
+        int resolvedClubId, string? poolType, DateTime start, DateTime endExclusive, int seasonYear)
+    {
+        var query = _read.Results.AsNoTracking()
+            .Where(r => r.TimeMillisecond != null
+                        && !r.TimeFail
+                        && r.RelayId == null
+                        && r.SuspectReason == null
+                        && r.CompetitionDate >= start
+                        && r.CompetitionDate < endExclusive);
+
+        // ⚠ 25m и 50m — разные времена: PoolType всегда часть ключа слота,
+        // фильтр тут лишь сужает выборку под конкретный бассейн.
+        if (!string.IsNullOrWhiteSpace(poolType))
+            query = query.Where(r => r.Competition.PoolType == poolType);
+
+        // Возраст нужен на строку, поэтому лидеров считаем в памяти: за сезон это ~16 тысяч
+        // заплывов по всем клубам — приемлемо, ответ кэшируется.
+        var rows = await query
+            .Select(r => new SeasonBestRow(
+                r.Style.Name,
+                r.Distance,
+                r.Competition.PoolType,
+                r.Gender,
+                r.TimeOriginal,
+                r.SuspectReason,
+                r.TimeMillisecond,
+                r.SwimmerId,
+                r.ClubId,
+                (r.Swimmer.LastName + " " + r.Swimmer.FirstName).Trim(),
+                (r.Swimmer.LastNameEn + " " + r.Swimmer.FirstNameEn).Trim(),
+                r.Competition.Name,
+                r.Competition.Date,
+                r.CompetitionDate,
+                r.InternationalPoints,
+                r.Swimmer.BirthYear))
+            .ToListAsync();
+
+        // Сколько соревнований вошло в расчёт — эту цифру карточка обязана показать:
+        // «первый в Израиле» у нас значит «первый среди того, что импортировано», а
+        // юниорских и взрослых чемпионатов в базе может не быть вовсе.
+        var meets = rows.Select(r => r.CompetitionName + "|" + r.Date).Distinct().Count();
+
+        // Слот = дисциплина × возрастная ступень. В каждом слоте оставляем ОДНОГО лидера
+        // страны; при равенстве времени — более ранний заплыв.
+        // Возраст берётся ПО СЕЗОНУ (SeasonMath.AgeInSeason), а не по дате заплыва.
+        var leaders = rows
+            .Select(r => new LeaderRow(r, AgeBucket(r.BirthYear is int by ? SeasonMath.AgeInSeason(seasonYear, by) : null)))
+            .GroupBy(x => new
+            {
+                x.Row.StyleName, x.Row.Distance, x.Row.PoolType, x.Row.Gender, AgeKey = x.Age.Key
+            })
+            .Select(g => g
+                .OrderBy(x => x.Row.TimeMillisecond)
+                .ThenBy(x => x.Row.CompetitionDate)
+                .First())
+            // …и только те слоты, где лидер — пловец этого клуба.
+            .Where(x => x.Row.ClubId == resolvedClubId)
+            .ToList();
+
+        return (leaders, meets);
+    }
+
+    private sealed record SeasonBestRow(
+        string StyleName, string Distance, string? PoolType, string? Gender, string TimeOriginal,
+        string? SuspectReason, int? TimeMillisecond, int SwimmerId, int ClubId, string SwimmerName,
+        string SwimmerNameEn, string CompetitionName, string Date, DateTime CompetitionDate,
+        int InternationalPoints, int? BirthYear);
+
+    private sealed record LeaderRow(SeasonBestRow Row, (string Key, string Label, int Order) Age);
 
     /// <summary>
     /// Возрастная ступень — по устройству таблиц федерации: до 18 включительно каждый год

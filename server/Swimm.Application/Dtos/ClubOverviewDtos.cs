@@ -105,6 +105,32 @@ public sealed class ClubKpiDto
     /// <summary>Лучшее (наименьшее) место клуба в скоупе. null — зачётов нет.</summary>
     [JsonPropertyName("best_rank")]
     public int? BestRank { get; set; }
+
+    // ── Витрина Hero (решение Влада 2026-08-09) ───────────────────────────────
+    // Плитки шапки считают НЕ то же, что поля выше: чемпионаты и первые места — за всю
+    // историю клуба независимо от карусели сезонов, рекорды — действующие, season best —
+    // за ВИТРИННЫЙ сезон (ShowcaseSeason: с последнего зимнего чемпионата).
+    // Старые поля оставлены: они дешёвые и на них держатся тесты и прочие потребители.
+
+    /// <summary>Чемпионатов за всю историю клуба (зачётных единиц, а не дней).</summary>
+    [JsonPropertyName("championships")]
+    public int Championships { get; set; }
+
+    /// <summary>Из них выигранных (Rank = 1), за всю историю.</summary>
+    [JsonPropertyName("championship_wins")]
+    public int ChampionshipWins { get; set; }
+
+    /// <summary>Действующих официальных рекордов за клубом (то же число, что в Record wall).</summary>
+    [JsonPropertyName("records")]
+    public int Records { get; set; }
+
+    /// <summary>Лучших времён страны (season best) за витринный сезон.</summary>
+    [JsonPropertyName("season_bests")]
+    public int SeasonBests { get; set; }
+
+    /// <summary>Начало витринного сезона, dd/MM/yyyy — подпись к плитке season best.</summary>
+    [JsonPropertyName("showcase_season_from")]
+    public string? ShowcaseSeasonFrom { get; set; }
 }
 
 /// <summary>Сезон для фильтра.</summary>

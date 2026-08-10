@@ -53,5 +53,13 @@ public interface IClubPublicRepository
     /// или название + суффикс источника; учитываются и имена склеенных дублей.
     /// <paramref name="poolType"/> — "25m"/"50m", null — оба.
     /// </summary>
+    /// <summary>
+    /// Сколько у клуба лучших времён страны в ПРОИЗВОЛЬНОМ окне дат — плитка Hero
+    /// «season bests» за витринный сезон (<see cref="Swimm.Domain.ShowcaseSeason"/>).
+    /// Отдельный метод, а не параметр к <see cref="GetSeasonBestAsync"/>: карточке нужен
+    /// календарный сезон с меткой, витрине — окно и одно число.
+    /// </summary>
+    Task<int> GetSeasonBestCountAsync(int resolvedClubId, DateTime start, DateTime endExclusive);
+
     Task<ClubRecordWallDto> GetRecordWallAsync(int resolvedClubId, string? poolType);
 }

@@ -85,7 +85,7 @@ function ClubProject() {
 
         {data && (
           <>
-            <ClubHero club={data.club} kpi={data.kpi} scopeLabel={scopeLabel} />
+            <ClubHero club={data.club} kpi={data.kpi} />
 
             {/* Полоса сезонов стоит МЕЖДУ шапкой и табами и действует на всю страницу
                 (handoff filter-season 4c). Карточки, которым сезон не положен —

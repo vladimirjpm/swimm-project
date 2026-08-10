@@ -32,6 +32,13 @@ export interface ClubKpi {
   bronze: number;
   competitions: number;
   best_rank: number | null;
+  /** Плитки Hero. Скоуп у них РАЗНЫЙ и подписан в UI (см. club-hero.tsx). */
+  championships: number;
+  championship_wins: number;
+  records: number;
+  season_bests: number;
+  /** dd/MM/yyyy — начало витринного сезона (docs/season-boundary-rule.md). */
+  showcase_season_from: string | null;
 }
 
 export interface ClubSeasonOption {

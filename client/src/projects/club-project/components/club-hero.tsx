@@ -14,11 +14,11 @@ import UI_FlagEmoji from '../../components/mix/flag-icon/flag-icon';
 interface Props {
   club: ClubProfile;
   kpi: ClubKpi;
-  /** Подпись скоупа: «All seasons» либо «2025/26». */
-  scopeLabel: string;
 }
 
-function ClubHero({ club, kpi, scopeLabel }: Props) {
+// Подписи скоупа у плиток свои (см. ниже), поэтому общий scopeLabel страницы шапке
+// больше не нужен: у неё нет ни одной цифры, которая слушала бы карусель сезонов.
+function ClubHero({ club, kpi }: Props) {
   return (
     <section
       className="mb-4 rounded-2xl border p-6"
@@ -54,17 +54,32 @@ function ClubHero({ club, kpi, scopeLabel }: Props) {
                 <Badge accent>Official group</Badge>
               </a>
             )}
-            <Badge>{club.swimmer_count} swimmers</Badge>
+            {/* Бейджа «N swimmers» тут больше нет: пловцы стали плиткой KPI, а две
+                одинаковые цифры в одной шапке читаются как ошибка. */}
             {club.first_season != null && <Badge>since {club.first_season}</Badge>}
           </div>
         </div>
       </div>
 
+      {/* Плитки (решение Влада 2026-08-09). Скоуп у них РАЗНЫЙ и потому подписан у каждой:
+          чемпионаты и победы — за всю историю клуба (карусель сезонов на них не влияет),
+          рекорды — действующие, season bests — за витринный сезон, который режется
+          последним зимним чемпионатом (docs/season-boundary-rule.md). */}
       <div className="mt-6 flex flex-wrap gap-8">
-        <Kpi label="Points" value={kpi.points} hint={scopeLabel} />
-        <Kpi label="Medals" value={kpi.gold + kpi.silver + kpi.bronze} hint={`${kpi.gold} · ${kpi.silver} · ${kpi.bronze}`} />
-        <Kpi label="Competitions" value={kpi.competitions} hint={scopeLabel} />
-        <Kpi label="Best rank" value={kpi.best_rank ?? '—'} hint={scopeLabel} gold={kpi.best_rank === 1} />
+        <Kpi label="Championships" value={kpi.championships} hint="all time" />
+        <Kpi
+          label="Championship wins"
+          value={kpi.championship_wins}
+          hint="all time"
+          gold={kpi.championship_wins > 0}
+        />
+        <Kpi label="Records" value={kpi.records} hint="in force" />
+        <Kpi
+          label="Season bests"
+          value={kpi.season_bests}
+          hint={kpi.showcase_season_from ? `since ${kpi.showcase_season_from}` : 'this season'}
+        />
+        <Kpi label="Swimmers" value={club.swimmer_count} hint="current roster" />
       </div>
     </section>
   );
