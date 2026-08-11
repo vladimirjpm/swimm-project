@@ -213,7 +213,8 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             .Where(u => u.SortDate.Year > 1)
             .GroupBy(u => SeasonOf(u.SortDate))
             .OrderByDescending(g => g.Key)
-            .Select(g => new SeasonCountDto(g.Key, g.Count(), g.Count(u => u.Db != null)))
+            .Select(g => new SeasonCountDto(
+                g.Key, g.Count(), g.Count(u => u.Db != null), g.Count(IsNothingToPull)))
             .ToList();
 
         // 4b) Фильтр по сезону (сен–авг) — один предикат на обе стороны, по дате строки.
@@ -223,11 +224,13 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         // 4c) Счётчики по месяцам (под текущими фильтрами вкл. сезон, но ДО фильтра по месяцу).
         var monthCounts = new int[12];
         var monthImported = new int[12];
+        var monthNothingToPull = new int[12];
         foreach (var u in unified)
             if (u.SortDate.Year > 1) // непарсибельные даты (MinValue) не считаем
             {
                 monthCounts[u.SortDate.Month - 1]++;
                 if (u.Db != null) monthImported[u.SortDate.Month - 1]++;
+                else if (IsNothingToPull(u)) monthNothingToPull[u.SortDate.Month - 1]++;
             }
 
         // 5) Фильтр по месяцу (если задан) + единый date-desc порядок + пагинация в памяти.
@@ -239,8 +242,21 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         var pageItems = unified.Skip((page - 1) * pageSize).Take(pageSize).ToList();
         return new UnifiedCompetitionList(
             new PagedResult<UnifiedCompetitionRowDto>(pageItems, total, page, pageSize), monthCounts,
-            hiddenByDiscipline, monthImported, seasonCounts);
+            hiddenByDiscipline, monthImported, seasonCounts, monthNothingToPull);
     }
+
+    /// <summary>
+    /// Строка, которую затянуть НЕЛЬЗЯ, а не «ещё не затянули»: в БД её нет и на сайте брать
+    /// нечего — либо протокол пуст (<c>EmptySourceAt</c>, ставится автоматически при разборе,
+    /// который ничего не нашёл), либо результаты вообще не опубликованы (нет loglig-id, и
+    /// значит нет ссылки на файл).
+    ///
+    /// Нужно, чтобы счётчик «затянуто из всего» не пугал зря: «12 из 14» читается как долг
+    /// на две штуки, хотя тянуть там нечего и делать нечего. Ошибка забора
+    /// (<c>LastError</c>) сюда НЕ входит — это как раз повод вернуться.
+    /// </summary>
+    private static bool IsNothingToPull(UnifiedCompetitionRowDto u) =>
+        u.Db == null && u.Site != null && (u.Site.EmptySourceAt != null || u.Site.LogligId == null);
 
     /// <summary>
     /// Чемпионат = чемпионат ИЗРАИЛЯ: «אליפות ישראל» (или английское Israel + Championship).

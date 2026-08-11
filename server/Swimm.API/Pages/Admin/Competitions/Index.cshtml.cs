@@ -93,6 +93,9 @@ public class IndexModel : PageModel
     /// <summary>Из <see cref="MonthCounts"/> — сколько уже затянуто в БД (для «2/5» на кнопке месяца).</summary>
     public IReadOnlyList<int> MonthImported { get; private set; } = new int[12];
 
+    /// <summary>Из <see cref="MonthCounts"/> — сколько затянуть НЕЛЬЗЯ (нечего брать).</summary>
+    public IReadOnlyList<int> MonthNothingToPull { get; private set; } = new int[12];
+
     public IReadOnlyList<CategoryTagDto> Categories { get; private set; } = [];
 
     /// <summary>Чипы-сезоны над списком: сезон + «затянуто из всего». Считаются по тем же
@@ -125,6 +128,7 @@ public class IndexModel : PageModel
         Result = list.Page;
         MonthCounts = list.MonthCounts;
         MonthImported = list.MonthImported ?? new int[12];
+        MonthNothingToPull = list.MonthNothingToPull ?? new int[12];
         SeasonCounts = list.SeasonCounts ?? [];
         HiddenByDiscipline = list.HiddenByDiscipline;
         Categories = await _repo.GetAllCategoriesAsync();

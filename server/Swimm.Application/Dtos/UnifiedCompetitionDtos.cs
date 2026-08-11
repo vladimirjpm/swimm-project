@@ -30,10 +30,21 @@ public sealed record UnifiedCompetitionList(
     IReadOnlyList<int>? MonthImported = null,
     /// <summary>Счётчики по сезонам под текущими фильтрами, но БЕЗ фильтров сезона и месяца —
     /// чипы-сезоны над списком (сезон, всего, затянуто). Порядок — от свежего к старому.</summary>
-    IReadOnlyList<SeasonCountDto>? SeasonCounts = null);
+    IReadOnlyList<SeasonCountDto>? SeasonCounts = null,
+    /// <summary>Из <see cref="MonthCounts"/> — сколько НЕЛЬЗЯ затянуть (нечего брать: пустой
+    /// протокол или результаты не опубликованы). Без этого «12 из 14» читается как долг.</summary>
+    IReadOnlyList<int>? MonthNothingToPull = null);
 
-/// <summary>Сезон (год окончания, 2026 = 25/26) со счётчиками «всего / затянуто в БД».</summary>
-public sealed record SeasonCountDto(int Season, int Total, int Imported);
+/// <summary>
+/// Сезон (год окончания, 2026 = 25/26) со счётчиками. Три числа, а не два: «затянуто»,
+/// «тянуть нечего» (пустой протокол / результаты не опубликованы) и всего. Разница
+/// <c>Total − Imported − NothingToPull</c> — единственное, что реально ждёт работы.
+/// </summary>
+public sealed record SeasonCountDto(int Season, int Total, int Imported, int NothingToPull = 0)
+{
+    /// <summary>Сколько ещё можно затянуть. 0 — сезон закрыт, показываем ✓.</summary>
+    public int Pending => Math.Max(0, Total - Imported - NothingToPull);
+}
 
 /// <summary>Discovery-сторона объединённой строки: данные с isr.org.il.</summary>
 public sealed class UnifiedSiteInfo

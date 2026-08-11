@@ -241,31 +241,58 @@
     }
 </form>
 
-@* Фильтр по сезонам: чип на сезон со счётчиком «затянуто из всего» — 25/26 (12 from 134).
+@{
+    // Счётчик «затянуто» одинаково рисуется на чипе сезона и на кнопке месяца, поэтому
+    // собирается ОДНОЙ функцией. Три числа вместо двух: затянуто / тянуть нечего / всего.
+    //
+    // Зачем «тянуть нечего» отдельным числом: «12 из 14» читается как долг на две штуки,
+    // хотя у этих двух пустой протокол или результаты не опубликованы — сделать с ними
+    // нельзя ничего. Такие показываем плюсом («12+2») и, когда ждать больше нечего,
+    // ставим зелёную галочку: месяц закрыт, возвращаться не надо.
+    (string Html, string Hint) PullCounter(int imported, int nothingToPull, int total)
+    {
+        var pending = Math.Max(0, total - imported - nothingToPull);
+        var body = nothingToPull > 0
+            ? $"{imported}<span class=\"opacity-60\">+{nothingToPull}</span>/{total}"
+            : $"{imported}/{total}";
+        var done = pending == 0 && total > 0;
+        var html = $"<span class=\"ml-1 tabular-nums {(done ? "text-admin-success" : "opacity-70")}\">{body}</span>"
+                   + (done ? "<span class=\"ml-1 text-admin-success\">✓</span>" : "");
+
+        var hint = $"затянуто {imported} из {total}";
+        if (nothingToPull > 0) hint += $", тянуть нечего у {nothingToPull} (пустой протокол или результаты не опубликованы)";
+        hint += pending > 0 ? $", ждёт затягивания {pending}" : " — всё, что можно, затянуто";
+        return (html, hint);
+    }
+}
+
+@* Фильтр по сезонам: чип на сезон со счётчиком «затянуто (+нечего тянуть) из всего».
    Считается по тем же фильтрам, что список, но без сезона/месяца. *@
 <div class="mb-2 flex flex-wrap items-center gap-1.5">
     @{
         var seasonTotal = Model.SeasonCounts.Sum(s => s.Total);
         var seasonImported = Model.SeasonCounts.Sum(s => s.Imported);
+        var seasonNothing = Model.SeasonCounts.Sum(s => s.NothingToPull);
+        var allCounter = PullCounter(seasonImported, seasonNothing, seasonTotal);
     }
     <a href="@SeasonUrl(null)"
        class="@(Model.Season == null ? "admin-btn admin-btn-primary py-1 px-2.5" : "admin-btn admin-btn-ghost py-1 px-2.5")"
-       title="Все сезоны">
-        Все <span class="ml-1 tabular-nums opacity-70">(@seasonImported from @seasonTotal)</span>
+       title="Все сезоны: @allCounter.Hint">
+        Все @Html.Raw(allCounter.Html)
     </a>
     @foreach (var s in Model.SeasonCounts)
     {
         var active = Model.Season == s.Season;
+        var c = PullCounter(s.Imported, s.NothingToPull, s.Total);
         <a href="@SeasonUrl(active ? (int?)null : s.Season)"
            class="@(active ? "admin-btn admin-btn-primary py-1 px-2.5" : "admin-btn admin-btn-ghost py-1 px-2.5")"
-           title="@(active ? "Снять фильтр по сезону" : $"Сезон {s.Season - 1}/{s.Season % 100:00}: затянуто {s.Imported} из {s.Total}")">
-            @($"{(s.Season - 1) % 100:00}-{s.Season % 100:00}")
-            <span class="ml-1 tabular-nums opacity-70">(@s.Imported from @s.Total)</span>
+           title="@(active ? $"Снять фильтр по сезону ({c.Hint})" : $"Сезон {s.Season - 1}/{s.Season % 100:00}: {c.Hint}")">
+            @($"{(s.Season - 1) % 100:00}-{s.Season % 100:00}") @Html.Raw(c.Html)
         </a>
     }
 </div>
 
-<!-- Фильтр по месяцам: 12 кнопок со счётчиками «затянуто/всего» (под текущими фильтрами; клик по активному снимает) -->
+<!-- Фильтр по месяцам: 12 кнопок с тем же счётчиком (под текущими фильтрами; клик по активному снимает) -->
 <div class="mb-3 flex flex-wrap gap-1.5">
     @for (var i = 0; i < 12; i++)
     {
@@ -273,12 +300,14 @@
         var active = Model.Month == m;
         var count = Model.MonthCounts.Count > i ? Model.MonthCounts[i] : 0;
         var imported = Model.MonthImported.Count > i ? Model.MonthImported[i] : 0;
+        var nothing = Model.MonthNothingToPull.Count > i ? Model.MonthNothingToPull[i] : 0;
+        var c = PullCounter(imported, nothing, count);
         <a href="@MonthUrl(active ? (int?)null : m)"
            class="@(active
                ? "admin-btn admin-btn-primary py-1 px-2.5"
                : "admin-btn admin-btn-ghost py-1 px-2.5") @(count == 0 && !active ? "opacity-40" : "")"
-           title="@(active ? "Снять фильтр по месяцу" : $"{monthNames[i]}: затянуто {imported} из {count}")">
-            @monthNames[i] <span class="ml-1 tabular-nums opacity-70">@imported/@count</span>
+           title="@(active ? $"Снять фильтр по месяцу ({c.Hint})" : $"{monthNames[i]}: {c.Hint}")">
+            @monthNames[i] @Html.Raw(c.Html)
         </a>
     }
 </div>
