@@ -131,14 +131,14 @@ public static class IsrOrgCompetitionParser
     // После маркера срыва (DQ/DNS/NS) допускается заметка правила ("/ SW 7.1"):
     // иначе такая строка не считалась полной, подклеивала следующую и теряла её.
     private static Regex FullResultRx => _fullResultRx ??= new Regex(
-        @"^(-|\d+)\s+\d+\s+\d+.*(\d{2}:\d{2}\.\d{2}|DNS|DNF|NS|DQ)(\s+(?:/|SW|\d+\.\d+))*\s+\d+$",
+        @"^(-|\d+)\s+\d+\s+\d+.*((?:\d{1,2}:)?\d{2}:\d{2}\.\d{2}|DNS|DNF|NS|DQ)(\s+(?:/|SW|\d+\.\d+))*\s+\d+$",
         RegexOptions.Compiled);
 
     // EN-строка команды эстафеты: "<heat> <lane> <team> <time> Rank <pos>".
     // Команда бывает пустой (перенос названия на соседние строки) → опциональна.
     private static Regex? _relayTeamLineEn;
     private static Regex RelayTeamLineEn => _relayTeamLineEn ??= new Regex(
-        @"^(?<heat>\d+)\s+(?<lane>\d+)\s+(?:(?<team>.+?)\s+)?(?<time>\d{2}:\d{2}\.\d{1,2}|DQ|NS)\s+Rank\s+(?<pos>\d+)$",
+        @"^(?<heat>\d+)\s+(?<lane>\d+)\s+(?:(?<team>.+?)\s+)?(?<time>(?:\d{1,2}:)?\d{2}:\d{2}\.\d{1,2}|DQ|NS)\s+Rank\s+(?<pos>\d+)$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // Каноничное имя английского стиля → к нижнему регистру + individual_medley.
@@ -233,7 +233,7 @@ public static class IsrOrgCompetitionParser
         RegexOptions.Compiled);
 
     private static Regex RelayTeamLineRxHE => _relayTeamLineRxHE ??= new Regex(
-        @"^(?<heat>\d+)\s+(?<lane>\d+)\s+(?<team>.+?)\s+(?<time>\d{2}:\d{2}\.\d{1,2}|DQ|NS)\s+" +
+        @"^(?<heat>\d+)\s+(?<lane>\d+)\s+(?<team>.+?)\s+(?<time>(?:\d{1,2}:)?\d{2}:\d{2}\.\d{1,2}|DQ|NS)\s+" +
         "מיקום" +
         @"\s+(?<pos>\d+)\s*$",
         RegexOptions.Compiled);
@@ -1506,9 +1506,9 @@ public static class IsrOrgCompetitionParser
                         string? time = null;
                         string? timeFailNote = null;
 
-                        if (Regex.IsMatch(timeTok, @"^\d{2}:\d{2}\.\d{1,2}$"))
+                        if (Regex.IsMatch(timeTok, @"^(?:\d{1,2}:)?\d{2}:\d{2}\.\d{1,2}$"))
                         {
-                            if (timeTok != "00:00.00" && timeTok != "00:00.0")
+                            if (!IsrOrgResultLineParser.IsZeroTime(timeTok))
                             {
                                 time = timeTok;
                             }
@@ -1631,9 +1631,9 @@ public static class IsrOrgCompetitionParser
 
                         string? time = null;
                         string? timeFailNote = null;
-                        if (Regex.IsMatch(timeTok, @"^\d{2}:\d{2}\.\d{1,2}$"))
+                        if (Regex.IsMatch(timeTok, @"^(?:\d{1,2}:)?\d{2}:\d{2}\.\d{1,2}$"))
                         {
-                            if (timeTok != "00:00.00" && timeTok != "00:00.0") time = timeTok;
+                            if (!IsrOrgResultLineParser.IsZeroTime(timeTok)) time = timeTok;
                         }
                         else if (timeTok is "DQ" or "NS")
                         {

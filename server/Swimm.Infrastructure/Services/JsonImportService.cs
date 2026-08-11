@@ -7,6 +7,7 @@ using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
+using Swimm.Domain;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -247,6 +248,8 @@ public class JsonImportService : IImportService
         var deleteMissing = overwriteExisting && (eventOptions?.DeleteMissing ?? false);
 
         int created = 0, skipped = 0, errors = 0;
+        // Строк, легших сразу с ручной пометкой «недостоверно» (галочка в превью).
+        int suspectFlagged = 0;
 
         // Сверка Д1: что обещал файл. Копим в цикле, а не пересобираем потом из items —
         // иначе пришлось бы повторить логику резолва соревнования и стиля второй копией
@@ -683,8 +686,17 @@ public class JsonImportService : IImportService
                     TimeFail = item.TimeFail,
                     TimeFailNote = item.TimeFailNote,
                     InternationalPoints = item.InternationalPoints ?? 0,
-                    Note = item.Note
+                    Note = item.Note,
+                    // Пометка из превью — сразу РУЧНАЯ: её поставил человек, и переживать
+                    // она должна и скан, и переимпорт (см. ApplyPayloadUpdate).
+                    SuspectIsManual = !string.IsNullOrWhiteSpace(item.SuspectNote),
+                    SuspectReason = string.IsNullOrWhiteSpace(item.SuspectNote) ? null : SuspectReasons.Manual,
+                    SuspectNote = string.IsNullOrWhiteSpace(item.SuspectNote)
+                        ? null
+                        : Truncate(item.SuspectNote.Trim(), 300)
                 };
+
+                if (record.SuspectIsManual) suspectFlagged++;
 
                 resultBatch.Add(record);
                 created++;
@@ -1043,6 +1055,7 @@ public class JsonImportService : IImportService
             DataChecks = dataChecksSummary,
             DataCheckErrors = dataCheckErrors,
             DataCheckWarnings = dataCheckWarnings,
+            SuspectFlagged = suspectFlagged,
             Message = message
         };
         }
@@ -1101,6 +1114,15 @@ public class JsonImportService : IImportService
         {
             old.SuspectReason = null;
             old.SuspectNote = null;
+        }
+
+        // Галочка «пометить сомнительным» в превью — это НОВОЕ решение человека, принятое
+        // прямо сейчас; оно перекрывает и отсутствие пометки, и старую ручную заметку.
+        if (incoming.SuspectIsManual)
+        {
+            old.SuspectIsManual = true;
+            old.SuspectReason = incoming.SuspectReason;
+            old.SuspectNote = incoming.SuspectNote;
         }
     }
 
@@ -1721,7 +1743,9 @@ public class JsonImportService : IImportService
     }
 
     /// <summary>
-    /// Парсит строку времени вида "1:23.45" / "59.12" / "29.3" в миллисекунды.
+    /// Парсит строку времени вида "1:23.45" / "59.12" / "29.3" / "00:40:29.16" в миллисекунды.
+    /// Часовая форма приходит с длинных дистанций (3 км) — без неё такие результаты легли бы
+    /// в БД с пустым TimeMillisecond и выпали из рекордов, PB и сортировок.
     /// </summary>
     private static int? ParseTimeToMs(string? time)
     {
@@ -1729,12 +1753,14 @@ public class JsonImportService : IImportService
 
         time = time.Trim().Replace(',', '.');
 
-        var match = Regex.Match(time, @"^(?:(\d+):)?(\d+)\.(\d+)$");
+        var match = Regex.Match(time, @"^(?:(?:(\d+):)?(\d+):)?(\d+)\.(\d+)$");
         if (!match.Success) return null;
 
-        int minutes = match.Groups[1].Success ? int.Parse(match.Groups[1].Value) : 0;
-        int seconds = int.Parse(match.Groups[2].Value);
-        string frac = match.Groups[3].Value;
+        int hours = match.Groups[1].Success ? int.Parse(match.Groups[1].Value) : 0;
+        int minutes = match.Groups[2].Success ? int.Parse(match.Groups[2].Value) : 0;
+        minutes += hours * 60;
+        int seconds = int.Parse(match.Groups[3].Value);
+        string frac = match.Groups[4].Value;
 
         frac = frac.Length switch
         {
@@ -1966,6 +1992,16 @@ public class ResultJsonItem
 
     [JsonPropertyName("note")]
     public string? Note { get; set; }
+
+    /// <summary>
+    /// Пометка «заплыв недостоверен», проставленная человеком ДО импорта — галочкой в превью
+    /// у строки, которая бьёт рекорд (docs/admin-pages/competitions.md). Строка ложится в БД
+    /// сразу с ручной пометкой: иначе между импортом и «Проверить качество» она успевает
+    /// побыть национальным рекордом на витрине, а автоматика ловит такое не всегда.
+    /// Заполняется сервером из выбора в превью, в протоколах федерации этого поля нет.
+    /// </summary>
+    [JsonPropertyName("suspect_note")]
+    public string? SuspectNote { get; set; }
 
     [JsonPropertyName("is_relay")]
     public bool? IsRelay { get; set; }
