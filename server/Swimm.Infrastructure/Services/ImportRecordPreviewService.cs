@@ -45,6 +45,9 @@ public class ImportRecordPreviewService(SwimmDbContext db) : IImportRecordPrevie
                 Count = beaten.Count,
                 Rows = beaten.Take(MaxRows).Select(b => new ImportRecordPreviewRow
                 {
+                    // ResultId кандидата на превью — это порядковый номер строки в файле
+                    // (Id в БД ещё нет), см. ParseRows. Он же адрес для галочки «сомнительный».
+                    RowIndex = (int)b.Row.ResultId,
                     Kind = CompetitionRecordsDetector.Kind(b.Rec),
                     SwimmerName = $"{b.Row.FirstName} {b.Row.LastName}".Trim(),
                     Club = b.Row.Club,

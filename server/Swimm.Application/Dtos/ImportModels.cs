@@ -76,6 +76,12 @@ public class ImportResult
 
     /// <summary>Открытых находок уровня Warning после импорта.</summary>
     public int DataCheckWarnings { get; set; }
+
+    /// <summary>
+    /// Сколько строк легло сразу с РУЧНОЙ пометкой «недостоверно» — галочка в превью
+    /// у заплыва, который бьёт рекорд. 0 — обычный случай.
+    /// </summary>
+    public int SuspectFlagged { get; set; }
 }
 
 /// <summary>Существующее (по ключу (Name|SubName)|Date|PoolType) соревнование, найденное для дня из превью.</summary>

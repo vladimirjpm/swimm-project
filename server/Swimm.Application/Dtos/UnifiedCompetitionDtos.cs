@@ -25,7 +25,15 @@ public sealed record UnifiedCompetitionList(
     IReadOnlyList<int> MonthCounts,
     /// <summary>Сколько строк спрятал фильтр дисциплины (артистическое плавание и прочее).
     /// Показывается чипом «скрыто N»: молча пропавшие строки читаются как потеря данных.</summary>
-    int HiddenByDiscipline = 0);
+    int HiddenByDiscipline = 0,
+    /// <summary>Из <see cref="MonthCounts"/> — сколько уже затянуто в БД (строка есть в справочнике).</summary>
+    IReadOnlyList<int>? MonthImported = null,
+    /// <summary>Счётчики по сезонам под текущими фильтрами, но БЕЗ фильтров сезона и месяца —
+    /// чипы-сезоны над списком (сезон, всего, затянуто). Порядок — от свежего к старому.</summary>
+    IReadOnlyList<SeasonCountDto>? SeasonCounts = null);
+
+/// <summary>Сезон (год окончания, 2026 = 25/26) со счётчиками «всего / затянуто в БД».</summary>
+public sealed record SeasonCountDto(int Season, int Total, int Imported);
 
 /// <summary>Discovery-сторона объединённой строки: данные с isr.org.il.</summary>
 public sealed class UnifiedSiteInfo

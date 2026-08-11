@@ -57,6 +57,27 @@ public class ImportRecordPreviewServiceTests
         Assert.Equal("01:59.85", row.RecordTime);
         Assert.Equal("Age 13 record", row.Kind);
         Assert.Contains("ורדי איתן", row.SwimmerName);
+        // Адрес строки в файле — по нему галочка «пометить сомнительным» попадает
+        // ровно в этот заплыв (см. ImportPayloadSuspectFlags).
+        Assert.Equal(0, row.RowIndex);
+    }
+
+    [Fact]
+    public async Task RowIndex_PointsAtTheRightRow_WhenTheRecordBreakerIsNotFirst()
+    {
+        // Строка-нарушитель второй в файле: индекс обязан быть 1, иначе галочка в превью
+        // пометит чужой заплыв — тихо и незаметно.
+        await using var db = CreateDb(nameof(RowIndex_PointsAtTheRightRow_WhenTheRecordBreakerIsNotFirst));
+        db.Records.Add(AgeRecord("13", "01:59.85"));
+        await db.SaveChangesAsync();
+
+        var json = $"[{Json("02:14.30")[1..^1]},{Json("01:53.09")[1..^1]}]";
+
+        var result = await new ImportRecordPreviewService(db).AnalyzeAsync(json);
+
+        var row = Assert.Single(result.Rows);
+        Assert.Equal(1, row.RowIndex);
+        Assert.Equal("01:53.09", row.Time);
     }
 
     [Fact]

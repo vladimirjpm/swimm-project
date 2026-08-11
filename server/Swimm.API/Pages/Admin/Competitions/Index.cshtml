@@ -13,6 +13,10 @@
     string MonthUrl(int? m) =>
         Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, discipline = Model.Discipline, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = m, filter = Model.QualityFilter })!;
 
+    // Ссылка на сезон (чипы над месяцами; смена сезона сбрасывает месяц и страницу).
+    string SeasonUrl(int? sn) =>
+        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = sn, kind = Model.Kind, discipline = Model.Discipline, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, filter = Model.QualityFilter })!;
+
     var monthNames = new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
     // Текущее состояние списка (фильтры + страница) — уезжает в Edit параметром back,
@@ -218,16 +222,9 @@
             <option value="all" selected="@(Model.Discipline == "all")">все</option>
         </select>
     </label>
-    <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
-        Сезон
-        <select name="season" class="admin-input">
-            <option value="">Все</option>
-            @foreach (var s in Model.Seasons)
-            {
-                <option value="@s" selected="@(s == Model.Season)">@($"{s - 1}/{s % 100:00}")</option>
-            }
-        </select>
-    </label>
+    @* Сезон выбирается чипами над списком (там же счётчики «затянуто из всего»), а не селектом —
+       здесь только скрытое поле, чтобы «Найти» не сбрасывало выбранный сезон. *@
+    <input type="hidden" name="season" value="@Model.Season" />
     <input type="hidden" name="month" value="@Model.Month" />
     @if (!string.IsNullOrEmpty(Model.QualityFilter))
     {
@@ -244,19 +241,44 @@
     }
 </form>
 
-<!-- Фильтр по месяцам: 12 кнопок со счётчиками (под текущими фильтрами; клик по активному снимает) -->
+@* Фильтр по сезонам: чип на сезон со счётчиком «затянуто из всего» — 25/26 (12 from 134).
+   Считается по тем же фильтрам, что список, но без сезона/месяца. *@
+<div class="mb-2 flex flex-wrap items-center gap-1.5">
+    @{
+        var seasonTotal = Model.SeasonCounts.Sum(s => s.Total);
+        var seasonImported = Model.SeasonCounts.Sum(s => s.Imported);
+    }
+    <a href="@SeasonUrl(null)"
+       class="@(Model.Season == null ? "admin-btn admin-btn-primary py-1 px-2.5" : "admin-btn admin-btn-ghost py-1 px-2.5")"
+       title="Все сезоны">
+        Все <span class="ml-1 tabular-nums opacity-70">(@seasonImported from @seasonTotal)</span>
+    </a>
+    @foreach (var s in Model.SeasonCounts)
+    {
+        var active = Model.Season == s.Season;
+        <a href="@SeasonUrl(active ? (int?)null : s.Season)"
+           class="@(active ? "admin-btn admin-btn-primary py-1 px-2.5" : "admin-btn admin-btn-ghost py-1 px-2.5")"
+           title="@(active ? "Снять фильтр по сезону" : $"Сезон {s.Season - 1}/{s.Season % 100:00}: затянуто {s.Imported} из {s.Total}")">
+            @($"{(s.Season - 1) % 100:00}-{s.Season % 100:00}")
+            <span class="ml-1 tabular-nums opacity-70">(@s.Imported from @s.Total)</span>
+        </a>
+    }
+</div>
+
+<!-- Фильтр по месяцам: 12 кнопок со счётчиками «затянуто/всего» (под текущими фильтрами; клик по активному снимает) -->
 <div class="mb-3 flex flex-wrap gap-1.5">
     @for (var i = 0; i < 12; i++)
     {
         var m = i + 1;
         var active = Model.Month == m;
         var count = Model.MonthCounts.Count > i ? Model.MonthCounts[i] : 0;
+        var imported = Model.MonthImported.Count > i ? Model.MonthImported[i] : 0;
         <a href="@MonthUrl(active ? (int?)null : m)"
            class="@(active
                ? "admin-btn admin-btn-primary py-1 px-2.5"
                : "admin-btn admin-btn-ghost py-1 px-2.5") @(count == 0 && !active ? "opacity-40" : "")"
-           title="@(active ? "Снять фильтр по месяцу" : $"Показать только {monthNames[i]}")">
-            @monthNames[i] <span class="ml-1 tabular-nums opacity-70">@count</span>
+           title="@(active ? "Снять фильтр по месяцу" : $"{monthNames[i]}: затянуто {imported} из {count}")">
+            @monthNames[i] <span class="ml-1 tabular-nums opacity-70">@imported/@count</span>
         </a>
     }
 </div>
@@ -872,7 +894,9 @@ else
                             recon: r.reconciliation ?? '', reconBad: r.reconciliationMismatches ?? 0,
                             // Прогон реестра проверок (Д5): гоняется автоматически в конце импорта.
                             checks: r.dataChecks ?? '', checkErr: r.dataCheckErrors ?? 0,
-                            checkWarn: r.dataCheckWarnings ?? 0
+                            checkWarn: r.dataCheckWarnings ?? 0,
+                            // Галочки «сомнительный» из превью — подтверждаем, что пометка легла.
+                            suspect: r.suspectFlagged ?? 0
                         }));
                         finish('ok', 'Готово. Обновляю таблицу…');
                         setTimeout(() => location.reload(), 700);
@@ -901,6 +925,8 @@ else
                     if (d.errors) steps.push({ text: `ошибок ${d.errors}`, state: 'fail' });
                     // Сверка с файлом важнее счётчиков: она отвечает на вопрос «легло ли верно».
                     if (d.recon) steps.push({ text: esc(d.recon), state: d.reconBad ? 'fail' : 'ok' });
+                    // Пометки из превью: молча применённая пометка так же плоха, как молча потерянная.
+                    if (d.suspect) steps.push({ text: `Помечено сомнительными: ${d.suspect} (в рекорды не идут)`, state: 'ok' });
                     // Проверки данных прогоняются сами (Д5) — показываем итог тут же.
                     if (d.checks) steps.push({
                         text: esc(d.checks),
@@ -1051,6 +1077,15 @@ else
             // Настоящий рекорд редок: много рекордов разом почти всегда значит, что протокол
             // разобрался неверно (эталон — 00:32.59 на 100 баттерфляем). Это ПОДСКАЗКА,
             // а не запрет: импорт не блокируется, решает человек.
+            // Заметка пишется САМА и хранится в БД: пометка без причины через полгода
+            // неотличима от случайного клика. Пишем, что именно смутило — время заплыва
+            // против конкретных действующих рекордов.
+            function suspectNote(g) {
+                const s = g.swim;
+                const recs = g.records.map(r => `${r.kind} ${r.recordTime}${r.recordHolder ? ' ' + r.recordHolder : ''}`).join('; ');
+                return `Помечено при импорте: ${s.time} на ${s.distance} ${s.styleName} быстрее рекорда — ${recs}`;
+            }
+
             function renderRecordPreview(rp) {
                 const box = document.getElementById('preview-records');
                 if (!box) return;
@@ -1069,13 +1104,38 @@ else
                 box.className = many
                     ? 'mt-3 rounded border border-admin-danger/40 bg-admin-danger/10 px-3 py-2 text-[12px]'
                     : 'mt-3 rounded border border-admin-warning/40 bg-admin-warning/10 px-3 py-2 text-[12px]';
+                // Один заплыв бьёт и open-, и возрастной рекорд — это ДВЕ строки превью с одним
+                // rowIndex. Галочка у них общая: помечается заплыв, а не «рекорд».
+                const byRow = new Map();
+                (rp.rows || []).forEach(r => {
+                    const key = r.rowIndex;
+                    if (!byRow.has(key)) byRow.set(key, { swim: r, records: [] });
+                    byRow.get(key).records.push(r);
+                });
+
                 box.innerHTML =
                     `<div class="font-semibold">${many ? '⚠ ' : ''}Файл побьёт рекордов: ${rp.count}</div>` +
                     (many ? '<div class="text-admin-text-muted">Столько рекордов сразу — обычно признак того, что протокол разобрался неверно. Стоит посмотреть глазами до «Применить».</div>' : '') +
-                    '<ul class="mt-1 list-disc pl-5">' + (rp.rows || []).map(r =>
-                        `<li dir="rtl" style="text-align:left">${esc(r.swimmerName)} · ${esc(r.distance)} ${esc(r.styleName)} · <b>${esc(r.time)}</b>`
-                        + ` <span class="text-admin-text-muted">(${esc(r.kind)}: ${esc(r.recordTime)} ${esc(r.recordHolder)})</span></li>`).join('') +
+                    '<ul class="mt-1 space-y-1.5">' + [...byRow.values()].map(g => {
+                        const s = g.swim;
+                        const recs = g.records.map(r =>
+                            `<div class="text-admin-text-muted" dir="rtl" style="text-align:left">${esc(r.kind)}: ${esc(r.recordTime)} ${esc(r.recordHolder)}</div>`).join('');
+                        return `<li>`
+                            + `<div dir="rtl" style="text-align:left">${esc(s.swimmerName)} · ${esc(s.distance)} ${esc(s.styleName)} · <b>${esc(s.time)}</b></div>`
+                            + recs
+                            + `<label class="mt-0.5 flex items-center gap-1.5 cursor-pointer text-admin-text-muted">`
+                            + `<input type="checkbox" class="suspect-flag cursor-pointer" value="${s.rowIndex}"`
+                            + ` data-note="${esc(suspectNote(g))}"> пометить заплыв сомнительным</label>`
+                            + `</li>`;
+                    }).join('') +
                     '</ul>' +
+                    // Штатный ложный случай: тянем протокол ТОГО САМОГО старта, на котором рекорд
+                    // и был установлен. Заплыв «бьёт» запись справочника, потому что это она и есть
+                    // (время равное или на сотые лучше — федерация округляет). Ничего делать не надо,
+                    // но без подсказки это читается как ошибка разбора — и галочку жмут зря.
+                    '<div class="mt-1.5 text-admin-text-muted">Если это тот самый заплыв, которым рекорд '
+                    + 'и был установлен, — предупреждение ложное: в справочнике уже стоит он же '
+                    + '(сверь имя и время в скобках). Помечать такую строку не нужно.</div>' +
                     (rp.count > (rp.rows || []).length ? `<div class="text-admin-text-muted">…и ещё ${rp.count - rp.rows.length}</div>` : '');
                 box.classList.remove('hidden');
             }
@@ -1199,7 +1259,11 @@ else
                             eventId: eventChoice && eventChoice !== '__new__' ? Number(eventChoice) : null,
                             newEventName: eventChoice === '__new__' ? document.getElementById('event-name').value.trim() : null,
                             overwriteExisting: document.getElementById('overwrite-existing-cb').checked,
-                            deleteMissing: document.getElementById('overwrite-existing-cb').checked && document.getElementById('delete-missing-cb').checked
+                            deleteMissing: document.getElementById('overwrite-existing-cb').checked && document.getElementById('delete-missing-cb').checked,
+                            // Галочки «пометить заплыв сомнительным» у строк-рекордов: строка
+                            // ляжет в БД сразу помеченной и не побудет рекордом на витрине.
+                            suspectFlags: [...document.querySelectorAll('.suspect-flag:checked')]
+                                .map(i => ({ rowIndex: Number(i.value), note: i.dataset.note || null }))
                         })
                     });
                     const { id: discId, name } = preview;

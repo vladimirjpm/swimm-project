@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using System.Text;
 
 namespace Swimm.API.Controllers;
@@ -316,8 +317,13 @@ public class DiscoveryAdminController : ControllerBase
         var discoveredOrgCompId = (await _discovery.GetAllAsync(ct))
             .FirstOrDefault(d => d.Id == entry.DiscoveredId)?.OrgCompId;
 
+        // Галочки «пометить сомнительным» из превью: адресуются порядковым номером строки
+        // в разобранном файле (ImportRecordPreviewRow.RowIndex) и уезжают в сам payload
+        // полем suspect_note — импорт положит такую строку сразу с ручной пометкой.
+        var resultsJson = ImportPayloadSuspectFlags.Apply(entry.Parsed.ResultsJson, request.SuspectFlags);
+
         var jobId = _jobs.Enqueue(
-            Encoding.UTF8.GetBytes(entry.Parsed.ResultsJson),
+            Encoding.UTF8.GetBytes(resultsJson),
             entry.FileName,
             request.CategoryKeys,
             eventOptions,
@@ -375,5 +381,6 @@ public class DiscoveryAdminController : ControllerBase
         int? EventId,
         string? NewEventName,
         bool OverwriteExisting = false,
-        bool DeleteMissing = false);
+        bool DeleteMissing = false,
+        IReadOnlyList<ImportSuspectFlag>? SuspectFlags = null);
 }

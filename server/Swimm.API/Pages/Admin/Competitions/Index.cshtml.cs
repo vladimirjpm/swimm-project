@@ -90,10 +90,14 @@ public class IndexModel : PageModel
     /// <summary>Счётчики соревнований по месяцам (индекс 0 = январь) для кнопок-фильтров.</summary>
     public IReadOnlyList<int> MonthCounts { get; private set; } = new int[12];
 
+    /// <summary>Из <see cref="MonthCounts"/> — сколько уже затянуто в БД (для «2/5» на кнопке месяца).</summary>
+    public IReadOnlyList<int> MonthImported { get; private set; } = new int[12];
+
     public IReadOnlyList<CategoryTagDto> Categories { get; private set; } = [];
 
-    /// <summary>Сезоны для фильтра — из справочника И из строк с сайта (прошлые сезоны автозабора).</summary>
-    public IReadOnlyList<int> Seasons { get; private set; } = [];
+    /// <summary>Чипы-сезоны над списком: сезон + «затянуто из всего». Считаются по тем же
+    /// фильтрам, что и список, но без фильтров сезона/месяца — иначе чип остался бы один.</summary>
+    public IReadOnlyList<SeasonCountDto> SeasonCounts { get; private set; } = [];
 
     /// <summary>Правила очков и типы бассейна — для селектов панели быстрой правки строки.</summary>
     public IReadOnlyList<PointRuleRowDto> ClubRules { get; private set; } = [];
@@ -120,9 +124,10 @@ public class IndexModel : PageModel
         var list = await _repo.GetUnifiedAsync(Search, CategoryKey, Season, Stage, ShowSynthetic, Month, PageNumber, PageSize, QualityFilter, Kind, Discipline);
         Result = list.Page;
         MonthCounts = list.MonthCounts;
+        MonthImported = list.MonthImported ?? new int[12];
+        SeasonCounts = list.SeasonCounts ?? [];
         HiddenByDiscipline = list.HiddenByDiscipline;
         Categories = await _repo.GetAllCategoriesAsync();
-        Seasons = await _repo.GetAvailableSeasonsAsync();
         ClubRules = await _rules.GetAllAsync(PointRuleKind.Clubs);
         SwimmerRules = await _rules.GetAllAsync(PointRuleKind.Swimmers);
     }

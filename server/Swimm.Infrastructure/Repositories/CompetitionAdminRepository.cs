@@ -160,11 +160,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 Stage = CompetitionStage.DbOnly, Db = row, SortDate = RowDate(row)
             });
 
-        // 2b) Фильтр по сезону (сен–авг) — один предикат на обе стороны, по дате строки.
-        if (season is int s)
-            unified = unified.Where(u => u.SortDate.Year > 1 && SeasonOf(u.SortDate) == s).ToList();
-
-        // 2b') Вид спорта строки + фильтр. Признак ХРАНИТСЯ (Competition.Discipline /
+        // 2b) Вид спорта строки + фильтр. Признак ХРАНИТСЯ (Competition.Discipline /
         // DiscoveredCompetition.Discipline), здесь только читаем: по названию на лету не
         // фильтруем сознательно — правило разъехалось бы по вьюхам, а промах распознавания
         // нельзя было бы поправить на одной строке.
@@ -211,11 +207,28 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             _ => unified
         };
 
-        // 4) Счётчики по месяцам (под текущими фильтрами, но ДО фильтра по месяцу — для кнопок).
+        // 4) Счётчики по сезонам — ДО фильтра по сезону, иначе на чипах остался бы один сезон.
+        // «Затянуто» = строка есть в справочнике БД (стадии Imported/DbOnly), т.е. Db != null.
+        var seasonCounts = unified
+            .Where(u => u.SortDate.Year > 1)
+            .GroupBy(u => SeasonOf(u.SortDate))
+            .OrderByDescending(g => g.Key)
+            .Select(g => new SeasonCountDto(g.Key, g.Count(), g.Count(u => u.Db != null)))
+            .ToList();
+
+        // 4b) Фильтр по сезону (сен–авг) — один предикат на обе стороны, по дате строки.
+        if (season is int s)
+            unified = unified.Where(u => u.SortDate.Year > 1 && SeasonOf(u.SortDate) == s).ToList();
+
+        // 4c) Счётчики по месяцам (под текущими фильтрами вкл. сезон, но ДО фильтра по месяцу).
         var monthCounts = new int[12];
+        var monthImported = new int[12];
         foreach (var u in unified)
             if (u.SortDate.Year > 1) // непарсибельные даты (MinValue) не считаем
+            {
                 monthCounts[u.SortDate.Month - 1]++;
+                if (u.Db != null) monthImported[u.SortDate.Month - 1]++;
+            }
 
         // 5) Фильтр по месяцу (если задан) + единый date-desc порядок + пагинация в памяти.
         if (month is >= 1 and <= 12)
@@ -226,7 +239,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         var pageItems = unified.Skip((page - 1) * pageSize).Take(pageSize).ToList();
         return new UnifiedCompetitionList(
             new PagedResult<UnifiedCompetitionRowDto>(pageItems, total, page, pageSize), monthCounts,
-            hiddenByDiscipline);
+            hiddenByDiscipline, monthImported, seasonCounts);
     }
 
     /// <summary>

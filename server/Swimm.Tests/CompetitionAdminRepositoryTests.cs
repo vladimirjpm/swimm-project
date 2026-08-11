@@ -160,6 +160,18 @@ public class CompetitionAdminRepositoryTests
         Assert.Equal(1, season2020.Page.TotalCount);
         Assert.Equal("PDF only comp", season2020.Page.Items[0].Db!.Single!.Name);
 
+        // Чипы-сезоны: считаются ДО фильтра по сезону (иначе чип остался бы один) и несут
+        // «затянуто из всего» — затянуто = строка есть в БД (Imported/DbOnly).
+        Assert.Equal([2026, 2020], all.SeasonCounts!.Select(s => s.Season));
+        var chip2026 = all.SeasonCounts!.First(s => s.Season == 2026);
+        Assert.Equal(3, chip2026.Total);     // imported + onSite + ignored
+        Assert.Equal(1, chip2026.Imported);  // в БД только imported
+        Assert.Equal(new SeasonCountDto(2020, 1, 1), all.SeasonCounts!.First(s => s.Season == 2020));
+        // Сезон выбран → чипы прежние, а счётчики месяцев уже по сезону.
+        Assert.Equal(2, season2026.SeasonCounts!.Count);
+        Assert.Equal(0, season2026.MonthCounts[0]);   // январь 2020 в сезон 2026 не входит
+        Assert.Equal(1, season2026.MonthImported![6]); // июль: затянута одна из одной
+
         // Список сезонов для селекта — из обеих сторон, по убыванию.
         var seasons = await repo.GetAvailableSeasonsAsync();
         Assert.Equal(seasons.OrderByDescending(s => s), seasons);

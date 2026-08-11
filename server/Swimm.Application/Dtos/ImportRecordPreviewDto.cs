@@ -31,6 +31,15 @@ public sealed class ImportRecordPreviewDto
 /// <summary>Один побиваемый рекорд в превью импорта.</summary>
 public sealed class ImportRecordPreviewRow
 {
+    /// <summary>
+    /// Порядковый номер строки в разобранном файле — адрес заплыва ДО того, как у него
+    /// появился Id в БД. По нему галочка «пометить сомнительным» в превью попадает ровно
+    /// в тот заплыв, который человек видел на экране (см. DiscoveryAdminController.Import).
+    /// Один заплыв может бить два рекорда (open + возрастной) — тогда две строки превью
+    /// несут ОДИН RowIndex.
+    /// </summary>
+    public int RowIndex { get; set; }
+
     /// <summary>«Age 13 record» / «Open record» / «Masters 45-49».</summary>
     public string Kind { get; set; } = "";
     public string SwimmerName { get; set; } = "";
