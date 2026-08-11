@@ -287,7 +287,9 @@ else
                     <th>OrgCompId</th>
                     <th>Площадка / языки</th>
                     <th class="text-right">Строк</th>
-                    <th></th>
+                    @* Колонка действий липкая (см. .col-actions): таблица шире экрана,
+                       и «Открыть» уезжал за правый край — строка выглядела без действий. *@
+                    <th class="col-actions"></th>
                 </tr>
             </thead>
             <tbody>
@@ -321,7 +323,7 @@ else
                             </td>
                             <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(u.Site != null ? System.Net.WebUtility.HtmlEncode(u.Site.Venue ?? "—") + LangBadges(u.Site.Languages) : "—")</td>
                             <td class="text-right tabular-nums">@ev.TotalResultCount</td>
-                            <td class="text-right whitespace-nowrap">
+                            <td class="col-actions text-right whitespace-nowrap">
                                 @* Проверка качества вынесена в саму строку (раньше жила только в
                                    раскрытой панели и потому не попадалась на глаза): после импорта
                                    её нужно нажимать вручную — автозапуска нет. *@
@@ -372,7 +374,7 @@ else
                             </td>
                             <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(u.Site != null ? System.Net.WebUtility.HtmlEncode(u.Site.Venue ?? "—") + LangBadges(u.Site.Languages) : "—")</td>
                             <td class="text-right tabular-nums">@c.ResultCount</td>
-                            <td class="text-right whitespace-nowrap">
+                            <td class="col-actions text-right whitespace-nowrap">
                                 @* См. комментарий у события: кнопка вынесена из панели в строку. *@
                                 @if (c.ResultCount > 0)
                                 {
@@ -421,7 +423,7 @@ else
                             <td class="text-admin-text-muted">@s.OrgCompId</td>
                             <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(System.Net.WebUtility.HtmlEncode(s.Venue ?? "—") + LangBadges(s.Languages))</td>
                             <td class="text-right text-admin-text-muted">—</td>
-                            <td class="text-right whitespace-nowrap">
+                            <td class="col-actions text-right whitespace-nowrap">
                                 <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 row-toggle"
                                         data-key="@rowKey" aria-expanded="false">▸ Открыть</button>
                             </td>
@@ -476,7 +478,7 @@ else
                                                     </td>
                                                     <td>@await Html.PartialAsync("/Pages/Admin/Competitions/_CompFlags.cshtml", d)</td>
                                                     <td class="text-right tabular-nums">@d.ResultCount</td>
-                                                    <td class="text-right whitespace-nowrap">
+                                                    <td class="col-actions text-right whitespace-nowrap">
                                                         <a href="@EditUrl(d.Id)" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
                                                         <form method="post" asp-page-handler="Delete"
                                                               asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
@@ -1277,7 +1279,7 @@ else
                                         ${esc(REASONS[r.reason] ?? r.reason)}${r.isManual ? ' (вручную)' : ''}</span>
                                     <div class="text-[11px] text-admin-text-muted mt-0.5">${esc(r.note ?? '')}</div>
                                 </td>
-                                <td class="text-right whitespace-nowrap">
+                                <td class="col-actions text-right whitespace-nowrap">
                                     <button type="button" class="admin-btn admin-btn-ghost py-1 px-2 quality-clear"
                                             data-id="${r.resultId}" title="Строка в порядке — снять пометку">Снять</button>
                                 </td>
@@ -1304,7 +1306,7 @@ else
                                 <td>${esc(r.swimmerName)} <span class="text-admin-text-muted">· ${esc(r.club)}</span></td>
                                 <td class="whitespace-nowrap">${esc(r.distance)} ${esc(r.styleName)}</td>
                                 <td class="text-right tabular-nums font-semibold">${esc(r.time)}</td>
-                                <td class="text-right whitespace-nowrap">
+                                <td class="col-actions text-right whitespace-nowrap">
                                     ${r.reason
                                         ? '<span class="text-[11px] text-admin-text-muted">уже помечено</span>'
                                         : `<button type="button" class="admin-btn admin-btn-ghost py-1 px-2 quality-flag"
