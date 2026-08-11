@@ -580,6 +580,42 @@
   --theme-border: var(--theme-mode-border);
 }
 
+/* Носитель спорного времени: строка таблицы результатов, карточка «Best times by style»
+   (гибрид 15d). Caution-лента слева во всю высоту — ДЕКОРАЦИЯ (::before, для скринридера
+   невидим): смысл несёт чип «⚠ Under review», который рисует UI_SwimTime, а полный текст
+   уходит в title/aria-label носителя. Класс и атрибуты выдаёт `swimFlaggedRowProps` —
+   один источник на все экраны.
+   Живёт здесь, а не в CSS конкретной фичи: помеченный заплыв показывается на нескольких
+   страницах, и импорт чужого feature.css ради одной ленты был бы хуже.
+   Отступ под ленту добавляет вызывающий (pl-*): у строки таблицы и у карточки свой
+   базовый паддинг, и переопределять tailwind-утилиту отсюда значило бы полагаться на
+   порядок слоёв в бандле. Фон, зебру и hover носителя не трогаем — метка не должна
+   маскировать сам результат. */
+.swim-flagged-row {
+  position: relative;
+}
+
+.swim-flagged-row::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 8px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--theme-flag-tape-a) 0 8px,
+    var(--theme-flag-tape-b) 8px 16px
+  );
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+/* У карточки скруглённые углы — лента обязана повторить их, иначе торчит квадратом. */
+.swim-flagged-row--rounded::before {
+  border-start-start-radius: inherit;
+  border-end-start-radius: inherit;
+}
+
 /* Утилитарные классы для тем */
 .theme-bg-section {
   background-color: var(--theme-bg-section);

@@ -20,6 +20,31 @@ import UI_InfoPopup, { InfoText } from '../../info-popup/info-popup';
 
 export type SwimQualityKind = 'protocol' | 'record';
 
+/**
+ * Полная формулировка для `title`/`aria-label` носителя пометки (строка результата,
+ * плитка рекорда). В самом чипе только «Under review» — короткая подпись; развёрнутый
+ * текст обязан быть рядом, иначе значок читается как украшение. Держим здесь, чтобы
+ * подпись и объяснение не разъехались по экранам.
+ */
+export const SWIM_QUALITY_TITLE =
+  'Suspected timing error. The result is being verified and may be corrected or removed.';
+
+/**
+ * Атрибуты СТРОКИ/КАРТОЧКИ, несущей спорное время (гибрид 15d): caution-лента слева
+ * (класс `swim-flagged-row`, стили и токены — в `index.css`) плюс полный текст в
+ * title/aria-label. Чип рисует сам `UI_SwimTime` — здесь только «обвязка» носителя.
+ *
+ * Живёт рядом с компонентом по той же причине, что и он сам: помеченный заплыв
+ * показывается на нескольких экранах (таблица результатов, карточка спортсмена,
+ * стена рекордов), и три копии одного className с одним текстом разъедутся на первой же
+ * правке. Возвращает пустой объект, если качество не задано, — вызывающий просто
+ * разворачивает его в JSX.
+ */
+export const swimFlaggedRowProps = (quality?: SwimQuality | null) =>
+  quality
+    ? { className: 'swim-flagged-row', title: SWIM_QUALITY_TITLE, 'aria-label': SWIM_QUALITY_TITLE }
+    : {};
+
 export interface SwimQuality {
   kind: SwimQualityKind;
   /** Код причины (`manual`, `personal_outlier`, …) — сейчас только для отладки/аналитики. */
@@ -98,14 +123,22 @@ interface SwimTimeProps {
   /** Классы на само время — типографика остаётся за вызывающим экраном. */
   className?: string;
   /**
-   * Вид метки: 'icon' — значок ⚠ рядом со временем (по умолчанию, для строк и таблиц);
-   * 'chip' — подпись «⚠ Under review» (стена рекордов, вариант 13a): голый значок там
-   * не считывался, а места на подпись хватает. Объяснялка у обоих одна.
+   * Вид метки: 'icon' — значок ⚠ рядом со временем; 'chip' — подпись «⚠ Under review»
+   * (стена рекордов — вариант 13a, строка результатов — гибрид 15d): голый значок не
+   * считывался, а места на подпись хватает. Объяснялка у обоих одна.
    */
   marker?: 'icon' | 'chip';
+  /**
+   * Размер чипа: 'md' — стена рекордов (11px, паддинг 3/10), 'sm' — строка таблицы
+   * результатов (10px, паддинг 2/9), где чип стоит под временем в узкой колонке.
+   * Цвета у обоих одни и те же токены `--theme-flag-*` — разный только кегль.
+   */
+  chipSize?: 'sm' | 'md';
 }
 
-const UI_SwimTime: React.FC<SwimTimeProps> = ({ time, quality, className = '', marker = 'icon' }) => {
+const UI_SwimTime: React.FC<SwimTimeProps> = ({
+  time, quality, className = '', marker = 'icon', chipSize = 'md',
+}) => {
   const [open, setOpen] = React.useState(false);
   if (!quality) return <span className={className}>{time}</span>;
 
@@ -124,7 +157,9 @@ const UI_SwimTime: React.FC<SwimTimeProps> = ({ time, quality, className = '', m
           type="button"
           onClick={openInfo}
           aria-label={TITLE[quality.kind].en}
-          className="inline-flex shrink-0 items-center gap-[5px] whitespace-nowrap rounded-full px-[10px] py-[3px] text-[11px] font-extrabold leading-none hover:opacity-80"
+          className={`inline-flex shrink-0 items-center gap-[5px] whitespace-nowrap rounded-full font-extrabold leading-none hover:opacity-80 ${
+            chipSize === 'sm' ? 'px-[9px] py-[2px] text-[10px]' : 'px-[10px] py-[3px] text-[11px]'
+          }`}
           style={{
             background: 'var(--theme-flag-chip-bg)',
             color: 'var(--theme-flag-text)',

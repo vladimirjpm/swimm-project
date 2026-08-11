@@ -23,6 +23,7 @@ import { useResultsLoadMode } from '../../hooks/useResultsLoadMode';
 import { useCompetitionMedia } from '../../hooks/useCompetitionMedia';
 import { buildResultsFilterParams, fetchResultsPage } from '../../utils/helpers/results-api';
 import AddLinkModal from '../my-media-project/components/add-link-modal';
+import { swimFlaggedRowProps } from '../components/mix/swim-time/swim-time';
 import { addUserMedia } from '../my-media-project/use-all-my-media';
 
 function ResultsTable() {
@@ -501,11 +502,19 @@ function ResultsTable() {
                   }
                 : undefined;
 
+              // Спорное время (гибрид 15d): caution-лента слева во всю высоту строки + чип
+              // «⚠ Under review» под временем (рисует UI_SwimTime). Признак тот же самый,
+              // по которому раньше стоял голый значок ⚠ — suspect_reason с сервера.
+              const isFlagged = !!resForRow.suspect_reason;
+              const flagProps = swimFlaggedRowProps(
+                isFlagged ? { kind: 'protocol', reason: resForRow.suspect_reason } : null);
+
               return (
                 <React.Fragment key={index}>
                   <li
                     data-result-id={resForRow.id ?? undefined}
-                    className={`lg:hidden flex flex-col gap-2 px-3 py-2 rounded border-l-4 border-b border-b-[var(--theme-mode-border-row)] ${isPrimary ? 'border-l-[#f5b800] bg-[var(--theme-mode-me-highlight)]' : `border-l-transparent ${Helper.getGenderBgClass(rowGender)}`}`}
+                    {...flagProps}
+                    className={`lg:hidden flex flex-col gap-2 ${isFlagged ? 'pl-5 pr-3' : 'px-3'} py-2 rounded border-l-4 border-b border-b-[var(--theme-mode-border-row)] ${flagProps.className ?? ''} ${isPrimary ? 'border-l-[#f5b800] bg-[var(--theme-mode-me-highlight)]' : `border-l-transparent ${Helper.getGenderBgClass(rowGender)}`}`}
                   >
                     <ResultsTableMobile
                       res={resForRow}
@@ -533,7 +542,8 @@ function ResultsTable() {
 
                   <li
                     data-result-id={resForRow.id ?? undefined}
-                    className={`hidden lg:grid ${isPrimary ? '' : Helper.getGenderBgClass(rowGender)}`}
+                    {...flagProps}
+                    className={`hidden lg:grid ${flagProps.className ?? ''} ${isFlagged ? 'pl-2' : ''} ${isPrimary ? '' : Helper.getGenderBgClass(rowGender)}`}
                   >
                     <ResultsTableDesktop
                       res={resForRow}

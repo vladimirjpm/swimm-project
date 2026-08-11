@@ -143,6 +143,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
           secondLineClassName="text-xs justify-start"
           isRecordHolder={isRecordTime}
           quality={res.suspect_reason ? { kind: 'protocol', reason: res.suspect_reason } : null}
+          qualityMarker="chip"
         />
       </div>
 

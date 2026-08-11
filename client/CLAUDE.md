@@ -98,6 +98,15 @@ npm --prefix client run build      # prebuild авто-генерит club-icons
 (`Results.SuspectReason`), `record` — спорная запись справочника рекордов (`Sys_RecordIssues`).
 Тексты объяснений разные, оба на EN/RU/HE. Источник мы не правим — помечаем.
 
+**Носитель пометки (строка/карточка) тоже оформляется из одного места** — хелпер
+`swimFlaggedRowProps(quality)` из того же модуля отдаёт класс `swim-flagged-row`
+(caution-лента слева, стили и токены `--theme-flag-*` — в `src/index.css`) и полный текст
+в `title`/`aria-label`. Так оформлены строка таблицы результатов и карточка «Best times by
+style»; чип «⚠ Under review» вместо голого значка включается пропом `qualityMarker="chip"`
+у `UI_SwimmerTimeCell`. Отступ под ленту (`pl-*`) добавляет вызывающий — у каждой
+поверхности свой базовый паддинг. Спека — `!design_handoff/design_handoff_competition_overview_rec-warning/RECORD-FLAG.md`
+(карточка рекорда — вариант 13a, строка — гибрид 15d).
+
 Инвариант на стороне API: **DTO, несущий время заплыва, несёт и признак качества**
 (И11, см. `docs/data-integrity.md`). План перевода экранов —
 [`docs/plans/swim-time-quality-everywhere-plan.md`](../docs/plans/swim-time-quality-everywhere-plan.md).

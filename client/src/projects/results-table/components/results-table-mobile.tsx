@@ -127,6 +127,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
                 className="text-right"
                 isRecordHolder={isRecordTime}
           quality={res.suspect_reason ? { kind: 'protocol', reason: res.suspect_reason } : null}
+          qualityMarker="chip"
               />
               {showEvent && (
                 <UI_SwimmStyleIcon

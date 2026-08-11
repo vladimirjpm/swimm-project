@@ -113,6 +113,7 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
           firstLineClassName="text-xl font-bold tabular-nums"
           isRecordHolder={isRecordTime}
           quality={res.suspect_reason ? { kind: 'protocol', reason: res.suspect_reason } : null}
+          qualityMarker="chip"
         />
       </div>
 
