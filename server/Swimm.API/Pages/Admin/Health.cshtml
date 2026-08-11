@@ -36,6 +36,8 @@
     // База публичного сайта: пусто = тот же origin (прод), в dev — Vite на своём порту.
     // Сами находки хранят только относительный путь (контракт client/src/utils/routes.ts).
     const PUBLIC_BASE = @Html.Raw(Json.Serialize(Model.PublicSiteBaseUrl));
+    // Правила клубных очков для селекта в находке: их единицы, поэтому отдаём страницей.
+    const CLUB_RULES = @Html.Raw(Json.Serialize(Model.ClubRules.Select(r => new { r.Id, r.Version, r.Description })));
     const SEV = { 2: ['Ошибка', 'bg-admin-danger/20 text-[#ef9a9a]'],
                   1: ['Предупреждение', 'bg-admin-warning/15 text-admin-warning'],
                   0: ['Инфо', 'bg-white/[.08] text-admin-text-muted'] };
@@ -75,6 +77,7 @@
                             data-name="${esc(f.subjectName)}" title="Скопировать имя — искать в интернете">копировать</button>
                     ${f.fixKind === 'swimmer-gender' ? renderFixControls(f) : ''}
                 </div>` : ''}
+                ${f.fixKind === 'competition-club-rule' ? renderClubRule(f) : ''}
                 ${accepted && f.note ? `<div class="text-[11px] text-admin-text-muted">принято: ${esc(f.note)}</div>` : ''}</td>
             <td class="align-top whitespace-nowrap text-[11px] text-admin-text-muted">
                 ${f.publicLink ? `<a href="${esc(PUBLIC_BASE + f.publicLink)}" target="_blank" rel="noopener"
@@ -85,6 +88,22 @@
                     ? `<button class="admin-btn admin-btn-ghost py-1 px-2 finding-reopen" data-id="${f.id}">Вернуть</button>`
                     : `<button class="admin-btn admin-btn-ghost py-1 px-2 finding-accept" data-id="${f.id}">Принять</button>`}
             </td></tr>`;
+    }
+
+    // Правило клубных очков выбирается прямо здесь: заходить в карточку соревнования ради
+    // одного селекта незачем, а находок бывает десяток за раз. Сохраняем сразу по выбору —
+    // отдельная кнопка «ок» на один селект только добавляет клик.
+    function renderClubRule(f) {
+        const opts = CLUB_RULES.map(r =>
+            `<option value="${r.id}" ${f.subjectClubRuleId === r.id ? 'selected' : ''}
+                     title="${esc(r.description || '')}">${esc(r.version)}</option>`).join('');
+        return `<div class="mt-1 flex items-center gap-1.5">
+            <span class="text-[11px] text-admin-text-muted">правило клубных очков:</span>
+            <select class="admin-input py-0.5 px-1.5 text-[12px] w-auto finding-club-rule" data-id="${f.id}">
+                <option value="">— выбрать —</option>${opts}
+            </select>
+            <span class="text-[11px] text-admin-text-muted finding-club-rule-info"></span>
+        </div>`;
     }
 
     // Проставленное должно быть ВИДНО: иначе после нажатия непонятно, что уже сделано, и
@@ -179,6 +198,8 @@
         document.querySelectorAll('.finding-copy').forEach(b => b.addEventListener('click', () => copyName(b)));
         document.querySelectorAll('.finding-gender').forEach(b =>
             b.addEventListener('click', () => fixGender(b.dataset.id, b.dataset.gender, b)));
+        document.querySelectorAll('.finding-club-rule').forEach(sel =>
+            sel.addEventListener('change', () => fixClubRule(sel)));
         document.querySelectorAll('.finding-loglig').forEach(b =>
             b.addEventListener('click', () => setLoglig(b)));
         const bulk = document.getElementById('btn-gender-all');
@@ -206,6 +227,28 @@
 
     // Проставить пол пловцу прямо из находки. Сервер правит и строки без пола — иначе
     // находка осталась бы висеть до переимпорта и кнопка выглядела бы сломанной.
+    async function fixClubRule(sel) {
+        const ruleId = Number(sel.value);
+        if (!ruleId) return;
+        const info = sel.parentElement.querySelector('.finding-club-rule-info');
+        sel.disabled = true;
+        info.textContent = 'сохраняю…';
+        try {
+            await api(`${API}/${sel.dataset.id}/fix-club-rule`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ruleId })
+            });
+            // Зачёт пересчитан на сервере; находка исчезнет на следующем прогоне, поэтому
+            // здесь просто показываем, что правило встало.
+            info.textContent = '✓ привязано, зачёт пересчитан';
+        } catch (e) {
+            info.textContent = '';
+            toast('Ошибка: ' + e.message, 5000);
+        } finally {
+            sel.disabled = false;
+        }
+    }
+
     async function fixGender(id, gender, btn) {
         btn.disabled = true;
         try {

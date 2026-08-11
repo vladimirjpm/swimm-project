@@ -50,6 +50,8 @@ public class DataChecksAdminController(IDataCheckRunner runner, IAdminAuditServi
         return Ok();
     }
 
+    public sealed record FixClubRuleRequest(int RuleId);
+
     public sealed record FixGenderRequest(string Gender);
 
     /// <summary>
@@ -69,6 +71,20 @@ public class DataChecksAdminController(IDataCheckRunner runner, IAdminAuditServi
             new { findingId = id, request.Gender, rows }, ct);
 
         return Ok(new { rows });
+    }
+
+    /// <summary>Привязать правило клубных очков прямо из находки (без захода в карточку).</summary>
+    [HttpPost("{id:int}/fix-club-rule")]
+    public async Task<IActionResult> FixClubRule(int id, [FromBody] FixClubRuleRequest request, CancellationToken ct)
+    {
+        if (!await runner.FixCompetitionClubRuleAsync(id, request.RuleId, ct))
+            return BadRequest(new { error = "Находка не найдена, не поддерживает это исправление или правило неизвестно" });
+
+        await audit.LogAsync("datacheck.fix-club-rule", "DataCheckFinding", id.ToString(),
+            $"Находка #{id}: соревнованию привязано правило клубных очков #{request.RuleId}, зачёт пересчитан",
+            new { findingId = id, request.RuleId }, ct);
+
+        return Ok(new { ok = true });
     }
 
     /// <summary>

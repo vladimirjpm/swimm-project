@@ -20,7 +20,12 @@ namespace Swimm.Infrastructure.Services;
 /// Прогон одной проверки изолирован: упавшая проверка не роняет остальные — иначе один
 /// битый запрос лишал бы админа всей картины.
 /// </summary>
-public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) : IDataCheckRunner
+public class DataCheckRunner(
+    SwimmDbContext db,
+    IEnumerable<IDataCheck> checks,
+    // Пересчёт зачёта после привязки правила. Необязателен: без него правило проставится,
+    // но цифры Top Clubs останутся старыми до следующего пересчёта — в тестах это не нужно.
+    IClubStandingService? standings = null) : IDataCheckRunner
 {
     public async Task<DataCheckRunDto> RunAllAsync(string trigger, CancellationToken ct = default)
     {
@@ -179,6 +184,21 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
                 .Select(r => new { r.Id, r.Gender })
                 .ToDictionaryAsync(r => r.Id, r => r.Gender, ct);
 
+        // Текущее правило клубных очков — по той же причине живое: селект в находке должен
+        // показывать то, что в базе сейчас, а не то, что было на прогоне.
+        var ruleCompIds = findings
+            .Where(f => f.FixKind == DataCheckFixKinds.CompetitionClubRule && f.FixEntityId != null)
+            .Select(f => f.FixEntityId!.Value)
+            .Distinct()
+            .ToList();
+
+        var clubRules = ruleCompIds.Count == 0
+            ? []
+            : await db.Competitions.AsNoTracking()
+                .Where(c => ruleCompIds.Contains(c.Id))
+                .Select(c => new { c.Id, c.PointRuleClubsId })
+                .ToDictionaryAsync(c => c.Id, c => c.PointRuleClubsId, ct);
+
         // Показываем ВСЕ зарегистрированные проверки, даже пустые: «проверка есть и она
         // молчит» — полезная информация, отличная от «проверки нет».
         return checks
@@ -190,7 +210,7 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
                     c.Id, c.Title, c.Description, c.Severity,
                     items.Count(f => f.Resolution == null),
                     items.Count(f => f.Resolution == DataCheckResolutions.Accepted),
-                    items.Select(f => ToDto(f, subjects, resultGenders)).ToList(),
+                    items.Select(f => ToDto(f, subjects, resultGenders, clubRules)).ToList(),
                     state?.Total, state?.LastRunAt, state?.Failed ?? false);
             })
             .OrderByDescending(g => g.OpenCount > 0)
@@ -266,6 +286,35 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
         return rows.Count;
     }
 
+    public async Task<bool> FixCompetitionClubRuleAsync(int findingId, int ruleId, CancellationToken ct = default)
+    {
+        var f = await db.DataCheckFindings.FirstOrDefaultAsync(x => x.Id == findingId, ct);
+        if (f?.FixKind != DataCheckFixKinds.CompetitionClubRule || f.FixEntityId is not { } competitionId)
+            return false;
+
+        if (!await db.PointRulesClubs.AnyAsync(r => r.Id == ruleId, ct)) return false;
+
+        var comp = await db.Competitions.FirstOrDefaultAsync(c => c.Id == competitionId, ct);
+        if (comp is null) return false;
+
+        // Регламент у многодневного события один — ставим всем дням, иначе у дней одного
+        // чемпионата получился бы разный зачёт (тот же принцип, что в быстрой правке списка).
+        var targets = comp.EventId is int eventId
+            ? await db.Competitions.Where(c => c.EventId == eventId).ToListAsync(ct)
+            : [comp];
+
+        foreach (var c in targets) c.PointRuleClubsId = ruleId;
+        await db.SaveChangesAsync(ct);
+
+        // Клубный зачёт материализован — без пересчёта цифры остались бы старыми, и
+        // находка выглядела бы «починенной», не изменив ничего на витринах.
+        if (standings is not null)
+            foreach (var c in targets)
+                await standings.RebuildForCompetitionAsync(c.Id, ct);
+
+        return true;
+    }
+
     public async Task<(int Findings, int Rows)> FixAllKnownSwimmerGendersAsync(CancellationToken ct = default)
     {
         var swimmerIds = await db.DataCheckFindings
@@ -315,7 +364,8 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
     private static DataCheckFindingDto ToDto(
         DataCheckFinding f,
         IReadOnlyDictionary<int, (string? Gender, int? LogligId)>? subjects = null,
-        IReadOnlyDictionary<long, string>? resultGenders = null)
+        IReadOnlyDictionary<long, string>? resultGenders = null,
+        IReadOnlyDictionary<int, int?>? clubRules = null)
     {
         var subject = f.FixEntityId is { } id && subjects is not null && subjects.TryGetValue(id, out var v)
             ? v
@@ -331,6 +381,9 @@ public class DataCheckRunner(SwimmDbContext db, IEnumerable<IDataCheck> checks) 
             f.Id, f.CheckId, (DataCheckSeverity)f.Severity, f.EntityType, f.EntityId,
             f.Message, f.Details, f.Link, f.FirstSeenAt, f.LastSeenAt, f.Resolution, f.Note,
             f.PublicLink, f.SubjectName, f.FixKind, f.FixEntityId,
-            gender, subject.LogligId);
+            gender, subject.LogligId,
+            f.FixEntityId is { } cid && clubRules is not null && clubRules.TryGetValue(cid, out var rule)
+                ? rule
+                : null);
     }
 }

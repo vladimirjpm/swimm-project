@@ -109,6 +109,9 @@ public class DashboardStatusServiceTests
             throw new NotSupportedException();
         public Task<int?> FixSwimmerGenderAsync(int findingId, string gender, CancellationToken ct = default) =>
             throw new NotSupportedException();
+
+        public Task<bool> FixCompetitionClubRuleAsync(int findingId, int ruleId, CancellationToken ct = default) =>
+            Task.FromResult(false);
         public Task<(int Findings, int Rows)> FixAllKnownSwimmerGendersAsync(CancellationToken ct = default) =>
             throw new NotSupportedException();
         public Task<bool> ReopenAsync(int findingId, CancellationToken ct = default) =>

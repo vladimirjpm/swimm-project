@@ -74,6 +74,16 @@ public interface IDataCheckRunner
     Task<int?> FixSwimmerGenderAsync(int findingId, string gender, CancellationToken ct = default);
 
     /// <summary>
+    /// Привязать правило клубных очков к соревнованию находки (fixKind
+    /// <c>competition-club-rule</c>) и пересчитать его зачёт. false — находки нет,
+    /// у неё другое исправление или правило неизвестно.
+    ///
+    /// Правило ставится всем дням события: регламент у многодневного старта один, и
+    /// привязка «через день» дала бы разный зачёт у дней одного чемпионата.
+    /// </summary>
+    Task<bool> FixCompetitionClubRuleAsync(int findingId, int ruleId, CancellationToken ct = default);
+
+    /// <summary>
     /// Массовое исправление той же находки: у пловца пол уже известен (приехал из другого
     /// протокола), а спорная строка пустая — тогда «правильный» ответ уже есть в базе и
     /// кликать по каждой находке нечего. Правит ТОЛЬКО такие: где пол пловца задан.

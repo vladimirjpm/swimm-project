@@ -101,9 +101,11 @@ public sealed class EmptyClubCheck(IDataQualityService quality) : IDataCheck
 /// числом. Обнаружить это можно только по странным суммам Top Clubs, поэтому индикатор
 /// и просился в реестр.
 ///
-/// Соревнования с пометкой «клубный зачёт не ведётся» (<c>ClubPointsDisabled</c>) в находки
-/// не идут: лиги и товарищеские старты живут без зачёта законно, и до появления пометки
-/// проверка звала чинить их наравне с настоящими пропусками (решение Р19).
+/// Проверяем ТОЛЬКО чемпионаты, мастерс и Маккабиаду (решение Влада 2026-08-10): клубный
+/// зачёт ведут по ним. Лиги, отборочные («מוקדמות») и товарищеские старты живут без правила
+/// законно — на реальных данных из 19 находок настоящими были 3, остальные звали чинить то,
+/// что чинить не нужно. Пометка «клубный зачёт не ведётся» (<c>ClubPointsDisabled</c>)
+/// продолжает работать поверх (решение Р19) — ею глушат исключения внутри самих чемпионатов.
 ///
 /// Правило ПЛОВЦОВ сознательно не проверяем: «не привязано → legacy-расчёт по FINA» —
 /// легитимный режим (masters и Маккабиада живут так намеренно), и находка по каждому
@@ -111,12 +113,16 @@ public sealed class EmptyClubCheck(IDataQualityService quality) : IDataCheck
 /// </summary>
 public sealed class CompetitionWithoutClubPointRuleCheck(SwimmDbContext db) : IDataCheck
 {
+    /// <summary>Ключ категории Маккабиады — она не помечена ни чемпионатом, ни мастерсом.</summary>
+    private const string MaccabiahCategoryKey = "result-maccabiah";
+
     public string Id => "competitions.no-club-point-rule";
     public string Title => "Соревнования без правила клубных очков";
     public string Description =>
-        "У соревнования есть результаты, но не привязано правило клубных очков — зачёт считается " +
-        "страховочным подбором по дате, и новая версия правила сдвинет цифры задним числом. " +
-        "Проставляется на /Admin/Competitions/AssignRules (массово) или в форме соревнования.";
+        "У чемпионата (или мастерса/Маккабиады) есть результаты, но не привязано правило клубных " +
+        "очков — зачёт считается страховочным подбором по дате, и новая версия правила сдвинет " +
+        "цифры задним числом. Правило выбирается прямо здесь; массово — на " +
+        "/Admin/Competitions/AssignRules. Лиги и отборочные не проверяются: они без зачёта законно.";
     public DataCheckSeverity Severity => DataCheckSeverity.Warning;
 
     public async Task<DataCheckOutcome> RunAsync(CancellationToken ct = default)
@@ -125,6 +131,11 @@ public sealed class CompetitionWithoutClubPointRuleCheck(SwimmDbContext db) : ID
         // отдельная проверка competitions.empty — две находки на одну причину только шумят.
         var rows = await db.Competitions.AsNoTracking()
             .Where(c => c.PointRuleClubsId == null && !c.ClubPointsDisabled
+                        // Маккабиада — своя категория лестницы («соревнование само по себе»),
+                        // флага у неё нет, поэтому опознаётся членством в категории.
+                        && (c.IsChampionship || c.IsMasters
+                            || db.CategoryCompetitions.Any(cc =>
+                                cc.CompetitionId == c.Id && cc.Category.Key == MaccabiahCategoryKey))
                         && db.Results.Any(r => r.CompetitionId == c.Id))
             .Select(c => new
             {
@@ -143,7 +154,11 @@ public sealed class CompetitionWithoutClubPointRuleCheck(SwimmDbContext db) : ID
                 c.Name,
                 $"{c.Date}, строк {c.Rows}" + (c.IsMasters ? ", masters" : ""),
                 $"/Admin/Competitions/Edit?id={c.Id}",
-                PublicRoutes.Competition(c.Id)))
+                PublicRoutes.Competition(c.Id),
+                // Правило выбирается прямо в находке — заходить в карточку ради одного
+                // селекта незачем (см. DataCheckFixKinds.CompetitionClubRule).
+                FixKind: DataCheckFixKinds.CompetitionClubRule,
+                FixEntityId: c.Id))
             .ToList());
     }
 }

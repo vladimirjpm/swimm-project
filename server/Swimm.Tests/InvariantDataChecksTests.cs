@@ -174,10 +174,14 @@ public class InvariantDataChecksTests
         await using var db = CreateDb(nameof(NoClubPointRule_FoundOnlyForCompetitionsWithResults));
         var (comp, style, club, swimmer) = await SeedAsync(db);
 
+        // Проверка смотрит только на чемпионаты/мастерс/Маккабиаду (сужение 2026-08-10),
+        // поэтому у подопытных стоит флаг чемпионата — иначе тест проверял бы фильтр типа,
+        // а не «пустое соревнование не находка».
+        comp.IsChampionship = true;
         var rule = new PointRuleClubs { Version = "2026.01", Scope = "all", EffectiveFrom = new DateOnly(2026, 1, 1) };
         db.Add(rule);
-        var bound = new Competition { Name = "С правилом", Date = "03/06/2026", PoolType = "25m" };
-        var empty = new Competition { Name = "Пустое без правила", Date = "02/06/2026", PoolType = "25m" };
+        var bound = new Competition { Name = "С правилом", Date = "03/06/2026", PoolType = "25m", IsChampionship = true };
+        var empty = new Competition { Name = "Пустое без правила", Date = "02/06/2026", PoolType = "25m", IsChampionship = true };
         db.Competitions.AddRange(bound, empty);
         await db.SaveChangesAsync();
 
@@ -204,6 +208,8 @@ public class InvariantDataChecksTests
         await using var db = CreateDb(nameof(NoClubPointRule_SkipsCompetitionsWhereStandingsAreNotKept));
         var (comp, style, club, swimmer) = await SeedAsync(db);
 
+        // Чемпионат — иначе находки не было бы и без пометки, и тест ничего не проверял бы.
+        comp.IsChampionship = true;
         comp.ClubPointsDisabled = true;
         db.Results.Add(new ResultRecord
         {

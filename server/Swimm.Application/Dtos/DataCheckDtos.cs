@@ -11,6 +11,13 @@ public static class DataCheckFixKinds
 {
     /// <summary>Проставить пол пловцу (и его строкам без пола) — находка `results.no-gender`.</summary>
     public const string SwimmerGender = "swimmer-gender";
+
+    /// <summary>
+    /// Привязать правило клубных очков — находка `competitions.no-club-point-rule`.
+    /// Правится селектом прямо в находке: заходить в карточку соревнования ради одного
+    /// выбора незачем, а находок бывает десяток за раз.
+    /// </summary>
+    public const string CompetitionClubRule = "competition-club-rule";
 }
 
 /// <summary>Чем закончилась находка. null в БД = ещё открыта.</summary>
@@ -69,7 +76,10 @@ public sealed record DataCheckFindingDto(
     DateTime FirstSeenAt, DateTime LastSeenAt, string? Resolution, string? Note,
     string? PublicLink = null, string? SubjectName = null,
     string? FixKind = null, int? FixEntityId = null,
-    string? SubjectGender = null, int? SubjectLogligId = null);
+    string? SubjectGender = null, int? SubjectLogligId = null,
+    /// <summary>ТЕКУЩЕЕ правило клубных очков соревнования — живое, по той же причине,
+    /// что пол и loglig: находка обновляется только прогоном и врала бы сразу после правки.</summary>
+    int? SubjectClubRuleId = null);
 
 /// <summary>Находки одной проверки + её описание (для страницы /Admin/Health).</summary>
 /// <param name="Total">

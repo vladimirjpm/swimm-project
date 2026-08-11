@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Swimm.Application.Abstractions;
+using Swimm.Application.Dtos;
 
 namespace Swimm.API.Pages.Admin;
 
@@ -9,7 +11,7 @@ namespace Swimm.API.Pages.Admin;
 /// не блокировал рендер: проверки ходят в БД десятками запросов.
 /// </summary>
 [Authorize(Roles = "Admin")]
-public class HealthModel(IConfiguration config, IWebHostEnvironment env) : PageModel
+public class HealthModel(IConfiguration config, IWebHostEnvironment env, IPointRulesAdminRepository rules) : PageModel
 {
     /// <summary>
     /// База для ссылок «смотреть на сайте». В проде клиент лежит на том же origin, что и
@@ -21,8 +23,15 @@ public class HealthModel(IConfiguration config, IWebHostEnvironment env) : PageM
     /// </summary>
     public string PublicSiteBaseUrl { get; private set; } = "";
 
-    public void OnGet() =>
+    /// <summary>Правила клубных очков — для селекта в находке «без правила клубных очков».
+    /// Их единицы, поэтому отдаём страницей, а не отдельным запросом.</summary>
+    public IReadOnlyList<PointRuleRowDto> ClubRules { get; private set; } = [];
+
+    public async Task OnGetAsync()
+    {
         PublicSiteBaseUrl = (config["PublicSite:BaseUrl"]
             ?? (env.IsDevelopment() ? "http://localhost:5173" : ""))
             .TrimEnd('/');
+        ClubRules = await rules.GetAllAsync(PointRuleKind.Clubs);
+    }
 }
