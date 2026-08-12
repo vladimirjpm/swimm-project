@@ -1,4 +1,4 @@
-// -*- coding: utf-8 -*-
+﻿// -*- coding: utf-8 -*-
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -38,13 +38,13 @@ public static class IsrOrgCompetitionParser
         GenderPatternOriginal + "|" + GenderPatternReversed + "|" + HebrewMix + "|" + HebrewMixReversed;
 
     private static Regex HeaderRxHE => _headerRxHE ??= new Regex(
-        @"^(?<len>\d+)\s+(?<style>.+?)\s*-\s*(?<gender>" +
+        @"^(?<len>\d+[Kk]?)\s+(?<style>.+?)\s*-\s*(?<gender>" +
         GenderPatternOriginal + "|" + GenderPatternReversed +
         @")\s+(?<age>\d+(-\d+)?)$",
         RegexOptions.Compiled);
 
     private static Regex HeaderRxHESimple => _headerRxHESimple ??= new Regex(
-        @"^(?<len>\d+)\s+(?<style>[֐-׿\s]+)$",
+        @"^(?<len>\d+[Kk]?)\s+(?<style>[֐-׿\s]+)$",
         RegexOptions.Compiled);
 
     // Заголовок с ТЕКСТОВОЙ категорией вместо «пол + возраст»: «200 חופשי - שומרי שבת
@@ -55,7 +55,7 @@ public static class IsrOrgCompetitionParser
     // Работает ФОЛЛБЕКОМ после HeaderRxHE, поэтому обычные «- בנים 13-14» сюда не доходят.
     private static Regex? _headerRxHECategory;
     private static Regex HeaderRxHECategory => _headerRxHECategory ??= new Regex(
-        @"^(?<len>\d+)\s+(?<style>[֐-׿\s]+?)\s*-\s*(?<cat>[֐-׿][֐-׿\s""׳'\-]*)$",
+        @"^(?<len>\d+[Kk]?)\s+(?<style>[֐-׿\s]+?)\s*-\s*(?<cat>[֐-׿][֐-׿\s""׳'\-]*)$",
         RegexOptions.Compiled);
 
     // То же для эстафеты: «4X50 מעורב שליחים מיקס - שומרי שבת מוקדמות צעירים».
@@ -283,6 +283,24 @@ public static class IsrOrgCompetitionParser
     private static void Log(string message)
     {
         _debugLog.Add($"[{_debugLog.Count + 1}] {message}");
+    }
+
+    /// <summary>
+    /// Дистанция заголовка → метры. Открытая вода печатается в километрах («5K חופשי»,
+    /// «10K חופשי»), бассейн — в метрах («1600 חופשי», «50m Freestyle»). Без перевода
+    /// 10 км и 5 км не были бы заголовками вообще: регулярки ждали цифры, строка не
+    /// распознавалась, и результаты дописывались в ПРЕДЫДУЩИЙ заплыв — на чемпионате
+    /// в Эйлате 2026 так слиплись 3000 нокаут, 5K и 10K, а проверка качества потом
+    /// честно ругалась на «повтор дисциплины за день» с временами от 5 минут до двух часов.
+    /// </summary>
+    internal static string NormalizeHeaderLen(string rawLen)
+    {
+        var len = rawLen.Trim();
+        if (len.EndsWith("m", StringComparison.OrdinalIgnoreCase)) len = len[..^1];
+        if (len.EndsWith("k", StringComparison.OrdinalIgnoreCase)
+            && int.TryParse(len[..^1], out var km))
+            return (km * 1000).ToString();
+        return len;
     }
 
     private static string NormalizeIfHe(string s, bool isHE) =>
@@ -962,7 +980,7 @@ public static class IsrOrgCompetitionParser
                     var enNoGenderHead = HeaderEnNoGenderInHE.Match(raw);
                     if (enNoGenderHead.Success)
                     {
-                        pendingEventLen = enNoGenderHead.Groups["len"].Value;
+                        pendingEventLen = NormalizeHeaderLen(enNoGenderHead.Groups["len"].Value);
                         pendingEventStyle = CanonEnStyle(enNoGenderHead.Groups["style"].Value);
                         pendingEventLine = raw;
                         pendingRelayLen = null;
@@ -1320,7 +1338,7 @@ public static class IsrOrgCompetitionParser
                     var enMastersHead = HeaderEnNoGenderInHE.Match(line);
                     if (enMastersHead.Success)
                     {
-                        pendingEventLen = enMastersHead.Groups["len"].Value;
+                        pendingEventLen = NormalizeHeaderLen(enMastersHead.Groups["len"].Value);
                         pendingEventStyle = CanonEnStyle(enMastersHead.Groups["style"].Value);
                         pendingEventLine = line;
                         pendingRelayLen = null;
@@ -1399,10 +1417,7 @@ public static class IsrOrgCompetitionParser
                         date = dat_relay;
                     }
 
-                    var rawLen = m.Groups["len"].Value;
-                    var len = rawLen.EndsWith("m", StringComparison.OrdinalIgnoreCase)
-                        ? rawLen[..^1]
-                        : rawLen;
+                    var len = NormalizeHeaderLen(m.Groups["len"].Value);
 
                     string genderNorm = isHE
                         ? HebrewTextHelper.NormalizeGenderHE(m.Groups["gender"].Value)
@@ -1456,7 +1471,7 @@ public static class IsrOrgCompetitionParser
                                 Date: dateCat,
                                 Event: line,
                                 EventStyleName: HebrewTextHelper.NormalizeStyleName(styleMapped),
-                                EventStyleLen: catMatch.Groups["len"].Value,
+                                EventStyleLen: NormalizeHeaderLen(catMatch.Groups["len"].Value),
                                 EventStyleGender: "none",     // поплыв смешанный, пол берётся с пловца
                                 EventStyleAge: catToken ?? string.Empty,
                                 PoolType: "25m",
@@ -1478,7 +1493,7 @@ public static class IsrOrgCompetitionParser
                             !styleCheck.Contains("מקצה") &&
                             !styleCheck.Contains("תוצאות"))
                         {
-                            pendingEventLen = simpleMatch.Groups["len"].Value;
+                            pendingEventLen = NormalizeHeaderLen(simpleMatch.Groups["len"].Value);
                             pendingEventStyle = styleCheck;
                             pendingEventLine = line;
                             Log($"  -> PENDING SimpleHeader: len={pendingEventLen}, style={pendingEventStyle}");
