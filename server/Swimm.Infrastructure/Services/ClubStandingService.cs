@@ -115,7 +115,8 @@ public class ClubStandingService : IClubStandingService
                 ClubNameEn = r.Club.NameEn,
                 RelayTeamName = r.Relay != null ? r.Relay.TeamName : null,
                 r.SwimmerId,
-                r.Position,
+                // Место prelim-заплыва — ранжир сессии, не награда: очков и медалей не даёт.
+                Position = r.HeatType == "prelim" ? null : r.Position,
                 r.TimeFail,
                 IsRelay = r.RelayId != null,
                 IsMasters = r.Competition.IsMasters,

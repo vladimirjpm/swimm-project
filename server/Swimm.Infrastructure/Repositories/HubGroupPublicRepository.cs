@@ -242,7 +242,8 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             .Select(r => new SeasonResultRow
             {
                 SwimmerId = r.SwimmerId,
-                Position = r.Position,
+                // Место prelim-заплыва — ранжир сессии: ни медаль, ни клубные очки.
+                Position = r.HeatType == "prelim" ? null : r.Position,
                 TimeFail = r.TimeFail,
                 InternationalPoints = r.InternationalPoints,
                 CompetitionDate = r.CompetitionDate,

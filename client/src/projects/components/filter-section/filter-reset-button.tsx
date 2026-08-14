@@ -24,6 +24,7 @@ const FilterResetButton: React.FC = () => {
           level_filter: 'all',
           event_date: 'all',
           event_category: 'all',
+          show_prelims: false,
         },
       }),
     );

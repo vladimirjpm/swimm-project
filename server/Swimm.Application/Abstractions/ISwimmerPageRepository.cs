@@ -1,0 +1,79 @@
+using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
+
+namespace Swimm.Application.Abstractions;
+
+/// <summary>
+/// Шов страницы спортсмена (этап A1, docs/plans/athlete-page-plan.md): ВСЕ заплывы пловца
+/// одной выборкой, из которой пять эндпоинтов страницы считают своё.
+///
+/// Зачем одна выборка, а не запрос на таб: сезонные KPI, лучшие времена, PB и прогресс —
+/// это разные срезы ОДНОГО набора заплывов. Считать их независимыми запросами значит завести
+/// пять мест, где «сезон» и «лучшее» определяются заново, и первое же расхождение будет
+/// неотлаживаемым (ровно это ловили на странице клуба). Арифметика живёт в
+/// <see cref="SeasonAggregator"/>, здесь — только I/O.
+/// </summary>
+public interface ISwimmerPageRepository
+{
+    /// <summary>
+    /// Заплывы пловца от старых к новым: личные старты плюс эстафеты, где он значится ногой
+    /// (<c>RelayMembers</c>) либо владельцем строки. Эстафеты приходят с
+    /// <c>IsRelay = true</c> и в best/PB не попадают (<see cref="SeasonAggregator.IsCountable"/>),
+    /// но нужны медалям и истории: командная награда так же личная, как индивидуальная.
+    ///
+    /// У ВСЕХ строк <c>SwimmerId</c> — это запрошенный пловец, в том числе у эстафет, где
+    /// в базе строка привязана к первой ноге. Иначе PB-детекция ключевалась бы по чужому id.
+    ///
+    /// Пловца нет или заплывов нет — пустой список (не null): пустая страница это штатное
+    /// состояние, а не ошибка.
+    /// </summary>
+    Task<IReadOnlyList<SeasonSwimRow>> GetSwimsAsync(int swimmerId);
+
+    /// <summary>
+    /// Даты ПРОШЕДШИХ и будущих зимних чемпионатов (все ступени) — вход для
+    /// <see cref="Swimm.Domain.ShowcaseSeason"/>. Граница витрины общая для продукта,
+    /// поэтому считается по всем чемпионатам базы, а не по стартам конкретного пловца.
+    /// </summary>
+    Task<IReadOnlyList<DateTime>> GetWinterChampionshipDatesAsync();
+
+    /// <summary>
+    /// Роль соревнования в сезоне (<c>winter</c>/<c>summer</c>/<c>openwater</c>/null) —
+    /// та же, что на странице клуба (<c>StandingKinds.Resolve</c>): выводится из
+    /// <c>IsChampionship</c> + <c>PoolType</c>, ручное исключение — <c>StandingKindOverride</c>.
+    /// </summary>
+    Task<IReadOnlyDictionary<int, string?>> GetStandingKindsAsync(IEnumerable<int> competitionIds);
+
+    /// <summary>
+    /// Зачётная группа пловца (Kids/Young/Juniors/Adults/Masters) — по категориям тех
+    /// соревнований, где он стартовал. Возраста у <c>Category</c> нет, членство задаётся
+    /// соревнованию, поэтому группа пловца выводится из его стартов: берётся самая частая,
+    /// при равенстве — младшая по лестнице. Кастомные категории (<c>result-maccabiah</c>)
+    /// группой не считаются — это «соревнование само по себе».
+    /// null — стартов в лестничных категориях не было.
+    /// </summary>
+    Task<SwimmerAgeGroupDto?> GetLadderGroupAsync(IEnumerable<int> competitionIds);
+
+    /// <summary>
+    /// Сколько официальных рекордов держит пловец — бейдж «🏆 N records».
+    /// ⚠ Связь только ПО ИМЕНИ: у <c>Record</c> нет <c>SwimmerId</c> (решение §6.1 плана,
+    /// та же погрешность, что у Record wall клуба). Тёзка заберёт чужой рекорд.
+    /// </summary>
+    Task<int> CountRecordsHeldAsync(int swimmerId);
+
+    /// <summary>
+    /// Лучшее время клуба в каждой дисциплине (ключ — <c>SeasonAggregator.DisciplineKey</c>
+    /// без категории), посчитанное ПО НАШЕЙ БАЗЕ. Это не «клубный рекорд» из справочника:
+    /// у <c>Record</c> нет <c>ClubId</c>, и стена рекордов клуба связана с ним по названию.
+    /// Отсюда обязательная подпись витрины «among N meets in our database».
+    /// Эстафеты, DSQ и помеченные времена исключены.
+    /// </summary>
+    Task<IReadOnlyDictionary<string, int>> GetClubBestMsAsync(int clubId);
+
+    /// <summary>
+    /// Официальные рекорды страны по ВОЗРАСТНОЙ ступени (<c>Category = age</c>) для колонки
+    /// «Δ Israel {age}»: ключ — тот же ключ дисциплины, значение — рекорд.
+    /// <paramref name="regionCode"/> — alpha-3 страны пловца; сегодня заполнен только ISR.
+    /// </summary>
+    Task<IReadOnlyDictionary<string, NationalAgeRecordRow>> GetNationalAgeRecordsAsync(
+        string? regionCode, string? gender, int age);
+}

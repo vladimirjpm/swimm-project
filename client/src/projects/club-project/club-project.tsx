@@ -1,6 +1,6 @@
 ﻿import React, { useMemo, useState } from 'react';
 import '../../index.css';
-import './club-theme.css';
+import '../components/deep/deep-theme.css';
 import { useMode } from '../../hooks/useMode';
 import { useClubOverview, type ClubScope } from '../../hooks/useClubOverview';
 import { parseRoute } from '../../utils/routes';
@@ -8,7 +8,7 @@ import AppTopbar from '../components/app-topbar/app-topbar';
 import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import ClubHero from './components/club-hero';
 import ClubFilters, { SHOW_GROUP_TILES } from './components/club-filters';
-import ClubSeasonCarousel from './components/club-season-carousel';
+import DeepSeasonCarousel from '../components/deep/season-carousel';
 import ClubGrid from './components/club-grid';
 import ClubStandings from './components/club-standings';
 import ClubTimeline from './components/club-timeline';
@@ -17,7 +17,7 @@ import ClubSwimmers from './components/club-swimmers';
 import ClubRecords from './components/club-records';
 import ClubRecordWall from './components/club-record-wall';
 import ClubCoaches from './components/club-coaches';
-import ClubTabs, { isClubTab, type ClubTab } from './components/club-tabs';
+import DeepTabs, { type DeepTabItem } from '../components/deep/tabs';
 import ClubSoonCard from './components/club-soon-card';
 
 /**
@@ -30,6 +30,12 @@ import ClubSoonCard from './components/club-soon-card';
  * Тема — токены `--deep-*` из дизайн-хендоффа (club-theme.css): класс .theme-deep или
  * .theme-deep-light навешивается по глобальному режиму light/dark.
  */
+/** Табы страницы клуба (TABS.md 3a). Сам компонент плиток общий — ../components/deep/tabs. */
+type ClubTab = 'season' | 'records' | 'swimmers' | 'media' | 'history';
+const CLUB_TABS: ClubTab[] = ['season', 'records', 'swimmers', 'media', 'history'];
+const isClubTab = (value: string | null | undefined): value is ClubTab =>
+  value != null && (CLUB_TABS as string[]).includes(value);
+
 function ClubProject() {
   const clubId = useMemo<number | null>(() => parseRoute().clubId, []);
   const { mode } = useMode();
@@ -47,7 +53,7 @@ function ClubProject() {
     return isClubTab(t) ? t : 'season';
   });
 
-  const handleTab = (next: ClubTab) => {
+  const handleTab: (next: ClubTab) => void = (next) => {
     setTab(next);
     const url = new URL(window.location.href);
     if (next === 'season') url.searchParams.delete('tab');
@@ -91,7 +97,7 @@ function ClubProject() {
                 (handoff filter-season 4c). Карточки, которым сезон не положен —
                 Record wall (у рекорда сезона нет) и Season best (сознательно живёт
                 текущим сезоном) — его по-прежнему не слушают. */}
-            <ClubSeasonCarousel
+            <DeepSeasonCarousel
               seasons={data.seasons}
               season={scope.season}
               // Смена сезона сбрасывает раскрытый зачёт: он мог принадлежать другому.
@@ -102,18 +108,19 @@ function ClubProject() {
                 активная плитка срастается с панелью. Поэтому они в общей обёртке, а не
                 двумя блоками с отступом между ними. */}
             <div className="deep-folder mb-4">
-            <ClubTabs
+            <DeepTabs
+              ariaLabel="Club sections"
               active={tab}
               onSelect={handleTab}
-              subs={{
-                season: 'grid · standings',
+              tabs={[
+                { id: 'season', icon: '▦', label: 'Season', sub: 'grid · standings' },
                 // Число рекордов знает сама карточка (свой эндпоинт с фильтром пула),
                 // страница его не грузит — цифру не выдумываем.
-                records: 'wall · best season',
-                swimmers: `${data.club.swimmer_count} · coaches`,
-                media: 'soon',
-                history: `${data.timeline.length} competitions`,
-              }}
+                { id: 'records', icon: '⏱', label: 'Records', sub: 'wall · best season' },
+                { id: 'swimmers', icon: '🏊', label: 'Swimmers', sub: `${data.club.swimmer_count} · coaches` },
+                { id: 'media', icon: '▶', label: 'Media', sub: 'soon' },
+                { id: 'history', icon: '🗓', label: 'History', sub: `${data.timeline.length} competitions` },
+              ]}
             />
 
             <div className="deep-tabs-panel">

@@ -1,8 +1,9 @@
 import React, { useMemo, useRef, useState } from 'react';
-import type { ClubSeasonOption } from '../../../hooks/useClubOverview';
 
 /**
- * Полоса сезонов — кольцевая карусель (design_handoff_club_page_filter-season, вариант 4c).
+ * Полоса сезонов — кольцевая карусель (design_handoff_club_page_tabs/SEASON-CAROUSEL.md,
+ * вариант 4c). ОБЩИЙ компонент страниц клуба и спортсмена: хендофф требует её «1:1»,
+ * а поведение здесь нетривиальное (проезд ряда без ремоунта) — копия разъедется.
  *
  * Это КАРУСЕЛЬ, а не степпер. Правила, которые нельзя потерять при правках:
  *  • выбранный сезон ВСЕГДА строго по центру и никогда не смещается;
@@ -27,17 +28,24 @@ function shortLabel(season: number): string {
   return `${from}/${to}`;
 }
 
+/** Минимум, который нужен карусели; страницы передают свои более полные типы. */
+export interface DeepSeasonOption {
+  /** Год НАЧАЛА сезона (2025 → «2025/26»). */
+  season: number;
+  label: string;
+}
+
 interface Props {
-  seasons: ClubSeasonOption[];
+  seasons: DeepSeasonOption[];
   /** null — режим All (сезон не выбран). */
   season: number | null;
   onSeason: (season: number | null) => void;
 }
 
 /** Элемент кольца: либо сезон, либо ∞ («все сезоны»). */
-type RingItem = { kind: 'season'; option: ClubSeasonOption } | { kind: 'all' };
+type RingItem = { kind: 'season'; option: DeepSeasonOption } | { kind: 'all' };
 
-function ClubSeasonCarousel({ seasons, season, onSeason }: Props) {
+function DeepSeasonCarousel({ seasons, season, onSeason }: Props) {
   /**
    * Лента = сезоны по возрастанию + ∞ ПОСЛЕ самого свежего сезона, и на этом она
    * КОНЧАЕТСЯ: слева край — самый старый сезон, справа — ∞. «Все сезоны» выбираются
@@ -238,4 +246,4 @@ function ClubSeasonCarousel({ seasons, season, onSeason }: Props) {
   );
 }
 
-export default ClubSeasonCarousel;
+export default DeepSeasonCarousel;

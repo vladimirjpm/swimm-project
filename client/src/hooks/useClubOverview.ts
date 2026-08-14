@@ -37,8 +37,8 @@ export interface ClubKpi {
   championship_wins: number;
   records: number;
   season_bests: number;
-  /** dd/MM/yyyy — начало витринного сезона (docs/season-boundary-rule.md). */
-  showcase_season_from: string | null;
+  /** Метка витринного сезона, «2025/26» (docs/season-boundary-rule.md). */
+  showcase_season: string | null;
 }
 
 export interface ClubSeasonOption {

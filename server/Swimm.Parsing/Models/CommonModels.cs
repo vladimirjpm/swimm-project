@@ -47,7 +47,15 @@ public record Result(
     /// протокола («Men», «U17 Boys», «Men Para») сливались в одну дисциплину «50 freestyle
     /// male», где оказывалось три первых места.
     /// </summary>
-    [property: JsonPropertyName("event_category")] string? EventCategory = null
+    [property: JsonPropertyName("event_category")] string? EventCategory = null,
+
+    /// <summary>
+    /// Тип заплыва: <c>prelim</c> / <c>final</c>; null — единственный заплыв дисциплины
+    /// за день (timed final). В протоколах loglig слов «מוקדמות/גמר» нет — признак выводит
+    /// <c>IsrOrgParser.AssignHeatTypes</c> по порядку сессий в документе: повтор дисциплины
+    /// в один день ⇒ раннее событие prelim, позднее final.
+    /// </summary>
+    [property: JsonPropertyName("heat_type")] string? HeatType = null
 );
 
 public record RelaySwimmer(

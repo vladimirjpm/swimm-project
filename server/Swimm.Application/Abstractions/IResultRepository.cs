@@ -11,8 +11,14 @@ public interface IResultRepository
     /// <summary>Список источников для DDL: события (свёрнуты в одну запись) + однодневные соревнования.
     /// country — alpha-3 страны соревнования (опционально); для события — совпадение хотя бы одного дня.</summary>
     Task<IReadOnlyList<CompetitionSourceDto>> GetSourcesAsync(string? country = null);
-    /// <summary>Карьерные (all-time) данные спортсмена по полному имени; null — пловец не найден.</summary>
+    /// <summary>
+    /// Карьерные (all-time) данные спортсмена по полному имени; null — пловец не найден.
+    /// АЛИАС для попапа-карточки: имена не уникальны, у страницы правда — по id
+    /// (<see cref="GetAthleteCareerByIdAsync"/>).
+    /// </summary>
     Task<AthleteCareerDto?> GetAthleteCareerAsync(string name);
+    /// <summary>Карьерные (all-time) данные по id пловца; эстафеты — через RelayMembers.</summary>
+    Task<AthleteCareerDto?> GetAthleteCareerByIdAsync(int swimmerId);
     /// <summary>Профиль спортсмена по id (для страницы пловца); null — не найден.</summary>
     Task<SwimmerProfileDto?> GetSwimmerProfileAsync(int id);
     /// <summary>Сводка по клубам под фильтром-источником (очки/медали/пловцы) — серверный аналог

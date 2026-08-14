@@ -20,8 +20,10 @@ public class SuspectResultDetectorTests
     private static SuspectCandidateRow Row(
         long id, int ms, string style = "butterfly", string distance = "100",
         string gender = "female", int swimmerId = 1, DateTime? date = null,
-        bool isRelay = false, bool timeFail = false, string? ageGroup = null)
-        => new(id, swimmerId, style, distance, gender, ms, date ?? Day1, isRelay, timeFail, ageGroup);
+        bool isRelay = false, bool timeFail = false, string? ageGroup = null,
+        string? heatType = null)
+        => new(id, swimmerId, style, distance, gender, ms, date ?? Day1, isRelay, timeFail, ageGroup,
+            HeatType: heatType);
 
     /// <summary>Правдоподобный «фон» заплыва, чтобы медиана была осмысленной.</summary>
     private static IEnumerable<SuspectCandidateRow> Field(int startId, params int[] times)
@@ -174,6 +176,29 @@ public class SuspectResultDetectorTests
             Row(2, 61_000, swimmerId: 7, date: Day1.AddDays(1)),
         };
         Assert.Empty(SuspectResultDetector.Detect(otherDays));
+    }
+
+    [Fact]
+    public void DuplicateSwim_PrelimPlusFinalSameDayNotFlagged_SameSessionStillFlagged()
+    {
+        // Бугрим: предварительные и финал одной дисциплины в ОДИН день — норма
+        // (1678 ложных пометок на чемпионате 2026 до появления HeatType).
+        var prelimFinal = new[]
+        {
+            Row(1, 60_000, swimmerId: 7, heatType: "prelim"),
+            Row(2, 59_500, swimmerId: 7, heatType: "final"),
+        };
+        Assert.Empty(SuspectResultDetector.Detect(prelimFinal));
+
+        // Дубль ВНУТРИ одной сессии по-прежнему ловится.
+        var withinFinal = new[]
+        {
+            Row(1, 60_000, swimmerId: 7, heatType: "final"),
+            Row(2, 61_000, swimmerId: 7, heatType: "final"),
+        };
+        var flagged = SuspectResultDetector.Detect(withinFinal);
+        Assert.Equal(2, flagged.Count);
+        Assert.All(flagged, v => Assert.Equal(SuspectReasons.DuplicateSwim, v.Reason));
     }
 
     /* ── Выброс относительно личных результатов (Б1) ───────────────────────────────

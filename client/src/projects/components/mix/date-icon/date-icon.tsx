@@ -1,6 +1,7 @@
 import './date-icon.css';
 import { useAppDispatch } from '../../../../store/store';
 import React from 'react';
+import UI_PrelimLabel from '../prelim-label/prelim-label';
 
 interface UI_DateIconProps {
   styleType?: 'cube'  | 'row-style-1' | 'row-style-2';
@@ -8,6 +9,10 @@ interface UI_DateIconProps {
   paddingClass?: string;
   className?: string;
   fontClassName?: string; // переопределяет текстовый стиль (size/weight/color) для row-style-1
+  /** Индикатор тумблера предварительных заплывов под кубом даты (сводка фильтров):
+   *  'on' → зелёный [prelim ON], 'off' → оранжевый [prelim OFF]. Не задан — ничего.
+   *  Текст/цвета живут в UI_PrelimLabel — тут только место в раскладке. */
+  prelimState?: 'on' | 'off';
 }
 
 const parseCustomDate = (dateStr?: string): Date => {
@@ -23,6 +28,7 @@ const UI_DateIcon: React.FC<UI_DateIconProps> = ({
   className = '',
   paddingClass = 'px-1 md:px-4 py-1 md:py-3',
   fontClassName,
+  prelimState,
 }) => {
   const dispatch = useAppDispatch();
 
@@ -74,7 +80,7 @@ if (styleType === 'row-style-2') {
   );
 }
 
-  return (
+  const cube = (
     <div className={`dv-date-icon w-fit h-auto flex flex-col rounded-lg shadow overflow-hidden text-gray-900 ${className}`}>
       <div className={`${topBgClass} ${topTextClass} text-center ${paddingClass} font-bold`}>
         {year}
@@ -85,6 +91,15 @@ if (styleType === 'row-style-2') {
           <div className={`font-bold uppercase pl-2 ${accentTextClass}`}>{month}</div>
         </div>
       </div>
+    </div>
+  );
+
+  // Обёртка появляется только под индикатор — остальные вызовы получают прежнюю разметку.
+  if (!prelimState) return cube;
+  return (
+    <div className="flex flex-col items-center gap-1">
+      {cube}
+      <UI_PrelimLabel state={prelimState} className="text-[10px]" />
     </div>
   );
 };

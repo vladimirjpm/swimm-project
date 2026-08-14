@@ -77,7 +77,7 @@ function ClubHero({ club, kpi }: Props) {
         <Kpi
           label="Season bests"
           value={kpi.season_bests}
-          hint={kpi.showcase_season_from ? `since ${kpi.showcase_season_from}` : 'this season'}
+          hint={kpi.showcase_season ? `season ${kpi.showcase_season}` : 'this season'}
         />
         <Kpi label="Swimmers" value={club.swimmer_count} hint="current roster" />
       </div>

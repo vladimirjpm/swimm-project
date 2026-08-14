@@ -12,6 +12,7 @@ import { routes } from '../../utils/routes';
 import UI_ClubIcon from '../components/mix/club-icon/club-icon';
 import UI_NormativeLevelIcon from '../components/mix/normative-level-icon/normative-level-icon';
 import UI_MedalIcon from '../components/mix/medal-icon/medal-icon';
+import UI_PrelimLabel from '../components/mix/prelim-label/prelim-label';
 import UI_PositionBadge from '../components/mix/position-badge/position-badge';
 import ResultRowDateInfo from '../results-table/components/result-row-date-info';
 import UI_PoolIcon from '../components/mix/pool-icon/pool-icon';
@@ -1006,7 +1007,8 @@ function ResultsTable({
           !isNaN(Number(res.international_points));
         // По-строчный флаг (all-time может смешивать разные соревнования) с фолбэком
         // на общий isAwardSource (одно соревнование — таб «это соревнование»).
-        const rowIsAward = res.is_award ?? isAwardSource ?? false;
+        // Медаль только за награждаемый заплыв: prelim-место — ранжир сессии, не награда.
+        const rowIsAward = (res.is_award ?? isAwardSource ?? false) && res.heat_type !== 'prelim';
 
         // Иконка «есть видео» — только для строк с DB id заплыва (статические источники
         // его не имеют, см. Footguns задания). Добавление медиа с этой страницы убрано —
@@ -1032,6 +1034,7 @@ function ResultsTable({
             <div className="flex items-center gap-3">
               <div className="flex shrink-0 flex-col items-center gap-1">
                 <UI_MedalIcon place={String(res.position ?? index + 1)} styleType={rowIsAward ? 'icon-place' : 'icon-noplace'} styleSize="medal-40" />
+                <UI_PrelimLabel heatType={res.heat_type} />
                 {res.event_style_age && (
                   <div className="text-[10px]" style={{ color: 'var(--theme-mode-text-muted)' }}>
                     age: <strong style={{ color: 'var(--theme-mode-text)' }}>{res.event_style_age}</strong>

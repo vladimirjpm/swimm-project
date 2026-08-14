@@ -103,6 +103,9 @@ export interface OverviewHighPoint {
   club: string;
   points: number;
   is_tie: boolean;
+  /** Правило требует «только финалы», но признака типа заплыва в данных нет —
+   *  посчитано по всем заплывам (сноска в карточке). */
+  finals_only_unavailable?: boolean;
 }
 
 /** Зарезервированный контракт карточки рекорда (v1 сервер отдаёт пусто). */

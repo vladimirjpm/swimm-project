@@ -215,7 +215,10 @@
   /* Снизу 0: активная плитка стыкуется с панелью, зазора между ними быть не должно */
   padding: 12px 14px 0;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  /* Число табов задаёт компонент: у клуба 5, у спортсмена 6.
+     minmax(0,…), а не 1fr: голый 1fr это minmax(auto,1fr), и длинное имя таба
+     («Records & PB») раздувало свою колонку за счёт соседних. */
+  grid-template-columns: repeat(var(--deep-tabs-count, 5), minmax(0, 1fr));
   gap: 8px;
 }
 .deep-tab {

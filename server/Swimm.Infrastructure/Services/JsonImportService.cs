@@ -676,6 +676,7 @@ public class JsonImportService : IImportService
                     AgeGroup = item.AgeGroup ?? string.Empty,
                     EventStyleAge = item.EventStyleAge ?? string.Empty,
                     EventCategory = string.IsNullOrWhiteSpace(item.EventCategory) ? null : item.EventCategory,
+                    HeatType = string.IsNullOrWhiteSpace(item.HeatType) ? null : item.HeatType,
                     Position = item.Position,
                     PositionAgeGroup = item.PositionAgeGroup,
                     Heat = item.Heat ?? 0,
@@ -1095,6 +1096,7 @@ public class JsonImportService : IImportService
         old.AgeGroup = incoming.AgeGroup;
         old.EventStyleAge = incoming.EventStyleAge;
         old.EventCategory = incoming.EventCategory;
+        old.HeatType = incoming.HeatType;
         old.Position = incoming.Position;
         old.PositionAgeGroup = incoming.PositionAgeGroup;
         old.TimeMillisecond = incoming.TimeMillisecond;
@@ -1938,6 +1940,11 @@ public class ResultJsonItem
     /// В отличие от age_group и event_style_age НЕ производна от года рождения пловца.</summary>
     [JsonPropertyName("event_category")]
     public string? EventCategory { get; set; }
+
+    /// <summary>prelim / final; null — единственный заплыв дисциплины за день (timed final).
+    /// Выводится парсером из порядка сессий (AssignHeatTypes) — в протоколе слова нет.</summary>
+    [JsonPropertyName("heat_type")]
+    public string? HeatType { get; set; }
 
     [JsonPropertyName("pool_type")]
     public string? PoolType { get; set; }

@@ -40,8 +40,8 @@ public class PointRulesSwimmersScoringTests
     private static SwimmerHighPointRow Row(
         int swimmerId, int? place, int age = 13, string gender = "male",
         int fina = 0, bool isRelay = false, bool timeFail = false,
-        RecordStatus record = RecordStatus.None, string ageGroup = "13-14")
-        => new(swimmerId, gender, age, ageGroup, place, fina, isRelay, timeFail, record);
+        RecordStatus record = RecordStatus.None, string ageGroup = "13-14", string? heatType = null)
+        => new(swimmerId, gender, age, ageGroup, place, fina, isRelay, timeFail, record, heatType);
 
     [Theory]
     [InlineData(1, 5)]
@@ -72,6 +72,28 @@ public class PointRulesSwimmersScoringTests
             AgeRule(), Row(1, place: 2, record: RecordStatus.Broken)));
         Assert.Equal(13, PointRulesSwimmersScoring.PointsFor(
             AgeRule(), Row(1, place: 9, record: RecordStatus.Broken)));
+    }
+
+    [Fact]
+    public void FinalsOnly_PrelimScoresZero_AndExcludedFromWinners()
+    {
+        // Бугрим п.16: кубок по очкам финальных заплывов. Утренний прелим быстрее вечернего
+        // финала не должен приносить очков; null-HeatType (timed final / старые данные) проходит.
+        var rule = FinaRule();
+        Assert.Equal(0, PointRulesSwimmersScoring.PointsFor(rule, Row(1, 1, fina: 900, heatType: "prelim")));
+        Assert.Equal(850, PointRulesSwimmersScoring.PointsFor(rule, Row(1, 1, fina: 850, heatType: "final")));
+        Assert.Equal(800, PointRulesSwimmersScoring.PointsFor(rule, Row(1, 1, fina: 800)));
+
+        // Пловец 1: прелим 950 (не в счёт) + финал 700. Пловец 2: финал 800 — он и победитель.
+        var winners = PointRulesSwimmersScoring.Winners(rule,
+        [
+            Row(1, 1, fina: 950, heatType: "prelim"),
+            Row(1, 2, fina: 700, heatType: "final"),
+            Row(2, 1, fina: 800, heatType: "final"),
+        ]);
+        var w = Assert.Single(winners);
+        Assert.Equal(2, w.SwimmerId);
+        Assert.Equal(800, w.Points);
     }
 
     [Fact]

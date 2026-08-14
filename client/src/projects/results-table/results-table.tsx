@@ -83,6 +83,11 @@ function ResultsTable() {
     // Фильтр по дате события
     if (event_date && event_date !== 'all' && res.date !== event_date) return false;
 
+    // Предварительные заплывы по умолчанию скрыты (официальный вид — финалы);
+    // тумблер [prelim] в фильтре Date возвращает их. Строки без признака (timed final,
+    // старые данные) видны всегда.
+    if (res.heat_type === 'prelim' && !filters.show_prelims) return false;
+
     // Фильтр по категории (программе) заплыва. У строк, импортированных до появления
     // event_category, оно пустое — такие в выборку по конкретной категории не попадают.
     const catFilter = filters.event_category;

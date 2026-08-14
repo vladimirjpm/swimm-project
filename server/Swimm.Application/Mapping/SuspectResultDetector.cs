@@ -16,7 +16,12 @@ public sealed record SuspectCandidateRow(
     string? AgeGroup,
     /// <summary>Очки FINA этого заплыва — единственная величина, сравнимая между стилями
     /// и дистанциями. Нужны правилу «выброс относительно личных результатов».</summary>
-    int? Points = null);
+    int? Points = null,
+    /// <summary>prelim / final / null (timed final или данные без признака). Различает
+    /// сессии в правиле «дубль дисциплины»: у бугрим предварительные и финал плывут в ОДИН
+    /// день, и без признака каждый финалист выглядел дублем (1678 ложных пометок на
+    /// чемпионате 2026).</summary>
+    string? HeatType = null);
 
 /// <summary>
 /// Заплыв пловца из его личной истории (для правила «выброс относительно себя»).
@@ -193,9 +198,12 @@ public static class SuspectResultDetector
         }
 
         // 5. Один пловец дважды в одной дисциплине одного дня с разным временем.
-        //    Разные ДНИ — норма (предварительные/финал, повтор дисциплины), поэтому день в ключе.
+        //    Разные ДНИ — норма (повтор дисциплины), поэтому день в ключе. Разные СЕССИИ
+        //    одного дня — тоже норма (у бугрим предварительные и финал в один день),
+        //    поэтому в ключе и HeatType: prelim и final не сравниваются друг с другом,
+        //    дубль внутри одной сессии по-прежнему ловится.
         foreach (var grp in timed.GroupBy(r =>
-                     (r.SwimmerId, r.StyleName, r.Distance, r.CompetitionDate.Date)))
+                     (r.SwimmerId, r.StyleName, r.Distance, r.CompetitionDate.Date, r.HeatType)))
         {
             if (grp.Count() < 2) continue;
             if (grp.Select(r => r.TimeMilliseconds).Distinct().Count() < 2) continue;

@@ -3,9 +3,15 @@ using Swimm.Domain;
 namespace Swimm.Application.Mapping;
 
 /// <summary>
-/// Минимальная проекция заплыва для сезонных агрегатов. Чистые данные — I/O делает репозиторий.
+/// Проекция заплыва для сезонных агрегатов. Чистые данные — I/O делает репозиторий.
 /// <paramref name="PoolType"/> живёт у соревнования, поэтому репозиторий обязан его подтянуть
 /// (25m и 50m — разные дисциплины, времена несравнимы).
+///
+/// В конструкторе — минимум, которого хватает арифметике сезона (best/PB/сезоны). Всё, что
+/// нужно только для ОТРИСОВКИ строки результата, добавлено `init`-свойствами ниже: страница
+/// спортсмена показывает место, очки, сплиты и соревнование, и заводить ради них вторую
+/// проекцию нельзя — через полгода будет два способа считать сезон (плана athlete-page §A1).
+/// Незаполненные свойства безопасны: агрегаты их не читают.
 /// </summary>
 public sealed record SeasonSwimRow(
     long ResultId,
@@ -20,7 +26,64 @@ public sealed record SeasonSwimRow(
     int? TimeMilliseconds,
     bool TimeFail,
     string? SuspectReason,
-    bool IsRelay);
+    bool IsRelay)
+{
+    /// <summary>Место в протоколе своего заплыва — ОФИЦИАЛЬНОЕ, за него вручена медаль.</summary>
+    public int? Position { get; init; }
+
+    /// <summary>prelim / final / null (timed final или данные без признака). Место
+    /// prelim-заплыва — ранжир сессии, не награда: медали считаются без него.</summary>
+    public string? HeatType { get; init; }
+
+    /// <summary>Место внутри возрастной полосы протокола (грубее заплыва).</summary>
+    public int? PositionAgeGroup { get; init; }
+
+    /// <summary>Очки FINA за заплыв. Сравнимы между стартами только внутри одной таблицы очков.</summary>
+    public int InternationalPoints { get; init; }
+
+    /// <summary>Время как напечатано в протоколе — единственное, что показывает `UI_SwimTime`.</summary>
+    public string? TimeOriginal { get; init; }
+
+    /// <summary>Сплиты строкой из протокола.</summary>
+    public string? TimeSplit { get; init; }
+
+    /// <summary>Событие многодневки: все дни делят один <c>EventId</c> — по нему считается
+    /// «сколько соревнований», иначе трёхдневный старт станет тремя.</summary>
+    public int? EventId { get; init; }
+
+    public string? CompetitionName { get; init; }
+
+    /// <summary>Единственный источник значка 🏆 — по названию чемпионат не определяется.</summary>
+    public bool IsChampionship { get; init; }
+
+    /// <summary>Медали вручались (<c>Competition.IsAward</c>): без него место — просто место.</summary>
+    public bool IsAward { get; init; }
+
+    public bool IsMasters { get; init; }
+
+    /// <summary>Ключ стиля как на клиенте (freestyle/backstroke/…) — по нему рисуется плита стиля.</summary>
+    public string? StyleName { get; init; }
+
+    /// <summary>Клуб НА МОМЕНТ заплыва: пловец переходит между клубами, и история это помнит.</summary>
+    public int ClubId { get; init; }
+
+    /// <summary>Возрастная полоса протокола («9-10»).</summary>
+    public string? AgeGroup { get; init; }
+
+    /// <summary>Возраст события — настоящая ось заплыва (см. <c>ResultRecord.EventStyleAge</c>).</summary>
+    public string? EventStyleAge { get; init; }
+}
+
+/// <summary>
+/// Официальный рекорд страны по возрастной ступени — вход для колонки «Δ Israel {age}».
+/// <paramref name="TimeMs"/> считается парсингом строки: у <c>Record</c> времени в
+/// миллисекундах нет (открытое решение №3 в records-all-countries-plan).
+/// <paramref name="IssueReason"/> обязателен по инварианту И11: раз тут показано время,
+/// рядом должен быть признак его качества — справочник рекордов тоже ошибается
+/// (<c>Sys_RecordIssues</c>, качество <c>record</c>).
+/// </summary>
+public sealed record NationalAgeRecordRow(
+    string Time, int? TimeMs, string? Holder, string AgeKey, string? IssueReason = null);
 
 /// <summary>
 /// Общий сезонный шов страниц спортсмена и клуба (фаза 10.1): «результаты → сезоны»,
@@ -52,11 +115,22 @@ public static class SeasonAggregator
     /// <c>mix</c>/возрастная) — нужна на странице спортсмена, иначе три золота Маккабиады в одной
     /// дисциплине сливаются в одно. В клубном зачёте <c>EventCategory</c> сознательно не учитывается.
     /// </summary>
-    public static string DisciplineKey(SeasonSwimRow row, bool includeEventCategory = false)
+    public static string DisciplineKey(SeasonSwimRow row, bool includeEventCategory = false) =>
+        DisciplineKey(row.StyleId, row.Distance, row.PoolType, row.Gender,
+            includeEventCategory ? row.EventCategory : null, includeEventCategory);
+
+    /// <summary>
+    /// Тот же ключ, собранный из частей — нужен, чтобы сравнивать заплывы со СПРАВОЧНИКОМ
+    /// рекордов, где дистанция записана иначе («50m» против «50»), а стиль строкой.
+    /// Нормализация обязана быть одна на оба источника, иначе сравнение молча не найдёт пару.
+    /// </summary>
+    public static string DisciplineKey(
+        int styleId, string? distance, string? poolType, string? gender,
+        string? eventCategory = null, bool includeEventCategory = false)
     {
-        var dist = Norm(row.Distance).TrimEnd('m');
-        var key = $"{row.StyleId}|{dist}|{Norm(row.PoolType)}|{Norm(row.Gender)}";
-        return includeEventCategory ? $"{key}|{Norm(row.EventCategory)}" : key;
+        var dist = Norm(distance).TrimEnd('m');
+        var key = $"{styleId}|{dist}|{Norm(poolType)}|{Norm(gender)}";
+        return includeEventCategory ? $"{key}|{Norm(eventCategory)}" : key;
     }
 
     /// <summary>Год начала сезона, которому принадлежит заплыв.</summary>

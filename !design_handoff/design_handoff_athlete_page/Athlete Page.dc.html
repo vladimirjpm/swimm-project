@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e9ebef;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#1a1a1a;}
+a{color:#0e7490;text-decoration:none;} a:hover{color:#0c6379;}
+</style>
+</helmet>
+
+<section style="display:flex;flex-direction:column;gap:16px;padding:40px 40px 0;">
+  <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;">
+    <span style="font-family:'Archivo Black',sans-serif;font-size:20px;">2a — Card DNA</span>
+    <span style="font-size:13px;font-weight:700;color:#5b6470;">страница собрана из блоков реальной попап-карточки (sportsmen-details.tsx) + канон клуба</span>
+  </div>
+  <div style="max-width:1000px;font-size:12.5px;font-weight:600;color:#5b6470;line-height:1.55;">
+    Взято из кода как есть: identity-бар (фото 76 + флаг, RTL-имя, «12 year (2014)», чип клуба с лого на белом круге, ♡/☆ под фото, «Suggest loglig profile»), три плитки <b>POINTS / MEDALS / LEVEL</b> с дугой-датчиком, сегментный переключатель «соревнование ↔ All-time», градиентный scope-баннер, двухлинейная строка результата (место + age · иконка стиля 86px с дистанцией · время · вторая линия: сплиты / очки / дата + дуга уровня), «My links» и гостевой CTA. <b>По замечанию:</b> в табе Results убран переключатель «последнее соревнование ↔ All-time» — здесь только лучшее время на каждую дистанцию (чип BEST); история всех заплывов по стилю и дистанции живёт в табе Progress; в каждой строке рядом с датой есть название соревнования и значок 🏆, если это чемпионат. Добавлено моё: сезон-карусель и плитки-табы как на странице клуба, шапка-hero вместо попапа, каренная лента флага «под вопросом» на строке.
+  </div>
+
+  <div id="2a" style="display:flex;gap:22px;align-items:flex-start;">
+
+    <div style="flex:none;width:1440px;border-radius:18px;overflow:hidden;background:#04182b;box-shadow:0 8px 28px rgba(4,32,58,.22);">
+      <div style="height:48px;padding:0 24px;background:#020f1d;display:flex;align-items:center;gap:20px;color:#fff;">
+        <span style="font-family:'Archivo Black',sans-serif;font-size:15px;color:#22d3ee;">SWIMM</span>
+        <span style="font-size:13px;font-weight:700;color:rgba(255,255,255,.55);">Competitions</span>
+        <span style="font-size:13px;font-weight:700;color:rgba(255,255,255,.55);">Clubs</span>
+        <span style="height:48px;display:flex;align-items:center;font-size:13px;font-weight:800;color:#fff;border-bottom:2px solid #22d3ee;">Swimmers</span>
+        <span style="flex:1;"></span>
+        <span style="font-size:11.5px;font-weight:800;color:rgba(255,255,255,.45);">Vladimir</span>
+        <span style="width:28px;height:28px;border-radius:999px;background:#22d3ee;color:#04182b;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;">V</span>
+      </div>
+
+      <div style="background:linear-gradient(160deg,#062a4a 0%,#04182b 60%);padding:20px 24px 18px;">
+        <div style="max-width:1392px;margin:0 auto;display:grid;grid-template-columns:auto minmax(0,1fr) 700px;gap:22px;align-items:center;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:9px;">
+            <div style="position:relative;">
+              <div style="width:96px;height:96px;border-radius:999px;border:3px solid #22d3ee;background:repeating-linear-gradient(135deg,rgba(34,211,238,.10) 0 6px,rgba(34,211,238,.03) 6px 12px);display:flex;align-items:center;justify-content:center;">
+                <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9px;font-weight:700;color:rgba(34,211,238,.8);text-align:center;line-height:1.3;">swimmer<br>photo</span>
+              </div>
+              <span style="position:absolute;right:-4px;bottom:-3px;width:28px;height:21px;border-radius:4px;background:#0b3f6b;border:1px solid rgba(255,255,255,.25);box-shadow:0 2px 6px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;font-size:12px;">🇮🇱</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;">
+              <button style="cursor:pointer;font-family:inherit;width:32px;height:32px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:rgba(255,255,255,.6);font-size:14px;display:flex;align-items:center;justify-content:center;" style-hover="color:#f472b6;border-color:rgba(244,114,182,.5);">♡</button>
+              <button style="cursor:pointer;font-family:inherit;width:32px;height:32px;border-radius:999px;border:1px solid rgba(251,191,36,.5);background:rgba(251,191,36,.16);color:#fbbf24;font-size:14px;display:flex;align-items:center;justify-content:center;">★</button>
+            </div>
+            <span style="cursor:pointer;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);color:rgba(255,255,255,.6);font-size:10px;font-weight:800;white-space:nowrap;">Suggest loglig profile</span>
+          </div>
+
+          <div style="min-width:0;display:flex;flex-direction:column;gap:9px;">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <span dir="rtl" style="font-family:'Archivo Black',sans-serif;font-size:31px;line-height:1.15;color:#fff;text-align:left;">ליאור שילה</span>
+              <span style="font-size:12.5px;font-weight:800;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums;">12 year (2014)</span>
+              <span style="display:flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;background:rgba(251,191,36,.16);border:1px solid rgba(251,191,36,.35);color:#fbbf24;font-size:11px;font-weight:900;">🏆 2 records</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <a href="?tab=clubs&amp;clubId=23" dir="rtl" style="display:flex;align-items:center;gap:9px;padding:5px 14px 5px 5px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);color:#fff;">
+                <span style="flex:none;width:32px;height:32px;border-radius:999px;background:#fff;box-shadow:0 0 0 2px rgba(34,211,238,.4);display:flex;align-items:center;justify-content:center;">
+                  <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:7px;font-weight:700;color:#5b6470;">logo</span>
+                </span>
+                <span dir="auto" style="font-size:12.5px;font-weight:800;">הפועל בית שמש</span>
+              </a>
+              <span style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(34,211,238,.10);border:1px solid rgba(34,211,238,.30);color:#22d3ee;font-size:12px;font-weight:800;">Y 11–14</span>
+              <span style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);color:rgba(255,255,255,.6);font-size:12px;font-weight:800;">🌊 open water</span>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;">
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);padding:14px 10px;min-width:0;">
+              <span style="font-family:'Archivo Black',sans-serif;font-size:27px;line-height:1;color:#22d3ee;font-variant-numeric:tabular-nums;">9029</span>
+              <span style="font-size:9.5px;font-weight:800;letter-spacing:.06em;color:rgba(255,255,255,.45);">POINTS</span>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);padding:14px 10px;min-width:0;">
+              <span style="display:flex;justify-content:center;gap:5px;">
+                <span style="width:26px;height:26px;border-radius:999px;background:radial-gradient(circle at 32% 28%,#fde68a,#d69b0b);color:#3b2a04;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;">17</span>
+                <span style="width:26px;height:26px;border-radius:999px;background:radial-gradient(circle at 32% 28%,#f1f5f9,#94a3b8);color:#1e293b;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;">2</span>
+                <span style="width:26px;height:26px;border-radius:999px;background:radial-gradient(circle at 32% 28%,#e6b98f,#a1663a);color:#31190a;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;opacity:.4;">0</span>
+              </span>
+              <span style="font-size:9.5px;font-weight:800;letter-spacing:.06em;color:rgba(255,255,255,.45);">MEDALS</span>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);padding:10px;min-width:0;">
+              <svg width="62" height="38" viewBox="0 0 46 30" fill="none" aria-hidden="true">
+                <path d="M 6 27 A 17 17 0 1 1 40 27" stroke="rgba(255,255,255,.16)" stroke-width="4" stroke-linecap="round"></path>
+                <path d="M 6 27 A 17 17 0 1 1 40 27" stroke="#22d3ee" stroke-width="4" stroke-linecap="round" stroke-dasharray="41 70"></path>
+                <text x="23" y="26" text-anchor="middle" fill="#22d3ee" font-size="10" font-weight="800" font-family="ui-sans-serif,system-ui">2y</text>
+              </svg>
+              <span style="font-size:9.5px;font-weight:800;letter-spacing:.06em;color:rgba(255,255,255,.45);">LEVEL</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:11px 22px;background:rgba(0,0,0,.16);border-top:1px solid rgba(34,211,238,.14);display:flex;align-items:center;gap:14px;">
+        <span style="flex:none;width:64px;cursor:pointer;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:rgba(255,255,255,.7);font-size:12px;font-weight:800;padding:6px 0;border-radius:999px;text-align:center;">All</span>
+        <span style="flex:1;display:flex;align-items:center;justify-content:center;gap:16px;">
+          <span style="cursor:pointer;width:32px;height:32px;flex:none;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;">‹</span>
+          <span style="display:grid;grid-template-columns:repeat(3,52px) auto repeat(3,52px);align-items:center;gap:14px;font-variant-numeric:tabular-nums;">
+            <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:12px;color:rgba(255,255,255,.28);">21/22</span>
+            <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:13px;color:rgba(255,255,255,.42);">22/23</span>
+            <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:15px;color:rgba(255,255,255,.65);">23/24</span>
+            <span style="display:flex;flex-direction:column;align-items:center;margin:0 6px;">
+              <span style="font-size:9px;font-weight:800;letter-spacing:.14em;color:rgba(255,255,255,.4);">SEASON</span>
+              <span style="font-family:'Archivo Black',sans-serif;font-size:21px;line-height:1.1;color:#22d3ee;text-shadow:0 0 16px rgba(34,211,238,.5);">25/26</span>
+            </span>
+            <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:15px;color:rgba(255,255,255,.65);">10/11</span>
+            <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:13px;color:rgba(255,255,255,.42);">11/12</span>
+            <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:12px;color:rgba(255,255,255,.28);">12/13</span>
+          </span>
+          <span style="cursor:pointer;width:32px;height:32px;flex:none;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;">›</span>
+        </span>
+        <span style="flex:none;width:64px;"></span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:12px 14px 0;background:rgba(0,0,0,.28);">
+        <span style="cursor:pointer;border-radius:13px;padding:11px 13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;gap:7px;">
+          <span style="display:flex;align-items:center;gap:7px;"><span style="flex:none;width:24px;height:24px;border-radius:999px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:12px;">▦</span><span style="font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.75);">SEASON</span></span>
+          <span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.4);">🌊 open water · #5</span>
+        </span>
+        <span style="cursor:pointer;position:relative;z-index:1;margin-bottom:-1px;border-radius:13px 13px 0 0;padding:11px 13px 12px;background:#0c2a3f;border:1px solid rgba(34,211,238,.5);border-bottom:none;box-shadow:0 -6px 18px rgba(34,211,238,.18);display:flex;flex-direction:column;gap:7px;">
+          <span style="display:flex;align-items:center;gap:7px;"><span style="flex:none;width:24px;height:24px;border-radius:999px;background:#22d3ee;color:#04182b;display:flex;align-items:center;justify-content:center;font-size:12px;">⏱</span><span style="font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:.04em;color:#22d3ee;">RESULTS</span></span>
+          <span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.55);">11 best times</span>
+        </span>
+        <span style="cursor:pointer;border-radius:13px;padding:11px 13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;gap:7px;">
+          <span style="display:flex;align-items:center;gap:7px;"><span style="flex:none;width:24px;height:24px;border-radius:999px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:12px;">🏅</span><span style="font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.75);">RECORDS &amp; PB</span></span>
+          <span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.4);">11 bests · 2 records</span>
+        </span>
+        <span style="cursor:pointer;border-radius:13px;padding:11px 13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;gap:7px;">
+          <span style="display:flex;align-items:center;gap:7px;"><span style="flex:none;width:24px;height:24px;border-radius:999px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:12px;">📈</span><span style="font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.75);">PROGRESS</span></span>
+          <span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.4);">история по стилю и дистанции</span>
+        </span>
+        <span style="cursor:pointer;border-radius:13px;padding:11px 13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;gap:7px;">
+          <span style="display:flex;align-items:center;gap:7px;"><span style="flex:none;width:24px;height:24px;border-radius:999px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:12px;">▶</span><span style="font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.75);">MEDIA</span></span>
+          <span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.4);">my links · 6</span>
+        </span>
+        <span style="cursor:pointer;border-radius:13px;padding:11px 13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;gap:7px;">
+          <span style="display:flex;align-items:center;gap:7px;"><span style="flex:none;width:24px;height:24px;border-radius:999px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:12px;">🗓</span><span style="font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.75);">HISTORY</span></span>
+          <span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.4);">5 seasons · 29 meets</span>
+        </span>
+      </div>
+
+      <div style="position:relative;margin:0 14px 14px;background:#0c2a3f;border:1px solid rgba(34,211,238,.5);border-radius:13px;box-shadow:0 0 18px rgba(34,211,238,.14);padding:16px 18px 20px;display:flex;flex-direction:column;gap:14px;">
+        <div style="border-radius:14px;padding:14px 18px;background:linear-gradient(135deg,#0e7490,#22d3ee);display:flex;align-items:center;justify-content:space-between;gap:16px;">
+          <div style="display:flex;flex-direction:column;gap:3px;">
+            <span style="font-family:'Archivo Black',sans-serif;font-size:26px;line-height:1;color:#04182b;font-variant-numeric:tabular-nums;">9 029<span style="font-size:12px;font-weight:800;"> pt</span></span>
+            <span dir="auto" style="font-size:10.5px;font-weight:900;color:rgba(4,24,43,.7);">season 25/26 · 31 swims · 11 events</span>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <span style="width:30px;height:30px;border-radius:999px;background:radial-gradient(circle at 32% 28%,#fde68a,#d69b0b);color:#3b2a04;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;">17</span>
+            <span style="width:30px;height:30px;border-radius:999px;background:radial-gradient(circle at 32% 28%,#f1f5f9,#94a3b8);color:#1e293b;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;">2</span>
+            <span style="width:30px;height:30px;border-radius:999px;background:radial-gradient(circle at 32% 28%,#e6b98f,#a1663a);color:#31190a;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;opacity:.4;">0</span>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:baseline;gap:12px;">
+          <span style="font-family:'Archivo Black',sans-serif;font-size:15px;color:#22d3ee;">Best times</span>
+          <span style="font-size:11.5px;font-weight:800;color:rgba(255,255,255,.4);">по одному лучшему результату на дистанцию · строка → заплыв в результатах соревнования</span>
+          <span style="flex:1;"></span>
+          <span style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;color:rgba(255,255,255,.4);"><span style="font-size:13px;">🏆</span>чемпионат</span>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <a href="results_main.html?competitionId=64&amp;tab=swims&amp;swimmerId=1207&amp;resultId=88201" style="display:flex;flex-direction:column;gap:9px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);padding:12px;color:#fff;" style-hover="background:rgba(255,255,255,.07);">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <span style="flex:none;width:52px;display:flex;flex-direction:column;align-items:center;gap:3px;">
+                <span style="width:38px;height:38px;border-radius:999px;background:radial-gradient(circle at 32% 28%,#fde68a,#d69b0b);color:#3b2a04;font-family:'Archivo Black',sans-serif;font-size:15px;display:flex;align-items:center;justify-content:center;">1</span>
+                <span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.4);">age: <b style="color:#fff;">12</b></span>
+              </span>
+              <span style="flex:none;position:relative;width:86px;height:52px;border-radius:7px;background:#fff;padding:4px;display:flex;align-items:center;justify-content:center;">
+                <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:8px;font-weight:700;color:#8a93a3;text-align:center;line-height:1.3;">style icon<br>freestyle</span>
+                <span style="position:absolute;top:-6px;right:-4px;font-size:15px;font-weight:900;color:#e53935;text-shadow:0 1px 0 #fff,0 -1px 0 #fff,1px 0 0 #fff,-1px 0 0 #fff;font-variant-numeric:tabular-nums;">1600</span>
+              </span>
+              <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;">
+                <span style="display:flex;align-items:center;gap:7px;min-width:0;">
+                  <span style="flex:none;font-size:14px;">🏆</span>
+                  <span dir="auto" style="min-width:0;font-size:12.5px;font-weight:900;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">אליפות ישראל — מים פתוחים, אילת 2026</span>
+                </span>
+                <span style="font-size:11px;font-weight:800;color:rgba(255,255,255,.4);">🌊 open water · Eilat</span>
+              </span>
+              <span style="flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
+                <span style="font-family:'Archivo Black',sans-serif;font-size:22px;line-height:1;color:#fff;font-variant-numeric:tabular-nums;">29:19.11</span>
+                <span style="font-size:10px;font-weight:900;letter-spacing:.06em;color:#22d3ee;">BEST</span>
+              </span>
+            </div>
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:9px 0 0 46px;border-top:1px solid rgba(255,255,255,.08);">
+              <span style="display:flex;flex-direction:column;gap:2px;min-width:0;">
+                <span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.4);">Time split: 7:12.4 · 14:41.8 · 22:05.2</span>
+                <span style="font-size:11.5px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;">Points: 612</span>
+                <span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.4);font-variant-numeric:tabular-nums;">27 APR 2026</span>
+              </span>
+              <svg width="62" height="40" viewBox="0 0 46 30" fill="none" aria-hidden="true">
+                <path d="M 6 27 A 17 17 0 1 1 40 27" stroke="rgba(255,255,255,.16)" stroke-width="4" stroke-linecap="round"></path>
+                <path d="M 6 27 A 17 17 0 1 1 40 27" stroke="#22d3ee" stroke-width="4" stroke-linecap="round" stroke-dasharray="48 70"></path>
+                <text x="23" y="26" text-anchor="middle" fill="#22d3ee" font-size="10" font-weight="800" font-family="ui-sans-serif,system-ui">2y</text>
+              </svg>
+            </div>
+          </a>
+
+          <a href="results_main.html?competitionId=64&amp;tab=swims&amp;swimmerId=1207&amp;resultId=88214" style="display:flex;flex-direction:column;gap:9px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);padding:12px;color:#fff;" style-hover="background:rgba(255,255,255,.07);">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <span style="flex:none;width:52px;display:flex;flex-direction:column;align-items:center;gap:3px;">
+                <span style="width:38px;height:38px;border-radius:999px;background:radial-gradient(circle at 32% 28%,#f1f5f9,#94a3b8);color:#1e293b;font-family:'Archivo Black',sans-serif;font-size:15px;display:flex;align-items:center;justify-content:center;">2</span>
+                <span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.4);">age: <b style="color:#fff;">12</b></span>
+              </span>
+              <span style="flex:none;position:relative;width:86px;height:52px;border-radius:7px;background:#fff;padding:4px;display:flex;align-items:center;justify-content:center;">
+                <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:8px;font-weight:700;color:#8a93a3;text-align:center;line-height:1.3;">style icon<br>freestyle</span>
+                <span style="position:absolute;top:-6px;right:-4px;font-size:15px;font-weight:900;color:#e53935;text-shadow:0 1px 0 #fff,0 -1px 0 #fff,1px 0 0 #fff,-1px 0 0 #fff;font-variant-numeric:tabular-nums;">800</span>
+              </span>
+              <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;">
+                <span style="display:flex;align-items:center;gap:7px;min-width:0;">
+                  <span style="flex:none;font-size:14px;">🏆</span>
+                  <span dir="auto" style="min-width:0;font-size:12.5px;font-weight:900;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">אליפות ישראל — מים פתוחים, אילת 2026</span>
+                </span>
+                <span style="font-size:11px;font-weight:800;color:rgba(255,255,255,.4);">🌊 open water · Eilat</span>
+              </span>
+              <span style="flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
+                <span style="font-family:'Archivo Black',sans-serif;font-size:22px;line-height:1;color:#fff;font-variant-numeric:tabular-nums;">14:02.66</span>
+                <span style="font-size:10px;font-weight:900;letter-spacing:.06em;color:#22d3ee;">BEST</span>
+              </span>
+            </div>
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:9px 0 0 46px;border-top:1px solid rgba(255,255,255,.08);">
+              <span style="display:flex;flex-direction:column;gap:2px;min-width:0;">
+                <span style="font-size:11.5px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;">Points: 588</span>
+                <span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.4);font-variant-numeric:tabular-nums;">27 APR 2026</span>
+              </span>
+              <svg width="62" height="40" viewBox="0 0 46 30" fill="none" aria-hidden="true">
+                <path d="M 6 27 A 17 17 0 1 1 40 27" stroke="rgba(255,255,255,.16)" stroke-width="4" stroke-linecap="round"></path>
+                <path d="M 6 27 A 17 17 0 1 1 40 27" stroke="#22d3ee" stroke-width="4" stroke-linecap="round" stroke-dasharray="38 70"></path>
+                <text x="23" y="26" text-anchor="middle" fill="#22d3ee" font-size="10" font-weight="800" font-family="ui-sans-serif,system-ui">1y</text>
+              </svg>
+            </div>
+          </a>
+
+          <div style="position:relative;display:flex;flex-direction:column;gap:9px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(240,180,41,.55);padding:12px 12px 12px 20px;color:#fff;overflow:hidden;">
+            <span style="position:absolute;left:0;top:0;bottom:0;width:8px;background:repeating-linear-gradient(-45deg,#f0b429 0 9px,#2a2416 9px 18px);opacity:.9;" aria-hidden="true"></span>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <span style="flex:none;width:52px;display:flex;flex-direction:column;align-items:center;gap:3px;">
+                <span style="width:38px;height:38px;border-radius:999px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.16);color:rgba(255,255,255,.75);font-family:'Archivo Black',sans-serif;font-size:14px;display:flex;align-items:center;justify-content:center;">4</span>
+                <span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.4);">age: <b style="color:#fff;">12</b></span>
+              </span>
+              <span style="flex:none;position:relative;width:86px;height:52px;border-radius:7px;background:#fff;padding:4px;display:flex;align-items:center;justify-content:center;">
+                <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:8px;font-weight:700;color:#8a93a3;text-align:center;line-height:1.3;">style icon<br>medley</span>
+                <span style="position:absolute;top:-6px;right:-4px;font-size:15px;font-weight:900;color:#e53935;text-shadow:0 1px 0 #fff,0 -1px 0 #fff,1px 0 0 #fff,-1px 0 0 #fff;font-variant-numeric:tabular-nums;">200</span>
+              </span>
+              <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;">
+                <span style="display:flex;align-items:center;gap:7px;min-width:0;">
+                  <span dir="auto" style="min-width:0;font-size:12.5px;font-weight:900;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">גביע האביב — ירושלים</span>
+                </span>
+                <span style="display:inline-flex;align-self:flex-start;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;background:rgba(245,158,11,.16);border:1px solid rgba(245,158,11,.4);color:#f0b429;font-size:11px;font-weight:800;white-space:nowrap;">⚠ Under review · в зачёт пока не идёт</span>
+              </span>
+              <span style="flex:none;font-family:'Archivo Black',sans-serif;font-size:22px;color:#fff;font-variant-numeric:tabular-nums;">2:41.09</span>
+            </div>
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:9px 0 0 46px;border-top:1px solid rgba(255,255,255,.08);">
+              <span style="display:flex;flex-direction:column;gap:2px;min-width:0;">
+                <span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.4);">Time split: 35.10 · 1:18.44 · 2:04.71</span>
+                <span style="font-size:11.5px;font-weight:900;color:rgba(255,255,255,.55);font-variant-numeric:tabular-nums;">Points: —</span>
+                <span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.4);font-variant-numeric:tabular-nums;">26 APR 2026</span>
+              </span>
+              <svg width="62" height="40" viewBox="0 0 46 30" fill="none" aria-hidden="true">
+                <path d="M 6 27 A 17 17 0 1 1 40 27" stroke="rgba(255,255,255,.16)" stroke-width="4" stroke-linecap="round"></path>
+                <text x="23" y="26" text-anchor="middle" fill="rgba(255,255,255,.4)" font-size="10" font-weight="800" font-family="ui-sans-serif,system-ui">—</text>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:10px;border-top:1px solid rgba(255,255,255,.08);padding-top:14px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-family:'Archivo Black',sans-serif;font-size:15px;color:#22d3ee;">My links (6)</span>
+            <a href="media.html" style="font-size:11.5px;font-weight:800;color:rgba(255,255,255,.55);text-decoration:underline;">Manage in My media →</a>
+            <span style="flex:1;"></span>
+            <span style="padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);color:rgba(255,255,255,.45);font-size:10.5px;font-weight:800;">owner-only</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;">
+            <span style="position:relative;aspect-ratio:16/9;border-radius:10px;background:repeating-linear-gradient(135deg,rgba(255,255,255,.06) 0 6px,rgba(255,255,255,.02) 6px 12px);border:1px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;"><span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:8px;color:rgba(255,255,255,.4);">video</span><span style="position:absolute;bottom:4px;left:4px;padding:1px 6px;border-radius:4px;background:rgba(0,0,0,.55);color:#fff;font-size:9px;font-weight:800;">1600m free</span></span>
+            <span style="position:relative;aspect-ratio:16/9;border-radius:10px;background:repeating-linear-gradient(135deg,rgba(255,255,255,.06) 0 6px,rgba(255,255,255,.02) 6px 12px);border:1px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;"><span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:8px;color:rgba(255,255,255,.4);">video</span><span style="position:absolute;bottom:4px;left:4px;padding:1px 6px;border-radius:4px;background:rgba(0,0,0,.55);color:#fff;font-size:9px;font-weight:800;">800m free</span></span>
+            <span style="aspect-ratio:16/9;border-radius:10px;background:repeating-linear-gradient(135deg,rgba(255,255,255,.06) 0 6px,rgba(255,255,255,.02) 6px 12px);border:1px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;"><span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:8px;color:rgba(255,255,255,.4);">photo</span></span>
+            <span style="aspect-ratio:16/9;border-radius:10px;background:repeating-linear-gradient(135deg,rgba(255,255,255,.06) 0 6px,rgba(255,255,255,.02) 6px 12px);border:1px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;"><span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:8px;color:rgba(255,255,255,.4);">photo</span></span>
+            <span style="aspect-ratio:16/9;border-radius:10px;background:repeating-linear-gradient(135deg,rgba(255,255,255,.06) 0 6px,rgba(255,255,255,.02) 6px 12px);border:1px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;"><span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:8px;color:rgba(255,255,255,.4);">link</span></span>
+            <span style="aspect-ratio:16/9;border-radius:10px;background:rgba(34,211,238,.08);border:1px dashed rgba(34,211,238,.35);display:flex;align-items:center;justify-content:center;color:#22d3ee;font-size:11px;font-weight:900;cursor:pointer;">＋ add</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex:none;display:flex;flex-direction:column;gap:22px;">
+      <div style="width:390px;border-radius:18px;overflow:hidden;background:#04182b;box-shadow:0 8px 28px rgba(4,32,58,.22);">
+        <div style="background:linear-gradient(160deg,#062a4a 0%,#04182b 60%);padding:16px 14px 14px;display:flex;gap:14px;align-items:flex-start;">
+          <div style="flex:none;display:flex;flex-direction:column;align-items:center;gap:8px;">
+            <div style="position:relative;">
+              <div style="width:76px;height:76px;border-radius:999px;border:3px solid #22d3ee;background:repeating-linear-gradient(135deg,rgba(34,211,238,.10) 0 6px,rgba(34,211,238,.03) 6px 12px);display:flex;align-items:center;justify-content:center;">
+                <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:8px;font-weight:700;color:rgba(34,211,238,.8);">photo</span>
+              </div>
+              <span style="position:absolute;right:-4px;bottom:-3px;width:28px;height:21px;border-radius:4px;background:#0b3f6b;border:1px solid rgba(255,255,255,.25);box-shadow:0 2px 6px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;font-size:12px;">🇮🇱</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <button style="cursor:pointer;font-family:inherit;width:44px;height:44px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:rgba(255,255,255,.6);font-size:15px;">♡</button>
+              <button style="cursor:pointer;font-family:inherit;width:44px;height:44px;border-radius:999px;border:1px solid rgba(251,191,36,.5);background:rgba(251,191,36,.16);color:#fbbf24;font-size:15px;">★</button>
+            </div>
+            <span style="cursor:pointer;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);color:rgba(255,255,255,.55);font-size:9px;font-weight:800;text-align:center;line-height:1.3;">Suggest<br>loglig profile</span>
+          </div>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+            <span dir="rtl" style="font-family:'Archivo Black',sans-serif;font-size:21px;line-height:1.15;color:#fff;text-align:right;max-width:100%;">ליאור שילה</span>
+            <span style="display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;color:rgba(255,255,255,.5);">
+              <span style="color:#fbbf24;">🏆 2</span>
+              <span style="font-variant-numeric:tabular-nums;">12 year (2014)</span>
+            </span>
+            <a href="?tab=clubs&amp;clubId=23" dir="rtl" style="display:flex;align-items:center;gap:8px;padding:4px 12px 4px 5px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);max-width:100%;color:#fff;">
+              <span style="flex:none;width:32px;height:32px;border-radius:999px;background:#fff;box-shadow:0 0 0 2px rgba(34,211,238,.4);display:flex;align-items:center;justify-content:center;"><span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:7px;font-weight:700;color:#5b6470;">logo</span></span>
+              <span dir="auto" style="font-size:12px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">הפועל בית שמש</span>
+            </a>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;padding:8px 14px 0;">
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);padding:10px 8px;min-width:0;">
+            <span style="font-family:'Archivo Black',sans-serif;font-size:20px;line-height:1;color:#22d3ee;font-variant-numeric:tabular-nums;">9029</span>
+            <span style="font-size:9px;font-weight:800;letter-spacing:.05em;color:rgba(255,255,255,.45);">POINTS</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);padding:10px 8px;min-width:0;">
+            <span style="display:flex;gap:4px;">
+              <span style="width:26px;height:26px;border-radius:999px;background:radial-gradient(circle at 32% 28%,#fde68a,#d69b0b);color:#3b2a04;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;">17</span>
+              <span style="width:26px;height:26px;border-radius:999px;background:radial-gradient(circle at 32% 28%,#f1f5f9,#94a3b8);color:#1e293b;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;">2</span>
+              <span style="width:26px;height:26px;border-radius:999px;background:radial-gradient(circle at 32% 28%,#e6b98f,#a1663a);color:#31190a;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center;opacity:.4;">0</span>
+            </span>
+            <span style="font-size:9px;font-weight:800;letter-spacing:.05em;color:rgba(255,255,255,.45);">MEDALS</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);padding:8px;min-width:0;">
+            <svg width="62" height="38" viewBox="0 0 46 30" fill="none" aria-hidden="true">
+              <path d="M 6 27 A 17 17 0 1 1 40 27" stroke="rgba(255,255,255,.16)" stroke-width="4" stroke-linecap="round"></path>
+              <path d="M 6 27 A 17 17 0 1 1 40 27" stroke="#22d3ee" stroke-width="4" stroke-linecap="round" stroke-dasharray="41 70"></path>
+              <text x="23" y="26" text-anchor="middle" fill="#22d3ee" font-size="10" font-weight="800" font-family="ui-sans-serif,system-ui">2y</text>
+            </svg>
+            <span style="font-size:9px;font-weight:800;letter-spacing:.05em;color:rgba(255,255,255,.45);">LEVEL</span>
+          </div>
+        </div>
+
+        <div style="padding:9px 14px;margin-top:10px;background:rgba(0,0,0,.16);border-top:1px solid rgba(34,211,238,.14);display:flex;align-items:center;gap:8px;">
+          <span style="flex:none;width:52px;cursor:pointer;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:rgba(255,255,255,.7);font-size:11.5px;font-weight:800;padding:6px 0;border-radius:999px;text-align:center;">All</span>
+          <span style="flex:1;display:grid;grid-template-columns:32px 44px auto 44px 32px;align-items:center;justify-content:center;gap:6px;font-variant-numeric:tabular-nums;">
+            <span style="cursor:pointer;width:32px;height:32px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;">‹</span>
+            <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:13px;color:rgba(255,255,255,.42);">24/25</span>
+            <span style="display:flex;flex-direction:column;align-items:center;">
+              <span style="font-size:8.5px;font-weight:800;letter-spacing:.14em;color:rgba(255,255,255,.4);">SEASON</span>
+              <span style="font-family:'Archivo Black',sans-serif;font-size:19px;line-height:1.1;color:#22d3ee;text-shadow:0 0 14px rgba(34,211,238,.5);">25/26</span>
+            </span>
+            <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:13px;color:rgba(255,255,255,.42);">10/11</span>
+            <span style="cursor:pointer;width:32px;height:32px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;">›</span>
+          </span>
+          <span style="flex:none;width:52px;"></span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);background:rgba(0,0,0,.28);">
+          <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:48px;padding:7px 0 8px;border-bottom:2.5px solid transparent;color:rgba(255,255,255,.6);cursor:pointer;"><span style="font-size:17px;line-height:1;">▦</span><span style="font-size:9.5px;font-weight:800;">Season</span></span>
+          <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:48px;padding:7px 0 8px;border-bottom:2.5px solid #22d3ee;color:#22d3ee;cursor:pointer;"><span style="font-size:17px;line-height:1;text-shadow:0 0 14px rgba(34,211,238,.55);">⏱</span><span style="font-size:9.5px;font-weight:800;">Results</span></span>
+          <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:48px;padding:7px 0 8px;border-bottom:2.5px solid transparent;color:rgba(255,255,255,.6);cursor:pointer;"><span style="font-size:17px;line-height:1;">🏅</span><span style="font-size:9.5px;font-weight:800;">PB</span></span>
+          <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:48px;padding:7px 0 8px;border-bottom:2.5px solid transparent;color:rgba(255,255,255,.6);cursor:pointer;"><span style="font-size:17px;line-height:1;">📈</span><span style="font-size:9.5px;font-weight:800;">Progress</span></span>
+          <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:48px;padding:7px 0 8px;border-bottom:2.5px solid transparent;color:rgba(255,255,255,.6);cursor:pointer;"><span style="font-size:17px;line-height:1;">▶</span><span style="font-size:9.5px;font-weight:800;">Media</span></span>
+          <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:48px;padding:7px 0 8px;border-bottom:2.5px solid transparent;color:rgba(255,255,255,.6);cursor:pointer;"><span style="font-size:17px;line-height:1;">🗓</span><span style="font-size:9.5px;font-weight:800;">History</span></span>
+        </div>
+
+        <div style="padding:12px 14px 16px;display:flex;flex-direction:column;gap:12px;">
+          <div style="border-radius:14px;padding:12px 14px;background:linear-gradient(135deg,#0e7490,#22d3ee);display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <div style="display:flex;flex-direction:column;gap:2px;min-width:0;">
+              <span style="font-family:'Archivo Black',sans-serif;font-size:22px;line-height:1;color:#04182b;font-variant-numeric:tabular-nums;">9 029<span style="font-size:11px;font-weight:800;"> pt</span></span>
+              <span style="font-size:9.5px;font-weight:900;color:rgba(4,24,43,.7);">season 25/26 · 11 events</span>
+            </div>
+            <div style="display:flex;gap:5px;flex:none;">
+              <span style="width:28px;height:28px;border-radius:999px;background:radial-gradient(circle at 32% 28%,#fde68a,#d69b0b);color:#3b2a04;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center;">17</span>
+              <span style="width:28px;height:28px;border-radius:999px;background:radial-gradient(circle at 32% 28%,#f1f5f9,#94a3b8);color:#1e293b;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center;">2</span>
+              <span style="width:28px;height:28px;border-radius:999px;background:radial-gradient(circle at 32% 28%,#e6b98f,#a1663a);color:#31190a;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center;opacity:.4;">0</span>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:baseline;gap:8px;">
+            <span style="font-family:'Archivo Black',sans-serif;font-size:14px;color:#22d3ee;">Best times</span>
+            <span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.4);">лучшее на дистанцию</span>
+          </div>
+
+          <a href="results_main.html?competitionId=64&amp;tab=swims&amp;swimmerId=1207&amp;resultId=88201" style="display:flex;flex-direction:column;gap:8px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);padding:12px;color:#fff;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="flex:none;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;">
+                <span style="width:36px;height:36px;border-radius:999px;background:radial-gradient(circle at 32% 28%,#fde68a,#d69b0b);color:#3b2a04;font-family:'Archivo Black',sans-serif;font-size:14px;display:flex;align-items:center;justify-content:center;">1</span>
+                <span style="font-size:9.5px;font-weight:700;color:rgba(255,255,255,.4);">age: <b style="color:#fff;">12</b></span>
+              </span>
+              <span style="flex:none;position:relative;width:86px;height:48px;border-radius:7px;background:#fff;padding:4px;display:flex;align-items:center;justify-content:center;">
+                <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:8px;font-weight:700;color:#8a93a3;text-align:center;line-height:1.3;">style icon<br>freestyle</span>
+                <span style="position:absolute;top:-6px;right:-4px;font-size:15px;font-weight:900;color:#e53935;text-shadow:0 1px 0 #fff,0 -1px 0 #fff,1px 0 0 #fff,-1px 0 0 #fff;font-variant-numeric:tabular-nums;">1600</span>
+              </span>
+              <span style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
+                <span style="font-family:'Archivo Black',sans-serif;font-size:18px;line-height:1;color:#fff;font-variant-numeric:tabular-nums;">29:19.11</span>
+                <span style="font-size:9px;font-weight:900;letter-spacing:.06em;color:#22d3ee;">BEST</span>
+              </span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;padding-left:46px;min-width:0;">
+              <span style="flex:none;font-size:13px;">🏆</span>
+              <span dir="auto" style="min-width:0;font-size:11.5px;font-weight:900;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">אליפות ישראל — מים פתוחים, אילת</span>
+            </div>
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px;padding:8px 0 0 46px;border-top:1px solid rgba(255,255,255,.08);">
+              <span style="display:flex;flex-direction:column;gap:2px;min-width:0;">
+                <span style="font-size:9.5px;font-weight:700;color:rgba(255,255,255,.4);">Time split: 7:12.4 · 14:41.8</span>
+                <span style="font-size:11px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;">Points: 612</span>
+                <span style="font-size:9.5px;font-weight:700;color:rgba(255,255,255,.4);font-variant-numeric:tabular-nums;">27 APR 2026</span>
+              </span>
+              <svg width="62" height="40" viewBox="0 0 46 30" fill="none" aria-hidden="true">
+                <path d="M 6 27 A 17 17 0 1 1 40 27" stroke="rgba(255,255,255,.16)" stroke-width="4" stroke-linecap="round"></path>
+                <path d="M 6 27 A 17 17 0 1 1 40 27" stroke="#22d3ee" stroke-width="4" stroke-linecap="round" stroke-dasharray="48 70"></path>
+                <text x="23" y="26" text-anchor="middle" fill="#22d3ee" font-size="10" font-weight="800" font-family="ui-sans-serif,system-ui">2y</text>
+              </svg>
+            </div>
+          </a>
+
+          <div style="position:relative;display:flex;flex-direction:column;gap:8px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(240,180,41,.55);padding:12px 12px 12px 20px;color:#fff;overflow:hidden;">
+            <span style="position:absolute;left:0;top:0;bottom:0;width:8px;background:repeating-linear-gradient(-45deg,#f0b429 0 9px,#2a2416 9px 18px);opacity:.9;" aria-hidden="true"></span>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="flex:none;width:46px;display:flex;flex-direction:column;align-items:center;gap:3px;">
+                <span style="width:36px;height:36px;border-radius:999px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.16);color:rgba(255,255,255,.75);font-family:'Archivo Black',sans-serif;font-size:13px;display:flex;align-items:center;justify-content:center;">4</span>
+                <span style="font-size:9.5px;font-weight:700;color:rgba(255,255,255,.4);">age: <b style="color:#fff;">12</b></span>
+              </span>
+              <span style="flex:none;position:relative;width:86px;height:48px;border-radius:7px;background:#fff;padding:4px;display:flex;align-items:center;justify-content:center;">
+                <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:8px;font-weight:700;color:#8a93a3;text-align:center;line-height:1.3;">style icon<br>medley</span>
+                <span style="position:absolute;top:-6px;right:-4px;font-size:15px;font-weight:900;color:#e53935;text-shadow:0 1px 0 #fff,0 -1px 0 #fff,1px 0 0 #fff,-1px 0 0 #fff;font-variant-numeric:tabular-nums;">200</span>
+              </span>
+              <span style="flex:1;min-width:0;text-align:right;font-family:'Archivo Black',sans-serif;font-size:18px;color:#fff;font-variant-numeric:tabular-nums;">2:41.09</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px;padding-left:46px;min-width:0;">
+              <span dir="auto" style="min-width:0;font-size:11.5px;font-weight:900;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">גביע האביב — ירושלים</span>
+              <span style="display:inline-flex;align-self:flex-start;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;background:rgba(245,158,11,.16);border:1px solid rgba(245,158,11,.4);color:#f0b429;font-size:11px;font-weight:800;">⚠ Under review</span>
+            </div>
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px;padding:8px 0 0 46px;border-top:1px solid rgba(255,255,255,.08);">
+              <span style="display:flex;flex-direction:column;gap:2px;min-width:0;">
+                <span style="font-size:11px;font-weight:900;color:rgba(255,255,255,.55);">Points: —</span>
+                <span style="font-size:9.5px;font-weight:700;color:rgba(255,255,255,.4);font-variant-numeric:tabular-nums;">26 APR 2026</span>
+              </span>
+              <svg width="62" height="40" viewBox="0 0 46 30" fill="none" aria-hidden="true">
+                <path d="M 6 27 A 17 17 0 1 1 40 27" stroke="rgba(255,255,255,.16)" stroke-width="4" stroke-linecap="round"></path>
+                <text x="23" y="26" text-anchor="middle" fill="rgba(255,255,255,.4)" font-size="10" font-weight="800" font-family="ui-sans-serif,system-ui">—</text>
+              </svg>
+            </div>
+          </div>
+
+          <details style="border-top:1px solid rgba(255,255,255,.08);padding-top:12px;">
+            <summary style="cursor:pointer;list-style:none;font-family:'Archivo Black',sans-serif;font-size:14px;color:#22d3ee;">My links (6)</summary>
+            <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:10px;">
+              <span style="aspect-ratio:16/9;border-radius:10px;background:repeating-linear-gradient(135deg,rgba(255,255,255,.06) 0 6px,rgba(255,255,255,.02) 6px 12px);border:1px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;"><span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:8px;color:rgba(255,255,255,.4);">video</span></span>
+              <span style="aspect-ratio:16/9;border-radius:10px;background:repeating-linear-gradient(135deg,rgba(255,255,255,.06) 0 6px,rgba(255,255,255,.02) 6px 12px);border:1px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;"><span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:8px;color:rgba(255,255,255,.4);">photo</span></span>
+              <span style="aspect-ratio:16/9;border-radius:10px;background:rgba(34,211,238,.08);border:1px dashed rgba(34,211,238,.35);display:flex;align-items:center;justify-content:center;color:#22d3ee;font-size:10.5px;font-weight:900;">＋ add</span>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div style="width:390px;display:flex;flex-direction:column;gap:8px;">
+        <span style="font-size:12px;font-weight:800;color:#5b6470;">Гость — вместо ♡/★ и «My links» один CTA (как в коде)</span>
+        <div style="border-radius:18px;overflow:hidden;background:#04182b;box-shadow:0 8px 28px rgba(4,32,58,.22);padding:14px;display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="flex:none;width:56px;height:56px;border-radius:999px;border:3px solid #22d3ee;background:repeating-linear-gradient(135deg,rgba(34,211,238,.10) 0 6px,rgba(34,211,238,.03) 6px 12px);display:flex;align-items:center;justify-content:center;"><span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:7.5px;font-weight:700;color:rgba(34,211,238,.8);">photo</span></div>
+            <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;align-items:flex-end;">
+              <span dir="rtl" style="font-family:'Archivo Black',sans-serif;font-size:18px;color:#fff;">ליאור שילה</span>
+              <span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums;">12 year (2014)</span>
+            </span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);padding:12px 14px;">
+            <span style="flex:1;min-width:0;font-size:12.5px;font-weight:700;color:rgba(255,255,255,.6);line-height:1.4;">Sign in to save favorites and links</span>
+            <button style="flex:none;cursor:pointer;font-family:inherit;min-height:38px;padding:0 14px;border-radius:11px;background:linear-gradient(140deg,#38bdf8,#0369a1);border:none;color:#06263f;font-size:12.5px;font-weight:900;">Sign in</button>
+          </div>
+          <span style="font-size:11px;font-weight:700;color:rgba(255,255,255,.4);line-height:1.5;">Публичное видно всё: очки, медали, уровень, заплывы, PB, история. Скрыты ♡ / ★, «My links», «Suggest loglig profile» и добавление медиа.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <span style="max-width:1440px;font-size:12px;font-weight:600;color:#5b6470;line-height:1.55;">Токены: макет в Deep (dark-пара), реализация читает <b>--theme-mode-*</b> — surface → карточка, input-bg → плитки/строки/чипы, hero-grad → шапка, primary → очки/дуга/активный сегмент, border → разделители. Статусные цвета темы не касаются: медальные кружки, красная дистанция #e53935, белая подложка иконки стиля и лого клуба. Флаг спорного времени — <b>--theme-flag-*</b> (лента -45°, чип «⚠ Under review»), строка-носитель через <code>swimFlaggedRowProps</code>, время — только через <code>UI_SwimTime</code>. Дуга уровня — тот же <code>UI_NormativeLevelIcon</code> (viewBox 0 0 46 30, 62×38 в плитке, 62×40 в строке).</span>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:16px;padding:40px 40px 80px;">
+  <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;">
+    <span style="font-family:'Archivo Black',sans-serif;font-size:20px;">Athlete page — два направления</span>
+    <span style="font-size:13px;font-weight:700;color:#5b6470;">Deep · шапка → сезон-карусель → плитки-табы → панель-«папка» · desktop 1440 + mobile 390</span>
+  </div>
+  <div style="max-width:1000px;font-size:12.5px;font-weight:600;color:#5b6470;line-height:1.55;">
+    Табы (6): <b>Season · Results · Records &amp; PB · Progress · Media · History</b>. Отдельного таба Compare нет — сравнение с рекордами живёт колонками дельты внутри PB-таблицы (по твоему ответу). Различие направлений — в шапке и в том, что считается главным экраном: <a href="#1a">1a</a> открывает Season (сводка сезона), <a href="#1b">1b</a> открывает Records&nbsp;&amp;&nbsp;PB.
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:44px;align-items:flex-start;">
+
+    <!-- ================= 1a — SEASON DESK ================= -->
+    <div id="1a" style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="background:#0f172a;color:#22d3ee;font-size:12px;font-weight:800;padding:4px 9px;border-radius:6px;">1a</span>
+        <span style="font-size:15px;font-weight:800;">Season desk — сезон как главный экран</span>
+        <span style="font-size:12.5px;font-weight:600;color:#5b6470;">шапка-досье: аватар, клуб, группа, KPI и PB-полоса; панель = сводка сезона ❄/☀</span>
+      </div>
+
+      <div style="display:flex;gap:22px;align-items:flex-start;">
+
+        <div style="width:1440px;border-radius:18px;overflow:hidden;background:#04182b;box-shadow:0 8px 28px rgba(4,32,58,.22);">
+          <div style="height:48px;padding:0 24px;background:#020f1d;display:flex;align-items:center;gap:20px;color:#fff;">
+            <span style="font-family:'Archivo Black',sans-serif;font-size:15px;color:#22d3ee;">SWIMM</span>
+            <span style="font-size:13px;font-weight:700;color:rgba(255,255,255,.55);">Competitions</span>
+            <span style="font-size:13px;font-weight:700;color:rgba(255,255,255,.55);">Clubs</span>
+            <span style="height:48px;display:flex;align-items:center;font-size:13px;font-weight:800;color:#fff;border-bottom:2px solid #22d3ee;">Swimmers</span>
+            <span style="flex:1;"></span>
+            <span style="font-size:11.5px;font-weight:800;color:rgba(255,255,255,.45);">Vladimir</span>
+            <span style="width:28px;height:28px;border-radius:999px;background:#22d3ee;color:#04182b;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;">V</span>
+          </div>
+
+          <div style="background:linear-gradient(160deg,#062a4a 0%,#04182b 60%);padding:22px 24px 18px;">
+            <div style="max-width:1392px;margin:0 auto;display:flex;flex-direction:column;gap:16px;">
+              <div style="font-size:11.5px;font-weight:800;letter-spacing:.06em;color:rgba(255,255,255,.4);">SWIMMERS · <span dir="auto">מכבי וייסגל רחובות</span></div>
+              <div style="display:grid;grid-template-columns:104px minmax(0,1fr) auto;gap:20px;align-items:start;">
+                <div style="position:relative;width:104px;height:104px;">
+                  <div style="width:104px;height:104px;border-radius:20px;background:repeating-linear-gradient(135deg,rgba(34,211,238,.10) 0 6px,rgba(34,211,238,.03) 6px 12px);border:2px dashed rgba(34,211,238,.45);display:flex;align-items:center;justify-content:center;">
+                    <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9.5px;font-weight:700;color:rgba(34,211,238,.75);text-align:center;line-height:1.3;">athlete<br>photo</span>
+                  </div>
+                  <span style="position:absolute;right:-6px;bottom:-6px;width:30px;height:30px;border-radius:999px;background:#04182b;border:1px solid rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;font-size:14px;">🇮🇱</span>
+                </div>
+
+                <div style="min-width:0;display:flex;flex-direction:column;gap:10px;">
+                  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                    <span dir="rtl" style="font-family:'Archivo Black',sans-serif;font-size:32px;line-height:1.15;color:#fff;text-align:left;">אניה גוסטמלסקי</span>
+                    <span style="font-size:12.5px;font-weight:800;letter-spacing:.05em;color:#22d3ee;">ANYA GUSTMALSKY</span>
+                    <span style="display:flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;background:rgba(251,191,36,.16);border:1px solid rgba(251,191,36,.35);color:#fbbf24;font-size:11.5px;font-weight:900;">🏆 3 records</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px;font-weight:800;color:rgba(255,255,255,.65);">
+                    <span style="font-variant-numeric:tabular-nums;">age 14 <span style="color:rgba(255,255,255,.4);">(2011)</span></span>
+                    <span style="color:rgba(255,255,255,.2);">·</span>
+                    <a href="?tab=clubs&amp;clubId=17" style="display:flex;align-items:center;gap:8px;padding:5px 11px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);color:#fff;">
+                      <span style="flex:none;width:20px;height:20px;border-radius:6px;background:rgba(34,211,238,.14);border:1px solid rgba(34,211,238,.35);color:#22d3ee;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;" dir="auto">מ</span>
+                      <span dir="auto">מכבי וייסגל רחובות</span>
+                    </a>
+                    <span style="color:rgba(255,255,255,.2);">·</span>
+                    <span style="display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;background:rgba(34,211,238,.10);border:1px solid rgba(34,211,238,.30);color:#22d3ee;">Y 11–14</span>
+                    <span style="color:rgba(255,255,255,.2);">·</span>
+                    <span>since 2019</span>
+                  </div>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:22px;">
+                  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
+                    <span style="font-family:'Archivo Black',sans-serif;font-size:30px;line-height:1;color:#fff;font-variant-numeric:tabular-nums;">1 842</span>
+                    <span style="font-size:10.5px;font-weight:800;letter-spacing:.1em;color:rgba(255,255,255,.45);">POINTS 25/26</span>
+                  </div>
+                  <span style="width:1px;height:38px;background:rgba(255,255,255,.10);"></span>
+                  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                    <span style="display:flex;align-items:center;gap:9px;font-family:'Archivo Black',sans-serif;font-size:17px;color:#fff;font-variant-numeric:tabular-nums;">
+                      <span style="display:flex;align-items:center;gap:4px;color:#fbbf24;">🥇 7</span>
+                      <span style="display:flex;align-items:center;gap:4px;color:rgba(255,255,255,.75);">🥈 4</span>
+                      <span style="display:flex;align-items:center;gap:4px;color:rgba(255,255,255,.55);">🥉 2</span>
+                    </span>
+                    <span style="font-size:10.5px;font-weight:800;letter-spacing:.1em;color:rgba(255,255,255,.45);">13 MEDALS</span>
+                  </div>
+                  <span style="width:1px;height:38px;background:rgba(255,255,255,.10);"></span>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <button style="cursor:pointer;font-family:inherit;height:38px;padding:0 14px;border-radius:11px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.8);font-size:12.5px;font-weight:800;" style-hover="background:rgba(255,255,255,.09);">❤️ Follow</button>
+                    <button style="cursor:pointer;font-family:inherit;height:38px;padding:0 16px;border-radius:11px;background:#22d3ee;border:none;color:#04182b;font-size:12.5px;font-weight:900;" style-hover="background:#67e8f9;">🎉 Congratulate</button>
+                    <button style="cursor:pointer;font-family:inherit;width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.7);font-size:14px;font-weight:900;">⋯</button>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display:grid;grid-template-columns:auto repeat(5,minmax(0,1fr));gap:8px;align-items:stretch;">
+                <span style="display:flex;flex-direction:column;justify-content:center;gap:2px;padding:0 14px 0 0;">
+                  <span style="font-size:10px;font-weight:900;letter-spacing:.14em;color:rgba(255,255,255,.4);">PERSONAL</span>
+                  <span style="font-size:10px;font-weight:900;letter-spacing:.14em;color:rgba(255,255,255,.4);">BESTS</span>
+                </span>
+                <span style="border-radius:13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);padding:9px 13px;display:flex;flex-direction:column;gap:3px;min-width:0;">
+                  <span style="font-size:10.5px;font-weight:900;letter-spacing:.05em;color:rgba(255,255,255,.5);">50 FREE</span>
+                  <span style="display:flex;align-items:baseline;gap:7px;"><span style="font-family:'Archivo Black',sans-serif;font-size:19px;color:#fff;font-variant-numeric:tabular-nums;">26.98</span><span style="font-size:10.5px;font-weight:900;color:#22d3ee;">PB</span></span>
+                </span>
+                <span style="border-radius:13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);padding:9px 13px;display:flex;flex-direction:column;gap:3px;min-width:0;">
+                  <span style="font-size:10.5px;font-weight:900;letter-spacing:.05em;color:rgba(255,255,255,.5);">100 FREE</span>
+                  <span style="display:flex;align-items:baseline;gap:7px;"><span style="font-family:'Archivo Black',sans-serif;font-size:19px;color:#fff;font-variant-numeric:tabular-nums;">58.42</span><span style="font-size:10.5px;font-weight:900;color:#fbbf24;">IL 14</span></span>
+                </span>
+                <span style="border-radius:13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);padding:9px 13px;display:flex;flex-direction:column;gap:3px;min-width:0;">
+                  <span style="font-size:10.5px;font-weight:900;letter-spacing:.05em;color:rgba(255,255,255,.5);">100 BACK</span>
+                  <span style="display:flex;align-items:baseline;gap:7px;"><span style="font-family:'Archivo Black',sans-serif;font-size:19px;color:#fff;font-variant-numeric:tabular-nums;">1:05.33</span></span>
+                </span>
+                <span style="border-radius:13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);padding:9px 13px;display:flex;flex-direction:column;gap:3px;min-width:0;">
+                  <span style="font-size:10.5px;font-weight:900;letter-spacing:.05em;color:rgba(255,255,255,.5);">200 IM</span>
+                  <span style="display:flex;align-items:baseline;gap:7px;"><span style="font-family:'Archivo Black',sans-serif;font-size:19px;color:#fff;font-variant-numeric:tabular-nums;">2:24.55</span></span>
+                </span>
+                <span style="border-radius:13px;background:rgba(34,211,238,.08);border:1px dashed rgba(34,211,238,.35);padding:9px 13px;display:flex;align-items:center;justify-content:center;color:#22d3ee;font-size:11.5px;font-weight:900;cursor:pointer;">all 14 bests →</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding:11px 22px;background:rgba(0,0,0,.16);border-top:1px solid rgba(34,211,238,.14);display:flex;align-items:center;gap:14px;">
+            <span style="flex:none;width:64px;cursor:pointer;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:rgba(255,255,255,.7);font-size:12px;font-weight:800;padding:6px 0;border-radius:999px;text-align:center;">All</span>
+            <span style="flex:1;display:flex;align-items:center;justify-content:center;gap:16px;">
+              <span style="cursor:pointer;width:32px;height:32px;flex:none;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;">‹</span>
+              <span style="display:grid;grid-template-columns:repeat(3,52px) auto repeat(3,52px);align-items:center;gap:14px;font-variant-numeric:tabular-nums;">
+                <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:12px;color:rgba(255,255,255,.28);">21/22</span>
+                <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:13px;color:rgba(255,255,255,.42);">22/23</span>
+                <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:15px;color:rgba(255,255,255,.65);">23/24</span>
+                <span style="display:flex;flex-direction:column;align-items:center;margin:0 6px;">
+                  <span style="font-size:9px;font-weight:800;letter-spacing:.14em;color:rgba(255,255,255,.4);">SEASON</span>
+                  <span style="font-family:'Archivo Black',sans-serif;font-size:21px;line-height:1.1;color:#22d3ee;text-shadow:0 0 16px rgba(34,211,238,.5);">25/26</span>
+                </span>
+                <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:15px;color:rgba(255,255,255,.65);">10/11</span>
+                <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:13px;color:rgba(255,255,255,.42);">11/12</span>
+                <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:12px;color:rgba(255,255,255,.28);">12/13</span>
+              </span>
+              <span style="cursor:pointer;width:32px;height:32px;flex:none;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;">›</span>
+            </span>
+            <span style="flex:none;width:64px;"></span>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:12px 14px 0;background:rgba(0,0,0,.28);">
+            <span style="cursor:pointer;position:relative;z-index:1;margin-bottom:-1px;border-radius:13px 13px 0 0;padding:11px 13px 12px;background:#0c2a3f;border:1px solid rgba(34,211,238,.5);border-bottom:none;box-shadow:0 -6px 18px rgba(34,211,238,.18);display:flex;flex-direction:column;gap:7px;">
+              <span style="display:flex;align-items:center;gap:7px;"><span style="flex:none;width:24px;height:24px;border-radius:999px;background:#22d3ee;color:#04182b;display:flex;align-items:center;justify-content:center;font-size:12px;">▦</span><span style="font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:.04em;color:#22d3ee;">SEASON</span></span>
+              <span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.55);">❄ #2 · ☀ #1 · 1 842 pts</span>
+            </span>
+            <span style="cursor:pointer;border-radius:13px;padding:11px 13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;gap:7px;">
+              <span style="display:flex;align-items:center;gap:7px;"><span style="flex:none;width:24px;height:24px;border-radius:999px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:12px;">⏱</span><span style="font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.75);">RESULTS</span></span>
+              <span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.4);">38 swims · 9 meets</span>
+            </span>
+            <span style="cursor:pointer;border-radius:13px;padding:11px 13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;gap:7px;">
+              <span style="display:flex;align-items:center;gap:7px;"><span style="flex:none;width:24px;height:24px;border-radius:999px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:12px;">🏅</span><span style="font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.75);">RECORDS &amp; PB</span></span>
+              <span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.4);">14 bests · 3 records</span>
+            </span>
+            <span style="cursor:pointer;border-radius:13px;padding:11px 13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;gap:7px;">
+              <span style="display:flex;align-items:center;gap:7px;"><span style="flex:none;width:24px;height:24px;border-radius:999px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:12px;">📈</span><span style="font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.75);">PROGRESS</span></span>
+              <span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.4);">time · points · rank</span>
+            </span>
+            <span style="cursor:pointer;border-radius:13px;padding:11px 13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;gap:7px;">
+              <span style="display:flex;align-items:center;gap:7px;"><span style="flex:none;width:24px;height:24px;border-radius:999px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:12px;">▶</span><span style="font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.75);">MEDIA</span></span>
+              <span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.4);">21 items</span>
+            </span>
+            <span style="cursor:pointer;border-radius:13px;padding:11px 13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;gap:7px;">
+              <span style="display:flex;align-items:center;gap:7px;"><span style="flex:none;width:24px;height:24px;border-radius:999px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:12px;">🗓</span><span style="font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.75);">HISTORY</span></span>
+              <span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.4);">7 seasons · 64 meets</span>
+            </span>
+          </div>
+
+          <div style="position:relative;margin:0 14px 14px;background:#0c2a3f;border:1px solid rgba(34,211,238,.5);border-radius:0 13px 13px 13px;box-shadow:0 0 18px rgba(34,211,238,.14);padding:18px 18px 20px;display:flex;flex-direction:column;gap:16px;">
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;">
+              <div style="border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(34,211,238,.22);padding:15px 17px;display:flex;flex-direction:column;gap:12px;min-width:0;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <span style="font-family:'Archivo Black',sans-serif;font-size:15px;color:#22d3ee;">❄ WINTER</span>
+                  <span style="font-size:11px;font-weight:800;color:rgba(255,255,255,.4);">Oct — Feb · group Y 11–14</span>
+                  <span style="flex:1;"></span>
+                  <span style="padding:3px 10px;border-radius:999px;background:rgba(34,211,238,.14);border:1px solid rgba(34,211,238,.45);color:#22d3ee;font-size:11.5px;font-weight:900;font-variant-numeric:tabular-nums;">#2 in group</span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;">
+                  <span style="display:flex;flex-direction:column;gap:2px;"><span style="font-family:'Archivo Black',sans-serif;font-size:22px;color:#fff;font-variant-numeric:tabular-nums;">861</span><span style="font-size:10px;font-weight:900;letter-spacing:.1em;color:rgba(255,255,255,.4);">POINTS</span></span>
+                  <span style="display:flex;flex-direction:column;gap:2px;"><span style="font-family:'Archivo Black',sans-serif;font-size:22px;color:#fff;font-variant-numeric:tabular-nums;">18</span><span style="font-size:10px;font-weight:900;letter-spacing:.1em;color:rgba(255,255,255,.4);">SWIMS</span></span>
+                  <span style="display:flex;flex-direction:column;gap:2px;"><span style="font-family:'Archivo Black',sans-serif;font-size:22px;color:#fbbf24;font-variant-numeric:tabular-nums;">3 · 2 · 1</span><span style="font-size:10px;font-weight:900;letter-spacing:.1em;color:rgba(255,255,255,.4);">MEDALS</span></span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px;">
+                  <a href="results_main.html?competitionId=41&amp;tab=swims&amp;swimmerId=884" style="display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:#fff;">
+                    <span style="flex:none;width:36px;font-size:10.5px;font-weight:900;color:rgba(255,255,255,.4);font-variant-numeric:tabular-nums;">11.11</span>
+                    <span dir="auto" style="flex:1;min-width:0;font-size:12.5px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">גביע חנוכה — נתניה</span>
+                    <span style="flex:none;font-size:11.5px;font-weight:800;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums;">6 swims</span>
+                    <span style="flex:none;font-family:'Archivo Black',sans-serif;font-size:13px;color:#fbbf24;font-variant-numeric:tabular-nums;">🥇🥈</span>
+                    <span style="flex:none;width:52px;text-align:right;font-family:'Archivo Black',sans-serif;font-size:13px;color:#fff;font-variant-numeric:tabular-nums;">312</span>
+                  </a>
+                  <a href="results_main.html?competitionId=39&amp;tab=swims&amp;swimmerId=884" style="display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:#fff;">
+                    <span style="flex:none;width:36px;font-size:10.5px;font-weight:900;color:rgba(255,255,255,.4);font-variant-numeric:tabular-nums;">14.12</span>
+                    <span dir="auto" style="flex:1;min-width:0;font-size:12.5px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">אליפות ישראל חורף — ווינגייט</span>
+                    <span style="flex:none;font-size:11.5px;font-weight:800;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums;">7 swims</span>
+                    <span style="flex:none;font-family:'Archivo Black',sans-serif;font-size:13px;color:#fbbf24;font-variant-numeric:tabular-nums;">🥇🥉</span>
+                    <span style="flex:none;width:52px;text-align:right;font-family:'Archivo Black',sans-serif;font-size:13px;color:#fff;font-variant-numeric:tabular-nums;">349</span>
+                  </a>
+                  <a href="results_main.html?competitionId=36&amp;tab=swims&amp;swimmerId=884" style="display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:#fff;">
+                    <span style="flex:none;width:36px;font-size:10.5px;font-weight:900;color:rgba(255,255,255,.4);font-variant-numeric:tabular-nums;">02.02</span>
+                    <span dir="auto" style="flex:1;min-width:0;font-size:12.5px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">מפגש מחוזי — רחובות</span>
+                    <span style="flex:none;font-size:11.5px;font-weight:800;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums;">5 swims</span>
+                    <span style="flex:none;font-family:'Archivo Black',sans-serif;font-size:13px;color:#fbbf24;font-variant-numeric:tabular-nums;">🥇</span>
+                    <span style="flex:none;width:52px;text-align:right;font-family:'Archivo Black',sans-serif;font-size:13px;color:#fff;font-variant-numeric:tabular-nums;">200</span>
+                  </a>
+                </div>
+              </div>
+
+              <div style="border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(251,191,36,.22);padding:15px 17px;display:flex;flex-direction:column;gap:12px;min-width:0;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <span style="font-family:'Archivo Black',sans-serif;font-size:15px;color:#fbbf24;">☀ SUMMER</span>
+                  <span style="font-size:11px;font-weight:800;color:rgba(255,255,255,.4);">Mar — Aug · group Y 11–14</span>
+                  <span style="flex:1;"></span>
+                  <span style="padding:3px 10px;border-radius:999px;background:rgba(251,191,36,.16);border:1px solid rgba(251,191,36,.35);color:#fbbf24;font-size:11.5px;font-weight:900;font-variant-numeric:tabular-nums;">#1 in group</span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;">
+                  <span style="display:flex;flex-direction:column;gap:2px;"><span style="font-family:'Archivo Black',sans-serif;font-size:22px;color:#fff;font-variant-numeric:tabular-nums;">981</span><span style="font-size:10px;font-weight:900;letter-spacing:.1em;color:rgba(255,255,255,.4);">POINTS</span></span>
+                  <span style="display:flex;flex-direction:column;gap:2px;"><span style="font-family:'Archivo Black',sans-serif;font-size:22px;color:#fff;font-variant-numeric:tabular-nums;">20</span><span style="font-size:10px;font-weight:900;letter-spacing:.1em;color:rgba(255,255,255,.4);">SWIMS</span></span>
+                  <span style="display:flex;flex-direction:column;gap:2px;"><span style="font-family:'Archivo Black',sans-serif;font-size:22px;color:#fbbf24;font-variant-numeric:tabular-nums;">4 · 2 · 1</span><span style="font-size:10px;font-weight:900;letter-spacing:.1em;color:rgba(255,255,255,.4);">MEDALS</span></span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px;">
+                  <a href="results_main.html?competitionId=52&amp;tab=swims&amp;swimmerId=884" style="display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:#fff;">
+                    <span style="flex:none;width:36px;font-size:10.5px;font-weight:900;color:rgba(255,255,255,.4);font-variant-numeric:tabular-nums;">18.04</span>
+                    <span dir="auto" style="flex:1;min-width:0;font-size:12.5px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">אליפות ישראל "ארנה" 11-14</span>
+                    <span style="flex:none;font-size:11.5px;font-weight:800;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums;">8 swims</span>
+                    <span style="flex:none;font-family:'Archivo Black',sans-serif;font-size:13px;color:#fbbf24;font-variant-numeric:tabular-nums;">🥇🥇🥈</span>
+                    <span style="flex:none;width:52px;text-align:right;font-family:'Archivo Black',sans-serif;font-size:13px;color:#fff;font-variant-numeric:tabular-nums;">421</span>
+                  </a>
+                  <a href="results_main.html?competitionId=57&amp;tab=swims&amp;swimmerId=884" style="display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:#fff;">
+                    <span style="flex:none;width:36px;font-size:10.5px;font-weight:900;color:rgba(255,255,255,.4);font-variant-numeric:tabular-nums;">30.05</span>
+                    <span dir="auto" style="flex:1;min-width:0;font-size:12.5px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">גביע המכביה הצעירה</span>
+                    <span style="flex:none;font-size:11.5px;font-weight:800;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums;">6 swims</span>
+                    <span style="flex:none;font-family:'Archivo Black',sans-serif;font-size:13px;color:#fbbf24;font-variant-numeric:tabular-nums;">🥇🥈</span>
+                    <span style="flex:none;width:52px;text-align:right;font-family:'Archivo Black',sans-serif;font-size:13px;color:#fff;font-variant-numeric:tabular-nums;">318</span>
+                  </a>
+                  <a href="results_main.html?competitionId=61&amp;tab=swims&amp;swimmerId=884" style="display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:#fff;">
+                    <span style="flex:none;width:36px;font-size:10.5px;font-weight:900;color:rgba(255,255,255,.4);font-variant-numeric:tabular-nums;">21.07</span>
+                    <span dir="auto" style="flex:1;min-width:0;font-size:12.5px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">גביע הקיץ — חיפה</span>
+                    <span style="flex:none;font-size:11.5px;font-weight:800;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums;">6 swims</span>
+                    <span style="flex:none;font-family:'Archivo Black',sans-serif;font-size:13px;color:#fbbf24;font-variant-numeric:tabular-nums;">🥇🥉</span>
+                    <span style="flex:none;width:52px;text-align:right;font-family:'Archivo Black',sans-serif;font-size:13px;color:#fff;font-variant-numeric:tabular-nums;">242</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:14px;align-items:start;">
+              <div style="border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.10);padding:15px 17px;display:flex;flex-direction:column;gap:14px;min-width:0;">
+                <div style="display:flex;align-items:baseline;gap:10px;">
+                  <span style="font-family:'Archivo Black',sans-serif;font-size:14px;color:#fff;">SEASON SHAPE</span>
+                  <span style="font-size:11px;font-weight:800;color:rgba(255,255,255,.4);">очки за старт · ❄ winter / ☀ summer</span>
+                </div>
+                <div style="display:flex;align-items:flex-end;gap:9px;height:96px;">
+                  <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;"><span style="width:100%;height:52px;border-radius:6px 6px 3px 3px;background:linear-gradient(180deg,#22d3ee,#0e7490);"></span><span style="font-size:9.5px;font-weight:800;color:rgba(255,255,255,.35);">OCT</span></span>
+                  <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;"><span style="width:100%;height:66px;border-radius:6px 6px 3px 3px;background:linear-gradient(180deg,#22d3ee,#0e7490);"></span><span style="font-size:9.5px;font-weight:800;color:rgba(255,255,255,.35);">NOV</span></span>
+                  <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;"><span style="width:100%;height:74px;border-radius:6px 6px 3px 3px;background:linear-gradient(180deg,#22d3ee,#0e7490);"></span><span style="font-size:9.5px;font-weight:800;color:rgba(255,255,255,.35);">DEC</span></span>
+                  <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;"><span style="width:100%;height:44px;border-radius:6px 6px 3px 3px;background:linear-gradient(180deg,#22d3ee,#0e7490);"></span><span style="font-size:9.5px;font-weight:800;color:rgba(255,255,255,.35);">FEB</span></span>
+                  <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;"><span style="width:100%;height:88px;border-radius:6px 6px 3px 3px;background:linear-gradient(180deg,#fbbf24,#b45309);"></span><span style="font-size:9.5px;font-weight:800;color:rgba(255,255,255,.35);">APR</span></span>
+                  <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;"><span style="width:100%;height:70px;border-radius:6px 6px 3px 3px;background:linear-gradient(180deg,#fbbf24,#b45309);"></span><span style="font-size:9.5px;font-weight:800;color:rgba(255,255,255,.35);">MAY</span></span>
+                  <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;"><span style="width:100%;height:58px;border-radius:6px 6px 3px 3px;background:linear-gradient(180deg,#fbbf24,#b45309);"></span><span style="font-size:9.5px;font-weight:800;color:rgba(255,255,255,.35);">JUL</span></span>
+                  <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;"><span style="width:100%;height:34px;border-radius:6px 6px 3px 3px;background:rgba(255,255,255,.12);"></span><span style="font-size:9.5px;font-weight:800;color:rgba(255,255,255,.35);">AUG</span></span>
+                </div>
+              </div>
+
+              <div style="border-radius:14px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.28);padding:15px 17px;display:flex;flex-direction:column;gap:11px;">
+                <div style="display:flex;align-items:center;gap:9px;">
+                  <span style="font-family:'Archivo Black',sans-serif;font-size:14px;color:#fbbf24;">NEW IN 25/26</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:7px;">
+                  <span style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(251,191,36,.25);">
+                    <span style="flex:none;font-size:13px;">🏆</span>
+                    <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;"><span style="font-size:12px;font-weight:900;color:#fff;">100 free · Israel 14 y.o.</span><span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.45);">18.04 · אליפות ישראל</span></span>
+                    <span style="flex:none;font-family:'Archivo Black',sans-serif;font-size:14px;color:#fbbf24;font-variant-numeric:tabular-nums;">58.42</span>
+                  </span>
+                  <span style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);">
+                    <span style="flex:none;font-size:13px;">⭐</span>
+                    <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;"><span style="font-size:12px;font-weight:900;color:#fff;">50 free · club record</span><span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.45);">30.05 · גביע המכביה</span></span>
+                    <span style="flex:none;font-family:'Archivo Black',sans-serif;font-size:14px;color:#22d3ee;font-variant-numeric:tabular-nums;">26.98</span>
+                  </span>
+                  <span style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);">
+                    <span style="flex:none;font-size:13px;">⏱</span>
+                    <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;"><span style="font-size:12px;font-weight:900;color:#fff;">6 personal bests</span><span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.45);">из 38 заплывов сезона</span></span>
+                    <span style="flex:none;font-size:11.5px;font-weight:900;color:#22d3ee;">see all →</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="width:390px;border-radius:18px;overflow:hidden;background:#04182b;box-shadow:0 8px 28px rgba(4,32,58,.22);">
+          <div style="background:linear-gradient(160deg,#062a4a 0%,#04182b 60%);padding:14px 14px 13px;display:flex;flex-direction:column;gap:12px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div style="flex:none;width:60px;height:60px;border-radius:16px;background:repeating-linear-gradient(135deg,rgba(34,211,238,.10) 0 6px,rgba(34,211,238,.03) 6px 12px);border:2px dashed rgba(34,211,238,.45);display:flex;align-items:center;justify-content:center;">
+                <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:8px;font-weight:700;color:rgba(34,211,238,.75);text-align:center;line-height:1.3;">photo</span>
+              </div>
+              <span style="min-width:0;flex:1;display:flex;flex-direction:column;gap:3px;">
+                <span dir="rtl" style="font-family:'Archivo Black',sans-serif;font-size:19px;color:#fff;text-align:left;">אניה גוסטמלסקי</span>
+                <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:10.5px;font-weight:800;color:rgba(255,255,255,.55);">
+                  <span>age 14</span><span style="color:rgba(255,255,255,.2);">·</span>
+                  <span style="color:#22d3ee;">Y 11–14</span><span style="color:rgba(255,255,255,.2);">·</span>
+                  <a href="?tab=clubs&amp;clubId=17" dir="auto" style="color:#fff;">מכבי וייסגל רחובות</a>
+                </span>
+              </span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;">
+              <span style="border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);padding:8px 10px;display:flex;flex-direction:column;gap:2px;min-width:0;"><span style="font-family:'Archivo Black',sans-serif;font-size:17px;color:#fff;font-variant-numeric:tabular-nums;">1 842</span><span style="font-size:9px;font-weight:900;letter-spacing:.08em;color:rgba(255,255,255,.4);">POINTS</span></span>
+              <span style="border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);padding:8px 10px;display:flex;flex-direction:column;gap:2px;min-width:0;"><span style="font-family:'Archivo Black',sans-serif;font-size:17px;color:#fbbf24;font-variant-numeric:tabular-nums;">13</span><span style="font-size:9px;font-weight:900;letter-spacing:.08em;color:rgba(255,255,255,.4);">MEDALS</span></span>
+              <span style="border-radius:12px;background:rgba(251,191,36,.10);border:1px solid rgba(251,191,36,.35);padding:8px 10px;display:flex;flex-direction:column;gap:2px;min-width:0;"><span style="font-family:'Archivo Black',sans-serif;font-size:17px;color:#fbbf24;font-variant-numeric:tabular-nums;">3</span><span style="font-size:9px;font-weight:900;letter-spacing:.08em;color:rgba(255,255,255,.4);">RECORDS</span></span>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button style="flex:1;cursor:pointer;font-family:inherit;min-height:44px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.8);font-size:12.5px;font-weight:800;">❤️ Follow</button>
+              <button style="flex:1;cursor:pointer;font-family:inherit;min-height:44px;border-radius:12px;background:#22d3ee;border:none;color:#04182b;font-size:12.5px;font-weight:900;">🎉 Congratulate</button>
+            </div>
+          </div>
+
+          <div style="padding:9px 14px;background:rgba(0,0,0,.16);border-top:1px solid rgba(34,211,238,.14);display:flex;align-items:center;gap:8px;">
+            <span style="flex:none;width:52px;cursor:pointer;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:rgba(255,255,255,.7);font-size:11.5px;font-weight:800;padding:6px 0;border-radius:999px;text-align:center;">All</span>
+            <span style="flex:1;display:grid;grid-template-columns:32px 44px auto 44px 32px;align-items:center;justify-content:center;gap:6px;font-variant-numeric:tabular-nums;">
+              <span style="cursor:pointer;width:32px;height:32px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;">‹</span>
+              <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:13px;color:rgba(255,255,255,.42);">24/25</span>
+              <span style="display:flex;flex-direction:column;align-items:center;">
+                <span style="font-size:8.5px;font-weight:800;letter-spacing:.14em;color:rgba(255,255,255,.4);">SEASON</span>
+                <span style="font-family:'Archivo Black',sans-serif;font-size:19px;line-height:1.1;color:#22d3ee;text-shadow:0 0 14px rgba(34,211,238,.5);">25/26</span>
+              </span>
+              <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:13px;color:rgba(255,255,255,.42);">10/11</span>
+              <span style="cursor:pointer;width:32px;height:32px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;">›</span>
+            </span>
+            <span style="flex:none;width:52px;"></span>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(6,1fr);background:rgba(0,0,0,.28);">
+            <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:48px;padding:7px 0 8px;border-bottom:2.5px solid #22d3ee;color:#22d3ee;cursor:pointer;"><span style="font-size:17px;line-height:1;text-shadow:0 0 14px rgba(34,211,238,.55);">▦</span><span style="font-size:9.5px;font-weight:800;">Season</span></span>
+            <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:48px;padding:7px 0 8px;border-bottom:2.5px solid transparent;color:rgba(255,255,255,.6);cursor:pointer;"><span style="font-size:17px;line-height:1;">⏱</span><span style="font-size:9.5px;font-weight:800;">Results</span></span>
+            <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:48px;padding:7px 0 8px;border-bottom:2.5px solid transparent;color:rgba(255,255,255,.6);cursor:pointer;"><span style="font-size:17px;line-height:1;">🏅</span><span style="font-size:9.5px;font-weight:800;">PB</span></span>
+            <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:48px;padding:7px 0 8px;border-bottom:2.5px solid transparent;color:rgba(255,255,255,.6);cursor:pointer;"><span style="font-size:17px;line-height:1;">📈</span><span style="font-size:9.5px;font-weight:800;">Progress</span></span>
+            <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:48px;padding:7px 0 8px;border-bottom:2.5px solid transparent;color:rgba(255,255,255,.6);cursor:pointer;"><span style="font-size:17px;line-height:1;">▶</span><span style="font-size:9.5px;font-weight:800;">Media</span></span>
+            <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:48px;padding:7px 0 8px;border-bottom:2.5px solid transparent;color:rgba(255,255,255,.6);cursor:pointer;"><span style="font-size:17px;line-height:1;">🗓</span><span style="font-size:9.5px;font-weight:800;">History</span></span>
+          </div>
+
+          <div style="padding:12px 14px 16px;display:flex;flex-direction:column;gap:10px;">
+            <div style="border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(34,211,238,.22);padding:13px 14px;display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-family:'Archivo Black',sans-serif;font-size:13px;color:#22d3ee;">❄ WINTER</span>
+                <span style="flex:1;"></span>
+                <span style="padding:3px 9px;border-radius:999px;background:rgba(34,211,238,.14);border:1px solid rgba(34,211,238,.45);color:#22d3ee;font-size:11px;font-weight:900;">#2 in group</span>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;">
+                <span style="display:flex;flex-direction:column;gap:1px;"><span style="font-family:'Archivo Black',sans-serif;font-size:17px;color:#fff;font-variant-numeric:tabular-nums;">861</span><span style="font-size:9px;font-weight:900;letter-spacing:.08em;color:rgba(255,255,255,.4);">POINTS</span></span>
+                <span style="display:flex;flex-direction:column;gap:1px;"><span style="font-family:'Archivo Black',sans-serif;font-size:17px;color:#fff;font-variant-numeric:tabular-nums;">18</span><span style="font-size:9px;font-weight:900;letter-spacing:.08em;color:rgba(255,255,255,.4);">SWIMS</span></span>
+                <span style="display:flex;flex-direction:column;gap:1px;"><span style="font-family:'Archivo Black',sans-serif;font-size:17px;color:#fbbf24;font-variant-numeric:tabular-nums;">6</span><span style="font-size:9px;font-weight:900;letter-spacing:.08em;color:rgba(255,255,255,.4);">MEDALS</span></span>
+              </div>
+            </div>
+            <div style="border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(251,191,36,.22);padding:13px 14px;display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-family:'Archivo Black',sans-serif;font-size:13px;color:#fbbf24;">☀ SUMMER</span>
+                <span style="flex:1;"></span>
+                <span style="padding:3px 9px;border-radius:999px;background:rgba(251,191,36,.16);border:1px solid rgba(251,191,36,.35);color:#fbbf24;font-size:11px;font-weight:900;">#1 in group</span>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;">
+                <span style="display:flex;flex-direction:column;gap:1px;"><span style="font-family:'Archivo Black',sans-serif;font-size:17px;color:#fff;font-variant-numeric:tabular-nums;">981</span><span style="font-size:9px;font-weight:900;letter-spacing:.08em;color:rgba(255,255,255,.4);">POINTS</span></span>
+                <span style="display:flex;flex-direction:column;gap:1px;"><span style="font-family:'Archivo Black',sans-serif;font-size:17px;color:#fff;font-variant-numeric:tabular-nums;">20</span><span style="font-size:9px;font-weight:900;letter-spacing:.08em;color:rgba(255,255,255,.4);">SWIMS</span></span>
+                <span style="display:flex;flex-direction:column;gap:1px;"><span style="font-family:'Archivo Black',sans-serif;font-size:17px;color:#fbbf24;font-variant-numeric:tabular-nums;">7</span><span style="font-size:9px;font-weight:900;letter-spacing:.08em;color:rgba(255,255,255,.4);">MEDALS</span></span>
+              </div>
+            </div>
+            <a href="results_main.html?competitionId=52&amp;tab=swims&amp;swimmerId=884" style="display:flex;align-items:center;gap:10px;min-height:44px;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:#fff;">
+              <span style="flex:none;width:34px;font-size:10px;font-weight:900;color:rgba(255,255,255,.4);font-variant-numeric:tabular-nums;">18.04</span>
+              <span dir="auto" style="flex:1;min-width:0;font-size:12px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">אליפות ישראל "ארנה" 11-14</span>
+              <span style="flex:none;font-size:12px;color:#fbbf24;">🥇🥇🥈</span>
+            </a>
+            <a href="results_main.html?competitionId=57&amp;tab=swims&amp;swimmerId=884" style="display:flex;align-items:center;gap:10px;min-height:44px;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:#fff;">
+              <span style="flex:none;width:34px;font-size:10px;font-weight:900;color:rgba(255,255,255,.4);font-variant-numeric:tabular-nums;">30.05</span>
+              <span dir="auto" style="flex:1;min-width:0;font-size:12px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">גביע המכביה הצעירה</span>
+              <span style="flex:none;font-size:12px;color:#fbbf24;">🥇🥈</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <span style="max-width:1440px;font-size:12px;font-weight:600;color:#5b6470;line-height:1.55;">Шапка-досье: аватар (плейсхолдер под фото), имя RTL + транслит cyan, мета-строка (возраст · клуб-линк · зачётная группа · с какого года), справа очки сезона / медали / кнопки. Полоса PB — 4 главные дистанции + вход в полную таблицу. Дальше канон клуба: сезон-карусель → 6 плиток-табов → панель-«папка». Панель Season: два чемпионата ❄/☀ (место в группе, очки, заплывы, медали + соревнования с линками на заплывы), Season shape (очки за старт, цвет = чемпионат) и «New in 25/26» — рекорды и PB сезона.</span>
+    </div>
+
+    <!-- ================= 1b — PB FIRST ================= -->
+    <div id="1b" style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="background:#0f172a;color:#fbbf24;font-size:12px;font-weight:800;padding:4px 9px;border-radius:6px;">1b</span>
+        <span style="font-size:15px;font-weight:800;">PB first — таблица личных рекордов как главный экран</span>
+        <span style="font-size:12.5px;font-weight:600;color:#5b6470;">шапка-плакат с дорожками; панель = PB-таблица 25/50 с дельтой до рекордов; состояние гостя</span>
+      </div>
+
+      <div style="display:flex;gap:22px;align-items:flex-start;">
+
+        <div style="width:1440px;border-radius:18px;overflow:hidden;background:#04182b;box-shadow:0 8px 28px rgba(4,32,58,.22);">
+          <div style="height:48px;padding:0 24px;background:#020f1d;display:flex;align-items:center;gap:20px;color:#fff;">
+            <span style="font-family:'Archivo Black',sans-serif;font-size:15px;color:#22d3ee;">SWIMM</span>
+            <span style="font-size:13px;font-weight:700;color:rgba(255,255,255,.55);">Competitions</span>
+            <span style="font-size:13px;font-weight:700;color:rgba(255,255,255,.55);">Clubs</span>
+            <span style="height:48px;display:flex;align-items:center;font-size:13px;font-weight:800;color:#fff;border-bottom:2px solid #22d3ee;">Swimmers</span>
+            <span style="flex:1;"></span>
+            <span style="font-size:11.5px;font-weight:800;color:rgba(255,255,255,.45);">Vladimir</span>
+            <span style="width:28px;height:28px;border-radius:999px;background:#22d3ee;color:#04182b;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;">V</span>
+          </div>
+
+          <div style="position:relative;background:linear-gradient(160deg,#062a4a 0%,#04182b 60%);padding:26px 24px 20px;overflow:hidden;">
+            <span style="position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(34,211,238,.07) 0 1px,transparent 1px 120px);pointer-events:none;"></span>
+            <div style="position:relative;max-width:1392px;margin:0 auto;display:grid;grid-template-columns:auto minmax(0,1fr);gap:26px;align-items:center;">
+              <div style="width:132px;height:132px;border-radius:24px;background:repeating-linear-gradient(135deg,rgba(34,211,238,.10) 0 6px,rgba(34,211,238,.03) 6px 12px);border:2px dashed rgba(34,211,238,.45);display:flex;align-items:center;justify-content:center;">
+                <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;font-weight:700;color:rgba(34,211,238,.75);text-align:center;line-height:1.4;">athlete<br>photo</span>
+              </div>
+              <div style="min-width:0;display:flex;flex-direction:column;gap:14px;">
+                <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;">
+                  <span dir="rtl" style="font-family:'Archivo Black',sans-serif;font-size:44px;line-height:1;color:#fff;text-align:left;">אניה גוסטמלסקי</span>
+                  <span style="display:flex;flex-direction:column;gap:3px;padding-bottom:3px;">
+                    <span style="font-size:12px;font-weight:800;letter-spacing:.08em;color:#22d3ee;">ANYA GUSTMALSKY</span>
+                    <span style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;color:rgba(255,255,255,.6);">
+                      <span>🇮🇱 age 14 (2011)</span>
+                      <span style="color:rgba(255,255,255,.2);">·</span>
+                      <a href="?tab=clubs&amp;clubId=17" dir="auto" style="color:#fff;">מכבי וייסגל רחובות</a>
+                      <span style="color:rgba(255,255,255,.2);">·</span>
+                      <span style="color:#22d3ee;">Y 11–14</span>
+                    </span>
+                  </span>
+                  <span style="flex:1;"></span>
+                  <span style="display:flex;align-items:center;gap:8px;">
+                    <button style="cursor:pointer;font-family:inherit;height:40px;padding:0 15px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.8);font-size:12.5px;font-weight:800;" style-hover="background:rgba(255,255,255,.09);">❤️ Follow</button>
+                    <button style="cursor:pointer;font-family:inherit;height:40px;padding:0 17px;border-radius:12px;background:#22d3ee;border:none;color:#04182b;font-size:12.5px;font-weight:900;" style-hover="background:#67e8f9;">🎉 Congratulate</button>
+                  </span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.09);border-radius:14px;overflow:hidden;">
+                  <span style="background:#052134;padding:11px 16px;display:flex;flex-direction:column;gap:2px;min-width:0;"><span style="font-family:'Archivo Black',sans-serif;font-size:24px;color:#fff;font-variant-numeric:tabular-nums;">1 842</span><span style="font-size:10px;font-weight:900;letter-spacing:.12em;color:rgba(255,255,255,.42);">POINTS · SEASON 25/26</span></span>
+                  <span style="background:#052134;padding:11px 16px;display:flex;flex-direction:column;gap:2px;min-width:0;"><span style="font-family:'Archivo Black',sans-serif;font-size:24px;color:#fbbf24;font-variant-numeric:tabular-nums;">7 · 4 · 2</span><span style="font-size:10px;font-weight:900;letter-spacing:.12em;color:rgba(255,255,255,.42);">MEDALS 🥇🥈🥉</span></span>
+                  <span style="background:#052134;padding:11px 16px;display:flex;flex-direction:column;gap:2px;min-width:0;"><span style="font-family:'Archivo Black',sans-serif;font-size:24px;color:#fbbf24;font-variant-numeric:tabular-nums;">3</span><span style="font-size:10px;font-weight:900;letter-spacing:.12em;color:rgba(255,255,255,.42);">RECORDS HELD</span></span>
+                  <span style="background:#052134;padding:11px 16px;display:flex;flex-direction:column;gap:2px;min-width:0;"><span style="display:flex;align-items:baseline;gap:8px;"><span style="font-family:'Archivo Black',sans-serif;font-size:24px;color:#22d3ee;font-variant-numeric:tabular-nums;">26.98</span><span style="font-size:11px;font-weight:900;color:rgba(255,255,255,.5);">50 FREE</span></span><span style="font-size:10px;font-weight:900;letter-spacing:.12em;color:rgba(255,255,255,.42);">SIGNATURE BEST</span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding:11px 22px;background:rgba(0,0,0,.16);border-top:1px solid rgba(34,211,238,.14);display:flex;align-items:center;gap:14px;">
+            <span style="flex:none;width:64px;cursor:pointer;border:1px solid rgba(34,211,238,.5);background:rgba(34,211,238,.14);color:#22d3ee;font-size:12px;font-weight:800;padding:6px 0;border-radius:999px;text-align:center;">All</span>
+            <span style="flex:1;display:flex;align-items:center;justify-content:center;gap:16px;">
+              <span style="cursor:pointer;width:32px;height:32px;flex:none;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;">‹</span>
+              <span style="display:grid;grid-template-columns:repeat(3,52px) auto repeat(3,52px);align-items:center;gap:14px;font-variant-numeric:tabular-nums;">
+                <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:12px;color:rgba(255,255,255,.28);">21/22</span>
+                <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:13px;color:rgba(255,255,255,.42);">22/23</span>
+                <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:15px;color:rgba(255,255,255,.65);">23/24</span>
+                <span style="display:flex;flex-direction:column;align-items:center;margin:0 6px;">
+                  <span style="font-size:9px;font-weight:800;letter-spacing:.14em;color:rgba(255,255,255,.4);">SEASON</span>
+                  <span style="font-family:'Archivo Black',sans-serif;font-size:21px;line-height:1.1;color:rgba(255,255,255,.75);">25/26</span>
+                </span>
+                <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:15px;color:rgba(255,255,255,.65);">10/11</span>
+                <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:13px;color:rgba(255,255,255,.42);">11/12</span>
+                <span style="cursor:pointer;text-align:center;font-family:'Archivo Black',sans-serif;font-size:12px;color:rgba(255,255,255,.28);">12/13</span>
+              </span>
+              <span style="cursor:pointer;width:32px;height:32px;flex:none;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;">›</span>
+            </span>
+            <span style="flex:none;width:64px;"></span>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:12px 14px 0;background:rgba(0,0,0,.28);">
+            <span style="cursor:pointer;border-radius:13px;padding:11px 13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;gap:7px;">
+              <span style="display:flex;align-items:center;gap:7px;"><span style="flex:none;width:24px;height:24px;border-radius:999px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:12px;">▦</span><span style="font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.75);">SEASON</span></span>
+              <span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.4);">❄ #2 · ☀ #1</span>
+            </span>
+            <span style="cursor:pointer;border-radius:13px;padding:11px 13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;gap:7px;">
+              <span style="display:flex;align-items:center;gap:7px;"><span style="flex:none;width:24px;height:24px;border-radius:999px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:12px;">⏱</span><span style="font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.75);">RESULTS</span></span>
+              <span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.4);">186 swims all-time</span>
+            </span>
+            <span style="cursor:pointer;position:relative;z-index:1;margin-bottom:-1px;border-radius:13px 13px 0 0;padding:11px 13px 12px;background:#0c2a3f;border:1px solid rgba(34,211,238,.5);border-bottom:none;box-shadow:0 -6px 18px rgba(34,211,238,.18);display:flex;flex-direction:column;gap:7px;">
+              <span style="display:flex;align-items:center;gap:7px;"><span style="flex:none;width:24px;height:24px;border-radius:999px;background:#22d3ee;color:#04182b;display:flex;align-items:center;justify-content:center;font-size:12px;">🏅</span><span style="font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:.04em;color:#22d3ee;">RECORDS &amp; PB</span></span>
+              <span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.55);">14 bests · 3 records</span>
+            </span>
+            <span style="cursor:pointer;border-radius:13px;padding:11px 13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;gap:7px;">
+              <span style="display:flex;align-items:center;gap:7px;"><span style="flex:none;width:24px;height:24px;border-radius:999px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:12px;">📈</span><span style="font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.75);">PROGRESS</span></span>
+              <span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.4);">time · points · rank</span>
+            </span>
+            <span style="cursor:pointer;border-radius:13px;padding:11px 13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;gap:7px;">
+              <span style="display:flex;align-items:center;gap:7px;"><span style="flex:none;width:24px;height:24px;border-radius:999px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:12px;">▶</span><span style="font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.75);">MEDIA</span></span>
+              <span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.4);">21 items</span>
+            </span>
+            <span style="cursor:pointer;border-radius:13px;padding:11px 13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;gap:7px;">
+              <span style="display:flex;align-items:center;gap:7px;"><span style="flex:none;width:24px;height:24px;border-radius:999px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:12px;">🗓</span><span style="font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.75);">HISTORY</span></span>
+              <span style="font-size:10.5px;font-weight:800;color:rgba(255,255,255,.4);">7 seasons · 64 meets</span>
+            </span>
+          </div>
+
+          <div style="position:relative;margin:0 14px 14px;background:#0c2a3f;border:1px solid rgba(34,211,238,.5);border-radius:13px;box-shadow:0 0 18px rgba(34,211,238,.14);padding:18px 18px 20px;display:flex;flex-direction:column;gap:14px;">
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+              <span style="font-family:'Archivo Black',sans-serif;font-size:16px;color:#fff;">PERSONAL BESTS</span>
+              <span style="font-size:11.5px;font-weight:800;color:rgba(255,255,255,.4);">лучшее время на каждой дистанции · дельта до рекордов</span>
+              <span style="flex:1;"></span>
+              <sc-if value="{{ is25 }}" hint-placeholder-val="{{ true }}">
+                <span style="display:flex;gap:3px;background:rgba(255,255,255,.08);border-radius:999px;padding:3px;">
+                  <button onClick="{{ pick25 }}" style="cursor:pointer;font-family:inherit;border:none;background:#fff;color:#04182b;font-size:12px;font-weight:900;padding:6px 15px;border-radius:999px;">25 m</button>
+                  <button onClick="{{ pick50 }}" style="cursor:pointer;font-family:inherit;border:none;background:transparent;color:rgba(255,255,255,.55);font-size:12px;font-weight:900;padding:6px 15px;border-radius:999px;">50 m</button>
+                </span>
+              </sc-if>
+              <sc-if value="{{ is50 }}">
+                <span style="display:flex;gap:3px;background:rgba(255,255,255,.08);border-radius:999px;padding:3px;">
+                  <button onClick="{{ pick25 }}" style="cursor:pointer;font-family:inherit;border:none;background:transparent;color:rgba(255,255,255,.55);font-size:12px;font-weight:900;padding:6px 15px;border-radius:999px;">25 m</button>
+                  <button onClick="{{ pick50 }}" style="cursor:pointer;font-family:inherit;border:none;background:#fff;color:#04182b;font-size:12px;font-weight:900;padding:6px 15px;border-radius:999px;">50 m</button>
+                </span>
+              </sc-if>
+            </div>
+
+            <div style="display:grid;grid-template-columns:8px 132px 116px minmax(0,1fr) 92px 132px 132px;align-items:center;gap:0 14px;padding:0 14px 8px 0;">
+              <span></span>
+              <span style="font-size:10px;font-weight:900;letter-spacing:.1em;color:rgba(255,255,255,.4);">EVENT</span>
+              <span style="font-size:10px;font-weight:900;letter-spacing:.1em;color:rgba(255,255,255,.4);">BEST TIME</span>
+              <span style="font-size:10px;font-weight:900;letter-spacing:.1em;color:rgba(255,255,255,.4);">WHERE · WHEN</span>
+              <span style="text-align:right;font-size:10px;font-weight:900;letter-spacing:.1em;color:rgba(255,255,255,.4);">POINTS</span>
+              <span style="text-align:right;font-size:10px;font-weight:900;letter-spacing:.1em;color:rgba(255,255,255,.4);">Δ CLUB REC</span>
+              <span style="text-align:right;font-size:10px;font-weight:900;letter-spacing:.1em;color:rgba(255,255,255,.4);">Δ ISRAEL 14</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <sc-for list="{{ pb }}" as="r" hint-placeholder-count="6">
+                <a href="{{ r.href }}" style="display:grid;grid-template-columns:8px 132px 116px minmax(0,1fr) 92px 132px 132px;align-items:center;gap:0 14px;padding:11px 14px 11px 0;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:#fff;overflow:hidden;" style-hover="background:rgba(255,255,255,.06);">
+                  <span></span>
+                  <span style="display:flex;align-items:center;gap:8px;min-width:0;"><span style="font-size:13px;font-weight:900;">{{ r.event }}</span><span style="font-size:10px;font-weight:900;color:rgba(255,255,255,.35);">{{ r.stroke }}</span></span>
+                  <span style="display:flex;align-items:center;gap:8px;"><span style="font-family:'Archivo Black',sans-serif;font-size:16px;color:#fff;font-variant-numeric:tabular-nums;">{{ r.time }}</span><span style="font-size:10px;font-weight:900;color:#22d3ee;">{{ r.tag }}</span></span>
+                  <span dir="auto" style="min-width:0;font-size:12px;font-weight:800;color:rgba(255,255,255,.6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ r.meet }}</span>
+                  <span style="text-align:right;font-size:13px;font-weight:900;color:rgba(255,255,255,.75);font-variant-numeric:tabular-nums;">{{ r.points }}</span>
+                  <span style="text-align:right;font-size:12.5px;font-weight:900;color:{{ r.clubColor }};font-variant-numeric:tabular-nums;">{{ r.club }}</span>
+                  <span style="text-align:right;font-size:12.5px;font-weight:900;color:{{ r.ilColor }};font-variant-numeric:tabular-nums;">{{ r.il }}</span>
+                </a>
+              </sc-for>
+
+              <a href="results_main.html?competitionId=57&amp;tab=swims&amp;swimmerId=884&amp;eventId=204" style="position:relative;display:grid;grid-template-columns:8px 132px 116px minmax(0,1fr) 92px 132px 132px;align-items:center;gap:0 14px;padding:11px 14px 11px 0;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(240,180,41,.55);color:#fff;overflow:hidden;">
+                <span style="align-self:stretch;background:repeating-linear-gradient(-45deg,#f0b429 0 9px,#2a2416 9px 18px);opacity:.9;"></span>
+                <span style="display:flex;align-items:center;gap:8px;min-width:0;"><span style="font-size:13px;font-weight:900;">200 m</span><span style="font-size:10px;font-weight:900;color:rgba(255,255,255,.35);">IM</span></span>
+                <span style="display:flex;flex-direction:column;gap:4px;">
+                  <span style="font-family:'Archivo Black',sans-serif;font-size:16px;color:#fff;font-variant-numeric:tabular-nums;">2:24.55</span>
+                  <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:rgba(245,158,11,.16);border:1px solid rgba(245,158,11,.4);color:#f0b429;font-size:11px;font-weight:800;white-space:nowrap;">⚠ Under review</span>
+                </span>
+                <span dir="auto" style="min-width:0;font-size:12px;font-weight:800;color:rgba(255,255,255,.6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">גביע המכביה הצעירה · 30.05.26</span>
+                <span style="text-align:right;font-size:13px;font-weight:900;color:rgba(255,255,255,.75);font-variant-numeric:tabular-nums;">514</span>
+                <span style="text-align:right;font-size:12.5px;font-weight:900;color:rgba(255,255,255,.35);font-variant-numeric:tabular-nums;">+1.08</span>
+                <span style="text-align:right;font-size:12.5px;font-weight:900;color:rgba(255,255,255,.35);font-variant-numeric:tabular-nums;">+2.91</span>
+              </a>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-top:4px;font-size:11px;font-weight:800;color:rgba(255,255,255,.4);">
+              <span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:3px;background:#fbbf24;"></span>рекорд принадлежит пловчихе</span>
+              <span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:3px;background:rgba(255,255,255,.35);"></span>отставание от рекорда, сек</span>
+              <span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:3px;background:#f0b429;"></span>время на проверке — в зачёт пока не идёт</span>
+              <span style="flex:1;"></span>
+              <span style="color:rgba(255,255,255,.5);">строка кликабельна → заплыв в результатах соревнования</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:22px;">
+          <div style="width:390px;border-radius:18px;overflow:hidden;background:#04182b;box-shadow:0 8px 28px rgba(4,32,58,.22);">
+            <div style="position:relative;background:linear-gradient(160deg,#062a4a 0%,#04182b 60%);padding:16px 14px 14px;display:flex;flex-direction:column;gap:12px;overflow:hidden;">
+              <span style="position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(34,211,238,.07) 0 1px,transparent 1px 78px);pointer-events:none;"></span>
+              <div style="position:relative;display:flex;align-items:center;gap:12px;">
+                <div style="flex:none;width:64px;height:64px;border-radius:18px;background:repeating-linear-gradient(135deg,rgba(34,211,238,.10) 0 6px,rgba(34,211,238,.03) 6px 12px);border:2px dashed rgba(34,211,238,.45);display:flex;align-items:center;justify-content:center;">
+                  <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:8px;font-weight:700;color:rgba(34,211,238,.75);">photo</span>
+                </div>
+                <span style="min-width:0;flex:1;display:flex;flex-direction:column;gap:4px;">
+                  <span dir="rtl" style="font-family:'Archivo Black',sans-serif;font-size:21px;line-height:1.1;color:#fff;text-align:left;">אניה גוסטמלסקי</span>
+                  <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:10.5px;font-weight:800;color:rgba(255,255,255,.55);">
+                    <span>age 14</span><span style="color:rgba(255,255,255,.2);">·</span>
+                    <span style="color:#22d3ee;">Y 11–14</span><span style="color:rgba(255,255,255,.2);">·</span>
+                    <a href="?tab=clubs&amp;clubId=17" dir="auto" style="color:#fff;">מכבי וייסגל</a>
+                  </span>
+                </span>
+              </div>
+              <div style="position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.09);border-radius:13px;overflow:hidden;">
+                <span style="background:#052134;padding:9px 11px;display:flex;flex-direction:column;gap:1px;min-width:0;"><span style="font-family:'Archivo Black',sans-serif;font-size:17px;color:#fff;font-variant-numeric:tabular-nums;">1 842</span><span style="font-size:8.5px;font-weight:900;letter-spacing:.1em;color:rgba(255,255,255,.42);">POINTS</span></span>
+                <span style="background:#052134;padding:9px 11px;display:flex;flex-direction:column;gap:1px;min-width:0;"><span style="font-family:'Archivo Black',sans-serif;font-size:17px;color:#fbbf24;font-variant-numeric:tabular-nums;">13</span><span style="font-size:8.5px;font-weight:900;letter-spacing:.1em;color:rgba(255,255,255,.42);">MEDALS</span></span>
+                <span style="background:#052134;padding:9px 11px;display:flex;flex-direction:column;gap:1px;min-width:0;"><span style="font-family:'Archivo Black',sans-serif;font-size:17px;color:#fbbf24;font-variant-numeric:tabular-nums;">3</span><span style="font-size:8.5px;font-weight:900;letter-spacing:.1em;color:rgba(255,255,255,.42);">RECORDS</span></span>
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(6,1fr);background:rgba(0,0,0,.28);">
+              <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:48px;padding:7px 0 8px;border-bottom:2.5px solid transparent;color:rgba(255,255,255,.6);cursor:pointer;"><span style="font-size:17px;line-height:1;">▦</span><span style="font-size:9.5px;font-weight:800;">Season</span></span>
+              <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:48px;padding:7px 0 8px;border-bottom:2.5px solid transparent;color:rgba(255,255,255,.6);cursor:pointer;"><span style="font-size:17px;line-height:1;">⏱</span><span style="font-size:9.5px;font-weight:800;">Results</span></span>
+              <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:48px;padding:7px 0 8px;border-bottom:2.5px solid #22d3ee;color:#22d3ee;cursor:pointer;"><span style="font-size:17px;line-height:1;text-shadow:0 0 14px rgba(34,211,238,.55);">🏅</span><span style="font-size:9.5px;font-weight:800;">PB</span></span>
+              <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:48px;padding:7px 0 8px;border-bottom:2.5px solid transparent;color:rgba(255,255,255,.6);cursor:pointer;"><span style="font-size:17px;line-height:1;">📈</span><span style="font-size:9.5px;font-weight:800;">Progress</span></span>
+              <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:48px;padding:7px 0 8px;border-bottom:2.5px solid transparent;color:rgba(255,255,255,.6);cursor:pointer;"><span style="font-size:17px;line-height:1;">▶</span><span style="font-size:9.5px;font-weight:800;">Media</span></span>
+              <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:48px;padding:7px 0 8px;border-bottom:2.5px solid transparent;color:rgba(255,255,255,.6);cursor:pointer;"><span style="font-size:17px;line-height:1;">🗓</span><span style="font-size:9.5px;font-weight:800;">History</span></span>
+            </div>
+
+            <div style="padding:12px 14px 16px;display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-family:'Archivo Black',sans-serif;font-size:13px;color:#fff;">PERSONAL BESTS</span>
+                <span style="flex:1;"></span>
+                <span style="display:flex;gap:3px;background:rgba(255,255,255,.08);border-radius:999px;padding:3px;">
+                  <span style="background:#fff;color:#04182b;font-size:11.5px;font-weight:900;padding:6px 13px;border-radius:999px;">25 m</span>
+                  <span style="color:rgba(255,255,255,.55);font-size:11.5px;font-weight:900;padding:6px 13px;border-radius:999px;">50 m</span>
+                </span>
+              </div>
+              <a href="results_main.html?competitionId=57&amp;tab=swims&amp;swimmerId=884&amp;eventId=101" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;min-height:44px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:#fff;">
+                <span style="display:flex;align-items:center;gap:8px;min-width:0;"><span style="font-size:12.5px;font-weight:900;">50 m free</span><span style="padding:1px 6px;border-radius:999px;background:rgba(251,191,36,.16);border:1px solid rgba(251,191,36,.35);color:#fbbf24;font-size:9px;font-weight:900;">CLUB REC</span></span>
+                <span style="font-family:'Archivo Black',sans-serif;font-size:17px;color:#fff;font-variant-numeric:tabular-nums;text-align:right;">26.98</span>
+                <span dir="auto" style="min-width:0;font-size:10.5px;font-weight:800;color:rgba(255,255,255,.45);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">גביע המכביה · 30.05.26</span>
+                <span style="text-align:right;font-size:10.5px;font-weight:900;color:rgba(255,255,255,.35);font-variant-numeric:tabular-nums;">IL 14: +0.44</span>
+              </a>
+              <a href="results_main.html?competitionId=52&amp;tab=swims&amp;swimmerId=884&amp;eventId=102" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;min-height:44px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:#fff;">
+                <span style="display:flex;align-items:center;gap:8px;min-width:0;"><span style="font-size:12.5px;font-weight:900;">100 m free</span><span style="padding:1px 6px;border-radius:999px;background:rgba(251,191,36,.16);border:1px solid rgba(251,191,36,.35);color:#fbbf24;font-size:9px;font-weight:900;">IL 14</span></span>
+                <span style="font-family:'Archivo Black',sans-serif;font-size:17px;color:#fff;font-variant-numeric:tabular-nums;text-align:right;">58.42</span>
+                <span dir="auto" style="min-width:0;font-size:10.5px;font-weight:800;color:rgba(255,255,255,.45);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">אליפות ישראל · 18.04.26</span>
+                <span style="text-align:right;font-size:10.5px;font-weight:900;color:#fbbf24;font-variant-numeric:tabular-nums;">record</span>
+              </a>
+              <a href="results_main.html?competitionId=41&amp;tab=swims&amp;swimmerId=884&amp;eventId=110" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;min-height:44px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:#fff;">
+                <span style="display:flex;align-items:center;gap:8px;min-width:0;"><span style="font-size:12.5px;font-weight:900;">100 m back</span></span>
+                <span style="font-family:'Archivo Black',sans-serif;font-size:17px;color:#fff;font-variant-numeric:tabular-nums;text-align:right;">1:05.33</span>
+                <span dir="auto" style="min-width:0;font-size:10.5px;font-weight:800;color:rgba(255,255,255,.45);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">גביע חנוכה · 11.11.25</span>
+                <span style="text-align:right;font-size:10.5px;font-weight:900;color:rgba(255,255,255,.35);font-variant-numeric:tabular-nums;">club: +0.87</span>
+              </a>
+              <div style="position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;min-height:44px;padding:10px 12px 10px 20px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(240,180,41,.55);color:#fff;overflow:hidden;">
+                <span style="position:absolute;left:0;top:0;bottom:0;width:8px;background:repeating-linear-gradient(-45deg,#f0b429 0 9px,#2a2416 9px 18px);opacity:.9;"></span>
+                <span style="display:flex;align-items:center;gap:8px;min-width:0;"><span style="font-size:12.5px;font-weight:900;">200 m IM</span><span style="padding:2px 8px;border-radius:999px;background:rgba(245,158,11,.16);border:1px solid rgba(245,158,11,.4);color:#f0b429;font-size:10px;font-weight:800;">⚠ Under review</span></span>
+                <span style="font-family:'Archivo Black',sans-serif;font-size:17px;color:#fff;font-variant-numeric:tabular-nums;text-align:right;">2:24.55</span>
+                <span dir="auto" style="min-width:0;font-size:10.5px;font-weight:800;color:rgba(255,255,255,.45);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">גביע המכביה · 30.05.26</span>
+                <span style="text-align:right;font-size:10.5px;font-weight:900;color:rgba(255,255,255,.35);font-variant-numeric:tabular-nums;">club: +1.08</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="width:390px;display:flex;flex-direction:column;gap:8px;">
+            <span style="font-size:12px;font-weight:800;color:#5b6470;">Гость (не залогинен) — та же страница без действий</span>
+            <div style="border-radius:18px;overflow:hidden;background:#04182b;box-shadow:0 8px 28px rgba(4,32,58,.22);">
+              <div style="background:linear-gradient(160deg,#062a4a 0%,#04182b 60%);padding:16px 14px 14px;display:flex;flex-direction:column;gap:12px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <div style="flex:none;width:64px;height:64px;border-radius:18px;background:repeating-linear-gradient(135deg,rgba(34,211,238,.10) 0 6px,rgba(34,211,238,.03) 6px 12px);border:2px dashed rgba(34,211,238,.45);display:flex;align-items:center;justify-content:center;">
+                    <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:8px;font-weight:700;color:rgba(34,211,238,.75);">photo</span>
+                  </div>
+                  <span style="min-width:0;flex:1;display:flex;flex-direction:column;gap:4px;">
+                    <span dir="rtl" style="font-family:'Archivo Black',sans-serif;font-size:21px;line-height:1.1;color:#fff;text-align:left;">אניה גוסטמלסקי</span>
+                    <span style="display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;color:rgba(255,255,255,.55);">
+                      <span>age 14</span><span style="color:rgba(255,255,255,.2);">·</span>
+                      <span style="color:#22d3ee;">Y 11–14</span><span style="color:rgba(255,255,255,.2);">·</span>
+                      <a href="?tab=clubs&amp;clubId=17" dir="auto" style="color:#fff;">מכבי וייסגל</a>
+                    </span>
+                  </span>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:13px;background:rgba(34,211,238,.08);border:1px dashed rgba(34,211,238,.35);">
+                  <span style="flex:1;min-width:0;font-size:11.5px;font-weight:800;color:rgba(255,255,255,.6);line-height:1.4;">Войдите, чтобы следить за пловцом, поздравлять и добавлять медиа</span>
+                  <button style="flex:none;cursor:pointer;font-family:inherit;min-height:36px;padding:0 14px;border-radius:11px;background:#22d3ee;border:none;color:#04182b;font-size:12px;font-weight:900;">Sign in</button>
+                </div>
+              </div>
+              <div style="padding:12px 14px 16px;font-size:11.5px;font-weight:700;color:rgba(255,255,255,.4);line-height:1.5;">Всё публичное видно: сезон, результаты, PB, прогресс, медиа, история. Скрыты только действия — Follow, Congratulate, ＋ Add media, редактирование профиля (последние два — только у владельца).</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <span style="max-width:1440px;font-size:12px;font-weight:600;color:#5b6470;line-height:1.55;">Шапка-плакат: крупное имя, дорожки бассейна как фон, KPI одной лентой (очки сезона · медали · рекорды · signature best). Панель — PB-таблица: тумблер 25 m / 50 m (живой, переключается), колонки дельты до клубного рекорда и рекорда Израиля по возрасту (gold = рекорд принадлежит ей). Спорное время — гибрид по <b>RECORD-FLAG</b>: caution-лента 8px на левом краю строки + чип «⚠ Under review» под временем. Здесь сезон-фильтр стоит в состоянии <b>All</b> — glow ушёл на кнопку All, PB считаются за всю карьеру.</span>
+    </div>
+
+  </div>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1920,&quot;height&quot;:1200}}">
+class Component extends DCLogic {
+  state = { pool: '25' };
+  renderVals() {
+    const gold = '#fbbf24', mute = 'rgba(255,255,255,.35)';
+    const pb25 = [
+      { event: '50 m', stroke: 'FREE', time: '26.98', tag: 'PB', meet: 'גביע המכביה הצעירה · 30.05.26', points: '641', club: 'record', clubColor: gold, il: '+0.44', ilColor: mute, href: 'results_main.html?competitionId=57&tab=swims&swimmerId=884&eventId=101' },
+      { event: '100 m', stroke: 'FREE', time: '58.42', tag: 'PB', meet: 'אליפות ישראל "ארנה" 11-14 · 18.04.26', points: '672', club: 'record', clubColor: gold, il: 'record', ilColor: gold, href: 'results_main.html?competitionId=52&tab=swims&swimmerId=884&eventId=102' },
+      { event: '200 m', stroke: 'FREE', time: '2:07.10', tag: '', meet: 'אליפות ישראל חורף · 14.12.25', points: '598', club: '+1.34', clubColor: mute, il: '+3.02', ilColor: mute, href: 'results_main.html?competitionId=39&tab=swims&swimmerId=884&eventId=103' },
+      { event: '100 m', stroke: 'BACK', time: '1:05.33', tag: '', meet: 'גביע חנוכה — נתניה · 11.11.25', points: '612', club: '+0.87', clubColor: mute, il: '+1.96', ilColor: mute, href: 'results_main.html?competitionId=41&tab=swims&swimmerId=884&eventId=110' },
+      { event: '100 m', stroke: 'BREAST', time: '1:16.20', tag: '', meet: 'גביע הקיץ — חיפה · 21.07.26', points: '523', club: '+2.41', clubColor: mute, il: '+4.88', ilColor: mute, href: 'results_main.html?competitionId=61&tab=swims&swimmerId=884&eventId=120' },
+      { event: '100 m', stroke: 'FLY', time: '1:04.90', tag: 'PB', meet: 'אליפות ישראל "ארנה" 11-14 · 18.04.26', points: '629', club: 'record', clubColor: gold, il: '+1.12', ilColor: mute, href: 'results_main.html?competitionId=52&tab=swims&swimmerId=884&eventId=130' }
+    ];
+    const pb50 = [
+      { event: '50 m', stroke: 'FREE', time: '27.61', tag: 'PB', meet: 'אליפות ישראל קיץ · 12.06.26', points: '618', club: '+0.19', clubColor: mute, il: '+0.93', ilColor: mute, href: 'results_main.html?competitionId=59&tab=swims&swimmerId=884&eventId=201' },
+      { event: '100 m', stroke: 'FREE', time: '59.88', tag: 'PB', meet: 'אליפות ישראל קיץ · 13.06.26', points: '634', club: 'record', clubColor: gold, il: '+0.62', ilColor: mute, href: 'results_main.html?competitionId=59&tab=swims&swimmerId=884&eventId=202' },
+      { event: '200 m', stroke: 'FREE', time: '2:10.44', tag: '', meet: 'גביע הקיץ — חיפה · 21.07.26', points: '561', club: '+2.10', clubColor: mute, il: '+4.31', ilColor: mute, href: 'results_main.html?competitionId=61&tab=swims&swimmerId=884&eventId=203' },
+      { event: '100 m', stroke: 'BACK', time: '1:07.02', tag: '', meet: 'אליפות ישראל קיץ · 14.06.26', points: '577', club: '+1.44', clubColor: mute, il: '+2.85', ilColor: mute, href: 'results_main.html?competitionId=59&tab=swims&swimmerId=884&eventId=210' },
+      { event: '100 m', stroke: 'FLY', time: '1:06.31', tag: '', meet: 'גביע המכביה הצעירה · 30.05.26', points: '588', club: '+0.55', clubColor: mute, il: '+1.90', ilColor: mute, href: 'results_main.html?competitionId=57&tab=swims&swimmerId=884&eventId=230' }
+    ];
+    return {
+      pb: this.state.pool === '25' ? pb25 : pb50,
+      is25: this.state.pool === '25',
+      is50: this.state.pool === '50',
+      pick25: () => this.setState({ pool: '25' }),
+      pick50: () => this.setState({ pool: '50' })
+    };
+  }
+}
+</script>
+</body>
+</html>

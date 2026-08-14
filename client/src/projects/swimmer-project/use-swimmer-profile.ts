@@ -1,5 +1,21 @@
 import { useEffect, useState } from 'react';
 
+/** Зачётная группа возрастной лестницы (Kids/Young/Juniors/Adults/Masters). */
+export interface SwimmerAgeGroup {
+  code: string;
+  label: string;
+  badge?: string | null;
+}
+
+/** Сезон для карусели. Ровно у одного `isDisplayDefault` — витринный (см. season-boundary-rule). */
+export interface SwimmerSeasonOption {
+  season: number;
+  label: string;
+  isCurrent: boolean;
+  isDisplayDefault: boolean;
+  swims: number;
+}
+
 /** Профиль пловца (GET /api/swimmers/{id}). camelCase — как отдаёт SwimmerProfileDto. */
 export interface SwimmerProfile {
   id: number;
@@ -16,6 +32,13 @@ export interface SwimmerProfile {
   countryName?: string | null;
   avatarUrl?: string | null;
   origin: string;
+
+  // Шапка страницы спортсмена (этап A2). Попап-карточка эти поля игнорирует.
+  ageInSeason?: number | null;
+  ageGroup?: SwimmerAgeGroup | null;
+  programs?: string[];
+  recordsHeld?: number;
+  seasons?: SwimmerSeasonOption[];
 }
 
 type State =

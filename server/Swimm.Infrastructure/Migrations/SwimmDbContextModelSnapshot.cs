@@ -2095,6 +2095,10 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int>("Heat")
                         .HasColumnType("integer");
 
+                    b.Property<string>("HeatType")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<int>("InternationalPoints")
                         .HasColumnType("integer");
 

@@ -91,6 +91,11 @@ export interface ResultWrap {
     /** Этот заплыв — лучший у пловца в дисциплине за событие (считает сервер). */
     is_best_result?: boolean | null;
 
+    /** Тип заплыва: 'prelim' | 'final'; null/undefined — единственный заплыв дисциплины
+     *  за день (timed final) либо данные без признака. Место prelim-заплыва — ранжир
+     *  сессии, не награда: бейдж места рисуется без медали (как non-award). */
+    heat_type?: string | null;
+
     /* training-specific data */
     training?: TrainingInfo;
 

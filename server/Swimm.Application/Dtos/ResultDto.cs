@@ -80,6 +80,14 @@ public class ResultDto
     public string? EventCategory { get; set; }
 
     /// <summary>
+    /// Тип заплыва: prelim / final; null — единственный заплыв дисциплины за день (timed
+    /// final) либо данные без признака. Место prelim-заплыва — ранжир сессии, не награда:
+    /// клубные очки за него не начисляются (ApplyClubPoints), медали не считаются.
+    /// </summary>
+    [JsonPropertyName("heat_type")]
+    public string? HeatType { get; set; }
+
+    /// <summary>
     /// Заплыв помечен как недостоверный: ошибка САМОГО протокола (docs/data-integrity.md).
     /// Строка остаётся в результатах — мы не переписываем протокол, — но клиент обязан
     /// показать это глазом, иначе бессмыслица вроде 200 вольным за 1:53 у 13-летнего

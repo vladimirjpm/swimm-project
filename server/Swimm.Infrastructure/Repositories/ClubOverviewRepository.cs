@@ -241,25 +241,26 @@ public class ClubOverviewRepository : IClubOverviewRepository
             .Distinct()
             .Count();
 
-        // Витринный сезон: последний ПРОШЕДШИЙ зимний чемпионат по всей базе, а не только
-        // по стартам этого клуба — граница общая для продукта.
+        // Витринный сезон: самый свежий сезон, чей последний зимний чемпионат уже проплыли —
+        // по всей базе, а не только по стартам этого клуба (граница общая для продукта).
         var winterDates = await _read.Competitions.AsNoTracking()
             .Where(c => c.IsChampionship)
             .Select(c => new { c.Date, c.PoolType, c.StandingKindOverride })
             .ToListAsync();
 
-        var showcaseStart = ShowcaseSeason.StartOf(
+        var (showcaseStart, showcaseEnd) = ShowcaseSeason.RangeOf(
             winterDates
                 .Where(c => StandingKinds.Resolve(true, c.PoolType, c.StandingKindOverride) == StandingKinds.Winter)
                 .Select(c => ParseDate(c.Date))
                 .Where(d => d != DateTime.MinValue),
             DateTime.UtcNow);
 
-        kpi.ShowcaseSeasonFrom = showcaseStart.ToString("dd/MM/yyyy");
+        kpi.ShowcaseSeason = SeasonMath.Label(SeasonMath.StartYearOf(showcaseStart));
 
         if (_clubs is null) return;
         kpi.Records = (await _clubs.GetRecordWallAsync(clubId, null)).Data.Count;
-        kpi.SeasonBests = await _clubs.GetSeasonBestCountAsync(clubId, showcaseStart, DateTime.MaxValue);
+        // Окно — ЦЕЛЫЙ витринный сезон: зимний чемпионат его закрывает, а не отрезает начало.
+        kpi.SeasonBests = await _clubs.GetSeasonBestCountAsync(clubId, showcaseStart, showcaseEnd);
     }
 
     /// <summary>KPI Hero. На вход — по ОДНОЙ строке на соревнование (см. схлопывание выше).</summary>
@@ -449,7 +450,8 @@ public class ClubOverviewRepository : IClubOverviewRepository
             .Select(r => new
             {
                 r.SwimmerId,
-                r.Position,
+                // Место prelim-заплыва — ранжир сессии, не награда: очков не даёт.
+                Position = r.HeatType == "prelim" ? null : r.Position,
                 r.TimeFail,
                 IsRelay = r.RelayId != null,
                 IsMasters = r.Competition.IsMasters,
