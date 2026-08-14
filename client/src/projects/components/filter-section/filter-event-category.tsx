@@ -43,8 +43,11 @@ function sortKey(category: string): [number, number, string] {
  * программы одного соревнования — у Маккабиады 50 вольным у мужчин разыгрывалось трижды:
  * «Men», «U17 Boys» и «Men Para». Без фильтра три золота в таблице выглядят ошибкой данных.
  *
- * Показывается только когда категорий действительно больше одной: у обычного возрастного
- * чемпионата она одна на всё соревнование, и кнопка была бы шумом.
+ * Показывается только там, где программы РЕАЛЬНО делят дисциплину: хотя бы в одной
+ * дисциплине (стиль × дистанция × пол × день) должно встречаться две и более категории —
+ * это и есть «несколько первых мест на одной дистанции». Просто «категорий больше одной»
+ * недостаточно: у бугрим женская программа печатается как «13-99», мужская — «14-99»,
+ * они никогда не пересекаются в одной дисциплине, и фильтр дублировал бы Gender.
  */
 const FilterEventCategory: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -53,16 +56,29 @@ const FilterEventCategory: React.FC = () => {
 
   const current = filters.event_category || 'all';
 
-  const categories = useMemo(() => {
+  const { categories, splitsDiscipline } = useMemo(() => {
     const set = new Set<string>();
+    // Дисциплина → её категории: фильтр осмыслен, только если где-то их ≥2.
+    const byDiscipline = new Map<string, Set<string>>();
     filteredByTypeResults.forEach((r) => {
-      if (r.event_category) set.add(r.event_category);
+      if (!r.event_category) return;
+      set.add(r.event_category);
+      // heat_type в ключе: прелимы и финал — разные сессии, и их категории могут быть
+      // напечатаны с разной возрастной планкой (бугрим 25/05: прелимы «13-99», финал
+      // «14-99») — это НЕ параллельные программы.
+      const key = `${r.event_style_name}|${r.event_style_len}|${r.event_style_gender}|${r.date}|${r.heat_type ?? ''}`;
+      const cats = byDiscipline.get(key) ?? new Set<string>();
+      cats.add(r.event_category);
+      byDiscipline.set(key, cats);
     });
-    return Array.from(set).sort((a, b) => {
-      const ka = sortKey(a);
-      const kb = sortKey(b);
-      return ka[0] - kb[0] || ka[1] - kb[1] || ka[2].localeCompare(kb[2]);
-    });
+    return {
+      categories: Array.from(set).sort((a, b) => {
+        const ka = sortKey(a);
+        const kb = sortKey(b);
+        return ka[0] - kb[0] || ka[1] - kb[1] || ka[2].localeCompare(kb[2]);
+      }),
+      splitsDiscipline: [...byDiscipline.values()].some((cats) => cats.size > 1),
+    };
   }, [filteredByTypeResults]);
 
   const updateFilter = (value: string) => {
@@ -73,8 +89,9 @@ const FilterEventCategory: React.FC = () => {
     );
   };
 
-  // Одна категория (или ни одной — данные импортированы до появления поля) — фильтр не нужен.
-  if (categories.length <= 1) return null;
+  // Одна категория (или ни одной — данные импортированы до появления поля) — фильтр не
+  // нужен; как и когда категории не делят ни одну дисциплину (бугрим: 13-99=Ж, 14-99=М).
+  if (categories.length <= 1 || !splitsDiscipline) return null;
 
   return (
     <FilterCard
