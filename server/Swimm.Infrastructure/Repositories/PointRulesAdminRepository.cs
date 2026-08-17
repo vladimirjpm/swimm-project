@@ -1,8 +1,10 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
+using Swimm.Infrastructure.Services;
 
 namespace Swimm.Infrastructure.Repositories;
 
@@ -16,8 +18,18 @@ namespace Swimm.Infrastructure.Repositories;
 /// Правки правил меняют очки в публичных выдачах результатов и клубного зачёта, поэтому
 /// после каждой мутации сбрасывается весь кэш: точечных ключей мало не будет —
 /// очки денормализованы и в <c>club-points:rules</c>, и в HTTP-ответах.
+///
+/// Одного кэша мало: клубный зачёт МАТЕРИАЛИЗОВАН в <c>ClubCompetitionStandings</c>, поэтому
+/// правка шкалы и перепривязка соревнований запускают его пересчёт
+/// (docs/points-rules-per-competition-plan.md §10.5).
 /// </summary>
-public class PointRulesAdminRepository(SwimmDbContext db, ICacheService cache) : IPointRulesAdminRepository
+/// <param name="recalc">
+/// Пересчёт материализованных величин. Необязателен: null — пересчёт пропускается (тесты).
+/// </param>
+public class PointRulesAdminRepository(
+    SwimmDbContext db,
+    ICacheService cache,
+    ICompetitionRecalculationService? recalc = null) : IPointRulesAdminRepository
 {
     private static readonly string[] Scopes = ["all", "masters", "non-masters"];
     private static readonly string[] PointsSources = ["placement", "fina"];
@@ -220,6 +232,7 @@ public class PointRulesAdminRepository(SwimmDbContext db, ICacheService cache) :
             .ToListAsync();
 
         var changed = 0;
+        var changedHeads = new List<int>();
         foreach (var item in items)
         {
             var head = heads.FirstOrDefault(h => h.Id == item.CompetitionId);
@@ -248,13 +261,24 @@ public class PointRulesAdminRepository(SwimmDbContext db, ICacheService cache) :
                 touched = true;
             }
 
-            if (touched) changed++;
+            if (touched)
+            {
+                changed++;
+                changedHeads.Add(head.Id);
+            }
         }
 
         if (changed == 0) return PointRuleSaveResult.Ok(0);
 
         await db.SaveChangesAsync();
         await cache.InvalidateAllAsync();
+
+        // Перепривязка отсюда — тот же случай, что и в /Admin/Competitions: клубный зачёт
+        // материализован, без пересчёта соревнование осталось бы на очках прежнего правила.
+        // Зачётная единица — событие целиком, поэтому хватает «головы» из items.
+        if (kind == PointRuleKind.Clubs)
+            await RebuildStandingsAsync(changedHeads);
+
         return PointRuleSaveResult.Ok(changed);
     }
 
@@ -388,6 +412,12 @@ public class PointRulesAdminRepository(SwimmDbContext db, ICacheService cache) :
         }
 
         await cache.InvalidateAllAsync();
+
+        // Привязок у нового правила ещё нет, но НЕ-ManualOnly правило сразу входит в
+        // автоподбор и может перехватить соревнования без FK — их зачёт станет неверным.
+        if (kind == PointRuleKind.Clubs && !input.ManualOnly)
+            await RebuildStandingsAsync(await UnitsScoredByRuleAsync(id));
+
         return PointRuleSaveResult.Ok(id);
     }
 
@@ -396,10 +426,20 @@ public class PointRulesAdminRepository(SwimmDbContext db, ICacheService cache) :
         var error = await ValidateAsync(kind, input, excludeId: id);
         if (error != null) return PointRuleSaveResult.Fail(error);
 
+        // Кого правило считало ДО правки. Нужно именно «до»: правка EffectiveFrom / Scope /
+        // ManualOnly сдвигает автоподбор, и соревнование уедет на другое правило — его очки
+        // тоже станут неверными, а после сохранения оно в выборку уже не попадёт.
+        var unitsBefore = kind == PointRuleKind.Clubs ? await UnitsScoredByRuleAsync(id) : [];
+        var scoringChanged = false;
+
         if (kind == PointRuleKind.Clubs)
         {
             var rule = await db.PointRulesClubs.Include(x => x.Entries).FirstOrDefaultAsync(x => x.Id == id);
             if (rule == null) return PointRuleSaveResult.Fail($"Правило #{id} не найдено");
+
+            // Переименование или новое описание зачёт не меняют — гонять по ним пересчёт
+            // соревнований незачем.
+            scoringChanged = ShapeOf(rule) != ShapeOf(input);
 
             ApplyClubs(rule, input);
             // Шкала перезаписывается целиком. Удаление и вставку разносим по двум SaveChanges:
@@ -427,11 +467,21 @@ public class PointRulesAdminRepository(SwimmDbContext db, ICacheService cache) :
         }
 
         await cache.InvalidateAllAsync();
+
+        // Клубный зачёт материализован — правка шкалы обязана его пересчитать. Очки пловцов
+        // (High Point) считаются на лету (Э6), им хватает сброса кэша.
+        if (scoringChanged)
+            await RebuildStandingsAsync(unitsBefore.Concat(await UnitsScoredByRuleAsync(id)));
+
         return PointRuleSaveResult.Ok(id);
     }
 
     public async Task<PointRuleSaveResult> DeleteAsync(PointRuleKind kind, int id)
     {
+        // Соревнования с явной привязкой удалить не дадут (гард ниже), но автоподбор на
+        // удаляемое правило снять некому — эти зачёты осиротеют на старых очках.
+        var unitsBefore = kind == PointRuleKind.Clubs ? await UnitsScoredByRuleAsync(id) : [];
+
         if (kind == PointRuleKind.Clubs)
         {
             var rule = await db.PointRulesClubs.FirstOrDefaultAsync(x => x.Id == id);
@@ -455,8 +505,80 @@ public class PointRulesAdminRepository(SwimmDbContext db, ICacheService cache) :
 
         if (await SaveAsync() is { } fail) return fail;
         await cache.InvalidateAllAsync();
+        await RebuildStandingsAsync(unitsBefore);
         return PointRuleSaveResult.Ok(id);
     }
+
+    // ── пересчёт материализованного клубного зачёта ────────────────────────────
+
+    /// <summary>
+    /// Всё, из чего клубный зачёт считает очки. Версия и описание сюда не входят намеренно:
+    /// переименование правила зачёт не меняет.
+    /// </summary>
+    private sealed record ClubScoringShape(
+        string Scope, DateOnly EffectiveFrom, bool ManualOnly,
+        int DefaultPoints, int? MaxScoringPlace, int RelayMultiplier, string Scale);
+
+    private static ClubScoringShape ShapeOf(PointRuleClubs r) => new(
+        r.Scope, r.EffectiveFrom, r.ManualOnly, r.DefaultPoints, r.MaxScoringPlace, r.RelayMultiplier,
+        ScaleKey(r.Entries.Select(e => (e.Place, e.Points))));
+
+    private static ClubScoringShape ShapeOf(PointRuleInputDto i) => new(
+        i.Scope, i.EffectiveFrom, i.ManualOnly, i.DefaultPoints, i.MaxScoringPlace, i.RelayMultiplier,
+        ScaleKey(i.Entries.Select(e => (e.Place, e.Points))));
+
+    private static string ScaleKey(IEnumerable<(int Place, int Points)> entries) =>
+        string.Join(",", entries.OrderBy(e => e.Place).Select(e => $"{e.Place}:{e.Points}"));
+
+    /// <summary>
+    /// Зачётные единицы (событие целиком либо однодневка), которые СЕЙЧАС считаются по этому
+    /// правилу — и по явной привязке, и через автоподбор: у соревнований без FK правка
+    /// правила-по-умолчанию меняет очки ровно так же.
+    ///
+    /// Берём только соревнования с материализованным зачётом: у остальных устаревать нечему,
+    /// а прогон по всем 600+ соревнованиям правила 1 повесил бы админский POST.
+    /// </summary>
+    private async Task<List<int>> UnitsScoredByRuleAsync(int ruleId)
+    {
+        if (recalc is null) return [];
+
+        var withStandings = await db.ClubCompetitionStandings.AsNoTracking()
+            .Select(s => s.CompetitionId).Distinct().ToListAsync();
+        if (withStandings.Count == 0) return [];
+
+        // Шкала (Entries) для выбора правила не нужна — только Scope/EffectiveFrom/ManualOnly.
+        var rules = await db.PointRulesClubs.AsNoTracking().ToListAsync();
+        var comps = await db.Competitions.AsNoTracking()
+            .Where(c => withStandings.Contains(c.Id))
+            .Select(c => new { c.Id, c.EventId, c.IsMasters, c.Date, c.PointRuleClubsId })
+            .ToListAsync();
+
+        return comps
+            .Where(c => CompetitionRuleResolver
+                .Resolve(rules, c.PointRuleClubsId, c.IsMasters, ParseDate(c.Date))?.Id == ruleId)
+            .GroupBy(c => c.EventId ?? -c.Id)
+            .Select(g => g.OrderBy(c => c.Id).First().Id)
+            .ToList();
+    }
+
+    private async Task RebuildStandingsAsync(IEnumerable<int> unitHeadIds)
+    {
+        if (recalc is null) return;
+
+        foreach (var id in unitHeadIds.Distinct())
+        {
+            // Правило уже сохранено — сбой пересчёта не должен отменять правку формы.
+            // Аварийный прогон: `dotnet run -- --rebuild-club-standings`.
+            try { await recalc.RecalculateCompetitionAsync(id); }
+            catch (Exception) { /* лог не нужен: аварийный прогон закрывает случай */ }
+        }
+    }
+
+    /// <summary>Дата соревнования — строка dd/MM/yyyy; без неё правило подбирается на сегодня.</summary>
+    private static DateOnly ParseDate(string? date) =>
+        DateOnly.TryParseExact(date, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)
+            ? d
+            : DateOnly.FromDateTime(DateTime.UtcNow);
 
     // ── helpers ────────────────────────────────────────────────────────────────
 

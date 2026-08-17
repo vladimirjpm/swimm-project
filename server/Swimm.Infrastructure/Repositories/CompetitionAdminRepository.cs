@@ -21,8 +21,9 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
     private readonly ICompetitionRecalculationService? _recalc;
 
     /// <param name="recalc">
-    /// Пересчёт материализованных величин (объединённые места) при смене
-    /// <c>ShowCombineAllResults</c>. Необязателен: null — пересчёт пропускается (тесты).
+    /// Пересчёт материализованных величин (объединённые места + клубный зачёт) при смене
+    /// <c>ShowCombineAllResults</c> или привязки <c>PointRuleClubsId</c>.
+    /// Необязателен: null — пересчёт пропускается (тесты).
     /// </param>
     public CompetitionAdminRepository(SwimmDbContext db, ICacheService cache,
         ICompetitionRecalculationService? recalc = null)
@@ -629,16 +630,22 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         // пустую таблицу; выключили — значения обязаны обнулиться, иначе останутся от
         // прошлой жизни (docs/points-rules-per-competition-plan.md §3.4).
         var combineChanged = comp.ShowCombineAllResults != input.ShowCombineAllResults;
+        // Клубный зачёт материализован (ClubCompetitionStandings) и считается по привязанному
+        // правилу — смена привязки обязана его пересчитать, иначе витрина остаётся на очках
+        // старого правила (Маккаби-2026 #1565: импорт посчитал по автоподбору, привязка
+        // правила из quick-edit зачёт не тронула).
+        var clubRuleChanged = comp.PointRuleClubsId != input.PointRuleClubsId;
 
         Apply(comp, input);
         await ApplyCountryAsync(comp, input.Country);
         var save = await SaveAsync(comp);
         if (save.Success) await SyncCategoriesAsync(comp.Id, input.CategoryKeys);
 
-        if (save.Success && combineChanged && _recalc is not null)
+        if (save.Success && (combineChanged || clubRuleChanged) && _recalc is not null)
         {
             // Соревнование уже сохранено — сбой пересчёта не должен отменять правку формы.
-            // Аварийный прогон: `dotnet run -- --recalc-combined`.
+            // Аварийный прогон: `dotnet run -- --recalc-combined` (места) и
+            // `dotnet run -- --rebuild-club-standings` (клубный зачёт).
             try { await _recalc.RecalculateCompetitionAsync(comp.Id); }
             catch (Exception) { /* лог не нужен: аварийный прогон закрывает случай */ }
             await _cache.InvalidateAllAsync();
@@ -900,14 +907,36 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         if (error != null) return CompetitionSaveResult.Fail(error);
 
         var comps = await _db.Competitions.Where(c => ids.Contains(c.Id)).ToListAsync();
+        var clubRuleChanged = new List<Competition>();
         foreach (var comp in comps)
         {
-            if (assignment.SetClubs) comp.PointRuleClubsId = assignment.ClubsRuleId;
+            if (assignment.SetClubs && comp.PointRuleClubsId != assignment.ClubsRuleId)
+            {
+                comp.PointRuleClubsId = assignment.ClubsRuleId;
+                clubRuleChanged.Add(comp);
+            }
             if (assignment.SetSwimmers) comp.PointRuleSwimmersId = assignment.SwimmersRuleId;
         }
 
         await _db.SaveChangesAsync();
         await _cache.InvalidateAllAsync();
+
+        // Клубный зачёт материализован — смена привязки без пересчёта оставила бы очки
+        // старого правила. Зачётная единица — событие целиком, поэтому пересчёт по разу
+        // на событие, а не на каждый день. Очки пловцов не материализованы — им не нужно.
+        if (clubRuleChanged.Count > 0 && _recalc is not null)
+        {
+            foreach (var unitId in clubRuleChanged
+                .GroupBy(c => c.EventId ?? -c.Id)
+                .Select(g => g.First().Id))
+            {
+                // Привязка уже сохранена — сбой пересчёта не должен отменять операцию.
+                // Аварийный прогон: `dotnet run -- --rebuild-club-standings`.
+                try { await _recalc.RecalculateCompetitionAsync(unitId); }
+                catch (Exception) { /* лог не нужен: аварийный прогон закрывает случай */ }
+            }
+        }
+
         // Id в результате нет — это массовая операция; число изменённых строк отдаём через Id.
         return CompetitionSaveResult.Ok(comps.Count);
     }

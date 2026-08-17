@@ -10,9 +10,12 @@ using Xunit;
 namespace Swimm.Tests;
 
 /// <summary>
-/// Смена флага «Combine All Results» в админке запускает пересчёт объединённых мест.
-/// Включили задним числом — строки остались бы с пустым CombinedPlace и тоггл на клиенте
-/// показал бы пустую таблицу; выключили — значения обязаны обнулиться.
+/// Смена флага «Combine All Results» или привязки правила клубных очков в админке
+/// запускает пересчёт материализованных величин. Combine: включили задним числом — строки
+/// остались бы с пустым CombinedPlace и тоггл на клиенте показал бы пустую таблицу;
+/// выключили — значения обязаны обнулиться. Правило: клубный зачёт материализован в
+/// ClubCompetitionStandings — без пересчёта витрина остаётся на очках старого правила
+/// (Маккаби-2026 #1565: показывал шкалу автоподбора вместо привязанной вручную).
 /// </summary>
 public class CompetitionRecalcOnFlagTests
 {
@@ -122,5 +125,109 @@ public class CompetitionRecalcOnFlagTests
 
         Assert.True(res.Success);
         Assert.True((await db.Competitions.FindAsync(comp.Id))!.ShowCombineAllResults);
+    }
+
+    // ── смена привязки правила клубных очков ─────────────────────────────────
+
+    private static PointRuleClubs ClubsRule(int id) => new()
+    {
+        Id = id,
+        Version = $"test.{id}",
+        Scope = "all",
+        EffectiveFrom = new DateOnly(2000, 1, 1),
+        Entries = [new PointRuleClubsEntry { Place = 1, Points = 9 }]
+    };
+
+    [Fact]
+    public async Task ClubsRuleRebind_TriggersRecalculation()
+    {
+        await using var db = CreateDb(nameof(ClubsRuleRebind_TriggersRecalculation));
+        db.Add(ClubsRule(4));
+        var comp = await SeedAsync(db, showCombine: false);
+        var spy = new RecalcSpy();
+
+        var input = Input(comp, showCombine: false);
+        input.PointRuleClubsId = 4; // было null (авто) → привязали вручную
+        var res = await new CompetitionAdminRepository(db, new NullCache(), spy)
+            .UpdateAsync(comp.Id, input);
+
+        Assert.True(res.Success);
+        Assert.Equal([comp.Id], spy.Calls);
+        Assert.Equal(4, (await db.Competitions.FindAsync(comp.Id))!.PointRuleClubsId);
+    }
+
+    [Fact]
+    public async Task SwimmersRuleRebind_DoesNotRecalculate()
+    {
+        // Очки пловцов (High Point) не материализованы — считаются на лету (Э6),
+        // пересчёт зачёта при их перепривязке был бы пустой работой.
+        await using var db = CreateDb(nameof(SwimmersRuleRebind_DoesNotRecalculate));
+        db.Add(new PointRuleSwimmers
+        {
+            Id = 7,
+            Version = "test.7",
+            Scope = "all",
+            EffectiveFrom = new DateOnly(2000, 1, 1)
+        });
+        var comp = await SeedAsync(db, showCombine: false);
+        var spy = new RecalcSpy();
+
+        var input = Input(comp, showCombine: false);
+        input.PointRuleSwimmersId = 7;
+        await new CompetitionAdminRepository(db, new NullCache(), spy).UpdateAsync(comp.Id, input);
+
+        Assert.Empty(spy.Calls);
+    }
+
+    [Fact]
+    public async Task AssignRules_ClubsRuleChange_RecalculatesOncePerEvent()
+    {
+        await using var db = CreateDb(nameof(AssignRules_ClubsRuleChange_RecalculatesOncePerEvent));
+        db.Add(ClubsRule(4));
+        var ev = new CompetitionEvent { Name = "Событие" };
+        db.Add(ev);
+        await db.SaveChangesAsync();
+        var day1 = new Competition { Name = "День 1", Date = "01/07/2026", PoolType = "25m", EventId = ev.Id, DayNumber = 1 };
+        var day2 = new Competition { Name = "День 2", Date = "02/07/2026", PoolType = "25m", EventId = ev.Id, DayNumber = 2 };
+        var single = new Competition { Name = "Однодневка", Date = "03/07/2026", PoolType = "25m" };
+        db.AddRange(day1, day2, single);
+        await db.SaveChangesAsync();
+        var spy = new RecalcSpy();
+
+        var res = await new CompetitionAdminRepository(db, new NullCache(), spy)
+            .AssignRulesAsync(new CompetitionRuleAssignmentDto
+            {
+                CompetitionIds = [day1.Id, day2.Id, single.Id],
+                SetClubs = true,
+                ClubsRuleId = 4
+            });
+
+        Assert.True(res.Success);
+        // Дни одного события — одна зачётная единица: пересчёт по разу на событие + одиночка.
+        Assert.Equal(2, spy.Calls.Count);
+        Assert.Contains(single.Id, spy.Calls);
+        Assert.Contains(spy.Calls, id => id == day1.Id || id == day2.Id);
+    }
+
+    [Fact]
+    public async Task AssignRules_SameClubsRule_DoesNotRecalculate()
+    {
+        await using var db = CreateDb(nameof(AssignRules_SameClubsRule_DoesNotRecalculate));
+        db.Add(ClubsRule(4));
+        var comp = await SeedAsync(db, showCombine: false);
+        comp.PointRuleClubsId = 4;
+        await db.SaveChangesAsync();
+        var spy = new RecalcSpy();
+
+        var res = await new CompetitionAdminRepository(db, new NullCache(), spy)
+            .AssignRulesAsync(new CompetitionRuleAssignmentDto
+            {
+                CompetitionIds = [comp.Id],
+                SetClubs = true,
+                ClubsRuleId = 4 // то же правило — зачёт не менялся
+            });
+
+        Assert.True(res.Success);
+        Assert.Empty(spy.Calls);
     }
 }
