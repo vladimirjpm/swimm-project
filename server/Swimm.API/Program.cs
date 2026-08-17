@@ -182,6 +182,23 @@ if (args.Contains("--rebuild-club-standings"))
     return;
 }
 
+// Проставить «есть ли ОФИЦИАЛЬНЫЙ клубный зачёт (דירוג מועדונים)» уже импортированным:
+//   dotnet run -- --probe-club-standings [--force]
+// Затягивание новых соревнований проставляет флаг само; этот прогон — для тех, кто попал в
+// базу раньше. --force перепроверяет и уже помеченные (зачёт публикуют не сразу).
+if (args.Contains("--probe-club-standings"))
+{
+    using var scope = app.Services.CreateScope();
+    var svc = scope.ServiceProvider.GetRequiredService<IOfficialClubStandingService>();
+    var report = await svc.BackfillAsync(args.Contains("--force"));
+
+    foreach (var line in report.Lines) Console.WriteLine(line);
+    Console.WriteLine(
+        $"\nИтог: проверено {report.Checked}, с официальным зачётом {report.WithStanding}, " +
+        $"без него {report.WithoutStanding}, не удалось проверить {report.Unknown}");
+    return;
+}
+
 // Сверка справочника рекордов с нашими протоколами:
 //   dotnet run -- --verify-records
 // То же самое, что кнопка «Сверить с протоколами» на дашборде; отдельный флаг нужен, чтобы

@@ -26,6 +26,7 @@ public class DiscoveryAdminController : ControllerBase
     private readonly IImportService _import;
     private readonly IMemoryCache _cache;
     private readonly IImportRecordPreviewService _recordPreview;
+    private readonly IOfficialClubStandingService _clubStandings;
     private readonly ILogger<DiscoveryAdminController> _logger;
 
     public DiscoveryAdminController(
@@ -37,6 +38,7 @@ public class DiscoveryAdminController : ControllerBase
         IImportService import,
         IMemoryCache cache,
         IImportRecordPreviewService recordPreview,
+        IOfficialClubStandingService clubStandings,
         ILogger<DiscoveryAdminController> logger)
     {
         _discovery = discovery;
@@ -47,6 +49,7 @@ public class DiscoveryAdminController : ControllerBase
         _import = import;
         _cache = cache;
         _recordPreview = recordPreview;
+        _clubStandings = clubStandings;
         _logger = logger;
     }
 
@@ -186,6 +189,11 @@ public class DiscoveryAdminController : ControllerBase
         // событие редкое, а десяток разом почти всегда значит, что протокол разобрался неверно.
         var recordPreview = await _recordPreview.AnalyzeAsync(parsed.ResultsJson, ct);
 
+        // Есть ли у соревнования ОФИЦИАЛЬНЫЙ клубный зачёт и по какой шкале он считается.
+        // Показываем ДО импорта: если шкала опознана — правило подставится в форму, если
+        // зачёт есть, а правила под него нет — админ заведёт его до того, как очки разъедутся.
+        var clubStanding = await ProbeClubStandingAsync(id, ct);
+
         return Ok(new
         {
             previewId,
@@ -196,7 +204,8 @@ public class DiscoveryAdminController : ControllerBase
             languages,
             existingCompetitionId,
             existingCompetitions = existingMatches,
-            recordPreview
+            recordPreview,
+            officialClubStanding = clubStanding
         });
     }
 
@@ -310,8 +319,16 @@ public class DiscoveryAdminController : ControllerBase
         _cache.Remove(key);
 
         ImportEventOptions? eventOptions = null;
-        if (request.EventId.HasValue || !string.IsNullOrWhiteSpace(request.NewEventName) || request.OverwriteExisting)
-            eventOptions = new ImportEventOptions(request.EventId, request.NewEventName, request.OverwriteExisting, request.DeleteMissing);
+        if (request.EventId.HasValue || !string.IsNullOrWhiteSpace(request.NewEventName)
+            || request.OverwriteExisting || request.PointRuleClubsId.HasValue)
+        {
+            // Правило клубных очков приезжает из превью: там оно подставлено по шкале
+            // официального зачёта. Без него соревнование ушло бы на автоподбор по дате —
+            // ровно так зимний чемпионат 2025 получил чужую шкалу (§10.3 плана).
+            eventOptions = new ImportEventOptions(
+                request.EventId, request.NewEventName, request.OverwriteExisting, request.DeleteMissing,
+                request.PointRuleClubsId);
+        }
 
         // compID сайта — штампуется в Competition.OrgCompId для связи Discovery ↔ Competitions.
         var discoveredOrgCompId = (await _discovery.GetAllAsync(ct))
@@ -332,6 +349,38 @@ public class DiscoveryAdminController : ControllerBase
 
         // Статус imported проставляет фоновый обработчик после успешного завершения job (A1).
         return Accepted(new { jobId });
+    }
+
+    /// <summary>
+    /// Официальный клубный зачёт соревнования для превью. Сбой проверки превью не роняет:
+    /// затянуть протокол важнее, чем узнать про зачёт — вернём «не проверено».
+    /// </summary>
+    private async Task<object> ProbeClubStandingAsync(int discoveredId, CancellationToken ct)
+    {
+        var row = (await _discovery.GetAllAsync(ct)).FirstOrDefault(d => d.Id == discoveredId);
+        if (row?.LogligId is not int logligId)
+            return new { known = false, hasStanding = false, ruleId = (int?)null, ruleVersion = (string?)null,
+                message = "loglig-id неизвестен — про официальный клубный зачёт ничего сказать нельзя." };
+
+        try
+        {
+            var probe = await _clubStandings.ProbeAsync(logligId, ct);
+            return new
+            {
+                known = true,
+                hasStanding = probe.HasStanding,
+                ruleId = probe.MatchedRuleId,
+                ruleVersion = probe.MatchedRuleVersion,
+                scale = probe.Scale.OrderBy(p => p.Key).Select(p => new { place = p.Key, points = p.Value }),
+                message = probe.Message
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Discovery: не удалось проверить клубный зачёт для строки {Id}", discoveredId);
+            return new { known = false, hasStanding = false, ruleId = (int?)null, ruleVersion = (string?)null,
+                message = "Проверить официальный клубный зачёт не удалось (loglig недоступен)." };
+        }
     }
 
     private async Task<(byte[]? pdf, string fileName, string? error)> FetchPdfAsync(
@@ -382,5 +431,6 @@ public class DiscoveryAdminController : ControllerBase
         string? NewEventName,
         bool OverwriteExisting = false,
         bool DeleteMissing = false,
-        IReadOnlyList<ImportSuspectFlag>? SuspectFlags = null);
+        IReadOnlyList<ImportSuspectFlag>? SuspectFlags = null,
+        int? PointRuleClubsId = null);
 }

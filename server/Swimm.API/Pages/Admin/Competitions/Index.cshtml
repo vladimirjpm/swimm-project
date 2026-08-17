@@ -656,6 +656,23 @@ else
         <div id="preview-categories" class="flex flex-wrap gap-3 text-[13px]"></div>
     </div>
 
+    @* Официальный клубный зачёт (דירוג מועדונים) на loglig: есть ли он и по какой шкале.
+       Кнопка зачёта есть у ВСЕХ соревнований — признак только непустая таблица, поэтому
+       проверку делает сервер. Если шкала опознана, правило подставляется в селект ниже. *@
+    <div class="mb-3">
+        <div class="mb-1 text-[12px] font-semibold uppercase tracking-wide text-admin-text-muted">Клубные очки</div>
+        <div id="preview-standing" class="mb-2 rounded-md border border-admin-border px-3 py-2 text-[13px] text-admin-text-muted">
+            Проверяю официальный зачёт…
+        </div>
+        <select id="preview-rule-clubs" class="admin-input w-full max-w-md rounded-md px-3 py-2 text-[13px]">
+            <option value="">Авто (по дате и типу)</option>
+            @foreach (var r in Model.ClubRules)
+            {
+                <option value="@r.Id">@r.Version@(r.ManualOnly ? " · manual" : "")</option>
+            }
+        </select>
+    </div>
+
     <div class="mb-3 hidden" id="overwrite-block">
         <label class="inline-flex items-center gap-2 text-[13px] text-admin-text bg-[rgba(255,213,79,0.08)] border border-[rgba(255,213,79,0.3)] rounded-md py-2 px-3 cursor-pointer">
             <input type="checkbox" id="overwrite-existing-cb">
@@ -1169,6 +1186,35 @@ else
                 box.classList.remove('hidden');
             }
 
+            // Официальный клубный зачёт: есть/нет + подстановка правила под его шкалу.
+            // «Нет» — не ошибка, а факт: у лиг, мокдамот и региональных этапов зачёта не бывает,
+            // и наши клубные очки на них сверять не с чем.
+            function renderOfficialStanding(s) {
+                const box = document.getElementById('preview-standing');
+                const select = document.getElementById('preview-rule-clubs');
+                select.value = '';
+
+                if (!s) {
+                    box.className = 'mb-2 rounded-md border border-admin-border px-3 py-2 text-[13px] text-admin-text-muted';
+                    box.textContent = 'Официальный клубный зачёт не проверялся.';
+                    return;
+                }
+
+                if (s.hasStanding && s.ruleId) {
+                    // Правило опознано по шкале — подставляем его, но оставляем изменяемым.
+                    select.value = String(s.ruleId);
+                    box.className = 'mb-2 rounded-md border border-admin-success/40 bg-admin-success/10 px-3 py-2 text-[13px] text-admin-text';
+                } else if (s.hasStanding) {
+                    // Зачёт есть, а правила под его шкалу нет — это надо завести ДО импорта.
+                    box.className = 'mb-2 rounded-md border border-[rgba(255,213,79,0.4)] bg-[rgba(255,213,79,0.08)] px-3 py-2 text-[13px] text-admin-text';
+                } else {
+                    box.className = 'mb-2 rounded-md border border-admin-border px-3 py-2 text-[13px] text-admin-text-muted';
+                }
+
+                const scale = (s.scale ?? []).slice(0, 12).map(x => x.points).join(', ');
+                box.innerHTML = esc(s.message) + (scale ? `<div class="mt-1 text-[12px] text-admin-text-muted">Шкала зачёта: ${esc(scale)}…</div>` : '');
+            }
+
             async function showPreview(p, name, repull) {
                 document.getElementById('preview-card').classList.remove('hidden');
                 document.getElementById('preview-title').textContent = `Превью: ${name}`;
@@ -1183,6 +1229,7 @@ else
                 warn.innerHTML = (p.warnings ?? []).map(esc).join('<br>');
 
                 renderRecordPreview(p.recordPreview);
+                renderOfficialStanding(p.officialClubStanding);
 
                 // Upsert-чекбокс — только когда превью нашло существующее соревнование по ключу Name|Date|PoolType.
                 const overwriteBlock = document.getElementById('overwrite-block');
@@ -1289,6 +1336,9 @@ else
                             newEventName: eventChoice === '__new__' ? document.getElementById('event-name').value.trim() : null,
                             overwriteExisting: document.getElementById('overwrite-existing-cb').checked,
                             deleteMissing: document.getElementById('overwrite-existing-cb').checked && document.getElementById('delete-missing-cb').checked,
+                            // Правило клубных очков: подставлено по шкале официального зачёта
+                            // либо выбрано вручную. Пусто — автоподбор по дате и типу.
+                            pointRuleClubsId: Number(document.getElementById('preview-rule-clubs').value) || null,
                             // Галочки «пометить заплыв сомнительным» у строк-рекордов: строка
                             // ляжет в БД сразу помеченной и не побудет рекордом на витрине.
                             suspectFlags: [...document.querySelectorAll('.suspect-flag:checked')]

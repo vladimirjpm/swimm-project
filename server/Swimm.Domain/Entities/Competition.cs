@@ -128,6 +128,21 @@ public class Competition
   /// </summary>
   public bool ClubPointsDisabled { get; set; }
 
+  /// <summary>
+  /// Опубликован ли у соревнования ОФИЦИАЛЬНЫЙ клубный зачёт — тот, что на loglig показывает
+  /// кнопка «דירוג מועדונים». Проставляется автоматически при затягивании соревнования
+  /// (см. <c>IOfficialClubStandingService</c>).
+  ///
+  /// Три состояния, и <c>null</c> здесь значимый: <b>не проверяли</b> (нет LogligId, сайт был
+  /// недоступен) — это не то же самое, что «зачёта нет». <c>false</c> — проверили, зачёта нет:
+  /// наши клубные очки сверять не с чем (лиги, мокдамот, региональные этапы — таких
+  /// большинство). <c>true</c> — официальные очки есть, расхождение с ними значимо.
+  ///
+  /// Кнопка на странице loglig НЕ признак: она в шаблоне у всех соревнований
+  /// (docs/points-rules-per-competition-plan.md §10.1).
+  /// </summary>
+  public bool? HasOfficialClubStanding { get; set; }
+
   /// <summary>Правило очков пловца (High Point). null — legacy-расчёт по FINA.</summary>
   public int? PointRuleSwimmersId { get; set; }
 

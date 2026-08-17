@@ -1,0 +1,906 @@
+
+<div class="modal-dialog modal-lg modal-result-custom-width">
+<div class="modal-content" style="padding: 18px;">
+    <button type="button" class="close pull-left" data-dismiss="modal">
+        <span aria-hidden="true">&times;</span><span class="sr-only"></span>
+    </button>
+    <div class="swimming-export-actions" style="display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
+<form action="/LeagueTable/ExportSwimmingDisciplineResults?leagueId=15155" method="post">            <button id="excelBtnExp" type="submit" class="allow-readonly btn btn-primary" style="margin-left:15px;">
+                <i class="glyphicon glyphicon-open"></i>
+                PDF
+                <i class="fa fa-spin fa-spinner exportLSloading"
+                   style="visibility: hidden;">
+                </i>
+            </button>
+<input data-val="true" data-val-number="The field DisciplineCompetitionId must be a number." data-val-required="השדה DisciplineCompetitionId נדרש." id="DisciplineCompetitionId" name="DisciplineCompetitionId" type="hidden" value="82537" /></form>
+<form action="/LeagueTable/ExportSwimmingDisciplineResults?leagueId=15155&amp;IsSplitResults=True" method="post">            <button id="excelBtnExpSplit" type="submit" class="allow-readonly btn btn-primary" style="margin-left:15px;">
+                <i class="glyphicon glyphicon-open"></i>
+                זמני ביניים
+                <i class="fa fa-spin fa-spinner exportLSloading"
+                   style="visibility: hidden;">
+                </i>
+            </button>
+<input data-val="true" data-val-number="The field DisciplineCompetitionId must be a number." data-val-required="השדה DisciplineCompetitionId נדרש." id="DisciplineCompetitionId" name="DisciplineCompetitionId" type="hidden" value="82537" /></form>    </div>
+<div class="print_id" id="print_id" data-print-title="">
+
+<style>
+    td, th {
+        text-align: center;
+    }
+    .modal-result-custom-width {
+        width: 100%;
+    }
+    .format6cell {
+        border: 1px solid #dddddd !important;
+        height: 35px;
+        min-width: 30px;
+        max-width: 30px;
+    }
+    .format6th {
+        min-width: 90px;
+        max-width: 90px;
+    }
+    @media screen and ( min-width: 1500px) {
+    .modal-result-custom-width {
+        max-width: 1500px;
+        width: 100%;
+    }
+    @page {size: auto; margin: 5mm;}
+    }
+    }
+
+            </style>
+<div class="main-title disciplines-title">
+    <table class="borderless disciplines-title" style="width: 100%;">
+        <tr>
+            <td style="vertical-align: middle; text-align: left;" colspan="3" rowspan="3">
+    <img src="https://loglig.com/assets/union/logo_10032020094946824.jpg" class="img-circle keep-for-print" style="max-height:7rem;max-width:11rem;" alt=""/>
+            </td>
+            <td style="text-align: right;" colspan="4">
+                <h3 style="margin-top: 0px; margin-bottom: 0px;">
+                    איגוד השחייה בישראל
+                </h3>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="3" style="text-align:right;">
+                <h4 style="margin-top: 0px; margin-bottom: 0px;">
+                        מכביה ואליפות ישראל  ARENA למאסטרס קיץ 2026 - 07/07/2026
+                </h4>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="3" style="text-align:right;">
+                <h4 style="margin-top: 0px; margin-bottom: 0px;">4X50 מעורב שליחים -  נשים 21-99 - תוצאות</h4>
+            </td>
+        </tr>
+    </table>
+</div>
+<div class="table-responsive">
+    <table class="table res-table">
+        <thead>
+        <tr class="disciplines-title">
+            <th>מיקום</th>
+            <th>שם מלא</th>
+                <th></th>
+                        <th>
+                אגודה
+            </th>
+                <th>מקצה</th>
+                    <th>מסלול</th>
+            <th style="text-align: center;">תוצאות</th>
+                            <th>ניקוד</th>
+
+                    <th>ניקוד קבוצתי</th>
+                                </tr>
+        </thead>
+        <tbody>
+
+                        <tr>
+                            <td colspan="2" style="text-align:right;">גמר ישיר - מאסטרס שליחות 120-159</td>
+                        </tr>
+                            <tr>
+
+
+
+
+                                <td>1</td>
+
+                                <td>
+                                                <span style="color: #000080;">
+                                                    קרן זיבנר זילברמן, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    טל מרמור סירוטה, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    רעות גזית, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    שירי נוסם
+                                                </span>
+                                </td>
+                                    <td style="color: #EB5E01; font-weight: bold;">C</td>
+                                                                <td>    
+מכבי עולם המים                                </td>
+                                    <td>
+                                        1
+                                    </td>
+                                    <td>
+                                        6
+                                    </td>
+                                <td style="direction: ltr;">
+02:29.70                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            24
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>2</td>
+
+                                <td>
+                                                <span style="color: #000080;">
+                                                    עדן ראובן, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    קורל הרשקוביץ, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    איילת מרקברייט סדן, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    אוקסנה בליסה
+                                                </span>
+                                </td>
+                                    <td style="color: #EB5E01; font-weight: bold;">C</td>
+                                                                <td>    
+הפועל בת ים                                </td>
+                                    <td>
+                                        1
+                                    </td>
+                                    <td>
+                                        4
+                                    </td>
+                                <td style="direction: ltr;">
+02:34.24                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            22
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>3</td>
+
+                                <td>
+                                                <span style="color: #000080;">
+                                                    אניה גוסטמלסקי, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    רונית פורת, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    לימור הראל
+                                                </span>
+                                </td>
+                                    <td style="color: #EB5E01; font-weight: bold;">C</td>
+                                                                <td>    
+מכבי עולם המים                                </td>
+                                    <td>
+                                        1
+                                    </td>
+                                    <td>
+                                        2
+                                    </td>
+                                <td style="direction: ltr;">
+02:46.02                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            20
+                                        </td>
+                                                            </tr>
+                        <tr>
+                            <td colspan="2" style="text-align:right;">גמר ישיר - מאסטרס שליחות 160-199</td>
+                        </tr>
+                            <tr>
+
+
+
+
+                                <td>1</td>
+
+                                <td>
+                                                <span style="color: #000080;">
+                                                    הילה מלכנר, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    רעות מרן, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    מורן בורלא, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    ענבר קנטרביץ ארליך
+                                                </span>
+                                </td>
+                                    <td style="color: #EB5E01; font-weight: bold;">C</td>
+                                                                <td>    
+אקוותיקים                                </td>
+                                    <td>
+                                        1
+                                    </td>
+                                    <td>
+                                        5
+                                    </td>
+                                <td style="direction: ltr;">
+02:34.43                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            24
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>2</td>
+
+                                <td>
+                                                <span style="color: #000080;">
+                                                    Renata FINKELSZTAIN, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    Tamara GUTERMAN, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    Paula KOVARSKY, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    Claudia ZAITZ
+                                                </span>
+                                </td>
+                                    <td style="color: #EB5E01; font-weight: bold;">M</td>
+                                                                <td>    
+Brazil                                </td>
+                                    <td>
+                                        1
+                                    </td>
+                                    <td>
+                                        1
+                                    </td>
+                                <td style="direction: ltr;">
+DQ                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            
+                                        </td>
+                                                            </tr>
+                        <tr>
+                            <td colspan="2" style="text-align:right;">גמר ישיר - מאסטרס שליחות 200-239</td>
+                        </tr>
+                            <tr>
+
+
+
+
+                                <td>1</td>
+
+                                <td>
+                                                <span style="color: #000080;">
+                                                    עדינה פאור, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    שרית פרידמן, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    יעל קוסביצקי, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    Shirli BEN SHOHAM
+                                                </span>
+                                </td>
+                                    <td style="color: #EB5E01; font-weight: bold;">M/C</td>
+                                                                <td>    
+מכבי שוהם                                </td>
+                                    <td>
+                                        2
+                                    </td>
+                                    <td>
+                                        4
+                                    </td>
+                                <td style="direction: ltr;">
+02:29.83                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            24
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>2</td>
+
+                                <td>
+                                                <span style="color: #000080;">
+                                                    נטליה אדייקינה, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    עפרה דיין, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    הלן שרעבי, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    נורית סער
+                                                </span>
+                                </td>
+                                    <td style="color: #EB5E01; font-weight: bold;">C</td>
+                                                                <td>    
+מכבי חיפה                                </td>
+                                    <td>
+                                        2
+                                    </td>
+                                    <td>
+                                        8
+                                    </td>
+                                <td style="direction: ltr;">
+02:39.35                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            22
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>3</td>
+
+                                <td>
+                                                <span style="color: #000080;">
+                                                    אוגניה שילדרמן, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    אדוה לנדסמן , 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    ימית דאון, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    אסתר יעקובי
+                                                </span>
+                                </td>
+                                    <td style="color: #EB5E01; font-weight: bold;">M/C</td>
+                                                                <td>    
+מאסטרס רחובות                                </td>
+                                    <td>
+                                        2
+                                    </td>
+                                    <td>
+                                        5
+                                    </td>
+                                <td style="direction: ltr;">
+02:48.82                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            20
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>4</td>
+
+                                <td>
+                                                <span style="color: #000080;">
+                                                    Elise LEVINOFF, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    Karen SALVO KOFMAN, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    Cecy COHEN, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    Alida LIPTON
+                                                </span>
+                                </td>
+                                    <td style="color: #EB5E01; font-weight: bold;">M</td>
+                                                                <td>    
+Maccabiah MIX                                </td>
+                                    <td>
+                                        3
+                                    </td>
+                                    <td>
+                                        5
+                                    </td>
+                                <td style="direction: ltr;">
+02:52.71                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>5</td>
+
+                                <td>
+                                                <span style="color: #000080;">
+                                                    רונית קטן, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    איה שפאץ, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    דפנה סלוצקאי, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    לירון פוגל
+                                                </span>
+                                </td>
+                                    <td style="color: #EB5E01; font-weight: bold;">C</td>
+                                                                <td>    
+אקוותיקים                                </td>
+                                    <td>
+                                        1
+                                    </td>
+                                    <td>
+                                        3
+                                    </td>
+                                <td style="direction: ltr;">
+02:54.18                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            18
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>6</td>
+
+                                <td>
+                                                <span style="color: #000080;">
+                                                    עדי  מנחם באר, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    לובוב זיורוב, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    לודמילה בבאי, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    רעיה אובסישר
+                                                </span>
+                                </td>
+                                    <td style="color: #EB5E01; font-weight: bold;">M/C</td>
+                                                                <td>    
+מכבי כפר המכביה                                </td>
+                                    <td>
+                                        2
+                                    </td>
+                                    <td>
+                                        1
+                                    </td>
+                                <td style="direction: ltr;">
+02:54.67                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            16
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>7</td>
+
+                                <td>
+                                                <span style="color: #000080;">
+                                                    Sonia KIBLISKY, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    Pamela ALTMAN, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    Marcela KLEIN, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    Cecilia SEPULVEDA
+                                                </span>
+                                </td>
+                                    <td style="color: #EB5E01; font-weight: bold;">M</td>
+                                                                <td>    
+Chile                                </td>
+                                    <td>
+                                        1
+                                    </td>
+                                    <td>
+                                        8
+                                    </td>
+                                <td style="direction: ltr;">
+02:55.98                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>8</td>
+
+                                <td>
+                                                <span style="color: #000080;">
+                                                    דנה וינטר, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    קרן סובלמן, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    רונית כהן, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    מיה חי
+                                                </span>
+                                </td>
+                                    <td style="color: #EB5E01; font-weight: bold;">C</td>
+                                                                <td>    
+מכבי עולם המים                                </td>
+                                    <td>
+                                        1
+                                    </td>
+                                    <td>
+                                        7
+                                    </td>
+                                <td style="direction: ltr;">
+02:57.30                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            14
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>9</td>
+
+                                <td>
+                                                <span style="color: #000080;">
+                                                    Marlene BRUTEN, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    Janet WALKER, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    Ramon GILBERT, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    Miriam LEITKO
+                                                </span>
+                                </td>
+                                    <td style="color: #EB5E01; font-weight: bold;">M</td>
+                                                                <td>    
+USA                                </td>
+                                    <td>
+                                        3
+                                    </td>
+                                    <td>
+                                        3
+                                    </td>
+                                <td style="direction: ltr;">
+03:03.97                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>10</td>
+
+                                <td>
+                                                <span style="color: #000080;">
+                                                    Adriana AZAR, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    Gabriela BOBROW, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    Anete BLANC, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    Juliana KRAISER
+                                                </span>
+                                </td>
+                                    <td style="color: #EB5E01; font-weight: bold;">M</td>
+                                                                <td>    
+Brazil                                </td>
+                                    <td>
+                                        3
+                                    </td>
+                                    <td>
+                                        4
+                                    </td>
+                                <td style="direction: ltr;">
+03:08.91                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>11</td>
+
+                                <td>
+                                                <span style="color: #000080;">
+                                                    ליאב כהן, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    שלומית שורק, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    לאה ברנשטיין, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    נורית טרביטש
+                                                </span>
+                                </td>
+                                    <td style="color: #EB5E01; font-weight: bold;">C</td>
+                                                                <td>    
+מכבי פ.מ. רעות                                </td>
+                                    <td>
+                                        2
+                                    </td>
+                                    <td>
+                                        6
+                                    </td>
+                                <td style="direction: ltr;">
+03:10.75                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            12
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>12</td>
+
+                                <td>
+                                                <span style="color: #000080;">
+                                                    פרנסואז נתיב, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    רותם סילוני, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    חוה טנחיל, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    לימור ברק
+                                                </span>
+                                </td>
+                                    <td style="color: #EB5E01; font-weight: bold;">M/C</td>
+                                                                <td>    
+מכבי שוהם                                </td>
+                                    <td>
+                                        2
+                                    </td>
+                                    <td>
+                                        3
+                                    </td>
+                                <td style="direction: ltr;">
+03:17.04                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            10
+                                        </td>
+                                                            </tr>
+                        <tr>
+                            <td colspan="2" style="text-align:right;">גמר ישיר - מאסטרס שליחות 240-279</td>
+                        </tr>
+                            <tr>
+
+
+
+
+                                <td>1</td>
+
+                                <td>
+                                                <span style="color: #000080;">
+                                                    Isabel COHN, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    Lia ZABOROWSKY, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    Vivian FEHER, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    Daniela KARMELI
+                                                </span>
+                                </td>
+                                    <td style="color: #EB5E01; font-weight: bold;">M</td>
+                                                                <td>    
+Brazil                                </td>
+                                    <td>
+                                        2
+                                    </td>
+                                    <td>
+                                        0
+                                    </td>
+                                <td style="direction: ltr;">
+03:43.36                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>2</td>
+
+                                <td>
+                                                <span style="color: #000080;">
+                                                    אלן פישל-בודנר, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    חגית כהן, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    תמר זלאיט, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    מישל קובין קופר
+                                                </span>
+                                </td>
+                                    <td style="color: #EB5E01; font-weight: bold;">C</td>
+                                                                <td>    
+אקוותיקים                                </td>
+                                    <td>
+                                        2
+                                    </td>
+                                    <td>
+                                        2
+                                    </td>
+                                <td style="direction: ltr;">
+DQ                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            
+                                        </td>
+                                                            </tr>
+                        <tr>
+                            <td colspan="2" style="text-align:right;">גמר ישיר - מאסטרס שליחות 280-319</td>
+                        </tr>
+                            <tr>
+
+
+
+
+                                <td>1</td>
+
+                                <td>
+                                                <span style="color: #000080;">
+                                                    תמר כהן, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    נורית אמיר, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    יעל שטיינברג, 
+                                                </span>
+                                                <span style="color: #000080;">
+                                                    פולה בריל אדלמן
+                                                </span>
+                                </td>
+                                    <td style="color: #EB5E01; font-weight: bold;">M/C</td>
+                                                                <td>    
+אקוותיקים                                </td>
+                                    <td>
+                                        2
+                                    </td>
+                                    <td>
+                                        7
+                                    </td>
+                                <td style="direction: ltr;">
+NS                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            
+                                        </td>
+                                                            </tr>
+        </tbody>
+    </table>
+</div>
+
+
+</div>
+
+    <div class="modal-footer">
+        <button type="button" class="btn btn-default mobile-only" data-dismiss="modal">סגור</button>
+    </div>
+
+
+</div>
+</div>
+
+

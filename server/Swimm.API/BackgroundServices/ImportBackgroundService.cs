@@ -57,6 +57,25 @@ public sealed class ImportBackgroundService : BackgroundService
                             _logger.LogWarning(ex, "Import job {JobId}: не удалось проставить статус imported для discovery {DiscoveredId}", jobId, id);
                         }
                     }
+
+                    // Есть ли у соревнования ОФИЦИАЛЬНЫЙ клубный зачёт (דירוג מועדונים). Знать это
+                    // нужно сразу: без него наши клубные очки не с чем сверять, а с ним расхождение
+                    // значимо. Сбой проверки импорт не роняет — флаг просто останется «не проверяли»,
+                    // добирается прогоном `--probe-club-standings`.
+                    if (orgCompId is int compId)
+                    {
+                        try
+                        {
+                            var standings = scope.ServiceProvider.GetRequiredService<IOfficialClubStandingService>();
+                            var probe = await standings.ProbeAndStampAsync(compId, stoppingToken);
+                            _logger.LogInformation("Import job {JobId}: клубный зачёт compID {OrgCompId} — {Message}",
+                                jobId, compId, probe?.Message ?? "проверить не удалось");
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Import job {JobId}: не удалось проверить клубный зачёт compID {OrgCompId}", jobId, compId);
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
