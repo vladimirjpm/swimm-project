@@ -141,10 +141,19 @@ public class IsrOrgParser : IFormatParser
         // не парит. Финал опознаём по СОСТАВУ: участники позднего события — подмножество
         // раннего (финалисты ⊂ пловцы прелимов). Настоящие разные категории (U17 vs open
         // Маккабиады) так не склеятся: их составы не пересекаются — пловец заявлен в одной.
+        //
+        // Участники эстафеты — ЛЮДИ её ног, как у индивидуальных, а не «клуб+имя команды»:
+        // имя команды у Маккаби равно клубу, и возрастные полосы одной дисциплины (после
+        // RelayBandReconstructor) состоят из одних и тех же клубов — по клубам полосы
+        // склеивались в ложные prelim/final пары (33 эстафеты Маккаби-2026 теряли очки
+        // зачёта). Составы полос не пересекаются людьми; «клуб+команда» остаётся только
+        // фолбэком для эстафет без разобранного состава.
         var participants = comps.Select(c => c.Results
-                .Select(r => r.IsRelay == true
-                    ? $"relay|{r.Club}|{r.RelayTeamName}"
-                    : $"{r.LastName}|{r.FirstName}|{r.BirthYear}")
+                .SelectMany(r => r.IsRelay == true
+                    ? r.RelaySwimmers is { Count: > 0 }
+                        ? r.RelaySwimmers.Select(s => $"{s.LastName}|{s.FirstName}|{s.BirthYear}")
+                        : [$"relay|{r.Club}|{r.RelayTeamName}"]
+                    : [$"{r.LastName}|{r.FirstName}|{r.BirthYear}"])
                 .ToHashSet())
             .ToList();
 
@@ -218,6 +227,11 @@ public class IsrOrgParser : IFormatParser
         bool isAward, string? poolOverride)
     {
         var compList = comps as IReadOnlyList<IsrOrgCompetitionResult> ?? comps.ToList();
+        // Эстафеты «без категории» (Маккаби) разбиваются на зачётные полосы по составам —
+        // детерминированно от файла, см. RelayBandReconstructor. В bilingual-ветке
+        // (MergeBilingual) реконструкции нет: там полосы пришлось бы синхронизировать
+        // между EN- и HE-стороной пары; подключим, когда встретится такой экспорт.
+        compList = RelayBandReconstructor.Reconstruct(compList);
         var heatTypes = AssignHeatTypes(compList);
         for (int ci = 0; ci < compList.Count; ci++)
         {

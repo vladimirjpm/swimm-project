@@ -184,6 +184,7 @@ public static class IsrOrgCompetitionParser
     private static bool IsAnyEventHeaderHE(string line) =>
         RelayHeaderRxHE.IsMatch(line) || RelayHeaderRxHE2.IsMatch(line)
         || RelayHeaderRxHECategory.IsMatch(line)
+        || RelayHeaderNoCategoryRxHE.IsMatch(line)
         || HeaderRxHE.IsMatch(line) || HeaderRxHECategory.IsMatch(line)
         || HeaderRxHESimple.IsMatch(line);
 
@@ -233,9 +234,17 @@ public static class IsrOrgCompetitionParser
         RegexOptions.Compiled);
 
     private static Regex RelayTeamLineRxHE => _relayTeamLineRxHE ??= new Regex(
-        @"^(?<heat>\d+)\s+(?<lane>\d+)\s+(?<team>.+?)\s+(?<time>(?:\d{1,2}:)?\d{2}:\d{2}\.\d{1,2}|DQ|NS)\s+" +
+        @"^(?<heat>\d+)\s+(?<lane>\d+)\s+(?<team>.+?)\s+(?<time>(?:\d{1,2}:)?\d{2}:\d{2}\.\d{1,2}|DQ|NS|DNF|DNS)\s+" +
         "מיקום" +
         @"\s+(?<pos>\d+)\s*$",
+        RegexOptions.Compiled);
+
+    // Заголовок эстафеты вовсе без категории («4X50 חופשי שליחים») — masters-экспорты ARENA
+    // (категория придёт строкой «מאסטרס …» ниже) и Маккаби (категории не будет совсем,
+    // событие материализует первая командная строка).
+    private static Regex? _relayHeaderNoCategoryRxHE;
+    private static Regex RelayHeaderNoCategoryRxHE => _relayHeaderNoCategoryRxHE ??= new Regex(
+        @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)\s+(?<style>.+?)\s+שליח(?:ים|ות)?\s*$",
         RegexOptions.Compiled);
 
     private static Regex DateLineRx => _dateLineRx ??= new Regex(
@@ -1196,9 +1205,9 @@ public static class IsrOrgCompetitionParser
                         continue;
                     }
 
-                    if (Regex.IsMatch(line, @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)\s+(?<style>.+?)\s+שליח(?:ים|ות)?\s*$"))
+                    if (RelayHeaderNoCategoryRxHE.IsMatch(line))
                     {
-                        var mm = Regex.Match(line, @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)\s+(?<style>.+?)\s+שליח(?:ים|ות)?\s*$");
+                        var mm = RelayHeaderNoCategoryRxHE.Match(line);
                         int legs = int.Parse(mm.Groups["legs"].Value);
                         int legLen = int.Parse(mm.Groups["len"].Value);
                         var styleHe = mm.Groups["style"].Value.Trim();
@@ -1506,6 +1515,41 @@ public static class IsrOrgCompetitionParser
                     }
                 }
 
+                // Маккаби-экспорт loglig: заголовок эстафеты вовсе без категории
+                // («4X50 חופשי שליחים»), и строки «מאסטרס …», которая довесила бы пол/возраст
+                // (masters-механика pendingRelay*), не будет — сразу идут команды. Первая же
+                // командная строка материализует событие из pending: пол и возрастная полоса
+                // в таком протоколе не печатаются (места сквозные по всей дисциплине),
+                // поэтому gender="none", возраст пустой — как у эстафет с текстовой категорией.
+                if (isHE && pendingRelayLen != null && (current == null || !currentIsRelay)
+                    && RelayTeamLineRxHE.IsMatch(line))
+                {
+                    if (current != null) yield return current;
+
+                    currentIsRelay = true;
+                    currentRelayLegs = pendingRelayLegs;
+                    var styleHePending = pendingRelayStyleHe!;
+                    current = new IsrOrgCompetitionResult(
+                        Competition: HebrewTextHelper.NormalizeHebrewLine(lines[0].Trim()),
+                        AgeGroup: string.Empty,
+                        Date: dat_relay,
+                        Event: pendingEventLine ?? string.Empty,
+                        EventStyleName: HebrewTextHelper.NormalizeStyleName(
+                            HebrewTextHelper.StyleMapHE.GetValueOrDefault(styleHePending, styleHePending)),
+                        EventStyleLen: pendingRelayLen,
+                        EventStyleGender: "none",
+                        EventStyleAge: string.Empty,
+                        PoolType: "25m",
+                        Results: new List<IsrOrgResult>()
+                    );
+                    Log($"  -> NEW RELAY EVENT (no category, materialized by first team line): {current.Event}");
+                    pendingRelayLen = null;
+                    pendingRelayStyleHe = null;
+                    pendingRelayLegs = 0;
+                    pendingEventLine = null;
+                    // Без continue: эта же строка тут же разбирается как команда ниже.
+                }
+
                 if (current != null && currentIsRelay)
                 {
                     var tm = RelayTeamLineRxHE.Match(line);
@@ -1528,7 +1572,7 @@ public static class IsrOrgCompetitionParser
                                 time = timeTok;
                             }
                         }
-                        else if (timeTok == "DQ" || timeTok == "NS")
+                        else if (timeTok is "DQ" or "NS" or "DNF" or "DNS")
                         {
                             timeFailNote = timeTok;
                         }
