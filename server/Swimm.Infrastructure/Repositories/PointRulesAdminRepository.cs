@@ -161,7 +161,8 @@ public class PointRulesAdminRepository(
                 c.OrgCompId,
                 VerifiedAt = kind == PointRuleKind.Clubs ? c.ClubPointsVerifiedAt : c.SwimmersPointsVerifiedAt,
                 VerifiedBy = kind == PointRuleKind.Clubs ? c.ClubPointsVerifiedBy : c.SwimmersPointsVerifiedBy,
-                VerifiedKind = kind == PointRuleKind.Clubs ? c.ClubPointsVerifiedKind : c.SwimmersPointsVerifiedKind
+                VerifiedKind = kind == PointRuleKind.Clubs ? c.ClubPointsVerifiedKind : c.SwimmersPointsVerifiedKind,
+                c.ClubPointsVerifiedNote
             })
             .ToListAsync();
 
@@ -199,6 +200,10 @@ public class PointRulesAdminRepository(
                     VerifiedAt = g.Select(d => d.VerifiedAt).FirstOrDefault(x => x != null),
                     VerifiedBy = g.Select(d => d.VerifiedBy).FirstOrDefault(x => x != null),
                     VerifiedKind = g.Select(d => d.VerifiedKind).FirstOrDefault(x => x != null),
+                    // Объяснение — свойство соревнования целиком: у дней события оно одно.
+                    MismatchNote = kind == PointRuleKind.Clubs
+                        ? g.Select(d => d.ClubPointsVerifiedNote).FirstOrDefault(x => x != null)
+                        : null,
                     RuleId = ruleId
                 };
             })
@@ -330,6 +335,30 @@ public class PointRulesAdminRepository(
         await db.SaveChangesAsync();
         // Кэш не трогаем: отметка админская, в публичные выдачи не попадает.
         return PointRuleSaveResult.Ok(now == null ? 0 : 1);
+    }
+
+    public async Task<PointRuleSaveResult> SetClubMismatchNoteAsync(int competitionId, string? note)
+    {
+        var head = await db.Competitions.AsNoTracking()
+            .Where(c => c.Id == competitionId)
+            .Select(c => new { c.Id, c.EventId })
+            .FirstOrDefaultAsync();
+        if (head == null) return PointRuleSaveResult.Fail($"Соревнование #{competitionId} не найдено");
+
+        // Расхождение — свойство соревнования, а не отдельного дня: пишем всем дням события,
+        // как и саму отметку сверки.
+        var days = head.EventId is int ev
+            ? await db.Competitions.Where(c => c.EventId == ev).ToListAsync()
+            : await db.Competitions.Where(c => c.Id == head.Id).ToListAsync();
+
+        var clean = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        foreach (var day in days)
+            day.ClubPointsVerifiedNote = clean;
+
+        await db.SaveChangesAsync();
+        // Текст едет в публичный overview — кэш обязан протухнуть.
+        await cache.InvalidateAllAsync();
+        return PointRuleSaveResult.Ok(clean is null ? 0 : 1);
     }
 
     public async Task<PointRuleEditDto?> GetByIdAsync(PointRuleKind kind, int id)

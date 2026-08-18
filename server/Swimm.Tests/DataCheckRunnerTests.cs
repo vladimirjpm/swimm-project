@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Services;
 using Xunit;
@@ -243,5 +244,57 @@ public class DataCheckRunnerTests
         var history = await runner.GetHistoryAsync();
         Assert.Equal(2, history.Count);
         Assert.Equal("import", history[0].Trigger);
+    }
+
+    /// <summary>
+    /// compID на isr.org.il для ссылки на протокол. У многодневки штамп живёт на событии
+    /// (или на одном из дней — UNIQUE не даёт проставить его всем), поэтому день без своего
+    /// compID обязан унаследовать событийный: иначе ссылка пропадала бы у дней 2..N.
+    /// </summary>
+    [Fact]
+    public async Task GetCurrent_ResolvesOrgCompId_OwnThenEventThenSiblingDay()
+    {
+        await using var db = CreateDb(nameof(GetCurrent_ResolvesOrgCompId_OwnThenEventThenSiblingDay));
+
+        var stampedEvent = new CompetitionEvent { Name = "Событие со штампом", OrgCompId = 6621 };
+        var barEvent = new CompetitionEvent { Name = "Событие без штампа" };
+        db.CompetitionEvents.AddRange(stampedEvent, barEvent);
+        await db.SaveChangesAsync();
+
+        var own = new Competition { Name = "Свой compID", Date = "01/06/2026", PoolType = "25m", OrgCompId = 7001 };
+        var byEvent = new Competition
+        {
+            Name = "День 2 события", Date = "02/06/2026", PoolType = "25m", EventId = stampedEvent.Id
+        };
+        var stampedDay = new Competition
+        {
+            Name = "День 1 без штампа события", Date = "03/06/2026", PoolType = "25m",
+            EventId = barEvent.Id, OrgCompId = 7100
+        };
+        var bySibling = new Competition
+        {
+            Name = "День 2 без штампа события", Date = "04/06/2026", PoolType = "25m", EventId = barEvent.Id
+        };
+        var orphan = new Competition { Name = "Не сопоставлено", Date = "05/06/2026", PoolType = "25m" };
+        db.Competitions.AddRange(own, byEvent, stampedDay, bySibling, orphan);
+        await db.SaveChangesAsync();
+
+        var check = new FakeCheck("test.competitions");
+        foreach (var c in new[] { own, byEvent, bySibling, orphan })
+            check.Items.Add(new DataCheckItem("Competition", c.Id, c.Name));
+        // Находка не про соревнование: compID ей взять неоткуда, и подставлять чужой нельзя.
+        check.Items.Add(Item(1, "строка результата"));
+
+        var runner = new DataCheckRunner(db, [check]);
+        await runner.RunAllAsync("manual");
+
+        var byMessage = (await runner.GetCurrentAsync())
+            .Single().Findings.ToDictionary(f => f.Message, f => f.SubjectOrgCompId);
+
+        Assert.Equal(7001, byMessage["Свой compID"]);
+        Assert.Equal(6621, byMessage["День 2 события"]);
+        Assert.Equal(7100, byMessage["День 2 без штампа события"]);
+        Assert.Null(byMessage["Не сопоставлено"]);
+        Assert.Null(byMessage["строка результата"]);
     }
 }

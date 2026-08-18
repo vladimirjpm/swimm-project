@@ -79,7 +79,14 @@ public sealed record DataCheckFindingDto(
     string? SubjectGender = null, int? SubjectLogligId = null,
     /// <summary>ТЕКУЩЕЕ правило клубных очков соревнования — живое, по той же причине,
     /// что пол и loglig: находка обновляется только прогоном и врала бы сразу после правки.</summary>
-    int? SubjectClubRuleId = null);
+    int? SubjectClubRuleId = null,
+    /// <summary>
+    /// compID соревнования на isr.org.il — для ссылки на первоисточник (comp.asp?compID=).
+    /// Живой по той же причине: штамп проставляется переимпортом и бэкфиллом Discovery,
+    /// а находка обновляется только прогоном — сохранённый в находке оставался бы пустым до следующего.
+    /// null — соревнование не сопоставлено с сайтом (или находка не про соревнование).
+    /// </summary>
+    int? SubjectOrgCompId = null);
 
 /// <summary>Находки одной проверки + её описание (для страницы /Admin/Health).</summary>
 /// <param name="Total">

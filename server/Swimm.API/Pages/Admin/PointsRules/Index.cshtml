@@ -243,6 +243,28 @@
                                                     </div>
                                                 </td>
                                             </tr>
+                                            @* Объяснение расхождения — только у клубного зачёта и только когда он помечен
+                                               «★ расхождение»: без метки этот текст некуда показывать. Уезжает читателю
+                                               сайта (попап «Points system»), поэтому по-английски. *@
+                                            @if (kind == "clubs" && c.VerifiedKind == PointsVerifiedKinds.Mismatch)
+                                            {
+                                                <tr data-verified="@(c.VerifiedKind ?? "none")">
+                                                    <td colspan="6" class="pb-3">
+                                                        <label class="block text-[12px] text-admin-text-muted mb-1">
+                                                            Почему официальные очки неверны (по-английски — текст видит читатель сайта)
+                                                        </label>
+                                                        <div class="flex gap-2 items-start">
+                                                            <textarea name="mismatchNote" rows="2"
+                                                                      class="admin-input flex-1 text-[12.5px]"
+                                                                      placeholder="e.g. The official table awarded 6 and 5 points for places 21-22 instead of the 5 and 3 set by the meet regulations.">@c.MismatchNote</textarea>
+                                                            <button type="submit"
+                                                                    name="noteCompetitionId" value="@c.Id"
+                                                                    formaction="@Url.Page("Index", "SaveMismatchNote", new { kind })"
+                                                                    class="admin-btn admin-btn-ghost py-1 px-2.5">Сохранить пояснение</button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            }
                                         }
                                     </tbody>
                                 </table>

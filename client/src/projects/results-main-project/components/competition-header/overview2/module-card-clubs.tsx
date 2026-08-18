@@ -90,7 +90,9 @@ export default function ModuleCardClubs({
     dispatch(rootActions.updateState({
       isPopup: true,
       popUpType: Enums.PopupType.clubPoints,
-      popUpObj: { rules },
+      // Объяснение расхождения едет в попап вместе со шкалой: бейдж на карточке говорит
+      // «официальные очки неверны», а ПОЧЕМУ — место есть только тут.
+      popUpObj: { rules, mismatchNote: officialMismatch ? overview.club_points_verified_note : null },
     }));
 
   return (
@@ -121,7 +123,7 @@ export default function ModuleCardClubs({
                   color: '#dc2626',
                   border: '1px solid color-mix(in srgb, #dc2626 30%, transparent)',
                 }}
-                title="The official standings contain an error. We checked the results by hand — the points shown here are correct."
+                title="The official standings contain an error. We checked the results by hand — the points shown here are correct. See “Points system” for details."
               >
                 ★ Differs from official — ours verified
               </span>

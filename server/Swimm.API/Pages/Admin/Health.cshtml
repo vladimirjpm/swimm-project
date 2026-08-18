@@ -81,7 +81,10 @@
                 ${accepted && f.note ? `<div class="text-[11px] text-admin-text-muted">принято: ${esc(f.note)}</div>` : ''}</td>
             <td class="align-top whitespace-nowrap text-[11px] text-admin-text-muted">
                 ${f.publicLink ? `<a href="${esc(PUBLIC_BASE + f.publicLink)}" target="_blank" rel="noopener"
-                    class="text-admin-accent hover:underline" title="Открыть публичную страницу — посмотреть глазами">на сайте ↗</a><br>` : ''}
+                    class="text-admin-accent hover:underline" title="Открыть публичную страницу — посмотреть глазами">на swim-hub ↗</a><br>` : ''}
+                ${f.subjectOrgCompId ? `<a href="https://isr.org.il/comp.asp?compID=${f.subjectOrgCompId}"
+                    target="_blank" rel="noopener" class="text-admin-accent hover:underline"
+                    title="Протокол на сайте федерации — сверить с первоисточником">на isr.org.il ↗</a><br>` : ''}
                 с ${new Date(f.firstSeenAt).toLocaleDateString('ru-RU')}</td>
             <td class="align-top text-right whitespace-nowrap">
                 ${accepted

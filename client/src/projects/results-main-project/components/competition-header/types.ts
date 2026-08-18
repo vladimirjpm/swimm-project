@@ -144,6 +144,9 @@ export interface CompetitionOverview {
   /** Итог ручной проверки очков: 'official' | 'accepted' | 'mismatch' | null (не проверялось
    *  либо в выборке смешаны разные итоги). */
   club_points_verified: string | null;
+  /** Чем именно наши очки расходятся с официальными (текст для читателя) — показывается
+   *  в попапе «Points system» рядом со шкалой. Приходит только вместе с 'mismatch'. */
+  club_points_verified_note: string | null;
   top_clubs_men: OverviewClub[];
   top_clubs_women: OverviewClub[];
   /** Самые титулованные: при равном наборе медалей — все, а не первый попавшийся. */

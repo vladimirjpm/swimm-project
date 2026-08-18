@@ -50,6 +50,14 @@ public sealed class CompetitionOverviewDto
     /// </summary>
     [JsonPropertyName("club_points_verified")]
     public string? ClubPointsVerified { get; init; }
+
+    /// <summary>
+    /// Чем именно наши очки отличаются от официальных — текст для читателя (по-английски),
+    /// показывается в попапе «Points system» под бейджем расхождения. null — объяснения нет.
+    /// Как и бейдж, отдаётся только если одинаков у всех соревнований выборки.
+    /// </summary>
+    [JsonPropertyName("club_points_verified_note")]
+    public string? ClubPointsVerifiedNote { get; init; }
     [JsonPropertyName("top_clubs_men")] public IReadOnlyList<ClubSummaryDto> TopClubsMen { get; init; } = [];
     [JsonPropertyName("top_clubs_women")] public IReadOnlyList<ClubSummaryDto> TopClubsWomen { get; init; } = [];
     /// <summary>

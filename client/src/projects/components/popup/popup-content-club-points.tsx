@@ -9,6 +9,9 @@ import type { ClubPointsRule } from '../../results-main-project/components/compe
  */
 interface PopupData {
   rules: ClubPointsRule[];
+  /** Чем наши очки расходятся с официальными — приходит только у соревнований с бейджем
+   *  «Differs from official». null — расхождения нет либо объяснение не записано. */
+  mismatchNote?: string | null;
 }
 
 const SCOPE_LABELS: Record<string, string> = {
@@ -69,6 +72,7 @@ function RuleBlock({ rule }: { rule: ClubPointsRule }) {
 const PopupContentClubPoints: React.FC = () => {
   const popUpObj = useAppSelector((state) => state.popUpObj) as PopupData | null;
   const rules = popUpObj?.rules ?? [];
+  const mismatchNote = popUpObj?.mismatchNote;
 
   return (
     <div>
@@ -76,6 +80,26 @@ const PopupContentClubPoints: React.FC = () => {
       <p className="mb-4 text-[13px]" style={{ color: 'var(--theme-mode-text-muted)' }}>
         Points per place, as defined by the rule this meet is scored with.
       </p>
+
+      {/* Расхождение с официальной таблицей. Стоит ПЕРЕД шкалой: читатель пришёл сюда по
+          бейджу «Differs from official» и ищет объяснение, а не список мест. */}
+      {mismatchNote && (
+        <div
+          className="mb-4 rounded-lg p-3 text-[13px]"
+          style={{
+            background: 'color-mix(in srgb, #dc2626 10%, transparent)',
+            border: '1px solid color-mix(in srgb, #dc2626 30%, transparent)',
+          }}
+        >
+          <div className="mb-1 font-bold" style={{ color: '#dc2626' }}>
+            The official standings were scored incorrectly
+          </div>
+          <p style={{ color: 'var(--theme-mode-text-secondary)' }}>{mismatchNote}</p>
+          <p className="mt-2" style={{ color: 'var(--theme-mode-text-muted)' }}>
+            The scale below is the one from the meet regulations — the points on this page follow it.
+          </p>
+        </div>
+      )}
 
       {rules.length === 0 ? (
         <p className="text-[13px]" style={{ color: 'var(--theme-mode-text-muted)' }}>

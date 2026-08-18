@@ -72,6 +72,12 @@ public sealed class PointRuleCompetitionRowDto
 
     /// <summary>Текущее правило нужного вида; null — привязки нет (автоподбор по дате).</summary>
     public int? RuleId { get; set; }
+
+    /// <summary>
+    /// Объяснение расхождения с официальными очками (только клубный зачёт). Показывается
+    /// читателю сайта в попапе «Points system», поэтому пишется по-английски.
+    /// </summary>
+    public string? MismatchNote { get; set; }
 }
 
 /// <summary>Одна перепривязка из панели: соревнование → правило (null — снять, вернуть автоподбор).</summary>

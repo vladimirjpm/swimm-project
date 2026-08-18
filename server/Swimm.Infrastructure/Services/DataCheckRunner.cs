@@ -199,6 +199,16 @@ public class DataCheckRunner(
                 .Select(c => new { c.Id, c.PointRuleClubsId })
                 .ToDictionaryAsync(c => c.Id, c => c.PointRuleClubsId, ct);
 
+        // compID на isr.org.il — тоже живой: штамп проставляется переимпортом и бэкфиллом
+        // Discovery, и сохранённый в находке он остался бы пустым до следующего прогона.
+        var compIds = findings
+            .Where(f => f.EntityType == "Competition" && f.EntityId != null)
+            .Select(f => f.EntityId!.Value)
+            .Distinct()
+            .ToList();
+
+        var orgCompIds = await ResolveOrgCompIdsAsync(compIds, ct);
+
         // Показываем ВСЕ зарегистрированные проверки, даже пустые: «проверка есть и она
         // молчит» — полезная информация, отличная от «проверки нет».
         return checks
@@ -210,7 +220,7 @@ public class DataCheckRunner(
                     c.Id, c.Title, c.Description, c.Severity,
                     items.Count(f => f.Resolution == null),
                     items.Count(f => f.Resolution == DataCheckResolutions.Accepted),
-                    items.Select(f => ToDto(f, subjects, resultGenders, clubRules)).ToList(),
+                    items.Select(f => ToDto(f, subjects, resultGenders, clubRules, orgCompIds)).ToList(),
                     state?.Total, state?.LastRunAt, state?.Failed ?? false);
             })
             .OrderByDescending(g => g.OpenCount > 0)
@@ -361,11 +371,58 @@ public class DataCheckRunner(
     private static DataCheckRunDto ToDto(DataCheckRun r) =>
         new(r.Id, r.StartedAt, r.FinishedAt, r.Trigger, r.ErrorCount, r.WarningCount, r.InfoCount, r.FixedCount);
 
+    /// <summary>
+    /// compID на isr.org.il для соревнований, попавших в находки. У многодневки он проставлен
+    /// не каждому дню: <c>Competition.OrgCompId</c> — альтернативный ключ с UNIQUE-индексом
+    /// (максимум один день), а общий штамп Д2 живёт на событии. Поэтому дню без своего compID
+    /// подставляем событийный, а затем первый непустой у соседних дней — иначе ссылка на
+    /// протокол пропадала бы у дней 2..N.
+    /// </summary>
+    private async Task<Dictionary<int, int?>> ResolveOrgCompIdsAsync(
+        List<int> compIds, CancellationToken ct)
+    {
+        if (compIds.Count == 0) return [];
+
+        var comps = await db.Competitions.AsNoTracking()
+            .Where(c => compIds.Contains(c.Id))
+            .Select(c => new { c.Id, c.EventId, c.OrgCompId })
+            .ToListAsync(ct);
+
+        var eventIds = comps
+            .Where(c => c.OrgCompId == null && c.EventId != null)
+            .Select(c => c.EventId!.Value)
+            .Distinct()
+            .ToList();
+
+        var byEvent = new Dictionary<int, int?>();
+        if (eventIds.Count > 0)
+        {
+            byEvent = await db.CompetitionEvents.AsNoTracking()
+                .Where(e => eventIds.Contains(e.Id))
+                .Select(e => new { e.Id, e.OrgCompId })
+                .ToDictionaryAsync(e => e.Id, e => e.OrgCompId, ct);
+
+            var stampedDays = await db.Competitions.AsNoTracking()
+                .Where(c => c.EventId != null && eventIds.Contains(c.EventId!.Value) && c.OrgCompId != null)
+                .Select(c => new { EventId = c.EventId!.Value, c.OrgCompId })
+                .ToListAsync(ct);
+
+            foreach (var g in stampedDays.GroupBy(d => d.EventId))
+                if (byEvent.GetValueOrDefault(g.Key) is null)
+                    byEvent[g.Key] = g.First().OrgCompId;
+        }
+
+        return comps.ToDictionary(
+            c => c.Id,
+            c => c.OrgCompId ?? (c.EventId is { } ev ? byEvent.GetValueOrDefault(ev) : null));
+    }
+
     private static DataCheckFindingDto ToDto(
         DataCheckFinding f,
         IReadOnlyDictionary<int, (string? Gender, int? LogligId)>? subjects = null,
         IReadOnlyDictionary<long, string>? resultGenders = null,
-        IReadOnlyDictionary<int, int?>? clubRules = null)
+        IReadOnlyDictionary<int, int?>? clubRules = null,
+        IReadOnlyDictionary<int, int?>? orgCompIds = null)
     {
         var subject = f.FixEntityId is { } id && subjects is not null && subjects.TryGetValue(id, out var v)
             ? v
@@ -384,6 +441,9 @@ public class DataCheckRunner(
             gender, subject.LogligId,
             f.FixEntityId is { } cid && clubRules is not null && clubRules.TryGetValue(cid, out var rule)
                 ? rule
+                : null,
+            f.EntityType == "Competition" && f.EntityId is { } compId && orgCompIds is not null
+                ? orgCompIds.GetValueOrDefault(compId)
                 : null);
     }
 }

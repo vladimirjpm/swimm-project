@@ -49,6 +49,13 @@ public interface IPointRulesAdminRepository
     Task<PointRuleSaveResult> ToggleVerifiedAsync(
         PointRuleKind kind, int competitionId, string verifiedKind, string? user);
 
+    /// <summary>
+    /// Записать объяснение расхождения клубных очков с официальными (или стереть его пустой
+    /// строкой). Текст уезжает на публичную страницу — в попап «Points system» под бейджем
+    /// «Differs from official», поэтому ожидается английский.
+    /// </summary>
+    Task<PointRuleSaveResult> SetClubMismatchNoteAsync(int competitionId, string? note);
+
     /// <summary>Удалить. Отказ — если на правило ссылаются соревнования.</summary>
     Task<PointRuleSaveResult> DeleteAsync(PointRuleKind kind, int id);
 }

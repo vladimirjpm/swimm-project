@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -753,6 +753,18 @@ public class ResultRepository : IResultRepository
 
         var clubPointsVerified = verifiedKinds.Count == 1 ? verifiedKinds[0] : null;
 
+        // Объяснение расхождения — только к бейджу расхождения и только если оно одно на всю
+        // выборку: два разных объяснения в одном попапе противоречили бы друг другу.
+        string? clubPointsVerifiedNote = null;
+        if (clubPointsVerified == PointsVerifiedKinds.Mismatch)
+        {
+            var notes = await query
+                .Select(r => r.Competition.ClubPointsVerifiedNote)
+                .Distinct()
+                .ToListAsync();
+            clubPointsVerifiedNote = notes.Count == 1 ? notes[0] : null;
+        }
+
         var appliedRules = ruleKeys
             .Select(k => CompetitionRuleResolver.Resolve(
                 allClubRules, k.PointRuleClubsId, k.IsMasters, DateOnly.FromDateTime(k.CompetitionDate)))
@@ -813,6 +825,7 @@ public class ResultRepository : IResultRepository
             TopClubs = topClubs,
             ClubPointsRules = appliedRules,
             ClubPointsVerified = clubPointsVerified,
+            ClubPointsVerifiedNote = clubPointsVerifiedNote,
             TopClubsMen = topClubsMen,
             TopClubsWomen = topClubsWomen,
             TopMedalists = topMedalists,

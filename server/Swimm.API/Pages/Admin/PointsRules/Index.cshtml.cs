@@ -96,6 +96,32 @@ public class IndexModel : PageModel
     }
 
     /// <summary>
+    /// Пояснение к бейджу «★ расхождение»: чем именно официальные очки неверны. Текст едет на
+    /// публичную страницу (попап «Points system»), поэтому пишется по-английски. Пустая строка
+    /// стирает пояснение.
+    /// </summary>
+    public async Task<IActionResult> OnPostSaveMismatchNoteAsync(int noteCompetitionId, string? mismatchNote)
+    {
+        var kindSlug = PointRulesKindParser.ToSlug(RuleKind);
+        var result = await _repo.SetClubMismatchNoteAsync(noteCompetitionId, mismatchNote);
+
+        if (!result.Success)
+        {
+            TempData["Flash"] = $"Не сохранено: {result.Error}";
+            return RedirectToPage("Index", new { kind = kindSlug });
+        }
+
+        var saved = result.Id == 1;
+        await _audit.LogAsync("pointrule.verify", "Competition", noteCompetitionId.ToString(),
+            saved
+                ? $"Пояснение к расхождению клубных очков у соревнования #{noteCompetitionId}: {mismatchNote?.Trim()}"
+                : $"Пояснение к расхождению клубных очков у соревнования #{noteCompetitionId} стёрто");
+
+        TempData["Flash"] = saved ? "Пояснение сохранено" : "Пояснение стёрто";
+        return RedirectToPage("Index", new { kind = kindSlug });
+    }
+
+    /// <summary>
     /// Сохранение панели «Соревнования»: меняет правило у выбранных соревнований (у многодневных —
     /// всем дням) и возвращает на список, чтобы счётчики в верхней таблице пересчитались.
     /// </summary>
