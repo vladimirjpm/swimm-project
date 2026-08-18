@@ -1,4 +1,4 @@
-﻿@page
+@page
 @using Swimm.Application.Dtos
 @model Swimm.API.Pages.Admin.Competitions.IndexModel
 @{
@@ -696,6 +696,24 @@ else
                 <option value="@r.Id">@r.Version@(r.ManualOnly ? " · manual" : "")</option>
             }
         </select>
+
+        @* Зачёт есть, а правила под его шкалу нет: заводим прямо отсюда, иначе цикл
+           «уйти на /Admin/PointsRules → завести → вернуться → перезатянуть». Кнопка, а не
+           галочка «создать автоматически»: шкала снята эвристикой, и админ должен увидеть,
+           что именно заводит (у גביע האביב 2026 регламент вдобавок содержал условие сверх
+           шкалы — машине его не видно). *@
+        <div id="preview-rule-create" class="mt-2 hidden rounded-md border border-[rgba(255,213,79,0.4)] bg-[rgba(255,213,79,0.08)] p-3">
+            <div class="mb-2 text-[12.5px] text-admin-text">
+                Шкалы этого зачёта нет ни в одном правиле. Завести новое по снятой шкале?
+            </div>
+            <div id="preview-rule-scale" class="mb-2 font-mono text-[12px] text-admin-text-muted"></div>
+            <div class="flex flex-wrap items-center gap-2">
+                <input type="text" id="preview-rule-version" class="admin-input min-w-[220px] rounded-md px-3 py-2 text-[13px]"
+                       placeholder="Версия правила" />
+                <button type="button" id="btn-create-rule" class="admin-btn admin-btn-ghost">Завести правило по этой шкале</button>
+                <span class="text-[12px] text-admin-text-muted">manual · эстафеты ×2</span>
+            </div>
+        </div>
     </div>
 
     <div class="mb-3 hidden" id="overwrite-block">
@@ -1238,6 +1256,15 @@ else
 
                 const scale = (s.scale ?? []).slice(0, 12).map(x => x.points).join(', ');
                 box.innerHTML = esc(s.message) + (scale ? `<div class="mt-1 text-[12px] text-admin-text-muted">Шкала зачёта: ${esc(scale)}…</div>` : '');
+
+                // Предложение завести правило — только когда зачёт есть, а шкала не опознана.
+                const createBox = document.getElementById('preview-rule-create');
+                createBox.classList.toggle('hidden', !s.canCreateRule);
+                if (s.canCreateRule) {
+                    document.getElementById('preview-rule-version').value = s.suggestedVersion ?? '';
+                    document.getElementById('preview-rule-scale').textContent =
+                        (s.scale ?? []).map(x => `${x.place}:${x.points}`).join('  ');
+                }
             }
 
             async function showPreview(p, name, repull) {
@@ -1345,6 +1372,37 @@ else
             });
             document.getElementById('event-select').addEventListener('change', (e) => {
                 document.getElementById('event-name').classList.toggle('hidden', e.target.value !== '__new__');
+            });
+
+            // Завести правило по снятой шкале. Шкалу сервер берёт из своего кэша превью —
+            // отсюда уезжает только имя версии.
+            document.getElementById('btn-create-rule').addEventListener('click', async (e) => {
+                if (!preview) return;
+                const btn = e.currentTarget;
+                const version = document.getElementById('preview-rule-version').value.trim();
+                btn.disabled = true;
+                try {
+                    const r = await apiJson(`${API}/club-rule`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ previewId: preview.previewId, version })
+                    });
+
+                    // Правило создано — кладём в селект и выбираем, чтобы импорт ушёл уже с ним.
+                    const select = document.getElementById('preview-rule-clubs');
+                    const opt = document.createElement('option');
+                    opt.value = String(r.ruleId);
+                    opt.textContent = `${r.version} · manual`;
+                    select.appendChild(opt);
+                    select.value = String(r.ruleId);
+
+                    document.getElementById('preview-rule-create').classList.add('hidden');
+                    const box = document.getElementById('preview-standing');
+                    box.className = 'mb-2 rounded-md border border-admin-success/40 bg-admin-success/10 px-3 py-2 text-[13px] text-admin-text';
+                    box.textContent = `Правило «${r.version}» заведено и подставлено — соревнование импортируется с ним.`;
+                } catch (err) {
+                    alert(`Правило не заведено: ${err.message}`);
+                    btn.disabled = false;
+                }
             });
 
             document.getElementById('btn-import').addEventListener('click', async () => {
