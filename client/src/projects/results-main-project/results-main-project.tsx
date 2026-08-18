@@ -577,8 +577,6 @@ function ResultsMain() {
               </div>
             )}
 
-            {/* POPUP */}
-            {isPopup && <Popup />}
           </div>
 
           {/* Мобильная нижняя шторка с фильтрами (во весь экран при раскрытии) */}
@@ -595,6 +593,10 @@ function ResultsMain() {
           </MobileSportsmenModal>
         </>
       )}
+
+      {/* POPUP — на уровне страницы, а не внутри ветки Swims: попап открывают и карточки
+          Overview (напр. «Points system» в Top clubs), а та ветка при tab!=swims не рендерится. */}
+      {isPopup && <Popup />}
       </div>
     </div>
   );

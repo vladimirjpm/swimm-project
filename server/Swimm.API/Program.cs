@@ -6,8 +6,10 @@ using Microsoft.AspNetCore.RateLimiting;
 using Swimm.API.BackgroundServices;
 using Swimm.API.Security;
 using Swimm.API.Services;
+using Microsoft.EntityFrameworkCore;
 using Swimm.Application;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Dtos;
 using Swimm.Infrastructure;
 using Swimm.Parsing;
 
@@ -167,6 +169,53 @@ if (args.Contains("--recalc-combined"))
     return;
 }
 
+// Пересчёт материализованного клубного зачёта во всех соревнованиях:
+//   dotnet run -- --rebuild-club-standings
+// Нужен разово после миграции (бэкфилл истории) и как аварийная кнопка, если зачёты
+// разошлись с результатами. Штатно таблица поддерживается на шве пересчёта соревнования.
+if (args.Contains("--rebuild-club-standings"))
+{
+    using var scope = app.Services.CreateScope();
+    var svc = scope.ServiceProvider.GetRequiredService<IClubStandingService>();
+    var rows = await svc.RebuildAllAsync();
+    Console.WriteLine($"Клубный зачёт: строк в таблице — {rows}");
+    return;
+}
+
+// Проставить «есть ли ОФИЦИАЛЬНЫЙ клубный зачёт (דירוג מועדונים)» уже импортированным:
+//   dotnet run -- --probe-club-standings [--force]
+// Затягивание новых соревнований проставляет флаг само; этот прогон — для тех, кто попал в
+// базу раньше. --force перепроверяет и уже помеченные (зачёт публикуют не сразу).
+if (args.Contains("--probe-club-standings"))
+{
+    using var scope = app.Services.CreateScope();
+    var svc = scope.ServiceProvider.GetRequiredService<IOfficialClubStandingService>();
+    var report = await svc.BackfillAsync(args.Contains("--force"));
+
+    foreach (var line in report.Lines) Console.WriteLine(line);
+    Console.WriteLine(
+        $"\nИтог: проверено {report.Checked}, с официальным зачётом {report.WithStanding}, " +
+        $"без него {report.WithoutStanding}, не удалось проверить {report.Unknown}");
+    return;
+}
+
+// Сверка справочника рекордов с нашими протоколами:
+//   dotnet run -- --verify-records
+// То же самое, что кнопка «Сверить с протоколами» на дашборде; отдельный флаг нужен, чтобы
+// гонять сверку после массового переимпорта протоколов, не заходя в админку.
+// ⚠ «Не найдено» — не ошибка справочника: протоколы загружены не за все годы
+// (docs/plans/records-quality-plan.md).
+if (args.Contains("--verify-records"))
+{
+    using var scope = app.Services.CreateScope();
+    var svc = scope.ServiceProvider.GetRequiredService<IRecordQualityService>();
+    var report = await svc.VerifyAllAsync();
+    Console.WriteLine(
+        $"Рекорды сверены: {report.Checked} · найдено {report.Found} · не найдено {report.NotFound} " +
+        $"· с другой датой {report.FoundWrongDate}");
+    return;
+}
+
 // Одноразовый сид рекордов/нормативов из легаси JS-файлов клиента:
 //   dotnet run -- --seed-records <путь к client/public/data> [--force]
 // --force заменяет содержимое таблиц целиком (иначе непустые таблицы — отказ).
@@ -213,6 +262,200 @@ if (args.Contains("--seed-dolphin-training"))
     var seedLog = await seeder.SeedAsync(jsonPath, csvPath, groupId, args.Contains("--force"));
     foreach (var line in seedLog)
         Console.WriteLine(line);
+    return;
+}
+
+// Ретро-сверка загруженных протоколов с источником (docs/data-integrity.md, фаза Д1):
+//   dotnet run -- --audit-imports [--id <discoveredId>] [--limit N]
+// Качает протокол заново, парсит ТЕКУЩИМ парсером и сравнивает с БД. Диагноз, а не лечение:
+// результаты не меняются, пишется только журнал сверки. Ходит в чужой прод — с паузами,
+// поэтому первый прогон удобно делать на одной записи (--id или --limit 1).
+if (args.Contains("--audit-imports"))
+{
+    using var scope = app.Services.CreateScope();
+    var audit = scope.ServiceProvider.GetRequiredService<IImportAuditService>();
+
+    int? Arg(string name)
+    {
+        var i = Array.IndexOf(args, name) + 1;
+        return i > 0 && i < args.Length && int.TryParse(args[i], out var v) ? v : null;
+    }
+
+    var reports = Arg("--id") is int oneId
+        ? [await audit.AuditDiscoveredAsync(oneId)]
+        : await audit.AuditAllAsync(Arg("--limit"));
+
+    foreach (var r in reports)
+    {
+        Console.WriteLine($"\n#{r.DiscoveredId} (compID {r.OrgCompId}) «{r.Name}»");
+        if (r.Error != null) { Console.WriteLine($"  ОШИБКА: {r.Error}"); continue; }
+
+        foreach (var d in r.Days)
+        {
+            if (d.CompetitionId == null)
+            {
+                Console.WriteLine($"  {d.Date}: дня нет в БД (файл обещает {d.ExpectedRows} строк)");
+                continue;
+            }
+            var verdict = d.Mismatches.Count == 0 ? "сошлось" : $"РАСХОЖДЕНИЙ {d.Mismatches.Count}";
+            Console.WriteLine($"  {d.Date} → comp {d.CompetitionId} «{d.CompetitionName}»: файл {d.ExpectedRows}, БД {d.ActualRows} — {verdict}");
+            foreach (var m in d.Mismatches)
+                Console.WriteLine($"      {m.EventKey}: файл {m.ExpectedRows}, БД {m.ActualRows}");
+        }
+    }
+
+    var bad = reports.Count(r => r.HasProblems);
+    Console.WriteLine($"\nИтог: проверено {reports.Count}, с проблемами {bad}. Журнал — Sys_ImportReconciliation (ImportFileName начинается с 'audit:').");
+    return;
+}
+
+// Прогон реестра проверок данных (то же, что кнопка на /Admin/Health):
+//   dotnet run -- --check-data
+// Читающий: ставит диагноз и пишет находки, ничего не чинит.
+if (args.Contains("--check-data"))
+{
+    using var scope = app.Services.CreateScope();
+    var runner = scope.ServiceProvider.GetRequiredService<IDataCheckRunner>();
+
+    // Триггер отдельный от кнопки: в истории видно, откуда прогон (manual / cli / import).
+    var run = await runner.RunAllAsync("cli");
+    Console.WriteLine($"Прогон #{run.Id}: ошибок {run.ErrorCount}, предупреждений {run.WarningCount}, " +
+                      $"инфо {run.InfoCount}, закрыто {run.FixedCount}\n");
+
+    foreach (var g in await runner.GetCurrentAsync())
+    {
+        var mark = g.OpenCount == 0 ? "✓" : g.Severity == DataCheckSeverity.Error ? "!!" : " !";
+        Console.WriteLine($"{mark} {g.Title} — открыто {g.OpenCount}" +
+                          (g.AcceptedCount > 0 ? $", принято {g.AcceptedCount}" : "") + $"  [{g.CheckId}]");
+        foreach (var f in g.Findings.Where(f => f.Resolution == null).Take(5))
+            Console.WriteLine($"      {f.Message}");
+    }
+    return;
+}
+
+// Склейка клубов с ОДИНАКОВЫМ именем из консоли (эвристика same-name — «уверенная»):
+//   dotnet run -- --merge-same-name-clubs [--apply]
+// Без --apply это dry-run. Нужен после ивритских переимпортов: пока матчинг клуба шёл по
+// паре Name|NameEn, каждый HE-протокол плодил двойника канонического клуба (инцидент И-9).
+if (args.Contains("--merge-same-name-clubs"))
+{
+    using var scope = app.Services.CreateScope();
+    var dedup = scope.ServiceProvider.GetRequiredService<IClubDedupService>();
+    var merge = scope.ServiceProvider.GetRequiredService<IClubMergeService>();
+
+    var report = await dedup.FindCandidatesAsync();
+    var pairs = report.Candidates
+        .Where(c => c.Heuristic == "same-name")
+        .Select(c => new ClubMergePair(c.CanonicalId, c.DuplicateId))
+        .ToList();
+
+    Console.WriteLine($"Пар с одинаковым именем: {pairs.Count}");
+    foreach (var c in report.Candidates.Where(c => c.Heuristic == "same-name"))
+        Console.WriteLine($"  #{c.CanonicalId} «{c.CanonicalName}» ({c.CanonicalResults}) ← #{c.DuplicateId} ({c.DuplicateResults})");
+
+    if (pairs.Count == 0) return;
+
+    var apply = args.Contains("--apply");
+    var result = await merge.MergeAsync(pairs, dryRun: !apply);
+    var bad = result.Pairs.Where(p => p.Status is not ("merged" or "dry-run")).ToList();
+    Console.WriteLine($"\n{(apply ? "Применено" : "Dry-run")}: пар {result.Pairs.Count}, проблемных {bad.Count}");
+    foreach (var p in bad)
+        Console.WriteLine($"  #{p.CanonicalId}←#{p.DuplicateId}: {p.Status} {string.Join("; ", p.Conflicts)}");
+    if (!apply) Console.WriteLine("Повтори с --apply, чтобы применить.");
+    return;
+}
+
+// Чистка пустых клубов из консоли (то же, что кнопка «Удалить все пустые» на /Admin/Clubs):
+//   dotnet run -- --delete-empty-clubs
+// Зовёт тот же сервис, что и кнопка, — предикат «пустого клуба» живёт в одном месте
+// (правило 1 в docs/data-integrity.md). Непрошедшие проверку печатаются с причиной.
+if (args.Contains("--delete-empty-clubs"))
+{
+    using var scope = app.Services.CreateScope();
+    var clubs = scope.ServiceProvider.GetRequiredService<IClubAdminRepository>();
+    var report = await clubs.DeleteAllEmptyAsync();
+
+    foreach (var c in report.Deleted)
+        Console.WriteLine($"удалён #{c.Id} «{c.Name}»");
+    foreach (var reason in report.Skipped)
+        Console.WriteLine($"пропущен: {reason}");
+    Console.WriteLine($"\nИтог: удалено {report.Deleted.Count}, пропущено {report.Skipped.Count}");
+    return;
+}
+
+// Переимпорт протокола из Discovery без админки (docs/data-integrity.md, чек-лист §8):
+//   dotnet run -- --repull <discoveredId> [--delete-missing]
+// Тот же путь, что кнопка «Перезатянуть»: качаем HE-протокол, парсим, импортируем с
+// перезаписью. --delete-missing дополнительно удаляет строки, которых нет в файле (дубликаты
+// и следы старых разборов) — по умолчанию ВЫКЛЮЧЕНО, как и в UI: удаление отдельное решение.
+if (args.Contains("--repull"))
+{
+    var idIndex = Array.IndexOf(args, "--repull") + 1;
+    if (idIndex >= args.Length || !int.TryParse(args[idIndex], out var discoveredId))
+    {
+        Console.Error.WriteLine("Usage: dotnet run -- --repull <discoveredId> [--delete-missing]");
+        Environment.Exit(1);
+        return;
+    }
+
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<Swimm.Infrastructure.Data.SwimmDbContext>();
+    var discovery = scope.ServiceProvider.GetRequiredService<ICompetitionDiscoveryProvider>();
+    var source = scope.ServiceProvider.GetRequiredService<IResultSourceProvider>();
+    var importer = scope.ServiceProvider.GetRequiredService<IImportService>();
+
+    var row = await db.DiscoveredCompetitions.AsNoTracking().FirstOrDefaultAsync(d => d.Id == discoveredId);
+    if (row?.LogligId is not int logligId)
+    {
+        Console.Error.WriteLine($"Запись #{discoveredId} не найдена или без LogligId");
+        Environment.Exit(1);
+        return;
+    }
+
+    Console.WriteLine($"Качаю протокол loglig {logligId} для «{row.Name}» (compID {row.OrgCompId})…");
+    var pdf = await discovery.FetchResultsPdfAsync(logligId, "he-IL");
+    using var pdfStream = new MemoryStream(pdf);
+    var parsed = await source.ParseAsync(new ResultSourceRequest(
+        pdfStream, $"isrorg-{row.OrgCompId}-loglig-{logligId}-he.pdf", "IsrOrg", Language: "he"));
+    Console.WriteLine($"Распознано строк: {parsed.ResultCount}");
+
+    var deleteMissing = args.Contains("--delete-missing");
+    using var json = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(parsed.ResultsJson));
+    var result = await importer.ImportAsync(
+        json, $"isrorg-{row.OrgCompId}-loglig-{logligId}-he.pdf", null,
+        new ImportEventOptions(null, null, OverwriteExisting: true, DeleteMissing: deleteMissing),
+        row.OrgCompId);
+
+    Console.WriteLine($"\n{result.Message}");
+    Console.WriteLine(result.Reconciliation);
+    if (result.DataChecks.Length > 0) Console.WriteLine(result.DataChecks);
+    foreach (var line in result.DiagnosticLog.Where(l =>
+                 l.Contains("Идентичность") || l.Contains("Upsert") || l.Contains("Сверка")))
+        Console.WriteLine("  " + line);
+    if (result.ErrorMessages.Count > 0)
+        Console.WriteLine("ОШИБКИ: " + string.Join("; ", result.ErrorMessages.Take(5)));
+    return;
+}
+
+// Прогон «Проверить качество» по событию без админки (пара к --repull: после переимпорта
+// автопометки сброшены, и вернуть актуальные может только скан):
+//   dotnet run -- --quality-scan <eventId>
+if (args.Contains("--quality-scan"))
+{
+    var qsIndex = Array.IndexOf(args, "--quality-scan") + 1;
+    if (qsIndex >= args.Length || !int.TryParse(args[qsIndex], out var qsEventId))
+    {
+        Console.Error.WriteLine("Usage: dotnet run -- --quality-scan <eventId>");
+        Environment.Exit(1);
+        return;
+    }
+
+    using var scope = app.Services.CreateScope();
+    var suspects = scope.ServiceProvider.GetRequiredService<ISuspectResultService>();
+    var scan = await suspects.ScanAsync(qsEventId, null);
+    Console.WriteLine($"Просмотрено {scan.Scanned}, помечено {scan.Flagged}, снято {scan.Cleared}, ручных сохранено {scan.ManualKept}");
+    foreach (var g in scan.Rows.GroupBy(r => r.Reason))
+        Console.WriteLine($"  {g.Key}: {g.Count()}");
     return;
 }
 
@@ -442,6 +685,7 @@ app.Use(async (context, next) =>
                 "competitions" => "/competitions.html",
                 "groups" => "/groups.html",
                 "swimmers" => "/results_main.html", // /swimmers без id — пусть падает штатно
+                "clubs" => "/results_main.html",     // /clubs без id — пусть падает штатно
                 "my-media" => "/media.html",
                 "about" => "/about.html",
                 _ => null,
@@ -450,6 +694,7 @@ app.Use(async (context, next) =>
             {
                 "competitions" => "/results_main.html",              // /competitions/{id}
                 "swimmers" => "/swimmer.html",                       // /swimmers/{id}
+                "clubs" => "/club.html",                             // /clubs/{id}
                 "groups" when seg.Length >= 3 && seg[2] == "results"
                     => "/results_main.html",                         // /groups/{slug}/results
                 "groups" => "/groups.html",                          // /groups/{slug}

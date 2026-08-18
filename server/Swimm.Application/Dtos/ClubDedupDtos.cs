@@ -1,4 +1,4 @@
-namespace Swimm.Application.Dtos;
+﻿namespace Swimm.Application.Dtos;
 
 /// <summary>Пара-кандидат на склейку клубов (canonical слева).</summary>
 public sealed record ClubDedupCandidate(
@@ -10,7 +10,8 @@ public sealed record ClubDedupCandidate(
     string DuplicateName,
     string? DuplicateNameEn,
     int DuplicateResults,
-    /// <summary>suffix (мусорный хвост парсера) | swimmers (пересечение пловцов) | levenshtein.</summary>
+    /// <summary>same-name (одно имя у разных Id) | suffix (мусорный хвост парсера) |
+    /// swimmers (пересечение пловцов) | levenshtein.</summary>
     string Heuristic,
     /// <summary>Общих пловцов (для эвристики swimmers; иначе 0).</summary>
     int SharedSwimmers,

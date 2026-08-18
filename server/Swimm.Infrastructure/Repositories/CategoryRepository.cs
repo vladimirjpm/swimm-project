@@ -33,6 +33,7 @@ public class CategoryRepository : ICategoryRepository
             {
                 Key          = c.Key,
                 Name         = c.Name,
+                NameHe       = c.NameHe,
                 Badge        = c.Badge,
                 DisplayOrder = c.DisplayOrder
             })
@@ -84,6 +85,7 @@ public class CategoryRepository : ICategoryRepository
         {
             Key          = category.Key,
             Name         = category.Name,
+            NameHe       = category.NameHe,
             Badge        = category.Badge,
             DisplayOrder = category.DisplayOrder,
             Competitions = competitions

@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -63,10 +63,15 @@ public class DashboardStatusServiceTests
         SwimmDbContext db,
         SwimmerDedupReport? swimmerReport = null,
         ClubDedupReport? clubReport = null,
-        IMemoryCache? cache = null) =>
+        IMemoryCache? cache = null,
+        IDataCheckRunner? dataChecks = null) =>
         new(db,
             new FakeSwimmerDedupService(swimmerReport ?? SwimmerReport(0, 0, 0)),
             new FakeClubDedupService(clubReport ?? ClubReport(0, 0)),
+            new RecordQualityService(db),
+            // Реестр без единой проверки: состояний нет → дашборд считает метрики вживую,
+            // как до Д3. Ровно то, что нужно тестам «старых» счётчиков.
+            dataChecks ?? new DataCheckRunner(db, []),
             cache ?? new MemoryCache(new MemoryCacheOptions()));
 
     [Fact]
@@ -84,6 +89,149 @@ public class DashboardStatusServiceTests
         Assert.Equal(3, result.Swimmers.Orphans);
         Assert.Equal(1, result.Clubs.SureCandidates);
         Assert.Equal(4, result.Clubs.UnsureCandidates);
+    }
+
+    /// <summary>Реестр-заглушка с готовыми состояниями — дашборд обязан брать числа отсюда.</summary>
+    private sealed class FakeDataCheckRunner(DataCheckRunDto? lastRun, params DataCheckStateDto[] states)
+        : IDataCheckRunner
+    {
+        public Task<(DataCheckRunDto? LastRun, IReadOnlyList<DataCheckStateDto> States)> GetStateAsync(
+            CancellationToken ct = default) =>
+            Task.FromResult<(DataCheckRunDto?, IReadOnlyList<DataCheckStateDto>)>((lastRun, states));
+
+        public Task<DataCheckRunDto> RunAllAsync(string trigger, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public Task<IReadOnlyList<DataCheckGroupDto>> GetCurrentAsync(CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public Task<IReadOnlyList<DataCheckRunDto>> GetHistoryAsync(int limit = 20, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public Task<bool> AcceptAsync(int findingId, string? note, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public Task<int?> FixSwimmerGenderAsync(int findingId, string gender, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<bool> FixCompetitionClubRuleAsync(int findingId, int ruleId, CancellationToken ct = default) =>
+            Task.FromResult(false);
+        public Task<(int Findings, int Rows)> FixAllKnownSwimmerGendersAsync(CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public Task<bool> ReopenAsync(int findingId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+    }
+
+    private static DataCheckStateDto State(string checkId, DataCheckSeverity severity, int total,
+        bool failed = false, int accepted = 0) =>
+        new(checkId, severity, total, Math.Min(total, 50), failed, 7,
+            new DateTime(2026, 8, 3, 10, 0, 0, DateTimeKind.Utc), accepted);
+
+    private static DataCheckRunDto Run() =>
+        new(7, new DateTime(2026, 8, 3, 10, 0, 0, DateTimeKind.Utc), null, "import", 0, 0, 0, 0);
+
+    [Fact]
+    public async Task GetStatusAsync_TakesMetricsFromRegistry_NotFromItsOwnCount()
+    {
+        // Смысл перевода на реестр: одно число в двух местах. Дедуп-отчёт говорит «2 уверенных»,
+        // реестр — «5»; дашборд обязан показать реестровое, иначе он разойдётся с /Admin/Health.
+        await using var db = CreateDb(nameof(GetStatusAsync_TakesMetricsFromRegistry_NotFromItsOwnCount));
+        var service = CreateService(db,
+            swimmerReport: SwimmerReport(orphans: 3, sure: 2, unsure: 5),
+            dataChecks: new FakeDataCheckRunner(Run(),
+                State("swimmers.dedup-sure", DataCheckSeverity.Warning, 5),
+                State("swimmers.orphans", DataCheckSeverity.Info, 11)));
+
+        var result = await service.GetStatusAsync(CancellationToken.None);
+
+        Assert.Equal(5, result.Swimmers.SureCandidates);
+        Assert.Equal(11, result.Swimmers.Orphans);
+        // «Неуверенных» проверки в реестре нет — они по-прежнему считаются вживую.
+        Assert.Equal(5, result.Swimmers.UnsureCandidates);
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_FallsBackToLiveCount_WhenCheckNeverRan()
+    {
+        // Новая база: реестр пуст. Показать 0 значило бы соврать «всё чисто».
+        await using var db = CreateDb(nameof(GetStatusAsync_FallsBackToLiveCount_WhenCheckNeverRan));
+        var service = CreateService(db, swimmerReport: SwimmerReport(orphans: 3, sure: 2, unsure: 0));
+
+        var result = await service.GetStatusAsync(CancellationToken.None);
+
+        Assert.Equal(2, result.Swimmers.SureCandidates);
+        Assert.Equal(3, result.Swimmers.Orphans);
+        Assert.Null(result.Checks.LastRunAt);
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_AcceptedFindings_AreNotCountedAsWork()
+    {
+        // Живой случай: 42 находки relays.gender-conflict приняты как есть (Р16). Дашборд
+        // обязан показать столько же, сколько /Admin/Health в «открытых», иначе перевод на
+        // реестр не имеет смысла.
+        await using var db = CreateDb(nameof(GetStatusAsync_AcceptedFindings_AreNotCountedAsWork));
+        var service = CreateService(db,
+            swimmerReport: SwimmerReport(orphans: 0, sure: 0, unsure: 0),
+            dataChecks: new FakeDataCheckRunner(Run(),
+                State("relays.gender-conflict", DataCheckSeverity.Warning, total: 42, accepted: 42),
+                State("swimmers.dedup-sure", DataCheckSeverity.Warning, total: 5, accepted: 2)));
+
+        var result = await service.GetStatusAsync(CancellationToken.None);
+
+        Assert.Equal(3, result.Checks.Warnings);
+        Assert.Equal(3, result.Swimmers.SureCandidates);
+        // Полностью принятая проверка из строк сводки уходит — работы по ней нет.
+        Assert.Equal("swimmers.dedup-sure", Assert.Single(result.Checks.Lines).CheckId);
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_OldRunsWithoutStates_ReadAsNeverRan()
+    {
+        // Сразу после миграции AddDataCheckStates: прогоны в истории есть, состояний ещё нет.
+        // Показать дату старого прогона с нулями значило бы соврать «всё чисто».
+        await using var db = CreateDb(nameof(GetStatusAsync_OldRunsWithoutStates_ReadAsNeverRan));
+        var service = CreateService(db, dataChecks: new FakeDataCheckRunner(Run()));
+
+        var checks = (await service.GetStatusAsync(CancellationToken.None)).Checks;
+
+        Assert.Null(checks.LastRunAt);
+        Assert.Null(checks.LastRunTrigger);
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_FallsBackToLiveCount_WhenCheckFailed()
+    {
+        // Упавшая проверка отдаёт мусорный Total — доверять ему нельзя.
+        await using var db = CreateDb(nameof(GetStatusAsync_FallsBackToLiveCount_WhenCheckFailed));
+        var service = CreateService(db,
+            swimmerReport: SwimmerReport(orphans: 3, sure: 2, unsure: 0),
+            dataChecks: new FakeDataCheckRunner(Run(),
+                State("swimmers.orphans", DataCheckSeverity.Info, 999, failed: true)));
+
+        var result = await service.GetStatusAsync(CancellationToken.None);
+
+        Assert.Equal(3, result.Swimmers.Orphans);
+        Assert.Equal(1, result.Checks.FailedChecks);
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_ChecksBlock_SumsBySeverity_AndKeepsFullTotals()
+    {
+        // Суммируем по СОСТОЯНИЯМ проверок, а не по счётчикам прогона: в прогоне лежат числа
+        // записанных находок (срез 50), здесь нужны полные.
+        await using var db = CreateDb(nameof(GetStatusAsync_ChecksBlock_SumsBySeverity_AndKeepsFullTotals));
+        var service = CreateService(db, dataChecks: new FakeDataCheckRunner(Run(),
+            State("a.error", DataCheckSeverity.Error, 2),
+            State("b.warning", DataCheckSeverity.Warning, 8071),
+            State("c.info", DataCheckSeverity.Info, 4),
+            State("d.clean", DataCheckSeverity.Error, 0)));
+
+        var checks = (await service.GetStatusAsync(CancellationToken.None)).Checks;
+
+        Assert.Equal(2, checks.Errors);
+        Assert.Equal(8071, checks.Warnings);
+        Assert.Equal(4, checks.Infos);
+        Assert.Equal("import", checks.LastRunTrigger);
+        // Чистые проверки в строки не попадают — в сводке нужны те, где есть работа.
+        Assert.Equal(3, checks.Lines.Count);
+        Assert.Equal("a.error", checks.Lines[0].CheckId);     // severity важнее количества
     }
 
     [Fact]
@@ -490,5 +638,94 @@ public class DashboardStatusServiceTests
         var second = await service.GetStatusAsync(CancellationToken.None);
 
         Assert.Equal(0, second.Swimmers.Total); // из кэша, БД изменилась, но число не изменилось
+    }
+
+    // ── Дубль клубного зачёта (K6) ──────────────────────────────────────────
+
+    private static Competition Champ(string date, string pool, string name = "Champ", int? eventId = null, int? day = null) =>
+        new() { Name = name, Date = date, PoolType = pool, IsChampionship = true, EventId = eventId, DayNumber = day };
+
+    [Fact]
+    public async Task DuplicateStandings_TwoWinterChampionshipsOfSameGroup_AreCounted()
+    {
+        // Двух зимних чемпионатов одной группы за сезон быть не может: если такое есть,
+        // ошибка во флагах соревнования (IsChampionship / PoolType), а не в зачёте.
+        await using var db = CreateDb(nameof(DuplicateStandings_TwoWinterChampionshipsOfSameGroup_AreCounted));
+        var kids = new Category { Key = "results-kids-team", Name = "Kids", DisplayOrder = 1 };
+        var a = Champ("15/02/2026", "25m", "A");
+        var b = Champ("20/02/2026", "25m", "B");
+        db.AddRange(kids, a, b);
+        await db.SaveChangesAsync();
+        db.AddRange(
+            new CategoryCompetition { CategoryId = kids.Id, CompetitionId = a.Id },
+            new CategoryCompetition { CategoryId = kids.Id, CompetitionId = b.Id });
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).GetStatusAsync(CancellationToken.None);
+
+        Assert.Equal(1, result.Competitions.DuplicateStandings);
+    }
+
+    [Fact]
+    public async Task DuplicateStandings_WinterAndSummer_AreNotDuplicates()
+    {
+        // Норма: у группы за сезон ОДИН зимний (25м) и ОДИН летний (50м).
+        await using var db = CreateDb(nameof(DuplicateStandings_WinterAndSummer_AreNotDuplicates));
+        var kids = new Category { Key = "results-kids-team", Name = "Kids", DisplayOrder = 1 };
+        var winter = Champ("15/02/2026", "25m", "W");
+        var summer = Champ("20/07/2026", "50m", "S");
+        db.AddRange(kids, winter, summer);
+        await db.SaveChangesAsync();
+        db.AddRange(
+            new CategoryCompetition { CategoryId = kids.Id, CompetitionId = winter.Id },
+            new CategoryCompetition { CategoryId = kids.Id, CompetitionId = summer.Id });
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).GetStatusAsync(CancellationToken.None);
+
+        Assert.Equal(0, result.Competitions.DuplicateStandings);
+    }
+
+    [Fact]
+    public async Task DuplicateStandings_DaysOfOneEvent_AreNotDuplicates()
+    {
+        // Зачётная единица — СОБЫТИЕ целиком; три дня чемпионата это один зачёт.
+        await using var db = CreateDb(nameof(DuplicateStandings_DaysOfOneEvent_AreNotDuplicates));
+        var kids = new Category { Key = "results-kids-team", Name = "Kids", DisplayOrder = 1 };
+        var ev = new CompetitionEvent { Name = "Champ" };
+        db.AddRange(kids, ev);
+        await db.SaveChangesAsync();
+        var d1 = Champ("15/02/2026", "25m", "D1", ev.Id, 1);
+        var d2 = Champ("16/02/2026", "25m", "D2", ev.Id, 2);
+        db.AddRange(d1, d2);
+        await db.SaveChangesAsync();
+        db.AddRange(
+            new CategoryCompetition { CategoryId = kids.Id, CompetitionId = d1.Id },
+            new CategoryCompetition { CategoryId = kids.Id, CompetitionId = d2.Id });
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).GetStatusAsync(CancellationToken.None);
+
+        Assert.Equal(0, result.Competitions.DuplicateStandings);
+    }
+
+    [Fact]
+    public async Task DuplicateStandings_CustomCategory_IsIgnored()
+    {
+        // Кастомная категория (result-maccabiah) зачёта не образует вовсе.
+        await using var db = CreateDb(nameof(DuplicateStandings_CustomCategory_IsIgnored));
+        var custom = new Category { Key = "result-maccabiah", Name = "Maccabiah", DisplayOrder = 9 };
+        var a = Champ("15/02/2026", "25m", "A");
+        var b = Champ("20/02/2026", "25m", "B");
+        db.AddRange(custom, a, b);
+        await db.SaveChangesAsync();
+        db.AddRange(
+            new CategoryCompetition { CategoryId = custom.Id, CompetitionId = a.Id },
+            new CategoryCompetition { CategoryId = custom.Id, CompetitionId = b.Id });
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).GetStatusAsync(CancellationToken.None);
+
+        Assert.Equal(0, result.Competitions.DuplicateStandings);
     }
 }

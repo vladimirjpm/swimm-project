@@ -1,0 +1,447 @@
+﻿/* Swimm — Deep / Deep Light. Полный набор токенов + рецепты.
+   Подключение: класс .theme-deep или .theme-deep-light на корне страницы (или карточки).
+   Компоненты используют ТОЛЬКО var(--deep-*) — тогда любая карточка работает в обеих темах
+   и переносится на другие страницы без правок. */
+
+.theme-deep {
+  --deep-page-bg: #04182b;
+  --deep-hero-grad: linear-gradient(160deg, #062a4a 0%, #04182b 60%);
+  --deep-waterline: rgba(34,211,238,.14);
+  --deep-card-bg: rgba(255,255,255,.05);
+  --deep-card-bg-raised: rgba(255,255,255,.04);   /* вложенные тайлы/строки */
+  --deep-card-bg-row: rgba(255,255,255,.03);      /* строки списков */
+  --deep-card-border: rgba(255,255,255,.10);
+  --deep-card-border-soft: rgba(255,255,255,.08);
+  --deep-divider: rgba(255,255,255,.07);
+  --deep-text: #ffffff;
+  --deep-text-mute: rgba(255,255,255,.55);
+  --deep-text-faint: rgba(255,255,255,.45);
+  --deep-text-ghost: rgba(255,255,255,.35);
+  --deep-accent: #22d3ee;
+  --deep-accent-hover: #67e8f9;
+  --deep-accent-ink: #04182b;
+  --deep-accent-soft: rgba(34,211,238,.12);
+  --deep-accent-chip: rgba(34,211,238,.14);
+  --deep-accent-border: rgba(34,211,238,.45);
+  --deep-accent-glow: 0 0 22px rgba(34,211,238,.18);
+  --deep-accent-grad: linear-gradient(180deg,#22d3ee,#0e7490);
+  --deep-accent-bar: #22d3ee;                      /* сегменты ❄ текущего сезона */
+  --deep-accent-bar-dim: rgba(34,211,238,.35);     /* сегменты ❄ прошлых сезонов */
+  --deep-gold: #fbbf24;
+  --deep-gold-soft: rgba(251,191,36,.10);
+  --deep-gold-chip: rgba(251,191,36,.16);
+  --deep-gold-border: rgba(251,191,36,.35);
+  --deep-gold-grad: linear-gradient(180deg,#fbbf24,#b45309);
+  --deep-gold-bar: #fbbf24;                        /* сегменты ☀ */
+  --deep-gold-bar-dim: rgba(251,191,36,.35);
+  --deep-ow: #a78bfa;                              /* open water 3/5 km */
+  --deep-ow-soft: rgba(167,139,250,.12);
+  --deep-ow-chip: rgba(167,139,250,.14);
+  --deep-ow-border: rgba(167,139,250,.5);
+  --deep-ow-bar: #a78bfa;
+  --deep-ow-bar-dim: rgba(167,139,250,.35);
+  --deep-danger: #f87171;
+  --deep-danger-soft: rgba(248,113,113,.14);
+  --deep-male: #60a5fa;  --deep-male-soft: rgba(59,130,246,.14);  --deep-male-border: rgba(59,130,246,.3);
+  --deep-female: #f472b6; --deep-female-soft: rgba(236,72,153,.14); --deep-female-border: rgba(236,72,153,.3);
+  --deep-seg-track: rgba(255,255,255,.08);         /* фон сегмент-контролов (25m/50m) */
+  --deep-seg-active-bg: #fff;
+  --deep-seg-active-fg: #04182b;
+  --deep-card-shadow: 0 8px 28px rgba(4,32,58,.22);
+  /* Табы страницы клуба (3a): подложка тёмного стекла + cyan-волосок сверху */
+  --deep-tabs-bg: rgba(0,0,0,.28);
+  --deep-tabs-hairline: rgba(34,211,238,.14);
+  --deep-tab-glow: 0 -6px 18px rgba(34,211,238,.18);
+  --deep-tab-text-glow: 0 0 12px rgba(34,211,238,.5);
+  /* «Папка» (TABS.md 3a folder-tab): активная плитка и панель контента — один
+     непрозрачный корпус, поэтому фон СПЛОШНОЙ, а не стекло: полупрозрачный давал бы
+     видимый шов на стыке. */
+  --deep-panel-bg: #0c2a3f;
+  --deep-panel-border: rgba(34,211,238,.5);
+  --deep-panel-glow: 0 0 18px rgba(34,211,238,.14);
+  /* Полоса сезонов (4c): подложка чуть светлее табов, свечение центра карусели */
+  --deep-strip-bg: rgba(0,0,0,.16);
+  --deep-wheel-glow: 0 0 16px rgba(34,211,238,.5);
+  --deep-wheel-glow-sm: 0 0 14px rgba(34,211,238,.5);
+  /* Соседи карусели гаснут к краям — своя лесенка, а не общие text-токены:
+     шаг между ступенями здесь мельче (.65 / .42 / .28). */
+  --deep-wheel-d1: rgba(255,255,255,.65);
+  --deep-wheel-d2: rgba(255,255,255,.42);
+  --deep-wheel-d3: rgba(255,255,255,.28);
+  --deep-wheel-off: rgba(255,255,255,.75);   /* центр, когда активен All */
+}
+
+.theme-deep-light {
+  --deep-page-bg: #f4f9fc;
+  --deep-hero-grad: linear-gradient(160deg,#dceff7 0%,#f0f8fc 55%,#f4f9fc 100%);
+  --deep-waterline: rgba(14,116,144,.10);
+  --deep-card-bg: #ffffff;
+  --deep-card-bg-raised: #f9fbfd;
+  --deep-card-bg-row: #fbfdfe;
+  --deep-card-border: #e0ecf2;
+  --deep-card-border-soft: #e9f1f6;
+  --deep-divider: #eef4f8;
+  --deep-text: #04283e;
+  --deep-text-mute: #7b95a3;
+  --deep-text-faint: #9db0bb;
+  --deep-text-ghost: #b8c7d0;
+  --deep-accent: #0e7490;
+  --deep-accent-hover: #0c6379;
+  --deep-accent-ink: #ffffff;
+  --deep-accent-soft: rgba(14,116,144,.06);
+  --deep-accent-chip: rgba(14,116,144,.10);
+  --deep-accent-border: rgba(14,116,144,.45);
+  --deep-accent-glow: 0 2px 12px rgba(8,60,84,.10);
+  --deep-accent-grad: linear-gradient(180deg,#0e7490,#0a4f61);
+  --deep-accent-bar: #0e7490;
+  --deep-accent-bar-dim: rgba(14,116,144,.30);
+  --deep-gold: #b17d11;                            /* текст-голд, контраст ≥4.5 на белом */
+  --deep-gold-soft: rgba(217,164,32,.12);
+  --deep-gold-chip: rgba(217,164,32,.14);
+  --deep-gold-border: rgba(178,125,17,.35);
+  --deep-gold-grad: linear-gradient(180deg,#d9a420,#92600a);
+  --deep-gold-bar: #d9a420;
+  --deep-gold-bar-dim: rgba(217,164,32,.35);
+  --deep-ow: #7c3aed;
+  --deep-ow-soft: rgba(124,58,237,.06);
+  --deep-ow-chip: rgba(124,58,237,.08);
+  --deep-ow-border: rgba(124,58,237,.45);
+  --deep-ow-bar: #7c3aed;
+  --deep-ow-bar-dim: rgba(124,58,237,.30);
+  --deep-danger: #b23b3b;
+  --deep-danger-soft: rgba(178,59,59,.08);
+  --deep-male: #1d4ed8;  --deep-male-soft: rgba(29,78,216,.05);  --deep-male-border: rgba(29,78,216,.2);
+  --deep-female: #be185d; --deep-female-soft: rgba(190,24,93,.04); --deep-female-border: rgba(190,24,93,.18);
+  --deep-seg-track: #eef4f8;
+  --deep-seg-active-bg: #0e7490;
+  --deep-seg-active-fg: #fff;
+  --deep-card-shadow: 0 2px 10px rgba(8,60,84,.05);
+  /* Табы в светлой теме: подложка — прохладный тон страницы, а не чёрное стекло
+     (0,0,0,.28 на белом даёт серую плашку и убивает контраст подписей). */
+  --deep-tabs-bg: #eaf3f8;
+  --deep-tabs-hairline: rgba(14,116,144,.18);
+  --deep-tab-glow: 0 -4px 14px rgba(8,60,84,.10);
+  --deep-tab-text-glow: none;
+  --deep-panel-bg: #ffffff;
+  --deep-panel-border: rgba(14,116,144,.45);
+  --deep-panel-glow: 0 2px 12px rgba(8,60,84,.08);
+  /* В светлой теме свечения нет: на белом «сияющий» текст читается как размытие,
+     роль «выбран» несут цвет-акцент и размер. */
+  --deep-strip-bg: #f0f6fa;
+  --deep-wheel-glow: none;
+  --deep-wheel-glow-sm: none;
+  --deep-wheel-d1: #5b7684;
+  --deep-wheel-d2: #8ea4b0;
+  --deep-wheel-d3: #b0c1cb;
+  --deep-wheel-off: #7b95a3;
+}
+
+.theme-deep, .theme-deep-light {
+  --deep-font-display: 'Archivo Black', sans-serif; /* заголовки карточек, большие числа, год */
+  --deep-radius-card: 16px;
+  --deep-radius-tile: 14px;
+  --deep-radius-row: 12px;
+  --deep-radius-pill: 999px;
+}
+
+/* ── Рецепты (все карточки собираются из них) ── */
+.deep-card { background: var(--deep-card-bg); border: 1px solid var(--deep-card-border); border-radius: var(--deep-radius-card); padding: 20px 22px; box-shadow: var(--deep-card-shadow); }
+.deep-card-title { font-family: var(--deep-font-display); font-size: 17px; color: var(--deep-text); }
+.deep-card-sub { font-size: 12px; font-weight: 700; color: var(--deep-text-mute); }
+.deep-cta { background: var(--deep-accent); color: var(--deep-accent-ink); border: none; border-radius: 12px; font-weight: 900; cursor: pointer; }
+.deep-cta:hover { background: var(--deep-accent-hover); }
+/* Фильтр-пилюля (сезоны, любые списки) */
+.deep-pill { border-radius: var(--deep-radius-pill); font-weight: 800; font-size: 12.5px; padding: 7px 13px; border: 1px solid var(--deep-card-border); background: var(--deep-card-bg-raised); color: var(--deep-text-faint); cursor: pointer; white-space: nowrap; }
+.deep-pill--active { background: var(--deep-accent-chip); border-color: var(--deep-accent-border); color: var(--deep-accent); }
+/* Свайп-ряд для длинных списков фильтров: закреплённый All + скролл */
+.deep-swipe-row { display: flex; gap: 6px; width: max-content; padding: 2px 0; }
+.deep-swipe-clip { flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+/* Плитка группы (K/Y/N/B/M/3k/5k) */
+.deep-group-tile { width: 176px; text-align: left; background: var(--deep-card-bg-raised); border: 1px solid var(--deep-card-border); border-radius: var(--deep-radius-tile); padding: 12px 14px; cursor: pointer; }
+.deep-group-tile--active { background: var(--deep-accent-soft); border-color: var(--deep-accent-border); box-shadow: var(--deep-accent-glow); }
+.deep-group-tile--ow.deep-group-tile--active { background: var(--deep-ow-soft); border-color: var(--deep-ow-border); }
+/* Сегмент-контрол (All/25m/50m и т.п.) */
+.deep-seg { display: flex; gap: 3px; background: var(--deep-seg-track); border-radius: var(--deep-radius-pill); padding: 3px; }
+.deep-seg > button { border: none; background: transparent; color: var(--deep-text-mute); font-size: 12px; font-weight: 800; padding: 6px 13px; border-radius: var(--deep-radius-pill); cursor: pointer; }
+.deep-seg > button.active { background: var(--deep-seg-active-bg); color: var(--deep-seg-active-fg); }
+/* Ранг-сегменты (Season × Group grid): #10+ = 1 шт, каждое место выше +1, #1 = 10 шт */
+.deep-rank-seg { display: block; width: 8px; height: 10px; border-radius: 2px; }
+.deep-rank-seg--winter { background: var(--deep-accent-bar); } .deep-rank-seg--winter-dim { background: var(--deep-accent-bar-dim); }
+.deep-rank-seg--summer { background: var(--deep-gold-bar); }   .deep-rank-seg--summer-dim { background: var(--deep-gold-bar-dim); }
+.deep-rank-seg--ow { background: var(--deep-ow-bar); }         .deep-rank-seg--ow-dim { background: var(--deep-ow-bar-dim); }
+/* Строка standings; --us = наш клуб (единственный glow в карточке) */
+.deep-stand-row { display: flex; align-items: center; gap: 11px; padding: 10px 13px; border-radius: var(--deep-radius-row); background: var(--deep-card-bg-row); border: 1px solid var(--deep-card-border-soft); }
+.deep-stand-row--us { background: var(--deep-accent-soft); border-color: var(--deep-accent-border); box-shadow: var(--deep-accent-glow); }
+/* Бейдж-счётчик (напр. «6 RECORDS») */
+.deep-count-badge { display: flex; align-items: baseline; gap: 7px; padding: 2px 14px; border-radius: var(--deep-radius-pill); background: var(--deep-gold-soft); border: 1px solid var(--deep-gold-border); }
+.deep-count-badge b { font-family: var(--deep-font-display); font-size: 22px; color: var(--deep-gold); }
+/* Рекорд-тайл (♂/♀) */
+.deep-record-tile { position: relative; border-radius: var(--deep-radius-tile); padding: 14px 16px; }
+.deep-record-tile--m { background: var(--deep-male-soft); border: 1px solid var(--deep-male-border); }
+.deep-record-tile--f { background: var(--deep-female-soft); border: 1px solid var(--deep-female-border); }
+/* Спорный рекорд (13a): янтарная рамка вместо гендерной + caution-ленты сверху и снизу.
+   Подложка ♀/♂, время, имя и дата не меняются — метка не должна маскировать сам рекорд.
+   Паддинг тела уменьшен на высоту лент, иначе плитка выше соседних в сетке. */
+.deep-record-tile--flagged { border-color: var(--theme-flag-border); overflow: hidden; padding: 0; }
+.deep-record-tile__body { padding: 12px 16px; }
+.deep-record-tile__tape {
+  display: block;
+  height: 7px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--theme-flag-tape-a) 0 9px,
+    var(--theme-flag-tape-b) 9px 18px
+  );
+  opacity: .9;
+  pointer-events: none;
+}
+
+/* ── Мобайл (CARDS.md «Мобайл (390)») ────────────────────────────────────────
+   Сегменты ранга мельче: 5×7 вместо 8×10. Без этого строка грида (кружок группы +
+   название + 10 сегментов + подпись) не влезает в 375px и тянет горизонтальный
+   скролл всей страницы. Длина полосы остаётся пропорциональной месту. */
+@media (max-width: 640px) {
+  .deep-rank-seg { width: 5px; height: 7px; }
+}
+
+/* ── Табы страницы клуба (handoff club_tabs, вариант 3a) ─────────────────────
+   Карточки страницы разложены по пяти табам. Подложка и стекло — из тех же
+   deep-токенов, новых цветов вариант не вводит. Glow только у активной плитки
+   (правило темы: один glow на блок). */
+/* Обёртка «папки»: полоса плиток + сросшаяся с активной плиткой панель контента */
+.deep-folder { background: var(--deep-tabs-bg); border-radius: var(--deep-radius-card); }
+
+.deep-tabs {
+  /* Снизу 0: активная плитка стыкуется с панелью, зазора между ними быть не должно */
+  padding: 12px 14px 0;
+  display: grid;
+  /* Число табов задаёт компонент: у клуба 5, у спортсмена 6.
+     minmax(0,…), а не 1fr: голый 1fr это minmax(auto,1fr), и длинное имя таба
+     («Records & PB») раздувало свою колонку за счёт соседних. */
+  grid-template-columns: repeat(var(--deep-tabs-count, 5), minmax(0, 1fr));
+  gap: 8px;
+}
+.deep-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  /* Низ прямой у ВСЕХ плиток, не только у активной: полоса плиток стоит вплотную к
+     панели, и скруглённые нижние углы неактивных давали засветы-«ушки» на стыке. */
+  border-radius: 13px 13px 0 0;
+  padding: 11px 13px;
+  text-align: left;
+  cursor: pointer;
+  background: var(--deep-card-bg-raised);
+  border: 1px solid var(--deep-card-border);
+  color: var(--deep-text-mute);
+}
+.deep-tab__head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.deep-tab__icon {
+  width: 24px; height: 24px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 999px;
+  background: var(--deep-accent-soft);
+  color: var(--deep-accent);
+  font-size: 13px;
+}
+.deep-tab__name {
+  font-family: var(--deep-font-display);
+  font-size: 12px;
+  letter-spacing: .04em;
+  color: var(--deep-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.deep-tab__sub { font-size: 10.5px; font-weight: 800; color: var(--deep-text-faint); }
+/* Активная плитка — язычок папки: снизу рамки нет, а -1px и z-index кладут её
+   ПОВЕРХ верхней рамки панели, чтобы шва не было видно. */
+.deep-tab--active {
+  background: var(--deep-panel-bg);
+  border: 1px solid var(--deep-panel-border);
+  border-bottom: none;
+  border-radius: 13px 13px 0 0;
+  margin-bottom: -1px;
+  position: relative;
+  z-index: 1;
+  box-shadow: var(--deep-tab-glow);
+}
+.deep-tab--active .deep-tab__icon { background: var(--deep-accent); color: var(--deep-accent-ink); }
+.deep-tab--active .deep-tab__name { color: var(--deep-accent); }
+.deep-tab--active .deep-tab__sub { color: var(--deep-accent); }
+
+/* Панель контента: тот же корпус, что у активной плитки */
+/* Карточки внутри панели держат свой mb-4; у последней он лишний — иначе снизу
+   двойной отступ (padding панели + margin карточки). */
+.deep-tabs-panel > *:last-child { margin-bottom: 0; }
+.deep-tabs-panel {
+  background: var(--deep-panel-bg);
+  border: 1px solid var(--deep-panel-border);
+  /* Верх прямой: панель стыкуется с полосой плиток по всей ширине, скруглённые
+     верхние углы отрывали её от язычка активной плитки. */
+  border-radius: 0 0 13px 13px;
+  box-shadow: var(--deep-panel-glow);
+  margin: 0 14px 14px;
+  padding: 14px;
+}
+
+/* Мобайл: та же пятёрка колонок, но иконка над подписью и без счётчиков.
+   Активная отбивается подчёркиванием, а не заливкой — заливка на 78px колонке
+   съедает подпись. */
+@media (max-width: 639px) {
+  .deep-tabs { padding: 8px 8px 0; gap: 4px; }
+  .deep-tabs-panel { margin: 8px; padding: 10px; }
+  .deep-tab {
+    align-items: center;
+    gap: 4px;
+    min-height: 48px;
+    padding: 7px 2px;
+    border: none;
+    background: transparent;
+    border-bottom: 2.5px solid transparent;
+    border-radius: 10px 10px 0 0;
+  }
+  .deep-tab__head { flex-direction: column; gap: 2px; }
+  .deep-tab__icon { width: auto; height: auto; background: none; font-size: 17px; }
+  .deep-tab__name { font-size: 9.5px; font-weight: 800; letter-spacing: 0; }
+  /* В мобайле «папки» нет: плитки-колонки узкие, язычок на 70px читается как артефакт.
+     Активную отбивает подчёркивание — поэтому корпус папки здесь снимается. */
+  .deep-tab--active {
+    background: transparent;
+    box-shadow: none;
+    border: none;
+    border-bottom: 2.5px solid var(--deep-accent);
+    border-radius: 10px 10px 0 0;
+    margin-bottom: 0;
+  }
+  .deep-tab--active .deep-tab__icon { background: none; color: var(--deep-accent); }
+  .deep-tab--active .deep-tab__name { color: var(--deep-accent); text-shadow: var(--deep-tab-text-glow); }
+}
+
+/* ── Полоса сезонов: кольцевая карусель (handoff filter-season, вариант 4c) ───
+   Выбранный сезон ВСЕГДА по центру, соседи симметрично (десктоп ±3, мобайл ±1),
+   лента закольцована — слоты не пустуют. Ширина слота фиксирована, чтобы ряд не
+   дёргался при смене цифр. Сколько соседей видно, решает CSS, а не JS-медиазапрос. */
+.deep-season-strip {
+  background: var(--deep-strip-bg);
+  border-top: 1px solid var(--deep-tabs-hairline);
+  border-radius: var(--deep-radius-card);
+  padding: 11px 22px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.deep-wheel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;          /* стрелки не липнут к крайним цифрам */
+  overflow: hidden;   /* уезжающий ряд не вылезает за полосу */
+}
+/* Ряд соседей + центр. Едет целиком: на каждом шаге key меняется, анимация
+   перезапускается — иначе два шага подряд проходят без движения. */
+.deep-wheel__row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+/* Проезд ряда делает transform + transition из компонента (см. club-season-carousel.tsx):
+   @keyframes тут не годятся — их перезапуск требует ремоунта, а ремоунт даёт рывок. */
+.deep-wheel__row { will-change: transform; }
+
+.deep-wheel__slot {
+  font-family: var(--deep-font-display);
+  width: 52px;
+  flex: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  transition: font-size .2s ease-out, color .2s ease-out;
+}
+/* Дальние соседи бледнее ближних — это и даёт «глубину» ленты */
+.deep-wheel__slot--d1 { font-size: 15px; color: var(--deep-wheel-d1); }
+.deep-wheel__slot--d2 { font-size: 13px; color: var(--deep-wheel-d2); }
+.deep-wheel__slot--d3 { font-size: 12px; color: var(--deep-wheel-d3); }
+/* Центр — кнопка: при активном All тап по нему выбирает этот сезон.
+   Ширина не 52px, как у слотов-соседей: цифра здесь вдвое крупнее и в слот соседа
+   физически не влезает, поэтому центр шире и с воздухом по бокам. */
+.deep-wheel__center {
+  min-width: 112px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 16px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+.deep-wheel__label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .14em;
+  color: var(--deep-text-faint);
+}
+.deep-wheel__value {
+  font-family: var(--deep-font-display);
+  font-size: 42px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--deep-accent);
+  text-shadow: var(--deep-wheel-glow);
+}
+/* All активен → подсветка уходит с центра: cyan-glow в полосе ровно один */
+/* ∞ («все сезоны») — глиф низкий и рядом с цифрами выглядит вдвое мельче, поэтому
+   кегль ему удваивают, а line-height подрезают, чтобы бокс не вырос. */
+.deep-wheel__value--inf { font-size: 84px; line-height: .5; }
+.deep-wheel__slot--all { line-height: .5; }
+.deep-wheel__slot--d1.deep-wheel__slot--all { font-size: 30px; }
+.deep-wheel__slot--d2.deep-wheel__slot--all { font-size: 26px; }
+.deep-wheel__slot--d3.deep-wheel__slot--all { font-size: 24px; }
+
+/* Режим All рисует в центре ∞ активным цветом, поэтому гашения центра больше нет
+   (класс --muted снят; --deep-wheel-off остаётся на случай возврата варианта). */
+
+.deep-wheel-nav {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 999px;
+  border: 1px solid var(--deep-card-border);
+  background: var(--deep-card-bg-raised);
+  color: var(--deep-text-mute);
+  cursor: pointer;
+  /* Хит-таргет ≥44px добирается прозрачным контуром, а сам круг остаётся 32px */
+  outline: 6px solid transparent;
+}
+.deep-wheel-nav:hover:not(:disabled) { color: var(--deep-text); }
+/* Край ленты: идти некуда — кнопка гаснет и не ловит курсор */
+.deep-wheel-nav:disabled { opacity: .35; cursor: default; }
+
+/* Спейсер справа шириной с All — иначе центр карусели уезжает влево */
+.deep-strip-side { width: 64px; flex: none; }
+
+@media (max-width: 639px) {
+  .deep-season-strip { padding: 9px 14px; gap: 6px; }
+  .deep-wheel { gap: 8px; }
+  .deep-wheel__slot { width: 44px; }
+  .deep-wheel__center { min-width: 88px; padding: 4px 10px; }
+  .deep-wheel__slot--d2, .deep-wheel__slot--d3 { display: none; }  /* мобайл: соседи ±1 */
+  .deep-wheel__slot--d1 { font-size: 13px; color: var(--deep-wheel-d2); }
+  .deep-wheel__label { font-size: 8.5px; }
+  .deep-wheel__value { font-size: 34px; text-shadow: var(--deep-wheel-glow-sm); }
+  .deep-wheel__value--inf { font-size: 68px; }
+  .deep-wheel__slot--d1.deep-wheel__slot--all { font-size: 26px; }
+  .deep-strip-side { width: 52px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deep-wheel__slot { transition: none; }
+  .deep-wheel__row { transition: none !important; }
+}

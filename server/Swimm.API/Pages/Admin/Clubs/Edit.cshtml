@@ -1,4 +1,4 @@
-@page
+﻿@page
 @model Swimm.API.Pages.Admin.Clubs.EditModel
 @{
     ViewData["Title"] = "Правка клуба";
@@ -22,8 +22,20 @@
 
     @if (d != null)
     {
+        @if (d.MergedIntoId is int mergedInto)
+        {
+            <div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-4 text-xs text-admin-text-muted">
+                Клуб склеен в <a href="/Admin/Clubs/Edit?id=@mergedInto" class="text-admin-accent hover:underline">#@mergedInto @d.MergedIntoName</a>.
+                Строка оставлена намеренно, чтобы ссылки на старый Id не гнили:
+                <a href="/clubs/@d.Id" target="_blank" class="text-admin-accent hover:underline">/clubs/@d.Id</a>
+                покажет клуб-приёмника. Из публичных выборок и дедупа склеенные исключены.
+            </div>
+        }
+
         <div class="admin-card mb-4 text-xs text-admin-text-muted">
             Результатов у клуба: <strong class="text-admin-text">@d.ResultCount</strong>.
+            Публичная страница —
+            <a href="/clubs/@d.Id" target="_blank" class="text-admin-accent hover:underline">/clubs/@d.Id</a>.
             Переименование меняет публичные выдачи (кэш сбрасывается). Склейка дублей — на странице
             <a href="@Url.Page("Index")" class="text-admin-accent hover:underline">Clubs</a>.
         </div>

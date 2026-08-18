@@ -1,6 +1,8 @@
 @page
 @using Swimm.Application.Dtos
+@using Swimm.Domain.Entities
 @model Swimm.API.Pages.Admin.PointsRules.IndexModel
+@using Swimm.Application.Validation
 @{
     ViewData["Title"] = "Points rules";
     ViewData["PageSubtitle"] = "Правила начисления очков: клубный зачёт и High Point";
@@ -73,14 +75,283 @@
                     <td class="tabular-nums">@r.EffectiveFrom.ToString("dd/MM/yyyy")</td>
                     <td class="text-admin-text-muted text-xs max-w-[320px]">@r.Description</td>
                     <td class="text-right tabular-nums">@r.EntryCount</td>
-                    <td class="text-right tabular-nums">@r.CompetitionCount</td>
+                    <td class="text-right tabular-nums">
+                        @r.CompetitionCount
+                        @if (r.CompetitionCount > 0)
+                        {
+                            var checkedTotal = r.VerifiedCount + r.AcceptedCount + r.MismatchCount;
+                            <span class="ml-1.5 admin-badge @(checkedTotal == r.CompetitionCount ? "border-admin-success/30 bg-admin-success/15 text-admin-success" : "border-admin-border bg-admin-surface-hover text-admin-text-muted")"
+                                  title="Сверено с официальным протоколом: @r.VerifiedCount из @r.CompetitionCount">✓ @r.VerifiedCount</span>
+                            @if (r.AcceptedCount > 0)
+                            {
+                                <span class="ml-1 admin-badge border-admin-warning/30 bg-admin-warning/15 text-admin-warning"
+                                      title="Принято как верное (официальных очков нет): @r.AcceptedCount">≈ @r.AcceptedCount</span>
+                            }
+                            @if (r.MismatchCount > 0)
+                            {
+                                <span class="ml-1 admin-badge border-admin-danger/30 bg-admin-danger/15 text-admin-danger"
+                                      title="Расходится с официальными (ошибка у организатора, верны наши): @r.MismatchCount">★ @r.MismatchCount</span>
+                            }
+                        }
+                    </td>
                     <td class="text-right whitespace-nowrap">
+                        @if (r.CompetitionCount > 0)
+                        {
+                            <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 rule-toggle"
+                                    data-key="@r.Id" aria-expanded="false">▸ Соревнования</button>
+                        }
+                        else
+                        {
+                            <span class="admin-btn admin-btn-ghost py-1 px-2.5 opacity-40 cursor-default"
+                                  title="К этому правилу ничего не привязано">Соревнования</span>
+                        }
                         <a href="@Url.Page("Edit", new { kind, id = r.Id })" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
                         <a href="@Url.Page("Edit", new { kind, cloneFrom = r.Id })" class="admin-btn admin-btn-ghost py-1 px-2.5"
                            title="Создать новую версию на основе этой">Клонировать</a>
                     </td>
                 </tr>
+
+                @* Панель правила: что к нему привязано и быстрая смена системы очков. *@
+                @if (Model.Competitions.TryGetValue(r.Id, out var comps) && comps.Count > 0)
+                {
+                    <tr id="rule-panel-@r.Id" class="rule-panel hidden">
+                        <td colspan="8" class="bg-admin-surface-hover/40 p-4">
+                            <form method="post" asp-page-handler="Reassign" asp-route-kind="@kind">
+                                <input type="hidden" name="ruleId" value="@r.Id" />
+
+                                <div class="mb-2 flex flex-wrap items-center gap-3 text-xs text-admin-text-muted">
+                                    <span>
+                                        Соревнования с явной привязкой к <span class="font-mono text-admin-text">@r.Version</span>.
+                                        Смена правила у многодневного события применяется ко всем его дням.
+                                    </span>
+                                    <span class="flex-1"></span>
+                                    @* Фильтр по ручной сверке — клиентский: строки панели уже отрисованы. *@
+                                    <span class="flex gap-1 verify-filter" data-rule="@r.Id">
+                                        @foreach (var (val, label) in new[] { ("all", "Все"), ("official", "✓ Проверенные"), ("accepted", "≈ Принятые"), ("mismatch", "★ Расхождения"), ("none", "Непроверенные") })
+                                        {
+                                            <button type="button" class="admin-btn admin-btn-ghost py-0.5 px-2 text-[11px] verify-filter-btn @(val == "all" ? "import-tab-active" : "")"
+                                                    data-value="@val">@label</button>
+                                        }
+                                    </span>
+                                </div>
+
+                                <table class="admin-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Соревнование</th>
+                                            <th>isr.org.il</th>
+                                            <th>Дата</th>
+                                            <th class="text-right">Результатов</th>
+                                            <th class="w-[280px]">Система очков</th>
+                                            <th>Статус</th>
+                                            <th class="w-[220px]">Сверка</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @for (var i = 0; i < comps.Count; i++)
+                                        {
+                                            var c = comps[i];
+                                            <tr data-verified="@(c.VerifiedKind ?? "none")">
+                                                <td>
+                                                    <a href="@Url.Page("/Admin/Competitions/Edit", new { id = c.Id })"
+                                                       class="text-admin-accent hover:underline">@c.Name</a>
+                                                    @if (c.DayCount > 1)
+                                                    {
+                                                        <span class="ml-1.5 admin-badge border-admin-border bg-admin-surface-hover text-admin-text-muted"
+                                                              title="Многодневное событие — правило проставится всем дням">@c.DayCount дн.</span>
+                                                    }
+                                                    @if (c.IsMasters)
+                                                    {
+                                                        <span class="ml-1.5 admin-badge border-admin-border bg-admin-surface-hover text-admin-text-muted">masters</span>
+                                                    }
+                                                </td>
+                                                <td class="tabular-nums">
+                                                    @if (c.OrgCompId is int orgId)
+                                                    {
+                                                        <a href="https://isr.org.il/comp.asp?compID=@orgId" target="_blank" rel="noopener"
+                                                           class="text-admin-accent hover:underline">@orgId ↗</a>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-admin-text-muted">—</span>
+                                                    }
+                                                </td>
+                                                <td class="tabular-nums text-admin-text-muted">@c.Date</td>
+                                                <td class="text-right tabular-nums text-admin-text-muted">@c.ResultCount</td>
+                                                <td>
+                                                    <input type="hidden" name="rows[@i].CompetitionId" value="@c.Id" />
+                                                    <select name="rows[@i].RuleId" class="admin-input">
+                                                        <option value="">Авто (по дате и типу)</option>
+                                                        @foreach (var opt in Model.Rules)
+                                                        {
+                                                            <option value="@opt.Id" selected="@(opt.Id == c.RuleId)">@opt.Version</option>
+                                                        }
+                                                    </select>
+                                                </td>
+                                                @* Бейдж рисуем по ИТОГУ проверки, а не по дате: иначе строка без итога
+                                                   выглядела бы проверенной, а фильтр относил бы её к непроверенным. *@
+                                                <td class="whitespace-nowrap">
+                                                    @if (PointsVerifiedKinds.IsKnown(c.VerifiedKind))
+                                                    {
+                                                        var stampTitle = (c.VerifiedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "")
+                                                            + (string.IsNullOrEmpty(c.VerifiedBy) ? "" : " · " + c.VerifiedBy);
+                                                        var (badgeClass, badgeText, badgeTitle) = c.VerifiedKind switch
+                                                        {
+                                                            PointsVerifiedKinds.Accepted => (
+                                                                "border-admin-warning/30 bg-admin-warning/15 text-admin-warning",
+                                                                "≈ принято",
+                                                                "Официальных очков нет; проверено и принято как верное."),
+                                                            PointsVerifiedKinds.Mismatch => (
+                                                                "border-admin-danger/30 bg-admin-danger/15 text-admin-danger",
+                                                                "★ расхождение",
+                                                                "Официальные очки не совпадают с нашими: ошибка у организатора, проверено — верны наши."),
+                                                            _ => (
+                                                                "border-admin-success/30 bg-admin-success/15 text-admin-success",
+                                                                "✓ проверено",
+                                                                "Сверено с официальным протоколом.")
+                                                        };
+                                                        <span class="admin-badge @badgeClass" title="@badgeTitle @stampTitle">@badgeText</span>
+                                                        @* «Снять» — повторный сабмит текущего итога (он же и снимает отметку). *@
+                                                        <button type="submit"
+                                                                name="verifyCompetitionId" value="@c.Id"
+                                                                formaction="@Url.Page("Index", "ToggleVerified", new { kind, verifiedKind = c.VerifiedKind })"
+                                                                class="admin-btn admin-btn-ghost py-0.5 px-2 ml-1.5 text-[11px]"
+                                                                title="Снять отметку">Снять</button>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-admin-text-muted">—</span>
+                                                    }
+                                                </td>
+                                                @* Кнопки сабмитят ТУ ЖЕ форму панели: вложенные <form> нельзя, а выбранные
+                                                   в других строках правила при этом просто игнорируются. Итог передаётся через
+                                                   formaction, а не asp-page-handler: Razor запрещает их вместе. *@
+                                                <td class="whitespace-nowrap">
+                                                    <div class="flex flex-col items-stretch gap-1">
+                                                        @foreach (var (val, label, hint) in new[]
+                                                        {
+                                                            (PointsVerifiedKinds.Official, "Проверено вручную", "Сверено с официальным протоколом — цифры совпали"),
+                                                            (PointsVerifiedKinds.Accepted, "Принято как верное", "Официальных очков нет — проверил сам и считаю верным"),
+                                                            (PointsVerifiedKinds.Mismatch, "Не совпадает с официальным", "Официальные очки есть, но в них ошибка — проверено, верны наши")
+                                                        })
+                                                        {
+                                                            <button type="submit"
+                                                                    name="verifyCompetitionId" value="@c.Id"
+                                                                    formaction="@Url.Page("Index", "ToggleVerified", new { kind, verifiedKind = val })"
+                                                                    class="admin-btn admin-btn-ghost py-1 px-2.5 text-left @(c.VerifiedKind == val ? "import-tab-active" : "")"
+                                                                    title="@hint">@label</button>
+                                                        }
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            @* Объяснение расхождения — только у клубного зачёта и только когда он помечен
+                                               «★ расхождение»: без метки этот текст некуда показывать. Едет читателю сайта
+                                               (попап «Points system»), где он сам переключает язык — поэтому все три сразу. *@
+                                            @if (kind == "clubs" && c.VerifiedKind == PointsVerifiedKinds.Mismatch)
+                                            {
+                                                <tr data-verified="@(c.VerifiedKind ?? "none")">
+                                                    <td colspan="6" class="pb-3">
+                                                        <div class="text-[12px] text-admin-text-muted mb-1">
+                                                            Почему официальные очки неверны — текст видит читатель сайта, переключая язык в попапе
+                                                        </div>
+                                                        <div class="grid gap-2 md:grid-cols-3">
+                                                            @foreach (var (langCode, langLabel, placeholder) in new[]
+                                                            {
+                                                                (CompetitionNoteLangs.En, "EN", "The official table awarded 6 and 5 points for places 21-22 instead of the 5 and 3 set by the regulations."),
+                                                                (CompetitionNoteLangs.Ru, "RU", "Официальная таблица дала за 21-22 места 6 и 5 очков вместо 5 и 3 из регламента."),
+                                                                (CompetitionNoteLangs.He, "HE", "הטבלה הרשמית העניקה 6 ו-5 נקודות על מקומות 21-22 במקום 5 ו-3 שבתקנון.")
+                                                            })
+                                                            {
+                                                                <label class="text-[12px] text-admin-text-muted flex flex-col gap-1">
+                                                                    @langLabel
+                                                                    <textarea name="note@(langLabel)" rows="4"
+                                                                              dir="@(langCode == CompetitionNoteLangs.He ? "rtl" : "ltr")"
+                                                                              class="admin-input text-[12.5px]"
+                                                                              placeholder="@placeholder">@(c.MismatchNote?.Texts.GetValueOrDefault(langCode))</textarea>
+                                                                </label>
+                                                            }
+                                                        </div>
+                                                        <div class="mt-2 flex gap-2 items-end">
+                                                            <label class="text-[12px] text-admin-text-muted flex flex-col gap-1 flex-1">
+                                                                Табличка расхождения — «место:по регламенту&gt;начислено», через запятую
+                                                                <input type="text" name="scaleDiff" class="admin-input text-[12.5px]"
+                                                                       placeholder="21:5&gt;6, 22:3&gt;5"
+                                                                       value="@(c.MismatchNote == null ? "" : ScaleDiffText.Format(c.MismatchNote.ScaleDiff))" />
+                                                            </label>
+                                                            <label class="text-[12px] text-admin-text-muted flex flex-col gap-1 flex-1">
+                                                                Ссылка на регламент (תקנון) — читатель откроет её из попапа
+                                                                <input type="url" name="sourceUrl" class="admin-input text-[12.5px]"
+                                                                       placeholder="https://loglig.com:2053/LeagueTable/ShowLeagueDoc/2502"
+                                                                       value="@(c.MismatchNote?.SourceUrl)" />
+                                                            </label>
+                                                            <button type="submit"
+                                                                    name="noteCompetitionId" value="@c.Id"
+                                                                    formaction="@Url.Page("Index", "SaveMismatchNote", new { kind })"
+                                                                    class="admin-btn admin-btn-ghost py-1 px-2.5">Сохранить пояснение</button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+
+                                <div class="mt-3">
+                                    <button type="submit" class="admin-btn admin-btn-primary">Сохранить</button>
+                                </div>
+                            </form>
+                        </td>
+                    </tr>
+                }
             }
         </tbody>
     </table>
 </div>
+
+@section Scripts {
+    <script>
+        // Панель «Соревнования» у правила. Состояние переживает перезагрузку: после сохранения
+        // страница редиректится, чтобы пересчитались счётчики в верхней таблице.
+        (function () {
+            const KEY = 'admin-pointsrules-open-rules';
+            const open = new Set(JSON.parse(sessionStorage.getItem(KEY) || '[]'));
+
+            const apply = (btn, isOpen) => {
+                const panel = document.getElementById('rule-panel-' + btn.dataset.key);
+                if (!panel) return;
+                panel.classList.toggle('hidden', !isOpen);
+                btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                btn.textContent = isOpen ? '▾ Соревнования' : '▸ Соревнования';
+            };
+
+            document.querySelectorAll('.rule-toggle').forEach(btn => {
+                if (open.has(btn.dataset.key)) apply(btn, true);
+                btn.addEventListener('click', () => {
+                    const isOpen = btn.getAttribute('aria-expanded') !== 'true';
+                    apply(btn, isOpen);
+                    isOpen ? open.add(btn.dataset.key) : open.delete(btn.dataset.key);
+                    sessionStorage.setItem(KEY, JSON.stringify([...open]));
+                });
+            });
+        })();
+
+        // Фильтр панели по ручной сверке: строки уже в DOM, поэтому просто прячем лишние.
+        (function () {
+            document.querySelectorAll('.verify-filter').forEach(group => {
+                const panel = document.getElementById('rule-panel-' + group.dataset.rule);
+                if (!panel) return;
+
+                group.querySelectorAll('.verify-filter-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const value = btn.dataset.value;
+                        group.querySelectorAll('.verify-filter-btn')
+                            .forEach(b => b.classList.toggle('import-tab-active', b === btn));
+                        panel.querySelectorAll('tr[data-verified]').forEach(tr => {
+                            tr.classList.toggle('hidden', value !== 'all' && tr.dataset.verified !== value);
+                        });
+                    });
+                });
+            });
+        })();
+    </script>
+}

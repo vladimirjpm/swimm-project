@@ -79,6 +79,24 @@ public class ResultDto
     [JsonPropertyName("event_category")]
     public string? EventCategory { get; set; }
 
+    /// <summary>
+    /// Тип заплыва: prelim / final; null — единственный заплыв дисциплины за день (timed
+    /// final) либо данные без признака. Место prelim-заплыва — ранжир сессии, не награда:
+    /// клубные очки за него не начисляются (ApplyClubPoints), медали не считаются.
+    /// </summary>
+    [JsonPropertyName("heat_type")]
+    public string? HeatType { get; set; }
+
+    /// <summary>
+    /// Заплыв помечен как недостоверный: ошибка САМОГО протокола (docs/data-integrity.md).
+    /// Строка остаётся в результатах — мы не переписываем протокол, — но клиент обязан
+    /// показать это глазом, иначе бессмыслица вроде 200 вольным за 1:53 у 13-летнего
+    /// выглядит как достижение и получает бейдж рекорда.
+    /// null — строка в порядке.
+    /// </summary>
+    [JsonPropertyName("suspect_reason")]
+    public string? SuspectReason { get; set; }
+
     [JsonPropertyName("pool_type")]
     public string PoolType { get; set; } = string.Empty;
 
@@ -144,6 +162,14 @@ public class ResultDto
 
     [JsonPropertyName("birth_year")]
     public int BirthYear { get; set; }
+
+    /// <summary>
+    /// Id клуба. Нужен, чтобы клуб был ССЫЛКОЙ на свою страницу (<c>/clubs/{id}</c>), а не
+    /// строкой: имена не уникальны, а после merge дублей строки-имена остаются одинаковыми.
+    /// Читается из готового FK <c>ResultRecord.ClubId</c> — лишнего JOIN не добавляет.
+    /// </summary>
+    [JsonPropertyName("club_id")]
+    public int ClubId { get; set; }
 
     [JsonPropertyName("club")]
     public string ClubName { get; set; } = string.Empty;

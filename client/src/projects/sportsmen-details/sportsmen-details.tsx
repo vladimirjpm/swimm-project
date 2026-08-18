@@ -12,10 +12,12 @@ import { routes } from '../../utils/routes';
 import UI_ClubIcon from '../components/mix/club-icon/club-icon';
 import UI_NormativeLevelIcon from '../components/mix/normative-level-icon/normative-level-icon';
 import UI_MedalIcon from '../components/mix/medal-icon/medal-icon';
+import UI_PrelimLabel from '../components/mix/prelim-label/prelim-label';
 import UI_PositionBadge from '../components/mix/position-badge/position-badge';
 import ResultRowDateInfo from '../results-table/components/result-row-date-info';
 import UI_PoolIcon from '../components/mix/pool-icon/pool-icon';
 import UI_SwimmerTimeCell from '../components/mix/swimmer-time-cell/swimmer-time-cell';
+import { swimFlaggedRowProps } from '../components/mix/swim-time/swim-time';
 import UI_FlagEmoji from '../components/mix/flag-icon/flag-icon';
 import UI_RecordCount from '../components/mix/record-count/record-count';
 import UI_SwimmerGallery from '../components/mix/swimmer-gallery/swimmer-gallery';
@@ -537,6 +539,10 @@ function AllTimeBests({ career }: { career: AthleteCareer }) {
       event_style_name: b.stroke,
       event_style_len: b.distance,
       time: b.time,
+      // Инвариант И11: строка со временем несёт и качество. Без этого all-time-карточка
+      // молча показывала спорный заплыв как обычный — API признак отдаёт (CareerBest.suspect_reason),
+      // терялся он ровно здесь, в мэппинге.
+      suspect_reason: b.suspect_reason ?? null,
       international_points: b.points,
       date: b.date,
       competition: b.competition,
@@ -1001,7 +1007,8 @@ function ResultsTable({
           !isNaN(Number(res.international_points));
         // По-строчный флаг (all-time может смешивать разные соревнования) с фолбэком
         // на общий isAwardSource (одно соревнование — таб «это соревнование»).
-        const rowIsAward = res.is_award ?? isAwardSource ?? false;
+        // Медаль только за награждаемый заплыв: prelim-место — ранжир сессии, не награда.
+        const rowIsAward = (res.is_award ?? isAwardSource ?? false) && res.heat_type !== 'prelim';
 
         // Иконка «есть видео» — только для строк с DB id заплыва (статические источники
         // его не имеют, см. Footguns задания). Добавление медиа с этой страницы убрано —
@@ -1009,16 +1016,25 @@ function ResultsTable({
         const rowId = typeof res.id === 'number' ? res.id : null;
         const hasMedia = rowId != null && !!mediaResultIds?.has(rowId);
 
+        // Спорное время (гибрид 15d): та же обвязка, что у строки таблицы результатов —
+        // лента слева + полный текст в title/aria-label; чип рисует UI_SwimTime.
+        const quality = res.suspect_reason ? { kind: 'protocol' as const, reason: res.suspect_reason } : null;
+        const flagProps = swimFlaggedRowProps(quality);
+
         return (
           <li
             key={index}
-            className="flex flex-col gap-2 rounded-[14px] p-3"
+            {...flagProps}
+            className={`flex flex-col gap-2 rounded-[14px] py-3 pr-3 ${
+              quality ? `${flagProps.className} swim-flagged-row--rounded pl-5` : 'pl-3'
+            }`}
             style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)' }}
           >
             {/* Линия 1: место+возраст · стиль с дистанцией · время */}
             <div className="flex items-center gap-3">
               <div className="flex shrink-0 flex-col items-center gap-1">
                 <UI_MedalIcon place={String(res.position ?? index + 1)} styleType={rowIsAward ? 'icon-place' : 'icon-noplace'} styleSize="medal-40" />
+                <UI_PrelimLabel heatType={res.heat_type} />
                 {res.event_style_age && (
                   <div className="text-[10px]" style={{ color: 'var(--theme-mode-text-muted)' }}>
                     age: <strong style={{ color: 'var(--theme-mode-text)' }}>{res.event_style_age}</strong>
@@ -1047,6 +1063,8 @@ function ResultsTable({
               <div className="flex-1" />
               <UI_SwimmerTimeCell
                 time={res.time}
+                quality={quality}
+                qualityMarker="chip"
                 time_split={res.time_split}
                 time_fail={res.time_fail}
                 time_fail_note={res.time_fail_note}

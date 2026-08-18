@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
+using Swimm.Domain;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Services;
@@ -20,8 +21,9 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
     private readonly ICompetitionRecalculationService? _recalc;
 
     /// <param name="recalc">
-    /// Пересчёт материализованных величин (объединённые места) при смене
-    /// <c>ShowCombineAllResults</c>. Необязателен: null — пересчёт пропускается (тесты).
+    /// Пересчёт материализованных величин (объединённые места + клубный зачёт) при смене
+    /// <c>ShowCombineAllResults</c> или привязки <c>PointRuleClubsId</c>.
+    /// Необязателен: null — пересчёт пропускается (тесты).
     /// </param>
     public CompetitionAdminRepository(SwimmDbContext db, ICacheService cache,
         ICompetitionRecalculationService? recalc = null)
@@ -69,7 +71,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
 
     public async Task<UnifiedCompetitionList> GetUnifiedAsync(
         string? search, string? categoryKey, int? season, string? stage, bool showSynthetic, int? month, int page, int pageSize,
-        string? qualityFilter = null, string? kind = null)
+        string? qualityFilter = null, string? kind = null, string? discipline = null)
     {
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 20;
@@ -103,6 +105,10 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             .Select(c => new { OrgCompId = c.OrgCompId!.Value, c.Id })
             .ToDictionaryAsync(c => c.OrgCompId, c => c.Id);
 
+        var disciplineByCompId = await _db.Competitions.AsNoTracking()
+            .Select(c => new { c.Id, c.Discipline })
+            .ToDictionaryAsync(c => c.Id, c => c.Discipline);
+
         var unified = new List<UnifiedCompetitionRowDto>(dbRows.Count + discovered.Count);
         var overlaidRows = new HashSet<CompetitionRowDto>();
 
@@ -112,7 +118,8 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             {
                 DiscoveredId = d.Id, OrgCompId = d.OrgCompId, Name = d.Name,
                 DateStart = d.DateStart, DateEnd = d.DateEnd, Venue = d.Venue,
-                Status = d.Status, Languages = d.Languages, LastError = d.LastError, LogligId = d.LogligId
+                Status = d.Status, Languages = d.Languages, LastError = d.LastError, LogligId = d.LogligId,
+                EmptySourceAt = d.EmptySourceAt, Discipline = d.Discipline
             };
 
             // Резолв к соревнованию: OrgCompId штампован → он; иначе матч по имени+дате.
@@ -154,9 +161,28 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 Stage = CompetitionStage.DbOnly, Db = row, SortDate = RowDate(row)
             });
 
-        // 2b) Фильтр по сезону (сен–авг) — один предикат на обе стороны, по дате строки.
-        if (season is int s)
-            unified = unified.Where(u => u.SortDate.Year > 1 && SeasonOf(u.SortDate) == s).ToList();
+        // 2b) Вид спорта строки + фильтр. Признак ХРАНИТСЯ (Competition.Discipline /
+        // DiscoveredCompetition.Discipline), здесь только читаем: по названию на лету не
+        // фильтруем сознательно — правило разъехалось бы по вьюхам, а промах распознавания
+        // нельзя было бы поправить на одной строке.
+        foreach (var u in unified)
+        {
+            var compId = u.Db?.Single?.Id ?? (u.Db?.Days.Count > 0 ? u.Db.Days[0].Id : (int?)null);
+            u.Discipline = compId is int id2 && disciplineByCompId.TryGetValue(id2, out var dsc)
+                ? dsc
+                : u.Site?.Discipline ?? Disciplines.Swimming;
+        }
+
+        // Пусто → только плавание: артистическое (~6% входящих) в список не идёт, но и не
+        // теряется — «all» показывает всё, счётчик скрытых уходит наверх.
+        var hiddenByDiscipline = 0;
+        if (!string.Equals(discipline, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            var wanted = Disciplines.IsValid(discipline) ? discipline! : Disciplines.Swimming;
+            var before = unified.Count;
+            unified = unified.Where(u => u.Discipline == wanted).ToList();
+            hiddenByDiscipline = before - unified.Count;
+        }
 
         // 2c) Признак «чемпионат Израиля» — по названию любой стороны строки (у входящих других
         // признаков нет). Считаем всегда: он и фильтр «Тип», и иконка 🏆 в списке.
@@ -182,11 +208,31 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             _ => unified
         };
 
-        // 4) Счётчики по месяцам (под текущими фильтрами, но ДО фильтра по месяцу — для кнопок).
+        // 4) Счётчики по сезонам — ДО фильтра по сезону, иначе на чипах остался бы один сезон.
+        // «Затянуто» = строка есть в справочнике БД (стадии Imported/DbOnly), т.е. Db != null.
+        var seasonCounts = unified
+            .Where(u => u.SortDate.Year > 1)
+            .GroupBy(u => SeasonOf(u.SortDate))
+            .OrderByDescending(g => g.Key)
+            .Select(g => new SeasonCountDto(
+                g.Key, g.Count(), g.Count(u => u.Db != null), g.Count(IsNothingToPull)))
+            .ToList();
+
+        // 4b) Фильтр по сезону (сен–авг) — один предикат на обе стороны, по дате строки.
+        if (season is int s)
+            unified = unified.Where(u => u.SortDate.Year > 1 && SeasonOf(u.SortDate) == s).ToList();
+
+        // 4c) Счётчики по месяцам (под текущими фильтрами вкл. сезон, но ДО фильтра по месяцу).
         var monthCounts = new int[12];
+        var monthImported = new int[12];
+        var monthNothingToPull = new int[12];
         foreach (var u in unified)
             if (u.SortDate.Year > 1) // непарсибельные даты (MinValue) не считаем
+            {
                 monthCounts[u.SortDate.Month - 1]++;
+                if (u.Db != null) monthImported[u.SortDate.Month - 1]++;
+                else if (IsNothingToPull(u)) monthNothingToPull[u.SortDate.Month - 1]++;
+            }
 
         // 5) Фильтр по месяцу (если задан) + единый date-desc порядок + пагинация в памяти.
         if (month is >= 1 and <= 12)
@@ -196,8 +242,27 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         var total = unified.Count;
         var pageItems = unified.Skip((page - 1) * pageSize).Take(pageSize).ToList();
         return new UnifiedCompetitionList(
-            new PagedResult<UnifiedCompetitionRowDto>(pageItems, total, page, pageSize), monthCounts);
+            new PagedResult<UnifiedCompetitionRowDto>(pageItems, total, page, pageSize), monthCounts,
+            hiddenByDiscipline, monthImported, seasonCounts, monthNothingToPull);
     }
+
+    /// <summary>
+    /// Строка, по которой работы БОЛЬШЕ НЕТ, хотя в БД её нет: протокол пуст
+    /// (<c>EmptySourceAt</c> — ставится автоматически при разборе, который ничего не нашёл,
+    /// и снимается сам, если файл потом выложили) либо строка скрыта админом (Ignored —
+    /// решение принято).
+    ///
+    /// Нужно, чтобы счётчик не пугал зря: «12 из 14» читается как долг на две штуки, хотя
+    /// у обеих тянуть нечего и месяц закрыт.
+    ///
+    /// ⚠ Отсутствие loglig-id сюда НЕ входит, хотя соблазн есть: у 89 строк сезона 2025/26
+    /// его нет просто потому, что детали ещё не загружались (грузятся при первом
+    /// «Затянуть»). Это «ещё не пробовали», а не «нечего брать» — иначе целый апрель из
+    /// трёх незатянутых соревнований показал бы зелёную галочку. Ошибка забора
+    /// (<c>LastError</c>) — тем более повод вернуться, а не закрытый вопрос.
+    /// </summary>
+    private static bool IsNothingToPull(UnifiedCompetitionRowDto u) =>
+        u.Db == null && (u.Stage == CompetitionStage.Ignored || u.Site?.EmptySourceAt != null);
 
     /// <summary>
     /// Чемпионат = чемпионат ИЗРАИЛЯ: «אליפות ישראל» (или английское Israel + Championship).
@@ -232,8 +297,10 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
     /// <summary>
     /// Сезон плавания по дате: сентябрь–август, называется годом окончания (окт-2024 → 2025).
     /// Совпадает с cYear на isr.org.il (проверено на списке cYear=2025: окт-2024 … авг-2025).
+    /// ⚠ Это нумерация ФЕДЕРАЦИИ — на 1 больше публичной (год начала), которой пользуются
+    /// страницы спортсмена и клуба. Обе живут в <see cref="SeasonMath"/>, смешивать нельзя.
     /// </summary>
-    public static int SeasonOf(DateTime date) => date.Month >= 9 ? date.Year + 1 : date.Year;
+    public static int SeasonOf(DateTime date) => SeasonMath.FederationYearOf(date);
 
     /// <summary>Дата строки для сортировки: одиночное — своя дата, событие — дата первого дня.
     /// Date хранится текстом «дд/ММ/гггг»; непарсибельное → MinValue (уедет вниз списка).</summary>
@@ -330,6 +397,12 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                     Days = days,
                     DayCount = days.Count,
                     TotalResultCount = days.Sum(d => d.ResultCount),
+                    SuspectCount = days.Sum(d => d.SuspectCount),
+                    // Событие проверено, только если проверены ВСЕ дни; показываем самый
+                    // старый прогон — по нему видно, не устарела ли проверка.
+                    QualityScannedAt = days.All(d => d.QualityScannedAt != null)
+                        ? days.Min(d => d.QualityScannedAt)
+                        : null,
                     DateRange = FormatDateRange(days),
                     PoolType = days[0].PoolType,
                     Country = days[0].Country,
@@ -339,6 +412,9 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                     // Чемпионат — если хоть один день помечен: регламент у события один.
                     IsChampionship = days.Any(d => d.IsChampionship),
                     ShowCombineAllResults = days.All(d => d.ShowCombineAllResults),
+                    // «Не ведётся» у события = у ВСЕХ его дней: один день с зачётом делает
+                    // событие зачётным, иначе флаг соврал бы про остальные.
+                    ClubPointsDisabled = days.All(d => d.ClubPointsDisabled),
                 };
             }
             return new CompetitionRowDto { Single = h };
@@ -433,6 +509,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         IsAward = c.IsAward,
         IsChampionship = c.IsChampionship,
         ShowCombineAllResults = c.ShowCombineAllResults,
+        ClubPointsDisabled = c.ClubPointsDisabled,
         PointRuleClubsId = c.PointRuleClubsId,
         PointRuleSwimmersId = c.PointRuleSwimmersId,
         EventId = c.EventId,
@@ -441,7 +518,9 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         ResultCount = _db.Results.Count(r => r.CompetitionId == c.Id),
         ResultUrlCount = c.OrgCompId != null
             ? _db.CompetitionResultUrls.Count(u => u.OrgCompId == c.OrgCompId)
-            : 0
+            : 0,
+        QualityScannedAt = c.QualityScannedAt,
+        SuspectCount = _db.Results.Count(r => r.CompetitionId == c.Id && r.SuspectReason != null)
     };
 
     /// <summary>«дд/ММ/гггг – дд/ММ/гггг» по дням события (или один день, если даты совпали).</summary>
@@ -478,8 +557,10 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             EventId = c.EventId,
             EventName = c.Event?.Name,
             DayNumber = c.DayNumber,
+            StandingKindOverride = c.StandingKindOverride,
             PointRuleClubsId = c.PointRuleClubsId,
             PointRuleSwimmersId = c.PointRuleSwimmersId,
+            ClubPointsDisabled = c.ClubPointsDisabled,
             EventDayCount = c.EventId == null
                 ? 1
                 : await _db.Competitions.CountAsync(x => x.EventId == c.EventId),
@@ -549,16 +630,22 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         // пустую таблицу; выключили — значения обязаны обнулиться, иначе останутся от
         // прошлой жизни (docs/points-rules-per-competition-plan.md §3.4).
         var combineChanged = comp.ShowCombineAllResults != input.ShowCombineAllResults;
+        // Клубный зачёт материализован (ClubCompetitionStandings) и считается по привязанному
+        // правилу — смена привязки обязана его пересчитать, иначе витрина остаётся на очках
+        // старого правила (Маккаби-2026 #1565: импорт посчитал по автоподбору, привязка
+        // правила из quick-edit зачёт не тронула).
+        var clubRuleChanged = comp.PointRuleClubsId != input.PointRuleClubsId;
 
         Apply(comp, input);
         await ApplyCountryAsync(comp, input.Country);
         var save = await SaveAsync(comp);
         if (save.Success) await SyncCategoriesAsync(comp.Id, input.CategoryKeys);
 
-        if (save.Success && combineChanged && _recalc is not null)
+        if (save.Success && (combineChanged || clubRuleChanged) && _recalc is not null)
         {
             // Соревнование уже сохранено — сбой пересчёта не должен отменять правку формы.
-            // Аварийный прогон: `dotnet run -- --recalc-combined`.
+            // Аварийный прогон: `dotnet run -- --recalc-combined` (места) и
+            // `dotnet run -- --rebuild-club-standings` (клубный зачёт).
             try { await _recalc.RecalculateCompetitionAsync(comp.Id); }
             catch (Exception) { /* лог не нужен: аварийный прогон закрывает случай */ }
             await _cache.InvalidateAllAsync();
@@ -647,8 +734,13 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         comp.IsAward = input.IsAward;
         comp.IsChampionship = input.IsChampionship;
         comp.ShowCombineAllResults = input.ShowCombineAllResults;
+        // Пустая строка из формы = «Авто» (null), иначе мусор поехал бы в БД.
+        comp.StandingKindOverride = string.IsNullOrWhiteSpace(input.StandingKindOverride)
+            ? null
+            : input.StandingKindOverride.Trim();
         comp.PointRuleClubsId = input.PointRuleClubsId;
         comp.PointRuleSwimmersId = input.PointRuleSwimmersId;
+        comp.ClubPointsDisabled = input.ClubPointsDisabled;
     }
 
     /// <summary>
@@ -815,14 +907,36 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         if (error != null) return CompetitionSaveResult.Fail(error);
 
         var comps = await _db.Competitions.Where(c => ids.Contains(c.Id)).ToListAsync();
+        var clubRuleChanged = new List<Competition>();
         foreach (var comp in comps)
         {
-            if (assignment.SetClubs) comp.PointRuleClubsId = assignment.ClubsRuleId;
+            if (assignment.SetClubs && comp.PointRuleClubsId != assignment.ClubsRuleId)
+            {
+                comp.PointRuleClubsId = assignment.ClubsRuleId;
+                clubRuleChanged.Add(comp);
+            }
             if (assignment.SetSwimmers) comp.PointRuleSwimmersId = assignment.SwimmersRuleId;
         }
 
         await _db.SaveChangesAsync();
         await _cache.InvalidateAllAsync();
+
+        // Клубный зачёт материализован — смена привязки без пересчёта оставила бы очки
+        // старого правила. Зачётная единица — событие целиком, поэтому пересчёт по разу
+        // на событие, а не на каждый день. Очки пловцов не материализованы — им не нужно.
+        if (clubRuleChanged.Count > 0 && _recalc is not null)
+        {
+            foreach (var unitId in clubRuleChanged
+                .GroupBy(c => c.EventId ?? -c.Id)
+                .Select(g => g.First().Id))
+            {
+                // Привязка уже сохранена — сбой пересчёта не должен отменять операцию.
+                // Аварийный прогон: `dotnet run -- --rebuild-club-standings`.
+                try { await _recalc.RecalculateCompetitionAsync(unitId); }
+                catch (Exception) { /* лог не нужен: аварийный прогон закрывает случай */ }
+            }
+        }
+
         // Id в результате нет — это массовая операция; число изменённых строк отдаём через Id.
         return CompetitionSaveResult.Ok(comps.Count);
     }
@@ -863,7 +977,8 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 ShowCombineAllResults = input.ShowCombineAllResults,
                 CategoryKeys = input.CategoryKeys,
                 PointRuleClubsId = input.PointRuleClubsId,
-                PointRuleSwimmersId = input.PointRuleSwimmersId
+                PointRuleSwimmersId = input.PointRuleSwimmersId,
+                ClubPointsDisabled = input.ClubPointsDisabled
             });
             // Первая же ошибка — наружу: молча применить «половину дней» хуже, чем сказать.
             if (!result.Success) return result;

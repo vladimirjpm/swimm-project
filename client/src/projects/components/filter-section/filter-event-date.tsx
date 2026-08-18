@@ -5,6 +5,7 @@ import {
   useAppSelector,
 } from '../../../store/store';
 import UI_DateIcon from '../mix/date-icon/date-icon';
+import UI_PrelimLabel from '../mix/prelim-label/prelim-label';
 import { useFilteredByTypeResults } from './use-filtered-results';
 import FilterCard from './filter-card';
 import { useResultsLoadMode } from '../../../hooks/useResultsLoadMode';
@@ -61,8 +62,11 @@ const FilterEventDate: React.FC = () => {
     }
   };
 
-  // Если только одна дата — фильтр не нужен
-  if (uniqueDates.length <= 1) return null;
+  // Если только одна дата — выбор даты не нужен; но если в данных есть предварительные
+  // заплывы, карточка остаётся ради тумблера [prelim] — иначе на одиночном дне
+  // соревнования с прелимами их никак не включить.
+  const hasPrelims = filteredByTypeResults.some((r) => r.heat_type === 'prelim');
+  if (uniqueDates.length <= 1 && !hasPrelims) return null;
 
   return (
     <FilterCard
@@ -95,6 +99,25 @@ const FilterEventDate: React.FC = () => {
             />
           </button>
         ))}
+
+        {/* Предварительные заплывы (heat_type='prelim') по умолчанию скрыты — официальный
+            вид это финалы. Тумблер есть только у соревнований с прелимами: выключен —
+            [has prelim] («они тут есть»), включён — зелёный [prelim ON]. Тексты и цвета —
+            в UI_PrelimLabel; сводка сверху дублирует состояние под датой. */}
+        {hasPrelims && (
+          <button
+            className="fseg"
+            onClick={() =>
+              dispatch(
+                rootActions.updateState({
+                  filterSelected: { ...filters, show_prelims: !filters.show_prelims },
+                }),
+              )
+            }
+          >
+            <UI_PrelimLabel state={filters.show_prelims ? 'on' : 'has'} className="text-[12px] normal-case" />
+          </button>
+        )}
       </div>
     </FilterCard>
   );

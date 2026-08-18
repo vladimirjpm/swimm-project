@@ -16,6 +16,8 @@ public interface ICompetitionFlags
     /// <summary>Чемпионат Израиля (ручной флаг соревнования) — бейдж 🏆.</summary>
     bool IsChampionship { get; }
     bool ShowCombineAllResults { get; }
+    /// <summary>Клубный зачёт тут не ведётся (лига, товарищеский старт).</summary>
+    bool ClubPointsDisabled { get; }
 }
 
 /// <summary>Строка списка соревнований (Competitions/Index).</summary>
@@ -33,11 +35,21 @@ public sealed class CompetitionListItemDto : ICompetitionFlags
     /// <summary>Чемпионат Израиля (ручной флаг).</summary>
     public bool IsChampionship { get; set; }
     public bool ShowCombineAllResults { get; set; }
+    /// <summary>Клубный зачёт тут не ведётся — правило очков и не нужно.</summary>
+    public bool ClubPointsDisabled { get; set; }
     public int? EventId { get; set; }
     public string? EventName { get; set; }
     public int? DayNumber { get; set; }
     public int ResultCount { get; set; }
     public int ResultUrlCount { get; set; }
+
+    /// <summary>
+    /// Когда в последний раз гоняли проверку качества. null — не гоняли; это НЕ «ошибок нет».
+    /// </summary>
+    public DateTime? QualityScannedAt { get; set; }
+
+    /// <summary>Помеченных недостоверными строк сейчас (авто + ручные).</summary>
+    public int SuspectCount { get; set; }
     /// <summary>Привязанное правило клубных очков; null — «Авто» (для панели быстрой правки).</summary>
     public int? PointRuleClubsId { get; set; }
     /// <summary>Привязанное правило High Point; null — «Авто».</summary>
@@ -72,6 +84,13 @@ public sealed class CompetitionRowDto : ICompetitionFlags
     public string? Country { get; set; }
     public int DayCount { get; set; }
     public int TotalResultCount { get; set; }
+
+    /// <summary>Проверка качества по СОБЫТИЮ: самый старый прогон среди дней (null — хоть
+    /// один день не проверялся, значит событие целиком считать проверенным нельзя).</summary>
+    public DateTime? QualityScannedAt { get; set; }
+
+    /// <summary>Помеченных строк по всем дням события.</summary>
+    public int SuspectCount { get; set; }
     /// <summary>Дни события по возрастанию DayNumber (для раскрытия строки).</summary>
     public List<CompetitionListItemDto> Days { get; set; } = [];
 
@@ -81,6 +100,8 @@ public sealed class CompetitionRowDto : ICompetitionFlags
     /// <summary>Чемпионат Израиля (ручной флаг).</summary>
     public bool IsChampionship { get; set; }
     public bool ShowCombineAllResults { get; set; }
+    /// <summary>Клубный зачёт не ведётся — общий флаг дней события.</summary>
+    public bool ClubPointsDisabled { get; set; }
 
     /// <summary>Категории события = общие для всех дней.</summary>
     public List<CategoryTagDto> Categories { get; set; } = [];
@@ -112,11 +133,20 @@ public sealed class CompetitionEditDto
     /// <summary>Ключи категорий, в которых состоит соревнование (для предвыбора чекбоксов).</summary>
     public List<string> CategoryKeys { get; set; } = [];
 
+    /// <summary>
+    /// Ручное переопределение роли в КЛУБНОМ ЗАЧЁТЕ: winter | summer | openwater | none.
+    /// null — «Авто»: роль выводится из IsChampionship + PoolType (25м → зима, 50м → лето).
+    /// </summary>
+    public string? StandingKindOverride { get; set; }
+
     /// <summary>Явная привязка к правилу клубных очков; null — правило подбирается по дате и типу (Э4).</summary>
     public int? PointRuleClubsId { get; set; }
 
     /// <summary>Явная привязка к правилу High Point; null — подбор по дате и типу.</summary>
     public int? PointRuleSwimmersId { get; set; }
+
+    /// <summary>Клубный зачёт тут не ведётся — отличает «не надо» от «забыли привязать».</summary>
+    public bool ClubPointsDisabled { get; set; }
 
     /// <summary>Сколько дней у события (1 — одиночное соревнование). Для операции «проставить всем дням».</summary>
     public int EventDayCount { get; set; } = 1;
@@ -147,11 +177,20 @@ public sealed class CompetitionInputDto
     /// <summary>Выбранные категории. IsMasters у соревнования выводится из членства в категории Masters.</summary>
     public List<string> CategoryKeys { get; set; } = [];
 
+    /// <summary>
+    /// Ручное переопределение роли в КЛУБНОМ ЗАЧЁТЕ: winter | summer | openwater | none.
+    /// null — «Авто»: роль выводится из IsChampionship + PoolType (25м → зима, 50м → лето).
+    /// </summary>
+    public string? StandingKindOverride { get; set; }
+
     /// <summary>Привязка к правилу клубных очков; null — «Авто» (подбор по дате и типу).</summary>
     public int? PointRuleClubsId { get; set; }
 
     /// <summary>Привязка к правилу High Point; null — «Авто».</summary>
     public int? PointRuleSwimmersId { get; set; }
+
+    /// <summary>Клубный зачёт тут не ведётся — правило не нужно, реестр не считает это пропуском.</summary>
+    public bool ClubPointsDisabled { get; set; }
 }
 
 /// <summary>
@@ -173,6 +212,8 @@ public sealed class CompetitionQuickEditDto
     public int? PointRuleClubsId { get; set; }
     /// <summary>Правило High Point; null — «Авто».</summary>
     public int? PointRuleSwimmersId { get; set; }
+    /// <summary>Клубный зачёт тут не ведётся (общее для всех дней события).</summary>
+    public bool ClubPointsDisabled { get; set; }
 }
 
 /// <summary>Результат мутации: успех + Id + сообщение об ошибке валидации (для показа в форме).</summary>

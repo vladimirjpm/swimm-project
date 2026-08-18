@@ -1,8 +1,10 @@
 import React from 'react';
+import { useAppSelector } from '../../../store/store';
 import UI_DateIcon from '../../components/mix/date-icon/date-icon';
 import UI_ClubIcon from '../../components/mix/club-icon/club-icon';
 import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
 import UI_PoolIcon from '../../components/mix/pool-icon/pool-icon';
+import UI_PrelimLabel from '../../components/mix/prelim-label/prelim-label';
 import { Result } from '../../../utils/interfaces/results';
 
 interface ResultsFilteredInfoProps {
@@ -29,6 +31,12 @@ function ResultsFilteredInfo({
   showPoolType,
   showEvent,
 }: ResultsFilteredInfoProps) {
+  // Индикатор тумблера [prelim] (фильтр Date) под датой: зелёный ON / оранжевый OFF.
+  // Показывается только если в данных вообще есть предварительные заплывы — на обычных
+  // соревнованиях без прелимов пометка была бы шумом.
+  const showPrelims = useAppSelector((state) => !!state.filterSelected?.show_prelims);
+  const hasPrelims = useAppSelector((state) =>
+    (state.dataSourceSelected?.results ?? []).some((r) => r.heat_type === 'prelim'));
   return (
     <div className="show-filtered-data mb-4">
       <div className="flex items-stretch bg-[var(--theme-mode-surface)] rounded-[14px] shadow-sm px-2 py-4">
@@ -36,10 +44,19 @@ function ResultsFilteredInfo({
         <div className={`${COL} ${DIV}`}>
           <span className={LABEL}>Date</span>
           {showDate ? (
-            <span className={ALL_VAL}>All</span>
+            <>
+              <span className={ALL_VAL}>All</span>
+              {hasPrelims && <UI_PrelimLabel state={showPrelims ? 'on' : 'off'} className="text-[10px]" />}
+            </>
           ) : (
             firstResult?.date && (
-              <UI_DateIcon paddingClass="px-1 py-1" className="text-xs" styleType="cube" date={firstResult.date} />
+              <UI_DateIcon
+                paddingClass="px-1 py-1"
+                className="text-xs"
+                styleType="cube"
+                date={firstResult.date}
+                prelimState={hasPrelims ? (showPrelims ? 'on' : 'off') : undefined}
+              />
             )
           )}
         </div>

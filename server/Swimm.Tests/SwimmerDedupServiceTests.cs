@@ -196,6 +196,46 @@ public class SwimmerDedupServiceTests
     }
 
     [Fact]
+    public async Task DeleteOrphans_SwimmerWithRelayLegOnly_NotDeleted()
+    {
+        // Ребёнок плавает ТОЛЬКО эстафеты: личных результатов нет, но он живой пловец.
+        // Регрессия 2026-08-02: без проверки RelayMembers таких «сирот» было 102 из 109.
+        await using var db = CreateDb(nameof(DeleteOrphans_SwimmerWithRelayLegOnly_NotDeleted));
+        var swimmer = S("Только", "Эстафеты", 2014);
+        db.Add(swimmer);
+        await db.SaveChangesAsync();
+        var relay = new Relay { TeamName = "Команда", SwimmersName = "нога" };
+        relay.Members.Add(new RelayMember { SwimmerId = swimmer.Id, LegOrder = 1 });
+        db.Relays.Add(relay);
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerDedupService(db).DeleteOrphansAsync(null);
+
+        Assert.Equal(0, report.Deleted);
+        Assert.Equal(1, await db.Swimmers.CountAsync(s => s.Id == swimmer.Id));
+    }
+
+    [Fact]
+    public async Task FindCandidates_SwimmerWithRelayLegOnly_NotListedAsOrphan()
+    {
+        // Список на странице и удаление ходят через один и тот же OrphanQuery — проверяем оба:
+        // иначе админ видит живого пловца в «сиротах» и жмёт «удалить всех».
+        await using var db = CreateDb(nameof(FindCandidates_SwimmerWithRelayLegOnly_NotListedAsOrphan));
+        var legOnly = S("Только", "Эстафеты", 2014);
+        var realOrphan = S("Настоящая", "Сирота", 2014);
+        db.AddRange(legOnly, realOrphan);
+        await db.SaveChangesAsync();
+        var relay = new Relay { TeamName = "Команда", SwimmersName = "нога" };
+        relay.Members.Add(new RelayMember { SwimmerId = legOnly.Id, LegOrder = 1 });
+        db.Relays.Add(relay);
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerDedupService(db).FindCandidatesAsync();
+
+        Assert.Equal(realOrphan.Id, Assert.Single(report.Orphans).Id);
+    }
+
+    [Fact]
     public async Task DeleteOrphans_SwimmerWithHubGroupMembership_NotDeleted()
     {
         await using var db = CreateDb(nameof(DeleteOrphans_SwimmerWithHubGroupMembership_NotDeleted));

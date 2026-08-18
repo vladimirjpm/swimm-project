@@ -7,7 +7,15 @@ namespace Swimm.Parsing.Parsers.IsrOrg;
 
 public static class IsrOrgResultLineParser
 {
-    private static readonly Regex TimeRx = new(@"^\d{2}:\d{2}\.\d{1,2}$", RegexOptions.Compiled);
+    // Время заплыва: «мм:сс.дд» и «чч:мм:сс.дд». Часовая форма — не экзотика: длинные
+    // дистанции (3 км «в бассейне», открытая вода) печатаются как 00:40:29.16, и без неё
+    // токен времени не распознавался, уезжал в НАЗВАНИЕ КЛУБА («בני הרצליה 00:42:41.03»),
+    // а результат сохранялся вообще без времени (соревнование 16776, 2026-02-13).
+    private static readonly Regex TimeRx = new(@"^(?:\d{1,2}:)?\d{2}:\d{2}\.\d{1,2}$", RegexOptions.Compiled);
+
+    /// <summary>Нулевое время («не плыл») в обеих формах — в результат не идёт.</summary>
+    public static bool IsZeroTime(string t) =>
+        t is "00:00.00" or "00:00.0" or "00:00:00.00" or "00:00:00.0";
 
     // Маркер срыва результата (дисквалификация / неявка / не финишировал). Раньше
     // "DNS"/"DNF" не распознавались и прилипали к названию клуба ("… DNS", "… 10.2 SW / DNF").
@@ -82,7 +90,7 @@ public static class IsrOrgResultLineParser
         if (idxTime >= 0)
         {
             var timeTok = tok[idxTime];
-            if (timeTok != "00:00.00" && timeTok != "00:00.0")
+            if (!IsZeroTime(timeTok))
             {
                 time = timeTok;
             }
@@ -127,21 +135,38 @@ public static class IsrOrgResultLineParser
             lastEn = string.Join(' ', tok[3..(idxYear - 1)]);
         }
 
+        // Название клуба собираем ТОЛЬКО из «словесных» токенов: всё, что состоит из цифр
+        // и пунктуации без единой буквы, — это остаток числовых колонок, а не часть имени.
+        // Живой случай (comp 6592, «ליגה 3 הפועל ירושלים», 50 баттерфляй): протокол напечатал
+        // ячейку времени искажённой — «2/.00:28». Токен не подошёл ни под время, ни под
+        // DQ/NS, уехал в клуб — и импорт завёл клуб «הפועל בית שמש 2/.00:28», а с ним и
+        // ВТОРОГО пловца-двойника (ключ пловца включает клуб). Мусор не выбрасываем молча:
+        // если времени нет, он становится заметкой — иначе строка выглядит обычной неявкой.
+        // Клубы с цифрами В СЛОВЕ («M25», «הפועל H2O כפר שמריהו») правило не задевает:
+        // в них есть буквы.
         string club = string.Empty;
+        var junk = Array.Empty<string>();
         if (idxTime > idxYear + 1)
         {
-            club = string.Join(' ', tok[(idxYear + 1)..idxTime]);
+            (club, junk) = SplitClubTokens(tok[(idxYear + 1)..idxTime]);
         }
         else if (idxTime < 0 && idxPoints > idxYear + 1)
         {
             if (idxNoteStart > idxYear + 1)
             {
-                club = string.Join(' ', tok[(idxYear + 1)..idxNoteStart]);
+                (club, junk) = SplitClubTokens(tok[(idxYear + 1)..idxNoteStart]);
             }
             else if (idxNoteStart < 0)
             {
-                club = string.Join(' ', tok[(idxYear + 1)..idxPoints]);
+                (club, junk) = SplitClubTokens(tok[(idxYear + 1)..idxPoints]);
             }
+        }
+
+        // Время не распозналось, а в его колонке что-то стояло — сохраняем это «что-то»
+        // заметкой. Правило проекта: ошибку протокола не чиним и не додумываем, помечаем.
+        if (time == null && timeFailNote == null && junk.Length > 0)
+        {
+            timeFailNote = string.Join(' ', junk);
         }
 
         // Клуб, перенесённый на соседнюю строку: после склейки строк его токены
@@ -176,6 +201,17 @@ public static class IsrOrgResultLineParser
         );
     }
 
+    /// <summary>Делит токены колонки клуба на само название и числовой мусор
+    /// (токен с цифрой и без единой буквы — остаток соседней колонки).</summary>
+    private static (string Club, string[] Junk) SplitClubTokens(string[] tokens)
+    {
+        var words = tokens.Where(t => !IsNumericJunk(t)).ToArray();
+        var junk = tokens.Where(IsNumericJunk).ToArray();
+        return (string.Join(' ', words), junk);
+    }
+
+    private static bool IsNumericJunk(string t) => t.Any(char.IsDigit) && !t.Any(char.IsLetter);
+
     public static RelaySwimmer ParseRelaySwimmerLine(string line, int order)
     {
         var tok = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -184,7 +220,14 @@ public static class IsrOrgResultLineParser
         int? birth = null;
         if (idxYear >= 0 && int.TryParse(tok[idxYear], out var y)) birth = y;
 
-        string last = tok.Length > 0 ? tok[0] : "";
+        // Фамилия — ВСЁ до имени, а не первый токен: ивритские фамилии сплошь и рядом
+        // из двух слов («בן יוסף», «אבו ריא», «די קסטרו»). Брали только tok[0] — и нога
+        // эстафеты «בן יוסף ניתאי 2012» давала «ניתאי בן», то есть НОВОГО пловца рядом с
+        // настоящим: ключ пловца при импорте — фамилия|имя|год. Так в базе завелись
+        // сотни «пловцов-теней» без единого личного результата, только с ногами эстафет.
+        // Порядок токенов один и тот же в обеих ветках: «Фамилия… Имя Год»
+        // (ивритская строка к этому моменту уже нормализована).
+        string last = (idxYear >= 2) ? string.Join(' ', tok[..(idxYear - 1)]) : (tok.Length > 0 ? tok[0] : "");
         string first = (idxYear >= 2) ? tok[idxYear - 1] : (tok.Length > 1 ? tok[1] : "");
 
         return new RelaySwimmer(

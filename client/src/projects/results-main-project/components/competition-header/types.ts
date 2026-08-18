@@ -32,6 +32,8 @@ export interface OverviewBestSwim {
   distance: string;
   gender: string;
   time: string;
+  /** Ошибка протокола (И11). null — заплыв в порядке. */
+  suspect_reason?: string | null;
   international_points: number;
   is_relay: boolean;
   relay_team_name: string | null;
@@ -48,6 +50,37 @@ export interface OverviewClub {
   gold: number;
   silver: number;
   bronze: number;
+}
+
+/** Строка шкалы правила клубных очков: место → очки. */
+export interface ClubPointsRuleEntry {
+  place: number;
+  points: number;
+}
+
+/** Объяснение расхождения с официальным зачётом: тексты по языкам + табличка расхождения. */
+export interface CompetitionMismatchNote {
+  /** Язык ('en'|'ru'|'he') → текст. Языка нет — вкладка в попапе выключена. */
+  texts: Record<string, string>;
+  /** Строки «место / по регламенту / начислено официально»; пусто — только проза. */
+  scale_diff: { place: number; expected: number; actual: number }[];
+  /** Ссылка на регламент соревнования (תקנון) — доказательство объяснения. Сервер отдаёт
+   *  только http(s), но клиент проверяет ещё раз перед тем, как класть её в href. */
+  source_url?: string | null;
+}
+
+/** Правило клубных очков, применённое к этому зачёту (overview.club_points_rules). */
+export interface ClubPointsRule {
+  version: string;
+  description: string | null;
+  /** 'all' | 'masters' | 'non-masters'. */
+  scope: string;
+  /** 'yyyy-MM-dd'. */
+  effective_from: string;
+  default_points: number;
+  max_scoring_place: number | null;
+  relay_multiplier: number;
+  points_by_place: ClubPointsRuleEntry[];
 }
 
 export interface OverviewMedalist {
@@ -81,6 +114,9 @@ export interface OverviewHighPoint {
   club: string;
   points: number;
   is_tie: boolean;
+  /** Правило требует «только финалы», но признака типа заплыва в данных нет —
+   *  посчитано по всем заплывам (сноска в карточке). */
+  finals_only_unavailable?: boolean;
 }
 
 /** Зарезервированный контракт карточки рекорда (v1 сервер отдаёт пусто). */
@@ -90,6 +126,8 @@ export interface OverviewRecord {
   distance: string;
   gender: string;
   time: string;
+  /** Ошибка протокола (И11). У рекорда почти всегда null: помеченные заплывы рекордов не бьют. */
+  suspect_reason?: string | null;
   holder_name: string;
   swimmer_id: number;
   /** Возрастная группа держателя ("25-29"); пусто, если нет в данных. */
@@ -101,11 +139,26 @@ export interface OverviewRecord {
 
 export interface CompetitionOverview {
   summary: OverviewSummary;
+  /**
+   * Наградное ли соревнование (Competition.IsAward). У ненаградных (лиги, отборы) места в
+   * протоколе есть, а медалей нет — Overview прячет всё медальное: Most decorated, медали
+   * в клубном зачёте, High Point. Сами расчёты сервер отдаёт всегда, флаг влияет на показ.
+   */
+  has_awards: boolean;
   days: OverviewDay[];
   best_swim: OverviewBestSwim | null;
   best_swim_male: OverviewBestSwim | null;
   best_swim_female: OverviewBestSwim | null;
   top_clubs: OverviewClub[];
+  /** Правила, по которым посчитан клубный зачёт (обычно одно) — попап «How points are scored». */
+  club_points_rules: ClubPointsRule[];
+  /** Итог ручной проверки очков: 'official' | 'accepted' | 'mismatch' | null (не проверялось
+   *  либо в выборке смешаны разные итоги). */
+  club_points_verified: string | null;
+  /** Чем именно наши очки расходятся с официальными: проза на трёх языках + табличка
+   *  «место / по регламенту / начислено». Показывается в попапе «Points system».
+   *  Приходит только вместе с 'mismatch'. */
+  club_points_mismatch_note: CompetitionMismatchNote | null;
   top_clubs_men: OverviewClub[];
   top_clubs_women: OverviewClub[];
   /** Самые титулованные: при равном наборе медалей — все, а не первый попавшийся. */

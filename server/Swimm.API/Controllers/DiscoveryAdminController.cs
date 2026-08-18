@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
+using System.Globalization;
 using System.Text;
 
 namespace Swimm.API.Controllers;
@@ -24,6 +26,10 @@ public class DiscoveryAdminController : ControllerBase
     private readonly IImportJobQueue _jobs;
     private readonly IImportService _import;
     private readonly IMemoryCache _cache;
+    private readonly IImportRecordPreviewService _recordPreview;
+    private readonly IOfficialClubStandingService _clubStandings;
+    private readonly IPointRulesAdminRepository _rules;
+    private readonly IAdminAuditService _audit;
     private readonly ILogger<DiscoveryAdminController> _logger;
 
     public DiscoveryAdminController(
@@ -34,6 +40,10 @@ public class DiscoveryAdminController : ControllerBase
         IImportJobQueue jobs,
         IImportService import,
         IMemoryCache cache,
+        IImportRecordPreviewService recordPreview,
+        IOfficialClubStandingService clubStandings,
+        IPointRulesAdminRepository rules,
+        IAdminAuditService audit,
         ILogger<DiscoveryAdminController> logger)
     {
         _discovery = discovery;
@@ -43,6 +53,10 @@ public class DiscoveryAdminController : ControllerBase
         _jobs = jobs;
         _import = import;
         _cache = cache;
+        _recordPreview = recordPreview;
+        _clubStandings = clubStandings;
+        _rules = rules;
+        _audit = audit;
         _logger = logger;
     }
 
@@ -81,6 +95,13 @@ public class DiscoveryAdminController : ControllerBase
         => await _discovery.SetStatusAsync(id, request.Status, ct)
             ? Ok(new { ok = true })
             : BadRequest(new { error = "Запись не найдена или статус неизвестен" });
+
+    /// <summary>Правка вида спорта строки: эвристика по названию иногда промахивается.</summary>
+    [HttpPost("{id:int}/discipline")]
+    public async Task<IActionResult> SetDiscipline(int id, [FromBody] SetDisciplineRequest request, CancellationToken ct)
+        => await _discovery.SetDisciplineAsync(id, request.Discipline, ct)
+            ? Ok(new { ok = true })
+            : BadRequest(new { error = "Запись не найдена или дисциплина неизвестна" });
 
     /// <summary>Скачать PDF-протокол вручную (для существующего Import-флоу или глазами посмотреть).</summary>
     [HttpGet("{id:int}/pdf")]
@@ -144,20 +165,41 @@ public class DiscoveryAdminController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
+            // «No competitions found in PDF» = у соревнования нет протокола (страница пустая).
+            // Это не сбой, который стоит повторить, а факт «тянуть нечего» — помечаем строку,
+            // чтобы её не пробовали затянуть снова и снова.
+            if (LooksLikeEmptySource(ex.Message))
+                await _discovery.SetEmptySourceAsync(id, true, "auto", ct);
             return BadRequest(new { error = ex.Message });
         }
 
         if (parsed.ResultCount == 0)
+        {
+            await _discovery.SetEmptySourceAsync(id, true, "auto", ct);
             return BadRequest(new { error = "Парсер не распознал ни одного результата — формат протокола изменился? (B4)" });
+        }
+
+        // Разобралось — значит протокол всё-таки есть: снимаем прежнюю пометку «пусто»
+        // (файл могли выложить позже, и строка не должна оставаться зачёркнутой навсегда).
+        await _discovery.SetEmptySourceAsync(id, false, "auto", ct);
 
         await _discovery.AddLanguagesAsync(id, languages, ct);
 
+        // Официальный клубный зачёт: есть ли он и по какой шкале. Кладём В КЭШ вместе с превью —
+        // из него потом заводится правило кнопкой, и второй поход в loglig (десяток запросов
+        // ради той же шкалы) был бы лишним.
+        var standingProbe = await ProbeClubStandingAsync(id, ct);
+
         var previewId = Guid.NewGuid();
         _cache.Set(PreviewCacheKey(previewId),
-            new DiscoveryPreviewEntry(parsed, primaryName, id), TimeSpan.FromMinutes(15));
+            new DiscoveryPreviewEntry(parsed, primaryName, id, standingProbe), TimeSpan.FromMinutes(15));
 
         var existingMatches = await _import.FindExistingCompetitionsAsync(parsed.Competitions);
         var existingCompetitionId = existingMatches.FirstOrDefault(m => m.ExistingCompetitionId != null)?.ExistingCompetitionId;
+
+        // Сколько рекордов побьёт файл (Б2). Считается ДО «Применить»: настоящий рекорд —
+        // событие редкое, а десяток разом почти всегда значит, что протокол разобрался неверно.
+        var recordPreview = await _recordPreview.AnalyzeAsync(parsed.ResultsJson, ct);
 
         return Ok(new
         {
@@ -168,9 +210,35 @@ public class DiscoveryAdminController : ControllerBase
             warnings = parsed.Warnings,
             languages,
             existingCompetitionId,
-            existingCompetitions = existingMatches
+            existingCompetitions = existingMatches,
+            recordPreview,
+            officialClubStanding = StandingResponse(standingProbe, parsed)
         });
     }
+
+    public sealed record EmptySourceRequest(bool Empty);
+
+    /// <summary>
+    /// Пометить/снять вручную «у соревнования нет протокола». Нужно для случаев, когда PDF
+    /// пуст не навсегда или наоборот — админ знает, что протокола не будет.
+    /// </summary>
+    [HttpPost("{id:int}/empty-source")]
+    public async Task<IActionResult> SetEmptySource(int id, [FromBody] EmptySourceRequest request, CancellationToken ct = default)
+    {
+        var by = User.Identity?.Name ?? "admin";
+        if (!await _discovery.SetEmptySourceAsync(id, request.Empty, by, ct))
+            return NotFound(new { error = $"Строка входящих {id} не найдена" });
+
+        return Ok(new { id, request.Empty });
+    }
+
+    /// <summary>
+    /// Сообщения парсера, означающие «в файле ничего нет». Держим списком, а не подстрокой
+    /// «not found»: иначе под пометку попали бы сетевые и форматные сбои, которые надо повторять.
+    /// </summary>
+    private static bool LooksLikeEmptySource(string message) =>
+        message.Contains("No competitions found", StringComparison.OrdinalIgnoreCase)
+        || message.Contains("0 lines extracted", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>«Синхронизировать языки»: скачать оба PDF, склеить пару и дозаполнить
     /// EN/HE-имена пловцов в БД по уже импортированным результатам (без переимпорта).</summary>
@@ -258,15 +326,28 @@ public class DiscoveryAdminController : ControllerBase
         _cache.Remove(key);
 
         ImportEventOptions? eventOptions = null;
-        if (request.EventId.HasValue || !string.IsNullOrWhiteSpace(request.NewEventName) || request.OverwriteExisting)
-            eventOptions = new ImportEventOptions(request.EventId, request.NewEventName, request.OverwriteExisting, request.DeleteMissing);
+        if (request.EventId.HasValue || !string.IsNullOrWhiteSpace(request.NewEventName)
+            || request.OverwriteExisting || request.PointRuleClubsId.HasValue)
+        {
+            // Правило клубных очков приезжает из превью: там оно подставлено по шкале
+            // официального зачёта. Без него соревнование ушло бы на автоподбор по дате —
+            // ровно так зимний чемпионат 2025 получил чужую шкалу (§10.3 плана).
+            eventOptions = new ImportEventOptions(
+                request.EventId, request.NewEventName, request.OverwriteExisting, request.DeleteMissing,
+                request.PointRuleClubsId);
+        }
 
         // compID сайта — штампуется в Competition.OrgCompId для связи Discovery ↔ Competitions.
         var discoveredOrgCompId = (await _discovery.GetAllAsync(ct))
             .FirstOrDefault(d => d.Id == entry.DiscoveredId)?.OrgCompId;
 
+        // Галочки «пометить сомнительным» из превью: адресуются порядковым номером строки
+        // в разобранном файле (ImportRecordPreviewRow.RowIndex) и уезжают в сам payload
+        // полем suspect_note — импорт положит такую строку сразу с ручной пометкой.
+        var resultsJson = ImportPayloadSuspectFlags.Apply(entry.Parsed.ResultsJson, request.SuspectFlags);
+
         var jobId = _jobs.Enqueue(
-            Encoding.UTF8.GetBytes(entry.Parsed.ResultsJson),
+            Encoding.UTF8.GetBytes(resultsJson),
             entry.FileName,
             request.CategoryKeys,
             eventOptions,
@@ -276,6 +357,133 @@ public class DiscoveryAdminController : ControllerBase
         // Статус imported проставляет фоновый обработчик после успешного завершения job (A1).
         return Accepted(new { jobId });
     }
+
+    /// <summary>
+    /// Официальный клубный зачёт соревнования. Сбой проверки превью не роняет: затянуть
+    /// протокол важнее, чем узнать про зачёт — вернём «не проверено».
+    /// </summary>
+    private async Task<OfficialClubStandingProbe?> ProbeClubStandingAsync(int discoveredId, CancellationToken ct)
+    {
+        var row = (await _discovery.GetAllAsync(ct)).FirstOrDefault(d => d.Id == discoveredId);
+        if (row?.LogligId is not int logligId) return null;
+
+        try
+        {
+            return await _clubStandings.ProbeAsync(logligId, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Discovery: не удалось проверить клубный зачёт для строки {Id}", discoveredId);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Ответ превью про клубный зачёт. Когда зачёт есть, а правила под его шкалу нет, отдаём
+    /// заготовку для кнопки «Завести правило»: имя версии по конвенции и саму шкалу — админ
+    /// видит, что именно заведёт, и правит имя, если нужно.
+    /// </summary>
+    private static object StandingResponse(OfficialClubStandingProbe? probe, ParsedCompetition parsed)
+    {
+        if (probe is null)
+            return new
+            {
+                known = false, hasStanding = false, ruleId = (int?)null, ruleVersion = (string?)null,
+                canCreateRule = false, suggestedVersion = (string?)null,
+                message = "Про официальный клубный зачёт ничего сказать нельзя: нет loglig-id или сайт недоступен."
+            };
+
+        var scale = probe.Scale.OrderBy(p => p.Key).ToList();
+        var canCreateRule = probe.HasStanding && probe.MatchedRuleId is null && scale.Count > 0;
+
+        return new
+        {
+            known = true,
+            hasStanding = probe.HasStanding,
+            ruleId = probe.MatchedRuleId,
+            ruleVersion = probe.MatchedRuleVersion,
+            scale = scale.Select(p => new { place = p.Key, points = p.Value }),
+            canCreateRule,
+            suggestedVersion = canCreateRule ? SuggestRuleVersion(scale, parsed) : null,
+            message = probe.Message
+        };
+    }
+
+    /// <summary>
+    /// Имя версии по конвенции проекта — «(очки за 1 место)pt.(мест)pl.(год)»
+    /// (docs/admin-pages/pointsrules.md): в выпадашке привязки сразу видно шкалу, а не только дату.
+    /// </summary>
+    private static string SuggestRuleVersion(
+        IReadOnlyList<KeyValuePair<int, int>> scale, ParsedCompetition parsed)
+    {
+        var top = scale[0].Value;
+        var places = scale[^1].Key;
+        var year = ParseCompetitionYear(parsed) ?? DateTime.UtcNow.Year;
+        return $"{top}pt.{places}pl.{year}";
+    }
+
+    private static int? ParseCompetitionYear(ParsedCompetition parsed) =>
+        DateOnly.TryParseExact(parsed.Competitions.FirstOrDefault()?.Date, "dd/MM/yyyy",
+            CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)
+            ? d.Year
+            : null;
+
+    /// <summary>
+    /// Завести правило клубных очков по шкале официального зачёта — прямо из превью, без
+    /// похода в /Admin/PointsRules и повторного затягивания.
+    ///
+    /// Шкалу берём ИЗ КЭША ПРЕВЬЮ, а не из тела запроса: сервер уже снял её с loglig минуту
+    /// назад, и сочинить её со стороны клиента быть не должно.
+    /// </summary>
+    [HttpPost("club-rule")]
+    public async Task<IActionResult> CreateClubRule([FromBody] CreateClubRuleRequest request, CancellationToken ct)
+    {
+        if (!_cache.TryGetValue(PreviewCacheKey(request.PreviewId), out DiscoveryPreviewEntry? entry) || entry == null)
+            return NotFound(new { error = "Превью не найдено или истекло (15 мин)" });
+
+        var probe = entry.ClubStanding;
+        if (probe is null || !probe.HasStanding || probe.Scale.Count == 0)
+            return BadRequest(new { error = "У этого соревнования нет официального зачёта со снятой шкалой" });
+
+        if (probe.MatchedRuleId is int already)
+            return BadRequest(new { error = $"Шкала уже совпадает с правилом #{already} — заводить новое незачем" });
+
+        var scale = probe.Scale.OrderBy(p => p.Key).ToList();
+        var version = string.IsNullOrWhiteSpace(request.Version)
+            ? SuggestRuleVersion(scale, entry.Parsed)
+            : request.Version.Trim();
+
+        var year = ParseCompetitionYear(entry.Parsed);
+        var name = entry.Parsed.Competitions.FirstOrDefault()?.Competition;
+
+        var input = new PointRuleInputDto
+        {
+            Version = version,
+            EffectiveFrom = new DateOnly(year ?? DateTime.UtcNow.Year, 1, 1),
+            Description = $"Заведено из превью затягивания по официальному зачёту loglig: {name}",
+            Scope = "all",
+            DefaultPoints = 0,
+            MaxScoringPlace = scale[^1].Key,
+            // ManualOnly обязателен: правило без него сразу входит в автоподбор и перехватывает
+            // ВСЕ соревнования без явной привязки — этот баг мы уже ловили.
+            ManualOnly = true,
+            RelayMultiplier = 2,
+            Entries = scale.Select(p => new PointRuleEntryDto { Place = p.Key, Points = p.Value }).ToList()
+        };
+
+        var result = await _rules.CreateAsync(PointRuleKind.Clubs, input);
+        if (!result.Success) return BadRequest(new { error = result.Error });
+
+        await _audit.LogAsync("pointrule.create", "PointRuleClubs", result.Id.ToString(),
+            $"Правило «{version}» заведено из превью затягивания: шкала "
+            + string.Join(",", scale.Select(p => p.Value)) + $" ({scale.Count} мест)");
+
+        _logger.LogInformation("Discovery: заведено правило клубных очков {Version} (#{Id}) из превью",
+            version, result.Id);
+        return Ok(new { ruleId = result.Id, version });
+    }
+
+    public sealed record CreateClubRuleRequest(Guid PreviewId, string? Version);
 
     private async Task<(byte[]? pdf, string fileName, string? error)> FetchPdfAsync(
         int id, string language, bool refreshIfMissing, CancellationToken ct)
@@ -312,9 +520,12 @@ public class DiscoveryAdminController : ControllerBase
 
     private static string PreviewCacheKey(Guid previewId) => $"discovery-preview:{previewId}";
 
-    private sealed record DiscoveryPreviewEntry(ParsedCompetition Parsed, string FileName, int DiscoveredId);
+    private sealed record DiscoveryPreviewEntry(
+        ParsedCompetition Parsed, string FileName, int DiscoveredId, OfficialClubStandingProbe? ClubStanding);
 
     public sealed record SetStatusRequest(string Status);
+
+    public sealed record SetDisciplineRequest(string Discipline);
 
     public sealed record DiscoveryImportRequest(
         Guid PreviewId,
@@ -322,5 +533,7 @@ public class DiscoveryAdminController : ControllerBase
         int? EventId,
         string? NewEventName,
         bool OverwriteExisting = false,
-        bool DeleteMissing = false);
+        bool DeleteMissing = false,
+        IReadOnlyList<ImportSuspectFlag>? SuspectFlags = null,
+        int? PointRuleClubsId = null);
 }

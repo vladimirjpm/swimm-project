@@ -2,6 +2,8 @@ import React from 'react';
 import type { CompetitionOverview, OverviewClub } from '../types';
 import { GENDER_CIRCLE } from '../overview-shared';
 import UI_ClubIcon from '../../../../components/mix/club-icon/club-icon';
+import { rootActions, useAppDispatch } from '../../../../../store/store';
+import { Enums } from '../../../../../utils/interfaces/enums';
 
 // Карточка модуля Top clubs (9d): слева топ-5 + ♂/♀ топ-3, справа витрина клуба-чемпиона.
 // Реализация по спеке dc.html секция 9d (sc-if is9dClubs, композиция 1:1).
@@ -10,14 +12,27 @@ import UI_ClubIcon from '../../../../components/mix/club-icon/club-icon';
 //   очки за места по правилу клубных очков соревнования, эстафета — с множителем
 //   (обычно ×2); три зачёта (общий/♂/♀); категория заплыва (para/mix) сознательно НЕ
 //   учитывается — места протокола уже корректны внутри своей программы.
+//
+// Медали / шкала очков / панели ♂-♀ выключаются пропсами (showMedals, showPointsRule,
+// showGenderPanels) — так ненаградное соревнование показывает голый зачёт очков тем же
+// компонентом, без отдельной «упрощённой» карточки.
 
 interface Props {
   overview: CompetitionOverview;
   onOpenTab(tab: 'swims' | 'clubs' | 'media' | 'records'): void;
   onOpenClub?(club: string): void;
+  /** Показывать медали (строки зачёта + витрина лидера). false — ненаградное соревнование:
+   *  места в протоколе есть, медалей нет, остаётся только зачёт очков. */
+  showMedals?: boolean;
+  /** Показывать кнопку «Points system» (шкала правила очков попапом). */
+  showPointsRule?: boolean;
+  /** Показывать панели зачёта ♂/♀ под общим списком. */
+  showGenderPanels?: boolean;
 }
 
-function ClubRow({ club, rank, big, onOpenClub }: { club: OverviewClub; rank: number; big?: boolean; onOpenClub?: (club: string) => void }) {
+function ClubRow({ club, rank, big, showMedals = true, onOpenClub }: {
+  club: OverviewClub; rank: number; big?: boolean; showMedals?: boolean; onOpenClub?: (club: string) => void;
+}) {
   return (
     <button
       type="button"
@@ -27,7 +42,7 @@ function ClubRow({ club, rank, big, onOpenClub }: { club: OverviewClub; rank: nu
     >
       <span className={`flex-none ${big ? 'w-4' : 'w-3'}`} style={{ color: 'var(--theme-mode-text-muted)' }}>{rank}</span>
       <span dir="auto" className="min-w-0 flex-1 truncate">{club.club}</span>
-      {big && (
+      {big && showMedals && (
         <span className="flex-none whitespace-nowrap font-semibold">
           🥇{club.gold} 🥈{club.silver} 🥉{club.bronze}
         </span>
@@ -57,9 +72,28 @@ function GenderPanel({ title, symbol, gender, clubs, onOpenClub }: {
   );
 }
 
-export default function ModuleCardClubs({ overview, onOpenTab, onOpenClub }: Props) {
+export default function ModuleCardClubs({
+  overview, onOpenTab, onOpenClub,
+  showMedals = true, showPointsRule = true, showGenderPanels = true,
+}: Props) {
+  const dispatch = useAppDispatch();
   const clubs = overview.top_clubs.slice(0, 5);
   const leader = overview.top_clubs[0] ?? null;
+  const rules = overview.club_points_rules ?? [];
+  // Официальные очки расходятся с нашими: у организатора ошибка, наш расчёт сверен вручную.
+  // Без подписи расхождение читается как наш баг, поэтому говорим о нём прямо.
+  const officialMismatch = overview.club_points_verified === 'mismatch';
+
+  // Шкала очков — попапом: цифра очков без правила необъяснима, а разворачивать 24 места
+  // прямо в карточке негде.
+  const openPointsRule = () =>
+    dispatch(rootActions.updateState({
+      isPopup: true,
+      popUpType: Enums.PopupType.clubPoints,
+      // Объяснение расхождения едет в попап вместе со шкалой: бейдж на карточке говорит
+      // «официальные очки неверны», а ПОЧЕМУ — место есть только тут.
+      popUpObj: { rules, mismatchNote: officialMismatch ? overview.club_points_mismatch_note : null },
+    }));
 
   return (
     <section className="ov2-card grid gap-5 lg:grid-cols-[minmax(0,1.7fr)_268px] items-start" data-module="clubs">
@@ -71,23 +105,48 @@ export default function ModuleCardClubs({ overview, onOpenTab, onOpenClub }: Pro
             <span className="text-[12px] font-semibold" style={{ color: 'var(--theme-mode-text-muted)' }}>
               club standings
             </span>
+            {showPointsRule && (
+              <button
+                type="button"
+                onClick={openPointsRule}
+                className="ov2-card__link"
+                title="How club points are scored"
+              >
+                Points system
+              </button>
+            )}
+            {officialMismatch && (
+              <span
+                className="rounded-full px-2 py-[2px] text-[11px] font-extrabold"
+                style={{
+                  background: 'color-mix(in srgb, #dc2626 14%, transparent)',
+                  color: '#dc2626',
+                  border: '1px solid color-mix(in srgb, #dc2626 30%, transparent)',
+                }}
+                title="The official standings contain an error. We checked the results by hand — the points shown here are correct. See “Points system” for details."
+              >
+                ★ Differs from official — ours verified
+              </span>
+            )}
             <span className="flex-1" />
             <button type="button" onClick={() => onOpenTab('clubs')} className="ov2-card__link">
               Clubs tab →
             </button>
           </div>
           {clubs.map((c, i) => (
-            <ClubRow key={c.club} club={c} rank={i + 1} big onOpenClub={onOpenClub} />
+            <ClubRow key={c.club} club={c} rank={i + 1} big showMedals={showMedals} onOpenClub={onOpenClub} />
           ))}
           <button type="button" onClick={() => onOpenTab('clubs')} className="mt-2 ov2-card__link text-[12.5px]">
             All {overview.summary.club_count} clubs →
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <GenderPanel title="Men" symbol="♂" gender="male" clubs={overview.top_clubs_men} onOpenClub={onOpenClub} />
-          <GenderPanel title="Women" symbol="♀" gender="female" clubs={overview.top_clubs_women} onOpenClub={onOpenClub} />
-        </div>
+        {showGenderPanels && (
+          <div className="grid grid-cols-2 gap-3">
+            <GenderPanel title="Men" symbol="♂" gender="male" clubs={overview.top_clubs_men} onOpenClub={onOpenClub} />
+            <GenderPanel title="Women" symbol="♀" gender="female" clubs={overview.top_clubs_women} onOpenClub={onOpenClub} />
+          </div>
+        )}
       </div>
 
       {/* Витрина клуба-лидера */}
@@ -120,22 +179,31 @@ export default function ModuleCardClubs({ overview, onOpenTab, onOpenClub }: Pro
               POINTS
             </span>
           </span>
-          <span className="grid w-full grid-cols-3 gap-1.5">
-            <span className="flex flex-col gap-px rounded-[9px] py-1.5" style={{ background: 'var(--m-surface)' }}>
-              <span className="text-[15px] font-black">{leader.gold}</span>
-              <span className="text-[10px] font-bold" style={{ color: 'var(--theme-mode-text-secondary)' }}>🥇</span>
+          {showMedals && (
+            <span className="grid w-full grid-cols-3 gap-1.5">
+              <span className="flex flex-col gap-px rounded-[9px] py-1.5" style={{ background: 'var(--m-surface)' }}>
+                <span className="text-[15px] font-black">{leader.gold}</span>
+                <span className="text-[10px] font-bold" style={{ color: 'var(--theme-mode-text-secondary)' }}>🥇</span>
+              </span>
+              <span className="flex flex-col gap-px rounded-[9px] py-1.5" style={{ background: 'var(--m-surface)' }}>
+                <span className="text-[15px] font-black">{leader.silver}</span>
+                <span className="text-[10px] font-bold" style={{ color: 'var(--theme-mode-text-secondary)' }}>🥈</span>
+              </span>
+              <span className="flex flex-col gap-px rounded-[9px] py-1.5" style={{ background: 'var(--m-surface)' }}>
+                <span className="text-[15px] font-black">{leader.bronze}</span>
+                <span className="text-[10px] font-bold" style={{ color: 'var(--theme-mode-text-secondary)' }}>🥉</span>
+              </span>
             </span>
-            <span className="flex flex-col gap-px rounded-[9px] py-1.5" style={{ background: 'var(--m-surface)' }}>
-              <span className="text-[15px] font-black">{leader.silver}</span>
-              <span className="text-[10px] font-bold" style={{ color: 'var(--theme-mode-text-secondary)' }}>🥈</span>
-            </span>
-            <span className="flex flex-col gap-px rounded-[9px] py-1.5" style={{ background: 'var(--m-surface)' }}>
-              <span className="text-[15px] font-black">{leader.bronze}</span>
-              <span className="text-[10px] font-bold" style={{ color: 'var(--theme-mode-text-secondary)' }}>🥉</span>
-            </span>
-          </span>
-          <span className="text-[11.5px] font-bold" style={{ color: 'var(--theme-mode-text-secondary)' }}>
-            {leader.swimmerCount} swimmers · {leader.successfulCount} results
+          )}
+          {/* «scoring swims», а не «results»: successfulCount — заплывы, ПРИНЁСШИЕ очки, а не
+              все заплывы клуба. С «results» падение цифры вдвое при Combine All Results
+              читалось как потеря данных (у клуба 132 заплыва при 95 очковых). */}
+          <span
+            className="text-[11.5px] font-bold"
+            style={{ color: 'var(--theme-mode-text-secondary)' }}
+            title="Swims that scored club points — not the club's total number of swims"
+          >
+            {leader.swimmerCount} swimmers · {leader.successfulCount} scoring swims
           </span>
           <span className="ov2-card__link">Club page →</span>
         </button>

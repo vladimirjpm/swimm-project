@@ -208,6 +208,10 @@ namespace Swimm.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("NameHe")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Key")
@@ -218,35 +222,48 @@ namespace Swimm.Infrastructure.Migrations
                     b.HasData(
                         new
                         {
-                            Id = 1,
-                            Badge = "J",
-                            DisplayOrder = 1,
-                            Key = "results-main",
-                            Name = "Juniors"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Badge = "M",
-                            DisplayOrder = 2,
-                            Key = "results-masters",
-                            Name = "Masters"
-                        },
-                        new
-                        {
                             Id = 3,
                             Badge = "K",
-                            DisplayOrder = 3,
-                            Key = "results-youth-team",
-                            Name = "Kids"
+                            DisplayOrder = 1,
+                            Key = "results-kids-team",
+                            Name = "Kids",
+                            NameHe = "ילדים"
                         },
                         new
                         {
                             Id = 4,
                             Badge = "Y",
-                            DisplayOrder = 4,
+                            DisplayOrder = 2,
+                            Key = "results-youth-team",
+                            Name = "Young",
+                            NameHe = "צעירים"
+                        },
+                        new
+                        {
+                            Id = 1,
+                            Badge = "J",
+                            DisplayOrder = 3,
                             Key = "results-junior-results",
-                            Name = "Youth"
+                            Name = "Juniors",
+                            NameHe = "נוער"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Badge = "A",
+                            DisplayOrder = 4,
+                            Key = "results-main",
+                            Name = "Adults",
+                            NameHe = "בוגרים"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Badge = "M",
+                            DisplayOrder = 5,
+                            Key = "results-masters",
+                            Name = "Masters",
+                            NameHe = "מסטרס"
                         });
                 });
 
@@ -291,6 +308,9 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<bool>("IsPseudo")
                         .HasColumnType("boolean");
 
+                    b.Property<int?>("MergedIntoId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -305,9 +325,64 @@ namespace Swimm.Infrastructure.Migrations
 
                     b.HasIndex("CountryId");
 
+                    b.HasIndex("MergedIntoId");
+
                     b.HasIndex("Name");
 
                     b.ToTable("Clubs", (string)null);
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.ClubCompetitionStanding", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Bronze")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ClubId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("CompetitionId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ComputedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Gold")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Rank")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ScoringSwims")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Silver")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SwimCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SwimmerCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClubId");
+
+                    b.HasIndex("CompetitionId", "ClubId")
+                        .IsUnique();
+
+                    b.HasIndex("CompetitionId", "Rank");
+
+                    b.ToTable("ClubCompetitionStandings", (string)null);
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.Competition", b =>
@@ -317,6 +392,20 @@ namespace Swimm.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("ClubPointsDisabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ClubPointsVerifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ClubPointsVerifiedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ClubPointsVerifiedKind")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<int?>("CountryId")
                         .HasColumnType("integer");
@@ -329,8 +418,16 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int?>("DayNumber")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Discipline")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<int?>("EventId")
                         .HasColumnType("integer");
+
+                    b.Property<bool?>("HasOfficialClubStanding")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsAward")
                         .HasColumnType("boolean");
@@ -360,12 +457,30 @@ namespace Swimm.Infrastructure.Migrations
                         .HasMaxLength(5)
                         .HasColumnType("character varying(5)");
 
+                    b.Property<DateTime?>("QualityScannedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("ShowCombineAllResults")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("StandingKindOverride")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("SubName")
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
+
+                    b.Property<DateTime?>("SwimmersPointsVerifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SwimmersPointsVerifiedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("SwimmersPointsVerifiedKind")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.HasKey("Id");
 
@@ -399,12 +514,83 @@ namespace Swimm.Infrastructure.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
+                    b.Property<int?>("OrgCompId")
+                        .HasColumnType("integer");
+
                     b.Property<DateOnly?>("StartDate")
                         .HasColumnType("date");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OrgCompId");
+
                     b.ToTable("CompetitionEvents", (string)null);
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.CompetitionNote", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CompetitionId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("ScaleDiffJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SourceUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompetitionId", "Kind")
+                        .IsUnique();
+
+                    b.ToTable("CompetitionNotes", (string)null);
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.CompetitionNoteText", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Lang")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)");
+
+                    b.Property<int>("NoteId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NoteId", "Lang")
+                        .IsUnique();
+
+                    b.ToTable("CompetitionNoteTexts", (string)null);
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.CompetitionResultUrl", b =>
@@ -462,6 +648,153 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("Countries", (string)null);
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.DataCheckFinding", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CheckId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Details")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int?>("EntityId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("FirstSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("FixEntityId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("FixKind")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Link")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("PublicLink")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("Resolution")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Severity")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SubjectName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Resolution")
+                        .HasDatabaseName("IX_Sys_DataCheckFindings_Open")
+                        .HasFilter("\"Resolution\" IS NULL OR \"Resolution\" = 'accepted'");
+
+                    b.HasIndex("CheckId", "EntityType", "EntityId");
+
+                    b.ToTable("Sys_DataCheckFindings", (string)null);
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.DataCheckRun", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ErrorCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("FixedCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("InfoCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Trigger")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("WarningCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StartedAt");
+
+                    b.ToTable("Sys_DataCheckRuns", (string)null);
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.DataCheckState", b =>
+                {
+                    b.Property<string>("CheckId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("Failed")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("LastRunAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("LastRunId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Severity")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Shown")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Total")
+                        .HasColumnType("integer");
+
+                    b.HasKey("CheckId");
+
+                    b.ToTable("Sys_DataCheckStates", (string)null);
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.DedupIgnoredPair", b =>
                 {
                     b.Property<int>("Id")
@@ -506,8 +839,20 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<DateTime>("DateStart")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Discipline")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<DateTime>("DiscoveredAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("EmptySourceAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EmptySourceBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("Languages")
                         .HasMaxLength(20)
@@ -957,6 +1302,54 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("Sys_ImportHistory", (string)null);
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.ImportReconciliation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ActualRows")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("CompetitionId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("EventKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("ExpectedRows")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ImportFileName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("ImportedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompetitionId");
+
+                    b.HasIndex("ImportedAt");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("IX_Sys_ImportReconciliation_Mismatch")
+                        .HasFilter("\"Status\" = 'mismatch'");
+
+                    b.ToTable("Sys_ImportReconciliation", (string)null);
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.NormativeStandard", b =>
                 {
                     b.Property<int>("Id")
@@ -1073,7 +1466,7 @@ namespace Swimm.Infrastructure.Migrations
                             MaxScoringPlace = 24,
                             RelayMultiplier = 2,
                             Scope = "all",
-                            Version = "2025.01"
+                            Version = "30pt.24pl.2025.01"
                         },
                         new
                         {
@@ -1085,7 +1478,7 @@ namespace Swimm.Infrastructure.Migrations
                             MaxScoringPlace = 12,
                             RelayMultiplier = 2,
                             Scope = "masters",
-                            Version = "2025.01-masters"
+                            Version = "12pt.12pl.2025.01"
                         });
                 });
 
@@ -1548,6 +1941,121 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("Records", (string)null);
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.RecordIssue", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AgeKey")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Distance")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("FlaggedTime")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Gender")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PoolType")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("RegionCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("RegionType")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Style")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("RegionType", "RegionCode", "Category", "AgeKey", "Gender", "PoolType", "Style", "Distance", "FlaggedTime")
+                        .IsUnique();
+
+                    b.ToTable("Sys_RecordIssues", (string)null);
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.RecordVerification", b =>
+                {
+                    b.Property<int>("RecordId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CheckedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool?>("DateMatched")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("Found")
+                        .HasColumnType("boolean");
+
+                    b.Property<long?>("ResultId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int?>("SwimmerId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("RecordId");
+
+                    b.HasIndex("Found");
+
+                    b.ToTable("Sys_RecordVerifications", (string)null);
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.Relay", b =>
                 {
                     b.Property<int>("Id")
@@ -1655,6 +2163,10 @@ namespace Swimm.Infrastructure.Migrations
 
                     b.Property<int>("Heat")
                         .HasColumnType("integer");
+
+                    b.Property<string>("HeatType")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<int>("InternationalPoints")
                         .HasColumnType("integer");
@@ -2439,7 +2951,33 @@ namespace Swimm.Infrastructure.Migrations
                         .HasForeignKey("CountryId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Swimm.Domain.Entities.Club", "MergedInto")
+                        .WithMany()
+                        .HasForeignKey("MergedIntoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Country");
+
+                    b.Navigation("MergedInto");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.ClubCompetitionStanding", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.Club", "Club")
+                        .WithMany()
+                        .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Swimm.Domain.Entities.Competition", "Competition")
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Club");
+
+                    b.Navigation("Competition");
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.Competition", b =>
@@ -2470,6 +3008,28 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("PointRuleClubs");
 
                     b.Navigation("PointRuleSwimmers");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.CompetitionNote", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.Competition", "Competition")
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Competition");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.CompetitionNoteText", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.CompetitionNote", "Note")
+                        .WithMany("Texts")
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Note");
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.GalleryItem", b =>
@@ -2671,6 +3231,17 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("Competition");
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.ImportReconciliation", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.Competition", "Competition")
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Competition");
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.PointRuleClubsEntry", b =>
                 {
                     b.HasOne("Swimm.Domain.Entities.PointRuleClubs", "Rule")
@@ -2691,6 +3262,17 @@ namespace Swimm.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Rule");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.RecordVerification", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.Record", "Record")
+                        .WithOne()
+                        .HasForeignKey("Swimm.Domain.Entities.RecordVerification", "RecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Record");
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.RelayMember", b =>
@@ -2993,6 +3575,11 @@ namespace Swimm.Infrastructure.Migrations
             modelBuilder.Entity("Swimm.Domain.Entities.CompetitionEvent", b =>
                 {
                     b.Navigation("Days");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.CompetitionNote", b =>
+                {
+                    b.Navigation("Texts");
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.Gallery", b =>

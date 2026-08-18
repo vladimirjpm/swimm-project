@@ -1,4 +1,4 @@
-﻿@page
+@page
 @using Swimm.Application.Dtos
 @model Swimm.API.Pages.Admin.Competitions.IndexModel
 @{
@@ -7,11 +7,15 @@
 
     // ВНИМАНИЕ: параметр пагинации — «p», НЕ «page» (page зарезервирован Razor Pages, ломает переходы).
     string PageUrl(int pg) =>
-        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = Model.Month, p = pg, filter = Model.QualityFilter })!;
+        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, discipline = Model.Discipline, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = Model.Month, p = pg, filter = Model.QualityFilter })!;
 
     // Ссылка на месяц (сброс страницы на 1; повторный клик по активному — снять фильтр).
     string MonthUrl(int? m) =>
-        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = m, filter = Model.QualityFilter })!;
+        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, discipline = Model.Discipline, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = m, filter = Model.QualityFilter })!;
+
+    // Ссылка на сезон (чипы над месяцами; смена сезона сбрасывает месяц и страницу).
+    string SeasonUrl(int? sn) =>
+        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = sn, kind = Model.Kind, discipline = Model.Discipline, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, filter = Model.QualityFilter })!;
 
     var monthNames = new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
@@ -24,13 +28,48 @@
         || Model.Season != null || !string.IsNullOrEmpty(Model.Stage) || Model.Month != null
         || !string.IsNullOrEmpty(Model.Kind);
 
-    (string Text, string Cls) StageBadge(CompetitionStage s) => s switch
+    // Short — подпись для экранов уже 1920: таблица широкая (стадия, категории, площадка,
+    // действия), и «импортировано» съедает колонку, из-за которой переносится всё остальное.
+    (string Text, string Short, string Cls) StageBadge(CompetitionStage s) => s switch
     {
-        CompetitionStage.OnSite => ("на сайте", "bg-[rgba(79,195,247,0.15)] text-[#4fc3f7]"),
-        CompetitionStage.Imported => ("импортировано", "bg-[rgba(102,187,106,0.2)] text-[#66bb6a]"),
-        CompetitionStage.DbOnly => ("только в БД", "bg-white/[.08] text-admin-text-muted"),
-        _ => ("скрыто", "bg-white/[.05] text-admin-text-muted/70"),
+        CompetitionStage.OnSite => ("на сайте", "сайт", "bg-[rgba(79,195,247,0.15)] text-[#4fc3f7]"),
+        CompetitionStage.Imported => ("импортировано", "имп", "bg-[rgba(102,187,106,0.2)] text-[#66bb6a]"),
+        CompetitionStage.DbOnly => ("только в БД", "БД", "bg-white/[.08] text-admin-text-muted"),
+        _ => ("скрыто", "скрыто", "bg-white/[.05] text-admin-text-muted/70"),
     };
+
+    // Ссылка «посмотреть соревнование на сайте» — вторая строка в колонке OrgCompId.
+    // Есть только у строк, которые уже в справочнике: у site-строк соревнования в БД ещё нет,
+    // и вести там некуда. У многодневки ведёт на первый день — публичная страница открывает
+    // событие целиком по любому его дню.
+    string PublicCompetitionLink(int? competitionId) =>
+        competitionId is int id
+            ? $"<a href=\"{Model.PublicSiteBaseUrl}/competitions/{id}\" target=\"_blank\" rel=\"noopener\" "
+              + "class=\"text-admin-accent hover:underline\">swimhub ↗</a>"
+            : "";
+
+    // Бейдж стадии: короткий текст по умолчанию, полный — только на широком экране.
+    // Полная подпись остаётся в title, чтобы сокращение не пришлось разгадывать.
+    string StageBadgeHtml((string Text, string Short, string Cls) b) =>
+        $"<span class=\"inline-block py-0.5 px-2 rounded text-xs font-semibold {b.Cls}\" title=\"{b.Text}\">" +
+        $"<span class=\"min-[1920px]:hidden\">{b.Short}</span>" +
+        $"<span class=\"hidden min-[1920px]:inline\">{b.Text}</span></span>";
+
+    // Диапазон дат: до 1920 — в две строки, дальше одной. Колонка дат иначе тянет таблицу
+    // шире экрана, и горизонтальный скролл прячет колонку действий.
+    string DateRangeHtml(string? range)
+    {
+        if (string.IsNullOrEmpty(range)) return "—";
+
+        var parts = range.Split(" – ");
+        if (parts.Length != 2) return System.Net.WebUtility.HtmlEncode(range);
+
+        var from = System.Net.WebUtility.HtmlEncode(parts[0]);
+        var to = System.Net.WebUtility.HtmlEncode(parts[1]);
+        return $"<span class=\"block min-[1920px]:inline\">{from}</span>" +
+               $"<span class=\"hidden min-[1920px]:inline\"> – </span>" +
+               $"<span class=\"block min-[1920px]:inline\">{to}</span>";
+    }
 }
 
 @functions {
@@ -39,6 +78,24 @@
         var t = n % 100;
         if (t is >= 11 and <= 14) return "дней";
         return (n % 10) switch { 1 => "день", >= 2 and <= 4 => "дня", _ => "дней" };
+    }
+
+    // Состояние проверки качества у строки. Три состояния, и «не проверялось» — отдельное:
+    // пустой список без отметки о прогоне читался бы как «всё чисто», хотя никто не смотрел.
+    //   есть помеченные  → оранжевый бейдж с числом (работа);
+    //   проверено, пусто → зелёная галочка с датой прогона;
+    //   не проверялось   → ничего, чтобы не создавать ложного успокоения.
+    static string QualityBadge(DateTime? scannedAt, int suspectCount)
+    {
+        if (suspectCount > 0)
+            return $"<span class=\"inline-block mr-1 py-0.5 px-1.5 rounded text-[10px] font-bold bg-admin-warning/15 text-admin-warning\" " +
+                   $"title=\"Помеченных недостоверными строк: {suspectCount}\">⚑ {suspectCount}</span>";
+
+        if (scannedAt is { } at)
+            return $"<span class=\"inline-block mr-1 py-0.5 px-1.5 rounded text-[10px] font-bold bg-admin-success/15 text-admin-success\" " +
+                   $"title=\"Проверено {at.ToLocalTime():dd.MM.yyyy HH:mm} — подозрительных строк нет\">✓</span>";
+
+        return "";
     }
 
     // Бейджи языков загруженных PDF (he — синий, en — фиолетовый).
@@ -63,15 +120,33 @@
             sb.Append($"<button onclick=\"discPreview({s.DiscoveredId})\" class=\"{btn}\">Затянуть</button> ");
             sb.Append($"<button onclick=\"discStatus({s.DiscoveredId},'imported')\" class=\"{btn}\" title=\"Пометить импортированным вручную\">✓ имп.</button> ");
         }
+        // Уже импортированное тоже нужно уметь тянуть заново: протокол на сайте правят
+        // (дисквалификации, опечатки), да и наш парсер чинится — старым разбором остаются
+        // испорченные строки. Открывает то же превью, но с заранее взведённой перезаписью.
+        if (imported && finished)
+            sb.Append($"<button onclick=\"discPreview({s.DiscoveredId}, true)\" class=\"{btn}\" title=\"Скачать протокол заново и перезаписать результаты\">Перезатянуть</button> ");
         if (finished && string.IsNullOrEmpty(s.Languages))
             sb.Append($"<button onclick=\"discSyncLangs({s.DiscoveredId}, this)\" class=\"{btn}\" title=\"Скачать HE+EN пару и дозаполнить англ. имена пловцов\">Синхр. языки</button> ");
         else if (s.Languages == "he")
             sb.Append("<span class=\"text-[11px] text-admin-text-muted\" title=\"Второй язык на loglig не найден\">только HE</span> ");
         sb.Append($"<a href=\"{api}/{s.DiscoveredId}/pdf\" class=\"{btn}\">PDF</a> ");
+        // Ручная пометка «нет протокола»: PDF на сайте бывает пустым (страница без единой
+        // строки), и без пометки строка выглядит обычной «новой» — её пробуют затянуть снова.
+        sb.Append(s.EmptySourceAt is null
+            ? $"<button onclick=\"discEmptySource({s.DiscoveredId}, true)\" class=\"{btn}\" title=\"Протокола нет: PDF пустой\">∅ нет протокола</button> "
+            : $"<button onclick=\"discEmptySource({s.DiscoveredId}, false)\" class=\"{btn}\" title=\"Снять пометку — протокол появился\">↺ протокол есть</button> ");
         if (!imported)
             sb.Append(s.Status == "ignored"
                 ? $"<button onclick=\"discStatus({s.DiscoveredId},'new')\" class=\"{btn}\">вернуть</button>"
                 : $"<button onclick=\"discStatus({s.DiscoveredId},'ignored')\" class=\"{btn}\" title=\"Скрыть\">✕</button>");
+
+        // Вид спорта — селектом прямо в строке: эвристика по названию иногда промахивается,
+        // и поправить её должно быть дешевле, чем разбираться, почему строка пропала.
+        var sel = "text-[11px] bg-transparent border border-admin-border rounded px-1 py-0.5 ml-1";
+        sb.Append($"<select onchange=\"discDiscipline({s.DiscoveredId}, this.value)\" class=\"{sel}\" title=\"Вид спорта\">");
+        foreach (var (value, label) in new[] { ("swimming", "плавание"), ("artistic", "артистич."), ("other", "прочее") })
+            sb.Append($"<option value=\"{value}\"{(s.Discipline == value ? " selected" : "")}>{label}</option>");
+        sb.Append("</select>");
         return sb.ToString();
     }
 }
@@ -95,7 +170,18 @@
     };
     <div class="admin-card border-l-[3px] border-l-admin-warning bg-admin-warning/5 mb-4 flex items-center justify-between px-4 py-2 text-[13px]">
         <span>Активный фильтр «здоровья данных»: <strong class="text-admin-text">@label</strong></span>
-        <a href="@Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, synth = Model.ShowSynthetic ? "true" : null, month = Model.Month })" class="admin-btn admin-btn-ghost py-1 px-2.5">сбросить ✕</a>
+        <a href="@Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, discipline = Model.Discipline, synth = Model.ShowSynthetic ? "true" : null, month = Model.Month })" class="admin-btn admin-btn-ghost py-1 px-2.5">сбросить ✕</a>
+    </div>
+}
+
+@* Скрытые фильтром дисциплины показываем счётчиком: молча пропавшие строки читаются
+   как потеря данных, а так видно и сколько их, и куда нажать. *@
+@if (Model.HiddenByDiscipline > 0)
+{
+    <div class="mb-3 text-[12px] text-admin-text-muted">
+        Скрыто фильтром дисциплины: <strong class="text-admin-text">@Model.HiddenByDiscipline</strong>
+        <a class="text-admin-accent hover:underline ml-1"
+           href="@Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, stage = Model.Stage, discipline = "all", synth = Model.ShowSynthetic ? "true" : null, month = Model.Month, filter = Model.QualityFilter })">показать все ↗</a>
     </div>
 }
 
@@ -160,15 +246,20 @@
         </select>
     </label>
     <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
-        Сезон
-        <select name="season" class="admin-input">
-            <option value="">Все</option>
-            @foreach (var s in Model.Seasons)
-            {
-                <option value="@s" selected="@(s == Model.Season)">@($"{s - 1}/{s % 100:00}")</option>
-            }
+        Дисциплина
+        @* Федерация проводит не только плавание: артистическое (שחייה אומנותית) во
+           входящих есть, а нам не нужно. Прячем ФИЛЬТРОМ с дефолтом, не удаляя строки —
+           понадобится, переключат на «все». *@
+        <select name="discipline" class="admin-input">
+            <option value="" selected="@(string.IsNullOrEmpty(Model.Discipline))">плавание</option>
+            <option value="artistic" selected="@(Model.Discipline == "artistic")">артистическое</option>
+            <option value="other" selected="@(Model.Discipline == "other")">прочее</option>
+            <option value="all" selected="@(Model.Discipline == "all")">все</option>
         </select>
     </label>
+    @* Сезон выбирается чипами над списком (там же счётчики «затянуто из всего»), а не селектом —
+       здесь только скрытое поле, чтобы «Найти» не сбрасывало выбранный сезон. *@
+    <input type="hidden" name="season" value="@Model.Season" />
     <input type="hidden" name="month" value="@Model.Month" />
     @if (!string.IsNullOrEmpty(Model.QualityFilter))
     {
@@ -185,19 +276,73 @@
     }
 </form>
 
-<!-- Фильтр по месяцам: 12 кнопок со счётчиками (под текущими фильтрами; клик по активному снимает) -->
+@{
+    // Счётчик «затянуто» одинаково рисуется на чипе сезона и на кнопке месяца, поэтому
+    // собирается ОДНОЙ функцией. Три числа вместо двух: затянуто / тянуть нечего / всего.
+    //
+    // Зачем «тянуть нечего» отдельным числом: «12 из 14» читается как долг на две штуки,
+    // хотя у этих двух пустой протокол или результаты не опубликованы — сделать с ними
+    // нельзя ничего. Такие показываем плюсом («12+2») и, когда ждать больше нечего,
+    // ставим зелёную галочку: месяц закрыт, возвращаться не надо.
+    (string Html, string Hint) PullCounter(int imported, int nothingToPull, int total)
+    {
+        var pending = Math.Max(0, total - imported - nothingToPull);
+        var body = nothingToPull > 0
+            ? $"{imported}<span class=\"opacity-60\">+{nothingToPull}</span>/{total}"
+            : $"{imported}/{total}";
+        var done = pending == 0 && total > 0;
+        var html = $"<span class=\"ml-1 tabular-nums {(done ? "text-admin-success" : "opacity-70")}\">{body}</span>"
+                   + (done ? "<span class=\"ml-1 text-admin-success\">✓</span>" : "");
+
+        var hint = $"затянуто {imported} из {total}";
+        if (nothingToPull > 0) hint += $", тянуть нечего у {nothingToPull} (пустой протокол или результаты не опубликованы)";
+        hint += pending > 0 ? $", ждёт затягивания {pending}" : " — всё, что можно, затянуто";
+        return (html, hint);
+    }
+}
+
+@* Фильтр по сезонам: чип на сезон со счётчиком «затянуто (+нечего тянуть) из всего».
+   Считается по тем же фильтрам, что список, но без сезона/месяца. *@
+<div class="mb-2 flex flex-wrap items-center gap-1.5">
+    @{
+        var seasonTotal = Model.SeasonCounts.Sum(s => s.Total);
+        var seasonImported = Model.SeasonCounts.Sum(s => s.Imported);
+        var seasonNothing = Model.SeasonCounts.Sum(s => s.NothingToPull);
+        var allCounter = PullCounter(seasonImported, seasonNothing, seasonTotal);
+    }
+    <a href="@SeasonUrl(null)"
+       class="@(Model.Season == null ? "admin-btn admin-btn-primary py-1 px-2.5" : "admin-btn admin-btn-ghost py-1 px-2.5")"
+       title="Все сезоны: @allCounter.Hint">
+        Все @Html.Raw(allCounter.Html)
+    </a>
+    @foreach (var s in Model.SeasonCounts)
+    {
+        var active = Model.Season == s.Season;
+        var c = PullCounter(s.Imported, s.NothingToPull, s.Total);
+        <a href="@SeasonUrl(active ? (int?)null : s.Season)"
+           class="@(active ? "admin-btn admin-btn-primary py-1 px-2.5" : "admin-btn admin-btn-ghost py-1 px-2.5")"
+           title="@(active ? $"Снять фильтр по сезону ({c.Hint})" : $"Сезон {s.Season - 1}/{s.Season % 100:00}: {c.Hint}")">
+            @($"{(s.Season - 1) % 100:00}-{s.Season % 100:00}") @Html.Raw(c.Html)
+        </a>
+    }
+</div>
+
+<!-- Фильтр по месяцам: 12 кнопок с тем же счётчиком (под текущими фильтрами; клик по активному снимает) -->
 <div class="mb-3 flex flex-wrap gap-1.5">
     @for (var i = 0; i < 12; i++)
     {
         var m = i + 1;
         var active = Model.Month == m;
         var count = Model.MonthCounts.Count > i ? Model.MonthCounts[i] : 0;
+        var imported = Model.MonthImported.Count > i ? Model.MonthImported[i] : 0;
+        var nothing = Model.MonthNothingToPull.Count > i ? Model.MonthNothingToPull[i] : 0;
+        var c = PullCounter(imported, nothing, count);
         <a href="@MonthUrl(active ? (int?)null : m)"
            class="@(active
                ? "admin-btn admin-btn-primary py-1 px-2.5"
                : "admin-btn admin-btn-ghost py-1 px-2.5") @(count == 0 && !active ? "opacity-40" : "")"
-           title="@(active ? "Снять фильтр по месяцу" : $"Показать только {monthNames[i]}")">
-            @monthNames[i] <span class="ml-1 tabular-nums opacity-70">@count</span>
+           title="@(active ? $"Снять фильтр по месяцу ({c.Hint})" : $"{monthNames[i]}: {c.Hint}")">
+            @monthNames[i] @Html.Raw(c.Html)
         </a>
     }
 </div>
@@ -228,7 +373,9 @@ else
                     <th>OrgCompId</th>
                     <th>Площадка / языки</th>
                     <th class="text-right">Строк</th>
-                    <th></th>
+                    @* Колонка действий липкая (см. .col-actions): таблица шире экрана,
+                       и «Открыть» уезжал за правый край — строка выглядела без действий. *@
+                    <th class="col-actions"></th>
                 </tr>
             </thead>
             <tbody>
@@ -242,31 +389,46 @@ else
                     @if (u.Db is { IsEvent: true } ev)
                     {
                         <!-- Многодневное событие: заголовок (дни и действия — в панели) -->
-                        <tr id="evhead-@ev.EventId">
-                            <td><span class="inline-block py-0.5 px-2 rounded text-xs font-semibold @badge.Cls">@badge.Text</span></td>
+                        @* data-disc-id — якорь для бейджа «затянуто» после успешного импорта. *@
+                        <tr id="evhead-@ev.EventId" data-disc-id="@(u.Site?.DiscoveredId)">
+                            <td>@Html.Raw(StageBadgeHtml(badge))</td>
                             <td class="text-center">@(u.IsChampionship ? "🏆" : "")</td>
                             <td>
                                 <span class="font-medium text-admin-text">@ev.EventName</span>
                                 <span class="ml-1.5 inline-block py-0.5 px-1.5 rounded text-[10px] font-semibold bg-admin-success/15 text-admin-success">@ev.DayCount @DaysWord(ev.DayCount)</span>
                                 @await Html.PartialAsync("/Pages/Admin/Competitions/_CompCategories.cshtml", ev.Categories)
                             </td>
-                            <td class="whitespace-nowrap text-admin-text-muted">@(string.IsNullOrEmpty(ev.DateRange) ? "—" : ev.DateRange)</td>
+                            <td class="whitespace-nowrap text-admin-text-muted">@Html.Raw(DateRangeHtml(ev.DateRange))</td>
                             <td>@(string.IsNullOrEmpty(ev.PoolType) ? "—" : ev.PoolType)</td>
                             <td class="text-admin-text-muted">
-                                @if (u.Site is { } es)
-                                {
-                                    <a href="https://isr.org.il/comp.asp?compID=@es.OrgCompId" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@es.OrgCompId ↗</a>
-                                }
-                                else { <text>—</text> }
+                                <div class="flex flex-col gap-0.5">
+                                    @if (u.Site is { } es)
+                                    {
+                                        <a href="https://isr.org.il/comp.asp?compID=@es.OrgCompId" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@es.OrgCompId ↗</a>
+                                    }
+                                    else { <span>—</span> }
+                                    @Html.Raw(PublicCompetitionLink(ev.Days.FirstOrDefault()?.Id))
+                                </div>
                             </td>
                             <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(u.Site != null ? System.Net.WebUtility.HtmlEncode(u.Site.Venue ?? "—") + LangBadges(u.Site.Languages) : "—")</td>
                             <td class="text-right tabular-nums">@ev.TotalResultCount</td>
-                            <td class="text-right whitespace-nowrap">
+                            <td class="col-actions text-right whitespace-nowrap">
+                                @* Проверка качества вынесена в саму строку (раньше жила только в
+                                   раскрытой панели и потому не попадалась на глаза): после импорта
+                                   её нужно нажимать вручную — автозапуска нет. *@
+                                @if (ev.TotalResultCount > 0)
+                                {
+                                    @Html.Raw(QualityBadge(ev.QualityScannedAt, ev.SuspectCount))
+                                    <button type="button" class="admin-btn admin-btn-primary py-1 px-2.5 quality-btn"
+                                            data-event-id="@ev.EventId"
+                                            data-title="@ev.EventName"
+                                            title="Проверить достоверность результатов">⚑ Качество</button>
+                                }
                                 <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 row-toggle"
                                         data-key="@rowKey" aria-expanded="false">▸ Открыть</button>
                                 <form method="post" asp-page-handler="DeleteEvent"
                                       asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                      asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-stage="@Model.Stage"
+                                      asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-discipline="@Model.Discipline" asp-route-stage="@Model.Stage"
                                       asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
                                       class="inline comp-delete-form" data-kind="event" data-name="@ev.EventName" data-days="@ev.DayCount" data-rows="@ev.TotalResultCount">
                                     <input type="hidden" name="eventId" value="@ev.EventId" />
@@ -278,8 +440,8 @@ else
                     else if (u.Db?.Single is { } c)
                     {
                         <!-- Одиночное соревнование (импортировано или только в БД) -->
-                        <tr>
-                            <td><span class="inline-block py-0.5 px-2 rounded text-xs font-semibold @badge.Cls">@badge.Text</span></td>
+                        <tr data-disc-id="@(u.Site?.DiscoveredId)">
+                            <td>@Html.Raw(StageBadgeHtml(badge))</td>
                             <td class="text-center">@(u.IsChampionship ? "🏆" : "")</td>
                             <td>
                                 <a href="@EditUrl(c.Id)" class="text-admin-accent hover:underline font-medium">@c.Name</a>
@@ -293,20 +455,32 @@ else
                             <td>@(string.IsNullOrEmpty(c.PoolType) ? "—" : c.PoolType)</td>
                             <td class="text-admin-text-muted">
                                 @{ var org = c.OrgCompId ?? u.Site?.OrgCompId; }
-                                @if (org is int soc)
-                                {
-                                    <a href="https://isr.org.il/comp.asp?compID=@soc" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@soc ↗</a>
-                                }
-                                else { <text>—</text> }
+                                <div class="flex flex-col gap-0.5">
+                                    @if (org is int soc)
+                                    {
+                                        <a href="https://isr.org.il/comp.asp?compID=@soc" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@soc ↗</a>
+                                    }
+                                    else { <span>—</span> }
+                                    @Html.Raw(PublicCompetitionLink(c.Id))
+                                </div>
                             </td>
                             <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(u.Site != null ? System.Net.WebUtility.HtmlEncode(u.Site.Venue ?? "—") + LangBadges(u.Site.Languages) : "—")</td>
                             <td class="text-right tabular-nums">@c.ResultCount</td>
-                            <td class="text-right whitespace-nowrap">
+                            <td class="col-actions text-right whitespace-nowrap">
+                                @* См. комментарий у события: кнопка вынесена из панели в строку. *@
+                                @if (c.ResultCount > 0)
+                                {
+                                    @Html.Raw(QualityBadge(c.QualityScannedAt, c.SuspectCount))
+                                    <button type="button" class="admin-btn admin-btn-primary py-1 px-2.5 quality-btn"
+                                            data-competition-id="@c.Id"
+                                            data-title="@c.Name"
+                                            title="Проверить достоверность результатов">⚑ Качество</button>
+                                }
                                 <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 row-toggle"
                                         data-key="@rowKey" aria-expanded="false">▸ Открыть</button>
                                 <form method="post" asp-page-handler="Delete"
                                       asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                      asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-stage="@Model.Stage"
+                                      asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-discipline="@Model.Discipline" asp-route-stage="@Model.Stage"
                                       asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
                                       class="inline comp-delete-form" data-kind="single" data-name="@c.Name" data-rows="@c.ResultCount">
                                     <input type="hidden" name="id" value="@c.Id" />
@@ -318,8 +492,16 @@ else
                     else if (u.Site is { } s)
                     {
                         <!-- Только на сайте (в БД ещё нет) -->
-                        <tr>
-                            <td><span class="inline-block py-0.5 px-2 rounded text-xs font-semibold @badge.Cls">@badge.Text</span></td>
+                        <tr data-disc-id="@s.DiscoveredId">
+                            <td>
+                                @Html.Raw(StageBadgeHtml(badge))
+                                @* Протокола нет (PDF пустой) — чтобы не пробовать «Затянуть» снова. *@
+                                @if (s.EmptySourceAt is { } emptyAt)
+                                {
+                                    <span class="ml-1 inline-block py-0.5 px-1.5 rounded text-[10px] font-bold bg-white/[.08] text-admin-text-muted"
+                                          title="Протокола нет: PDF пустой (@emptyAt.ToLocalTime().ToString("dd.MM.yyyy"))">∅ нет протокола</span>
+                                }
+                            </td>
                             <td class="text-center">@(u.IsChampionship ? "🏆" : "")</td>
                             <td dir="rtl" style="text-align:left">
                                 <a class="text-admin-accent hover:underline" href="https://isr.org.il/comp.asp?compID=@s.OrgCompId" target="_blank" rel="noopener">@s.Name ↗</a>
@@ -328,12 +510,12 @@ else
                                     <div class="text-[11px] text-[#ef9a9a]" dir="ltr">@s.LastError</div>
                                 }
                             </td>
-                            <td class="whitespace-nowrap text-admin-text-muted">@(s.DateStart == s.DateEnd ? s.DateStart.ToString("dd/MM/yyyy") : $"{s.DateStart:dd/MM/yyyy} – {s.DateEnd:dd/MM/yyyy}")</td>
+                            <td class="whitespace-nowrap text-admin-text-muted">@Html.Raw(DateRangeHtml(s.DateStart == s.DateEnd ? s.DateStart.ToString("dd/MM/yyyy") : $"{s.DateStart:dd/MM/yyyy} – {s.DateEnd:dd/MM/yyyy}"))</td>
                             <td class="text-admin-text-muted">—</td>
                             <td class="text-admin-text-muted">@s.OrgCompId</td>
                             <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(System.Net.WebUtility.HtmlEncode(s.Venue ?? "—") + LangBadges(s.Languages))</td>
                             <td class="text-right text-admin-text-muted">—</td>
-                            <td class="text-right whitespace-nowrap">
+                            <td class="col-actions text-right whitespace-nowrap">
                                 <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 row-toggle"
                                         data-key="@rowKey" aria-expanded="false">▸ Открыть</button>
                             </td>
@@ -353,11 +535,11 @@ else
                                 }
                                 @if (rowResults > 0 && u.Db is { } dbq)
                                 {
-                                    <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 quality-btn"
+                                    <button type="button" class="admin-btn admin-btn-primary py-1 px-2.5 quality-btn"
                                             data-event-id="@(dbq.IsEvent ? dbq.EventId?.ToString() : null)"
                                             data-competition-id="@(dbq.IsEvent ? null : dbq.Single?.Id.ToString())"
                                             data-title="@rowTitle"
-                                            title="Проверить достоверность результатов">Качество</button>
+                                            title="Проверить достоверность результатов">⚑ Проверить качество</button>
                                 }
                                 @Html.Raw(u.Site != null ? SiteActions(u.Site, imported: u.Db != null) : "")
                             </div>
@@ -380,19 +562,22 @@ else
                                                     <td class="whitespace-nowrap text-admin-text-muted">@(string.IsNullOrEmpty(d.Date) ? "—" : d.Date)</td>
                                                     <td>@(string.IsNullOrEmpty(d.PoolType) ? "—" : d.PoolType)</td>
                                                     <td class="text-admin-text-muted">
-                                                        @if (d.OrgCompId is int doc)
-                                                        {
-                                                            <a href="https://isr.org.il/comp.asp?compID=@doc" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@doc ↗</a>
-                                                        }
-                                                        else { <text>—</text> }
+                                                        <div class="flex flex-col gap-0.5">
+                                                            @if (d.OrgCompId is int doc)
+                                                            {
+                                                                <a href="https://isr.org.il/comp.asp?compID=@doc" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@doc ↗</a>
+                                                            }
+                                                            else { <span>—</span> }
+                                                            @Html.Raw(PublicCompetitionLink(d.Id))
+                                                        </div>
                                                     </td>
                                                     <td>@await Html.PartialAsync("/Pages/Admin/Competitions/_CompFlags.cshtml", d)</td>
                                                     <td class="text-right tabular-nums">@d.ResultCount</td>
-                                                    <td class="text-right whitespace-nowrap">
+                                                    <td class="col-actions text-right whitespace-nowrap">
                                                         <a href="@EditUrl(d.Id)" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
                                                         <form method="post" asp-page-handler="Delete"
                                                               asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                                              asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-stage="@Model.Stage"
+                                                              asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-discipline="@Model.Discipline" asp-route-stage="@Model.Stage"
                                                               asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
                                                               class="inline comp-delete-form" data-kind="day" data-name="День @(d.DayNumber?.ToString() ?? "?")" data-rows="@d.ResultCount">
                                                             <input type="hidden" name="id" value="@d.Id" />
@@ -411,7 +596,7 @@ else
                                 @* Быстрая правка: только поля, общие для всех дней события. Имя/дата/страна — на Edit. *@
                                 <form method="post" asp-page-handler="QuickSave"
                                       asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                      asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-stage="@Model.Stage"
+                                      asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-discipline="@Model.Discipline" asp-route-stage="@Model.Stage"
                                       asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
                                       class="mt-3">
                                     <input type="hidden" name="id" value="@head.Id" />
@@ -448,6 +633,11 @@ else
                                         <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
                                             <input type="checkbox" name="showCombineAllResults" value="true" checked="@(u.Db.IsEvent ? u.Db.ShowCombineAllResults : head.ShowCombineAllResults)" class="w-4 h-4 cursor-pointer" />
                                             <span class="text-admin-text">Combine all results</span>
+                                        </label>
+                                        <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none"
+                                               title="Лига, товарищеский старт — очки клубам тут никто не считает. Реестр перестаёт требовать правило очков.">
+                                            <input type="checkbox" name="clubPointsDisabled" value="true" checked="@(u.Db.IsEvent ? u.Db.ClubPointsDisabled : head.ClubPointsDisabled)" class="w-4 h-4 cursor-pointer" />
+                                            <span class="text-admin-text">Клубный зачёт не ведётся</span>
                                         </label>
                                     </div>
                                     <div class="mt-3 flex flex-wrap items-end gap-3">
@@ -502,10 +692,47 @@ else
     <div class="mb-2 text-sm font-semibold text-admin-text" id="preview-title"></div>
     <div id="preview-summary" class="mb-3 text-[13px] text-admin-text-muted"></div>
     <div id="preview-warnings" class="mb-3 hidden rounded-md border border-admin-danger/40 bg-admin-danger/10 p-3 text-[12.5px]"></div>
+    @* Сколько рекордов побьёт файл (Б2) — подсказка перед «Применить», не запрет. *@
+    <div id="preview-records" class="hidden"></div>
 
     <div class="mb-3">
         <div class="mb-1 text-[12px] font-semibold uppercase tracking-wide text-admin-text-muted">Категории</div>
         <div id="preview-categories" class="flex flex-wrap gap-3 text-[13px]"></div>
+    </div>
+
+    @* Официальный клубный зачёт (דירוג מועדונים) на loglig: есть ли он и по какой шкале.
+       Кнопка зачёта есть у ВСЕХ соревнований — признак только непустая таблица, поэтому
+       проверку делает сервер. Если шкала опознана, правило подставляется в селект ниже. *@
+    <div class="mb-3">
+        <div class="mb-1 text-[12px] font-semibold uppercase tracking-wide text-admin-text-muted">Клубные очки</div>
+        <div id="preview-standing" class="mb-2 rounded-md border border-admin-border px-3 py-2 text-[13px] text-admin-text-muted">
+            Проверяю официальный зачёт…
+        </div>
+        <select id="preview-rule-clubs" class="admin-input w-full max-w-md rounded-md px-3 py-2 text-[13px]">
+            <option value="">Авто (по дате и типу)</option>
+            @foreach (var r in Model.ClubRules)
+            {
+                <option value="@r.Id">@r.Version@(r.ManualOnly ? " · manual" : "")</option>
+            }
+        </select>
+
+        @* Зачёт есть, а правила под его шкалу нет: заводим прямо отсюда, иначе цикл
+           «уйти на /Admin/PointsRules → завести → вернуться → перезатянуть». Кнопка, а не
+           галочка «создать автоматически»: шкала снята эвристикой, и админ должен увидеть,
+           что именно заводит (у גביע האביב 2026 регламент вдобавок содержал условие сверх
+           шкалы — машине его не видно). *@
+        <div id="preview-rule-create" class="mt-2 hidden rounded-md border border-[rgba(255,213,79,0.4)] bg-[rgba(255,213,79,0.08)] p-3">
+            <div class="mb-2 text-[12.5px] text-admin-text">
+                Шкалы этого зачёта нет ни в одном правиле. Завести новое по снятой шкале?
+            </div>
+            <div id="preview-rule-scale" class="mb-2 font-mono text-[12px] text-admin-text-muted"></div>
+            <div class="flex flex-wrap items-center gap-2">
+                <input type="text" id="preview-rule-version" class="admin-input min-w-[220px] rounded-md px-3 py-2 text-[13px]"
+                       placeholder="Версия правила" />
+                <button type="button" id="btn-create-rule" class="admin-btn admin-btn-ghost">Завести правило по этой шкале</button>
+                <span class="text-[12px] text-admin-text-muted">manual · эстафеты ×2</span>
+            </div>
+        </div>
     </div>
 
     <div class="mb-3 hidden" id="overwrite-block">
@@ -537,6 +764,23 @@ else
     </div>
 </div>
 
+@* Ход затягивания: закреплённая панель справа внизу. Раньше шаги уходили в тост, который
+   гаснет через несколько секунд — а затягивание идёт минуты (скачивание PDF, парсинг,
+   фоновый job), и админ терял из виду, чем всё кончилось. Панель живёт до закрытия,
+   переживает перезагрузку страницы (sessionStorage) и сама показывает итог. *@
+<div id="pull-panel"
+     class="fixed bottom-4 right-4 z-50 hidden w-[min(24rem,calc(100vw-2rem))] rounded-lg border border-admin-border bg-admin-surface p-4 text-admin-text shadow-xl shadow-black/50">
+    <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+            <h2 class="text-sm font-semibold text-white">Затягивание</h2>
+            <div id="pull-name" class="mt-0.5 truncate text-[12px] text-admin-text-muted" dir="rtl" style="text-align:left"></div>
+        </div>
+        <button type="button" id="pull-close" class="admin-btn admin-btn-ghost py-1 px-2.5" title="Закрыть">✕</button>
+    </div>
+    <ol id="pull-steps" class="mt-3 space-y-1.5 text-[12.5px]"></ol>
+    <div id="pull-footer" class="mt-3 hidden text-[12px] text-admin-text-muted"></div>
+</div>
+
 @* Качество результатов: список помеченных строк + прогон проверок. Пометка НЕ скрывает
    и НЕ удаляет заплыв — он остаётся в протоколе, но выпадает из детекции рекордов. *@
 <dialog id="quality-modal"
@@ -561,6 +805,17 @@ else
             <span id="quality-stats" class="text-[12px] text-admin-text-muted"></span>
         </div>
 
+        @* Ручная пометка. Нужна потому, что правила ловят не всё: ошибка протокола бывает
+           медленнее рекорда и не нарушает ни одного порога — её видит только человек,
+           знающий пловца (200 вольным за 1:53 при стольнике 1:05). *@
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+            <input type="search" id="quality-search" placeholder="Пометить вручную: имя, клуб, время или дистанция"
+                   class="admin-input py-1 px-2 text-[13px] w-[22rem] max-w-full" />
+            <button type="button" id="quality-search-btn" class="admin-btn admin-btn-ghost py-1 px-3">Найти</button>
+            <span id="quality-search-hint" class="text-[11px] text-admin-text-muted"></span>
+        </div>
+
+        <div id="quality-found" class="mt-3"></div>
         <div id="quality-body" class="mt-4 max-h-[60vh] overflow-y-auto"></div>
     </div>
 </dialog>
@@ -642,6 +897,180 @@ else
             });
         });
 
+        // ── Панель хода затягивания ─────────────────────────────────────────────
+        // Затягивание идёт минуты и в несколько шагов (скачать PDF → распарсить → превью →
+        // фоновый job импорта), а тост живёт секунды и не переживает перезагрузку. Панель
+        // держит шаги на экране, опрашивает job до конца и после успеха обновляет таблицу,
+        // помечая строку бейджем «затянуто».
+        window.pullPanel = (function () {
+            const PENDING_KEY = 'pullPending';  // job, за которым следим (переживает F5)
+            const DONE_KEY = 'pullDone';        // итог, который надо показать после reload
+
+            const panel = document.getElementById('pull-panel');
+            const nameEl = document.getElementById('pull-name');
+            const stepsEl = document.getElementById('pull-steps');
+            const footerEl = document.getElementById('pull-footer');
+            let steps = [];  // [{ text, state: 'run'|'ok'|'fail'|'wait' }]
+
+            const ICON = {
+                run: '<span class="text-admin-accent">●</span>',
+                ok: '<span class="text-admin-success">✓</span>',
+                fail: '<span class="text-[#ef9a9a]">✕</span>',
+                wait: '<span class="text-admin-text-muted">○</span>',
+            };
+
+            function render() {
+                stepsEl.innerHTML = steps.map(s => `
+                    <li class="flex gap-2 ${s.state === 'fail' ? 'text-[#ef9a9a]' : s.state === 'wait' ? 'text-admin-text-muted' : ''}">
+                        <span class="w-3.5 shrink-0">${ICON[s.state] ?? ''}</span>
+                        <span class="min-w-0">${s.text}</span>
+                    </li>`).join('');
+            }
+
+            function open(name) {
+                steps = [];
+                nameEl.textContent = name ?? '';
+                footerEl.classList.add('hidden');
+                footerEl.textContent = '';
+                panel.classList.remove('hidden');
+                render();
+            }
+
+            /// Новый шаг «в работе»; предыдущий незакрытый считаем успешным.
+            function step(text) {
+                const last = steps[steps.length - 1];
+                if (last && last.state === 'run') last.state = 'ok';
+                steps.push({ text, state: 'run' });
+                render();
+            }
+
+            function finish(state, text) {
+                const last = steps[steps.length - 1];
+                if (last && last.state === 'run') last.state = state === 'fail' ? 'fail' : 'ok';
+                if (text) steps.push({ text, state });
+                render();
+            }
+
+            function footer(html) {
+                footerEl.innerHTML = html;
+                footerEl.classList.remove('hidden');
+            }
+
+            document.getElementById('pull-close').addEventListener('click', () => {
+                panel.classList.add('hidden');
+                sessionStorage.removeItem(PENDING_KEY);
+            });
+
+            // Бейдж на строке: вешаем в ячейку стадии, рядом с «импортировано».
+            function markRow(discId) {
+                const row = document.querySelector(`tr[data-disc-id="${discId}"]`);
+                if (!row) return false;
+                const cell = row.querySelector('td');
+                if (cell && !cell.querySelector('.pulled-badge')) {
+                    cell.insertAdjacentHTML('beforeend',
+                        '<span class="pulled-badge ml-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase bg-admin-success/20 text-admin-success">затянуто</span>');
+                }
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return true;
+            }
+
+            // Опрос job'а. Импорт идёт в фоне, поэтому единственный честный признак конца —
+            // состояние job'а, а не ответ на POST /import (он лишь ставит в очередь).
+            async function watch(jobId, discId, name) {
+                sessionStorage.setItem(PENDING_KEY, JSON.stringify({ jobId, discId, name }));
+                const deadline = Date.now() + 10 * 60 * 1000;
+                let running = false;
+
+                while (Date.now() < deadline) {
+                    await new Promise(r => setTimeout(r, 1500));
+                    let s;
+                    try {
+                        s = await fetch(`/api/admin/import/status/${jobId}`, { credentials: 'same-origin' })
+                            .then(r => r.ok ? r.json() : null);
+                    } catch { continue; } // сеть моргнула — пробуем дальше
+                    if (!s) continue;
+
+                    if (s.state === 'running' && !running) { running = true; step('Импортирую результаты…'); }
+
+                    if (s.state === 'completed') {
+                        const r = s.result ?? {};
+                        sessionStorage.removeItem(PENDING_KEY);
+                        sessionStorage.setItem(DONE_KEY, JSON.stringify({
+                            discId, name, created: r.created ?? 0, total: r.totalRows ?? 0,
+                            skipped: r.skipped ?? 0, errors: r.errors ?? 0,
+                            // Сверка с файлом (Д1): главный признак того, что импорт лёг верно.
+                            recon: r.reconciliation ?? '', reconBad: r.reconciliationMismatches ?? 0,
+                            // Прогон реестра проверок (Д5): гоняется автоматически в конце импорта.
+                            checks: r.dataChecks ?? '', checkErr: r.dataCheckErrors ?? 0,
+                            checkWarn: r.dataCheckWarnings ?? 0,
+                            // Галочки «сомнительный» из превью — подтверждаем, что пометка легла.
+                            suspect: r.suspectFlagged ?? 0
+                        }));
+                        finish('ok', 'Готово. Обновляю таблицу…');
+                        setTimeout(() => location.reload(), 700);
+                        return;
+                    }
+                    if (s.state === 'failed') {
+                        sessionStorage.removeItem(PENDING_KEY);
+                        finish('fail', `Импорт не прошёл: ${esc(s.error ?? 'причина неизвестна')}`);
+                        footer('Подробности — в <a class="text-admin-accent hover:underline" href="/Admin/ImportHistory">Import History</a>.');
+                        return;
+                    }
+                }
+
+                finish('fail', 'Жду слишком долго — статус смотри в Import History.');
+            }
+
+            // После reload: показать итог и повесить бейдж; если job ещё шёл — продолжить опрос.
+            function restore() {
+                const done = sessionStorage.getItem(DONE_KEY);
+                if (done) {
+                    sessionStorage.removeItem(DONE_KEY);
+                    const d = JSON.parse(done);
+                    open(d.name);
+                    steps = [{ text: `Затянуто: создано ${d.created} из ${d.total}`, state: 'ok' }];
+                    if (d.skipped) steps.push({ text: `пропущено ${d.skipped}`, state: 'wait' });
+                    if (d.errors) steps.push({ text: `ошибок ${d.errors}`, state: 'fail' });
+                    // Сверка с файлом важнее счётчиков: она отвечает на вопрос «легло ли верно».
+                    if (d.recon) steps.push({ text: esc(d.recon), state: d.reconBad ? 'fail' : 'ok' });
+                    // Пометки из превью: молча применённая пометка так же плоха, как молча потерянная.
+                    if (d.suspect) steps.push({ text: `Помечено сомнительными: ${d.suspect} (в рекорды не идут)`, state: 'ok' });
+                    // Проверки данных прогоняются сами (Д5) — показываем итог тут же.
+                    if (d.checks) steps.push({
+                        text: esc(d.checks),
+                        state: d.checkErr ? 'fail' : (d.checkWarn ? 'wait' : 'ok')
+                    });
+                    render();
+
+                    const rowFound = markRow(d.discId);
+                    if (d.reconBad) {
+                        footer('Данные разошлись с протоколом. Разбор — <code>docs/data-integrity.md</code> §8; '
+                             + 'чаще всего лечится повторным «Перезатянуть» с галкой «удалять лишние».');
+                    } else if (d.checkErr || d.checkWarn) {
+                        footer('Проверки данных нашли, что разобрать — '
+                             + '<a class="text-admin-accent hover:underline" href="/Admin/Health">Health</a>.');
+                    } else if (!rowFound) {
+                        footer('Строка не видна при текущих фильтрах — сбрось их, чтобы увидеть её со стадией «импортировано».');
+                    } else {
+                        footer('Дальше стоит нажать <b>⚑ Качество</b> — автозапуска проверки нет.');
+                    }
+                    return;
+                }
+
+                const pending = sessionStorage.getItem(PENDING_KEY);
+                if (pending) {
+                    const p = JSON.parse(pending);
+                    open(p.name);
+                    step('Импорт продолжается в фоне…');
+                    watch(p.jobId, p.discId, p.name);
+                }
+            }
+
+            return { open, step, finish, footer, watch, restore };
+        })();
+
+        pullPanel.restore();
+
         // ── Действия Discovery (перенос из /Admin/Discovery; после мутаций перезагружаем SSR) ──
         (function () {
             const API = '/api/admin/discovery';
@@ -689,6 +1118,29 @@ else
                 } catch (e) { toast('Ошибка: ' + e.message); }
             };
 
+            // «Нет протокола»: PDF на сайте пустой. Пометка ставится и автоматически — при
+            // разборе, который не нашёл ни одного соревнования, — но человек должен уметь
+            // поставить/снять её руками: файл могут выложить позже.
+            window.discDiscipline = async function (id, discipline) {
+                try {
+                    await apiJson(`${API}/${id}/discipline`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ discipline })
+                    });
+                    location.reload();
+                } catch (e) { toast('Ошибка: ' + e.message); }
+            };
+
+            window.discEmptySource = async function (id, empty) {
+                try {
+                    await apiJson(`${API}/${id}/empty-source`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ empty })
+                    });
+                    location.reload();
+                } catch (e) { toast('Ошибка: ' + e.message); }
+            };
+
             window.discSyncLangs = async function (id, btn) {
                 const name = discName(id);
                 if (btn) { btn.disabled = true; btn.textContent = 'Синхронизирую…'; }
@@ -704,17 +1156,137 @@ else
                 setTimeout(() => location.reload(), 1500); // дать прочитать итог перед перезагрузкой
             };
 
-            window.discPreview = async function (id) {
+            // repull=true («Перезатянуть») — то же превью, но с заранее взведённой перезаписью:
+            // намерение уже выражено кликом, второй раз спрашивать незачем.
+            window.discPreview = async function (id, repull) {
                 const name = discName(id);
-                toast('Скачиваю и парсю PDF…', 4000);
+                pullPanel.open(name);
+                pullPanel.step(repull
+                    ? 'Скачиваю протокол заново и разбираю…'
+                    : 'Скачиваю PDF с isr.org.il и разбираю…');
                 try {
                     const p = await apiJson(`${API}/${id}/preview`, { method: 'POST' });
                     preview = { previewId: p.previewId, id, name };
-                    await showPreview(p, name);
-                } catch (e) { toast('Ошибка: ' + e.message, 6000); }
+                    await showPreview(p, name, repull);
+                    pullPanel.finish('ok', `Распознано результатов: ${p.resultCount}`);
+                    pullPanel.step('Жду: проверь превью и нажми «Импортировать»');
+                    pullPanel.footer(
+                        repull && p.existingCompetitionId
+                            ? 'Перезапись существующих результатов уже включена. Превью живёт 15 минут.'
+                            : repull
+                                ? 'Совпадения с существующим соревнованием НЕ найдено — импорт создаст новое. Проверь дату и название.'
+                                : 'Превью живёт 15 минут.');
+                } catch (e) {
+                    pullPanel.finish('fail', `Не удалось разобрать: ${esc(e.message)}`);
+                }
             };
 
-            async function showPreview(p, name) {
+            // «Сколько рекордов побьёт файл» — считается сервером ДО «Применить» (Б2).
+            // Настоящий рекорд редок: много рекордов разом почти всегда значит, что протокол
+            // разобрался неверно (эталон — 00:32.59 на 100 баттерфляем). Это ПОДСКАЗКА,
+            // а не запрет: импорт не блокируется, решает человек.
+            // Заметка пишется САМА и хранится в БД: пометка без причины через полгода
+            // неотличима от случайного клика. Пишем, что именно смутило — время заплыва
+            // против конкретных действующих рекордов.
+            function suspectNote(g) {
+                const s = g.swim;
+                const recs = g.records.map(r => `${r.kind} ${r.recordTime}${r.recordHolder ? ' ' + r.recordHolder : ''}`).join('; ');
+                return `Помечено при импорте: ${s.time} на ${s.distance} ${s.styleName} быстрее рекорда — ${recs}`;
+            }
+
+            function renderRecordPreview(rp) {
+                const box = document.getElementById('preview-records');
+                if (!box) return;
+                if (!rp || (rp.count === 0 && !rp.error)) { box.classList.add('hidden'); return; }
+
+                if (rp.error) {
+                    box.className = 'mt-3 rounded border border-admin-border bg-admin-surface px-3 py-2 text-[12px] text-admin-text-muted';
+                    box.textContent = `Рекорды не проверены: ${rp.error}`;
+                    box.classList.remove('hidden');
+                    return;
+                }
+
+                // Порог «много» намеренно грубый: два-три рекорда на серьёзном старте — норма,
+                // десяток — почти наверняка разбор поехал.
+                const many = rp.count >= 5;
+                box.className = many
+                    ? 'mt-3 rounded border border-admin-danger/40 bg-admin-danger/10 px-3 py-2 text-[12px]'
+                    : 'mt-3 rounded border border-admin-warning/40 bg-admin-warning/10 px-3 py-2 text-[12px]';
+                // Один заплыв бьёт и open-, и возрастной рекорд — это ДВЕ строки превью с одним
+                // rowIndex. Галочка у них общая: помечается заплыв, а не «рекорд».
+                const byRow = new Map();
+                (rp.rows || []).forEach(r => {
+                    const key = r.rowIndex;
+                    if (!byRow.has(key)) byRow.set(key, { swim: r, records: [] });
+                    byRow.get(key).records.push(r);
+                });
+
+                box.innerHTML =
+                    `<div class="font-semibold">${many ? '⚠ ' : ''}Файл побьёт рекордов: ${rp.count}</div>` +
+                    (many ? '<div class="text-admin-text-muted">Столько рекордов сразу — обычно признак того, что протокол разобрался неверно. Стоит посмотреть глазами до «Применить».</div>' : '') +
+                    '<ul class="mt-1 space-y-1.5">' + [...byRow.values()].map(g => {
+                        const s = g.swim;
+                        const recs = g.records.map(r =>
+                            `<div class="text-admin-text-muted" dir="rtl" style="text-align:left">${esc(r.kind)}: ${esc(r.recordTime)} ${esc(r.recordHolder)}</div>`).join('');
+                        return `<li>`
+                            + `<div dir="rtl" style="text-align:left">${esc(s.swimmerName)} · ${esc(s.distance)} ${esc(s.styleName)} · <b>${esc(s.time)}</b></div>`
+                            + recs
+                            + `<label class="mt-0.5 flex items-center gap-1.5 cursor-pointer text-admin-text-muted">`
+                            + `<input type="checkbox" class="suspect-flag cursor-pointer" value="${s.rowIndex}"`
+                            + ` data-note="${esc(suspectNote(g))}"> пометить заплыв сомнительным</label>`
+                            + `</li>`;
+                    }).join('') +
+                    '</ul>' +
+                    // Штатный ложный случай: тянем протокол ТОГО САМОГО старта, на котором рекорд
+                    // и был установлен. Заплыв «бьёт» запись справочника, потому что это она и есть
+                    // (время равное или на сотые лучше — федерация округляет). Ничего делать не надо,
+                    // но без подсказки это читается как ошибка разбора — и галочку жмут зря.
+                    '<div class="mt-1.5 text-admin-text-muted">Если это тот самый заплыв, которым рекорд '
+                    + 'и был установлен, — предупреждение ложное: в справочнике уже стоит он же '
+                    + '(сверь имя и время в скобках). Помечать такую строку не нужно.</div>' +
+                    (rp.count > (rp.rows || []).length ? `<div class="text-admin-text-muted">…и ещё ${rp.count - rp.rows.length}</div>` : '');
+                box.classList.remove('hidden');
+            }
+
+            // Официальный клубный зачёт: есть/нет + подстановка правила под его шкалу.
+            // «Нет» — не ошибка, а факт: у лиг, мокдамот и региональных этапов зачёта не бывает,
+            // и наши клубные очки на них сверять не с чем.
+            function renderOfficialStanding(s) {
+                const box = document.getElementById('preview-standing');
+                const select = document.getElementById('preview-rule-clubs');
+                select.value = '';
+
+                if (!s) {
+                    box.className = 'mb-2 rounded-md border border-admin-border px-3 py-2 text-[13px] text-admin-text-muted';
+                    box.textContent = 'Официальный клубный зачёт не проверялся.';
+                    return;
+                }
+
+                if (s.hasStanding && s.ruleId) {
+                    // Правило опознано по шкале — подставляем его, но оставляем изменяемым.
+                    select.value = String(s.ruleId);
+                    box.className = 'mb-2 rounded-md border border-admin-success/40 bg-admin-success/10 px-3 py-2 text-[13px] text-admin-text';
+                } else if (s.hasStanding) {
+                    // Зачёт есть, а правила под его шкалу нет — это надо завести ДО импорта.
+                    box.className = 'mb-2 rounded-md border border-[rgba(255,213,79,0.4)] bg-[rgba(255,213,79,0.08)] px-3 py-2 text-[13px] text-admin-text';
+                } else {
+                    box.className = 'mb-2 rounded-md border border-admin-border px-3 py-2 text-[13px] text-admin-text-muted';
+                }
+
+                const scale = (s.scale ?? []).slice(0, 12).map(x => x.points).join(', ');
+                box.innerHTML = esc(s.message) + (scale ? `<div class="mt-1 text-[12px] text-admin-text-muted">Шкала зачёта: ${esc(scale)}…</div>` : '');
+
+                // Предложение завести правило — только когда зачёт есть, а шкала не опознана.
+                const createBox = document.getElementById('preview-rule-create');
+                createBox.classList.toggle('hidden', !s.canCreateRule);
+                if (s.canCreateRule) {
+                    document.getElementById('preview-rule-version').value = s.suggestedVersion ?? '';
+                    document.getElementById('preview-rule-scale').textContent =
+                        (s.scale ?? []).map(x => `${x.place}:${x.points}`).join('  ');
+                }
+            }
+
+            async function showPreview(p, name, repull) {
                 document.getElementById('preview-card').classList.remove('hidden');
                 document.getElementById('preview-title').textContent = `Превью: ${name}`;
                 document.getElementById('preview-summary').innerHTML =
@@ -726,6 +1298,9 @@ else
                 const warn = document.getElementById('preview-warnings');
                 warn.classList.toggle('hidden', !(p.warnings?.length));
                 warn.innerHTML = (p.warnings ?? []).map(esc).join('<br>');
+
+                renderRecordPreview(p.recordPreview);
+                renderOfficialStanding(p.officialClubStanding);
 
                 // Upsert-чекбокс — только когда превью нашло существующее соревнование по ключу Name|Date|PoolType.
                 const overwriteBlock = document.getElementById('overwrite-block');
@@ -771,6 +1346,13 @@ else
                 overwriteCb.onchange = updateDeleteMissingVisibility;
                 deleteMissingCb.onchange = updateOverwriteDeleteWarning;
 
+                // «Перезатянуть»: взводим перезапись сразу. «Удалять лишние» НЕ трогаем —
+                // это отдельное решение, оно удаляет строки из БД.
+                if (repull && p.existingCompetitionId) {
+                    overwriteCb.checked = true;
+                    updateDeleteMissingVisibility();
+                }
+
                 // Список существующих событий (второй день дописывается к первому).
                 const eventSelect = document.getElementById('event-select');
                 [...eventSelect.querySelectorAll('option[data-event]')].forEach(o => o.remove());
@@ -791,7 +1373,10 @@ else
                 document.getElementById('event-name').classList.toggle('hidden', !multiDay);
 
                 try {
-                    const cats = await fetch('/api/categories', { credentials: 'same-origin' }).then(r => r.json());
+                    // cache: 'no-store' — иначе только что созданная категория не появится
+                    // здесь до истечения браузерного кэша вкладки (Cache-Control: public,
+                    // max-age=300 у /api/categories рассчитан на публичный сайт).
+                    const cats = await fetch('/api/categories', { credentials: 'same-origin', cache: 'no-store' }).then(r => r.json());
                     document.getElementById('preview-categories').innerHTML = cats.map(c =>
                         `<label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" value="${esc(c.key)}" class="disc-cat cursor-pointer"> ${esc(c.name)}</label>`
                     ).join('');
@@ -808,6 +1393,37 @@ else
                 document.getElementById('event-name').classList.toggle('hidden', e.target.value !== '__new__');
             });
 
+            // Завести правило по снятой шкале. Шкалу сервер берёт из своего кэша превью —
+            // отсюда уезжает только имя версии.
+            document.getElementById('btn-create-rule').addEventListener('click', async (e) => {
+                if (!preview) return;
+                const btn = e.currentTarget;
+                const version = document.getElementById('preview-rule-version').value.trim();
+                btn.disabled = true;
+                try {
+                    const r = await apiJson(`${API}/club-rule`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ previewId: preview.previewId, version })
+                    });
+
+                    // Правило создано — кладём в селект и выбираем, чтобы импорт ушёл уже с ним.
+                    const select = document.getElementById('preview-rule-clubs');
+                    const opt = document.createElement('option');
+                    opt.value = String(r.ruleId);
+                    opt.textContent = `${r.version} · manual`;
+                    select.appendChild(opt);
+                    select.value = String(r.ruleId);
+
+                    document.getElementById('preview-rule-create').classList.add('hidden');
+                    const box = document.getElementById('preview-standing');
+                    box.className = 'mb-2 rounded-md border border-admin-success/40 bg-admin-success/10 px-3 py-2 text-[13px] text-admin-text';
+                    box.textContent = `Правило «${r.version}» заведено и подставлено — соревнование импортируется с ним.`;
+                } catch (err) {
+                    alert(`Правило не заведено: ${err.message}`);
+                    btn.disabled = false;
+                }
+            });
+
             document.getElementById('btn-import').addEventListener('click', async () => {
                 if (!preview) return;
                 const categoryKeys = [...document.querySelectorAll('.disc-cat:checked')].map(i => i.value);
@@ -821,13 +1437,22 @@ else
                             eventId: eventChoice && eventChoice !== '__new__' ? Number(eventChoice) : null,
                             newEventName: eventChoice === '__new__' ? document.getElementById('event-name').value.trim() : null,
                             overwriteExisting: document.getElementById('overwrite-existing-cb').checked,
-                            deleteMissing: document.getElementById('overwrite-existing-cb').checked && document.getElementById('delete-missing-cb').checked
+                            deleteMissing: document.getElementById('overwrite-existing-cb').checked && document.getElementById('delete-missing-cb').checked,
+                            // Правило клубных очков: подставлено по шкале официального зачёта
+                            // либо выбрано вручную. Пусто — автоподбор по дате и типу.
+                            pointRuleClubsId: Number(document.getElementById('preview-rule-clubs').value) || null,
+                            // Галочки «пометить заплыв сомнительным» у строк-рекордов: строка
+                            // ляжет в БД сразу помеченной и не побудет рекордом на витрине.
+                            suspectFlags: [...document.querySelectorAll('.suspect-flag:checked')]
+                                .map(i => ({ rowIndex: Number(i.value), note: i.dataset.note || null }))
                         })
                     });
-                    toast(`Импорт поставлен в очередь (job ${r.jobId}) — статус в Import History`, 6000);
+                    const { id: discId, name } = preview;
                     preview = null;
                     document.getElementById('preview-card').classList.add('hidden');
-                } catch (e) { toast('Ошибка импорта: ' + e.message, 6000); }
+                    pullPanel.step('Импорт поставлен в очередь…');
+                    pullPanel.watch(r.jobId, discId, name);
+                } catch (e) { pullPanel.finish('fail', `Импорт не запустился: ${esc(e.message)}`); }
             });
         })();
 
@@ -850,6 +1475,7 @@ else
                 time_outlier: 'Выброс по времени',
                 gender_mismatch: 'Пол не совпадает',
                 duplicate_swim: 'Повтор дисциплины за день',
+                personal_outlier: 'Выброс по личным результатам',
                 manual: 'Помечено вручную'
             };
 
@@ -898,7 +1524,7 @@ else
                                         ${esc(REASONS[r.reason] ?? r.reason)}${r.isManual ? ' (вручную)' : ''}</span>
                                     <div class="text-[11px] text-admin-text-muted mt-0.5">${esc(r.note ?? '')}</div>
                                 </td>
-                                <td class="text-right whitespace-nowrap">
+                                <td class="col-actions text-right whitespace-nowrap">
                                     <button type="button" class="admin-btn admin-btn-ghost py-1 px-2 quality-clear"
                                             data-id="${r.resultId}" title="Строка в порядке — снять пометку">Снять</button>
                                 </td>
@@ -906,6 +1532,67 @@ else
                         </tbody>
                     </table>`;
             }
+
+            // ── Ручная пометка: найти строку и пометить ──────────────────────────────
+            const searchInput = document.getElementById('quality-search');
+            const searchBtn = document.getElementById('quality-search-btn');
+            const searchHint = document.getElementById('quality-search-hint');
+            const foundEl = document.getElementById('quality-found');
+
+            function renderFound(rows) {
+                if (!rows.length) {
+                    foundEl.innerHTML = '<div class="text-[12px] text-admin-text-muted">Ничего не нашлось.</div>';
+                    return;
+                }
+                foundEl.innerHTML = `
+                    <table class="admin-table w-full text-[13px]">
+                        <tbody>${rows.map(r => `
+                            <tr>
+                                <td>${esc(r.swimmerName)} <span class="text-admin-text-muted">· ${esc(r.club)}</span></td>
+                                <td class="whitespace-nowrap">${esc(r.distance)} ${esc(r.styleName)}</td>
+                                <td class="text-right tabular-nums font-semibold">${esc(r.time)}</td>
+                                <td class="col-actions text-right whitespace-nowrap">
+                                    ${r.reason
+                                        ? '<span class="text-[11px] text-admin-text-muted">уже помечено</span>'
+                                        : `<button type="button" class="admin-btn admin-btn-ghost py-1 px-2 quality-flag"
+                                                data-id="${r.resultId}">Пометить</button>`}
+                                </td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>`;
+            }
+
+            async function runSearch() {
+                const q = searchInput.value.trim();
+                if (q.length < 2) { searchHint.textContent = 'Минимум 2 символа'; return; }
+                searchHint.textContent = 'Ищу…';
+                try {
+                    const rows = await api(`${API}/search?${qs()}&q=${encodeURIComponent(q)}`);
+                    searchHint.textContent = `найдено ${rows.length}`;
+                    renderFound(rows);
+                } catch (err) { searchHint.textContent = 'Ошибка: ' + err.message; }
+            }
+
+            searchBtn.addEventListener('click', runSearch);
+            searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); runSearch(); } });
+
+            foundEl.addEventListener('click', async (e) => {
+                const btn = e.target.closest('.quality-flag');
+                if (!btn) return;
+                // Заметка обязательна: пометка без причины через полгода неотличима от случайного клика.
+                const note = prompt('Почему строка недостоверна? (попадёт в аудит и в список)');
+                if (note === null || !note.trim()) return;
+                btn.disabled = true;
+                try {
+                    await api(`${API}/${btn.dataset.id}/manual`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ flagged: true, note: note.trim() })
+                    });
+                    render(await api(`${API}?${qs()}`));
+                    await runSearch();
+                    toast('Помечено вручную — переимпорт и повторная проверка это сохранят');
+                } catch (err) { btn.disabled = false; toast('Ошибка: ' + err.message, 6000); }
+            });
 
             body.addEventListener('click', async (e) => {
                 const btn = e.target.closest('.quality-clear');
@@ -941,6 +1628,9 @@ else
                         : { competitionId: Number(btn.dataset.competitionId) };
                     titleEl.textContent = btn.dataset.title || 'Качество результатов';
                     statsEl.textContent = '';
+                    searchInput.value = '';
+                    searchHint.textContent = '';
+                    foundEl.innerHTML = '';
                     body.innerHTML = '<div class="text-sm text-admin-text-muted py-6 text-center">Загружаю…</div>';
                     dlg.showModal();
                     try { render(await api(`${API}?${qs()}`)); }

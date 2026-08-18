@@ -25,12 +25,20 @@ public static class SuspectReasons
     /// <summary>Пловец дважды в одной дисциплине одного дня с разным временем.</summary>
     public const string DuplicateSwim = "duplicate_swim";
 
+    /// <summary>
+    /// Заплыв не сходится с СОБСТВЕННЫМИ результатами пловца за тот же период.
+    /// Ловит ошибки внутри порогов остальных правил: 200 вольным за 1:53.09 у пловца,
+    /// чей стольник 1:05.05, рекорда не бьёт и от медианы заплыва недалеко — но так не плавают.
+    /// </summary>
+    public const string PersonalOutlier = "personal_outlier";
+
     /// <summary>Поставлено человеком. Переживает переимпорт (в отличие от автоматических).</summary>
     public const string Manual = "manual";
 
     /// <summary>Все коды автопроверок — то, что пересчитывается при каждом прогоне.</summary>
     public static readonly string[] Automatic =
     [
-        TimeOutlier, TimeVsDistance, RelayTimeInIndividual, GenderMismatch, DuplicateSwim
+        TimeOutlier, TimeVsDistance, RelayTimeInIndividual, GenderMismatch, DuplicateSwim,
+        PersonalOutlier
     ];
 }

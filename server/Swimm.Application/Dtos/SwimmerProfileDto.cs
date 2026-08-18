@@ -55,4 +55,34 @@ public class SwimmerProfileDto
     /// <summary>isr | local (см. Swimmer.Origin).</summary>
     [JsonPropertyName("origin")]
     public string Origin { get; set; } = "isr";
+
+    // ── Шапка страницы спортсмена (этап A2, docs/plans/athlete-page-plan.md) ──────
+    // Поля добавлены к существующему DTO, а не вынесены во второй эндпоинт: попапу они не
+    // мешают (лишние ключи он игнорирует), а странице иначе понадобился бы второй запрос
+    // ради возраста и списка сезонов.
+
+    /// <summary>
+    /// Возраст В СЕЗОНЕ (год окончания сезона минус год рождения) для витринного сезона —
+    /// подпись «12 year (2014)». null — год рождения не заполнен.
+    /// ⚠ Это НЕ возраст на день заплыва: осенние и весенние старты одного пловца иначе
+    /// разъезжаются по двум возрастным ступеням (SeasonMath.AgeInSeason).
+    /// </summary>
+    [JsonPropertyName("ageInSeason")]
+    public int? AgeInSeason { get; set; }
+
+    /// <summary>Зачётная группа лестницы; null — стартов в лестничных категориях не было.</summary>
+    [JsonPropertyName("ageGroup")]
+    public SwimmerAgeGroupDto? AgeGroup { get; set; }
+
+    /// <summary>Программы: «pool», позже «open» (docs/plans/open-water-course-plan.md).</summary>
+    [JsonPropertyName("programs")]
+    public List<string> Programs { get; set; } = [];
+
+    /// <summary>Официальных рекордов за пловцом; 0 — бейдж не рендерится.</summary>
+    [JsonPropertyName("recordsHeld")]
+    public int RecordsHeld { get; set; }
+
+    /// <summary>Сезоны с заплывами, от свежих к старым; ровно один — isDisplayDefault.</summary>
+    [JsonPropertyName("seasons")]
+    public List<SwimmerSeasonOptionDto> Seasons { get; set; } = [];
 }

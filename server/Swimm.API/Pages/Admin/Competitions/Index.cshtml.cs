@@ -20,15 +20,20 @@ public class IndexModel : PageModel
     private readonly IImportService _import;
     private readonly IPointRulesAdminRepository _rules;
     private readonly IAdminAuditService _audit;
+    private readonly IConfiguration _config;
+    private readonly IWebHostEnvironment _env;
     private readonly ILogger<IndexModel> _logger;
 
     public IndexModel(ICompetitionAdminRepository repo, IImportService import,
-        IPointRulesAdminRepository rules, IAdminAuditService audit, ILogger<IndexModel> logger)
+        IPointRulesAdminRepository rules, IAdminAuditService audit,
+        IConfiguration config, IWebHostEnvironment env, ILogger<IndexModel> logger)
     {
         _repo = repo;
         _import = import;
         _rules = rules;
         _audit = audit;
+        _config = config;
+        _env = env;
         _logger = logger;
     }
 
@@ -45,6 +50,16 @@ public class IndexModel : PageModel
     /// <summary>Тип соревнования: «champ» — только чемпионаты (по названию), пусто — все.</summary>
     [BindProperty(SupportsGet = true, Name = "kind")]
     public string? Kind { get; set; }
+
+    /// <summary>
+    /// Вид спорта: пусто — только плавание (дефолт), «all» — всё, иначе конкретная дисциплина.
+    /// Артистическое плавание из списка прячем, но не удаляем — см. Disciplines.
+    /// </summary>
+    [BindProperty(SupportsGet = true, Name = "discipline")]
+    public string? Discipline { get; set; }
+
+    /// <summary>Сколько строк спрятал фильтр дисциплины — чип «скрыто N» над списком.</summary>
+    public int HiddenByDiscipline { get; private set; }
 
     /// <summary>Фильтр по стадии: OnSite | Imported | DbOnly | Ignored (пусто — все).</summary>
     [BindProperty(SupportsGet = true, Name = "stage")]
@@ -80,18 +95,38 @@ public class IndexModel : PageModel
     /// <summary>Счётчики соревнований по месяцам (индекс 0 = январь) для кнопок-фильтров.</summary>
     public IReadOnlyList<int> MonthCounts { get; private set; } = new int[12];
 
+    /// <summary>Из <see cref="MonthCounts"/> — сколько уже затянуто в БД (для «2/5» на кнопке месяца).</summary>
+    public IReadOnlyList<int> MonthImported { get; private set; } = new int[12];
+
+    /// <summary>Из <see cref="MonthCounts"/> — сколько затянуть НЕЛЬЗЯ (нечего брать).</summary>
+    public IReadOnlyList<int> MonthNothingToPull { get; private set; } = new int[12];
+
     public IReadOnlyList<CategoryTagDto> Categories { get; private set; } = [];
 
-    /// <summary>Сезоны для фильтра — из справочника И из строк с сайта (прошлые сезоны автозабора).</summary>
-    public IReadOnlyList<int> Seasons { get; private set; } = [];
+    /// <summary>Чипы-сезоны над списком: сезон + «затянуто из всего». Считаются по тем же
+    /// фильтрам, что и список, но без фильтров сезона/месяца — иначе чип остался бы один.</summary>
+    public IReadOnlyList<SeasonCountDto> SeasonCounts { get; private set; } = [];
 
     /// <summary>Правила очков и типы бассейна — для селектов панели быстрой правки строки.</summary>
+    /// <summary>
+    /// База для ссылок «смотреть на сайте». В проде клиент лежит на том же origin, что и
+    /// админка, поэтому пусто = относительные ссылки; в Development клиент крутится на своём
+    /// Vite-порту. Настройка <c>PublicSite:BaseUrl</c> — как на /Admin/Health.
+    /// </summary>
+    public string PublicSiteBaseUrl { get; private set; } = "";
+
     public IReadOnlyList<PointRuleRowDto> ClubRules { get; private set; } = [];
     public IReadOnlyList<PointRuleRowDto> SwimmerRules { get; private set; } = [];
     public IReadOnlyList<string> PoolTypeOptions => Swimm.Application.Constants.PoolTypes.All;
 
     public async Task OnGetAsync()
     {
+        // Dev-адрес клиента нельзя зашивать в разметку: он уехал бы в прод. Та же настройка,
+        // что у /Admin/Health — пусто в проде значит «тот же origin», ссылка относительная.
+        PublicSiteBaseUrl = (_config["PublicSite:BaseUrl"]
+            ?? (_env.IsDevelopment() ? "http://localhost:5173" : ""))
+            .TrimEnd('/');
+
         if (PageNumber < 1) PageNumber = 1;
         if (string.IsNullOrEmpty(Stage))
         {
@@ -107,11 +142,14 @@ public class IndexModel : PageModel
             "discovery-error" or "no-org-comp-id" or "no-results" => FilterAlias,
             _ => null
         };
-        var list = await _repo.GetUnifiedAsync(Search, CategoryKey, Season, Stage, ShowSynthetic, Month, PageNumber, PageSize, QualityFilter, Kind);
+        var list = await _repo.GetUnifiedAsync(Search, CategoryKey, Season, Stage, ShowSynthetic, Month, PageNumber, PageSize, QualityFilter, Kind, Discipline);
         Result = list.Page;
         MonthCounts = list.MonthCounts;
+        MonthImported = list.MonthImported ?? new int[12];
+        MonthNothingToPull = list.MonthNothingToPull ?? new int[12];
+        SeasonCounts = list.SeasonCounts ?? [];
+        HiddenByDiscipline = list.HiddenByDiscipline;
         Categories = await _repo.GetAllCategoriesAsync();
-        Seasons = await _repo.GetAvailableSeasonsAsync();
         ClubRules = await _rules.GetAllAsync(PointRuleKind.Clubs);
         SwimmerRules = await _rules.GetAllAsync(PointRuleKind.Swimmers);
     }
@@ -122,7 +160,8 @@ public class IndexModel : PageModel
     /// </summary>
     public async Task<IActionResult> OnPostQuickSaveAsync(int id, string poolType,
         bool isAward, bool isChampionship, bool showCombineAllResults,
-        List<string>? categoryKeys, int? pointRuleClubsId, int? pointRuleSwimmersId)
+        List<string>? categoryKeys, int? pointRuleClubsId, int? pointRuleSwimmersId,
+        bool clubPointsDisabled = false)
     {
         var result = await _repo.QuickUpdateAsync(new CompetitionQuickEditDto
         {
@@ -133,7 +172,8 @@ public class IndexModel : PageModel
             ShowCombineAllResults = showCombineAllResults,
             CategoryKeys = categoryKeys ?? [],
             PointRuleClubsId = pointRuleClubsId,
-            PointRuleSwimmersId = pointRuleSwimmersId
+            PointRuleSwimmersId = pointRuleSwimmersId,
+            ClubPointsDisabled = clubPointsDisabled
         });
 
         if (!result.Success)
@@ -146,7 +186,8 @@ public class IndexModel : PageModel
         await _audit.LogAsync("competition.quick-edit", "Competition", id.ToString(),
             $"Быстрая правка из списка (#{id}): бассейн={poolType}, awards={isAward}, " +
             $"чемпионат={isChampionship}, combine={showCombineAllResults}, " +
-            $"категории=[{string.Join(",", categoryKeys ?? [])}], дней изменено: {result.Id}");
+            $"категории=[{string.Join(",", categoryKeys ?? [])}], " +
+            $"клубный зачёт={(clubPointsDisabled ? "не ведётся" : "ведётся")}, дней изменено: {result.Id}");
 
         TempData["Flash"] = result.Id > 1
             ? $"Сохранено, применено ко всем дням события: {result.Id}"

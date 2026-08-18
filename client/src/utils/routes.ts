@@ -11,6 +11,7 @@
 //   /groups/{slug}          → groups.html (страница группы)
 //   /groups/{slug}/results  → results_main.html (результаты ростера группы)
 //   /swimmers/{id}          → swimmer.html
+//   /clubs/{id}             → club.html
 //   /my-media               → media.html
 //   /about                  → about.html
 //
@@ -34,6 +35,7 @@ export const routes = {
   groupResults: (slug: string) => `/groups/${enc(slug)}/results`,
 
   swimmer: (id: string | number) => `/swimmers/${enc(String(id))}`,
+  club: (id: string | number) => `/clubs/${enc(String(id))}`,
   myMedia: () => '/my-media',
 };
 
@@ -47,6 +49,8 @@ export interface RouteIdentity {
   competitionId: string | null;
   /** id пловца из /swimmers/{id}. */
   swimmerId: number | null;
+  /** id клуба из /clubs/{id}. */
+  clubId: number | null;
 }
 
 /**
@@ -64,6 +68,7 @@ export function parseRoute(pathname: string = window.location.pathname): RouteId
     groupResults: false,
     competitionId: null,
     swimmerId: null,
+    clubId: null,
   };
 
   if (seg[0] === 'groups' && seg[1]) {
@@ -74,6 +79,9 @@ export function parseRoute(pathname: string = window.location.pathname): RouteId
   } else if (seg[0] === 'swimmers' && seg[1]) {
     const n = Number(decodeURIComponent(seg[1]));
     id.swimmerId = Number.isFinite(n) && n > 0 ? n : null;
+  } else if (seg[0] === 'clubs' && seg[1]) {
+    const n = Number(decodeURIComponent(seg[1]));
+    id.clubId = Number.isFinite(n) && n > 0 ? n : null;
   }
 
   return id;

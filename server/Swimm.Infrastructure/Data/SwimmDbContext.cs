@@ -43,12 +43,25 @@ public class SwimmDbContext : DbContext
     /* === Результаты === */
     public DbSet<ResultRecord> Results => Set<ResultRecord>();
 
+    /* === Клубный зачёт соревнования (материализованный; страница клуба, Фаза 10) === */
+    public DbSet<ClubCompetitionStanding> ClubCompetitionStandings => Set<ClubCompetitionStanding>();
+    public DbSet<CompetitionNote> CompetitionNotes => Set<CompetitionNote>();
+    public DbSet<CompetitionNoteText> CompetitionNoteTexts => Set<CompetitionNoteText>();
+
     /* === Рекорды и нормативы (фаза 2) === */
     public DbSet<Record> Records => Set<Record>();
     public DbSet<NormativeStandard> NormativeStandards => Set<NormativeStandard>();
 
+    /* === Качество рекордов (Sys_): реестр спорных записей + сверка с протоколами === */
+    public DbSet<RecordIssue> RecordIssues => Set<RecordIssue>();
+    public DbSet<RecordVerification> RecordVerifications => Set<RecordVerification>();
+
     /* === Импорт === */
     public DbSet<ImportHistory> ImportHistory => Set<ImportHistory>();
+    public DbSet<ImportReconciliation> ImportReconciliations => Set<ImportReconciliation>();
+    public DbSet<DataCheckRun> DataCheckRuns => Set<DataCheckRun>();
+    public DbSet<DataCheckFinding> DataCheckFindings => Set<DataCheckFinding>();
+    public DbSet<DataCheckState> DataCheckStates => Set<DataCheckState>();
     public DbSet<DiscoveredCompetition> DiscoveredCompetitions => Set<DiscoveredCompetition>();
 
     /* === Фавориты и медиа пользователей === */
@@ -123,6 +136,9 @@ public class SwimmDbContext : DbContext
         modelBuilder.Entity<CompetitionEvent>(entity =>
         {
             entity.ToTable("CompetitionEvents");
+            // Штамп сайта на событии (Д2). Индекс НЕ уникальный: одному событию могут
+            // соответствовать две записи Discovery (6621 и 6622 → один и тот же протокол).
+            entity.HasIndex(e => e.OrgCompId);
         });
 
         modelBuilder.Entity<CompetitionResultUrl>(entity =>
@@ -142,6 +158,16 @@ public class SwimmDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.CountryId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Мягкий merge: склеенный клуб не удаляется, а ссылается на приёмника.
+            // Restrict — приёмника нельзя удалить, пока на него ссылаются склеенные:
+            // иначе ссылка повисла бы и /clubs/{старый id} снова отдавал бы 404.
+            entity.HasOne(e => e.MergedInto)
+                .WithMany()
+                .HasForeignKey(e => e.MergedIntoId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => e.MergedIntoId);
         });
 
         modelBuilder.Entity<Swimmer>(entity =>
@@ -195,6 +221,42 @@ public class SwimmDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        // Материализованный клубный зачёт соревнования (страница клуба, Фаза 10).
+        // Cascade с обеих сторон намеренно: строка зачёта — производная, без своего
+        // соревнования или клуба смысла не имеет и должна уходить вместе с ними.
+        modelBuilder.Entity<ClubCompetitionStanding>(entity =>
+        {
+            entity.ToTable("ClubCompetitionStandings");
+
+            entity.HasOne(e => e.Competition)
+                .WithMany()
+                .HasForeignKey(e => e.CompetitionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Club)
+                .WithMany()
+                .HasForeignKey(e => e.ClubId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CompetitionNote>(entity =>
+        {
+            entity.ToTable("CompetitionNotes");
+
+            entity.HasOne(e => e.Competition)
+                .WithMany()
+                .HasForeignKey(e => e.CompetitionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Переводы живут только вместе с заметкой.
+            entity.HasMany(e => e.Texts)
+                .WithOne(t => t.Note)
+                .HasForeignKey(t => t.NoteId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CompetitionNoteText>(entity => entity.ToTable("CompetitionNoteTexts"));
+
         modelBuilder.Entity<Style>(entity =>
         {
             entity.ToTable("Styles");
@@ -217,13 +279,15 @@ public class SwimmDbContext : DbContext
             entity.HasIndex(e => e.Key).IsUnique();
 
             entity.HasData(
-                // Возрастные ступени (2026-07-28): 8–11 Kids, 11–14 Youth, בוגרים Juniors,
-                // мастерс Masters. Ключи исторические и с подписями НЕ совпадают — они в URL
-                // (?category=) и в закладках пользователей, поэтому не переименовывались.
-                new Category { Id = 1, Key = "results-main",           Name = "Juniors", DisplayOrder = 1, Badge = "J" },
-                new Category { Id = 2, Key = "results-masters",        Name = "Masters", DisplayOrder = 2, Badge = "M" },
-                new Category { Id = 3, Key = "results-youth-team",     Name = "Kids",    DisplayOrder = 3, Badge = "K" },
-                new Category { Id = 4, Key = "results-junior-results", Name = "Youth",   DisplayOrder = 4, Badge = "Y" }
+                // Возрастная лестница (2026-07-31): ילדים 8–11 Kids, צעירים 11–14 Young,
+                // נוער Juniors, בוגרים Adults, мастерс Masters. Ключи приведены к подписям
+                // (миграция CategoryLadderRenameAndHebrew) — старые ?category= уводятся
+                // алиасами в results-categories.ts.
+                new Category { Id = 3, Key = "results-kids-team",      Name = "Kids",    NameHe = "ילדים",  DisplayOrder = 1, Badge = "K" },
+                new Category { Id = 4, Key = "results-youth-team",     Name = "Young",   NameHe = "צעירים", DisplayOrder = 2, Badge = "Y" },
+                new Category { Id = 1, Key = "results-junior-results", Name = "Juniors", NameHe = "נוער",   DisplayOrder = 3, Badge = "J" },
+                new Category { Id = 7, Key = "results-main",           Name = "Adults",  NameHe = "בוגרים", DisplayOrder = 4, Badge = "A" },
+                new Category { Id = 2, Key = "results-masters",        Name = "Masters", NameHe = "מסטרס",  DisplayOrder = 5, Badge = "M" }
             );
         });
 
@@ -259,6 +323,35 @@ public class SwimmDbContext : DbContext
             entity.HasIndex(e => new { e.RegionType, e.RegionCode, e.Category });
         });
 
+        // Реестр спорных записей справочника рекордов (docs/plans/records-quality-plan.md).
+        // Sys_-таблица: это НАША внутренняя кухня, а не данные федерации — публичной роли
+        // swimm_ro она не нужна. Ошибки источника мы не чиним, а помечаем здесь.
+        modelBuilder.Entity<RecordIssue>(entity =>
+        {
+            entity.ToTable("Sys_RecordIssues");
+            // Ключ претензии — ось рекорда ПЛЮС оспариваемое время: одна и та же клетка
+            // лестницы может попасть в реестр повторно, когда рекорд сменится.
+            entity.HasIndex(e => new
+            {
+                e.RegionType, e.RegionCode, e.Category, e.AgeKey,
+                e.Gender, e.PoolType, e.Style, e.Distance, e.FlaggedTime
+            }).IsUnique();
+            entity.HasIndex(e => e.Status);
+        });
+
+        // Сверка рекордов с нашими протоколами. Одна строка на рекорд, каскад от Records:
+        // сверка бессмысленна без своего рекорда.
+        modelBuilder.Entity<RecordVerification>(entity =>
+        {
+            entity.ToTable("Sys_RecordVerifications");
+            entity.HasKey(e => e.RecordId);
+            entity.HasOne(e => e.Record)
+                .WithOne()
+                .HasForeignKey<RecordVerification>(e => e.RecordId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(e => e.Found);
+        });
+
         modelBuilder.Entity<NormativeStandard>(entity =>
         {
             entity.ToTable("NormativeStandards");
@@ -285,7 +378,7 @@ public class SwimmDbContext : DbContext
                 new PointRuleClubs
                 {
                     Id = 1,
-                    Version = "2025.01",
+                    Version = "30pt.24pl.2025.01",
                     EffectiveFrom = new DateOnly(2025, 1, 1),
                     Description = "Israeli swimming club points system starting Jan 2025",
                     Scope = "all",
@@ -295,7 +388,7 @@ public class SwimmDbContext : DbContext
                 new PointRuleClubs
                 {
                     Id = 2,
-                    Version = "2025.01-masters",
+                    Version = "12pt.12pl.2025.01",
                     EffectiveFrom = new DateOnly(2025, 1, 1),
                     Description = "Masters club points system (places 1-12)",
                     Scope = "masters",
@@ -444,6 +537,46 @@ public class SwimmDbContext : DbContext
             entity.ToTable("Sys_ImportHistory");
             entity.HasIndex(e => e.CompetitionId);
             entity.HasIndex(e => e.ImportDate);
+
+            entity.HasOne(e => e.Competition)
+                .WithMany()
+                .HasForeignKey(e => e.CompetitionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Реестр проверок данных (Д3).
+        modelBuilder.Entity<DataCheckRun>(entity =>
+        {
+            entity.ToTable("Sys_DataCheckRuns");
+            entity.HasIndex(e => e.StartedAt);
+        });
+
+        // Итог последнего прогона по каждой проверке — источник счётчиков дашборда.
+        modelBuilder.Entity<DataCheckState>(entity => entity.ToTable("Sys_DataCheckStates"));
+
+        modelBuilder.Entity<DataCheckFinding>(entity =>
+        {
+            entity.ToTable("Sys_DataCheckFindings");
+            // Ключ находки между прогонами — по нему её узнают и сохраняют решение.
+            entity.HasIndex(e => new { e.CheckId, e.EntityType, e.EntityId });
+            // Открытые и принятые — то, что спрашивают у таблицы всегда; починенных со
+            // временем станет на порядки больше, поэтому частичный индекс.
+            entity.HasIndex(e => e.Resolution)
+                .HasFilter("\"Resolution\" IS NULL OR \"Resolution\" = 'accepted'")
+                .HasDatabaseName("IX_Sys_DataCheckFindings_Open");
+        });
+
+        // Сверка импорта (Д1): журнал «файл обещал N, в БД оказалось M» по каждому заплыву.
+        modelBuilder.Entity<ImportReconciliation>(entity =>
+        {
+            entity.ToTable("Sys_ImportReconciliation");
+            entity.HasIndex(e => e.CompetitionId);
+            entity.HasIndex(e => e.ImportedAt);
+            // Частичный индекс: расхождения — то, что спрашивают у таблицы чаще всего,
+            // а их на порядки меньше, чем успешных строк сверки.
+            entity.HasIndex(e => e.Status)
+                .HasFilter("\"Status\" = 'mismatch'")
+                .HasDatabaseName("IX_Sys_ImportReconciliation_Mismatch");
 
             entity.HasOne(e => e.Competition)
                 .WithMany()

@@ -12,7 +12,22 @@ public sealed record SuspectCandidateRow(
     int? TimeMilliseconds,
     DateTime CompetitionDate,
     bool IsRelay,
-    bool TimeFail);
+    bool TimeFail,
+    string? AgeGroup,
+    /// <summary>Очки FINA этого заплыва — единственная величина, сравнимая между стилями
+    /// и дистанциями. Нужны правилу «выброс относительно личных результатов».</summary>
+    int? Points = null,
+    /// <summary>prelim / final / null (timed final или данные без признака). Различает
+    /// сессии в правиле «дубль дисциплины»: у бугрим предварительные и финал плывут в ОДИН
+    /// день, и без признака каждый финалист выглядел дублем (1678 ложных пометок на
+    /// чемпионате 2026).</summary>
+    string? HeatType = null);
+
+/// <summary>
+/// Заплыв пловца из его личной истории (для правила «выброс относительно себя»).
+/// Кладётся сервисом: истории нет в скоупе соревнования, она приходит из БД.
+/// </summary>
+public sealed record PersonalSwim(long ResultId, int Points, DateTime Date);
 
 /// <summary>Вердикт по одной строке: код причины + человекочитаемое пояснение.</summary>
 public sealed record SuspectVerdict(long ResultId, string Reason, string Note);
@@ -76,7 +91,35 @@ public static class SuspectResultDetector
     /// <summary>Минимум строк в заплыве, чтобы медиана вообще что-то значила.</summary>
     private const int MinRowsForMedian = 4;
 
-    public static List<SuspectVerdict> Detect(IReadOnlyCollection<SuspectCandidateRow> rows)
+    /* ── Правило «выброс относительно личных результатов» (Б1) ─────────────────────
+     * Калибровано на живой базе 2026-08-03 (26 тыс. личных заплывов, 3963 пловца).
+     *
+     * Метрика — очки FINA: единственное, что сравнимо между стилями и дистанциями.
+     * Сравниваем с ЛУЧШИМ личным заплывом, а не с медианой: у новичка медиана крошечная,
+     * и любой удачный старт даёт кратный выброс — по медиане с порогом 1.4 набиралось
+     * 1528 «находок», то есть чистый крик волком.
+     *
+     * Порог 2.0 против личного лучшего внутри окна ±120 дней даёт 5 находок на всю базу,
+     * и обе известные ошибки внутри: 00:32.59 на 100 баттерфляем (ratio 6.53) и
+     * 01:53.09 на 200 вольным (2.17). Для сравнения 1.5 дало бы 20 строк, 1.4 — 33;
+     * ослаблять будем по фактам, когда разберём эти пять.
+     *
+     * Окно нужно от подросткового прогресса: за год 13-летний легально прибавляет
+     * 10–15%, и сравнение с прошлогодним результатом ловило бы рост, а не ошибку.
+     */
+    private const double PersonalOutlierFactor = 2.0;
+    private const int PersonalWindowDays = 120;
+
+    /// <summary>Минимум своих заплывов в окне: по одному-двум профиль не построить.</summary>
+    private const int MinPersonalSwims = 3;
+
+    /// <param name="personalHistory">
+    /// Заплывы пловцов по их Id — своя история за пределами этого соревнования тоже.
+    /// null/пусто — правило «выброс относительно себя» просто не работает (остальные живут).
+    /// </param>
+    public static List<SuspectVerdict> Detect(
+        IReadOnlyCollection<SuspectCandidateRow> rows,
+        IReadOnlyDictionary<int, IReadOnlyList<PersonalSwim>>? personalHistory = null)
     {
         var verdicts = new Dictionary<long, SuspectVerdict>();
 
@@ -119,8 +162,13 @@ public static class SuspectResultDetector
                 $"{Fmt(ms)} на {row.Distance} м — похоже на время отрезка {meters / 2} м, а не всей дистанции");
         }
 
-        // 3. Выброс относительно своего заплыва.
-        foreach (var grp in timed.GroupBy(r => (r.StyleName, r.Distance, r.Gender)))
+        // 3. Выброс относительно своей дисциплины В СВОЕЙ возрастной ступени.
+        //    AgeGroup в ключе обязателен: на детской лиге в одной дисциплине плывут и
+        //    восьмилетки (медиана ~59 с), и семнадцатилетние (~30 с). Без ступени медиану
+        //    задают младшие, и победители старшей группы становятся «выбросами» — 2026-08-02
+        //    так пометились 25.25 и 26.03 на 50 вольным при медиане 43.53 по всем 93 строкам.
+        //    Ошибки протокола, ради которых правило и живёт, выбиваются и внутри ступени.
+        foreach (var grp in timed.GroupBy(r => (r.StyleName, r.Distance, r.Gender, r.AgeGroup)))
         {
             if (grp.Count() < MinRowsForMedian) continue;
             var sorted = grp.Select(r => r.TimeMilliseconds!.Value).OrderBy(x => x).ToList();
@@ -128,8 +176,9 @@ public static class SuspectResultDetector
             foreach (var row in grp)
             {
                 if (row.TimeMilliseconds!.Value >= median * OutlierFactor) continue;
+                var scope = string.IsNullOrWhiteSpace(row.AgeGroup) ? "дисциплины" : $"ступени {row.AgeGroup}";
                 Flag(row, SuspectReasons.TimeOutlier,
-                    $"{Fmt(row.TimeMilliseconds.Value)} против медианы заплыва {Fmt(median)} — быстрее, чем физически правдоподобно");
+                    $"{Fmt(row.TimeMilliseconds.Value)} против медианы {scope} {Fmt(median)} — быстрее, чем физически правдоподобно");
             }
         }
 
@@ -149,9 +198,12 @@ public static class SuspectResultDetector
         }
 
         // 5. Один пловец дважды в одной дисциплине одного дня с разным временем.
-        //    Разные ДНИ — норма (предварительные/финал, повтор дисциплины), поэтому день в ключе.
+        //    Разные ДНИ — норма (повтор дисциплины), поэтому день в ключе. Разные СЕССИИ
+        //    одного дня — тоже норма (у бугрим предварительные и финал в один день),
+        //    поэтому в ключе и HeatType: prelim и final не сравниваются друг с другом,
+        //    дубль внутри одной сессии по-прежнему ловится.
         foreach (var grp in timed.GroupBy(r =>
-                     (r.SwimmerId, r.StyleName, r.Distance, r.CompetitionDate.Date)))
+                     (r.SwimmerId, r.StyleName, r.Distance, r.CompetitionDate.Date, r.HeatType)))
         {
             if (grp.Count() < 2) continue;
             if (grp.Select(r => r.TimeMilliseconds).Distinct().Count() < 2) continue;
@@ -159,6 +211,31 @@ public static class SuspectResultDetector
             foreach (var row in grp)
                 Flag(row, SuspectReasons.DuplicateSwim,
                     $"дисциплина повторяется в один день с разным временем: {times}");
+        }
+
+        // 6. Выброс относительно СОБСТВЕННЫХ результатов пловца (Б1). Идёт последним:
+        //    правило самое мягкое из автоматических — оно про «так не плавают», а не про
+        //    «физически невозможно», и уступает место более надёжным причинам.
+        if (personalHistory is { Count: > 0 })
+        {
+            foreach (var row in timed)
+            {
+                if (row.Points is not > 0) continue;
+                if (!personalHistory.TryGetValue(row.SwimmerId, out var history)) continue;
+
+                var window = history
+                    .Where(h => h.ResultId != row.ResultId && h.Points > 0)
+                    .Where(h => Math.Abs((h.Date - row.CompetitionDate).TotalDays) <= PersonalWindowDays)
+                    .ToList();
+                if (window.Count < MinPersonalSwims) continue;
+
+                var best = window.Max(h => h.Points);
+                if (row.Points.Value < best * PersonalOutlierFactor) continue;
+
+                Flag(row, SuspectReasons.PersonalOutlier,
+                    $"{row.Points} очков против личного лучшего {best} за ±{PersonalWindowDays} дней "
+                    + $"({window.Count} заплывов) — вдвое выше собственного уровня");
+            }
         }
 
         return verdicts.Values.OrderBy(v => v.ResultId).ToList();

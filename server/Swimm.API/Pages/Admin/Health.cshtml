@@ -1,0 +1,349 @@
+@page
+@model Swimm.API.Pages.Admin.HealthModel
+@{
+    ViewData["Title"] = "Health";
+    ViewData["PageSubtitle"] = "Проверки целостности данных: одно место, история, статусы находок";
+}
+
+<div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-4 text-[0.85rem] text-admin-text-muted leading-relaxed">
+    Реестр проверок (<code>IDataCheck</code>). Находка живёт <b>до устранения</b>, а не до
+    следующего прогона: исчезла — закрывается сама, неустранимую можно
+    <b>принять как есть</b>, и решение переживёт следующие прогоны.
+    Проверки только ставят диагноз — лечение (переимпорт, склейка, удаление) остаётся
+    отдельным осознанным действием. Подробности и журнал инцидентов —
+    <code>docs/data-integrity.md</code>.
+</div>
+
+<div class="mb-4 flex flex-wrap items-center gap-3">
+    <button id="btn-run" class="admin-btn admin-btn-primary cursor-pointer">Прогнать проверки</button>
+    <span id="run-info" class="text-[12.5px] text-admin-text-muted"></span>
+</div>
+
+<div id="summary" class="mb-4 flex flex-wrap gap-3"></div>
+<div id="groups" class="text-[13px] text-admin-text-muted">Загружаю…</div>
+
+<details id="history-wrap" class="mt-8 max-w-[900px]">
+    <summary class="cursor-pointer select-none text-sm font-semibold text-admin-text">История прогонов</summary>
+    <div id="history" class="mt-3 text-[13px] text-admin-text-muted"></div>
+</details>
+
+<partial name="/Pages/Admin/Shared/_ConfirmDialog.cshtml" />
+
+@section Scripts {
+<script>
+(function () {
+    const API = '/api/admin/data-checks';
+    // База публичного сайта: пусто = тот же origin (прод), в dev — Vite на своём порту.
+    // Сами находки хранят только относительный путь (контракт client/src/utils/routes.ts).
+    const PUBLIC_BASE = @Html.Raw(Json.Serialize(Model.PublicSiteBaseUrl));
+    // Правила клубных очков для селекта в находке: их единицы, поэтому отдаём страницей.
+    const CLUB_RULES = @Html.Raw(Json.Serialize(Model.ClubRules.Select(r => new { r.Id, r.Version, r.Description })));
+    const SEV = { 2: ['Ошибка', 'bg-admin-danger/20 text-[#ef9a9a]'],
+                  1: ['Предупреждение', 'bg-admin-warning/15 text-admin-warning'],
+                  0: ['Инфо', 'bg-white/[.08] text-admin-text-muted'] };
+
+    async function api(url, opts = {}) {
+        opts.headers = { 'X-XSRF-TOKEN': _csrfToken, ...(opts.headers ?? {}) };
+        const res = await fetch(url, { credentials: 'same-origin', ...opts });
+        let body = null;
+        try { body = await res.json(); } catch { }
+        if (!res.ok) throw new Error(body?.error ?? `${res.status} ${res.statusText}`);
+        return body;
+    }
+
+    function renderSummary(groups) {
+        const open = { 2: 0, 1: 0, 0: 0 };
+        let accepted = 0;
+        groups.forEach(g => { open[g.severity] += g.openCount; accepted += g.acceptedCount; });
+
+        document.getElementById('summary').innerHTML = [2, 1, 0]
+            .map(s => `<div class="admin-card px-4 py-2.5">
+                <div class="text-[11px] uppercase tracking-wide text-admin-text-muted">${SEV[s][0]}</div>
+                <div class="text-xl font-bold ${open[s] ? '' : 'text-admin-text-muted'}">${open[s]}</div></div>`)
+            .join('') +
+            `<div class="admin-card px-4 py-2.5">
+                <div class="text-[11px] uppercase tracking-wide text-admin-text-muted">Принято как есть</div>
+                <div class="text-xl font-bold text-admin-text-muted">${accepted}</div></div>`;
+    }
+
+    function findingRow(f) {
+        const accepted = f.resolution === 'accepted';
+        return `<tr class="${accepted ? 'opacity-60' : ''}">
+            <td class="align-top">${f.link ? `<a href="${esc(f.link)}" class="text-admin-accent hover:underline">${esc(f.message)}</a>` : esc(f.message)}
+                ${f.details ? `<div class="text-[11px] text-admin-text-muted">${esc(f.details)}</div>` : ''}
+                ${f.subjectName ? `<div class="mt-1 flex items-center gap-1.5">
+                    <code class="rounded bg-white/[.06] px-1.5 py-0.5 text-[12px]" dir="auto">${esc(f.subjectName)}</code>
+                    <button class="admin-btn admin-btn-ghost py-0.5 px-1.5 text-[11px] finding-copy"
+                            data-name="${esc(f.subjectName)}" title="Скопировать имя — искать в интернете">копировать</button>
+                    ${f.fixKind === 'swimmer-gender' ? renderFixControls(f) : ''}
+                </div>` : ''}
+                ${f.fixKind === 'competition-club-rule' ? renderClubRule(f) : ''}
+                ${accepted && f.note ? `<div class="text-[11px] text-admin-text-muted">принято: ${esc(f.note)}</div>` : ''}</td>
+            <td class="align-top whitespace-nowrap text-[11px] text-admin-text-muted">
+                ${f.publicLink ? `<a href="${esc(PUBLIC_BASE + f.publicLink)}" target="_blank" rel="noopener"
+                    class="text-admin-accent hover:underline" title="Открыть публичную страницу — посмотреть глазами">на swim-hub ↗</a><br>` : ''}
+                ${f.subjectOrgCompId ? `<a href="https://isr.org.il/comp.asp?compID=${f.subjectOrgCompId}"
+                    target="_blank" rel="noopener" class="text-admin-accent hover:underline"
+                    title="Протокол на сайте федерации — сверить с первоисточником">на isr.org.il ↗</a><br>` : ''}
+                с ${new Date(f.firstSeenAt).toLocaleDateString('ru-RU')}</td>
+            <td class="align-top text-right whitespace-nowrap">
+                ${accepted
+                    ? `<button class="admin-btn admin-btn-ghost py-1 px-2 finding-reopen" data-id="${f.id}">Вернуть</button>`
+                    : `<button class="admin-btn admin-btn-ghost py-1 px-2 finding-accept" data-id="${f.id}">Принять</button>`}
+            </td></tr>`;
+    }
+
+    // Правило клубных очков выбирается прямо здесь: заходить в карточку соревнования ради
+    // одного селекта незачем, а находок бывает десяток за раз. Сохраняем сразу по выбору —
+    // отдельная кнопка «ок» на один селект только добавляет клик.
+    function renderClubRule(f) {
+        const opts = CLUB_RULES.map(r =>
+            `<option value="${r.id}" ${f.subjectClubRuleId === r.id ? 'selected' : ''}
+                     title="${esc(r.description || '')}">${esc(r.version)}</option>`).join('');
+        return `<div class="mt-1 flex items-center gap-1.5">
+            <span class="text-[11px] text-admin-text-muted">правило клубных очков:</span>
+            <select class="admin-input py-0.5 px-1.5 text-[12px] w-auto finding-club-rule" data-id="${f.id}">
+                <option value="">— выбрать —</option>${opts}
+            </select>
+            <span class="text-[11px] text-admin-text-muted finding-club-rule-info"></span>
+        </div>`;
+    }
+
+    // Проставленное должно быть ВИДНО: иначе после нажатия непонятно, что уже сделано, и
+    // человек жмёт по второму разу. Активный пол — залитая кнопка с галочкой, привязанный
+    // loglig — чип со ссылкой на карточку вместо поля ввода.
+    const GENDER_TONE = {
+        male:   { border: '#4fa8ff', label: '♂', title: 'Мужской' },
+        female: { border: '#ff7ab8', label: '♀', title: 'Женский' },
+    };
+
+    function genderButton(f, gender) {
+        const t = GENDER_TONE[gender];
+        const active = f.subjectGender === gender;
+        return `<button class="py-0.5 px-2 rounded text-[12px] font-bold cursor-pointer finding-gender
+                        ${active ? 'ring-1 ring-offset-0' : ''}"
+                    style="border:1px solid ${t.border}${active ? '' : '80'};
+                           background:${t.border}${active ? '' : '26'};
+                           color:${active ? '#0f1420' : t.border};"
+                    data-id="${f.id}" data-gender="${gender}" title="${t.title}">${active ? '✓ ' : ''}${t.label}</button>`;
+    }
+
+    function renderFixControls(f) {
+        return `
+            <span class="text-[11px] text-admin-text-muted">пол:</span>
+            ${genderButton(f, 'male')}
+            ${genderButton(f, 'female')}
+            <span class="ml-2 text-[11px] text-admin-text-muted">loglig:</span>
+            ${f.subjectLogligId
+                ? `<a href="https://loglig.com:2053/Players/Details/${f.subjectLogligId}" target="_blank" rel="noopener"
+                       class="rounded bg-admin-success/15 px-1.5 py-0.5 text-[11px] font-bold text-admin-success hover:underline"
+                       title="Пловец привязан — открыть карточку">✓ ${f.subjectLogligId} ↗</a>`
+                : `<input type="number" class="admin-input py-0.5 px-1.5 w-[7.5rem] text-[12px] finding-loglig-input"
+                          data-swimmer="${f.fixEntityId}" placeholder="id с loglig" />
+                   <button class="admin-btn admin-btn-ghost py-0.5 px-1.5 text-[11px] finding-loglig"
+                           data-swimmer="${f.fixEntityId}" title="Привязать пловца к карточке loglig">привязать</button>`}`;
+    }
+
+    // Пол пловца часто уже известен — приехал из другого протокола, где заплыв не был
+    // смешанным. Тогда «правильный» ответ есть в базе, и кликать по каждой находке нечего:
+    // одна кнопка дописывает его в строки. Гадать за человека она не станет — находки, где
+    // пол неизвестен и у пловца, останутся в списке.
+    function bulkGenderButton(g) {
+        if (g.checkId !== 'results.no-gender' || !g.openCount) return '';
+        return `<div class="mt-2"><button id="btn-gender-all" class="admin-btn admin-btn-ghost py-1 px-2 text-[12px]"
+                    title="Дописать пол в строки тех находок, где пол пловца уже известен">
+                    проставить всем по полу пловца</button></div>`;
+    }
+
+    async function fixGenderAll(btn) {
+        btn.disabled = true;
+        try {
+            const res = await api(`${API}/fix-gender-all`, { method: 'POST' });
+            if (!res.rows) {
+                toast('Нечего проставлять: пол неизвестен и у пловцов — эти находки только руками');
+                btn.disabled = false;
+                return;
+            }
+            // Сразу гоним проверки: иначе поправленные находки висели бы до ручного прогона,
+            // и кнопка выглядела бы не сработавшей.
+            const data = await api(`${API}/run`, { method: 'POST' });
+            render(data);
+            toast(`Проставлено по ${res.findings} пловцам, строк — ${res.rows}; закрыто находок: ${data.run.fixedCount}`, 6000);
+        } catch (e) { btn.disabled = false; toast('Ошибка: ' + e.message, 6000); }
+    }
+
+    function renderGroups(groups) {
+        document.getElementById('groups').innerHTML = groups.map(g => {
+            const [sevName, sevCls] = SEV[g.severity];
+            const clean = g.openCount === 0 && g.acceptedCount === 0;
+            return `<details class="admin-card mb-2 px-4 py-3" ${g.openCount ? 'open' : ''}>
+                <summary class="cursor-pointer select-none flex flex-wrap items-center gap-2">
+                    <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold ${sevCls}">${sevName}</span>
+                    <span class="font-semibold text-admin-text">${esc(g.title)}</span>
+                    <span class="${g.openCount ? 'font-bold text-admin-text' : 'text-admin-text-muted'}">${g.openCount}</span>
+                    ${g.acceptedCount ? `<span class="text-[11px] text-admin-text-muted">+${g.acceptedCount} принято</span>` : ''}
+                    ${g.total != null && g.total > g.findings.length
+                        ? `<span class="text-[11px] text-admin-warning" title="Список находок обрезан — полное число известно из последнего прогона">показано ${g.findings.length} из ${g.total}</span>`
+                        : ''}
+                    ${g.failed ? '<span class="text-[11px] text-admin-danger">проверка упала</span>' : ''}
+                    ${clean ? '<span class="text-[11px] text-admin-success">чисто</span>' : ''}
+                    <code class="ml-auto text-[10px] text-admin-text-muted/70">${esc(g.checkId)}</code>
+                </summary>
+                <div class="mt-2 text-[12px]">${esc(g.description)}</div>
+                ${bulkGenderButton(g)}
+                ${g.findings.length ? `<div class="overflow-x-auto mt-2"><table class="admin-table w-full">
+                    <tbody>${g.findings.map(findingRow).join('')}</tbody></table></div>` : ''}
+            </details>`;
+        }).join('');
+
+        document.querySelectorAll('.finding-accept').forEach(b => b.addEventListener('click', () => accept(b.dataset.id)));
+        document.querySelectorAll('.finding-reopen').forEach(b => b.addEventListener('click', () => reopen(b.dataset.id)));
+        document.querySelectorAll('.finding-copy').forEach(b => b.addEventListener('click', () => copyName(b)));
+        document.querySelectorAll('.finding-gender').forEach(b =>
+            b.addEventListener('click', () => fixGender(b.dataset.id, b.dataset.gender, b)));
+        document.querySelectorAll('.finding-club-rule').forEach(sel =>
+            sel.addEventListener('change', () => fixClubRule(sel)));
+        document.querySelectorAll('.finding-loglig').forEach(b =>
+            b.addEventListener('click', () => setLoglig(b)));
+        const bulk = document.getElementById('btn-gender-all');
+        if (bulk) bulk.addEventListener('click', () => fixGenderAll(bulk));
+    }
+
+    // Имя субъекта отдельной кнопкой: его копируют, чтобы найти пловца в интернете.
+    // Fallback через textarea — clipboard API недоступен без https на некоторых dev-хостах.
+    async function copyName(btn) {
+        const name = btn.dataset.name ?? '';
+        try {
+            await navigator.clipboard.writeText(name);
+        } catch {
+            const ta = document.createElement('textarea');
+            ta.value = name;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            ta.remove();
+        }
+        const prev = btn.textContent;
+        btn.textContent = 'скопировано';
+        setTimeout(() => { btn.textContent = prev; }, 1200);
+    }
+
+    // Проставить пол пловцу прямо из находки. Сервер правит и строки без пола — иначе
+    // находка осталась бы висеть до переимпорта и кнопка выглядела бы сломанной.
+    async function fixClubRule(sel) {
+        const ruleId = Number(sel.value);
+        if (!ruleId) return;
+        const info = sel.parentElement.querySelector('.finding-club-rule-info');
+        sel.disabled = true;
+        info.textContent = 'сохраняю…';
+        try {
+            await api(`${API}/${sel.dataset.id}/fix-club-rule`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ruleId })
+            });
+            // Зачёт пересчитан на сервере; находка исчезнет на следующем прогоне, поэтому
+            // здесь просто показываем, что правило встало.
+            info.textContent = '✓ привязано, зачёт пересчитан';
+        } catch (e) {
+            info.textContent = '';
+            toast('Ошибка: ' + e.message, 5000);
+        } finally {
+            sel.disabled = false;
+        }
+    }
+
+    async function fixGender(id, gender, btn) {
+        btn.disabled = true;
+        try {
+            const res = await api(`${API}/${id}/fix-gender`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ gender })
+            });
+            toast(`Пол проставлен, строк поправлено: ${res.rows}. Прогони проверки, чтобы находка закрылась.`);
+            await load();
+        } catch (e) { btn.disabled = false; toast('Ошибка: ' + e.message, 6000); }
+    }
+
+    // Привязка к loglig прямо отсюда: раз человек уже пошёл на loglig искать пол, id он
+    // видит там же. Используем ШТАТНЫЙ эндпоинт привязки (/api/admin/loglig/set) — он
+    // тянет карточку, сверяет год и клуб и пишет свой аудит; дублировать это в реестре
+    // значило бы завести вторую, расходящуюся реализацию.
+    async function setLoglig(btn) {
+        const input = btn.parentElement.querySelector('.finding-loglig-input');
+        const logligId = Number(input?.value);
+        if (!Number.isFinite(logligId) || logligId <= 0) { toast('Введите числовой id с loglig'); return; }
+
+        btn.disabled = true;
+        try {
+            const res = await api('/api/admin/loglig/set', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ swimmerId: Number(btn.dataset.swimmer), logligId })
+            });
+            // linked=false — доменный отказ (уже привязан, карточка недоступна), не HTTP-ошибка.
+            if (res && res.linked === false) { toast('Не привязано: ' + (res.error ?? 'причина неизвестна'), 6000); btn.disabled = false; return; }
+            toast(`Привязан loglig #${logligId}`);
+            await load();
+        } catch (e) { btn.disabled = false; toast('Ошибка: ' + e.message, 6000); }
+    }
+
+    function renderHistory(history) {
+        document.getElementById('history').innerHTML = history.length === 0
+            ? '<div class="italic">Прогонов ещё не было.</div>'
+            : `<div class="overflow-x-auto"><table class="admin-table">
+                <thead><tr><th>Когда</th><th>Кто запустил</th><th>Ошибки</th><th>Предупр.</th><th>Инфо</th><th>Закрыто</th></tr></thead>
+                <tbody>${history.map(r => `<tr>
+                    <td class="whitespace-nowrap">${new Date(r.startedAt).toLocaleString('ru-RU')}</td>
+                    <td>${esc(r.trigger)}</td>
+                    <td>${r.errorCount}</td><td>${r.warningCount}</td><td>${r.infoCount}</td>
+                    <td>${r.fixedCount}</td></tr>`).join('')}</tbody></table></div>`;
+    }
+
+    function render(data) {
+        renderSummary(data.groups);
+        renderGroups(data.groups);
+        renderHistory(data.history);
+        const last = data.history[0];
+        document.getElementById('run-info').textContent = last
+            ? `последний прогон: ${new Date(last.startedAt).toLocaleString('ru-RU')}`
+            : 'проверки ещё не гонялись';
+    }
+
+    async function accept(id) {
+        const ok = await adminConfirm({
+            title: 'Принять находку как есть?',
+            message: 'Она перестанет считаться проблемой и переживёт следующие прогоны. Так помечают неустранимое — например ошибку в протоколе федерации.',
+            confirmText: 'Принять',
+        });
+        if (!ok) return;
+        try { await api(`${API}/${id}/accept`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ note: null }) }); await load(); }
+        catch (e) { toast('Ошибка: ' + e.message, 5000); }
+    }
+
+    async function reopen(id) {
+        try { await api(`${API}/${id}/reopen`, { method: 'POST' }); await load(); }
+        catch (e) { toast('Ошибка: ' + e.message, 5000); }
+    }
+
+    async function load() {
+        try { render(await api(API)); }
+        catch (e) { document.getElementById('groups').textContent = 'Ошибка: ' + e.message; }
+    }
+
+    document.getElementById('btn-run').addEventListener('click', async () => {
+        const btn = document.getElementById('btn-run');
+        btn.disabled = true;
+        document.getElementById('run-info').textContent = 'Гоняю проверки…';
+        try {
+            const data = await api(`${API}/run`, { method: 'POST' });
+            render(data);
+            const r = data.run;
+            toast(`Прогон завершён: ошибок ${r.errorCount}, предупреждений ${r.warningCount}, закрыто ${r.fixedCount}`, 5000);
+        } catch (e) {
+            toast('Ошибка прогона: ' + e.message, 6000);
+        } finally { btn.disabled = false; }
+    });
+
+    load();
+})();
+</script>
+}

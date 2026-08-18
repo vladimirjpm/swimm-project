@@ -22,11 +22,36 @@ public sealed record UnifiedCompetitionList(
     PagedResult<UnifiedCompetitionRowDto> Page,
     /// <summary>Число соревнований в каждом месяце (индекс 0 = январь … 11 = декабрь) под текущими
     /// фильтрами, но БЕЗ фильтра по месяцу — чтобы на кнопках были полные счётчики.</summary>
-    IReadOnlyList<int> MonthCounts);
+    IReadOnlyList<int> MonthCounts,
+    /// <summary>Сколько строк спрятал фильтр дисциплины (артистическое плавание и прочее).
+    /// Показывается чипом «скрыто N»: молча пропавшие строки читаются как потеря данных.</summary>
+    int HiddenByDiscipline = 0,
+    /// <summary>Из <see cref="MonthCounts"/> — сколько уже затянуто в БД (строка есть в справочнике).</summary>
+    IReadOnlyList<int>? MonthImported = null,
+    /// <summary>Счётчики по сезонам под текущими фильтрами, но БЕЗ фильтров сезона и месяца —
+    /// чипы-сезоны над списком (сезон, всего, затянуто). Порядок — от свежего к старому.</summary>
+    IReadOnlyList<SeasonCountDto>? SeasonCounts = null,
+    /// <summary>Из <see cref="MonthCounts"/> — сколько НЕЛЬЗЯ затянуть (нечего брать: пустой
+    /// протокол или результаты не опубликованы). Без этого «12 из 14» читается как долг.</summary>
+    IReadOnlyList<int>? MonthNothingToPull = null);
+
+/// <summary>
+/// Сезон (год окончания, 2026 = 25/26) со счётчиками. Три числа, а не два: «затянуто»,
+/// «тянуть нечего» (пустой протокол / результаты не опубликованы) и всего. Разница
+/// <c>Total − Imported − NothingToPull</c> — единственное, что реально ждёт работы.
+/// </summary>
+public sealed record SeasonCountDto(int Season, int Total, int Imported, int NothingToPull = 0)
+{
+    /// <summary>Сколько ещё можно затянуть. 0 — сезон закрыт, показываем ✓.</summary>
+    public int Pending => Math.Max(0, Total - Imported - NothingToPull);
+}
 
 /// <summary>Discovery-сторона объединённой строки: данные с isr.org.il.</summary>
 public sealed class UnifiedSiteInfo
 {
+    /// <summary>Вид спорта строки с сайта (проставлен при обнаружении, правится в админке).</summary>
+    public string Discipline { get; set; } = "swimming";
+
     public int DiscoveredId { get; set; }
     public int OrgCompId { get; set; }
     public string Name { get; set; } = "";
@@ -38,6 +63,11 @@ public sealed class UnifiedSiteInfo
     /// <summary>Языки загруженных PDF: null | "he" | "en" | "he,en".</summary>
     public string? Languages { get; set; }
     public string? LastError { get; set; }
+
+    /// <summary>Протокола нет: PDF пуст (см. DiscoveredCompetition.EmptySourceAt). Не ошибка —
+    /// факт «тянуть нечего», поэтому строка помечается, а не прячется.</summary>
+    public DateTime? EmptySourceAt { get; set; }
+
     public int? LogligId { get; set; }
 }
 
@@ -62,4 +92,12 @@ public sealed class UnifiedCompetitionRowDto
 
     /// <summary>Чемпионат Израиля (по названию любой стороны строки) — иконка 🏆 и фильтр «Тип».</summary>
     public bool IsChampionship { get; set; }
+
+    /// <summary>
+    /// Вид спорта строки: swimming | artistic | other. У строки в БД берётся из
+    /// <c>Competition.Discipline</c>, у «только на сайте» — из
+    /// <c>Sys_DiscoveredCompetitions.Discipline</c>; и то и другое проставлено при
+    /// обнаружении/импорте, а не угадывается на каждый показ.
+    /// </summary>
+    public string Discipline { get; set; } = "swimming";
 }

@@ -33,6 +33,9 @@ export interface FilterSelected {
    * «Men Para»). Фильтр даёт посмотреть зачёт одной программы.
    */
   event_category?: string;
+  /** Показывать предварительные заплывы (heat_type === 'prelim'). По умолчанию скрыты:
+   *  официальный вид — финалы; тумблер живёт в фильтре Date. */
+  show_prelims?: boolean;
   // Recalculate positions across all days (best time per swimmer per event)
   is_recalculated?: boolean;
   // Scope by viewer's swimmers (?filter= в URL, персональная полоса шапки соревнования):

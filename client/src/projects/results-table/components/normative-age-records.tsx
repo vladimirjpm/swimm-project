@@ -6,6 +6,8 @@ import UI_GenderAgeTable, { GenderAgeEntry } from '../../components/mix/gender-a
 
 interface AgeRecord {
   time: string;
+  /** Открытая претензия к записи справочника (И11 для рекордов). */
+  issue_reason?: string | null;
   name: string;
   club: string;
   country: string;
@@ -15,7 +17,10 @@ interface AgeRecord {
 
 /** AgeRecord → строка единой таблицы UI_GenderAgeTable (значение = время, дата = record_date). */
 function recordToEntry(r: AgeRecord): GenderAgeEntry {
-  return { firstName: r.name, club: r.club, value: r.time, date: r.record_date };
+  return {
+    firstName: r.name, club: r.club, value: r.time, date: r.record_date,
+    quality: r.issue_reason ? { kind: 'record', reason: r.issue_reason } : null,
+  };
 }
 
 interface NormativeAgeRecordsProps {

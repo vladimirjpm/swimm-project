@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
@@ -9,7 +9,9 @@ namespace Swimm.Infrastructure.Services;
 /// <summary>
 /// Склейка клубов-дублей (docs/tasks/club-merge-plan.md, фаза B). Перевешивает на
 /// канонический: Results, Swimmers, HubGroups, Sys_HubGroupClubRequests, Sys_UserFavorites;
-/// пустые NameEn/CountryId канонического дозаполняет из дубля; дубль удаляет.
+/// пустые NameEn/CountryId канонического дозаполняет из дубля; дубль помечает
+/// <see cref="Club.MergedIntoId"/> (мягкое слияние — строка остаётся, чтобы ссылки на
+/// старый Id не гнили; из публичных выборок и дедупа склеенные исключаются).
 /// Guard 1: у ОБОИХ клубов официальная hub-группа (partial unique index
 /// HubGroups.ClubId WHERE IsOfficial) — пара блокируется. Guard 2: дубль-строки
 /// Sys_UserFavorites (клуб дважды в избранном одного юзера) схлопываются в одну.
@@ -18,7 +20,8 @@ namespace Swimm.Infrastructure.Services;
 /// После реального merge кэш сбрасывается целиком (club-summary и публичные выдачи
 /// денормализуют клуб).
 /// </summary>
-public class ClubMergeService(SwimmDbContext db, ICacheService cache) : IClubMergeService
+public class ClubMergeService(SwimmDbContext db, ICacheService cache, IClubStandingService standings)
+    : IClubMergeService
 {
     public async Task<ClubMergeReport> MergeAsync(
         IReadOnlyList<ClubMergePair> pairs, bool dryRun = true, CancellationToken ct = default)
@@ -59,6 +62,12 @@ public class ClubMergeService(SwimmDbContext db, ICacheService cache) : IClubMer
         // Каноны, получившие официальную группу от дубля в ЭТОМ вызове (см. movedFavs).
         var gotOfficial = new HashSet<int>();
 
+        // Зачётные единицы, где у ДУБЛЕЙ есть строки в материализованном зачёте. Собираем
+        // ДО переноса результатов: после него связь «клуб → соревнование» уже не найти,
+        // а пересчёта только по соревнованиям канона оказалось мало (2026-08-01: после
+        // склейки 68 дублей три строки исчезнувших клубов пережили merge).
+        var standingUnits = new HashSet<int>();
+
         foreach (var pair in pairs)
         {
             var res = new ClubMergePairResult { CanonicalId = pair.CanonicalId, DuplicateId = pair.DuplicateId };
@@ -85,6 +94,16 @@ public class ClubMergeService(SwimmDbContext db, ICacheService cache) : IClubMer
                 res.Conflicts.Add("синтетические клубы (SYNTH%) не мержатся");
                 continue;
             }
+            // Guard 0: уже склеенный клуб не может участвовать снова. Как дубль — потому что
+            // его связи давно переехали, как канон — потому что получилась бы цепочка
+            // A → B → C, и /clubs/{A} пришлось бы разматывать рекурсивно.
+            if (duplicate.MergedIntoId is not null || canonical.MergedIntoId is not null)
+            {
+                res.Status = "error";
+                var merged = duplicate.MergedIntoId is not null ? duplicate.Id : canonical.Id;
+                res.Conflicts.Add($"клуб {merged} уже склеен в другой — повторный merge не имеет смысла");
+                continue;
+            }
 
             // Guard 1: официальная группа уникальна по клубу (partial unique index) —
             // если официальные группы есть у обоих, перецеливание нарушит индекс.
@@ -102,6 +121,12 @@ public class ClubMergeService(SwimmDbContext db, ICacheService cache) : IClubMer
             }
 
             // --- Перенос связей ---
+
+            foreach (var unitId in await db.ClubCompetitionStandings.AsNoTracking()
+                         .Where(s => s.ClubId == duplicate.Id)
+                         .Select(s => s.CompetitionId)
+                         .ToListAsync(ct))
+                standingUnits.Add(unitId);
 
             var results = await db.Results.Where(r => r.ClubId == duplicate.Id).ToListAsync(ct);
             foreach (var r in results) r.ClubId = canonical.Id;
@@ -151,8 +176,11 @@ public class ClubMergeService(SwimmDbContext db, ICacheService cache) : IClubMer
             if (canonical.CountryId is null && duplicate.CountryId is not null)
             { canonical.CountryId = duplicate.CountryId; res.Actions.Add("Club.CountryId ← дубль"); }
 
-            db.Clubs.Remove(duplicate);
-            res.Actions.Add($"Club {duplicate.Id} удалён");
+            // Мягкое слияние: строку НЕ удаляем, а помечаем ссылкой на приёмника.
+            // Иначе внешние ссылки и /clubs/{старый id} гниют после каждой чистки дублей.
+            // Все связи выше уже переехали, так что склеенный клуб пуст.
+            duplicate.MergedIntoId = canonical.Id;
+            res.Actions.Add($"Club {duplicate.Id} склеен в {canonical.Id} (MergedIntoId)");
             res.Status = dryRun ? "dry-run" : "merged";
             anyMerged = true;
         }
@@ -165,6 +193,20 @@ public class ClubMergeService(SwimmDbContext db, ICacheService cache) : IClubMer
         }
 
         await db.SaveChangesAsync(ct); // один SaveChanges = одна транзакция
+
+        // Материализованный клубный зачёт помнит места ИСЧЕЗНУВШЕГО клуба — пересчитываем.
+        // ДВА прохода, и оба нужны:
+        //   1) зачёты, где стоял сам дубль (собраны выше, до переноса) — иначе его место
+        //      остаётся висеть в таблице;
+        //   2) соревнования канона — у него изменились очки и состав.
+        if (anyMerged)
+        {
+            foreach (var unitId in standingUnits)
+                await standings.RebuildForCompetitionAsync(unitId, ct);
+
+            foreach (var id in report.Pairs.Where(p => p.Status == "merged").Select(p => p.CanonicalId).Distinct())
+                await standings.RebuildForClubAsync(id, ct);
+        }
 
         // club-summary (фаза 3.4) и прочие публичные выдачи денормализуют клуб.
         if (anyMerged) await cache.InvalidateAllAsync();

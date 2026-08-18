@@ -24,6 +24,10 @@ public interface ICompetitionDiscoveryService
     /// <summary>Сменить статус (new | imported | ignored). false — записи нет или статус неизвестен.</summary>
     Task<bool> SetStatusAsync(int id, string status, CancellationToken ct = default);
 
+    /// <summary>Ручная правка вида спорта строки (Disciplines). false — нет записи или
+    /// значение неизвестно.</summary>
+    Task<bool> SetDisciplineAsync(int id, string discipline, CancellationToken ct = default);
+
     /// <summary>Разовый CLI-бэкфилл всех Discovery-строк: проставляет OrgCompId сматченным
     /// (по имени+дате) соревнованиям, импортированным до появления штампа OrgCompId. dry-run
     /// при apply=false (БД не меняется, Action=WouldLink); apply=true пишет одним SaveChanges.</summary>
@@ -35,4 +39,10 @@ public interface ICompetitionDiscoveryService
 
     /// <summary>Записать/очистить LastError записи (диагностика «затянуть»/«синхр. языки» в админке).</summary>
     Task<bool> SetLastErrorAsync(int id, string? error, CancellationToken ct = default);
+
+    /// <summary>
+    /// Пометить/снять «у соревнования нет протокола» (PDF пуст). Отдельно от ошибки: ошибку
+    /// имеет смысл повторить, а пустой источник — повод больше не пытаться.
+    /// </summary>
+    Task<bool> SetEmptySourceAsync(int id, bool empty, string by, CancellationToken ct = default);
 }

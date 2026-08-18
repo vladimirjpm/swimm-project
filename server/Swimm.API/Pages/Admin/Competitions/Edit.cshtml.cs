@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -58,6 +58,16 @@ public class EditModel : PageModel
     /// <summary>Канонические типы бассейна для select-а формы.</summary>
     public IReadOnlyList<string> PoolTypeOptions => PoolTypes.All;
 
+    /// <summary>Роль соревнования в клубном зачёте, выведенная из текущих флагов, — для подсказки.</summary>
+    public string DerivedStandingKindLabel =>
+        StandingKinds.Resolve(Input.IsChampionship, Input.PoolType, null) switch
+        {
+            StandingKinds.Winter => "❄ зимний чемпионат",
+            StandingKinds.Summer => "☀ летний чемпионат",
+            StandingKinds.OpenWater => "🌊 открытая вода",
+            _ => "в зачёт не идёт",
+        };
+
     // Форма добавления URL результатов
     [BindProperty] public string? NewUrlCulture { get; set; }
     [BindProperty] public string? NewUrl { get; set; }
@@ -91,12 +101,16 @@ public class EditModel : PageModel
         /// <summary>Чемпионат Израиля — ручной флаг (галка в форме).</summary>
         public bool IsChampionship { get; set; }
         public bool ShowCombineAllResults { get; set; }
+        /// <summary>Роль в клубном зачёте вручную; пусто/null — «Авто» (по IsChampionship + PoolType).</summary>
+        public string? StandingKindOverride { get; set; }
         /// <summary>Выбранные категории (IsMasters выводится из категории Masters).</summary>
         public List<string> CategoryKeys { get; set; } = [];
         /// <summary>Правило клубных очков; null — «Авто» (подбор по дате и типу).</summary>
         public int? PointRuleClubsId { get; set; }
         /// <summary>Правило High Point; null — «Авто».</summary>
         public int? PointRuleSwimmersId { get; set; }
+        /// <summary>Клубный зачёт тут не ведётся — правило и не нужно.</summary>
+        public bool ClubPointsDisabled { get; set; }
     }
 
     public async Task<IActionResult> OnGetAsync()
@@ -265,9 +279,11 @@ public class EditModel : PageModel
         IsAward = d.IsAward,
         IsChampionship = d.IsChampionship,
         ShowCombineAllResults = d.ShowCombineAllResults,
+        StandingKindOverride = d.StandingKindOverride,
         CategoryKeys = d.CategoryKeys,
         PointRuleClubsId = d.PointRuleClubsId,
-        PointRuleSwimmersId = d.PointRuleSwimmersId
+        PointRuleSwimmersId = d.PointRuleSwimmersId,
+        ClubPointsDisabled = d.ClubPointsDisabled
     };
 
     private static CompetitionInputDto ToInput(CompetitionForm f) => new()
@@ -281,8 +297,10 @@ public class EditModel : PageModel
         IsAward = f.IsAward,
         IsChampionship = f.IsChampionship,
         ShowCombineAllResults = f.ShowCombineAllResults,
+        StandingKindOverride = f.StandingKindOverride,
         CategoryKeys = f.CategoryKeys ?? [],
         PointRuleClubsId = f.PointRuleClubsId,
-        PointRuleSwimmersId = f.PointRuleSwimmersId
+        PointRuleSwimmersId = f.PointRuleSwimmersId,
+        ClubPointsDisabled = f.ClubPointsDisabled
     };
 }

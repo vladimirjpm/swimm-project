@@ -51,6 +51,13 @@
             </label>
 
             <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Название на иврите</span>
+                <input asp-for="Input.NameHe" class="admin-input" autocomplete="off" dir="rtl"
+                       placeholder="נוער" />
+                <span class="text-[11px] text-admin-text-muted">В публичном UI пока не показывается — UI сайта английский.</span>
+            </label>
+
+            <label class="flex flex-col gap-1">
                 <span class="text-xs text-admin-text-muted">Бейдж (буква/эмодзи, до 8 симв.)</span>
                 <input asp-for="Input.Badge" class="admin-input" autocomplete="off" maxlength="8" placeholder="J" />
             </label>

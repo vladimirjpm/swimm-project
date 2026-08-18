@@ -57,6 +57,31 @@ public class ImportResult
     public int Deleted { get; set; }
     /// <summary>Исчезнувшие результаты, НЕ удалённые из-за навешанного UserMedia/HubGroupMedia — разберитесь руками.</summary>
     public int SkippedWithMedia { get; set; }
+
+    /* === Сверка с файлом (Д1, docs/data-integrity.md) === */
+
+    /// <summary>Человекочитаемый итог сверки «файл против БД» — показывается в панели затягивания.</summary>
+    public string Reconciliation { get; set; } = string.Empty;
+
+    /// <summary>Заплывов, где число строк в файле и в БД не совпало. &gt;0 — разбираться.</summary>
+    public int ReconciliationMismatches { get; set; }
+
+    /* === Прогон реестра проверок (Д5, решение Р13) === */
+
+    /// <summary>Человекочитаемый итог прогона всех проверок данных; пусто — прогон не делался.</summary>
+    public string DataChecks { get; set; } = string.Empty;
+
+    /// <summary>Открытых находок уровня Error после импорта.</summary>
+    public int DataCheckErrors { get; set; }
+
+    /// <summary>Открытых находок уровня Warning после импорта.</summary>
+    public int DataCheckWarnings { get; set; }
+
+    /// <summary>
+    /// Сколько строк легло сразу с РУЧНОЙ пометкой «недостоверно» — галочка в превью
+    /// у заплыва, который бьёт рекорд. 0 — обычный случай.
+    /// </summary>
+    public int SuspectFlagged { get; set; }
 }
 
 /// <summary>Существующее (по ключу (Name|SubName)|Date|PoolType) соревнование, найденное для дня из превью.</summary>

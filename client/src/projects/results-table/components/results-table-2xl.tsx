@@ -11,6 +11,7 @@ import { ResultsTableRowProps } from './types';
 import UI_AgeLabel from '../../components/mix/age-label/age-label';
 import UI_FavoriteControls from '../../components/mix/favorite-controls/favorite-controls';
 import UI_PositionBadge from '../../components/mix/position-badge/position-badge';
+import UI_PrelimLabel from '../../components/mix/prelim-label/prelim-label';
 
 const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
   res,
@@ -39,7 +40,8 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
 
   // Медаль красится только если ЭТОТ заплыв award-eligible (res.is_award — денормализовано
   // с API; для статических источников используем общий флаг источника isAwardSource).
-  const rowIsAward = res.is_award ?? isAwardSource ?? false;
+  // Медаль только за награждаемый заплыв: prelim-место — ранжир сессии, не награда.
+  const rowIsAward = (res.is_award ?? isAwardSource ?? false) && res.heat_type !== 'prelim';
 
   return (
     <>
@@ -58,7 +60,8 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
             />
           )}
         </div>
-        {showAge && <UI_AgeLabel age={res.event_style_age} eventCategory={res.event_category} isMasters={isMastersResult} ageGroup={res.age_group} />}
+        <UI_PrelimLabel heatType={res.heat_type} />
+        {showAge && <UI_AgeLabel age={res.event_style_age} eventCategory={res.event_category} isRelay={res.is_relay} gender={res.event_style_gender} isMasters={isMastersResult} ageGroup={res.age_group} />}
       </div>
 
       <div className='flex flex-col col-span-3'>
@@ -112,6 +115,8 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
           time_fail_note={res.time_fail_note}
           firstLineClassName="text-xl font-bold tabular-nums"
           isRecordHolder={isRecordTime}
+          quality={res.suspect_reason ? { kind: 'protocol', reason: res.suspect_reason } : null}
+          qualityMarker="chip"
         />
       </div>
 

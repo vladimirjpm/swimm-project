@@ -23,6 +23,18 @@ public interface ISuspectResultService
     Task<IReadOnlyList<SuspectRowDto>> GetFlaggedAsync(int? eventId, int? competitionId, CancellationToken ct = default);
 
     /// <summary>
+    /// Поиск строки внутри скоупа, чтобы пометить её ВРУЧНУЮ. Нужен потому, что автоматика
+    /// ловит не всё: 200 вольным за 1:53 у пловца со стольником 1:05 — очевидная ошибка
+    /// протокола, но она медленнее рекорда, и ни одно правило её не видит. Без поиска
+    /// пометить такую строку было нечем: список показывает только уже помеченные.
+    ///
+    /// Ищет по имени пловца, клубу, дистанции и времени (подстрока, регистронезависимо).
+    /// Возвращает и помеченные тоже — чтобы человек видел, что строка уже разобрана.
+    /// </summary>
+    Task<IReadOnlyList<SuspectRowDto>> SearchAsync(
+        int? eventId, int? competitionId, string query, int limit = 30, CancellationToken ct = default);
+
+    /// <summary>
     /// Ручная пометка/снятие одной строки. <paramref name="note"/> — пояснение человека;
     /// снятие (<paramref name="flagged"/> = false) убирает и автоматическую пометку тоже.
     /// </summary>

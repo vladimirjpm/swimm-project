@@ -31,9 +31,12 @@ public interface ICompetitionAdminRepository
     /// и к БД-строкам, и к строкам с сайта. null — все.</param>
     /// <param name="kind">«champ» — только чемпионаты Израиля (по названию: אליפות + ישראל).
     /// null/пусто — все.</param>
+    /// <param name="discipline">Вид спорта (<c>Disciplines</c>): null/пусто — только плавание
+    /// (дефолт, артистическое прячем), «all» — всё, иначе конкретная дисциплина. Скрытые не
+    /// удаляются, а считаются: <c>UnifiedCompetitionList.HiddenByDiscipline</c>.</param>
     Task<UnifiedCompetitionList> GetUnifiedAsync(
         string? search, string? categoryKey, int? season, string? stage, bool showSynthetic, int? month, int page, int pageSize,
-        string? qualityFilter = null, string? kind = null);
+        string? qualityFilter = null, string? kind = null, string? discipline = null);
 
     /// <summary>Полные данные для формы Edit (включая URL-ы результатов). null — не найдено.</summary>
     Task<CompetitionEditDto?> GetByIdAsync(int id);

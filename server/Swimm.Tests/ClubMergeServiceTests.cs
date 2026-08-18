@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -22,6 +22,19 @@ public class ClubMergeServiceTests
         public Task SetAsync<T>(string key, T value, TimeSpan ttl) => Task.CompletedTask;
         public Task RemoveAsync(string key) => Task.CompletedTask;
         public Task InvalidateAllAsync() { InvalidateCount++; return Task.CompletedTask; }
+    }
+
+    /// <summary>Шпион пересчёта клубного зачёта: merge обязан его дёрнуть, иначе в
+    /// ClubCompetitionStandings останутся места склеенного клуба.</summary>
+    private sealed class StandingSpy : IClubStandingService
+    {
+        public List<int> RebuiltClubs { get; } = [];
+        public List<int> RebuiltCompetitions { get; } = [];
+        public Task<int> RebuildForCompetitionAsync(int competitionId, CancellationToken ct = default)
+        { RebuiltCompetitions.Add(competitionId); return Task.FromResult(0); }
+        public Task<int> RebuildAllAsync(CancellationToken ct = default) => Task.FromResult(0);
+        public Task<int> RebuildForClubAsync(int clubId, CancellationToken ct = default)
+        { RebuiltClubs.Add(clubId); return Task.FromResult(0); }
     }
 
     private static SwimmDbContext CreateDb(string name) =>
@@ -61,11 +74,13 @@ public class ClubMergeServiceTests
         await db.SaveChangesAsync();
 
         var cache = new FakeCache();
-        var report = await new ClubMergeService(db, cache)
+        var report = await new ClubMergeService(db, cache, new StandingSpy())
             .MergeAsync([new ClubMergePair(canon.Id, dup.Id)], dryRun: false);
 
         Assert.Equal("merged", report.Pairs.Single().Status);
-        Assert.Null(await db.Clubs.FindAsync(dup.Id));
+        // Мягкое слияние: строка дубля ОСТАЁТСЯ со ссылкой на приёмника — иначе ссылки
+        // на старый Id (в т.ч. /clubs/{id}) гниют после каждой чистки.
+        Assert.Equal(canon.Id, (await db.Clubs.FindAsync(dup.Id))!.MergedIntoId);
         Assert.Equal(canon.Id, (await db.Results.SingleAsync()).ClubId);
         Assert.Equal(canon.Id, (await db.Swimmers.SingleAsync()).ClubId);
         Assert.Equal(canon.Id, (await db.HubGroups.SingleAsync()).ClubId);
@@ -95,7 +110,7 @@ public class ClubMergeServiceTests
         await db.SaveChangesAsync();
 
         var cache = new FakeCache();
-        var report = await new ClubMergeService(db, cache)
+        var report = await new ClubMergeService(db, cache, new StandingSpy())
             .MergeAsync([new ClubMergePair(canon.Id, dup.Id)], dryRun: false);
 
         Assert.Equal("conflict", report.Pairs.Single().Status);
@@ -115,7 +130,7 @@ public class ClubMergeServiceTests
             new HubGroup { Name = "GB", Slug = "gb", Club = dup, IsOfficial = true, Owner = owner });
         await db.SaveChangesAsync();
 
-        var report = await new ClubMergeService(db, new FakeCache())
+        var report = await new ClubMergeService(db, new FakeCache(), new StandingSpy())
             .MergeAsync([new ClubMergePair(canon.Id, dup.Id)], dryRun: false);
 
         Assert.Equal("merged", report.Pairs.Single().Status);
@@ -136,7 +151,7 @@ public class ClubMergeServiceTests
             new UserFavorite { User = user, TargetType = "club", Club = dup });
         await db.SaveChangesAsync();
 
-        var report = await new ClubMergeService(db, new FakeCache())
+        var report = await new ClubMergeService(db, new FakeCache(), new StandingSpy())
             .MergeAsync([new ClubMergePair(canon.Id, dup.Id)], dryRun: false);
 
         Assert.Equal("merged", report.Pairs.Single().Status);
@@ -157,7 +172,7 @@ public class ClubMergeServiceTests
         await db.SaveChangesAsync();
 
         var cache = new FakeCache();
-        var report = await new ClubMergeService(db, cache)
+        var report = await new ClubMergeService(db, cache, new StandingSpy())
             .MergeAsync([new ClubMergePair(canon.Id, dup.Id)]);            // dryRun по умолчанию
 
         Assert.True(report.DryRun);
@@ -181,7 +196,7 @@ public class ClubMergeServiceTests
         db.AddRange(canon, synth);
         await db.SaveChangesAsync();
 
-        var report = await new ClubMergeService(db, new FakeCache())
+        var report = await new ClubMergeService(db, new FakeCache(), new StandingSpy())
             .MergeAsync([new ClubMergePair(canon.Id, synth.Id)], dryRun: false);
 
         Assert.Equal("error", report.Pairs.Single().Status);
@@ -204,12 +219,12 @@ public class ClubMergeServiceTests
             new UserFavorite { User = user, TargetType = "club", Club = dup2 });
         await db.SaveChangesAsync();
 
-        var report = await new ClubMergeService(db, new FakeCache())
+        var report = await new ClubMergeService(db, new FakeCache(), new StandingSpy())
             .MergeAsync([new ClubMergePair(canon.Id, dup1.Id), new ClubMergePair(canon.Id, dup2.Id)], dryRun: false);
 
         Assert.All(report.Pairs, p => Assert.Equal("merged", p.Status));
-        Assert.Null(await db.Clubs.FindAsync(dup1.Id));
-        Assert.Null(await db.Clubs.FindAsync(dup2.Id));
+        Assert.Equal(canon.Id, (await db.Clubs.FindAsync(dup1.Id))!.MergedIntoId);
+        Assert.Equal(canon.Id, (await db.Clubs.FindAsync(dup2.Id))!.MergedIntoId);
         // Избранное схлопнулось в одну строку даже при общем каноне в одном вызове.
         var fav = await db.UserFavorites.SingleAsync();
         Assert.Equal(canon.Id, fav.ClubId);
@@ -227,7 +242,7 @@ public class ClubMergeServiceTests
 
         // b — дубль в первой паре и канон во второй (цепочка).
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            new ClubMergeService(db, new FakeCache())
+            new ClubMergeService(db, new FakeCache(), new StandingSpy())
                 .MergeAsync([new ClubMergePair(a.Id, b.Id), new ClubMergePair(b.Id, c.Id)], dryRun: false));
     }
 
@@ -242,7 +257,106 @@ public class ClubMergeServiceTests
         await db.SaveChangesAsync();
 
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            new ClubMergeService(db, new FakeCache())
+            new ClubMergeService(db, new FakeCache(), new StandingSpy())
                 .MergeAsync([new ClubMergePair(a.Id, c.Id), new ClubMergePair(b.Id, c.Id)], dryRun: false));
+    }
+
+    // ── Мягкое слияние (K2) ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Merge_RebuildsClubStandingsOfCanonical()
+    {
+        // Иначе в ClubCompetitionStandings останутся места клуба, которого больше нет.
+        await using var db = CreateDb(nameof(Merge_RebuildsClubStandingsOfCanonical));
+        var canon = new Club { Name = "A" };
+        var dup = new Club { Name = "B" };
+        db.AddRange(canon, dup);
+        await db.SaveChangesAsync();
+
+        var spy = new StandingSpy();
+        await new ClubMergeService(db, new FakeCache(), spy)
+            .MergeAsync([new ClubMergePair(canon.Id, dup.Id)], dryRun: false);
+
+        Assert.Equal([canon.Id], spy.RebuiltClubs);
+    }
+
+    [Fact]
+    public async Task Merge_AlsoRebuildsStandingsWhereDuplicateStood()
+    {
+        // Пересчёта только по соревнованиям канона мало: 2026-08-01 после склейки 68 дублей
+        // ТРИ строки исчезнувших клубов пережили merge и остались висеть в зачёте.
+        // Единицы зачёта дубля собираются ДО переноса результатов — потом связь не найти.
+        await using var db = CreateDb(nameof(Merge_AlsoRebuildsStandingsWhereDuplicateStood));
+        var canon = new Club { Name = "A" };
+        var dup = new Club { Name = "B" };
+        var comp = new Competition { Name = "Meet", Date = "01/06/2026", PoolType = "25m" };
+        db.AddRange(canon, dup, comp);
+        await db.SaveChangesAsync();
+        db.Add(new ClubCompetitionStanding
+        {
+            CompetitionId = comp.Id, ClubId = dup.Id, Rank = 3,
+            Points = 10, Gold = 1, Silver = 0, Bronze = 0,
+            SwimmerCount = 2, ScoringSwims = 2, SwimCount = 2,
+        });
+        await db.SaveChangesAsync();
+
+        var spy = new StandingSpy();
+        await new ClubMergeService(db, new FakeCache(), spy)
+            .MergeAsync([new ClubMergePair(canon.Id, dup.Id)], dryRun: false);
+
+        Assert.Equal([comp.Id], spy.RebuiltCompetitions);
+    }
+
+    [Fact]
+    public async Task DryRun_DoesNotRebuildStandings()
+    {
+        await using var db = CreateDb(nameof(DryRun_DoesNotRebuildStandings));
+        var canon = new Club { Name = "A" };
+        var dup = new Club { Name = "B" };
+        db.AddRange(canon, dup);
+        await db.SaveChangesAsync();
+
+        var spy = new StandingSpy();
+        await new ClubMergeService(db, new FakeCache(), spy)
+            .MergeAsync([new ClubMergePair(canon.Id, dup.Id)], dryRun: true);
+
+        Assert.Empty(spy.RebuiltClubs);
+        Assert.Null((await db.Clubs.FindAsync(dup.Id))!.MergedIntoId);
+    }
+
+    [Fact]
+    public async Task AlreadyMergedClub_CannotBeMergedAgain()
+    {
+        // Повтор дал бы цепочку A → B → C, и /clubs/{A} пришлось бы разматывать рекурсивно.
+        await using var db = CreateDb(nameof(AlreadyMergedClub_CannotBeMergedAgain));
+        var canon = new Club { Name = "A" };
+        var dup = new Club { Name = "B" };
+        var third = new Club { Name = "C" };
+        db.AddRange(canon, dup, third);
+        await db.SaveChangesAsync();
+        await new ClubMergeService(db, new FakeCache(), new StandingSpy())
+            .MergeAsync([new ClubMergePair(canon.Id, dup.Id)], dryRun: false);
+
+        var report = await new ClubMergeService(db, new FakeCache(), new StandingSpy())
+            .MergeAsync([new ClubMergePair(third.Id, dup.Id)], dryRun: false);
+
+        Assert.Equal("error", report.Pairs.Single().Status);
+        Assert.Equal(canon.Id, (await db.Clubs.FindAsync(dup.Id))!.MergedIntoId);
+    }
+
+    [Fact]
+    public async Task MergedClub_IsHiddenFromDedupCandidates()
+    {
+        await using var db = CreateDb(nameof(MergedClub_IsHiddenFromDedupCandidates));
+        var canon = new Club { Name = "מכבי חיפה" };
+        var dup = new Club { Name = "מכבי חיפה " };   // тот же клуб с хвостом-пробелом
+        db.AddRange(canon, dup);
+        await db.SaveChangesAsync();
+        await new ClubMergeService(db, new FakeCache(), new StandingSpy())
+            .MergeAsync([new ClubMergePair(canon.Id, dup.Id)], dryRun: false);
+
+        var report = await new ClubDedupService(db).FindCandidatesAsync();
+
+        Assert.DoesNotContain(report.Candidates, c => c.DuplicateId == dup.Id || c.CanonicalId == dup.Id);
     }
 }

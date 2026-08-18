@@ -20,8 +20,10 @@ public class SuspectResultDetectorTests
     private static SuspectCandidateRow Row(
         long id, int ms, string style = "butterfly", string distance = "100",
         string gender = "female", int swimmerId = 1, DateTime? date = null,
-        bool isRelay = false, bool timeFail = false)
-        => new(id, swimmerId, style, distance, gender, ms, date ?? Day1, isRelay, timeFail);
+        bool isRelay = false, bool timeFail = false, string? ageGroup = null,
+        string? heatType = null)
+        => new(id, swimmerId, style, distance, gender, ms, date ?? Day1, isRelay, timeFail, ageGroup,
+            HeatType: heatType);
 
     /// <summary>Правдоподобный «фон» заплыва, чтобы медиана была осмысленной.</summary>
     private static IEnumerable<SuspectCandidateRow> Field(int startId, params int[] times)
@@ -77,6 +79,56 @@ public class SuspectResultDetectorTests
     }
 
     [Fact]
+    public void Outlier_MedianIsPerAgeGroup_NotWholeDiscipline()
+    {
+        // Реальная детская лига (competition 1516, «ליגה מס 2- הפועל ירושלים», 50 вольным
+        // мужчины): в одной дисциплине плывут восьмилетки и семнадцатилетние. Медиана по всем
+        // строкам — 43.53, и победители старшей ступени (25.25 и 26.03) оказывались быстрее
+        // 60% от неё. Внутри своей ступени (медиана ~30.06) они совершенно нормальны.
+        var rows = new List<SuspectCandidateRow>
+        {
+            Row(1, 25_250, "freestyle", "50", "male", swimmerId: 1, ageGroup: "17-18"),
+            Row(2, 26_030, "freestyle", "50", "male", swimmerId: 2, ageGroup: "17-18"),
+            Row(3, 28_440, "freestyle", "50", "male", swimmerId: 3, ageGroup: "17-18"),
+            Row(4, 30_060, "freestyle", "50", "male", swimmerId: 4, ageGroup: "17-18"),
+            Row(5, 33_100, "freestyle", "50", "male", swimmerId: 5, ageGroup: "17-18"),
+            // Младших больше — как в жизни: именно они и утягивают общую медиану вниз.
+            Row(6, 40_210, "freestyle", "50", "male", swimmerId: 6, ageGroup: "9-10"),
+            Row(7, 44_000, "freestyle", "50", "male", swimmerId: 7, ageGroup: "9-10"),
+            Row(8, 49_370, "freestyle", "50", "male", swimmerId: 8, ageGroup: "0-8"),
+            Row(9, 55_200, "freestyle", "50", "male", swimmerId: 9, ageGroup: "0-8"),
+            Row(10, 59_095, "freestyle", "50", "male", swimmerId: 10, ageGroup: "0-8"),
+            Row(11, 64_800, "freestyle", "50", "male", swimmerId: 11, ageGroup: "0-8"),
+            Row(12, 70_000, "freestyle", "50", "male", swimmerId: 12, ageGroup: "9-10"),
+        };
+
+        // Общая медиана тут 44.00 → старый порог 26.40 пометил бы обе верхние строки.
+        Assert.Empty(SuspectResultDetector.Detect(rows));
+    }
+
+    [Fact]
+    public void Outlier_RealErrorInsideAgeGroup_StillFlagged()
+    {
+        // Сужение группы не должно ослабить правило: ошибка протокола выбивается и внутри
+        // своей ступени. Соседняя ступень с быстрыми временами больше ни на что не влияет.
+        var rows = new List<SuspectCandidateRow>
+        {
+            Row(1, 22_000, "freestyle", "50", "male", swimmerId: 1, ageGroup: "0-8"),
+            Row(2, 55_200, "freestyle", "50", "male", swimmerId: 2, ageGroup: "0-8"),
+            Row(3, 59_095, "freestyle", "50", "male", swimmerId: 3, ageGroup: "0-8"),
+            Row(4, 64_800, "freestyle", "50", "male", swimmerId: 4, ageGroup: "0-8"),
+            Row(5, 25_250, "freestyle", "50", "male", swimmerId: 5, ageGroup: "17-18"),
+            Row(6, 26_030, "freestyle", "50", "male", swimmerId: 6, ageGroup: "17-18"),
+            Row(7, 28_440, "freestyle", "50", "male", swimmerId: 7, ageGroup: "17-18"),
+            Row(8, 30_060, "freestyle", "50", "male", swimmerId: 8, ageGroup: "17-18"),
+        };
+
+        var v = Assert.Single(SuspectResultDetector.Detect(rows), x => x.ResultId == 1);
+        Assert.Equal(SuspectReasons.TimeOutlier, v.Reason);
+        Assert.Contains("ступени 0-8", v.Note);
+    }
+
+    [Fact]
     public void Relays_And_FailedTimes_Ignored()
     {
         var rows = new[]
@@ -124,6 +176,104 @@ public class SuspectResultDetectorTests
             Row(2, 61_000, swimmerId: 7, date: Day1.AddDays(1)),
         };
         Assert.Empty(SuspectResultDetector.Detect(otherDays));
+    }
+
+    [Fact]
+    public void DuplicateSwim_PrelimPlusFinalSameDayNotFlagged_SameSessionStillFlagged()
+    {
+        // Бугрим: предварительные и финал одной дисциплины в ОДИН день — норма
+        // (1678 ложных пометок на чемпионате 2026 до появления HeatType).
+        var prelimFinal = new[]
+        {
+            Row(1, 60_000, swimmerId: 7, heatType: "prelim"),
+            Row(2, 59_500, swimmerId: 7, heatType: "final"),
+        };
+        Assert.Empty(SuspectResultDetector.Detect(prelimFinal));
+
+        // Дубль ВНУТРИ одной сессии по-прежнему ловится.
+        var withinFinal = new[]
+        {
+            Row(1, 60_000, swimmerId: 7, heatType: "final"),
+            Row(2, 61_000, swimmerId: 7, heatType: "final"),
+        };
+        var flagged = SuspectResultDetector.Detect(withinFinal);
+        Assert.Equal(2, flagged.Count);
+        Assert.All(flagged, v => Assert.Equal(SuspectReasons.DuplicateSwim, v.Reason));
+    }
+
+    /* ── Выброс относительно личных результатов (Б1) ───────────────────────────────
+     * Живой случай: 200 вольным за 01:53.09 (678 очков) у пловца, чей лучший результат
+     * тех же месяцев — 312 очков. Рекорда не бьёт, от медианы заплыва недалеко — ни одно
+     * из прежних правил его не видит. Порог 2.0 калиброван на живой базе: он даёт 5 находок
+     * на 26 тыс. заплывов, при 1.5 их было бы 20.
+     */
+    private static SuspectCandidateRow PointRow(long id, int points, DateTime? date = null, int swimmerId = 7)
+        => new(id, swimmerId, "freestyle", "200", "male", 113_090, date ?? Day1, false, false, "13-14", points);
+
+    private static IReadOnlyDictionary<int, IReadOnlyList<PersonalSwim>> History(params PersonalSwim[] swims)
+        => new Dictionary<int, IReadOnlyList<PersonalSwim>> { [7] = swims };
+
+    [Fact]
+    public void PersonalOutlier_TwiceOwnBest_Flagged()
+    {
+        var rows = new[] { PointRow(1, 678) };
+        var history = History(
+            new PersonalSwim(2, 312, Day1.AddDays(-8)),
+            new PersonalSwim(3, 290, Day1.AddDays(-30)),
+            new PersonalSwim(4, 275, Day1.AddDays(-60)));
+
+        var v = Assert.Single(SuspectResultDetector.Detect(rows, history));
+        Assert.Equal(SuspectReasons.PersonalOutlier, v.Reason);
+        Assert.Contains("312", v.Note);
+    }
+
+    [Fact]
+    public void PersonalOutlier_WithinOwnLevel_NotFlagged()
+    {
+        var rows = new[] { PointRow(1, 400) };
+        var history = History(
+            new PersonalSwim(2, 312, Day1.AddDays(-8)),
+            new PersonalSwim(3, 290, Day1.AddDays(-30)),
+            new PersonalSwim(4, 275, Day1.AddDays(-60)));
+
+        Assert.Empty(SuspectResultDetector.Detect(rows, history));
+    }
+
+    [Fact]
+    public void PersonalOutlier_OldSwimsOnly_NotFlagged()
+    {
+        // Подросток за год легально прибавляет 10–15%: сравнение с прошлогодним результатом
+        // ловило бы рост, а не ошибку. Поэтому окно ±120 дней.
+        var rows = new[] { PointRow(1, 678) };
+        var history = History(
+            new PersonalSwim(2, 312, Day1.AddDays(-400)),
+            new PersonalSwim(3, 290, Day1.AddDays(-420)),
+            new PersonalSwim(4, 275, Day1.AddDays(-450)));
+
+        Assert.Empty(SuspectResultDetector.Detect(rows, history));
+    }
+
+    [Fact]
+    public void PersonalOutlier_TooFewSwims_NotFlagged()
+    {
+        // По одному-двум стартам профиля нет: у новичка первый же удачный заплыв дал бы
+        // кратный выброс. Ровно так правило превратилось бы в крикуна.
+        var rows = new[] { PointRow(1, 678) };
+        var history = History(
+            new PersonalSwim(2, 312, Day1.AddDays(-8)),
+            new PersonalSwim(3, 290, Day1.AddDays(-30)));
+
+        Assert.Empty(SuspectResultDetector.Detect(rows, history));
+    }
+
+    [Fact]
+    public void PersonalOutlier_NoHistory_RuleSilent_OthersStillWork()
+    {
+        // Истории нет — правило молчит, но остальные проверки обязаны работать как раньше.
+        var rows = new[] { Row(1, 32_590) }.Concat(Field(10, 57_330, 65_690, 66_690, 67_020)).ToList();
+
+        var v = Assert.Single(SuspectResultDetector.Detect(rows, null), x => x.ResultId == 1);
+        Assert.Equal(SuspectReasons.TimeVsDistance, v.Reason);
     }
 
     [Fact]

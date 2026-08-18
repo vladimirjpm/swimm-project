@@ -1,0 +1,59 @@
+/* Record wall: карточка спорного рекорда «Under review» (вариант 13a).
+   Токены объявить в каждой теме client/src/index.css; здесь — значения текущего дизайна. */
+
+:root {
+  --theme-flag-text: #b45309;
+  --theme-flag-chip-bg: rgba(245, 158, 11, .16);
+  --theme-flag-chip-border: rgba(245, 158, 11, .4);
+  --theme-flag-border: rgba(240, 180, 41, .55);
+  --theme-flag-tape-a: #f0b429;
+  --theme-flag-tape-b: #2a2416;
+}
+
+/* Модификатор к существующей карточке рекорда */
+.record-card--flagged {
+  border-color: var(--theme-flag-border);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+/* фон ♀/♂ подложки, время, имя, дата — без изменений */
+
+.record-card--flagged .record-card__body {
+  padding-top: 10px;    /* было 12px — компенсация лент */
+  padding-bottom: 10px;
+}
+
+/* Caution-лента: декоративная, aria-hidden */
+.record-card__tape {
+  height: 7px;
+  flex: none;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--theme-flag-tape-a) 0 9px,
+    var(--theme-flag-tape-b) 9px 18px
+  );
+  opacity: .9;
+  pointer-events: none;
+}
+
+/* Чип рядом со временем; контейнер времени — flex с flex-wrap */
+.record-card__time-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.record-card__flag-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  background: var(--theme-flag-chip-bg);
+  color: var(--theme-flag-text);
+  border: 1px solid var(--theme-flag-chip-border);
+  white-space: nowrap;
+}

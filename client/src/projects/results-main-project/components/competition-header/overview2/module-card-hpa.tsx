@@ -50,6 +50,11 @@ export default function ModuleCardHpa({ overview }: Props) {
         </span>
       </div>
       <UI_GenderAgeTable rows={rows} showClubIcon hideClubIconMobile ageColWidthMobile={32} />
+      {awards.some((a) => a.finals_only_unavailable) && (
+        <span className="text-[11px]" style={{ color: 'var(--theme-mode-text-muted)' }}>
+          * regulation counts finals only; computed over all swims (heat type not in data yet)
+        </span>
+      )}
     </section>
   );
 }

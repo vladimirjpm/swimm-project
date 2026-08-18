@@ -46,4 +46,28 @@ internal static class ImportCompetitionMatcher
         }
         return byKey;
     }
+
+    /// <summary>
+    /// Индекс дней ПО ДАТЕ внутри соревнования/события, привязанного к штампу сайта
+    /// (<c>OrgCompId</c>) — идентичность фазы Д2 (docs/data-integrity.md).
+    ///
+    /// Зачем в обход имени: у одного и того же протокола название на сайте и в БД
+    /// расходится («מוקדמות אליפות צעירים» против «…חלק ב'»), матчинг по имени промахивался
+    /// и переимпорт создавал ПОЛНЫЙ дубликат события (инцидент И-3, 1837 строк). Внутри
+    /// одного события даты дней уникальны, поэтому дата — надёжный ключ, а имя остаётся
+    /// косметикой.
+    ///
+    /// Коллизия дат внутри события (теоретически — два дня с одной датой) разрешается
+    /// первым: TryAdd, как и в основном индексе.
+    /// </summary>
+    public static Dictionary<string, T> BuildDateIndex<T>(IEnumerable<T> days, Func<T, string> date)
+    {
+        var byDate = new Dictionary<string, T>();
+        foreach (var d in days)
+        {
+            var key = date(d);
+            if (!string.IsNullOrWhiteSpace(key)) byDate.TryAdd(key, d);
+        }
+        return byDate;
+    }
 }

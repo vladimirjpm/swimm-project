@@ -1,13 +1,11 @@
 import React from 'react';
-import FilterRecalculate from '../../../components/filter-section/filter-recalculate';
 import type { CompetitionOverview, CompetitionTab } from './types';
 import { PAGE_CONTAINER } from '../../../../utils/layout';
 
 // Табы шапки соревнования (паттерн GroupTabs: primary + внутренний bg-black/10).
 // Overview | Swims N | Clubs N | Records N (только если рекорды есть) | Media N.
-// Справа (только ≥lg) — тогглер Combine All Results (перенесён из фильтров;
-// на мобиле остаётся в фильтрах Swims — решение дизайнера). Условия видимости
-// самого тогглера не меняются — FilterRecalculate сам решает, рендериться ли.
+// Тогглера Combine All Results тут больше нет: он стал полосой под табами
+// (combine-bar.tsx, handoff 12b) — на всех брейкпоинтах.
 
 interface Props {
   overview: CompetitionOverview | null;
@@ -52,9 +50,6 @@ export default function CompetitionTabs({ overview, activeTab, onTabChange, medi
             )}
           </button>
         ))}
-        <span className="ml-auto hidden shrink-0 items-center pb-1 lg:flex">
-          <FilterRecalculate />
-        </span>
       </div>
       </div>
     </div>

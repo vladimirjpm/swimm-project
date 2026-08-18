@@ -1,10 +1,13 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
+using Swimm.Domain;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -19,6 +22,7 @@ public class JsonImportService : IImportService
     private readonly SwimmDbContext _db;
     private readonly ICompetitionRecalculationService? _recalc;
     private readonly ICacheService _cache;
+    private readonly IDataCheckRunner? _checks;
 
     private static readonly string[] ClearableTables =
         ["Results", "GalleryItems", "Galleries", "Relays", "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "CompetitionEvents", "Countries"];
@@ -28,12 +32,19 @@ public class JsonImportService : IImportService
     /// null — пересчёт пропускается. Так тесты импорта, которым он не нужен, продолжают
     /// конструировать сервис двумя аргументами; в приложении его подставляет DI.
     /// </param>
+    /// <param name="checks">
+    /// Реестр проверок данных (Д5, решение Р13): гоняется в конце импорта, чтобы человеку не
+    /// приходилось догадываться открыть /Admin/Health. Необязателен по той же причине, что и
+    /// <paramref name="recalc"/> — тестам импорта он не нужен.
+    /// </param>
     public JsonImportService(SwimmDbContext db, ICacheService cache,
-        ICompetitionRecalculationService? recalc = null)
+        ICompetitionRecalculationService? recalc = null,
+        IDataCheckRunner? checks = null)
     {
         _db    = db;
         _cache = cache;
         _recalc = recalc;
+        _checks = checks;
     }
 
     public string[] GetClearableTables() => ClearableTables;
@@ -59,6 +70,25 @@ public class JsonImportService : IImportService
         options.Converters.Add(new LenientNullableIntConverter());
         options.Converters.Add(new LenientStringConverter());
         return options;
+    }
+
+    /// <summary>
+    /// Разбор того же JSON, что принимает <see cref="ImportAsync"/>, БЕЗ импорта — для
+    /// проверок на превью (напр. «сколько рекордов побьёт файл», Б2). Читается тем же
+    /// кодом и теми же опциями: иначе превью судило бы о других строках, чем те, что лягут
+    /// в БД. Оба формата, как в импорте: ResultWrap { results: [...] } и голый массив.
+    /// </summary>
+    internal static List<ResultJsonItem> DeserializeResultItems(string json)
+    {
+        var options = CreateLenientOptions();
+        try
+        {
+            var wrap = JsonSerializer.Deserialize<ResultWrap>(json, options);
+            if (wrap?.Results is { Count: > 0 }) return wrap.Results;
+        }
+        catch (JsonException) { /* не ResultWrap — пробуем массивом */ }
+
+        return JsonSerializer.Deserialize<List<ResultJsonItem>>(json, options) ?? [];
     }
 
     public async Task<ImportResult> ImportAsync(Stream jsonStream, string? fileName = null, IReadOnlyCollection<string>? categoryKeys = null, ImportEventOptions? eventOptions = null, int? orgCompId = null)
@@ -152,14 +182,38 @@ public class JsonImportService : IImportService
             await _db.Competitions.AsNoTracking().ToListAsync(),
             c => c.Name, c => c.SubName, c => c.Date, c => c.PoolType);
 
-        // Clubs: AsNoTracking — we only read their IDs
+        // Идентичность по штампу сайта (Д2, docs/data-integrity.md). Если импорт знает compID,
+        // сначала ищем СВОИ дни по дате внутри связанного соревнования/события, и только потом
+        // падаем на матчинг по имени. Штамп живёт либо на одиночном соревновании
+        // (Competition.OrgCompId — альтернативный ключ), либо на событии (CompetitionEvent.OrgCompId).
+        var linkedDaysByDate = new Dictionary<string, Competition>();
+        if (orgCompId is int linkOrgCompId)
+        {
+            var linkedDays = await CompetitionIdentity.ResolveDaysAsync(_db, linkOrgCompId);
+            linkedDaysByDate = ImportCompetitionMatcher.BuildDateIndex(linkedDays, c => c.Date);
+            if (linkedDaysByDate.Count > 0)
+                diagnosticLog.Add($"Идентичность: compID {linkOrgCompId} → {linkedDaysByDate.Count} день(дней) в БД, матчинг по дате");
+        }
+
+        // Clubs: AsNoTracking — we only read their IDs.
+        // Склеенные (MergedIntoId) в кэш НЕ попадают: иначе импорт нашёл бы дубль по имени
+        // и повесил новые результаты на клуб, которого уже нет, — merge молча откатился бы.
         var clubCache = new Dictionary<string, Club>();
-        foreach (var c in await _db.Clubs.AsNoTracking().ToListAsync())
+        foreach (var c in await _db.Clubs.AsNoTracking().Where(c => c.MergedIntoId == null).ToListAsync())
             clubCache.TryAdd($"{c.Name}|{c.NameEn}", c);
 
         // Swimmers: tracked — EnrichSwimmerFromResult modifies them, changes saved in batch.
         // Второй индекс по EN-имени — фоллбек-матчинг для двуязычных/EN-протоколов
         // (Maccabiah-кейс: пловец известен под английским именем).
+        // Страж тёзок (инцидент И-11, docs/data-integrity.md). Ключ матчинга пловца —
+        // «фамилия|имя|годРождения», без клуба и без внешнего id, поэтому два ребёнка-тёзки
+        // одного года рождения склеивались в одну запись ВСЕГДА. Признак, что это разные
+        // люди: в ОДНОМ соревновании пловец не может выступать за два клуба.
+        //   seenClubInCompetition: (соревнование, пловец) → канонический клуб этого прогона;
+        //   namesakeByClub:        (соревнование, ключ имени, клуб) → выделенный тёзка.
+        var seenClubInCompetition = new Dictionary<(int CompetitionId, int SwimmerId), int>();
+        var namesakeByClub = new Dictionary<(int CompetitionId, string NameKey, int ClubId), Swimmer>();
+
         var swimmerCache = new Dictionary<string, Swimmer>();
         var swimmerCacheEn = new Dictionary<string, Swimmer>();
         foreach (var s in await _db.Swimmers.ToListAsync())
@@ -194,6 +248,13 @@ public class JsonImportService : IImportService
         var deleteMissing = overwriteExisting && (eventOptions?.DeleteMissing ?? false);
 
         int created = 0, skipped = 0, errors = 0;
+        // Строк, легших сразу с ручной пометкой «недостоверно» (галочка в превью).
+        int suspectFlagged = 0;
+
+        // Сверка Д1: что обещал файл. Копим в цикле, а не пересобираем потом из items —
+        // иначе пришлось бы повторить логику резолва соревнования и стиля второй копией
+        // (правило 1 в docs/data-integrity.md: предикат живёт в одном месте).
+        var expectedByEvent = new Dictionary<(int CompetitionId, string EventKey), int>();
         var errorMessages = new List<string>();
         // Batch of ResultRecords to insert at once at the end
         var resultBatch = new List<ResultRecord>(items.Count);
@@ -280,12 +341,22 @@ public class JsonImportService : IImportService
                 // приходит из файла в сыром виде ("25"/"25m") — сравнивать нужно нормализованное с
                 // нормализованным, иначе тот же промах мимо кэша, что и с Name/SubName.
                 var compKey = ImportCompetitionMatcher.Key(displayName, item.Date ?? string.Empty, NormalizePoolType(item.PoolType));
+
+                // Д2: день, привязанный к тому же compID, узнаём ПО ДАТЕ — даже если название
+                // разошлось. Кладём находку в кэш под именным ключом, чтобы весь дальнейший
+                // цикл (upsert-пометка, категории, touched) работал как обычно.
+                if (linkedDaysByDate.TryGetValue(item.Date ?? string.Empty, out var linkedDay))
+                    competitionCache.TryAdd(compKey, linkedDay);
+
                 if (!competitionCache.TryGetValue(compKey, out var competition))
                 {
                     competition = new Competition
                     {
                         Name = displayName,
                         CountryId = country?.Id,
+                        // Дисциплина по названию: протоколов артистического мы не грузим,
+                        // но если такой файл однажды заедет — он не притворится плаванием.
+                        Discipline = Disciplines.GuessFromName(displayName),
                         Date = item.Date ?? string.Empty,
                         PoolType = NormalizePoolType(item.PoolType),
                         IsMasters = isMasters || (item.IsMasters ?? false),
@@ -361,6 +432,12 @@ public class JsonImportService : IImportService
                     }
                 }
 
+                // Сверка Д1: строка файла учтена как ожидаемая. Считаем ДО остальных шагов —
+                // если строка дальше упадёт с ошибкой, расхождение это и покажет.
+                (int CompetitionId, string EventKey) reconKey = (competition.Id, ImportReconciler.EventKey(
+                    styleName, item.EventStyleLen, item.IsRelay == true, item.EventCategory));
+                expectedByEvent[reconKey] = expectedByEvent.GetValueOrDefault(reconKey) + 1;
+
                 // 4. Club
                 var clubName = (item.Club ?? string.Empty).Trim();
                 var clubNameEn = (item.ClubEn ?? string.Empty).Trim();
@@ -374,7 +451,35 @@ public class JsonImportService : IImportService
                 var clubKey = $"{clubName}|{clubNameEn}";
                 if (!clubCache.TryGetValue(clubKey, out var club))
                 {
-                    club = await _db.Clubs.FirstOrDefaultAsync(c => c.Name == clubName && c.NameEn == clubNameEn);
+                    // Склеенные исключены и ЗДЕСЬ, а не только в фоллбеке ниже: у надгробия
+                    // NameEn обычно пустой, ивритский протокол его тоже не приносит — точная
+                    // пара «Name|''» попадала прямо в склеенный клуб, и merge молча
+                    // откатывался (инцидент И-13: 61 надгробие снова с результатами).
+                    club = await _db.Clubs.FirstOrDefaultAsync(
+                        c => c.MergedIntoId == null && c.Name == clubName && c.NameEn == clubNameEn);
+
+                    // Фоллбек по ОДНОМУ имени. Ивритский протокол не приносит NameEn, а у
+                    // канонического клуба он заполнен (следствие двуязычного импорта), — по паре
+                    // Name|NameEn матч промахивается и рождается клуб-дубль. 2026-08-03 так
+                    // появилось 59 клубов на 5141 результат при переимпорте пяти протоколов.
+                    // Совпадение имени = «уверенный» дубль и в дедупе клубов (эвристика same-name),
+                    // так что матчить по имени безопаснее, чем плодить двойников.
+                    // Склеенные исключены: иначе результаты уедут на клуб, которого уже нет.
+                    club ??= await _db.Clubs
+                        .Where(c => c.MergedIntoId == null && c.Name == clubName)
+                        .OrderBy(c => c.Id)
+                        .FirstOrDefaultAsync();
+
+                    // Нашли по имени и у нас есть английское название, которого в БД нет —
+                    // дозаполняем (тот же приём, что «Синхр. языки»).
+                    if (club != null && clubNameEn.Length > 0 && string.IsNullOrWhiteSpace(club.NameEn))
+                    {
+                        var tracked = await _db.Clubs.FirstAsync(c => c.Id == club.Id);
+                        tracked.NameEn = clubNameEn;
+                        await _db.SaveChangesAsync();
+                        club = tracked;
+                    }
+
                     if (club == null)
                     {
                         club = new Club { Name = clubName, NameEn = clubNameEn, CountryId = country?.Id };
@@ -476,6 +581,41 @@ public class JsonImportService : IImportService
                     swimmerCache[swimmerKey] = swimmer;
                 }
 
+                // Страж тёзок: тот же пловец уже плыл в ЭТОМ соревновании за другой клуб —
+                // значит это другой человек с тем же именем и годом рождения (инцидент И-11).
+                // Сравниваем канонические клубы: у склеенных клубов остаётся «надгробие»
+                // (MergedIntoId), и без канонизации один и тот же клуб выглядел бы как два.
+                if (!isAnonymousSwimmer && item.IsRelay != true && club != null && swimmer.Id != 0)
+                {
+                    var canonicalClubId = club.MergedIntoId ?? club.Id;
+                    var namesakeKey = (competition.Id, swimmerKey, canonicalClubId);
+
+                    if (namesakeByClub.TryGetValue(namesakeKey, out var namesake))
+                    {
+                        swimmer = namesake;
+                    }
+                    else if (seenClubInCompetition.TryGetValue((competition.Id, swimmer.Id), out var seenClub)
+                             && seenClub != canonicalClubId)
+                    {
+                        swimmer = new Swimmer
+                        {
+                            LastName = item.LastName ?? string.Empty,
+                            FirstName = item.FirstName ?? string.Empty,
+                            LastNameEn = item.LastNameEn ?? string.Empty,
+                            FirstNameEn = item.FirstNameEn ?? string.Empty,
+                            BirthYear = item.BirthYear ?? 0
+                        };
+                        _db.Swimmers.Add(swimmer);
+                        await _db.SaveChangesAsync();
+                        namesakeByClub[namesakeKey] = swimmer;
+                        diagnosticLog.Add(
+                            $"Тёзки: '{item.LastName} {item.FirstName}' ({item.BirthYear}) выступают за разные клубы "
+                            + $"в одном соревновании — заведена отдельная запись #{swimmer.Id} для '{club.Name}'");
+                    }
+
+                    seenClubInCompetition[(competition.Id, swimmer.Id)] = canonicalClubId;
+                }
+
                 // Дополнение данных спортсмена из результата (Gender, ClubId, CountryId)
                 EnrichSwimmerFromResult(swimmer, item.EventStyleGender, club, country);
 
@@ -532,10 +672,11 @@ public class JsonImportService : IImportService
                     Gallery = gallery,  // EF Core inserts Gallery + GalleryItems and sets GalleryId
                     CompetitionDate = ParseDate(item.Date),
                     Distance = item.EventStyleLen ?? string.Empty,
-                    Gender = item.EventStyleGender ?? string.Empty,
+                    Gender = ResolveResultGender(item.EventStyleGender, swimmer, item.IsRelay == true),
                     AgeGroup = item.AgeGroup ?? string.Empty,
                     EventStyleAge = item.EventStyleAge ?? string.Empty,
                     EventCategory = string.IsNullOrWhiteSpace(item.EventCategory) ? null : item.EventCategory,
+                    HeatType = string.IsNullOrWhiteSpace(item.HeatType) ? null : item.HeatType,
                     Position = item.Position,
                     PositionAgeGroup = item.PositionAgeGroup,
                     Heat = item.Heat ?? 0,
@@ -546,8 +687,17 @@ public class JsonImportService : IImportService
                     TimeFail = item.TimeFail,
                     TimeFailNote = item.TimeFailNote,
                     InternationalPoints = item.InternationalPoints ?? 0,
-                    Note = item.Note
+                    Note = item.Note,
+                    // Пометка из превью — сразу РУЧНАЯ: её поставил человек, и переживать
+                    // она должна и скан, и переимпорт (см. ApplyPayloadUpdate).
+                    SuspectIsManual = !string.IsNullOrWhiteSpace(item.SuspectNote),
+                    SuspectReason = string.IsNullOrWhiteSpace(item.SuspectNote) ? null : SuspectReasons.Manual,
+                    SuspectNote = string.IsNullOrWhiteSpace(item.SuspectNote)
+                        ? null
+                        : Truncate(item.SuspectNote.Trim(), 300)
                 };
+
+                if (record.SuspectIsManual) suspectFlagged++;
 
                 resultBatch.Add(record);
                 created++;
@@ -603,7 +753,7 @@ public class JsonImportService : IImportService
             var match = ResultMatcher.Match(
                 oldRows, newRowsForComp,
                 ResultMatcher.KeyOfPersisted, ResultMatcher.KeyOfTransient,
-                ResultMatcher.SwimmerIdOfPersisted, ResultMatcher.SwimmerIdOfTransient);
+                ResultMatcher.DiscriminatorOfPersisted, ResultMatcher.DiscriminatorOfTransient);
 
             foreach (var (old, incoming) in match.Matched)
             {
@@ -730,6 +880,21 @@ public class JsonImportService : IImportService
                     await _db.SaveChangesAsync();
                 }
             }
+
+            // Д2: штамп ещё и на СОБЫТИИ — иначе у многодневки идентичность есть только у
+            // первого дня (AK на Competition.OrgCompId уникален, трём дням его не раздать),
+            // и переимпорт снова искал бы дни 2–3 по названию.
+            var stampEventId = primary.EventId ?? competitionCache[touchedCompetitionKeys[0]].EventId;
+            if (stampEventId is int evId)
+            {
+                var ev = await _db.CompetitionEvents.FirstOrDefaultAsync(e => e.Id == evId);
+                if (ev != null && ev.OrgCompId != oc)
+                {
+                    ev.OrgCompId = oc;
+                    await _db.SaveChangesAsync();
+                    diagnosticLog.Add($"Идентичность: событие {evId} помечено compID {oc}");
+                }
+            }
         }
 
         // Запись в историю импортов — одна запись на весь импорт файла
@@ -779,6 +944,89 @@ public class JsonImportService : IImportService
             }
         }
 
+        // Сверка с файлом (Д1, docs/data-integrity.md). Как и пересчёт выше — ПОСЛЕ коммита
+        // и в try/catch: прибор не имеет права уронить уже загруженные результаты.
+        var reconciliationSummary = "";
+        var reconciliationMismatches = 0;
+        try
+        {
+            var competitionIds = expectedByEvent.Keys.Select(k => k.CompetitionId).Distinct().ToList();
+            if (competitionIds.Count > 0)
+            {
+                var actualRaw = await _db.Results.AsNoTracking()
+                    .Where(r => competitionIds.Contains(r.CompetitionId))
+                    .Select(r => new
+                    {
+                        r.CompetitionId,
+                        StyleName = r.Style != null ? r.Style.Name : "",
+                        r.Distance,
+                        IsRelay = r.RelayId != null,
+                        r.EventCategory
+                    })
+                    .ToListAsync();
+
+                var actualByEvent = actualRaw
+                    .GroupBy(r => (r.CompetitionId, Key: ImportReconciler.EventKey(
+                        r.StyleName, r.Distance, r.IsRelay, r.EventCategory)))
+                    .ToDictionary(g => (g.Key.CompetitionId, g.Key.Key), g => g.Count());
+
+                var rows = ImportReconciler.Build(expectedByEvent, actualByEvent);
+                var stamp = DateTime.UtcNow;
+
+                _db.ImportReconciliations.AddRange(rows.Select(r => new ImportReconciliation
+                {
+                    CompetitionId = r.CompetitionId,
+                    ImportedAt = stamp,
+                    ImportFileName = fileName ?? "unknown.json",
+                    EventKey = r.EventKey,
+                    ExpectedRows = r.Expected,
+                    ActualRows = r.Actual,
+                    Status = r.Status
+                }));
+                await _db.SaveChangesAsync();
+
+                reconciliationMismatches = rows.Count(r => r.EventKey.Length > 0 && r.IsMismatch);
+                reconciliationSummary = ImportReconciler.Describe(rows);
+                diagnosticLog.Add(reconciliationSummary);
+            }
+        }
+        catch (Exception ex)
+        {
+            diagnosticLog.Add($"Сверка с файлом не выполнена ({ex.GetType().Name}: {ex.Message}). Импорт сохранён.");
+        }
+
+        // Прогон всех проверок данных (Д5, решение Р13). После коммита и в try/catch — прибор
+        // не имеет права уронить уже загруженные результаты. Гоняем ВСЕ, а не только связанные
+        // с этим соревнованием: импорт трогает и справочники (клубы, пловцы), а на 30к строк
+        // это секунды. Запускается последним — чтобы ReconciliationMismatchCheck увидел строки
+        // сверки, записанные выше.
+        var dataChecksSummary = "";
+        var dataCheckErrors = 0;
+        var dataCheckWarnings = 0;
+        if (_checks is not null)
+        {
+            try
+            {
+                // Импорт натащил в трекер десятки тысяч сущностей; всё уже сохранено и
+                // закоммичено, а DetectChanges на них стоил бы дороже самих проверок.
+                _db.ChangeTracker.Clear();
+
+                var run = await _checks.RunAllAsync("import");
+                dataCheckErrors = run.ErrorCount;
+                dataCheckWarnings = run.WarningCount;
+                dataChecksSummary = run.ErrorCount == 0 && run.WarningCount == 0
+                    ? "Проверки данных: чисто."
+                    : $"Проверки данных: ошибок — {run.ErrorCount}, предупреждений — {run.WarningCount}.";
+                diagnosticLog.Add(dataChecksSummary);
+            }
+            catch (Exception ex)
+            {
+                diagnosticLog.Add(
+                    $"Проверки данных не выполнены ({ex.GetType().Name}: {ex.Message}). " +
+                    "Импорт сохранён; прогнать вручную — /Admin/Health или `dotnet run -- --check-data`.");
+            }
+        }
+
         await _cache.InvalidateAllAsync();
 
         // insertedCount — реально вставленные строки resultBatch (после того как сматченные
@@ -803,6 +1051,12 @@ public class JsonImportService : IImportService
             Inserted = insertedCount,
             Deleted = deletedCount,
             SkippedWithMedia = skippedWithMediaCount,
+            Reconciliation = reconciliationSummary,
+            ReconciliationMismatches = reconciliationMismatches,
+            DataChecks = dataChecksSummary,
+            DataCheckErrors = dataCheckErrors,
+            DataCheckWarnings = dataCheckWarnings,
+            SuspectFlagged = suspectFlagged,
             Message = message
         };
         }
@@ -842,6 +1096,7 @@ public class JsonImportService : IImportService
         old.AgeGroup = incoming.AgeGroup;
         old.EventStyleAge = incoming.EventStyleAge;
         old.EventCategory = incoming.EventCategory;
+        old.HeatType = incoming.HeatType;
         old.Position = incoming.Position;
         old.PositionAgeGroup = incoming.PositionAgeGroup;
         old.TimeMillisecond = incoming.TimeMillisecond;
@@ -861,6 +1116,15 @@ public class JsonImportService : IImportService
         {
             old.SuspectReason = null;
             old.SuspectNote = null;
+        }
+
+        // Галочка «пометить сомнительным» в превью — это НОВОЕ решение человека, принятое
+        // прямо сейчас; оно перекрывает и отсутствие пометки, и старую ручную заметку.
+        if (incoming.SuspectIsManual)
+        {
+            old.SuspectIsManual = true;
+            old.SuspectReason = incoming.SuspectReason;
+            old.SuspectNote = incoming.SuspectNote;
         }
     }
 
@@ -1032,9 +1296,34 @@ public class JsonImportService : IImportService
     /// Gender (из event_style_gender), ClubId (FK на клуб) и CountryId (FK на страну).
     /// Обновляет только пустые поля — не перезаписывает уже заполненные.
     /// </summary>
+    /// <summary>
+    /// Пол заплыва, у которого его нет в шапке протокола («none» — смешанные заплывы вроде
+    /// «שומרי שבת»), берём с самого пловца: его пол известен по другим заплывам. Если и там
+    /// пусто — оставляем пустым, такие строки видны в «дырах данных» (Admin/Results).
+    ///
+    /// ⚠ ЭСТАФЕТЫ ИСКЛЮЧЕНЫ. У команды нет одного пола (в миксе плывут и мальчики, и
+    /// девочки), а «владелец» строки — просто первая нога. Плюс <c>Gender</c> входит в ключ
+    /// upsert (<see cref="ResultMatcher.KeyOfPersisted"/>): подменив его, переимпорт перестал
+    /// бы узнавать свои же строки и на каждом прогоне плодил бы дубликаты эстафет.
+    /// </summary>
+    private static string ResolveResultGender(string? eventGender, Swimmer swimmer, bool isRelay)
+    {
+        if (isRelay) return eventGender ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(eventGender) && !IsUnknownGender(eventGender))
+            return eventGender;
+        return swimmer.Gender ?? string.Empty;
+    }
+
+    private static bool IsUnknownGender(string? gender) =>
+        string.IsNullOrWhiteSpace(gender)
+        || gender.Equals("none", StringComparison.OrdinalIgnoreCase)
+        || gender.Equals("mix", StringComparison.OrdinalIgnoreCase);
+
     private static void EnrichSwimmerFromResult(Swimmer swimmer, string? gender, Club? club, Country? country)
     {
-        if (string.IsNullOrEmpty(swimmer.Gender) && !string.IsNullOrWhiteSpace(gender))
+        // «none»/«mix» — это отсутствие пола в шапке, а не пол пловца: записав его в Swimmer,
+        // мы бы навсегда испортили карточку человека из-за одного смешанного заплыва.
+        if (string.IsNullOrEmpty(swimmer.Gender) && !IsUnknownGender(gender))
             swimmer.Gender = gender;
 
         // Псевдоклуб (страна/сборная) — не «клуб пловца»; страна уходит в CountryId ниже.
@@ -1456,7 +1745,9 @@ public class JsonImportService : IImportService
     }
 
     /// <summary>
-    /// Парсит строку времени вида "1:23.45" / "59.12" / "29.3" в миллисекунды.
+    /// Парсит строку времени вида "1:23.45" / "59.12" / "29.3" / "00:40:29.16" в миллисекунды.
+    /// Часовая форма приходит с длинных дистанций (3 км) — без неё такие результаты легли бы
+    /// в БД с пустым TimeMillisecond и выпали из рекордов, PB и сортировок.
     /// </summary>
     private static int? ParseTimeToMs(string? time)
     {
@@ -1464,12 +1755,14 @@ public class JsonImportService : IImportService
 
         time = time.Trim().Replace(',', '.');
 
-        var match = Regex.Match(time, @"^(?:(\d+):)?(\d+)\.(\d+)$");
+        var match = Regex.Match(time, @"^(?:(?:(\d+):)?(\d+):)?(\d+)\.(\d+)$");
         if (!match.Success) return null;
 
-        int minutes = match.Groups[1].Success ? int.Parse(match.Groups[1].Value) : 0;
-        int seconds = int.Parse(match.Groups[2].Value);
-        string frac = match.Groups[3].Value;
+        int hours = match.Groups[1].Success ? int.Parse(match.Groups[1].Value) : 0;
+        int minutes = match.Groups[2].Success ? int.Parse(match.Groups[2].Value) : 0;
+        minutes += hours * 60;
+        int seconds = int.Parse(match.Groups[3].Value);
+        string frac = match.Groups[4].Value;
 
         frac = frac.Length switch
         {
@@ -1648,6 +1941,11 @@ public class ResultJsonItem
     [JsonPropertyName("event_category")]
     public string? EventCategory { get; set; }
 
+    /// <summary>prelim / final; null — единственный заплыв дисциплины за день (timed final).
+    /// Выводится парсером из порядка сессий (AssignHeatTypes) — в протоколе слова нет.</summary>
+    [JsonPropertyName("heat_type")]
+    public string? HeatType { get; set; }
+
     [JsonPropertyName("pool_type")]
     public string? PoolType { get; set; }
 
@@ -1701,6 +1999,16 @@ public class ResultJsonItem
 
     [JsonPropertyName("note")]
     public string? Note { get; set; }
+
+    /// <summary>
+    /// Пометка «заплыв недостоверен», проставленная человеком ДО импорта — галочкой в превью
+    /// у строки, которая бьёт рекорд (docs/admin-pages/competitions.md). Строка ложится в БД
+    /// сразу с ручной пометкой: иначе между импортом и «Проверить качество» она успевает
+    /// побыть национальным рекордом на витрине, а автоматика ловит такое не всегда.
+    /// Заполняется сервером из выбора в превью, в протоколах федерации этого поля нет.
+    /// </summary>
+    [JsonPropertyName("suspect_note")]
+    public string? SuspectNote { get; set; }
 
     [JsonPropertyName("is_relay")]
     public bool? IsRelay { get; set; }

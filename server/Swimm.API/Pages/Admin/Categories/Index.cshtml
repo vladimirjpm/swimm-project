@@ -25,6 +25,7 @@
                 <th>Бейдж</th>
                 <th>Key</th>
                 <th>Название</th>
+                <th>עברית</th>
                 <th class="text-right">Порядок</th>
                 <th class="text-right">Соревнований</th>
                 <th></th>
@@ -53,6 +54,9 @@
                     </td>
                     <td>
                         <a href="@Url.Page("Edit", new { id = c.Id })" class="text-admin-accent hover:underline font-medium">@c.Name</a>
+                    </td>
+                    <td dir="rtl" class="text-admin-text-muted">
+                        @(string.IsNullOrEmpty(c.NameHe) ? "—" : c.NameHe)
                     </td>
                     <td class="text-right tabular-nums">@c.DisplayOrder</td>
                     <td class="text-right tabular-nums">

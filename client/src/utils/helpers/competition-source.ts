@@ -1,6 +1,8 @@
 // Общие хелперы для элементов /api/competitions (события/соревнования), вынесены из
 // filter-data-source-ddl.tsx — используются и селектором, и секцией Meets на competitions.tsx.
 
+import CategoryHelper from './category-helper';
+
 // Элемент /api/competitions: событие (свёрнуто в одну запись) или однодневное соревнование.
 export type CompetitionSource = {
   kind: 'event' | 'competition';
@@ -10,7 +12,7 @@ export type CompetitionSource = {
   date_end?: string | null;
   pool_type: string;
   /** Канонический таб; null — только «All» + кастомные табы по categories. */
-  category: 'young8_11' | 'junior' | 'adults' | 'masters' | null;
+  category: 'kids8_11' | 'young11_14' | 'juniors' | 'adults' | 'masters' | null;
   /** Полное членство — сырые Category.Key из БД (включая кастомные, напр. result-maccabiah). */
   categories?: string[];
   status: 'live' | 'upcoming' | 'done';
@@ -59,8 +61,13 @@ export const monthLabel = (src: CompetitionSource): string => {
 // названия. Слот, который не удалось определить, НЕ рендерится (см. COMPETITION-TILE.md).
 
 export type CompetitionTileData = {
-  /** 'K' — детские ступени, 'M' — masters, '' — группа не определена. */
-  letter: 'K' | 'M' | '';
+  /**
+   * Буква-бейдж категории: 'K' Kids, 'Y' Youth, 'J' Juniors, 'M' Masters; '' — категория
+   * не определена. Источник — `Category.Badge` из БД через `CategoryHelper`, НЕ хардкод:
+   * бейджи правятся в /Admin/Categories, и до 2026-07-30 здесь стояло `category ? 'K' : 'M'`,
+   * из-за чего Youth и Juniors тоже показывались как «K».
+   */
+  letter: string;
   /** Возрастная лента: '8-11' | '11-14'; null — ленты нет. */
   ageGroup: string | null;
   /** '❄️' зима / '☀️' лето; null — сезон не определён. */
@@ -71,8 +78,8 @@ export type CompetitionTileData = {
 
 /** Возрастная лента по канонической категории: только детские ступени. */
 const AGE_GROUP_BY_CATEGORY: Record<string, string> = {
-  young8_11: '8-11',
-  junior: '11-14',
+  kids8_11: '8-11',
+  young11_14: '11-14',
 };
 
 // Слово-маркер важнее даты: «Winter Championship» в апреле — всё-таки зимний чемпионат.
@@ -119,7 +126,7 @@ export function competitionTileData(src: CompetitionSource | undefined | null): 
   }
 
   return {
-    letter: category === 'masters' ? 'M' : category ? 'K' : '',
+    letter: category ? CategoryHelper.getBadgeByCanonicalKeySync(category) ?? '' : '',
     ageGroup: category ? AGE_GROUP_BY_CATEGORY[category] ?? null : null,
     season,
     isChampionship: isChampionshipSource(src),

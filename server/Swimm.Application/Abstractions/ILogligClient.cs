@@ -11,4 +11,12 @@ public interface ILogligClient
     /// <summary>Публичный URL карточки игрока (с актуальным seasonId — без него страница
     /// отдаёт 500, на старом сезоне — урезанную таблицу). Единый источник сборки URL.</summary>
     string BuildPublicProfileUrl(int logligId);
+
+    /// <summary>
+    /// Официальный клубный зачёт соревнования: опубликован ли он и по какой шкале посчитан.
+    /// null — соревнование недоступно (сеть/404); это НЕ то же, что «зачёта нет».
+    /// </summary>
+    /// <param name="scaleSampleEvents">Сколько индивидуальных заплывов опросить ради шкалы.</param>
+    Task<LogligCompetitionStanding?> GetCompetitionStandingAsync(
+        int logligId, int scaleSampleEvents = 12, CancellationToken ct = default);
 }

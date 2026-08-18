@@ -39,6 +39,13 @@ export interface ResultWrap {
      * плывут разные возрасты, а паралимпийская программа идёт отдельно от основной.
      */
     event_category?: string | null;
+    /**
+     * Заплыв помечен как недостоверный — ошибка САМОГО протокола (docs/data-integrity.md).
+     * Строку не прячем и не правим: протокол напечатан так, как напечатан. Но и молчать
+     * нельзя — бессмыслица вроде 200 вольным за 1:53 у 13-летнего иначе выглядит как
+     * достижение и получает бейдж рекорда. null/undefined — строка в порядке.
+     */
+    suspect_reason?: string | null;
     pool_type: '25' | '50' | '25m' | '50m';
     /*individual data*/
     swimmer_id?: number;
@@ -51,6 +58,8 @@ export interface ResultWrap {
     last_name_en: string;
     first_name_en: string;
     birth_year: number;
+    /** Id клуба — для ссылки на /clubs/{id}. Опционален: у статических источников его нет. */
+    club_id?: number;
     club: string;
     club_en: string;
     time: string;
@@ -81,6 +90,11 @@ export interface ResultWrap {
 
     /** Этот заплыв — лучший у пловца в дисциплине за событие (считает сервер). */
     is_best_result?: boolean | null;
+
+    /** Тип заплыва: 'prelim' | 'final'; null/undefined — единственный заплыв дисциплины
+     *  за день (timed final) либо данные без признака. Место prelim-заплыва — ранжир
+     *  сессии, не награда: бейдж места рисуется без медали (как non-award). */
+    heat_type?: string | null;
 
     /* training-specific data */
     training?: TrainingInfo;

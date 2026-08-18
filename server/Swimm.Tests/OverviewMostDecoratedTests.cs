@@ -61,13 +61,38 @@ public class OverviewMostDecoratedTests
         BirthYear = 2000, Gender = gender
     };
 
-    private static ResultRecord Row(Fixture f, int swimmerId, int? position, int? relayId = null) => new()
+    private static ResultRecord Row(
+        Fixture f, int swimmerId, int? position, int? relayId = null, string? heatType = null) => new()
     {
         CompetitionId = f.Comp.Id, SwimmerId = swimmerId, ClubId = f.Club.Id, StyleId = f.Style.Id,
         RelayId = relayId, Distance = "100", Gender = "male", CompetitionDate = Date,
         TimeOriginal = "1:00.00", Position = position, AgeGroup = "Open",
-        EventStyleAge = "100 freestyle Open"
+        EventStyleAge = "100 freestyle Open", HeatType = heatType
     };
+
+    [Fact]
+    public async Task PrelimPlace_IsNotAMedal()
+    {
+        // Бугрим: протокол печатает места и в предварительных — «первый в прелимах» не золото.
+        // У חרותי иначе выходило 2 золота за одну дисциплину (prelim + финал в один день).
+        await using var db = CreateDb(nameof(PrelimPlace_IsNotAMedal));
+        var f = await SeedBaseAsync(db);
+
+        var swimmer = NewSwimmer("Cheruti", "male");
+        db.Add(swimmer);
+        await db.SaveChangesAsync();
+
+        db.Results.AddRange(
+            Row(f, swimmer.Id, 1, heatType: "prelim"),
+            Row(f, swimmer.Id, 1, heatType: "final"));
+        await db.SaveChangesAsync();
+
+        var overview = await new ResultRepository(db, new NullCache())
+            .GetCompetitionOverviewAsync(new ResultFilter { CompetitionId = f.Comp.Id });
+
+        var top = Assert.Single(overview.TopMedalists);
+        Assert.Equal(1, top.Gold);
+    }
 
     [Fact]
     public async Task RelayMedal_GoesToEveryMember_NotRowOwner()

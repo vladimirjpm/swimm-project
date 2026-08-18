@@ -1,8 +1,9 @@
-﻿using System.Globalization;
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
+using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Services;
 
@@ -241,11 +242,14 @@ public class ResultRepository : IResultRepository
             .Where(r => !r.Club.IsPseudo)
             .Select(r => new
             {
+                r.ClubId,
                 ClubName = r.Club.Name,
                 ClubNameEn = r.Club.NameEn,
                 RelayTeamName = r.Relay != null ? r.Relay.TeamName : null,
-                LastName = r.Swimmer.LastName,
-                r.Position,
+                r.SwimmerId,
+                // Место prelim-заплыва — ранжир сессии, не награда: медали и клубные очки
+                // дают за финал (у бугрим протокол печатает места и в предварительных).
+                Position = r.HeatType == "prelim" ? null : r.Position,
                 r.CombinedPlace,
                 ShowCombine = r.Competition.ShowCombineAllResults,
                 r.TimeFail,
@@ -261,8 +265,10 @@ public class ResultRepository : IResultRepository
             .Include(r => r.Entries)
             .ToListAsync();
 
-        var map = new Dictionary<string, (int Points, HashSet<string> Swimmers, int Successful, int Gold, int Silver, int Bronze)>();
-
+        // Агрегация и ранжирование — в общем ClubStandingCalculator (Application/Mapping):
+        // тот же алгоритм считает материализованный зачёт страницы клуба. Здесь остаётся
+        // только то, что зависит от Infrastructure: правило очков и выбор места.
+        var scoring = new List<ClubScoringRow>(rows.Count);
         foreach (var r in rows)
         {
             // Ключ клуба — как в клиентском getClubsSummary: club → relay_team_name → club_en.
@@ -285,30 +291,22 @@ public class ResultRepository : IResultRepository
             var place = EffectivePlace(filter.Combined && r.ShowCombine, r.Position, r.CombinedPlace);
             var points = PointRulesClubsScoring.RelayPointsFor(rule, place, r.TimeFail, r.IsRelay);
 
-            map.TryGetValue(club, out var e);
-            e.Swimmers ??= new HashSet<string>();
-            e.Points += points;
-            if (points > 0) e.Successful += 1;
-            if (!string.IsNullOrWhiteSpace(r.LastName)) e.Swimmers.Add(r.LastName.Trim());
-            if (place == 1) e.Gold += 1;
-            else if (place == 2) e.Silver += 1;
-            else if (place == 3) e.Bronze += 1;
-            map[club] = e;
+            scoring.Add(new ClubScoringRow(
+                ClubId: r.ClubId, ClubKey: club, SwimmerId: r.SwimmerId,
+                Place: place, IsRelay: r.IsRelay, Points: points));
         }
 
-        var summary = map
-            .Select(kv => new ClubSummaryDto
+        var summary = ClubStandingCalculator.Build(scoring)
+            .Select(c => new ClubSummaryDto
             {
-                Club = kv.Key,
-                Points = kv.Value.Points,
-                SwimmerCount = kv.Value.Swimmers.Count,
-                SuccessfulCount = kv.Value.Successful,
-                Gold = kv.Value.Gold,
-                Silver = kv.Value.Silver,
-                Bronze = kv.Value.Bronze
+                Club = c.ClubKey,
+                Points = c.Points,
+                SwimmerCount = c.SwimmerCount,
+                SuccessfulCount = c.ScoringSwims,
+                Gold = c.Gold,
+                Silver = c.Silver,
+                Bronze = c.Bronze
             })
-            .OrderByDescending(c => c.Points)
-            .ThenBy(c => c.Club)
             .ToList();
 
         await _cache.SetAsync(key, (IReadOnlyList<ClubSummaryDto>)summary, ResultsTtl);
@@ -356,6 +354,11 @@ public class ResultRepository : IResultRepository
         var clubCount = await query.Where(r => !r.Club.IsPseudo)
             .Select(r => r.ClubId).Distinct().CountAsync();
 
+        // Наградной ли протокол: у ненаградных места в протоколе есть, а медалей нет —
+        // клиент по этому флагу прячет медальные блоки Overview (см. CompetitionOverviewDto).
+        // Any, а не All: если у многодневного события наградной хотя бы один день, медали есть.
+        var hasAwards = await query.AnyAsync(r => r.Competition.IsAward);
+
         // Лучший заплыв — максимум FINA-очков; тай-брейк по времени, затем Id (стабильность).
         // ♂/♀ (design_handoff вариант 4) — та же проекция с фильтром по полу.
         static IQueryable<OverviewBestSwimDto> BestSwimProjection(IQueryable<Domain.Entities.ResultRecord> q) =>
@@ -376,6 +379,7 @@ public class ResultRepository : IResultRepository
                  Distance = r.Distance,
                  Gender = r.Gender,
                  Time = r.TimeOriginal,
+                 SuspectReason = r.SuspectReason,
                  Points = r.InternationalPoints,
                  IsRelay = r.RelayId != null,
                  RelayTeamName = r.Relay != null ? r.Relay.TeamName : null,
@@ -404,9 +408,11 @@ public class ResultRepository : IResultRepository
                 r.Swimmer.LastNameEn,
                 Club = r.Club.Name,
                 r.Gender,
+                // Prelim: протокольное место не медаль (ранжир сессии); объединённое место,
+                // если оно лежит на prelim-строке (лучший заплыв был утром), остаётся.
                 Position = filter.Combined && r.Competition.ShowCombineAllResults
-                    ? (r.CombinedPlace ?? r.Position)
-                    : r.Position
+                    ? (r.CombinedPlace ?? (r.HeatType == "prelim" ? null : r.Position))
+                    : (r.HeatType == "prelim" ? null : r.Position)
             })
             .Where(r => r.Position != null && r.Position <= 3)
             .ToListAsync())
@@ -425,8 +431,8 @@ public class ResultRepository : IResultRepository
                 r.RelayId,
                 Club = r.Club.Name,
                 Position = filter.Combined && r.Competition.ShowCombineAllResults
-                    ? (r.CombinedPlace ?? r.Position)
-                    : r.Position
+                    ? (r.CombinedPlace ?? (r.HeatType == "prelim" ? null : r.Position))
+                    : (r.HeatType == "prelim" ? null : r.Position)
             })
             .Where(r => r.Position != null && r.Position <= 3)
             .Join(_db.RelayMembers.AsNoTracking(),
@@ -548,7 +554,8 @@ public class ResultRepository : IResultRepository
                 StyleName = r.Style.Name,
                 r.Distance,
                 PoolType = r.Competition.PoolType,
-                r.TimeMillisecond
+                r.TimeMillisecond,
+                r.HeatType
             })
             .ToListAsync();
 
@@ -685,8 +692,14 @@ public class ResultRepository : IResultRepository
                     IsRelay: false,
                     TimeFail: false,
                     Record: RecordStatusOf(r.Year - r.BirthYear, r.Gender, r.PoolType, r.StyleName,
-                        r.Distance, r.AgeGroup, r.IsMasters, r.TimeMillisecond)))
+                        r.Distance, r.AgeGroup, r.IsMasters, r.TimeMillisecond),
+                    HeatType: r.HeatType))
                 .ToList());
+
+            // «Только финалы» невыполнимо, лишь пока признака заплыва нет НИ У ОДНОЙ строки
+            // (данные импортированы до HeatType). Есть хоть одна — расчёт честный, сноска
+            // «по всем заплывам» на клиенте не нужна.
+            var finalsOnlyUnavailable = hpRule.FinalsOnly && hpRows.All(r => r.HeatType == null);
 
             highPointAwards = ruleWinners
                 .Select(w =>
@@ -709,7 +722,7 @@ public class ResultRepository : IResultRepository
                         IsTie = w.IsTie,
                         RuleVersion = hpRule.Version,
                         GroupLabel = hpRule.GroupBy == "age" ? null : w.Bucket,
-                        FinalsOnlyUnavailable = hpRule.FinalsOnly
+                        FinalsOnlyUnavailable = finalsOnlyUnavailable
                     };
                 })
                 .OrderBy(a => a.AgeGroup.Length > 0 ? AgeGroupLow(a.AgeGroup) : a.Age)
@@ -721,6 +734,65 @@ public class ResultRepository : IResultRepository
         // по полу — тот же расчёт с Gender-фильтром. Значения в Results.Gender —
         // "male"/"female" (плюс "none"), НЕ "M"/"F" (это формат Swimmer.Gender).
         var topClubs = (await GetClubSummaryAsync(filter)).Take(10).ToList();
+
+        // Правила, по которым посчитан этот зачёт: разрешаем ровно так же, как GetClubSummaryAsync
+        // (привязка соревнования важнее подбора по дате), и схлопываем в уникальные.
+        var ruleKeys = await query
+            .Select(r => new { r.Competition.PointRuleClubsId, r.Competition.IsMasters, r.CompetitionDate })
+            .Distinct()
+            .ToListAsync();
+
+        var allClubRules = await _db.PointRulesClubs.AsNoTracking().Include(r => r.Entries).ToListAsync();
+
+        // Итог ручной проверки показываем, только если он одинаков у всех соревнований выборки:
+        // «сверено» на одном дне и «расхождение» на другом в один бейдж не складываются.
+        var verifiedKinds = await query
+            .Select(r => r.Competition.ClubPointsVerifiedKind)
+            .Distinct()
+            .ToListAsync();
+
+        var clubPointsVerified = verifiedKinds.Count == 1 ? verifiedKinds[0] : null;
+
+        // Объяснение расхождения — только к бейджу расхождения и только если оно одно на всю
+        // выборку: два разных объяснения в одном попапе противоречили бы друг другу.
+        // У многодневки примечание записано каждому дню одинаковым, поэтому сравниваем
+        // содержимое, а не число строк.
+        CompetitionNoteDto? clubPointsMismatchNote = null;
+        if (clubPointsVerified == PointsVerifiedKinds.Mismatch)
+        {
+            var competitionIds = await query.Select(r => r.CompetitionId).Distinct().ToListAsync();
+            var notes = await _db.CompetitionNotes.AsNoTracking()
+                .Include(n => n.Texts)
+                .Where(n => competitionIds.Contains(n.CompetitionId)
+                         && n.Kind == CompetitionNoteKinds.ClubPointsMismatch)
+                .ToListAsync();
+
+            var dtos = notes.Select(PointRulesAdminRepository.ToDto).ToList();
+            if (dtos.Count > 0 && dtos.All(d => SameNote(d, dtos[0])))
+                clubPointsMismatchNote = dtos[0];
+        }
+
+        var appliedRules = ruleKeys
+            .Select(k => CompetitionRuleResolver.Resolve(
+                allClubRules, k.PointRuleClubsId, k.IsMasters, DateOnly.FromDateTime(k.CompetitionDate)))
+            .OfType<PointRuleClubs>()
+            .DistinctBy(r => r.Id)
+            .OrderBy(r => r.Version, StringComparer.Ordinal)
+            .Select(r => new OverviewPointsRuleDto
+            {
+                Version = r.Version,
+                Description = r.Description,
+                Scope = r.Scope,
+                EffectiveFrom = r.EffectiveFrom.ToString("yyyy-MM-dd"),
+                DefaultPoints = r.DefaultPoints,
+                MaxScoringPlace = r.MaxScoringPlace,
+                RelayMultiplier = r.RelayMultiplier,
+                PointsByPlace = r.Entries
+                    .OrderBy(e => e.Place)
+                    .Select(e => new OverviewPointsRuleEntryDto { Place = e.Place, Points = e.Points })
+                    .ToList()
+            })
+            .ToList();
         var topClubsMen = (await GetClubSummaryAsync(CloneWithGender(filter, "male"))).Take(3).ToList();
         var topClubsWomen = (await GetClubSummaryAsync(CloneWithGender(filter, "female"))).Take(3).ToList();
 
@@ -752,11 +824,15 @@ public class ResultRepository : IResultRepository
                 SwimmerCount = swimmerCount,
                 ClubCount = clubCount
             },
+            HasAwards = hasAwards,
             Days = days,
             BestSwim = bestSwim,
             BestSwimMale = bestSwimMale,
             BestSwimFemale = bestSwimFemale,
             TopClubs = topClubs,
+            ClubPointsRules = appliedRules,
+            ClubPointsVerified = clubPointsVerified,
+            ClubPointsMismatchNote = clubPointsMismatchNote,
             TopClubsMen = topClubsMen,
             TopClubsWomen = topClubsWomen,
             TopMedalists = topMedalists,
@@ -859,6 +935,7 @@ public class ResultRepository : IResultRepository
                 .ToArrayAsync(),
 
             "club" => await _db.Clubs
+                .Where(c => c.MergedIntoId == null)   // склеенные в подсказки фильтра не идут
                 .Where(c => prefix.Length == 0 || c.Name.StartsWith(prefix) || c.NameEn.StartsWith(prefix))
                 .Select(c => c.Name)
                 .Where(n => n.Length > 0)
@@ -963,8 +1040,9 @@ public class ResultRepository : IResultRepository
 
         // Категория для селектора — из РЕАЛЬНОГО членства (CategoryCompetitions, те же
         // чекбоксы, что в админке), а не эвристики по возрасту: соревнование может быть
-        // в нескольких категориях сразу, поэтому приоритет
-        // masters > youth-team (Kids) > junior-results (Youth) > main (Juniors/בוגרים).
+        // в нескольких категориях сразу, поэтому приоритет от младшей ступени к старшей:
+        // masters > kids-team (Kids) > youth-team (Young) > junior-results (Juniors) >
+        // main (Adults/בוגרים).
         var categoryKeysByCompetition = await _db.CategoryCompetitions.AsNoTracking()
             .Select(cc => new { cc.CompetitionId, cc.Category.Key })
             .ToListAsync();
@@ -990,13 +1068,14 @@ public class ResultRepository : IResultRepository
         // result-maccabiah или вовсе без категории): клиент покажет его в «All» и в табах
         // кастомных категорий по списку Categories, но НЕ в Junior. Раньше здесь был
         // фоллбек «всё прочее = junior», из-за которого в Junior падала вся синтетика.
-        // Канонические ключи табов исторические и с подписями НЕ совпадают (ступени
-        // переименованы 2026-07-28): young8_11 = «Kids», junior = «Youth», adults = «Juniors».
-        // Ключи в URL (?category=) и в закладках, поэтому не переименовывались.
+        // Ключи табов соответствуют ступеням (2026-07-31): kids8_11 = «Kids» (8–11),
+        // young11_14 = «Young» (11–14), juniors = «Juniors» (נוער), adults = «Adults» (בוגרים).
+        // Старые ключи (young8_11, junior) уводятся алиасами в results-categories.ts.
         static string? CategoryFor(bool isMasters, HashSet<string>? keys) =>
             isMasters || keys?.Contains("results-masters") == true ? "masters"
-            : keys?.Contains("results-youth-team") == true ? "young8_11"
-            : keys?.Contains("results-junior-results") == true ? "junior"
+            : keys?.Contains("results-kids-team") == true ? "kids8_11"
+            : keys?.Contains("results-youth-team") == true ? "young11_14"
+            : keys?.Contains("results-junior-results") == true ? "juniors"
             : keys?.Contains("results-main") == true ? "adults"
             : null;
 
@@ -1100,34 +1179,12 @@ public class ResultRepository : IResultRepository
             return cached;
 
         // Клиент передаёт полное имя ("First Last"); матчим оба порядка + EN-вариант.
-        var rows = await _db.Results.AsNoTracking()
+        var rows = await ProjectCareerRows(_db.Results.AsNoTracking()
             .Where(r => r.RelayId == null && (
                 r.Swimmer.FirstName + " " + r.Swimmer.LastName == name ||
                 r.Swimmer.LastName + " " + r.Swimmer.FirstName == name ||
                 r.Swimmer.FirstNameEn + " " + r.Swimmer.LastNameEn == name ||
-                r.Swimmer.LastNameEn + " " + r.Swimmer.FirstNameEn == name))
-            .Select(r => new
-            {
-                r.CompetitionId,
-                EventId = (int?)r.Competition.EventId,
-                r.CompetitionDate,
-                r.Position,
-                r.InternationalPoints,
-                r.TimeMillisecond,
-                r.TimeOriginal,
-                r.TimeFail,
-                StyleName = r.Style.Name,
-                r.Distance,
-                Pool = r.Competition.PoolType,
-                CompetitionName = r.Competition.Name,
-                DateRaw = r.Competition.Date,
-                r.Gender,
-                r.EventStyleAge,
-                r.AgeGroup,
-                IsMasters = r.Competition.IsMasters,
-                IsAward = r.Competition.IsAward
-            })
-            .ToListAsync();
+                r.Swimmer.LastNameEn + " " + r.Swimmer.FirstNameEn == name)));
 
         // Эстафеты: в БД одна строка Result на команду, привязана к ОДНОМУ "первому" пловцу
         // (SwimmerId), остальные участники — только строкой Relay.SwimmersName ("Имя Фамилия, …").
@@ -1143,12 +1200,13 @@ public class ResultRepository : IResultRepository
                 {
                     r.CompetitionId,
                     EventId = (int?)r.Competition.EventId,
-                    r.Position,
+                    Position = r.HeatType == "prelim" ? null : r.Position,
                     r.Relay!.SwimmersName,
                     StyleName = r.Style.Name,
                     r.Distance,
                     CompetitionName = r.Competition.Name,
-                    DateRaw = r.Competition.Date
+                    DateRaw = r.Competition.Date,
+                    IsAward = r.Competition.IsAward
                 })
                 .ToListAsync())
                 // Грубый фильтр по вхождению имени — на клиенте (EF InMemory-провайдер в тестах
@@ -1167,10 +1225,116 @@ public class ResultRepository : IResultRepository
 
         var relayMedals = relayCandidates
             .Where(r => (r.SwimmersName ?? "").Split(',').Any(seg => SegmentMatchesName(seg, name)))
+            .Select(r => new CareerRelayRow(
+                r.CompetitionId, r.EventId, r.Position, r.StyleName, r.Distance,
+                r.CompetitionName, r.DateRaw, r.IsAward))
             .ToList();
 
         if (rows.Count == 0 && relayMedals.Count == 0) return null;
 
+        return await BuildCareerAsync(key, rows, relayMedals);
+    }
+
+    /// <summary>
+    /// Карьера по ИДЕНТИЧНОСТИ пловца (этап A1 страницы спортсмена). Именной вариант выше
+    /// оставлен алиасом для попапа-карточки, но правда здесь: имена не уникальны и совпадают
+    /// у разных людей, а страница адресуется по id.
+    ///
+    /// Эстафеты берутся из <c>RelayMembers</c> (структурная связь), а не разбором строки
+    /// <c>Relay.SwimmersName</c>: в именном варианте это единственный доступный способ, здесь —
+    /// лишний источник ошибок (обрезанные фамилии, тёзки, см. docs/relays.md).
+    /// </summary>
+    public async Task<AthleteCareerDto?> GetAthleteCareerByIdAsync(int swimmerId)
+    {
+        if (swimmerId <= 0) return null;
+
+        var key = $"athlete-career-id:{swimmerId}";
+        var cached = await _cache.GetAsync<AthleteCareerDto>(key);
+        if (cached is not null) return cached;
+
+        var rows = await ProjectCareerRows(_db.Results.AsNoTracking()
+            .Where(r => r.SwimmerId == swimmerId && r.RelayId == null));
+
+        var relayIds = await _db.RelayMembers.AsNoTracking()
+            .Where(m => m.SwimmerId == swimmerId)
+            .Select(m => m.RelayId)
+            .Distinct()
+            .ToListAsync();
+
+        // Строка эстафеты, привязанная к самому пловцу как к «первой ноге», может не иметь
+        // записи в RelayMembers у старых импортов — берём и её, дальше дедуп по CompetitionId.
+        var relayMedals = (await _db.Results.AsNoTracking()
+            .Where(r => r.RelayId != null
+                        && (relayIds.Contains(r.RelayId!.Value) || r.SwimmerId == swimmerId))
+            .Select(r => new
+            {
+                r.Id,
+                r.CompetitionId,
+                EventId = (int?)r.Competition.EventId,
+                Position = r.HeatType == "prelim" ? null : r.Position,
+                StyleName = r.Style.Name,
+                r.Distance,
+                CompetitionName = r.Competition.Name,
+                DateRaw = r.Competition.Date,
+                IsAward = r.Competition.IsAward
+            })
+            .ToListAsync())
+            .GroupBy(r => r.Id)
+            .Select(g => g.First())
+            .Select(r => new CareerRelayRow(
+                r.CompetitionId, r.EventId, r.Position, r.StyleName, r.Distance,
+                r.CompetitionName, r.DateRaw, r.IsAward))
+            .ToList();
+
+        if (rows.Count == 0 && relayMedals.Count == 0) return null;
+
+        return await BuildCareerAsync(key, rows, relayMedals);
+    }
+
+    /// <summary>Личный заплыв карьеры — общая форма для именного и id-пути.</summary>
+    private sealed record CareerSwimRow(
+        int CompetitionId, int? EventId, DateTime CompetitionDate, int? Position,
+        int InternationalPoints, int? TimeMillisecond, string TimeOriginal, bool TimeFail,
+        string? SuspectReason, string StyleName, string Distance, string Pool,
+        string CompetitionName, string DateRaw, string Gender, string EventStyleAge,
+        string AgeGroup, bool IsMasters, bool IsAward, string? HeatType = null);
+
+    /// <summary>Эстафета карьеры: из неё берутся только медали и факт участия в соревновании.</summary>
+    private sealed record CareerRelayRow(
+        int CompetitionId, int? EventId, int? Position, string StyleName, string Distance,
+        string CompetitionName, string DateRaw, bool IsAward);
+
+    private static async Task<List<CareerSwimRow>> ProjectCareerRows(IQueryable<ResultRecord> q) =>
+        await q.Select(r => new CareerSwimRow(
+                r.CompetitionId,
+                r.Competition.EventId,
+                r.CompetitionDate,
+                r.Position,
+                r.InternationalPoints,
+                r.TimeMillisecond,
+                r.TimeOriginal,
+                r.TimeFail,
+                r.SuspectReason,
+                r.Style.Name,
+                r.Distance,
+                r.Competition.PoolType,
+                r.Competition.Name,
+                r.Competition.Date,
+                r.Gender,
+                r.EventStyleAge,
+                r.AgeGroup,
+                r.Competition.IsMasters,
+                r.Competition.IsAward,
+                r.HeatType))
+            .ToListAsync();
+
+    /// <summary>
+    /// Сборка карьерного DTO — одна на оба пути поиска. Разъехаться этим двум расчётам нельзя:
+    /// карточка-попап и страница показывали бы разные цифры про одного человека.
+    /// </summary>
+    private async Task<AthleteCareerDto> BuildCareerAsync(
+        string cacheKey, List<CareerSwimRow> rows, List<CareerRelayRow> relayMedals)
+    {
         // Лучшее время на (стиль × дистанция) — только валидные времена.
         var bestByStyle = rows
             .Where(r => r.TimeMillisecond != null && !r.TimeFail)
@@ -1182,6 +1346,7 @@ public class ResultRepository : IResultRepository
                 Stroke = r.StyleName,
                 Distance = r.Distance,
                 Time = r.TimeOriginal,
+                SuspectReason = r.SuspectReason,
                 Points = r.InternationalPoints,
                 Pool = r.Pool,
                 Competition = r.CompetitionName,
@@ -1195,8 +1360,17 @@ public class ResultRepository : IResultRepository
             })
             .ToList();
 
+        // ⚠ Медаль засчитывается ТОЛЬКО там, где её вручали (Competition.IsAward). На лигах
+        // мест призёров нет, и таблица результатов там медаль не рисует — карточка не должна
+        // считать иначе (найдено 2026-08-13 при сверке страницы спортсмена: первое место на
+        // «ליגה רבתי 3» шло в золото карьеры, хотя медали на этом старте не вручались).
+        // Prelim-заплывы в медали не идут: их место — ранжир сессии (у эстафет prelim-места
+        // обнулены ещё в проекции).
+        var awardedRows = rows.Where(r => r.IsAward && r.HeatType != "prelim").ToList();
+        var awardedRelays = relayMedals.Where(r => r.IsAward).ToList();
+
         // Разбивка медалей по конкретным заплывам — для тултипа "за что" на карточке.
-        var medals = rows
+        var medals = awardedRows
             .Where(r => r.Position is 1 or 2 or 3)
             .Select(r => new MedalDetailDto
             {
@@ -1205,7 +1379,7 @@ public class ResultRepository : IResultRepository
                 Competition = r.CompetitionName,
                 Date = r.DateRaw
             })
-            .Concat(relayMedals
+            .Concat(awardedRelays
                 .Where(r => r.Position is 1 or 2 or 3)
                 .Select(r => new MedalDetailDto
                 {
@@ -1230,14 +1404,14 @@ public class ResultRepository : IResultRepository
             TotalPoints = rows.Sum(r => r.InternationalPoints),
             // Медали за эстафету (relayMedals) считаются к общему итогу — командная награда
             // так же личная, как индивидуальная (see [[athlete-alltime-card]]).
-            Gold = rows.Count(r => r.Position == 1) + relayMedals.Count(r => r.Position == 1),
-            Silver = rows.Count(r => r.Position == 2) + relayMedals.Count(r => r.Position == 2),
-            Bronze = rows.Count(r => r.Position == 3) + relayMedals.Count(r => r.Position == 3),
+            Gold = awardedRows.Count(r => r.Position == 1) + awardedRelays.Count(r => r.Position == 1),
+            Silver = awardedRows.Count(r => r.Position == 2) + awardedRelays.Count(r => r.Position == 2),
+            Bronze = awardedRows.Count(r => r.Position == 3) + awardedRelays.Count(r => r.Position == 3),
             BestByStyle = bestByStyle,
             Medals = medals
         };
 
-        await _cache.SetAsync(key, dto, TimeSpan.FromMinutes(5));
+        await _cache.SetAsync(cacheKey, dto, TimeSpan.FromMinutes(5));
         return dto;
     }
 
@@ -1314,8 +1488,10 @@ public class ResultRepository : IResultRepository
             var date = ParseCompetitionDate(item.Date);
             var rule = CompetitionRuleResolver.Resolve(rules, item.PointRuleClubsId, item.IsMasters, date);
 
+            // Место prelim-заплыва очков не приносит (ранжир сессии, не награда); само
+            // Position в DTO остаётся — клиент показывает место в заплыве как в протоколе.
             item.ClubPoints = PointRulesClubsScoring.RelayPointsFor(
-                rule, item.Position, item.TimeFail, item.IsRelay);
+                rule, item.HeatType == "prelim" ? null : item.Position, item.TimeFail, item.IsRelay);
 
             // Объединённые очки есть только там, где есть объединённое место: тоггл на клиенте
             // переключает поле, а не запускает пересчёт.
@@ -1328,6 +1504,13 @@ public class ResultRepository : IResultRepository
 
     /// <summary>Дата соревнования из DTO (dd/MM/yyyy). Неразобранная — сегодня: правило по дате
     /// не подберётся «из прошлого», а привязка по Id всё равно важнее.</summary>
+    /// <summary>Одинаковы ли примечания дней события: сравниваем то, что увидит читатель.</summary>
+    private static bool SameNote(CompetitionNoteDto a, CompetitionNoteDto b) =>
+        a.Texts.Count == b.Texts.Count
+        && a.Texts.All(t => b.Texts.TryGetValue(t.Key, out var other) && other == t.Value)
+        && a.ScaleDiff.Count == b.ScaleDiff.Count
+        && a.ScaleDiff.Zip(b.ScaleDiff).All(p => p.First == p.Second);
+
     private static DateOnly ParseCompetitionDate(string? date) =>
         DateOnly.TryParseExact(date, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)
             ? d

@@ -13,6 +13,11 @@ public sealed class CategoryDto
     [JsonPropertyName("name")]
     public string Name { get; init; } = string.Empty;
 
+    /// <summary>Название на иврите (ילדים / צעירים / נוער / בוגרים). Клиент его пока не
+    /// показывает — UI английский; отдаём, чтобы перевод был доступен без правки API.</summary>
+    [JsonPropertyName("name_he")]
+    public string? NameHe { get; init; }
+
     /// <summary>Короткая метка бейджа (буква/эмодзи, напр. «J» для Junior). null — бейджа нет.</summary>
     [JsonPropertyName("badge")]
     public string? Badge { get; init; }
@@ -31,6 +36,10 @@ public sealed class CategoryDetailDto
 
     [JsonPropertyName("name")]
     public string Name { get; init; } = string.Empty;
+
+    /// <summary>Название на иврите; см. <see cref="CategoryDto.NameHe"/>.</summary>
+    [JsonPropertyName("name_he")]
+    public string? NameHe { get; init; }
 
     /// <summary>Короткая метка бейджа (буква/эмодзи, напр. «J» для Junior). null — бейджа нет.</summary>
     [JsonPropertyName("badge")]

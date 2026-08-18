@@ -453,7 +453,7 @@ public class ResultRepositoryTests
         Assert.Equal(1, alpha.Gold);
         Assert.Equal(1, alpha.Silver);
         Assert.Equal(0, alpha.Bronze);
-        Assert.Equal(2, alpha.SwimmerCount);   // s1 и s2 (по фамилиям)
+        Assert.Equal(2, alpha.SwimmerCount);   // s1 и s2 (уникальные SwimmerId)
         Assert.Equal(2, alpha.SuccessfulCount); // только заплывы с очками > 0
 
         var beta = summary[1];
@@ -545,6 +545,95 @@ public class ResultRepositoryTests
         // Нога-не-владелец обязана присутствовать — по ней клиент матчит эстафету.
         Assert.Contains(leg2.Id, row.MemberSwimmerIds!);
         Assert.Contains(owner.Id, row.MemberSwimmerIds!);
+    }
+
+    [Fact]
+    public async Task GetClubSummary_NamesakesCountAsSeparateSwimmers()
+    {
+        // Регресс: пловцы клуба считались по уникальной ФАМИЛИИ, и однофамильцы схлопывались
+        // в одного. На event 7 מכבי חיפה показывал 67 пловцов вместо 72, Дольфин — 52 вместо 53.
+        await using var db = CreateDb(nameof(GetClubSummary_NamesakesCountAsSeparateSwimmers));
+        var style = new Style { Name = "freestyle" };
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var comp = new Competition
+        {
+            Name = "Meet", Country = new Country { CountryCode = "ISR", CountryName = "ISR" },
+            Date = "01/01/2024", PoolType = "50m", IsMasters = false
+        };
+        // Одна фамилия, разные люди — типичная картина в реальных протоколах (братья/сёстры).
+        var s1 = new Swimmer { LastName = "Cohen", FirstName = "Dan", LastNameEn = "Cohen", FirstNameEn = "Dan", BirthYear = 2010 };
+        var s2 = new Swimmer { LastName = "Cohen", FirstName = "Noa", LastNameEn = "Cohen", FirstNameEn = "Noa", BirthYear = 2012 };
+        db.AddRange(style, club, comp, s1, s2);
+        db.PointRulesClubs.Add(new PointRuleClubs
+        {
+            Version = "test", Scope = "all", EffectiveFrom = new DateOnly(2000, 1, 1), DefaultPoints = 0,
+            Entries = [new PointRuleClubsEntry { Place = 1, Points = 30 }]
+        });
+        await db.SaveChangesAsync();
+
+        var date = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        ResultRecord Row(int swimmer, int? pos) => new()
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer, ClubId = club.Id, StyleId = style.Id,
+            Distance = "100", Gender = "male", CompetitionDate = date, TimeOriginal = "1:00.00",
+            AgeGroup = "Open", EventStyleAge = "100 freestyle Open", Position = pos
+        };
+        db.Results.AddRange(Row(s1.Id, 1), Row(s2.Id, 7));
+        await db.SaveChangesAsync();
+        var repo = new ResultRepository(db, NoCache());
+
+        var summary = await repo.GetClubSummaryAsync(new ResultFilter { CompetitionId = comp.Id });
+
+        var alpha = Assert.Single(summary);
+        Assert.Equal(2, alpha.SwimmerCount);
+        // SuccessfulCount — только очковые заплывы: 7-е место вне шкалы правила очков не даёт.
+        Assert.Equal(1, alpha.SuccessfulCount);
+    }
+
+    [Fact]
+    public async Task GetClubSummary_Combined_CountsOnlyScoringSwims()
+    {
+        // Подпись карточки Top clubs — «scoring swims», и это не синоним «заплывов клуба»:
+        // с Combine All Results место берётся из объединённого зачёта дисциплины, и заплыв,
+        // призовой внутри своей полосы, из шкалы очков выпадает.
+        await using var db = CreateDb(nameof(GetClubSummary_Combined_CountsOnlyScoringSwims));
+        var style = new Style { Name = "freestyle" };
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var comp = new Competition
+        {
+            Name = "Meet", Country = new Country { CountryCode = "ISR", CountryName = "ISR" },
+            Date = "01/01/2024", PoolType = "50m", IsMasters = false, ShowCombineAllResults = true
+        };
+        var s1 = new Swimmer { LastName = "Aaa", FirstName = "A", LastNameEn = "Aaa", FirstNameEn = "A", BirthYear = 2010 };
+        var s2 = new Swimmer { LastName = "Bbb", FirstName = "B", LastNameEn = "Bbb", FirstNameEn = "B", BirthYear = 2012 };
+        db.AddRange(style, club, comp, s1, s2);
+        db.PointRulesClubs.Add(new PointRuleClubs
+        {
+            Version = "test", Scope = "all", EffectiveFrom = new DateOnly(2000, 1, 1), DefaultPoints = 0,
+            Entries = [new PointRuleClubsEntry { Place = 1, Points = 30 }, new PointRuleClubsEntry { Place = 2, Points = 28 }]
+        });
+        await db.SaveChangesAsync();
+
+        var date = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        ResultRecord Row(int swimmer, int? pos, int? combined) => new()
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer, ClubId = club.Id, StyleId = style.Id,
+            Distance = "100", Gender = "male", CompetitionDate = date, TimeOriginal = "1:00.00",
+            AgeGroup = "Open", EventStyleAge = "100 freestyle Open", Position = pos, CombinedPlace = combined
+        };
+        // Оба — первые в своей возрастной полосе, но в общем зачёте дисциплины 1-й и 9-й.
+        db.Results.AddRange(Row(s1.Id, 1, 1), Row(s2.Id, 1, 9));
+        await db.SaveChangesAsync();
+        var repo = new ResultRepository(db, NoCache());
+
+        var plain = Assert.Single(await repo.GetClubSummaryAsync(new ResultFilter { CompetitionId = comp.Id }));
+        var combined = Assert.Single(await repo.GetClubSummaryAsync(new ResultFilter { CompetitionId = comp.Id, Combined = true }));
+
+        Assert.Equal(2, plain.SuccessfulCount);
+        Assert.Equal(1, combined.SuccessfulCount);
+        // Пловцы от тоггла не зависят — считаются по всем строкам клуба, места ни при чём.
+        Assert.Equal(2, plain.SwimmerCount);
+        Assert.Equal(2, combined.SwimmerCount);
     }
 
     [Fact]
@@ -646,6 +735,28 @@ public class ResultRepositoryTests
         Assert.Equal(2, overview.Summary.DayCount);
         Assert.Equal(4, overview.Summary.SwimmerCount);  // s1,s2,s4,s5 — эстафетный s3 не в счёте
         Assert.Equal(2, overview.Summary.ClubCount);      // Alpha, Beta — псевдоклуб не в счёте
+    }
+
+    [Fact]
+    public async Task Overview_HasAwards_TrueIfAnyDayIsAward()
+    {
+        // Флаг решает, показывать ли на клиенте медальные блоки Overview (Most decorated,
+        // медали в клубном зачёте, High Point). Any, а не All: наградной день в событии
+        // означает, что медали в событии есть.
+        await using var db = CreateDb(nameof(Overview_HasAwards_TrueIfAnyDayIsAward));
+        var eventId = await SeedOverviewFixtureAsync(db);
+        var repo = new ResultRepository(db, NoCache());
+
+        // Фикстура сеет оба дня ненаградными (IsAward по умолчанию false).
+        var plain = await repo.GetCompetitionOverviewAsync(new ResultFilter { EventId = eventId });
+        Assert.False(plain.HasAwards);
+
+        var day2 = await db.Competitions.OrderByDescending(c => c.DayNumber).FirstAsync();
+        day2.IsAward = true;
+        await db.SaveChangesAsync();
+
+        var awarded = await repo.GetCompetitionOverviewAsync(new ResultFilter { EventId = eventId });
+        Assert.True(awarded.HasAwards);
     }
 
     [Fact]

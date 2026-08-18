@@ -6,6 +6,7 @@ using Swimm.Application.Abstractions;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Repositories;
 using Swimm.Infrastructure.Services;
+using Swimm.Infrastructure.Services.DataChecks;
 
 namespace Swimm.Infrastructure;
 
@@ -62,6 +63,9 @@ public static class DependencyInjection
         services.AddScoped<IResultAdminRepository, ResultAdminRepository>();
         services.AddScoped<IResultTransferService, ResultTransferService>();
         services.AddScoped<IClubAdminRepository, ClubAdminRepository>();
+        services.AddScoped<IClubPublicRepository, ClubPublicRepository>();
+        services.AddScoped<IClubOverviewRepository, ClubOverviewRepository>();
+        services.AddScoped<ISwimmerPageRepository, SwimmerPageRepository>();
         services.AddScoped<IUserFavoriteRepository, UserFavoriteRepository>();
         services.AddScoped<IUserMediaRepository, UserMediaRepository>();
         services.AddScoped<IMySwimsRepository, MySwimsRepository>();
@@ -74,7 +78,31 @@ public static class DependencyInjection
         services.AddScoped<IHubGroupUserService, HubGroupUserService>();
         services.AddScoped<IHubGroupClubRequestAdminService, HubGroupClubRequestAdminService>();
         services.AddScoped<IClubPointsRepository, ClubPointsRepository>();
+        services.AddScoped<IClubStandingService, ClubStandingService>();
         services.AddScoped<ICompetitionRecalculationService, CompetitionRecalculationService>();
+        services.AddScoped<IImportAuditService, ImportAuditService>();
+        services.AddScoped<IImportRecordPreviewService, ImportRecordPreviewService>();
+
+        // Реестр проверок данных (Д3, docs/data-integrity.md). Проверки регистрируются как
+        // IDataCheck — добавить новую значит добавить строку сюда, ничего больше не трогая.
+        services.AddScoped<IDataCheckRunner, DataCheckRunner>();
+        services.AddScoped<IDataCheck, ExactDuplicateCheck>();
+        services.AddScoped<IDataCheck, UpsertKeyCollisionCheck>();
+        services.AddScoped<IDataCheck, RelayGenderFromLegCheck>();
+        services.AddScoped<IDataCheck, DuplicateEventDayCheck>();
+        services.AddScoped<IDataCheck, EmptyCompetitionCheck>();
+        services.AddScoped<IDataCheck, RelayDistanceWithoutRelayCheck>();
+        services.AddScoped<IDataCheck, FkAnomalyCheck>();
+        services.AddScoped<IDataCheck, ReconciliationMismatchCheck>();
+        services.AddScoped<IDataCheck, NoGenderCheck>();
+        services.AddScoped<IDataCheck, EmptyRelayCheck>();
+        services.AddScoped<IDataCheck, SwimmerDedupCheck>();
+        services.AddScoped<IDataCheck, ClubDedupCheck>();
+        services.AddScoped<IDataCheck, SwimmerOrphanCheck>();
+        services.AddScoped<IDataCheck, EmptyClubCheck>();
+        services.AddScoped<IDataCheck, MergedClubStillUsedCheck>();
+        services.AddScoped<IDataCheck, SwimmerTwoClubsInCompetitionCheck>();
+        services.AddScoped<IDataCheck, CompetitionWithoutClubPointRuleCheck>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
 
         // Локальный вход (email + пароль)
@@ -150,6 +178,7 @@ public static class DependencyInjection
             });
         services.AddScoped<ILogligClient, LogligClient>();
         services.AddScoped<ILogligMatchService, LogligMatchService>();
+        services.AddScoped<IOfficialClubStandingService, OfficialClubStandingService>();
 
         // Поиск кандидатов Loglig ID (шаг 4): serper.dev вместо закрытого Google CSE. Graceful —
         // пустой CandidateSearch:ApiKey отключает поиск (см. SerperCandidateSearchProvider).
@@ -163,6 +192,7 @@ public static class DependencyInjection
         services.AddScoped<ILogligSuggestionService, LogligSuggestionService>();
 
         // Сводка «Статус данных» для дашборда /Admin (docs/plans/admin-dashboard-status-cards-plan.md)
+        services.AddScoped<IRecordQualityService, RecordQualityService>();
         services.AddScoped<IDashboardStatusService, DashboardStatusService>();
 
         // Здоровье ссылок UserMedia (фаза 7.5): on-demand проверка живости по кнопке /Admin/Media.

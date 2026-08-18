@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
@@ -41,11 +41,17 @@ public class DataQualityService(SwimmDbContext db) : IDataQualityService
     {
         IQueryable<Club> q = filter switch
         {
+            // Склеенные клубы пусты по определению — в «дырах данных» им не место.
             "no-swimmers" => db.Clubs.AsNoTracking()
-                .Where(c => !c.IsPseudo && !c.Name.StartsWith("SYNTH"))
+                .Where(c => !c.IsPseudo && !c.Name.StartsWith("SYNTH") && c.MergedIntoId == null)
+                // Приёмник склейки без своих результатов формально пуст, но удалить его нельзя
+                // (в него склеены другие) — он висел бы в списке вечно как невыполнимая задача.
+                // Предсказано в docs/admin-pages/clubs.md, случилось 2026-08-03 с двумя клубами.
+                .Where(c => !db.Clubs.Any(x => x.MergedIntoId == c.Id))
                 .Where(c => !db.Swimmers.Any(s => s.ClubId == c.Id))
                 .Where(c => !db.Results.Any(r => r.ClubId == c.Id)),
-            "no-country" => db.Clubs.AsNoTracking().Where(c => c.CountryId == null && !c.IsPseudo),
+            "no-country" => db.Clubs.AsNoTracking()
+                .Where(c => c.CountryId == null && !c.IsPseudo && c.MergedIntoId == null),
             _ => db.Clubs.AsNoTracking().Where(_ => false)
         };
 
@@ -79,9 +85,71 @@ public class DataQualityService(SwimmDbContext db) : IDataQualityService
                 db.Results.Where(res => res.RelayId == r.Id).Select(res => res.CompetitionId).FirstOrDefault()))
             .ToListAsync(ct);
 
+        // Без пола: шапка протокола пола не давала (смешанный заплыв), и у пловца его тоже
+        // нет. Эстафеты не в счёт — там пол команды и так не всегда определён.
+        var noGenderQuery = db.Results.AsNoTracking()
+            .Where(r => r.RelayId == null && (r.Gender == "" || r.Gender == "none"));
+
+        var noGenderTotal = await noGenderQuery.CountAsync(ct);
+        var noGenderItems = await noGenderQuery.OrderBy(r => r.Id).Take(Cap)
+            .Select(r => new ResultNoGenderRowDto(
+                r.Id, r.SwimmerId,
+                r.Swimmer != null ? (r.Swimmer.LastName + " " + r.Swimmer.FirstName).Trim() : "",
+                r.CompetitionId,
+                r.Competition != null ? r.Competition.Name : "",
+                r.Distance,
+                r.Style != null ? r.Style.Name : ""))
+            .ToListAsync(ct);
+
+        // И10: точный дубликат — совпадает всё, включая заплыв, дорожку и время. Одну дорожку
+        // в одном заплыве занимает один пловец один раз, поэтому такое всегда след импорта
+        // (найдено 2026-08-03: 5 строк, инцидент И-7). Повтор дисциплины с РАЗНЫМ временем —
+        // законен (предварительные/финал, перезаплыв) и сюда не попадает; его отдельно метит
+        // правило duplicate_swim в проверке качества.
+        var dupGroups = db.Results.AsNoTracking()
+            .GroupBy(r => new
+            {
+                r.CompetitionId, r.SwimmerId, r.StyleId, r.Distance,
+                r.Heat, r.Lane, r.TimeOriginal, IsRelay = r.RelayId != null
+            })
+            .Where(g => g.Count() > 1);
+
+        var dupTotal = await dupGroups.CountAsync(ct);
+        var dupKeys = await dupGroups
+            .Select(g => new { FirstId = g.Min(x => x.Id), Copies = g.Count() })
+            .OrderBy(x => x.FirstId)
+            .Take(Cap)
+            .ToListAsync(ct);
+
+        var dupIds = dupKeys.Select(k => k.FirstId).ToList();
+        var dupRows = await db.Results.AsNoTracking()
+            .Where(r => dupIds.Contains(r.Id))
+            .Select(r => new
+            {
+                r.Id,
+                r.SwimmerId,
+                SwimmerName = r.Swimmer != null ? (r.Swimmer.LastName + " " + r.Swimmer.FirstName).Trim() : "",
+                r.CompetitionId,
+                CompetitionName = r.Competition != null ? r.Competition.Name : "",
+                StyleName = r.Style != null ? r.Style.Name : "",
+                r.Distance, r.Heat, r.Lane, r.TimeOriginal
+            })
+            .ToListAsync(ct);
+
+        var copiesById = dupKeys.ToDictionary(k => k.FirstId, k => k.Copies);
+        var dupItems = dupRows
+            .OrderBy(r => r.Id)
+            .Select(r => new ResultDuplicateRowDto(
+                r.Id, copiesById.GetValueOrDefault(r.Id), r.SwimmerId, r.SwimmerName,
+                r.CompetitionId, r.CompetitionName, r.StyleName, r.Distance,
+                r.Heat, r.Lane, r.TimeOriginal))
+            .ToList();
+
         return new ResultAnomaliesDto(
             new CappedListDto<ResultFkAnomalyRowDto>(fkTotal, fkItems),
-            new CappedListDto<EmptyRelayRowDto>(relayTotal, relayItems));
+            new CappedListDto<EmptyRelayRowDto>(relayTotal, relayItems),
+            new CappedListDto<ResultNoGenderRowDto>(noGenderTotal, noGenderItems),
+            new CappedListDto<ResultDuplicateRowDto>(dupTotal, dupItems));
     }
 
     public async Task<CappedListDto<ModerationPendingRowDto>> GetModerationPendingAsync(CancellationToken ct = default)

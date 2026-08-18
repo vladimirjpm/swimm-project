@@ -1,4 +1,4 @@
-namespace Swimm.Application.Dtos;
+﻿namespace Swimm.Application.Dtos;
 
 /// <summary>Сводный статус данных для дашборда /Admin (docs/plans/admin-dashboard-health-2-plan.md):
 /// блоки пловцы/клубы/соревнования/результаты/рекорды/медиа/юзеры-группы/система. Один запрос
@@ -9,9 +9,29 @@ public sealed record DashboardStatusSummary(
     DashboardCompetitionStatus Competitions,
     DashboardResultStatus Results,
     IReadOnlyList<DashboardRecordSetStatus> RecordSets,
+    RecordQualitySummary RecordQuality,
     DashboardMediaStatus Media,
     DashboardUsersGroupsStatus UsersGroups,
-    DashboardSystemStatus System);
+    DashboardSystemStatus System,
+    DashboardChecksStatus Checks);
+
+/// <summary>
+/// Блок «Проверки данных» — сводка реестра (docs/data-integrity.md, Д3). Дашборд НЕ гоняет
+/// проверки сам: он показывает итог последнего прогона и ведёт на /Admin/Health.
+/// </summary>
+/// <param name="LastRunAt">null — реестр ни разу не гонялся; тогда нули ничего не значат
+/// и страница обязана сказать «прогонов не было», а не «всё чисто».</param>
+public sealed record DashboardChecksStatus(
+    DateTime? LastRunAt, string? LastRunTrigger,
+    int Errors, int Warnings, int Infos,
+    /// <summary>Проверок, упавших на последнем прогоне: их числа недостоверны.</summary>
+    int FailedChecks,
+    /// <summary>Проверки с ненулевым результатом, тяжёлые первыми — для панели деталей.</summary>
+    IReadOnlyList<DashboardCheckLine> Lines);
+
+/// <summary>Строка сводки: одна проверка и сколько она нашла на последнем прогоне.</summary>
+public sealed record DashboardCheckLine(
+    string CheckId, DataCheckSeverity Severity, int Total, bool Failed);
 
 /// <summary>Блок «Пловцы»: происхождение записей, дедуп-кандидаты, привязка Loglig ID,
 /// пловцы без результатов/OrgId.</summary>
@@ -41,7 +61,14 @@ public sealed record DashboardCompetitionStatus(
     /// <summary>DiscoveredCompetition.LastError != null.</summary>
     int DiscoveryErrors,
     /// <summary>Competition.OrgCompId == null.</summary>
-    int NoOrgCompId);
+    int NoOrgCompId,
+    /// <summary>
+    /// Дубли клубного зачёта: два чемпионата одной зачётной группы одного вида (❄/☀)
+    /// в одном сезоне. В реальности такого не бывает — если счётчик не ноль, ошибка не в
+    /// зачёте, а во флагах самого соревнования (IsChampionship / PoolType).
+    /// См. docs/plans/club-page-model.md §2.1.
+    /// </summary>
+    int DuplicateStandings);
 
 /// <summary>Блок «Результаты»: провалы времени, FK-аномалии (сторож), эстафеты без состава.</summary>
 public sealed record DashboardResultStatus(

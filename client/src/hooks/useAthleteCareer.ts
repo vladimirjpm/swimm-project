@@ -5,6 +5,8 @@ export interface CareerBest {
   stroke: string;
   distance: string;
   time: string;
+  /** Ошибка протокола (И11). null — заплыв в порядке. */
+  suspect_reason?: string | null;
   points: number;
   pool: string;
   competition: string;

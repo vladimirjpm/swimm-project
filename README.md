@@ -47,7 +47,7 @@ server/
 ## Quick start
 
 ```bash
-# 1. Start PostgreSQL
+# 1. Start PostgreSQL  → localhost:5445 (host port; 5432 inside the container)
 docker compose -f server/docker-compose.yml up -d
 
 # 2. Create least-privilege DB roles (once per database)

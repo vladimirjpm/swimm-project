@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import '../text-effect/text-effect.css';
+import UI_SwimTime, { SwimQuality } from '../swim-time/swim-time';
 
 const TIME_SPLIT_SEPARATOR = '›';
 
@@ -12,6 +13,18 @@ interface UI_SwimmerTimeCellProps {
   secondLineClassName?: string;
   className?: string;
   isRecordHolder?: boolean;
+  /**
+   * Качество времени (docs/plans/swim-time-quality-everywhere-plan.md). null — всё в порядке.
+   * Значок и объяснение рисует `UI_SwimTime` — единственный шов вывода времени.
+   */
+  quality?: SwimQuality | null;
+  /**
+   * Как показать спорное время: 'icon' — значок ⚠ рядом с цифрами (по умолчанию),
+   * 'chip' — подпись «⚠ Under review» ПОД временем (строка таблицы результатов,
+   * гибрид 15d). В chip-режиме ячейка становится колонкой: время сверху, чип снизу —
+   * иначе подпись не влезает в узкую колонку времени и ломает сетку строки.
+   */
+  qualityMarker?: 'icon' | 'chip';
 }
 
 const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
@@ -23,8 +36,15 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
   secondLineClassName = 'text-xs',
   className = '',
   isRecordHolder = false,
+  quality = null,
+  qualityMarker = 'icon',
 }) => {
   const [splitOpen, setSplitOpen] = useState(false);
+
+  // Чип встаёт ПОД время (колонкой), значок — в строку с цифрами. Раскладку меняем только
+  // когда чип реально есть: у обычных строк ячейка времени остаётся ровно такой, как была.
+  const stacked = qualityMarker === 'chip' && !!quality;
+  const stackedClass = stacked ? 'flex flex-col items-center gap-[3px]' : '';
 
   const formattedTimeSplit = time_split
     ? time_split
@@ -53,10 +73,10 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
       )}
       {formattedTimeSplit ? (
         <div
-          className={`${firstLineClassName} flex items-center gap-1 cursor-pointer select-none`}
+          className={`${firstLineClassName} ${stacked ? stackedClass : 'flex items-center gap-1'} cursor-pointer select-none`}
           onClick={handleToggle}
         >
-          {time}
+          <UI_SwimTime time={time} quality={quality} marker={qualityMarker} chipSize="sm" />
           {time_fail && <span className="text-red-500 ml-1">*</span>}
           <span
             className={`theme-text-muted transition-transform duration-200 ${splitOpen ? 'rotate-180' : ''}`}
@@ -64,8 +84,8 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
           >➗</span>
         </div>
       ) : (
-        <div className={firstLineClassName}>
-          {time}
+        <div className={`${firstLineClassName} ${stackedClass}`}>
+          <UI_SwimTime time={time} quality={quality} marker={qualityMarker} chipSize="sm" />
           {time_fail && <span className="text-red-500 ml-1">*</span>}
         </div>
       )}

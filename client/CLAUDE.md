@@ -86,6 +86,31 @@ npm --prefix client run build      # prebuild авто-генерит club-icons
 (куки/antiforgery без CORS). Запусти API на :5078 (через Visual Studio или `dotnet run`) + `npm run dev`.
 Точечные API-вызовы уже есть (напр. избранное в [`hooks/useFavorites.ts`](src/hooks/useFavorites.ts)).
 
+## Правило: время заплыва — только через `UI_SwimTime`
+
+Время заплыва выводится **единственным способом** — компонентом
+[`components/mix/swim-time`](src/projects/components/mix/swim-time/swim-time.tsx). Он же
+рисует значок «время под вопросом» и объяснялку к нему. Причина та же, что у `routes.*()`:
+признак качества должен быть виден везде, где показано время (а показано оно в дюжине мест),
+и держать это перечислением мест невозможно — забудут в первом же новом экране.
+
+Качества два, и они не взаимозаменяемы: `protocol` — ошибка самого протокола федерации
+(`Results.SuspectReason`), `record` — спорная запись справочника рекордов (`Sys_RecordIssues`).
+Тексты объяснений разные, оба на EN/RU/HE. Источник мы не правим — помечаем.
+
+**Носитель пометки (строка/карточка) тоже оформляется из одного места** — хелпер
+`swimFlaggedRowProps(quality)` из того же модуля отдаёт класс `swim-flagged-row`
+(caution-лента слева, стили и токены `--theme-flag-*` — в `src/index.css`) и полный текст
+в `title`/`aria-label`. Так оформлены строка таблицы результатов и карточка «Best times by
+style»; чип «⚠ Under review» вместо голого значка включается пропом `qualityMarker="chip"`
+у `UI_SwimmerTimeCell`. Отступ под ленту (`pl-*`) добавляет вызывающий — у каждой
+поверхности свой базовый паддинг. Спека — `!design_handoff/design_handoff_competition_overview_rec-warning/RECORD-FLAG.md`
+(карточка рекорда — вариант 13a, строка — гибрид 15d).
+
+Инвариант на стороне API: **DTO, несущий время заплыва, несёт и признак качества**
+(И11, см. `docs/data-integrity.md`). План перевода экранов —
+[`docs/plans/swim-time-quality-everywhere-plan.md`](../docs/plans/swim-time-quality-everywhere-plan.md).
+
 ## Правило парных токенов (темизация)
 
 Текст на тем-зависимой поверхности красится ТОЛЬКО парным токеном той же поверхности,

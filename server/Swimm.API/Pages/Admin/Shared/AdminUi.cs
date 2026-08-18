@@ -14,6 +14,8 @@ public static class AdminNav
     public static readonly IReadOnlyList<AdminNavItem> Items =
     [
         new("Dashboard", "gauge", "/Admin", ExactMatch: true),
+        // Здоровье данных (Д3): единое место для всех проверок целостности.
+        new("Health", "alert-triangle", "/Admin/Health", ExactMatch: true),
 
         new("Competitions", "trophy", "/Admin/Competitions", "Data"),
         new("Results", "award", "/Admin/Results", "Data"),

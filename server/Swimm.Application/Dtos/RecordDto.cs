@@ -41,6 +41,14 @@ public class RecordDto
     [JsonPropertyName("time")]
     public string Time { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Открытая претензия к этой записи справочника (<c>Sys_RecordIssues</c>): код причины,
+    /// null — запись не оспаривается. Ошибку источника мы не правим, а помечаем
+    /// (docs/plans/records-quality-plan.md).
+    /// </summary>
+    [JsonPropertyName("issue_reason")]
+    public string? IssueReason { get; set; }
+
     [JsonPropertyName("holder_name")]
     public string? HolderName { get; set; }
 

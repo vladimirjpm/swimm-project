@@ -1,0 +1,930 @@
+
+<div class="modal-dialog modal-lg modal-result-custom-width">
+<div class="modal-content" style="padding: 18px;">
+    <button type="button" class="close pull-left" data-dismiss="modal">
+        <span aria-hidden="true">&times;</span><span class="sr-only"></span>
+    </button>
+    <div class="swimming-export-actions" style="display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
+<form action="/LeagueTable/ExportSwimmingDisciplineResults?leagueId=15252" method="post">            <button id="excelBtnExp" type="submit" class="allow-readonly btn btn-primary" style="margin-left:15px;">
+                <i class="glyphicon glyphicon-open"></i>
+                PDF
+                <i class="fa fa-spin fa-spinner exportLSloading"
+                   style="visibility: hidden;">
+                </i>
+            </button>
+<input data-val="true" data-val-number="The field DisciplineCompetitionId must be a number." data-val-required="השדה DisciplineCompetitionId נדרש." id="DisciplineCompetitionId" name="DisciplineCompetitionId" type="hidden" value="82997" /></form>
+<form action="/LeagueTable/ExportSwimmingDisciplineResults?leagueId=15252&amp;IsSplitResults=True" method="post">            <button id="excelBtnExpSplit" type="submit" class="allow-readonly btn btn-primary" style="margin-left:15px;">
+                <i class="glyphicon glyphicon-open"></i>
+                זמני ביניים
+                <i class="fa fa-spin fa-spinner exportLSloading"
+                   style="visibility: hidden;">
+                </i>
+            </button>
+<input data-val="true" data-val-number="The field DisciplineCompetitionId must be a number." data-val-required="השדה DisciplineCompetitionId נדרש." id="DisciplineCompetitionId" name="DisciplineCompetitionId" type="hidden" value="82997" /></form>    </div>
+<div class="print_id" id="print_id" data-print-title="">
+
+<style>
+    td, th {
+        text-align: center;
+    }
+    .modal-result-custom-width {
+        width: 100%;
+    }
+    .format6cell {
+        border: 1px solid #dddddd !important;
+        height: 35px;
+        min-width: 30px;
+        max-width: 30px;
+    }
+    .format6th {
+        min-width: 90px;
+        max-width: 90px;
+    }
+    @media screen and ( min-width: 1500px) {
+    .modal-result-custom-width {
+        max-width: 1500px;
+        width: 100%;
+    }
+    @page {size: auto; margin: 5mm;}
+    }
+    }
+
+            </style>
+<div class="main-title disciplines-title">
+    <table class="borderless disciplines-title" style="width: 100%;">
+        <tr>
+            <td style="vertical-align: middle; text-align: left;" colspan="3" rowspan="3">
+    <img src="https://loglig.com/assets/union/logo_10032020094946824.jpg" class="img-circle keep-for-print" style="max-height:7rem;max-width:11rem;" alt=""/>
+            </td>
+            <td style="text-align: right;" colspan="4">
+                <h3 style="margin-top: 0px; margin-bottom: 0px;">
+                    איגוד השחייה בישראל
+                </h3>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="3" style="text-align:right;">
+                <h4 style="margin-top: 0px; margin-bottom: 0px;">
+                        אליפות ישראל arena גילאים צעירים קיץ 2026 - 28/07/2026
+                </h4>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="3" style="text-align:right;">
+                <h4 style="margin-top: 0px; margin-bottom: 0px;">400 חופשי -  בנות 12 - תוצאות</h4>
+            </td>
+        </tr>
+    </table>
+</div>
+<div class="table-responsive">
+    <table class="table res-table">
+        <thead>
+        <tr class="disciplines-title">
+            <th>מיקום</th>
+            <th>שם מלא</th>
+                            <th>שנת לידה</th>
+            <th>
+                אגודה
+            </th>
+                <th>מקצה</th>
+                    <th>מסלול</th>
+            <th style="text-align: center;">תוצאות</th>
+                            <th>ניקוד</th>
+
+                    <th>ניקוד אישי</th>
+                    <th>ניקוד קבוצתי</th>
+                                </tr>
+        </thead>
+        <tbody>
+
+                <tr>
+                    <td>גמר</td>
+                </tr>
+                <tr>
+                        <td>1</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    ליאור שילה
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+הפועל בית שמש                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            4
+                        </td>
+                    <td style="direction: ltr;">
+04:51.39                    </td>
+                                            <td style="direction: ltr;">
+                            519
+                        </td>
+                                                <td style="direction: ltr;">
+                                5
+                            </td>
+                            <td style="direction: ltr;">
+                                40
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>2</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    שירה אביגדורי
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+TLV SWIM                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            5
+                        </td>
+                    <td style="direction: ltr;">
+04:54.56                    </td>
+                                            <td style="direction: ltr;">
+                            502
+                        </td>
+                                                <td style="direction: ltr;">
+                                3
+                            </td>
+                            <td style="direction: ltr;">
+                                34
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>3</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    קאי רומא  חינוואי 
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+הפועל בת ים                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            3
+                        </td>
+                    <td style="direction: ltr;">
+04:58.06                    </td>
+                                            <td style="direction: ltr;">
+                            484
+                        </td>
+                                                <td style="direction: ltr;">
+                                2
+                            </td>
+                            <td style="direction: ltr;">
+                                30
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>4</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    אמילי פאייר
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+הפועל בת ים                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            6
+                        </td>
+                    <td style="direction: ltr;">
+05:04.59                    </td>
+                                            <td style="direction: ltr;">
+                            454
+                        </td>
+                                                <td style="direction: ltr;">
+                                1
+                            </td>
+                            <td style="direction: ltr;">
+                                27
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>5</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    עזיזה מוחמטזיאנוב
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+מכבי חיפה                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            1
+                        </td>
+                    <td style="direction: ltr;">
+05:13.69                    </td>
+                                            <td style="direction: ltr;">
+                            416
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                25
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>6</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    קורל צארום
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+TLV SWIM                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            2
+                        </td>
+                    <td style="direction: ltr;">
+05:14.04                    </td>
+                                            <td style="direction: ltr;">
+                            414
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                24
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>7</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    אודל ברבי
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+ע.ל.ה עצמה רעננה                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            7
+                        </td>
+                    <td style="direction: ltr;">
+05:15.33                    </td>
+                                            <td style="direction: ltr;">
+                            409
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                23
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>8</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    הדס שרר
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+ע.ל.ה עצמה רעננה                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            4
+                        </td>
+                    <td style="direction: ltr;">
+05:21.24                    </td>
+                                            <td style="direction: ltr;">
+                            387
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                22
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>9</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    עמית  גלסברג
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+מכבי קרית ביאליק                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            8
+                        </td>
+                    <td style="direction: ltr;">
+05:24.83                    </td>
+                                            <td style="direction: ltr;">
+                            374
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                18
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>10</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    אוריה כפיר
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+בני הרצליה                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            5
+                        </td>
+                    <td style="direction: ltr;">
+05:29.06                    </td>
+                                            <td style="direction: ltr;">
+                            360
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                17
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>11</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    ליבי וינברג
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+הפועל דולפין נתניה                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            0
+                        </td>
+                    <td style="direction: ltr;">
+05:29.09                    </td>
+                                            <td style="direction: ltr;">
+                            360
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                16
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>12</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    אליזבטה דמיטרייב
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+מכבי קרית ביאליק                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            5
+                        </td>
+                    <td style="direction: ltr;">
+05:29.94                    </td>
+                                            <td style="direction: ltr;">
+                            357
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                15
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>13</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    נטע גרינבלט
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+מכבי קרית אונו                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            9
+                        </td>
+                    <td style="direction: ltr;">
+05:35.37                    </td>
+                                            <td style="direction: ltr;">
+                            340
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                14
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>14</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    ליה יעקוביאן
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+בני הרצליה                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            6
+                        </td>
+                    <td style="direction: ltr;">
+05:35.99                    </td>
+                                            <td style="direction: ltr;">
+                            338
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                13
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>15</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    אלה מלול
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+הפועל עמק חפר                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            1
+                        </td>
+                    <td style="direction: ltr;">
+05:37.09                    </td>
+                                            <td style="direction: ltr;">
+                            335
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                12
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>16</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    סופיה לפטב
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+מכבי חיפה                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            1
+                        </td>
+                    <td style="direction: ltr;">
+05:37.77                    </td>
+                                            <td style="direction: ltr;">
+                            333
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                11
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>17</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    שירה גורן
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+מכבי שוהם                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            8
+                        </td>
+                    <td style="direction: ltr;">
+05:40.32                    </td>
+                                            <td style="direction: ltr;">
+                            325
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                8
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>18</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    ליבי הרצקה
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+מכבי קרית אונו                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            3
+                        </td>
+                    <td style="direction: ltr;">
+05:40.43                    </td>
+                                            <td style="direction: ltr;">
+                            325
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                7
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>19</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    נוי חנה גוטפריד
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+מכבי א.ס. רמת השרון                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            2
+                        </td>
+                    <td style="direction: ltr;">
+05:40.81                    </td>
+                                            <td style="direction: ltr;">
+                            324
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                6
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>20</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    סיאל  ווכילה 
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+הפועל בת ים                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            9
+                        </td>
+                    <td style="direction: ltr;">
+05:42.63                    </td>
+                                            <td style="direction: ltr;">
+                            319
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                5
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>21</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    ליאן שטוטמן
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+מכבי חיפה                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            3
+                        </td>
+                    <td style="direction: ltr;">
+05:43.51                    </td>
+                                            <td style="direction: ltr;">
+                            316
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                4
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>22</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    מאי  בונצ&#39;וק
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+מכבי קרית ביאליק                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            7
+                        </td>
+                    <td style="direction: ltr;">
+05:44.37                    </td>
+                                            <td style="direction: ltr;">
+                            314
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                3
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>23</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    עומר ברזני
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+ע.ל.ה עצמה רעננה                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            4
+                        </td>
+                    <td style="direction: ltr;">
+05:45.22                    </td>
+                                            <td style="direction: ltr;">
+                            312
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                2
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>24</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    מריה גולצר
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+בני הרצליה                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            7
+                        </td>
+                    <td style="direction: ltr;">
+05:46.87                    </td>
+                                            <td style="direction: ltr;">
+                            307
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                1
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>25</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    לורן ועקנין
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+בני הרצליה                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            6
+                        </td>
+                    <td style="direction: ltr;">
+05:49.64                    </td>
+                                            <td style="direction: ltr;">
+                            300
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>26</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    אלמה חסקלוביץ&#39;
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+בני הרצליה                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            2
+                        </td>
+                    <td style="direction: ltr;">
+05:52.42                    </td>
+                                            <td style="direction: ltr;">
+                            293
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>27</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    סופיה שבח
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+מועדון אילות תל אביב                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            8
+                        </td>
+                    <td style="direction: ltr;">
+05:58.19                    </td>
+                                            <td style="direction: ltr;">
+                            279
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>28</td>
+                                        <td>
+                                <span style="margin: 8px 0; padding: 2px 12px; color: #000080;">
+                                    טליה ברדוגו
+                                </span>
+                    </td>
+                                            <td>
+2014                        </td>
+                    <td>
+מכבי נהריה                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            0
+                        </td>
+                    <td style="direction: ltr;">
+NS                    </td>
+                                            <td style="direction: ltr;">
+                            0
+                        </td>
+                                                <td style="direction: ltr;">
+                                
+                            </td>
+                            <td style="direction: ltr;">
+                                
+                            </td>
+                                                        </tr>
+        </tbody>
+    </table>
+</div>
+
+
+</div>
+
+    <div class="modal-footer">
+        <button type="button" class="btn btn-default mobile-only" data-dismiss="modal">סגור</button>
+    </div>
+
+
+</div>
+</div>
+
+

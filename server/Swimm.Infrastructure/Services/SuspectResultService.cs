@@ -26,10 +26,11 @@ public class SuspectResultService(SwimmDbContext db, ICacheService cache) : ISus
         var rows = await scope
             .Select(r => new SuspectCandidateRow(
                 r.Id, r.SwimmerId, r.Style.Name, r.Distance, r.Gender,
-                r.TimeMillisecond, r.CompetitionDate, r.RelayId != null, r.TimeFail))
+                r.TimeMillisecond, r.CompetitionDate, r.RelayId != null, r.TimeFail, r.AgeGroup,
+                r.InternationalPoints, r.HeatType))
             .ToListAsync(ct);
 
-        var verdicts = SuspectResultDetector.Detect(rows)
+        var verdicts = SuspectResultDetector.Detect(rows, await LoadPersonalHistoryAsync(rows, ct))
             .ToDictionary(v => v.ResultId);
 
         // Трекаем только то, что может измениться: уже помеченные + новые кандидаты.
@@ -63,6 +64,14 @@ public class SuspectResultService(SwimmDbContext db, ICacheService cache) : ISus
             }
         }
 
+        // Отметка «проверка была». Без неё пустой список неотличим от «никто не смотрел»,
+        // и в списке соревнований нечего было бы красить зелёным.
+        var scanStamp = DateTime.UtcNow;
+        var scannedCompetitions = eventId is { } eid
+            ? await db.Competitions.Where(c => c.EventId == eid).ToListAsync(ct)
+            : await db.Competitions.Where(c => c.Id == competitionId).ToListAsync(ct);
+        foreach (var c in scannedCompetitions) c.QualityScannedAt = scanStamp;
+
         await db.SaveChangesAsync(ct);
         // Рекорды в шапке соревнования считаются с учётом пометок — сбрасываем кэш.
         await cache.InvalidateAllAsync();
@@ -82,6 +91,71 @@ public class SuspectResultService(SwimmDbContext db, ICacheService cache) : ISus
                 r.Club.Name, r.Style.Name, r.Distance, r.Gender, r.TimeOriginal,
                 r.SuspectReason!, r.SuspectIsManual, r.SuspectNote))
             .ToListAsync(ct);
+
+    /// <summary>
+    /// Личная история пловцов соревнования — вход правила «выброс относительно себя» (Б1).
+    /// В скоупе её нет по определению: сравнивать надо с ДРУГИМИ стартами, поэтому это
+    /// отдельный запрос, а не часть выборки соревнования.
+    ///
+    /// Тянем только личные зачтённые заплывы с очками и только в окне вокруг дат
+    /// соревнования — иначе на пловца с десятилетней историей приезжали бы сотни строк,
+    /// из которых правило всё равно смотрит лишь ближайшие ±120 дней.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<int, IReadOnlyList<PersonalSwim>>> LoadPersonalHistoryAsync(
+        IReadOnlyCollection<SuspectCandidateRow> rows, CancellationToken ct)
+    {
+        var swimmerIds = rows.Select(r => r.SwimmerId).Distinct().ToList();
+        if (swimmerIds.Count == 0) return new Dictionary<int, IReadOnlyList<PersonalSwim>>();
+
+        // Запас к окну правила: даты дней многодневки разъезжаются, и жёсткая граница
+        // отрезала бы сравнения у крайних дней.
+        const int windowDays = 150;
+        var from = rows.Min(r => r.CompetitionDate).AddDays(-windowDays);
+        var to = rows.Max(r => r.CompetitionDate).AddDays(windowDays);
+
+        var history = await db.Results.AsNoTracking()
+            .Where(r => swimmerIds.Contains(r.SwimmerId))
+            .Where(r => r.RelayId == null && !r.TimeFail && r.InternationalPoints > 0)
+            .Where(r => r.CompetitionDate >= from && r.CompetitionDate <= to)
+            .Select(r => new { r.Id, r.SwimmerId, r.InternationalPoints, r.CompetitionDate })
+            .ToListAsync(ct);
+
+        return history
+            .GroupBy(h => h.SwimmerId)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyList<PersonalSwim>)g
+                    .Select(h => new PersonalSwim(h.Id, h.InternationalPoints, h.CompetitionDate))
+                    .ToList());
+    }
+
+    public async Task<IReadOnlyList<SuspectRowDto>> SearchAsync(
+        int? eventId, int? competitionId, string query, int limit = 30, CancellationToken ct = default)
+    {
+        var q = (query ?? "").Trim().ToLower();
+        if (q.Length < 2) return [];
+
+        // ToLower().Contains, а не EF.Functions.ILike: последний живёт только в Npgsql, и
+        // тест на InMemory-провайдере писать было бы не на чем. Индексов тут всё равно нет —
+        // выборка идёт внутри одного соревнования, это сотни строк.
+        //
+        // Пустой Reason у непомеченной строки: DTO общий с помеченными, и «пусто» здесь
+        // читается однозначно — строка ещё не разобрана.
+        return await Scope(eventId, competitionId)
+            .Where(r =>
+                (r.Swimmer.LastName + " " + r.Swimmer.FirstName).ToLower().Contains(q) ||
+                r.Club.Name.ToLower().Contains(q) ||
+                (r.TimeOriginal ?? "").ToLower().Contains(q) ||
+                r.Distance.ToLower().Contains(q))
+            .OrderBy(r => r.CompetitionDate).ThenBy(r => r.Id)
+            .Take(limit)
+            .Select(r => new SuspectRowDto(
+                r.Id, r.CompetitionId, r.CompetitionDate,
+                (r.Swimmer.FirstName + " " + r.Swimmer.LastName).Trim(),
+                r.Club.Name, r.Style.Name, r.Distance, r.Gender, r.TimeOriginal,
+                r.SuspectReason ?? "", r.SuspectIsManual, r.SuspectNote))
+            .ToListAsync(ct);
+    }
 
     public async Task<bool> SetManualAsync(
         long resultId, bool flagged, string? note, CancellationToken ct = default)

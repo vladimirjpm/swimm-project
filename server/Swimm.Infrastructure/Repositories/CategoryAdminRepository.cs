@@ -43,6 +43,7 @@ public class CategoryAdminRepository : ICategoryAdminRepository
             Id = c.Id,
             Key = c.Key,
             Name = c.Name,
+            NameHe = c.NameHe,
             Badge = c.Badge,
             DisplayOrder = c.DisplayOrder,
             CompetitionCount = counts.GetValueOrDefault(c.Id),
@@ -67,6 +68,7 @@ public class CategoryAdminRepository : ICategoryAdminRepository
             Id = c.Id,
             Key = c.Key,
             Name = c.Name,
+            NameHe = c.NameHe,
             Badge = c.Badge,
             DisplayOrder = c.DisplayOrder,
             CompetitionCount = count,
@@ -129,6 +131,7 @@ public class CategoryAdminRepository : ICategoryAdminRepository
     {
         cat.Key = input.Key.Trim();
         cat.Name = input.Name.Trim();
+        cat.NameHe = string.IsNullOrWhiteSpace(input.NameHe) ? null : input.NameHe.Trim();
         cat.Badge = string.IsNullOrWhiteSpace(input.Badge) ? null : input.Badge.Trim();
         cat.DisplayOrder = input.DisplayOrder;
     }

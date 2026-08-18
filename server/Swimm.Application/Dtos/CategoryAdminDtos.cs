@@ -6,6 +6,8 @@ public sealed class CategoryAdminRowDto
     public int Id { get; set; }
     public string Key { get; set; } = "";
     public string Name { get; set; } = "";
+    /// <summary>Название на иврите; в публичном UI пока не используется.</summary>
+    public string? NameHe { get; set; }
     public string? Badge { get; set; }
     public int DisplayOrder { get; set; }
     public int CompetitionCount { get; set; }
@@ -21,6 +23,7 @@ public sealed class CategoryEditDto
     public int Id { get; set; }
     public string Key { get; set; } = "";
     public string Name { get; set; } = "";
+    public string? NameHe { get; set; }
     public string? Badge { get; set; }
     public int DisplayOrder { get; set; }
     public int CompetitionCount { get; set; }
@@ -32,6 +35,7 @@ public sealed class CategoryInputDto
 {
     public string Key { get; set; } = "";
     public string Name { get; set; } = "";
+    public string? NameHe { get; set; }
     public string? Badge { get; set; }
     public int DisplayOrder { get; set; }
 }

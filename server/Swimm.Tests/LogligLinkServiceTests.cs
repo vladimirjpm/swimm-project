@@ -43,6 +43,11 @@ public class LogligLinkServiceTests
 
         public string BuildPublicProfileUrl(int logligId)
             => $"https://loglig.com:2053/Players/Details/{logligId}?seasonId=1715";
+
+        // Клубный зачёт соревнований этим тестам не нужен — привязка пловцов его не трогает.
+        public Task<LogligCompetitionStanding?> GetCompetitionStandingAsync(
+            int logligId, int scaleSampleEvents = 12, CancellationToken ct = default)
+            => Task.FromResult<LogligCompetitionStanding?>(null);
     }
 
     /// <summary>Фейк сверки: решение по id карточки, заданное словарём в тесте.</summary>

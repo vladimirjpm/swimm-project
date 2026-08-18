@@ -1,0 +1,144 @@
+/* Цвета модулей Overview — привязка к темам.
+   Правишь только 5 базовых токенов на тему (light + dark). Всё остальное считается.
+   См. MODULE-COLORS.md. */
+
+/* ---------- 1. Базовые токены темы ---------- */
+:root,
+[data-theme="competition-blue"] {
+  --theme-module-clubs: #0466c8;
+  --theme-module-records: #6d28d9;
+  --theme-module-champions: #b45309;
+  --theme-module-hpa: #0f766e;
+  --theme-module-media: #be185d;
+}
+
+[data-theme="competition-blue"].dark,
+.dark [data-theme="competition-blue"] {
+  --theme-module-clubs: #64a8f5;
+  --theme-module-records: #a78bfa;
+  --theme-module-champions: #e0a256;
+  --theme-module-hpa: #4dbfae;
+  --theme-module-media: #f472a6;
+}
+
+/* пример второй темы — оставлены те же роли, другой тон */
+[data-theme="competition-emerald"] {
+  --theme-module-clubs: #10b981;
+  --theme-module-records: #7c3aed;
+  --theme-module-champions: #b45309;
+  --theme-module-hpa: #0e7490;
+  --theme-module-media: #db2777;
+}
+
+/* ---------- 2. Производные значения ---------- */
+/* На контейнере модуля выставляется --m, дальше всё берётся из него.
+   .module--clubs / --records / --champions / --hpa / --media */
+.module--clubs { --m: var(--theme-module-clubs); }
+.module--records { --m: var(--theme-module-records); }
+.module--champions { --m: var(--theme-module-champions); }
+.module--hpa { --m: var(--theme-module-hpa); }
+.module--media { --m: var(--theme-module-media); }
+
+.module {
+  --m-surface: var(--theme-mode-surface, #fff);
+  --m-solid: var(--m);
+  --m-on-solid: var(--theme-mode-accent-text, #fff);
+  --m-fill: color-mix(in srgb, var(--m) 13%, var(--m-surface));
+  --m-hover: color-mix(in srgb, var(--m) 6%, var(--m-surface));
+  --m-chip: color-mix(in srgb, var(--m) 12%, var(--m-surface));
+  --m-hairline: color-mix(in srgb, var(--m) 20%, var(--m-surface));
+  --m-stripe-a: color-mix(in srgb, var(--m) 24%, var(--m-surface));
+  --m-stripe-b: color-mix(in srgb, var(--m) 8%, var(--m-surface));
+}
+
+/* ---------- 3. Плитка модуля ---------- */
+.module-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 56px;
+  padding: 13px 14px;
+  border: none;
+  border-radius: 14px;
+  background: var(--m-surface);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+.module-tile:hover { background: var(--m-hover); }
+.module-tile__bar { flex: none; width: 3px; height: 26px; border-radius: 2px; background: var(--m-solid); }
+.module-tile__medal {
+  flex: none; width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--m-chip); color: var(--m-solid);
+  font-size: 15px; font-weight: 900;
+}
+.module-tile__label {
+  font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--m-solid);
+}
+.module-tile__name { font-size: 14px; font-weight: 800; color: var(--theme-mode-text, #1a1a1a); }
+.module-tile__sub { font-size: 11px; font-weight: 600; color: var(--theme-mode-secondary, #5b6470); }
+
+/* активная плитка */
+.module-tile[aria-selected="true"] { background: var(--m-fill); }
+.module-tile[aria-selected="true"] .module-tile__bar {
+  position: absolute; inset: 0 auto 0 0; width: 4px; height: auto; border-radius: 14px;
+}
+.module-tile[aria-selected="true"] .module-tile__medal { background: var(--m-solid); color: var(--m-on-solid); }
+/* язычок: десктоп — вправо, мобайл — вниз */
+.module-tile[aria-selected="true"]::after {
+  content: ""; position: absolute; width: 18px; height: 18px;
+  background: var(--m-solid); transform: rotate(45deg); border-radius: 3px;
+  top: 50%; right: -9px; margin-top: -9px;
+}
+@media (max-width: 1023px) {
+  .module-tile[aria-selected="true"]::after {
+    top: auto; right: auto; bottom: -8px; left: 50%; margin: 0 0 0 -8px; width: 16px; height: 16px;
+  }
+}
+
+/* лого клуба — полосатый плейсхолдер, если логотипа нет */
+.module-logo {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9.5px; font-weight: 900; color: var(--m-solid);
+  background: repeating-linear-gradient(45deg,
+    var(--m-stripe-a), var(--m-stripe-a) 4px,
+    var(--m-stripe-b) 4px, var(--m-stripe-b) 8px);
+}
+.module-tile[aria-selected="true"] .module-logo { background: var(--m-solid); color: var(--m-on-solid); }
+
+/* ---------- 4. Большая карточка модуля ---------- */
+.module-card {
+  background: var(--m-surface);
+  border: 1px solid var(--theme-mode-border, #eef1f6);
+  border-left: 3px solid var(--m-solid);
+  border-radius: 12px;
+  box-shadow: var(--theme-mode-card-shadow, 0 1px 2px rgba(0, 0, 0, .05));
+  padding: 16px 18px;
+}
+.module-card__title { font-size: 17px; font-weight: 900; color: var(--m-solid); }
+.module-card__value { font-weight: 900; color: var(--m-solid); font-variant-numeric: tabular-nums; }
+.module-card__inner { border: 1px solid var(--m-hairline); border-radius: 10px; }
+.module-card__chip {
+  border-radius: 999px; padding: 2px 9px; font-size: 11px; font-weight: 800;
+  background: var(--m-chip); color: var(--m-solid);
+}
+/* вариант «лейны» (9b/9c): шапка карточки залита цветом модуля */
+.module-card--lane { border-left: none; overflow: hidden; }
+.module-card--lane > header {
+  background: var(--m-solid); color: var(--m-on-solid);
+  padding: 11px 18px; display: flex; align-items: baseline; gap: 10px;
+}
+
+/* ---------- 5. Tailwind v4 ---------- */
+/* @theme inline {
+     --color-module-clubs: var(--theme-module-clubs);
+     --color-module-records: var(--theme-module-records);
+     --color-module-champions: var(--theme-module-champions);
+     --color-module-hpa: var(--theme-module-hpa);
+     --color-module-media: var(--theme-module-media);
+   }
+   → доступно как text-module-clubs / bg-module-media/12 и т.д. */

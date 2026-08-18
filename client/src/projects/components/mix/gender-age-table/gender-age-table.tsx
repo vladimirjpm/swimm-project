@@ -1,6 +1,7 @@
 import React from 'react';
 import UI_SwimmerNameCell from '../swimmer-name-cell/swimmer-name-cell';
 import UI_DateIcon from '../date-icon/date-icon';
+import UI_SwimTime, { SwimQuality } from '../swim-time/swim-time';
 
 // Единая таблица «♂ MEN | AGE | ♀ WOMEN» в стиле ISR Masters/Age Records.
 // Используется и High Point Award (значение = очки), и ISR Masters Records (значение = время).
@@ -28,6 +29,8 @@ export interface GenderAgeEntry {
   club?: string;
   /** Значение к показу СТРОКОЙ: время ("00:34.10") или очки ("987"). */
   value: string;
+  /** Качество времени (И11): для рекордов — открытая претензия к записи справочника. */
+  quality?: SwimQuality | null;
   /** Дата DD/MM/YYYY — показывается, если showDate. */
   date?: string;
   /** Если задан — имя становится ссылкой на страницу пловца. */
@@ -104,7 +107,7 @@ function Cell({ entries, gender, showClubIcon, showDate }: {
   // а имена ставим рядом с переносом. Дублировать «10 · 10 · 10» было бы шумом.
   const value = (
     <div className={`shrink-0 text-[15px] font-extrabold leading-tight tabular-nums sm:text-[17px] ${s.accent}`}>
-      {entries[0].value}
+      <UI_SwimTime time={entries[0].value} quality={entries[0].quality} />
     </div>
   );
 

@@ -538,7 +538,7 @@
         <h3>Backend</h3>
         <div class="mono">
           <span class="c"># Prerequisites: .NET 10 SDK, Docker Desktop, Node (для admin-CSS)</span><br/>
-          docker compose -f server/docker-compose.yml up -d <span class="c"># Postgres :5432</span><br/>
+          docker compose -f server/docker-compose.yml up -d <span class="c"># Postgres :5445</span><br/>
           <span class="c"># миграции — явно (два контекста!):</span><br/>
           dotnet ef database update --project server/Swimm.Infrastructure --startup-project server/Swimm.API --context SwimmDbContext<br/>
           <span class="c"># или: dotnet run --project server/Swimm.API -- --migrate</span><br/>

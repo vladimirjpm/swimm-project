@@ -161,6 +161,105 @@ public class DataQualityServiceTests
     }
 
     [Fact]
+    public async Task GetResultAnomalies_NoGender_ExcludesRelays()
+    {
+        // Пол пуст у личного результата (смешанный заплыв, пол пловца неизвестен) — это
+        // дыра в данных. У эстафеты пола нет по определению — её в список тащить незачем.
+        await using var db = CreateDb(nameof(GetResultAnomalies_NoGender_ExcludesRelays));
+        var club = new Club { Name = "Club" };
+        var style = new Style { Name = "Freestyle" };
+        var swimmer = new Swimmer { LastName = "A", FirstName = "A", BirthYear = 2012 };
+        var comp = new Competition { Name = "Comp", Date = "01/01/2026", PoolType = "25m" };
+        db.Clubs.Add(club); db.Styles.Add(style); db.Swimmers.Add(swimmer); db.Competitions.Add(comp);
+        var relay = new Relay();
+        db.Relays.Add(relay);
+        await db.SaveChangesAsync();
+
+        var noGender = new ResultRecord
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer.Id, ClubId = club.Id, StyleId = style.Id,
+            Gender = "", Distance = "200", CompetitionDate = DateTime.UtcNow
+        };
+        db.Results.Add(noGender);
+        db.Results.Add(new ResultRecord
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer.Id, ClubId = club.Id, StyleId = style.Id,
+            Gender = "male", Distance = "50", CompetitionDate = DateTime.UtcNow
+        });
+        db.Results.Add(new ResultRecord
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer.Id, ClubId = club.Id, StyleId = style.Id,
+            RelayId = relay.Id, Gender = "", Distance = "4X50", CompetitionDate = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var result = await new DataQualityService(db).GetResultAnomaliesAsync();
+
+        Assert.Equal(1, result.NoGender.Total);
+        var row = Assert.Single(result.NoGender.Items);
+        Assert.Equal(noGender.Id, row.ResultId);
+        Assert.Equal("A A", row.SwimmerName);
+        Assert.Equal("200", row.Distance);
+    }
+
+    [Fact]
+    public async Task GetClubQuality_NoSwimmers_ExcludesMergeTargets()
+    {
+        // Приёмник склейки без своих результатов формально пуст, но удалить его нельзя —
+        // в списке «Без пловцов» это невыполнимая задача, висящая вечно.
+        await using var db = CreateDb(nameof(GetClubQuality_NoSwimmers_ExcludesMergeTargets));
+        var target = new Club { Name = "Приёмник" };
+        var junk = new Club { Name = "Мусор" };
+        db.AddRange(target, junk);
+        await db.SaveChangesAsync();
+        db.Clubs.Add(new Club { Name = "Дубль", MergedIntoId = target.Id });
+        await db.SaveChangesAsync();
+
+        var result = await new DataQualityService(db).GetClubQualityAsync("no-swimmers");
+
+        Assert.Equal(1, result.Total);
+        Assert.Equal(junk.Id, Assert.Single(result.Items).Id);
+    }
+
+    [Fact]
+    public async Task GetResultAnomalies_ExactDuplicates_OnlyIdenticalRows()
+    {
+        // И10: одну дорожку в одном заплыве занимает один пловец один раз, поэтому полное
+        // совпадение — всегда след импорта. Повтор дисциплины с РАЗНЫМ временем законен
+        // (предварительные/финал) и находкой быть не должен.
+        await using var db = CreateDb(nameof(GetResultAnomalies_ExactDuplicates_OnlyIdenticalRows));
+        var club = new Club { Name = "Club" };
+        var style = new Style { Name = "Freestyle" };
+        var swimmer = new Swimmer { LastName = "Коэн", FirstName = "Таль", BirthYear = 2012 };
+        var comp = new Competition { Name = "Meet", Date = "01/01/2026", PoolType = "25m" };
+        db.AddRange(club, style, swimmer, comp);
+        await db.SaveChangesAsync();
+
+        ResultRecord Row(string time, int heat, int lane) => new()
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer.Id, ClubId = club.Id, StyleId = style.Id,
+            Distance = "50", Gender = "male", Heat = heat, Lane = lane,
+            TimeOriginal = time, CompetitionDate = new DateTime(2026, 1, 1)
+        };
+
+        // Точный дубль (три копии одной строки).
+        db.Results.AddRange(Row("00:30.00", 1, 4), Row("00:30.00", 1, 4), Row("00:30.00", 1, 4));
+        // Законный повтор: та же дисциплина, другой заплыв и другое время — не находка.
+        db.Results.Add(Row("00:29.50", 2, 5));
+        await db.SaveChangesAsync();
+
+        var result = await new DataQualityService(db).GetResultAnomaliesAsync();
+
+        Assert.Equal(1, result.ExactDuplicates.Total);
+        var row = Assert.Single(result.ExactDuplicates.Items);
+        Assert.Equal(3, row.Copies);
+        Assert.Equal("Коэн Таль", row.SwimmerName);
+        Assert.Equal("00:30.00", row.Time);
+        Assert.Equal(1, row.Heat);
+        Assert.Equal(4, row.Lane);
+    }
+
+    [Fact]
     public async Task GetModerationPending_OnlyPendingStatus()
     {
         await using var db = CreateDb(nameof(GetModerationPending_OnlyPendingStatus));

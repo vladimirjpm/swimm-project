@@ -102,6 +102,10 @@ public class MySwimDto
     [JsonPropertyName("time")]
     public string Time { get; set; } = string.Empty;
 
+    /// <summary>Инвариант И11: DTO со временем несёт и качество. null — заплыв в порядке.</summary>
+    [JsonPropertyName("suspect_reason")]
+    public string? SuspectReason { get; set; }
+
     [JsonPropertyName("time_fail")]
     public bool TimeFail { get; set; }
 

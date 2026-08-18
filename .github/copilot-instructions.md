@@ -90,7 +90,7 @@ dotnet run --project server/Swimm.API -- --migrate
 - `GET /api/club-points` — правила очков (`{rules:[...]}`), заменяет `club-points-config.json`.
 - `GET /api/categories`, `GET /api/categories/{key}` — категории и их соревнования (заменили
   `sources-config*.json`, файл удалён). Клиент читает через `CategoryHelper` только для отображения
-  (name/badge); канонические ключи категорий (`all`/`young8_11`/`junior`/`masters`) и URL-контракт
+  (name/badge); канонические ключи категорий (`all`/`kids8_11`/`young11_14`/`juniors`/`adults`/`masters`) и URL-контракт
   остаются client-only в `results-categories.ts` — в БД их нет (`all` синтетический).
 
 Модель данных под это:
@@ -119,7 +119,7 @@ dotnet run --project server/Swimm.API -- --migrate
 dotnet run --project server/Swimm.API
 
 # PostgreSQL:
-docker compose up -d   # postgres:16, порт 5432
+docker compose up -d   # postgres:16, хост-порт 5445 (внутри контейнера 5432)
 
 # Google OAuth:  server/Swimm.API/appsettings.Development.json  (gitignored)
 ```

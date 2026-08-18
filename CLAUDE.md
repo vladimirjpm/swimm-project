@@ -11,13 +11,23 @@ Keep this file the single source of agent guidance; other agents are pointed her
   стратегия кэша, бэклог рефакторинга. Сверяйся перед структурными изменениями.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — план работ по фазам (parsing-lib, рекорды в БД,
   масштаб/кэш, логин, галереи, isr.org.il, админка). Отмечай выполненные этапы.
+- [`docs/plans/README.md`](docs/plans/README.md) — **рабочие планы** незапущенных фаз
+  (Azure-деплой, страницы спортсмена/клуба, рекорды всех стран) + список открытых решений,
+  ждущих ответа Влада. Читай перед стартом любой из этих работ, чтобы не планировать заново.
+- [`docs/data-integrity.md`](docs/data-integrity.md) — **целостность данных**: инварианты,
+  все слои проверок, журнал решений и инцидентов, чек-лист «вижу кривые данные», план
+  единого реестра проверок (фазы Д1–Д5). Читай ПЕРВЫМ, когда «в протоколе одно, а в базе
+  другое», и записывай туда решения по данным — это их единственное место.
 - [`docs/relays.md`](docs/relays.md) — **эстафеты**: модель `RelayMembers`, импорт/парсинг,
   журнал фиксов, чек-лист отладки. Читай ПЕРВЫМ при любом баге эстафет.
 - [`docs/media-page.md`](docs/media-page.md) — **подсистема медиа / My media**: модель
   `Sys_UserMedia`, API, потоки Add link, публикации, footguns. Читай при багах медиа.
 - [`docs/competition-overview-cards.md`](docs/competition-overview-cards.md) — **карточки
   Overview соревнования**: что считает каждая (Top clubs, Best swim, Most decorated, High
-  Point…), правила медалей/очков и чек-лист «цифра выглядит неправильно».
+  Point…), правила медалей/очков и чек-лист «цифра выглядит неправильно». Там же —
+  **«Почему у одного соревнования ДВА набора мест»**: протокольные места официальные
+  (медали дают за каждый день), Combine All Results — сравнительный вид. Читай перед
+  любым расчётом мест, медалей или очков.
 
 This file covers only what those don't: how to build, run, migrate, and test **in practice here**,
 plus repo-specific footguns.
@@ -94,7 +104,13 @@ were removed; anything they styled either became Tailwind utility classes inline
 
 ## Database (local)
 
-Local Postgres runs in Docker (`swimm-postgres`, db `swimm`, owner `swimm`/`swimm_local_dev`):
+Local Postgres runs in Docker (`swimm-postgres`, db `swimm`, owner `swimm`/`swimm_local_dev`).
+
+⚠️ **Хост-порт — `5445`, не дефолтный 5432** (5432/5433 заняты контейнерами других проектов
+на машине Влада). Внутри контейнера порт обычный 5432, поэтому `docker exec … psql` работает
+как раньше, а вот подключения **с хоста** (DBeaver/pgAdmin, `psql -h localhost`, строки
+подключения) должны идти на 5445. Источник правды — `ports:` в `server/docker-compose.yml`;
+локальные строки подключения в `server/Swimm.API/appsettings.json` уже на 5445.
 
 ```bash
 docker compose -f server/docker-compose.yml up -d

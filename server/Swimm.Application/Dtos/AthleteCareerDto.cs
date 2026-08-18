@@ -74,6 +74,10 @@ public class CareerBestDto
     [JsonPropertyName("time")]
     public string Time { get; set; } = string.Empty;
 
+    /// <summary>Инвариант И11: DTO со временем несёт и качество. null — заплыв в порядке.</summary>
+    [JsonPropertyName("suspect_reason")]
+    public string? SuspectReason { get; set; }
+
     [JsonPropertyName("points")]
     public int Points { get; set; }
 

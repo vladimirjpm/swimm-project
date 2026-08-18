@@ -1,4 +1,4 @@
-@page
+﻿@page
 @model Swimm.API.Pages.Admin.Competitions.EditModel
 @{
     ViewData["Title"] = Model.IsNew ? "Новое соревнование" : "Редактирование соревнования";
@@ -82,7 +82,17 @@
             </label>
 
             <label class="flex flex-col gap-1">
-                <span class="text-xs text-admin-text-muted">OrgCompId (ID у организатора)</span>
+                <span class="flex items-center gap-2 text-xs text-admin-text-muted">
+                    OrgCompId (ID у организатора)
+                    @if (Model.Existing.OrgCompId is int orgId)
+                    {
+                        @* Ссылка на карточку у организатора — та же, что в списке
+                           (Index.cshtml): со страницы правки чаще всего и надо свериться
+                           с источником, а до сих пор номер приходилось копировать руками. *@
+                        <a href="https://isr.org.il/comp.asp?compID=@orgId" target="_blank" rel="noopener"
+                           class="text-admin-accent hover:underline">isr.org.il ↗</a>
+                    }
+                </span>
                 <input asp-for="Input.OrgCompId" type="number" class="admin-input" autocomplete="off"
                        placeholder="напр. loglig competitionId" />
             </label>
@@ -128,6 +138,27 @@
             </label>
         </div>
 
+        <!-- ── Клубный зачёт сезона (K6) ───────────────────────────────────────── -->
+        <div class="mt-5">
+            <label class="block text-[11px] font-semibold uppercase tracking-wide text-admin-text-muted mb-1">
+                Роль в клубном зачёте
+            </label>
+            <select asp-for="Input.StandingKindOverride" class="admin-input w-full max-w-xs">
+                <option value="">Авто — @Model.DerivedStandingKindLabel</option>
+                <option value="winter">❄ Зимний чемпионат</option>
+                <option value="summer">☀ Летний чемпионат</option>
+                <option value="openwater">🌊 Открытая вода</option>
+                <option value="none">Не идёт в зачёт</option>
+            </select>
+            <div class="text-[11px] text-admin-text-muted mt-1.5 leading-relaxed">
+                Обычно менять не нужно: роль выводится сама из галки <strong class="text-admin-text">🏆 Чемпионат</strong>
+                и типа бассейна — <strong class="text-admin-text">25м → зимний</strong>,
+                <strong class="text-admin-text">50м → летний</strong>. Проверено на всех чемпионатах в базе,
+                исключений нет. Поле нужно для случаев вне этого правила — прежде всего открытой воды,
+                где бассейна нет. Зачёт рисует грид «сезон × группа» на странице клуба.
+            </div>
+        </div>
+
         <!-- ── Правила начисления очков (Э4) ──────────────────────────────────── -->
         <div class="mt-6 pt-5 border-t border-admin-border">
             <h2 class="text-sm font-semibold text-admin-text mb-1">Правила начисления очков</h2>
@@ -167,6 +198,19 @@
                     }
                 </label>
             </div>
+
+            <label class="mt-4 flex items-start gap-2">
+                <input asp-for="Input.ClubPointsDisabled" type="checkbox" class="mt-0.5" />
+                <span class="text-xs text-admin-text">
+                    Клубный зачёт не ведётся
+                    <span class="block text-[11px] text-admin-text-muted">
+                        Лига, товарищеский старт, отборочные — очки клубам тут никто не считает.
+                        Реестр перестаёт считать отсутствие правила пропуском
+                        (<a href="/Admin/Health" class="text-admin-accent hover:underline">Health</a>).
+                        На расчёт очков галочка не влияет.
+                    </span>
+                </span>
+            </label>
         </div>
 
         <div class="mt-5 flex flex-wrap gap-3">
@@ -198,7 +242,11 @@
                 }
                 else
                 {
-                    <text>Текущий OrgCompId: <strong class="text-admin-text">@Model.Existing.OrgCompId</strong>.</text>
+                    <text>
+                        Текущий OrgCompId:
+                        <a href="https://isr.org.il/comp.asp?compID=@Model.Existing.OrgCompId" target="_blank"
+                           rel="noopener" class="text-admin-accent hover:underline">@Model.Existing.OrgCompId ↗</a>.
+                    </text>
                 }
             </p>
 

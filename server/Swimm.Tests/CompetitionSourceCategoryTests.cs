@@ -10,8 +10,8 @@ namespace Swimm.Tests;
 
 /// <summary>
 /// Канонический таб селектора соревнований (`/api/competitions` → category).
-/// Ключи исторические и с подписями НЕ совпадают — ступени переименованы 2026-07-28:
-/// young8_11 = «Kids» (8–11), junior = «Youth» (11–14), adults = «Juniors» (בוגרים).
+/// Возрастная лестница (2026-07-31): kids8_11 = «Kids» (8–11), young11_14 = «Young» (11–14),
+/// juniors = «Juniors» (נוער), adults = «Adults» (בוגרים).
 /// </summary>
 public class CompetitionSourceCategoryTests
 {
@@ -88,16 +88,18 @@ public class CompetitionSourceCategoryTests
     }
 
     [Fact]
-    public async Task KidsAndYouthKeepTheirHistoricalKeys()
+    public async Task EachLadderStepGetsItsOwnTab()
     {
-        await using var db = CreateDb(nameof(KidsAndYouthKeepTheirHistoricalKeys));
-        await SeedCompetitionAsync(db, 1, "Kids", isMasters: false, "results-youth-team");
-        await SeedCompetitionAsync(db, 2, "Youth", isMasters: false, "results-junior-results");
+        await using var db = CreateDb(nameof(EachLadderStepGetsItsOwnTab));
+        await SeedCompetitionAsync(db, 1, "Kids", isMasters: false, "results-kids-team");
+        await SeedCompetitionAsync(db, 2, "Young", isMasters: false, "results-youth-team");
+        await SeedCompetitionAsync(db, 3, "Juniors", isMasters: false, "results-junior-results");
 
         var sources = await new ResultRepository(db, new NullCache()).GetSourcesAsync();
 
-        Assert.Equal("young8_11", sources.Single(s => s.Id == 1).Category);
-        Assert.Equal("junior", sources.Single(s => s.Id == 2).Category);
+        Assert.Equal("kids8_11", sources.Single(s => s.Id == 1).Category);
+        Assert.Equal("young11_14", sources.Single(s => s.Id == 2).Category);
+        Assert.Equal("juniors", sources.Single(s => s.Id == 3).Category);
     }
 
     [Fact]
@@ -112,16 +114,16 @@ public class CompetitionSourceCategoryTests
     }
 
     [Fact]
-    public async Task YouthWinsOverAdults_WhenBothMembershipsPresent()
+    public async Task YoungerStepWins_WhenBothMembershipsPresent()
     {
-        // Приоритет: masters > Kids > Youth > Juniors. Соревнование в двух ступенях сразу
-        // попадает в более младшую — так было и до появления таба «Juniors».
-        await using var db = CreateDb(nameof(YouthWinsOverAdults_WhenBothMembershipsPresent));
+        // Приоритет: masters > Kids > Young > Juniors > Adults. Соревнование в двух ступенях
+        // сразу попадает в более младшую.
+        await using var db = CreateDb(nameof(YoungerStepWins_WhenBothMembershipsPresent));
         await SeedCompetitionAsync(db, 1, "Mixed", isMasters: false, "results-junior-results", "results-main");
 
         var sources = await new ResultRepository(db, new NullCache()).GetSourcesAsync();
 
-        Assert.Equal("junior", Assert.Single(sources).Category);
+        Assert.Equal("juniors", Assert.Single(sources).Category);
     }
 
     [Fact]

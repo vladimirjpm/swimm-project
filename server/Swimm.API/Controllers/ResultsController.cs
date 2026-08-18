@@ -255,24 +255,20 @@ public class ResultsController : ControllerBase
     /// сумма очков, медали, лучшие времена по стилям. Пловец не найден → нулевой DTO.
     /// </summary>
     [HttpGet("/api/athletes/career")]
-    public async Task<IActionResult> GetAthleteCareer([FromQuery] string name)
+    public async Task<IActionResult> GetAthleteCareer([FromQuery] string? name, [FromQuery] int? id)
     {
-        if (string.IsNullOrWhiteSpace(name)) return BadRequest("name is required");
+        // id — основной ключ (страница спортсмена), name — алиас для попапа-карточки.
+        // Имена не уникальны: у тёзок именной путь склеит двух разных людей в одну карьеру.
+        if (id is > 0)
+            return await this.CachedJson(_cache, $"http:athlete-career-id:{id}",
+                async () => await _results.GetAthleteCareerByIdAsync(id.Value) ?? new AthleteCareerDto(),
+                PayloadTtl, CacheControlValue);
+
+        if (string.IsNullOrWhiteSpace(name)) return BadRequest("name or id is required");
 
         return await this.CachedJson(_cache, $"http:athlete-career:{name.Trim().ToLowerInvariant()}",
             async () => await _results.GetAthleteCareerAsync(name) ?? new AthleteCareerDto(),
             PayloadTtl, CacheControlValue);
     }
 
-    /// <summary>
-    /// Профиль спортсмена по id для самостоятельной страницы пловца
-    /// (swimmer.html?swimmer=&lt;id&gt;). 404 — пловец не найден.
-    /// </summary>
-    [HttpGet("/api/swimmers/{id:int}")]
-    public async Task<IActionResult> GetSwimmerProfile(int id)
-    {
-        var dto = await _results.GetSwimmerProfileAsync(id);
-        if (dto is null) return NotFound();
-        return Ok(dto);
-    }
 }

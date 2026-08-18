@@ -40,6 +40,267 @@ public class PointRulesAdminRepositoryTests
         Entries = points.Select((p, i) => new PointRuleEntryDto { Place = i + 1, Points = p }).ToList()
     };
 
+    /// <summary>Соревнование (день) с привязкой к клубному правилу.</summary>
+    private static Competition Comp(int id, string name, string date, int? clubsRuleId, int? eventId = null) => new()
+    {
+        Id = id, Name = name, Date = date, PoolType = "50m",
+        EventId = eventId, PointRuleClubsId = clubsRuleId
+    };
+
+    // ── панель «Соревнования правила» ─────────────────────────────────────────
+
+    [Fact]
+    public async Task Competitions_ListsOnlyExplicitlyBound_AndFoldsEventIntoOneRow()
+    {
+        await using var db = CreateDb(nameof(Competitions_ListsOnlyExplicitlyBound_AndFoldsEventIntoOneRow));
+        db.CompetitionEvents.Add(new CompetitionEvent { Id = 7, Name = "Winter champs" });
+        db.Competitions.AddRange(
+            Comp(1, "day 1", "10/01/2026", clubsRuleId: 1, eventId: 7),
+            Comp(2, "day 2", "11/01/2026", clubsRuleId: 1, eventId: 7),
+            Comp(3, "Single meet", "05/02/2026", clubsRuleId: 1),
+            Comp(4, "Other rule", "07/02/2026", clubsRuleId: 2),
+            Comp(5, "No rule at all", "08/02/2026", clubsRuleId: null));
+        await db.SaveChangesAsync();
+
+        var rows = await Repo(db).GetCompetitionsAsync(PointRuleKind.Clubs, 1);
+
+        Assert.Equal(2, rows.Count);
+        var single = rows.Single(r => r.Id == 3);
+        Assert.Equal("Single meet", single.Name);
+        Assert.Equal(1, single.DayCount);
+
+        // Многодневка — одна строка: имя события, «голова» = первый день, счётчик дней = 2.
+        var multi = rows.Single(r => r.EventId == 7);
+        Assert.Equal("Winter champs", multi.Name);
+        Assert.Equal(1, multi.Id);
+        Assert.Equal(2, multi.DayCount);
+    }
+
+    [Fact]
+    public async Task Reassign_AppliesToEveryDayOfEvent()
+    {
+        await using var db = CreateDb(nameof(Reassign_AppliesToEveryDayOfEvent));
+        db.CompetitionEvents.Add(new CompetitionEvent { Id = 7, Name = "Winter champs" });
+        db.Competitions.AddRange(
+            Comp(1, "day 1", "10/01/2026", clubsRuleId: 1, eventId: 7),
+            Comp(2, "day 2", "11/01/2026", clubsRuleId: 1, eventId: 7));
+        db.PointRulesClubs.Add(new PointRuleClubs { Id = 9, Version = "target", Scope = "all" });
+        await db.SaveChangesAsync();
+
+        var res = await Repo(db).ReassignCompetitionsAsync(
+            PointRuleKind.Clubs, [new PointRuleReassignItem(1, 9)]);
+
+        Assert.True(res.Success);
+        Assert.Equal(1, res.Id); // одно логическое соревнование
+        Assert.All(await db.Competitions.ToListAsync(), c => Assert.Equal(9, c.PointRuleClubsId));
+    }
+
+    [Fact]
+    public async Task Reassign_NullRule_DropsBindingToAuto()
+    {
+        await using var db = CreateDb(nameof(Reassign_NullRule_DropsBindingToAuto));
+        db.Competitions.Add(Comp(1, "Meet", "10/01/2026", clubsRuleId: 1));
+        await db.SaveChangesAsync();
+
+        var res = await Repo(db).ReassignCompetitionsAsync(
+            PointRuleKind.Clubs, [new PointRuleReassignItem(1, null)]);
+
+        Assert.True(res.Success);
+        Assert.Null((await db.Competitions.FindAsync(1))!.PointRuleClubsId);
+    }
+
+    [Fact]
+    public async Task Reassign_ReportsZero_WhenNothingChanged()
+    {
+        await using var db = CreateDb(nameof(Reassign_ReportsZero_WhenNothingChanged));
+        db.Competitions.Add(Comp(1, "Meet", "10/01/2026", clubsRuleId: 1));
+        db.PointRulesClubs.Add(new PointRuleClubs { Id = 1, Version = "same", Scope = "all" });
+        await db.SaveChangesAsync();
+
+        var res = await Repo(db).ReassignCompetitionsAsync(
+            PointRuleKind.Clubs, [new PointRuleReassignItem(1, 1)]);
+
+        Assert.True(res.Success);
+        Assert.Equal(0, res.Id);
+    }
+
+    [Fact]
+    public async Task Reassign_RejectsUnknownRule_WithoutTouchingData()
+    {
+        await using var db = CreateDb(nameof(Reassign_RejectsUnknownRule_WithoutTouchingData));
+        db.Competitions.Add(Comp(1, "Meet", "10/01/2026", clubsRuleId: 1));
+        await db.SaveChangesAsync();
+
+        var res = await Repo(db).ReassignCompetitionsAsync(
+            PointRuleKind.Clubs, [new PointRuleReassignItem(1, 404)]);
+
+        Assert.False(res.Success);
+        Assert.Contains("404", res.Error);
+        Assert.Equal(1, (await db.Competitions.FindAsync(1))!.PointRuleClubsId);
+    }
+
+    [Fact]
+    public async Task Reassign_ClubsKind_DoesNotTouchSwimmersBinding()
+    {
+        await using var db = CreateDb(nameof(Reassign_ClubsKind_DoesNotTouchSwimmersBinding));
+        var comp = Comp(1, "Meet", "10/01/2026", clubsRuleId: 1);
+        comp.PointRuleSwimmersId = 5;
+        db.Competitions.Add(comp);
+        db.PointRulesClubs.Add(new PointRuleClubs { Id = 9, Version = "target", Scope = "all" });
+        await db.SaveChangesAsync();
+
+        await Repo(db).ReassignCompetitionsAsync(PointRuleKind.Clubs, [new PointRuleReassignItem(1, 9)]);
+
+        var saved = await db.Competitions.FindAsync(1);
+        Assert.Equal(9, saved!.PointRuleClubsId);
+        Assert.Equal(5, saved.PointRuleSwimmersId);
+    }
+
+    [Fact]
+    public async Task CompetitionCount_CountsEventAsOne_NotPerDay()
+    {
+        await using var db = CreateDb(nameof(CompetitionCount_CountsEventAsOne_NotPerDay));
+        db.PointRulesClubs.Add(new PointRuleClubs { Id = 1, Version = "v1", Scope = "all" });
+        db.CompetitionEvents.Add(new CompetitionEvent { Id = 7, Name = "Champs" });
+        db.Competitions.AddRange(
+            Comp(1, "day 1", "10/01/2026", clubsRuleId: 1, eventId: 7),
+            Comp(2, "day 2", "11/01/2026", clubsRuleId: 1, eventId: 7),
+            Comp(3, "Single", "05/02/2026", clubsRuleId: 1));
+        await db.SaveChangesAsync();
+
+        var rules = await Repo(db).GetAllAsync(PointRuleKind.Clubs);
+
+        // 3 строки-дня, но 2 логических соревнования — столько же, сколько строк в панели.
+        Assert.Equal(2, rules.Single(r => r.Id == 1).CompetitionCount);
+    }
+
+    // ── ручная сверка очков ───────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ToggleVerified_MarksEveryDayOfEvent_AndFlipsBack()
+    {
+        await using var db = CreateDb(nameof(ToggleVerified_MarksEveryDayOfEvent_AndFlipsBack));
+        db.CompetitionEvents.Add(new CompetitionEvent { Id = 7, Name = "Champs" });
+        db.Competitions.AddRange(
+            Comp(1, "day 1", "10/01/2026", clubsRuleId: 1, eventId: 7),
+            Comp(2, "day 2", "11/01/2026", clubsRuleId: 1, eventId: 7));
+        await db.SaveChangesAsync();
+
+        var on = await Repo(db).ToggleVerifiedAsync(
+            PointRuleKind.Clubs, 1, PointsVerifiedKinds.Official, "vlad");
+        Assert.True(on.Success);
+        Assert.Equal(1, on.Id);
+        Assert.All(await db.Competitions.ToListAsync(), c =>
+        {
+            Assert.NotNull(c.ClubPointsVerifiedAt);
+            Assert.Equal("vlad", c.ClubPointsVerifiedBy);
+            Assert.Equal(PointsVerifiedKinds.Official, c.ClubPointsVerifiedKind);
+        });
+
+        // Повторный клик по тому же итогу снимает отметку — со всех дней сразу.
+        var off = await Repo(db).ToggleVerifiedAsync(
+            PointRuleKind.Clubs, 2, PointsVerifiedKinds.Official, "vlad");
+        Assert.Equal(0, off.Id);
+        Assert.All(await db.Competitions.ToListAsync(), c =>
+        {
+            Assert.Null(c.ClubPointsVerifiedAt);
+            Assert.Null(c.ClubPointsVerifiedBy);
+            Assert.Null(c.ClubPointsVerifiedKind);
+        });
+    }
+
+    [Fact]
+    public async Task ToggleVerified_ClubsAndHighPoint_AreIndependent()
+    {
+        await using var db = CreateDb(nameof(ToggleVerified_ClubsAndHighPoint_AreIndependent));
+        db.Competitions.Add(Comp(1, "Meet", "10/01/2026", clubsRuleId: 1));
+        await db.SaveChangesAsync();
+
+        await Repo(db).ToggleVerifiedAsync(PointRuleKind.Clubs, 1, PointsVerifiedKinds.Official, "vlad");
+
+        var saved = await db.Competitions.FindAsync(1);
+        Assert.NotNull(saved!.ClubPointsVerifiedAt);
+        Assert.Null(saved.SwimmersPointsVerifiedAt);
+    }
+
+    [Fact]
+    public async Task VerifiedCount_CountsEventOnce_AndOnlyVerified()
+    {
+        await using var db = CreateDb(nameof(VerifiedCount_CountsEventOnce_AndOnlyVerified));
+        db.PointRulesClubs.Add(new PointRuleClubs { Id = 1, Version = "v1", Scope = "all" });
+        db.CompetitionEvents.Add(new CompetitionEvent { Id = 7, Name = "Champs" });
+        db.Competitions.AddRange(
+            Comp(1, "day 1", "10/01/2026", clubsRuleId: 1, eventId: 7),
+            Comp(2, "day 2", "11/01/2026", clubsRuleId: 1, eventId: 7),
+            Comp(3, "Single", "05/02/2026", clubsRuleId: 1));
+        await db.SaveChangesAsync();
+
+        await Repo(db).ToggleVerifiedAsync(PointRuleKind.Clubs, 1, PointsVerifiedKinds.Official, "vlad");
+        await Repo(db).ToggleVerifiedAsync(PointRuleKind.Clubs, 3, PointsVerifiedKinds.Accepted, "vlad");
+
+        var rule = (await Repo(db).GetAllAsync(PointRuleKind.Clubs)).Single(r => r.Id == 1);
+        Assert.Equal(2, rule.CompetitionCount);
+        Assert.Equal(1, rule.VerifiedCount);
+        Assert.Equal(1, rule.AcceptedCount);
+
+        var rows = await Repo(db).GetCompetitionsAsync(PointRuleKind.Clubs, 1);
+        Assert.Equal(PointsVerifiedKinds.Official, rows.Single(r => r.EventId == 7).VerifiedKind);
+        Assert.Equal(PointsVerifiedKinds.Accepted, rows.Single(r => r.Id == 3).VerifiedKind);
+    }
+
+    [Fact]
+    public async Task ToggleVerified_SwitchesBetweenKinds_InsteadOfStacking()
+    {
+        await using var db = CreateDb(nameof(ToggleVerified_SwitchesBetweenKinds_InsteadOfStacking));
+        db.Competitions.Add(Comp(1, "Meet", "10/01/2026", clubsRuleId: 1));
+        await db.SaveChangesAsync();
+
+        await Repo(db).ToggleVerifiedAsync(PointRuleKind.Clubs, 1, PointsVerifiedKinds.Official, "vlad");
+        var switched = await Repo(db).ToggleVerifiedAsync(
+            PointRuleKind.Clubs, 1, PointsVerifiedKinds.Accepted, "vlad");
+
+        // Не «две галочки», а переключение: отметка одна и теперь другая.
+        Assert.Equal(1, switched.Id);
+        var saved = await db.Competitions.FindAsync(1);
+        Assert.Equal(PointsVerifiedKinds.Accepted, saved!.ClubPointsVerifiedKind);
+        Assert.NotNull(saved.ClubPointsVerifiedAt);
+    }
+
+    [Fact]
+    public async Task ToggleVerified_Mismatch_IsItsOwnState_AndCounted()
+    {
+        await using var db = CreateDb(nameof(ToggleVerified_Mismatch_IsItsOwnState_AndCounted));
+        db.PointRulesClubs.Add(new PointRuleClubs { Id = 1, Version = "v1", Scope = "all" });
+        db.Competitions.AddRange(
+            Comp(1, "Meet A", "10/01/2026", clubsRuleId: 1),
+            Comp(2, "Meet B", "11/01/2026", clubsRuleId: 1));
+        await db.SaveChangesAsync();
+
+        await Repo(db).ToggleVerifiedAsync(PointRuleKind.Clubs, 1, PointsVerifiedKinds.Mismatch, "vlad");
+        await Repo(db).ToggleVerifiedAsync(PointRuleKind.Clubs, 2, PointsVerifiedKinds.Official, "vlad");
+
+        var rule = (await Repo(db).GetAllAsync(PointRuleKind.Clubs)).Single(r => r.Id == 1);
+        Assert.Equal(1, rule.MismatchCount);
+        Assert.Equal(1, rule.VerifiedCount);
+        Assert.Equal(0, rule.AcceptedCount);
+
+        var rows = await Repo(db).GetCompetitionsAsync(PointRuleKind.Clubs, 1);
+        Assert.Equal(PointsVerifiedKinds.Mismatch, rows.Single(r => r.Id == 1).VerifiedKind);
+    }
+
+    [Fact]
+    public async Task ToggleVerified_RejectsUnknownKind()
+    {
+        await using var db = CreateDb(nameof(ToggleVerified_RejectsUnknownKind));
+        db.Competitions.Add(Comp(1, "Meet", "10/01/2026", clubsRuleId: 1));
+        await db.SaveChangesAsync();
+
+        var res = await Repo(db).ToggleVerifiedAsync(PointRuleKind.Clubs, 1, "whatever", "vlad");
+
+        Assert.False(res.Success);
+        Assert.Null((await db.Competitions.FindAsync(1))!.ClubPointsVerifiedKind);
+    }
+
     // ── шкала текстом ─────────────────────────────────────────────────────────
 
     [Fact]
@@ -239,5 +500,172 @@ public class PointRulesAdminRepositoryTests
         var row = Assert.Single(await repo.GetAllAsync(PointRuleKind.Clubs));
         Assert.Equal(2, row.EntryCount);
         Assert.Equal(2, row.CompetitionCount);
+    }
+
+    // ── пояснение к расхождению (CompetitionNotes) ────────────────────────────
+
+    private static CompetitionNoteInputDto NoteInput(
+        string? en = null, string? ru = null, string? he = null, string? sourceUrl = null,
+        params (int Place, int Expected, int Actual)[] diff) => new()
+    {
+        Texts = new Dictionary<string, string?> { ["en"] = en, ["ru"] = ru, ["he"] = he },
+        ScaleDiff = diff.Select(d => new ScaleDiffRowDto(d.Place, d.Expected, d.Actual)).ToList(),
+        SourceUrl = sourceUrl
+    };
+
+    [Fact]
+    public async Task MismatchNote_SavedForEveryDayOfEvent_WithAllLanguages()
+    {
+        // Расхождение — свойство соревнования, а не дня: попап на витрине один на все дни.
+        await using var db = CreateDb(nameof(MismatchNote_SavedForEveryDayOfEvent_WithAllLanguages));
+        db.CompetitionEvents.Add(new CompetitionEvent { Id = 7, Name = "Champs" });
+        db.Competitions.AddRange(
+            Comp(1, "day 1", "10/01/2026", clubsRuleId: 1, eventId: 7),
+            Comp(2, "day 2", "11/01/2026", clubsRuleId: 1, eventId: 7));
+        await db.SaveChangesAsync();
+
+        var res = await Repo(db).SetClubMismatchNoteAsync(1,
+            NoteInput(en: "  Places 21-22 were scored 6 and 5.  ", ru: "Места 21-22 получили 6 и 5.",
+                      he: "מקומות 21-22 קיבלו 6 ו-5.", sourceUrl: "https://loglig.com:2053/LeagueTable/ShowLeagueDoc/2502",
+                      diff: [(21, 5, 6), (22, 3, 5)]));
+
+        Assert.True(res.Success);
+        var notes = await db.CompetitionNotes.Include(n => n.Texts).ToListAsync();
+        Assert.Equal(2, notes.Count);
+        Assert.All(notes, n =>
+        {
+            Assert.Equal(CompetitionNoteKinds.ClubPointsMismatch, n.Kind);
+            Assert.Equal(3, n.Texts.Count);
+            // Пробелы по краям режутся: текст едет на витрину как есть.
+            Assert.Equal("Places 21-22 were scored 6 and 5.", n.Texts.Single(t => t.Lang == "en").Body);
+            Assert.Contains("21", n.ScaleDiffJson);
+        });
+    }
+
+    [Fact]
+    public async Task MismatchNote_LanguageCanBeAddedAndRemoved()
+    {
+        await using var db = CreateDb(nameof(MismatchNote_LanguageCanBeAddedAndRemoved));
+        db.Competitions.Add(Comp(1, "Meet", "10/01/2026", clubsRuleId: 1));
+        await db.SaveChangesAsync();
+        var repo = Repo(db);
+
+        await repo.SetClubMismatchNoteAsync(1, NoteInput(en: "English", ru: "Русский"));
+        await repo.SetClubMismatchNoteAsync(1, NoteInput(en: "English", he: "עברית"));
+
+        var note = await db.CompetitionNotes.Include(n => n.Texts).SingleAsync();
+        var langs = note.Texts.Select(t => t.Lang).OrderBy(l => l).ToList();
+        Assert.Equal(["en", "he"], langs); // ru стёрт, he добавлен
+    }
+
+    [Fact]
+    public async Task MismatchNote_EmptyInput_DeletesNote()
+    {
+        await using var db = CreateDb(nameof(MismatchNote_EmptyInput_DeletesNote));
+        db.Competitions.Add(Comp(1, "Meet", "10/01/2026", clubsRuleId: 1));
+        await db.SaveChangesAsync();
+        var repo = Repo(db);
+        await repo.SetClubMismatchNoteAsync(1, NoteInput(en: "text", diff: [(21, 5, 6)]));
+
+        var res = await repo.SetClubMismatchNoteAsync(1, NoteInput(en: "   "));
+
+        Assert.True(res.Success);
+        Assert.Equal(0, res.Id);
+        Assert.Empty(await db.CompetitionNotes.ToListAsync());
+        Assert.Empty(await db.CompetitionNoteTexts.ToListAsync());
+    }
+
+    [Fact]
+    public async Task MismatchNote_UnknownLanguage_Rejected()
+    {
+        await using var db = CreateDb(nameof(MismatchNote_UnknownLanguage_Rejected));
+        db.Competitions.Add(Comp(1, "Meet", "10/01/2026", clubsRuleId: 1));
+        await db.SaveChangesAsync();
+
+        var res = await Repo(db).SetClubMismatchNoteAsync(1, new CompetitionNoteInputDto
+        {
+            Texts = new Dictionary<string, string?> { ["de"] = "Deutsch" }
+        });
+
+        Assert.False(res.Success);
+        Assert.Contains("de", res.Error);
+    }
+
+    [Fact]
+    public async Task MismatchNote_UnknownCompetition_Fails()
+    {
+        await using var db = CreateDb(nameof(MismatchNote_UnknownCompetition_Fails));
+
+        var res = await Repo(db).SetClubMismatchNoteAsync(404, NoteInput(en: "note"));
+
+        Assert.False(res.Success);
+        Assert.Contains("404", res.Error);
+    }
+
+    [Fact]
+    public async Task Competitions_PanelShowsCurrentNote()
+    {
+        await using var db = CreateDb(nameof(Competitions_PanelShowsCurrentNote));
+        var comp = Comp(1, "Meet", "10/01/2026", clubsRuleId: 1);
+        comp.ClubPointsVerifiedKind = PointsVerifiedKinds.Mismatch;
+        db.Competitions.Add(comp);
+        await db.SaveChangesAsync();
+        await Repo(db).SetClubMismatchNoteAsync(1, NoteInput(
+            en: "Official table used a different tail.",
+            sourceUrl: "https://loglig.com:2053/LeagueTable/ShowLeagueDoc/2502", diff: [(21, 5, 6)]));
+
+        var rows = await Repo(db).GetCompetitionsAsync(PointRuleKind.Clubs, 1);
+
+        var note = rows.Single().MismatchNote;
+        Assert.NotNull(note);
+        Assert.Equal("Official table used a different tail.", note!.Texts["en"]);
+        Assert.Equal(new ScaleDiffRowDto(21, 5, 6), note.ScaleDiff.Single());
+    }
+
+    [Fact]
+    public async Task MismatchNote_SourceUrl_SavedAndReturned()
+    {
+        await using var db = CreateDb(nameof(MismatchNote_SourceUrl_SavedAndReturned));
+        db.Competitions.Add(Comp(1, "Meet", "10/01/2026", clubsRuleId: 1));
+        await db.SaveChangesAsync();
+
+        await Repo(db).SetClubMismatchNoteAsync(1,
+            NoteInput(en: "text", sourceUrl: " https://loglig.com:2053/LeagueTable/ShowLeagueDoc/2502 "));
+
+        var rows = await Repo(db).GetCompetitionsAsync(PointRuleKind.Clubs, 1);
+        Assert.Equal("https://loglig.com:2053/LeagueTable/ShowLeagueDoc/2502", rows.Single().MismatchNote!.SourceUrl);
+    }
+
+    [Theory]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("data:text/html,<script>alert(1)</script>")]
+    [InlineData("loglig.com/doc")]
+    public async Task MismatchNote_NonHttpUrl_Rejected(string url)
+    {
+        // Ссылка уезжает в href на публичной странице — «javascript:» там это готовый XSS.
+        await using var db = CreateDb(nameof(MismatchNote_NonHttpUrl_Rejected) + url.GetHashCode());
+        db.Competitions.Add(Comp(1, "Meet", "10/01/2026", clubsRuleId: 1));
+        await db.SaveChangesAsync();
+
+        var res = await Repo(db).SetClubMismatchNoteAsync(1, NoteInput(en: "text", sourceUrl: url));
+
+        Assert.False(res.Success);
+        Assert.Contains("http", res.Error);
+        Assert.Empty(await db.CompetitionNotes.ToListAsync());
+    }
+
+    [Fact]
+    public async Task MismatchNote_OnlySourceUrl_IsEnoughToKeepTheNote()
+    {
+        // Ссылка без текста — тоже содержимое: попап покажет её под шкалой.
+        await using var db = CreateDb(nameof(MismatchNote_OnlySourceUrl_IsEnoughToKeepTheNote));
+        db.Competitions.Add(Comp(1, "Meet", "10/01/2026", clubsRuleId: 1));
+        await db.SaveChangesAsync();
+
+        var res = await Repo(db).SetClubMismatchNoteAsync(1, NoteInput(sourceUrl: "https://example.org/reg.pdf"));
+
+        Assert.True(res.Success);
+        Assert.Equal(1, res.Id);
+        Assert.Single(await db.CompetitionNotes.ToListAsync());
     }
 }

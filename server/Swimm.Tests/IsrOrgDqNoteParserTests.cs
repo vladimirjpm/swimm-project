@@ -129,4 +129,52 @@ public class IsrOrgDqNoteParserTests
         Assert.Equal("00:27.79", next.Time);
         Assert.Equal(2, (int)next.Position!);
     }
+
+    // ===== Тот же класс бага, другая причина: искажённая ячейка времени =====
+
+    /// <summary>
+    /// Живой случай: comp 6592 «ליגה 3 הפועל ירושלים» 10.01.2025, 50 баттерфляй —
+    /// протокол напечатал ячейку времени как «2/.00:28». Токен не время и не DQ/NS,
+    /// поэтому уезжал в клуб: появился клуб «הפועל בית שמש 2/.00:28», а вместе с ним
+    /// ВТОРОЙ пловец-двойник (ключ пловца включает клуб).
+    /// Теперь числовой мусор в клуб не попадает, а становится заметкой: додумывать
+    /// время за федерацию мы не имеем права, но и молчать о нём нельзя.
+    /// </summary>
+    [Fact]
+    public void GarbledTimeCell_DoesNotLeakIntoClub_BecomesNote()
+    {
+        var r = IsrOrgResultLineParser.ParseResultLine(
+            "1 2 3 יודין דניאל 2008 הפועל בית שמש 2/.00:28 0");
+
+        Assert.Equal("הפועל בית שמש", r.Club);
+        Assert.Null(r.Time);
+        Assert.Equal("2/.00:28", r.TimeFailNote);
+        Assert.Equal(1, (int)r.Position!);
+    }
+
+    /// <summary>
+    /// Нога эстафеты с СОСТАВНОЙ фамилией. Раньше фамилией считался только первый
+    /// токен, поэтому «בן יוסף ניתאי 2012» превращалось в «ניתאי בן» — а это, по ключу
+    /// импорта (фамилия|имя|год), уже ДРУГОЙ пловец. Так рядом с настоящими детьми
+    /// заводились «тени»: без единого личного результата, только с ногами эстафет.
+    /// </summary>
+    [Theory]
+    [InlineData("בן יוסף ניתאי 2012", "בן יוסף", "ניתאי")]
+    [InlineData("אבו ריא סילין 2012", "אבו ריא", "סילין")]
+    [InlineData("יודין דניאל 2008", "יודין", "דניאל")]
+    [InlineData("WEBER-GALE Garrett 1985", "WEBER-GALE", "Garrett")]
+    public void RelaySwimmerLine_KeepsCompoundLastName(string line, string last, string first)
+    {
+        var s = IsrOrgResultLineParser.ParseRelaySwimmerLine(line, order: 1);
+        Assert.Equal(last, s.LastName);
+        Assert.Equal(first, s.FirstName);
+    }
+
+    /// <summary>Цифра ВНУТРИ слова — часть названия клуба, а не мусор: «M25»,
+    /// «הפועל H2O כפר שמריהו» реально есть в справочнике.</summary>
+    [Theory]
+    [InlineData("1 2 3 COHEN DAN 2008 M25 00:28.10 400", "M25")]
+    [InlineData("1 2 3 COHEN DAN 2008 הפועל H2O כפר שמריהו 00:28.10 400", "הפועל H2O כפר שמריהו")]
+    public void DigitsInsideWord_StayInClubName(string line, string expectedClub) =>
+        Assert.Equal(expectedClub, IsrOrgResultLineParser.ParseResultLine(line).Club);
 }

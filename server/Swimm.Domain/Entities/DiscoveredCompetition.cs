@@ -49,6 +49,14 @@ public class DiscoveredCompetition
     [MaxLength(20)]
     public string Status { get; set; } = DiscoveredCompetitionStatus.New;
 
+    /// <summary>
+    /// Вид спорта: swimming | artistic | other (см. <c>Disciplines</c> в Application).
+    /// Проставляется догадкой по названию при обнаружении и правится вручную в админке —
+    /// поэтому автозабор его НЕ перезаписывает у уже известных строк.
+    /// </summary>
+    [MaxLength(20)]
+    public string Discipline { get; set; } = "swimming";
+
     /// <summary>Языки, на которых PDF-протокол успешно загружался с loglig:
     /// null (не загружался) | "he" | "en" | "he,en". Заполняется при «затянуть» и
     /// «синхронизировать языки» — по нему админка показывает бэйджи и предлагает досинхронизацию.</summary>
@@ -63,4 +71,19 @@ public class DiscoveredCompetition
     /// <summary>Последняя ошибка забора деталей/PDF — для явной диагностики в админке (B4).</summary>
     [MaxLength(1000)]
     public string? LastError { get; set; }
+
+    /// <summary>
+    /// Когда установлено, что у соревнования НЕТ протокола: PDF на isr.org.il пуст (страница
+    /// без единой строки текста) либо парсер не нашёл ни одного соревнования.
+    ///
+    /// Отдельно от <see cref="LastError"/> сознательно: ошибка — про сбой, который стоит
+    /// повторить, а пустой источник — про факт «тянуть нечего». Без этой пометки строка
+    /// выглядит как обычная «новая», и человек пробует «Затянуть» снова и снова.
+    /// null — источник не признан пустым.
+    /// </summary>
+    public DateTime? EmptySourceAt { get; set; }
+
+    /// <summary>Кто/что поставило пометку: «auto» (разбор) или email админа (вручную).</summary>
+    [MaxLength(200)]
+    public string? EmptySourceBy { get; set; }
 }

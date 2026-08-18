@@ -36,10 +36,15 @@ function readPanelFromUrl(): ModuleKey | null {
   return isModuleKey(p) ? p : null;
 }
 
+
 export default function CompetitionOverview2({
   overview, loading, mediaItems, onOpenTab, onOpenSwim, onOpenClub, onOpenSwimsScoped, onAddMedia,
 }: Props) {
   const { isAuthenticated, primarySwimmerId, favoriteSwimmerIds } = useFavoritesContext();
+
+  // Ненаградное соревнование (лига, отбор): места в протоколе есть, награждения нет.
+  // Всё медальное гасится ПРОПСАМИ существующих карточек, а не отдельными компонентами.
+  const hasAwards = overview?.has_awards ?? true;
 
   // --- какие модули видимы (пустые скрываются по-отдельности) ---
   const visible = useMemo(() => {
@@ -47,37 +52,61 @@ export default function CompetitionOverview2({
     if (!overview) return set;
     if (overview.top_clubs.length) set.add('clubs');
     if (overview.records.length) set.add('records');
-    if (overview.best_swim || overview.best_swim_male || overview.best_swim_female
-      || overview.top_medalists?.length || overview.top_medalists_male?.length
-      || overview.top_medalists_female?.length) set.add('champions');
+    // Без награждения карточку Champions держит только Best swim: медалисты в ней скрыты,
+    // и модуль из одних медалистов оказался бы пустым.
+    const hasBestSwim = !!(overview.best_swim || overview.best_swim_male || overview.best_swim_female);
+    const hasMedalists = !!(overview.top_medalists?.length || overview.top_medalists_male?.length
+      || overview.top_medalists_female?.length);
+    if (hasBestSwim || (hasAwards && hasMedalists)) set.add('champions');
     if (overview.high_point_awards.length) set.add('hpa');
     if (mediaItems.length) set.add('media');
     if (isAuthenticated && (primarySwimmerId != null || favoriteSwimmerIds.size > 0)) set.add('favorites');
     return set;
-  }, [overview, mediaItems.length, isAuthenticated, primarySwimmerId, favoriteSwimmerIds]);
+  }, [overview, hasAwards, mediaItems.length, isAuthenticated, primarySwimmerId, favoriteSwimmerIds]);
+
+  // Модули, которые видны, но не открываются: High Point без награждения не разыгрывается.
+  const isDisabled = useCallback((m: ModuleKey) => m === 'hpa' && !hasAwards, [hasAwards]);
 
   const modules = MODULE_ORDER.filter((m) => visible.has(m));
 
   // --- state активного модуля + синк с ?panel= ---
   const [active, setActive] = useState<ModuleKey | null>(readPanelFromUrl);
-  const effective: ModuleKey | null =
-    active && visible.has(active) ? active : modules[0] ?? null;
 
-  const handleSelect = useCallback((m: ModuleKey) => {
-    setActive(m);
-    const url = new URL(window.location.href);
-    url.searchParams.set('panel', m);
-    window.history.replaceState(null, '', url.toString());
-  }, []);
+  // Выбранный модуль засчитывается, только если он видим и не выключен: и диплинк
+  // ?panel=, и прошлый выбор не должны упираться в пустую карточку.
+  const chosen: ModuleKey | null =
+    active && visible.has(active) && !isDisabled(active) ? active : null;
 
-  // При уходе с таба ?panel= чистит results-main-project (см. handleCompTabChange).
+  // ДЕФОЛТ РАЗНЫЙ ПО МАКЕТАМ, и решает это CSS, а не JS-медиазапрос: оба макета всегда
+  // в DOM, видимость даёт брейкпоинт lg. Мобайл-аккордеон открытым по умолчанию не бывает
+  // (первая карточка отжимала бы остальные плитки за экран), а у мастер-детейла правая
+  // половина обязана что-то показывать — там дефолт остаётся первым доступным модулем.
+  const desktopActive: ModuleKey | null = chosen ?? modules.find((m) => !isDisabled(m)) ?? null;
+  const mobileActive: ModuleKey | null = chosen;
+
+  const selectDesktop = useCallback((m: ModuleKey) => setActive(m), []);
+  // В аккордеоне повторный тап по открытой плитке закрывает её — раз «всё закрыто»
+  // штатное состояние, в него надо уметь вернуться.
+  const selectMobile = useCallback(
+    (m: ModuleKey) => setActive((prev) => (prev === m ? null : m)),
+    [],
+  );
+
+  // ?panel= пишем ТОЛЬКО по явному выбору пользователя, а не по дефолту: какой макет
+  // сейчас на экране, JS тут не знает, и ссылка не должна обещать карточку, которой
+  // в мобайле не открыто. При уходе с таба параметр чистит results-main-project
+  // (см. handleCompTabChange).
   useEffect(() => {
-    if (effective && readPanelFromUrl() !== effective) {
-      const url = new URL(window.location.href);
-      url.searchParams.set('panel', effective);
-      window.history.replaceState(null, '', url.toString());
+    const url = new URL(window.location.href);
+    if (chosen) {
+      if (readPanelFromUrl() === chosen) return;
+      url.searchParams.set('panel', chosen);
+    } else {
+      if (!url.searchParams.has('panel')) return;
+      url.searchParams.delete('panel');
     }
-  }, [effective]);
+    window.history.replaceState(null, '', url.toString());
+  }, [chosen]);
 
   if (!overview) {
     return (
@@ -136,9 +165,10 @@ export default function CompetitionOverview2({
       sub: champion ? `max points · ${champion.gender === 'male' ? '♂' : '♀'}` : undefined,
     },
     hpa: {
-      medal: hpaRange || '—',
-      name: `${overview.high_point_awards.length} awards`,
-      sub: 'each age · ♂ / ♀',
+      // Без награждения плитка гасится: обещать «12 awards» там, где наград нет, нельзя.
+      medal: hasAwards ? (hpaRange || '—') : '—',
+      name: hasAwards ? `${overview.high_point_awards.length} awards` : 'Not contested',
+      sub: hasAwards ? 'each age · ♂ / ♀' : 'no awards at this competition',
     },
     media: {
       medal: mediaItems.length,
@@ -155,11 +185,28 @@ export default function CompetitionOverview2({
   const renderCard = (m: ModuleKey) => {
     switch (m) {
       case 'clubs':
-        return <ModuleCardClubs overview={overview} onOpenTab={onOpenTab} onOpenClub={onOpenClub} />;
+        // Без награждения — голый зачёт очков: ни медалей, ни шкалы правила, ни ♂/♀.
+        return (
+          <ModuleCardClubs
+            overview={overview}
+            onOpenTab={onOpenTab}
+            onOpenClub={onOpenClub}
+            showMedals={hasAwards}
+            showPointsRule={hasAwards}
+            showGenderPanels={hasAwards}
+          />
+        );
       case 'records':
         return <ModuleCardRecords overview={overview} onOpenTab={onOpenTab} onOpenSwim={onOpenSwim} />;
       case 'champions':
-        return <ModuleCardChampions overview={overview} onOpenSwim={onOpenSwim} onOpenClub={onOpenClub} />;
+        return (
+          <ModuleCardChampions
+            overview={overview}
+            onOpenSwim={onOpenSwim}
+            onOpenClub={onOpenClub}
+            showMostDecorated={hasAwards}
+          />
+        );
       case 'hpa':
         return <ModuleCardHpa overview={overview} onOpenClub={onOpenClub} />;
       case 'media':
@@ -184,8 +231,16 @@ export default function CompetitionOverview2({
     }
   };
 
-  const tile = (m: ModuleKey) => (
-    <ModuleTile key={m} module={m} active={m === effective} onSelect={handleSelect} {...tileProps[m]} />
+  const tile = (m: ModuleKey, activeKey: ModuleKey | null, onSelect: (m: ModuleKey) => void) => (
+    <ModuleTile
+      key={m}
+      module={m}
+      active={m === activeKey}
+      onSelect={onSelect}
+      disabled={isDisabled(m)}
+      disabledReason="No awards at this competition — High Point is not contested"
+      {...tileProps[m]}
+    />
   );
 
   return (
@@ -198,19 +253,21 @@ export default function CompetitionOverview2({
           className="flex flex-col gap-0.5 rounded-[12px] p-0 overflow-visible"
           style={{ background: 'var(--theme-mode-border)' }}
         >
-          {modules.map(tile)}
+          {modules.map((m) => tile(m, desktopActive, selectDesktop))}
         </div>
         <div className="min-w-0">
-          {effective && <div className={`ov2-module ov2-module--${effective}`}>{renderCard(effective)}</div>}
+          {desktopActive && (
+            <div className={`ov2-module ov2-module--${desktopActive}`}>{renderCard(desktopActive)}</div>
+          )}
         </div>
       </div>
 
-      {/* Мобайл 9f: аккордеон — карточка ПОД своей плиткой */}
+      {/* Мобайл 9f: аккордеон — карточка ПОД своей плиткой; по умолчанию всё закрыто */}
       <div className="flex flex-col gap-1 lg:hidden" role="tablist" aria-label="Overview modules">
         {modules.map((m) => (
           <React.Fragment key={m}>
-            {tile(m)}
-            {m === effective && (
+            {tile(m, mobileActive, selectMobile)}
+            {m === mobileActive && (
               <div className={`ov2-module ov2-module--${m} mt-1 mb-1`}>{renderCard(m)}</div>
             )}
           </React.Fragment>

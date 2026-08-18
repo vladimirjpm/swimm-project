@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -38,7 +38,10 @@ public class ClubDedupService(SwimmDbContext db) : IClubDedupService
         // ставится импортом по справочнику Countries) и пустое название — технический
         // «клуб без клуба» (результаты, где клуб не был указан в протоколе).
         var rawClubs = await db.Clubs.AsNoTracking()
-            .Where(c => !c.Name.StartsWith("SYNTH") && !c.IsPseudo && c.Name.Trim() != "")
+            // Склеенные (MergedIntoId) исключены: их связи давно переехали на приёмника,
+            // предлагать их в кандидаты — значит склеивать пустышку второй раз.
+            .Where(c => !c.Name.StartsWith("SYNTH") && !c.IsPseudo && c.Name.Trim() != ""
+                        && c.MergedIntoId == null)
             .Select(c => new { c.Id, c.Name, c.NameEn })
             .ToListAsync(ct);
         var realClubIds = rawClubs.Select(c => c.Id).ToList();
@@ -87,6 +90,26 @@ public class ClubDedupService(SwimmDbContext db) : IClubDedupService
                 canon.Id, canon.Name, canon.NameEn, canon.ResultCount,
                 dup.Id, dup.Name, dup.NameEn, dup.ResultCount,
                 heuristic, sharedSwimmers, sure));
+        }
+
+        // ── 0. ОДИНАКОВОЕ имя у разных Id → sure ──────────────────────────
+        // Самый очевидный дубль, а находился до 2026-08-01 только случайно: эвристика
+        // суффикса требует хвоста, а левенштейн совпадающие имена явно пропускает
+        // (na == nb → continue). Ловила их только эвристика по общим пловцам, да и та
+        // молчала, если у дубля меньше трёх пловцов.
+        // Массово это следы второго импорта: у канона имя на иврите без NameEn, у дубля
+        // тот же Name и заполненный NameEn (65 групп, 68 дублей, 7793 результата).
+        // Канон — у кого больше результатов (при равенстве меньший Id): к нему уедут
+        // связи, а пустой NameEn канона merge дозаполнит из дубля.
+        foreach (var group in real.GroupBy(c => c.Name.Trim()).Where(g => g.Count() > 1))
+        {
+            var ordered = group
+                .OrderByDescending(c => c.ResultCount)
+                .ThenBy(c => c.Id)
+                .ToList();
+            var canon = ordered[0];
+            foreach (var dup in ordered.Skip(1))
+                Add(canon, dup, "same-name", 0, sure: true);
         }
 
         // ── 1. Мусорный суффикс: Name = Name другого клуба + хвост → sure ──

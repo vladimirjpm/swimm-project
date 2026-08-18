@@ -4,6 +4,7 @@ export namespace Enums {
     normative = "normative",
     html = "html",
     swimmerRecords = "swimmerRecords",
+    clubPoints = "clubPoints",
   }
   export enum TestEnum {
     test1 = "test1",

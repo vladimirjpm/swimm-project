@@ -22,7 +22,8 @@ public sealed record SwimmerHighPointRow(
     int InternationalPoints,
     bool IsRelay,
     bool TimeFail,
-    RecordStatus Record = RecordStatus.None);
+    RecordStatus Record = RecordStatus.None,
+    string? HeatType = null);
 
 /// <summary>Победитель номинации.</summary>
 public sealed record SwimmerHighPointWinner(
@@ -61,6 +62,10 @@ public static class PointRulesSwimmersScoring
     {
         if (rule is null || row.TimeFail) return 0;
         if (row.IsRelay && !rule.IncludeRelays) return 0;
+        // FinalsOnly (бугрим п.16): предварительные заплывы очков не приносят. null-HeatType
+        // проходит — это timed final либо данные без признака (тогда считаем по всем, как
+        // до его появления; карточка показывает сноску FinalsOnlyUnavailable).
+        if (rule.FinalsOnly && row.HeatType == "prelim") return 0;
 
         if (rule.PointsSource == "fina") return row.InternationalPoints;
 
@@ -87,9 +92,10 @@ public static class PointRulesSwimmersScoring
     /// <c>SplitByGender</c>). Ничья по сумме → в результат попадают все с максимумом
     /// (<c>IsTie</c>), как в прежнем зашитом расчёте.
     ///
-    /// <c>FinalsOnly</c> здесь СОЗНАТЕЛЬНО не учитывается: признака типа заплыва
-    /// (предварительный/финал) в данных пока нет, и до его появления флаг ни на что не
-    /// влияет — расчёт идёт по всем заплывам (решение по §8.B.3, вариант 3).
+    /// <c>FinalsOnly</c>: предварительные заплывы (<c>HeatType == "prelim"</c>) исключаются
+    /// целиком — не только из очков, но и из SwimCount/MinSwims. Строки с null-HeatType
+    /// проходят: это timed final либо данные, импортированные до появления признака
+    /// (тогда расчёт фактически идёт по всем заплывам — прежнее поведение варианта 3).
     /// </summary>
     public static List<SwimmerHighPointWinner> Winners(
         PointRuleSwimmers? rule, IReadOnlyCollection<SwimmerHighPointRow> rows)
@@ -98,6 +104,7 @@ public static class PointRulesSwimmersScoring
 
         var scored = rows
             .Where(r => !r.TimeFail && (rule.IncludeRelays || !r.IsRelay))
+            .Where(r => !rule.FinalsOnly || r.HeatType != "prelim")
             .Select(r => (Row: r, Points: PointsFor(rule, r)))
             .ToList();
 

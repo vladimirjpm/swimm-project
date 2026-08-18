@@ -34,6 +34,8 @@ export interface MySwimDto {
   place: number | null;
   points: number;
   time: string;
+  /** Ошибка протокола (И11). null — заплыв в порядке. */
+  suspect_reason?: string | null;
   time_fail: boolean;
   is_pb: boolean;
   congrats_count: number;

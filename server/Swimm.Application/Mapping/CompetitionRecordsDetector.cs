@@ -37,6 +37,30 @@ public sealed record RecordCandidateRow(
 public static class CompetitionRecordsDetector
 {
     public static List<OverviewRecordDto> Detect(
+        IReadOnlyCollection<Record> records, IReadOnlyCollection<RecordCandidateRow> rows) =>
+        DetectBest(records, rows)
+            .Select(b => new OverviewRecordDto
+            {
+                Kind = KindLabel(b.Rec),
+                StyleName = b.Row.StyleName,
+                Distance = b.Row.Distance,
+                Gender = b.Row.Gender,
+                Time = b.Row.TimeOriginal,
+                HolderName = $"{b.Row.FirstName} {b.Row.LastName}".Trim(),
+                SwimmerId = b.Row.SwimmerId,
+                AgeGroup = b.Row.AgeGroup,
+                Club = b.Row.Club,
+                DayNumber = b.Row.DayNumber,
+                ResultId = b.Row.ResultId
+            })
+            .ToList();
+
+    /// <summary>
+    /// Побитые рекорды парами «заплыв ↔ рекорд». Отдельно от <see cref="Detect"/>, потому что
+    /// превью импорта (Б2) показывает и СТАРЫЙ рекорд с его владельцем: без них «побьёт 7
+    /// рекордов» — цифра, которую нечем проверить глазами.
+    /// </summary>
+    public static List<(RecordCandidateRow Row, Record Rec)> DetectBest(
         IReadOnlyCollection<Record> records, IReadOnlyCollection<RecordCandidateRow> rows)
     {
         if (records.Count == 0 || rows.Count == 0) return [];
@@ -72,22 +96,11 @@ public static class CompetitionRecordsDetector
             .OrderBy(b => b.Row.DayNumber ?? int.MaxValue)
             .ThenBy(b => b.Row.StyleName)
             .ThenBy(b => TrimDistance(b.Row.Distance).Length)
-            .Select(b => new OverviewRecordDto
-            {
-                Kind = KindLabel(b.Rec),
-                StyleName = b.Row.StyleName,
-                Distance = b.Row.Distance,
-                Gender = b.Row.Gender,
-                Time = b.Row.TimeOriginal,
-                HolderName = $"{b.Row.FirstName} {b.Row.LastName}".Trim(),
-                SwimmerId = b.Row.SwimmerId,
-                AgeGroup = b.Row.AgeGroup,
-                Club = b.Row.Club,
-                DayNumber = b.Row.DayNumber,
-                ResultId = b.Row.ResultId
-            })
             .ToList();
     }
+
+    /// <summary>Человеку: «Age 13 record» / «Open record» / «Masters 45-49».</summary>
+    public static string Kind(Record rec) => KindLabel(rec);
 
     /// <summary>Категории/AgeKey, по которым заплыв может побить рекорд.</summary>
     private static IEnumerable<(string Category, string AgeKey)> CandidateKeys(RecordCandidateRow row)

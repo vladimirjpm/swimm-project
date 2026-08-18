@@ -4,15 +4,16 @@ namespace Swimm.Application.Mapping;
 
 /// <summary>
 /// Парс/формат времени заплыва «строка ↔ миллисекунды». Логика парса совпадает с
-/// импортом (JsonImportService.ParseTimeToMs): формат <c>[m:]ss.ff[f]</c>, запятая = точка.
+/// импортом (JsonImportService.ParseTimeToMs): формат <c>[[h:]m:]ss.ff[f]</c>, запятая = точка.
 /// Используется формой ручной правки результата (Admin/Results).
 /// </summary>
 public static partial class SwimTime
 {
-    [GeneratedRegex(@"^(?:(\d+):)?(\d+)\.(\d+)$")]
+    [GeneratedRegex(@"^(?:(?:(\d+):)?(\d+):)?(\d+)\.(\d+)$")]
     private static partial Regex TimeRx();
 
-    /// <summary>«1:02.34» / «58.21» → мс. null — пусто или не распознано.</summary>
+    /// <summary>«1:02.34» / «58.21» / «00:40:29.16» (длинные дистанции) → мс.
+    /// null — пусто или не распознано.</summary>
     public static int? ParseToMs(string? time)
     {
         if (string.IsNullOrWhiteSpace(time)) return null;
@@ -21,9 +22,10 @@ public static partial class SwimTime
         var match = TimeRx().Match(time);
         if (!match.Success) return null;
 
-        int minutes = match.Groups[1].Success ? int.Parse(match.Groups[1].Value) : 0;
-        int seconds = int.Parse(match.Groups[2].Value);
-        string frac = match.Groups[3].Value;
+        int hours = match.Groups[1].Success ? int.Parse(match.Groups[1].Value) : 0;
+        int minutes = (match.Groups[2].Success ? int.Parse(match.Groups[2].Value) : 0) + hours * 60;
+        int seconds = int.Parse(match.Groups[3].Value);
+        string frac = match.Groups[4].Value;
 
         frac = frac.Length switch
         {
