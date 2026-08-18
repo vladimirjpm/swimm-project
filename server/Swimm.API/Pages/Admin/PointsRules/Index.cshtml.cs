@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Validation;
 using Swimm.Domain.Entities;
 
 namespace Swimm.API.Pages.Admin.PointsRules;
@@ -96,14 +97,32 @@ public class IndexModel : PageModel
     }
 
     /// <summary>
-    /// Пояснение к бейджу «★ расхождение»: чем именно официальные очки неверны. Текст едет на
-    /// публичную страницу (попап «Points system»), поэтому пишется по-английски. Пустая строка
-    /// стирает пояснение.
+    /// Пояснение к бейджу «★ расхождение»: чем именно официальные очки неверны. Уезжает на
+    /// публичную страницу (попап «Points system»), где читатель сам переключает язык — поэтому
+    /// принимаем все три сразу. Табличка расхождения вводится строкой «21:5>6, 22:3>5».
+    /// Пустой ввод стирает пояснение целиком.
     /// </summary>
-    public async Task<IActionResult> OnPostSaveMismatchNoteAsync(int noteCompetitionId, string? mismatchNote)
+    public async Task<IActionResult> OnPostSaveMismatchNoteAsync(
+        int noteCompetitionId, string? noteEn, string? noteRu, string? noteHe, string? scaleDiff)
     {
         var kindSlug = PointRulesKindParser.ToSlug(RuleKind);
-        var result = await _repo.SetClubMismatchNoteAsync(noteCompetitionId, mismatchNote);
+
+        if (!ScaleDiffText.TryParse(scaleDiff, out var diff, out var parseError))
+        {
+            TempData["Flash"] = $"Не сохранено: {parseError}";
+            return RedirectToPage("Index", new { kind = kindSlug });
+        }
+
+        var result = await _repo.SetClubMismatchNoteAsync(noteCompetitionId, new CompetitionNoteInputDto
+        {
+            Texts = new Dictionary<string, string?>
+            {
+                [CompetitionNoteLangs.En] = noteEn,
+                [CompetitionNoteLangs.Ru] = noteRu,
+                [CompetitionNoteLangs.He] = noteHe,
+            },
+            ScaleDiff = diff
+        });
 
         if (!result.Success)
         {
@@ -114,7 +133,9 @@ public class IndexModel : PageModel
         var saved = result.Id == 1;
         await _audit.LogAsync("pointrule.verify", "Competition", noteCompetitionId.ToString(),
             saved
-                ? $"Пояснение к расхождению клубных очков у соревнования #{noteCompetitionId}: {mismatchNote?.Trim()}"
+                ? $"Пояснение к расхождению клубных очков у соревнования #{noteCompetitionId} сохранено " +
+                  $"(языков: {new[] { noteEn, noteRu, noteHe }.Count(t => !string.IsNullOrWhiteSpace(t))}, " +
+                  $"строк расхождения: {diff.Count})"
                 : $"Пояснение к расхождению клубных очков у соревнования #{noteCompetitionId} стёрто");
 
         TempData["Flash"] = saved ? "Пояснение сохранено" : "Пояснение стёрто";

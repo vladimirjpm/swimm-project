@@ -74,10 +74,10 @@ public sealed class PointRuleCompetitionRowDto
     public int? RuleId { get; set; }
 
     /// <summary>
-    /// Объяснение расхождения с официальными очками (только клубный зачёт). Показывается
-    /// читателю сайта в попапе «Points system», поэтому пишется по-английски.
+    /// Объяснение расхождения с официальными очками (только клубный зачёт): тексты по языкам
+    /// и табличка расхождения. null — объяснение не написано.
     /// </summary>
-    public string? MismatchNote { get; set; }
+    public CompetitionNoteDto? MismatchNote { get; set; }
 }
 
 /// <summary>Одна перепривязка из панели: соревнование → правило (null — снять, вернуть автоподбор).</summary>

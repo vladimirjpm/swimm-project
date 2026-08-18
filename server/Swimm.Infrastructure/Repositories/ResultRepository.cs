@@ -755,14 +755,21 @@ public class ResultRepository : IResultRepository
 
         // Объяснение расхождения — только к бейджу расхождения и только если оно одно на всю
         // выборку: два разных объяснения в одном попапе противоречили бы друг другу.
-        string? clubPointsVerifiedNote = null;
+        // У многодневки примечание записано каждому дню одинаковым, поэтому сравниваем
+        // содержимое, а не число строк.
+        CompetitionNoteDto? clubPointsMismatchNote = null;
         if (clubPointsVerified == PointsVerifiedKinds.Mismatch)
         {
-            var notes = await query
-                .Select(r => r.Competition.ClubPointsVerifiedNote)
-                .Distinct()
+            var competitionIds = await query.Select(r => r.CompetitionId).Distinct().ToListAsync();
+            var notes = await _db.CompetitionNotes.AsNoTracking()
+                .Include(n => n.Texts)
+                .Where(n => competitionIds.Contains(n.CompetitionId)
+                         && n.Kind == CompetitionNoteKinds.ClubPointsMismatch)
                 .ToListAsync();
-            clubPointsVerifiedNote = notes.Count == 1 ? notes[0] : null;
+
+            var dtos = notes.Select(PointRulesAdminRepository.ToDto).ToList();
+            if (dtos.Count > 0 && dtos.All(d => SameNote(d, dtos[0])))
+                clubPointsMismatchNote = dtos[0];
         }
 
         var appliedRules = ruleKeys
@@ -825,7 +832,7 @@ public class ResultRepository : IResultRepository
             TopClubs = topClubs,
             ClubPointsRules = appliedRules,
             ClubPointsVerified = clubPointsVerified,
-            ClubPointsVerifiedNote = clubPointsVerifiedNote,
+            ClubPointsMismatchNote = clubPointsMismatchNote,
             TopClubsMen = topClubsMen,
             TopClubsWomen = topClubsWomen,
             TopMedalists = topMedalists,
@@ -1497,6 +1504,13 @@ public class ResultRepository : IResultRepository
 
     /// <summary>Дата соревнования из DTO (dd/MM/yyyy). Неразобранная — сегодня: правило по дате
     /// не подберётся «из прошлого», а привязка по Id всё равно важнее.</summary>
+    /// <summary>Одинаковы ли примечания дней события: сравниваем то, что увидит читатель.</summary>
+    private static bool SameNote(CompetitionNoteDto a, CompetitionNoteDto b) =>
+        a.Texts.Count == b.Texts.Count
+        && a.Texts.All(t => b.Texts.TryGetValue(t.Key, out var other) && other == t.Value)
+        && a.ScaleDiff.Count == b.ScaleDiff.Count
+        && a.ScaleDiff.Zip(b.ScaleDiff).All(p => p.First == p.Second);
+
     private static DateOnly ParseCompetitionDate(string? date) =>
         DateOnly.TryParseExact(date, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)
             ? d

@@ -168,18 +168,6 @@ public class Competition
   [MaxLength(20)]
   public string? ClubPointsVerifiedKind { get; set; }
 
-  /// <summary>
-  /// Чем именно наши клубные очки отличаются от официальных — текст ДЛЯ ЧИТАТЕЛЯ САЙТА,
-  /// поэтому по-английски (правило «UI только English»).
-  ///
-  /// Живёт рядом с <see cref="ClubPointsVerifiedKind"/>, потому что смысл имеет только
-  /// вместе с ним: бейдж «Differs from official» без объяснения — это утверждение без
-  /// доказательства, а объяснение у каждого соревнования своё (у 1501 — хвост шкалы,
-  /// у следующего будет что-то другое). Показывается в попапе «Points system».
-  /// </summary>
-  [MaxLength(2000)]
-  public string? ClubPointsVerifiedNote { get; set; }
-
   /// <summary>Когда вручную проверен HIGH POINT этого соревнования. См. <see cref="ClubPointsVerifiedAt"/>.</summary>
   public DateTime? SwimmersPointsVerifiedAt { get; set; }
 

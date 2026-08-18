@@ -2,6 +2,7 @@
 @using Swimm.Application.Dtos
 @using Swimm.Domain.Entities
 @model Swimm.API.Pages.Admin.PointsRules.IndexModel
+@using Swimm.Application.Validation
 @{
     ViewData["Title"] = "Points rules";
     ViewData["PageSubtitle"] = "Правила начисления очков: клубный зачёт и High Point";
@@ -244,19 +245,39 @@
                                                 </td>
                                             </tr>
                                             @* Объяснение расхождения — только у клубного зачёта и только когда он помечен
-                                               «★ расхождение»: без метки этот текст некуда показывать. Уезжает читателю
-                                               сайта (попап «Points system»), поэтому по-английски. *@
+                                               «★ расхождение»: без метки этот текст некуда показывать. Едет читателю сайта
+                                               (попап «Points system»), где он сам переключает язык — поэтому все три сразу. *@
                                             @if (kind == "clubs" && c.VerifiedKind == PointsVerifiedKinds.Mismatch)
                                             {
                                                 <tr data-verified="@(c.VerifiedKind ?? "none")">
                                                     <td colspan="6" class="pb-3">
-                                                        <label class="block text-[12px] text-admin-text-muted mb-1">
-                                                            Почему официальные очки неверны (по-английски — текст видит читатель сайта)
-                                                        </label>
-                                                        <div class="flex gap-2 items-start">
-                                                            <textarea name="mismatchNote" rows="2"
-                                                                      class="admin-input flex-1 text-[12.5px]"
-                                                                      placeholder="e.g. The official table awarded 6 and 5 points for places 21-22 instead of the 5 and 3 set by the meet regulations.">@c.MismatchNote</textarea>
+                                                        <div class="text-[12px] text-admin-text-muted mb-1">
+                                                            Почему официальные очки неверны — текст видит читатель сайта, переключая язык в попапе
+                                                        </div>
+                                                        <div class="grid gap-2 md:grid-cols-3">
+                                                            @foreach (var (langCode, langLabel, placeholder) in new[]
+                                                            {
+                                                                (CompetitionNoteLangs.En, "EN", "The official table awarded 6 and 5 points for places 21-22 instead of the 5 and 3 set by the regulations."),
+                                                                (CompetitionNoteLangs.Ru, "RU", "Официальная таблица дала за 21-22 места 6 и 5 очков вместо 5 и 3 из регламента."),
+                                                                (CompetitionNoteLangs.He, "HE", "הטבלה הרשמית העניקה 6 ו-5 נקודות על מקומות 21-22 במקום 5 ו-3 שבתקנון.")
+                                                            })
+                                                            {
+                                                                <label class="text-[12px] text-admin-text-muted flex flex-col gap-1">
+                                                                    @langLabel
+                                                                    <textarea name="note@(langLabel)" rows="4"
+                                                                              dir="@(langCode == CompetitionNoteLangs.He ? "rtl" : "ltr")"
+                                                                              class="admin-input text-[12.5px]"
+                                                                              placeholder="@placeholder">@(c.MismatchNote?.Texts.GetValueOrDefault(langCode))</textarea>
+                                                                </label>
+                                                            }
+                                                        </div>
+                                                        <div class="mt-2 flex gap-2 items-end">
+                                                            <label class="text-[12px] text-admin-text-muted flex flex-col gap-1 flex-1">
+                                                                Табличка расхождения — «место:по регламенту&gt;начислено», через запятую
+                                                                <input type="text" name="scaleDiff" class="admin-input text-[12.5px]"
+                                                                       placeholder="21:5&gt;6, 22:3&gt;5"
+                                                                       value="@(c.MismatchNote == null ? "" : ScaleDiffText.Format(c.MismatchNote.ScaleDiff))" />
+                                                            </label>
                                                             <button type="submit"
                                                                     name="noteCompetitionId" value="@c.Id"
                                                                     formaction="@Url.Page("Index", "SaveMismatchNote", new { kind })"

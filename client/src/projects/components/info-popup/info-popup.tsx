@@ -51,17 +51,57 @@ function readLang(): InfoLang {
   return 'en';
 }
 
-const UI_InfoPopup: React.FC<InfoPopupProps> = ({ open, onClose, title, body, footnote }) => {
+/**
+ * Выбранный язык объяснялок — ОДИН на весь сайт. Вынесен из попапа, потому что тем же
+ * механизмом пользуется попап «Points system»: человек, переключившийся на иврит в одном
+ * месте, не должен переключаться снова в другом.
+ */
+export function useInfoLang(): [InfoLang, (next: InfoLang) => void] {
   const [lang, setLang] = React.useState<InfoLang>(readLang);
 
-  const pickLang = (next: InfoLang) => {
+  const pickLang = React.useCallback((next: InfoLang) => {
     setLang(next);
     try {
       localStorage.setItem(STORAGE_KEY, next);
     } catch {
       /* не критично */
     }
-  };
+  }, []);
+
+  return [lang, pickLang];
+}
+
+/** Вкладки EN/RU/HE. Язык без текста выключен — вкладка-пустышка обманывает читателя. */
+export const UI_LangTabs: React.FC<{
+  lang: InfoLang;
+  onPick: (next: InfoLang) => void;
+  available: Partial<Record<InfoLang, string | undefined>>;
+}> = ({ lang, onPick, available }) => (
+  <div className="mb-3 flex gap-1">
+    {LANGS.map(({ key, label }) => {
+      const empty = !available[key]?.trim();
+      const active = key === lang;
+      return (
+        <button
+          key={key}
+          type="button"
+          disabled={empty}
+          onClick={() => onPick(key)}
+          className={`rounded-md px-2.5 py-1 text-[11px] font-bold tracking-wide transition-colors
+            ${active
+              ? 'bg-[var(--theme-primary)] text-[var(--theme-mode-accent-text)]'
+              : 'text-[var(--theme-mode-text-muted)] hover:text-[var(--theme-mode-text)]'}
+            ${empty ? 'cursor-not-allowed opacity-40' : ''}`}
+        >
+          {label}
+        </button>
+      );
+    })}
+  </div>
+);
+
+const UI_InfoPopup: React.FC<InfoPopupProps> = ({ open, onClose, title, body, footnote }) => {
+  const [lang, pickLang] = useInfoLang();
 
   React.useEffect(() => {
     if (!open) return;
@@ -105,27 +145,7 @@ const UI_InfoPopup: React.FC<InfoPopupProps> = ({ open, onClose, title, body, fo
           ✕
         </button>
 
-        <div className="mb-3 flex gap-1">
-          {LANGS.map(({ key, label }) => {
-            const empty = !body[key]?.trim();
-            const active = key === lang;
-            return (
-              <button
-                key={key}
-                type="button"
-                disabled={empty}
-                onClick={() => pickLang(key)}
-                className={`rounded-md px-2.5 py-1 text-[11px] font-bold tracking-wide transition-colors
-                  ${active
-                    ? 'bg-[var(--theme-primary)] text-[var(--theme-mode-accent-text)]'
-                    : 'text-[var(--theme-mode-text-muted)] hover:text-[var(--theme-mode-text)]'}
-                  ${empty ? 'cursor-not-allowed opacity-40' : ''}`}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+        <UI_LangTabs lang={lang} onPick={pickLang} available={body} />
 
         <div dir={isRtl ? 'rtl' : 'ltr'} style={{ textAlign: isRtl ? 'right' : 'left' }}>
           <div className="mb-2 pr-6 text-[15px] font-bold">{title[lang]}</div>

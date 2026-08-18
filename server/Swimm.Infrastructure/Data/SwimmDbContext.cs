@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Swimm.Domain.Entities;
 
 namespace Swimm.Infrastructure.Data;
@@ -45,6 +45,8 @@ public class SwimmDbContext : DbContext
 
     /* === Клубный зачёт соревнования (материализованный; страница клуба, Фаза 10) === */
     public DbSet<ClubCompetitionStanding> ClubCompetitionStandings => Set<ClubCompetitionStanding>();
+    public DbSet<CompetitionNote> CompetitionNotes => Set<CompetitionNote>();
+    public DbSet<CompetitionNoteText> CompetitionNoteTexts => Set<CompetitionNoteText>();
 
     /* === Рекорды и нормативы (фаза 2) === */
     public DbSet<Record> Records => Set<Record>();
@@ -236,6 +238,24 @@ public class SwimmDbContext : DbContext
                 .HasForeignKey(e => e.ClubId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+
+        modelBuilder.Entity<CompetitionNote>(entity =>
+        {
+            entity.ToTable("CompetitionNotes");
+
+            entity.HasOne(e => e.Competition)
+                .WithMany()
+                .HasForeignKey(e => e.CompetitionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Переводы живут только вместе с заметкой.
+            entity.HasMany(e => e.Texts)
+                .WithOne(t => t.Note)
+                .HasForeignKey(t => t.NoteId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CompetitionNoteText>(entity => entity.ToTable("CompetitionNoteTexts"));
 
         modelBuilder.Entity<Style>(entity =>
         {

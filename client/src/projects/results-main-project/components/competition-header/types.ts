@@ -58,6 +58,14 @@ export interface ClubPointsRuleEntry {
   points: number;
 }
 
+/** Объяснение расхождения с официальным зачётом: тексты по языкам + табличка расхождения. */
+export interface CompetitionMismatchNote {
+  /** Язык ('en'|'ru'|'he') → текст. Языка нет — вкладка в попапе выключена. */
+  texts: Record<string, string>;
+  /** Строки «место / по регламенту / начислено официально»; пусто — только проза. */
+  scale_diff: { place: number; expected: number; actual: number }[];
+}
+
 /** Правило клубных очков, применённое к этому зачёту (overview.club_points_rules). */
 export interface ClubPointsRule {
   version: string;
@@ -144,9 +152,10 @@ export interface CompetitionOverview {
   /** Итог ручной проверки очков: 'official' | 'accepted' | 'mismatch' | null (не проверялось
    *  либо в выборке смешаны разные итоги). */
   club_points_verified: string | null;
-  /** Чем именно наши очки расходятся с официальными (текст для читателя) — показывается
-   *  в попапе «Points system» рядом со шкалой. Приходит только вместе с 'mismatch'. */
-  club_points_verified_note: string | null;
+  /** Чем именно наши очки расходятся с официальными: проза на трёх языках + табличка
+   *  «место / по регламенту / начислено». Показывается в попапе «Points system».
+   *  Приходит только вместе с 'mismatch'. */
+  club_points_mismatch_note: CompetitionMismatchNote | null;
   top_clubs_men: OverviewClub[];
   top_clubs_women: OverviewClub[];
   /** Самые титулованные: при равном наборе медалей — все, а не первый попавшийся. */

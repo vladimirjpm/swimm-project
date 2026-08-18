@@ -1,6 +1,9 @@
 import React from 'react';
 import { useAppSelector } from '../../../store/store';
-import type { ClubPointsRule } from '../../results-main-project/components/competition-header/types';
+import type {
+  ClubPointsRule, CompetitionMismatchNote,
+} from '../../results-main-project/components/competition-header/types';
+import { UI_LangTabs, useInfoLang, type InfoLang } from '../info-popup/info-popup';
 
 /**
  * Попап «как начисляются клубные очки»: шкала мест того правила (или правил), по которому
@@ -11,7 +14,86 @@ interface PopupData {
   rules: ClubPointsRule[];
   /** Чем наши очки расходятся с официальными — приходит только у соревнований с бейджем
    *  «Differs from official». null — расхождения нет либо объяснение не записано. */
-  mismatchNote?: string | null;
+  mismatchNote?: CompetitionMismatchNote | null;
+}
+
+/** Подписи таблички расхождения — статика интерфейса, поэтому в коде, а не в БД. */
+const DIFF_LABELS: Record<InfoLang, { title: string; place: string; expected: string; actual: string }> = {
+  en: { title: 'The official standings were scored incorrectly',
+        place: 'Place', expected: 'Per regulations', actual: 'Officially awarded' },
+  ru: { title: 'Официальный зачёт посчитан неверно',
+        place: 'Место', expected: 'По регламенту', actual: 'Начислено официально' },
+  he: { title: 'הדירוג הרשמי חושב באופן שגוי',
+        place: 'מקום', expected: 'לפי התקנון', actual: 'הוענק רשמית' },
+};
+
+const FOLLOW_UP: Record<InfoLang, string> = {
+  en: 'The scale below is the one from the meet regulations — the points on this page follow it.',
+  ru: 'Шкала ниже — из регламента соревнования, очки на этой странице считаются по ней.',
+  he: 'הסולם למטה הוא זה שבתקנון התחרות — הנקודות בעמוד זה מחושבות לפיו.',
+};
+
+/**
+ * Расхождение с официальной таблицей. Стоит ПЕРЕД шкалой: читатель пришёл сюда по бейджу
+ * «Differs from official» и ищет объяснение, а не список мест.
+ *
+ * Языки переключаются теми же вкладками и тем же запомненным выбором, что и остальные
+ * объяснялки сайта (`useInfoLang`). Табличка расхождения приходит ДАННЫМИ и рисуется здесь —
+ * так она живёт в теме сайта и переживает узкий экран, чего готовая вёрстка из базы не умеет.
+ */
+function MismatchBlock({ note }: { note: CompetitionMismatchNote }) {
+  const [lang, pickLang] = useInfoLang();
+  const texts = note.texts ?? {};
+  // Языка может не быть — тогда показываем любой заполненный, но вкладку не подсвечиваем ложно.
+  const shown = texts[lang] ?? texts.en ?? Object.values(texts)[0] ?? '';
+  const labels = DIFF_LABELS[lang];
+  const isRtl = lang === 'he';
+
+  return (
+    <div
+      className="mb-4 rounded-lg p-3"
+      style={{
+        background: 'color-mix(in srgb, #dc2626 10%, transparent)',
+        border: '1px solid color-mix(in srgb, #dc2626 30%, transparent)',
+      }}
+    >
+      <UI_LangTabs lang={lang} onPick={pickLang} available={texts} />
+
+      <div dir={isRtl ? 'rtl' : 'ltr'} style={{ textAlign: isRtl ? 'right' : 'left' }}>
+        <div className="mb-1 text-[13px] font-bold" style={{ color: '#dc2626' }}>{labels.title}</div>
+        <p className="whitespace-pre-line text-[13px]" style={{ color: 'var(--theme-mode-text-secondary)' }}>
+          {shown}
+        </p>
+
+        {note.scale_diff?.length > 0 && (
+          <div className="mt-3 overflow-x-auto">
+            <table className="text-[12.5px] tabular-nums">
+              <thead>
+                <tr style={{ color: 'var(--theme-mode-text-muted)' }}>
+                  <th className="px-2 py-1 text-start font-semibold">{labels.place}</th>
+                  <th className="px-2 py-1 text-start font-semibold">{labels.expected}</th>
+                  <th className="px-2 py-1 text-start font-semibold">{labels.actual}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {note.scale_diff.map((row) => (
+                  <tr key={row.place}>
+                    <td className="px-2 py-1 font-semibold">{row.place}</td>
+                    <td className="px-2 py-1">{row.expected}</td>
+                    <td className="px-2 py-1 font-bold" style={{ color: '#dc2626' }}>{row.actual}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <p className="mt-2 text-[12px]" style={{ color: 'var(--theme-mode-text-muted)' }}>
+          {FOLLOW_UP[lang]}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 const SCOPE_LABELS: Record<string, string> = {
@@ -81,25 +163,7 @@ const PopupContentClubPoints: React.FC = () => {
         Points per place, as defined by the rule this meet is scored with.
       </p>
 
-      {/* Расхождение с официальной таблицей. Стоит ПЕРЕД шкалой: читатель пришёл сюда по
-          бейджу «Differs from official» и ищет объяснение, а не список мест. */}
-      {mismatchNote && (
-        <div
-          className="mb-4 rounded-lg p-3 text-[13px]"
-          style={{
-            background: 'color-mix(in srgb, #dc2626 10%, transparent)',
-            border: '1px solid color-mix(in srgb, #dc2626 30%, transparent)',
-          }}
-        >
-          <div className="mb-1 font-bold" style={{ color: '#dc2626' }}>
-            The official standings were scored incorrectly
-          </div>
-          <p style={{ color: 'var(--theme-mode-text-secondary)' }}>{mismatchNote}</p>
-          <p className="mt-2" style={{ color: 'var(--theme-mode-text-muted)' }}>
-            The scale below is the one from the meet regulations — the points on this page follow it.
-          </p>
-        </div>
-      )}
+      {mismatchNote && <MismatchBlock note={mismatchNote} />}
 
       {rules.length === 0 ? (
         <p className="text-[13px]" style={{ color: 'var(--theme-mode-text-muted)' }}>

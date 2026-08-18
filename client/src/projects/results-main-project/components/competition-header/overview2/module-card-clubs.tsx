@@ -92,7 +92,7 @@ export default function ModuleCardClubs({
       popUpType: Enums.PopupType.clubPoints,
       // Объяснение расхождения едет в попап вместе со шкалой: бейдж на карточке говорит
       // «официальные очки неверны», а ПОЧЕМУ — место есть только тут.
-      popUpObj: { rules, mismatchNote: officialMismatch ? overview.club_points_verified_note : null },
+      popUpObj: { rules, mismatchNote: officialMismatch ? overview.club_points_mismatch_note : null },
     }));
 
   return (

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -161,14 +162,19 @@ public class PointRulesAdminRepository(
                 c.OrgCompId,
                 VerifiedAt = kind == PointRuleKind.Clubs ? c.ClubPointsVerifiedAt : c.SwimmersPointsVerifiedAt,
                 VerifiedBy = kind == PointRuleKind.Clubs ? c.ClubPointsVerifiedBy : c.SwimmersPointsVerifiedBy,
-                VerifiedKind = kind == PointRuleKind.Clubs ? c.ClubPointsVerifiedKind : c.SwimmersPointsVerifiedKind,
-                c.ClubPointsVerifiedNote
+                VerifiedKind = kind == PointRuleKind.Clubs ? c.ClubPointsVerifiedKind : c.SwimmersPointsVerifiedKind
             })
             .ToListAsync();
 
         if (days.Count == 0) return [];
 
         var dayIds = days.Select(d => d.Id).ToList();
+
+        // Примечания к расхождению — отдельным запросом: они есть у единиц соревнований,
+        // тянуть их джойном в каждую строку панели незачем.
+        var notes = kind == PointRuleKind.Clubs
+            ? await LoadNotesAsync(dayIds)
+            : new Dictionary<int, CompetitionNoteDto>();
         var resultCounts = await db.Results.AsNoTracking()
             .Where(r => dayIds.Contains(r.CompetitionId))
             .GroupBy(r => r.CompetitionId)
@@ -201,9 +207,7 @@ public class PointRulesAdminRepository(
                     VerifiedBy = g.Select(d => d.VerifiedBy).FirstOrDefault(x => x != null),
                     VerifiedKind = g.Select(d => d.VerifiedKind).FirstOrDefault(x => x != null),
                     // Объяснение — свойство соревнования целиком: у дней события оно одно.
-                    MismatchNote = kind == PointRuleKind.Clubs
-                        ? g.Select(d => d.ClubPointsVerifiedNote).FirstOrDefault(x => x != null)
-                        : null,
+                    MismatchNote = g.Select(d => notes.GetValueOrDefault(d.Id)).FirstOrDefault(x => x != null),
                     RuleId = ruleId
                 };
             })
@@ -337,7 +341,8 @@ public class PointRulesAdminRepository(
         return PointRuleSaveResult.Ok(now == null ? 0 : 1);
     }
 
-    public async Task<PointRuleSaveResult> SetClubMismatchNoteAsync(int competitionId, string? note)
+    public async Task<PointRuleSaveResult> SetClubMismatchNoteAsync(
+        int competitionId, CompetitionNoteInputDto input)
     {
         var head = await db.Competitions.AsNoTracking()
             .Where(c => c.Id == competitionId)
@@ -345,20 +350,108 @@ public class PointRulesAdminRepository(
             .FirstOrDefaultAsync();
         if (head == null) return PointRuleSaveResult.Fail($"Соревнование #{competitionId} не найдено");
 
+        foreach (var lang in input.Texts.Keys)
+            if (!CompetitionNoteLangs.IsKnown(lang))
+                return PointRuleSaveResult.Fail($"Неизвестный язык «{lang}»");
+
+        if (input.ScaleDiff.Any(r => r.Place <= 0))
+            return PointRuleSaveResult.Fail("В табличке расхождения есть место ≤ 0");
+
         // Расхождение — свойство соревнования, а не отдельного дня: пишем всем дням события,
         // как и саму отметку сверки.
-        var days = head.EventId is int ev
-            ? await db.Competitions.Where(c => c.EventId == ev).ToListAsync()
-            : await db.Competitions.Where(c => c.Id == head.Id).ToListAsync();
+        var dayIds = head.EventId is int ev
+            ? await db.Competitions.Where(c => c.EventId == ev).Select(c => c.Id).ToListAsync()
+            : [head.Id];
 
-        var clean = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
-        foreach (var day in days)
-            day.ClubPointsVerifiedNote = clean;
+        var texts = input.Texts
+            .Where(t => !string.IsNullOrWhiteSpace(t.Value))
+            .ToDictionary(t => t.Key, t => t.Value!.Trim());
+        var diff = input.ScaleDiff.OrderBy(r => r.Place).ToList();
+        var empty = texts.Count == 0 && diff.Count == 0;
+
+        var existing = await db.CompetitionNotes
+            .Include(n => n.Texts)
+            .Where(n => dayIds.Contains(n.CompetitionId) && n.Kind == CompetitionNoteKinds.ClubPointsMismatch)
+            .ToListAsync();
+
+        if (empty)
+        {
+            // Пустой ввод стирает примечание целиком — переводы уедут каскадом.
+            db.CompetitionNotes.RemoveRange(existing);
+            await db.SaveChangesAsync();
+            await cache.InvalidateAllAsync();
+            return PointRuleSaveResult.Ok(0);
+        }
+
+        var diffJson = diff.Count == 0 ? null : JsonSerializer.Serialize(diff);
+
+        foreach (var dayId in dayIds)
+        {
+            var note = existing.FirstOrDefault(n => n.CompetitionId == dayId);
+            if (note is null)
+            {
+                note = new CompetitionNote
+                {
+                    CompetitionId = dayId,
+                    Kind = CompetitionNoteKinds.ClubPointsMismatch
+                };
+                db.CompetitionNotes.Add(note);
+            }
+
+            note.ScaleDiffJson = diffJson;
+            note.UpdatedAt = DateTime.UtcNow;
+
+            // Перевод, который стёрли, должен исчезнуть, а не остаться от прошлой правки.
+            foreach (var stale in note.Texts.Where(t => !texts.ContainsKey(t.Lang)).ToList())
+                db.CompetitionNoteTexts.Remove(stale);
+
+            foreach (var (lang, body) in texts)
+            {
+                var text = note.Texts.FirstOrDefault(t => t.Lang == lang);
+                if (text is null)
+                    note.Texts.Add(new CompetitionNoteText { Lang = lang, Body = body });
+                else
+                    text.Body = body;
+            }
+        }
 
         await db.SaveChangesAsync();
         // Текст едет в публичный overview — кэш обязан протухнуть.
         await cache.InvalidateAllAsync();
-        return PointRuleSaveResult.Ok(clean is null ? 0 : 1);
+        return PointRuleSaveResult.Ok(1);
+    }
+
+    /// <summary>Примечания «расхождение клубных очков» по дням: competitionId → примечание.</summary>
+    private async Task<Dictionary<int, CompetitionNoteDto>> LoadNotesAsync(IReadOnlyCollection<int> competitionIds)
+    {
+        var notes = await db.CompetitionNotes.AsNoTracking()
+            .Include(n => n.Texts)
+            .Where(n => competitionIds.Contains(n.CompetitionId)
+                     && n.Kind == CompetitionNoteKinds.ClubPointsMismatch)
+            .ToListAsync();
+
+        return notes.ToDictionary(n => n.CompetitionId, ToDto);
+    }
+
+    /// <summary>Сущность → публичный вид. Битый JSON расхождения не роняет страницу.</summary>
+    internal static CompetitionNoteDto ToDto(CompetitionNote note)
+    {
+        List<ScaleDiffRowDto> diff = [];
+        if (!string.IsNullOrWhiteSpace(note.ScaleDiffJson))
+        {
+            try
+            {
+                diff = JsonSerializer.Deserialize<List<ScaleDiffRowDto>>(note.ScaleDiffJson) ?? [];
+            }
+            catch (JsonException)
+            {
+                diff = [];
+            }
+        }
+
+        return new CompetitionNoteDto(
+            note.Texts.ToDictionary(t => t.Lang, t => t.Body),
+            diff);
     }
 
     public async Task<PointRuleEditDto?> GetByIdAsync(PointRuleKind kind, int id)

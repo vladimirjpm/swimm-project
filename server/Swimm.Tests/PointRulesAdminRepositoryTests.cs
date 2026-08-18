@@ -502,40 +502,90 @@ public class PointRulesAdminRepositoryTests
         Assert.Equal(2, row.CompetitionCount);
     }
 
-    // ── пояснение к расхождению ───────────────────────────────────────────────
+    // ── пояснение к расхождению (CompetitionNotes) ────────────────────────────
+
+    private static CompetitionNoteInputDto NoteInput(
+        string? en = null, string? ru = null, string? he = null, params (int Place, int Expected, int Actual)[] diff) => new()
+    {
+        Texts = new Dictionary<string, string?> { ["en"] = en, ["ru"] = ru, ["he"] = he },
+        ScaleDiff = diff.Select(d => new ScaleDiffRowDto(d.Place, d.Expected, d.Actual)).ToList()
+    };
 
     [Fact]
-    public async Task MismatchNote_SavedForEveryDayOfEvent()
+    public async Task MismatchNote_SavedForEveryDayOfEvent_WithAllLanguages()
     {
         // Расхождение — свойство соревнования, а не дня: попап на витрине один на все дни.
-        await using var db = CreateDb(nameof(MismatchNote_SavedForEveryDayOfEvent));
+        await using var db = CreateDb(nameof(MismatchNote_SavedForEveryDayOfEvent_WithAllLanguages));
         db.CompetitionEvents.Add(new CompetitionEvent { Id = 7, Name = "Champs" });
         db.Competitions.AddRange(
             Comp(1, "day 1", "10/01/2026", clubsRuleId: 1, eventId: 7),
             Comp(2, "day 2", "11/01/2026", clubsRuleId: 1, eventId: 7));
         await db.SaveChangesAsync();
 
-        var res = await Repo(db).SetClubMismatchNoteAsync(1, "  Places 21-22 were scored 6 and 5.  ");
+        var res = await Repo(db).SetClubMismatchNoteAsync(1,
+            NoteInput(en: "  Places 21-22 were scored 6 and 5.  ", ru: "Места 21-22 получили 6 и 5.",
+                      he: "מקומות 21-22 קיבלו 6 ו-5.", diff: [(21, 5, 6), (22, 3, 5)]));
 
         Assert.True(res.Success);
-        Assert.All(await db.Competitions.ToListAsync(),
-            c => Assert.Equal("Places 21-22 were scored 6 and 5.", c.ClubPointsVerifiedNote));
+        var notes = await db.CompetitionNotes.Include(n => n.Texts).ToListAsync();
+        Assert.Equal(2, notes.Count);
+        Assert.All(notes, n =>
+        {
+            Assert.Equal(CompetitionNoteKinds.ClubPointsMismatch, n.Kind);
+            Assert.Equal(3, n.Texts.Count);
+            // Пробелы по краям режутся: текст едет на витрину как есть.
+            Assert.Equal("Places 21-22 were scored 6 and 5.", n.Texts.Single(t => t.Lang == "en").Body);
+            Assert.Contains("21", n.ScaleDiffJson);
+        });
     }
 
     [Fact]
-    public async Task MismatchNote_EmptyText_ClearsIt()
+    public async Task MismatchNote_LanguageCanBeAddedAndRemoved()
     {
-        await using var db = CreateDb(nameof(MismatchNote_EmptyText_ClearsIt));
-        var comp = Comp(1, "Meet", "10/01/2026", clubsRuleId: 1);
-        comp.ClubPointsVerifiedNote = "old text";
-        db.Competitions.Add(comp);
+        await using var db = CreateDb(nameof(MismatchNote_LanguageCanBeAddedAndRemoved));
+        db.Competitions.Add(Comp(1, "Meet", "10/01/2026", clubsRuleId: 1));
         await db.SaveChangesAsync();
+        var repo = Repo(db);
 
-        var res = await Repo(db).SetClubMismatchNoteAsync(1, "   ");
+        await repo.SetClubMismatchNoteAsync(1, NoteInput(en: "English", ru: "Русский"));
+        await repo.SetClubMismatchNoteAsync(1, NoteInput(en: "English", he: "עברית"));
+
+        var note = await db.CompetitionNotes.Include(n => n.Texts).SingleAsync();
+        var langs = note.Texts.Select(t => t.Lang).OrderBy(l => l).ToList();
+        Assert.Equal(["en", "he"], langs); // ru стёрт, he добавлен
+    }
+
+    [Fact]
+    public async Task MismatchNote_EmptyInput_DeletesNote()
+    {
+        await using var db = CreateDb(nameof(MismatchNote_EmptyInput_DeletesNote));
+        db.Competitions.Add(Comp(1, "Meet", "10/01/2026", clubsRuleId: 1));
+        await db.SaveChangesAsync();
+        var repo = Repo(db);
+        await repo.SetClubMismatchNoteAsync(1, NoteInput(en: "text", diff: [(21, 5, 6)]));
+
+        var res = await repo.SetClubMismatchNoteAsync(1, NoteInput(en: "   "));
 
         Assert.True(res.Success);
-        Assert.Equal(0, res.Id); // 0 = стёрто, 1 = записано
-        Assert.Null((await db.Competitions.FindAsync(1))!.ClubPointsVerifiedNote);
+        Assert.Equal(0, res.Id);
+        Assert.Empty(await db.CompetitionNotes.ToListAsync());
+        Assert.Empty(await db.CompetitionNoteTexts.ToListAsync());
+    }
+
+    [Fact]
+    public async Task MismatchNote_UnknownLanguage_Rejected()
+    {
+        await using var db = CreateDb(nameof(MismatchNote_UnknownLanguage_Rejected));
+        db.Competitions.Add(Comp(1, "Meet", "10/01/2026", clubsRuleId: 1));
+        await db.SaveChangesAsync();
+
+        var res = await Repo(db).SetClubMismatchNoteAsync(1, new CompetitionNoteInputDto
+        {
+            Texts = new Dictionary<string, string?> { ["de"] = "Deutsch" }
+        });
+
+        Assert.False(res.Success);
+        Assert.Contains("de", res.Error);
     }
 
     [Fact]
@@ -543,7 +593,7 @@ public class PointRulesAdminRepositoryTests
     {
         await using var db = CreateDb(nameof(MismatchNote_UnknownCompetition_Fails));
 
-        var res = await Repo(db).SetClubMismatchNoteAsync(404, "note");
+        var res = await Repo(db).SetClubMismatchNoteAsync(404, NoteInput(en: "note"));
 
         Assert.False(res.Success);
         Assert.Contains("404", res.Error);
@@ -555,12 +605,15 @@ public class PointRulesAdminRepositoryTests
         await using var db = CreateDb(nameof(Competitions_PanelShowsCurrentNote));
         var comp = Comp(1, "Meet", "10/01/2026", clubsRuleId: 1);
         comp.ClubPointsVerifiedKind = PointsVerifiedKinds.Mismatch;
-        comp.ClubPointsVerifiedNote = "Official table used a different tail.";
         db.Competitions.Add(comp);
         await db.SaveChangesAsync();
+        await Repo(db).SetClubMismatchNoteAsync(1, NoteInput(en: "Official table used a different tail.", diff: [(21, 5, 6)]));
 
         var rows = await Repo(db).GetCompetitionsAsync(PointRuleKind.Clubs, 1);
 
-        Assert.Equal("Official table used a different tail.", rows.Single().MismatchNote);
+        var note = rows.Single().MismatchNote;
+        Assert.NotNull(note);
+        Assert.Equal("Official table used a different tail.", note!.Texts["en"]);
+        Assert.Equal(new ScaleDiffRowDto(21, 5, 6), note.ScaleDiff.Single());
     }
 }
