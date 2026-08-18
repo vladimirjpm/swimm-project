@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Swimm.Application.Abstractions;
@@ -20,15 +20,20 @@ public class IndexModel : PageModel
     private readonly IImportService _import;
     private readonly IPointRulesAdminRepository _rules;
     private readonly IAdminAuditService _audit;
+    private readonly IConfiguration _config;
+    private readonly IWebHostEnvironment _env;
     private readonly ILogger<IndexModel> _logger;
 
     public IndexModel(ICompetitionAdminRepository repo, IImportService import,
-        IPointRulesAdminRepository rules, IAdminAuditService audit, ILogger<IndexModel> logger)
+        IPointRulesAdminRepository rules, IAdminAuditService audit,
+        IConfiguration config, IWebHostEnvironment env, ILogger<IndexModel> logger)
     {
         _repo = repo;
         _import = import;
         _rules = rules;
         _audit = audit;
+        _config = config;
+        _env = env;
         _logger = logger;
     }
 
@@ -103,12 +108,25 @@ public class IndexModel : PageModel
     public IReadOnlyList<SeasonCountDto> SeasonCounts { get; private set; } = [];
 
     /// <summary>Правила очков и типы бассейна — для селектов панели быстрой правки строки.</summary>
+    /// <summary>
+    /// База для ссылок «смотреть на сайте». В проде клиент лежит на том же origin, что и
+    /// админка, поэтому пусто = относительные ссылки; в Development клиент крутится на своём
+    /// Vite-порту. Настройка <c>PublicSite:BaseUrl</c> — как на /Admin/Health.
+    /// </summary>
+    public string PublicSiteBaseUrl { get; private set; } = "";
+
     public IReadOnlyList<PointRuleRowDto> ClubRules { get; private set; } = [];
     public IReadOnlyList<PointRuleRowDto> SwimmerRules { get; private set; } = [];
     public IReadOnlyList<string> PoolTypeOptions => Swimm.Application.Constants.PoolTypes.All;
 
     public async Task OnGetAsync()
     {
+        // Dev-адрес клиента нельзя зашивать в разметку: он уехал бы в прод. Та же настройка,
+        // что у /Admin/Health — пусто в проде значит «тот же origin», ссылка относительная.
+        PublicSiteBaseUrl = (_config["PublicSite:BaseUrl"]
+            ?? (_env.IsDevelopment() ? "http://localhost:5173" : ""))
+            .TrimEnd('/');
+
         if (PageNumber < 1) PageNumber = 1;
         if (string.IsNullOrEmpty(Stage))
         {

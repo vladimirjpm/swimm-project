@@ -38,6 +38,16 @@
         _ => ("скрыто", "скрыто", "bg-white/[.05] text-admin-text-muted/70"),
     };
 
+    // Ссылка «посмотреть соревнование на сайте» — вторая строка в колонке OrgCompId.
+    // Есть только у строк, которые уже в справочнике: у site-строк соревнования в БД ещё нет,
+    // и вести там некуда. У многодневки ведёт на первый день — публичная страница открывает
+    // событие целиком по любому его дню.
+    string PublicCompetitionLink(int? competitionId) =>
+        competitionId is int id
+            ? $"<a href=\"{Model.PublicSiteBaseUrl}/competitions/{id}\" target=\"_blank\" rel=\"noopener\" "
+              + "class=\"text-admin-accent hover:underline\">swimhub ↗</a>"
+            : "";
+
     // Бейдж стадии: короткий текст по умолчанию, полный — только на широком экране.
     // Полная подпись остаётся в title, чтобы сокращение не пришлось разгадывать.
     string StageBadgeHtml((string Text, string Short, string Cls) b) =>
@@ -391,11 +401,14 @@ else
                             <td class="whitespace-nowrap text-admin-text-muted">@Html.Raw(DateRangeHtml(ev.DateRange))</td>
                             <td>@(string.IsNullOrEmpty(ev.PoolType) ? "—" : ev.PoolType)</td>
                             <td class="text-admin-text-muted">
-                                @if (u.Site is { } es)
-                                {
-                                    <a href="https://isr.org.il/comp.asp?compID=@es.OrgCompId" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@es.OrgCompId ↗</a>
-                                }
-                                else { <text>—</text> }
+                                <div class="flex flex-col gap-0.5">
+                                    @if (u.Site is { } es)
+                                    {
+                                        <a href="https://isr.org.il/comp.asp?compID=@es.OrgCompId" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@es.OrgCompId ↗</a>
+                                    }
+                                    else { <span>—</span> }
+                                    @Html.Raw(PublicCompetitionLink(ev.Days.FirstOrDefault()?.Id))
+                                </div>
                             </td>
                             <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(u.Site != null ? System.Net.WebUtility.HtmlEncode(u.Site.Venue ?? "—") + LangBadges(u.Site.Languages) : "—")</td>
                             <td class="text-right tabular-nums">@ev.TotalResultCount</td>
@@ -442,11 +455,14 @@ else
                             <td>@(string.IsNullOrEmpty(c.PoolType) ? "—" : c.PoolType)</td>
                             <td class="text-admin-text-muted">
                                 @{ var org = c.OrgCompId ?? u.Site?.OrgCompId; }
-                                @if (org is int soc)
-                                {
-                                    <a href="https://isr.org.il/comp.asp?compID=@soc" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@soc ↗</a>
-                                }
-                                else { <text>—</text> }
+                                <div class="flex flex-col gap-0.5">
+                                    @if (org is int soc)
+                                    {
+                                        <a href="https://isr.org.il/comp.asp?compID=@soc" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@soc ↗</a>
+                                    }
+                                    else { <span>—</span> }
+                                    @Html.Raw(PublicCompetitionLink(c.Id))
+                                </div>
                             </td>
                             <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(u.Site != null ? System.Net.WebUtility.HtmlEncode(u.Site.Venue ?? "—") + LangBadges(u.Site.Languages) : "—")</td>
                             <td class="text-right tabular-nums">@c.ResultCount</td>
@@ -546,11 +562,14 @@ else
                                                     <td class="whitespace-nowrap text-admin-text-muted">@(string.IsNullOrEmpty(d.Date) ? "—" : d.Date)</td>
                                                     <td>@(string.IsNullOrEmpty(d.PoolType) ? "—" : d.PoolType)</td>
                                                     <td class="text-admin-text-muted">
-                                                        @if (d.OrgCompId is int doc)
-                                                        {
-                                                            <a href="https://isr.org.il/comp.asp?compID=@doc" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@doc ↗</a>
-                                                        }
-                                                        else { <text>—</text> }
+                                                        <div class="flex flex-col gap-0.5">
+                                                            @if (d.OrgCompId is int doc)
+                                                            {
+                                                                <a href="https://isr.org.il/comp.asp?compID=@doc" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@doc ↗</a>
+                                                            }
+                                                            else { <span>—</span> }
+                                                            @Html.Raw(PublicCompetitionLink(d.Id))
+                                                        </div>
                                                     </td>
                                                     <td>@await Html.PartialAsync("/Pages/Admin/Competitions/_CompFlags.cshtml", d)</td>
                                                     <td class="text-right tabular-nums">@d.ResultCount</td>
