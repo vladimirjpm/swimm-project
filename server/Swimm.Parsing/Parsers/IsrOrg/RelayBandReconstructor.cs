@@ -34,8 +34,18 @@ namespace Swimm.Parsing.Parsers.IsrOrg;
 /// </summary>
 internal static class RelayBandReconstructor
 {
-    /// <summary>Метка пола для ивритского названия полосного события.</summary>
-    private static string HeGenderLabel(string gender) => gender == "male" ? "בנים" : "בנות";
+    /// <summary>
+    /// Метка пола для ивритского названия полосного события. У открытых сверху полос
+    /// («16-99») организатор пишет взрослое נשים/גברים, у детских — בנות/בנים; повторяем,
+    /// чтобы название совпадало с событием в live-зачёте loglig.
+    /// </summary>
+    private static string HeGenderLabel(string gender, string band)
+    {
+        var adult = band.EndsWith("-99", StringComparison.Ordinal);
+        return gender == "male"
+            ? (adult ? "גברים" : "בנים")
+            : (adult ? "נשים" : "בנות");
+    }
 
     /// <summary>
     /// Разбивает эстафетные дисциплины «без категории» (gender none, возраст пуст) на полосы
@@ -45,27 +55,37 @@ internal static class RelayBandReconstructor
     {
         var (exactGender, firstNameGender) = BuildGenderIndex(comps);
 
-        var result = new List<IsrOrgCompetitionResult>(comps.Count);
-        foreach (var comp in comps)
-        {
-            if (!IsCandidate(comp))
-            {
-                result.Add(comp);
-                continue;
-            }
+        // Составы всех кандидатов считаем ДО разбиения: по ним выбирается сетка полос,
+        // общая на весь файл (см. PickGrid).
+        var teams = comps
+            .Select(c => IsCandidate(c) ? ClassifyTeams(c, exactGender, firstNameGender) : null)
+            .ToList();
+        var grid = PickGrid(teams);
 
-            var bands = TrySplit(comp, exactGender, firstNameGender);
+        var result = new List<IsrOrgCompetitionResult>(comps.Count);
+        for (var i = 0; i < comps.Count; i++)
+        {
+            var bands = teams[i] is null ? null : TrySplit(comps[i], teams[i]!, grid);
             if (bands is null)
-                result.Add(comp);       // полосы не восстановились — оставляем сквозной протокол
+                result.Add(comps[i]);   // полосы не восстановились — оставляем сквозной протокол
             else
                 result.AddRange(bands); // полосные события на месте исходного
         }
         return result;
     }
 
+    /// <summary>
+    /// Маркер чемпионата Маккаби в названии протокола. Сетки полос ниже — из регламента
+    /// МАККАБИ, чужому протоколу они бы выдумали неверные полосы. Эстафеты «без категории»
+    /// есть и у ARENA (например «бугрим» 1562, «צעירים» 1512) — там организатор в зачёте
+    /// полос не делает, и трогать их нельзя.
+    /// </summary>
+    private const string MaccabiTitleMarker = "אליפות מכבי";
+
     /// <summary>Эстафетная дисциплина, у которой в заголовке не было ни пола, ни возраста.</summary>
     private static bool IsCandidate(IsrOrgCompetitionResult comp) =>
-        comp.EventStyleGender == "none"
+        comp.Competition.Contains(MaccabiTitleMarker, StringComparison.Ordinal)
+        && comp.EventStyleGender == "none"
         && string.IsNullOrEmpty(comp.EventStyleAge)
         && comp.Results.Count > 0
         && comp.Results.All(r => r.IsRelay == true && r.RelaySwimmers is { Count: > 0 });
@@ -124,16 +144,17 @@ internal static class RelayBandReconstructor
     }
 
     /// <summary>
-    /// Пытается разбить дисциплину на полосы. null — хоть одна команда не классифицировалась
-    /// (пол или возраст не восстановлены), дисциплину не трогаем.
+    /// Состав команд дисциплины: пол и возраст СТАРШЕЙ ноги — всё, что нужно для полосы.
+    /// null — хоть одна команда не классифицировалась (пол или год рождения не восстановлены),
+    /// дисциплину не трогаем.
     /// </summary>
-    private static List<IsrOrgCompetitionResult>? TrySplit(
+    private static List<(IsrOrgResult Row, string Gender, int TopAge)>? ClassifyTeams(
         IsrOrgCompetitionResult comp,
         Dictionary<string, string> exactGender,
         Dictionary<string, string> firstNameGender)
     {
         var eventYear = AgeGroupHelper.ExtractYearFromDateString(comp.Date);
-        var classified = new List<(IsrOrgResult Row, string Band, int BandLowerAge, string Gender)>();
+        var teams = new List<(IsrOrgResult, string, int)>(comp.Results.Count);
 
         foreach (var row in comp.Results)
         {
@@ -147,11 +168,26 @@ internal static class RelayBandReconstructor
                 .ToList();
             if (ages.Count == 0) return null;
 
-            // Полоса — по СТАРШЕМУ участнику, сетка полос — из регламента Маккаби-«цеирим»
-            // (loglig doc 3185, программа дня): девочки 9-11 и 12-13, мальчики 9-10, 11-12,
-            // 13-14 — у девочек полосы ШИРЕ стандартной сетки возрастных групп. Сверено с
-            // live-зачётом loglig (comp 14668): его эстафетные события ровно такие.
-            var band = MaccabiRelayBand(gender, ages.Max());
+            teams.Add((row, gender, ages.Max()));
+        }
+        return teams;
+    }
+
+    /// <summary>
+    /// Пытается разбить дисциплину на полосы выбранной сеткой. null — хоть одна команда
+    /// в сетку не попала, дисциплину не трогаем.
+    /// </summary>
+    private static List<IsrOrgCompetitionResult>? TrySplit(
+        IsrOrgCompetitionResult comp,
+        List<(IsrOrgResult Row, string Gender, int TopAge)> teams,
+        RelayBandGrid grid)
+    {
+        var classified = new List<(IsrOrgResult Row, string Band, int BandLowerAge, string Gender)>();
+
+        foreach (var (row, gender, topAge) in teams)
+        {
+            // Полоса — по СТАРШЕМУ участнику; сетка полос выбрана на весь файл, см. PickGrid.
+            var band = MaccabiRelayBand(gender, topAge, grid);
             if (band is null) return null;
             classified.Add((row, band, BandLowerAge(band), gender));
         }
@@ -206,18 +242,54 @@ internal static class RelayBandReconstructor
         return null;
     }
 
+    /// <summary>Сетка эстафетных полос: у Маккаби их две — по возрастной половине чемпионата.</summary>
+    private enum RelayBandGrid
+    {
+        /// <summary>«צעירים» (loglig doc 3185): девочки 9-11 и 12-13, мальчики 9-10, 11-12, 13-14.</summary>
+        Youth,
+
+        /// <summary>«נוער ובוגרים»: בנות 14-15, בנים 15-16, נשים 16-99, גברים 17-99.</summary>
+        Senior
+    }
+
     /// <summary>
-    /// Сетка эстафетных полос Маккаби-«цеирим» (регламент, loglig doc 3185): девочки —
-    /// 9-11 и 12-13, мальчики — 9-10, 11-12, 13-14. Возраст вне сетки (15+) — null:
-    /// дисциплина остаётся сквозной, как напечатана (страховка от чужих форматов —
-    /// у «ноар-богрим» того же чемпионата полосы другие).
+    /// Сетка выбирается на ВЕСЬ файл и с приоритетом младшей: берём Youth, если по ней
+    /// раскладываются все команды всех дисциплин файла, иначе Senior. Так «цеирим»
+    /// (все возрасты ≤14) считается ровно как раньше, а файл с юношами и взрослыми —
+    /// по своей сетке. Выбор от файла, а не от БД, — то же требование
+    /// детерминированности, что и у пола (инцидент И-4).
     /// </summary>
-    private static string? MaccabiRelayBand(string gender, int topAge)
+    private static RelayBandGrid PickGrid(
+        IReadOnlyList<List<(IsrOrgResult Row, string Gender, int TopAge)>?> teamsPerComp)
+    {
+        var youthFits = teamsPerComp
+            .Where(t => t is not null)
+            .SelectMany(t => t!)
+            .All(t => MaccabiRelayBand(t.Gender, t.TopAge, RelayBandGrid.Youth) is not null);
+        return youthFits ? RelayBandGrid.Youth : RelayBandGrid.Senior;
+    }
+
+    /// <summary>
+    /// Полоса Маккаби по полу и возрасту старшей ноги. Обе сетки сверены с live-зачётом
+    /// loglig: Youth — соревнование 14668 (comp 1565), Senior — 14669 (comp 1576), где
+    /// эстафетные события ровно «בנות 14-15 / בנים 15-16 / נשים 16-99 / גברים 17-99».
+    /// У девочек полосы ШИРЕ стандартной сетки возрастных групп, у старших они ещё и
+    /// открытые сверху. Возраст вне сетки — null: дисциплина остаётся сквозной, как
+    /// напечатана (страховка от чужих форматов).
+    /// </summary>
+    private static string? MaccabiRelayBand(string gender, int topAge, RelayBandGrid grid)
     {
         if (topAge < 9) return null;
+        if (grid == RelayBandGrid.Youth)
+        {
+            if (gender == "female")
+                return topAge <= 11 ? "9-11" : topAge <= 13 ? "12-13" : null;
+            return topAge <= 10 ? "9-10" : topAge <= 12 ? "11-12" : topAge <= 14 ? "13-14" : null;
+        }
+
         if (gender == "female")
-            return topAge <= 11 ? "9-11" : topAge <= 13 ? "12-13" : null;
-        return topAge <= 10 ? "9-10" : topAge <= 12 ? "11-12" : topAge <= 14 ? "13-14" : null;
+            return topAge <= 15 ? "14-15" : "16-99";
+        return topAge <= 16 ? "15-16" : "17-99";
     }
 
     /// <summary>Нижняя граница полосы («13-14» → 13) — для сортировки полос по старшинству.</summary>
@@ -261,7 +333,7 @@ internal static class RelayBandReconstructor
         return comp with
         {
             AgeGroup = band,
-            Event = $"{comp.Event} - {HeGenderLabel(gender)} {band}",
+            Event = $"{comp.Event} - {HeGenderLabel(gender, band)} {band}",
             EventStyleGender = gender,
             EventStyleAge = band,
             Results = reRanked
