@@ -357,6 +357,12 @@ public class PointRulesAdminRepository(
         if (input.ScaleDiff.Any(r => r.Place <= 0))
             return PointRuleSaveResult.Fail("В табличке расхождения есть место ≤ 0");
 
+        // Ссылка уедет в href на публичной странице: пускаем только http/https, иначе
+        // «javascript:…» превратится в XSS одним сохранением из админки.
+        var sourceUrl = string.IsNullOrWhiteSpace(input.SourceUrl) ? null : input.SourceUrl.Trim();
+        if (sourceUrl is not null && !IsSafeHttpUrl(sourceUrl))
+            return PointRuleSaveResult.Fail("Ссылка на регламент должна начинаться с http:// или https://");
+
         // Расхождение — свойство соревнования, а не отдельного дня: пишем всем дням события,
         // как и саму отметку сверки.
         var dayIds = head.EventId is int ev
@@ -367,7 +373,7 @@ public class PointRulesAdminRepository(
             .Where(t => !string.IsNullOrWhiteSpace(t.Value))
             .ToDictionary(t => t.Key, t => t.Value!.Trim());
         var diff = input.ScaleDiff.OrderBy(r => r.Place).ToList();
-        var empty = texts.Count == 0 && diff.Count == 0;
+        var empty = texts.Count == 0 && diff.Count == 0 && sourceUrl is null;
 
         var existing = await db.CompetitionNotes
             .Include(n => n.Texts)
@@ -399,6 +405,7 @@ public class PointRulesAdminRepository(
             }
 
             note.ScaleDiffJson = diffJson;
+            note.SourceUrl = sourceUrl;
             note.UpdatedAt = DateTime.UtcNow;
 
             // Перевод, который стёрли, должен исчезнуть, а не остаться от прошлой правки.
@@ -449,10 +456,20 @@ public class PointRulesAdminRepository(
             }
         }
 
+        // Ссылку проверяем и на выводе: в базе она могла оказаться до появления проверки
+        // (ручной UPDATE, старая миграция), а href на публичной странице обязан быть безопасным.
+        var url = note.SourceUrl is not null && IsSafeHttpUrl(note.SourceUrl) ? note.SourceUrl : null;
+
         return new CompetitionNoteDto(
             note.Texts.ToDictionary(t => t.Lang, t => t.Body),
-            diff);
+            diff,
+            url);
     }
+
+    /// <summary>Ссылка годится для <c>href</c>: абсолютная и только http/https.</summary>
+    internal static bool IsSafeHttpUrl(string url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri)
+        && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
 
     public async Task<PointRuleEditDto?> GetByIdAsync(PointRuleKind kind, int id)
     {

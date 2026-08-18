@@ -505,10 +505,12 @@ public class PointRulesAdminRepositoryTests
     // ── пояснение к расхождению (CompetitionNotes) ────────────────────────────
 
     private static CompetitionNoteInputDto NoteInput(
-        string? en = null, string? ru = null, string? he = null, params (int Place, int Expected, int Actual)[] diff) => new()
+        string? en = null, string? ru = null, string? he = null, string? sourceUrl = null,
+        params (int Place, int Expected, int Actual)[] diff) => new()
     {
         Texts = new Dictionary<string, string?> { ["en"] = en, ["ru"] = ru, ["he"] = he },
-        ScaleDiff = diff.Select(d => new ScaleDiffRowDto(d.Place, d.Expected, d.Actual)).ToList()
+        ScaleDiff = diff.Select(d => new ScaleDiffRowDto(d.Place, d.Expected, d.Actual)).ToList(),
+        SourceUrl = sourceUrl
     };
 
     [Fact]
@@ -524,7 +526,8 @@ public class PointRulesAdminRepositoryTests
 
         var res = await Repo(db).SetClubMismatchNoteAsync(1,
             NoteInput(en: "  Places 21-22 were scored 6 and 5.  ", ru: "Места 21-22 получили 6 и 5.",
-                      he: "מקומות 21-22 קיבלו 6 ו-5.", diff: [(21, 5, 6), (22, 3, 5)]));
+                      he: "מקומות 21-22 קיבלו 6 ו-5.", sourceUrl: "https://loglig.com:2053/LeagueTable/ShowLeagueDoc/2502",
+                      diff: [(21, 5, 6), (22, 3, 5)]));
 
         Assert.True(res.Success);
         var notes = await db.CompetitionNotes.Include(n => n.Texts).ToListAsync();
@@ -607,7 +610,9 @@ public class PointRulesAdminRepositoryTests
         comp.ClubPointsVerifiedKind = PointsVerifiedKinds.Mismatch;
         db.Competitions.Add(comp);
         await db.SaveChangesAsync();
-        await Repo(db).SetClubMismatchNoteAsync(1, NoteInput(en: "Official table used a different tail.", diff: [(21, 5, 6)]));
+        await Repo(db).SetClubMismatchNoteAsync(1, NoteInput(
+            en: "Official table used a different tail.",
+            sourceUrl: "https://loglig.com:2053/LeagueTable/ShowLeagueDoc/2502", diff: [(21, 5, 6)]));
 
         var rows = await Repo(db).GetCompetitionsAsync(PointRuleKind.Clubs, 1);
 
@@ -615,5 +620,52 @@ public class PointRulesAdminRepositoryTests
         Assert.NotNull(note);
         Assert.Equal("Official table used a different tail.", note!.Texts["en"]);
         Assert.Equal(new ScaleDiffRowDto(21, 5, 6), note.ScaleDiff.Single());
+    }
+
+    [Fact]
+    public async Task MismatchNote_SourceUrl_SavedAndReturned()
+    {
+        await using var db = CreateDb(nameof(MismatchNote_SourceUrl_SavedAndReturned));
+        db.Competitions.Add(Comp(1, "Meet", "10/01/2026", clubsRuleId: 1));
+        await db.SaveChangesAsync();
+
+        await Repo(db).SetClubMismatchNoteAsync(1,
+            NoteInput(en: "text", sourceUrl: " https://loglig.com:2053/LeagueTable/ShowLeagueDoc/2502 "));
+
+        var rows = await Repo(db).GetCompetitionsAsync(PointRuleKind.Clubs, 1);
+        Assert.Equal("https://loglig.com:2053/LeagueTable/ShowLeagueDoc/2502", rows.Single().MismatchNote!.SourceUrl);
+    }
+
+    [Theory]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("data:text/html,<script>alert(1)</script>")]
+    [InlineData("loglig.com/doc")]
+    public async Task MismatchNote_NonHttpUrl_Rejected(string url)
+    {
+        // Ссылка уезжает в href на публичной странице — «javascript:» там это готовый XSS.
+        await using var db = CreateDb(nameof(MismatchNote_NonHttpUrl_Rejected) + url.GetHashCode());
+        db.Competitions.Add(Comp(1, "Meet", "10/01/2026", clubsRuleId: 1));
+        await db.SaveChangesAsync();
+
+        var res = await Repo(db).SetClubMismatchNoteAsync(1, NoteInput(en: "text", sourceUrl: url));
+
+        Assert.False(res.Success);
+        Assert.Contains("http", res.Error);
+        Assert.Empty(await db.CompetitionNotes.ToListAsync());
+    }
+
+    [Fact]
+    public async Task MismatchNote_OnlySourceUrl_IsEnoughToKeepTheNote()
+    {
+        // Ссылка без текста — тоже содержимое: попап покажет её под шкалой.
+        await using var db = CreateDb(nameof(MismatchNote_OnlySourceUrl_IsEnoughToKeepTheNote));
+        db.Competitions.Add(Comp(1, "Meet", "10/01/2026", clubsRuleId: 1));
+        await db.SaveChangesAsync();
+
+        var res = await Repo(db).SetClubMismatchNoteAsync(1, NoteInput(sourceUrl: "https://example.org/reg.pdf"));
+
+        Assert.True(res.Success);
+        Assert.Equal(1, res.Id);
+        Assert.Single(await db.CompetitionNotes.ToListAsync());
     }
 }

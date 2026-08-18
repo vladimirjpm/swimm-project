@@ -9,9 +9,11 @@ namespace Swimm.Application.Dtos;
 /// </summary>
 /// <param name="Texts">Язык (<c>en</c>/<c>ru</c>/<c>he</c>) → текст. Языка нет — вкладка пустая.</param>
 /// <param name="ScaleDiff">Строки «место / по регламенту / начислено»; пусто — только проза.</param>
+/// <param name="SourceUrl">Ссылка на регламент соревнования; null — источник не указан.</param>
 public sealed record CompetitionNoteDto(
     [property: JsonPropertyName("texts")] IReadOnlyDictionary<string, string> Texts,
-    [property: JsonPropertyName("scale_diff")] IReadOnlyList<ScaleDiffRowDto> ScaleDiff);
+    [property: JsonPropertyName("scale_diff")] IReadOnlyList<ScaleDiffRowDto> ScaleDiff,
+    [property: JsonPropertyName("source_url")] string? SourceUrl = null);
 
 /// <summary>
 /// Одна строка расхождения шкал. Хранится ДАННЫМИ, а не свёрстанной таблицей: цифры не
@@ -33,4 +35,7 @@ public sealed class CompetitionNoteInputDto
 
     /// <summary>Строки расхождения; пустой список стирает табличку.</summary>
     public IReadOnlyList<ScaleDiffRowDto> ScaleDiff { get; init; } = [];
+
+    /// <summary>Ссылка на регламент; пустая строка стирает её.</summary>
+    public string? SourceUrl { get; init; }
 }

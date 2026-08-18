@@ -64,6 +64,9 @@ export interface CompetitionMismatchNote {
   texts: Record<string, string>;
   /** Строки «место / по регламенту / начислено официально»; пусто — только проза. */
   scale_diff: { place: number; expected: number; actual: number }[];
+  /** Ссылка на регламент соревнования (תקנון) — доказательство объяснения. Сервер отдаёт
+   *  только http(s), но клиент проверяет ещё раз перед тем, как класть её в href. */
+  source_url?: string | null;
 }
 
 /** Правило клубных очков, применённое к этому зачёту (overview.club_points_rules). */

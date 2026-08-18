@@ -44,6 +44,17 @@ public class CompetitionNote
     /// </summary>
     public string? ScaleDiffJson { get; set; }
 
+    /// <summary>
+    /// Ссылка на источник, который доказывает объяснение — обычно регламент соревнования
+    /// («תקנון», PDF на loglig). Одна на все языки: URL не переводится, как и цифры.
+    ///
+    /// Только <c>http</c>/<c>https</c> — проверяется при сохранении и ещё раз при выводе:
+    /// ссылка попадает в <c>href</c> на публичной странице, а <c>javascript:</c> в href это
+    /// готовый XSS.
+    /// </summary>
+    [MaxLength(1000)]
+    public string? SourceUrl { get; set; }
+
     /// <summary>Тексты по языкам (en/ru/he). Пустой список — заметка ещё не написана.</summary>
     public ICollection<CompetitionNoteText> Texts { get; set; } = [];
 

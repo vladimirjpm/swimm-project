@@ -103,7 +103,8 @@ public class IndexModel : PageModel
     /// Пустой ввод стирает пояснение целиком.
     /// </summary>
     public async Task<IActionResult> OnPostSaveMismatchNoteAsync(
-        int noteCompetitionId, string? noteEn, string? noteRu, string? noteHe, string? scaleDiff)
+        int noteCompetitionId, string? noteEn, string? noteRu, string? noteHe,
+        string? scaleDiff, string? sourceUrl)
     {
         var kindSlug = PointRulesKindParser.ToSlug(RuleKind);
 
@@ -121,7 +122,8 @@ public class IndexModel : PageModel
                 [CompetitionNoteLangs.Ru] = noteRu,
                 [CompetitionNoteLangs.He] = noteHe,
             },
-            ScaleDiff = diff
+            ScaleDiff = diff,
+            SourceUrl = sourceUrl
         });
 
         if (!result.Success)

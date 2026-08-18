@@ -33,6 +33,27 @@ const FOLLOW_UP: Record<InfoLang, string> = {
   he: 'הסולם למטה הוא זה שבתקנון התחרות — הנקודות בעמוד זה מחושבות לפיו.',
 };
 
+/** Подпись ссылки на регламент — статика интерфейса, как и заголовки таблички. */
+const SOURCE_LINK: Record<InfoLang, string> = {
+  en: 'Read the meet regulations',
+  ru: 'Открыть регламент соревнования',
+  he: 'לצפייה בתקנון התחרות',
+};
+
+/**
+ * Ссылка идёт в href, поэтому схему проверяем ещё раз здесь: сервер уже фильтрует, но
+ * «javascript:» в href — слишком дешёвый XSS, чтобы полагаться на одну проверку.
+ */
+function safeHttpUrl(url?: string | null): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? url : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Расхождение с официальной таблицей. Стоит ПЕРЕД шкалой: читатель пришёл сюда по бейджу
  * «Differs from official» и ищет объяснение, а не список мест.
@@ -48,6 +69,7 @@ function MismatchBlock({ note }: { note: CompetitionMismatchNote }) {
   const shown = texts[lang] ?? texts.en ?? Object.values(texts)[0] ?? '';
   const labels = DIFF_LABELS[lang];
   const isRtl = lang === 'he';
+  const sourceUrl = safeHttpUrl(note.source_url);
 
   return (
     <div
@@ -91,6 +113,19 @@ function MismatchBlock({ note }: { note: CompetitionMismatchNote }) {
         <p className="mt-2 text-[12px]" style={{ color: 'var(--theme-mode-text-muted)' }}>
           {FOLLOW_UP[lang]}
         </p>
+
+        {/* Ссылка на регламент — то, чем объяснение доказывается: читатель может проверить сам. */}
+        {sourceUrl && (
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-block text-[12px] font-semibold underline"
+            style={{ color: '#dc2626' }}
+          >
+            {SOURCE_LINK[lang]} ↗
+          </a>
+        )}
       </div>
     </div>
   );
