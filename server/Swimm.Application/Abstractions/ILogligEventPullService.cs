@@ -16,6 +16,15 @@ public interface ILogligEventPullService
     /// </summary>
     /// <param name="discoveredId">Запись Sys_DiscoveredCompetitions — из неё берётся LogligId.</param>
     Task<LogligPullReport> DryRunAsync(int discoveredId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Перетянуть соревнование из пособытийного источника: скачать события, сопоставить имена,
+    /// собрать JSON и импортировать поверх существующего (upsert с удалением исчезнувших —
+    /// у строк меняется ключ из-за <c>Round</c>). Эстафеты сохраняются: их источник не несёт.
+    /// </summary>
+    /// <returns>Отчёт разведки и итог импорта одной строкой.</returns>
+    Task<(LogligPullReport Report, string ImportSummary)> ImportAsync(
+        int discoveredId, CancellationToken ct = default);
 }
 
 /// <summary>Итог разведки: что нашлось у источника и что мешает импортировать.</summary>

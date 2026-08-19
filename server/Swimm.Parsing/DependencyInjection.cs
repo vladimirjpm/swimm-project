@@ -37,6 +37,10 @@ public static class DependencyInjection
 
         services.AddSingleton<IResultSourceProvider, PdfResultSourceProvider>();
 
+        // Сборка JSON импорта из пособытийного источника loglig (data-integrity §10):
+        // здесь модель строки импорта и правила возрастных групп.
+        services.AddSingleton<ILogligImportBuilder, Parsers.Loglig.LogligImportBuilder>();
+
         // Автозабор соревнований isr.org.il (фаза 6): singleton — троттлинг общий на процесс
         services.AddSingleton<ICompetitionDiscoveryProvider, Discovery.IsrOrgDiscoveryProvider>();
 

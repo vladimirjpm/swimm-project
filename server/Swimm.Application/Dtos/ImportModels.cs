@@ -35,7 +35,16 @@ public sealed record ImportEventOptions(
     bool OverwriteExisting = false,
     bool DeleteMissing = false,
     int? PointRuleClubsId = null,
-    int? PointRuleSwimmersId = null);
+    int? PointRuleSwimmersId = null,
+
+    /// <summary>
+    /// При <c>DeleteMissing</c> НЕ удалять эстафетные строки, даже если их нет в файле.
+    /// Нужно источникам, которые физически не несут эстафет: пособытийные страницы loglig
+    /// печатают команду, но не её состав, поэтому эстафеты такого соревнования остаются
+    /// от PDF-импорта (решение Влада, docs/data-integrity.md §10). Без флага «удалить
+    /// лишнее» снесло бы их вместе со старыми личными строками.
+    /// </summary>
+    bool PreserveRelays = false);
 
 public class ImportResult
 {

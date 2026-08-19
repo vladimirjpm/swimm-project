@@ -460,7 +460,7 @@ if (args.Contains("--quality-scan"))
 }
 
 // Разведка пособытийного источника loglig (шаг 3 «склеенных сессий», data-integrity §10):
-//   dotnet run -- --pull-events <discoveredId>
+//   dotnet run -- --pull-events <discoveredId> [--import]
 // Только читает и отчитывается: сколько событий, строк, по каким раундам, какие имена не
 // сопоставились с пловцами в БД и сколько официальных клубных очков насчитал организатор.
 // Ходит в чужой прод с паузой 2 с между запросами — на большом чемпионате это минуты.
@@ -476,7 +476,16 @@ if (args.Contains("--pull-events"))
 
     using var scope = app.Services.CreateScope();
     var pull = scope.ServiceProvider.GetRequiredService<ILogligEventPullService>();
-    var report = await pull.DryRunAsync(discoveredId);
+
+    // Без --import это чистая разведка. С ним — переимпорт поверх существующего:
+    // upsert с удалением исчезнувших (ключ сменился из-за Round) и сохранением эстафет.
+    var doImport = args.Contains("--import");
+    var summary = string.Empty;
+    LogligPullReport report;
+    if (doImport)
+        (report, summary) = await pull.ImportAsync(discoveredId);
+    else
+        report = await pull.DryRunAsync(discoveredId);
 
     Console.WriteLine($"«{report.CompetitionName}»: событий {report.Events}, личных строк {report.IndividualRows}");
     Console.WriteLine($"  эстафетных событий пропущено: {report.RelayEvents} (состав команд страница не печатает)");
@@ -490,6 +499,12 @@ if (args.Contains("--pull-events"))
     Console.WriteLine($"  имена без пары в БД: {report.UnresolvedNames.Count}");
     foreach (var name in report.UnresolvedNames.Take(10))
         Console.WriteLine($"      {name}");
+
+    if (doImport)
+    {
+        Console.WriteLine($"ИМПОРТ: {summary}");
+        Console.WriteLine("Не забудь пересчитать зачёт: dotnet run -- --rebuild-club-standings");
+    }
     return;
 }
 

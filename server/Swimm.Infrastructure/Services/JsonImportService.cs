@@ -246,6 +246,7 @@ public class JsonImportService : IImportService
         // Удаление исчезнувших результатов — опт-ин поверх overwriteExisting (см. ImportModels.cs,
         // DeleteMissing). Без него upsert только обновляет/вставляет и НИКОГДА не удаляет.
         var deleteMissing = overwriteExisting && (eventOptions?.DeleteMissing ?? false);
+        var preserveRelays = eventOptions?.PreserveRelays ?? false;
 
         int created = 0, skipped = 0, errors = 0;
         // Строк, легших сразу с ручной пометкой «недостоверно» (галочка в превью).
@@ -783,6 +784,14 @@ public class JsonImportService : IImportService
             {
                 foreach (var old in match.Deleted)
                 {
+                    // Источник без эстафет (пособытийные страницы loglig) не вправе объявлять
+                    // эстафеты исчезнувшими — они живут от PDF-импорта.
+                    if (preserveRelays && old.RelayId != null)
+                    {
+                        diagnosticLog.Add($"Upsert: эстафета {old.Id} (comp {competitionId}) сохранена — источник эстафет не несёт (PreserveRelays)");
+                        continue;
+                    }
+
                     var hasMedia = await _db.UserMedia.AnyAsync(m => m.ResultId == old.Id)
                         || await _db.HubGroupMedia.AnyAsync(m => m.ResultId == old.Id);
                     if (hasMedia)
