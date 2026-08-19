@@ -21,6 +21,15 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
 {
     private const string ListUrl = "https://isr.org.il/competitions.asp";
     private const string DetailsUrl = "https://isr.org.il/comp.asp?compID=";
+    /// <summary>Страница событий соревнования у loglig (в comp.asp она зашита в iframe).</summary>
+    private const string EventListUrlTemplate =
+        "https://loglig.com:2053/LeagueTable/AthleticsDisciplines/{0}";
+
+    /// <summary>Результаты одного события. showCategories=True добавляет подзаголовки секций
+    /// («גמר ישיר - בנות 14»), из которых берётся раунд и категория.</summary>
+    private const string EventResultsUrlTemplate =
+        "https://loglig.com:2053/LeagueTable/AthleticsDisciplineResults/{0}?isModal=True&showCategories=True";
+
     private const string PdfUrlTemplate =
         "https://loglig.com/Leagues/ExportSwimmingCompetitionResults?competitionId={0}&culture={1}&isSplitResults=false&isByHeat=false";
 
@@ -76,6 +85,42 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
         return bytes;
     }
 
+    public async Task<IReadOnlyList<int>> FetchEventIdsAsync(int logligId, CancellationToken ct = default)
+    {
+        var html = await GetStringAsync(
+            string.Format(CultureInfo.InvariantCulture, EventListUrlTemplate, logligId),
+            $"loglig-events-{logligId}", ct);
+
+        // Порядок программы сохраняем, дубли убираем: одна и та же ссылка на событие
+        // печатается несколько раз (кнопки «תוצאות», «תוצאות מקצים», «Start list»).
+        var ids = new List<int>();
+        foreach (Match m in EventResultsIdRx().Matches(html))
+        {
+            var id = int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture);
+            if (!ids.Contains(id)) ids.Add(id);
+        }
+
+        if (ids.Count == 0)
+            throw new InvalidOperationException(
+                $"loglig: у соревнования {logligId} не нашлось ни одного события — " +
+                "вёрстка страницы AthleticsDisciplines изменилась или зачёт ещё не опубликован.");
+        return ids;
+    }
+
+    public async Task<LogligEventResultsDto> FetchEventResultsAsync(int eventId, CancellationToken ct = default)
+    {
+        var html = await GetStringAsync(
+            string.Format(CultureInfo.InvariantCulture, EventResultsUrlTemplate, eventId),
+            $"loglig-event-{eventId}", ct);
+
+        var ev = Parsers.Loglig.LogligEventResultsParser.Parse(html);
+        return new LogligEventResultsDto(
+            ev.CompetitionName, ev.Date, ev.StyleName, ev.Distance, ev.Gender, ev.AgeBand, ev.IsRelay,
+            ev.Rows.Select(r => new LogligResultRowDto(
+                r.Position, r.Round, r.Category, r.FullName, r.BirthYear, r.Club, r.Heat, r.Lane,
+                r.Time, r.FailNote, r.InternationalPoints, r.PersonalPoints, r.ClubPoints)).ToList());
+    }
+
     // ── Парсинг (чистые функции, тестируются на снапшотах) ──────────────────
 
     [GeneratedRegex(
@@ -88,6 +133,11 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
 
     [GeneratedRegex("""alt="מקום התחרות"\s*/>\s*<br\s*/>([^<]*)<""", RegexOptions.Singleline)]
     private static partial Regex VenueRx();
+
+    /// <summary>Ссылка на результаты одного события; ByHeat-вариант даёт тот же id и
+    /// отсеивается дедупликацией.</summary>
+    [GeneratedRegex("""AthleticsDisciplineResults(?:ByHeat)?/(\d+)""")]
+    private static partial Regex EventResultsIdRx();
 
     [GeneratedRegex("""LeagueTable/AthleticsDisciplines/(\d+)""")]
     private static partial Regex LogligRx();

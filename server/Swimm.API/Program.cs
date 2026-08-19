@@ -459,6 +459,40 @@ if (args.Contains("--quality-scan"))
     return;
 }
 
+// Разведка пособытийного источника loglig (шаг 3 «склеенных сессий», data-integrity §10):
+//   dotnet run -- --pull-events <discoveredId>
+// Только читает и отчитывается: сколько событий, строк, по каким раундам, какие имена не
+// сопоставились с пловцами в БД и сколько официальных клубных очков насчитал организатор.
+// Ходит в чужой прод с паузой 2 с между запросами — на большом чемпионате это минуты.
+if (args.Contains("--pull-events"))
+{
+    var peIndex = Array.IndexOf(args, "--pull-events") + 1;
+    if (peIndex >= args.Length || !int.TryParse(args[peIndex], out var discoveredId))
+    {
+        Console.Error.WriteLine("Usage: dotnet run -- --pull-events <discoveredId>");
+        Environment.Exit(1);
+        return;
+    }
+
+    using var scope = app.Services.CreateScope();
+    var pull = scope.ServiceProvider.GetRequiredService<ILogligEventPullService>();
+    var report = await pull.DryRunAsync(discoveredId);
+
+    Console.WriteLine($"«{report.CompetitionName}»: событий {report.Events}, личных строк {report.IndividualRows}");
+    Console.WriteLine($"  эстафетных событий пропущено: {report.RelayEvents} (состав команд страница не печатает)");
+    foreach (var (round, count) in report.RowsByRound.OrderByDescending(r => r.Value))
+        Console.WriteLine($"  раунд {round}: {count}");
+
+    Console.WriteLine($"  официальные клубные очки: сумма {report.OfficialClubPoints.Values.Sum()}");
+    foreach (var (club, points) in report.OfficialClubPoints.OrderByDescending(c => c.Value).Take(5))
+        Console.WriteLine($"      {points,6}  {club}");
+
+    Console.WriteLine($"  имена без пары в БД: {report.UnresolvedNames.Count}");
+    foreach (var name in report.UnresolvedNames.Take(10))
+        Console.WriteLine($"      {name}");
+    return;
+}
+
 // Прогон ВСЕГО реестра проверок данных из консоли (пара к кнопке на /Admin/Health):
 //   dotnet run -- --data-checks
 // Нужен, когда админка недоступна (нет сессии, headless-машина) и чтобы увидеть картину

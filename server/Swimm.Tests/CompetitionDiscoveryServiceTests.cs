@@ -32,6 +32,12 @@ public class CompetitionDiscoveryServiceTests
 
         public Task<byte[]> FetchResultsPdfAsync(int logligId, string culture = "he-IL", CancellationToken ct = default)
             => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<int>> FetchEventIdsAsync(int logligId, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        public Task<LogligEventResultsDto> FetchEventResultsAsync(int eventId, CancellationToken ct = default)
+            => throw new NotSupportedException();
     }
 
     private static SwimmDbContext CreateDb(string name) =>

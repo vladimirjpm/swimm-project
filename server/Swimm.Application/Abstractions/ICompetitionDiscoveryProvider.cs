@@ -21,4 +21,15 @@ public interface ICompetitionDiscoveryProvider
 
     /// <summary>Скачать PDF-протокол результатов (loglig ExportSwimmingCompetitionResults).</summary>
     Task<byte[]> FetchResultsPdfAsync(int logligId, string culture = "he-IL", CancellationToken ct = default);
+
+    /// <summary>
+    /// Идентификаторы ПОСОБЫТИЙНЫХ результатов соревнования (страница AthleticsDisciplines):
+    /// по одному на дисциплину-категорию, в порядке программы. Нужны там, где PDF-экспорт
+    /// беднее сайта: он склеивает утреннюю и вечернюю сессии в один список, а сайт держит
+    /// их разными событиями (И13, docs/data-integrity.md §10).
+    /// </summary>
+    Task<IReadOnlyList<int>> FetchEventIdsAsync(int logligId, CancellationToken ct = default);
+
+    /// <summary>Результаты одного события: секции с раундом, места, времена и официальные очки.</summary>
+    Task<LogligEventResultsDto> FetchEventResultsAsync(int eventId, CancellationToken ct = default);
 }
