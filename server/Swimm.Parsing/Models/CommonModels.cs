@@ -55,7 +55,16 @@ public record Result(
     /// <c>IsrOrgParser.AssignHeatTypes</c> по порядку сессий в документе: повтор дисциплины
     /// в один день ⇒ раннее событие prelim, позднее final.
     /// </summary>
-    [property: JsonPropertyName("heat_type")] string? HeatType = null
+    [property: JsonPropertyName("heat_type")] string? HeatType = null,
+
+    /// <summary>
+    /// Раунд зачёта из секции источника: <c>timed-final</c> (גמר ישיר) / <c>final</c> (גמר) /
+    /// <c>prelim</c> (מוקדמות); null — источник раундов не различает. PDF-экспорт loglig
+    /// не различает НИКОГДА (обе сессии печатаются одним списком), значение приходит только
+    /// из пособытийного источника. Не путать с <c>heat_type</c>: тот — наш вывод об отборе,
+    /// этот — факт из протокола. Подробности — docs/data-integrity.md §10.
+    /// </summary>
+    [property: JsonPropertyName("round")] string? Round = null
 );
 
 public record RelaySwimmer(

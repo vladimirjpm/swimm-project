@@ -12,7 +12,8 @@ namespace Swimm.Tests;
 public class ResultMatcherTests
 {
     private static ResultRecord Old(int id, int compId = 1, int styleId = 1, string distance = "50",
-        string gender = "male", int heat = 1, int lane = 1, int? relayId = null, int swimmerId = 0) => new()
+        string gender = "male", int heat = 1, int lane = 1, int? relayId = null, int swimmerId = 0,
+        string? round = null) => new()
     {
         Id = id,
         CompetitionId = compId,
@@ -22,12 +23,13 @@ public class ResultMatcherTests
         Heat = heat,
         Lane = lane,
         RelayId = relayId,
-        SwimmerId = swimmerId == 0 ? id : swimmerId
+        SwimmerId = swimmerId == 0 ? id : swimmerId,
+        Round = round
     };
 
     private static ResultRecord New(int compId = 1, int styleId = 1, string distance = "50",
         string gender = "male", int heat = 1, int lane = 1, bool isRelay = false, string? note = null,
-        int swimmerId = 0) => new()
+        int swimmerId = 0, string? round = null) => new()
     {
         CompetitionId = compId,
         StyleId = styleId,
@@ -37,7 +39,8 @@ public class ResultMatcherTests
         Lane = lane,
         Relay = isRelay ? new Relay() : null,
         Note = note,
-        SwimmerId = swimmerId
+        SwimmerId = swimmerId,
+        Round = round
     };
 
     private static ResultMatch<ResultRecord, ResultRecord> RunMatch(
@@ -386,4 +389,61 @@ public class ResultMatcherTests
         Assert.Empty(result.Inserted);
         Assert.Empty(result.Deleted);
     }
+    /// <summary>
+    /// Раунд входит в ключ: утренний зачёт возрастных групп и вечерний финал — РАЗНЫЕ строки,
+    /// даже когда совпадает всё остальное. Без этого вторая сессия затирала бы первую при
+    /// переимпорте, а официально обе дают медали и клубные очки (И13, data-integrity §10).
+    /// </summary>
+    [Fact]
+    public void DifferentRounds_AreDifferentRows()
+    {
+        var oldRows = new[]
+        {
+            Old(1, heat: 4, lane: 4, swimmerId: 7, round: "timed-final"),
+            Old(2, heat: 1, lane: 4, swimmerId: 7, round: "final")
+        };
+        var newRows = new[]
+        {
+            New(heat: 4, lane: 4, swimmerId: 7, round: "timed-final"),
+            New(heat: 1, lane: 4, swimmerId: 7, round: "final")
+        };
+
+        var match = RunMatch(oldRows, newRows);
+
+        Assert.Equal(2, match.Matched.Count);
+        Assert.Empty(match.Inserted);
+        Assert.Empty(match.Deleted);
+        Assert.All(match.Matched, pair => Assert.Equal(pair.Old.Round, pair.New.Round));
+    }
+
+    /// <summary>
+    /// Появление раунда у строки — это НОВАЯ строка, а старая уходит в Deleted: ключ сменился.
+    /// Отсюда правило «первый переимпорт соревнования с раундами идёт с --delete-missing»,
+    /// иначе рядом останутся старые безраундовые строки (тот же механизм, что в инциденте И-4).
+    /// </summary>
+    [Fact]
+    public void RoundAppearing_ChangesKey_SoOldRowIsDeleted()
+    {
+        var oldRows = new[] { Old(1, heat: 4, lane: 4, swimmerId: 7) };          // без раунда
+        var newRows = new[] { New(heat: 4, lane: 4, swimmerId: 7, round: "timed-final") };
+
+        var match = RunMatch(oldRows, newRows);
+
+        Assert.Empty(match.Matched);
+        Assert.Single(match.Inserted);
+        Assert.Single(match.Deleted);
+    }
+
+    /// <summary>Старые данные: раунда нет ни у кого — ключи прежние, переимпорт не «поедет».</summary>
+    [Fact]
+    public void NoRounds_KeysUnchanged()
+    {
+        var match = RunMatch([Old(1, heat: 2, lane: 5, swimmerId: 7)],
+                             [New(heat: 2, lane: 5, swimmerId: 7)]);
+
+        Assert.Single(match.Matched);
+        Assert.Empty(match.Inserted);
+        Assert.Empty(match.Deleted);
+    }
+
 }

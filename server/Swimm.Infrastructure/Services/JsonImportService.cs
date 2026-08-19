@@ -677,6 +677,7 @@ public class JsonImportService : IImportService
                     EventStyleAge = item.EventStyleAge ?? string.Empty,
                     EventCategory = string.IsNullOrWhiteSpace(item.EventCategory) ? null : item.EventCategory,
                     HeatType = string.IsNullOrWhiteSpace(item.HeatType) ? null : item.HeatType,
+                    Round = string.IsNullOrWhiteSpace(item.Round) ? null : item.Round,
                     Position = item.Position,
                     PositionAgeGroup = item.PositionAgeGroup,
                     Heat = item.Heat ?? 0,
@@ -1097,6 +1098,7 @@ public class JsonImportService : IImportService
         old.EventStyleAge = incoming.EventStyleAge;
         old.EventCategory = incoming.EventCategory;
         old.HeatType = incoming.HeatType;
+        old.Round = incoming.Round;
         old.Position = incoming.Position;
         old.PositionAgeGroup = incoming.PositionAgeGroup;
         old.TimeMillisecond = incoming.TimeMillisecond;
@@ -1945,6 +1947,11 @@ public class ResultJsonItem
     /// Выводится парсером из порядка сессий (AssignHeatTypes) — в протоколе слова нет.</summary>
     [JsonPropertyName("heat_type")]
     public string? HeatType { get; set; }
+
+    /// <summary>timed-final / final / prelim — раунд зачёта из секции источника; null —
+    /// источник раундов не различает (так у всех PDF-экспортов). Входит в ключ upsert.</summary>
+    [JsonPropertyName("round")]
+    public string? Round { get; set; }
 
     [JsonPropertyName("pool_type")]
     public string? PoolType { get; set; }

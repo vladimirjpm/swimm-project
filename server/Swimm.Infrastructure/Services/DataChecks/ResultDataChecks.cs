@@ -181,10 +181,11 @@ public sealed class MergedSessionsCheck(SwimmDbContext db) : IDataCheck
 
     public async Task<DataCheckOutcome> RunAsync(CancellationToken ct = default)
     {
-        // Оба HeatType пусты: если разметка сессий уже есть, prelim/final различимы и это
-        // не наш случай. Эстафеты исключены — там «дважды» законно (две команды клуба).
+        // Разметки сессий нет ни в каком виде: HeatType (наш вывод об отборе) и Round
+        // (раунд из источника) пусты. Если хоть одно проставлено — строки различимы, и это
+        // не наш случай. Эстафеты исключены: там «дважды» законно (две команды клуба).
         var dupes = await db.Results.AsNoTracking()
-            .Where(r => r.RelayId == null && r.HeatType == null
+            .Where(r => r.RelayId == null && r.HeatType == null && r.Round == null
                         && r.Position != null && r.TimeMillisecond != null)
             .GroupBy(r => new
             {

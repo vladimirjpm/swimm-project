@@ -14,7 +14,15 @@ public readonly record struct ResultMatchKey(
     string Gender,
     int Heat,
     int Lane,
-    bool IsRelay);
+    bool IsRelay,
+    /// <summary>
+    /// Раунд зачёта (<c>timed-final</c>/<c>final</c>/<c>prelim</c>), пустая строка — источник
+    /// раундов не различает. Без него утренний и вечерний заплывы одного пловца в чемпионате
+    /// «мокдамот и финал» имеют ОДИН ключ, и переимпорт схлопывает их в одну строку —
+    /// вторая молча затирает первую (И13, docs/data-integrity.md §10). У старых данных поле
+    /// пустое у обеих сторон, поэтому ключи не меняются и переимпорт не «поедет».
+    /// </summary>
+    string Round);
 
 /// <summary>
 /// Вторичный дискриминатор — им разводятся строки ВНУТРИ коллизии ключа.
@@ -170,11 +178,13 @@ public static class ResultMatcher
 
     /// <summary>Ключ для строки результата, уже сохранённой в БД (RelayId — надёжный источник IsRelay).</summary>
     public static ResultMatchKey KeyOfPersisted(ResultRecord r) =>
-        new(r.CompetitionId, r.StyleId, r.Distance, r.Gender, r.Heat, r.Lane, r.RelayId != null);
+        new(r.CompetitionId, r.StyleId, r.Distance, r.Gender, r.Heat, r.Lane, r.RelayId != null,
+            r.Round ?? string.Empty);
 
     /// <summary>Ключ для ещё не сохранённой строки результата (Relay — навигация, RelayId ещё не проставлен).</summary>
     public static ResultMatchKey KeyOfTransient(ResultRecord r) =>
-        new(r.CompetitionId, r.StyleId, r.Distance, r.Gender, r.Heat, r.Lane, r.Relay != null || r.RelayId != null);
+        new(r.CompetitionId, r.StyleId, r.Distance, r.Gender, r.Heat, r.Lane,
+            r.Relay != null || r.RelayId != null, r.Round ?? string.Empty);
 
     /// <summary>Дискриминатор старой строки — Relay подгружен через Include (см. JsonImportService).</summary>
     public static ResultDiscriminator DiscriminatorOfPersisted(ResultRecord r) =>
