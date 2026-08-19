@@ -35,7 +35,7 @@ public sealed class LogligEventPullService(
 
         // Имена пловцов, уже известные по этому соревнованию: пособытийный источник печатает
         // «имя фамилия» одной строкой, и разрезать её надёжно можно только сверкой с базой.
-        var known = await KnownSwimmerNamesAsync(row.OrgCompId, ct);
+        var resolver = new LogligSwimmerNameResolver(await KnownSwimmersAsync(row.OrgCompId, ct));
 
         var competitionName = string.Empty;
         var individualRows = 0;
@@ -62,7 +62,7 @@ public sealed class LogligEventPullService(
                 if (r.ClubPoints is int points and > 0)
                     clubPoints[r.Club] = clubPoints.GetValueOrDefault(r.Club) + points;
 
-                if (!known.Contains(NameKey(r.FullName, r.BirthYear)))
+                if (!resolver.Resolve(r.FullName, r.BirthYear, r.Club).Matched)
                     unresolved.Add($"{r.FullName} ({r.BirthYear}) · {r.Club}");
             }
         }
@@ -74,39 +74,25 @@ public sealed class LogligEventPullService(
     }
 
     /// <summary>
-    /// Ключи имён пловцов, уже импортированных по этому соревнованию (по всем его дням).
-    /// Ключ — НАБОР токенов имени плюс год рождения: у loglig порядок «имя фамилия»,
-    /// у нас поля раздельные, и порядок в исходниках не совпадает.
+    /// Пловцы, уже импортированные по этому соревнованию (по всем его дням) — кандидаты
+    /// сопоставления для <see cref="LogligSwimmerNameResolver"/>.
     /// </summary>
-    private async Task<HashSet<string>> KnownSwimmerNamesAsync(int? orgCompId, CancellationToken ct)
+    private async Task<List<KnownSwimmerName>> KnownSwimmersAsync(int? orgCompId, CancellationToken ct)
     {
-        var swimmers = await db.Results.AsNoTracking()
+        var rows = await db.Results.AsNoTracking()
             .Where(r => r.Competition!.OrgCompId == orgCompId)
-            .Select(r => new { r.Swimmer!.LastName, r.Swimmer.FirstName, r.Swimmer.BirthYear })
+            .Select(r => new
+            {
+                r.Swimmer!.LastName,
+                r.Swimmer.FirstName,
+                r.Swimmer.BirthYear,
+                Club = r.Club!.Name
+            })
             .Distinct()
             .ToListAsync(ct);
 
-        return swimmers
-            .Select(s => NameKey($"{s.LastName} {s.FirstName}", s.BirthYear))
-            .ToHashSet(StringComparer.Ordinal);
+        return rows
+            .Select(r => new KnownSwimmerName(r.LastName, r.FirstName, r.BirthYear, r.Club))
+            .ToList();
     }
-
-    /// <summary>
-    /// Токены имени в каноническом порядке + год рождения. Апострофы приводятся к ивритскому
-    /// гершу: PDF и веб-страница loglig пишут «ג׳מים» разными символами (U+05F3, ASCII «'»,
-    /// типографские «’»/«‘»), и без нормализации «אנג'לה» с сайта не находит «אנג׳לה» из базы.
-    /// </summary>
-    private static string NameKey(string fullName, int? birthYear)
-    {
-        var tokens = NormalizeApostrophes(fullName)
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .OrderBy(t => t, StringComparer.Ordinal);
-        return $"{string.Join(' ', tokens)}|{birthYear}";
-    }
-
-    private static string NormalizeApostrophes(string text) => text
-        .Replace('\'', '׳')
-        .Replace('’', '׳')
-        .Replace('‘', '׳')
-        .Replace('`', '׳');
 }
