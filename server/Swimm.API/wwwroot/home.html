@@ -42,8 +42,9 @@
         </div>
 
         <div class="flex gap-4 justify-center flex-wrap mt-8">
-            <a href="/Admin/Api" class="admin-btn admin-btn-ghost text-sm">📡 API Reference</a>
-            <a id="admin-link" href="/Admin" class="hidden admin-btn admin-btn-ghost text-sm">🔧 Admin Panel</a>
+            <a href="/Admin/Competitions" class="admin-only hidden admin-btn admin-btn-ghost text-sm">🏆 Competitions</a>
+            <a href="/Admin/Health" class="admin-only hidden admin-btn admin-btn-ghost text-sm">🩺 Health</a>
+            <a href="/Admin" class="admin-only hidden admin-btn admin-btn-ghost text-sm">🔧 Dashboard</a>
         </div>
     </div>
 </main>
@@ -79,7 +80,9 @@
                 authArea.innerHTML = userHtml;
 
                 if ((data.roles || []).includes('Admin')) {
-                    document.getElementById('admin-link').classList.remove('hidden');
+                    document.querySelectorAll('.admin-only').forEach(function (el) {
+                        el.classList.remove('hidden');
+                    });
                 }
             }
         } catch (e) {
