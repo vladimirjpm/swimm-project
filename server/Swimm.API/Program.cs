@@ -459,6 +459,28 @@ if (args.Contains("--quality-scan"))
     return;
 }
 
+// Прогон ВСЕГО реестра проверок данных из консоли (пара к кнопке на /Admin/Health):
+//   dotnet run -- --data-checks
+// Нужен, когда админка недоступна (нет сессии, headless-машина) и чтобы увидеть картину
+// целиком после массовой правки данных. Проверки только читают — лечение всегда отдельное.
+if (args.Contains("--data-checks"))
+{
+    using var scope = app.Services.CreateScope();
+    var runner = scope.ServiceProvider.GetRequiredService<IDataCheckRunner>();
+    var run = await runner.RunAllAsync("cli");
+    Console.WriteLine($"Прогон #{run.Id}: ошибок {run.ErrorCount}, предупреждений {run.WarningCount}, info {run.InfoCount}");
+
+    foreach (var group in await runner.GetCurrentAsync())
+    {
+        var total = group.Total ?? group.OpenCount;
+        if (total == 0) continue;
+        Console.WriteLine($"  [{group.Severity}] {group.CheckId}: {total} — {group.Title}");
+        foreach (var finding in group.Findings.Take(5))
+            Console.WriteLine($"      {finding.Message}");
+    }
+    return;
+}
+
 // Разовая синхронизация «входящих» автозабора isr.org.il (фаза 6) и выход:
 //   dotnet run -- --discovery-sync
 if (args.Contains("--discovery-sync"))

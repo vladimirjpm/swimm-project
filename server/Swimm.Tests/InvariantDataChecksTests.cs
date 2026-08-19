@@ -68,6 +68,66 @@ public class InvariantDataChecksTests
     }
 
     [Fact]
+    public async Task MergedSessions_FlagsCompetitionWhereSwimmerHasTwoPlacedSwims()
+    {
+        // Чемпионат «мокдамот и финал»: PDF-экспорт слил утреннюю и вечернюю сессии в один
+        // список, и финалист занимает два места подряд. Официально это два зачёта с
+        // отдельными медалями и очками (loglig держит их разными событиями), у нас — один.
+        await using var db = CreateDb(nameof(MergedSessions_FlagsCompetitionWhereSwimmerHasTwoPlacedSwims));
+        var (comp, style, club, swimmer) = await SeedAsync(db);
+
+        ResultRecord Row(int? position, string? time, int? ms, int heat, int lane, int? swimmerId = null) => new()
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmerId ?? swimmer.Id, ClubId = club.Id,
+            StyleId = style.Id, Distance = "50", Gender = "male", EventStyleAge = "14",
+            Position = position, TimeOriginal = time ?? string.Empty, TimeMillisecond = ms,
+            Heat = heat, Lane = lane, CompetitionDate = new DateTime(2026, 6, 1)
+        };
+
+        // Утро и вечер: обе строки с местом и временем — это и есть склейка.
+        db.Results.AddRange(Row(1, "00:26.62", 26620, 4, 4), Row(2, "00:26.63", 26630, 1, 4));
+
+        // Калибровка: «снятие + результат» у другого пловца находкой быть НЕ должно —
+        // этим занимается UpsertKeyCollisionCheck, и severity там мягче.
+        var other = new Swimmer { LastName = "Леви", FirstName = "Дан", BirthYear = 2012, Gender = "male" };
+        db.Swimmers.Add(other);
+        await db.SaveChangesAsync();
+        db.Results.AddRange(
+            Row(3, "00:28.00", 28000, 2, 3, other.Id),
+            Row(null, null, null, 2, 3, other.Id));
+        await db.SaveChangesAsync();
+
+        var outcome = await new MergedSessionsCheck(db).RunAsync();
+
+        // Находка одна — на СОРЕВНОВАНИЕ, а не на каждый заплыв.
+        Assert.Equal(1, outcome.Total);
+        var item = Assert.Single(outcome.Items);
+        Assert.Equal("Competition", item.EntityType);
+        Assert.Equal(comp.Id, item.EntityId);
+        Assert.Contains("заплывов с дублем 1", item.Message);
+    }
+
+    [Fact]
+    public async Task MergedSessions_IgnoresRowsAlreadyMarkedPrelimOrFinal()
+    {
+        // Если сессии уже размечены (HeatType), prelim/final различимы — чинить нечего.
+        await using var db = CreateDb(nameof(MergedSessions_IgnoresRowsAlreadyMarkedPrelimOrFinal));
+        var (comp, style, club, swimmer) = await SeedAsync(db);
+
+        ResultRecord Row(int position, int ms, string heatType) => new()
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer.Id, ClubId = club.Id, StyleId = style.Id,
+            Distance = "50", Gender = "male", EventStyleAge = "14", Position = position,
+            TimeOriginal = "00:26.62", TimeMillisecond = ms, HeatType = heatType,
+            Heat = 1, Lane = 4, CompetitionDate = new DateTime(2026, 6, 1)
+        };
+        db.Results.AddRange(Row(1, 26620, "final"), Row(1, 26630, "prelim"));
+        await db.SaveChangesAsync();
+
+        Assert.Equal(0, (await new MergedSessionsCheck(db).RunAsync()).Total);
+    }
+
+    [Fact]
     public async Task RelayGenderFromLeg_FlagsMixedTeamWithConcreteGender()
     {
         // И3: у смешанной команды пола нет. Помеченная male строка — след того, что пол

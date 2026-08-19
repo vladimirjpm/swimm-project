@@ -143,3 +143,80 @@ public sealed class EmptyRelayCheck(IDataQualityService quality) : IDataCheck
             .ToList());
     }
 }
+
+/// <summary>
+/// Сессии одного заплыва склеены в одно событие: пловец встречается в дисциплине ДВАЖДЫ,
+/// и обе строки — полноценные результаты (место + время).
+///
+/// Откуда берётся. Чемпионаты формата «мокдамот и финал» (регламент, например loglig doc 3311)
+/// разыгрывают ДВА самостоятельных зачёта: утренние заплывы по возрастным группам и вечерний
+/// финал. Официально оба дают медали и клубные очки — в live-зачёте loglig это два разных
+/// события (<c>AthleticsDisciplineResults/{id}</c>). А PDF-экспорт, из которого мы импортируем,
+/// печатает их ОДНИМ списком, пересортированным по времени, и слова «מוקדמות»/«גמר» в файле
+/// нет. Из-за этого финалист занимает в нашей таблице сразу два места подряд (1-е и 2-е),
+/// а очки и медали считаются один раз вместо двух: у соревнования 1581 зачёт 29 200 против
+/// официальных 40 575.
+///
+/// ⚠ Калибровка. Требуем у ОБЕИХ строк место и время — иначе проверка ловила бы законное
+/// «протокол напечатал и снятие (NS/DQ), и результат», которым занимается
+/// <see cref="UpsertKeyCollisionCheck"/>. С этим условием на живой базе находятся ровно два
+/// соревнования: 1581 (747 заплывов) и 1526 (2 строки с ОДИНАКОВЫМ временем на разных
+/// дорожках — другая болезнь, но тоже требует человека).
+///
+/// Находка — на СОРЕВНОВАНИЕ, а не на пловца: чинится оно целиком (перетягиванием из
+/// другого источника), и 747 отдельных находок только утопили бы /Admin/Health.
+/// Проверка ставит диагноз, лечение — отдельное осознанное действие.
+/// </summary>
+public sealed class MergedSessionsCheck(SwimmDbContext db) : IDataCheck
+{
+    public string Id => "results.merged-sessions";
+    public string Title => "Сессии склеены: пловец дважды в одной дисциплине";
+    public string Description =>
+        "В одной дисциплине у пловца две строки, и обе — с местом и временем. Так выглядит " +
+        "чемпионат «мокдамот и финал», у которого PDF-экспорт слил утреннюю и вечернюю сессии " +
+        "в один список: официально это два зачёта с отдельными медалями и очками, а у нас один. " +
+        "Места в таблице идут подряд у одного человека, клубный зачёт занижен. Лечится " +
+        "перетягиванием соревнования из пособытийного источника loglig.";
+    public DataCheckSeverity Severity => DataCheckSeverity.Error;
+
+    public async Task<DataCheckOutcome> RunAsync(CancellationToken ct = default)
+    {
+        // Оба HeatType пусты: если разметка сессий уже есть, prelim/final различимы и это
+        // не наш случай. Эстафеты исключены — там «дважды» законно (две команды клуба).
+        var dupes = await db.Results.AsNoTracking()
+            .Where(r => r.RelayId == null && r.HeatType == null
+                        && r.Position != null && r.TimeMillisecond != null)
+            .GroupBy(r => new
+            {
+                r.CompetitionId, r.StyleId, r.Distance, r.Gender, r.EventStyleAge, r.SwimmerId
+            })
+            .Where(g => g.Count() > 1)
+            .Select(g => new { g.Key.CompetitionId, Rows = g.Count() })
+            .ToListAsync(ct);
+
+        if (dupes.Count == 0) return DataCheckOutcome.Empty;
+
+        var byComp = dupes
+            .GroupBy(d => d.CompetitionId)
+            .Select(g => new { CompetitionId = g.Key, Swims = g.Count(), Rows = g.Sum(x => x.Rows) })
+            .OrderByDescending(x => x.Swims)
+            .ToList();
+
+        var ids = byComp.Select(c => c.CompetitionId).Take(50).ToList();
+        var comps = await db.Competitions.AsNoTracking()
+            .Where(c => ids.Contains(c.Id))
+            .Select(c => new { c.Id, c.Name, c.Date })
+            .ToDictionaryAsync(c => c.Id, ct);
+
+        return new DataCheckOutcome(byComp.Count, byComp
+            .Take(50)
+            .Select(c => new DataCheckItem(
+                "Competition", c.CompetitionId,
+                $"{comps.GetValueOrDefault(c.CompetitionId)?.Name ?? $"#{c.CompetitionId}"} — " +
+                $"заплывов с дублем {c.Swims}, строк {c.Rows}",
+                comps.GetValueOrDefault(c.CompetitionId)?.Date ?? string.Empty,
+                $"/Admin/Competitions?q={c.CompetitionId}",
+                PublicRoutes.Competition(c.CompetitionId)))
+            .ToList());
+    }
+}
