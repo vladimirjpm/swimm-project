@@ -21,7 +21,12 @@ public sealed record SuspectCandidateRow(
     /// сессии в правиле «дубль дисциплины»: у бугрим предварительные и финал плывут в ОДИН
     /// день, и без признака каждый финалист выглядел дублем (1678 ложных пометок на
     /// чемпионате 2026).</summary>
-    string? HeatType = null);
+    string? HeatType = null,
+    /// <summary>Раунд зачёта источника (timed-final / final / prelim); null — источник их не
+    /// различает. Тоже входит в ключ «дубля дисциплины»: у чемпионата «мокдамот и финал»
+    /// утренний зачёт возрастных групп и вечерний финал — РАЗНЫЕ соревнования в один день,
+    /// и оба помечены HeatType=final (И13, docs/data-integrity.md §10).</summary>
+    string? Round = null);
 
 /// <summary>
 /// Заплыв пловца из его личной истории (для правила «выброс относительно себя»).
@@ -201,9 +206,10 @@ public static class SuspectResultDetector
         //    Разные ДНИ — норма (повтор дисциплины), поэтому день в ключе. Разные СЕССИИ
         //    одного дня — тоже норма (у бугрим предварительные и финал в один день),
         //    поэтому в ключе и HeatType: prelim и final не сравниваются друг с другом,
-        //    дубль внутри одной сессии по-прежнему ловится.
+        //    дубль внутри одной сессии по-прежнему ловится. Round — по той же причине:
+        //    утренний зачёт возрастов и вечерний финал оба «final», но это разные зачёты.
         foreach (var grp in timed.GroupBy(r =>
-                     (r.SwimmerId, r.StyleName, r.Distance, r.CompetitionDate.Date, r.HeatType)))
+                     (r.SwimmerId, r.StyleName, r.Distance, r.CompetitionDate.Date, r.HeatType, r.Round)))
         {
             if (grp.Count() < 2) continue;
             if (grp.Select(r => r.TimeMilliseconds).Distinct().Count() < 2) continue;

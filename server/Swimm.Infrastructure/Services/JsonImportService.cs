@@ -963,8 +963,13 @@ public class JsonImportService : IImportService
             var competitionIds = expectedByEvent.Keys.Select(k => k.CompetitionId).Distinct().ToList();
             if (competitionIds.Count > 0)
             {
+                // Сверка сравнивает файл с тем, что этот файл ВПРАВЕ был принести. Источник
+                // без эстафет (пособытийные страницы loglig, PreserveRelays) их не несёт и
+                // не удаляет — считать их «лишними строками в БД» значит объявлять
+                // расхождение там, где всё сделано намеренно (1581: файл 3466, БД 3561).
                 var actualRaw = await _db.Results.AsNoTracking()
                     .Where(r => competitionIds.Contains(r.CompetitionId))
+                    .Where(r => !preserveRelays || r.RelayId == null)
                     .Select(r => new
                     {
                         r.CompetitionId,

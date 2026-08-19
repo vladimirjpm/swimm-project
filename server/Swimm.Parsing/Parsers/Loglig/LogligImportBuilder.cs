@@ -27,6 +27,7 @@ public sealed class LogligImportBuilder : ILogligImportBuilder
         Func<LogligResultRowDto, (string LastName, string FirstName)> resolveName)
     {
         var eventYear = AgeGroupHelper.ExtractYearFromDateString(context.Date);
+        var withFinal = DisciplinesWithFinal(events);
         var rows = new List<Result>();
 
         foreach (var ev in events)
@@ -81,13 +82,46 @@ public sealed class LogligImportBuilder : ILogligImportBuilder
                     RelaySwimmersName: null,
                     RelaySwimmers: null,
                     EventCategory: null,
-                    HeatType: null,
+                    HeatType: HeatTypeOf(r.Round, withFinal.Contains(DisciplineKey(ev, r.Category))),
                     Round: r.Round));
             }
         }
 
         return JsonSerializer.Serialize(rows);
     }
+
+    /// <summary>
+    /// Дисциплины, у которых есть финальный раунд. Нужно, чтобы отличить предварительные
+    /// от «утра, ставшего результатом»: регламент отменяет финал, если в нём осталось
+    /// ≤ 2 участника («הגמר יבוטל»), и тогда мокдамот — единственный заплыв дисциплины.
+    /// </summary>
+    private static HashSet<string> DisciplinesWithFinal(IReadOnlyList<LogligEventResultsDto> events) =>
+    [
+        .. events
+            .Where(ev => !ev.IsRelay)
+            .SelectMany(ev => ev.Rows
+                .Where(r => r.Round is LogligRounds.Final or LogligRounds.TimedFinal)
+                .Select(r => DisciplineKey(ev, r.Category)))
+    ];
+
+    private static string DisciplineKey(LogligEventResultsDto ev, string category) =>
+        $"{ev.StyleName}|{ev.Distance}|{category}";
+
+    /// <summary>
+    /// Наш ВЫВОД об отборе, который читает правило Р34 «место в предварительном — не награда»
+    /// (и <c>FinalsOnly</c> у High Point). Раунд источника остаётся в <c>Round</c> как факт.
+    ///
+    /// Предварительные помечаются <c>prelim</c> ТОЛЬКО когда у дисциплины есть финал: если
+    /// финал отменён (в нём ≤ 2 участника), медали и очки даёт утренний заплыв, и гасить его
+    /// правилом Р34 нельзя. Обе разновидности финала — вечерний и утренний прямой — для
+    /// этого правила одинаковы: и там и там место есть награда.
+    /// </summary>
+    private static string? HeatTypeOf(string round, bool disciplineHasFinal) => round switch
+    {
+        LogligRounds.Prelim => disciplineHasFinal ? "prelim" : null,
+        LogligRounds.Final or LogligRounds.TimedFinal => "final",
+        _ => null
+    };
 
     /// <summary>«בנות 14» → female + «14»; «כללי» — пола и возраста нет, берём из шапки события.</summary>
     private static (string Gender, string Age) ParseCategory(string category)
