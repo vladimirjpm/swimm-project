@@ -22,7 +22,7 @@ const PAGES: CompetitionLink[] = [
   {
     href: routes.competition('last'),
     title: 'Latest meet',
-    subtitle: 'Свежие результаты последнего соревнования',
+    subtitle: 'Fresh results from the latest meet',
     badge: '● LIVE',
     live: true,
   },
@@ -56,7 +56,7 @@ const PAGES: CompetitionLink[] = [
     href: `${routes.results()}?category=masters`,
     title: 'Masters',
     subtitle: 'Masters meets incl. Dolphin, ages 21+',
-    badge: 'М',
+    badge: 'M',
   },
   {
     href: `${routes.results()}?category=all`,
@@ -80,7 +80,7 @@ function MeetsSection() {
     (async () => {
       try {
         const resp = await fetch('/api/competitions', { credentials: 'same-origin' });
-        if (!resp.ok) throw new Error(`API /api/competitions вернул ${resp.status}`);
+        if (!resp.ok) throw new Error(`API /api/competitions returned ${resp.status}`);
         const data = (await resp.json()) as CompetitionSource[];
         if (!cancelled) setSources(data);
       } catch (e) {

@@ -771,7 +771,7 @@ function MyMediaSection({
                         className="text-[10px] font-bold px-2 py-0.5 rounded"
                         style={{ background: '#e23b5a', color: '#fff' }}
                       >
-                        Да
+                        Yes
                       </button>
                       <button
                         type="button"
@@ -779,7 +779,7 @@ function MyMediaSection({
                         className="text-[10px] font-bold px-2 py-0.5 rounded"
                         style={{ background: 'rgba(255,255,255,0.2)', color: '#fff' }}
                       >
-                        Нет
+                        No
                       </button>
                     </div>
                   </div>
@@ -827,7 +827,7 @@ function MyMediaSection({
               className="rounded-lg px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-50"
               style={{ background: 'var(--theme-primary)' }}
             >
-              Подать
+              Submit
             </button>
           </div>
           {pubError && <div className="text-[10px]" style={{ color: '#e23b5a' }}>{pubError}</div>}

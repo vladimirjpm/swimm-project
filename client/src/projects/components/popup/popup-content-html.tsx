@@ -7,7 +7,7 @@ const PopupContentHtml: React.FC = () => {
    return (
     <div>
       <h2 className="text-xl font-bold mb-4">HTML Content</h2>
-      <div dangerouslySetInnerHTML={{ __html: '<p>HTML контент из стора или API</p>' }} />
+      <div dangerouslySetInnerHTML={{ __html: '<p>HTML content from the store or API</p>' }} />
     </div>
   );
 };

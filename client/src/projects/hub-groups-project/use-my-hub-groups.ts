@@ -60,7 +60,7 @@ async function saveResultFrom(r: Response): Promise<SaveResult> {
     return { success: true, id: data.id };
   }
   const data = await r.json().catch(() => ({}));
-  return { success: false, error: data.error ?? `Ошибка (${r.status})` };
+  return { success: false, error: data.error ?? `Error (${r.status})` };
 }
 
 export interface CurrentIdentity {
@@ -160,7 +160,7 @@ export function useMyHubGroupEdit(id: number | null) {
   useEffect(() => { reload(); }, [reload]);
 
   const update = useCallback(async (input: HubGroupInput): Promise<SaveResult> => {
-    if (id == null) return { success: false, error: 'Нет группы' };
+    if (id == null) return { success: false, error: 'No group' };
     const r = await apiFetch(`/api/me/hub-groups/${id}`, { method: 'PUT', body: JSON.stringify(input) });
     const result = await saveResultFrom(r);
     if (result.success) await reload();
@@ -178,7 +178,7 @@ export function useMyHubGroupEdit(id: number | null) {
   }, []);
 
   const addMember = useCallback(async (swimmerId: number, role: string): Promise<SaveResult> => {
-    if (id == null) return { success: false, error: 'Нет группы' };
+    if (id == null) return { success: false, error: 'No group' };
     const r = await apiFetch(`/api/me/hub-groups/${id}/members`, {
       method: 'POST', body: JSON.stringify({ swimmerId, role }),
     });
@@ -188,7 +188,7 @@ export function useMyHubGroupEdit(id: number | null) {
   }, [id, reload]);
 
   const updateMember = useCallback(async (memberId: number, role: string, sortOrder: number): Promise<SaveResult> => {
-    if (id == null) return { success: false, error: 'Нет группы' };
+    if (id == null) return { success: false, error: 'No group' };
     const r = await apiFetch(`/api/me/hub-groups/${id}/members/${memberId}`, {
       method: 'PUT', body: JSON.stringify({ role, sortOrder }),
     });
@@ -198,7 +198,7 @@ export function useMyHubGroupEdit(id: number | null) {
   }, [id, reload]);
 
   const removeMember = useCallback(async (memberId: number): Promise<SaveResult> => {
-    if (id == null) return { success: false, error: 'Нет группы' };
+    if (id == null) return { success: false, error: 'No group' };
     const r = await apiFetch(`/api/me/hub-groups/${id}/members/${memberId}`, { method: 'DELETE' });
     const result = await saveResultFrom(r);
     if (result.success) await reload();
@@ -206,7 +206,7 @@ export function useMyHubGroupEdit(id: number | null) {
   }, [id, reload]);
 
   const addAdmin = useCallback(async (email: string): Promise<SaveResult> => {
-    if (id == null) return { success: false, error: 'Нет группы' };
+    if (id == null) return { success: false, error: 'No group' };
     const r = await apiFetch(`/api/me/hub-groups/${id}/admins`, { method: 'POST', body: JSON.stringify({ email }) });
     const result = await saveResultFrom(r);
     if (result.success) await reload();
@@ -214,7 +214,7 @@ export function useMyHubGroupEdit(id: number | null) {
   }, [id, reload]);
 
   const removeAdmin = useCallback(async (userId: number): Promise<SaveResult> => {
-    if (id == null) return { success: false, error: 'Нет группы' };
+    if (id == null) return { success: false, error: 'No group' };
     const r = await apiFetch(`/api/me/hub-groups/${id}/admins/${userId}`, { method: 'DELETE' });
     const result = await saveResultFrom(r);
     if (result.success) await reload();
@@ -222,7 +222,7 @@ export function useMyHubGroupEdit(id: number | null) {
   }, [id, reload]);
 
   const submitClubRequest = useCallback(async (input: HubGroupClubRequestInput): Promise<SaveResult> => {
-    if (id == null) return { success: false, error: 'Нет группы' };
+    if (id == null) return { success: false, error: 'No group' };
     const r = await apiFetch(`/api/me/hub-groups/${id}/club-request`, { method: 'POST', body: JSON.stringify(input) });
     const result = await saveResultFrom(r);
     if (result.success) await reload();
@@ -230,7 +230,7 @@ export function useMyHubGroupEdit(id: number | null) {
   }, [id, reload]);
 
   const addUserMember = useCallback(async (email: string, swimmerId?: number | null, note?: string | null): Promise<SaveResult> => {
-    if (id == null) return { success: false, error: 'Нет группы' };
+    if (id == null) return { success: false, error: 'No group' };
     const r = await apiFetch(`/api/me/hub-groups/${id}/user-members`, {
       method: 'POST',
       body: JSON.stringify({ email, swimmerId: swimmerId ?? null, note: note ?? null }),
@@ -241,7 +241,7 @@ export function useMyHubGroupEdit(id: number | null) {
   }, [id, reload]);
 
   const setUserMemberLabel = useCallback(async (userId: number, swimmerId: number | null, note: string | null): Promise<SaveResult> => {
-    if (id == null) return { success: false, error: 'Нет группы' };
+    if (id == null) return { success: false, error: 'No group' };
     const r = await apiFetch(`/api/me/hub-groups/${id}/user-members/${userId}/label`, {
       method: 'PUT',
       body: JSON.stringify({ swimmerId, note }),
@@ -252,7 +252,7 @@ export function useMyHubGroupEdit(id: number | null) {
   }, [id, reload]);
 
   const approveUserMember = useCallback(async (userId: number): Promise<SaveResult> => {
-    if (id == null) return { success: false, error: 'Нет группы' };
+    if (id == null) return { success: false, error: 'No group' };
     const r = await apiFetch(`/api/me/hub-groups/${id}/user-members/${userId}/approve`, { method: 'POST' });
     const result = await saveResultFrom(r);
     if (result.success) await reload();
@@ -260,7 +260,7 @@ export function useMyHubGroupEdit(id: number | null) {
   }, [id, reload]);
 
   const removeUserMember = useCallback(async (userId: number): Promise<SaveResult> => {
-    if (id == null) return { success: false, error: 'Нет группы' };
+    if (id == null) return { success: false, error: 'No group' };
     const r = await apiFetch(`/api/me/hub-groups/${id}/user-members/${userId}`, { method: 'DELETE' });
     const result = await saveResultFrom(r);
     if (result.success) await reload();

@@ -225,7 +225,7 @@ export default class HelperSwimmer {
     filteredResults.forEach((res) => {
       if (res.position !== null && res.position !== undefined && isAward) {
         const pos = Number(res.position);
-        const note = `${res.event_style_name} ${res.event_style_len}м`;
+        const note = `${res.event_style_name} ${res.event_style_len}m`;
 
         const resultWithNote: Result = {
           ...res,

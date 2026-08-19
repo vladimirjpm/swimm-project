@@ -112,7 +112,7 @@ function TrainingTableBySet({
                             selected_name: `${res.first_name}${res.last_name ? ' ' + res.last_name : ''}`,
                           })
                         }
-                        title={`Фильтровать по: ${res.first_name}${res.last_name ? ' ' + res.last_name : ''}`}
+                        title={`Filter by: ${res.first_name}${res.last_name ? ' ' + res.last_name : ''}`}
                       >
                         {res.first_name} {res.last_name ? `- ${res.last_name}` : ''}
                       </div>

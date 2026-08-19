@@ -63,7 +63,7 @@ const loadFromApi = async (
       pageSize: String(pageSize),
     });
     const resp = await fetch(`/api/results?${qs}`, { credentials: 'same-origin' });
-    if (!resp.ok) throw new Error(`API /api/results вернул ${resp.status}`);
+    if (!resp.ok) throw new Error(`API /api/results returned ${resp.status}`);
     const json = await resp.json();
     all.push(...((json.data ?? []) as Result[]));
     if (!json.hasMore) break;

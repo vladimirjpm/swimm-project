@@ -5,7 +5,7 @@ import type { HubGroupMediaItem } from '../../utils/interfaces/results';
 import { routes } from '../../utils/routes';
 
 const DISCLAIMER =
-  'Состав ведётся создателем группы и не является официальной заявкой клуба или федерации.';
+  'The roster is maintained by the group creator and is not an official club or federation entry.';
 
 const cardCls =
   'hp-card-std rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]';
@@ -53,23 +53,23 @@ function GroupInputForm({
     setError(null);
     const result = await onSubmit(form);
     setSaving(false);
-    if (!result.success) setError(result.error ?? 'Ошибка сохранения');
+    if (!result.success) setError(result.error ?? 'Could not save');
   };
 
   return (
     <div className="flex flex-col gap-3">
-      <input className={inputCls} placeholder="Название" value={form.name}
+      <input className={inputCls} placeholder="Name" value={form.name}
         onChange={(e) => setField('name', e.target.value)} />
-      <input className={inputCls} placeholder="Название (англ.)" value={form.nameEn ?? ''}
+      <input className={inputCls} placeholder="Name (English)" value={form.nameEn ?? ''}
         onChange={(e) => setField('nameEn', e.target.value)} />
-      <textarea className={inputCls} placeholder="Описание" rows={2} value={form.description ?? ''}
+      <textarea className={inputCls} placeholder="Description" rows={2} value={form.description ?? ''}
         onChange={(e) => setField('description', e.target.value)} />
-      <input className={inputCls} placeholder="Город/бассейн" value={form.location ?? ''}
+      <input className={inputCls} placeholder="City / pool" value={form.location ?? ''}
         onChange={(e) => setField('location', e.target.value)} />
       {/* Alpha-3 код World Aquatics (ISR/GER/…) — как в БД; резолв FK делает сервер. */}
-      <input className={inputCls} placeholder="Страна — код (ISR)" maxLength={3} value={form.country ?? ''}
+      <input className={inputCls} placeholder="Country code (ISR)" maxLength={3} value={form.country ?? ''}
         onChange={(e) => setField('country', e.target.value.toUpperCase())} />
-      <input className={inputCls} placeholder="Иконка (ссылка)" value={form.iconUrl ?? ''}
+      <input className={inputCls} placeholder="Icon (link)" value={form.iconUrl ?? ''}
         onChange={(e) => setField('iconUrl', e.target.value)} />
 
       <div className="flex flex-col gap-2">
@@ -87,27 +87,27 @@ function GroupInputForm({
             <button type="button" className={btnDangerCls} onClick={() => removeLink(i)}>✕</button>
           </div>
         ))}
-        <button type="button" className={btnCls} onClick={addLink}>+ Ссылка</button>
+        <button type="button" className={btnCls} onClick={addLink}>+ Link</button>
       </div>
 
       <label className="flex items-center gap-2 text-[13px] font-bold text-[#cbe0f0]/80">
         <input type="checkbox" checked={form.isPublic}
           onChange={(e) => setField('isPublic', e.target.checked)} />
-        Публичная группа
+        Public group
       </label>
 
       <label className="flex items-center gap-2 text-[13px] font-bold text-[#cbe0f0]/80">
-        Вступление:
+        Joining:
         <select className={`${inputCls} max-w-[220px]`} value={form.joinPolicy ?? 'open'}
           onChange={(e) => setField('joinPolicy', e.target.value as 'open' | 'approval')}>
-          <option value="open">свободное</option>
-          <option value="approval">по заявке (одобряет тренер)</option>
+          <option value="open">open</option>
+          <option value="approval">by request (coach approves)</option>
         </select>
       </label>
       {recommendApproval && (form.joinPolicy ?? 'open') === 'open' && (
         <p className="m-0 text-[11.5px] italic text-[#ffca7a]/80">
-          У официальной группы members-контент (разборы, тренировки) виден всем вступившим —
-          рекомендуем режим «по заявке».
+          In an official group, members-only content (reviews, training) is visible to everyone who
+          joins — we recommend the “by request” mode.
         </p>
       )}
 
@@ -117,7 +117,7 @@ function GroupInputForm({
         <button type="button" className={btnCls} disabled={saving || !form.name.trim()} onClick={submit}>
           {saving ? '…' : submitLabel}
         </button>
-        <button type="button" className={btnCls} onClick={onCancel}>Отмена</button>
+        <button type="button" className={btnCls} onClick={onCancel}>Cancel</button>
       </div>
     </div>
   );
@@ -159,12 +159,12 @@ function MembersEditor({ hubGroupId, clubId }: { hubGroupId: number; clubId?: nu
           </li>
         ))}
         {edit.data.members.length === 0 && (
-          <p className="text-[12.5px] text-[#cbe0f0]/55">Состав пока пуст.</p>
+          <p className="text-[12.5px] text-[#cbe0f0]/55">The roster is empty.</p>
         )}
       </ul>
 
       <div className="relative">
-        <input className={inputCls} placeholder="Найти пловца по фамилии…" value={query}
+        <input className={inputCls} placeholder="Find a swimmer by last name…" value={query}
           onChange={(e) => onSearch(e.target.value)} />
         {results.length > 0 && (
           <ul className="absolute z-10 m-0 mt-1 flex max-h-[220px] w-full list-none flex-col gap-1 overflow-y-auto rounded-[10px] border border-[#7dd3fc]/30 bg-[#06182c] p-2">
@@ -184,12 +184,12 @@ function MembersEditor({ hubGroupId, clubId }: { hubGroupId: number; clubId?: nu
       {clubId && (
         <div>
           <button type="button" className={btnCls} onClick={toggleClubSwimmers}>
-            {clubSwimmers != null ? 'Скрыть пловцов клуба' : 'Показать пловцов клуба'}
+            {clubSwimmers != null ? 'Hide club swimmers' : 'Show club swimmers'}
           </button>
           {clubSwimmers != null && (
             <ul className="m-0 mt-2 flex max-h-[220px] list-none flex-col gap-1 overflow-y-auto rounded-[10px] border border-[#7dd3fc]/30 bg-[#06182c] p-2">
               {clubSwimmers.length === 0 && (
-                <p className="px-2 py-1 text-[12.5px] text-[#cbe0f0]/55">Пловцов клуба не найдено.</p>
+                <p className="px-2 py-1 text-[12.5px] text-[#cbe0f0]/55">No club swimmers found.</p>
               )}
               {clubSwimmers.map((s) => (
                 <li key={s.id}>
@@ -218,7 +218,7 @@ function AdminsEditor({ hubGroupId, isOwnerOrAdmin }: { hubGroupId: number; isOw
   const submit = async () => {
     setError(null);
     const result = await edit.addAdmin(email);
-    if (result.success) setEmail(''); else setError(result.error ?? 'Ошибка');
+    if (result.success) setEmail(''); else setError(result.error ?? 'Something went wrong');
   };
 
   return (
@@ -231,13 +231,13 @@ function AdminsEditor({ hubGroupId, isOwnerOrAdmin }: { hubGroupId: number; isOw
           </li>
         ))}
         {edit.admins.length === 0 && (
-          <p className="text-[12.5px] text-[#cbe0f0]/55">Админов группы пока нет.</p>
+          <p className="text-[12.5px] text-[#cbe0f0]/55">No group admins yet.</p>
         )}
       </ul>
       <div className="flex gap-2">
-        <input className={inputCls} placeholder="Email пользователя" value={email}
+        <input className={inputCls} placeholder="User email" value={email}
           onChange={(e) => setEmail(e.target.value)} />
-        <button type="button" className={btnCls} disabled={!email.trim()} onClick={submit}>+ Админ</button>
+        <button type="button" className={btnCls} disabled={!email.trim()} onClick={submit}>+ Admin</button>
       </div>
       {error && <p className="text-[12.5px] font-bold text-[#ef5350]">{error}</p>}
     </div>
@@ -292,7 +292,7 @@ function UserMembersEditor({ hubGroupId }: { hubGroupId: number }) {
   const submit = async () => {
     setError(null);
     const result = await edit.addUserMember(email, labelSwimmer?.id ?? null, note || null);
-    if (result.success) { setEmail(''); setLabelSwimmer(null); setNote(''); } else setError(result.error ?? 'Ошибка');
+    if (result.success) { setEmail(''); setLabelSwimmer(null); setNote(''); } else setError(result.error ?? 'Something went wrong');
   };
 
   const members = edit.data?.userMembers ?? [];
@@ -300,7 +300,7 @@ function UserMembersEditor({ hubGroupId }: { hubGroupId: number }) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-[11.5px] italic text-[#cbe0f0]/45">
-        Приватный список — виден только владельцу и админам группы, не на публичной странице.
+        Private list — visible only to the group owner and admins, never on the public page.
       </p>
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
         {members.map((m) => (
@@ -308,27 +308,27 @@ function UserMembersEditor({ hubGroupId }: { hubGroupId: number }) {
             <div className="flex items-center justify-between gap-2">
               <span className="min-w-0 truncate text-[13px] text-[#f3f8fd]">
                 {m.displayName} <span className="text-[#cbe0f0]/50">({m.email})</span>
-                {m.selfJoined && <span className="ml-1 text-[10.5px] text-[#7dd3fc]/70">вступил сам</span>}
+                {m.selfJoined && <span className="ml-1 text-[10.5px] text-[#7dd3fc]/70">joined on their own</span>}
                 {m.status === 'pending' && (
                   <span className="ml-1 rounded-[6px] border border-[#ffca7a]/50 px-[5px] py-[1px] text-[10px] font-extrabold text-[#ffca7a]">
-                    заявка
+                    request
                   </span>
                 )}
                 {m.swimmerId != null && (
                   <span className="ml-1 text-[11px] text-[#cbe0f0]/70">
-                    — {m.note || 'родитель'}: {m.swimmerName}
+                    — {m.note || 'parent'}: {m.swimmerName}
                   </span>
                 )}
               </span>
               <div className="flex shrink-0 items-center gap-2">
                 {m.status === 'pending' && (
                   <button type="button" className={btnCls} onClick={() => edit.approveUserMember(m.userId)}>
-                    Одобрить
+                    Approve
                   </button>
                 )}
                 <button type="button" className={btnCls}
                   onClick={() => setEditingUserId(editingUserId === m.userId ? null : m.userId)}>
-                  {m.swimmerId != null ? 'Ярлык' : '+ Ярлык'}
+                  {m.swimmerId != null ? 'Label' : '+ Label'}
                 </button>
                 <button type="button" className={btnDangerCls} onClick={() => edit.removeUserMember(m.userId)}>✕</button>
               </div>
@@ -339,24 +339,24 @@ function UserMembersEditor({ hubGroupId }: { hubGroupId: number }) {
           </li>
         ))}
         {members.length === 0 && (
-          <p className="text-[12.5px] text-[#cbe0f0]/55">Участников-аккаунтов пока нет.</p>
+          <p className="text-[12.5px] text-[#cbe0f0]/55">No account members yet.</p>
         )}
       </ul>
       <div className="flex flex-col gap-2">
-        <input className={inputCls} placeholder="Email пользователя" value={email}
+        <input className={inputCls} placeholder="User email" value={email}
           onChange={(e) => setEmail(e.target.value)} />
-        <SwimmerPicker edit={edit} placeholder="Ярлык: пловец (опционально)" onPick={setLabelSwimmer} />
+        <SwimmerPicker edit={edit} placeholder="Label: swimmer (optional)" onPick={setLabelSwimmer} />
         {labelSwimmer && (
           <div className="flex items-center gap-2 text-[12px] text-[#cbe0f0]/80">
-            <span>Пловец: {labelSwimmer.name || labelSwimmer.nameEn}</span>
+            <span>Swimmer: {labelSwimmer.name || labelSwimmer.nameEn}</span>
             <button type="button" className={btnDangerCls} onClick={() => setLabelSwimmer(null)}>✕</button>
           </div>
         )}
         {labelSwimmer && (
-          <input className={inputCls} placeholder="Подпись (напр. «родитель»)" value={note}
+          <input className={inputCls} placeholder="Note (e.g. “parent”)" value={note}
             onChange={(e) => setNote(e.target.value)} />
         )}
-        <button type="button" className={btnCls} disabled={!email.trim()} onClick={submit}>+ Участник</button>
+        <button type="button" className={btnCls} disabled={!email.trim()} onClick={submit}>+ Member</button>
       </div>
       {error && <p className="text-[12.5px] font-bold text-[#ef5350]">{error}</p>}
     </div>
@@ -380,30 +380,30 @@ function UserMemberLabelEditor({
   const save = async () => {
     setError(null);
     const result = await edit.setUserMemberLabel(member.userId, swimmer?.id ?? null, note || null);
-    if (result.success) onDone(); else setError(result.error ?? 'Ошибка');
+    if (result.success) onDone(); else setError(result.error ?? 'Something went wrong');
   };
 
   const clear = async () => {
     setError(null);
     const result = await edit.setUserMemberLabel(member.userId, null, null);
-    if (result.success) onDone(); else setError(result.error ?? 'Ошибка');
+    if (result.success) onDone(); else setError(result.error ?? 'Something went wrong');
   };
 
   return (
     <div className="ml-2 flex flex-col gap-2 border-l border-[#7dd3fc]/25 pl-3">
-      <SwimmerPicker edit={edit} placeholder="Пловец" onPick={setSwimmer} />
+      <SwimmerPicker edit={edit} placeholder="Swimmer" onPick={setSwimmer} />
       {swimmer && (
         <div className="flex items-center gap-2 text-[12px] text-[#cbe0f0]/80">
           <span>{swimmer.name || swimmer.nameEn || `#${swimmer.id}`}</span>
           <button type="button" className={btnDangerCls} onClick={() => setSwimmer(null)}>✕</button>
         </div>
       )}
-      <input className={inputCls} placeholder="Подпись (напр. «родитель»)" value={note}
+      <input className={inputCls} placeholder="Note (e.g. “parent”)" value={note}
         onChange={(e) => setNote(e.target.value)} />
       <div className="flex gap-2">
-        <button type="button" className={btnCls} onClick={save}>Сохранить</button>
-        <button type="button" className={btnCls} onClick={clear}>Снять ярлык</button>
-        <button type="button" className={btnCls} onClick={onDone}>Отмена</button>
+        <button type="button" className={btnCls} onClick={save}>Save</button>
+        <button type="button" className={btnCls} onClick={clear}>Clear label</button>
+        <button type="button" className={btnCls} onClick={onDone}>Cancel</button>
       </div>
       {error && <p className="text-[12.5px] font-bold text-[#ef5350]">{error}</p>}
     </div>
@@ -588,7 +588,7 @@ function ClubRequestPanel({ hubGroupId }: { hubGroupId: number }) {
   if (request?.status === 'pending') {
     return (
       <p className="text-[12.5px] text-[#cbe0f0]/70">
-        Заявка на официальный статус клуба «{request.clubName}» рассматривается.
+        The official-status request for “{request.clubName}” is under review.
       </p>
     );
   }
@@ -599,28 +599,28 @@ function ClubRequestPanel({ hubGroupId }: { hubGroupId: number }) {
     setError(null);
     const r = await edit.submitClubRequest({ clubId, message: message.trim() || null });
     setSaving(false);
-    if (!r.success) setError(r.error ?? 'Ошибка отправки заявки');
+    if (!r.success) setError(r.error ?? 'Could not submit the request');
   };
 
   return (
     <div className="flex flex-col gap-2">
       {request?.status === 'rejected' && (
         <p className="text-[12.5px] text-[#cbe0f0]/55">
-          Предыдущая заявка на «{request.clubName}» отклонена — можно подать снова.
+          The previous request for “{request.clubName}” was declined — you can apply again.
         </p>
       )}
       <div className="flex gap-2">
         <select className={`${inputCls} max-w-[220px]`} value={clubId}
           onChange={(e) => setClubId(e.target.value ? Number(e.target.value) : '')}>
-          <option value="">Выбрать клуб…</option>
+          <option value="">Select a club…</option>
           {clubs.map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
-        <input className={inputCls} placeholder="Сообщение админу (необязательно)" value={message}
+        <input className={inputCls} placeholder="Message to the admin (optional)" value={message}
           onChange={(e) => setMessage(e.target.value)} />
         <button type="button" className={btnCls} disabled={!clubId || saving} onClick={submit}>
-          {saving ? '…' : 'Подать заявку'}
+          {saving ? '…' : 'Submit request'}
         </button>
       </div>
       {error && <p className="text-[12.5px] font-bold text-[#ef5350]">{error}</p>}
@@ -633,7 +633,7 @@ function EditGroupCard({ row, currentUserId, isAdmin, onClose, onSaved }: {
 }) {
   const edit = useMyHubGroupEdit(row.id);
 
-  if (edit.forbidden) return <p className="text-[13px] font-bold text-[#ef5350]">Нет прав на правку этой группы.</p>;
+  if (edit.forbidden) return <p className="text-[13px] font-bold text-[#ef5350]">You do not have rights to edit this group.</p>;
   if (edit.loading || !edit.data) return <p className="text-[13px] text-[#cbe0f0]/60">Loading…</p>;
 
   const isOwnerOrAdmin = isAdmin || edit.data.ownerUserId === currentUserId;
@@ -651,21 +651,21 @@ function EditGroupCard({ row, currentUserId, isAdmin, onClose, onSaved }: {
       <GroupInputForm
         initial={input}
         recommendApproval={edit.data.isOfficial}
-        submitLabel="Сохранить"
+        submitLabel="Save"
         onCancel={onClose}
         onSubmit={async (i) => { const r = await edit.update(i); if (r.success) onSaved(); return r; }}
       />
       <div>
-        <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#7dd3fc]">Участники</h3>
+        <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#7dd3fc]">Members</h3>
         <MembersEditor hubGroupId={row.id} clubId={edit.data.isOfficial ? edit.data.clubId : null} />
         <p className="mt-2 text-[11.5px] italic text-[#cbe0f0]/45">{DISCLAIMER}</p>
       </div>
       <div>
-        <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#7dd3fc]">Админы группы</h3>
+        <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#7dd3fc]">Group admins</h3>
         <AdminsEditor hubGroupId={row.id} isOwnerOrAdmin={isOwnerOrAdmin} />
       </div>
       <div>
-        <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#7dd3fc]">Участники-аккаунты</h3>
+        <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#7dd3fc]">Account members</h3>
         <UserMembersEditor hubGroupId={row.id} />
       </div>
       <div>
@@ -675,7 +675,7 @@ function EditGroupCard({ row, currentUserId, isAdmin, onClose, onSaved }: {
       {isOwnerOrAdmin && !edit.data.isOfficial && (
         <div>
           <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#7dd3fc]">
-            Официальный статус клуба
+            Official club status
           </h3>
           <ClubRequestPanel hubGroupId={row.id} />
         </div>
@@ -700,10 +700,10 @@ export default function MyGroupsPanel() {
     <section className="px-4 pt-[26px] lg:px-16" aria-label="My groups">
       <div className={cardCls}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">Мои группы</h2>
+          <h2 className="text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">My groups</h2>
           {!creating && mine.eligibility?.canCreate && (
             <button type="button" className={btnCls} onClick={() => setCreating(true)}>
-              + Создать группу{mine.eligibility.remaining != null ? ` (осталось ${mine.eligibility.remaining})` : ''}
+              + Create group{mine.eligibility.remaining != null ? ` (${mine.eligibility.remaining} left)` : ''}
             </button>
           )}
         </div>
@@ -716,7 +716,7 @@ export default function MyGroupsPanel() {
           <div className="mb-4">
             <GroupInputForm
               initial={EMPTY_INPUT}
-              submitLabel="Создать"
+              submitLabel="Create"
               onCancel={() => setCreating(false)}
               onSubmit={async (input) => { const r = await mine.createGroup(input); if (r.success) setCreating(false); return r; }}
             />
@@ -726,7 +726,7 @@ export default function MyGroupsPanel() {
         {mine.loading ? (
           <p className="text-[13px] text-[#cbe0f0]/60">Loading…</p>
         ) : mine.groups.length === 0 && !creating ? (
-          <p className="text-[13px] text-[#cbe0f0]/60">Вы пока не владеете и не со-тренируете ни одной группы.</p>
+          <p className="text-[13px] text-[#cbe0f0]/60">You do not own or co-coach any group yet.</p>
         ) : (
           <ul className="m-0 flex list-none flex-col gap-3 p-0">
             {mine.groups.map((g) => (
@@ -747,11 +747,11 @@ export default function MyGroupsPanel() {
                   <div className="flex shrink-0 gap-2">
                     <button type="button" className={btnCls}
                       onClick={() => setEditingId(editingId === g.id ? null : g.id)}>
-                      {editingId === g.id ? 'Закрыть' : 'Править'}
+                      {editingId === g.id ? 'Close' : 'Edit'}
                     </button>
                     <button type="button" className={btnDangerCls}
-                      onClick={async () => { if (window.confirm(`Удалить группу «${g.name}»?`)) await mine.deleteGroup(g.id); }}>
-                      Удалить
+                      onClick={async () => { if (window.confirm(`Delete the group “${g.name}”?`)) await mine.deleteGroup(g.id); }}>
+                      Delete
                     </button>
                   </div>
                 </div>

@@ -365,7 +365,7 @@ function TrainingShowFullTable({
     ))}
 
     {!blocks.length && (
-      <div className="text-[var(--theme-mode-text-muted)] italic">Нет результатов по текущим фильтрам.</div>
+      <div className="text-[var(--theme-mode-text-muted)] italic">No results match the current filters.</div>
     )}
   </div>
 );

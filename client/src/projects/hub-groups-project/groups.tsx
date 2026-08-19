@@ -187,7 +187,7 @@ function GroupsList({ groups, favorites }: { groups: HubGroupListItem[]; favorit
         ))}
         {groups.length === 0 && !favorites && (
           <p className="col-span-full py-10 text-center text-[14px] text-[#cbe0f0]/60">
-            Групп пока нет.
+            No groups yet.
           </p>
         )}
       </section>
@@ -631,7 +631,7 @@ function PublicationsInbox({ group, onDecided }: { group: HubGroupDetails; onDec
                       onClick={() => decide(item.id, true)}
                       className="hp-mono rounded-[8px] bg-[#38ef8f] px-3 py-[6px] text-[11.5px] font-extrabold text-[#04101f] hover:brightness-110 disabled:opacity-50"
                     >
-                      Опубликовать
+                      Publish
                     </button>
                     <button
                       type="button"
@@ -639,7 +639,7 @@ function PublicationsInbox({ group, onDecided }: { group: HubGroupDetails; onDec
                       onClick={() => decide(item.id, false)}
                       className="hp-mono rounded-[8px] border border-[#ef5350]/50 px-3 py-[6px] text-[11.5px] font-extrabold text-[#ef5350] hover:bg-[#ef5350]/10 disabled:opacity-50"
                     >
-                      Отклонить
+                      Decline
                     </button>
                   </>
                 )}
@@ -650,7 +650,7 @@ function PublicationsInbox({ group, onDecided }: { group: HubGroupDetails; onDec
                     onClick={() => decide(item.id, false)}
                     className="hp-mono rounded-[8px] border border-[#ffca7a]/50 px-3 py-[6px] text-[11.5px] font-extrabold text-[#ffca7a] hover:bg-[#ffca7a]/10 disabled:opacity-50"
                   >
-                    Снять
+                    Unpublish
                   </button>
                 )}
               </div>

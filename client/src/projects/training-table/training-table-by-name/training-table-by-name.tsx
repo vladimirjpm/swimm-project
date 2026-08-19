@@ -64,7 +64,7 @@ function TrainingTableByName({
             <div
               className="text-lg font-bold cursor-pointer relative transition-colors duration-150 hover:text-blue-700"
               onClick={() => updateFilter({ selected_name: group.title })}
-              title={`Фильтровать по: ${group.title}`}
+              title={`Filter by: ${group.title}`}
             >
               <span>
                 {group.title}&nbsp;

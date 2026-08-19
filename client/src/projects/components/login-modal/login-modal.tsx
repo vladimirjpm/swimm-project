@@ -78,12 +78,12 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
         onClose();
         return;
       }
-      if (r.status === 401) setError('Неверный email или пароль.');
-      else if (r.status === 403) setError('Email не подтверждён — проверь почту и перейди по ссылке из письма.');
-      else if (r.status === 429) setError('Слишком много попыток. Попробуй позже.');
-      else setError(`Не удалось войти (${r.status}).`);
+      if (r.status === 401) setError('Wrong email or password.');
+      else if (r.status === 403) setError('Email not confirmed — check your inbox and follow the link we sent.');
+      else if (r.status === 429) setError('Too many attempts. Try again later.');
+      else setError(`Could not sign in (${r.status}).`);
     } catch {
-      setError('Сеть недоступна. Попробуй ещё раз.');
+      setError('Network unavailable. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -107,19 +107,19 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
         }),
       });
       if (r.ok) {
-        setStatus('Письмо отправлено — подтверди email по ссылке из письма.');
+        setStatus('Email sent — confirm your address via the link we sent.');
         return;
       }
       if (r.status === 400) {
         const body = await r.json().catch(() => null);
-        setError(body?.error ?? 'Некорректные данные.');
+        setError(body?.error ?? 'Invalid details.');
       } else if (r.status === 429) {
-        setError('Слишком много попыток. Попробуй позже.');
+        setError('Too many attempts. Try again later.');
       } else {
-        setError(`Не удалось зарегистрироваться (${r.status}).`);
+        setError(`Could not create the account (${r.status}).`);
       }
     } catch {
-      setError('Сеть недоступна. Попробуй ещё раз.');
+      setError('Network unavailable. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -139,14 +139,14 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
         body: JSON.stringify({ email: email.trim() }),
       });
       if (r.ok) {
-        setStatus('Если такой email зарегистрирован, письмо со ссылкой отправлено.');
+        setStatus('If that email is registered, a reset link is on its way.');
       } else if (r.status === 429) {
-        setError('Слишком много попыток. Попробуй позже.');
+        setError('Too many attempts. Try again later.');
       } else {
-        setError(`Не удалось отправить письмо (${r.status}).`);
+        setError(`Could not send the email (${r.status}).`);
       }
     } catch {
-      setError('Сеть недоступна. Попробуй ещё раз.');
+      setError('Network unavailable. Please try again.');
     } finally {
       setSubmitting(false);
     }

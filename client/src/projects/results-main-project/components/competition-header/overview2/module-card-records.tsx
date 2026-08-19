@@ -51,7 +51,7 @@ export default function ModuleCardRecords({ overview, onOpenTab, onOpenSwim }: P
       <section className="ov2-card" data-module="records">
         <div className="ov2-card__title">New records</div>
         <div className="text-[12px]" style={{ color: 'var(--theme-mode-text-muted)' }}>
-          Нет новых рекордов
+          No new records
         </div>
       </section>
     );
