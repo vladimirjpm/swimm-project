@@ -83,7 +83,12 @@ public sealed class LogligImportBuilder : ILogligImportBuilder
                     RelaySwimmers: null,
                     EventCategory: null,
                     HeatType: HeatTypeOf(r.Round, withFinal.Contains(DisciplineKey(ev, r.Category))),
-                    Round: r.Round));
+                    Round: r.Round,
+                    // Пустая ячейка «ניקוד קבוצתי» у пособытийного источника означает
+                    // «организатор за этот заплыв не заплатил», а НЕ «данных нет»: колонка
+                    // в таблице есть всегда. Пишем 0, иначе сверка не увидит самый частый
+                    // случай расхождения — мы платим, а официально ноль (секция «כללי»).
+                    OfficialClubPoints: r.ClubPoints ?? 0));
             }
         }
 

@@ -64,7 +64,14 @@ public record Result(
     /// из пособытийного источника. Не путать с <c>heat_type</c>: тот — наш вывод об отборе,
     /// этот — факт из протокола. Подробности — docs/data-integrity.md §10.
     /// </summary>
-    [property: JsonPropertyName("round")] string? Round = null
+    [property: JsonPropertyName("round")] string? Round = null,
+
+    /// <summary>
+    /// Клубные очки, начисленные САМИМ организатором за этот заплыв. Есть только у
+    /// пособытийного источника loglig; у PDF-протоколов такой колонки нет — null.
+    /// Хранится как эталон для сверки, зачёт считает наш движок правил.
+    /// </summary>
+    [property: JsonPropertyName("official_club_points")] int? OfficialClubPoints = null
 );
 
 public record RelaySwimmer(

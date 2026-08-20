@@ -97,6 +97,7 @@ public static class DependencyInjection
         services.AddScoped<IDataCheck, NoGenderCheck>();
         services.AddScoped<IDataCheck, EmptyRelayCheck>();
         services.AddScoped<IDataCheck, MergedSessionsCheck>();
+        services.AddScoped<IDataCheck, OfficialClubPointsMismatchCheck>();
         services.AddScoped<ILogligEventPullService, LogligEventPullService>();
         services.AddScoped<IDataCheck, SwimmerDedupCheck>();
         services.AddScoped<IDataCheck, ClubDedupCheck>();

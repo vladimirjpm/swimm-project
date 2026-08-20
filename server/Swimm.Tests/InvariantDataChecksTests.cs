@@ -107,6 +107,73 @@ public class InvariantDataChecksTests
         Assert.Contains("заплывов с дублем 1", item.Message);
     }
 
+    /// <summary>
+    /// Эталон официальных очков: расхождение с нашим расчётом ловится построчно и
+    /// суммируется на соревнование. Строки без эталона (все PDF-импорты) проверку не будят.
+    /// </summary>
+    [Fact]
+    public async Task OfficialClubPoints_FlagsCompetitionWhereOurRuleDisagrees()
+    {
+        await using var db = CreateDb(nameof(OfficialClubPoints_FlagsCompetitionWhereOurRuleDisagrees));
+        var (comp, style, club, swimmer) = await SeedAsync(db);
+
+        var rule = new PointRuleClubs
+        {
+            Version = "test", EffectiveFrom = new DateOnly(2026, 1, 1), Scope = "all",
+            DefaultPoints = 0, MaxScoringPlace = 3, RelayMultiplier = 2,
+            Entries = [
+                new PointRuleClubsEntry { Place = 1, Points = 25 },
+                new PointRuleClubsEntry { Place = 2, Points = 22 },
+                new PointRuleClubsEntry { Place = 3, Points = 20 }
+            ]
+        };
+        db.PointRulesClubs.Add(rule);
+        await db.SaveChangesAsync();
+        comp.PointRuleClubsId = rule.Id;
+        await db.SaveChangesAsync();
+
+        ResultRecord Row(int position, string? heatType, int? official) => new()
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer.Id, ClubId = club.Id, StyleId = style.Id,
+            Distance = "50", Gender = "male", EventStyleAge = "14", Position = position,
+            TimeOriginal = "00:26.62", TimeMillisecond = 26620, HeatType = heatType,
+            Heat = 1, Lane = position, CompetitionDate = new DateTime(2026, 6, 1),
+            OfficialClubPoints = official
+        };
+
+        db.Results.AddRange(
+            Row(1, "final", 25),      // сошлось
+            Row(2, "prelim", 22),     // организатор ЗАПЛАТИЛ за предварительный, мы — нет
+            Row(3, "final", 0));      // организатор не заплатил за секцию, мы дали 20
+        await db.SaveChangesAsync();
+
+        var outcome = await new OfficialClubPointsMismatchCheck(db).RunAsync();
+
+        Assert.Equal(1, outcome.Total);
+        var item = Assert.Single(outcome.Items);
+        Assert.Equal("Competition", item.EntityType);
+        Assert.Contains("наши 45", item.Message);        // 25 + 0 (prelim) + 20
+        Assert.Contains("официальные 47", item.Message); // 25 + 22 + 0
+        Assert.Contains("строк с расхождением 2", item.Message);
+    }
+
+    /// <summary>Нет эталона — нет и проверки: PDF-импорты официальных очков не несут.</summary>
+    [Fact]
+    public async Task OfficialClubPoints_WithoutReference_IsSilent()
+    {
+        await using var db = CreateDb(nameof(OfficialClubPoints_WithoutReference_IsSilent));
+        var (comp, style, club, swimmer) = await SeedAsync(db);
+        db.Results.Add(new ResultRecord
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer.Id, ClubId = club.Id, StyleId = style.Id,
+            Distance = "50", Gender = "male", Position = 1, TimeOriginal = "00:26.62",
+            Heat = 1, Lane = 4, CompetitionDate = new DateTime(2026, 6, 1)
+        });
+        await db.SaveChangesAsync();
+
+        Assert.Equal(0, (await new OfficialClubPointsMismatchCheck(db).RunAsync()).Total);
+    }
+
     [Fact]
     public async Task MergedSessions_IgnoresRowsAlreadyMarkedPrelimOrFinal()
     {

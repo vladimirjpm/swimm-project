@@ -679,6 +679,7 @@ public class JsonImportService : IImportService
                     EventCategory = string.IsNullOrWhiteSpace(item.EventCategory) ? null : item.EventCategory,
                     HeatType = string.IsNullOrWhiteSpace(item.HeatType) ? null : item.HeatType,
                     Round = string.IsNullOrWhiteSpace(item.Round) ? null : item.Round,
+                    OfficialClubPoints = item.OfficialClubPoints,
                     Position = item.Position,
                     PositionAgeGroup = item.PositionAgeGroup,
                     Heat = item.Heat ?? 0,
@@ -1113,6 +1114,7 @@ public class JsonImportService : IImportService
         old.EventCategory = incoming.EventCategory;
         old.HeatType = incoming.HeatType;
         old.Round = incoming.Round;
+        old.OfficialClubPoints = incoming.OfficialClubPoints;
         old.Position = incoming.Position;
         old.PositionAgeGroup = incoming.PositionAgeGroup;
         old.TimeMillisecond = incoming.TimeMillisecond;
@@ -1966,6 +1968,11 @@ public class ResultJsonItem
     /// источник раундов не различает (так у всех PDF-экспортов). Входит в ключ upsert.</summary>
     [JsonPropertyName("round")]
     public string? Round { get; set; }
+
+    /// <summary>Клубные очки самого организатора за этот заплыв (эталон для сверки);
+    /// null — источник их не даёт.</summary>
+    [JsonPropertyName("official_club_points")]
+    public int? OfficialClubPoints { get; set; }
 
     [JsonPropertyName("pool_type")]
     public string? PoolType { get; set; }

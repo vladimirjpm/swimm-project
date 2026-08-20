@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -220,4 +221,104 @@ public sealed class MergedSessionsCheck(SwimmDbContext db) : IDataCheck
                 PublicRoutes.Competition(c.CompetitionId)))
             .ToList());
     }
+}
+
+/// <summary>
+/// Наш клубный зачёт разошёлся с ОФИЦИАЛЬНЫМ построчно.
+///
+/// У соревнований, затянутых из пособытийного источника loglig, рядом с каждым заплывом
+/// лежит <c>Results.OfficialClubPoints</c> — сколько очков за него начислила сама федерация.
+/// Проверка считает наши очки тем же движком, что и витрина
+/// (<see cref="PointRulesClubsScoring.RelayPointsFor"/> по привязанному правилу), и сравнивает.
+///
+/// Зачем. Раньше расхождение было видно только суммой («39 562 против 40 575»), и разбирать
+/// его приходилось раскопками. Сверка 1581 нашла −131 очко, размазанные по 223 строкам В ОБЕ
+/// СТОРОНЫ: организатор решает, кто получает очки, по СЕКЦИИ протокола, а не по раунду —
+/// у взрослых 19-99 платят мокдамот, секция «כללי» не платит вовсе (docs/data-integrity.md §10).
+/// Правилами это не выводится, поэтому эталон и хранится построчно.
+///
+/// Находка — на СОРЕВНОВАНИЕ: чинится оно целиком (правилом, привязкой или решением
+/// «расходится, принято»), а сотни строк утопили бы /Admin/Health.
+/// </summary>
+public sealed class OfficialClubPointsMismatchCheck(SwimmDbContext db) : IDataCheck
+{
+    public string Id => "results.official-club-points-mismatch";
+    public string Title => "Клубные очки расходятся с официальными";
+    public string Description =>
+        "У соревнования есть официальные клубные очки построчно (пособытийный источник loglig), " +
+        "и наш расчёт по правилу с ними не совпал. Обычная причина — регламентная тонкость, " +
+        "которую движок правил не выводит из места: какие секции протокола вообще оплачиваются. " +
+        "Сравниваются только строки С эталоном — эстафеты сюда не входят, их пособытийный " +
+        "источник не несёт. Лечится правкой правила, привязки — либо решением «расходится, " +
+        "принято как есть».";
+    public DataCheckSeverity Severity => DataCheckSeverity.Warning;
+
+    public async Task<DataCheckOutcome> RunAsync(CancellationToken ct = default)
+    {
+        var rows = await db.Results.AsNoTracking()
+            .Where(r => r.OfficialClubPoints != null)
+            .Select(r => new
+            {
+                r.CompetitionId,
+                CompetitionName = r.Competition!.Name,
+                r.Competition.Date,
+                r.Competition.IsMasters,
+                RuleId = r.Competition.PointRuleClubsId,
+                r.Position,
+                r.HeatType,
+                r.TimeFail,
+                IsRelay = r.RelayId != null,
+                Official = r.OfficialClubPoints!.Value
+            })
+            .ToListAsync(ct);
+
+        if (rows.Count == 0) return DataCheckOutcome.Empty;
+
+        var rules = await db.PointRulesClubs.AsNoTracking().Include(r => r.Entries).ToListAsync(ct);
+
+        var findings = new List<(int CompetitionId, string Name, string Date, int Ours, int Official, int Rows)>();
+        foreach (var group in rows.GroupBy(r => r.CompetitionId))
+        {
+            var head = group.First();
+            var rule = CompetitionRuleResolver.Resolve(
+                rules, head.RuleId, head.IsMasters, ParseDate(head.Date));
+
+            var ours = 0;
+            var official = 0;
+            var mismatched = 0;
+            foreach (var r in group)
+            {
+                // Место prelim-заплыва очков не приносит (Р34) — ровно как на витрине.
+                var mine = PointRulesClubsScoring.RelayPointsFor(
+                    rule, r.HeatType == "prelim" ? null : r.Position, r.TimeFail, r.IsRelay);
+                ours += mine;
+                official += r.Official;
+                if (mine != r.Official) mismatched++;
+            }
+
+            if (mismatched > 0)
+                findings.Add((group.Key, head.CompetitionName, head.Date, ours, official, mismatched));
+        }
+
+        if (findings.Count == 0) return DataCheckOutcome.Empty;
+
+        return new DataCheckOutcome(findings.Count, findings
+            .OrderByDescending(f => Math.Abs(f.Ours - f.Official))
+            .Take(50)
+            .Select(f => new DataCheckItem(
+                "Competition", f.CompetitionId,
+                $"{f.Name}: наши {f.Ours}, официальные {f.Official} " +
+                $"({(f.Ours - f.Official > 0 ? "+" : string.Empty)}{f.Ours - f.Official}), " +
+                $"строк с расхождением {f.Rows}",
+                f.Date,
+                $"/Admin/Competitions?q={f.CompetitionId}",
+                PublicRoutes.Competition(f.CompetitionId)))
+            .ToList());
+    }
+
+    /// <summary>Дата соревнования хранится строкой «dd/MM/yyyy»; неразобранная — минимальная.</summary>
+    private static DateOnly ParseDate(string date) =>
+        DateOnly.TryParseExact(date, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)
+            ? d
+            : DateOnly.MinValue;
 }
