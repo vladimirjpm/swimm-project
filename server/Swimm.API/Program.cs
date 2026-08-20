@@ -10,6 +10,8 @@ using Microsoft.EntityFrameworkCore;
 using Swimm.Application;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
+using System.Globalization;
 using Swimm.Infrastructure;
 using Swimm.Parsing;
 
@@ -553,6 +555,90 @@ if (args.Contains("--pull-relays"))
     Console.WriteLine(relayReport.Applied > 0
         ? $"ПРИМЕНЕНО: обновлено строк {relayReport.Applied}, зачёт соревнования пересчитан"
         : "Ничего не записано (dry-run). Повторите с --apply.");
+    return;
+}
+
+// Построчный разбор расхождения с официальными клубными очками (data-integrity §10):
+//   dotnet run -- --points-diff <competitionId>
+// Проверка реестра показывает величину долга («наши X, официальные Y»), а этот прогон —
+// из чего он состоит: отделяет наши ошибки от дефектов источника. Только читает.
+if (args.Contains("--points-diff"))
+{
+    var pdIndex = Array.IndexOf(args, "--points-diff") + 1;
+    if (pdIndex >= args.Length || !int.TryParse(args[pdIndex], out var diffCompetitionId))
+    {
+        Console.Error.WriteLine("Usage: dotnet run -- --points-diff <competitionId>");
+        Environment.Exit(1);
+        return;
+    }
+
+    using var scope = app.Services.CreateScope();
+    var diffDb = scope.ServiceProvider.GetRequiredService<Swimm.Infrastructure.Data.SwimmDbContext>();
+
+    var comp = await diffDb.Competitions.AsNoTracking()
+        .Where(c => c.Id == diffCompetitionId)
+        .Select(c => new { c.Id, c.Name, c.Date, c.IsMasters, c.PointRuleClubsId })
+        .FirstOrDefaultAsync();
+    if (comp is null)
+    {
+        Console.Error.WriteLine($"Соревнование #{diffCompetitionId} не найдено");
+        Environment.Exit(1);
+        return;
+    }
+
+    var diffRules = await diffDb.PointRulesClubs.AsNoTracking().Include(r => r.Entries).ToListAsync();
+    var diffRule = Swimm.Infrastructure.Services.CompetitionRuleResolver.Resolve(
+        diffRules, comp.PointRuleClubsId, comp.IsMasters,
+        DateOnly.TryParseExact(comp.Date, "dd/MM/yyyy", CultureInfo.InvariantCulture,
+            DateTimeStyles.None, out var parsedDate) ? parsedDate : DateOnly.MinValue);
+
+    var diffRaw = await diffDb.Results.AsNoTracking()
+        .Where(r => r.CompetitionId == diffCompetitionId && r.OfficialClubPoints != null)
+        .Select(r => new
+        {
+            r.Id,
+            Style = r.Style!.Name,
+            r.Distance,
+            r.Gender,
+            r.EventStyleAge,
+            r.Round,
+            r.HeatType,
+            r.Position,
+            r.Heat,
+            r.TimeMillisecond,
+            r.TimeFail,
+            IsRelay = r.RelayId != null,
+            Official = r.OfficialClubPoints!.Value
+        })
+        .ToListAsync();
+
+    var diffRows = diffRaw.Select(r =>
+    {
+        // Ровно как на витрине: предварительный заплыв (Р34) и общий финал «כללי» (Р43)
+        // места не дают. Гашение — это НАШЕ правило, и разбор обязан его учитывать.
+        var suppressed = r.HeatType == "prelim" || r.Round == Swimm.Domain.ResultRounds.FinalOpen;
+        var ours = Swimm.Infrastructure.Services.PointRulesClubsScoring.RelayPointsFor(
+            diffRule, suppressed ? null : r.Position, r.TimeFail, r.IsRelay);
+        return new OfficialPointsRow(
+            r.Id,
+            SectionKey: $"{r.Style}|{r.Distance}|{r.Gender}|{r.EventStyleAge}|{r.Round}",
+            Label: $"{r.Distance} {r.Style} · {r.Gender} {r.EventStyleAge} · {r.Round ?? "—"}",
+            r.Position, r.Heat, r.TimeMillisecond, suppressed, ours, r.Official);
+    }).ToList();
+
+    var diff = OfficialPointsDiffAnalyzer.Analyze(
+        diffRows,
+        place => Swimm.Infrastructure.Services.PointRulesClubsScoring.PointsFor(diffRule, place, false));
+
+    Console.WriteLine($"«{comp.Name}» ({comp.Date}), правило #{diffRule?.Id.ToString() ?? "нет"}");
+    Console.WriteLine($"  строк с эталоном {diff.Rows}: наши {diff.Ours}, официальные {diff.Official}, " +
+                      $"расхождение {diff.Ours - diff.Official}, строк с расхождением {diff.Mismatched}");
+    foreach (var group in diff.Groups)
+    {
+        Console.WriteLine($"\n  [{group.Kind}] строк {group.Rows}, очков {group.Diff:+#;-#;0}");
+        Console.WriteLine($"      {group.Explanation}");
+        foreach (var example in group.Examples) Console.WriteLine($"      · {example}");
+    }
     return;
 }
 
