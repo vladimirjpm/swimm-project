@@ -64,7 +64,14 @@ export interface CompetitionMismatchNote {
   texts: Record<string, string>;
   /** Строки «место / кому / по регламенту / начислено официально»; пусто — только проза.
    *  subject — клуб или пловец: без него перестановка очков не читается как доказательство. */
-  scale_diff: { place: number; expected: number; actual: number; subject?: string | null }[];
+  scale_diff: {
+    place: number; expected: number; actual: number;
+    subject?: string | null;
+    /** Номер заплыва — часто он и есть причина расхождения (очки по заплыву, а не по месту). */
+    heat?: number | null;
+    /** Время строки: доказывает, что места расставлены верно и спорны именно очки. */
+    time?: string | null;
+  }[];
   /** Какой заплыв разобран в табличке («50 m backstroke · girls 17-18 · final»). */
   scale_diff_caption?: string | null;
   /** Ссылка на регламент соревнования (תקנון) — доказательство объяснения. Сервер отдаёт

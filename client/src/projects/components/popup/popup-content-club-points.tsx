@@ -19,14 +19,18 @@ interface PopupData {
 
 /** Подписи таблички расхождения — статика интерфейса, поэтому в коде, а не в БД. */
 const DIFF_LABELS: Record<InfoLang, {
-  title: string; place: string; subject: string; expected: string; actual: string;
+  title: string; place: string; heat: string; time: string;
+  subject: string; expected: string; actual: string;
 }> = {
   en: { title: 'The official standings were scored incorrectly',
-        place: 'Place', subject: 'Went to', expected: 'Per regulations', actual: 'Officially awarded' },
+        place: 'Place', heat: 'Heat', time: 'Time',
+        subject: 'Went to', expected: 'Per regulations', actual: 'Officially awarded' },
   ru: { title: 'Официальный зачёт посчитан неверно',
-        place: 'Место', subject: 'Кому', expected: 'По регламенту', actual: 'Начислено официально' },
+        place: 'Место', heat: 'Заплыв', time: 'Время',
+        subject: 'Кому', expected: 'По регламенту', actual: 'Начислено официально' },
   he: { title: 'הדירוג הרשמי חושב באופן שגוי',
-        place: 'מקום', subject: 'למי', expected: 'לפי התקנון', actual: 'הוענק רשמית' },
+        place: 'מקום', heat: 'מקצה', time: 'זמן',
+        subject: 'למי', expected: 'לפי התקנון', actual: 'הוענק רשמית' },
 };
 
 const FOLLOW_UP: Record<InfoLang, string> = {
@@ -72,7 +76,12 @@ function MismatchBlock({ note }: { note: CompetitionMismatchNote }) {
   const labels = DIFF_LABELS[lang];
   const isRtl = lang === 'he';
   const sourceUrl = safeHttpUrl(note.source_url);
-  const hasSubjects = note.scale_diff?.some((row) => !!row.subject) ?? false;
+  // Колонки контекста показываем только там, где они заполнены: у старых заметок их нет,
+  // и пустые столбцы выглядели бы как потерянные данные.
+  const rows = note.scale_diff ?? [];
+  const hasSubjects = rows.some((row) => !!row.subject);
+  const hasHeats = rows.some((row) => row.heat != null);
+  const hasTimes = rows.some((row) => !!row.time);
 
   return (
     <div
@@ -90,7 +99,7 @@ function MismatchBlock({ note }: { note: CompetitionMismatchNote }) {
           {shown}
         </p>
 
-        {note.scale_diff?.length > 0 && (
+        {rows.length > 0 && (
           <div className="mt-3 overflow-x-auto">
             {/* Подпись обязана стоять НАД таблицей: столбик мест без названия заплыва
                 читается как «шкала соревнования», а это разбор одной дистанции. */}
@@ -103,17 +112,21 @@ function MismatchBlock({ note }: { note: CompetitionMismatchNote }) {
               <thead>
                 <tr style={{ color: 'var(--theme-mode-text-muted)' }}>
                   <th className="px-2 py-1 text-start font-semibold">{labels.place}</th>
+                  {hasHeats && <th className="px-2 py-1 text-start font-semibold">{labels.heat}</th>}
+                  {hasTimes && <th className="px-2 py-1 text-start font-semibold">{labels.time}</th>}
                   {hasSubjects && <th className="px-2 py-1 text-start font-semibold">{labels.subject}</th>}
                   <th className="px-2 py-1 text-start font-semibold">{labels.expected}</th>
                   <th className="px-2 py-1 text-start font-semibold">{labels.actual}</th>
                 </tr>
               </thead>
               <tbody>
-                {note.scale_diff.map((row) => (
+                {rows.map((row) => (
                   <tr key={row.place}>
                     <td className="px-2 py-1 font-semibold">{row.place}</td>
-                    {/* Колонку показываем только когда «кому» заполнено хоть где-то: у старых
-                        заметок его нет, и пустой столбец выглядел бы как потерянные данные. */}
+                    {hasHeats && <td className="px-2 py-1">{row.heat ?? '—'}</td>}
+                    {hasTimes && (
+                      <td className="px-2 py-1 whitespace-nowrap" dir="ltr">{row.time ?? '—'}</td>
+                    )}
                     {hasSubjects && (
                       <td className="px-2 py-1 whitespace-nowrap">{row.subject ?? '—'}</td>
                     )}

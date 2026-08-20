@@ -126,4 +126,56 @@ public class ScaleDiffTextTests
         Assert.False(ScaleDiffText.TryParse(text, out _, out var error));
         Assert.Contains("Кто", error);
     }
+
+    /// <summary>
+    /// Заплыв и время — доказательство, а не украшение: у 1581 очки розданы ПО НОМЕРУ
+    /// ЗАПЛЫВА, и утверждать это, не показывая номер, значит просить верить на слово.
+    /// </summary>
+    [Fact]
+    public void Parses_HeatAndTime_AfterSubject()
+    {
+        Assert.True(ScaleDiffText.TryParse("9:12>25 | Maccabi Haifa | 1 | 32.90", out var rows, out var error));
+
+        Assert.Null(error);
+        Assert.Equal(new ScaleDiffRowDto(9, 12, 25, "Maccabi Haifa", 1, "32.90"), Assert.Single(rows));
+    }
+
+    /// <summary>
+    /// Позиция ячейки важнее её наличия: пропущенный «кто» оставляет пустое место между
+    /// чертами, иначе заплыв уехал бы в колонку клуба.
+    /// </summary>
+    [Fact]
+    public void EmptyCell_KeepsTheColumnsInPlace()
+    {
+        Assert.True(ScaleDiffText.TryParse("9:12>25 || 1 | 32.90", out var rows, out _));
+
+        var row = Assert.Single(rows);
+        Assert.Null(row.Subject);
+        Assert.Equal(1, row.Heat);
+        Assert.Equal("32.90", row.Time);
+    }
+
+    [Fact]
+    public void NonNumericHeat_ReportsWhatItCouldNotRead()
+    {
+        Assert.False(ScaleDiffText.TryParse("9:12>25 | Maccabi Haifa | первый", out _, out var error));
+        Assert.Contains("первый", error);
+    }
+
+    /// <summary>Формат обратим и с контекстом — включая дыру посередине.</summary>
+    [Fact]
+    public void FormatsBack_WithContext_AndParsesAgain()
+    {
+        List<ScaleDiffRowDto> original =
+        [
+            new ScaleDiffRowDto(9, 12, 25, "Maccabi Haifa", 1, "32.90"),
+            new ScaleDiffRowDto(1, 25, 14, "Cohen, Dan", null, "29.17"),
+            new ScaleDiffRowDto(3, 20, 12, null, 3, null),
+        ];
+
+        var text = ScaleDiffText.Format(original);
+        Assert.True(ScaleDiffText.TryParse(text, out var again, out var error));
+        Assert.Null(error);
+        Assert.Equal(original.OrderBy(r => r.Place), again);
+    }
 }

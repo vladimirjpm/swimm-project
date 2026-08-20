@@ -29,11 +29,22 @@ public sealed record CompetitionNoteDto(
 /// не прочитать: «за 9-е место 25 очков» становится доказательством только когда видно,
 /// что они ушли конкретному клубу. null — старые заметки, где разбиралась только шкала.
 /// </param>
+/// <param name="Heat">
+/// Номер заплыва. Часто это и есть ПРИЧИНА расхождения: у 1581 официальные очки розданы
+/// по номеру заплыва вместо места, и утверждать это, не показывая номер, — просить верить
+/// на слово. null — причина в другом (например, в самой шкале).
+/// </param>
+/// <param name="Time">
+/// Время строки, как напечатано в протоколе. Доказывает, что места расставлены верно и
+/// спорны именно очки: без него читатель не может проверить порядок. null — не указано.
+/// </param>
 public sealed record ScaleDiffRowDto(
     [property: JsonPropertyName("place")] int Place,
     [property: JsonPropertyName("expected")] int Expected,
     [property: JsonPropertyName("actual")] int Actual,
-    [property: JsonPropertyName("subject")] string? Subject = null);
+    [property: JsonPropertyName("subject")] string? Subject = null,
+    [property: JsonPropertyName("heat")] int? Heat = null,
+    [property: JsonPropertyName("time")] string? Time = null);
 
 /// <summary>Что админ вводит в форме примечания: тексты по языкам + строки расхождения.</summary>
 public sealed class CompetitionNoteInputDto
