@@ -10,6 +10,7 @@ import UI_AgeLabel from '../../components/mix/age-label/age-label';
 import UI_FavoriteControls from '../../components/mix/favorite-controls/favorite-controls';
 import UI_PositionBadge from '../../components/mix/position-badge/position-badge';
 import UI_PrelimLabel from '../../components/mix/prelim-label/prelim-label';
+import UI_RoundLabel from '../../components/mix/round-label/round-label';
 import { ResultsTableRowProps } from './types';
 import ResultRowDateInfo from './result-row-date-info';
 import UI_AddVideoIcon from '../../components/mix/add-video-icon/add-video-icon';
@@ -67,6 +68,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
             )}
           </div>
           <UI_PrelimLabel heatType={res.heat_type} />
+          <UI_RoundLabel round={res.round} />
           {showAge && <UI_AgeLabel age={res.event_style_age} eventCategory={res.event_category} isRelay={res.is_relay} gender={res.event_style_gender} isMasters={isMastersResult} ageGroup={res.age_group} />}
           <UI_FavoriteControls
             swimmerId={res.swimmer_id}

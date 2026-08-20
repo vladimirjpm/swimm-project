@@ -96,6 +96,12 @@ export interface ResultWrap {
      *  сессии, не награда: бейдж места рисуется без медали (как non-award). */
     heat_type?: string | null;
 
+    /** Раунд зачёта источника: 'timed-final' (утренний зачёт возрастных групп) | 'final'
+     *  (финал первенства) | 'prelim'; null/undefined — источник раундов не различает.
+     *  У чемпионата «мокдамот и финал» один пловец законно занимает первое место ДВАЖДЫ —
+     *  в утреннем и вечернем зачёте, — поэтому строку помечает UI_RoundLabel. */
+    round?: string | null;
+
     /* training-specific data */
     training?: TrainingInfo;
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { ROUND_ORDER, roundSectionTitle } from '../components/mix/round-label/round-label';
 import './results-table.css';
 import { rootActions,useAppDispatch, useAppSelector } from '../../store/store';
 import { useFavoritesContext } from '../../hooks/favorites-context';
@@ -204,6 +205,38 @@ function ResultsTable() {
   // displayResults = sortedResults (recalculation уже применён в sourceResults)
   const displayResults = sortedResults;
 
+  // Раунды зачёта: у чемпионата «мокдамот и финал» утренние заплывы по возрастным группам
+  // и вечерний финал — ДВА САМОСТОЯТЕЛЬНЫХ зачёта со своей нумерацией мест. В одном списке
+  // по времени они дают «1, 1, 2, 2» и читаются как задвоение, поэтому раунды разведены
+  // по ТАБАМ: в каждом — сплошная таблица одного зачёта. Обычные соревнования (раунда нет)
+  // не видят ни табов, ни изменений: набор раундов там из одного значения.
+  const roundOf = (r: { round?: string | null }) => r.round ?? '';
+  const roundTabs = useMemo(() => {
+    const present = Array.from(new Set(displayResults.map(roundOf)));
+    return present.length > 1
+      ? present.sort((a, b) => (ROUND_ORDER[a] ?? 99) - (ROUND_ORDER[b] ?? 99))
+      : [];
+  }, [displayResults]);
+
+  const [activeRound, setActiveRound] = useState<string | null>(null);
+  // Набор раундов меняется вместе с фильтрами (напр. включили предварительные) — выбор
+  // сбрасываем на первый доступный, иначе таблица молча опустеет.
+  useEffect(() => {
+    if (roundTabs.length === 0) { if (activeRound !== null) setActiveRound(null); return; }
+    if (activeRound === null || !roundTabs.includes(activeRound)) setActiveRound(roundTabs[0]);
+  }, [roundTabs, activeRound]);
+
+  /** Подпись таба: раунду — его название, строкам без раунда — что они такое. */
+  const roundTabLabel = (round: string) => roundSectionTitle(round)
+    ?? (displayResults.filter((r) => roundOf(r) === round).every((r) => r.is_relay) ? 'Relays' : 'Other swims');
+
+  const orderedResults = useMemo(
+    () => (roundTabs.length > 0 && activeRound !== null
+      ? displayResults.filter((r) => roundOf(r) === activeRound)
+      : displayResults),
+    [displayResults, roundTabs, activeRound],
+  );
+
   // Диплинк на заплыв (?swim=<resultId>, НАВ-контракт шапки соревнования):
   // после появления строк скроллим к строке и подсвечиваем её на несколько секунд.
   const highlightedSwimRef = React.useRef<string | null>(null);
@@ -386,6 +419,23 @@ function ResultsTable() {
           />
         )}
         
+        {roundTabs.length > 0 && (
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            {roundTabs.map((round) => (
+              <button
+                key={round}
+                className={`fseg ${activeRound === round ? 'fseg-active' : ''}`}
+                onClick={() => setActiveRound(round)}
+              >
+                {roundTabLabel(round)}
+                <span className="ml-1 opacity-60">
+                  {displayResults.filter((r) => roundOf(r) === round).length}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="max-h-[650px] overflow-y-auto border border-[var(--theme-mode-border)] rounded-2xl shadow-sm" >
           {/* Unified header (single view for all sizes) */}
           <div className="bg-[var(--theme-mode-surface-alt)] sticky top-0 z-10">
@@ -417,7 +467,7 @@ function ResultsTable() {
             </div>
           </div>
           <ul>
-            {displayResults.map((res, index) => {
+            {orderedResults.map((res, index) => {
               const clubPoints = clubPointsOf(res);
               const isMaster = Helper.isResultMasters(isMastersSource, res.event_style_age);
               const resolvedGender = Helper.resolveGender(res.event_style_gender);

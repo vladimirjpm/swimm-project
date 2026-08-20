@@ -12,6 +12,7 @@ import UI_FavoriteControls from '../../components/mix/favorite-controls/favorite
 import UI_PositionBadge from '../../components/mix/position-badge/position-badge';
 import UI_MedalIcon from '../../components/mix/medal-icon/medal-icon';
 import UI_PrelimLabel from '../../components/mix/prelim-label/prelim-label';
+import UI_RoundLabel from '../../components/mix/round-label/round-label';
 import ResultRowDateInfo from './result-row-date-info';
 import UI_AddVideoIcon from '../../components/mix/add-video-icon/add-video-icon';
 
@@ -92,6 +93,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
           )}
         </div>
         <UI_PrelimLabel heatType={res.heat_type} />
+        <UI_RoundLabel round={res.round} />
         {showAge && <UI_AgeLabel age={res.event_style_age} eventCategory={res.event_category} isRelay={res.is_relay} gender={res.event_style_gender} isMasters={isMastersResult} ageGroup={res.age_group} className="items-center text-[var(--theme-mode-text-muted)] [&>div]:text-[9px] [&>div]:mt-0 [&>div]:font-bold [&_span]:text-[9px] [&_span]:font-bold" />}
       </div>
 
