@@ -373,7 +373,10 @@ public class PointRulesAdminRepository(
             .Where(t => !string.IsNullOrWhiteSpace(t.Value))
             .ToDictionary(t => t.Key, t => t.Value!.Trim());
         var diff = input.ScaleDiff.OrderBy(r => r.Place).ToList();
-        var empty = texts.Count == 0 && diff.Count == 0 && sourceUrl is null;
+        var caption = string.IsNullOrWhiteSpace(input.ScaleDiffCaption)
+            ? null
+            : input.ScaleDiffCaption.Trim();
+        var empty = texts.Count == 0 && diff.Count == 0 && sourceUrl is null && caption is null;
 
         var existing = await db.CompetitionNotes
             .Include(n => n.Texts)
@@ -405,6 +408,7 @@ public class PointRulesAdminRepository(
             }
 
             note.ScaleDiffJson = diffJson;
+            note.ScaleDiffCaption = caption;
             note.SourceUrl = sourceUrl;
             note.UpdatedAt = DateTime.UtcNow;
 
@@ -463,7 +467,8 @@ public class PointRulesAdminRepository(
         return new CompetitionNoteDto(
             note.Texts.ToDictionary(t => t.Lang, t => t.Body),
             diff,
-            url);
+            url,
+            note.ScaleDiffCaption);
     }
 
     /// <summary>Ссылка годится для <c>href</c>: абсолютная и только http/https.</summary>

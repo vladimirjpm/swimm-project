@@ -1532,6 +1532,7 @@ public class ResultRepository : IResultRepository
     private static bool SameNote(CompetitionNoteDto a, CompetitionNoteDto b) =>
         a.Texts.Count == b.Texts.Count
         && a.Texts.All(t => b.Texts.TryGetValue(t.Key, out var other) && other == t.Value)
+        && a.ScaleDiffCaption == b.ScaleDiffCaption
         && a.ScaleDiff.Count == b.ScaleDiff.Count
         && a.ScaleDiff.Zip(b.ScaleDiff).All(p => p.First == p.Second);
 

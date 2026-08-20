@@ -65,4 +65,65 @@ public class ScaleDiffTextTests
         var text = ScaleDiffText.Format([new ScaleDiffRowDto(22, 3, 5), new ScaleDiffRowDto(21, 5, 6)]);
         Assert.Equal("21:5>6, 22:3>5", text);
     }
+
+    /// <summary>
+    /// «Кому достались очки» — после «|». Ради него столбец и заводился: «за 9-е место 25
+    /// очков» становится доказательством только когда видно, какому клубу они ушли.
+    /// </summary>
+    [Fact]
+    public void Parses_SubjectAfterPipe()
+    {
+        Assert.True(ScaleDiffText.TryParse(
+            """
+            1:25>14 | Maccabi Kiryat Bialik
+            9:12>25 | Maccabi Haifa
+            """,
+            out var rows, out var error));
+
+        Assert.Null(error);
+        Assert.Equal(
+        [
+            new ScaleDiffRowDto(1, 25, 14, "Maccabi Kiryat Bialik"),
+            new ScaleDiffRowDto(9, 12, 25, "Maccabi Haifa"),
+        ], rows);
+    }
+
+    /// <summary>
+    /// Запятая делит строки только пока «кому» не используется: в названиях и именах она
+    /// встречается, и резать по ней значило бы рвать их пополам.
+    /// </summary>
+    [Fact]
+    public void CommaInsideSubject_DoesNotSplitTheRow()
+    {
+        Assert.True(ScaleDiffText.TryParse("9:12>25 | Cohen, Dan", out var rows, out _));
+        Assert.Equal("Cohen, Dan", Assert.Single(rows).Subject);
+    }
+
+    [Fact]
+    public void RowsWithAndWithoutSubject_LiveTogether()
+    {
+        Assert.True(ScaleDiffText.TryParse("1:25>14 | Maccabi Haifa; 2:22>13", out var rows, out _));
+        Assert.Equal("Maccabi Haifa", rows[0].Subject);
+        Assert.Null(rows[1].Subject);
+    }
+
+    /// <summary>Формат обратим: то, что форма показала, она же обязана и разобрать.</summary>
+    [Fact]
+    public void FormatsBack_WithSubjects_AndParsesAgain()
+    {
+        List<ScaleDiffRowDto> original =
+            [new ScaleDiffRowDto(9, 12, 25, "Maccabi Haifa"), new ScaleDiffRowDto(1, 25, 14, "Cohen, Dan")];
+
+        var text = ScaleDiffText.Format(original);
+        Assert.True(ScaleDiffText.TryParse(text, out var again, out _));
+        Assert.Equal(original.OrderBy(r => r.Place), again);
+    }
+
+    [Fact]
+    public void OverlongSubject_Rejected()
+    {
+        var text = $"1:25>14 | {new string('x', ScaleDiffText.SubjectMaxLength + 1)}";
+        Assert.False(ScaleDiffText.TryParse(text, out _, out var error));
+        Assert.Contains("Кто", error);
+    }
 }

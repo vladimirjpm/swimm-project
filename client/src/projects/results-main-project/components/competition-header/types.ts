@@ -62,8 +62,11 @@ export interface ClubPointsRuleEntry {
 export interface CompetitionMismatchNote {
   /** Язык ('en'|'ru'|'he') → текст. Языка нет — вкладка в попапе выключена. */
   texts: Record<string, string>;
-  /** Строки «место / по регламенту / начислено официально»; пусто — только проза. */
-  scale_diff: { place: number; expected: number; actual: number }[];
+  /** Строки «место / кому / по регламенту / начислено официально»; пусто — только проза.
+   *  subject — клуб или пловец: без него перестановка очков не читается как доказательство. */
+  scale_diff: { place: number; expected: number; actual: number; subject?: string | null }[];
+  /** Какой заплыв разобран в табличке («50 m backstroke · girls 17-18 · final»). */
+  scale_diff_caption?: string | null;
   /** Ссылка на регламент соревнования (תקנון) — доказательство объяснения. Сервер отдаёт
    *  только http(s), но клиент проверяет ещё раз перед тем, как класть её в href. */
   source_url?: string | null;

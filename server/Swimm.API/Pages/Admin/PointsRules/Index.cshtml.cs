@@ -99,12 +99,13 @@ public class IndexModel : PageModel
     /// <summary>
     /// Пояснение к бейджу «★ расхождение»: чем именно официальные очки неверны. Уезжает на
     /// публичную страницу (попап «Points system»), где читатель сам переключает язык — поэтому
-    /// принимаем все три сразу. Табличка расхождения вводится строкой «21:5>6, 22:3>5».
+    /// принимаем все три сразу. Табличка расхождения вводится строкой «21:5>6, 22:3>5»,
+    /// где после «|» можно указать, КОМУ достались очки, а подпись говорит, какой это заплыв.
     /// Пустой ввод стирает пояснение целиком.
     /// </summary>
     public async Task<IActionResult> OnPostSaveMismatchNoteAsync(
         int noteCompetitionId, string? noteEn, string? noteRu, string? noteHe,
-        string? scaleDiff, string? sourceUrl)
+        string? scaleDiff, string? sourceUrl, string? scaleDiffCaption)
     {
         var kindSlug = PointRulesKindParser.ToSlug(RuleKind);
 
@@ -123,7 +124,8 @@ public class IndexModel : PageModel
                 [CompetitionNoteLangs.He] = noteHe,
             },
             ScaleDiff = diff,
-            SourceUrl = sourceUrl
+            SourceUrl = sourceUrl,
+            ScaleDiffCaption = scaleDiffCaption
         });
 
         if (!result.Success)
