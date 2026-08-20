@@ -24,11 +24,6 @@ public sealed record CompetitionNoteDto(
 /// <param name="Place">Место в заплыве.</param>
 /// <param name="Expected">Сколько очков даёт регламент (и наш расчёт).</param>
 /// <param name="Actual">Сколько начислила официальная таблица.</param>
-/// <param name="Subject">
-/// Кому достались очки — клуб или пловец, как в протоколе. Без этого столбца перестановку
-/// не прочитать: «за 9-е место 25 очков» становится доказательством только когда видно,
-/// что они ушли конкретному клубу. null — старые заметки, где разбиралась только шкала.
-/// </param>
 /// <param name="Heat">
 /// Номер заплыва. Часто это и есть ПРИЧИНА расхождения: у 1581 официальные очки розданы
 /// по номеру заплыва вместо места, и утверждать это, не показывая номер, — просить верить
@@ -38,13 +33,20 @@ public sealed record CompetitionNoteDto(
 /// Время строки, как напечатано в протоколе. Доказывает, что места расставлены верно и
 /// спорны именно очки: без него читатель не может проверить порядок. null — не указано.
 /// </param>
+/// <param name="Swimmer">Кто плыл — по нему читатель находит строку в протоколе.</param>
+/// <param name="Club">
+/// Кому достались очки. Клуб и пловец разведены, потому что очки клубные: перестановка
+/// видна как «два начисления за призовые места ушли ОДНОМУ клубу», а это утверждение про
+/// клуб, не про человека. null — старые заметки, где разбиралась только шкала.
+/// </param>
 public sealed record ScaleDiffRowDto(
     [property: JsonPropertyName("place")] int Place,
     [property: JsonPropertyName("expected")] int Expected,
     [property: JsonPropertyName("actual")] int Actual,
-    [property: JsonPropertyName("subject")] string? Subject = null,
     [property: JsonPropertyName("heat")] int? Heat = null,
-    [property: JsonPropertyName("time")] string? Time = null);
+    [property: JsonPropertyName("time")] string? Time = null,
+    [property: JsonPropertyName("swimmer")] string? Swimmer = null,
+    [property: JsonPropertyName("club")] string? Club = null);
 
 /// <summary>Что админ вводит в форме примечания: тексты по языкам + строки расхождения.</summary>
 public sealed class CompetitionNoteInputDto

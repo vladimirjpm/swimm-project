@@ -67,99 +67,76 @@ public class ScaleDiffTextTests
     }
 
     /// <summary>
-    /// «Кому достались очки» — после «|». Ради него столбец и заводился: «за 9-е место 25
-    /// очков» становится доказательством только когда видно, какому клубу они ушли.
+    /// Контекст строки протокола после черт: заплыв, время, пловец, клуб — в том же порядке,
+    /// в каком стоят колонки таблицы. Ради заплыва всё и заводилось: у 1581 очки розданы ПО
+    /// НОМЕРУ ЗАПЛЫВА, и утверждать это, не показывая номер, значит просить верить на слово.
     /// </summary>
     [Fact]
-    public void Parses_SubjectAfterPipe()
+    public void Parses_ProtocolContextAfterPipes()
     {
         Assert.True(ScaleDiffText.TryParse(
             """
-            1:25>14 | Maccabi Kiryat Bialik
-            9:12>25 | Maccabi Haifa
+            1:25>14 | 3 | 29.17 | Ofir Simcha | Maccabi Kiryat Bialik
+            9:12>25 | 1 | 32.90 | Ruth Gutman | Maccabi Haifa
             """,
             out var rows, out var error));
 
         Assert.Null(error);
         Assert.Equal(
         [
-            new ScaleDiffRowDto(1, 25, 14, "Maccabi Kiryat Bialik"),
-            new ScaleDiffRowDto(9, 12, 25, "Maccabi Haifa"),
+            new ScaleDiffRowDto(1, 25, 14, 3, "29.17", "Ofir Simcha", "Maccabi Kiryat Bialik"),
+            new ScaleDiffRowDto(9, 12, 25, 1, "32.90", "Ruth Gutman", "Maccabi Haifa"),
         ], rows);
     }
 
     /// <summary>
-    /// Запятая делит строки только пока «кому» не используется: в названиях и именах она
+    /// Запятая делит строки только пока контекст не используется: в именах и названиях она
     /// встречается, и резать по ней значило бы рвать их пополам.
     /// </summary>
     [Fact]
-    public void CommaInsideSubject_DoesNotSplitTheRow()
+    public void CommaInsideName_DoesNotSplitTheRow()
     {
-        Assert.True(ScaleDiffText.TryParse("9:12>25 | Cohen, Dan", out var rows, out _));
-        Assert.Equal("Cohen, Dan", Assert.Single(rows).Subject);
+        Assert.True(ScaleDiffText.TryParse("9:12>25 | 1 | 32.90 | Cohen, Dan", out var rows, out _));
+        Assert.Equal("Cohen, Dan", Assert.Single(rows).Swimmer);
     }
 
     [Fact]
-    public void RowsWithAndWithoutSubject_LiveTogether()
+    public void RowsWithAndWithoutContext_LiveTogether()
     {
-        Assert.True(ScaleDiffText.TryParse("1:25>14 | Maccabi Haifa; 2:22>13", out var rows, out _));
-        Assert.Equal("Maccabi Haifa", rows[0].Subject);
-        Assert.Null(rows[1].Subject);
-    }
-
-    /// <summary>Формат обратим: то, что форма показала, она же обязана и разобрать.</summary>
-    [Fact]
-    public void FormatsBack_WithSubjects_AndParsesAgain()
-    {
-        List<ScaleDiffRowDto> original =
-            [new ScaleDiffRowDto(9, 12, 25, "Maccabi Haifa"), new ScaleDiffRowDto(1, 25, 14, "Cohen, Dan")];
-
-        var text = ScaleDiffText.Format(original);
-        Assert.True(ScaleDiffText.TryParse(text, out var again, out _));
-        Assert.Equal(original.OrderBy(r => r.Place), again);
-    }
-
-    [Fact]
-    public void OverlongSubject_Rejected()
-    {
-        var text = $"1:25>14 | {new string('x', ScaleDiffText.SubjectMaxLength + 1)}";
-        Assert.False(ScaleDiffText.TryParse(text, out _, out var error));
-        Assert.Contains("Кто", error);
+        Assert.True(ScaleDiffText.TryParse("1:25>14 | 3; 2:22>13", out var rows, out _));
+        Assert.Equal(3, rows[0].Heat);
+        Assert.Null(rows[1].Heat);
     }
 
     /// <summary>
-    /// Заплыв и время — доказательство, а не украшение: у 1581 очки розданы ПО НОМЕРУ
-    /// ЗАПЛЫВА, и утверждать это, не показывая номер, значит просить верить на слово.
+    /// Позиция ячейки важнее её наличия: пропущенные заплыв и время оставляют пустые места
+    /// между чертами, иначе имя уехало бы в колонку заплыва.
     /// </summary>
     [Fact]
-    public void Parses_HeatAndTime_AfterSubject()
+    public void EmptyCells_KeepTheColumnsInPlace()
     {
-        Assert.True(ScaleDiffText.TryParse("9:12>25 | Maccabi Haifa | 1 | 32.90", out var rows, out var error));
-
-        Assert.Null(error);
-        Assert.Equal(new ScaleDiffRowDto(9, 12, 25, "Maccabi Haifa", 1, "32.90"), Assert.Single(rows));
-    }
-
-    /// <summary>
-    /// Позиция ячейки важнее её наличия: пропущенный «кто» оставляет пустое место между
-    /// чертами, иначе заплыв уехал бы в колонку клуба.
-    /// </summary>
-    [Fact]
-    public void EmptyCell_KeepsTheColumnsInPlace()
-    {
-        Assert.True(ScaleDiffText.TryParse("9:12>25 || 1 | 32.90", out var rows, out _));
+        Assert.True(ScaleDiffText.TryParse("9:12>25 ||| Ruth Gutman | Maccabi Haifa", out var rows, out _));
 
         var row = Assert.Single(rows);
-        Assert.Null(row.Subject);
-        Assert.Equal(1, row.Heat);
-        Assert.Equal("32.90", row.Time);
+        Assert.Null(row.Heat);
+        Assert.Null(row.Time);
+        Assert.Equal("Ruth Gutman", row.Swimmer);
+        Assert.Equal("Maccabi Haifa", row.Club);
     }
 
     [Fact]
     public void NonNumericHeat_ReportsWhatItCouldNotRead()
     {
-        Assert.False(ScaleDiffText.TryParse("9:12>25 | Maccabi Haifa | первый", out _, out var error));
+        Assert.False(ScaleDiffText.TryParse("9:12>25 | первый", out _, out var error));
         Assert.Contains("первый", error);
+    }
+
+    [Fact]
+    public void OverlongName_Rejected()
+    {
+        var text = $"1:25>14 | 3 | 29.17 | {new string('x', ScaleDiffText.SubjectMaxLength + 1)}";
+        Assert.False(ScaleDiffText.TryParse(text, out _, out var error));
+        Assert.Contains("Пловец", error);
     }
 
     /// <summary>Формат обратим и с контекстом — включая дыру посередине.</summary>
@@ -168,9 +145,9 @@ public class ScaleDiffTextTests
     {
         List<ScaleDiffRowDto> original =
         [
-            new ScaleDiffRowDto(9, 12, 25, "Maccabi Haifa", 1, "32.90"),
-            new ScaleDiffRowDto(1, 25, 14, "Cohen, Dan", null, "29.17"),
-            new ScaleDiffRowDto(3, 20, 12, null, 3, null),
+            new ScaleDiffRowDto(9, 12, 25, 1, "32.90", "Ruth Gutman", "Maccabi Haifa"),
+            new ScaleDiffRowDto(1, 25, 14, null, "29.17", "Cohen, Dan", null),
+            new ScaleDiffRowDto(3, 20, 12, 3, null, null, "Maccabi Haifa"),
         ];
 
         var text = ScaleDiffText.Format(original);

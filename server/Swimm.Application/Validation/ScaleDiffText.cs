@@ -6,9 +6,9 @@ namespace Swimm.Application.Validation;
 /// <summary>
 /// Табличка расхождения очков — вводом одной строкой: <c>21:5&gt;6, 22:3&gt;5</c>
 /// («место : по регламенту &gt; начислено официально»). После вертикальных черт идёт
-/// контекст строки протокола, позиционно и весь необязательный:
-/// <c>место:регламент&gt;официально | кому | заплыв | время</c>, например
-/// <c>9:12&gt;25 | Maccabi Haifa | 1 | 32.90</c>.
+/// контекст строки протокола — в том же порядке, в каком стоят колонки таблицы, и весь
+/// необязательный: <c>место:регламент&gt;официально | заплыв | время | пловец | клуб</c>,
+/// например <c>9:12&gt;25 | 1 | 32.90 | גוטמן רות | מכבי חיפה</c>.
 ///
 /// Зачем контекст. Одни цифры доказывают расхождение только когда причина в самой шкале.
 /// Если очки розданы по номеру заплыва (разбор 1581), то номер заплыва — и есть довод, а
@@ -45,7 +45,7 @@ public static partial class ScaleDiffText
             if (!m.Success)
             {
                 error = $"Не разобрал «{chunk.Trim()}» — ожидается «место:по регламенту>начислено», " +
-                        "например 21:5>6 или 9:12>25 | Maccabi Haifa";
+                        "например 21:5>6 или 9:12>25 | 1 | 32.90 | Имя | Клуб";
                 return false;
             }
 
@@ -56,21 +56,14 @@ public static partial class ScaleDiffText
                 return false;
             }
 
-            // Контекст позиционный: кому | заплыв | время. Пропущенное поле — пустая ячейка
-            // между чертами, чтобы «время без заплыва» не съезжало в соседнюю колонку.
+            // Контекст позиционный, в порядке колонок таблицы: заплыв | время | пловец | клуб.
+            // Пропущенное поле — пустая ячейка между чертами, чтобы имя не съехало в клуб.
             var context = m.Groups[4].Success
                 ? m.Groups[4].Value.Split('|').Select(p => p.Trim()).ToArray()
                 : [];
 
-            var subject = Cell(context, 0);
-            if (subject is { Length: > SubjectMaxLength })
-            {
-                error = $"«Кто» длиннее {SubjectMaxLength} символов — это подпись строки, а не абзац";
-                return false;
-            }
-
             int? heat = null;
-            if (Cell(context, 1) is { } heatText)
+            if (Cell(context, 0) is { } heatText)
             {
                 if (!int.TryParse(heatText, out var heatValue) || heatValue <= 0)
                 {
@@ -80,9 +73,18 @@ public static partial class ScaleDiffText
                 heat = heatValue;
             }
 
+            var swimmer = Cell(context, 2);
+            var club = Cell(context, 3);
+            foreach (var (value, label) in new[] { (swimmer, "Пловец"), (club, "Клуб") })
+                if (value is { Length: > SubjectMaxLength })
+                {
+                    error = $"«{label}» длиннее {SubjectMaxLength} символов — это подпись строки, а не абзац";
+                    return false;
+                }
+
             rows.Add(new ScaleDiffRowDto(
                 place, int.Parse(m.Groups[2].Value), int.Parse(m.Groups[3].Value),
-                subject, heat, Cell(context, 2)));
+                heat, Cell(context, 1), swimmer, club));
         }
 
         if (rows.Select(r => r.Place).Distinct().Count() != rows.Count)
@@ -106,8 +108,8 @@ public static partial class ScaleDiffText
     /// Обратно в строку для формы. Разделитель зависит от того, есть ли контекст: с ним строки
     /// уходят на отдельные линии, иначе форма вернула бы текст, который сама же не разберёт.
     ///
-    /// Хвостовые пустые ячейки обрезаются, а срединные остаются: «время без заплыва» обязано
-    /// сохранить свою позицию, иначе разбор вернул бы его в колонку заплыва.
+    /// Хвостовые пустые ячейки обрезаются, а срединные остаются: клуб без имени пловца обязан
+    /// сохранить свою позицию, иначе разбор вернул бы его в колонку пловца.
     /// </summary>
     public static string Format(IEnumerable<ScaleDiffRowDto> rows)
     {
@@ -115,7 +117,7 @@ public static partial class ScaleDiffText
         var parts = ordered.Select(r =>
         {
             var head = $"{r.Place}:{r.Expected}>{r.Actual}";
-            var context = new[] { r.Subject, r.Heat?.ToString(), r.Time };
+            var context = new[] { r.Heat?.ToString(), r.Time, r.Swimmer, r.Club };
 
             var last = Array.FindLastIndex(context, c => !string.IsNullOrWhiteSpace(c));
             return last < 0
@@ -127,5 +129,6 @@ public static partial class ScaleDiffText
     }
 
     private static bool HasContext(ScaleDiffRowDto row) =>
-        row.Subject is { Length: > 0 } || row.Heat is not null || row.Time is { Length: > 0 };
+        row.Heat is not null || row.Time is { Length: > 0 }
+        || row.Swimmer is { Length: > 0 } || row.Club is { Length: > 0 };
 }

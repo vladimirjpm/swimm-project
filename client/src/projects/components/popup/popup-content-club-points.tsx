@@ -20,17 +20,17 @@ interface PopupData {
 /** Подписи таблички расхождения — статика интерфейса, поэтому в коде, а не в БД. */
 const DIFF_LABELS: Record<InfoLang, {
   title: string; place: string; heat: string; time: string;
-  subject: string; expected: string; actual: string;
+  swimmer: string; club: string; expected: string; actual: string;
 }> = {
   en: { title: 'The official standings were scored incorrectly',
-        place: 'Place', heat: 'Heat', time: 'Time',
-        subject: 'Went to', expected: 'Per regulations', actual: 'Officially awarded' },
+        place: 'Place', heat: 'Heat', time: 'Time', swimmer: 'Swimmer', club: 'Went to',
+        expected: 'Per regulations', actual: 'Officially awarded' },
   ru: { title: 'Официальный зачёт посчитан неверно',
-        place: 'Место', heat: 'Заплыв', time: 'Время',
-        subject: 'Кому', expected: 'По регламенту', actual: 'Начислено официально' },
+        place: 'Место', heat: 'Заплыв', time: 'Время', swimmer: 'Пловец', club: 'Кому',
+        expected: 'По регламенту', actual: 'Начислено официально' },
   he: { title: 'הדירוג הרשמי חושב באופן שגוי',
-        place: 'מקום', heat: 'מקצה', time: 'זמן',
-        subject: 'למי', expected: 'לפי התקנון', actual: 'הוענק רשמית' },
+        place: 'מקום', heat: 'מקצה', time: 'זמן', swimmer: 'שחיין', club: 'למי',
+        expected: 'לפי התקנון', actual: 'הוענק רשמית' },
 };
 
 const FOLLOW_UP: Record<InfoLang, string> = {
@@ -79,9 +79,10 @@ function MismatchBlock({ note }: { note: CompetitionMismatchNote }) {
   // Колонки контекста показываем только там, где они заполнены: у старых заметок их нет,
   // и пустые столбцы выглядели бы как потерянные данные.
   const rows = note.scale_diff ?? [];
-  const hasSubjects = rows.some((row) => !!row.subject);
   const hasHeats = rows.some((row) => row.heat != null);
   const hasTimes = rows.some((row) => !!row.time);
+  const hasSwimmers = rows.some((row) => !!row.swimmer);
+  const hasClubs = rows.some((row) => !!row.club);
 
   return (
     <div
@@ -114,7 +115,8 @@ function MismatchBlock({ note }: { note: CompetitionMismatchNote }) {
                   <th className="px-2 py-1 text-start font-semibold">{labels.place}</th>
                   {hasHeats && <th className="px-2 py-1 text-start font-semibold">{labels.heat}</th>}
                   {hasTimes && <th className="px-2 py-1 text-start font-semibold">{labels.time}</th>}
-                  {hasSubjects && <th className="px-2 py-1 text-start font-semibold">{labels.subject}</th>}
+                  {hasSwimmers && <th className="px-2 py-1 text-start font-semibold">{labels.swimmer}</th>}
+                  {hasClubs && <th className="px-2 py-1 text-start font-semibold">{labels.club}</th>}
                   <th className="px-2 py-1 text-start font-semibold">{labels.expected}</th>
                   <th className="px-2 py-1 text-start font-semibold">{labels.actual}</th>
                 </tr>
@@ -127,8 +129,11 @@ function MismatchBlock({ note }: { note: CompetitionMismatchNote }) {
                     {hasTimes && (
                       <td className="px-2 py-1 whitespace-nowrap" dir="ltr">{row.time ?? '—'}</td>
                     )}
-                    {hasSubjects && (
-                      <td className="px-2 py-1 whitespace-nowrap">{row.subject ?? '—'}</td>
+                    {hasSwimmers && (
+                      <td className="px-2 py-1 whitespace-nowrap">{row.swimmer ?? '—'}</td>
+                    )}
+                    {hasClubs && (
+                      <td className="px-2 py-1 whitespace-nowrap">{row.club ?? '—'}</td>
                     )}
                     <td className="px-2 py-1">{row.expected}</td>
                     <td className="px-2 py-1 font-bold" style={{ color: '#dc2626' }}>{row.actual}</td>

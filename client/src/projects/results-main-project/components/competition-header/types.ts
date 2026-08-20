@@ -66,11 +66,14 @@ export interface CompetitionMismatchNote {
    *  subject — клуб или пловец: без него перестановка очков не читается как доказательство. */
   scale_diff: {
     place: number; expected: number; actual: number;
-    subject?: string | null;
     /** Номер заплыва — часто он и есть причина расхождения (очки по заплыву, а не по месту). */
     heat?: number | null;
     /** Время строки: доказывает, что места расставлены верно и спорны именно очки. */
     time?: string | null;
+    /** Кто плыл — по нему читатель находит строку в протоколе. */
+    swimmer?: string | null;
+    /** Кому достались очки: перестановка видна как «два призовых начисления одному клубу». */
+    club?: string | null;
   }[];
   /** Какой заплыв разобран в табличке («50 m backstroke · girls 17-18 · final»). */
   scale_diff_caption?: string | null;
