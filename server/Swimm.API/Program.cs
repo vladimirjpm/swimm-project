@@ -508,6 +508,54 @@ if (args.Contains("--pull-events"))
     return;
 }
 
+// Ремонт зачётных полос эстафет по пособытийному источнику (data-integrity §10):
+//   dotnet run -- --pull-relays <discoveredId> [--apply]
+// PDF печатает эстафеты сквозной дисциплиной (пол «none», места через все полосы), а сайт
+// держит их полосными событиями. Прогон правит ТОЛЬКО пол, полосу и место; состав, ноги и
+// RelayId остаются как есть. Без --apply — dry-run. Ходит в чужой прод с паузой 2 с.
+if (args.Contains("--pull-relays"))
+{
+    var prIndex = Array.IndexOf(args, "--pull-relays") + 1;
+    if (prIndex >= args.Length || !int.TryParse(args[prIndex], out var relayDiscoveredId))
+    {
+        Console.Error.WriteLine("Usage: dotnet run -- --pull-relays <discoveredId> [--apply]");
+        Environment.Exit(1);
+        return;
+    }
+
+    using var scope = app.Services.CreateScope();
+    var relays = scope.ServiceProvider.GetRequiredService<ILogligRelayBandService>();
+    var relayReport = await relays.RepairAsync(relayDiscoveredId, args.Contains("--apply"));
+
+    Console.WriteLine($"«{relayReport.CompetitionName}»: эстафетных событий {relayReport.RelayEvents}, " +
+                      $"строк у источника {relayReport.SourceRows}, у нас {relayReport.DbRows}");
+    Console.WriteLine($"  клубные очки эстафет: было {relayReport.PointsBefore}, " +
+                      $"станет {relayReport.PointsAfter}, официально {relayReport.OfficialPoints}");
+
+    if (relayReport.Plan.Problems.Count > 0)
+    {
+        Console.WriteLine($"  НЕПРИМЕНИМО, расхождений {relayReport.Plan.Problems.Count}:");
+        foreach (var problem in relayReport.Plan.Problems.Take(20))
+            Console.WriteLine($"      {problem}");
+        Console.WriteLine("  План не применяется целиком: полосы разложены наполовину дали бы кривые места.");
+        return;
+    }
+
+    var relayChanges = relayReport.Plan.Changes.Where(c => c.HasChanges).ToList();
+    Console.WriteLine($"  строк к правке: {relayChanges.Count} из {relayReport.Plan.Changes.Count}");
+    foreach (var band in relayChanges.GroupBy(c => $"{c.StyleName} {c.Distance} · {c.GenderAfter} {c.BandAfter}"))
+        Console.WriteLine($"      {band.Key}: {band.Count()}");
+    foreach (var change in relayChanges.Take(5))
+        Console.WriteLine($"      #{change.ResultId} {change.Club}: " +
+                          $"{change.GenderBefore}/{change.BandBefore}/место {change.PositionBefore} → " +
+                          $"{change.GenderAfter}/{change.BandAfter}/место {change.PositionAfter}");
+
+    Console.WriteLine(relayReport.Applied > 0
+        ? $"ПРИМЕНЕНО: обновлено строк {relayReport.Applied}, зачёт соревнования пересчитан"
+        : "Ничего не записано (dry-run). Повторите с --apply.");
+    return;
+}
+
 // Прогон ВСЕГО реестра проверок данных из консоли (пара к кнопке на /Admin/Health):
 //   dotnet run -- --data-checks
 // Нужен, когда админка недоступна (нет сессии, headless-машина) и чтобы увидеть картину
