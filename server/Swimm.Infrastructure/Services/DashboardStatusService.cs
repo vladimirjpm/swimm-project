@@ -75,10 +75,147 @@ public class DashboardStatusService(
         var media = await BuildMediaAsync(ct);
         var usersGroups = await BuildUsersGroupsAsync(ct);
         var system = await BuildSystemAsync(ct);
+        var clubPoints = await BuildClubPointsAsync(ct);
 
         return new DashboardStatusSummary(
             swimmers, clubs, competitions, results, recordSets, recordQualitySummary,
-            media, usersGroups, system, checks);
+            media, usersGroups, system, checks, clubPoints);
+    }
+
+    /// <summary>
+    /// Блок «Клубные очки»: итоги ручной сверки зачёта с официальным (docs/admin-pages/pointsrules.md).
+    ///
+    /// Считаем по СОБЫТИЯМ: отметка ставится всем дням многодневки, и по строкам-дням
+    /// один чемпионат выглядел бы четырьмя расхождениями. Ключ события — <c>EventId</c>,
+    /// а у однодневки его нет, поэтому она сама себе событие (тот же приём, что в
+    /// <c>PointRulesAdminRepository</c> и <c>CompetitionRecalculationService</c>).
+    /// </summary>
+    private async Task<DashboardClubPointsStatus> BuildClubPointsAsync(CancellationToken ct)
+    {
+        var days = await db.Competitions.AsNoTracking()
+            .Select(c => new
+            {
+                c.Id, c.EventId, c.Name, c.Date,
+                c.PointRuleClubsId, Kind = c.ClubPointsVerifiedKind
+            })
+            .ToListAsync(ct);
+
+        // Событие: EventId, а у однодневки — её собственный Id с минусом, чтобы ключи не
+        // столкнулись. Представитель события — день с наименьшим Id, как везде.
+        var events = days
+            .GroupBy(d => d.EventId ?? -d.Id)
+            .Select(g => new
+            {
+                Head = g.OrderBy(d => d.Id).First(),
+                Kind = g.Select(d => d.Kind).FirstOrDefault(k => k != null),
+                HasRule = g.Any(d => d.PointRuleClubsId != null)
+            })
+            .ToList();
+
+        var mismatchEvents = events.Where(e => e.Kind == PointsVerifiedKinds.Mismatch).ToList();
+        var mismatchIds = mismatchEvents.Select(e => e.Head.Id).ToList();
+
+        // Дни каждого события с расхождением — очки и эталон суммируются по ним всем.
+        var dayIdsByEvent = mismatchEvents.ToDictionary(
+            e => e.Head.Id,
+            e => days.Where(d => (d.EventId ?? -d.Id) == (e.Head.EventId ?? -e.Head.Id))
+                     .Select(d => d.Id).ToList());
+        var allDayIds = dayIdsByEvent.Values.SelectMany(x => x).Distinct().ToList();
+
+        var pointsByDay = await db.ClubCompetitionStandings.AsNoTracking()
+            .Where(s => allDayIds.Contains(s.CompetitionId))
+            .GroupBy(s => s.CompetitionId)
+            .Select(g => new { CompetitionId = g.Key, Points = g.Sum(x => x.Points) })
+            .ToDictionaryAsync(x => x.CompetitionId, x => x.Points, ct);
+
+        // Эталон официальных очков есть только у соревнований из пособытийного источника.
+        var officialByDay = await db.Results.AsNoTracking()
+            .Where(r => allDayIds.Contains(r.CompetitionId) && r.OfficialClubPoints != null)
+            .GroupBy(r => r.CompetitionId)
+            .Select(g => new { CompetitionId = g.Key, Official = g.Sum(x => x.OfficialClubPoints!.Value) })
+            .ToDictionaryAsync(x => x.CompetitionId, x => x.Official, ct);
+
+        var withNote = await db.CompetitionNotes.AsNoTracking()
+            .Where(n => allDayIds.Contains(n.CompetitionId)
+                     && n.Kind == CompetitionNoteKinds.ClubPointsMismatch)
+            .Select(n => n.CompetitionId)
+            .ToListAsync(ct);
+
+        var mismatchedRows = await MismatchedRowsAsync(allDayIds, ct);
+
+        var lines = mismatchEvents
+            .Select(e =>
+            {
+                var ids = dayIdsByEvent[e.Head.Id];
+                var official = ids.Where(officialByDay.ContainsKey).Sum(i => officialByDay[i]);
+                var rows = ids.Sum(i => mismatchedRows.GetValueOrDefault(i));
+                var hasOfficial = ids.Any(officialByDay.ContainsKey);
+
+                return new DashboardClubPointsLine(
+                    e.Head.Id, e.Head.Name, e.Head.Date,
+                    OurPoints: ids.Sum(i => pointsByDay.GetValueOrDefault(i)),
+                    OfficialPoints: hasOfficial ? official : null,
+                    MismatchedRows: hasOfficial ? rows : null,
+                    HasNote: ids.Any(withNote.Contains));
+            })
+            .OrderByDescending(l => l.MismatchedRows ?? 0)
+            .ThenBy(l => l.CompetitionId)
+            .ToList();
+
+        return new DashboardClubPointsStatus(
+            MismatchEvents: mismatchEvents.Count,
+            MismatchWithoutNote: lines.Count(l => !l.HasNote),
+            VerifiedEvents: events.Count(e => e.Kind == PointsVerifiedKinds.Official),
+            AcceptedEvents: events.Count(e => e.Kind == PointsVerifiedKinds.Accepted),
+            UncheckedEvents: events.Count(e => e.Kind is null && e.HasRule),
+            NoRuleEvents: events.Count(e => !e.HasRule),
+            Mismatches: lines);
+    }
+
+    /// <summary>
+    /// Сколько строк каждого дня расходится с эталоном. Считается тем же движком, что и
+    /// витрина, — иначе дашборд обещал бы одно, а проверка реестра показывала другое
+    /// (правило то же, что в <c>OfficialClubPointsMismatchCheck</c>).
+    /// </summary>
+    private async Task<Dictionary<int, int>> MismatchedRowsAsync(
+        IReadOnlyList<int> dayIds, CancellationToken ct)
+    {
+        var rows = await db.Results.AsNoTracking()
+            .Where(r => dayIds.Contains(r.CompetitionId) && r.OfficialClubPoints != null)
+            .Select(r => new
+            {
+                r.CompetitionId,
+                r.Competition!.Date,
+                r.Competition.IsMasters,
+                RuleId = r.Competition.PointRuleClubsId,
+                r.Position, r.HeatType, r.Round, r.TimeFail,
+                IsRelay = r.RelayId != null,
+                Official = r.OfficialClubPoints!.Value
+            })
+            .ToListAsync(ct);
+
+        if (rows.Count == 0) return [];
+
+        var rules = await db.PointRulesClubs.AsNoTracking().Include(r => r.Entries).ToListAsync(ct);
+        var result = new Dictionary<int, int>();
+
+        foreach (var group in rows.GroupBy(r => r.CompetitionId))
+        {
+            var head = group.First();
+            var rule = CompetitionRuleResolver.Resolve(
+                rules, head.RuleId, head.IsMasters,
+                DateOnly.TryParseExact(head.Date, "dd/MM/yyyy",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var d) ? d : DateOnly.MinValue);
+
+            result[group.Key] = group.Count(r =>
+                PointRulesClubsScoring.RelayPointsFor(
+                    rule,
+                    r.HeatType == "prelim" || r.Round == ResultRounds.FinalOpen ? null : r.Position,
+                    r.TimeFail, r.IsRelay) != r.Official);
+        }
+
+        return result;
     }
 
     /// <summary>

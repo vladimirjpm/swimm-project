@@ -728,4 +728,88 @@ public class DashboardStatusServiceTests
 
         Assert.Equal(0, result.Competitions.DuplicateStandings);
     }
+
+    /// <summary>
+    /// Блок «Клубные очки» считает СОБЫТИЯ, а не дни: отметка «★ расхождение» ставится
+    /// каждому дню многодневки, и по строкам-дням один чемпионат выглядел бы четырьмя
+    /// расхождениями. Живой случай — чемпионат 2025 на четыре дня.
+    /// </summary>
+    [Fact]
+    public async Task ClubPoints_CountsEventsNotDays()
+    {
+        await using var db = CreateDb(nameof(ClubPoints_CountsEventsNotDays));
+
+        // Четырёхдневное событие с расхождением — это ОДНО расхождение.
+        for (var day = 0; day < 4; day++)
+            db.Competitions.Add(new Competition
+            {
+                Name = "Multi-day", Date = $"0{day + 1}/06/2026", PoolType = "50m", EventId = 7,
+                ClubPointsVerifiedKind = PointsVerifiedKinds.Mismatch, PointRuleClubsId = null
+            });
+
+        // Однодневка со своим расхождением — второе.
+        db.Competitions.Add(new Competition
+        {
+            Name = "Single", Date = "10/06/2026", PoolType = "50m",
+            ClubPointsVerifiedKind = PointsVerifiedKinds.Mismatch
+        });
+
+        // Сверенное и вовсе не проверявшееся — в счётчики расхождений не попадают.
+        db.Competitions.Add(new Competition
+        {
+            Name = "Verified", Date = "11/06/2026", PoolType = "50m",
+            ClubPointsVerifiedKind = PointsVerifiedKinds.Official
+        });
+        db.Competitions.Add(new Competition { Name = "Untouched", Date = "12/06/2026", PoolType = "50m" });
+        await db.SaveChangesAsync();
+
+        var status = await CreateService(db).GetStatusAsync();
+        var cp = status.ClubPoints;
+
+        Assert.Equal(2, cp.MismatchEvents);
+        Assert.Equal(2, cp.Mismatches.Count);
+        Assert.Equal(1, cp.VerifiedEvents);
+        // Пояснений нет ни у одного — бейдж без доказательства, это и должно быть видно.
+        Assert.Equal(2, cp.MismatchWithoutNote);
+        // Правил ни у кого нет, поэтому «не сверялось» пусто, а «без правила» считает все.
+        Assert.Equal(0, cp.UncheckedEvents);
+        Assert.Equal(4, cp.NoRuleEvents);
+    }
+
+    /// <summary>
+    /// Эталон официальных очков есть только у соревнований из пособытийного источника.
+    /// Без него величину расхождения знает лишь пояснение — и панель обязана сказать это,
+    /// а не показать «официальные 0» (это читалось бы как «федерация не дала очков»).
+    /// </summary>
+    [Fact]
+    public async Task ClubPoints_LeavesOfficialEmpty_WhenThereIsNoReference()
+    {
+        await using var db = CreateDb(nameof(ClubPoints_LeavesOfficialEmpty_WhenThereIsNoReference));
+
+        var comp = new Competition
+        {
+            Name = "PDF meet", Date = "01/06/2026", PoolType = "50m",
+            ClubPointsVerifiedKind = PointsVerifiedKinds.Mismatch
+        };
+        var club = new Club { Name = "Club" };
+        db.AddRange(comp, club);
+        await db.SaveChangesAsync();
+
+        db.ClubCompetitionStandings.Add(new ClubCompetitionStanding
+        {
+            CompetitionId = comp.Id, ClubId = club.Id, Points = 120, ComputedAt = DateTime.UtcNow
+        });
+        db.CompetitionNotes.Add(new CompetitionNote
+        {
+            CompetitionId = comp.Id, Kind = CompetitionNoteKinds.ClubPointsMismatch
+        });
+        await db.SaveChangesAsync();
+
+        var line = Assert.Single((await CreateService(db).GetStatusAsync()).ClubPoints.Mismatches);
+
+        Assert.Equal(120, line.OurPoints);
+        Assert.Null(line.OfficialPoints);
+        Assert.Null(line.MismatchedRows);
+        Assert.True(line.HasNote);
+    }
 }

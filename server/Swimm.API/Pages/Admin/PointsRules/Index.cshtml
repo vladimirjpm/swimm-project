@@ -357,6 +357,25 @@
                     });
                 });
             });
+
+            // Дашборд ведёт сюда ссылкой «?filter=mismatch» (карточка «Клубные очки»).
+            // Без чтения параметра ссылка обещала бы фильтр, а показывала полный список —
+            // поэтому раскрываем панели правил и жмём нужную кнопку за человека.
+            const wanted = new URLSearchParams(location.search).get('filter');
+            if (!wanted || wanted === 'all') return;
+
+            document.querySelectorAll('.rule-toggle').forEach(toggle => {
+                const panel = document.getElementById('rule-panel-' + toggle.dataset.key);
+                // Открываем только правила, у которых искомые строки есть: иначе фильтр
+                // разворачивает пустые панели и прячет от человека то, за чем он пришёл.
+                if (!panel || !panel.querySelector(`tr[data-verified="${wanted}"]`)) return;
+                if (toggle.getAttribute('aria-expanded') !== 'true') toggle.click();
+            });
+
+            document.querySelectorAll('.verify-filter').forEach(group => {
+                const btn = group.querySelector(`.verify-filter-btn[data-value="${wanted}"]`);
+                if (btn) btn.click();
+            });
         })();
     </script>
 }

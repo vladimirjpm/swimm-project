@@ -13,7 +13,47 @@ public sealed record DashboardStatusSummary(
     DashboardMediaStatus Media,
     DashboardUsersGroupsStatus UsersGroups,
     DashboardSystemStatus System,
-    DashboardChecksStatus Checks);
+    DashboardChecksStatus Checks,
+    DashboardClubPointsStatus ClubPoints);
+
+/// <summary>
+/// Блок «Клубные очки»: где наш зачёт разошёлся с официальным и признано, что верны мы
+/// (<c>ClubPointsVerifiedKind = mismatch</c>, бейдж «★ расхождение» на витрине).
+///
+/// Зачем отдельный блок. Такое соревнование — единственное место, где сайт ПУБЛИЧНО спорит
+/// с федерацией, и цена ошибки тут выше обычной: если разбор неверен, мы обвиняем
+/// организатора зря. Поэтому их видно на дашборде поимённо, а не одним счётчиком.
+///
+/// Счёт идёт по СОБЫТИЯМ, а не по дням: у многодневки отметка стоит на каждом дне, и
+/// «4 расхождения» вместо одного чемпионата пугали бы на пустом месте.
+/// </summary>
+/// <param name="MismatchWithoutNote">
+/// Из них без пояснения. Бейдж без объяснения — утверждение без доказательства: читатель
+/// видит «официальные очки неверны» и не может проверить. Такие чинятся в первую очередь.
+/// </param>
+public sealed record DashboardClubPointsStatus(
+    int MismatchEvents,
+    int MismatchWithoutNote,
+    /// <summary>Сверено с официальным протоколом, цифры совпали.</summary>
+    int VerifiedEvents,
+    /// <summary>Официальных очков не публиковали; проверено самостоятельно и принято.</summary>
+    int AcceptedEvents,
+    /// <summary>Правило привязано, но глазами никто не сверял.</summary>
+    int UncheckedEvents,
+    /// <summary>Правила клубных очков нет вовсе — зачёт такого соревнования пуст.</summary>
+    int NoRuleEvents,
+    /// <summary>Сами расхождения, по одной строке на событие — для панели деталей.</summary>
+    IReadOnlyList<DashboardClubPointsLine> Mismatches);
+
+/// <summary>Одно соревнование с расхождением: наши очки против официальных.</summary>
+/// <param name="OfficialPoints">
+/// null — построчного эталона у соревнования нет (он приезжает только из пособытийного
+/// источника loglig). Тогда величину расхождения знает лишь пояснение, и сравнивать нечего.
+/// </param>
+/// <param name="MismatchedRows">Строк, где наш расчёт разошёлся с эталоном; null без эталона.</param>
+public sealed record DashboardClubPointsLine(
+    int CompetitionId, string Name, string Date,
+    int OurPoints, int? OfficialPoints, int? MismatchedRows, bool HasNote);
 
 /// <summary>
 /// Блок «Проверки данных» — сводка реестра (docs/data-integrity.md, Д3). Дашборд НЕ гоняет
