@@ -139,6 +139,58 @@ public class InvariantDataChecksTests
     }
 
     /// <summary>
+    /// Раунд различает строки так же, как их различает переимпорт. Живой случай — comp 1581:
+    /// у одного пловца утренний и вечерний заплывы случайно совпали по заплыву и дорожке, и
+    /// проверка объявила неразличимыми 33 законные пары.
+    /// </summary>
+    [Fact]
+    public async Task UpsertCollision_IgnoresRowsThatDifferByRound()
+    {
+        await using var db = CreateDb(nameof(UpsertCollision_IgnoresRowsThatDifferByRound));
+        var (comp, style, club, swimmer) = await SeedAsync(db);
+
+        ResultRecord Row(string? round, string time, int ms) => new()
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer.Id, ClubId = club.Id, StyleId = style.Id,
+            Distance = "50", Gender = "male", EventStyleAge = "16", Round = round,
+            Position = 2, TimeOriginal = time, TimeMillisecond = ms,
+            Heat = 2, Lane = 5, CompetitionDate = new DateTime(2026, 6, 1)
+        };
+
+        // Заплыв и дорожка совпали, но раунды разные — матчер такие строки разводит.
+        db.Results.AddRange(Row("timed-final", "00:31.90", 31900), Row("final", "00:31.36", 31360));
+        await db.SaveChangesAsync();
+
+        Assert.Equal(0, (await new UpsertKeyCollisionCheck(db).RunAsync()).Total);
+
+        // А вот совпадение ВМЕСТЕ с раундом — настоящая коллизия, её проверка обязана видеть.
+        db.Results.Add(Row("final", "00:31.40", 31400));
+        await db.SaveChangesAsync();
+
+        Assert.Equal(1, (await new UpsertKeyCollisionCheck(db).RunAsync()).Total);
+    }
+
+    /// <summary>
+    /// Сторож копии: ключ проверки повторяет <c>ResultMatchKey</c> полем в поле, и однажды
+    /// копия уже разъехалась (Round добавили в матчер, а сюда нет — 33 ложные находки).
+    /// Тест падает при ЛЮБОМ изменении состава ключа: это напоминание поправить и проверку,
+    /// а не просто обновить список.
+    /// </summary>
+    [Fact]
+    public void UpsertKeyFields_AreMirroredByTheCheck()
+    {
+        var fields = typeof(Swimm.Infrastructure.Services.ResultMatchKey)
+            .GetProperties()
+            .Select(p => p.Name)
+            .OrderBy(n => n, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Equal(
+            ["CompetitionId", "Distance", "Gender", "Heat", "IsRelay", "Lane", "Round", "StyleId"],
+            fields);
+    }
+
+    /// <summary>
     /// Эталон официальных очков: расхождение с нашим расчётом ловится построчно и
     /// суммируется на соревнование. Строки без эталона (все PDF-импорты) проверку не будят.
     /// </summary>
