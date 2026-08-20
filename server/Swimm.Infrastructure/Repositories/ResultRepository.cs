@@ -412,13 +412,18 @@ public class ResultRepository : IResultRepository
                 // если оно лежит на prelim-строке (лучший заплыв был утром), остаётся.
                 Position = filter.Combined && r.Competition.ShowCombineAllResults
                     ? (r.CombinedPlace ?? (r.HeatType == "prelim" ? null : r.Position))
-                    : (r.HeatType == "prelim" ? null : r.Position)
+                    : (r.HeatType == "prelim" ? null : r.Position),
+                StyleName = r.Style.Name,
+                r.Distance,
+                r.EventStyleAge,
+                r.Round
             })
             .Where(r => r.Position != null && r.Position <= 3)
             .ToListAsync())
             .Select(r => new MedalRow(
                 r.SwimmerId, r.FirstName, r.LastName, r.FirstNameEn, r.LastNameEn,
-                r.Club, r.Gender, r.Position, false));
+                r.Club, r.Gender, r.Position, false,
+                $"{r.SwimmerId}|{r.StyleName}|{r.Distance}|{r.EventStyleAge}", r.Round));
 
         // Эстафетная медаль принадлежит ВСЕЙ команде — разворачиваем строку на ноги через
         // RelayMembers (docs/relays.md: считать по владельцу строки — классический баг, медаль
@@ -453,7 +458,13 @@ public class ResultRepository : IResultRepository
                 r.SwimmerId, r.FirstName, r.LastName, r.FirstNameEn, r.LastNameEn,
                 r.Club, r.Gender, r.Position, true));
 
-        var medalRows = personalMedals.Concat(relayMedals).ToList();
+        // Медаль возрастной ступени одна, даже если ступень разыграна дважды за день
+        // (утренний зачёт + вечерний финал): раунды схлопываются по лучшему месту.
+        // Клубных очков это не касается — там задвоение официальное.
+        var medalRows = RoundMedalCollapser
+            .Collapse(personalMedals, r => r.MedalKey, r => r.Round, r => r.Position)
+            .Concat(relayMedals)
+            .ToList();
 
         // Топ-медалисты общие и по полу (design_handoff вариант 4). gender == null → без фильтра.
         // Порядок — золото → серебро → бронза, а НЕ по сумме наград: три бронзы не выше одного
@@ -1297,7 +1308,8 @@ public class ResultRepository : IResultRepository
         int InternationalPoints, int? TimeMillisecond, string TimeOriginal, bool TimeFail,
         string? SuspectReason, string StyleName, string Distance, string Pool,
         string CompetitionName, string DateRaw, string Gender, string EventStyleAge,
-        string AgeGroup, bool IsMasters, bool IsAward, string? HeatType = null);
+        string AgeGroup, bool IsMasters, bool IsAward, string? HeatType = null,
+        string? Round = null);
 
     /// <summary>Эстафета карьеры: из неё берутся только медали и факт участия в соревновании.</summary>
     private sealed record CareerRelayRow(
@@ -1325,7 +1337,8 @@ public class ResultRepository : IResultRepository
                 r.AgeGroup,
                 r.Competition.IsMasters,
                 r.Competition.IsAward,
-                r.HeatType))
+                r.HeatType,
+                r.Round))
             .ToListAsync();
 
     /// <summary>
@@ -1366,7 +1379,13 @@ public class ResultRepository : IResultRepository
         // «ליגה רבתי 3» шло в золото карьеры, хотя медали на этом старте не вручались).
         // Prelim-заплывы в медали не идут: их место — ранжир сессии (у эстафет prelim-места
         // обнулены ещё в проекции).
-        var awardedRows = rows.Where(r => r.IsAward && r.HeatType != "prelim").ToList();
+        // Медаль возрастной ступени одна, даже когда ступень разыграна дважды за день
+        // (утренний зачёт возрастов + вечерний финал первенства) — см. RoundMedalCollapser.
+        var awardedRows = RoundMedalCollapser.Collapse(
+            rows.Where(r => r.IsAward && r.HeatType != "prelim"),
+            r => $"{r.CompetitionId}|{r.StyleName}|{r.Distance}|{r.EventStyleAge}",
+            r => r.Round,
+            r => r.Position);
         var awardedRelays = relayMedals.Where(r => r.IsAward).ToList();
 
         // Разбивка медалей по конкретным заплывам — для тултипа "за что" на карточке.
@@ -1521,6 +1540,10 @@ public class ResultRepository : IResultRepository
     /// развёрнута на каждую ногу через RelayMembers). <paramref name="Gender"/> — пол самого
     /// пловца, а не строки результата: эстафеты бывают смешанные.
     /// </summary>
+    /// <param name="MedalKey">
+    /// Единица награждения — пловец + дисциплина + возрастная ступень. Нужна, чтобы схлопнуть
+    /// медали, задвоенные раундами чемпионата «мокдамот и финал» (<see cref="RoundMedalCollapser"/>).
+    /// </param>
     private sealed record MedalRow(
         int SwimmerId,
         string FirstName,
@@ -1530,5 +1553,7 @@ public class ResultRepository : IResultRepository
         string Club,
         string? Gender,
         int? Position,
-        bool IsRelay);
+        bool IsRelay,
+        string MedalKey = "",
+        string? Round = null);
 }
