@@ -1,4 +1,5 @@
 using System.Globalization;
+using Swimm.Domain;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -249,7 +250,10 @@ public class ResultRepository : IResultRepository
                 r.SwimmerId,
                 // Место prelim-заплыва — ранжир сессии, не награда: медали и клубные очки
                 // дают за финал (у бугрим протокол печатает места и в предварительных).
-                Position = r.HeatType == "prelim" ? null : r.Position,
+                // Общий финал «כללי» (Round=final-open) тоже не зачётный: единица зачёта —
+                // возрастная ступень, там пловец очки и получает (Р43).
+                Position = r.HeatType == "prelim" || r.Round == ResultRounds.FinalOpen
+                    ? null : r.Position,
                 r.CombinedPlace,
                 ShowCombine = r.Competition.ShowCombineAllResults,
                 r.TimeFail,
@@ -410,9 +414,10 @@ public class ResultRepository : IResultRepository
                 r.Gender,
                 // Prelim: протокольное место не медаль (ранжир сессии); объединённое место,
                 // если оно лежит на prelim-строке (лучший заплыв был утром), остаётся.
+                // Общий финал «כללי» медали тоже не даёт — она у возрастной ступени (Р43).
                 Position = filter.Combined && r.Competition.ShowCombineAllResults
-                    ? (r.CombinedPlace ?? (r.HeatType == "prelim" ? null : r.Position))
-                    : (r.HeatType == "prelim" ? null : r.Position),
+                    ? (r.CombinedPlace ?? (r.HeatType == "prelim" || r.Round == ResultRounds.FinalOpen ? null : r.Position))
+                    : (r.HeatType == "prelim" || r.Round == ResultRounds.FinalOpen ? null : r.Position),
                 StyleName = r.Style.Name,
                 r.Distance,
                 r.EventStyleAge,

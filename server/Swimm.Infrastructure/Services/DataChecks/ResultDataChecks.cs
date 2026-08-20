@@ -1,3 +1,4 @@
+using Swimm.Domain;
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
@@ -266,6 +267,7 @@ public sealed class OfficialClubPointsMismatchCheck(SwimmDbContext db) : IDataCh
                 RuleId = r.Competition.PointRuleClubsId,
                 r.Position,
                 r.HeatType,
+                r.Round,
                 r.TimeFail,
                 IsRelay = r.RelayId != null,
                 Official = r.OfficialClubPoints!.Value
@@ -288,9 +290,13 @@ public sealed class OfficialClubPointsMismatchCheck(SwimmDbContext db) : IDataCh
             var mismatched = 0;
             foreach (var r in group)
             {
-                // Место prelim-заплыва очков не приносит (Р34) — ровно как на витрине.
+                // Ровно как на витрине: место prelim-заплыва очков не приносит (Р34),
+                // общий финал «כללי» — тоже (Р43).
+                var scoringPlace = r.HeatType == "prelim" || r.Round == ResultRounds.FinalOpen
+                    ? null
+                    : r.Position;
                 var mine = PointRulesClubsScoring.RelayPointsFor(
-                    rule, r.HeatType == "prelim" ? null : r.Position, r.TimeFail, r.IsRelay);
+                    rule, scoringPlace, r.TimeFail, r.IsRelay);
                 ours += mine;
                 official += r.Official;
                 if (mine != r.Official) mismatched++;

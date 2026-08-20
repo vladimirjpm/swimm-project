@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
+using Swimm.Domain;
 using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
@@ -115,8 +116,11 @@ public class ClubStandingService : IClubStandingService
                 ClubNameEn = r.Club.NameEn,
                 RelayTeamName = r.Relay != null ? r.Relay.TeamName : null,
                 r.SwimmerId,
-                // Место prelim-заплыва — ранжир сессии, не награда: очков и медалей не даёт.
-                Position = r.HeatType == "prelim" ? null : r.Position,
+                // Место prelim-заплыва — ранжир сессии, не награда; общий финал «כללי»
+                // (Round=final-open) тоже не зачётный: у организатора единица зачёта —
+                // возрастная ступень, там пловец очки и получает (Р34, Р43).
+                Position = r.HeatType == "prelim" || r.Round == ResultRounds.FinalOpen
+                    ? null : r.Position,
                 r.TimeFail,
                 IsRelay = r.RelayId != null,
                 IsMasters = r.Competition.IsMasters,

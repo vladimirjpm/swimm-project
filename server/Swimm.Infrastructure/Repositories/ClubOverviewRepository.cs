@@ -450,8 +450,11 @@ public class ClubOverviewRepository : IClubOverviewRepository
             .Select(r => new
             {
                 r.SwimmerId,
-                // Место prelim-заплыва — ранжир сессии, не награда: очков не даёт.
-                Position = r.HeatType == "prelim" ? null : r.Position,
+                // Место prelim-заплыва — ранжир сессии, не награда; общий финал «כללי»
+                // (Round=final-open) тоже не зачётный: у организатора единица зачёта —
+                // возрастная ступень, там пловец очки и получает (Р34, Р43).
+                Position = r.HeatType == "prelim" || r.Round == ResultRounds.FinalOpen
+                    ? null : r.Position,
                 r.TimeFail,
                 IsRelay = r.RelayId != null,
                 IsMasters = r.Competition.IsMasters,

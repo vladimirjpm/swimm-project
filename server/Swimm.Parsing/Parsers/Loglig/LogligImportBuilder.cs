@@ -6,6 +6,7 @@ using System.Text.Json;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Parsing.Helpers;
+using Swimm.Domain;
 using Swimm.Parsing.Models;
 
 namespace Swimm.Parsing.Parsers.Loglig;
@@ -43,6 +44,11 @@ public sealed class LogligImportBuilder : ILogligImportBuilder
                 // Пол и возрастная полоса — из СЕКЦИИ строки: у вечернего финала шапка
                 // события открытая («נשים 13-99»), а очки и медали считаются по секциям
                 // внутри него («גמר - בנות 14»).
+                // Секция «כללי» — общий финал без возрастной категории: очков и медалей он
+                // не приносит (Р43), поэтому едет отдельным раундом, а не «финалом».
+                var isOpenSection = r.Category.Contains("כללי", StringComparison.Ordinal);
+                var round = isOpenSection ? ResultRounds.FinalOpen : r.Round;
+
                 var (sectionGender, sectionAge) = ParseCategory(r.Category);
                 var gender = sectionGender != "none" ? sectionGender : ev.Gender;
                 var eventStyleAge = sectionAge.Length > 0 ? sectionAge
@@ -83,7 +89,7 @@ public sealed class LogligImportBuilder : ILogligImportBuilder
                     RelaySwimmers: null,
                     EventCategory: null,
                     HeatType: HeatTypeOf(r.Round, withFinal.Contains(DisciplineKey(ev, r.Category))),
-                    Round: r.Round,
+                    Round: round,
                     // Пустая ячейка «ניקוד קבוצתי» у пособытийного источника означает
                     // «организатор за этот заплыв не заплатил», а НЕ «данных нет»: колонка
                     // в таблице есть всегда. Пишем 0, иначе сверка не увидит самый частый

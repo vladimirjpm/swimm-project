@@ -242,8 +242,11 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             .Select(r => new SeasonResultRow
             {
                 SwimmerId = r.SwimmerId,
-                // Место prelim-заплыва — ранжир сессии: ни медаль, ни клубные очки.
-                Position = r.HeatType == "prelim" ? null : r.Position,
+                // Место prelim-заплыва — ранжир сессии, не награда; общий финал «כללי»
+                // (Round=final-open) тоже не зачётный: у организатора единица зачёта —
+                // возрастная ступень, там пловец очки и получает (Р34, Р43).
+                Position = r.HeatType == "prelim" || r.Round == ResultRounds.FinalOpen
+                    ? null : r.Position,
                 TimeFail = r.TimeFail,
                 InternationalPoints = r.InternationalPoints,
                 CompetitionDate = r.CompetitionDate,
