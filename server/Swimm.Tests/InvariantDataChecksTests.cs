@@ -108,6 +108,37 @@ public class InvariantDataChecksTests
     }
 
     /// <summary>
+    /// Одна попытка, засчитанная в ДВУХ зачётах разной программы, — не склейка сессий.
+    /// Живой случай — comp 1526: заплыв соблюдающих субботу печатается и в своём зачёте,
+    /// и в возрастном, тем же временем. Без EventCategory в ключе проверка кричала на
+    /// здоровые данные, а ложная тревога в реестре обесценивает его целиком.
+    /// </summary>
+    [Fact]
+    public async Task MergedSessions_IgnoresSameSwimCountedInTwoProgrammes()
+    {
+        await using var db = CreateDb(nameof(MergedSessions_IgnoresSameSwimCountedInTwoProgrammes));
+        var (comp, style, club, swimmer) = await SeedAsync(db);
+
+        ResultRecord Row(int position, string? category) => new()
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer.Id, ClubId = club.Id,
+            StyleId = style.Id, Distance = "800", Gender = "male", EventStyleAge = "14",
+            EventCategory = category,
+            Position = position, TimeOriginal = "10:19.69", TimeMillisecond = 619690,
+            Heat = 1, Lane = position, CompetitionDate = new DateTime(2026, 6, 1)
+        };
+
+        // Возрастной зачёт и шабатный: время одно, места свои — так печатает протокол.
+        db.Results.AddRange(Row(6, null), Row(2, "mix-shabbat"));
+        await db.SaveChangesAsync();
+
+        var outcome = await new MergedSessionsCheck(db).RunAsync();
+
+        Assert.Equal(0, outcome.Total);
+        Assert.Empty(outcome.Items);
+    }
+
+    /// <summary>
     /// Эталон официальных очков: расхождение с нашим расчётом ловится построчно и
     /// суммируется на соревнование. Строки без эталона (все PDF-импорты) проверку не будят.
     /// </summary>

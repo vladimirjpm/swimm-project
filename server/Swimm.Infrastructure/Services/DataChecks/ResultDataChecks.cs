@@ -178,7 +178,9 @@ public sealed class MergedSessionsCheck(SwimmDbContext db) : IDataCheck
         "чемпионат «мокдамот и финал», у которого PDF-экспорт слил утреннюю и вечернюю сессии " +
         "в один список: официально это два зачёта с отдельными медалями и очками, а у нас один. " +
         "Места в таблице идут подряд у одного человека, клубный зачёт занижен. Лечится " +
-        "перетягиванием соревнования из пособытийного источника loglig.";
+        "перетягиванием соревнования из пособытийного источника loglig. Заплывы разной " +
+        "ПРОГРАММЫ (EventCategory — «שומרי שבת», para, open) сюда не попадают: одна попытка " +
+        "в двух зачётах — это не склейка.";
     public DataCheckSeverity Severity => DataCheckSeverity.Error;
 
     public async Task<DataCheckOutcome> RunAsync(CancellationToken ct = default)
@@ -186,12 +188,19 @@ public sealed class MergedSessionsCheck(SwimmDbContext db) : IDataCheck
         // Разметки сессий нет ни в каком виде: HeatType (наш вывод об отборе) и Round
         // (раунд из источника) пусты. Если хоть одно проставлено — строки различимы, и это
         // не наш случай. Эстафеты исключены: там «дважды» законно (две команды клуба).
+        //
+        // EventCategory входит в ключ по той же причине: это ПРОГРАММА заплыва, и разная
+        // программа — законно разные заплывы. Живой случай — comp 1526: заплыв соблюдающих
+        // субботу («שומרי שבת», mix-shabbat) печатается и в своём зачёте, и в возрастном,
+        // одним и тем же временем. Одна попытка в двух зачётах — не склейка сессий, а
+        // ровно то, ради чего EventCategory и заведена.
         var dupes = await db.Results.AsNoTracking()
             .Where(r => r.RelayId == null && r.HeatType == null && r.Round == null
                         && r.Position != null && r.TimeMillisecond != null)
             .GroupBy(r => new
             {
-                r.CompetitionId, r.StyleId, r.Distance, r.Gender, r.EventStyleAge, r.SwimmerId
+                r.CompetitionId, r.StyleId, r.Distance, r.Gender, r.EventStyleAge,
+                r.EventCategory, r.SwimmerId
             })
             .Where(g => g.Count() > 1)
             .Select(g => new { g.Key.CompetitionId, Rows = g.Count() })
