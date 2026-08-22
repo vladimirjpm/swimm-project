@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+body{margin:0;background:#e9ebef;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#1f2733;}
+a{color:#0466c8;text-decoration:none;} a:hover{color:#034a97;}
+</style>
+</helmet>
+
+<section style="display:flex;flex-direction:column;gap:16px;padding:40px 40px 20px;">
+  <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;width:1180px;">
+    <span style="background:#1f2733;color:#fff;border-radius:8px;padding:4px 10px;font-size:13px;font-weight:800;">2</span>
+    <span style="font-size:15px;font-weight:800;">Принято: десктоп — новая колонка, мобайл — две строки</span>
+    <span style="font-size:12.5px;color:#5b6470;font-weight:600;"><a href="#2a">2a</a> десктоп · <a href="#2b">2b</a> мобайл</span>
+  </div>
+  <div style="width:1180px;font-size:12.5px;line-height:1.6;color:#5b6470;font-weight:600;">
+    Значения Position берём один в один из сайдбара (<code>filter-position-buttons.tsx</code>): «All», «Top 10», «🥇🥈🥉 1-2-3» — та же подпись, тот же порядок, никакого второго словаря.
+  </div>
+
+  <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
+
+    <div id="2a" style="width:1180px;flex:none;background:#fff;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:16px;box-shadow:0 1px 2px rgba(16,24,40,.06);">
+      <div style="display:flex;align-items:baseline;gap:10px;">
+        <span style="background:#0466c8;color:#fff;border-radius:6px;padding:3px 8px;font-size:11.5px;font-weight:800;">2a</span>
+        <span style="font-size:14px;font-weight:800;">Десктоп — шестая колонка</span>
+      </div>
+      <div style="display:flex;justify-content:center;align-items:stretch;background:#fff;border:1px solid #e6e8ee;border-radius:14px;padding:16px 8px;box-shadow:0 1px 2px rgba(16,24,40,.05);">
+        <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 20px;min-width:132px;border-right:1px solid #e6e8ee;">
+          <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Date</span>
+          <span style="display:flex;flex-direction:column;align-items:stretch;border-radius:6px;overflow:hidden;border:1px solid #e6e8ee;width:62px;">
+            <span style="background:#f2871e;color:#fff;font-size:12px;font-weight:800;text-align:center;padding:2px 0;">2025</span>
+            <span style="background:#fff;font-size:11px;font-weight:700;text-align:center;padding:2px 0;color:#5b6470;">22 DEC</span>
+          </span>
+        </span>
+        <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 20px;min-width:132px;border-right:1px solid #e6e8ee;">
+          <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Club</span>
+          <span style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+            <span style="width:26px;height:26px;border-radius:999px;background:repeating-linear-gradient(135deg,#e8ebf1 0 4px,#f4f6f9 4px 8px);border:1px solid #dfe3ea;"></span>
+            <span dir="rtl" style="font-size:10.5px;font-weight:700;color:#5b6470;">מכבי אשדוד</span>
+          </span>
+        </span>
+        <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 20px;min-width:132px;border-right:1px solid #e6e8ee;">
+          <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Event</span>
+          <span style="display:flex;align-items:center;gap:5px;">
+            <span style="width:46px;height:20px;border-radius:4px;background:repeating-linear-gradient(135deg,#e8ebf1 0 4px,#f4f6f9 4px 8px);border:1px solid #dfe3ea;"></span>
+            <span style="font-size:15px;font-weight:900;color:#dc2626;">50</span>
+          </span>
+        </span>
+        <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 20px;min-width:132px;border-right:1px solid #e6e8ee;">
+          <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Age</span>
+          <span style="font-size:22px;font-weight:800;line-height:1;">2017</span>
+        </span>
+        <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 20px;min-width:132px;border-right:1px solid #e6e8ee;">
+          <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Pool</span>
+          <span style="font-size:18px;font-weight:800;line-height:1;">25m</span>
+          <span style="font-size:13px;color:#0466c8;line-height:1;">〰️〰️</span>
+        </span>
+        <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:6px 20px;min-width:132px;border-radius:10px;background:#eef4fd;border:1px solid rgba(4,102,200,.22);">
+          <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Position</span>
+          <span style="font-size:19px;font-weight:800;color:#0466c8;line-height:1;white-space:nowrap;">Top 10</span>
+        </span>
+      </div>
+      <span style="font-size:12px;font-weight:600;color:#5b6470;line-height:1.55;">Шестая колонка в том же ряду, ширина 132px, подпись «Position» и значение из сайдбара. Podium в этой ячейке — «🥇🥈🥉 1-2-3» в одну строку.</span>
+    </div>
+
+    <div id="2b" style="width:1180px;flex:none;background:#fff;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:18px;box-shadow:0 1px 2px rgba(16,24,40,.06);">
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
+        <span style="background:#0466c8;color:#fff;border-radius:6px;padding:3px 8px;font-size:11.5px;font-weight:800;">2b</span>
+        <span style="font-size:14px;font-weight:800;">Мобайл 390px — верхняя строка «доступно», нижняя «выбрано»</span>
+        <span style="font-size:12px;font-weight:600;color:#8a8f9c;">кликай по чипам в первом макете — фильтр переезжает вниз и обратно</span>
+      </div>
+
+      <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <span style="font-size:11.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#8a8f9c;">Живой прототип · выбрано {{ activeCount }}</span>
+          <div style="width:390px;background:#f0f2f5;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;">
+            <div style="background:#fff;border:1px solid #e6e8ee;border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;flex-wrap:nowrap;gap:4px;">
+                <sc-for list="{{ idle }}" as="f" hint-placeholder-count="6">
+                  <span onClick="{{ f.toggle }}" style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;border-radius:8px;background:#f7f8fa;border:1px solid #edeff3;cursor:pointer;" style-hover="background:#eef0f4;">
+                    <span style="font-size:8.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#a2a8b4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;">{{ f.label }}</span>
+                    <span style="font-size:10.5px;font-weight:700;color:#8a8f9c;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;">{{ f.idleValue }}</span>
+                  </span>
+                </sc-for>
+              </div>
+              <sc-if value="{{ hasActive }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:8px;border-top:1px dashed #e6e8ee;padding-top:9px;">
+                  <sc-for list="{{ active }}" as="f" hint-placeholder-count="1">
+                    <span onClick="{{ f.toggle }}" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:7px 14px;border-radius:10px;background:#eef4fd;border:1px solid rgba(4,102,200,.24);cursor:pointer;" style-hover="background:#e2ecfb;">
+                      <span style="font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#8a8f9c;white-space:nowrap;">{{ f.label }}</span>
+                      <span style="font-size:16px;font-weight:800;color:#0466c8;line-height:1.2;white-space:nowrap;">{{ f.activeValue }}</span>
+                    </span>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:center;gap:8px;background:#fff;border:1px solid #e6e8ee;border-radius:12px;padding:10px;">
+              <span style="font-size:17px;font-weight:800;">Results</span>
+              <span style="font-size:11.5px;font-weight:700;color:#8a8f9c;">{{ resultCount }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <span style="font-size:11.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#8a8f9c;">Ничего не выбрано — одна строка</span>
+          <div style="width:390px;background:#f0f2f5;border-radius:14px;padding:12px;">
+            <div style="background:#fff;border:1px solid #e6e8ee;border-radius:12px;padding:8px;display:flex;gap:4px;">
+              <span style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;border-radius:8px;background:#f7f8fa;border:1px solid #edeff3;">
+                <span style="font-size:8.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#a2a8b4;">Date</span>
+                <span style="font-size:10.5px;font-weight:700;color:#8a8f9c;">All</span>
+              </span>
+              <span style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;border-radius:8px;background:#f7f8fa;border:1px solid #edeff3;">
+                <span style="font-size:8.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#a2a8b4;">Club</span>
+                <span style="font-size:10.5px;font-weight:700;color:#8a8f9c;">All</span>
+              </span>
+              <span style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;border-radius:8px;background:#f7f8fa;border:1px solid #edeff3;">
+                <span style="font-size:8.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#a2a8b4;">Event</span>
+                <span style="font-size:10.5px;font-weight:700;color:#8a8f9c;">All</span>
+              </span>
+              <span style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;border-radius:8px;background:#f7f8fa;border:1px solid #edeff3;">
+                <span style="font-size:8.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#a2a8b4;">Age</span>
+                <span style="font-size:10.5px;font-weight:700;color:#8a8f9c;">All</span>
+              </span>
+              <span style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;border-radius:8px;background:#f7f8fa;border:1px solid #edeff3;">
+                <span style="font-size:8.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#a2a8b4;">Pool</span>
+                <span style="font-size:10.5px;font-weight:700;color:#8a8f9c;">All</span>
+              </span>
+              <span style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;border-radius:8px;background:#f7f8fa;border:1px solid #edeff3;">
+                <span style="font-size:8.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#a2a8b4;">Pos</span>
+                <span style="font-size:10.5px;font-weight:700;color:#8a8f9c;">All</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <span style="font-size:11.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#8a8f9c;">Один выбран — Position по центру</span>
+          <div style="width:390px;background:#f0f2f5;border-radius:14px;padding:12px;">
+            <div style="background:#fff;border:1px solid #e6e8ee;border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;gap:4px;">
+                <span style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;border-radius:8px;background:#f7f8fa;border:1px solid #edeff3;">
+                  <span style="font-size:8.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#a2a8b4;">Date</span>
+                  <span style="font-size:10.5px;font-weight:700;color:#8a8f9c;">All</span>
+                </span>
+                <span style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;border-radius:8px;background:#f7f8fa;border:1px solid #edeff3;">
+                  <span style="font-size:8.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#a2a8b4;">Club</span>
+                  <span style="font-size:10.5px;font-weight:700;color:#8a8f9c;">All</span>
+                </span>
+                <span style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;border-radius:8px;background:#f7f8fa;border:1px solid #edeff3;">
+                  <span style="font-size:8.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#a2a8b4;">Event</span>
+                  <span style="font-size:10.5px;font-weight:700;color:#8a8f9c;">All</span>
+                </span>
+                <span style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;border-radius:8px;background:#f7f8fa;border:1px solid #edeff3;">
+                  <span style="font-size:8.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#a2a8b4;">Age</span>
+                  <span style="font-size:10.5px;font-weight:700;color:#8a8f9c;">All</span>
+                </span>
+                <span style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;border-radius:8px;background:#f7f8fa;border:1px solid #edeff3;">
+                  <span style="font-size:8.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#a2a8b4;">Pool</span>
+                  <span style="font-size:10.5px;font-weight:700;color:#8a8f9c;">All</span>
+                </span>
+              </div>
+              <div style="display:flex;justify-content:center;border-top:1px dashed #e6e8ee;padding-top:9px;">
+                <span style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:7px 16px;border-radius:10px;background:#eef4fd;border:1px solid rgba(4,102,200,.24);">
+                  <span style="font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#8a8f9c;">Position</span>
+                  <span style="font-size:16px;font-weight:800;color:#0466c8;line-height:1.2;white-space:nowrap;">Top 10</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <span style="font-size:11.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#8a8f9c;">Три выбраны — графика вместо текста</span>
+          <div style="width:390px;background:#f0f2f5;border-radius:14px;padding:12px;">
+            <div style="background:#fff;border:1px solid #e6e8ee;border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;gap:4px;">
+                <span style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;border-radius:8px;background:#f7f8fa;border:1px solid #edeff3;">
+                  <span style="font-size:8.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#a2a8b4;">Club</span>
+                  <span style="font-size:10.5px;font-weight:700;color:#8a8f9c;">All</span>
+                </span>
+                <span style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;border-radius:8px;background:#f7f8fa;border:1px solid #edeff3;">
+                  <span style="font-size:8.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#a2a8b4;">Age</span>
+                  <span style="font-size:10.5px;font-weight:700;color:#8a8f9c;">All</span>
+                </span>
+                <span style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;border-radius:8px;background:#f7f8fa;border:1px solid #edeff3;">
+                  <span style="font-size:8.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#a2a8b4;">Pool</span>
+                  <span style="font-size:10.5px;font-weight:700;color:#8a8f9c;">All</span>
+                </span>
+              </div>
+              <div style="display:flex;justify-content:center;align-items:stretch;gap:8px;border-top:1px dashed #e6e8ee;padding-top:9px;">
+                <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:7px 10px;border-radius:10px;background:#eef4fd;border:1px solid rgba(4,102,200,.24);">
+                  <span style="font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#8a8f9c;">Date</span>
+                  <span style="display:flex;flex-direction:column;align-items:stretch;border-radius:5px;overflow:hidden;border:1px solid #dfe3ea;width:54px;">
+                    <span style="background:#f2871e;color:#fff;font-size:10.5px;font-weight:800;text-align:center;">2025</span>
+                    <span style="background:#fff;font-size:10px;font-weight:700;text-align:center;color:#5b6470;">22 DEC</span>
+                  </span>
+                </span>
+                <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:7px 10px;border-radius:10px;background:#eef4fd;border:1px solid rgba(4,102,200,.24);">
+                  <span style="font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#8a8f9c;">Event</span>
+                  <span style="display:flex;align-items:center;gap:4px;">
+                    <span style="width:36px;height:17px;border-radius:4px;background:repeating-linear-gradient(135deg,#e8ebf1 0 4px,#f4f6f9 4px 8px);border:1px solid #dfe3ea;"></span>
+                    <span style="font-size:14px;font-weight:900;color:#dc2626;">50</span>
+                  </span>
+                </span>
+                <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:7px 10px;border-radius:10px;background:rgba(212,175,55,.14);border:1px solid rgba(212,175,55,.45);">
+                  <span style="font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#8a8f9c;">Position</span>
+                  <span style="font-size:13px;line-height:1.3;letter-spacing:-.5px;white-space:nowrap;">🥇🥈🥉 <span style="font-size:11px;font-weight:900;color:#8a6d1a;">1-2-3</span></span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <span style="font-size:12px;font-weight:600;color:#5b6470;line-height:1.55;">Правила: верхняя строка — всё, что в состоянии «All», шесть чипов по <code>flex:1</code> в один ряд (8.5/10.5px, без переноса); выбранный уходит из неё вниз, и оставшимся автоматически достаётся больше ширины. Нижняя строка центрирована, чипы по контенту, значение 16px. Пустая нижняя строка не рендерится — тогда полоса ровно одна строка. Position в подиуме подсвечен золотом (медали), в Top 10 — синим, как остальные активные.</span>
+    </div>
+
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:16px;padding:20px 40px 60px;">
+  <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;width:1180px;">
+    <span style="background:#1f2733;color:#fff;border-radius:8px;padding:4px 10px;font-size:13px;font-weight:800;">1</span>
+    <span style="font-size:15px;font-weight:800;">Position в полосе выбранных фильтров (results-filtered-info)</span>
+    <span style="font-size:12.5px;color:#5b6470;font-weight:600;"><a href="#1a">1a</a> шестая колонка · <a href="#1b">1b</a> бейдж у POS</span>
+  </div>
+  <div style="max-width:1180px;font-size:12.5px;line-height:1.6;color:#5b6470;font-weight:600;">
+    Общее для двух вариантов: колонки в состоянии «All» не рендерятся (в коде это <code>show*</code>-флаги — теперь они и есть условие показа), поэтому место освобождается само; podium — медали 🥇🥈🥉, top — «TOP 10» текстом; мобайл — сетка 3 в ряд; при большем числе фильтров лишние уезжают в «+N».
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    <span style="font-size:12.5px;font-weight:800;">Живой чип — клик переключает три значения</span>
+    <div style="display:flex;align-items:center;gap:16px;background:#fff;border-radius:14px;padding:14px 18px;width:max-content;box-shadow:0 1px 2px rgba(16,24,40,.06);">
+      <span onClick="{{ cyclePos }}" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:6px 16px;border-radius:10px;background:#eef4fd;border:1px solid rgba(4,102,200,.22);cursor:pointer;user-select:none;min-width:118px;" style-hover="background:#e2ecfb;">
+        <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Position</span>
+        <span style="font-size:19px;font-weight:800;color:#0466c8;line-height:1;white-space:nowrap;">{{ posLabel }}</span>
+      </span>
+      <span style="font-size:12px;font-weight:600;color:#8a8f9c;">клик = цикл All → TOP {{ topN }} → 🥇🥈🥉 (интерактив по умолчанию; попап не нужен — значений всего три)</span>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
+
+    <div id="1a" style="width:1180px;flex:none;background:#fff;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:18px;box-shadow:0 1px 2px rgba(16,24,40,.06);">
+      <div style="display:flex;align-items:baseline;gap:10px;">
+        <span style="background:#0466c8;color:#fff;border-radius:6px;padding:3px 8px;font-size:11.5px;font-weight:800;">1a</span>
+        <span style="font-size:14px;font-weight:800;">Шестая колонка в полосе</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <span style="font-size:11.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#8a8f9c;">Обычный случай — активны только Pool и Position</span>
+        <div style="display:flex;justify-content:center;align-items:stretch;background:#fff;border:1px solid #e6e8ee;border-radius:14px;padding:16px 8px;box-shadow:0 1px 2px rgba(16,24,40,.05);">
+          <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 22px;min-width:140px;border-right:1px solid #e6e8ee;">
+            <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Pool</span>
+            <span style="font-size:18px;font-weight:800;line-height:1;">25m</span>
+            <span style="font-size:13px;color:#0466c8;line-height:1;">〰️〰️</span>
+          </span>
+          <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:6px 22px;min-width:140px;border-radius:10px;background:#eef4fd;border:1px solid rgba(4,102,200,.22);">
+            <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Position</span>
+            <span style="font-size:19px;font-weight:800;color:#0466c8;line-height:1;white-space:nowrap;">TOP 10</span>
+          </span>
+        </div>
+        <span style="font-size:12px;font-weight:600;color:#5b6470;line-height:1.55;">Дефолт фильтра — <code>top</code>, значит Position почти всегда активен: он единственный, кто молча режет выдачу, и должен быть видимым. Мягкая подложка отделяет «ограничение списка» от справочных колонок.</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <span style="font-size:11.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#8a8f9c;">Максимум — шесть колонок, 1180px хватает с запасом</span>
+        <div style="display:flex;justify-content:center;align-items:stretch;background:#fff;border:1px solid #e6e8ee;border-radius:14px;padding:14px 8px;box-shadow:0 1px 2px rgba(16,24,40,.05);">
+          <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 20px;min-width:132px;border-right:1px solid #e6e8ee;">
+            <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Date</span>
+            <span style="display:flex;flex-direction:column;align-items:stretch;border-radius:6px;overflow:hidden;border:1px solid #e6e8ee;width:62px;">
+              <span style="background:#f2871e;color:#fff;font-size:12px;font-weight:800;text-align:center;padding:2px 0;">2025</span>
+              <span style="background:#fff;font-size:11px;font-weight:700;text-align:center;padding:2px 0;color:#5b6470;">22 DEC</span>
+            </span>
+          </span>
+          <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 20px;min-width:132px;border-right:1px solid #e6e8ee;">
+            <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Club</span>
+            <span style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+              <span style="width:26px;height:26px;border-radius:999px;background:repeating-linear-gradient(135deg,#e8ebf1 0 4px,#f4f6f9 4px 8px);border:1px solid #dfe3ea;"></span>
+              <span dir="rtl" style="font-size:10.5px;font-weight:700;color:#5b6470;">מכבי אשדוד</span>
+            </span>
+          </span>
+          <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 20px;min-width:132px;border-right:1px solid #e6e8ee;">
+            <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Event</span>
+            <span style="display:flex;align-items:center;gap:5px;">
+              <span style="width:46px;height:20px;border-radius:4px;background:repeating-linear-gradient(135deg,#e8ebf1 0 4px,#f4f6f9 4px 8px);border:1px solid #dfe3ea;"></span>
+              <span style="font-size:15px;font-weight:900;color:#dc2626;">50</span>
+            </span>
+          </span>
+          <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 20px;min-width:132px;border-right:1px solid #e6e8ee;">
+            <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Age</span>
+            <span style="font-size:22px;font-weight:800;line-height:1;">2017</span>
+          </span>
+          <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 20px;min-width:132px;border-right:1px solid #e6e8ee;">
+            <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Pool</span>
+            <span style="font-size:18px;font-weight:800;line-height:1;">25m</span>
+            <span style="font-size:13px;color:#0466c8;line-height:1;">〰️〰️</span>
+          </span>
+          <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:6px 20px;min-width:132px;border-radius:10px;background:#eef4fd;border:1px solid rgba(4,102,200,.22);">
+            <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Position</span>
+            <span style="font-size:19px;line-height:1.2;letter-spacing:-1px;">🥇🥈🥉</span>
+            <span style="font-size:10px;font-weight:800;color:#8a6d1a;letter-spacing:.4px;">1-2-3</span>
+          </span>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <span style="font-size:11.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#8a8f9c;">Рост числа фильтров — «+N» вместо давки</span>
+        <div style="display:flex;justify-content:center;align-items:stretch;background:#fff;border:1px solid #e6e8ee;border-radius:14px;padding:14px 8px;box-shadow:0 1px 2px rgba(16,24,40,.05);">
+          <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 18px;min-width:118px;border-right:1px solid #e6e8ee;">
+            <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Event</span>
+            <span style="display:flex;align-items:center;gap:5px;">
+              <span style="width:40px;height:18px;border-radius:4px;background:repeating-linear-gradient(135deg,#e8ebf1 0 4px,#f4f6f9 4px 8px);border:1px solid #dfe3ea;"></span>
+              <span style="font-size:14px;font-weight:900;color:#dc2626;">50</span>
+            </span>
+          </span>
+          <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 18px;min-width:118px;border-right:1px solid #e6e8ee;">
+            <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Age</span>
+            <span style="font-size:20px;font-weight:800;line-height:1;">2017</span>
+          </span>
+          <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 18px;min-width:118px;border-right:1px solid #e6e8ee;">
+            <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Date</span>
+            <span style="display:flex;flex-direction:column;align-items:stretch;border-radius:6px;overflow:hidden;border:1px solid #e6e8ee;width:58px;">
+              <span style="background:#f2871e;color:#fff;font-size:11.5px;font-weight:800;text-align:center;padding:2px 0;">2025</span>
+              <span style="background:#fff;font-size:10.5px;font-weight:700;text-align:center;padding:2px 0;color:#5b6470;">22 DEC</span>
+            </span>
+          </span>
+          <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 18px;min-width:118px;border-right:1px solid #e6e8ee;">
+            <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Level</span>
+            <span style="font-size:16px;font-weight:900;color:#0466c8;line-height:1;">2y+</span>
+          </span>
+          <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 18px;min-width:118px;border-right:1px solid #e6e8ee;">
+            <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Gender</span>
+            <span style="font-size:20px;font-weight:800;color:#1d4ed8;line-height:1;">♂</span>
+          </span>
+          <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:6px 18px;min-width:118px;border-radius:10px;background:#eef4fd;border:1px solid rgba(4,102,200,.22);">
+            <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Position</span>
+            <span style="font-size:18px;font-weight:800;color:#0466c8;line-height:1;white-space:nowrap;">TOP 10</span>
+          </span>
+          <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:6px 16px;margin-left:8px;min-width:78px;border-radius:10px;background:#f4f6f9;border:1px dashed #cfd5df;cursor:pointer;" style-hover="background:#eaeef4;">
+            <span style="font-size:15px;font-weight:900;color:#5b6470;line-height:1;">+2</span>
+            <span style="font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#8a8f9c;">filters</span>
+          </span>
+        </div>
+        <span style="font-size:12px;font-weight:600;color:#5b6470;line-height:1.55;">Порядок приоритета: Position закреплён (он один невидимо режет список), дальше Event · Age · Date · Club · Pool · Level · Gender · Category; всё, что не влезло — в «+N» (поповер со списком). Ширина колонки 118–140px, лимит на десктопе 7 + «+N».</span>
+      </div>
+
+      <div style="display:flex;gap:20px;flex-wrap:wrap;">
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <span style="font-size:11.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#8a8f9c;">390px · обычный случай</span>
+          <div style="width:390px;background:#f0f2f5;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;">
+            <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;background:#fff;border:1px solid #e6e8ee;border-radius:12px;padding:10px;">
+              <span style="display:flex;flex-direction:column;align-items:center;gap:5px;background:#f7f8fa;border-radius:9px;padding:7px 4px;">
+                <span style="font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#8a8f9c;">Pool</span>
+                <span style="font-size:15px;font-weight:800;line-height:1;">25m</span>
+              </span>
+              <span style="display:flex;flex-direction:column;align-items:center;gap:5px;background:#eef4fd;border:1px solid rgba(4,102,200,.22);border-radius:9px;padding:7px 4px;">
+                <span style="font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#8a8f9c;">Position</span>
+                <span style="font-size:15px;font-weight:800;color:#0466c8;line-height:1;white-space:nowrap;">TOP 10</span>
+              </span>
+              <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px dashed #cfd5df;border-radius:9px;padding:7px 4px;color:#8a8f9c;">
+                <span style="font-size:15px;font-weight:900;line-height:1;">＋</span>
+                <span style="font-size:9px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;">filters</span>
+              </span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:center;gap:8px;background:#fff;border:1px solid #e6e8ee;border-radius:12px;padding:10px;">
+              <span style="font-size:17px;font-weight:800;">Results</span>
+              <span style="font-size:11.5px;font-weight:700;color:#8a8f9c;">3 029</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <span style="font-size:11.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#8a8f9c;">390px · шесть фильтров, 3+3</span>
+          <div style="width:390px;background:#f0f2f5;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;">
+            <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;background:#fff;border:1px solid #e6e8ee;border-radius:12px;padding:10px;">
+              <span style="display:flex;flex-direction:column;align-items:center;gap:5px;background:#f7f8fa;border-radius:9px;padding:7px 4px;">
+                <span style="font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#8a8f9c;">Date</span>
+                <span style="display:flex;flex-direction:column;align-items:stretch;border-radius:5px;overflow:hidden;border:1px solid #e6e8ee;width:52px;">
+                  <span style="background:#f2871e;color:#fff;font-size:10px;font-weight:800;text-align:center;">2025</span>
+                  <span style="background:#fff;font-size:9.5px;font-weight:700;text-align:center;color:#5b6470;">22 DEC</span>
+                </span>
+              </span>
+              <span style="display:flex;flex-direction:column;align-items:center;gap:5px;background:#f7f8fa;border-radius:9px;padding:7px 4px;">
+                <span style="font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#8a8f9c;">Club</span>
+                <span style="width:22px;height:22px;border-radius:999px;background:repeating-linear-gradient(135deg,#e8ebf1 0 4px,#f4f6f9 4px 8px);border:1px solid #dfe3ea;"></span>
+              </span>
+              <span style="display:flex;flex-direction:column;align-items:center;gap:5px;background:#f7f8fa;border-radius:9px;padding:7px 4px;">
+                <span style="font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#8a8f9c;">Event</span>
+                <span style="display:flex;align-items:center;gap:4px;">
+                  <span style="width:30px;height:15px;border-radius:3px;background:repeating-linear-gradient(135deg,#e8ebf1 0 4px,#f4f6f9 4px 8px);border:1px solid #dfe3ea;"></span>
+                  <span style="font-size:12px;font-weight:900;color:#dc2626;">50</span>
+                </span>
+              </span>
+              <span style="display:flex;flex-direction:column;align-items:center;gap:5px;background:#f7f8fa;border-radius:9px;padding:7px 4px;">
+                <span style="font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#8a8f9c;">Age</span>
+                <span style="font-size:15px;font-weight:800;line-height:1;">2017</span>
+              </span>
+              <span style="display:flex;flex-direction:column;align-items:center;gap:5px;background:#f7f8fa;border-radius:9px;padding:7px 4px;">
+                <span style="font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#8a8f9c;">Pool</span>
+                <span style="font-size:15px;font-weight:800;line-height:1;">25m</span>
+              </span>
+              <span style="display:flex;flex-direction:column;align-items:center;gap:5px;background:#eef4fd;border:1px solid rgba(4,102,200,.22);border-radius:9px;padding:7px 4px;">
+                <span style="font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#8a8f9c;">Position</span>
+                <span style="font-size:14px;line-height:1.25;letter-spacing:-1px;">🥇🥈🥉</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <span style="font-size:12px;font-weight:600;color:#5b6470;line-height:1.55;">Плюс: Position читается так же, как остальные фильтры, одна модель на все брейкпоинты. Минус: полоса «дышит» — число колонок меняется от выборки, и на 390px шесть чипов дают вторую строку (+52px над таблицей).</span>
+    </div>
+
+    <div id="1b" style="width:1180px;flex:none;background:#fff;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:18px;box-shadow:0 1px 2px rgba(16,24,40,.06);">
+      <div style="display:flex;align-items:baseline;gap:10px;">
+        <span style="background:#0466c8;color:#fff;border-radius:6px;padding:3px 8px;font-size:11.5px;font-weight:800;">1b</span>
+        <span style="font-size:14px;font-weight:800;">Бейдж в шапке таблицы, у колонки POS</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <span style="font-size:11.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#8a8f9c;">Полоса остаётся про «что за выборка», Position — про «докуда список»</span>
+        <div style="display:flex;justify-content:center;align-items:stretch;background:#fff;border:1px solid #e6e8ee;border-radius:14px;padding:16px 8px;box-shadow:0 1px 2px rgba(16,24,40,.05);">
+          <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 22px;min-width:140px;border-right:1px solid #e6e8ee;">
+            <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Age</span>
+            <span style="font-size:22px;font-weight:800;line-height:1;">2017</span>
+          </span>
+          <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 22px;min-width:140px;">
+            <span style="font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#8a8f9c;">Pool</span>
+            <span style="font-size:18px;font-weight:800;line-height:1;">25m</span>
+            <span style="font-size:13px;color:#0466c8;line-height:1;">〰️〰️</span>
+          </span>
+        </div>
+
+        <div style="border:1px solid #e6e8ee;border-radius:14px;overflow:hidden;">
+          <div style="display:grid;grid-template-columns:28px 92px minmax(0,1fr) 70px 110px 110px 80px 68px;gap:14px;align-items:center;padding:11px 24px;background:#f7f8fa;border-bottom:1px solid #e6e8ee;">
+            <span style="font-size:13px;color:#8a8f9c;">⊙</span>
+            <span style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+              <span style="font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#8a8f9c;">Pos</span>
+              <span style="display:flex;align-items:center;gap:4px;border-radius:999px;padding:2px 9px;background:#eef4fd;border:1px solid rgba(4,102,200,.28);cursor:pointer;white-space:nowrap;" style-hover="background:#e2ecfb;">
+                <span style="font-size:10.5px;font-weight:900;color:#0466c8;letter-spacing:.03em;">TOP 10</span>
+                <span style="font-size:9px;color:#0466c8;opacity:.7;">▾</span>
+              </span>
+            </span>
+            <span style="font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#8a8f9c;">Swimmer</span>
+            <span style="font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#8a8f9c;text-align:center;">Club</span>
+            <span style="font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#8a8f9c;">Style</span>
+            <span style="font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#8a8f9c;text-align:right;">Time</span>
+            <span style="font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#8a8f9c;text-align:center;">Level</span>
+            <span style="font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#8a8f9c;text-align:right;">Pts</span>
+          </div>
+          <div style="display:grid;grid-template-columns:28px 92px minmax(0,1fr) 70px 110px 110px 80px 68px;gap:14px;align-items:center;padding:12px 24px;background:#f4f6ff;border-bottom:1px solid #eef0f4;">
+            <span style="font-size:15px;color:#b9bec9;">♡</span>
+            <span style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+              <span style="width:34px;height:34px;border-radius:999px;background:#fff;border:1px solid #e6e8ee;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#8a8f9c;">3</span>
+              <span style="font-size:9.5px;font-weight:700;color:#aab0bd;">age: 8</span>
+            </span>
+            <span style="min-width:0;display:flex;flex-direction:column;gap:1px;">
+              <span dir="rtl" style="font-size:14.5px;font-weight:800;text-align:left;">אדם שפירא</span>
+              <span dir="rtl" style="font-size:12px;font-weight:600;color:#0f766e;text-align:left;">הפועל דולפין נתניה</span>
+            </span>
+            <span style="display:flex;justify-content:center;"><span style="width:26px;height:26px;border-radius:999px;background:repeating-linear-gradient(135deg,#e8ebf1 0 4px,#f4f6f9 4px 8px);border:1px solid #dfe3ea;"></span></span>
+            <span style="display:flex;align-items:center;gap:5px;">
+              <span style="width:44px;height:20px;border-radius:4px;background:repeating-linear-gradient(135deg,#e8ebf1 0 4px,#f4f6f9 4px 8px);border:1px solid #dfe3ea;"></span>
+              <span style="font-size:14px;font-weight:900;color:#dc2626;">50</span>
+            </span>
+            <span style="font-size:18px;font-weight:900;font-variant-numeric:tabular-nums;text-align:right;">00:40.51</span>
+            <span style="text-align:center;font-size:13px;font-weight:900;color:#16a34a;">2y</span>
+            <span style="display:flex;flex-direction:column;align-items:flex-end;"><span style="font-size:15px;font-weight:900;font-variant-numeric:tabular-nums;">123</span><span style="font-size:9.5px;font-weight:700;color:#aab0bd;">PTS</span></span>
+          </div>
+        </div>
+        <span style="font-size:12px;font-weight:600;color:#5b6470;line-height:1.55;">Колонка POS в коде уже 92px по гриду — чип «TOP 10» влезает под лейбл без правки шаблона; клик открывает те же три кнопки, что в сайдбаре. Полоса при этом не растёт вообще.</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <span style="font-size:11.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#8a8f9c;">Podium — медали вместо текста</span>
+        <div style="border:1px solid #e6e8ee;border-radius:14px;overflow:hidden;width:640px;">
+          <div style="display:grid;grid-template-columns:28px 92px minmax(0,1fr) 110px;gap:14px;align-items:center;padding:11px 20px;background:#f7f8fa;border-bottom:1px solid #e6e8ee;">
+            <span style="font-size:13px;color:#8a8f9c;">⊙</span>
+            <span style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+              <span style="font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#8a8f9c;">Pos</span>
+              <span style="display:flex;align-items:center;gap:3px;border-radius:999px;padding:2px 8px;background:rgba(212,175,55,.18);border:1px solid rgba(212,175,55,.5);cursor:pointer;white-space:nowrap;" style-hover="background:rgba(212,175,55,.26);">
+                <span style="font-size:11px;line-height:1.3;letter-spacing:-1px;">🥇🥈🥉</span>
+                <span style="font-size:9px;color:#8a6d1a;opacity:.8;">▾</span>
+              </span>
+            </span>
+            <span style="font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#8a8f9c;">Swimmer</span>
+            <span style="font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#8a8f9c;text-align:right;">Time</span>
+          </div>
+          <div style="display:grid;grid-template-columns:28px 92px minmax(0,1fr) 110px;gap:14px;align-items:center;padding:12px 20px;background:#fffdf6;">
+            <span style="font-size:15px;color:#b9bec9;">♡</span>
+            <span style="display:flex;justify-content:center;"><span style="width:34px;height:34px;border-radius:999px;background:rgba(212,175,55,.16);border:1px solid rgba(212,175,55,.45);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#8a6d1a;">1</span></span>
+            <span dir="rtl" style="font-size:14.5px;font-weight:800;text-align:left;">אניה גוסטמלסקי</span>
+            <span style="font-size:18px;font-weight:900;font-variant-numeric:tabular-nums;text-align:right;">00:28.12</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:20px;flex-wrap:wrap;">
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <span style="font-size:11.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#8a8f9c;">390px · чип уезжает в шапку «Results»</span>
+          <div style="width:390px;background:#f0f2f5;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;">
+            <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;background:#fff;border:1px solid #e6e8ee;border-radius:12px;padding:10px;">
+              <span style="display:flex;flex-direction:column;align-items:center;gap:5px;background:#f7f8fa;border-radius:9px;padding:7px 4px;">
+                <span style="font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#8a8f9c;">Age</span>
+                <span style="font-size:15px;font-weight:800;line-height:1;">2017</span>
+              </span>
+              <span style="display:flex;flex-direction:column;align-items:center;gap:5px;background:#f7f8fa;border-radius:9px;padding:7px 4px;">
+                <span style="font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#8a8f9c;">Pool</span>
+                <span style="font-size:15px;font-weight:800;line-height:1;">25m</span>
+              </span>
+              <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px dashed #cfd5df;border-radius:9px;padding:7px 4px;color:#8a8f9c;">
+                <span style="font-size:15px;font-weight:900;line-height:1;">＋</span>
+                <span style="font-size:9px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;">filters</span>
+              </span>
+            </div>
+            <div style="background:#fff;border:1px solid #e6e8ee;border-radius:12px;overflow:hidden;">
+              <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:9px 12px;background:#f7f8fa;border-bottom:1px solid #e6e8ee;position:relative;">
+                <span style="font-size:17px;font-weight:800;">Results</span>
+                <span style="display:flex;align-items:center;gap:4px;border-radius:999px;padding:3px 9px;background:#eef4fd;border:1px solid rgba(4,102,200,.28);">
+                  <span style="font-size:10.5px;font-weight:900;color:#0466c8;">TOP 10</span>
+                  <span style="font-size:9px;color:#0466c8;opacity:.7;">▾</span>
+                </span>
+                <span style="position:absolute;right:10px;width:26px;height:26px;border-radius:999px;background:#fff;border:1px solid #e6e8ee;display:flex;align-items:center;justify-content:center;font-size:12px;color:#8a8f9c;">⊙</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f4f6ff;">
+                <span style="flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;"><span style="width:30px;height:30px;border-radius:999px;background:#fff;border:1px solid #e6e8ee;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#8a8f9c;">3</span><span style="font-size:9px;font-weight:700;color:#aab0bd;">age: 8</span></span>
+                <span style="min-width:0;flex:1;display:flex;flex-direction:column;gap:1px;"><span dir="rtl" style="font-size:13.5px;font-weight:800;text-align:left;">אדם שפירא</span><span dir="rtl" style="font-size:11px;font-weight:600;color:#0f766e;text-align:left;">הפועל דולפין נתניה</span></span>
+                <span style="flex:none;font-size:15px;font-weight:900;font-variant-numeric:tabular-nums;">00:40.51</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <span style="font-size:11.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#8a8f9c;">390px · фильтров нет вовсе</span>
+          <div style="width:390px;background:#f0f2f5;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border:1px solid #e6e8ee;border-radius:12px;padding:10px 12px;">
+              <span style="font-size:12px;font-weight:700;color:#8a8f9c;white-space:nowrap;">Все заплывы · 3 029</span>
+              <span style="display:flex;align-items:center;gap:5px;border:1px dashed #cfd5df;border-radius:999px;padding:4px 10px;color:#5b6470;font-size:11px;font-weight:800;">＋ Filters</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;border:1px solid #e6e8ee;border-radius:12px;padding:9px 12px;">
+              <span style="font-size:17px;font-weight:800;">Results</span>
+              <span style="display:flex;align-items:center;gap:4px;border-radius:999px;padding:3px 9px;background:#f4f6f9;border:1px solid #e6e8ee;">
+                <span style="font-size:10.5px;font-weight:900;color:#5b6470;">ALL</span>
+                <span style="font-size:9px;color:#8a8f9c;">▾</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <span style="font-size:12px;font-weight:600;color:#5b6470;line-height:1.55;">Плюс: полоса не растёт ни на десктопе, ни на мобайле, и фильтр стоит там, где его результат — над числами мест. Минус: два разных места для фильтров (полоса + шапка таблицы), и на мобайле чип конкурирует за центр с заголовком «Results».</span>
+    </div>
+
+  </div>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;topN&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:10,&quot;tsType&quot;:&quot;number&quot;,&quot;min&quot;:3,&quot;max&quot;:20,&quot;section&quot;:&quot;Position&quot;}}">
+class Component extends DCLogic {
+  state = { pos: 'top', on: { position: true } };
+
+  renderVals() {
+    const topN = this.props.topN ?? 10;
+    const order = ['all', 'top', 'podium'];
+    const posLabels = { all: 'All', top: 'Top ' + topN, podium: '🥇🥈🥉 1-2-3' };
+
+    const defs = [
+      { key: 'date', label: 'Date', short: 'Date', value: '22 DEC 25' },
+      { key: 'club', label: 'Club', short: 'Club', value: 'מכבי אשדוד' },
+      { key: 'event', label: 'Event', short: 'Event', value: '50 free' },
+      { key: 'age', label: 'Age', short: 'Age', value: '2017' },
+      { key: 'pool', label: 'Pool', short: 'Pool', value: '25m' },
+      { key: 'position', label: 'Position', short: 'Pos', value: posLabels[this.state.pos] },
+    ];
+
+    const toggle = (k) => () =>
+      this.setState((s) => {
+        if (k === 'position' && s.on.position) {
+          const next = order[(order.indexOf(s.pos) + 1) % 3];
+          return next === 'all'
+            ? { pos: next, on: { ...s.on, position: false } }
+            : { pos: next };
+        }
+        if (k === 'position') return { pos: 'top', on: { ...s.on, position: true } };
+        return { on: { ...s.on, [k]: !s.on[k] } };
+      });
+
+    const rows = defs.map((d) => ({
+      ...d,
+      idleValue: 'All',
+      activeValue: d.value,
+      toggle: toggle(d.key),
+    }));
+
+    const active = rows.filter((r) => this.state.on[r.key]);
+    const idle = rows.filter((r) => !this.state.on[r.key]).map((r) => ({ ...r, label: r.short }));
+
+    return {
+      topN,
+      posLabel: posLabels[this.state.pos],
+      cyclePos: () => this.setState((s) => ({ pos: order[(order.indexOf(s.pos) + 1) % 3] })),
+      active,
+      idle,
+      hasActive: active.length > 0,
+      activeCount: active.length,
+      resultCount: (3029 - active.length * 700).toLocaleString('ru-RU'),
+    };
+  }
+}
+
+</script>
+</body>
+</html>
