@@ -13,6 +13,7 @@ import UI_FavoriteControls from '../../components/mix/favorite-controls/favorite
 import UI_PositionBadge from '../../components/mix/position-badge/position-badge';
 import UI_PrelimLabel from '../../components/mix/prelim-label/prelim-label';
 import UI_RoundLabel from '../../components/mix/round-label/round-label';
+import HelperResults from '../../../utils/helpers/helper-results';
 
 const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
   res,
@@ -63,7 +64,7 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
         </div>
         <UI_PrelimLabel heatType={res.heat_type} />
         <UI_RoundLabel round={res.round} />
-        {showAge && <UI_AgeLabel age={res.event_style_age} eventCategory={res.event_category} isRelay={res.is_relay} gender={res.event_style_gender} isMasters={isMastersResult} ageGroup={res.age_group} />}
+        {showAge && <UI_AgeLabel age={HelperResults.ageLabel(res)} eventCategory={res.event_category} isRelay={res.is_relay} gender={res.event_style_gender} isMasters={isMastersResult} ageGroup={res.age_group} />}
       </div>
 
       <div className='flex flex-col col-span-3'>

@@ -35,6 +35,11 @@ export interface GenderAgeEntry {
   date?: string;
   /** Если задан — имя становится ссылкой на страницу пловца. */
   swimmerId?: number;
+  /**
+   * Мелкая подпись под датой. Сейчас единственный потребитель — отладочная опция
+   * ShowAgeRecordsDetails: «born 2011 · age 10» под датой рекорда. Пусто — строки нет.
+   */
+  note?: string | null;
 }
 
 export interface GenderAgeRow {
@@ -145,6 +150,15 @@ function Cell({ entries, gender, showClubIcon, showDate }: {
               fontClassName="text-[9px] sm:text-[10px] text-[#aab0bd] tabular-nums"
               className={isMale ? '!justify-start' : '!justify-end'}
             />
+          )}
+          {entry.note && (
+            <div
+              className={`text-[9px] sm:text-[10px] tabular-nums text-[#8a93a3] ${
+                isMale ? 'text-left' : 'text-right'
+              }`}
+            >
+              {entry.note}
+            </div>
           )}
         </div>
       ))}

@@ -1,6 +1,7 @@
 ﻿import React from 'react';
 import type { ClubStandingsTable } from '../../../hooks/useClubOverview';
 import { routes } from '../../../utils/routes';
+import { seasonLabel } from '../../../utils/helpers/season-helper';
 
 /**
  * Standings — детализация выбранного зачёта (клик по линии в гриде «сезон × группа», или
@@ -17,11 +18,6 @@ interface Props {
 }
 
 const KIND_ICON: Record<string, string> = { winter: '❄', summer: '☀', openwater: '🌊' };
-
-/** «2025/26» — тот же формат, что SeasonMath.Label на сервере. */
-function seasonLabel(season: number): string {
-  return `${season}/${String((season + 1) % 100).padStart(2, '0')}`;
-}
 
 function ClubStandings({ standings }: Props) {
   if (!standings) {

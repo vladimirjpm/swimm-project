@@ -5,6 +5,7 @@ import { rootActions,useAppDispatch, useAppSelector } from '../../store/store';
 import { useFavoritesContext } from '../../hooks/favorites-context';
 import { useLoginModal } from '../components/login-modal/login-modal-context';
 import Helper from '../../utils/helpers/data-helper'
+import { loadRecordAgeAxis } from '../../utils/helpers/record-age-axis'
 import ClubPointsHelper from '../../utils/helpers/club-points-helper';
 import UI_DateIcon from '../components/mix/date-icon/date-icon';
 import UI_ClubIcon from '../components/mix/club-icon/club-icon';
@@ -137,6 +138,15 @@ function ResultsTable() {
   }), [sourceResults, filters, isAuthenticated, primarySwimmerId, favoriteSwimmerIds]);
 
   // Вычисляем наивысший уровень из базовых результатов и пушим в store
+  // Ось возраста для сверки с рекордами приезжает из /api/client-config: без неё
+  // бейдж строки считался бы по своей оси и разошёлся с карточкой «New records».
+  const [, setAxisLoaded] = React.useState(0);
+  React.useEffect(() => {
+    let alive = true;
+    loadRecordAgeAxis().then(() => { if (alive) setAxisLoaded((n) => n + 1); });
+    return () => { alive = false; };
+  }, []);
+
   useEffect(() => {
     let highestPriority = 0;
     let bestInfo: import('../../store/store').BestLevelInfo | null = null;
@@ -481,7 +491,9 @@ function ResultsTable() {
                 poolType: res.pool_type,
                 styleName: res.event_style_name,
                 distance: `${res.event_style_len}m`,
-                age: res.event_style_age,
+                // Ключ поиска в справочнике — по оси RecordAgeAxis, а не возраст пловца:
+                // иначе бейдж строки разойдётся с карточкой «New records» (её считает сервер).
+                age: Helper.recordStepAge(res),
                 isMasters: isMaster,
               };
               // Заплыв, помеченный админом как ошибка протокола, НЕ носит бейдж рекорда:

@@ -57,9 +57,7 @@ const EMPTY: MySwimsResponse = {
   swimmers: [], seasons: [], season: 0, swims: [], competition_media: [], unlinked_media: [],
 };
 
-export function seasonLabel(startYear: number): string {
-  return `${startYear}–${String((startYear + 1) % 100).padStart(2, '0')}`;
-}
+export { seasonLabel } from '../../utils/helpers/season-helper';
 
 /**
  * Заплывы favorite-пловцов за сезон + медиа + реакции — GET /api/me/swims.

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Helper from '../../../utils/helpers/data-helper';
 import RecordsHelper, { maxUpdatedAtLabel } from '../../../utils/helpers/records-helper';
 import { HOME_REGION } from '../../../utils/constants/home-region';
+import { recordStepAge } from '../../../utils/helpers/season-helper';
 import UI_GenderAgeTable, { GenderAgeEntry } from '../../components/mix/gender-age-table/gender-age-table';
 
 interface AgeRecord {
@@ -13,6 +14,10 @@ interface AgeRecord {
   country: string;
   record_date: string;
   updated_at?: string;
+  /** Подробности держателя — приходят только при включённой опции ShowAgeRecordsDetails. */
+  holder_birth_year?: number | null;
+  holder_age?: number | null;
+  holder_source?: string | null;
 }
 
 /** AgeRecord → строка единой таблицы UI_GenderAgeTable (значение = время, дата = record_date). */
@@ -20,7 +25,27 @@ function recordToEntry(r: AgeRecord): GenderAgeEntry {
   return {
     firstName: r.name, club: r.club, value: r.time, date: r.record_date,
     quality: r.issue_reason ? { kind: 'record', reason: r.issue_reason } : null,
+    note: holderNote(r),
   };
+}
+
+/**
+ * Подпись под датой рекорда — только при включённой опции ShowAgeRecordsDetails
+ * (сервер тогда присылает holder_birth_year, иначе поля пустые и подписи нет).
+ *
+ * Показываем ровно то, ради чего опцию заводили: год рождения держателя и сколько ему было
+ * в год рекорда. Из этой пары видно, почему запись стоит в ступени 10, хотя пловчихе того
+ * же года рождения в сезоне уже 11 (docs/data-integrity.md §13).
+ *
+ * «?» у источника `name` — держателя опознали по совпадению имени, а не по найденному
+ * заплыву: тёзка с тем же именем ошибку бы дал, и об этом честнее предупредить.
+ */
+function holderNote(r: AgeRecord): string | null {
+  if (!r.holder_birth_year) return null;
+
+  const age = r.holder_age ? ` · age ${r.holder_age}` : '';
+  const uncertain = r.holder_source === 'name' ? ' ?' : '';
+  return `born ${r.holder_birth_year}${age}${uncertain}`;
 }
 
 interface NormativeAgeRecordsProps {
@@ -31,12 +56,13 @@ interface NormativeAgeRecordsProps {
   age: string; // 'all' or birth year like '2015'
 }
 
-/** Convert birth year to age based on current year */
+/**
+ * Год рождения → ступень в справочнике. Ось — федерации (календарный год), а не наш
+ * возраст в сезоне: витрина показывает их таблицу, см. recordStepAge.
+ */
 function birthYearToAge(birthYear: string): string | null {
-  const year = Number(birthYear);
-  if (!year || year < 1900 || year > 2100) return null;
-  const currentYear = new Date().getFullYear();
-  return String(currentYear - year);
+  const age = recordStepAge(birthYear);
+  return age === null ? null : String(age);
 }
 
 function getDistanceData(

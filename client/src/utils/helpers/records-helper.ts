@@ -39,6 +39,12 @@ interface RecordDto {
   holder_country?: string | null;
   record_date?: string | null;
   updated_at?: string;
+  /** Год рождения держателя — только при включённой опции ShowAgeRecordsDetails, иначе null. */
+  holder_birth_year?: number | null;
+  /** Сколько держателю было в год рекорда (ось справочника — календарная). */
+  holder_age?: number | null;
+  /** Как опознан держатель: 'verified' (заплыв нашёлся у нас) | 'name' (уникальное имя). */
+  holder_source?: string | null;
 }
 
 interface NormativeStandardDto {
@@ -73,6 +79,10 @@ export interface AgeRecordCell {
   country?: string | null;
   record_date?: string | null;
   updated_at?: string;
+  /** Подробности держателя — приходят только при включённой отладочной опции. */
+  holder_birth_year?: number | null;
+  holder_age?: number | null;
+  holder_source?: string | null;
 }
 export type AgeRecordsTree = {
   normatives: Record<Gender, Record<PoolKey, Record<string, Record<string, Record<string, AgeRecordCell>>>>>;
@@ -192,6 +202,9 @@ export default class RecordsHelper {
           country: rec.holder_country,
           record_date: rec.record_date,
           updated_at: rec.updated_at,
+          holder_birth_year: rec.holder_birth_year ?? null,
+          holder_age: rec.holder_age ?? null,
+          holder_source: rec.holder_source ?? null,
         };
       });
       return tree;

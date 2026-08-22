@@ -2,6 +2,7 @@ import React from 'react';
 import Helper from '../../../utils/helpers/data-helper';
 import RecordsHelper, { maxUpdatedAtLabel } from '../../../utils/helpers/records-helper';
 import { HOME_REGION } from '../../../utils/constants/home-region';
+import { recordStepAge } from '../../../utils/helpers/season-helper';
 import UI_GenderAgeTable, { GenderAgeEntry } from '../../components/mix/gender-age-table/gender-age-table';
 
 interface MastersRecord {
@@ -30,12 +31,12 @@ interface NormativeMastersRecordsProps {
   age: string; // 'all' or birth year like '1992'
 }
 
-/** Convert birth year to age based on current year */
+/**
+ * Год рождения → возраст для masters-полосы справочника. Ось — федерации (календарный
+ * год), как и у возрастных ступеней: витрина отображает их таблицу, см. recordStepAge.
+ */
 function birthYearToAge(birthYear: string): number | null {
-  const year = Number(birthYear);
-  if (!year || year < 1900 || year > 2100) return null;
-  const currentYear = new Date().getFullYear();
-  return currentYear - year;
+  return recordStepAge(birthYear);
 }
 
 /** Find the masters age group key (e.g. "30-34") for a given age */
