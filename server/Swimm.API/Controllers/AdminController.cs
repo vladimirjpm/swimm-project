@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using Swimm.Application.Abstractions;
@@ -24,6 +24,8 @@ public class AdminController : ControllerBase
     private readonly IAdminAuditService _audit;
     private readonly ICacheService _cacheService;
     private readonly IUserMediaLinkChecker _linkChecker;
+    private readonly IDebugOptionsService _debugOptions;
+    private readonly IRegulationAnalyzer _regulation;
 
     public AdminController(
         IAdminRepository admin,
@@ -36,7 +38,9 @@ public class AdminController : ControllerBase
         IMemoryCache cache,
         IAdminAuditService audit,
         ICacheService cacheService,
-        IUserMediaLinkChecker linkChecker)
+        IUserMediaLinkChecker linkChecker,
+        IDebugOptionsService debugOptions,
+        IRegulationAnalyzer regulation)
     {
         _admin = admin;
         _schema = schema;
@@ -49,6 +53,8 @@ public class AdminController : ControllerBase
         _audit = audit;
         _cacheService = cacheService;
         _linkChecker = linkChecker;
+        _debugOptions = debugOptions;
+        _regulation = regulation;
     }
 
     // ── Users ────────────────────────────────────────────────────────────────
@@ -147,6 +153,50 @@ public class AdminController : ControllerBase
         await _audit.LogAsync("setting.update", "Setting", key,
             $"Настройка «{key}» изменена на «{request.Value}»", new { key, request.Value });
         return Ok(_settings.Get(key));
+    }
+
+    // ── Регламент соревнования ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Разбор регламента (תקנון, PDF) при затягивании: медали, клубный зачёт, чемпионат.
+    ///
+    /// Ничего не сохраняет — возвращает НАХОДКИ С ЦИТАТАМИ, а галочки в панели проставляет
+    /// админ (мы лишь предлагаем). Регламент — чужой документ произвольной формы, и молча
+    /// менять по нему флаги соревнования нельзя.
+    /// </summary>
+    [HttpPost("competitions/analyze-regulation")]
+    [RequestSizeLimit(20 * 1024 * 1024)]
+    public IActionResult AnalyzeRegulation([FromForm] IFormFile file)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(new { error = "Файл регламента не приложен" });
+
+        using var stream = file.OpenReadStream();
+        return Ok(_regulation.Analyze(stream, file.FileName));
+    }
+
+    // ── Отладочные подробности ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Опции витрин + состояние общего тумблера DebugDetails. Опция действует только когда
+    /// включены ОБА уровня — в ответе это поле <c>effective</c>.
+    /// </summary>
+    [HttpGet("debug-options")]
+    public async Task<IActionResult> GetDebugOptions()
+        => Ok(await _debugOptions.GetAllAsync(HttpContext.RequestAborted));
+
+    [HttpPut("debug-options/{key}")]
+    public async Task<IActionResult> UpdateDebugOption(string key, [FromBody] UpdateDebugOptionRequest request)
+    {
+        if (!await _debugOptions.SetAsync(key, request.Enabled, User.Identity?.Name,
+                HttpContext.RequestAborted))
+            return NotFound(new { error = $"Неизвестная отладочная опция «{key}»" });
+
+        await _audit.LogAsync("debug-option.update", "DebugOption", key,
+            $"Отладочная опция «{key}» {(request.Enabled ? "включена" : "выключена")}",
+            new { key, request.Enabled });
+
+        return Ok(await _debugOptions.GetAllAsync(HttpContext.RequestAborted));
     }
 
     // ── Кэш ──────────────────────────────────────────────────────────────────
@@ -465,3 +515,6 @@ public class AdminController : ControllerBase
         bool OverwriteExisting = false, bool DeleteMissing = false,
         int? PointRuleClubsId = null, int? PointRuleSwimmersId = null);
 }
+
+/// <summary>Тело PUT /api/admin/debug-options/{key}.</summary>
+public sealed record UpdateDebugOptionRequest(bool Enabled);

@@ -1,4 +1,4 @@
-using System.Threading.RateLimiting;
+﻿using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
@@ -11,6 +11,7 @@ using Swimm.Application;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
+using Swimm.Domain.Entities;
 using System.Globalization;
 using Swimm.Infrastructure;
 using Swimm.Parsing;
@@ -942,10 +943,23 @@ app.MapGet("/api/db-status",
 // Публичная конфигурация клиента (не секреты!). resultsLoadMode: full/paged — принудительный
 // режим загрузки результатов (?loadMode= игнорируется), client — режим выбирает клиент.
 // См. ResultsLoadMode в Admin/Settings и results-load-mode.ts на клиенте.
+//
+// recordAgeAxis: по какой оси сверять заплывы со справочником рекордов (calendar/season,
+// docs/data-integrity.md §13). Клиенту она нужна затем же, зачем серверу: бейдж рекорда в
+// строке результата обязан совпадать с карточкой «New records», а её считает сервер.
 app.MapGet("/api/client-config",
-    (ISettingsService settings) => Results.Ok(new
+    async (ISettingsService settings, IDebugOptionsService debug) => Results.Ok(new
     {
-        resultsLoadMode = settings.GetValue("ResultsLoadMode", "client")
+        resultsLoadMode = settings.GetValue("ResultsLoadMode", "client"),
+        recordAgeAxis = RecordAgeAxisSetting.From(settings) == RecordAgeAxis.Season
+            ? "season"
+            : "calendar",
+        // Отладочные подробности витрин: только ДЕЙСТВУЮЩИЕ (общий тумблер × галочка опции),
+        // клиенту знать про два уровня незачем. См. DebugOption.
+        debug = new
+        {
+            ageRecordsDetails = await debug.IsEnabledAsync(DebugOptionKeys.ShowAgeRecordsDetails)
+        }
     }))
     .AllowAnonymous();
 
