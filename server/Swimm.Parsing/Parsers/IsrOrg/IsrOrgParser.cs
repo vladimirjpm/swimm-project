@@ -116,32 +116,19 @@ public class IsrOrgParser : IFormatParser
     /// встречается за день дважды — раннее событие предварительные, позднее финал.
     ///
     /// Больше двух событий на ключ (прелимы + финалы B/A отдельными событиями) — финалом
-    /// считается только последнее, остальные prelim: для FinalsOnly-зачёта полуфиналы и
-    /// B-финалы очков не приносят, а правило «дубль дисциплины» различает сессии и так.
+    /// считается только ОДНО, остальные prelim: для FinalsOnly-зачёта полуфиналы и B-финалы
+    /// очков не приносят, а правило «дубль дисциплины» различает сессии и так.
+    ///
+    /// ⚠ Финал — не обязательно ПОСЛЕДНЯЯ серия. На אליפות הרצליה (01/11/2025) после финала
+    /// 50 вольным шли призовые заплывы на выбывание (skins): 8 → 4 у женщин, 8 → 2 у мужчин.
+    /// Правило «последняя = финал» объявляло финалом заплыв двух человек, а настоящий финал
+    /// с восемью уезжал в prelim — вместе с местами, которые на выдаче гасятся у прелимов.
+    /// Поэтому хвост убывающих мини-серий отбрасывается (см. PickFinal).
     /// </summary>
     internal static IReadOnlyList<string?> AssignHeatTypes(IReadOnlyList<IsrOrgCompetitionResult> comps)
     {
         var types = new string?[comps.Count];
 
-        // Проход 1: точный ключ (с категорией). Дважды за день одна и та же категория —
-        // раннее событие prelim, позднее final.
-        var byKey = Enumerable.Range(0, comps.Count).GroupBy(i =>
-            (comps[i].Date, comps[i].EventStyleName, comps[i].EventStyleLen,
-             comps[i].EventStyleGender, comps[i].EventStyleAge));
-        foreach (var g in byKey)
-        {
-            var idxs = g.ToList();
-            if (idxs.Count < 2) continue;
-            foreach (var i in idxs) types[i] = "prelim";
-            types[idxs[^1]] = "final";
-        }
-
-        // Проход 2: категории сессий напечатаны по-разному (реальный кейс бугрим 25/05/2026:
-        // прелимы «13-99», финал «14-99» — планка возраста у финала своя), точный ключ их
-        // не парит. Финал опознаём по СОСТАВУ: участники позднего события — подмножество
-        // раннего (финалисты ⊂ пловцы прелимов). Настоящие разные категории (U17 vs open
-        // Маккабиады) так не склеятся: их составы не пересекаются — пловец заявлен в одной.
-        //
         // Участники эстафеты — ЛЮДИ её ног, как у индивидуальных, а не «клуб+имя команды»:
         // имя команды у Маккаби равно клубу, и возрастные полосы одной дисциплины (после
         // RelayBandReconstructor) состоят из одних и тех же клубов — по клубам полосы
@@ -157,6 +144,25 @@ public class IsrOrgParser : IFormatParser
                 .ToHashSet())
             .ToList();
 
+        // Проход 1: точный ключ (с категорией). Дважды за день одна и та же категория —
+        // раннее событие prelim, позднее final.
+        var byKey = Enumerable.Range(0, comps.Count).GroupBy(i =>
+            (comps[i].Date, comps[i].EventStyleName, comps[i].EventStyleLen,
+             comps[i].EventStyleGender, comps[i].EventStyleAge));
+        foreach (var g in byKey)
+        {
+            var idxs = g.ToList();
+            if (idxs.Count < 2) continue;
+            foreach (var i in idxs) types[i] = "prelim";
+            types[PickFinal(idxs, participants)] = "final";
+        }
+
+        // Проход 2: категории сессий напечатаны по-разному (реальный кейс бугрим 25/05/2026:
+        // прелимы «13-99», финал «14-99» — планка возраста у финала своя), точный ключ их
+        // не парит. Финал опознаём по СОСТАВУ: участники позднего события — подмножество
+        // раннего (финалисты ⊂ пловцы прелимов). Настоящие разные категории (U17 vs open
+        // Маккабиады) так не склеятся: их составы не пересекаются — пловец заявлен в одной.
+        //
         var byLooseKey = Enumerable.Range(0, comps.Count).GroupBy(i =>
             (comps[i].Date, comps[i].EventStyleName, comps[i].EventStyleLen, comps[i].EventStyleGender));
         foreach (var g in byLooseKey)
@@ -185,11 +191,47 @@ public class IsrOrgParser : IFormatParser
         return types;
     }
 
-    private static int DetermineAge(int eventYear, int birthYear, string? eventStyleAge)
+    /// <summary>
+    /// Финал среди серий одной дисциплины: последняя ПОЛНОЦЕННАЯ, а не хвост призовых
+    /// заплывов после неё.
+    ///
+    /// Идём с конца и пропускаем серию, пока она мала (меньше <see cref="MinFinalHeat"/>
+    /// участников) И заметно меньше предыдущей — это признак skins-раунда (8 → 4 → 2), а не
+    /// финала. Обычный финал — это заплыв на все дорожки, он под условие не подпадает.
+    ///
+    /// Если пропустить нечего (две серии, вторая нормального размера) — поведение прежнее:
+    /// финал = последняя.
+    /// </summary>
+    private static int PickFinal(IReadOnlyList<int> idxs, IReadOnlyList<HashSet<string>> participants)
     {
-        if (birthYear > 0 && eventYear > 0)
+        for (int k = idxs.Count - 1; k > 0; k--)
         {
-            return eventYear - birthYear;
+            var current = participants[idxs[k]].Count;
+            var previous = participants[idxs[k - 1]].Count;
+
+            var looksLikeSkins = current > 0 && current < MinFinalHeat && current < previous;
+            if (!looksLikeSkins) return idxs[k];
+        }
+
+        return idxs[0];
+    }
+
+    /// <summary>
+    /// Меньше стольких участников — это уже не финал, а призовой заплыв. Финал плывут на
+    /// все дорожки (обычно 8); 6 — запас на снятия и на бассейны с шестью дорожками.
+    /// </summary>
+    private const int MinFinalHeat = 6;
+
+    /// <summary>
+    /// Возраст пловца для строки результата. <paramref name="seasonYear"/> — год ОКОНЧАНИЯ
+    /// сезона (см. <see cref="AgeGroupHelper.SeasonEndYearFromDateString"/>), поэтому возраст
+    /// один на все старты сезона и совпадает с полосами протокола.
+    /// </summary>
+    private static int DetermineAge(int seasonYear, int birthYear, string? eventStyleAge)
+    {
+        if (birthYear > 0 && seasonYear > 0)
+        {
+            return seasonYear - birthYear;
         }
 
         if (!string.IsNullOrWhiteSpace(eventStyleAge))
@@ -239,7 +281,7 @@ public class IsrOrgParser : IFormatParser
             var heatType = heatTypes[ci];
             foreach (var rHe in comp.Results)
             {
-                int eventYear = AgeGroupHelper.ExtractYearFromDateString(comp.Date);
+                int eventYear = AgeGroupHelper.SeasonEndYearFromDateString(comp.Date);
 
                 if (rHe.IsRelay == true && rHe.RelaySwimmers?.Count > 0)
                 {
@@ -373,7 +415,7 @@ public class IsrOrgParser : IFormatParser
                     throw new InvalidOperationException($"Time mismatch EN='{rEn.Time}', HE='{rHe.Time}'");
                 }
 
-                int eventYear = AgeGroupHelper.ExtractYearFromDateString(compEn.Date);
+                int eventYear = AgeGroupHelper.SeasonEndYearFromDateString(compEn.Date);
 
                 bool isRelay = rHe.IsRelay == true || rEn.IsRelay == true;
                 var relaySwimmers = rHe.RelaySwimmers ?? rEn.RelaySwimmers;
