@@ -41,6 +41,7 @@ public static class DependencyInjection
 
         // Settings (singleton — in-memory store)
         services.AddSingleton<ISettingsService, AdminSettingsService>();
+        services.AddScoped<IDebugOptionsService, DebugOptionsService>();
 
         // Scoped services
         services.AddScoped<IImportService, JsonImportService>();

@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Swimm.API.Http;
 using Swimm.Application.Abstractions;
 using Swimm.Domain.Entities;
@@ -19,6 +19,7 @@ public class RecordsController : ControllerBase
 {
     private readonly IRecordRepository _records;
     private readonly ICacheService _cache;
+    private readonly IDebugOptionsService _debugOptions;
 
     // max-age=300: браузер 5 минут не ходит в сеть вообще, потом дешёвая ревалидация
     // по ETag (304 без тела). Компромисс «свежесть после правки в админке» ↔ «ноль
@@ -26,10 +27,12 @@ public class RecordsController : ControllerBase
     private const string CacheControlValue = "public, max-age=300";
     private static readonly TimeSpan PayloadTtl = TimeSpan.FromHours(24);
 
-    public RecordsController(IRecordRepository records, ICacheService cache)
+    public RecordsController(
+        IRecordRepository records, ICacheService cache, IDebugOptionsService debugOptions)
     {
         _records = records;
         _cache = cache;
+        _debugOptions = debugOptions;
     }
 
     /// <summary>
@@ -47,9 +50,15 @@ public class RecordsController : ControllerBase
         if (category != null && !Record.Categories.Contains(category))
             return BadRequest($"category must be one of: {string.Join(", ", Record.Categories)}");
 
+        // Подробности держателя — отладочная опция; она же попадает в ключ кэша, иначе
+        // после выключения витрина показывала бы их ещё сутки.
+        var withDetails = await _debugOptions.IsEnabledAsync(
+            DebugOptionKeys.ShowAgeRecordsDetails, HttpContext.RequestAborted);
+
         return await this.CachedJson(_cache,
-            $"http:records:{region.Trim().ToUpperInvariant()}:{category ?? "all"}",
-            () => _records.GetRecordsAsync(region, category),
+            $"http:records:{region.Trim().ToUpperInvariant()}:{category ?? "all"}"
+                + (withDetails ? ":details" : ""),
+            () => _records.GetRecordsAsync(region, category, withDetails),
             PayloadTtl, CacheControlValue);
     }
 

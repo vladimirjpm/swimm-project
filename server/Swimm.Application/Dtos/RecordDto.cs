@@ -64,6 +64,28 @@ public class RecordDto
     /// <summary>Когда МЫ обновили эту запись (UTC) — не дата установления рекорда.</summary>
     [JsonPropertyName("updated_at")]
     public DateTime UpdatedAt { get; set; }
+    /// <summary>
+    /// Год рождения держателя — ТОЛЬКО при включённой отладочной опции
+    /// <c>ShowAgeRecordsDetails</c>, иначе null (см. DebugOption). В самом справочнике года
+    /// рождения нет: он восстанавливается по нашим протоколам.
+    /// </summary>
+    [JsonPropertyName("holder_birth_year")]
+    public int? HolderBirthYear { get; set; }
+
+    /// <summary>
+    /// Сколько держателю было в год рекорда («год рекорда − год рождения») — та ось, по
+    /// которой федерация раскладывает ступени (docs/data-integrity.md §13). Ради этого числа
+    /// подробности и включают: видно, почему запись стоит в ступени 10.
+    /// </summary>
+    [JsonPropertyName("holder_age")]
+    public int? HolderAge { get; set; }
+
+    /// <summary>
+    /// Как опознан держатель: <c>verified</c> — сверка нашла его заплыв в наших протоколах;
+    /// <c>name</c> — совпало уникальное имя. null — не опознан, год рождения неизвестен.
+    /// </summary>
+    [JsonPropertyName("holder_source")]
+    public string? HolderSource { get; set; }
 }
 
 /// <summary>Плоский DTO норматива для /api/normative-standards.</summary>
@@ -100,4 +122,5 @@ public class NormativeStandardDto
 
     [JsonPropertyName("time")]
     public string Time { get; set; } = string.Empty;
+
 }
