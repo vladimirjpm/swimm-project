@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
+using Swimm.Domain;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -16,7 +17,8 @@ namespace Swimm.Infrastructure.Services;
 /// загружены не за все годы, рекорд 1995 года сверять просто не с чем. Сервис отвечает на
 /// вопрос «можем ли мы подтвердить», а не «правда ли это».
 /// </summary>
-public class RecordQualityService(SwimmDbContext db) : IRecordQualityService
+public class RecordQualityService(SwimmDbContext db, ISettingsService? settings = null)
+    : IRecordQualityService
 {
     /// <summary>Форматы дат в источниках рекордов — смешанные, разбираем оба.</summary>
     private static readonly string[] RecordDateFormats = ["dd/MM/yyyy", "M/d/yyyy", "d/M/yyyy"];
@@ -26,7 +28,8 @@ public class RecordQualityService(SwimmDbContext db) : IRecordQualityService
         var records = await db.Records.AsNoTracking()
             .Select(r => new
             {
-                r.Id, r.Gender, r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate
+                r.Id, r.Gender, r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate,
+                r.Category, r.AgeKey
             })
             .ToListAsync(ct);
 
@@ -40,7 +43,9 @@ public class RecordQualityService(SwimmDbContext db) : IRecordQualityService
                 r.PoolType,
                 r.Style,
                 Distance = TrimDistance(r.Distance),
-                Date = ParseRecordDate(r.RecordDate)
+                Date = ParseRecordDate(r.RecordDate),
+                r.Category,
+                r.AgeKey
             })
             .ToList();
 
@@ -56,6 +61,7 @@ public class RecordQualityService(SwimmDbContext db) : IRecordQualityService
                 {
                     r.Id,
                     r.SwimmerId,
+                    BirthYear = r.Swimmer.BirthYear,
                     Ms = r.TimeMillisecond!.Value,
                     r.Gender,
                     PoolType = r.Competition.PoolType,
@@ -72,6 +78,7 @@ public class RecordQualityService(SwimmDbContext db) : IRecordQualityService
         var existing = await db.RecordVerifications.ToDictionaryAsync(v => v.RecordId, ct);
         var now = DateTime.UtcNow;
         int found = 0, notFound = 0, wrongDate = 0;
+        int axisChecked = 0, axisBoth = 0, axisCalendar = 0, axisSeason = 0, axisNone = 0;
 
         foreach (var p in parsed)
         {
@@ -99,6 +106,18 @@ public class RecordQualityService(SwimmDbContext db) : IRecordQualityService
             row.DateMatched = best == null || p.Date == null
                 ? null
                 : best.CompetitionDate.Date == p.Date.Value.Date;
+
+            // Ось возраста: сходится ли ступень справочника с пловцом и по какой именно оси.
+            // Считаем ВСЕГДА по обеим — поле отвечает на вопрос «какая ось у источника», а не
+            // «совпало ли с нашей настройкой» (docs/data-integrity.md §13).
+            //
+            // ⚠ Только при совпавшей ДАТЕ. Совпадение одного лишь времени опознаёт пловца
+            // ненадёжно: на реальной базе 147 из 167 «найденных» приходились на другой день,
+            // то есть на другого человека, и его возраст про ступень не говорит ничего.
+            row.AgeAxisMatch = best == null || row.DateMatched != true
+                ? null
+                : AgeAxisMatchOf(p.Category, p.AgeKey, p.Distance, best.BirthYear, best.CompetitionDate);
+
             row.CheckedAt = now;
 
             if (best == null) notFound++;
@@ -106,12 +125,26 @@ public class RecordQualityService(SwimmDbContext db) : IRecordQualityService
             {
                 found++;
                 if (row.DateMatched == false) wrongDate++;
+
+                switch (row.AgeAxisMatch)
+                {
+                    case AgeAxisMatches.Both:     axisChecked++; axisBoth++;     break;
+                    case AgeAxisMatches.Calendar: axisChecked++; axisCalendar++; break;
+                    case AgeAxisMatches.Season:   axisChecked++; axisSeason++;   break;
+                    case AgeAxisMatches.None:     axisChecked++; axisNone++;     break;
+                }
             }
         }
 
         await db.SaveChangesAsync(ct);
 
-        return new RecordVerifyResult(parsed.Count, found, notFound, wrongDate);
+        return new RecordVerifyResult(
+            parsed.Count, found, notFound, wrongDate,
+            AgeAxisChecked: axisChecked,
+            AgeAxisBoth: axisBoth,
+            AgeAxisCalendarOnly: axisCalendar,
+            AgeAxisSeasonOnly: axisSeason,
+            AgeAxisNone: axisNone);
     }
 
     public async Task<RecordQualitySummary> GetSummaryAsync(int issuesLimit = 20, CancellationToken ct = default)
@@ -125,6 +158,22 @@ public class RecordQualityService(SwimmDbContext db) : IRecordQualityService
             .OrderByDescending(v => v.CheckedAt)
             .Select(v => (DateTime?)v.CheckedAt)
             .FirstOrDefaultAsync(ct);
+
+        // Разбивка по осям: она же — ответ на вопрос «а как ступени раскладывает источник».
+        var axisBoth = await db.RecordVerifications.AsNoTracking()
+            .CountAsync(v => v.AgeAxisMatch == AgeAxisMatches.Both, ct);
+        var axisCalendar = await db.RecordVerifications.AsNoTracking()
+            .CountAsync(v => v.AgeAxisMatch == AgeAxisMatches.Calendar, ct);
+        var axisSeason = await db.RecordVerifications.AsNoTracking()
+            .CountAsync(v => v.AgeAxisMatch == AgeAxisMatches.Season, ct);
+        var axisNone = await db.RecordVerifications.AsNoTracking()
+            .CountAsync(v => v.AgeAxisMatch == AgeAxisMatches.None, ct);
+
+        var axis = RecordAgeAxisSetting.From(settings);
+        // «Не сходится с текущей осью» = не подтверждается ни обеими осями, ни выбранной.
+        var axisMismatch = axis == RecordAgeAxis.Calendar
+            ? axisSeason + axisNone
+            : axisCalendar + axisNone;
 
         var issuesTotal = await db.RecordIssues.AsNoTracking().CountAsync(ct);
         var issuesOpen = await db.RecordIssues.AsNoTracking()
@@ -149,7 +198,14 @@ public class RecordQualityService(SwimmDbContext db) : IRecordQualityService
             LastCheckedAt: lastCheckedAt,
             IssuesOpen: issuesOpen,
             IssuesTotal: issuesTotal,
-            Issues: issueDtos);
+            Issues: issueDtos,
+            AgeAxis: axis == RecordAgeAxis.Season ? "season" : "calendar",
+            AgeAxisChecked: axisBoth + axisCalendar + axisSeason + axisNone,
+            AgeAxisBoth: axisBoth,
+            AgeAxisCalendarOnly: axisCalendar,
+            AgeAxisSeasonOnly: axisSeason,
+            AgeAxisNone: axisNone,
+            AgeAxisMismatch: axisMismatch);
     }
 
     /* ──────────────────────── реестр претензий ──────────────────────── */
@@ -263,6 +319,64 @@ public class RecordQualityService(SwimmDbContext db) : IRecordQualityService
     }
 
     /* ───────────────────────── helpers ───────────────────────── */
+
+    /// <summary>
+    /// По какой оси возраста ступень рекорда сходится с найденным пловцом.
+    /// null — проверять нечего (см. <see cref="RecordVerification.AgeAxisMatch"/>).
+    ///
+    /// Эстафеты исключены сознательно: там ступень задаётся составом четвёрки, а мы нашли
+    /// одного пловца по времени — его возраст ничего не доказывает.
+    /// </summary>
+    private static string? AgeAxisMatchOf(
+        string category, string ageKey, string distance, int birthYear, DateTime swimDate)
+    {
+        if (birthYear <= 0) return null;
+        if (distance.Contains('X', StringComparison.OrdinalIgnoreCase)) return null;
+
+        var calendarAge = swimDate.Year - birthYear;
+        var seasonAge = SeasonMath.AgeInSeason(SeasonMath.StartYearOf(swimDate), birthYear);
+
+        var byCalendar = StepMatches(category, ageKey, calendarAge);
+        var bySeason = seasonAge is int sa ? StepMatches(category, ageKey, sa) : null;
+
+        // null от обоих = ступень не возрастная (open / adults / ISR): проверять нечего.
+        if (byCalendar is null && bySeason is null) return null;
+
+        return (byCalendar == true, bySeason == true) switch
+        {
+            (true, true)  => AgeAxisMatches.Both,
+            (true, false) => AgeAxisMatches.Calendar,
+            (false, true) => AgeAxisMatches.Season,
+            _             => AgeAxisMatches.None
+        };
+    }
+
+    /// <summary>
+    /// Попадает ли возраст в ступень справочника: «11» — точное совпадение, «25-29» —
+    /// диапазон masters. null — ключ не возрастной («», «adults», «ISR»).
+    /// </summary>
+    private static bool? StepMatches(string category, string ageKey, int age)
+    {
+        var key = (ageKey ?? "").Trim();
+        if (key.Length == 0) return null;
+
+        if (category == "age")
+            return int.TryParse(key, NumberStyles.Integer, CultureInfo.InvariantCulture, out var step)
+                ? step == age
+                : null;
+
+        if (category == "masters")
+        {
+            var parts = key.Split('-');
+            return parts.Length == 2
+                   && int.TryParse(parts[0], out var lo)
+                   && int.TryParse(parts[1], out var hi)
+                ? age >= lo && age <= hi
+                : null;
+        }
+
+        return null;
+    }
 
     private static string MatchKey(int ms, string gender, string poolType, string style, string distance) =>
         $"{ms}|{gender}|{poolType}|{style}|{distance}";

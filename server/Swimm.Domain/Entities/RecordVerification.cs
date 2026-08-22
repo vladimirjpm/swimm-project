@@ -35,5 +35,45 @@ public class RecordVerification
     /// </summary>
     public bool? DateMatched { get; set; }
 
+    /// <summary>
+    /// По какой ОСИ ВОЗРАСТА сходится ступень рекорда с найденным пловцом:
+    /// <list type="bullet">
+    /// <item><c>both</c> — сходится по обеим (заплыв с января по август: год окончания
+    /// сезона равен календарному, оси неразличимы);</item>
+    /// <item><c>calendar</c> — только «год заплыва − год рождения» (ось федерации);</item>
+    /// <item><c>season</c> — только «год окончания сезона − год рождения» (наш возраст);</item>
+    /// <item><c>none</c> — ни по одной: ступень не сходится с пловцом вообще (либо это
+    /// не тот человек, либо ошибка источника);</item>
+    /// <item><c>null</c> — проверять нечего: заплыв не найден, у пловца нет года рождения
+    /// либо ступень не возрастная (open / adults / ISR).</item>
+    /// </list>
+    /// Считается всегда по ОБЕИМ осям, независимо от настройки RecordAgeAxis: смысл поля —
+    /// показать, какая ось у источника на самом деле (docs/data-integrity.md §13).
+    /// </summary>
+    public string? AgeAxisMatch { get; set; }
+
     public DateTime CheckedAt { get; set; }
+}
+
+/// <summary>
+/// Значения <see cref="RecordVerification.AgeAxisMatch"/>. Строки, а не enum: поле читается
+/// прямо из SQL при разборе «а как источник раскладывает ступени», и осмысленное слово в
+/// колонке дороже экономии байтов.
+/// </summary>
+public static class AgeAxisMatches
+{
+    /// <summary>Сходится по обеим осям — заплыв января–августа, оси там неразличимы.</summary>
+    public const string Both = "both";
+
+    /// <summary>Только «год заплыва − год рождения» — ось справочника федерации.</summary>
+    public const string Calendar = "calendar";
+
+    /// <summary>Только «год окончания сезона − год рождения» — наш возраст в сезоне.</summary>
+    public const string Season = "season";
+
+    /// <summary>
+    /// Ни по одной. Обычно не ошибка источника, а протечка рекорда в старшую ступень
+    /// (время держится, пока его не побили) или совпадение времени у другого пловца.
+    /// </summary>
+    public const string None = "none";
 }

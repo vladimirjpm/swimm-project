@@ -428,7 +428,43 @@
             <button id="btn-verify-records" ${running ? 'disabled' : ''}
                 class="admin-btn text-sm ${running ? 'opacity-50 cursor-not-allowed' : ''}">${running ? 'Сверяю…' : 'Сверить с протоколами'}</button>
             ${recVerify.text ? `<div class="mt-1.5 text-[12px] text-admin-text-muted">${esc(recVerify.text)}</div>` : ''}
+            ${renderAgeAxis(q)}
             ${issues ? `<div class="mt-3"><div class="text-[12px] font-semibold text-admin-text mb-1">Спорные записи (open)</div>${issues}</div>` : ''}
+        </div>`;
+    }
+
+    // Ось возраста ступеней: по какой оси ступень справочника сходится с найденным пловцом.
+    // Оси различимы только у заплывов сентября–декабря, поэтому «обе» — самая частая метка
+    // и она НИЧЕГО не говорит об источнике. Смотреть надо на «только календарная» vs
+    // «только сезонная» (docs/data-integrity.md §13).
+    function renderAgeAxis(q) {
+        if (!q || !q.ageAxisChecked) return '';
+
+        const axisLabel = q.ageAxis === 'season'
+            ? 'сезонная (год окончания сезона)'
+            : 'календарная (год заплыва, как федерация)';
+        const decisive = q.ageAxisCalendarOnly + q.ageAxisSeasonOnly;
+        const mismatchCls = q.ageAxisMismatch > 0 ? 'text-admin-warning' : 'text-admin-text-muted';
+
+        return `<div class="mt-3 pt-2 border-t border-admin-border/60">
+            <div class="text-[12px] font-semibold text-admin-text mb-1">Ось возраста ступеней</div>
+            <div class="text-[11px] text-admin-text-muted mb-1">
+                Текущая настройка RecordAgeAxis: <span class="text-admin-text">${esc(axisLabel)}</span>.
+                Проверено ступеней: ${fmtN(q.ageAxisChecked)}.
+            </div>
+            <div class="text-[12px] text-admin-text">
+                Различают ось: <span class="font-semibold">${fmtN(decisive)}</span>
+                → календарная <span class="font-semibold">${fmtN(q.ageAxisCalendarOnly)}</span>
+                · сезонная <span class="font-semibold">${fmtN(q.ageAxisSeasonOnly)}</span>
+            </div>
+            <div class="text-[11px] text-admin-text-muted">
+                Обе оси совпали (заплыв янв–авг): ${fmtN(q.ageAxisBoth)} ·
+                ступень не сошлась вовсе: ${fmtN(q.ageAxisNone)}
+            </div>
+            <div class="text-[12px] mt-1 ${mismatchCls}">
+                Не сходится с текущей осью: <span class="font-semibold">${fmtN(q.ageAxisMismatch)}</span>
+                ${q.ageAxisMismatch > 0 ? ' — на этих записях сверка попадёт не в ту строку справочника' : ''}
+            </div>
         </div>`;
     }
 
