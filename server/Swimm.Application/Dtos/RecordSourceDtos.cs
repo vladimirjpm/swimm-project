@@ -66,3 +66,14 @@ public sealed record RecordDiffApplyResult(bool Success, string? Error, int Appl
 
 /// <summary>Статус источника для карточки в UI: когда последний раз реально обновлялись его рекорды.</summary>
 public sealed record RecordSourceStatusDto(string Source, DateTime? LastUpdatedAt);
+
+/// <summary>
+/// Ссылка на файл-справочник рекордов, найденная на странице источника. Нужна админке,
+/// чтобы до нажатия «Fetch» было видно, ЧТО именно подтянется и от какого числа файл.
+/// </summary>
+public sealed record RecordSourceLinkDto(
+    string Url,
+    string Label,
+    string PoolType,
+    bool IsMasters,
+    DateOnly? UpdatedOn);
