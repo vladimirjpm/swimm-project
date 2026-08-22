@@ -27,6 +27,8 @@ import { useCompetitionMedia } from '../../hooks/useCompetitionMedia';
 import { buildResultsFilterParams, fetchResultsPage } from '../../utils/helpers/results-api';
 import AddLinkModal from '../my-media-project/components/add-link-modal';
 import { swimFlaggedRowProps } from '../components/mix/swim-time/swim-time';
+import { parseDate } from '../../utils/helpers/competition-source';
+import { seasonStartYear } from '../../utils/helpers/season-helper';
 import { addUserMedia } from '../my-media-project/use-all-my-media';
 
 function ResultsTable() {
@@ -360,6 +362,10 @@ function ResultsTable() {
 );
 
   const firstResult = displayResults[0];
+  // Сезон открытого протокола — для таба «Season best» в карточке рекордов: страница чаще
+  // всего про прошедший старт, а не про текущий сезон (season-boundary-rule).
+  const competitionDate = firstResult?.date ? parseDate(firstResult.date) : null;
+  const competitionSeason = competitionDate ? seasonStartYear(competitionDate) : null;
   const poolTypeDisplay = showPoolType ? 'all' : (firstResult?.pool_type ?? filters.pool_type);
 // Функция обновления фильтров
   const updateFilter = (newFilter: Partial<typeof filters>) => {
@@ -418,6 +424,7 @@ function ResultsTable() {
             styleName={filters.style_name}
             styleLen={filters.style_len}
             age={filters.age}
+            season={competitionSeason}
           />
         )}
         {isMastersSource && (

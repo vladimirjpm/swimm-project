@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import Helper from '../../../utils/helpers/data-helper';
 import RecordsHelper, { maxUpdatedAtLabel } from '../../../utils/helpers/records-helper';
 import { HOME_REGION } from '../../../utils/constants/home-region';
-import { recordStepAge } from '../../../utils/helpers/season-helper';
-import UI_GenderAgeTable, { GenderAgeEntry } from '../../components/mix/gender-age-table/gender-age-table';
+import { recordStepAge, ageInSeason } from '../../../utils/helpers/season-helper';
+import useSeasonBest, { SeasonBestApiItem } from '../../../hooks/useSeasonBest';
+import UI_GenderAgeTable, { GenderAgeEntry, GenderAgeRow } from '../../components/mix/gender-age-table/gender-age-table';
+import { timeToMs } from '../../../utils/helpers/recalculate-positions';
 
 interface AgeRecord {
   time: string;
@@ -48,12 +50,19 @@ function holderNote(r: AgeRecord): string | null {
   return `born ${r.holder_birth_year}${age}${uncertain}`;
 }
 
+type CardTab = 'records' | 'season';
+
 interface NormativeAgeRecordsProps {
   gender: string;
   poolType: string;
   styleName: string;
   styleLen: string | number;
   age: string; // 'all' or birth year like '2015'
+  /**
+   * Год НАЧАЛА сезона соревнования — для таба «Season best». Не задан — текущий сезон.
+   * Берётся от даты открытого протокола: страница чаще всего про прошедший старт.
+   */
+  season?: number | null;
 }
 
 /**
@@ -95,6 +104,156 @@ function resolveGenderKeys(gender: string): string[] {
 const CARD_SURFACE = 'bg-white dark:bg-[#161b24]';
 const CARD_SHADOW = { boxShadow: '0 1px 3px rgba(20,28,45,0.05)' };
 
+/** Ступени возраста, для которых есть хоть один рекорд (ключи вида "10"), по возрастанию. */
+function ageKeysOf(
+  maleData: Record<string, AgeRecord> | null,
+  femaleData: Record<string, AgeRecord> | null,
+): string[] {
+  const ageSet = new Set<string>();
+  Object.keys(maleData ?? {}).forEach(k => /^\d+$/.test(k) && ageSet.add(k));
+  Object.keys(femaleData ?? {}).forEach(k => /^\d+$/.test(k) && ageSet.add(k));
+  return Array.from(ageSet).sort((a, b) => Number(a) - Number(b));
+}
+
+/** Ступени → строки таблицы. */
+function ageRowsOf(
+  maleData: Record<string, AgeRecord> | null,
+  femaleData: Record<string, AgeRecord> | null,
+): GenderAgeRow[] {
+  return ageKeysOf(maleData, femaleData).map(a => ({
+    age: `${a}y`,
+    male: maleData?.[a] ? recordToEntry(maleData[a]) : undefined,
+    female: femaleData?.[a] ? recordToEntry(femaleData[a]) : undefined,
+  }));
+}
+
+/** Год начала сезона → дата внутри него: ageInSeason считает возраст от даты. */
+function competitionDate(season?: number | null): Date {
+  return season ? new Date(season, 9, 1) : new Date();
+}
+
+/** Ответ /api/season-best → строки таблицы (по одной на возраст, оба пола рядом). */
+function seasonBestRows(items: SeasonBestApiItem[]): GenderAgeRow[] {
+  const byAge = new Map<number, GenderAgeRow>();
+  items.forEach((it) => {
+    const row = byAge.get(it.age) ?? { age: `${it.age}y` };
+    const entry: GenderAgeEntry = {
+      firstName: it.name,
+      club: it.club ?? undefined,
+      value: it.time,
+      date: it.date,
+      swimmerId: it.swimmer_id,
+    };
+    if (it.gender === 'male') row.male = entry; else row.female = entry;
+    byAge.set(it.age, row);
+  });
+  return Array.from(byAge.entries()).sort((a, b) => a[0] - b[0]).map(([, row]) => row);
+}
+
+/** Лучшее (наименьшее) время среди показанных строк — для свёрнутого таба. */
+function bestTimeOf(rows: GenderAgeRow[], gender: 'male' | 'female'): string | null {
+  let best: string | null = null;
+  let bestMs = Infinity;
+  rows.forEach((r) => {
+    const entry = r[gender] as GenderAgeEntry | undefined;
+    if (!entry?.value) return;
+    const ms = timeToMs(entry.value);
+    if (ms < bestMs) { bestMs = ms; best = entry.value; }
+  });
+  return best;
+}
+
+/** Сводка свёрнутого таба: «время ♂ · время ♀», без имени, клуба и даты. */
+function TabSummary({ rows, size }: { rows: GenderAgeRow[]; size: 'mobile' | 'desktop' }) {
+  const male = bestTimeOf(rows, 'male');
+  const female = bestTimeOf(rows, 'female');
+  if (!male && !female) return null;
+
+  const time = size === 'mobile' ? 'text-[11.5px]' : 'text-[13px]';
+  const dot = size === 'mobile' ? 'text-[9px]' : 'text-[10px]';
+  return (
+    <span className={`flex items-center gap-[7px] tabular-nums ${size === 'mobile' ? 'mt-[3px] justify-center' : ''}`}>
+      {male && <span className={`${time} font-extrabold text-[#1e6fd6] dark:text-[#5aa2f5]`}>{male}</span>}
+      {male && female && <span className={`${dot} text-[#c9cfd9]`}>·</span>}
+      {female && <span className={`${time} font-extrabold text-[#d6417f] dark:text-[#f072a6]`}>{female}</span>}
+    </span>
+  );
+}
+
+/**
+ * Панель табов «🏅 ISR Age Records | ⏱ Season best». Открыт всегда ровно один таб;
+ * свёрнутый показывает только лучшее время ♂ · ♀ (тап по нему открывает).
+ * Мобайл — табы по половине ширины, времена под подписью; десктоп — панель по контенту,
+ * времена в одну строку с подписью.
+ */
+function CardTabs({ active, onChange, recordRows, seasonRows, seasonLabel }: {
+  active: CardTab;
+  onChange: (tab: CardTab) => void;
+  recordRows: GenderAgeRow[];
+  seasonRows: GenderAgeRow[];
+  seasonLabel?: string;
+}) {
+  const tab = (isActive: boolean) =>
+    `flex-1 sm:flex-none sm:whitespace-nowrap cursor-pointer select-none rounded-[9px] px-3 py-[7px] text-center sm:text-left ${
+      isActive
+        ? 'bg-[var(--theme-agetabs-active-bg)] text-[#1a1a1a] dark:text-[#dbe8fb] shadow-[0_1px_2px_rgba(20,28,45,.10)]'
+        : 'bg-transparent text-[#8a93a3]'
+    }`;
+
+  return (
+    <div className="flex w-full gap-1 rounded-xl bg-[var(--theme-agetabs-panel-bg)] p-1 sm:w-fit sm:gap-1.5">
+      <div role="button" onClick={() => onChange('records')} className={tab(active === 'records')}>
+        <div className="flex items-center justify-center gap-[5px] text-[12px] font-extrabold sm:justify-start sm:gap-[7px] sm:text-[14px]">
+          <span>🏅</span>
+          <span>{`${HOME_REGION} Age Records`}</span>
+          {active !== 'records' && <span className="hidden sm:inline-flex"><TabSummary rows={recordRows} size="desktop" /></span>}
+        </div>
+        {active !== 'records' && <span className="flex sm:hidden"><TabSummary rows={recordRows} size="mobile" /></span>}
+      </div>
+      <div role="button" onClick={() => onChange('season')} className={tab(active === 'season')}>
+        <div className="flex items-center justify-center gap-[5px] text-[12px] font-extrabold sm:justify-start sm:gap-[7px] sm:text-[14px]">
+          <span>⏱</span>
+          <span>Season best{seasonLabel ? <span className="hidden sm:inline">{` ${seasonLabel}`}</span> : null}</span>
+          {active !== 'season' && <span className="hidden sm:inline-flex"><TabSummary rows={seasonRows} size="desktop" /></span>}
+        </div>
+        {active !== 'season' && <span className="flex sm:hidden"><TabSummary rows={seasonRows} size="mobile" /></span>}
+      </div>
+    </div>
+  );
+}
+
+/** Карточка с табами: панель сверху, под ней обычная таблица открытого таба. */
+function renderTabbedCard(
+  recordRows: GenderAgeRow[],
+  seasonRows: GenderAgeRow[],
+  seasonLabel: string | undefined,
+  active: CardTab,
+  onChange: (tab: CardTab) => void,
+) {
+  const rows = active === 'records' ? recordRows : seasonRows;
+  return (
+    <div className={`${CARD_SURFACE} border border-[#e9edf3] dark:border-[#28344a] rounded-2xl mb-4 p-3 sm:p-[18px_20px]`} style={CARD_SHADOW}>
+      <CardTabs
+        active={active}
+        onChange={onChange}
+        recordRows={recordRows}
+        seasonRows={seasonRows}
+        seasonLabel={seasonLabel}
+      />
+      <div className="mt-3 sm:mt-4">
+        <UI_GenderAgeTable
+          rows={rows}
+          showDate
+          menLabel="♂ MAN"
+          womenLabel="♀ WOMAN"
+          ageColWidth={52}
+          ageColWidthMobile={34}
+        />
+      </div>
+    </div>
+  );
+}
+
 /** Одиночный возраст — та же таблица UI_GenderAgeTable (одна строка), в простой карточке. */
 function renderSingleAgeCard(ageLabel: string, male?: AgeRecord, female?: AgeRecord) {
   return (
@@ -109,6 +268,7 @@ function renderSingleAgeCard(ageLabel: string, male?: AgeRecord, female?: AgeRec
         menLabel="♂ MAN"
         womenLabel="♀ WOMAN"
         ageColWidth={52}
+        ageColWidthMobile={34}
       />
     </div>
   );
@@ -125,10 +285,7 @@ function renderManyAges(
   isOpen: boolean,
   onToggle: () => void,
 ) {
-  const ageSet = new Set<string>();
-  Object.keys(maleData ?? {}).forEach(k => /^\d+$/.test(k) && ageSet.add(k));
-  Object.keys(femaleData ?? {}).forEach(k => /^\d+$/.test(k) && ageSet.add(k));
-  const ages = Array.from(ageSet).sort((a, b) => Number(a) - Number(b));
+  const ages = ageKeysOf(maleData, femaleData);
   if (ages.length === 0) return null;
 
   const rangeLabel = ages.length > 1 ? `${ages[0]}–${ages[ages.length - 1]}y` : `${ages[0]}y`;
@@ -164,15 +321,12 @@ function renderManyAges(
       {isOpen && (
         <div className="border-t border-[#eef1f6] dark:border-[#232b3a] px-3.5 sm:px-5 pt-3 sm:pt-4 pb-3 sm:pb-4">
           <UI_GenderAgeTable
-            rows={ages.map(a => ({
-              age: `${a}y`,
-              male: maleData?.[a] ? recordToEntry(maleData[a]) : undefined,
-              female: femaleData?.[a] ? recordToEntry(femaleData[a]) : undefined,
-            }))}
+            rows={ageRowsOf(maleData, femaleData)}
             showDate
             menLabel="♂ MAN"
             womenLabel="♀ WOMAN"
             ageColWidth={52}
+            ageColWidthMobile={34}
           />
           <div className="text-[10px] sm:text-[11px] text-[#aab0bd] mt-2.5 sm:mt-3">ⓘ Tap the header to collapse</div>
         </div>
@@ -181,8 +335,14 @@ function renderManyAges(
   );
 }
 
-function NormativeAgeRecords({ gender, poolType, styleName, styleLen, age }: NormativeAgeRecordsProps) {
+function NormativeAgeRecords({ gender, poolType, styleName, styleLen, age, season }: NormativeAgeRecordsProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<CardTab>('records');
+  // Хук — до любых ранних return: правило хуков React.
+  const seasonBest = useSeasonBest({
+    styleName, styleLen, poolType, season,
+    enabled: !!styleName && !!styleLen,
+  });
 
   // Only show if style and distance are selected
   if (!styleName || !styleLen) return null;
@@ -201,6 +361,60 @@ function NormativeAgeRecords({ gender, poolType, styleName, styleLen, age }: Nor
     const d = getDistanceData(data, gk, poolType, styleName, distanceKey);
     if (d) distanceByGender[gk] = d;
   });
+
+  // Есть season best → заголовок карточки заменяется панелью табов; сворачивания нет
+  // (открыт всегда ровно один таб). Нет — всё как раньше.
+  const recordRows: GenderAgeRow[] = (isSingleAge && resolvedAge)
+    ? [{
+        age: `${resolvedAge}y`,
+        male: distanceByGender.male?.[resolvedAge] ? recordToEntry(distanceByGender.male[resolvedAge]) : undefined,
+        female: distanceByGender.female?.[resolvedAge] ? recordToEntry(distanceByGender.female[resolvedAge]) : undefined,
+      }]
+    : ageRowsOf(distanceByGender.male ?? null, distanceByGender.female ?? null);
+
+  // Ступени таба season best = ступени справочника ПЛЮС наши собственные, которых в
+  // справочнике нет (федерация ведёт возрастные рекорды с 10 лет, а восьми- и
+  // девятилетние у нас плавают — их время показать надо). Ступень без времени сезона
+  // остаётся пустой строкой: видно «в этой ступени никто не плыл», а не «таблица
+  // начинается с 14 лет».
+  //
+  // Сверху ограничиваем последней ступенью справочника (18): дальше у федерации идут
+  // adults/masters, а masters в этот таб не входит по определению — иначе снизу таблицы
+  // повисал бы хвост случайных взрослых стартов до 60+.
+  //
+  // ⚠ При выбранном годе рождения ступени в табах РАЗНЫЕ по построению: у рекордов ось
+  // календарная (recordStepAge), у season best — сезонная (правило Влада 2026-08-22).
+  const ageNumberOf = (label: string) => Number(label.replace(/\D+$/, ''));
+  const seasonAge = isSingleAge ? ageInSeason(age, competitionDate(season)) : null;
+  const seasonByAge = new Map(
+    (seasonBest ? seasonBestRows(seasonBest.data) : []).map(r => [r.age, r]),
+  );
+
+  let seasonRows: GenderAgeRow[];
+  if (isSingleAge) {
+    seasonRows = seasonAge === null
+      ? []
+      : [seasonByAge.get(`${seasonAge}y`) ?? { age: `${seasonAge}y` }];
+  } else {
+    const maxAge = recordRows.length > 0
+      ? Math.max(...recordRows.map(r => ageNumberOf(r.age)))
+      : 18;
+    const labels = new Set<string>(recordRows.map(r => r.age));
+    seasonByAge.forEach((_, label) => {
+      if (ageNumberOf(label) <= maxAge) labels.add(label);
+    });
+    seasonRows = Array.from(labels)
+      .sort((a, b) => ageNumberOf(a) - ageNumberOf(b))
+      .map(label => seasonByAge.get(label) ?? { age: label });
+  }
+
+  // Панель табов появляется, только если сезон вообще чем-то наполнен: таблица из одних
+  // прочерков — не повод менять шапку карточки.
+  const hasSeasonBest = seasonRows.some(r => r.male || r.female);
+  if (hasSeasonBest) {
+    if (recordRows.length === 0) return null;
+    return renderTabbedCard(recordRows, seasonRows, seasonBest?.season_label, activeTab, setActiveTab);
+  }
 
   let rendered: React.ReactNode = null;
   if (isSingleAge && resolvedAge) {
