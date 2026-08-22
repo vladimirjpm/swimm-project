@@ -36,7 +36,8 @@ function ResultsFilteredInfo({
   // соревнованиях без прелимов пометка была бы шумом.
   const showPrelims = useAppSelector((state) => !!state.filterSelected?.show_prelims);
   const hasPrelims = useAppSelector((state) =>
-    (state.dataSourceSelected?.results ?? []).some((r) => r.heat_type === 'prelim'));
+    (state.dataSourceSelected?.results ?? [])
+      .some((r) => r.heat_type === 'prelim' || r.heat_type === 'extra'));
   return (
     <div className="show-filtered-data mb-4">
       <div className="flex items-stretch bg-[var(--theme-mode-surface)] rounded-[14px] shadow-sm px-2 py-4">

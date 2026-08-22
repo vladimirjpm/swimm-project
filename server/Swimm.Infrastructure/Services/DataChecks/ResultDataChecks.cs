@@ -301,7 +301,8 @@ public sealed class OfficialClubPointsMismatchCheck(SwimmDbContext db) : IDataCh
             {
                 // Ровно как на витрине: место prelim-заплыва очков не приносит (Р34),
                 // общий финал «כללי» — тоже (Р43).
-                var scoringPlace = r.HeatType == "prelim" || r.Round == ResultRounds.FinalOpen
+                var scoringPlace = r.HeatType == "prelim" || r.HeatType == "extra"
+                                   || r.Round == ResultRounds.FinalOpen
                     ? null
                     : r.Position;
                 var mine = PointRulesClubsScoring.RelayPointsFor(

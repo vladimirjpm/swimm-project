@@ -65,7 +65,10 @@ const FilterEventDate: React.FC = () => {
   // Если только одна дата — выбор даты не нужен; но если в данных есть предварительные
   // заплывы, карточка остаётся ради тумблера [prelim] — иначе на одиночном дне
   // соревнования с прелимами их никак не включить.
-  const hasPrelims = filteredByTypeResults.some((r) => r.heat_type === 'prelim');
+  // 'extra' — призовые заплывы после финала: тем же тумблером, они тоже скрыты по умолчанию.
+  const hasPrelims = filteredByTypeResults.some(
+    (r) => r.heat_type === 'prelim' || r.heat_type === 'extra',
+  );
   if (uniqueDates.length <= 1 && !hasPrelims) return null;
 
   return (

@@ -5,6 +5,7 @@ import { rootActions,useAppDispatch, useAppSelector } from '../../store/store';
 import { useFavoritesContext } from '../../hooks/favorites-context';
 import { useLoginModal } from '../components/login-modal/login-modal-context';
 import Helper from '../../utils/helpers/data-helper'
+import HelperResults from '../../utils/helpers/helper-results'
 import { loadRecordAgeAxis } from '../../utils/helpers/record-age-axis'
 import ClubPointsHelper from '../../utils/helpers/club-points-helper';
 import UI_DateIcon from '../components/mix/date-icon/date-icon';
@@ -88,7 +89,7 @@ function ResultsTable() {
     // Предварительные заплывы по умолчанию скрыты (официальный вид — финалы);
     // тумблер [prelim] в фильтре Date возвращает их. Строки без признака (timed final,
     // старые данные) видны всегда.
-    if (res.heat_type === 'prelim' && !filters.show_prelims) return false;
+    if (HelperResults.isHiddenHeat(res.heat_type) && !filters.show_prelims) return false;
 
     // Фильтр по категории (программе) заплыва. У строк, импортированных до появления
     // event_category, оно пустое — такие в выборку по конкретной категории не попадают.

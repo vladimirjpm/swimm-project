@@ -256,7 +256,7 @@ public class ResultRepository : IResultRepository
                 // дают за финал (у бугрим протокол печатает места и в предварительных).
                 // Общий финал «כללי» (Round=final-open) тоже не зачётный: единица зачёта —
                 // возрастная ступень, там пловец очки и получает (Р43).
-                Position = r.HeatType == "prelim" || r.Round == ResultRounds.FinalOpen
+                Position = r.HeatType == "prelim" || r.HeatType == "extra" || r.Round == ResultRounds.FinalOpen
                     ? null : r.Position,
                 r.CombinedPlace,
                 ShowCombine = r.Competition.ShowCombineAllResults,
@@ -420,8 +420,10 @@ public class ResultRepository : IResultRepository
                 // если оно лежит на prelim-строке (лучший заплыв был утром), остаётся.
                 // Общий финал «כללי» медали тоже не даёт — она у возрастной ступени (Р43).
                 Position = filter.Combined && r.Competition.ShowCombineAllResults
-                    ? (r.CombinedPlace ?? (r.HeatType == "prelim" || r.Round == ResultRounds.FinalOpen ? null : r.Position))
-                    : (r.HeatType == "prelim" || r.Round == ResultRounds.FinalOpen ? null : r.Position),
+                    ? (r.CombinedPlace ?? (r.HeatType == "prelim" || r.HeatType == "extra"
+                        || r.Round == ResultRounds.FinalOpen ? null : r.Position))
+                    : (r.HeatType == "prelim" || r.HeatType == "extra"
+                        || r.Round == ResultRounds.FinalOpen ? null : r.Position),
                 StyleName = r.Style.Name,
                 r.Distance,
                 r.EventStyleAge,
@@ -445,8 +447,8 @@ public class ResultRepository : IResultRepository
                 r.RelayId,
                 Club = r.Club.Name,
                 Position = filter.Combined && r.Competition.ShowCombineAllResults
-                    ? (r.CombinedPlace ?? (r.HeatType == "prelim" ? null : r.Position))
-                    : (r.HeatType == "prelim" ? null : r.Position)
+                    ? (r.CombinedPlace ?? (r.HeatType == "prelim" || r.HeatType == "extra" ? null : r.Position))
+                    : (r.HeatType == "prelim" || r.HeatType == "extra" ? null : r.Position)
             })
             .Where(r => r.Position != null && r.Position <= 3)
             .Join(_db.RelayMembers.AsNoTracking(),
@@ -1223,7 +1225,7 @@ public class ResultRepository : IResultRepository
                 {
                     r.CompetitionId,
                     EventId = (int?)r.Competition.EventId,
-                    Position = r.HeatType == "prelim" ? null : r.Position,
+                    Position = r.HeatType == "prelim" || r.HeatType == "extra" ? null : r.Position,
                     r.Relay!.SwimmersName,
                     StyleName = r.Style.Name,
                     r.Distance,
@@ -1294,7 +1296,7 @@ public class ResultRepository : IResultRepository
                 r.Id,
                 r.CompetitionId,
                 EventId = (int?)r.Competition.EventId,
-                Position = r.HeatType == "prelim" ? null : r.Position,
+                Position = r.HeatType == "prelim" || r.HeatType == "extra" ? null : r.Position,
                 StyleName = r.Style.Name,
                 r.Distance,
                 CompetitionName = r.Competition.Name,
@@ -1394,7 +1396,7 @@ public class ResultRepository : IResultRepository
         // Медаль возрастной ступени одна, даже когда ступень разыграна дважды за день
         // (утренний зачёт возрастов + вечерний финал первенства) — см. RoundMedalCollapser.
         var awardedRows = RoundMedalCollapser.Collapse(
-            rows.Where(r => r.IsAward && r.HeatType != "prelim"),
+            rows.Where(r => r.IsAward && HeatTypes.GivesOfficialPlace(r.HeatType)),
             r => $"{r.CompetitionId}|{r.StyleName}|{r.Distance}|{r.EventStyleAge}",
             r => r.Round,
             r => r.Position);
@@ -1522,7 +1524,8 @@ public class ResultRepository : IResultRepository
             // Место prelim-заплыва очков не приносит (ранжир сессии, не награда); само
             // Position в DTO остаётся — клиент показывает место в заплыве как в протоколе.
             item.ClubPoints = PointRulesClubsScoring.RelayPointsFor(
-                rule, item.HeatType == "prelim" ? null : item.Position, item.TimeFail, item.IsRelay);
+                rule, HeatTypes.GivesOfficialPlace(item.HeatType) ? item.Position : null,
+                item.TimeFail, item.IsRelay);
 
             // Объединённые очки есть только там, где есть объединённое место: тоггл на клиенте
             // переключает поле, а не запускает пересчёт.

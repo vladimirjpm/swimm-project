@@ -617,7 +617,8 @@ if (args.Contains("--points-diff"))
     {
         // Ровно как на витрине: предварительный заплыв (Р34) и общий финал «כללי» (Р43)
         // места не дают. Гашение — это НАШЕ правило, и разбор обязан его учитывать.
-        var suppressed = r.HeatType == "prelim" || r.Round == Swimm.Domain.ResultRounds.FinalOpen;
+        var suppressed = r.HeatType == "prelim" || r.HeatType == "extra"
+                      || r.Round == Swimm.Domain.ResultRounds.FinalOpen;
         var ours = Swimm.Infrastructure.Services.PointRulesClubsScoring.RelayPointsFor(
             diffRule, suppressed ? null : r.Position, r.TimeFail, r.IsRelay);
         return new OfficialPointsRow(

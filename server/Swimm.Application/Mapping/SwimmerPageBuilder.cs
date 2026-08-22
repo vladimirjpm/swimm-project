@@ -102,7 +102,7 @@ public static class SwimmerPageBuilder
             {
                 var first = g.OrderBy(r => r.CompetitionDate).ThenBy(r => r.ResultId).First();
                 // Prelim-места — ранжир сессии, не результат старта (Р34).
-                var places = g.Where(r => r.Position is > 0 && r.HeatType != "prelim")
+                var places = g.Where(r => r.Position is > 0 && HeatTypes.GivesOfficialPlace(r.HeatType))
                     .Select(r => r.Position!.Value).ToList();
                 return new SwimmerCompetitionDto
                 {
@@ -313,7 +313,7 @@ public static class SwimmerPageBuilder
     private static MedalCountsDto Medals(IReadOnlyList<SeasonSwimRow> rows)
     {
         // Prelim-заплывы в медали не идут: их место — ранжир сессии, медаль дают за финал.
-        var awarded = rows.Where(r => r.IsAward && r.HeatType != "prelim").ToList();
+        var awarded = rows.Where(r => r.IsAward && HeatTypes.GivesOfficialPlace(r.HeatType)).ToList();
         return new MedalCountsDto
         {
             Gold = awarded.Count(r => r.Position == 1),

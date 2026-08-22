@@ -48,7 +48,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
   // Медаль красится только если ЭТОТ заплыв award-eligible (res.is_award — денормализовано
   // с API; для статических источников используем общий флаг источника isAwardSource).
   // Медаль только за награждаемый заплыв: prelim-место — ранжир сессии, не награда.
-  const rowIsAward = (res.is_award ?? isAwardSource ?? false) && res.heat_type !== 'prelim';
+  const rowIsAward = (res.is_award ?? isAwardSource ?? false) && !HelperResults.isHiddenHeat(res.heat_type);
 
   return (
     <div

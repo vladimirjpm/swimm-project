@@ -119,7 +119,7 @@ public class ClubStandingService : IClubStandingService
                 // Место prelim-заплыва — ранжир сессии, не награда; общий финал «כללי»
                 // (Round=final-open) тоже не зачётный: у организатора единица зачёта —
                 // возрастная ступень, там пловец очки и получает (Р34, Р43).
-                Position = r.HeatType == "prelim" || r.Round == ResultRounds.FinalOpen
+                Position = r.HeatType == "prelim" || r.HeatType == "extra" || r.Round == ResultRounds.FinalOpen
                     ? null : r.Position,
                 r.TimeFail,
                 IsRelay = r.RelayId != null,

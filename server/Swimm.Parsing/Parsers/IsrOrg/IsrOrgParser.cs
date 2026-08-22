@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Swimm.Parsing.Models;
+using Swimm.Domain;
 using Swimm.Parsing.Helpers;
 
 namespace Swimm.Parsing.Parsers.IsrOrg;
@@ -153,8 +154,17 @@ public class IsrOrgParser : IFormatParser
         {
             var idxs = g.ToList();
             if (idxs.Count < 2) continue;
-            foreach (var i in idxs) types[i] = "prelim";
-            types[PickFinal(idxs, participants)] = "final";
+
+            var finalAt = PickFinal(idxs, participants);
+            for (int k = 0; k < idxs.Count; k++)
+            {
+                // До финала — предварительные, после — призовые серии (skins). Второе
+                // отдельным типом: иначе они сливаются с утренними заплывами в одну
+                // «сессию», и проверка качества ловит ложный «повтор дисциплины».
+                types[idxs[k]] = idxs[k] == finalAt
+                    ? HeatTypes.Final
+                    : (k > idxs.IndexOf(finalAt) ? HeatTypes.Extra : HeatTypes.Prelim);
+            }
         }
 
         // Проход 2: категории сессий напечатаны по-разному (реальный кейс бугрим 25/05/2026:

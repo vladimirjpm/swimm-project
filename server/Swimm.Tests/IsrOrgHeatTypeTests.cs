@@ -64,7 +64,9 @@ public class IsrOrgHeatTypeTests
             Comp("01/11/2025", len: "50", gender: "male", age: "17-99", swimmers: skins),
         ]);
 
-        Assert.Equal(["prelim", "final", "prelim"], types);
+        // Призовой заплыв — не «ещё один prelim»: свой тип, иначе он сливается с утренними
+        // заплывами в одну сессию, и проверка качества ловит ложный «повтор дисциплины».
+        Assert.Equal(["prelim", "final", "extra"], types);
     }
 
     [Fact]
@@ -79,7 +81,7 @@ public class IsrOrgHeatTypeTests
             Comp("01/11/2025", len: "50", age: "16-99", swimmers: [1, 2]),
         ]);
 
-        Assert.Equal(["prelim", "final", "prelim", "prelim"], types);
+        Assert.Equal(["prelim", "final", "extra", "extra"], types);
     }
 
     [Fact]

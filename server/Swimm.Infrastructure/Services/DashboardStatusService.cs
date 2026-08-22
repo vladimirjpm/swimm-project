@@ -211,7 +211,8 @@ public class DashboardStatusService(
             result[group.Key] = group.Count(r =>
                 PointRulesClubsScoring.RelayPointsFor(
                     rule,
-                    r.HeatType == "prelim" || r.Round == ResultRounds.FinalOpen ? null : r.Position,
+                    r.HeatType == "prelim" || r.HeatType == "extra" || r.Round == ResultRounds.FinalOpen
+                        ? null : r.Position,
                     r.TimeFail, r.IsRelay) != r.Official);
         }
 

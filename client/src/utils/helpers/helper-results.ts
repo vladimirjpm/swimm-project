@@ -8,6 +8,17 @@ import { recordAgeAxisNow } from './record-age-axis';
 
 export default class HelperResults {
   /**
+   * Заплывы, которые НЕ дают официального места и по умолчанию скрыты:
+   * 'prelim' — предварительные, 'extra' — призовые серии после финала (skins, переплывы).
+   *
+   * Зеркало серверного HeatTypes.GivesOfficialPlace — держим одно правило на клиенте,
+   * чтобы бейджи и фильтры не разъезжались со страницей соревнования.
+   */
+  static isHiddenHeat(heatType?: string | null): boolean {
+    return heatType === 'prelim' || heatType === 'extra';
+  }
+
+  /**
    * Возраст пловца в строке результата — по правилу сезона (год ОКОНЧАНИЯ сезона минус год
    * рождения), а не как посчитала федерация в протоколе.
    *

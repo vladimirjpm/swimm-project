@@ -201,6 +201,23 @@ public class SuspectResultDetectorTests
         Assert.All(flagged, v => Assert.Equal(SuspectReasons.DuplicateSwim, v.Reason));
     }
 
+    [Fact]
+    public void DuplicateSwim_ExtraHeatAfterFinal_NotFlagged()
+    {
+        // Герцлия 01/11/2025: 50 вольным плыли трижды — прелимы, финал и призовая серия на
+        // выбывание. Пока skins считался прелимом, он попадал с утренним заплывом в одну
+        // «сессию», и проверка помечала законные строки «повтором дисциплины за день».
+        var threeSessions = new[]
+        {
+            Row(1, 22_850, style: "freestyle", distance: "50", swimmerId: 7, heatType: "prelim"),
+            Row(2, 23_040, style: "freestyle", distance: "50", swimmerId: 7, heatType: "final"),
+            Row(3, 23_180, style: "freestyle", distance: "50", swimmerId: 7, heatType: "extra"),
+        };
+
+        var flagged = SuspectResultDetector.Detect(threeSessions);
+        Assert.DoesNotContain(flagged, v => v.Reason == SuspectReasons.DuplicateSwim);
+    }
+
     /* ── Выброс относительно личных результатов (Б1) ───────────────────────────────
      * Живой случай: 200 вольным за 01:53.09 (678 очков) у пловца, чей лучший результат
      * тех же месяцев — 312 очков. Рекорда не бьёт, от медианы заплыва недалеко — ни одно

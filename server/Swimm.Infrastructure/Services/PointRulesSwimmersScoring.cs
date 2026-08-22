@@ -1,4 +1,5 @@
 using Swimm.Domain.Entities;
+using Swimm.Domain;
 
 namespace Swimm.Infrastructure.Services;
 
@@ -65,7 +66,7 @@ public static class PointRulesSwimmersScoring
         // FinalsOnly (бугрим п.16): предварительные заплывы очков не приносят. null-HeatType
         // проходит — это timed final либо данные без признака (тогда считаем по всем, как
         // до его появления; карточка показывает сноску FinalsOnlyUnavailable).
-        if (rule.FinalsOnly && row.HeatType == "prelim") return 0;
+        if (rule.FinalsOnly && !HeatTypes.GivesOfficialPlace(row.HeatType)) return 0;
 
         if (rule.PointsSource == "fina") return row.InternationalPoints;
 
@@ -104,7 +105,7 @@ public static class PointRulesSwimmersScoring
 
         var scored = rows
             .Where(r => !r.TimeFail && (rule.IncludeRelays || !r.IsRelay))
-            .Where(r => !rule.FinalsOnly || r.HeatType != "prelim")
+            .Where(r => !rule.FinalsOnly || HeatTypes.GivesOfficialPlace(r.HeatType))
             .Select(r => (Row: r, Points: PointsFor(rule, r)))
             .ToList();
 
