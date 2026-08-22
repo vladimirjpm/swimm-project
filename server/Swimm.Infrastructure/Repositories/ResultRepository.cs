@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Swimm.Domain;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
@@ -16,15 +16,19 @@ public class ResultRepository : IResultRepository
     // привилегий записи на уровне БД.
     private readonly SwimmReadDbContext _db;
     private readonly ICacheService _cache;
+    // null допустим: так репозиторий конструируют изолированные тесты, которым рекорды
+    // не нужны. В приложении настройка приходит из DI, и ось берётся из /Admin/Settings.
+    private readonly ISettingsService? _settings;
 
     private static readonly TimeSpan StaticHintsTtl  = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan DynamicHintsTtl = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan ResultsTtl       = TimeSpan.FromMinutes(2);
 
-    public ResultRepository(SwimmReadDbContext db, ICacheService cache)
+    public ResultRepository(SwimmReadDbContext db, ICacheService cache, ISettingsService? settings = null)
     {
-        _db    = db;
-        _cache = cache;
+        _db       = db;
+        _cache    = cache;
+        _settings = settings;
     }
 
     public async Task<(List<ResultDto> Items, bool HasMore, int Total)> GetPagedAsync(ResultFilter filter, int page, int pageSize)
@@ -829,7 +833,10 @@ public class ResultRepository : IResultRepository
                 r.Swimmer.BirthYear, r.CompetitionDate, r.TimeMillisecond!.Value,
                 r.TimeOriginal, r.Competition.DayNumber, r.Competition.IsMasters, r.AgeGroup))
             .ToListAsync();
-        var newRecords = CompetitionRecordsDetector.Detect(records, candidateRows);
+        // Ось возраста для сверки со справочником — глобальная настройка RecordAgeAxis
+        // (дефолт calendar = как ведёт справочник федерация), см. docs/data-integrity.md §13.
+        var newRecords = CompetitionRecordsDetector.Detect(
+            records, candidateRows, RecordAgeAxisSetting.From(_settings));
 
         var overview = new CompetitionOverviewDto
         {

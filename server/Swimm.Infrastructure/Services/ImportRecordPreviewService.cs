@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
@@ -16,7 +16,8 @@ namespace Swimm.Infrastructure.Services;
 /// соревнования показывала другое, и доверия к предупреждению не было бы. Разница только
 /// во входе: строки берутся из разобранного файла, а не из БД.
 /// </summary>
-public class ImportRecordPreviewService(SwimmDbContext db) : IImportRecordPreviewService
+public class ImportRecordPreviewService(SwimmDbContext db, ISettingsService? settings = null)
+    : IImportRecordPreviewService
 {
     /// <summary>Больше не показываем: человеку нужен сигнал, а не простыня.</summary>
     private const int MaxRows = 20;
@@ -38,7 +39,10 @@ public class ImportRecordPreviewService(SwimmDbContext db) : IImportRecordPrevie
             if (records.Count == 0)
                 return new ImportRecordPreviewDto { Error = "Справочник рекордов пуст — сверять не с чем" };
 
-            var beaten = CompetitionRecordsDetector.DetectBest(records, rows);
+            // Та же ось, что и на карточке соревнования: превью обязано обещать ровно то,
+            // что потом покажет страница (настройка RecordAgeAxis).
+            var beaten = CompetitionRecordsDetector.DetectBest(
+                records, rows, RecordAgeAxisSetting.From(settings));
 
             return new ImportRecordPreviewDto
             {
@@ -121,9 +125,11 @@ public class ImportRecordPreviewService(SwimmDbContext db) : IImportRecordPrevie
     }
 
     /// <summary>
-    /// dd/MM/yyyy из протокола. Год важен: возраст пловца детектор считает как
-    /// «год соревнования − год рождения». Мусор → UtcNow, тогда возраст просто не совпадёт
-    /// ни с одной ступенью и строка выпадет из age-оси (open-ось при этом продолжит работать).
+    /// dd/MM/yyyy из протокола. Дата важна целиком, а не только год: детектор считает возраст
+    /// В СЕЗОНЕ (SeasonMath.AgeInSeason), а сезон определяется месяцем — октябрьский старт уже
+    /// принадлежит новому сезону и даёт возраст на год больше, чем «год заплыва − год рождения».
+    /// Мусор → UtcNow, тогда возраст просто не совпадёт ни с одной ступенью и строка выпадет
+    /// из age-оси (open-ось при этом продолжит работать).
     /// </summary>
     private static DateTime ParseDate(string? date) =>
         DateTime.TryParseExact(date, "dd/MM/yyyy", CultureInfo.InvariantCulture,

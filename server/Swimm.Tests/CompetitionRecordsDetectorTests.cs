@@ -36,6 +36,89 @@ public class CompetitionRecordsDetectorTests
         Assert.Equal(1, dto.ResultId);
     }
 
+    /// <summary>
+    /// Реальный случай, на котором ось всплыла: מיה גרינברג, 2015 г.р., 50 брассом 39.02 на
+    /// старте 31/10/2025. По календарю (ось федерации) ей 10, по сезону 2025/26 — 11, и
+    /// сверка попадает в РАЗНЫЕ ступени справочника. Осень — единственное место, где оси
+    /// расходятся, поэтому тесты держат именно эту дату.
+    /// </summary>
+    private static RecordCandidateRow AutumnMaya() =>
+        Row(39_020, birthYear: 2015, time: "00:39.02", style: "breaststroke",
+            gender: "female", pool: "25m") with { CompetitionDate = new DateTime(2025, 10, 31) };
+
+    private static Record[] MayaSteps() =>
+    [
+        Rec("age", "10", "39.85", style: "breaststroke", gender: "female", pool: "25m"),
+        Rec("age", "11", "37.38", style: "breaststroke", gender: "female", pool: "25m")
+    ];
+
+    [Fact]
+    public void AutumnSwim_CalendarAxis_HitsFederationStep()
+    {
+        // Ось по умолчанию — календарная, как ведёт справочник федерация: ступень Age 10,
+        // 39.02 быстрее 39.85 → рекорд.
+        var dto = Assert.Single(CompetitionRecordsDetector.Detect(MayaSteps(), [AutumnMaya()]));
+        Assert.Equal("Age 10 record", dto.Kind);
+    }
+
+    [Fact]
+    public void AutumnSwim_SeasonAxis_HitsOurStep()
+    {
+        // Сезонная ось (наш возраст в сезоне): ступень Age 11, её рекорд 37.38 быстрее —
+        // рекорда нет. Ступень Age 10 при этом НЕ проверяется вовсе, она уже чужая.
+        Assert.Empty(CompetitionRecordsDetector.Detect(
+            MayaSteps(), [AutumnMaya()], RecordAgeAxis.Season));
+
+        var slowerEleven = new[] { Rec("age", "11", "39.50", style: "breaststroke", gender: "female", pool: "25m") };
+        var dto = Assert.Single(CompetitionRecordsDetector.Detect(
+            slowerEleven, [AutumnMaya()], RecordAgeAxis.Season));
+        Assert.Equal("Age 11 record", dto.Kind);
+    }
+
+    [Fact]
+    public void SummerSwim_BothAxes_Agree()
+    {
+        // С января по август год окончания сезона совпадает с календарным, поэтому ось
+        // ничего не меняет — и настройку в это время можно крутить безнаказанно.
+        var records = new[] { Rec("age", "10", "45.00") };
+
+        Assert.Single(CompetitionRecordsDetector.Detect(records, [Row(40_000)], RecordAgeAxis.Calendar));
+        Assert.Single(CompetitionRecordsDetector.Detect(records, [Row(40_000)], RecordAgeAxis.Season));
+    }
+
+    [Theory]
+    [InlineData("calendar", RecordAgeAxis.Calendar)]
+    [InlineData("season", RecordAgeAxis.Season)]
+    [InlineData("Season", RecordAgeAxis.Season)]
+    [InlineData(" season ", RecordAgeAxis.Season)]
+    [InlineData("", RecordAgeAxis.Calendar)]
+    [InlineData("сезонная", RecordAgeAxis.Calendar)]
+    [InlineData(null, RecordAgeAxis.Calendar)]
+    public void AxisSetting_ParsesValue_UnknownFallsBackToCalendar(string? raw, RecordAgeAxis expected)
+        => Assert.Equal(expected, RecordAgeAxisSetting.Parse(raw));
+
+    [Fact]
+    public void AxisSetting_ReadsFromSettingsService_DefaultsToCalendar()
+    {
+        Assert.Equal(RecordAgeAxis.Calendar, RecordAgeAxisSetting.From(new SettingsStub()));
+        Assert.Equal(RecordAgeAxis.Season, RecordAgeAxisSetting.From(
+            new SettingsStub(new() { ["RecordAgeAxis"] = "season" })));
+
+        // Настройки нет вовсе (изолированный вызов) — тоже ось федерации.
+        Assert.Equal(RecordAgeAxis.Calendar, RecordAgeAxisSetting.From(null));
+    }
+
+    private sealed class SettingsStub : Swimm.Application.Abstractions.ISettingsService
+    {
+        private readonly Dictionary<string, string> _values;
+        public SettingsStub(Dictionary<string, string>? values = null) => _values = values ?? new();
+        public IReadOnlyList<Swimm.Application.Dtos.AdminSetting> GetAll() => [];
+        public Swimm.Application.Dtos.AdminSetting? Get(string key) => null;
+        public T GetValue<T>(string key, T fallback) =>
+            _values.TryGetValue(key, out var raw) ? (T)Convert.ChangeType(raw, typeof(T)) : fallback;
+        public bool Update(string key, string newValue) { _values[key] = newValue; return true; }
+    }
+
     [Fact]
     public void EqualTime_CountsAsRecord()
     {
