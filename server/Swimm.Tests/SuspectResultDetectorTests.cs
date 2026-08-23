@@ -266,6 +266,12 @@ public class SuspectResultDetectorTests
     private static SuspectCandidateRow PointRow(long id, int points, DateTime? date = null, int swimmerId = 7)
         => new(id, swimmerId, "freestyle", "200", "male", 113_090, date ?? Day1, false, false, "13-14", points);
 
+    /// <summary>Строка с номером заплыва — для страховки «согласовано со своим заплывом».</summary>
+    private static SuspectCandidateRow HeatRow(
+        long id, int ms, int heat, int swimmerId, int? points = null, string distance = "50")
+        => new(id, swimmerId, "freestyle", distance, "male", ms, Day1, false, false, "45-49",
+            points, Heat: heat);
+
     private static IReadOnlyDictionary<int, IReadOnlyList<PersonalSwim>> History(params PersonalSwim[] swims)
         => new Dictionary<int, IReadOnlyList<PersonalSwim>> { [7] = swims };
 
@@ -281,6 +287,51 @@ public class SuspectResultDetectorTests
         var v = Assert.Single(SuspectResultDetector.Detect(rows, history));
         Assert.Equal(SuspectReasons.PersonalOutlier, v.Reason);
         Assert.Contains("312", v.Note);
+    }
+
+    [Fact]
+    public void PersonalOutlier_ConfirmedByOwnHeat_NotFlagged()
+    {
+        // Живой случай (Maccabiah 2026, competition 1485): мастерс 1977 г.р. проплыл
+        // 50 вольным за 31.95 (256 очков) при своих же 50 баттерфляем 41.06 (82),
+        // 100 вольным 1:17.46 (74) и 50 на спине 47.75 (76) — формально «втрое выше
+        // собственного уровня», фактически обычный спринтер. Протокол это подтверждает:
+        // он выиграл СВОЙ заплыв у соседей 32.84 / 34.47 / 35.17, то есть время видели судьи.
+        var rows = new List<SuspectCandidateRow>
+        {
+            HeatRow(1, 31_950, heat: 2, swimmerId: 7, points: 256),
+            HeatRow(2, 32_840, heat: 2, swimmerId: 21),
+            HeatRow(3, 34_470, heat: 2, swimmerId: 22),
+            HeatRow(4, 35_170, heat: 2, swimmerId: 23),
+        };
+        var history = History(
+            new PersonalSwim(20, 82, Day1.AddDays(-1)),
+            new PersonalSwim(21, 74, Day1.AddDays(-2)),
+            new PersonalSwim(22, 76, Day1.AddDays(-3)));
+
+        Assert.Empty(SuspectResultDetector.Detect(rows, history));
+    }
+
+    [Fact]
+    public void PersonalOutlier_IsolatedInOwnHeat_StillFlagged()
+    {
+        // Ошибка протокола изолирована и в заплыве: 01:53.09 на 200 вольным у 13-летнего
+        // (competition 1527) стоит при ближайшем соседе 02:28.82 — 0.76 от него.
+        // Страховка «согласовано со своим заплывом» такую строку не спасает.
+        var rows = new List<SuspectCandidateRow>
+        {
+            HeatRow(1, 113_090, heat: 1, swimmerId: 7, points: 678, distance: "200"),
+            HeatRow(2, 148_820, heat: 1, swimmerId: 21, distance: "200"),
+            HeatRow(3, 151_410, heat: 1, swimmerId: 22, distance: "200"),
+            HeatRow(4, 153_910, heat: 1, swimmerId: 23, distance: "200"),
+        };
+        var history = History(
+            new PersonalSwim(20, 312, Day1.AddDays(-8)),
+            new PersonalSwim(21, 290, Day1.AddDays(-30)),
+            new PersonalSwim(22, 275, Day1.AddDays(-60)));
+
+        var v = Assert.Single(SuspectResultDetector.Detect(rows, history));
+        Assert.Equal(SuspectReasons.PersonalOutlier, v.Reason);
     }
 
     [Fact]

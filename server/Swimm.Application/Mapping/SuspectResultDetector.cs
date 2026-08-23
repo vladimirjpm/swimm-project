@@ -26,7 +26,10 @@ public sealed record SuspectCandidateRow(
     /// различает. Тоже входит в ключ «дубля дисциплины»: у чемпионата «мокдамот и финал»
     /// утренний зачёт возрастных групп и вечерний финал — РАЗНЫЕ соревнования в один день,
     /// и оба помечены HeatType=final (И13, docs/data-integrity.md §10).</summary>
-    string? Round = null);
+    string? Round = null,
+    /// <summary>Номер заплыва в протоколе. Соседи по нему — независимая проверка
+    /// правдоподобия времени: ошибка протокола изолирована, а победа в своём заплыве нет.</summary>
+    int Heat = 0);
 
 /// <summary>
 /// Заплыв пловца из его личной истории (для правила «выброс относительно себя»).
@@ -135,6 +138,26 @@ public static class SuspectResultDetector
 
     /// <summary>Минимум своих заплывов в окне: по одному-двум профиль не построить.</summary>
     private const int MinPersonalSwims = 3;
+
+    /* ── Страховка «согласовано со своим заплывом» ────────────────────────────────
+     * Правило «выброс относительно себя» строит личный уровень по ЛЮБЫМ дисциплинам —
+     * иначе у него не было бы данных. Но специализация выглядит как выброс: мастерс
+     * 1977 г.р. на Маккабиаде плыл 50 вольным за 31.95 (256 очков) при своих же
+     * 50 баттерфляем 41.06 (82), 100 вольным 1:17.46 (74) и 50 на спине 47.75 (76) —
+     * формально «втрое выше собственного уровня», фактически обычный спринтер.
+     *
+     * Отличает их протокол: он выиграл СВОЙ заплыв у соседей 32.84 / 34.47 / 35.17,
+     * то есть время согласовано с тем, что видели судьи. Настоящая ошибка изолирована
+     * и в заплыве: 01:53.09 на 200 вольным у 13-летнего стоит при ближайшем соседе
+     * 02:28.82 — 0.76 от него.
+     *
+     * Поэтому: время, отстающее от лучшего соседа по заплыву не более чем на 10%,
+     * считаем подтверждённым протоколом и не метим.
+     */
+    private const double HeatPlausibleFactor = 0.9;
+
+    /// <summary>Минимум соседей по заплыву, чтобы их времена что-то значили.</summary>
+    private const int MinHeatPeers = 3;
 
     /// <param name="personalHistory">
     /// Заплывы пловцов по их Id — своя история за пределами этого соревнования тоже.
@@ -265,6 +288,10 @@ public static class SuspectResultDetector
                 var best = window.Max(h => h.Points);
                 if (row.Points.Value < best * PersonalOutlierFactor) continue;
 
+                // Страховка протоколом: время, согласованное с собственным заплывом,
+                // ошибкой не бывает — судьи видели этих людей рядом (HeatPlausibleFactor).
+                if (IsPlausibleInHeat(row, timed)) continue;
+
                 Flag(row, SuspectReasons.PersonalOutlier,
                     $"{row.Points} очков против личного лучшего {best} за ±{PersonalWindowDays} дней "
                     + $"({window.Count} заплывов) — вдвое выше собственного уровня");
@@ -272,6 +299,32 @@ public static class SuspectResultDetector
         }
 
         return verdicts.Values.OrderBy(v => v.ResultId).ToList();
+    }
+
+    /// <summary>
+    /// Время подтверждено собственным заплывом: соседи по нему плыли примерно так же.
+    /// Заплыв — это то, что судьи видели глазами, поэтому он и служит опорой.
+    ///
+    /// Ключ заплыва — день + дисциплина + номер заплыва: номер уникален внутри дня одной
+    /// дисциплины, а через дни и дисциплины повторяется.
+    /// </summary>
+    private static bool IsPlausibleInHeat(
+        SuspectCandidateRow row, IReadOnlyCollection<SuspectCandidateRow> all)
+    {
+        // Heat = 0 — источник номера заплыва не дал; опоры нет, правило работает как прежде.
+        if (row.Heat <= 0) return false;
+
+        var peers = all
+            .Where(r => r.ResultId != row.ResultId
+                        && r.Heat == row.Heat
+                        && r.StyleName == row.StyleName
+                        && r.Distance == row.Distance
+                        && r.CompetitionDate.Date == row.CompetitionDate.Date)
+            .Select(r => r.TimeMilliseconds!.Value)
+            .ToList();
+        if (peers.Count < MinHeatPeers) return false;
+
+        return row.TimeMilliseconds!.Value >= peers.Min() * HeatPlausibleFactor;
     }
 
     /// <summary>
