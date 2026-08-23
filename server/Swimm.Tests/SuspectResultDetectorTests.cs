@@ -129,6 +129,45 @@ public class SuspectResultDetectorTests
     }
 
     [Fact]
+    public void Outlier_FastKidInWeakHeat_NotFlagged()
+    {
+        // Живой случай (competition 1590 «ליגה מס 1 הפועל בית שמש», 50 вольным, ступень 9-10):
+        // разброс внутри ступени двукратный, медиана 1:18.31 — половина группы едва плывёт.
+        // Победительница 46.89 ниже 60% медианы, но от второго результата (52.77) отстоит
+        // на 11%: это просто сильный ребёнок, а не ошибка протокола.
+        var rows = new List<SuspectCandidateRow>
+        {
+            Row(1, 46_890, "freestyle", "50", "female", swimmerId: 1, ageGroup: "9-10"),
+            Row(2, 52_770, "freestyle", "50", "female", swimmerId: 2, ageGroup: "9-10"),
+            Row(3, 64_800, "freestyle", "50", "female", swimmerId: 3, ageGroup: "9-10"),
+            Row(4, 78_310, "freestyle", "50", "female", swimmerId: 4, ageGroup: "9-10"),
+            Row(5, 94_980, "freestyle", "50", "female", swimmerId: 5, ageGroup: "9-10"),
+            Row(6, 101_140, "freestyle", "50", "female", swimmerId: 6, ageGroup: "9-10"),
+        };
+
+        Assert.Empty(SuspectResultDetector.Detect(rows));
+    }
+
+    [Fact]
+    public void Outlier_HalfDistanceTime_StillFlagged()
+    {
+        // Ради чего правило живёт: в протокол попало время отрезка — оно примерно вдвое
+        // меньше соседнего результата, а не на проценты. Само по себе оно правдоподобно
+        // (медленнее мирового рекорда), поэтому правила 1 и 2 его не видят.
+        var rows = new List<SuspectCandidateRow>
+        {
+            Row(1, 55_000, "freestyle", "100", "female", swimmerId: 1, ageGroup: "9-10"),
+            Row(2, 130_000, "freestyle", "100", "female", swimmerId: 2, ageGroup: "9-10"),
+            Row(3, 140_000, "freestyle", "100", "female", swimmerId: 3, ageGroup: "9-10"),
+            Row(4, 150_000, "freestyle", "100", "female", swimmerId: 4, ageGroup: "9-10"),
+        };
+
+        var v = Assert.Single(SuspectResultDetector.Detect(rows), x => x.ResultId == 1);
+        Assert.Equal(SuspectReasons.TimeOutlier, v.Reason);
+        Assert.Contains("ближайшем результате", v.Note);
+    }
+
+    [Fact]
     public void Relays_And_FailedTimes_Ignored()
     {
         var rows = new[]

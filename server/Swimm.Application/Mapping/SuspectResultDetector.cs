@@ -93,6 +93,24 @@ public static class SuspectResultDetector
     /// <summary>Во сколько раз время должно выбиваться из медианы заплыва.</summary>
     private const double OutlierFactor = 0.6;
 
+    /// <summary>
+    /// Второе условие того же правила: время должно быть оторвано и от БЛИЖАЙШЕГО соседа —
+    /// второго результата ступени.
+    ///
+    /// Зачем (калибровка на живой базе 2026-08-23): в детских лигах разброс внутри ступени
+    /// двукратный (9-10 лет, 50 вольным: 46.89 … 1:41.14), поэтому лидер там всегда ниже
+    /// 0.6 медианы — просто потому, что он умеет плавать, а половина группы ещё нет. По
+    /// одной медиане правило дало 11 пометок на всю базу, и настоящая ошибка среди них
+    /// одна (00:32.59 на 100 баттерфляем), да и ту ловит правило мирового рекорда. Ложные
+    /// же — обычные быстрые дети, вплоть до ЧЕТЫРЁХ помеченных девочек в одном заплыве.
+    ///
+    /// Ошибка протокола изолирована: время отрезка вместо всей дистанции даёт ~0.5 от
+    /// соседнего результата, опечатка в минутах — и того меньше. Настоящий сильный ребёнок
+    /// от второго места отрывается на проценты, а не в разы (0.61 … 1.08 у всех 11 находок).
+    /// Порог 0.55 покрывает «половину дистанции» с запасом и оставляет их все в покое.
+    /// </summary>
+    private const double OutlierGapFactor = 0.55;
+
     /// <summary>Минимум строк в заплыве, чтобы медиана вообще что-то значила.</summary>
     private const int MinRowsForMedian = 4;
 
@@ -178,12 +196,21 @@ public static class SuspectResultDetector
             if (grp.Count() < MinRowsForMedian) continue;
             var sorted = grp.Select(r => r.TimeMilliseconds!.Value).OrderBy(x => x).ToList();
             var median = sorted[sorted.Count / 2];
+            // Второе время ступени — мера «оторванности». Сравнивать надо именно с ним:
+            // с лучшим временем сравнивать бессмысленно (лучшее — сам кандидат).
+            var second = sorted[1];
             foreach (var row in grp)
             {
-                if (row.TimeMilliseconds!.Value >= median * OutlierFactor) continue;
+                var ms = row.TimeMilliseconds!.Value;
+                if (ms >= median * OutlierFactor) continue;
+                // …и оторвано от ближайшего соседа (см. OutlierGapFactor): иначе правило
+                // ловит просто сильных детей в слабой группе.
+                var nearest = ms <= second ? second : sorted.Last(x => x < ms);
+                if (ms >= nearest * OutlierGapFactor) continue;
                 var scope = string.IsNullOrWhiteSpace(row.AgeGroup) ? "дисциплины" : $"ступени {row.AgeGroup}";
                 Flag(row, SuspectReasons.TimeOutlier,
-                    $"{Fmt(row.TimeMilliseconds.Value)} против медианы {scope} {Fmt(median)} — быстрее, чем физически правдоподобно");
+                    $"{Fmt(ms)} против медианы {scope} {Fmt(median)} при ближайшем результате {Fmt(nearest)}"
+                    + " — быстрее, чем физически правдоподобно");
             }
         }
 
