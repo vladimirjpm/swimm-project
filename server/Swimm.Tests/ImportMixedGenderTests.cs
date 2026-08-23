@@ -32,11 +32,13 @@ public class ImportMixedGenderTests
         public Task InvalidateAllAsync() => Task.CompletedTask;
     }
 
-    private static object Item(string lastName, string gender, string time = "00:30.00") => new
+    private static object Item(
+        string lastName, string gender, string time = "00:30.00",
+        string competition = "Шабат", string date = "01/06/2026") => new
     {
         country = "ISR",
-        competition = "Шабат",
-        date = "01/06/2026",
+        competition,
+        date,
         event_style_name = "Freestyle",
         event_style_len = "200",
         event_style_gender = gender,
@@ -116,6 +118,49 @@ public class ImportMixedGenderTests
         await new JsonImportService(db, new NullCache()).ImportAsync(ToStream(new[] { relayItem }));
 
         Assert.Equal("none", (await db.Results.SingleAsync()).Gender);
+    }
+
+    [Fact]
+    public async Task GenderlessRow_FilledLater_WhenSwimmerGenderBecameKnown()
+    {
+        // Пловец впервые встретился в смешанном заплыве — пола нет ни в шапке, ни в карточке,
+        // строка легально остаётся пустой. На СЛЕДУЮЩЕМ старте пол известен, и старая строка
+        // обязана дописаться сама: иначе находка `results.no-gender` висит, хотя ответ уже
+        // лежит в базе (4 такие строки на живой базе 2026-08-23).
+        await using var db = CreateDb(nameof(GenderlessRow_FilledLater_WhenSwimmerGenderBecameKnown));
+        var service = new JsonImportService(db, new NullCache());
+
+        await service.ImportAsync(ToStream(new[] { Item("Levi", "none", "02:40.00") }));
+        Assert.Equal(string.Empty, (await db.Results.SingleAsync()).Gender);
+
+        await service.ImportAsync(ToStream(new[]
+        {
+            Item("Levi", "female", "02:38.00", competition: "Чемпионат", date: "15/06/2026"),
+        }));
+
+        Assert.Equal("female", (await db.Swimmers.SingleAsync()).Gender);
+        Assert.All(await db.Results.ToListAsync(), r => Assert.Equal("female", r.Gender));
+    }
+
+    [Fact]
+    public async Task ImportFixesCardByMajority_ButNeverOverwritesPrintedGender()
+    {
+        // Карточка приводится к большинству заплывов (одна ошибка в первом протоколе больше
+        // не делает её неверной навсегда), а вот НАПЕЧАТАННЫЙ в протоколе пол строки импорт
+        // не трогает: перезапись — осознанное решение человека, кнопка «выровнять» в реестре.
+        await using var db = CreateDb(nameof(ImportFixesCardByMajority_ButNeverOverwritesPrintedGender));
+        db.Swimmers.Add(new Swimmer { LastName = "Cohen", FirstName = "Tal", BirthYear = 2012, Gender = "male" });
+        await db.SaveChangesAsync();
+
+        await new JsonImportService(db, new NullCache()).ImportAsync(ToStream(new[]
+        {
+            Item("Cohen", "female", "02:31.00"),
+            Item("Cohen", "female", "02:32.00"),
+            Item("Cohen", "female", "02:33.00"),
+        }));
+
+        Assert.Equal("female", (await db.Swimmers.SingleAsync()).Gender);
+        Assert.All(await db.Results.ToListAsync(), r => Assert.Equal("female", r.Gender));
     }
 
     [Fact]

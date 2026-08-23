@@ -1440,10 +1440,33 @@ public class JsonImportService : IImportService
             swimmer.Gender = want;
         }
 
-        if (filled == 0 && corrected == 0) return "";
+        // Обратный ход: у личной строки пол мог не попасть в протокол («mix» в шапке), а у
+        // пловца он известен — тогда строке его дописываем. Иначе находка `results.no-gender`
+        // висит до тех пор, пока кто-нибудь не нажмёт кнопку руками, хотя ответ уже в базе.
+        // Пустые строки, а НЕ противоречащие: перезапись напечатанного в протоколе пола —
+        // осознанное решение человека (кнопка «выровнять» в реестре), а не побочный эффект импорта.
+        var knownGenders = await _db.Swimmers
+            .Where(s => s.Gender == "male" || s.Gender == "female")
+            .Select(s => new { s.Id, s.Gender })
+            .ToDictionaryAsync(s => s.Id, s => s.Gender!);
+
+        var genderless = await _db.Results
+            .Where(r => r.RelayId == null && (r.Gender == null || r.Gender == "" || r.Gender == "none"))
+            .ToListAsync();
+
+        var rowsFilled = 0;
+        foreach (var row in genderless)
+        {
+            if (!knownGenders.TryGetValue(row.SwimmerId, out var gender)) continue;
+            row.Gender = gender;
+            rowsFilled++;
+        }
+
+        if (filled == 0 && corrected == 0 && rowsFilled == 0) return "";
 
         await _db.SaveChangesAsync();
-        return $"Пол пловцов согласован с протоколами: заполнено {filled}, исправлено {corrected}.";
+        return $"Пол согласован с протоколами: карточек заполнено {filled}, исправлено {corrected}, "
+             + $"строк без пола дописано {rowsFilled}.";
     }
 
     /// <summary>Пол в БД живёт как male/female и как M/F — сводим к одному написанию.</summary>
