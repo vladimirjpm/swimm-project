@@ -1,4 +1,4 @@
-@page
+﻿@page
 @using Swimm.Application.Dtos
 @model Swimm.API.Pages.Admin.Competitions.IndexModel
 @{
@@ -672,6 +672,21 @@ else
                                         </label>
                                         <button type="submit" class="admin-btn admin-btn-primary">Сохранить</button>
                                     </div>
+
+                                    @* Регламент (תקנון): по нему проставляются те же галочки, что выше.
+                                       Файл никуда не сохраняется — только читается ради подсказки. *@
+                                    <div class="mt-3 pt-3 border-t border-admin-border/60">
+                                        <div class="text-xs text-admin-text-muted mb-1.5">
+                                            Регламент (PDF) — проверю медали, клубный зачёт и чемпионат, галочки поставлю сам
+                                        </div>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <input type="file" accept=".pdf" class="admin-input text-xs regulation-file" data-comp="@head.Id" />
+                                            <button type="button" class="admin-btn admin-btn-ghost text-xs regulation-check" data-comp="@head.Id">
+                                                Проверить регламент
+                                            </button>
+                                        </div>
+                                        <div class="regulation-result text-[11px] mt-1.5" data-comp="@head.Id"></div>
+                                    </div>
                                 </form>
                             }
                         </td>
@@ -821,6 +836,81 @@ else
 </dialog>
 
 @section Scripts {
+<script>
+    // ── Регламент соревнования (תקנון) ─────────────────────────────────────────
+    // Файл не сохраняется: сервер читает его и возвращает НАХОДКИ С ЦИТАТАМИ. Галочки
+    // ставим по ним автоматически, но решение остаётся за админом — он видит, по каким
+    // строкам мы так решили, и может снять их перед «Сохранить».
+    document.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.regulation-check');
+        if (!btn) return;
+
+        const compId = btn.dataset.comp;
+        const input = document.querySelector(`.regulation-file[data-comp="${compId}"]`);
+        const out = document.querySelector(`.regulation-result[data-comp="${compId}"]`);
+        const file = input?.files?.[0];
+
+        if (!file) {
+            out.innerHTML = '<span class="text-admin-warning">Сначала выберите PDF регламента.</span>';
+            return;
+        }
+
+        out.textContent = 'Читаю регламент…';
+        try {
+            const form = new FormData();
+            form.append('file', file);
+
+            const res = await fetch('/api/admin/competitions/analyze-regulation', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-XSRF-TOKEN': _csrfToken },
+                body: form
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+            applyRegulation(compId, data, out);
+        } catch (err) {
+            out.innerHTML = `<span class="text-admin-warning">${esc(err.message)}</span>`;
+        }
+    });
+
+    function applyRegulation(compId, data, out) {
+        if (data.error) {
+            out.innerHTML = `<span class="text-admin-warning">${esc(data.error)}</span>`;
+            return;
+        }
+
+        const form = document.querySelector(`.regulation-file[data-comp="${compId}"]`).closest('form');
+        const setBox = (name, checked) => {
+            const box = form.querySelector(`input[type=checkbox][name="${name}"]`);
+            if (box) box.checked = checked;
+        };
+
+        // Медали → Awards; клубный зачёт есть → снимаем «зачёт не ведётся»; чемпионат → 🏆.
+        if (data.hasMedals) setBox('isAward', true);
+        if (data.hasClubStanding) setBox('clubPointsDisabled', false);
+        if (data.isChampionship) setBox('isChampionship', true);
+
+        const labels = {
+            medals: 'медали → Awards',
+            clubStanding: 'клубный зачёт → галочка «не ведётся» снята',
+            championship: 'чемпионат Израиля → 🏆'
+        };
+
+        const findings = (data.findings || []).map(f => `
+            <div class="py-0.5">
+                <span class="text-admin-accent">${esc(labels[f.flag] || f.flag)}</span>
+                <span class="text-admin-text-muted"> · нашёл «${esc(f.matched)}»</span>
+                <div class="text-[10px] text-admin-text-muted" dir="rtl">${esc(f.quote)}</div>
+            </div>`).join('');
+
+        out.innerHTML = findings
+            ? `<div class="text-admin-text">Галочки проставлены — проверьте и нажмите «Сохранить»:</div>${findings}`
+            : '<span class="text-admin-text-muted">В регламенте не нашлось ни медалей, ни клубного зачёта — галочки не трогал.</span>';
+    }
+</script>
+
     <script>
         // Словарь discovery-строк на странице: id → { name, languages } — чтобы действия не
         // тащили имя через onclick (проблемы экранирования иврита/кавычек).

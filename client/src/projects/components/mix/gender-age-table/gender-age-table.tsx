@@ -35,6 +35,11 @@ export interface GenderAgeEntry {
   date?: string;
   /** Если задан — имя становится ссылкой на страницу пловца. */
   swimmerId?: number;
+  /**
+   * Мелкая подпись под датой. Сейчас единственный потребитель — отладочная опция
+   * ShowAgeRecordsDetails: «born 2011 · age 10» под датой рекорда. Пусто — строки нет.
+   */
+  note?: string | null;
 }
 
 export interface GenderAgeRow {
@@ -97,8 +102,10 @@ interface UI_GenderAgeTableProps {
   ageBrackets?: boolean;
 }
 
-function Cell({ entries, gender, showClubIcon, showDate }: {
+function Cell({ entries, gender, showClubIcon, showDate, stacked }: {
   entries: GenderAgeEntry[]; gender: 'male' | 'female'; showClubIcon?: boolean; showDate?: boolean;
+  /** Мобильный режим «в столбик»: время сверху, под ним имя / клуб / дата. */
+  stacked?: boolean;
 }) {
   const isMale = gender === 'male';
   const s = GENDER[gender];
@@ -106,7 +113,11 @@ function Cell({ entries, gender, showClubIcon, showDate }: {
   // При ничьей значение у всех одинаковое (в этом и суть ничьей) — печатаем его ОДИН раз,
   // а имена ставим рядом с переносом. Дублировать «10 · 10 · 10» было бы шумом.
   const value = (
-    <div className={`shrink-0 text-[15px] font-extrabold leading-tight tabular-nums sm:text-[17px] ${s.accent}`}>
+    <div
+      className={`shrink-0 font-extrabold tabular-nums ${s.accent} ${
+        stacked ? 'text-[16px] leading-[1.15]' : 'text-[15px] leading-tight sm:text-[17px]'
+      }`}
+    >
       <UI_SwimTime time={entries[0].value} quality={entries[0].quality} />
     </div>
   );
@@ -118,8 +129,10 @@ function Cell({ entries, gender, showClubIcon, showDate }: {
   // с переносом. Рядом на мобиле два имени с клубом не читаются.
   const info = (
     <div
-      className={`flex min-w-0 flex-1 flex-col gap-y-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 ${
-        isMale ? 'items-start' : 'items-end justify-end text-right sm:items-center'
+      className={`flex min-w-0 flex-col ${
+        stacked ? 'w-full gap-y-px' : 'flex-1 gap-y-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3'
+      } ${
+        isMale ? 'items-start' : `items-end justify-end text-right${stacked ? '' : ' sm:items-center'}`
       }`}
     >
       {entries.map((entry, i) => (
@@ -135,8 +148,14 @@ function Cell({ entries, gender, showClubIcon, showDate }: {
             onClick={entry.swimmerId && entry.swimmerId > 0 ? () => { window.location.href = `/swimmers/${entry.swimmerId}`; } : undefined}
             className="min-w-0"
             nameBlockClassName={isMale ? 'min-w-0' : 'min-w-0 flex-1 text-right'}
-            firstLineClassName={`truncate text-[11px] font-bold sm:text-[12.5px] ${s.deep}`}
-            secondLineClassName="truncate text-[10px] text-[#8a93a3] sm:text-[11px]"
+            firstLineClassName={`font-bold ${
+              stacked
+                ? 'break-words text-[11.5px] leading-[1.25]'
+                : 'truncate text-[11px] sm:text-[12.5px]'
+            } ${s.deep}`}
+            secondLineClassName={`text-[#8a93a3] ${
+              stacked ? 'break-words text-[10px] leading-[1.25]' : 'truncate text-[10px] sm:text-[11px]'
+            }`}
           />
           {showDate && entry.date && (
             <UI_DateIcon
@@ -146,10 +165,34 @@ function Cell({ entries, gender, showClubIcon, showDate }: {
               className={isMale ? '!justify-start' : '!justify-end'}
             />
           )}
+          {entry.note && (
+            <div
+              className={`text-[9px] sm:text-[10px] tabular-nums text-[#8a93a3] ${
+                isMale ? 'text-left' : 'text-right'
+              }`}
+            >
+              {entry.note}
+            </div>
+          )}
         </div>
       ))}
     </div>
   );
+
+  // В столбик порядок строк одинаковый для обоих полов (время → имя → клуб → дата);
+  // в строчном режиме он остаётся зеркальным, как был.
+  if (stacked) {
+    return (
+      <div
+        className={`flex flex-col gap-px rounded-lg px-2.5 py-[7px] ${s.soft} ${
+          isMale ? 'items-start' : 'items-end text-right'
+        }`}
+      >
+        {value}
+        {info}
+      </div>
+    );
+  }
 
   return (
     <div className={`flex items-center gap-2 rounded-lg px-2.5 py-[5px] sm:py-2 ${s.soft}`}>
@@ -175,6 +218,9 @@ export default function UI_GenderAgeTable({
   const showMale = rows.some((r) => entriesOf(r.male).length > 0);
   const showFemale = rows.some((r) => entriesOf(r.female).length > 0);
   const withClubIcon = showClubIcon && (isSmUp || !hideClubIconMobile);
+  // «Ячейка в столбик» — только на узком экране и только когда колонок две: при одном
+  // гендере ячейка получает всю ширину и строчный вид читается лучше.
+  const stacked = !isSmUp && showMale && showFemale;
 
   // Колонка возраста бывает уже на мобиле (там дорог каждый пиксель под имя+клуб).
   // Ширины прокидываем CSS-переменными: шаблон колонок зависит ещё и от showMale/showFemale,
@@ -186,7 +232,7 @@ export default function UI_GenderAgeTable({
 
   return (
     <div
-      className="grid grid-cols-[var(--gat-cols-mobile)] items-center gap-x-2 gap-y-1.5 sm:grid-cols-[var(--gat-cols)] sm:gap-x-4"
+      className="grid grid-cols-[var(--gat-cols-mobile)] items-stretch gap-x-1.5 gap-y-1.5 sm:grid-cols-[var(--gat-cols)] sm:items-center sm:gap-x-4"
       style={{
         '--gat-cols': template(ageColWidth),
         '--gat-cols-mobile': template(ageColWidthMobile ?? ageColWidth),
@@ -201,13 +247,15 @@ export default function UI_GenderAgeTable({
         return (
           <React.Fragment key={r.age}>
             {showMale && (males.length > 0
-              ? <Cell entries={males} gender="male" showClubIcon={withClubIcon} showDate={showDate} />
+              ? <Cell entries={males} gender="male" showClubIcon={withClubIcon} showDate={showDate} stacked={stacked} />
               : <div />)}
-            <div className="whitespace-nowrap text-center text-[10px] font-extrabold text-[#5b6470] dark:text-[#aab0bd] sm:text-[11px]">
+            {/* Строки в режиме «в столбик» высокие — возраст центрируем в самой ячейке,
+                а не выравниванием грида (у грида теперь items-stretch). */}
+            <div className="flex items-center justify-center whitespace-nowrap text-center text-[10px] font-extrabold text-[#5b6470] dark:text-[#aab0bd] sm:text-[11px]">
               {ageBrackets ? `[${r.age}]` : r.age}
             </div>
             {showFemale && (females.length > 0
-              ? <Cell entries={females} gender="female" showClubIcon={withClubIcon} showDate={showDate} />
+              ? <Cell entries={females} gender="female" showClubIcon={withClubIcon} showDate={showDate} stacked={stacked} />
               : <div />)}
           </React.Fragment>
         );

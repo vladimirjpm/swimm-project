@@ -26,7 +26,14 @@ public sealed record SuspectCandidateRow(
     /// различает. Тоже входит в ключ «дубля дисциплины»: у чемпионата «мокдамот и финал»
     /// утренний зачёт возрастных групп и вечерний финал — РАЗНЫЕ соревнования в один день,
     /// и оба помечены HeatType=final (И13, docs/data-integrity.md §10).</summary>
-    string? Round = null);
+    string? Round = null,
+    /// <summary>Номер заплыва в протоколе. Соседи по нему — независимая проверка
+    /// правдоподобия времени: ошибка протокола изолирована, а победа в своём заплыве нет.</summary>
+    int Heat = 0,
+    /// <summary>Пол ПЛОВЦА из карточки (male/female); null или пусто — не заполнен.
+    /// Опора правила «пол результата расходится с полом пловца»: она прямее, чем
+    /// большинство по заплывам этого соревнования.</summary>
+    string? SwimmerGender = null);
 
 /// <summary>
 /// Заплыв пловца из его личной истории (для правила «выброс относительно себя»).
@@ -93,6 +100,24 @@ public static class SuspectResultDetector
     /// <summary>Во сколько раз время должно выбиваться из медианы заплыва.</summary>
     private const double OutlierFactor = 0.6;
 
+    /// <summary>
+    /// Второе условие того же правила: время должно быть оторвано и от БЛИЖАЙШЕГО соседа —
+    /// второго результата ступени.
+    ///
+    /// Зачем (калибровка на живой базе 2026-08-23): в детских лигах разброс внутри ступени
+    /// двукратный (9-10 лет, 50 вольным: 46.89 … 1:41.14), поэтому лидер там всегда ниже
+    /// 0.6 медианы — просто потому, что он умеет плавать, а половина группы ещё нет. По
+    /// одной медиане правило дало 11 пометок на всю базу, и настоящая ошибка среди них
+    /// одна (00:32.59 на 100 баттерфляем), да и ту ловит правило мирового рекорда. Ложные
+    /// же — обычные быстрые дети, вплоть до ЧЕТЫРЁХ помеченных девочек в одном заплыве.
+    ///
+    /// Ошибка протокола изолирована: время отрезка вместо всей дистанции даёт ~0.5 от
+    /// соседнего результата, опечатка в минутах — и того меньше. Настоящий сильный ребёнок
+    /// от второго места отрывается на проценты, а не в разы (0.61 … 1.08 у всех 11 находок).
+    /// Порог 0.55 покрывает «половину дистанции» с запасом и оставляет их все в покое.
+    /// </summary>
+    private const double OutlierGapFactor = 0.55;
+
     /// <summary>Минимум строк в заплыве, чтобы медиана вообще что-то значила.</summary>
     private const int MinRowsForMedian = 4;
 
@@ -117,6 +142,26 @@ public static class SuspectResultDetector
 
     /// <summary>Минимум своих заплывов в окне: по одному-двум профиль не построить.</summary>
     private const int MinPersonalSwims = 3;
+
+    /* ── Страховка «согласовано со своим заплывом» ────────────────────────────────
+     * Правило «выброс относительно себя» строит личный уровень по ЛЮБЫМ дисциплинам —
+     * иначе у него не было бы данных. Но специализация выглядит как выброс: мастерс
+     * 1977 г.р. на Маккабиаде плыл 50 вольным за 31.95 (256 очков) при своих же
+     * 50 баттерфляем 41.06 (82), 100 вольным 1:17.46 (74) и 50 на спине 47.75 (76) —
+     * формально «втрое выше собственного уровня», фактически обычный спринтер.
+     *
+     * Отличает их протокол: он выиграл СВОЙ заплыв у соседей 32.84 / 34.47 / 35.17,
+     * то есть время согласовано с тем, что видели судьи. Настоящая ошибка изолирована
+     * и в заплыве: 01:53.09 на 200 вольным у 13-летнего стоит при ближайшем соседе
+     * 02:28.82 — 0.76 от него.
+     *
+     * Поэтому: время, отстающее от лучшего соседа по заплыву не более чем на 10%,
+     * считаем подтверждённым протоколом и не метим.
+     */
+    private const double HeatPlausibleFactor = 0.9;
+
+    /// <summary>Минимум соседей по заплыву, чтобы их времена что-то значили.</summary>
+    private const int MinHeatPeers = 3;
 
     /// <param name="personalHistory">
     /// Заплывы пловцов по их Id — своя история за пределами этого соревнования тоже.
@@ -178,16 +223,32 @@ public static class SuspectResultDetector
             if (grp.Count() < MinRowsForMedian) continue;
             var sorted = grp.Select(r => r.TimeMilliseconds!.Value).OrderBy(x => x).ToList();
             var median = sorted[sorted.Count / 2];
+            // Второе время ступени — мера «оторванности». Сравнивать надо именно с ним:
+            // с лучшим временем сравнивать бессмысленно (лучшее — сам кандидат).
+            var second = sorted[1];
             foreach (var row in grp)
             {
-                if (row.TimeMilliseconds!.Value >= median * OutlierFactor) continue;
+                var ms = row.TimeMilliseconds!.Value;
+                if (ms >= median * OutlierFactor) continue;
+                // …и оторвано от ближайшего соседа (см. OutlierGapFactor): иначе правило
+                // ловит просто сильных детей в слабой группе.
+                var nearest = ms <= second ? second : sorted.Last(x => x < ms);
+                if (ms >= nearest * OutlierGapFactor) continue;
                 var scope = string.IsNullOrWhiteSpace(row.AgeGroup) ? "дисциплины" : $"ступени {row.AgeGroup}";
                 Flag(row, SuspectReasons.TimeOutlier,
-                    $"{Fmt(row.TimeMilliseconds.Value)} против медианы {scope} {Fmt(median)} — быстрее, чем физически правдоподобно");
+                    $"{Fmt(ms)} против медианы {scope} {Fmt(median)} при ближайшем результате {Fmt(nearest)}"
+                    + " — быстрее, чем физически правдоподобно");
             }
         }
 
-        // 4. Пол результата расходится с полом пловца по остальным его заплывам.
+        // 4. Пол результата расходится с полом пловца.
+        //
+        // Опора — КАРТОЧКА пловца, если пол в ней заполнен, и лишь затем большинство по
+        // его заплывам этого соревнования. Большинство одно не годится: у пловца бывает
+        // ровно два старта, и при 1:1 «меньшинством» оказывается случайная строка. Живой
+        // случай (comp 1580): у пяти пловцов по два заплыва, один из них с чужим полом, —
+        // правило пометило верную строку лишь у четверых, а у טנא יהלי (male по карточке
+        // и по 32 другим заплывам) обвинило как раз мужскую строку.
         foreach (var grp in timed.GroupBy(r => r.SwimmerId))
         {
             var byGender = grp
@@ -195,11 +256,17 @@ public static class SuspectResultDetector
                 .GroupBy(r => r.Gender)
                 .ToList();
             if (byGender.Count < 2) continue;
-            var dominant = byGender.OrderByDescending(g => g.Count()).First();
-            foreach (var g in byGender.Where(g => g.Key != dominant.Key))
+
+            var cardGender = grp
+                .Select(r => Normalize(r.SwimmerGender))
+                .FirstOrDefault(g => g != null);
+            var expected = cardGender ?? byGender.OrderByDescending(g => g.Count()).First().Key;
+            var against = cardGender != null ? "по карточке пловца" : "в остальных заплывах пловца";
+
+            foreach (var g in byGender.Where(g => g.Key != expected))
             foreach (var row in g)
                 Flag(row, SuspectReasons.GenderMismatch,
-                    $"пол '{row.Gender}', тогда как в остальных заплывах пловца — '{dominant.Key}'");
+                    $"пол '{row.Gender}', тогда как {against} — '{expected}'");
         }
 
         // 5. Один пловец дважды в одной дисциплине одного дня с разным временем.
@@ -238,6 +305,10 @@ public static class SuspectResultDetector
                 var best = window.Max(h => h.Points);
                 if (row.Points.Value < best * PersonalOutlierFactor) continue;
 
+                // Страховка протоколом: время, согласованное с собственным заплывом,
+                // ошибкой не бывает — судьи видели этих людей рядом (HeatPlausibleFactor).
+                if (IsPlausibleInHeat(row, timed)) continue;
+
                 Flag(row, SuspectReasons.PersonalOutlier,
                     $"{row.Points} очков против личного лучшего {best} за ±{PersonalWindowDays} дней "
                     + $"({window.Count} заплывов) — вдвое выше собственного уровня");
@@ -245,6 +316,40 @@ public static class SuspectResultDetector
         }
 
         return verdicts.Values.OrderBy(v => v.ResultId).ToList();
+    }
+
+    /// <summary>Пол в БД живёт как male/female и как M/F — сводим к одному написанию.</summary>
+    private static string? Normalize(string? gender) => gender?.Trim().ToLowerInvariant() switch
+    {
+        "male" or "m" => "male",
+        "female" or "f" => "female",
+        _ => null,
+    };
+
+    /// <summary>
+    /// Время подтверждено собственным заплывом: соседи по нему плыли примерно так же.
+    /// Заплыв — это то, что судьи видели глазами, поэтому он и служит опорой.
+    ///
+    /// Ключ заплыва — день + дисциплина + номер заплыва: номер уникален внутри дня одной
+    /// дисциплины, а через дни и дисциплины повторяется.
+    /// </summary>
+    private static bool IsPlausibleInHeat(
+        SuspectCandidateRow row, IReadOnlyCollection<SuspectCandidateRow> all)
+    {
+        // Heat = 0 — источник номера заплыва не дал; опоры нет, правило работает как прежде.
+        if (row.Heat <= 0) return false;
+
+        var peers = all
+            .Where(r => r.ResultId != row.ResultId
+                        && r.Heat == row.Heat
+                        && r.StyleName == row.StyleName
+                        && r.Distance == row.Distance
+                        && r.CompetitionDate.Date == row.CompetitionDate.Date)
+            .Select(r => r.TimeMilliseconds!.Value)
+            .ToList();
+        if (peers.Count < MinHeatPeers) return false;
+
+        return row.TimeMilliseconds!.Value >= peers.Min() * HeatPlausibleFactor;
     }
 
     /// <summary>

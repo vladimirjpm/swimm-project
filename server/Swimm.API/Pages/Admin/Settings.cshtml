@@ -1,4 +1,4 @@
-@page
+﻿@page
 @model Swimm.API.Pages.Admin.SettingsModel
 @{
     ViewData["Title"] = "Settings";
@@ -48,7 +48,81 @@
 </table>
 
 @section Scripts {
+<div class="admin-card p-5 mt-6" id="debug-options-card">
+    <div class="flex items-center justify-between mb-1">
+        <h2 class="text-lg text-admin-accent m-0">Debug details</h2>
+        <span id="debug-master-badge" class="text-[0.7rem] py-0.5 px-1.5 rounded-sm font-semibold uppercase"></span>
+    </div>
+    <p class="text-xs text-admin-text-muted mt-0 mb-3">
+        Подробности, которые витрины обычно не показывают. Действуют, только когда включён
+        общий тумблер <code>DebugDetails</code> в таблице выше — иначе галочка ничего не меняет.
+    </p>
+    <div id="debug-options-list" class="text-sm text-admin-text-muted">Загружаю…</div>
+</div>
+
 <script>
+    // ── Debug details: двухуровневый выключатель (DebugDetails × галочка опции) ──
+    // «effective» считает сервер — на клиенте правило не дублируем, иначе разъедется.
+    async function loadDebugOptions() {
+        try {
+            renderDebugOptions(await api('/api/admin/debug-options'));
+        } catch (e) {
+            document.getElementById('debug-options-list').textContent =
+                'Не удалось загрузить опции: ' + e.message;
+        }
+    }
+
+    function renderDebugOptions(data) {
+        const list = document.getElementById('debug-options-list');
+        const badge = document.getElementById('debug-master-badge');
+
+        badge.textContent = data.masterEnabled ? 'DebugDetails: on' : 'DebugDetails: off';
+        badge.className = 'text-[0.7rem] py-0.5 px-1.5 rounded-sm font-semibold uppercase '
+            + (data.masterEnabled
+                ? 'bg-admin-accent/15 text-admin-accent'
+                : 'bg-white/5 text-admin-text-muted');
+
+        if (!data.options || !data.options.length) {
+            list.textContent = 'Опций пока нет.';
+            return;
+        }
+
+        list.innerHTML = data.options.map(o => `
+            <label class="flex items-start gap-2.5 py-2 border-t border-white/[.05] cursor-pointer">
+                <input type="checkbox" class="mt-1 debug-option-toggle" data-key="${esc(o.key)}"
+                       ${o.enabled ? 'checked' : ''}>
+                <span>
+                    <span class="text-admin-text font-semibold">${esc(o.title)}</span>
+                    ${o.effective
+                        ? '<span class="ml-2 text-[11px] text-admin-accent">действует</span>'
+                        : (o.enabled
+                            ? '<span class="ml-2 text-[11px] text-admin-warning">включена, но DebugDetails выключен</span>'
+                            : '')}
+                    <span class="block text-[11px] text-[#90a4ae] leading-snug">${esc(o.description)}</span>
+                    <span class="block text-[10px] text-[#546e7a]">${esc(o.key)}</span>
+                </span>
+            </label>`).join('');
+
+        list.querySelectorAll('.debug-option-toggle').forEach(cb => {
+            cb.addEventListener('change', () => saveDebugOption(cb.dataset.key, cb.checked));
+        });
+    }
+
+    async function saveDebugOption(key, enabled) {
+        try {
+            const data = await api('/api/admin/debug-options/' + encodeURIComponent(key), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled })
+            });
+            renderDebugOptions(data);
+            toast(`${key} = ${enabled}`);
+        } catch (e) {
+            toast(`Error: ${e.message}`);
+            loadDebugOptions();
+        }
+    }
+
 (async function () {
     const API = '/api/admin/settings';
     let settings = [];
@@ -177,6 +251,9 @@
         activeScope = btn.dataset.scope;
         render();
     });
+
+    // Опции отладки грузим независимо от таблицы настроек: упадёт одно — второе выживет.
+    loadDebugOptions();
 
     try {
         settings = await api(API);

@@ -25,7 +25,13 @@ public class DataCheckRunner(
     IEnumerable<IDataCheck> checks,
     // Пересчёт зачёта после привязки правила. Необязателен: без него правило проставится,
     // но цифры Top Clubs останутся старыми до следующего пересчёта — в тестах это не нужно.
-    IClubStandingService? standings = null) : IDataCheckRunner
+    IClubStandingService? standings = null,
+    // Сброс кэша после правок, меняющих витрину (пол участвует в рекордах и season best).
+    // Необязателен по той же причине, что и standings: в тестах кэша нет.
+    ICacheService? cache = null,
+    // «Не дубли» для пар дедупа при «Принять». Необязателен, как и остальные: в тестах,
+    // где проверяют только реестр, развязывать нечего.
+    IDedupIgnoreService? dedupIgnore = null) : IDataCheckRunner
 {
     public async Task<DataCheckRunDto> RunAllAsync(string trigger, CancellationToken ct = default)
     {
@@ -76,7 +82,7 @@ public class DataCheckRunner(
 
             foreach (var item in outcome.Items)
             {
-                var key = $"{check.Id}|{item.EntityType}|{item.EntityId}";
+                var key = Key(check.Id, item.EntityType, item.EntityId, item.FixKind, item.FixEntityId);
                 if (!seen.Add(key)) continue;
 
                 if (storedByKey.TryGetValue(key, out var existing))
@@ -154,7 +160,9 @@ public class DataCheckRunner(
         // прогоном, и сохранённое значение врало бы сразу после нажатия кнопки: человек
         // поправил, а список показывает старое.
         var subjectIds = findings
-            .Where(f => f.FixKind == DataCheckFixKinds.SwimmerGender && f.FixEntityId != null)
+            .Where(f => (f.FixKind == DataCheckFixKinds.SwimmerGender
+                         || f.FixKind == DataCheckFixKinds.SwimmerGenderAlign)
+                        && f.FixEntityId != null)
             .Select(f => f.FixEntityId!.Value)
             .Distinct()
             .ToList();
@@ -267,6 +275,17 @@ public class DataCheckRunner(
         f.ResolvedAt = DateTime.UtcNow;
         f.Note = note;
         await db.SaveChangesAsync(ct);
+
+        // «Принять» пару дедупа = «это не дубли, а тёзки». Значит она обязана уйти в тот же
+        // Sys_DedupIgnoredPairs, что заводит ✕ на /Admin/Swimmers: иначе механизма два —
+        // находка принята, а в списке дублей пара продолжает висеть и просить склейки.
+        if (f.FixKind == DataCheckFixKinds.DedupIgnore && f.EntityId is { } canonId
+            && f.FixEntityId is { } dupId && canonId != dupId && dedupIgnore != null)
+        {
+            var entityType = f.EntityType == "Club" ? DedupEntityType.Club : DedupEntityType.Swimmer;
+            await dedupIgnore.AddAsync(entityType, canonId, dupId, ct);
+        }
+
         return true;
     }
 
@@ -293,6 +312,33 @@ public class DataCheckRunner(
         foreach (var r in rows) r.Gender = gender;
 
         await db.SaveChangesAsync(ct);
+        return rows.Count;
+    }
+
+    public async Task<int?> AlignSwimmerGenderAsync(int findingId, string gender, CancellationToken ct = default)
+    {
+        if (gender is not ("male" or "female")) return null;
+
+        var f = await db.DataCheckFindings.FirstOrDefaultAsync(x => x.Id == findingId, ct);
+        if (f?.FixKind != DataCheckFixKinds.SwimmerGenderAlign || f.FixEntityId is not { } swimmerId)
+            return null;
+
+        var swimmer = await db.Swimmers.FirstOrDefaultAsync(s => s.Id == swimmerId, ct);
+        if (swimmer is null) return null;
+
+        swimmer.Gender = gender;
+
+        // Здесь, в отличие от `results.no-gender`, перезаписываем и НЕПУСТОЙ пол строки:
+        // находка и есть «копии разошлись», а человек только что сказал, какая верна.
+        // Эстафеты не трогаем — там пол команды, а не пловца.
+        var rows = await db.Results
+            .Where(r => r.SwimmerId == swimmerId && r.RelayId == null && r.Gender != gender)
+            .ToListAsync(ct);
+        foreach (var r in rows) r.Gender = gender;
+
+        await db.SaveChangesAsync(ct);
+        // Пол участвует в выборках витрин (рекорды, season best) — кэш обязан протухнуть.
+        if (cache != null) await cache.InvalidateAllAsync();
         return rows.Count;
     }
 
@@ -366,7 +412,18 @@ public class DataCheckRunner(
         return true;
     }
 
-    private static string Key(DataCheckFinding f) => $"{f.CheckId}|{f.EntityType}|{f.EntityId}";
+    /// <summary>
+    /// Ключ находки между прогонами. У находок-ПАР (дедуп) в него входит и второй участник:
+    /// иначе «A ← B» и «A ← C» неразличимы, вторая пара молча терялась, а «принять» одну
+    /// значило спрятать обе.
+    /// </summary>
+    private static string Key(DataCheckFinding f) =>
+        Key(f.CheckId, f.EntityType, f.EntityId, f.FixKind, f.FixEntityId);
+
+    private static string Key(string checkId, string entityType, int? entityId, string? fixKind, int? fixEntityId) =>
+        fixKind == DataCheckFixKinds.DedupIgnore
+            ? $"{checkId}|{entityType}|{entityId}|{fixEntityId}"
+            : $"{checkId}|{entityType}|{entityId}";
 
     private static DataCheckRunDto ToDto(DataCheckRun r) =>
         new(r.Id, r.StartedAt, r.FinishedAt, r.Trigger, r.ErrorCount, r.WarningCount, r.InfoCount, r.FixedCount);

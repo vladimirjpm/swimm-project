@@ -50,6 +50,16 @@ public class AdminSettingsService : ISettingsService
                 "Автозабор isr.org.il: true — фоновая проверка списка соревнований по расписанию"),
             new("DiscoveryIntervalHours", "12", "int", "admin",
                 "Интервал фоновой проверки isr.org.il в часах (минимум 1)"),
+            new("DebugDetails", "false", "bool", "both",
+                "Общий тумблер отладочных подробностей на витринах. Пока выключен, ни одна " +
+                "опция из Sys_DebugOptions не действует — одним движением гасится всё. " +
+                "Сами опции — секция «Debug details» ниже на этой странице"),
+            new("RecordAgeAxis", "calendar", "string", "both",
+                "Ось возраста ДЛЯ СВЕРКИ С РЕКОРДАМИ: calendar — по году заплыва, как ведёт " +
+                "справочник федерация (год заплыва минус год рождения); season — по году " +
+                "окончания сезона, как считаем возраст у себя. Оси расходятся только с " +
+                "сентября по декабрь. Возраст на страницах (ростер, зачёт, категории) " +
+                "настройка НЕ трогает — он всегда сезонный (docs/data-integrity.md §13)"),
         };
 
         foreach (var s in defaults)
@@ -91,6 +101,8 @@ public class AdminSettingsService : ISettingsService
         if (key == "HubGroupCreationPolicy" && newValue is not ("admin" or "coach" or "any"))
             return false;
         if (key == "HubGroupVisibility" && newValue is not ("public" or "private" or "perGroup"))
+            return false;
+        if (key == "RecordAgeAxis" && newValue is not ("calendar" or "season"))
             return false;
 
         _settings[key] = existing with { Value = newValue };

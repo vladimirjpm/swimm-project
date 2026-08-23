@@ -1,8 +1,25 @@
 ﻿using System.Globalization;
 using Swimm.Application.Dtos;
+using Swimm.Domain;
 using Swimm.Domain.Entities;
 
 namespace Swimm.Application.Mapping;
+
+/// <summary>
+/// Ось возраста для сверки со справочником рекордов. Настройка RecordAgeAxis в /Admin/Settings.
+///
+/// ⚠ Это НЕ «возраст пловца» — тот всегда сезонный (<see cref="SeasonMath.AgeInSeason"/>) и
+/// настройкой не управляется. Здесь — система координат ЧУЖОЙ таблицы: чтобы попасть в
+/// нужную строку справочника, ключ должен быть в той же оси, в какой его пишет федерация.
+/// </summary>
+public enum RecordAgeAxis
+{
+    /// <summary>Год заплыва минус год рождения — так ведёт справочник федерация (дефолт).</summary>
+    Calendar,
+
+    /// <summary>Год окончания сезона минус год рождения — как считаем возраст у себя.</summary>
+    Season
+}
 
 /// <summary>
 /// Кандидат-строка результата для детекции рекордов (минимальная проекция заплыва).
@@ -31,14 +48,15 @@ public sealed record RecordCandidateRow(
 /// рекорду из таблицы Records. Серверный аналог клиентского HelperNormative.isRecordTime:
 /// те же оси (gender/pool/style/distance/age), regione — country/ISR. Чистая функция —
 /// I/O (загрузка Records и строк) делает репозиторий.
-/// Сверяем по трём категориям: age (AgeKey = возраст в год соревнования, для masters —
-/// диапазон "25-29"), open (AgeKey = "") и национальный ключ AgeKey = "ISR".
+/// Сверяем по трём категориям: age (AgeKey = возраст по оси <see cref="RecordAgeAxis"/>,
+/// для masters — диапазон "25-29"), open (AgeKey = "") и национальный ключ AgeKey = "ISR".
 /// </summary>
 public static class CompetitionRecordsDetector
 {
     public static List<OverviewRecordDto> Detect(
-        IReadOnlyCollection<Record> records, IReadOnlyCollection<RecordCandidateRow> rows) =>
-        DetectBest(records, rows)
+        IReadOnlyCollection<Record> records, IReadOnlyCollection<RecordCandidateRow> rows,
+        RecordAgeAxis axis = RecordAgeAxis.Calendar) =>
+        DetectBest(records, rows, axis)
             .Select(b => new OverviewRecordDto
             {
                 Kind = KindLabel(b.Rec),
@@ -61,7 +79,8 @@ public static class CompetitionRecordsDetector
     /// рекордов» — цифра, которую нечем проверить глазами.
     /// </summary>
     public static List<(RecordCandidateRow Row, Record Rec)> DetectBest(
-        IReadOnlyCollection<Record> records, IReadOnlyCollection<RecordCandidateRow> rows)
+        IReadOnlyCollection<Record> records, IReadOnlyCollection<RecordCandidateRow> rows,
+        RecordAgeAxis axis = RecordAgeAxis.Calendar)
     {
         if (records.Count == 0 || rows.Count == 0) return [];
 
@@ -81,7 +100,7 @@ public static class CompetitionRecordsDetector
         var best = new Dictionary<string, (RecordCandidateRow Row, Record Rec)>();
         foreach (var row in rows)
         {
-            foreach (var (category, ageKey) in CandidateKeys(row))
+            foreach (var (category, ageKey) in CandidateKeys(row, axis))
             {
                 var key = Key(row.Gender, row.PoolType, row.StyleName, row.Distance, category, ageKey);
                 if (!index.TryGetValue(key, out var rec)) continue;
@@ -103,7 +122,8 @@ public static class CompetitionRecordsDetector
     public static string Kind(Record rec) => KindLabel(rec);
 
     /// <summary>Категории/AgeKey, по которым заплыв может побить рекорд.</summary>
-    private static IEnumerable<(string Category, string AgeKey)> CandidateKeys(RecordCandidateRow row)
+    private static IEnumerable<(string Category, string AgeKey)> CandidateKeys(
+        RecordCandidateRow row, RecordAgeAxis axis)
     {
         // Национальный рекорд живёт ровно в одном месте — category="open" (туда его кладёт
         // IsrOrgAgeRecordsSourceProvider для строк с Note="National Record").
@@ -114,8 +134,18 @@ public static class CompetitionRecordsDetector
         yield return ("open", "");
 
         if (row.BirthYear is null) yield break;
-        var age = row.CompetitionDate.Year - row.BirthYear.Value;
-        if (age is < 5 or > 120) yield break;
+
+        // Возраст для попадания в строку справочника — по выбранной оси (RecordAgeAxis):
+        //   calendar — год заплыва минус год рождения; так ведёт справочник федерация,
+        //              проверено на всей базе (docs/data-integrity.md §13). Дефолт.
+        //   season   — год окончания сезона минус год рождения; наш возраст в сезоне.
+        // Оси расходятся только с сентября по декабрь: пловчиха 2015 г.р. на старте
+        // 31/10/2025 — это Age 10 по календарю и Age 11 по сезону.
+        var ageValue = axis == RecordAgeAxis.Season
+            ? SeasonMath.AgeInSeason(SeasonMath.StartYearOf(row.CompetitionDate), row.BirthYear.Value)
+            : row.CompetitionDate.Year - row.BirthYear.Value;
+
+        if (ageValue is not int age || age is < 5 or > 120) yield break;
 
         if (row.IsMasters)
         {

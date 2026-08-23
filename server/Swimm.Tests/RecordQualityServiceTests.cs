@@ -89,6 +89,149 @@ public class RecordQualityServiceTests
         Assert.True(row.DateMatched);
     }
 
+    /* ───────────── ось возраста ступени (docs/data-integrity.md §13) ───────────── */
+
+    [Fact]
+    public async Task Verify_AutumnSwim_MarksCalendarAxis_WhenStepIsFederationsOne()
+    {
+        // Случай Мии: 2015 г.р., заплыв 31/10/2025. По календарю ей 10 (ступень справочника),
+        // по сезону 2025/26 — 11. Ступень «10» сходится ТОЛЬКО по календарной оси.
+        using var db = CreateDb(nameof(Verify_AutumnSwim_MarksCalendarAxis_WhenStepIsFederationsOne));
+        var (comp, swimmer) = await SeedBaseAsync(db);
+        db.Add(Rec("39.02", date: "31/10/2025", ageKey: "10"));
+        db.Add(Swim(comp, swimmer, 39_020, new DateTime(2025, 10, 31)));
+        await db.SaveChangesAsync();
+
+        var result = await new RecordQualityService(db).VerifyAllAsync();
+
+        Assert.Equal(AgeAxisMatches.Calendar, Assert.Single(db.RecordVerifications).AgeAxisMatch);
+        Assert.Equal(1, result.AgeAxisChecked);
+        Assert.Equal(1, result.AgeAxisCalendarOnly);
+        Assert.Equal(0, result.AgeAxisBoth);
+    }
+
+    [Fact]
+    public async Task Verify_AutumnSwim_MarksSeasonAxis_WhenStepIsOurs()
+    {
+        // Тот же осенний заплыв, но ступень «11» — так было бы, считай федерация по сезону.
+        using var db = CreateDb(nameof(Verify_AutumnSwim_MarksSeasonAxis_WhenStepIsOurs));
+        var (comp, swimmer) = await SeedBaseAsync(db);
+        db.Add(Rec("39.02", date: "31/10/2025", ageKey: "11"));
+        db.Add(Swim(comp, swimmer, 39_020, new DateTime(2025, 10, 31)));
+        await db.SaveChangesAsync();
+
+        var result = await new RecordQualityService(db).VerifyAllAsync();
+
+        Assert.Equal(AgeAxisMatches.Season, Assert.Single(db.RecordVerifications).AgeAxisMatch);
+        Assert.Equal(1, result.AgeAxisSeasonOnly);
+    }
+
+    [Fact]
+    public async Task Verify_SummerSwim_MarksBoth_BecauseAxesAgree()
+    {
+        // Июль: год окончания сезона равен календарному, оси неразличимы. Такие записи
+        // ничего не говорят об оси источника — ради этого «both» и отделён от «calendar».
+        using var db = CreateDb(nameof(Verify_SummerSwim_MarksBoth_BecauseAxesAgree));
+        var (comp, swimmer) = await SeedBaseAsync(db);
+        db.Add(Rec("34.08", date: "20/07/2025", ageKey: "10"));
+        db.Add(Swim(comp, swimmer, 34_080, new DateTime(2025, 7, 20)));
+        await db.SaveChangesAsync();
+
+        var result = await new RecordQualityService(db).VerifyAllAsync();
+
+        Assert.Equal(AgeAxisMatches.Both, Assert.Single(db.RecordVerifications).AgeAxisMatch);
+        Assert.Equal(1, result.AgeAxisBoth);
+    }
+
+    [Fact]
+    public async Task Verify_StepLeakedToOlderAge_MarksNone()
+    {
+        // Ступень 12 при пловце 10 лет — это протечка рекорда в старшую ступень (время
+        // держится, пока не побили). Не ошибка источника, но и не подтверждение оси.
+        using var db = CreateDb(nameof(Verify_StepLeakedToOlderAge_MarksNone));
+        var (comp, swimmer) = await SeedBaseAsync(db);
+        db.Add(Rec("34.08", date: "20/07/2025", ageKey: "12"));
+        db.Add(Swim(comp, swimmer, 34_080, new DateTime(2025, 7, 20)));
+        await db.SaveChangesAsync();
+
+        var result = await new RecordQualityService(db).VerifyAllAsync();
+
+        Assert.Equal(AgeAxisMatches.None, Assert.Single(db.RecordVerifications).AgeAxisMatch);
+        Assert.Equal(1, result.AgeAxisNone);
+    }
+
+    [Fact]
+    public async Task Verify_OpenAndRelay_LeaveAxisUnset()
+    {
+        // Ступени open/adults нечего сверять с возрастом, а у эстафеты ступень задаётся
+        // составом четвёрки — найденный по времени один пловец там ничего не доказывает.
+        using var db = CreateDb(nameof(Verify_OpenAndRelay_LeaveAxisUnset));
+        var (comp, swimmer) = await SeedBaseAsync(db);
+
+        var open = Rec("34.08", date: "20/07/2025");
+        open.Category = "open";
+        open.AgeKey = "";
+        db.Add(open);
+        db.Add(Swim(comp, swimmer, 34_080, new DateTime(2025, 7, 20)));
+
+        db.Add(Rec("41.10", distance: "4X50m", date: "20/07/2025", ageKey: "10"));
+        db.Add(Swim(comp, swimmer, 41_100, new DateTime(2025, 7, 20), distance: "4X50"));
+        await db.SaveChangesAsync();
+
+        var result = await new RecordQualityService(db).VerifyAllAsync();
+
+        Assert.Equal(2, result.Found);
+        Assert.Equal(0, result.AgeAxisChecked);
+        Assert.All(db.RecordVerifications, v => Assert.Null(v.AgeAxisMatch));
+    }
+
+    [Fact]
+    public async Task Verify_TimeMatchedOnAnotherDay_LeavesAxisUnset()
+    {
+        // Время совпало, а день другой — значит это, скорее всего, другой пловец. Его
+        // возраст про ступень справочника не говорит ничего, ось не проверяем.
+        using var db = CreateDb(nameof(Verify_TimeMatchedOnAnotherDay_LeavesAxisUnset));
+        var (comp, swimmer) = await SeedBaseAsync(db);
+        db.Add(Rec("39.02", date: "31/10/2025", ageKey: "10"));
+        db.Add(Swim(comp, swimmer, 39_020, new DateTime(2025, 7, 20)));
+        await db.SaveChangesAsync();
+
+        var result = await new RecordQualityService(db).VerifyAllAsync();
+
+        var row = Assert.Single(db.RecordVerifications);
+        Assert.True(row.Found);
+        Assert.False(row.DateMatched);
+        Assert.Null(row.AgeAxisMatch);
+        Assert.Equal(0, result.AgeAxisChecked);
+    }
+
+    [Fact]
+    public async Task Verify_MastersBand_ChecksRange()
+    {
+        // Masters: ступень — диапазон, проверка на попадание внутрь.
+        using var db = CreateDb(nameof(Verify_MastersBand_ChecksRange));
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var veteran = new Swimmer
+        {
+            Club = club, LastName = "V", FirstName = "V",
+            LastNameEn = "V", FirstNameEn = "V", BirthYear = 1998
+        };
+        var comp = new Competition { Name = "Masters Meet", Date = "20/07/2025", PoolType = "50m" };
+        db.AddRange(club, veteran, comp, new Style { Id = 100, Name = "backstroke" });
+        await db.SaveChangesAsync();
+
+        var band = Rec("34.08", date: "20/07/2025");
+        band.Category = "masters";
+        band.AgeKey = "25-29";                       // 2025 − 1998 = 27, внутри полосы
+        db.Add(band);
+        db.Add(Swim(comp, veteran, 34_080, new DateTime(2025, 7, 20)));
+        await db.SaveChangesAsync();
+
+        await new RecordQualityService(db).VerifyAllAsync();
+
+        Assert.Equal(AgeAxisMatches.Both, Assert.Single(db.RecordVerifications).AgeAxisMatch);
+    }
+
     [Fact]
     public async Task Verify_NotFound_IsNeutral_AndCreatesNoIssue()
     {

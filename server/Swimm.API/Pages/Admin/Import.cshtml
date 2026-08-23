@@ -1,4 +1,4 @@
-@page
+﻿@page
 @model Swimm.API.Pages.Admin.ImportModel
 @{
     ViewData["Title"] = "Import";
@@ -339,7 +339,8 @@
                 <div class="text-2xl mb-1">🇮🇱</div>
                 <div class="font-semibold text-admin-text mb-1">Age Records</div>
                 <div class="text-xs text-admin-text-muted mb-2">isr.org.il · PDF-протокол (10–18, national)</div>
-                <div class="text-xs text-admin-text-muted mb-3">Обновлено: <span class="rs-status" data-source="isrorg-age">—</span></div>
+                <div class="text-xs text-admin-text-muted mb-1">Обновлено: <span class="rs-status" data-source="isrorg-age">—</span></div>
+                <div class="text-[11px] text-admin-text-muted mb-3">Файлы: <span class="rs-links" data-source="isrorg-age">ищу на сайте…</span></div>
                 <div class="flex gap-2 mb-2">
                     <button class="admin-btn admin-btn-ghost flex-1 text-xs rs-fetch-btn" data-source="isrorg-age" data-pool-primary="25m">⬇ Fetch</button>
                     <button class="admin-btn admin-btn-ghost flex-1 text-xs rs-file-toggle" data-source="isrorg-age">📁 Файл</button>
@@ -363,7 +364,8 @@
                 <div class="text-2xl mb-1">🇮🇱</div>
                 <div class="font-semibold text-admin-text mb-1">Masters Records</div>
                 <div class="text-xs text-admin-text-muted mb-2">isr.org.il · PDF-протокол (25-29…)</div>
-                <div class="text-xs text-admin-text-muted mb-3">Обновлено: <span class="rs-status" data-source="isrorg-masters">—</span></div>
+                <div class="text-xs text-admin-text-muted mb-1">Обновлено: <span class="rs-status" data-source="isrorg-masters">—</span></div>
+                <div class="text-[11px] text-admin-text-muted mb-3">Файлы: <span class="rs-links" data-source="isrorg-masters">ищу на сайте…</span></div>
                 <div class="flex gap-2 mb-2">
                     <button class="admin-btn admin-btn-ghost flex-1 text-xs rs-fetch-btn" data-source="isrorg-masters" data-pool-primary="50m">⬇ Fetch</button>
                     <button class="admin-btn admin-btn-ghost flex-1 text-xs rs-file-toggle" data-source="isrorg-masters">📁 Файл</button>
@@ -472,6 +474,7 @@
         if (!isCompetitions && !recordsStatusLoaded) {
             recordsStatusLoaded = true;
             loadRecordSourceStatus();
+            loadIsrOrgRecordLinks();
         }
     }
     topTabCompetitions.addEventListener('click', () => setTopMode('competitions'));
@@ -1081,6 +1084,46 @@
         const d = new Date(iso);
         if (isNaN(d)) return '—';
         return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    }
+
+    // Что подтянет Fetch: ссылки резолвятся со страницы «שיאי ישראל» — прямые URL в конфиге
+    // протухают, потому что федерация зашивает дату обновления в имя файла.
+    function loadIsrOrgRecordLinks() {
+        const cells = document.querySelectorAll('.rs-links');
+        if (!cells.length) return;
+
+        fetch('/api/admin/records/isrorg-links', { credentials: 'same-origin' })
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                const links = (data && data.links) || [];
+                cells.forEach(el => {
+                    const wantMasters = el.dataset.source === 'isrorg-masters';
+                    const mine = links.filter(l => !!l.isMasters === wantMasters);
+
+                    if (!mine.length) {
+                        el.textContent = data && data.error ? 'сайт недоступен — грузите файлом' : 'не найдены';
+                        el.title = (data && data.error) || '';
+                        return;
+                    }
+
+                    el.innerHTML = mine
+                        .sort((a, b) => a.poolType.localeCompare(b.poolType))
+                        .map(l => {
+                            const upd = l.updatedOn ? ` <span class="opacity-70">от ${fmtDateOnly(l.updatedOn)}</span>` : '';
+                            return `<a href="${l.url}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">${l.poolType}</a>${upd}`;
+                        })
+                        .join(' · ');
+                });
+            })
+            .catch(() => {
+                cells.forEach(el => { el.textContent = 'не удалось проверить'; });
+            });
+    }
+
+    // «2026-08-17» → «17/08/2026»; сервер отдаёт DateOnly, без времени и таймзоны.
+    function fmtDateOnly(d) {
+        const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d || ''));
+        return m ? `${m[3]}/${m[2]}/${m[1]}` : String(d || '');
     }
 
     function loadRecordSourceStatus() {

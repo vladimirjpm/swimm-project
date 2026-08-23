@@ -47,6 +47,57 @@ public class IsrOrgHeatTypeTests
     }
 
     [Fact]
+    public void SkinsAfterFinal_DoNotStealTheFinalMark()
+    {
+        // אליפות הרצליה, 01/11/2025: после финала 50 вольным плыли призовые заплывы на
+        // выбывание — 8 → 2 у мужчин. Правило «последняя серия = финал» объявляло финалом
+        // заплыв двух человек, а настоящий финал уезжал в prelim вместе со своими местами
+        // (у прелимов Position на выдаче гасится). Финал — последняя ПОЛНОЦЕННАЯ серия.
+        var prelims = Enumerable.Range(1, 44).ToArray();
+        var final = Enumerable.Range(1, 8).ToArray();
+        var skins = new[] { 1, 2 };
+
+        var types = IsrOrgParser.AssignHeatTypes(
+        [
+            Comp("01/11/2025", len: "50", gender: "male", age: "17-99", swimmers: prelims),
+            Comp("01/11/2025", len: "50", gender: "male", age: "17-99", swimmers: final),
+            Comp("01/11/2025", len: "50", gender: "male", age: "17-99", swimmers: skins),
+        ]);
+
+        // Призовой заплыв — не «ещё один prelim»: свой тип, иначе он сливается с утренними
+        // заплывами в одну сессию, и проверка качества ловит ложный «повтор дисциплины».
+        Assert.Equal(["prelim", "final", "extra"], types);
+    }
+
+    [Fact]
+    public void SkinsChain_FallsBackToTheLastFullHeat()
+    {
+        // У женщин цепочка длиннее: 8 → 4 → 2. Отбрасываем весь хвост мини-серий.
+        var types = IsrOrgParser.AssignHeatTypes(
+        [
+            Comp("01/11/2025", len: "50", age: "16-99", swimmers: Enumerable.Range(1, 44).ToArray()),
+            Comp("01/11/2025", len: "50", age: "16-99", swimmers: Enumerable.Range(1, 8).ToArray()),
+            Comp("01/11/2025", len: "50", age: "16-99", swimmers: [1, 2, 3, 4]),
+            Comp("01/11/2025", len: "50", age: "16-99", swimmers: [1, 2]),
+        ]);
+
+        Assert.Equal(["prelim", "final", "extra", "extra"], types);
+    }
+
+    [Fact]
+    public void NormalFinal_StaysLast_EvenWhenSmallerThanPrelims()
+    {
+        // Обычная пара «прелимы 30 → финал 8»: финал меньше, но полноценный — метка на нём.
+        var types = IsrOrgParser.AssignHeatTypes(
+        [
+            Comp("23/05/2026", swimmers: Enumerable.Range(1, 30).ToArray()),
+            Comp("23/05/2026", swimmers: Enumerable.Range(1, 8).ToArray()),
+        ]);
+
+        Assert.Equal(["prelim", "final"], types);
+    }
+
+    [Fact]
     public void SingleOccurrence_OrDifferentDays_StayNull()
     {
         var types = IsrOrgParser.AssignHeatTypes(

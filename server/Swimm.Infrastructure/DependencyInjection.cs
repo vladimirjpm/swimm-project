@@ -41,6 +41,7 @@ public static class DependencyInjection
 
         // Settings (singleton — in-memory store)
         services.AddSingleton<ISettingsService, AdminSettingsService>();
+        services.AddScoped<IDebugOptionsService, DebugOptionsService>();
 
         // Scoped services
         services.AddScoped<IImportService, JsonImportService>();
@@ -65,6 +66,7 @@ public static class DependencyInjection
         services.AddScoped<IClubAdminRepository, ClubAdminRepository>();
         services.AddScoped<IClubPublicRepository, ClubPublicRepository>();
         services.AddScoped<IClubOverviewRepository, ClubOverviewRepository>();
+        services.AddScoped<ISeasonBestRepository, SeasonBestRepository>();
         services.AddScoped<ISwimmerPageRepository, SwimmerPageRepository>();
         services.AddScoped<IUserFavoriteRepository, UserFavoriteRepository>();
         services.AddScoped<IUserMediaRepository, UserMediaRepository>();
@@ -95,6 +97,7 @@ public static class DependencyInjection
         services.AddScoped<IDataCheck, FkAnomalyCheck>();
         services.AddScoped<IDataCheck, ReconciliationMismatchCheck>();
         services.AddScoped<IDataCheck, NoGenderCheck>();
+        services.AddScoped<IDataCheck, GenderVsCardCheck>();
         services.AddScoped<IDataCheck, EmptyRelayCheck>();
         services.AddScoped<IDataCheck, MergedSessionsCheck>();
         services.AddScoped<IDataCheck, OfficialClubPointsMismatchCheck>();

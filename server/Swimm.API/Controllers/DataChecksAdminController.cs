@@ -73,6 +73,26 @@ public class DataChecksAdminController(IDataCheckRunner runner, IAdminAuditServi
         return Ok(new { rows });
     }
 
+    /// <summary>
+    /// Выровнять пол пловца из находки `results.gender-vs-card`: пол уходит в карточку И во
+    /// ВСЕ его личные строки. Отдельный эндпоинт, а не флаг у fix-gender: перезапись
+    /// напечатанного в протоколе пола — другое по смыслу действие, и в аудите оно должно
+    /// выглядеть иначе.
+    /// </summary>
+    [HttpPost("{id:int}/fix-gender-align")]
+    public async Task<IActionResult> FixGenderAlign(int id, [FromBody] FixGenderRequest request, CancellationToken ct)
+    {
+        var rows = await runner.AlignSwimmerGenderAsync(id, request.Gender, ct);
+        if (rows is null)
+            return BadRequest(new { error = "Находка не найдена, не поддерживает это исправление или пол задан неверно" });
+
+        await audit.LogAsync("datacheck.fix-gender-align", "DataCheckFinding", id.ToString(),
+            $"Находка #{id}: пол '{request.Gender}' выровнен по карточке и строкам; строк переписано — {rows}",
+            new { findingId = id, request.Gender, rows }, ct);
+
+        return Ok(new { rows });
+    }
+
     /// <summary>Привязать правило клубных очков прямо из находки (без захода в карточку).</summary>
     [HttpPost("{id:int}/fix-club-rule")]
     public async Task<IActionResult> FixClubRule(int id, [FromBody] FixClubRuleRequest request, CancellationToken ct)

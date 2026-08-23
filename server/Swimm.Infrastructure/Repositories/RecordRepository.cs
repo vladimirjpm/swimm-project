@@ -23,11 +23,13 @@ public class RecordRepository : IRecordRepository
         _cache = cache;
     }
 
-    public async Task<IReadOnlyList<RecordDto>> GetRecordsAsync(string region, string? category = null)
+    public async Task<IReadOnlyList<RecordDto>> GetRecordsAsync(
+        string region, string? category = null, bool withHolderDetails = false)
     {
-        // Регион нормализуем к ключу кэша: records:{region}:{category|all}
+        // Регион нормализуем к ключу кэша: records:{region}:{category|all}[:details]
         var regionKey = region.Trim().ToUpperInvariant();
-        var cacheKey = $"records:{regionKey}:{category ?? "all"}";
+        var cacheKey = $"records:{regionKey}:{category ?? "all"}"
+                     + (withHolderDetails ? ":details" : "");
 
         var cached = await _cache.GetAsync<IReadOnlyList<RecordDto>>(cacheKey);
         if (cached is not null)
@@ -77,9 +79,95 @@ public class RecordRepository : IRecordRepository
         foreach (var (index, reason) in reasons)
             records[index].IssueReason = reason;
 
+        if (withHolderDetails) await FillHolderDetailsAsync(records);
+
         await _cache.SetAsync(cacheKey, (IReadOnlyList<RecordDto>)records, CacheTtl);
 
         return records;
+    }
+
+    /// <summary>
+    /// Досыпает год рождения держателя и его возраст в год рекорда (отладочная опция
+    /// ShowAgeRecordsDetails). В справочнике федерации года рождения нет — восстанавливаем
+    /// по нашим пловцам, совпадением имени.
+    ///
+    /// ⚠ Почему НЕ по сверке «рекорды ↔ протоколы» (Sys_RecordVerifications.SwimmerId), хотя
+    /// она надёжнее: публичный read-путь ходит под ролью <c>swimm_ro</c>, у которой нет прав
+    /// на <c>Sys_*</c> по дизайну (server/db/setup-roles.sql). Лезть туда из витрины — значит
+    /// открывать системные таблицы публичной роли ради отладочной подписи; не стоит того.
+    ///
+    /// Правила совпадения:
+    /// • имя сверяется в ОБЕИХ перестановках слов — справочник пишет «טלר מרק», мы «מרק טלר»;
+    /// • тёзки с разными годами рождения отбрасываются: угадывать нельзя;
+    /// • не опознан — поля остаются null, витрина покажет прочерк.
+    ///
+    /// Отсюда и пометка источника <c>name</c> в DTO: подпись на витрине помечена «?», потому
+    /// что это совпадение имени, а не доказанный заплыв.
+    /// </summary>
+    private async Task FillHolderDetailsAsync(List<RecordDto> records)
+    {
+        var byName = await SwimmerBirthYearsByNameAsync();
+
+        foreach (var r in records)
+        {
+            if (string.IsNullOrWhiteSpace(r.HolderName)) continue;
+            if (!byName.TryGetValue(NormalizeHolderName(r.HolderName!), out var birthYear)) continue;
+
+            r.HolderBirthYear = birthYear;
+            r.HolderSource = "name";
+
+            var recordYear = RecordYearOf(r.RecordDate);
+            if (recordYear is int y && y - birthYear is > 0 and < 120)
+                r.HolderAge = y - birthYear;
+        }
+    }
+
+    /// <summary>
+    /// «имя фамилия» → год рождения, только там, где имя однозначно. Ключи кладём в обеих
+    /// перестановках: справочник и наши протоколы пишут порядок слов по-разному.
+    /// </summary>
+    private async Task<Dictionary<string, int>> SwimmerBirthYearsByNameAsync()
+    {
+        var swimmers = await _db.Swimmers.AsNoTracking()
+            .Where(s => s.BirthYear > 0)
+            .Select(s => new { s.FirstName, s.LastName, s.BirthYear })
+            .ToListAsync();
+
+        var years = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
+
+        void Remember(string key, int year)
+        {
+            if (string.IsNullOrWhiteSpace(key)) return;
+            if (!years.TryGetValue(key, out var set)) years[key] = set = new HashSet<int>();
+            set.Add(year);
+        }
+
+        foreach (var s in swimmers)
+        {
+            var first = (s.FirstName ?? "").Trim();
+            var last = (s.LastName ?? "").Trim();
+            if (first.Length == 0 && last.Length == 0) continue;
+
+            Remember(NormalizeHolderName($"{first} {last}"), s.BirthYear);
+            Remember(NormalizeHolderName($"{last} {first}"), s.BirthYear);
+        }
+
+        // Один год рождения на имя — иначе это тёзки, и угадывать мы не имеем права.
+        return years
+            .Where(kv => kv.Value.Count == 1)
+            .ToDictionary(kv => kv.Key, kv => kv.Value.First(), StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Схлопывает пробелы: в справочнике их бывает по нескольку подряд.</summary>
+    private static string NormalizeHolderName(string name) =>
+        string.Join(' ', name.Split(' ', StringSplitOptions.RemoveEmptyEntries
+                                       | StringSplitOptions.TrimEntries));
+
+    /// <summary>Год из даты рекорда: «22/12/2003» → 2003. null — даты нет или она мусорная.</summary>
+    private static int? RecordYearOf(string? recordDate)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(recordDate ?? "", @"(19|20)\d{2}");
+        return m.Success && int.TryParse(m.Value, out var y) ? y : null;
     }
 
     /// <summary>

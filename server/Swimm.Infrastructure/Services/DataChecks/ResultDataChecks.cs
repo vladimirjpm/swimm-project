@@ -102,6 +102,88 @@ public sealed class NoGenderCheck(IDataQualityService quality) : IDataCheck
     }
 }
 
+/// <summary>
+/// Пол личной строки против пола в карточке пловца. Пол человека обязан жить в ОДНОМ месте —
+/// в карточке; в строке результата он законен только у эстафет (там это пол команды) и как
+/// пол зачёта смешанного заплыва.
+///
+/// На живой базе 2026-08-23 копии разошлись у 64 пловцов (357 строк), причём в обе стороны:
+/// у 46 расходятся ВСЕ строки (карточка досталась по ошибке — женские имена с полом male),
+/// у 18 — единичные строки (ошибка в шапке одного протокола, comp 1580). Поэтому находка
+/// показывает расклад «мужских/женских строк» и даёт выбрать верный пол: автоматика тут
+/// гадать не должна — при 2:2 правды в данных нет.
+/// </summary>
+public sealed class GenderVsCardCheck(SwimmDbContext db) : IDataCheck
+{
+    public string Id => "results.gender-vs-card";
+    public string Title => "Пол результата против карточки пловца";
+    public string Description =>
+        "У личных строк пловца пол не совпадает с полом в его карточке. Либо в шапке одного " +
+        "протокола ошибка, либо пол в карточке проставлен неверно — кнопка выравнивает и то, и другое.";
+    public DataCheckSeverity Severity => DataCheckSeverity.Warning;
+
+    public async Task<DataCheckOutcome> RunAsync(CancellationToken ct = default)
+    {
+        // Пол в БД живёт и как male/female, и как M/F — сводим в SQL, иначе половина
+        // расхождений окажется мнимой.
+        var rows = await db.Results.AsNoTracking()
+            .Where(r => r.RelayId == null
+                        && (r.Gender == "male" || r.Gender == "female")
+                        && (r.Swimmer.Gender == "male" || r.Swimmer.Gender == "female"
+                            || r.Swimmer.Gender == "M" || r.Swimmer.Gender == "F"))
+            .Select(r => new
+            {
+                r.SwimmerId,
+                RowGender = r.Gender,
+                CardGender = r.Swimmer.Gender!,
+                SwimmerName = (r.Swimmer.LastName + " " + r.Swimmer.FirstName).Trim(),
+                r.Swimmer.BirthYear,
+            })
+            .ToListAsync(ct);
+
+        var conflicts = rows
+            .GroupBy(r => r.SwimmerId)
+            .Select(g =>
+            {
+                var card = Normalize(g.First().CardGender);
+                var male = g.Count(r => r.RowGender == "male");
+                var female = g.Count(r => r.RowGender == "female");
+                var bad = g.Count(r => r.RowGender != card);
+                return new
+                {
+                    SwimmerId = g.Key, g.First().SwimmerName, g.First().BirthYear,
+                    Card = card, Male = male, Female = female, Bad = bad, Total = g.Count(),
+                };
+            })
+            .Where(x => x.Bad > 0)
+            .OrderByDescending(x => x.Bad)
+            .ToList();
+
+        return new DataCheckOutcome(conflicts.Count, conflicts
+            .Take(50)
+            .Select(x => new DataCheckItem(
+                "Swimmer", x.SwimmerId,
+                x.Bad == x.Total
+                    // Все строки против карточки — почти наверняка врёт карточка.
+                    ? $"{x.SwimmerName} ({x.BirthYear}): в карточке {x.Card}, а все {x.Total} заплывов — {(x.Card == "male" ? "женские" : "мужские")}"
+                    : $"{x.SwimmerName} ({x.BirthYear}): в карточке {x.Card}, но {x.Bad} из {x.Total} заплывов — {(x.Card == "male" ? "женские" : "мужские")}",
+                $"мужских строк {x.Male}, женских {x.Female}",
+                $"/Admin/Swimmers/Edit?id={x.SwimmerId}",
+                PublicRoutes.Swimmer(x.SwimmerId),
+                SubjectName: x.SwimmerName,
+                FixKind: DataCheckFixKinds.SwimmerGenderAlign,
+                FixEntityId: x.SwimmerId))
+            .ToList());
+    }
+
+    private static string Normalize(string gender) => gender.Trim().ToLowerInvariant() switch
+    {
+        "m" => "male",
+        "f" => "female",
+        var g => g,
+    };
+}
+
 /// <summary>FK-аномалии: результат ссылается на несуществующего пловца или клуб.</summary>
 public sealed class FkAnomalyCheck(IDataQualityService quality) : IDataCheck
 {
@@ -301,7 +383,8 @@ public sealed class OfficialClubPointsMismatchCheck(SwimmDbContext db) : IDataCh
             {
                 // Ровно как на витрине: место prelim-заплыва очков не приносит (Р34),
                 // общий финал «כללי» — тоже (Р43).
-                var scoringPlace = r.HeatType == "prelim" || r.Round == ResultRounds.FinalOpen
+                var scoringPlace = r.HeatType == "prelim" || r.HeatType == "extra"
+                                   || r.Round == ResultRounds.FinalOpen
                     ? null
                     : r.Position;
                 var mine = PointRulesClubsScoring.RelayPointsFor(

@@ -27,7 +27,8 @@ public sealed class LogligImportBuilder : ILogligImportBuilder
         LogligImportContext context,
         Func<LogligResultRowDto, (string LastName, string FirstName)> resolveName)
     {
-        var eventYear = AgeGroupHelper.ExtractYearFromDateString(context.Date);
+        // Возраст — по сезону (год окончания), одинаково с PDF-импортом (IsrOrgParser).
+        var eventYear = AgeGroupHelper.SeasonEndYearFromDateString(context.Date);
         var withFinal = DisciplinesWithFinal(events);
         var rows = new List<Result>();
 

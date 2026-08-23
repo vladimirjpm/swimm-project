@@ -9,6 +9,7 @@ import {
   dateLabel,
 } from '../../utils/helpers/competition-source';
 import { routes } from '../../utils/routes';
+import { seasonLabel, seasonStartYear } from '../../utils/helpers/season-helper';
 
 type CompetitionLink = {
   href: string;
@@ -115,7 +116,7 @@ function MeetsSection() {
   return (
     <section className="relative px-4 pt-[38px] lg:px-16 lg:pt-16" aria-label="Meets">
       <p className="mb-[14px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[#7dd3fc] lg:text-[13px] lg:tracking-[0.3em]">
-        {`${now.getFullYear()} Season · ${HOME_REGION_LABEL}`}
+        {`Season ${seasonLabel(seasonStartYear(now))} · ${HOME_REGION_LABEL}`}
       </p>
       <h2 className="mb-[18px] text-[26px] font-black tracking-[-0.02em] text-[#f3f8fd] lg:mb-6 lg:text-[36px]">
         Meets
@@ -176,7 +177,7 @@ function Competitions() {
 
       <section className="relative px-5 pt-[26px] lg:px-16 lg:pt-[46px]">
         <p className="mb-[18px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[#7dd3fc] lg:text-[15px] lg:tracking-[0.3em]">
-          {`${new Date().getFullYear()} Season · ${HOME_REGION_LABEL}`}
+          {`Season ${seasonLabel(seasonStartYear())} · ${HOME_REGION_LABEL}`}
         </p>
         <h1 className="text-[44px] font-black leading-[0.92] tracking-[-0.045em] text-[#f3f8fd] lg:text-[88px] lg:leading-[0.9]">
           Competitions

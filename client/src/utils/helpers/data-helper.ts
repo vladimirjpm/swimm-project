@@ -33,6 +33,8 @@ export default class Helper {
   static getSwimmerRecords = HelperNormative.getSwimmerRecords;
 
   // === Results ===
+  static ageLabel = HelperResults.ageLabel;
+  static recordStepAge = HelperResults.recordStepAge;
   static sortByTime = HelperResults.sortByTime;
   static showTrainingTable = HelperResults.showTrainingTable;
   static groupTrainingByName = HelperResults.groupTrainingByName;

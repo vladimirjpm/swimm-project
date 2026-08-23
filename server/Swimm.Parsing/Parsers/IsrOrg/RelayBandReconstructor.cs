@@ -153,7 +153,9 @@ internal static class RelayBandReconstructor
         Dictionary<string, string> exactGender,
         Dictionary<string, string> firstNameGender)
     {
-        var eventYear = AgeGroupHelper.ExtractYearFromDateString(comp.Date);
+        // Возраст — по сезону (год окончания), как нарезаны полосы протокола:
+        // календарный счёт на осенних стартах даёт год младше (docs/season-boundary-rule.md).
+        var eventYear = AgeGroupHelper.SeasonEndYearFromDateString(comp.Date);
         var teams = new List<(IsrOrgResult, string, int)>(comp.Results.Count);
 
         foreach (var row in comp.Results)

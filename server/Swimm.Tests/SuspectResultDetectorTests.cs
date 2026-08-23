@@ -129,6 +129,82 @@ public class SuspectResultDetectorTests
     }
 
     [Fact]
+    public void Outlier_FastKidInWeakHeat_NotFlagged()
+    {
+        // Живой случай (competition 1590 «ליגה מס 1 הפועל בית שמש», 50 вольным, ступень 9-10):
+        // разброс внутри ступени двукратный, медиана 1:18.31 — половина группы едва плывёт.
+        // Победительница 46.89 ниже 60% медианы, но от второго результата (52.77) отстоит
+        // на 11%: это просто сильный ребёнок, а не ошибка протокола.
+        var rows = new List<SuspectCandidateRow>
+        {
+            Row(1, 46_890, "freestyle", "50", "female", swimmerId: 1, ageGroup: "9-10"),
+            Row(2, 52_770, "freestyle", "50", "female", swimmerId: 2, ageGroup: "9-10"),
+            Row(3, 64_800, "freestyle", "50", "female", swimmerId: 3, ageGroup: "9-10"),
+            Row(4, 78_310, "freestyle", "50", "female", swimmerId: 4, ageGroup: "9-10"),
+            Row(5, 94_980, "freestyle", "50", "female", swimmerId: 5, ageGroup: "9-10"),
+            Row(6, 101_140, "freestyle", "50", "female", swimmerId: 6, ageGroup: "9-10"),
+        };
+
+        Assert.Empty(SuspectResultDetector.Detect(rows));
+    }
+
+    [Fact]
+    public void Outlier_HalfDistanceTime_StillFlagged()
+    {
+        // Ради чего правило живёт: в протокол попало время отрезка — оно примерно вдвое
+        // меньше соседнего результата, а не на проценты. Само по себе оно правдоподобно
+        // (медленнее мирового рекорда), поэтому правила 1 и 2 его не видят.
+        var rows = new List<SuspectCandidateRow>
+        {
+            Row(1, 55_000, "freestyle", "100", "female", swimmerId: 1, ageGroup: "9-10"),
+            Row(2, 130_000, "freestyle", "100", "female", swimmerId: 2, ageGroup: "9-10"),
+            Row(3, 140_000, "freestyle", "100", "female", swimmerId: 3, ageGroup: "9-10"),
+            Row(4, 150_000, "freestyle", "100", "female", swimmerId: 4, ageGroup: "9-10"),
+        };
+
+        var v = Assert.Single(SuspectResultDetector.Detect(rows), x => x.ResultId == 1);
+        Assert.Equal(SuspectReasons.TimeOutlier, v.Reason);
+        Assert.Contains("ближайшем результате", v.Note);
+    }
+
+    [Fact]
+    public void GenderMismatch_TwoSwims_LeansOnSwimmerCard()
+    {
+        // Живой случай (comp 1580): у пловца ровно два старта — брасс записан женским,
+        // комплекс мужским. По большинству 1:1 «меньшинством» оказывалась случайная строка,
+        // и у טנא יהלי (male по карточке и по 32 другим заплывам) обвинялась мужская.
+        var rows = new List<SuspectCandidateRow>
+        {
+            new(1, 7, "breaststroke", "200", "female", 159_240, Day1, false, false, "15-16",
+                SwimmerGender: "male"),
+            new(2, 7, "individual_medley", "200", "male", 152_950, Day1, false, false, "15-16",
+                SwimmerGender: "male"),
+        };
+
+        var v = Assert.Single(SuspectResultDetector.Detect(rows));
+        Assert.Equal(1, v.ResultId);
+        Assert.Equal(SuspectReasons.GenderMismatch, v.Reason);
+        Assert.Contains("по карточке пловца", v.Note);
+    }
+
+    [Fact]
+    public void GenderMismatch_NoCardGender_FallsBackToMajority()
+    {
+        // Пол в карточке не заполнен (в базе такие есть) — опора прежняя: большинство
+        // по заплывам этого соревнования.
+        var rows = new List<SuspectCandidateRow>
+        {
+            new(1, 7, "freestyle", "50", "female", 31_000, Day1, false, false, null),
+            new(2, 7, "freestyle", "100", "male", 68_000, Day1, false, false, null),
+            new(3, 7, "backstroke", "50", "male", 38_000, Day1, false, false, null),
+        };
+
+        var v = Assert.Single(SuspectResultDetector.Detect(rows));
+        Assert.Equal(1, v.ResultId);
+        Assert.Contains("в остальных заплывах пловца", v.Note);
+    }
+
+    [Fact]
     public void Relays_And_FailedTimes_Ignored()
     {
         var rows = new[]
@@ -201,6 +277,23 @@ public class SuspectResultDetectorTests
         Assert.All(flagged, v => Assert.Equal(SuspectReasons.DuplicateSwim, v.Reason));
     }
 
+    [Fact]
+    public void DuplicateSwim_ExtraHeatAfterFinal_NotFlagged()
+    {
+        // Герцлия 01/11/2025: 50 вольным плыли трижды — прелимы, финал и призовая серия на
+        // выбывание. Пока skins считался прелимом, он попадал с утренним заплывом в одну
+        // «сессию», и проверка помечала законные строки «повтором дисциплины за день».
+        var threeSessions = new[]
+        {
+            Row(1, 22_850, style: "freestyle", distance: "50", swimmerId: 7, heatType: "prelim"),
+            Row(2, 23_040, style: "freestyle", distance: "50", swimmerId: 7, heatType: "final"),
+            Row(3, 23_180, style: "freestyle", distance: "50", swimmerId: 7, heatType: "extra"),
+        };
+
+        var flagged = SuspectResultDetector.Detect(threeSessions);
+        Assert.DoesNotContain(flagged, v => v.Reason == SuspectReasons.DuplicateSwim);
+    }
+
     /* ── Выброс относительно личных результатов (Б1) ───────────────────────────────
      * Живой случай: 200 вольным за 01:53.09 (678 очков) у пловца, чей лучший результат
      * тех же месяцев — 312 очков. Рекорда не бьёт, от медианы заплыва недалеко — ни одно
@@ -209,6 +302,12 @@ public class SuspectResultDetectorTests
      */
     private static SuspectCandidateRow PointRow(long id, int points, DateTime? date = null, int swimmerId = 7)
         => new(id, swimmerId, "freestyle", "200", "male", 113_090, date ?? Day1, false, false, "13-14", points);
+
+    /// <summary>Строка с номером заплыва — для страховки «согласовано со своим заплывом».</summary>
+    private static SuspectCandidateRow HeatRow(
+        long id, int ms, int heat, int swimmerId, int? points = null, string distance = "50")
+        => new(id, swimmerId, "freestyle", distance, "male", ms, Day1, false, false, "45-49",
+            points, Heat: heat);
 
     private static IReadOnlyDictionary<int, IReadOnlyList<PersonalSwim>> History(params PersonalSwim[] swims)
         => new Dictionary<int, IReadOnlyList<PersonalSwim>> { [7] = swims };
@@ -225,6 +324,51 @@ public class SuspectResultDetectorTests
         var v = Assert.Single(SuspectResultDetector.Detect(rows, history));
         Assert.Equal(SuspectReasons.PersonalOutlier, v.Reason);
         Assert.Contains("312", v.Note);
+    }
+
+    [Fact]
+    public void PersonalOutlier_ConfirmedByOwnHeat_NotFlagged()
+    {
+        // Живой случай (Maccabiah 2026, competition 1485): мастерс 1977 г.р. проплыл
+        // 50 вольным за 31.95 (256 очков) при своих же 50 баттерфляем 41.06 (82),
+        // 100 вольным 1:17.46 (74) и 50 на спине 47.75 (76) — формально «втрое выше
+        // собственного уровня», фактически обычный спринтер. Протокол это подтверждает:
+        // он выиграл СВОЙ заплыв у соседей 32.84 / 34.47 / 35.17, то есть время видели судьи.
+        var rows = new List<SuspectCandidateRow>
+        {
+            HeatRow(1, 31_950, heat: 2, swimmerId: 7, points: 256),
+            HeatRow(2, 32_840, heat: 2, swimmerId: 21),
+            HeatRow(3, 34_470, heat: 2, swimmerId: 22),
+            HeatRow(4, 35_170, heat: 2, swimmerId: 23),
+        };
+        var history = History(
+            new PersonalSwim(20, 82, Day1.AddDays(-1)),
+            new PersonalSwim(21, 74, Day1.AddDays(-2)),
+            new PersonalSwim(22, 76, Day1.AddDays(-3)));
+
+        Assert.Empty(SuspectResultDetector.Detect(rows, history));
+    }
+
+    [Fact]
+    public void PersonalOutlier_IsolatedInOwnHeat_StillFlagged()
+    {
+        // Ошибка протокола изолирована и в заплыве: 01:53.09 на 200 вольным у 13-летнего
+        // (competition 1527) стоит при ближайшем соседе 02:28.82 — 0.76 от него.
+        // Страховка «согласовано со своим заплывом» такую строку не спасает.
+        var rows = new List<SuspectCandidateRow>
+        {
+            HeatRow(1, 113_090, heat: 1, swimmerId: 7, points: 678, distance: "200"),
+            HeatRow(2, 148_820, heat: 1, swimmerId: 21, distance: "200"),
+            HeatRow(3, 151_410, heat: 1, swimmerId: 22, distance: "200"),
+            HeatRow(4, 153_910, heat: 1, swimmerId: 23, distance: "200"),
+        };
+        var history = History(
+            new PersonalSwim(20, 312, Day1.AddDays(-8)),
+            new PersonalSwim(21, 290, Day1.AddDays(-30)),
+            new PersonalSwim(22, 275, Day1.AddDays(-60)));
+
+        var v = Assert.Single(SuspectResultDetector.Detect(rows, history));
+        Assert.Equal(SuspectReasons.PersonalOutlier, v.Reason);
     }
 
     [Fact]

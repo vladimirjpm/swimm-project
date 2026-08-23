@@ -8,6 +8,7 @@ import {
 } from '../../../store/store';
 import { Result } from '../../../utils/interfaces/results';
 import { routes, parseRoute } from '../../../utils/routes';
+import { seasonLabel, seasonStartYear } from '../../../utils/helpers/season-helper';
 import { ResultsPaging } from '../../../store/store';
 import {
   RESULTS_CATEGORIES,
@@ -523,21 +524,32 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
   }, [categoriesLoaded, allCategories]);
 
   // ── Производные списки ──
+  // Сезон, а НЕ календарный год: старт 31/10/2025 принадлежит сезону 2025/26 вместе с
+  // февральскими стартами 2026. По getFullYear() он уезжал в «Season 2025» отдельно от
+  // своего же сезона (docs/season-boundary-rule.md).
   const seasons = React.useMemo(() => {
     const years = new Set(
-      sources.map((s) => parseDate(s.date)?.getFullYear()).filter(Boolean) as number[],
+      sources
+        .map((s) => {
+          const d = parseDate(s.date);
+          return d ? seasonStartYear(d) : null;
+        })
+        .filter((y) => y !== null) as number[],
     );
     return [...years].sort((a, b) => b - a);
   }, [sources]);
-  const activeSeason = season ?? seasons[0] ?? new Date().getFullYear();
+  const activeSeason = season ?? seasons[0] ?? seasonStartYear();
 
   const now = new Date();
   // Канонический таб матчится по category, кастомный — по членству в categories
   // (одно соревнование может быть в нескольких: Maccabiah Masters = Masters + Maccabiah).
   const inCat = (s: CompetitionSource) =>
     cat === 'all' || s.category === cat || (s.categories?.includes(cat) ?? false);
-  const inSeason = (s: CompetitionSource) =>
-    activeSeason === 'all' || parseDate(s.date)?.getFullYear() === activeSeason;
+  const inSeason = (s: CompetitionSource) => {
+    if (activeSeason === 'all') return true;
+    const d = parseDate(s.date);
+    return d ? seasonStartYear(d) === activeSeason : false;
+  };
   const matchesSearch = (s: CompetitionSource) =>
     !search.trim() || s.name.toLowerCase().includes(search.trim().toLowerCase());
 
@@ -801,7 +813,7 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
         <option value="all">All seasons</option>
         {seasons.map((y) => (
           <option key={y} value={y}>
-            Season {y}
+            Season {seasonLabel(y)}
           </option>
         ))}
       </select>
@@ -1034,7 +1046,8 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
   }
 
   // С выбором — компактная шапка соревнования; «Change» открывает панель поверх контента
-  const seasonYear = parseDate(selectedSourceObj.date)?.getFullYear();
+  const selectedDate = parseDate(selectedSourceObj.date);
+  const seasonYear = selectedDate ? seasonStartYear(selectedDate) : undefined;
   // day_count в имя не подмешиваем: RTL-имена ломают порядок LTR-суффикса,
   // а многодневность и так видна по диапазону дат в headerMeta («15–16 Jul»).
   const headerName = selectedSourceObj.name;
@@ -1042,7 +1055,7 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
     dateLabel(selectedSourceObj),
     selectedSourceObj.pool_type,
     monthLabel(selectedSourceObj),
-    seasonYear ? `Season ${seasonYear}` : '',
+    seasonYear ? `Season ${seasonLabel(seasonYear)}` : '',
   ]
     .filter(Boolean)
     .join(' · ');

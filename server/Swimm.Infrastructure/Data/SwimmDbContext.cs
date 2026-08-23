@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Domain.Entities;
 
 namespace Swimm.Infrastructure.Data;
@@ -55,6 +55,9 @@ public class SwimmDbContext : DbContext
     /* === Качество рекордов (Sys_): реестр спорных записей + сверка с протоколами === */
     public DbSet<RecordIssue> RecordIssues => Set<RecordIssue>();
     public DbSet<RecordVerification> RecordVerifications => Set<RecordVerification>();
+
+    /// <summary>Отладочные подробности витрин (двухуровневый выключатель, см. DebugOption).</summary>
+    public DbSet<DebugOption> DebugOptions => Set<DebugOption>();
 
     /* === Импорт === */
     public DbSet<ImportHistory> ImportHistory => Set<ImportHistory>();
@@ -350,6 +353,18 @@ public class SwimmDbContext : DbContext
                 .HasForeignKey<RecordVerification>(e => e.RecordId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(e => e.Found);
+            entity.Property(e => e.AgeAxisMatch).HasMaxLength(10);
+            entity.HasIndex(e => e.AgeAxisMatch);
+        });
+
+        modelBuilder.Entity<DebugOption>(entity =>
+        {
+            entity.ToTable("Sys_DebugOptions");
+            entity.HasKey(e => e.Key);
+            entity.Property(e => e.Key).HasMaxLength(60);
+            entity.Property(e => e.Title).HasMaxLength(120);
+            entity.Property(e => e.Description).HasMaxLength(400);
+            entity.Property(e => e.UpdatedBy).HasMaxLength(200);
         });
 
         modelBuilder.Entity<NormativeStandard>(entity =>

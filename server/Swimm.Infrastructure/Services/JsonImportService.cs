@@ -1011,6 +1011,20 @@ public class JsonImportService : IImportService
             diagnosticLog.Add($"Сверка с файлом не выполнена ({ex.GetType().Name}: {ex.Message}). Импорт сохранён.");
         }
 
+        // Согласование пола карточек (решение 2026-08-23): пол человека живёт в ОДНОМ месте —
+        // в карточке пловца, и её надо держать в согласии с протоколами. Идёт до прогона
+        // проверок, чтобы results.gender-vs-card увидел уже поправленное.
+        try
+        {
+            _db.ChangeTracker.Clear();
+            var genderSummary = await AlignSwimmerGendersAsync();
+            if (genderSummary.Length > 0) diagnosticLog.Add(genderSummary);
+        }
+        catch (Exception ex)
+        {
+            diagnosticLog.Add($"Согласование пола пловцов не выполнено ({ex.GetType().Name}: {ex.Message}). Импорт сохранён.");
+        }
+
         // Прогон всех проверок данных (Д5, решение Р13). После коммита и в try/catch — прибор
         // не имеет права уронить уже загруженные результаты. Гоняем ВСЕ, а не только связанные
         // с этим соревнованием: импорт трогает и справочники (клубы, пловцы), а на 30к строк
@@ -1367,6 +1381,102 @@ public class JsonImportService : IImportService
     /// Заполняет Gender, ClubId и CountryId для записей, где эти поля ещё пусты,
     /// на основе самого свежего результата каждого спортсмена.
     /// </summary>
+    /// <summary>
+    /// Приводит пол в карточке пловца к ЯВНОМУ большинству его личных заплывов.
+    ///
+    /// Зачем: пол человека — один, и место ему в карточке. Импорт заполняет её ПЕРВЫМ
+    /// непустым полом из шапки заплыва (<see cref="EnrichSwimmerFromResult"/>) и больше не
+    /// возвращается к вопросу — значит одна ошибка в первом же протоколе делает карточку
+    /// неверной навсегда. На 2026-08-23 таких набралось 46: женские имена с полом male и
+    /// ни одного мужского заплыва.
+    ///
+    /// Спорные случаи не трогаем: при раскладе 2:2 правды в данных нет, а гадать за
+    /// человека нельзя — их показывает проверка `results.gender-vs-card`, где пол выбирает
+    /// админ. Эстафеты в счёт не идут: там пол команды, а не пловца.
+    /// </summary>
+    private async Task<string> AlignSwimmerGendersAsync()
+    {
+        // Доля строк за один пол, при которой большинство считается явным. 0.8 покрывает
+        // «одна ошибочная строка из пяти», но оставляет 2:2 и 3:2 проверке.
+        const double clearMajority = 0.8;
+        const int minRows = 3;
+
+        var stats = await _db.Results
+            .Where(r => r.RelayId == null && (r.Gender == "male" || r.Gender == "female"))
+            .GroupBy(r => new { r.SwimmerId, r.Gender })
+            .Select(g => new { g.Key.SwimmerId, g.Key.Gender, Count = g.Count() })
+            .ToListAsync();
+
+        var wanted = stats
+            .GroupBy(x => x.SwimmerId)
+            .Select(g =>
+            {
+                var total = g.Sum(x => x.Count);
+                var top = g.OrderByDescending(x => x.Count).First();
+                return new { SwimmerId = g.Key, top.Gender, total, top.Count };
+            })
+            // Либо явное большинство при трёх и более строках, либо ЕДИНОГЛАСИЕ: если все
+            // имеющиеся заплывы одного пола, карточка противоречит всему, что мы знаем, —
+            // и неважно, что заплывов пока один (в базе есть такие: женское имя, один
+            // женский заплыв и male в карточке).
+            .Where(x => (x.total >= minRows && x.Count >= x.total * clearMajority)
+                        || x.Count == x.total)
+            .ToDictionary(x => x.SwimmerId, x => x.Gender);
+
+        if (wanted.Count == 0) return "";
+
+        var ids = wanted.Keys.ToList();
+        var swimmers = await _db.Swimmers.Where(s => ids.Contains(s.Id)).ToListAsync();
+
+        var filled = 0;
+        var corrected = 0;
+        foreach (var swimmer in swimmers)
+        {
+            var want = wanted[swimmer.Id];
+            var current = NormalizeGender(swimmer.Gender);
+            if (current == want) continue;
+
+            if (current is null) filled++; else corrected++;
+            swimmer.Gender = want;
+        }
+
+        // Обратный ход: у личной строки пол мог не попасть в протокол («mix» в шапке), а у
+        // пловца он известен — тогда строке его дописываем. Иначе находка `results.no-gender`
+        // висит до тех пор, пока кто-нибудь не нажмёт кнопку руками, хотя ответ уже в базе.
+        // Пустые строки, а НЕ противоречащие: перезапись напечатанного в протоколе пола —
+        // осознанное решение человека (кнопка «выровнять» в реестре), а не побочный эффект импорта.
+        var knownGenders = await _db.Swimmers
+            .Where(s => s.Gender == "male" || s.Gender == "female")
+            .Select(s => new { s.Id, s.Gender })
+            .ToDictionaryAsync(s => s.Id, s => s.Gender!);
+
+        var genderless = await _db.Results
+            .Where(r => r.RelayId == null && (r.Gender == null || r.Gender == "" || r.Gender == "none"))
+            .ToListAsync();
+
+        var rowsFilled = 0;
+        foreach (var row in genderless)
+        {
+            if (!knownGenders.TryGetValue(row.SwimmerId, out var gender)) continue;
+            row.Gender = gender;
+            rowsFilled++;
+        }
+
+        if (filled == 0 && corrected == 0 && rowsFilled == 0) return "";
+
+        await _db.SaveChangesAsync();
+        return $"Пол согласован с протоколами: карточек заполнено {filled}, исправлено {corrected}, "
+             + $"строк без пола дописано {rowsFilled}.";
+    }
+
+    /// <summary>Пол в БД живёт как male/female и как M/F — сводим к одному написанию.</summary>
+    private static string? NormalizeGender(string? gender) => gender?.Trim().ToLowerInvariant() switch
+    {
+        "male" or "m" => "male",
+        "female" or "f" => "female",
+        _ => null,
+    };
+
     public async Task<int> EnrichSwimmersFromResultsAsync()
     {
         var updated = 0;

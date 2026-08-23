@@ -21,8 +21,26 @@ public class AdminSettingsServiceTests
 
         var all = svc.GetAll();
 
-        // 6 базовых + 3 HubGroups (фаза 8.1) + 2 Discovery (фаза 6: Enabled/IntervalHours).
-        Assert.Equal(11, all.Count);
+        // 6 базовых + 3 HubGroups (фаза 8.1) + 2 Discovery (фаза 6: Enabled/IntervalHours)
+        // + RecordAgeAxis (ось возраста для сверки с рекордами) + DebugDetails (общий
+        // тумблер отладочных подробностей) — оба 2026-08-22.
+        Assert.Equal(13, all.Count);
+    }
+
+    [Fact]
+    public void RecordAgeAxis_DefaultsToCalendar_AndAcceptsOnlyKnownValues()
+    {
+        var svc = Build();
+
+        // Дефолт — ось федерации: справочник ведёт она, и по умолчанию мы сверяемся в её оси.
+        Assert.Equal("calendar", svc.Get("RecordAgeAxis")!.Value);
+
+        Assert.True(svc.Update("RecordAgeAxis", "season"));
+        Assert.Equal("season", svc.GetValue("RecordAgeAxis", "calendar"));
+
+        // Опечатка молча переключила бы правило рекордов — валидируем явно.
+        Assert.False(svc.Update("RecordAgeAxis", "sezon"));
+        Assert.Equal("season", svc.GetValue("RecordAgeAxis", "calendar"));
     }
 
     // ── Get: существующий ключ возвращает запись ─────────────────────────────

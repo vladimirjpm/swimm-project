@@ -5,6 +5,8 @@ import { rootActions,useAppDispatch, useAppSelector } from '../../store/store';
 import { useFavoritesContext } from '../../hooks/favorites-context';
 import { useLoginModal } from '../components/login-modal/login-modal-context';
 import Helper from '../../utils/helpers/data-helper'
+import HelperResults from '../../utils/helpers/helper-results'
+import { loadRecordAgeAxis } from '../../utils/helpers/record-age-axis'
 import ClubPointsHelper from '../../utils/helpers/club-points-helper';
 import UI_DateIcon from '../components/mix/date-icon/date-icon';
 import UI_ClubIcon from '../components/mix/club-icon/club-icon';
@@ -25,6 +27,8 @@ import { useCompetitionMedia } from '../../hooks/useCompetitionMedia';
 import { buildResultsFilterParams, fetchResultsPage } from '../../utils/helpers/results-api';
 import AddLinkModal from '../my-media-project/components/add-link-modal';
 import { swimFlaggedRowProps } from '../components/mix/swim-time/swim-time';
+import { parseDate } from '../../utils/helpers/competition-source';
+import { seasonStartYear } from '../../utils/helpers/season-helper';
 import { addUserMedia } from '../my-media-project/use-all-my-media';
 
 function ResultsTable() {
@@ -87,7 +91,7 @@ function ResultsTable() {
     // Предварительные заплывы по умолчанию скрыты (официальный вид — финалы);
     // тумблер [prelim] в фильтре Date возвращает их. Строки без признака (timed final,
     // старые данные) видны всегда.
-    if (res.heat_type === 'prelim' && !filters.show_prelims) return false;
+    if (HelperResults.isHiddenHeat(res.heat_type) && !filters.show_prelims) return false;
 
     // Фильтр по категории (программе) заплыва. У строк, импортированных до появления
     // event_category, оно пустое — такие в выборку по конкретной категории не попадают.
@@ -137,6 +141,15 @@ function ResultsTable() {
   }), [sourceResults, filters, isAuthenticated, primarySwimmerId, favoriteSwimmerIds]);
 
   // Вычисляем наивысший уровень из базовых результатов и пушим в store
+  // Ось возраста для сверки с рекордами приезжает из /api/client-config: без неё
+  // бейдж строки считался бы по своей оси и разошёлся с карточкой «New records».
+  const [, setAxisLoaded] = React.useState(0);
+  React.useEffect(() => {
+    let alive = true;
+    loadRecordAgeAxis().then(() => { if (alive) setAxisLoaded((n) => n + 1); });
+    return () => { alive = false; };
+  }, []);
+
   useEffect(() => {
     let highestPriority = 0;
     let bestInfo: import('../../store/store').BestLevelInfo | null = null;
@@ -349,6 +362,10 @@ function ResultsTable() {
 );
 
   const firstResult = displayResults[0];
+  // Сезон открытого протокола — для таба «Season best» в карточке рекордов: страница чаще
+  // всего про прошедший старт, а не про текущий сезон (season-boundary-rule).
+  const competitionDate = firstResult?.date ? parseDate(firstResult.date) : null;
+  const competitionSeason = competitionDate ? seasonStartYear(competitionDate) : null;
   const poolTypeDisplay = showPoolType ? 'all' : (firstResult?.pool_type ?? filters.pool_type);
 // Функция обновления фильтров
   const updateFilter = (newFilter: Partial<typeof filters>) => {
@@ -407,6 +424,7 @@ function ResultsTable() {
             styleName={filters.style_name}
             styleLen={filters.style_len}
             age={filters.age}
+            season={competitionSeason}
           />
         )}
         {isMastersSource && (
@@ -481,7 +499,9 @@ function ResultsTable() {
                 poolType: res.pool_type,
                 styleName: res.event_style_name,
                 distance: `${res.event_style_len}m`,
-                age: res.event_style_age,
+                // Ключ поиска в справочнике — по оси RecordAgeAxis, а не возраст пловца:
+                // иначе бейдж строки разойдётся с карточкой «New records» (её считает сервер).
+                age: Helper.recordStepAge(res),
                 isMasters: isMaster,
               };
               // Заплыв, помеченный админом как ошибка протокола, НЕ носит бейдж рекорда:

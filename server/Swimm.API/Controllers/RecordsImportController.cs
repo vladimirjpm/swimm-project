@@ -20,20 +20,42 @@ public class RecordsImportController : ControllerBase
     private readonly IReadOnlyDictionary<string, IRecordSourceProvider> _providers;
     private readonly IRecordDiffService _diffService;
     private readonly IRecordQualityService _quality;
+    private readonly IRecordSourceLinksProvider _links;
 
     public RecordsImportController(
         IEnumerable<IRecordSourceProvider> providers,
         IRecordDiffService diffService,
-        IRecordQualityService quality)
+        IRecordQualityService quality,
+        IRecordSourceLinksProvider links)
     {
         _providers = providers.ToDictionary(p => p.Source, StringComparer.OrdinalIgnoreCase);
         _diffService = diffService;
         _quality = quality;
+        _links = links;
     }
 
     [HttpGet("source-status")]
     public async Task<IActionResult> GetSourceStatus()
         => Ok(await _diffService.GetSourceStatusAsync());
+
+    /// <summary>
+    /// Что именно скачает Fetch с isr.org.il: ссылки на PDF-справочники, найденные на
+    /// странице «שיאי ישראל». Ходит в сеть, поэтому недоступность источника — не 500,
+    /// а мягкий ответ с текстом ошибки: карточки в UI просто не покажут список файлов.
+    /// </summary>
+    [HttpGet("isrorg-links")]
+    public async Task<IActionResult> GetIsrOrgLinks()
+    {
+        try
+        {
+            var links = await _links.GetLinksAsync(HttpContext.RequestAborted);
+            return Ok(new { pageUrl = _links.PageUrl, links });
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
+        {
+            return Ok(new { pageUrl = _links.PageUrl, links = Array.Empty<object>(), error = ex.Message });
+        }
+    }
 
     /// <summary>
     /// Сверка справочника рекордов с нашими протоколами (docs/plans/records-quality-plan.md).

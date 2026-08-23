@@ -12,3 +12,5 @@ export { default as CategoryHelper, type CategoryDisplay } from './category-help
 export { default as HelperMedal, type MedalTier } from './helper-medal';
 export { default as ResultsLoadModeHelper, type ResultsLoadMode } from './results-load-mode';
 export { default as HelperMedia } from './helper-media';
+export { ageInSeason, recordStepAge, seasonLabel, seasonStartYear, SEASON_START_MONTH } from './season-helper';
+export { loadRecordAgeAxis, recordAgeAxisNow, type RecordAgeAxis } from './record-age-axis';

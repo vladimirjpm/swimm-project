@@ -75,7 +75,7 @@
                     <code class="rounded bg-white/[.06] px-1.5 py-0.5 text-[12px]" dir="auto">${esc(f.subjectName)}</code>
                     <button class="admin-btn admin-btn-ghost py-0.5 px-1.5 text-[11px] finding-copy"
                             data-name="${esc(f.subjectName)}" title="Скопировать имя — искать в интернете">копировать</button>
-                    ${f.fixKind === 'swimmer-gender' ? renderFixControls(f) : ''}
+                    ${f.fixKind === 'swimmer-gender' || f.fixKind === 'swimmer-gender-align' ? renderFixControls(f) : ''}
                 </div>` : ''}
                 ${f.fixKind === 'competition-club-rule' ? renderClubRule(f) : ''}
                 ${accepted && f.note ? `<div class="text-[11px] text-admin-text-muted">принято: ${esc(f.note)}</div>` : ''}</td>
@@ -89,7 +89,12 @@
             <td class="align-top text-right whitespace-nowrap">
                 ${accepted
                     ? `<button class="admin-btn admin-btn-ghost py-1 px-2 finding-reopen" data-id="${f.id}">Вернуть</button>`
-                    : `<button class="admin-btn admin-btn-ghost py-1 px-2 finding-accept" data-id="${f.id}">Принять</button>`}
+                    : f.fixKind === 'dedup-ignore'
+                        // У пары дедупа «принять» значит «это тёзки»: пара уйдёт в
+                        // Sys_DedupIgnoredPairs и пропадёт и здесь, и в списке дублей.
+                        ? `<button class="admin-btn admin-btn-ghost py-1 px-2 finding-accept" data-id="${f.id}"
+                                   title="Не дубли, а тёзки — развязать пару навсегда">Не дубли</button>`
+                        : `<button class="admin-btn admin-btn-ghost py-1 px-2 finding-accept" data-id="${f.id}">Принять</button>`}
             </td></tr>`;
     }
 
@@ -125,7 +130,8 @@
                     style="border:1px solid ${t.border}${active ? '' : '80'};
                            background:${t.border}${active ? '' : '26'};
                            color:${active ? '#0f1420' : t.border};"
-                    data-id="${f.id}" data-gender="${gender}" title="${t.title}">${active ? '✓ ' : ''}${t.label}</button>`;
+                    data-id="${f.id}" data-gender="${gender}" data-fix-kind="${f.fixKind}"
+                    title="${t.title}">${active ? '✓ ' : ''}${t.label}</button>`;
     }
 
     function renderFixControls(f) {
@@ -200,7 +206,7 @@
         document.querySelectorAll('.finding-reopen').forEach(b => b.addEventListener('click', () => reopen(b.dataset.id)));
         document.querySelectorAll('.finding-copy').forEach(b => b.addEventListener('click', () => copyName(b)));
         document.querySelectorAll('.finding-gender').forEach(b =>
-            b.addEventListener('click', () => fixGender(b.dataset.id, b.dataset.gender, b)));
+            b.addEventListener('click', () => fixGender(b.dataset.id, b.dataset.gender, b, b.dataset.fixKind)));
         document.querySelectorAll('.finding-club-rule').forEach(sel =>
             sel.addEventListener('change', () => fixClubRule(sel)));
         document.querySelectorAll('.finding-loglig').forEach(b =>
@@ -252,10 +258,14 @@
         }
     }
 
-    async function fixGender(id, gender, btn) {
+    // Две находки про пол чинятся одними и теми же кнопками, но разными эндпоинтами:
+    // `results.no-gender` дописывает пол в пустые строки, `results.gender-vs-card`
+    // перезаписывает разошедшиеся. Эндпоинт выбирается по fixKind находки.
+    async function fixGender(id, gender, btn, fixKind) {
         btn.disabled = true;
         try {
-            const res = await api(`${API}/${id}/fix-gender`, {
+            const path = fixKind === 'swimmer-gender-align' ? 'fix-gender-align' : 'fix-gender';
+            const res = await api(`${API}/${id}/${path}`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ gender })
             });

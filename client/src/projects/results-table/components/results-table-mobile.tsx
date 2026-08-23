@@ -14,6 +14,7 @@ import UI_RoundLabel from '../../components/mix/round-label/round-label';
 import { ResultsTableRowProps } from './types';
 import ResultRowDateInfo from './result-row-date-info';
 import UI_AddVideoIcon from '../../components/mix/add-video-icon/add-video-icon';
+import HelperResults from '../../../utils/helpers/helper-results';
 
 const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
   res,
@@ -46,7 +47,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
   // Медаль красится только если ЭТОТ заплыв award-eligible (res.is_award — денормализовано
   // с API; для статических источников используем общий флаг источника isAwardSource).
   // Медаль только за награждаемый заплыв: prelim-место — ранжир сессии, не награда.
-  const rowIsAward = (res.is_award ?? isAwardSource ?? false) && res.heat_type !== 'prelim';
+  const rowIsAward = (res.is_award ?? isAwardSource ?? false) && !HelperResults.isHiddenHeat(res.heat_type);
 
   return (
     <div className="cursor-pointer" onClick={onToggleExpand}>
@@ -69,7 +70,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
           </div>
           <UI_PrelimLabel heatType={res.heat_type} />
           <UI_RoundLabel round={res.round} />
-          {showAge && <UI_AgeLabel age={res.event_style_age} eventCategory={res.event_category} isRelay={res.is_relay} gender={res.event_style_gender} isMasters={isMastersResult} ageGroup={res.age_group} />}
+          {showAge && <UI_AgeLabel age={HelperResults.ageLabel(res)} eventCategory={res.event_category} isRelay={res.is_relay} gender={res.event_style_gender} isMasters={isMastersResult} ageGroup={res.age_group} />}
           <UI_FavoriteControls
             swimmerId={res.swimmer_id}
             isFavorite={isFavorite}

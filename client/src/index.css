@@ -100,6 +100,11 @@
   --theme-personal-border: rgba(212, 175, 55, 0.45);
   --theme-personal-accent: #8a6d1a;            /* бейджи, стрелки, PB */
   --theme-personal-badge-bg: rgba(212, 175, 55, 0.18);
+  /* Панель табов карточки ISR Age Records (design_handoff_age_records_sb):
+     подложка панели и фон активного таба. Пара «панель↔активный» держит активный
+     светлее подложки в обоих режимах. */
+  --theme-agetabs-panel-bg: #f4f6fa;
+  --theme-agetabs-active-bg: #ffffff;
   /* Плитка соревнования 11c (design_handoff_competition_overview3): живёт на --theme-primary,
      поэтому корпус/буква — производные от парного --theme-mode-accent-text, а полоса и лента
      возраста — от surface/primary. Перекрасить плитку per-theme = поправить эти 6 токенов. */
@@ -179,6 +184,10 @@
   --theme-personal-border: rgba(212, 175, 55, 0.4);
   --theme-personal-accent: #e3c15c;
   --theme-personal-badge-bg: rgba(212, 175, 55, 0.16);
+  /* Табы Age Records в dark: подложка чуть темнее карточки (#161b24), активный — как
+     поверхность surface, чтобы «поднятый» таб читался тем же приёмом, что в light. */
+  --theme-agetabs-panel-bg: #1b2331;
+  --theme-agetabs-active-bg: #263145;
   /* Плитка соревнования в dark: surface здесь тёмный, а плитка лежит на насыщенном
      --theme-primary — полоса и лента возраста строятся от светлого --theme-mode-accent-text,
      иначе тёмная лента с тёмно-синим текстом (пара primary на surface) нечитаема. */

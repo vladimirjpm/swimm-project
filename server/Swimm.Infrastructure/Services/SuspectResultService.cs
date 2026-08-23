@@ -27,7 +27,7 @@ public class SuspectResultService(SwimmDbContext db, ICacheService cache) : ISus
             .Select(r => new SuspectCandidateRow(
                 r.Id, r.SwimmerId, r.Style.Name, r.Distance, r.Gender,
                 r.TimeMillisecond, r.CompetitionDate, r.RelayId != null, r.TimeFail, r.AgeGroup,
-                r.InternationalPoints, r.HeatType, r.Round))
+                r.InternationalPoints, r.HeatType, r.Round, r.Heat, r.Swimmer.Gender))
             .ToListAsync(ct);
 
         var verdicts = SuspectResultDetector.Detect(rows, await LoadPersonalHistoryAsync(rows, ct))

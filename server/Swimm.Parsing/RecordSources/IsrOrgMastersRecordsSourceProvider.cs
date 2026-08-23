@@ -8,23 +8,25 @@ namespace Swimm.Parsing.RecordSources;
 
 /// <summary>
 /// Мастерские (25-29…) рекорды из PDF-протокола isr.org.il. Симметрично
-/// <see cref="IsrOrgAgeRecordsSourceProvider"/> — см. его комментарий по URL/SSRF/fallback.
+/// <see cref="IsrOrgAgeRecordsSourceProvider"/> — см. его комментарий по URL/SSRF/fallback:
+/// без настроек URL резолвятся со страницы «שיאי ישראל» через
+/// <see cref="IsrOrgRecordsPageResolver"/>, основной файл здесь — 50m.
 /// </summary>
 public class IsrOrgMastersRecordsSourceProvider : IRecordSourceProvider
 {
-    private const string AllowedHost = "isr.org.il";
-    private const string AllowedHostSuffix = ".isr.org.il";
-
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
     private readonly IsrOrgMastersRecordsParser _parser;
+    private readonly IsrOrgRecordsPageResolver _pageResolver;
 
     public IsrOrgMastersRecordsSourceProvider(
-        IHttpClientFactory httpClientFactory, IConfiguration configuration, IsrOrgMastersRecordsParser parser)
+        IHttpClientFactory httpClientFactory, IConfiguration configuration,
+        IsrOrgMastersRecordsParser parser, IsrOrgRecordsPageResolver pageResolver)
     {
         _httpClientFactory = httpClientFactory;
         _configuration = configuration;
         _parser = parser;
+        _pageResolver = pageResolver;
     }
 
     public string Source => "isrorg-masters";
@@ -47,34 +49,54 @@ public class IsrOrgMastersRecordsSourceProvider : IRecordSourceProvider
             {
                 var url50 = _configuration["RecordsImport:IsrOrgMastersRecordsUrl50m"];
                 var url25 = _configuration["RecordsImport:IsrOrgMastersRecordsUrl25m"];
-                if (string.IsNullOrWhiteSpace(url50))
-                    throw new InvalidOperationException(
-                        "URL источника Masters Records не настроен (RecordsImport:IsrOrgMastersRecordsUrl50m) — загрузите PDF-файл(ы) вручную.");
 
-                var client = _httpClientFactory.CreateClient();
-                client.Timeout = TimeSpan.FromSeconds(30);
-                // Без User-Agent некоторые источники (worldaquatics точно) не отвечают вовсе.
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("SwimmBot/1.0");
-
-                var ms50 = await FetchWhitelistedAsync(client, url50, ct);
-                owned.Add(ms50);
-                primary = ms50;
-                primaryPool = "50m";
-
-                if (!string.IsNullOrWhiteSpace(url25))
+                // Ничего не задано руками — идём на страницу-оглавление за актуальными файлами.
+                if (string.IsNullOrWhiteSpace(url50) && string.IsNullOrWhiteSpace(url25))
                 {
-                    var ms25 = await FetchWhitelistedAsync(client, url25, ct);
-                    owned.Add(ms25);
-                    secondary = ms25;
+                    var pageUrl = _pageResolver.PageUrl;
+                    var links = await _pageResolver.ResolveAsync(pageUrl, ct);
+                    url50 = IsrOrgRecordsPageResolver.Pick(links, isMasters: true, "50m")?.Url;
+                    url25 = IsrOrgRecordsPageResolver.Pick(links, isMasters: true, "25m")?.Url;
+
+                    if (string.IsNullOrWhiteSpace(url50) && string.IsNullOrWhiteSpace(url25))
+                        throw new InvalidOperationException(
+                            $"На странице {pageUrl} не нашлось ссылок на «שיאי מאסטרס» — "
+                            + "загрузите PDF-файл(ы) вручную.");
+                }
+
+                var client = IsrOrgRecordsSource.CreateClient(_httpClientFactory);
+
+                // Основной файл — 50m; если на странице есть только 25m, основным становится он.
+                if (!string.IsNullOrWhiteSpace(url50))
+                {
+                    var ms50 = await IsrOrgRecordsSource.FetchWhitelistedAsync(client, url50, ct);
+                    owned.Add(ms50);
+                    primary = ms50;
+                    primaryPool = "50m";
+
+                    if (!string.IsNullOrWhiteSpace(url25))
+                    {
+                        var ms25 = await IsrOrgRecordsSource.FetchWhitelistedAsync(client, url25, ct);
+                        owned.Add(ms25);
+                        secondary = ms25;
+                    }
+                    else
+                    {
+                        secondary = null;
+                    }
                 }
                 else
                 {
+                    var ms25 = await IsrOrgRecordsSource.FetchWhitelistedAsync(client, url25!, ct);
+                    owned.Add(ms25);
+                    primary = ms25;
+                    primaryPool = "25m";
                     secondary = null;
                 }
             }
 
             var parseRequest = new ParseRequest(
-                primary, "isrorg-masters-50m.pdf",
+                primary, $"isrorg-masters-{primaryPool}.pdf",
                 secondary, secondary != null ? "isrorg-masters-25m.pdf" : null,
                 IsAward: false,
                 PoolType: primaryPool);
@@ -111,21 +133,6 @@ public class IsrOrgMastersRecordsSourceProvider : IRecordSourceProvider
         {
             foreach (var ms in owned) await ms.DisposeAsync();
         }
-    }
-
-    private static async Task<MemoryStream> FetchWhitelistedAsync(HttpClient client, string url, CancellationToken ct)
-    {
-        var uri = new Uri(url);
-        if (!string.Equals(uri.Host, AllowedHost, StringComparison.OrdinalIgnoreCase)
-            && !uri.Host.EndsWith(AllowedHostSuffix, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException($"Домен '{uri.Host}' не в whitelist источников рекордов.");
-
-        var response = await client.GetAsync(uri, ct);
-        response.EnsureSuccessStatusCode();
-        var ms = new MemoryStream();
-        await response.Content.CopyToAsync(ms, ct);
-        ms.Position = 0;
-        return ms;
     }
 
     private static string NormalizeTime(string time) => time.StartsWith("00:") ? time[3..] : time;

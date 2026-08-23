@@ -3,8 +3,54 @@
  */
 import { Result, TrainingGroup } from '../interfaces/results';
 import HelperTime from './helper-time';
+import { ageInSeason } from './season-helper';
+import { recordAgeAxisNow } from './record-age-axis';
 
 export default class HelperResults {
+  /**
+   * Заплывы, которые НЕ дают официального места и по умолчанию скрыты:
+   * 'prelim' — предварительные, 'extra' — призовые серии после финала (skins, переплывы).
+   *
+   * Зеркало серверного HeatTypes.GivesOfficialPlace — держим одно правило на клиенте,
+   * чтобы бейджи и фильтры не разъезжались со страницей соревнования.
+   */
+  static isHiddenHeat(heatType?: string | null): boolean {
+    return heatType === 'prelim' || heatType === 'extra';
+  }
+
+  /**
+   * Возраст пловца в строке результата — по правилу сезона (год ОКОНЧАНИЯ сезона минус год
+   * рождения), а не как посчитала федерация в протоколе.
+   *
+   * ⚠ Почему не `event_style_age`: протокол считает возраст КАЛЕНДАРНО, и осенние старты
+   * уезжают на год младше. מיה גרינברג, 2015 г.р., старт 31/10/2025: в протоколе «10», по
+   * правилу сезона 2025/26 — 11 (docs/season-boundary-rule.md, решение Влада 2026-08-22).
+   *
+   * Fallback на протокольное значение — когда года рождения нет (эстафеты, старые данные).
+   */
+  /**
+   * Возраст-ключ для поиска строки в справочнике рекордов — по оси RecordAgeAxis.
+   *
+   * ⚠ Это НЕ то же, что `ageLabel`: там возраст ПЛОВЦА (всегда сезонный), здесь — адрес
+   * строки в ЧУЖОЙ таблице, и при оси 'calendar' он считается по году заплыва. Осенью
+   * числа расходятся на единицу, и это законно (docs/data-integrity.md §13).
+   */
+  static recordStepAge(res: Result): string | number {
+    if (recordAgeAxisNow() === 'season') return HelperResults.ageLabel(res);
+
+    const date = parseCompetitionDate(res.date);
+    if (!date || !res.birth_year) return res.event_style_age;
+
+    const age = date.getFullYear() - res.birth_year;
+    return age > 0 ? age : res.event_style_age;
+  }
+
+  static ageLabel(res: Result): string | number {
+    const date = parseCompetitionDate(res.date);
+    const age = res.birth_year ? ageInSeason(res.birth_year, date ?? undefined) : null;
+    return age ?? res.event_style_age;
+  }
+
   /**
    * Универсальная сортировка по времени
    */
@@ -156,4 +202,13 @@ export default class HelperResults {
 
     return grouped;
   }
+}
+
+/** «dd/MM/yyyy» из протокола → Date. null — формат неизвестен, возраст считаем от «сегодня». */
+function parseCompetitionDate(raw?: string | null): Date | null {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec((raw || '').trim());
+  if (!m) return null;
+
+  const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  return Number.isNaN(d.getTime()) ? null : d;
 }

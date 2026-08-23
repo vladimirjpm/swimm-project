@@ -799,6 +799,37 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("Sys_DataCheckStates", (string)null);
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.DebugOption", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("Sys_DebugOptions", (string)null);
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.DedupIgnoredPair", b =>
                 {
                     b.Property<int>("Id")
@@ -2038,6 +2069,10 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int>("RecordId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("AgeAxisMatch")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
                     b.Property<DateTime>("CheckedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2054,6 +2089,8 @@ namespace Swimm.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("RecordId");
+
+                    b.HasIndex("AgeAxisMatch");
 
                     b.HasIndex("Found");
 

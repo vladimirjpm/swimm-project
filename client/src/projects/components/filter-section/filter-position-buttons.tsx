@@ -4,21 +4,12 @@ import {
   useAppDispatch,
   useAppSelector,
 } from '../../../store/store';
-import { TOP_N_POSITIONS } from '../../../utils/constants/filter-constants';
+import {
+  POSITION_OPTIONS,
+  PositionFilterValue,
+  getPositionLabel,
+} from '../../../utils/constants/position-filter';
 import FilterCard from './filter-card';
-
-type PositionFilterValue = 'all' | 'top' | 'podium';
-
-interface PositionOption {
-  value: PositionFilterValue;
-  label: string;
-}
-
-const POSITION_OPTIONS: PositionOption[] = [
-  { value: 'all', label: 'All' },
-  { value: 'top', label: `Top ${TOP_N_POSITIONS}` },
-  { value: 'podium', label: '🥇🥈🥉 1-2-3' },
-];
 
 const FilterPositionButtons: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -33,8 +24,7 @@ const FilterPositionButtons: React.FC = () => {
     );
   };
 
-  const currentLabel =
-    POSITION_OPTIONS.find((opt) => opt.value === current)?.label || 'All';
+  const currentLabel = getPositionLabel(current);
 
   return (
     <FilterCard
