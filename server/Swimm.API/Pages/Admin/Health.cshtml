@@ -89,7 +89,12 @@
             <td class="align-top text-right whitespace-nowrap">
                 ${accepted
                     ? `<button class="admin-btn admin-btn-ghost py-1 px-2 finding-reopen" data-id="${f.id}">Вернуть</button>`
-                    : `<button class="admin-btn admin-btn-ghost py-1 px-2 finding-accept" data-id="${f.id}">Принять</button>`}
+                    : f.fixKind === 'dedup-ignore'
+                        // У пары дедупа «принять» значит «это тёзки»: пара уйдёт в
+                        // Sys_DedupIgnoredPairs и пропадёт и здесь, и в списке дублей.
+                        ? `<button class="admin-btn admin-btn-ghost py-1 px-2 finding-accept" data-id="${f.id}"
+                                   title="Не дубли, а тёзки — развязать пару навсегда">Не дубли</button>`
+                        : `<button class="admin-btn admin-btn-ghost py-1 px-2 finding-accept" data-id="${f.id}">Принять</button>`}
             </td></tr>`;
     }
 

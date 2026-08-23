@@ -45,7 +45,11 @@ public sealed class SwimmerDedupCheck(ISwimmerDedupService dedup) : IDataCheck
                 $"год {c.BirthYear}, расстояние имён {c.Distance}, {c.CanonicalResults} vs {c.DuplicateResults} результатов",
                 "/Admin/Swimmers?filter=dedup-sure",
                 // Ведём на КАНОН: перед merge смотрят его заплывы, а не дубля.
-                PublicRoutes.Swimmer(c.CanonicalId)))
+                PublicRoutes.Swimmer(c.CanonicalId),
+                // Пара целиком: «Принять» на такой находке значит «тёзки, не склеивать» и
+                // пишет её в тот же Sys_DedupIgnoredPairs, что кнопка ✕ на /Admin/Swimmers.
+                FixKind: DataCheckFixKinds.DedupIgnore,
+                FixEntityId: c.DuplicateId))
             .ToList());
     }
 }
@@ -69,7 +73,11 @@ public sealed class ClubDedupCheck(IClubDedupService dedup) : IDataCheck
                 $"{c.CanonicalName} #{c.CanonicalId} ({c.CanonicalResults}) ← #{c.DuplicateId} ({c.DuplicateResults})",
                 $"эвристика {c.Heuristic}",
                 "/Admin/Clubs?filter=dedup-sure",
-                PublicRoutes.Club(c.CanonicalId)))
+                PublicRoutes.Club(c.CanonicalId),
+                // Та же логика, что у пловцов: «Принять» = «не дубли», пара уходит в
+                // Sys_DedupIgnoredPairs и больше не всплывает и на /Admin/Clubs.
+                FixKind: DataCheckFixKinds.DedupIgnore,
+                FixEntityId: c.DuplicateId))
             .ToList());
     }
 }

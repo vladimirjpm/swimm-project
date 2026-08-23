@@ -20,6 +20,14 @@ public static class DataCheckFixKinds
     public const string SwimmerGenderAlign = "swimmer-gender-align";
 
     /// <summary>
+    /// Пара дедупа: «Принять как есть» на такой находке означает «это не дубли, а тёзки»
+    /// и пишет пару в `Sys_DedupIgnoredPairs` — тот же список, что заводит ✕ на
+    /// /Admin/Swimmers. Иначе механизма было бы два: находка принята, а в списке дублей
+    /// пара продолжает висеть.
+    /// </summary>
+    public const string DedupIgnore = "dedup-ignore";
+
+    /// <summary>
     /// Привязать правило клубных очков — находка `competitions.no-club-point-rule`.
     /// Правится селектом прямо в находке: заходить в карточку соревнования ради одного
     /// выбора незачем, а находок бывает десяток за раз.

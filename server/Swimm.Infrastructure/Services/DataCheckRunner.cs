@@ -28,7 +28,10 @@ public class DataCheckRunner(
     IClubStandingService? standings = null,
     // Сброс кэша после правок, меняющих витрину (пол участвует в рекордах и season best).
     // Необязателен по той же причине, что и standings: в тестах кэша нет.
-    ICacheService? cache = null) : IDataCheckRunner
+    ICacheService? cache = null,
+    // «Не дубли» для пар дедупа при «Принять». Необязателен, как и остальные: в тестах,
+    // где проверяют только реестр, развязывать нечего.
+    IDedupIgnoreService? dedupIgnore = null) : IDataCheckRunner
 {
     public async Task<DataCheckRunDto> RunAllAsync(string trigger, CancellationToken ct = default)
     {
@@ -79,7 +82,7 @@ public class DataCheckRunner(
 
             foreach (var item in outcome.Items)
             {
-                var key = $"{check.Id}|{item.EntityType}|{item.EntityId}";
+                var key = Key(check.Id, item.EntityType, item.EntityId, item.FixKind, item.FixEntityId);
                 if (!seen.Add(key)) continue;
 
                 if (storedByKey.TryGetValue(key, out var existing))
@@ -272,6 +275,17 @@ public class DataCheckRunner(
         f.ResolvedAt = DateTime.UtcNow;
         f.Note = note;
         await db.SaveChangesAsync(ct);
+
+        // «Принять» пару дедупа = «это не дубли, а тёзки». Значит она обязана уйти в тот же
+        // Sys_DedupIgnoredPairs, что заводит ✕ на /Admin/Swimmers: иначе механизма два —
+        // находка принята, а в списке дублей пара продолжает висеть и просить склейки.
+        if (f.FixKind == DataCheckFixKinds.DedupIgnore && f.EntityId is { } canonId
+            && f.FixEntityId is { } dupId && canonId != dupId && dedupIgnore != null)
+        {
+            var entityType = f.EntityType == "Club" ? DedupEntityType.Club : DedupEntityType.Swimmer;
+            await dedupIgnore.AddAsync(entityType, canonId, dupId, ct);
+        }
+
         return true;
     }
 
@@ -398,7 +412,18 @@ public class DataCheckRunner(
         return true;
     }
 
-    private static string Key(DataCheckFinding f) => $"{f.CheckId}|{f.EntityType}|{f.EntityId}";
+    /// <summary>
+    /// Ключ находки между прогонами. У находок-ПАР (дедуп) в него входит и второй участник:
+    /// иначе «A ← B» и «A ← C» неразличимы, вторая пара молча терялась, а «принять» одну
+    /// значило спрятать обе.
+    /// </summary>
+    private static string Key(DataCheckFinding f) =>
+        Key(f.CheckId, f.EntityType, f.EntityId, f.FixKind, f.FixEntityId);
+
+    private static string Key(string checkId, string entityType, int? entityId, string? fixKind, int? fixEntityId) =>
+        fixKind == DataCheckFixKinds.DedupIgnore
+            ? $"{checkId}|{entityType}|{entityId}|{fixEntityId}"
+            : $"{checkId}|{entityType}|{entityId}";
 
     private static DataCheckRunDto ToDto(DataCheckRun r) =>
         new(r.Id, r.StartedAt, r.FinishedAt, r.Trigger, r.ErrorCount, r.WarningCount, r.InfoCount, r.FixedCount);
