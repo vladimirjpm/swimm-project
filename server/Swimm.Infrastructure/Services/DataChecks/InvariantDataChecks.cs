@@ -23,7 +23,9 @@ namespace Swimm.Infrastructure.Services.DataChecks;
 /// строки матчер разводит. Проверка повторяет это правило — иначе она звала бы человека
 /// чинить то, что уже различимо.
 ///
-/// ⚠ Ключ обязан совпадать с <see cref="ResultMatcher.KeyOfPersisted"/> ПОЛЕ В ПОЛЕ. Копия
+/// ⚠ Группировка обязана совпадать с ключом <see cref="ResultMatcher.KeyOfPersisted"/> ПЛЮС
+/// дискриминатором <see cref="ResultDiscriminator"/> (пловец, состав команды, сессия) ПОЛЕ
+/// В ПОЛЕ. Копия
 /// уже разъезжалась: <c>Round</c> появился в ключе матчера 2026-08-19, а здесь нет — и
 /// проверка объявила неразличимыми 33 законные пары «утро + вечер» одного пловца в comp 1581
 /// (заплыв и дорожка совпали случайно, раунды разные). Это дыра №2 из §3: предикат
@@ -48,6 +50,9 @@ public sealed class UpsertKeyCollisionCheck(SwimmDbContext db) : IDataCheck
                 r.CompetitionId, r.StyleId, r.Distance, r.Gender,
                 r.Heat, r.Lane, IsRelay = r.RelayId != null, Round = r.Round ?? "",
                 r.SwimmerId,
+                // Сессия — часть ДИСКРИМИНАТОРА матчера (не ключа): prelim/final/extra с одним
+                // заплывом и дорожкой он разводит, значит и проверке звать чинить их незачем.
+                HeatType = r.HeatType ?? "",
                 TeamKey = r.Relay != null ? (r.Relay.SwimmersName ?? r.Relay.TeamName ?? "") : ""
             })
             .Where(g => g.Count() > 1);

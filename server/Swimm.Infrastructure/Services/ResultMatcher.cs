@@ -32,8 +32,19 @@ public readonly record struct ResultMatchKey(
 /// (comp #1513: «הפועל עמק חפר» 3037 и 3089, оба heat 3 lane 9, пловец 8238 в обеих) —
 /// тогда SwimmerId совпадает у ОБЕИХ строк и матч сваливался в FIFO, то есть в лотерею.
 /// Состав команды — то, чем эти строки различаются в самом протоколе.
+///
+/// HeatType (prelim/final/extra) добавлен 2026-08-23: у одного пловца бывают две строки с
+/// ОДИНАКОВЫМИ заплывом и дорожкой, различающиеся только сессией — предварительные и финал
+/// случайно совпали номерами (comp 1556-1559), либо после финала плыли призовой заплыв
+/// (comp 1586: final + extra). SwimmerId у них один, TeamKey пуст, и матч сваливался в FIFO,
+/// то есть в лотерею: время финала могло записаться в строку предварительных.
+///
+/// ⚠ Именно ДИСКРИМИНАТОР, а не ключ: он работает только внутри коллизии. У старых данных
+/// HeatType пуст с обеих сторон — пары не совпадут по нему и доматчатся FIFO, ровно как
+/// раньше. Внеси HeatType в ключ — и при первом же переимпорте старого протокола новым
+/// парсером (в файле сессия есть, в БД пусто) строки перестали бы находиться и задвоились.
 /// </summary>
-public readonly record struct ResultDiscriminator(int SwimmerId, string TeamKey);
+public readonly record struct ResultDiscriminator(int SwimmerId, string TeamKey, string HeatType = "");
 
 /// <summary>
 /// Результат матчинга старых (уже в БД) и новых (из импортируемого файла) строк результата.
@@ -188,11 +199,11 @@ public static class ResultMatcher
 
     /// <summary>Дискриминатор старой строки — Relay подгружен через Include (см. JsonImportService).</summary>
     public static ResultDiscriminator DiscriminatorOfPersisted(ResultRecord r) =>
-        new(r.SwimmerId, TeamKey(r.Relay));
+        new(r.SwimmerId, TeamKey(r.Relay), r.HeatType ?? string.Empty);
 
     /// <summary>Дискриминатор новой строки — Relay ещё навигация, Id у неё нет.</summary>
     public static ResultDiscriminator DiscriminatorOfTransient(ResultRecord r) =>
-        new(r.SwimmerId, TeamKey(r.Relay));
+        new(r.SwimmerId, TeamKey(r.Relay), r.HeatType ?? string.Empty);
 
     /// <summary>
     /// Состав команды как строка. Берём именно состав, а не TeamName: у двух команд одного

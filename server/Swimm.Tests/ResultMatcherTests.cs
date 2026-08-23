@@ -13,7 +13,7 @@ public class ResultMatcherTests
 {
     private static ResultRecord Old(int id, int compId = 1, int styleId = 1, string distance = "50",
         string gender = "male", int heat = 1, int lane = 1, int? relayId = null, int swimmerId = 0,
-        string? round = null) => new()
+        string? round = null, string? heatType = null) => new()
     {
         Id = id,
         CompetitionId = compId,
@@ -24,12 +24,13 @@ public class ResultMatcherTests
         Lane = lane,
         RelayId = relayId,
         SwimmerId = swimmerId == 0 ? id : swimmerId,
-        Round = round
+        Round = round,
+        HeatType = heatType
     };
 
     private static ResultRecord New(int compId = 1, int styleId = 1, string distance = "50",
         string gender = "male", int heat = 1, int lane = 1, bool isRelay = false, string? note = null,
-        int swimmerId = 0, string? round = null) => new()
+        int swimmerId = 0, string? round = null, string? heatType = null) => new()
     {
         CompetitionId = compId,
         StyleId = styleId,
@@ -40,7 +41,8 @@ public class ResultMatcherTests
         Relay = isRelay ? new Relay() : null,
         Note = note,
         SwimmerId = swimmerId,
-        Round = round
+        Round = round,
+        HeatType = heatType
     };
 
     private static ResultMatch<ResultRecord, ResultRecord> RunMatch(
@@ -48,6 +50,47 @@ public class ResultMatcherTests
         ResultMatcher.Match(oldRows, newRows,
             ResultMatcher.KeyOfPersisted, ResultMatcher.KeyOfTransient,
             ResultMatcher.DiscriminatorOfPersisted, ResultMatcher.DiscriminatorOfTransient);
+
+    [Fact]
+    public void SameKeyAndSwimmer_DifferentSession_MatchedBySession()
+    {
+        // Живой случай (comp 1556-1559, 1586): у одного пловца две строки с ОДНИМИ заплывом и
+        // дорожкой — предварительные и финал случайно совпали номерами, либо после финала плыли
+        // призовой заплыв. Ключ и SwimmerId у них общие, и матч сваливался в FIFO: время финала
+        // могло записаться в строку предварительных. Сессия разводит их точно.
+        var prelim = Old(1, swimmerId: 7, heatType: "prelim");
+        var final = Old(2, swimmerId: 7, heatType: "final");
+
+        var newFinal = New(swimmerId: 7, heatType: "final", note: "final-updated");
+        var newPrelim = New(swimmerId: 7, heatType: "prelim", note: "prelim-updated");
+
+        var result = RunMatch([prelim, final], [newFinal, newPrelim]);
+
+        Assert.Empty(result.Inserted);
+        Assert.Empty(result.Deleted);
+        Assert.Equal(2, result.Matched.Count);
+        Assert.Equal("final-updated", result.Matched.Single(m => m.Old.Id == 2).New.Note);
+        Assert.Equal("prelim-updated", result.Matched.Single(m => m.Old.Id == 1).New.Note);
+    }
+
+    [Fact]
+    public void SameKeyAndSwimmer_NoSessionInOldData_StillMatchesFifo()
+    {
+        // Старые данные сессии не знают (56 тыс. строк на 2026-08-23 с пустым HeatType).
+        // Поэтому сессия и не в КЛЮЧЕ: строки обязаны находиться по-прежнему, иначе первый же
+        // переимпорт старого протокола новым парсером задвоил бы их.
+        var first = Old(1, swimmerId: 7);
+        var second = Old(2, swimmerId: 7);
+
+        var result = RunMatch([first, second], [
+            New(swimmerId: 7, heatType: "prelim", note: "a"),
+            New(swimmerId: 7, heatType: "final", note: "b"),
+        ]);
+
+        Assert.Empty(result.Inserted);
+        Assert.Empty(result.Deleted);
+        Assert.Equal(2, result.Matched.Count);
+    }
 
     [Fact]
     public void SameKey_Matches()
