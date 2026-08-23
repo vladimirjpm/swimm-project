@@ -25,7 +25,10 @@ public class DataCheckRunner(
     IEnumerable<IDataCheck> checks,
     // Пересчёт зачёта после привязки правила. Необязателен: без него правило проставится,
     // но цифры Top Clubs останутся старыми до следующего пересчёта — в тестах это не нужно.
-    IClubStandingService? standings = null) : IDataCheckRunner
+    IClubStandingService? standings = null,
+    // Сброс кэша после правок, меняющих витрину (пол участвует в рекордах и season best).
+    // Необязателен по той же причине, что и standings: в тестах кэша нет.
+    ICacheService? cache = null) : IDataCheckRunner
 {
     public async Task<DataCheckRunDto> RunAllAsync(string trigger, CancellationToken ct = default)
     {
@@ -154,7 +157,9 @@ public class DataCheckRunner(
         // прогоном, и сохранённое значение врало бы сразу после нажатия кнопки: человек
         // поправил, а список показывает старое.
         var subjectIds = findings
-            .Where(f => f.FixKind == DataCheckFixKinds.SwimmerGender && f.FixEntityId != null)
+            .Where(f => (f.FixKind == DataCheckFixKinds.SwimmerGender
+                         || f.FixKind == DataCheckFixKinds.SwimmerGenderAlign)
+                        && f.FixEntityId != null)
             .Select(f => f.FixEntityId!.Value)
             .Distinct()
             .ToList();
@@ -293,6 +298,33 @@ public class DataCheckRunner(
         foreach (var r in rows) r.Gender = gender;
 
         await db.SaveChangesAsync(ct);
+        return rows.Count;
+    }
+
+    public async Task<int?> AlignSwimmerGenderAsync(int findingId, string gender, CancellationToken ct = default)
+    {
+        if (gender is not ("male" or "female")) return null;
+
+        var f = await db.DataCheckFindings.FirstOrDefaultAsync(x => x.Id == findingId, ct);
+        if (f?.FixKind != DataCheckFixKinds.SwimmerGenderAlign || f.FixEntityId is not { } swimmerId)
+            return null;
+
+        var swimmer = await db.Swimmers.FirstOrDefaultAsync(s => s.Id == swimmerId, ct);
+        if (swimmer is null) return null;
+
+        swimmer.Gender = gender;
+
+        // Здесь, в отличие от `results.no-gender`, перезаписываем и НЕПУСТОЙ пол строки:
+        // находка и есть «копии разошлись», а человек только что сказал, какая верна.
+        // Эстафеты не трогаем — там пол команды, а не пловца.
+        var rows = await db.Results
+            .Where(r => r.SwimmerId == swimmerId && r.RelayId == null && r.Gender != gender)
+            .ToListAsync(ct);
+        foreach (var r in rows) r.Gender = gender;
+
+        await db.SaveChangesAsync(ct);
+        // Пол участвует в выборках витрин (рекорды, season best) — кэш обязан протухнуть.
+        if (cache != null) await cache.InvalidateAllAsync();
         return rows.Count;
     }
 

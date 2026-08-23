@@ -168,6 +168,43 @@ public class SuspectResultDetectorTests
     }
 
     [Fact]
+    public void GenderMismatch_TwoSwims_LeansOnSwimmerCard()
+    {
+        // Живой случай (comp 1580): у пловца ровно два старта — брасс записан женским,
+        // комплекс мужским. По большинству 1:1 «меньшинством» оказывалась случайная строка,
+        // и у טנא יהלי (male по карточке и по 32 другим заплывам) обвинялась мужская.
+        var rows = new List<SuspectCandidateRow>
+        {
+            new(1, 7, "breaststroke", "200", "female", 159_240, Day1, false, false, "15-16",
+                SwimmerGender: "male"),
+            new(2, 7, "individual_medley", "200", "male", 152_950, Day1, false, false, "15-16",
+                SwimmerGender: "male"),
+        };
+
+        var v = Assert.Single(SuspectResultDetector.Detect(rows));
+        Assert.Equal(1, v.ResultId);
+        Assert.Equal(SuspectReasons.GenderMismatch, v.Reason);
+        Assert.Contains("по карточке пловца", v.Note);
+    }
+
+    [Fact]
+    public void GenderMismatch_NoCardGender_FallsBackToMajority()
+    {
+        // Пол в карточке не заполнен (в базе такие есть) — опора прежняя: большинство
+        // по заплывам этого соревнования.
+        var rows = new List<SuspectCandidateRow>
+        {
+            new(1, 7, "freestyle", "50", "female", 31_000, Day1, false, false, null),
+            new(2, 7, "freestyle", "100", "male", 68_000, Day1, false, false, null),
+            new(3, 7, "backstroke", "50", "male", 38_000, Day1, false, false, null),
+        };
+
+        var v = Assert.Single(SuspectResultDetector.Detect(rows));
+        Assert.Equal(1, v.ResultId);
+        Assert.Contains("в остальных заплывах пловца", v.Note);
+    }
+
+    [Fact]
     public void Relays_And_FailedTimes_Ignored()
     {
         var rows = new[]

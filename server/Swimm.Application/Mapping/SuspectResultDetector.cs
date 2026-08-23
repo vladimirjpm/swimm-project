@@ -29,7 +29,11 @@ public sealed record SuspectCandidateRow(
     string? Round = null,
     /// <summary>Номер заплыва в протоколе. Соседи по нему — независимая проверка
     /// правдоподобия времени: ошибка протокола изолирована, а победа в своём заплыве нет.</summary>
-    int Heat = 0);
+    int Heat = 0,
+    /// <summary>Пол ПЛОВЦА из карточки (male/female); null или пусто — не заполнен.
+    /// Опора правила «пол результата расходится с полом пловца»: она прямее, чем
+    /// большинство по заплывам этого соревнования.</summary>
+    string? SwimmerGender = null);
 
 /// <summary>
 /// Заплыв пловца из его личной истории (для правила «выброс относительно себя»).
@@ -237,7 +241,14 @@ public static class SuspectResultDetector
             }
         }
 
-        // 4. Пол результата расходится с полом пловца по остальным его заплывам.
+        // 4. Пол результата расходится с полом пловца.
+        //
+        // Опора — КАРТОЧКА пловца, если пол в ней заполнен, и лишь затем большинство по
+        // его заплывам этого соревнования. Большинство одно не годится: у пловца бывает
+        // ровно два старта, и при 1:1 «меньшинством» оказывается случайная строка. Живой
+        // случай (comp 1580): у пяти пловцов по два заплыва, один из них с чужим полом, —
+        // правило пометило верную строку лишь у четверых, а у טנא יהלי (male по карточке
+        // и по 32 другим заплывам) обвинило как раз мужскую строку.
         foreach (var grp in timed.GroupBy(r => r.SwimmerId))
         {
             var byGender = grp
@@ -245,11 +256,17 @@ public static class SuspectResultDetector
                 .GroupBy(r => r.Gender)
                 .ToList();
             if (byGender.Count < 2) continue;
-            var dominant = byGender.OrderByDescending(g => g.Count()).First();
-            foreach (var g in byGender.Where(g => g.Key != dominant.Key))
+
+            var cardGender = grp
+                .Select(r => Normalize(r.SwimmerGender))
+                .FirstOrDefault(g => g != null);
+            var expected = cardGender ?? byGender.OrderByDescending(g => g.Count()).First().Key;
+            var against = cardGender != null ? "по карточке пловца" : "в остальных заплывах пловца";
+
+            foreach (var g in byGender.Where(g => g.Key != expected))
             foreach (var row in g)
                 Flag(row, SuspectReasons.GenderMismatch,
-                    $"пол '{row.Gender}', тогда как в остальных заплывах пловца — '{dominant.Key}'");
+                    $"пол '{row.Gender}', тогда как {against} — '{expected}'");
         }
 
         // 5. Один пловец дважды в одной дисциплине одного дня с разным временем.
@@ -300,6 +317,14 @@ public static class SuspectResultDetector
 
         return verdicts.Values.OrderBy(v => v.ResultId).ToList();
     }
+
+    /// <summary>Пол в БД живёт как male/female и как M/F — сводим к одному написанию.</summary>
+    private static string? Normalize(string? gender) => gender?.Trim().ToLowerInvariant() switch
+    {
+        "male" or "m" => "male",
+        "female" or "f" => "female",
+        _ => null,
+    };
 
     /// <summary>
     /// Время подтверждено собственным заплывом: соседи по нему плыли примерно так же.

@@ -56,7 +56,10 @@ public class SeasonBestRepository : ISeasonBestRepository
         // как в клубном season best. Ответ кэшируется на сутки, выборка узкая (одна дистанция).
         var rows = await query
             .Select(r => new Row(
-                r.Gender,
+                // Пол берём у ПЛОВЦА, а не из строки: пол человека живёт в карточке, а
+                // Results.Gender — пол зачёта заплыва, и он бывает ошибочным (одна кривая
+                // шапка протокола уводила пловца в чужую колонку витрины).
+                r.Swimmer.Gender ?? r.Gender,
                 r.Swimmer.BirthYear,
                 r.TimeMillisecond,
                 r.TimeOriginal,

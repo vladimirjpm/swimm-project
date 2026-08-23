@@ -13,6 +13,13 @@ public static class DataCheckFixKinds
     public const string SwimmerGender = "swimmer-gender";
 
     /// <summary>
+    /// Выровнять пол пловца — находка `results.gender-vs-card`. В отличие от
+    /// <see cref="SwimmerGender"/> перезаписывает пол и в НЕПУСТЫХ личных строках: смысл
+    /// находки как раз в том, что копии разошлись, и человек говорит, какая верна.
+    /// </summary>
+    public const string SwimmerGenderAlign = "swimmer-gender-align";
+
+    /// <summary>
     /// Привязать правило клубных очков — находка `competitions.no-club-point-rule`.
     /// Правится селектом прямо в находке: заходить в карточку соревнования ради одного
     /// выбора незачем, а находок бывает десяток за раз.
