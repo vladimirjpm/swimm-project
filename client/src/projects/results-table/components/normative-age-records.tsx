@@ -181,13 +181,15 @@ function TabSummary({ rows, size }: { rows: GenderAgeRow[]; size: 'mobile' | 'de
 }
 
 /**
- * Панель табов «🏅 ISR Age Records | ⏱ Season best». Открыт всегда ровно один таб;
- * свёрнутый показывает только лучшее время ♂ · ♀ (тап по нему открывает).
- * Мобайл — табы по половине ширины, времена под подписью; десктоп — панель по контенту,
- * времена в одну строку с подписью.
+ * Панель табов «🏅 ISR Age Records | ⏱ Season best».
+ *
+ * `active = null` — карточка свёрнута целиком (состояние по умолчанию, когда возрастов
+ * много): видны только подписи и лучшие времена ♂ · ♀ у обоих табов, таблицы нет. Тап по
+ * табу открывает его, повторный тап по открытому — сворачивает обратно. Так карточка не
+ * занимает пол-экрана над таблицей результатов, ради чего свёрнутый вид и заводили.
  */
 function CardTabs({ active, onChange, recordRows, seasonRows, seasonLabel }: {
-  active: CardTab;
+  active: CardTab | null;
   onChange: (tab: CardTab) => void;
   recordRows: GenderAgeRow[];
   seasonRows: GenderAgeRow[];
@@ -222,15 +224,15 @@ function CardTabs({ active, onChange, recordRows, seasonRows, seasonLabel }: {
   );
 }
 
-/** Карточка с табами: панель сверху, под ней обычная таблица открытого таба. */
+/** Карточка с табами: панель сверху, под ней таблица открытого таба (или ничего, если свёрнута). */
 function renderTabbedCard(
   recordRows: GenderAgeRow[],
   seasonRows: GenderAgeRow[],
   seasonLabel: string | undefined,
-  active: CardTab,
+  active: CardTab | null,
   onChange: (tab: CardTab) => void,
 ) {
-  const rows = active === 'records' ? recordRows : seasonRows;
+  const rows = active === 'season' ? seasonRows : recordRows;
   return (
     <div className={`${CARD_SURFACE} border border-[#e9edf3] dark:border-[#28344a] rounded-2xl mb-4 p-3 sm:p-[18px_20px]`} style={CARD_SHADOW}>
       <CardTabs
@@ -240,6 +242,7 @@ function renderTabbedCard(
         seasonRows={seasonRows}
         seasonLabel={seasonLabel}
       />
+      {active && (
       <div className="mt-3 sm:mt-4">
         <UI_GenderAgeTable
           rows={rows}
@@ -250,6 +253,7 @@ function renderTabbedCard(
           ageColWidthMobile={34}
         />
       </div>
+      )}
     </div>
   );
 }
@@ -337,7 +341,10 @@ function renderManyAges(
 
 function NormativeAgeRecords({ gender, poolType, styleName, styleLen, age, season }: NormativeAgeRecordsProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<CardTab>('records');
+  // null — карточка свёрнута. При многих возрастах она такая по умолчанию (решение Влада
+  // 2026-08-23): раскрытая таблица на десяток ступеней занимает пол-экрана над результатами,
+  // ради которых человек и пришёл. При одном возрасте строка всего одна — прятать нечего.
+  const [activeTab, setActiveTab] = useState<CardTab | null>(null);
   // Хук — до любых ранних return: правило хуков React.
   const seasonBest = useSeasonBest({
     styleName, styleLen, poolType, season,
@@ -372,48 +379,40 @@ function NormativeAgeRecords({ gender, poolType, styleName, styleLen, age, seaso
       }]
     : ageRowsOf(distanceByGender.male ?? null, distanceByGender.female ?? null);
 
-  // Ступени таба season best = ступени справочника ПЛЮС наши собственные, которых в
-  // справочнике нет (федерация ведёт возрастные рекорды с 10 лет, а восьми- и
-  // девятилетние у нас плавают — их время показать надо). Ступень без времени сезона
-  // остаётся пустой строкой: видно «в этой ступени никто не плыл», а не «таблица
-  // начинается с 14 лет».
+  // У КАЖДОГО таба свои ступени: справочник федерации ведётся с 10 лет, а наши восьми- и
+  // девятилетние плавают — season best честно начинается с 8. Подгонять таблицы друг под
+  // друга нечем: это разные источники, и объединение давало бы у рекордов пустые строки 8-9,
+  // которых там не бывает по определению.
   //
-  // Сверху ограничиваем последней ступенью справочника (18): дальше у федерации идут
-  // adults/masters, а masters в этот таб не входит по определению — иначе снизу таблицы
-  // повисал бы хвост случайных взрослых стартов до 60+.
+  // Общий у них только ПОТОЛОК: последняя ступень справочника (18). Дальше у федерации идут
+  // adults/masters, masters в этот таб не входит, и без потолка снизу season best повисал бы
+  // хвост случайных взрослых стартов до 60+.
   //
   // ⚠ При выбранном годе рождения ступени в табах РАЗНЫЕ по построению: у рекордов ось
   // календарная (recordStepAge), у season best — сезонная (правило Влада 2026-08-22).
   const ageNumberOf = (label: string) => Number(label.replace(/\D+$/, ''));
+  const maxAge = recordRows.length > 0
+    ? Math.max(...recordRows.map(r => ageNumberOf(r.age)))
+    : 18;
   const seasonAge = isSingleAge ? ageInSeason(age, competitionDate(season)) : null;
-  const seasonByAge = new Map(
-    (seasonBest ? seasonBestRows(seasonBest.data) : []).map(r => [r.age, r]),
-  );
+  const allSeasonRows = seasonBest ? seasonBestRows(seasonBest.data) : [];
 
-  let seasonRows: GenderAgeRow[];
-  if (isSingleAge) {
-    seasonRows = seasonAge === null
-      ? []
-      : [seasonByAge.get(`${seasonAge}y`) ?? { age: `${seasonAge}y` }];
-  } else {
-    const maxAge = recordRows.length > 0
-      ? Math.max(...recordRows.map(r => ageNumberOf(r.age)))
-      : 18;
-    const labels = new Set<string>(recordRows.map(r => r.age));
-    seasonByAge.forEach((_, label) => {
-      if (ageNumberOf(label) <= maxAge) labels.add(label);
-    });
-    seasonRows = Array.from(labels)
-      .sort((a, b) => ageNumberOf(a) - ageNumberOf(b))
-      .map(label => seasonByAge.get(label) ?? { age: label });
-  }
+  const seasonRows: GenderAgeRow[] = isSingleAge
+    ? (seasonAge === null ? [] : allSeasonRows.filter(r => r.age === `${seasonAge}y`))
+    : allSeasonRows.filter(r => ageNumberOf(r.age) <= maxAge);
 
   // Панель табов появляется, только если сезон вообще чем-то наполнен: таблица из одних
   // прочерков — не повод менять шапку карточки.
   const hasSeasonBest = seasonRows.some(r => r.male || r.female);
   if (hasSeasonBest) {
     if (recordRows.length === 0) return null;
-    return renderTabbedCard(recordRows, seasonRows, seasonBest?.season_label, activeTab, setActiveTab);
+    return renderTabbedCard(
+      recordRows, seasonRows, seasonBest?.season_label,
+      // Один возраст — карточка сразу раскрыта на табе рекордов.
+      isSingleAge ? (activeTab ?? 'records') : activeTab,
+      // Тап по открытому табу сворачивает карточку обратно; по другому — переключает.
+      (tab) => setActiveTab(prev => (prev === tab ? null : tab)),
+    );
   }
 
   let rendered: React.ReactNode = null;
