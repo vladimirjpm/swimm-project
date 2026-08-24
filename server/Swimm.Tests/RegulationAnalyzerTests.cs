@@ -63,6 +63,65 @@ public class RegulationAnalyzerTests
             f => f.Flag == RegulationFlags.Championship);
     }
 
+    /// <summary>
+    /// «Миллениум 2025» (compID 16739): единственное упоминание чемпионата во всём регламенте —
+    /// во вступительном слове, и оно говорит РОВНО ОБРАТНОЕ: соревнование даёт «подготовиться
+    /// к чемпионату Израиля». Галочка «Чемпионат Израиля» уходила в БД и меняла вид клубного
+    /// зачёта; теперь такие упоминания отклоняются по словам подготовки рядом.
+    /// </summary>
+    [Fact]
+    public void Championship_PreparationForIt_IsNotAChampionship()
+    {
+        var text = Reversed(
+            "תחרות המילניום, אשר תתקיים בבריכה מהירה ומקצועית בת 8 מסלולים, תהווה "
+            + "להתחדד ולהתכונן באופן מיטבי לאליפות ישראל.");
+
+        Assert.DoesNotContain(RegulationAnalyzer.Find(text),
+            f => f.Flag == RegulationFlags.Championship);
+    }
+
+    [Theory]
+    [InlineData("תחרות הכנה לאליפות ישראל לגילאים צעירים")]
+    [InlineData("התחרות מתקיימת לקראת אליפות ישראל החורף")]
+    public void Championship_OtherPreparationWordings_AlsoRejected(string readable)
+        => Assert.DoesNotContain(RegulationAnalyzer.Find(Reversed(readable)),
+            f => f.Flag == RegulationFlags.Championship);
+
+    /// <summary>
+    /// Вторая живая формула — ССЫЛКА на чемпионат как на образец. «ליגה מס 1 צעירים»
+    /// (compID 16752) пишет: возрастные группы в лиге такие же, как на чемпионате Израиля.
+    /// Лига от этого чемпионатом не становится.
+    /// </summary>
+    [Theory]
+    [InlineData("קבוצות הגיל בליגה זהות לקבוצות הגיל באליפות ישראל לצעירים")]
+    [InlineData("המשחים יתקיימו בהתאם לתקנון אליפות ישראל")]
+    public void Championship_ReferenceAsATemplate_IsRejected(string readable)
+        => Assert.DoesNotContain(RegulationAnalyzer.Find(Reversed(readable)),
+            f => f.Flag == RegulationFlags.Championship);
+
+    [Fact]
+    public void Championship_PreparationMentionDoesNotHideARealOne()
+    {
+        // Вето отклоняет одно вхождение, но не должно прятать настоящее дальше по тексту:
+        // PdfPig отдаёт страницу ОДНОЙ строкой, так что оба упоминания придут вместе.
+        var readable =
+            "התחרות תהווה הזדמנות להתכונן לאליפות ישראל. " + new string('־', 200)
+            + " תקנון אליפות ישראל וטריילז ארנה 2026";
+
+        Assert.Contains(RegulationAnalyzer.Find(Reversed(readable)),
+            f => f.Flag == RegulationFlags.Championship);
+    }
+
+    /// <summary>Предлог ל־ сам по себе не улика: «регламент ДЛЯ чемпионата» — это чемпионат.</summary>
+    [Fact]
+    public void Championship_DativeWithoutPreparationWords_StaysAChampionship()
+    {
+        var text = Reversed("התקנון לאליפות ישראל וטריילז ארנה 2026");
+
+        Assert.Contains(RegulationAnalyzer.Find(text),
+            f => f.Flag == RegulationFlags.Championship);
+    }
+
     [Fact]
     public void PlainRegulation_WithoutMarkers_FindsNothing()
     {

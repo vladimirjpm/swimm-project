@@ -39,9 +39,37 @@ public class RegulationAnalyzer : IRegulationAnalyzer
         // извлечение PDF рвёт слова («מדליו ת» в регламенте Маккаби-2026).
         (new Regex(@"מדלי\s*(?:ו\s*)?(?:ית|ות|ת|ה)", RegexOptions.Compiled), RegulationFlags.Medals, "מדליות"),
 
-        // Чемпионат Израиля.
+        // Чемпионат Израиля. Осторожно: регламент обычного турнира сплошь и рядом упоминает
+        // чемпионат как ЦЕЛЬ подготовки — см. Veto ниже.
         (new Regex(@"אליפות\s+ישראל", RegexOptions.Compiled), RegulationFlags.Championship, "אליפות ישראל"),
     ];
+
+    /// <summary>
+    /// Когда упоминание чемпионата НЕ делает соревнование чемпионатом.
+    ///
+    /// Живой случай — «מילניום 2025» (compID 16739): единственное вхождение «אליפות ישראל»
+    /// во всём регламенте стоит во вступительном слове — «תחרות המילניום … תהווה להתחדד
+    /// ולהתכונן באופן מיטבי לאליפות ישראל», то есть «станет возможностью подготовиться К
+    /// чемпионату Израиля». Регламент говорит прямо обратное тому, что мы из него читали, а
+    /// галочка «Чемпионат Израиля» уходила в БД и меняла вид клубного зачёта
+    /// (StandingKinds.Resolve).
+    ///
+    /// Одного предлога ל־ мало: «התקנון לאליפות ישראל» — это уже настоящий чемпионат.
+    /// Отличают именно слова ПОДГОТОВКИ рядом, и это устойчивая формула федерации для
+    /// разминочных стартов перед чемпионатом, а не особенность «Миллениума».
+    ///
+    /// Вторая формула — ССЫЛКА на чемпионат как на образец: «ליגה מס 1 צעירים» (compID 16752)
+    /// пишет «קבוצות הגיל בליגה זהות לקבוצות הגיל באליפות ישראל לצעירים» — «возрастные группы
+    /// в лиге такие же, как на чемпионате Израиля». Тоже не чемпионат.
+    /// </summary>
+    private static readonly Regex ChampionshipVeto =
+        new(@"להתכונן|להתחדד|לקראת|הכנה|זהות|זהה|בהתאם", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Сколько символов вокруг находки смотрит вето. Не вся строка: PdfPig отдаёт страницу
+    /// одним куском, и по всей странице «подготовка» нашлась бы почти в любом регламенте.
+    /// </summary>
+    private const int VetoContext = 120;
 
     /// <summary>Больше — уже не помощь, а простыня: админу хватает пары цитат на флаг.</summary>
     private const int MaxQuotesPerFlag = 2;
@@ -93,24 +121,34 @@ public class RegulationAnalyzer : IRegulationAnalyzer
 
                 // Прямое вхождение — текст лёг нормально; обратное — строка перевёрнута
                 // (обычный случай для ивритских PDF федерации).
-                var match = rx.Match(raw);
-                var source = raw;
-                if (!match.Success)
+                var source = rx.IsMatch(raw) ? raw : reversed;
+
+                // Все вхождения, а не первое: одно может быть отклонено вето (подготовка к
+                // чемпионату), и оно не должно прятать настоящее упоминание дальше по тексту —
+                // тем более что PdfPig отдаёт страницу ОДНОЙ строкой.
+                foreach (Match match in rx.Matches(source))
                 {
-                    match = rx.Match(reversed);
-                    source = reversed;
+                    if (perFlag.GetValueOrDefault(flag) >= MaxQuotesPerFlag) break;
+                    if (flag == RegulationFlags.Championship && VetoedNearby(source, match)) continue;
+
+                    var quote = QuoteAround(source, match.Index, match.Length);
+                    if (!seen.Add($"{flag}|{quote}")) continue;
+
+                    findings.Add(new RegulationFindingDto(flag, label, quote));
+                    perFlag[flag] = perFlag.GetValueOrDefault(flag) + 1;
                 }
-                if (!match.Success) continue;
-
-                var quote = QuoteAround(source, match.Index, match.Length);
-                if (!seen.Add($"{flag}|{quote}")) continue;
-
-                findings.Add(new RegulationFindingDto(flag, label, quote));
-                perFlag[flag] = count + 1;
             }
         }
 
         return findings;
+    }
+
+    /// <summary>Стоят ли рядом с находкой слова подготовки — см. <see cref="ChampionshipVeto"/>.</summary>
+    private static bool VetoedNearby(string source, Match match)
+    {
+        var start = Math.Max(0, match.Index - VetoContext);
+        var end = Math.Min(source.Length, match.Index + match.Length + VetoContext);
+        return ChampionshipVeto.IsMatch(source[start..end]);
     }
 
     private static string ExtractText(Stream pdfStream)
