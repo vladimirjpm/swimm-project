@@ -458,6 +458,73 @@ if (args.Contains("--repull"))
     return;
 }
 
+// Обновление справочника рекордов В ПРАВИЛЬНОМ ПОРЯДКЕ:
+//   dotnet run -- --records-refresh [--dry-run]
+//
+// Порядок здесь — не деталь реализации, а САМО ПРАВИЛО (решение Влада 2026-08-24).
+// На country/ISR/open пишут ДВА источника с одним ключом упсерта: отчёт NR World Aquatics
+// (есть по всем 246 странам, но по Израилю отстал местами на 10 лет — 50 на спине 50 м у
+// них 24.60 от 2016 против 24.36 от 14/08/2026 у федерации) и PDF isr.org.il. Побеждает
+// применённый ПОСЛЕДНИМ, поэтому Израиль идёт вторым: World Aquatics приносит широту
+// (мировые рекорды + всё, чего у федерации нет), федерация поверх возвращает свои свежие.
+//
+// Ровно поэтому источники перечислены списком, а не запускаются как попало из админки:
+// перепутанный порядок молча откатывает 19 национальных рекордов.
+// Подробности — docs/data-integrity.md, И-13.
+if (args.Contains("--records-refresh"))
+{
+    var dryRun = args.Contains("--dry-run");
+    using var scope = app.Services.CreateScope();
+    var providers = scope.ServiceProvider.GetServices<IRecordSourceProvider>()
+        .ToDictionary(p => p.Source, StringComparer.OrdinalIgnoreCase);
+    var diffService = scope.ServiceProvider.GetRequiredService<IRecordDiffService>();
+
+    string[] order = ["worldrecords", "isrorg-age"];
+    foreach (var sourceKey in order)
+    {
+        if (!providers.TryGetValue(sourceKey, out var provider))
+        {
+            Console.Error.WriteLine($"Источник '{sourceKey}' не зарегистрирован — пропуск");
+            continue;
+        }
+
+        Console.WriteLine($"\n=== {sourceKey} ===");
+        IReadOnlyList<Swimm.Application.Dtos.ParsedRecordDto> parsed;
+        try
+        {
+            parsed = await provider.FetchAsync(
+                new Swimm.Application.Dtos.RecordSourceRequest(sourceKey, null, null, null, null, null));
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"  не скачалось: {ex.Message}");
+            continue;
+        }
+
+        var diff = await diffService.BuildDiffAsync(sourceKey, parsed);
+        Console.WriteLine($"  строк из источника: {parsed.Count}; без изменений {diff.UnchangedCount}, "
+            + $"изменится {diff.ChangedCount}, новых {diff.AddedCount}, нет в источнике {diff.MissingInSourceCount}");
+        foreach (var e in diff.Changed.Take(30))
+            Console.WriteLine($"    {e.RegionType,-7} {e.RegionCode,-3} {e.Gender,-6} {e.PoolType,-4} "
+                + $"{e.Style,-18} {e.Distance,-7} {e.OldTime ?? "(пусто)",9} -> {e.NewTime,9}");
+        if (diff.ChangedCount > 30) Console.WriteLine($"    … ещё {diff.ChangedCount - 30}");
+        foreach (var e in diff.Added.Take(15))
+            Console.WriteLine($"    + {e.RegionType,-7} {e.RegionCode,-3} {e.Gender,-6} {e.PoolType,-4} "
+                + $"{e.Style,-18} {e.Distance,-7} {e.NewTime,9}");
+
+        if (dryRun) { Console.WriteLine("  --dry-run: не применяю"); continue; }
+
+        var applied = await diffService.ApplyAsync(
+            new Swimm.Application.Dtos.RecordDiffApplyRequest(diff.DiffId, ApplyAdded: true, ApplyChanged: true));
+        Console.WriteLine(applied.Success
+            ? $"  применено: {applied.AppliedCount}"
+            : $"  ОШИБКА: {applied.Error}");
+    }
+
+    Console.WriteLine("\nГотово. Израиль обновлён ПОСЛЕ World Aquatics — иначе его рекорды откатятся.");
+    return;
+}
+
 // Прогон «Проверить качество» по событию без админки (пара к --repull: после переимпорта
 // автопометки сброшены, и вернуть актуальные может только скан):
 //   dotnet run -- --quality-scan <eventId>

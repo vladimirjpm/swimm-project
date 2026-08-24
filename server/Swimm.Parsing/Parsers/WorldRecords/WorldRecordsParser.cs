@@ -24,7 +24,16 @@ public class WorldRecordsParser : IFormatParser
         ["breaststroke"] = "breaststroke",
         ["butterfly"] = "butterfly",
         ["individual medley"] = "individual_medley",
-        ["medley"] = "medley",
+        // World Aquatics печатает комплекс БЕЗ слова Individual: «Women's 200m Medley»
+        // (и «4x100m Medley Relay» у эстафет — слово Relay отрезается раньше). Канон проекта
+        // один — individual_medley: так называется стиль в Styles, так его пишет импорт
+        // протоколов (JsonImportService.NormalizeStyleName) и ивритский парсер.
+        //
+        // Пока здесь стоял отдельный ключ "medley", импорт заводил ПАРАЛЛЕЛЬНЫЙ набор строк
+        // (32 штуки), невидимый всему, что ищет по individual_medley: рекорды комплекса
+        // обновлялись «мимо» справочника, а старые строки сидера так и оставались — у женских
+        // 200 и 400 к/п длинной воды с ПУСТЫМ временем. См. docs/data-integrity.md, И-13.
+        ["medley"] = "individual_medley",
         ["im"] = "individual_medley",
     };
 
