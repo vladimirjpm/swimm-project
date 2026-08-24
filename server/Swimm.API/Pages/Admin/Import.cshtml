@@ -1110,7 +1110,13 @@
                         .sort((a, b) => a.poolType.localeCompare(b.poolType))
                         .map(l => {
                             const upd = l.updatedOn ? ` <span class="opacity-70">от ${fmtDateOnly(l.updatedOn)}</span>` : '';
-                            return `<a href="${l.url}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">${l.poolType}</a>${upd}`;
+                            // trusted=false — на сайте федерации подпись ссылки не сходится с файлом,
+                            // автозагрузка её не возьмёт. Молча прятать нельзя: иначе «файл не найден»
+                            // выглядит нашей поломкой (docs/data-integrity.md, И-15).
+                            const warn = l.trusted === false
+                                ? ` <span class="text-admin-danger" title="Ссылка на сайте федерации ведёт не на тот файл — автозагрузка её пропустит, грузите вручную">⚠ битая ссылка</span>`
+                                : '';
+                            return `<a href="${l.url}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">${l.poolType}</a>${upd}${warn}`;
                         })
                         .join(' · ');
                 });

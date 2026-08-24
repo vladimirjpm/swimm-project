@@ -71,9 +71,15 @@ public sealed record RecordSourceStatusDto(string Source, DateTime? LastUpdatedA
 /// Ссылка на файл-справочник рекордов, найденная на странице источника. Нужна админке,
 /// чтобы до нажатия «Fetch» было видно, ЧТО именно подтянется и от какого числа файл.
 /// </summary>
+/// <param name="Trusted">
+/// false — подпись ссылки на сайте противоречит имени файла, автозагрузка её не берёт.
+/// Админке это надо показать: иначе «файл не найден» выглядит поломкой у нас, а сломана
+/// ссылка у федерации (docs/data-integrity.md, И-15).
+/// </param>
 public sealed record RecordSourceLinkDto(
     string Url,
     string Label,
     string PoolType,
     bool IsMasters,
-    DateOnly? UpdatedOn);
+    DateOnly? UpdatedOn,
+    bool Trusted = true);
