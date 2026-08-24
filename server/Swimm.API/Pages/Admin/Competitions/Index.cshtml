@@ -48,6 +48,16 @@
               + "class=\"text-admin-accent hover:underline\">swimhub ↗</a>"
             : "";
 
+    // Многодневное событие на сайте открывается ЦЕЛИКОМ, через ?eventId= — это контракт
+    // клиента (client/src/utils/routes.ts: идентичность соревнования идёт в путь, а событие
+    // остаётся фасетом вида на /results). Ссылка на первый день показывала бы один день из
+    // пяти, и «swimhub ↗» у пятидневного чемпионата открывал 23 декабря вместо турнира.
+    string PublicEventLink(int? eventId) =>
+        eventId is int id
+            ? $"<a href=\"{Model.PublicSiteBaseUrl}/results?eventId={id}\" target=\"_blank\" rel=\"noopener\" "
+              + "class=\"text-admin-accent hover:underline\">swimhub ↗</a>"
+            : "";
+
     // Бейдж стадии: короткий текст по умолчанию, полный — только на широком экране.
     // Полная подпись остаётся в title, чтобы сокращение не пришлось разгадывать.
     string StageBadgeHtml((string Text, string Short, string Cls) b) =>
@@ -467,7 +477,8 @@ else
                                         <a href="https://isr.org.il/comp.asp?compID=@es.OrgCompId" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@es.OrgCompId ↗</a>
                                     }
                                     else { <span>—</span> }
-                                    @Html.Raw(PublicCompetitionLink(ev.Days.FirstOrDefault()?.Id))
+                                    @* Событие — ссылка на весь турнир, а не на его первый день. *@
+                                    @Html.Raw(PublicEventLink(ev.EventId))
                                 </div>
                             </td>
                             <td class="text-admin-text-muted" dir="rtl" style="text-align:left">@Html.Raw(u.Site != null ? System.Net.WebUtility.HtmlEncode(u.Site.Venue ?? "—") + LangBadges(u.Site.Languages) : "—")</td>
