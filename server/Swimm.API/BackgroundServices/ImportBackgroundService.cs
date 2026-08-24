@@ -75,6 +75,32 @@ public sealed class ImportBackgroundService : BackgroundService
                         {
                             _logger.LogWarning(ex, "Import job {JobId}: не удалось проверить клубный зачёт compID {OrgCompId}", jobId, compId);
                         }
+
+                        // Loglig-id пловцам — из протокола этого же старта: на странице заплыва
+                        // имя напечатано ссылкой на карточку. Ручная привязка идёт по одному
+                        // человеку и потому почти не движется, а без неё не работает ни сверка
+                        // подозрительных рекордов, ни карточка пловца.
+                        //
+                        // Шаг платный (запрос на заплыв, у чемпионата их под сотню), поэтому
+                        // он ПОСЛЕ импорта и за тумблером: сбой ничего не ломает, привязки
+                        // просто не появятся — их доберёт следующий импорт или ручная привязка.
+                        try
+                        {
+                            var settings = scope.ServiceProvider.GetRequiredService<ISettingsService>();
+                            if (settings.GetValue("LogligStampOnImport", true))
+                            {
+                                var stamper = scope.ServiceProvider.GetRequiredService<ILogligStampService>();
+                                var report = await stamper.StampFromProtocolAsync(compId, stoppingToken);
+                                _logger.LogInformation("Import job {JobId}: loglig-id compID {OrgCompId} — {Message}",
+                                    jobId, compId, report.Message);
+                                foreach (var skip in report.Skipped.Take(20))
+                                    _logger.LogInformation("Import job {JobId}: loglig-id пропуск — {Skip}", jobId, skip);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Import job {JobId}: не удалось проставить loglig-id compID {OrgCompId}", jobId, compId);
+                        }
                     }
                 }
                 catch (Exception ex)

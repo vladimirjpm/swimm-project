@@ -54,4 +54,10 @@ public sealed class ImportRecordPreviewRow
     /// <summary>Действующий рекорд, который оно перебивает, и чей он.</summary>
     public string RecordTime { get; set; } = "";
     public string RecordHolder { get; set; } = "";
+
+    /// <summary>Год рождения из протокола — по нему пловец сопоставляется с БД (тёзки).</summary>
+    public int? BirthYear { get; set; }
+
+    /// <summary>Бассейн («25m»/«50m») — карточка loglig держит рекорды отдельно по длине.</summary>
+    public string PoolType { get; set; } = "";
 }

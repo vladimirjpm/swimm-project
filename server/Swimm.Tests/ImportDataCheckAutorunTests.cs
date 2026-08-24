@@ -57,6 +57,9 @@ public class ImportDataCheckAutorunTests
         public Task<int?> FixSwimmerGenderAsync(int findingId, string gender, CancellationToken ct = default) =>
             throw new NotSupportedException();
 
+        public Task<int?> SetSwimmerGenderAsync(int swimmerId, string gender, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
         public Task<int?> AlignSwimmerGenderAsync(int findingId, string gender, CancellationToken ct = default) =>
             throw new NotSupportedException();
 

@@ -1,4 +1,4 @@
-﻿@page
+@page
 @using Swimm.Application.Dtos
 @model Swimm.API.Pages.Admin.Competitions.IndexModel
 @{
@@ -129,6 +129,10 @@
             sb.Append($"<button onclick=\"discSyncLangs({s.DiscoveredId}, this)\" class=\"{btn}\" title=\"Скачать HE+EN пару и дозаполнить англ. имена пловцов\">Синхр. языки</button> ");
         else if (s.Languages == "he")
             sb.Append("<span class=\"text-[11px] text-admin-text-muted\" title=\"Второй язык на loglig не найден\">только HE</span> ");
+        // Loglig-id пловцам из протокола: на импорте делается само, кнопка — для тех стартов,
+        // что импортированы раньше (их сотня, а привязок в базе почти нет).
+        if (imported)
+            sb.Append($"<button onclick=\"discStampLoglig({s.OrgCompId}, this)\" class=\"{btn}\" title=\"Проставить пловцам loglig-id по протоколу соревнования\">Loglig-id</button> ");
         sb.Append($"<a href=\"{api}/{s.DiscoveredId}/pdf\" class=\"{btn}\">PDF</a> ");
         // Ручная пометка «нет протокола»: PDF на сайте бывает пустым (страница без единой
         // строки), и без пометки строка выглядит обычной «новой» — её пробуют затянуть снова.
@@ -284,15 +288,19 @@
     // хотя у этих двух пустой протокол или результаты не опубликованы — сделать с ними
     // нельзя ничего. Такие показываем плюсом («12+2») и, когда ждать больше нечего,
     // ставим зелёную галочку: месяц закрыт, возвращаться не надо.
-    (string Html, string Hint) PullCounter(int imported, int nothingToPull, int total)
+    (string Html, string Hint) PullCounter(int imported, int nothingToPull, int total, bool active = false)
     {
         var pending = Math.Max(0, total - imported - nothingToPull);
         var body = nothingToPull > 0
             ? $"{imported}<span class=\"opacity-60\">+{nothingToPull}</span>/{total}"
             : $"{imported}/{total}";
         var done = pending == 0 && total > 0;
-        var html = $"<span class=\"ml-1 tabular-nums {(done ? "text-admin-success" : "opacity-70")}\">{body}</span>"
-                   + (done ? "<span class=\"ml-1 text-admin-success\">✓</span>" : "");
+        // На АКТИВНОМ чипе заливка светло-голубая: зелёный «затянуто ✓» на ней почти не
+        // читается, поэтому там счётчик идёт цветом самого чипа (тёмным), а «закрыт» видно
+        // по галочке. На неактивных всё как было.
+        var doneClass = active ? "font-bold" : "text-admin-success";
+        var html = $"<span class=\"ml-1 tabular-nums {(done ? doneClass : "opacity-70")}\">{body}</span>"
+                   + (done ? $"<span class=\"ml-1 {doneClass}\">✓</span>" : "");
 
         var hint = $"затянуто {imported} из {total}";
         if (nothingToPull > 0) hint += $", тянуть нечего у {nothingToPull} (пустой протокол или результаты не опубликованы)";
@@ -308,19 +316,19 @@
         var seasonTotal = Model.SeasonCounts.Sum(s => s.Total);
         var seasonImported = Model.SeasonCounts.Sum(s => s.Imported);
         var seasonNothing = Model.SeasonCounts.Sum(s => s.NothingToPull);
-        var allCounter = PullCounter(seasonImported, seasonNothing, seasonTotal);
+        var allCounter = PullCounter(seasonImported, seasonNothing, seasonTotal, Model.Season == null);
     }
     <a href="@SeasonUrl(null)"
-       class="@(Model.Season == null ? "admin-btn admin-btn-primary py-1 px-2.5" : "admin-btn admin-btn-ghost py-1 px-2.5")"
+       class="@(Model.Season == null ? "admin-btn filter-chip-active py-1 px-2.5" : "admin-btn admin-btn-ghost py-1 px-2.5")"
        title="Все сезоны: @allCounter.Hint">
         Все @Html.Raw(allCounter.Html)
     </a>
     @foreach (var s in Model.SeasonCounts)
     {
         var active = Model.Season == s.Season;
-        var c = PullCounter(s.Imported, s.NothingToPull, s.Total);
+        var c = PullCounter(s.Imported, s.NothingToPull, s.Total, active);
         <a href="@SeasonUrl(active ? (int?)null : s.Season)"
-           class="@(active ? "admin-btn admin-btn-primary py-1 px-2.5" : "admin-btn admin-btn-ghost py-1 px-2.5")"
+           class="@(active ? "admin-btn filter-chip-active py-1 px-2.5" : "admin-btn admin-btn-ghost py-1 px-2.5")"
            title="@(active ? $"Снять фильтр по сезону ({c.Hint})" : $"Сезон {s.Season - 1}/{s.Season % 100:00}: {c.Hint}")">
             @($"{(s.Season - 1) % 100:00}-{s.Season % 100:00}") @Html.Raw(c.Html)
         </a>
@@ -336,10 +344,10 @@
         var count = Model.MonthCounts.Count > i ? Model.MonthCounts[i] : 0;
         var imported = Model.MonthImported.Count > i ? Model.MonthImported[i] : 0;
         var nothing = Model.MonthNothingToPull.Count > i ? Model.MonthNothingToPull[i] : 0;
-        var c = PullCounter(imported, nothing, count);
+        var c = PullCounter(imported, nothing, count, active);
         <a href="@MonthUrl(active ? (int?)null : m)"
            class="@(active
-               ? "admin-btn admin-btn-primary py-1 px-2.5"
+               ? "admin-btn filter-chip-active py-1 px-2.5"
                : "admin-btn admin-btn-ghost py-1 px-2.5") @(count == 0 && !active ? "opacity-40" : "")"
            title="@(active ? $"Снять фильтр по месяцу ({c.Hint})" : $"{monthNames[i]}: {c.Hint}")">
             @monthNames[i] @Html.Raw(c.Html)
@@ -347,12 +355,64 @@
     }
 </div>
 
-<div class="mb-3 text-xs text-admin-text-muted">
-    Всего: <strong class="text-admin-text">@Model.Result.TotalCount</strong>
-    @if (Model.Month is int mm)
+@{
+    // Пакетное затягивание (docs/plans/bulk-pull-plan.md): кандидаты — строки, которых нет
+    // в БД и по которым есть что тянуть. Те же правила, что у счётчика долга на чипах:
+    // скрытые (Ignored) и с пустым протоколом (EmptySourceAt) — не долг.
+    var bulkIds = Model.Result.Items
+        .Where(u => u.Db == null && u.Site != null
+                    && u.Stage != Swimm.Application.Dtos.CompetitionStage.Ignored
+                    && u.Site.EmptySourceAt == null)
+        .Select(u => u.Site!.DiscoveredId)
+        .ToList();
+}
+
+<div class="mb-3 flex flex-wrap items-center gap-3 text-xs text-admin-text-muted">
+    <span>
+        Всего: <strong class="text-admin-text">@Model.Result.TotalCount</strong>
+        @if (Model.Month is int mm)
+        {
+            <text> · месяц: <strong class="text-admin-text">@monthNames[mm - 1]</strong></text>
+        }
+    </span>
+
+    @if (bulkIds.Count > 0)
     {
-        <text> · месяц: <strong class="text-admin-text">@monthNames[mm - 1]</strong></text>
+        <label class="flex cursor-pointer items-center gap-1.5"
+               title="Чемпионаты Израиля разбираются штучно: медали, зачёт и категории у них свои">
+            <input type="checkbox" id="bulk-include-champ" class="cursor-pointer" />
+            включая чемпионаты
+        </label>
+        <button type="button" id="bulk-pull-btn" class="admin-btn admin-btn-primary py-1 px-2.5"
+                data-ids="@string.Join(",", bulkIds)">
+            ⏬ Затянуть все незатянутые (@bulkIds.Count)
+        </button>
     }
+</div>
+
+@* Панель пачки: не модал — забор идёт минутами, из него надо уметь уйти и вернуться
+   (batchId переживает перезагрузку страницы в sessionStorage). *@
+<div id="bulk-card" class="admin-card mb-4 hidden p-4">
+    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div class="text-sm font-semibold text-admin-text">Пакетное затягивание</div>
+        <button type="button" id="bulk-close" class="cursor-pointer text-[13px] text-admin-text-muted hover:underline">Закрыть</button>
+    </div>
+    <div id="bulk-progress" class="mb-2 text-[13px] text-admin-text-muted"></div>
+    <div id="bulk-skipped" class="mb-2 hidden text-[12.5px] text-admin-text-muted"></div>
+    <div id="bulk-rows" class="mb-3 overflow-x-auto"></div>
+    <div class="flex flex-wrap items-center gap-2">
+        <button type="button" id="bulk-import-btn" class="admin-btn admin-btn-primary py-1 px-3" disabled>
+            Импортировать отмеченные
+        </button>
+        <button type="button" id="bulk-uncheck-noreg" class="admin-btn admin-btn-ghost py-1 px-3">
+            Снять все без регламента
+        </button>
+        <span class="text-[12px] text-admin-text-muted">
+            Категория всем — <strong class="text-admin-text">Age 8-99</strong>;
+            перезапись существующего и удаление лишнего не применяются.
+        </span>
+    </div>
+    <div id="bulk-import-result" class="mt-2 text-[12.5px]"></div>
 </div>
 
 @if (Model.Result.Items.Count == 0)
@@ -677,11 +737,13 @@ else
                                        Файл никуда не сохраняется — только читается ради подсказки. *@
                                     <div class="mt-3 pt-3 border-t border-admin-border/60">
                                         <div class="text-xs text-admin-text-muted mb-1.5">
-                                            Регламент (PDF) — проверю медали, клубный зачёт и чемпионат, галочки поставлю сам
+                                            Регламент (תקנון) — проверю медали, клубный зачёт и чемпионат, галочки поставлю сам.
+                                            Без файла возьму его с loglig сам; файл нужен, только если ссылки там нет.
                                         </div>
                                         <div class="flex flex-wrap items-center gap-2">
                                             <input type="file" accept=".pdf" class="admin-input text-xs regulation-file" data-comp="@head.Id" />
-                                            <button type="button" class="admin-btn admin-btn-ghost text-xs regulation-check" data-comp="@head.Id">
+                                            <button type="button" class="admin-btn admin-btn-ghost text-xs regulation-check"
+                                                    data-comp="@head.Id" data-org="@((head.OrgCompId ?? u.Site?.OrgCompId)?.ToString() ?? "")">
                                                 Проверить регламент
                                             </button>
                                         </div>
@@ -709,6 +771,37 @@ else
     <div id="preview-warnings" class="mb-3 hidden rounded-md border border-admin-danger/40 bg-admin-danger/10 p-3 text-[12.5px]"></div>
     @* Сколько рекордов побьёт файл (Б2) — подсказка перед «Применить», не запрет. *@
     <div id="preview-records" class="hidden"></div>
+
+    @* Флаги соревнования: заполняются сами (регламент, название, файл, проба зачёта) и
+       правятся руками. До этого их ставили ПОСЛЕ импорта, в панели строки, и забывали. *@
+    <div class="mb-3 rounded-md border border-admin-border bg-admin-surface/60 p-3">
+        <div class="mb-1.5 text-[13px] text-admin-text-muted">
+            Флаги соревнования — проставлены по регламенту, названию и файлу; проверьте:
+        </div>
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px]">
+            <label class="flex cursor-pointer items-center gap-1.5" title="Вручают медали">
+                <input type="checkbox" id="flag-award" class="cursor-pointer" /> Awards (медали)
+            </label>
+            <label class="flex cursor-pointer items-center gap-1.5" title="Чемпионат Израиля">
+                <input type="checkbox" id="flag-championship" class="cursor-pointer" /> 🏆 Чемпионат Израиля
+            </label>
+            <label class="flex cursor-pointer items-center gap-1.5" title="Мастерс">
+                <input type="checkbox" id="flag-masters" class="cursor-pointer" /> Masters
+            </label>
+            <label class="flex cursor-pointer items-center gap-1.5" title="Клубный зачёт на этом старте не ведётся">
+                <input type="checkbox" id="flag-club-off" class="cursor-pointer" /> клубный зачёт не ведётся
+            </label>
+            <label class="flex items-center gap-1.5">
+                бассейн:
+                <select id="flag-pool" class="admin-input w-auto py-0.5 px-1.5 text-[12.5px]">
+                    <option value="">— не задан —</option>
+                    <option value="25m">25 м</option>
+                    <option value="50m">50 м</option>
+                </select>
+            </label>
+        </div>
+        <div id="flag-reasons" class="mt-1.5 space-y-0.5 text-[11.5px] text-admin-text-muted"></div>
+    </div>
 
     <div class="mb-3">
         <div class="mb-1 text-[12px] font-semibold uppercase tracking-wide text-admin-text-muted">Категории</div>
@@ -850,24 +943,35 @@ else
         const out = document.querySelector(`.regulation-result[data-comp="${compId}"]`);
         const file = input?.files?.[0];
 
-        if (!file) {
-            out.innerHTML = '<span class="text-admin-warning">Сначала выберите PDF регламента.</span>';
-            return;
-        }
-
-        out.textContent = 'Читаю регламент…';
+        // Файл не выбран — тянем регламент сами: он лежит на loglig (ссылка «תקנון» на
+        // странице соревнования). Загрузка файла остаётся запасным путём: ссылку ставят
+        // не всем, а у соревнований вне «входящих» (PDF-импорт) loglig-id вообще нет.
+        out.textContent = file ? 'Читаю регламент…' : 'Ищу регламент на loglig…';
         try {
-            const form = new FormData();
-            form.append('file', file);
-
-            const res = await fetch('/api/admin/competitions/analyze-regulation', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'X-XSRF-TOKEN': _csrfToken },
-                body: form
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+            let data;
+            if (file) {
+                const form = new FormData();
+                form.append('file', file);
+                const res = await fetch('/api/admin/competitions/analyze-regulation', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'X-XSRF-TOKEN': _csrfToken },
+                    body: form
+                });
+                data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+            } else {
+                const orgCompId = Number(btn.dataset.org) || null;
+                if (!orgCompId) throw new Error('У соревнования нет compID сайта — приложите PDF регламента.');
+                const res = await fetch('/api/admin/discovery/regulation', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': _csrfToken },
+                    body: JSON.stringify({ orgCompId })
+                });
+                data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+            }
 
             applyRegulation(compId, data, out);
         } catch (err) {
@@ -905,9 +1009,12 @@ else
                 <div class="text-[10px] text-admin-text-muted" dir="rtl">${esc(f.quote)}</div>
             </div>`).join('');
 
+        const src = data.url
+            ? ` <a href="${esc(data.url)}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">регламент ↗</a>`
+            : '';
         out.innerHTML = findings
-            ? `<div class="text-admin-text">Галочки проставлены — проверьте и нажмите «Сохранить»:</div>${findings}`
-            : '<span class="text-admin-text-muted">В регламенте не нашлось ни медалей, ни клубного зачёта — галочки не трогал.</span>';
+            ? `<div class="text-admin-text">Галочки проставлены — проверьте и нажмите «Сохранить»:${src}</div>${findings}`
+            : `<span class="text-admin-text-muted">В регламенте не нашлось ни медалей, ни клубного зачёта — галочки не трогал.${src}</span>`;
     }
 </script>
 
@@ -949,6 +1056,10 @@ else
                 panel.classList.toggle('hidden', !isOpen);
                 btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
                 btn.textContent = isOpen ? '▾ Закрыть' : '▸ Открыть';
+                // Подсветка: строка-заголовок и её панель — один блок. Без неё при
+                // нескольких раскрытых строках непонятно, что именно сейчас тянется.
+                btn.closest('tr')?.classList.toggle('row-open', isOpen);
+                panel.classList.toggle('row-panel-open', isOpen);
             };
 
             document.querySelectorAll('.row-toggle').forEach(btn => {
@@ -1161,6 +1272,203 @@ else
 
         pullPanel.restore();
 
+        // ── Пакетное затягивание (docs/plans/bulk-pull-plan.md) ────────────────────
+        // Забор идёт минутами и живёт на сервере: панель только поллит состояние, а batchId
+        // лежит в sessionStorage — перезагрузка страницы пачку не теряет.
+        (function () {
+            const API = '/api/admin/discovery';
+            const KEY = 'admin-bulk-pull-batch';
+            const card = document.getElementById('bulk-card');
+            const startBtn = document.getElementById('bulk-pull-btn');
+            if (!card) return;
+
+            const progress = document.getElementById('bulk-progress');
+            const skippedBox = document.getElementById('bulk-skipped');
+            const rowsBox = document.getElementById('bulk-rows');
+            const importBtn = document.getElementById('bulk-import-btn');
+            const importOut = document.getElementById('bulk-import-result');
+            let timer = null;
+            let batchId = sessionStorage.getItem(KEY);
+
+            function esc(v) {
+                return String(v ?? '').replace(/[&<>"']/g, c =>
+                    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            }
+
+            async function api(url, opts = {}) {
+                opts.headers = { 'X-XSRF-TOKEN': _csrfToken, ...(opts.headers ?? {}) };
+                const res = await fetch(url, { credentials: 'same-origin', ...opts });
+                let body = null;
+                try { body = await res.json(); } catch { /* пустое тело */ }
+                if (!res.ok) throw new Error(body?.error ?? `${res.status} ${res.statusText}`);
+                return body;
+            }
+
+            // Вердикты классификатора: значок, подпись и отмечать ли по умолчанию. Отмечены
+            // беспроблемные и «без регламента» — последние импортируются, но помечены.
+            const VERDICTS = {
+                Clean:        { icon: '🟢', label: 'беспроблемная',  checked: true,  cls: 'text-admin-success' },
+                NoRegulation: { icon: '🟠', label: 'без регламента', checked: true,  cls: 'text-admin-warning' },
+                NeedsReview:  { icon: '🟡', label: 'нужна проверка', checked: false, cls: 'text-admin-warning' },
+                Empty:        { icon: '⚪', label: 'нечего тянуть',  checked: false, cls: 'text-admin-text-muted' },
+                Failed:       { icon: '🔴', label: 'ошибка',         checked: false, cls: 'text-admin-danger' }
+            };
+
+            function renderRows(rows) {
+                if (!rows.length) { rowsBox.innerHTML = ''; return; }
+                const body = rows.map(r => {
+                    const v = VERDICTS[r.verdict] ?? VERDICTS.Failed;
+                    const canImport = !!r.previewId;
+                    // Галочку, которую админ уже трогал, перерисовка сохраняет: поллинг идёт
+                    // каждые 2 секунды, и снятые вручную отметки не должны возвращаться.
+                    const prev = rowsBox.querySelector(`input.bulk-row[value="${r.discoveredId}"]`);
+                    const checked = prev ? prev.checked : (v.checked && canImport);
+                    const reasons = (r.reasons || []).map(x => esc(x)).join('<br>');
+                    const reg = r.regulationUrl
+                        ? `<a href="${esc(r.regulationUrl)}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">תקנון ↗</a>`
+                        : '<span class="text-admin-text-muted">—</span>';
+                    const flags = [
+                        r.hasMedals ? 'медали' : null,
+                        r.hasClubStanding ? 'клубный зачёт' : null,
+                        r.isChampionship ? '🏆' : null,
+                        r.pointRuleClubsId ? `правило #${r.pointRuleClubsId}` : null
+                    ].filter(Boolean).map(esc).join(' · ');
+                    return `<tr data-verdict="${esc(r.verdict)}">
+                        <td class="align-top"><input type="checkbox" class="bulk-row cursor-pointer" value="${r.discoveredId}"
+                            ${checked ? 'checked' : ''} ${canImport ? '' : 'disabled'} /></td>
+                        <td class="align-top whitespace-nowrap ${v.cls}">${v.icon} ${esc(v.label)}</td>
+                        <td class="align-top" dir="rtl" style="text-align:left">
+                            <a href="https://isr.org.il/comp.asp?compID=${r.orgCompId}" target="_blank" rel="noopener"
+                               class="text-admin-accent hover:underline">${esc(r.name)} ↗</a>
+                        </td>
+                        <td class="align-top whitespace-nowrap text-admin-text-muted">${esc(r.date)}</td>
+                        <td class="align-top text-right tabular-nums">${r.resultCount || 0}</td>
+                        <td class="align-top text-[12px] text-admin-text-muted">${reasons || '—'}</td>
+                        <td class="align-top text-[12px]">${flags || '—'}</td>
+                        <td class="align-top text-[12px]">${reg}</td>
+                    </tr>`;
+                }).join('');
+
+                rowsBox.innerHTML = `<table class="admin-table text-[13px]">
+                    <thead><tr>
+                        <th class="w-6"></th><th>Флаг</th><th>Соревнование</th><th>Дата</th>
+                        <th class="text-right">Строк</th><th>Почему</th><th>Из регламента</th><th>Источник</th>
+                    </tr></thead><tbody>${body}</tbody></table>`;
+                updateImportBtn();
+            }
+
+            function updateImportBtn() {
+                const n = rowsBox.querySelectorAll('input.bulk-row:checked').length;
+                importBtn.disabled = n === 0;
+                importBtn.textContent = n ? `Импортировать отмеченные (${n})` : 'Импортировать отмеченные';
+            }
+
+            rowsBox.addEventListener('change', updateImportBtn);
+
+            function render(batch) {
+                card.classList.remove('hidden');
+                progress.textContent = batch.finished
+                    ? `Готово: затянуто ${batch.done} из ${batch.total}.`
+                    : `Тяну ${Math.min(batch.done + 1, batch.total)} из ${batch.total}… (можно уйти со страницы и вернуться)`;
+                if (batch.error) progress.textContent = batch.error;
+
+                const skipped = batch.skippedChampionships || [];
+                skippedBox.classList.toggle('hidden', skipped.length === 0);
+                if (skipped.length) {
+                    skippedBox.innerHTML = `Исключено чемпионатов: ${skipped.length} — `
+                        + skipped.map(esc).join(', ')
+                        + '. Отметьте «включая чемпионаты», если нужны они.';
+                }
+                renderRows(batch.rows || []);
+            }
+
+            async function poll() {
+                if (!batchId) return;
+                try {
+                    const batch = await api(`${API}/bulk-pull/${batchId}`);
+                    render(batch);
+                    if (batch.finished) { clearInterval(timer); timer = null; }
+                } catch (err) {
+                    clearInterval(timer); timer = null;
+                    sessionStorage.removeItem(KEY);
+                    batchId = null;
+                    progress.textContent = err.message;
+                }
+            }
+
+            function watch() {
+                if (timer) clearInterval(timer);
+                poll();
+                timer = setInterval(poll, 2000);
+            }
+
+            if (startBtn) {
+                startBtn.addEventListener('click', async () => {
+                    const ids = (startBtn.dataset.ids || '').split(',').filter(Boolean).map(Number);
+                    const includeChampionships = document.getElementById('bulk-include-champ').checked;
+                    startBtn.disabled = true;
+                    card.classList.remove('hidden');
+                    importOut.textContent = '';
+                    rowsBox.innerHTML = '';
+                    progress.textContent = 'Ставлю пачку…';
+                    try {
+                        const batch = await api(`${API}/bulk-pull`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ids, includeChampionships })
+                        });
+                        batchId = batch.batchId;
+                        sessionStorage.setItem(KEY, batchId);
+                        render(batch);
+                        watch();
+                    } catch (err) {
+                        progress.textContent = err.message;
+                    } finally {
+                        startBtn.disabled = false;
+                    }
+                });
+            }
+
+            document.getElementById('bulk-uncheck-noreg').addEventListener('click', () => {
+                rowsBox.querySelectorAll('tr[data-verdict="NoRegulation"] input.bulk-row')
+                    .forEach(cb => { cb.checked = false; });
+                updateImportBtn();
+            });
+
+            document.getElementById('bulk-close').addEventListener('click', () => {
+                card.classList.add('hidden');
+                sessionStorage.removeItem(KEY);
+                if (timer) { clearInterval(timer); timer = null; }
+                batchId = null;
+            });
+
+            importBtn.addEventListener('click', async () => {
+                const ids = [...rowsBox.querySelectorAll('input.bulk-row:checked')].map(cb => Number(cb.value));
+                if (!ids.length) return;
+                importBtn.disabled = true;
+                importOut.textContent = 'Ставлю в очередь импорта…';
+                try {
+                    const r = await api(`${API}/bulk-import`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ batchId, ids })
+                    });
+                    const skipped = (r.skipped || []).map(esc).join('<br>');
+                    importOut.innerHTML = `<span class="text-admin-success">В очередь ушло: ${r.queued}.</span>`
+                        + ' Ход импорта — в <a href="/Admin/ImportHistory" class="text-admin-accent hover:underline">истории импортов</a>.'
+                        + (skipped ? `<div class="mt-1 text-admin-warning">${skipped}</div>` : '');
+                    rowsBox.querySelectorAll('input.bulk-row:checked').forEach(cb => { cb.checked = false; cb.disabled = true; });
+                } catch (err) {
+                    importOut.innerHTML = `<span class="text-admin-danger">${esc(err.message)}</span>`;
+                } finally {
+                    updateImportBtn();
+                }
+            });
+
+            // Незакрытая пачка с прошлой загрузки страницы — показываем её снова.
+            if (batchId) watch();
+        })();
+
         // ── Действия Discovery (перенос из /Admin/Discovery; после мутаций перезагружаем SSR) ──
         (function () {
             const API = '/api/admin/discovery';
@@ -1311,19 +1619,28 @@ else
                     byRow.get(key).records.push(r);
                 });
 
+                // Каждый заплыв — отдельная карточка: заголовок (кто/что/время), под ним
+                // побитые рекорды, и ОТДЕЛЁННАЯ чертой строка решения (галочка + вердикт по
+                // loglig). Без этих границ четыре разных по смыслу строки читались как одна
+                // простыня, и глазами не находилось, где кончается один заплыв.
                 box.innerHTML =
                     `<div class="font-semibold">${many ? '⚠ ' : ''}Файл побьёт рекордов: ${rp.count}</div>` +
                     (many ? '<div class="text-admin-text-muted">Столько рекордов сразу — обычно признак того, что протокол разобрался неверно. Стоит посмотреть глазами до «Применить».</div>' : '') +
-                    '<ul class="mt-1 space-y-1.5">' + [...byRow.values()].map(g => {
+                    '<ul class="mt-2 space-y-2">' + [...byRow.values()].map(g => {
                         const s = g.swim;
                         const recs = g.records.map(r =>
                             `<div class="text-admin-text-muted" dir="rtl" style="text-align:left">${esc(r.kind)}: ${esc(r.recordTime)} ${esc(r.recordHolder)}</div>`).join('');
-                        return `<li>`
-                            + `<div dir="rtl" style="text-align:left">${esc(s.swimmerName)} · ${esc(s.distance)} ${esc(s.styleName)} · <b>${esc(s.time)}</b></div>`
-                            + recs
-                            + `<label class="mt-0.5 flex items-center gap-1.5 cursor-pointer text-admin-text-muted">`
+                        return `<li class="rounded-md border border-admin-border bg-admin-surface/60 px-2.5 py-2">`
+                            + `<div class="font-semibold text-admin-text" dir="rtl" style="text-align:left">${esc(s.swimmerName)} · ${esc(s.distance)} ${esc(s.styleName)} · <b>${esc(s.time)}</b></div>`
+                            + `<div class="mt-0.5 space-y-0.5 text-[11.5px]">${recs}</div>`
+                            + `<div class="mt-1.5 border-t border-admin-border pt-1.5">`
+                            + `<label class="flex items-center gap-1.5 cursor-pointer text-admin-text-muted">`
                             + `<input type="checkbox" class="suspect-flag cursor-pointer" value="${s.rowIndex}"`
                             + ` data-note="${esc(suspectNote(g))}"> пометить заплыв сомнительным</label>`
+                            // Сюда приезжает вердикт по карточке loglig (или поле для привязки
+                            // id и пола, если пловец ещё не привязан) — см. loadRecordCheck.
+                            + `<div class="record-check mt-1 text-[11.5px]" data-row="${s.rowIndex}"></div>`
+                            + `</div>`
                             + `</li>`;
                     }).join('') +
                     '</ul>' +
@@ -1331,12 +1648,175 @@ else
                     // и был установлен. Заплыв «бьёт» запись справочника, потому что это она и есть
                     // (время равное или на сотые лучше — федерация округляет). Ничего делать не надо,
                     // но без подсказки это читается как ошибка разбора — и галочку жмут зря.
-                    '<div class="mt-1.5 text-admin-text-muted">Если это тот самый заплыв, которым рекорд '
+                    '<div class="mt-2 border-t border-admin-border pt-1.5 text-admin-text-muted">Если это тот самый заплыв, которым рекорд '
                     + 'и был установлен, — предупреждение ложное: в справочнике уже стоит он же '
                     + '(сверь имя и время в скобках). Помечать такую строку не нужно.</div>' +
-                    (rp.count > (rp.rows || []).length ? `<div class="text-admin-text-muted">…и ещё ${rp.count - rp.rows.length}</div>` : '');
+                    (rp.count > (rp.rows || []).length ? `<div class="mt-0.5 text-admin-text-muted">…и ещё ${rp.count - rp.rows.length}</div>` : '');
                 box.classList.remove('hidden');
             }
+
+            // ── Флаги соревнования в превью ────────────────────────────────────────
+            // Ставим галочки сами, но показываем ОСНОВАНИЕ каждой: регламент — чужой документ
+            // произвольной формы, и молча проставленной галочке верить нельзя.
+            const FLAG_LABELS = {
+                isAward: 'Awards',
+                isChampionship: '🏆 Чемпионат Израиля',
+                isMasters: 'Masters',
+                clubPointsDisabled: 'клубный зачёт не ведётся',
+                poolType: 'бассейн'
+            };
+
+            function renderCompetitionFlags(flags) {
+                const award = document.getElementById('flag-award');
+                const champ = document.getElementById('flag-championship');
+                const masters = document.getElementById('flag-masters');
+                const clubOff = document.getElementById('flag-club-off');
+                const pool = document.getElementById('flag-pool');
+                const reasons = document.getElementById('flag-reasons');
+
+                const f = flags ?? {};
+                award.checked = !!f.isAward;
+                champ.checked = !!f.isChampionship;
+                masters.checked = !!f.isMasters;
+                clubOff.checked = !!f.clubPointsDisabled;
+                pool.value = f.poolType ?? '';
+
+                const lines = Object.entries(f.reasons ?? {})
+                    .map(([k, v]) => `<div>${esc(FLAG_LABELS[k] ?? k)}: ${esc(v)}</div>`);
+                if (f.regulationUrl)
+                    lines.push(`<div><a href="${esc(f.regulationUrl)}" target="_blank" rel="noopener"
+                                   class="text-admin-accent hover:underline">регламент (תקנון) ↗</a></div>`);
+                if (!lines.length)
+                    lines.push('<div>Ничего не предложено: регламента нет, название и файл признаков не дали.</div>');
+
+                reasons.innerHTML = lines.join('');
+            }
+
+            // ── Проверка подозрительных заплывов по карточке loglig ────────────────
+            // Протокол мы качаем С loglig, значит время из него обязано быть и в карточке
+            // пловца: совпало — рекорд настоящий, в карточке хуже — разбор поехал. Запрос
+            // отдельный (карточка на пловца), чтобы превью не ждало сеть.
+            const CHECK_TONE = {
+                Confirms:    { cls: 'text-admin-success', icon: '✓' },
+                Contradicts: { cls: 'text-admin-danger',  icon: '⚠' },
+                NoData:      { cls: 'text-admin-text-muted', icon: '·' },
+                NotChecked:  { cls: 'text-admin-text-muted', icon: '·' }
+            };
+
+            async function loadRecordCheck(previewId, rp) {
+                if (!previewId || !rp || !(rp.rows || []).length) return;
+
+                document.querySelectorAll('#preview-records .record-check')
+                    .forEach(el => { el.textContent = 'Проверяю по loglig…'; el.className = 'record-check mt-0.5 text-[11.5px] text-admin-text-muted'; });
+
+                let rows;
+                try {
+                    rows = await apiJson(`${API}/preview/${previewId}/record-check`, { method: 'POST' });
+                } catch (err) {
+                    document.querySelectorAll('#preview-records .record-check')
+                        .forEach(el => { el.textContent = `Проверка по loglig не удалась: ${err.message}`; });
+                    return;
+                }
+
+                (rows || []).forEach(renderRecordCheckRow);
+            }
+
+            function renderRecordCheckRow(r) {
+                const box = document.querySelector(`#preview-records .record-check[data-row="${r.rowIndex}"]`);
+                if (!box) return;
+
+                const tone = CHECK_TONE[r.verdict] ?? CHECK_TONE.NotChecked;
+                const shownId = r.logligId ?? r.suggestedLogligId;
+                const link = r.logligUrl
+                    ? ` <a href="${esc(r.logligUrl)}" target="_blank" rel="noopener"
+                           class="text-admin-accent hover:underline">карточка loglig #${shownId} ↗</a>`
+                    : '';
+
+                // Пловец в базе есть, но не привязан — даём привязать прямо тут (и пол заодно:
+                // на этом же экране он чаще всего и неизвестен). Проверять после ввода не
+                // будем — Влад смотрит карточку глазами.
+                //
+                // Если id пришёл ИЗ ПРОТОКОЛА (на странице заплыва loglig имя — ссылка), поле
+                // ввода не показываем вовсе: кнопка сразу с нужным номером. Руками вводят
+                // только тогда, когда протокол id не дал.
+                const gender = r.gender ? '' : `<span class="text-admin-text-muted">пол:</span>
+                           <button type="button" class="admin-btn admin-btn-ghost py-0.5 px-1.5 text-[11px] rc-gender"
+                                   data-swimmer="${r.swimmerId}" data-gender="male" data-row="${r.rowIndex}">♂</button>
+                           <button type="button" class="admin-btn admin-btn-ghost py-0.5 px-1.5 text-[11px] rc-gender"
+                                   data-swimmer="${r.swimmerId}" data-gender="female" data-row="${r.rowIndex}">♀</button>`;
+
+                let bind = '';
+                if (r.match === 'One' && !r.logligId && r.suggestedLogligId) {
+                    bind = `<span class="ml-1 inline-flex flex-wrap items-center gap-1">
+                           <button type="button" class="admin-btn admin-btn-ghost py-0.5 px-1.5 text-[11px] rc-loglig-bind"
+                                   data-swimmer="${r.swimmerId}" data-row="${r.rowIndex}"
+                                   data-loglig="${r.suggestedLogligId}">привязать #${r.suggestedLogligId}</button>
+                           ${gender}
+                       </span>`;
+                } else if (r.match === 'One' && !r.logligId) {
+                    bind = `<span class="ml-1 inline-flex flex-wrap items-center gap-1">
+                           <input type="number" class="admin-input py-0.5 px-1.5 w-[7.5rem] text-[11.5px] rc-loglig-input"
+                                  data-swimmer="${r.swimmerId}" placeholder="id с loglig" />
+                           <button type="button" class="admin-btn admin-btn-ghost py-0.5 px-1.5 text-[11px] rc-loglig-bind"
+                                   data-swimmer="${r.swimmerId}" data-row="${r.rowIndex}">привязать</button>
+                           ${gender}
+                       </span>`;
+                }
+
+                box.className = `record-check mt-0.5 text-[11.5px] ${tone.cls}`;
+                box.innerHTML = `${tone.icon} ${esc(r.message)}${link}${bind}`;
+            }
+
+            // Привязка id и пола — ШТАТНЫМИ эндпоинтами (/api/admin/loglig/set,
+            // /api/admin/swimmers/{id}/gender): вторая реализация тех же правил разошлась бы
+            // с первой (сверка года и клуба, аудит, дописывание пола в строки без пола).
+            document.getElementById('preview-records')?.addEventListener('click', async (e) => {
+                const bindBtn = e.target.closest('.rc-loglig-bind');
+                const genderBtn = e.target.closest('.rc-gender');
+                if (!bindBtn && !genderBtn) return;
+
+                const btn = bindBtn ?? genderBtn;
+                const row = btn.dataset.row;
+                const box = document.querySelector(`#preview-records .record-check[data-row="${row}"]`);
+                btn.disabled = true;
+
+                try {
+                    if (bindBtn) {
+                        // Готовый id из протокола (data-loglig) либо введённый руками.
+                        const input = document.querySelector(`.rc-loglig-input[data-swimmer="${btn.dataset.swimmer}"]`);
+                        const logligId = Number(btn.dataset.loglig || input?.value);
+                        if (!Number.isFinite(logligId) || logligId <= 0) {
+                            btn.disabled = false;
+                            return alert('Введите числовой id с loglig');
+                        }
+                        const res = await apiJson('/api/admin/loglig/set', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ swimmerId: Number(btn.dataset.swimmer), logligId })
+                        });
+                        // linked=false — доменный отказ (уже привязан, карточка недоступна), не HTTP-ошибка.
+                        if (res && res.linked === false) {
+                            box.innerHTML = `<span class="text-admin-warning">Не привязано: ${esc(res.error ?? 'причина неизвестна')}</span>`;
+                            return;
+                        }
+                        box.innerHTML = `<span class="text-admin-success">✓ Привязан loglig #${logligId}.</span>`
+                            + ` <a href="https://loglig.com:2053/Players/Details/${logligId}?tab=results" target="_blank"
+                                   rel="noopener" class="text-admin-accent hover:underline">карточка ↗</a>`;
+                    } else {
+                        await apiJson(`/api/admin/swimmers/${btn.dataset.swimmer}/gender`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ gender: btn.dataset.gender })
+                        });
+                        genderBtn.textContent = '✓ ' + genderBtn.textContent.replace('✓ ', '');
+                        genderBtn.classList.add('text-admin-success');
+                    }
+                } catch (err) {
+                    box.innerHTML = `<span class="text-admin-danger">${esc(err.message)}</span>`;
+                } finally {
+                    btn.disabled = false;
+                }
+            });
 
             // Официальный клубный зачёт: есть/нет + подстановка правила под его шкалу.
             // «Нет» — не ошибка, а факт: у лиг, мокдамот и региональных этапов зачёта не бывает,
@@ -1389,7 +1869,9 @@ else
                 warn.classList.toggle('hidden', !(p.warnings?.length));
                 warn.innerHTML = (p.warnings ?? []).map(esc).join('<br>');
 
+                renderCompetitionFlags(p.flags);
                 renderRecordPreview(p.recordPreview);
+                loadRecordCheck(p.previewId, p.recordPreview);
                 renderOfficialStanding(p.officialClubStanding);
 
                 // Upsert-чекбокс — только когда превью нашло существующее соревнование по ключу Name|Date|PoolType.
@@ -1475,6 +1957,25 @@ else
                 document.getElementById('preview-card').scrollIntoView({ behavior: 'smooth' });
             }
 
+            // Штамповка loglig-id по протоколу уже импортированного соревнования. Идёт по
+            // страницам заплывов, поэтому долгая — кнопку гасим и пишем в общий info.
+            window.discStampLoglig = async (orgCompId, btn) => {
+                btn.disabled = true;
+                info.textContent = `Loglig-id (compID ${orgCompId}): читаю протокол на loglig… (может занять минуту)`;
+                try {
+                    const r = await apiJson(`${API}/stamp-loglig`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ orgCompId })
+                    });
+                    info.textContent = `Loglig-id (compID ${orgCompId}): ${r.message}`;
+                } catch (e) {
+                    info.textContent = `Loglig-id (compID ${orgCompId}): ОШИБКА — ${e.message}`;
+                } finally {
+                    btn.disabled = false;
+                }
+            };
+
             document.getElementById('btn-cancel-preview').addEventListener('click', () => {
                 preview = null;
                 document.getElementById('preview-card').classList.add('hidden');
@@ -1531,6 +2032,12 @@ else
                             // Правило клубных очков: подставлено по шкале официального зачёта
                             // либо выбрано вручную. Пусто — автоподбор по дате и типу.
                             pointRuleClubsId: Number(document.getElementById('preview-rule-clubs').value) || null,
+                            // Флаги соревнования: уезжает то, что видел человек, — уже с его правками.
+                            isAward: document.getElementById('flag-award').checked,
+                            isChampionship: document.getElementById('flag-championship').checked,
+                            isMasters: document.getElementById('flag-masters').checked,
+                            clubPointsDisabled: document.getElementById('flag-club-off').checked,
+                            poolType: document.getElementById('flag-pool').value || null,
                             // Галочки «пометить заплыв сомнительным» у строк-рекордов: строка
                             // ляжет в БД сразу помеченной и не побудет рекордом на витрине.
                             suspectFlags: [...document.querySelectorAll('.suspect-flag:checked')]

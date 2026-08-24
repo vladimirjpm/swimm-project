@@ -297,6 +297,14 @@ public class DataCheckRunner(
         if (f?.FixKind != DataCheckFixKinds.SwimmerGender || f.FixEntityId is not { } swimmerId)
             return null;
 
+        return await SetSwimmerGenderAsync(swimmerId, gender, ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<int?> SetSwimmerGenderAsync(int swimmerId, string gender, CancellationToken ct = default)
+    {
+        if (gender is not ("male" or "female")) return null;
+
         var swimmer = await db.Swimmers.FirstOrDefaultAsync(s => s.Id == swimmerId, ct);
         if (swimmer is null) return null;
 

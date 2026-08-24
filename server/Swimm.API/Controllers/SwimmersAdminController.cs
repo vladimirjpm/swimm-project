@@ -22,6 +22,7 @@ public class SwimmersAdminController : ControllerBase
     private readonly ICacheService _cache;
     private readonly IAdminAuditService _audit;
     private readonly IDataQualityService _quality;
+    private readonly IDataCheckRunner _checks;
     private readonly ILogger<SwimmersAdminController> _logger;
 
     public SwimmersAdminController(
@@ -31,6 +32,7 @@ public class SwimmersAdminController : ControllerBase
         ICacheService cache,
         IAdminAuditService audit,
         IDataQualityService quality,
+        IDataCheckRunner checks,
         ILogger<SwimmersAdminController> logger)
     {
         _dedup = dedup;
@@ -39,6 +41,7 @@ public class SwimmersAdminController : ControllerBase
         _cache = cache;
         _audit = audit;
         _quality = quality;
+        _checks = checks;
         _logger = logger;
     }
 
@@ -113,6 +116,29 @@ public class SwimmersAdminController : ControllerBase
         }
 
         return Ok(report);
+    }
+
+    public sealed record SetGenderRequest(string Gender);
+
+    /// <summary>
+    /// Проставить пол пловцу напрямую. Нужен превью затягивания: там подозрительный заплыв
+    /// разбирают ДО импорта, реестр проверок по нему ещё не отрабатывал, а находки — единственный
+    /// вход /Admin/Health — не существует. Логика та же самая (`SetSwimmerGenderAsync`):
+    /// пол уходит пловцу и в его строки БЕЗ пола, напечатанный в протоколе не перезаписывается.
+    /// </summary>
+    [HttpPost("{id:int}/gender")]
+    public async Task<IActionResult> SetGender(int id, [FromBody] SetGenderRequest request, CancellationToken ct)
+    {
+        var rows = await _checks.SetSwimmerGenderAsync(id, request.Gender, ct);
+        if (rows is null)
+            return BadRequest(new { error = "Пловец не найден или пол задан неверно (male|female)" });
+
+        await _audit.LogAsync("swimmer.set-gender", "Swimmer", id.ToString(),
+            $"Пол '{request.Gender}' проставлен пловцу; строк результата поправлено — {rows}",
+            new { swimmerId = id, request.Gender, rows }, ct);
+
+        await _cache.InvalidateAllAsync();
+        return Ok(new { rows });
     }
 
     public sealed record DeleteOrphansRequest(List<int>? Ids);

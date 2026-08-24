@@ -49,6 +49,30 @@
     @apply inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold;
   }
 
+  /* Активный чип фильтра (сезон/месяц на /Admin/Competitions). Отдельный класс, а не
+     admin-btn-primary: primary-кнопок на странице много («Найти», «Затянуть все»), и
+     выбранный фильтр среди них терялся. Здесь заливка ярче, рамка светлая и добавлено
+     кольцо с отступом — активный таб видно с одного взгляда. */
+  .filter-chip-active {
+    @apply border-admin-accent bg-admin-accent font-bold text-[#08202e]
+           ring-2 ring-admin-accent/40 ring-offset-2 ring-offset-admin-bg
+           hover:bg-[#81d4fa] hover:text-[#08202e];
+  }
+
+  /* Раскрытая строка списка соревнований и её панель. Пока панель просто «появлялась»,
+     при нескольких открытых строках было не видно, к какой из них относится то, что сейчас
+     тянется: заголовок строки ничем не отличался от соседей. Акцентная полоса слева +
+     лёгкая подложка связывают строку с панелью в один блок. */
+  .row-open > td {
+    @apply bg-admin-accent/12;
+  }
+  .row-open > td:first-child {
+    @apply border-l-2 border-admin-accent;
+  }
+  .row-panel-open > td {
+    @apply bg-admin-accent/6 border-l-2 border-admin-accent;
+  }
+
   .import-tab {
     @apply border border-admin-border bg-admin-surface text-admin-text-muted transition-colors hover:text-admin-text;
   }

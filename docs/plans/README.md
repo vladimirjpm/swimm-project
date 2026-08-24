@@ -1,4 +1,4 @@
-﻿# docs/plans — рабочие планы
+# docs/plans — рабочие планы
 
 Здесь живут планы работ, к которым можно вернуться через недели: этапы с критериями приёмки,
 контракты API, принятые и **открытые** решения, раздел «как вернуться к работе».
@@ -30,6 +30,7 @@
 
 | План | Что |
 |---|---|
+| [bulk-pull-plan.md](bulk-pull-plan.md) | **пакетное затягивание входящих** — реализовано 2026-08-23 (кнопка на /Admin/Competitions, автозабор регламента с loglig, импорт беспроблемных пачкой) |
 | [admin-dashboard-health-2-plan.md](admin-dashboard-health-2-plan.md) | дашборд «здоровье данных» 2.0 |
 | [admin-dashboard-status-cards-plan.md](admin-dashboard-status-cards-plan.md) | карточки статуса на дашборде |
 | [import-upsert-plan.md](import-upsert-plan.md) | upsert при переимпорте |

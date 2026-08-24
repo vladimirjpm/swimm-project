@@ -1,4 +1,4 @@
-﻿using System.Threading.RateLimiting;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
@@ -199,6 +199,24 @@ if (args.Contains("--probe-club-standings"))
     Console.WriteLine(
         $"\nИтог: проверено {report.Checked}, с официальным зачётом {report.WithStanding}, " +
         $"без него {report.WithoutStanding}, не удалось проверить {report.Unknown}");
+    return;
+}
+
+// Штамповка loglig-id пловцам по протоколам:
+//   dotnet run -- --stamp-loglig-ids
+// На импорте это делается само (настройка LogligStampOnImport); прогон нужен для стартов,
+// импортированных раньше. Идёт по страницам заплывов на loglig — небыстро; соревнования,
+// где все пловцы уже привязаны, пропускаются без обращения к сайту.
+if (args.Contains("--stamp-loglig-ids"))
+{
+    using var scope = app.Services.CreateScope();
+    var svc = scope.ServiceProvider.GetRequiredService<ILogligStampService>();
+    var report = await svc.BackfillAsync();
+
+    foreach (var line in report.Lines) Console.WriteLine(line);
+    Console.WriteLine(
+        $"\nИтог: соревнований {report.Competitions}, привязано {report.Stamped}, " +
+        $"не нашлось {report.NotFound}, пропущено {report.Skipped}");
     return;
 }
 
