@@ -187,13 +187,16 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         var isAward = analysis?.HasMedals ?? false;
         if (isAward) reasons["isAward"] = Quote(analysis!, "medals", "регламент упоминает медали");
 
-        // Чемпионат: имя — тот же предикат, что у фильтра списка; регламент — второй источник.
+        // Чемпионат: имя — тот же предикат, что у фильтра списка; регламент — ВТОРАЯ улика,
+        // и в одиночку он не считается (см. CompetitionAdminRepository.IsChampionship).
         var championshipByName = CompetitionAdminRepository.IsChampionship(row?.Name);
-        var isChampionship = championshipByName || (analysis?.IsChampionship ?? false);
+        var isChampionship = CompetitionAdminRepository.IsChampionship(
+            row?.Name, analysis?.IsChampionship ?? false);
         if (isChampionship)
             reasons["isChampionship"] = championshipByName
                 ? "в названии «אליפות … ישראל»"
-                : Quote(analysis!, "championship", "регламент чемпионата Израиля");
+                : Quote(analysis!, "championship", "регламент чемпионата Израиля")
+                  + " + в названии есть «אליפות»";
 
         // Мастерс: признак стоит у строк файла — парсер уже разметил их при разборе.
         var isMasters = parsed.ResultsJson.Contains("\"is_masters\":true", StringComparison.OrdinalIgnoreCase);

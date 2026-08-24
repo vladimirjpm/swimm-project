@@ -185,7 +185,8 @@ public sealed class BulkPullService : IBulkPullService
             RegulationFindings: analysis?.Findings ?? [],
             HasMedals: analysis?.HasMedals ?? false,
             HasClubStanding: analysis?.HasClubStanding ?? false,
-            IsChampionship: (analysis?.IsChampionship ?? false) || CompetitionAdminRepository.IsChampionship(row.Name),
+            IsChampionship: CompetitionAdminRepository.IsChampionship(
+                row.Name, analysis?.IsChampionship ?? false),
             PointRuleClubsId: preview?.ClubStanding?.MatchedRuleId,
             PoolType: preview?.Parsed?.Competitions.FirstOrDefault(c => !string.IsNullOrWhiteSpace(c.PoolType))?.PoolType);
     }

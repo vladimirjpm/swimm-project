@@ -282,6 +282,32 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 && name.Contains("israel", StringComparison.OrdinalIgnoreCase)));
 
     /// <summary>
+    /// Чемпионат ли соревнование с учётом регламента. Регламент сам по себе — СЛАБАЯ улика:
+    /// обычный турнир сплошь и рядом упоминает чемпионат как цель подготовки («תהווה להתכונן
+    /// לאליפות ישראל» у «מילניום 2025») или как образец («קבוצות הגיל זהות לקבוצות הגיל
+    /// באליפות ישראל» у «ליגה מס 1 צעירים»). Оба уехали в БД с ложной галкой.
+    ///
+    /// Формулировки отклоняет <c>RegulationAnalyzer</c>, но гоняться за ними бесконечно:
+    /// федерация напишет по-третьему. Поэтому структурная страховка — ПОДТВЕРЖДЕНИЕ ИМЕНЕМ:
+    /// регламент ставит галку, только если в названии есть слово «чемпионат». Одного слова
+    /// достаточно (без «ישראל»): «אליפות חורף ארנה גילאי 10-11» — возрастной чемпионат
+    /// страны, его полное имя на сайте федерации теряет «ישראל», и регламент тут как раз
+    /// уместная вторая улика.
+    ///
+    /// ⚠ Цена правила: настоящий чемпионат, названный вовсе без слова «אליפות», галку сам
+    /// не получит — её ставит админ, цитата регламента у него перед глазами.
+    /// </summary>
+    public static bool IsChampionship(string? name, bool regulationSaysChampionship) =>
+        IsChampionship(name)
+        || (regulationSaysChampionship && MentionsChampionshipWord(name));
+
+    /// <summary>Есть ли в названии слово «чемпионат» — на иврите или по-английски.</summary>
+    public static bool MentionsChampionshipWord(string? name) =>
+        !string.IsNullOrEmpty(name)
+        && (name.Contains("אליפות", StringComparison.Ordinal)
+            || name.Contains("championship", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
     /// Чемпионат ли строка объединённого списка. Если соревнование есть в БД — источник истины
     /// ФЛАГ <c>Competition.IsChampionship</c> (галка на Edit), эвристика по названию для таких
     /// строк не применяется: снятая руками галка не должна возвращаться сама.
