@@ -21,9 +21,47 @@ public class SuspectResultDetectorTests
         long id, int ms, string style = "butterfly", string distance = "100",
         string gender = "female", int swimmerId = 1, DateTime? date = null,
         bool isRelay = false, bool timeFail = false, string? ageGroup = null,
-        string? heatType = null)
+        string? heatType = null, string? pool = "50m")
         => new(id, swimmerId, style, distance, gender, ms, date ?? Day1, isRelay, timeFail, ageGroup,
-            HeatType: heatType);
+            HeatType: heatType, PoolType: pool);
+
+    /* ── Справочник мировых рекордов ──────────────────────────────────────────────
+     * Фикстура, а НЕ копия продакшн-таблицы: пороги приезжают из справочника Records
+     * (WorldBestReference), и тесту нужен свой воспроизводимый набор, который не поедет
+     * при следующем обновлении рекордов. Значения взяты настоящие, обе воды — на них
+     * держится проверка «мерим по своему бассейну».
+     *
+     * 100 к/п лежит ТОЛЬКО в короткой воде: в длинной такой дистанции не существует.
+     * На нём и проверяется фолбэк «рекорда 50 м нет — сверяем по 25 м и говорим об этом».
+     */
+    private static readonly WorldBestReference Wr = WorldBestReference.Build(
+    [
+        ("male", "freestyle", "50m", "50m", "20.88"),      ("male", "freestyle", "50m", "25m", "19.90"),
+        ("female", "freestyle", "50m", "50m", "23.55"),    ("female", "freestyle", "50m", "25m", "22.83"),
+        ("male", "freestyle", "100m", "50m", "46.40"),     ("male", "freestyle", "100m", "25m", "44.84"),
+        ("female", "freestyle", "100m", "50m", "51.68"),   ("female", "freestyle", "100m", "25m", "49.93"),
+        ("male", "freestyle", "200m", "50m", "01:42.00"),  ("male", "freestyle", "200m", "25m", "01:38.61"),
+        ("female", "freestyle", "200m", "50m", "01:52.23"),("female", "freestyle", "200m", "25m", "01:49.36"),
+        ("male", "backstroke", "50m", "50m", "23.55"),     ("male", "backstroke", "50m", "25m", "22.11"),
+        ("female", "backstroke", "50m", "50m", "26.86"),   ("female", "backstroke", "50m", "25m", "25.23"),
+        ("male", "backstroke", "100m", "50m", "51.60"),    ("male", "backstroke", "100m", "25m", "48.16"),
+        ("female", "backstroke", "100m", "50m", "57.13"),  ("female", "backstroke", "100m", "25m", "54.02"),
+        ("male", "butterfly", "50m", "50m", "22.27"),      ("male", "butterfly", "50m", "25m", "21.32"),
+        ("female", "butterfly", "50m", "50m", "24.43"),    ("female", "butterfly", "50m", "25m", "23.72"),
+        ("male", "butterfly", "100m", "50m", "49.45"),     ("male", "butterfly", "100m", "25m", "47.68"),
+        ("female", "butterfly", "100m", "50m", "54.33"),   ("female", "butterfly", "100m", "25m", "52.71"),
+        ("male", "breaststroke", "200m", "50m", "02:05.48"),   ("male", "breaststroke", "200m", "25m", "01:59.52"),
+        ("female", "breaststroke", "200m", "50m", "02:17.55"), ("female", "breaststroke", "200m", "25m", "02:12.50"),
+        ("male", "individual_medley", "200m", "50m", "01:52.69"), ("male", "individual_medley", "200m", "25m", "01:48.88"),
+        ("male", "individual_medley", "100m", "25m", "49.28"),
+        ("female", "individual_medley", "100m", "25m", "55.11"),
+    ]);
+
+    /// <summary>Обёртка: все тесты класса ходят в детектор с фикстурой рекордов выше.</summary>
+    private static List<SuspectVerdict> Detect(
+        IReadOnlyCollection<SuspectCandidateRow> rows,
+        IReadOnlyDictionary<int, IReadOnlyList<PersonalSwim>>? history = null)
+        => SuspectResultDetector.Detect(rows, history, Wr);
 
     /// <summary>Правдоподобный «фон» заплыва, чтобы медиана была осмысленной.</summary>
     private static IEnumerable<SuspectCandidateRow> Field(int startId, params int[] times)
@@ -34,7 +72,7 @@ public class SuspectResultDetectorTests
     {
         var rows = new[] { Row(1, 32_590) }.Concat(Field(10, 57_330, 65_690, 66_690, 67_020)).ToList();
 
-        var v = Assert.Single(SuspectResultDetector.Detect(rows), x => x.ResultId == 1);
+        var v = Assert.Single(Detect(rows), x => x.ResultId == 1);
         Assert.Equal(SuspectReasons.TimeVsDistance, v.Reason);
         Assert.Contains("мирового рекорда", v.Note);
     }
@@ -43,26 +81,26 @@ public class SuspectResultDetectorTests
     public void PlausibleField_NotFlagged()
     {
         var rows = Field(10, 57_330, 65_690, 66_690, 67_020, 87_240).ToList();
-        Assert.Empty(SuspectResultDetector.Detect(rows));
+        Assert.Empty(Detect(rows));
     }
 
     [Fact]
     public void WorldRecordThreshold_IsGenderSpecific()
     {
         // 00:53.42 на 100 м баттерфляем (реальная строка протокола Маккабиады): быстрее
-        // ЖЕНСКОГО мирового рекорда 54.60, но медленнее мужского 47.78. По мужскому порогу
+        // ЖЕНСКОГО мирового рекорда длинной воды 54.33, но медленнее мужского 49.45. По мужскому порогу
         // такие ошибки проходили незамеченными.
         var women = new[] { Row(1, 53_420, gender: "female") }
             .Concat(Field(10, 57_330, 65_690, 66_690, 67_020)).ToList();
-        var v = Assert.Single(SuspectResultDetector.Detect(women), x => x.ResultId == 1);
+        var v = Assert.Single(Detect(women), x => x.ResultId == 1);
         Assert.Equal(SuspectReasons.TimeVsDistance, v.Reason);
-        Assert.Contains("54.60", v.Note);
+        Assert.Contains("54.33", v.Note);
 
         // То же время у мужчины — законный сильный результат, не помечается.
         var men = new[] { Row(1, 53_420, gender: "male", swimmerId: 3) }
             .Concat(Enumerable.Range(0, 4).Select(i =>
                 Row(20 + i, 55_000 + i * 2000, gender: "male", swimmerId: 200 + i))).ToList();
-        Assert.DoesNotContain(SuspectResultDetector.Detect(men), x => x.ResultId == 1);
+        Assert.DoesNotContain(Detect(men), x => x.ResultId == 1);
     }
 
     [Fact]
@@ -74,7 +112,7 @@ public class SuspectResultDetectorTests
                 Row(10 + i, 240_000 + i * 1000, style: "medley_unknown", distance: "4X100", swimmerId: 50 + i)))
             .ToList();
 
-        var v = Assert.Single(SuspectResultDetector.Detect(rows), x => x.ResultId == 1);
+        var v = Assert.Single(Detect(rows), x => x.ResultId == 1);
         Assert.Equal(SuspectReasons.TimeOutlier, v.Reason);
     }
 
@@ -103,7 +141,7 @@ public class SuspectResultDetectorTests
         };
 
         // Общая медиана тут 44.00 → старый порог 26.40 пометил бы обе верхние строки.
-        Assert.Empty(SuspectResultDetector.Detect(rows));
+        Assert.Empty(Detect(rows));
     }
 
     [Fact]
@@ -123,7 +161,7 @@ public class SuspectResultDetectorTests
             Row(8, 30_060, "freestyle", "50", "male", swimmerId: 8, ageGroup: "17-18"),
         };
 
-        var v = Assert.Single(SuspectResultDetector.Detect(rows), x => x.ResultId == 1);
+        var v = Assert.Single(Detect(rows), x => x.ResultId == 1);
         Assert.Equal(SuspectReasons.TimeOutlier, v.Reason);
         Assert.Contains("ступени 0-8", v.Note);
     }
@@ -145,7 +183,7 @@ public class SuspectResultDetectorTests
             Row(6, 101_140, "freestyle", "50", "female", swimmerId: 6, ageGroup: "9-10"),
         };
 
-        Assert.Empty(SuspectResultDetector.Detect(rows));
+        Assert.Empty(Detect(rows));
     }
 
     [Fact]
@@ -162,7 +200,7 @@ public class SuspectResultDetectorTests
             Row(4, 150_000, "freestyle", "100", "female", swimmerId: 4, ageGroup: "9-10"),
         };
 
-        var v = Assert.Single(SuspectResultDetector.Detect(rows), x => x.ResultId == 1);
+        var v = Assert.Single(Detect(rows), x => x.ResultId == 1);
         Assert.Equal(SuspectReasons.TimeOutlier, v.Reason);
         Assert.Contains("ближайшем результате", v.Note);
     }
@@ -181,7 +219,7 @@ public class SuspectResultDetectorTests
                 SwimmerGender: "male"),
         };
 
-        var v = Assert.Single(SuspectResultDetector.Detect(rows));
+        var v = Assert.Single(Detect(rows));
         Assert.Equal(1, v.ResultId);
         Assert.Equal(SuspectReasons.GenderMismatch, v.Reason);
         Assert.Contains("по карточке пловца", v.Note);
@@ -199,7 +237,7 @@ public class SuspectResultDetectorTests
             new(3, 7, "backstroke", "50", "male", 38_000, Day1, false, false, null),
         };
 
-        var v = Assert.Single(SuspectResultDetector.Detect(rows));
+        var v = Assert.Single(Detect(rows));
         Assert.Equal(1, v.ResultId);
         Assert.Contains("в остальных заплывах пловца", v.Note);
     }
@@ -213,7 +251,7 @@ public class SuspectResultDetectorTests
             Row(2, 1_000, timeFail: true),          // DSQ/DNS
             Row(3, 0),                              // нет времени
         };
-        Assert.Empty(SuspectResultDetector.Detect(rows));
+        Assert.Empty(Detect(rows));
     }
 
     [Fact]
@@ -228,7 +266,7 @@ public class SuspectResultDetectorTests
             Row(4, 59_000, "backstroke", "100", "male", swimmerId: 7),
         };
 
-        var v = Assert.Single(SuspectResultDetector.Detect(rows), x => x.ResultId == 4);
+        var v = Assert.Single(Detect(rows), x => x.ResultId == 4);
         Assert.Equal(SuspectReasons.GenderMismatch, v.Reason);
         Assert.Contains("female", v.Note);
     }
@@ -241,7 +279,7 @@ public class SuspectResultDetectorTests
             Row(1, 60_000, swimmerId: 7),
             Row(2, 61_000, swimmerId: 7),
         };
-        var flagged = SuspectResultDetector.Detect(sameDay);
+        var flagged = Detect(sameDay);
         Assert.Equal(2, flagged.Count);
         Assert.All(flagged, v => Assert.Equal(SuspectReasons.DuplicateSwim, v.Reason));
 
@@ -251,7 +289,7 @@ public class SuspectResultDetectorTests
             Row(1, 60_000, swimmerId: 7),
             Row(2, 61_000, swimmerId: 7, date: Day1.AddDays(1)),
         };
-        Assert.Empty(SuspectResultDetector.Detect(otherDays));
+        Assert.Empty(Detect(otherDays));
     }
 
     [Fact]
@@ -264,7 +302,7 @@ public class SuspectResultDetectorTests
             Row(1, 60_000, swimmerId: 7, heatType: "prelim"),
             Row(2, 59_500, swimmerId: 7, heatType: "final"),
         };
-        Assert.Empty(SuspectResultDetector.Detect(prelimFinal));
+        Assert.Empty(Detect(prelimFinal));
 
         // Дубль ВНУТРИ одной сессии по-прежнему ловится.
         var withinFinal = new[]
@@ -272,7 +310,7 @@ public class SuspectResultDetectorTests
             Row(1, 60_000, swimmerId: 7, heatType: "final"),
             Row(2, 61_000, swimmerId: 7, heatType: "final"),
         };
-        var flagged = SuspectResultDetector.Detect(withinFinal);
+        var flagged = Detect(withinFinal);
         Assert.Equal(2, flagged.Count);
         Assert.All(flagged, v => Assert.Equal(SuspectReasons.DuplicateSwim, v.Reason));
     }
@@ -290,7 +328,7 @@ public class SuspectResultDetectorTests
             Row(3, 23_180, style: "freestyle", distance: "50", swimmerId: 7, heatType: "extra"),
         };
 
-        var flagged = SuspectResultDetector.Detect(threeSessions);
+        var flagged = Detect(threeSessions);
         Assert.DoesNotContain(flagged, v => v.Reason == SuspectReasons.DuplicateSwim);
     }
 
@@ -321,7 +359,7 @@ public class SuspectResultDetectorTests
             new PersonalSwim(3, 290, Day1.AddDays(-30)),
             new PersonalSwim(4, 275, Day1.AddDays(-60)));
 
-        var v = Assert.Single(SuspectResultDetector.Detect(rows, history));
+        var v = Assert.Single(Detect(rows, history));
         Assert.Equal(SuspectReasons.PersonalOutlier, v.Reason);
         Assert.Contains("312", v.Note);
     }
@@ -346,7 +384,7 @@ public class SuspectResultDetectorTests
             new PersonalSwim(21, 74, Day1.AddDays(-2)),
             new PersonalSwim(22, 76, Day1.AddDays(-3)));
 
-        Assert.Empty(SuspectResultDetector.Detect(rows, history));
+        Assert.Empty(Detect(rows, history));
     }
 
     [Fact]
@@ -367,7 +405,7 @@ public class SuspectResultDetectorTests
             new PersonalSwim(21, 290, Day1.AddDays(-30)),
             new PersonalSwim(22, 275, Day1.AddDays(-60)));
 
-        var v = Assert.Single(SuspectResultDetector.Detect(rows, history));
+        var v = Assert.Single(Detect(rows, history));
         Assert.Equal(SuspectReasons.PersonalOutlier, v.Reason);
     }
 
@@ -380,7 +418,7 @@ public class SuspectResultDetectorTests
             new PersonalSwim(3, 290, Day1.AddDays(-30)),
             new PersonalSwim(4, 275, Day1.AddDays(-60)));
 
-        Assert.Empty(SuspectResultDetector.Detect(rows, history));
+        Assert.Empty(Detect(rows, history));
     }
 
     [Fact]
@@ -394,7 +432,7 @@ public class SuspectResultDetectorTests
             new PersonalSwim(3, 290, Day1.AddDays(-420)),
             new PersonalSwim(4, 275, Day1.AddDays(-450)));
 
-        Assert.Empty(SuspectResultDetector.Detect(rows, history));
+        Assert.Empty(Detect(rows, history));
     }
 
     [Fact]
@@ -407,7 +445,7 @@ public class SuspectResultDetectorTests
             new PersonalSwim(2, 312, Day1.AddDays(-8)),
             new PersonalSwim(3, 290, Day1.AddDays(-30)));
 
-        Assert.Empty(SuspectResultDetector.Detect(rows, history));
+        Assert.Empty(Detect(rows, history));
     }
 
     [Fact]
@@ -416,8 +454,73 @@ public class SuspectResultDetectorTests
         // Истории нет — правило молчит, но остальные проверки обязаны работать как раньше.
         var rows = new[] { Row(1, 32_590) }.Concat(Field(10, 57_330, 65_690, 66_690, 67_020)).ToList();
 
-        var v = Assert.Single(SuspectResultDetector.Detect(rows, null), x => x.ResultId == 1);
+        var v = Assert.Single(Detect(rows, null), x => x.ResultId == 1);
         Assert.Equal(SuspectReasons.TimeVsDistance, v.Reason);
+    }
+
+    /* ── Ось бассейна (И-13) ──────────────────────────────────────────────────────
+     * В 25-метровом бассейне вдвое больше поворотов, и времена короткой воды на 1.5–4%
+     * быстрее — рекордов на каждую дистанцию ДВА. Пока порог был один (в основном длинная
+     * вода), зимний чемпионат в 25 м получил две ложные пометки: 23.46 на 50 на спине
+     * против рекорда 50 м 23.55, при том что рекорд 25 м — 22.11.
+     */
+
+    [Fact]
+    public void ShortCourseSwim_ComparedWithShortCourseRecord()
+    {
+        // Живой случай: תומר שוסטר, 50 на спине, 23.46 в 25-метровом бассейне. До рекорда
+        // короткой воды (22.11) ему 1.35 с — обычный сильный результат.
+        var shortCourse = new[] { Row(1, 23_460, "backstroke", "50", "male", pool: "25m") };
+        Assert.Empty(Detect(shortCourse));
+
+        // То же время в ДЛИННОЙ воде было бы быстрее мирового рекорда 23.55 — и вот там
+        // пометка законна.
+        var longCourse = new[] { Row(1, 23_460, "backstroke", "50", "male", pool: "50m") };
+        var v = Assert.Single(Detect(longCourse));
+        Assert.Equal(SuspectReasons.TimeVsDistance, v.Reason);
+        Assert.Contains("50 м (23.55)", v.Note);
+    }
+
+    [Fact]
+    public void PoolIsNamedInTheNote()
+    {
+        // Пометка обязана говорить, с чем сверялись: иначе спор «это же не быстрее рекорда»
+        // не разрешить, не читая код (ровно так и вскрылась И-13).
+        var rows = new[] { Row(1, 53_000, "backstroke", "100", "female", pool: "25m") };
+        var v = Assert.Single(Detect(rows));
+        Assert.Contains("мирового рекорда 25 м (54.02)", v.Note);
+    }
+
+    [Fact]
+    public void NoRecordForOwnPool_FallsBackToShortCourse_AndSaysSo()
+    {
+        // 100 к/п в длинной воде не плавают, рекорда для неё в справочнике нет. Решение
+        // Влада: мерить по короткой воде, но предупреждать — молчать хуже, чем сверить
+        // по заведомо МЯГКОМУ порогу и сказать об этом.
+        var rows = new[] { Row(1, 48_000, "individual_medley", "100", "male", pool: "50m") };
+        var v = Assert.Single(Detect(rows));
+        Assert.Equal(SuspectReasons.TimeVsDistance, v.Reason);
+        Assert.Contains("(49.28)", v.Note);
+        Assert.Contains("рекорда для 50 м в справочнике нет, сверено по рекорду 25 м", v.Note);
+    }
+
+    [Fact]
+    public void UnknownPool_UsesShortCourse_AndSaysSo()
+    {
+        // Бассейн не заполнен — берём короткую воду (порог мягче) и признаёмся в этом.
+        var rows = new[] { Row(1, 21_000, "backstroke", "50", "male", pool: null) };
+        var v = Assert.Single(Detect(rows));
+        Assert.Contains("(22.11)", v.Note);
+        Assert.Contains("бассейн соревнования неизвестен", v.Note);
+    }
+
+    [Fact]
+    public void WithoutReference_WorldRecordRulesStaySilent()
+    {
+        // Справочник не подан — обвинять «быстрее рекорда», не зная рекорда, нельзя.
+        // Остальные правила при этом живут.
+        var rows = new[] { Row(1, 5_000, "backstroke", "50", "male") };
+        Assert.Empty(SuspectResultDetector.Detect(rows));
     }
 
     [Fact]
@@ -426,7 +529,7 @@ public class SuspectResultDetectorTests
         // 32.59 на сотне подходит и под «быстрее МР», и под «время отрезка», и под выброс —
         // причина должна быть ровно одна, иначе пометка не отвечает на «почему».
         var rows = new[] { Row(1, 32_590) }.Concat(Field(10, 53_420, 57_330, 65_690, 66_690)).ToList();
-        var all = SuspectResultDetector.Detect(rows).Where(v => v.ResultId == 1).ToList();
+        var all = Detect(rows).Where(v => v.ResultId == 1).ToList();
         Assert.Single(all);
     }
 }

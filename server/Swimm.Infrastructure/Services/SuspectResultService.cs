@@ -27,10 +27,12 @@ public class SuspectResultService(SwimmDbContext db, ICacheService cache) : ISus
             .Select(r => new SuspectCandidateRow(
                 r.Id, r.SwimmerId, r.Style.Name, r.Distance, r.Gender,
                 r.TimeMillisecond, r.CompetitionDate, r.RelayId != null, r.TimeFail, r.AgeGroup,
-                r.InternationalPoints, r.HeatType, r.Round, r.Heat, r.Swimmer.Gender))
+                r.InternationalPoints, r.HeatType, r.Round, r.Heat, r.Swimmer.Gender,
+                r.Competition.PoolType))
             .ToListAsync(ct);
 
-        var verdicts = SuspectResultDetector.Detect(rows, await LoadPersonalHistoryAsync(rows, ct))
+        var verdicts = SuspectResultDetector.Detect(
+                rows, await LoadPersonalHistoryAsync(rows, ct), await LoadWorldBestsAsync(ct))
             .ToDictionary(v => v.ResultId);
 
         // Трекаем только то, что может измениться: уже помеченные + новые кандидаты.
@@ -101,6 +103,23 @@ public class SuspectResultService(SwimmDbContext db, ICacheService cache) : ISus
     /// соревнования — иначе на пловца с десятилетней историей приезжали бы сотни строк,
     /// из которых правило всё равно смотрит лишь ближайшие ±120 дней.
     /// </summary>
+    /// <summary>
+    /// Мировые рекорды из справочника <c>Records</c> — тот же источник, что у попапа
+    /// Normative Info. Раньше пороги лежали копией в коде и не знали про бассейн; сверка
+    /// 25-метрового заплыва с рекордом длинной воды дала две ложные пометки на зимнем
+    /// чемпионате (docs/data-integrity.md, И-13).
+    /// </summary>
+    private async Task<WorldBestReference> LoadWorldBestsAsync(CancellationToken ct)
+    {
+        var rows = await db.Records.AsNoTracking()
+            .Where(r => r.RegionType == "world")
+            .Select(r => new { r.Gender, r.Style, r.Distance, r.PoolType, r.Time })
+            .ToListAsync(ct);
+
+        return WorldBestReference.Build(
+            rows.Select(r => (r.Gender, r.Style, r.Distance, r.PoolType, (string?)r.Time)));
+    }
+
     private async Task<IReadOnlyDictionary<int, IReadOnlyList<PersonalSwim>>> LoadPersonalHistoryAsync(
         IReadOnlyCollection<SuspectCandidateRow> rows, CancellationToken ct)
     {
