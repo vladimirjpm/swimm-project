@@ -1663,7 +1663,8 @@ else
                 isChampionship: '🏆 Чемпионат Израиля',
                 isMasters: 'Masters',
                 clubPointsDisabled: 'клубный зачёт не ведётся',
-                poolType: 'бассейн'
+                poolType: 'бассейн',
+                categories: 'категории'
             };
 
             function renderCompetitionFlags(flags) {
@@ -1949,8 +1950,11 @@ else
                     // здесь до истечения браузерного кэша вкладки (Cache-Control: public,
                     // max-age=300 у /api/categories рассчитан на публичный сайт).
                     const cats = await fetch('/api/categories', { credentials: 'same-origin', cache: 'no-store' }).then(r => r.json());
+                    // Категории, подобранные по названию соревнования, отмечаем сразу —
+                    // раньше чек-лист был пустым, и про него забывали ровно так же, как про флаги.
+                    const suggested = new Set(p.flags?.categoryKeys ?? []);
                     document.getElementById('preview-categories').innerHTML = cats.map(c =>
-                        `<label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" value="${esc(c.key)}" class="disc-cat cursor-pointer"> ${esc(c.name)}</label>`
+                        `<label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" value="${esc(c.key)}" class="disc-cat cursor-pointer"${suggested.has(c.key) ? ' checked' : ''}> ${esc(c.name)}</label>`
                     ).join('');
                 } catch { /* категории опциональны */ }
 

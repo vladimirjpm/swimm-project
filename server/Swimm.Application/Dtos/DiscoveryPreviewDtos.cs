@@ -44,6 +44,10 @@ public sealed record DiscoveryPreviewResult(
 /// <param name="PoolType">Длина бассейна, распознанная парсером («25m»/«50m»).</param>
 /// <param name="RegulationUrl">Регламент, по которому предложены медали/чемпионат.</param>
 /// <param name="Reasons">Обоснования по флагам: ключ — имя флага, значение — фраза для админа.</param>
+/// <param name="CategoryKeys">
+/// Категории, подобранные ПО НАЗВАНИЮ соревнования (правило Влада: есть в названии слово из
+/// /Admin/Categories — применяем; возраста шире названных — добавляем «Age 8-99»).
+/// </param>
 public sealed record CompetitionFlagSuggestion(
     bool IsAward,
     bool IsChampionship,
@@ -51,7 +55,8 @@ public sealed record CompetitionFlagSuggestion(
     bool ClubPointsDisabled,
     string? PoolType,
     string? RegulationUrl,
-    IReadOnlyDictionary<string, string> Reasons);
+    IReadOnlyDictionary<string, string> Reasons,
+    IReadOnlyList<string> CategoryKeys);
 
 /// <summary>Отложенный разбор в кэше — то, из чего потом собирается импорт.</summary>
 /// <param name="Records">

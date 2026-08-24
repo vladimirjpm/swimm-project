@@ -35,7 +35,9 @@ public class CategoryRepository : ICategoryRepository
                 Name         = c.Name,
                 NameHe       = c.NameHe,
                 Badge        = c.Badge,
-                DisplayOrder = c.DisplayOrder
+                DisplayOrder = c.DisplayOrder,
+                MinAge       = c.MinAge,
+                MaxAge       = c.MaxAge
             })
             .ToListAsync();
 

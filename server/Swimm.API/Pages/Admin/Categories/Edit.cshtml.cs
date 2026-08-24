@@ -34,6 +34,11 @@ public class EditModel : PageModel
         public string? NameHe { get; set; }
         public string? Badge { get; set; }
         public int DisplayOrder { get; set; }
+
+        /// <summary>Возрастная полоса: Kids 8–11, Young 11–14, Juniors 14–17, Adults 17+.
+        /// Пусто — категория не про возраст; пустой «по» — полоса открыта сверху.</summary>
+        public int? MinAge { get; set; }
+        public int? MaxAge { get; set; }
     }
 
     public async Task<IActionResult> OnGetAsync()
@@ -88,7 +93,9 @@ public class EditModel : PageModel
         Name = d.Name,
         NameHe = d.NameHe,
         Badge = d.Badge,
-        DisplayOrder = d.DisplayOrder
+        DisplayOrder = d.DisplayOrder,
+        MinAge = d.MinAge,
+        MaxAge = d.MaxAge
     };
 
     private static CategoryInputDto ToInput(CategoryForm f) => new()
@@ -97,6 +104,8 @@ public class EditModel : PageModel
         Name = f.Name,
         NameHe = f.NameHe,
         Badge = f.Badge,
-        DisplayOrder = f.DisplayOrder
+        DisplayOrder = f.DisplayOrder,
+        MinAge = f.MinAge,
+        MaxAge = f.MaxAge
     };
 }

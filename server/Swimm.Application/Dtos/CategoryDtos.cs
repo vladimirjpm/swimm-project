@@ -13,6 +13,14 @@ public sealed class CategoryDto
     [JsonPropertyName("name")]
     public string Name { get; init; } = string.Empty;
 
+    /// <summary>Низ возрастной полосы (Kids 8, Young 11…); null — категория не про возраст.</summary>
+    [JsonPropertyName("min_age")]
+    public int? MinAge { get; init; }
+
+    /// <summary>Верх полосы; null — открыта сверху (Adults 17+) либо категория не про возраст.</summary>
+    [JsonPropertyName("max_age")]
+    public int? MaxAge { get; init; }
+
     /// <summary>Название на иврите (ילדים / צעירים / נוער / בוגרים). Клиент его пока не
     /// показывает — UI английский; отдаём, чтобы перевод был доступен без правки API.</summary>
     [JsonPropertyName("name_he")]

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Validation;
 using Swimm.Infrastructure.Repositories;
 
 namespace Swimm.Infrastructure.Services;
@@ -27,6 +28,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
     private readonly IImportRecordPreviewService _recordPreview;
     private readonly IOfficialClubStandingService _clubStandings;
     private readonly IRegulationFetchService _regulations;
+    private readonly ICategoryRepository _categories;
     private readonly IMemoryCache _cache;
     private readonly ILogger<DiscoveryPreviewService> _logger;
 
@@ -38,6 +40,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         IImportRecordPreviewService recordPreview,
         IOfficialClubStandingService clubStandings,
         IRegulationFetchService regulations,
+        ICategoryRepository categories,
         IMemoryCache cache,
         ILogger<DiscoveryPreviewService> logger)
     {
@@ -48,6 +51,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         _recordPreview = recordPreview;
         _clubStandings = clubStandings;
         _regulations = regulations;
+        _categories = categories;
         _cache = cache;
         _logger = logger;
     }
@@ -203,8 +207,22 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         var poolType = parsed.Competitions.FirstOrDefault(c => !string.IsNullOrWhiteSpace(c.PoolType))?.PoolType;
         if (!string.IsNullOrWhiteSpace(poolType)) reasons["poolType"] = "распознано парсером";
 
+        // Категории — по названию соревнования словами из самой таблицы категорий.
+        var categories = (await _categories.GetCategoriesAsync())
+            .Select(c => new CategoryWord(c.Key, new[] { c.Name, c.NameHe ?? "" }, c.MinAge, c.MaxAge))
+            .ToList();
+        var categoryKeys = CategoryNameMatcher.Suggest(row?.Name, categories, isMasters);
+        if (categoryKeys.Count > 0)
+        {
+            var names = categories
+                .Where(c => categoryKeys.Contains(c.Key))
+                .Select(c => c.Words.FirstOrDefault() ?? c.Key);
+            reasons["categories"] = "по названию: " + string.Join(", ", names);
+        }
+
         return new CompetitionFlagSuggestion(
-            isAward, isChampionship, isMasters, clubPointsDisabled, poolType, regulation?.Url, reasons);
+            isAward, isChampionship, isMasters, clubPointsDisabled, poolType, regulation?.Url,
+            reasons, categoryKeys);
     }
 
     /// <summary>Цитата регламента по флагу — основание, которое видит админ.</summary>

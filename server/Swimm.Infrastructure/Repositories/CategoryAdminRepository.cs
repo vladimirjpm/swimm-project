@@ -46,6 +46,8 @@ public class CategoryAdminRepository : ICategoryAdminRepository
             NameHe = c.NameHe,
             Badge = c.Badge,
             DisplayOrder = c.DisplayOrder,
+            MinAge = c.MinAge,
+            MaxAge = c.MaxAge,
             CompetitionCount = counts.GetValueOrDefault(c.Id),
             IsReserved = Category.ReservedKeys.Contains(c.Key)
         }).ToList();
@@ -71,6 +73,8 @@ public class CategoryAdminRepository : ICategoryAdminRepository
             NameHe = c.NameHe,
             Badge = c.Badge,
             DisplayOrder = c.DisplayOrder,
+            MinAge = c.MinAge,
+            MaxAge = c.MaxAge,
             CompetitionCount = count,
             IsReserved = Category.ReservedKeys.Contains(c.Key)
         };
@@ -134,6 +138,10 @@ public class CategoryAdminRepository : ICategoryAdminRepository
         cat.NameHe = string.IsNullOrWhiteSpace(input.NameHe) ? null : input.NameHe.Trim();
         cat.Badge = string.IsNullOrWhiteSpace(input.Badge) ? null : input.Badge.Trim();
         cat.DisplayOrder = input.DisplayOrder;
+        // Возрастная полоса: пустые поля значат «категория не про возраст» (Maccabiah) или
+        // «открыта сверху» (Adults 17+), поэтому нули сюда не подставляем.
+        cat.MinAge = input.MinAge;
+        cat.MaxAge = input.MaxAge;
     }
 
     private async Task<CategorySaveResult> SaveAsync(Category cat)
