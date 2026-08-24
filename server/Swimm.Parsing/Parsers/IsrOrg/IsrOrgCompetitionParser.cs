@@ -191,6 +191,25 @@ public static class IsrOrgCompetitionParser
     private static string? HeCategoryToken(string cat) =>
         cat.Contains("שומרי שבת", StringComparison.Ordinal) ? "shabbat" : null;
 
+    /// <summary>
+    /// EN-экспорт loglig переведён ЧЕРЕЗ СТРОЧКУ: в одном и том же протоколе соседствуют
+    /// «50m Freestyle - Girls 14» и «50m Freestyle - 15 תונב» (зимний чемпионат 26/12/2025,
+    /// loglig 13627). Ивритское слово приходит в визуальном порядке — как «תונב», то есть
+    /// ровно в реверснутом виде, который знает <see cref="HebrewTextHelper.NormalizeGenderHE"/>
+    /// (в EN-режиме строка через <c>NormalizeHebrewLine</c> не проходит).
+    ///
+    /// Без этого пол терялся («none»), заголовок объявлялся смешанным заплывом и
+    /// <c>NormalizeEventCategory</c> выдавала несуществующую программу «mix-15». Хуже того,
+    /// событие мальчиков и событие девочек одного возраста получали ОДИН ключ дисциплины и
+    /// <see cref="IsrOrgParser.AssignHeatTypes"/> объявляла их парой «прелимы + финал».
+    /// </summary>
+    private static string? HeGenderToken(string token)
+    {
+        if (!Regex.IsMatch(token, @"[֐-׿]")) return null;
+        var g = HebrewTextHelper.NormalizeGenderHE(token);
+        return g is "male" or "female" ? g : null;
+    }
+
     private static (string gender, string age) ParseEnCategory(string cat)
     {
         cat = Regex.Replace(cat.Trim(), @"\s+", " ");
@@ -208,6 +227,8 @@ public static class IsrOrgCompetitionParser
                 default:
                     if (Regex.IsMatch(t, @"^U?\d+(-\d+)?$", RegexOptions.IgnoreCase))
                         age = t.TrimStart('U', 'u');
+                    else if (HeGenderToken(t) is string heGender)
+                        gender = heGender;
                     break;
             }
         }
