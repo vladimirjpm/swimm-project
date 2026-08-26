@@ -14,6 +14,7 @@
 //   /clubs/{id}             → club.html
 //   /my-media               → media.html
 //   /about                  → about.html
+//   /season-best            → season-best.html (списки лучших в сезоне; всё в query)
 //
 // ПРАВИЛО: в путь идёт только идентичность ресурса. Состояние вида
 // (tab, filter, club, swim, eventId, cat, loadMode, themes) остаётся в query —
@@ -35,9 +36,83 @@ export const routes = {
   groupResults: (slug: string) => `/groups/${enc(slug)}/results`,
 
   swimmer: (id: string | number) => `/swimmers/${enc(String(id))}`,
+
   club: (id: string | number) => `/clubs/${enc(String(id))}`,
   myMedia: () => '/my-media',
+
+  /**
+   * Страница списков «лучшие в сезоне»: кто быстрее всех в связке возраст × пол ×
+   * стиль × дистанция × бассейн за сезон. С неё же будут списки по возрасту, по стилю и т.д.
+   *
+   * Страница-заготовка: маршрут и разбор параметров работают, самих списков ещё нет.
+   *
+   * Единственный генератор, принимающий query: у списка нет идентичности в пути — адресом
+   * его делает как раз набор фильтров, и держать их порознь значит завести второй контракт.
+   * Пустые поля не пишем: `/season-best?season=2025` — законный адрес «весь сезон».
+   */
+  seasonBest: (q: {
+    /** Год НАЧАЛА сезона, как везде на публичной стороне (2025 → «2025/26»). */
+    season: number;
+    /** Возраст В СЕЗОНЕ (SeasonMath.AgeInSeason), а не на дату заплыва. */
+    age?: number | null;
+    gender?: string | null;
+    /** Ключ стиля как на клиенте: freestyle / breaststroke / individual_medley… */
+    stroke?: string | null;
+    /** Дистанция без «m»: «50», «100». */
+    distance?: string | null;
+    /** «25m» / «50m» — времена разных бассейнов несравнимы, поэтому это часть адреса. */
+    poolType?: string | null;
+    /** Кого подсветить в списке; на выбор самого списка не влияет. */
+    swimmerId?: number | null;
+  }) => {
+    const params = new URLSearchParams();
+    params.set('season', String(q.season));
+    if (q.age != null) params.set('age', String(q.age));
+    if (q.gender) params.set('gender', q.gender);
+    if (q.stroke) params.set('stroke', q.stroke);
+    if (q.distance) params.set('distance', String(q.distance).replace(/m$/i, ''));
+    if (q.poolType) params.set('pool', q.poolType);
+    if (q.swimmerId != null) params.set('swimmer', String(q.swimmerId));
+    return `/season-best?${params.toString()}`;
+  },
 };
+
+/**
+ * Фильтр страницы `/season-best`, разобранный из query. Живёт рядом с генератором
+ * <c>routes.seasonBest</c> намеренно: писать и читать один адрес в разных местах значит
+ * завести два контракта, которые разъедутся на первом же переименовании параметра.
+ *
+ * Мусор и отсутствующие значения дают null, а не бросают: это витрина, а не форма.
+ * `season` без значения — тоже null, страница решает сама, что показывать по умолчанию.
+ */
+export interface SeasonBestQuery {
+  season: number | null;
+  age: number | null;
+  gender: 'male' | 'female' | null;
+  stroke: string | null;
+  distance: string | null;
+  poolType: string | null;
+  swimmerId: number | null;
+}
+
+export function parseSeasonBestQuery(search: string = window.location.search): SeasonBestQuery {
+  const p = new URLSearchParams(search);
+  const num = (key: string) => {
+    const n = Number(p.get(key));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const gender = (p.get('gender') ?? '').toLowerCase();
+
+  return {
+    season: num('season'),
+    age: num('age'),
+    gender: gender === 'male' || gender === 'female' ? gender : null,
+    stroke: p.get('stroke') || null,
+    distance: p.get('distance') || null,
+    poolType: p.get('pool') || null,
+    swimmerId: num('swimmer'),
+  };
+}
 
 /** Идентичность, вытащенная из текущего pathname (без query/hash). */
 export interface RouteIdentity {

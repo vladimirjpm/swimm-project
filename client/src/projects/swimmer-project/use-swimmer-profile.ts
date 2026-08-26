@@ -7,6 +7,31 @@ export interface SwimmerAgeGroup {
   badge?: string | null;
 }
 
+/** Признак качества времени — то же, что понимает UI_SwimTime. */
+export interface SwimQuality {
+  kind: 'protocol' | 'record';
+  reason?: string | null;
+}
+
+/**
+ * Официальный рекорд, который держит пловец (строка справочника, где он записан держателем).
+ * Это НЕ то же, что `holdsNationalAgeRecord` у личника: там сравнение по времени с рекордом
+ * своей ступени, здесь — сам справочник.
+ */
+export interface SwimmerHeldRecord {
+  regionType: string;
+  regionCode: string;
+  category: string;
+  ageKey: string;
+  gender: string;
+  poolType: string;
+  stroke: string;
+  distance: string;
+  time: string;
+  date?: string | null;
+  quality?: SwimQuality | null;
+}
+
 /** Сезон для карусели. Ровно у одного `isDisplayDefault` — витринный (см. season-boundary-rule). */
 export interface SwimmerSeasonOption {
   season: number;
@@ -38,6 +63,8 @@ export interface SwimmerProfile {
   ageGroup?: SwimmerAgeGroup | null;
   programs?: string[];
   recordsHeld?: number;
+  /** Сами рекорды — из них же считается recordsHeld. */
+  records?: SwimmerHeldRecord[];
   seasons?: SwimmerSeasonOption[];
 }
 

@@ -76,6 +76,8 @@ export interface SwimmerBestTime {
   competition: CompetitionRef;
   resultId: number;
   isCareerBest: boolean;
+  /** Мастерс-старт: у разряда своя таблица нормативов с возрастными полосами. */
+  isMasters: boolean;
 }
 
 export interface SwimmerPersonalBest {
@@ -100,6 +102,33 @@ export interface SwimmerPersonalBest {
   nationalAgeKey?: string | null;
 }
 
+/**
+ * Место в одной дисциплине среди сверстников — пловцов того же года рождения и пола.
+ * Строк результатов тут нет: они уже пришли из `/best-times` за тот же сезон, и клеятся
+ * по `disciplineKey`. Второй набор тех же строк означал бы два «лучших времени сезона».
+ */
+export interface SwimmerDisciplineRank {
+  disciplineKey: string;
+  /** 1 — быстрейший в группе (тогда же строка получает бейдж SB). */
+  rank: number;
+  /** Сколько сверстников плавало эту дисциплину в сезоне, включая самого. */
+  peerCount: number;
+  timeMs: number;
+  leaderTimeMs: number;
+  gapToLeaderMs: number;
+}
+
+export interface SwimmerSeasonRanks {
+  season: number | null;
+  label: string;
+  /** Возраст в сезоне; null — года рождения нет в базе, мест не будет. */
+  age?: number | null;
+  gender?: string | null;
+  /** Подпись группы («girls 9») — её обязан показать UI рядом с местом. */
+  groupLabel?: string | null;
+  rows: SwimmerDisciplineRank[];
+}
+
 export interface SwimmerProgressPoint {
   date: string;
   time?: string | null;
@@ -111,6 +140,8 @@ export interface SwimmerProgressPoint {
   /** 'prelim' | 'final' | null — место prelim-заплыва рисуется без медали. */
   heatType?: string | null;
   ageInSeason?: number | null;
+  /** Мастерс-старт: у разряда своя таблица нормативов с возрастными полосами. */
+  isMasters?: boolean;
   season: number;
   competition: CompetitionRef;
   resultId: number;
@@ -138,30 +169,85 @@ interface Loaded<T> {
   error: boolean;
 }
 
-/** Общая загрузка JSON с отменой по смене входа. `null` в url — запрос не нужен. */
+/**
+ * Кэш ответов на время жизни страницы + склейка одновременных запросов по одному адресу.
+ *
+ * Зачем (замеры 2026-08-25):
+ * • ОДИН адрес просили ДВА хука. `best-times?season=all` в режиме ∞ нужен и табу Results,
+ *   и разряду в шапке — уходило 4 запроса на загрузку вместо одного.
+ * • Возврат на таб перезапрашивал: Progress → Best time → Progress давал три запроса,
+ *   хотя данные не менялись.
+ * • В dev каждый запрос удваивает StrictMode — склейка гасит и это.
+ *
+ * Кэш модульный, а не в сторе, СОЗНАТЕЛЬНО: переходы между пловцами — обычные ссылки
+ * (сборка multi-page, SPA-роутера нет), поэтому стор умирает на навигации ровно так же,
+ * а запись в единый `rootSlice` перерисовывала бы всех подписчиков. Радиус — этот файл.
+ *
+ * ⚠ Данные страницы пловца только читаются. Появятся мутации — потребуется инвалидация,
+ * сейчас её сознательно нет.
+ */
+const CACHE_TTL_MS = 60_000;   // столько же, сколько сервер разрешает браузеру (max-age=60)
+
+const responseCache = new Map<string, { at: number; data: unknown }>();
+const inFlight = new Map<string, Promise<unknown>>();
+
+/** Свежий ответ из кэша либо undefined. undefined ≠ null: null — это законное значение. */
+function readCache<T>(url: string): T | undefined {
+  const hit = responseCache.get(url);
+  if (hit === undefined) return undefined;
+  if (Date.now() - hit.at > CACHE_TTL_MS) { responseCache.delete(url); return undefined; }
+  return hit.data as T;
+}
+
+function loadShared<T>(url: string): Promise<T> {
+  const running = inFlight.get(url);
+  if (running) return running as Promise<T>;
+
+  const started = (async () => {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = (await r.json()) as T;
+    responseCache.set(url, { at: Date.now(), data });
+    return data;
+  })();
+
+  inFlight.set(url, started);
+  // Снимаем ОБА исхода: одиночный `.catch` оставил бы необработанное отклонение у ветки
+  // очистки, а падение сети не должно всплывать в консоли отдельной ошибкой.
+  const forget = () => { if (inFlight.get(url) === started) inFlight.delete(url); };
+  started.then(forget, forget);
+
+  return started;
+}
+
+/** Общая загрузка JSON с кэшем, склейкой и отменой по смене входа. `null` в url — запрос не нужен. */
 function useJson<T>(url: string | null): Loaded<T> {
-  const [state, setState] = useState<Loaded<T>>({ data: null, loading: url != null, error: false });
+  const [state, setState] = useState<Loaded<T>>(() => {
+    const cached = url != null ? readCache<T>(url) : undefined;
+    return { data: cached ?? null, loading: url != null && cached === undefined, error: false };
+  });
 
   useEffect(() => {
     if (url == null) {
       setState({ data: null, loading: false, error: false });
       return;
     }
+
+    // Из кэша отдаём СИНХРОННО: иначе возврат на таб моргал бы «Loading…» на кадр.
+    const cached = readCache<T>(url);
+    if (cached !== undefined) {
+      setState({ data: cached, loading: false, error: false });
+      return;
+    }
+
     let alive = true;
     // Данные НЕ обнуляем: при смене сезона старая панель остаётся на экране и заменяется
     // на месте — иначе страница прыгала бы на каждый клик по карусели (урок клуба).
     setState((s) => ({ ...s, loading: true, error: false }));
-    (async () => {
-      try {
-        const r = await fetch(url);
-        if (!alive) return;
-        if (!r.ok) { setState({ data: null, loading: false, error: true }); return; }
-        const data: T = await r.json();
-        if (alive) setState({ data, loading: false, error: false });
-      } catch {
-        if (alive) setState({ data: null, loading: false, error: true });
-      }
-    })();
+    loadShared<T>(url).then(
+      (data) => { if (alive) setState({ data, loading: false, error: false }); },
+      () => { if (alive) setState({ data: null, loading: false, error: true }); },
+    );
     return () => { alive = false; };
   }, [url]);
 
@@ -179,6 +265,16 @@ export const useSwimmerBestTimes = (id: number | null, season: number | null, en
 export const useSwimmerPersonalBests = (id: number | null, poolType: string, enabled = true) =>
   useJson<SwimmerPersonalBest[]>(
     id != null && enabled ? `/api/swimmers/${id}/personal-bests?poolType=${poolType}` : null);
+
+/**
+ * Места среди сверстников за сезон. За карьеру (`season = null`) не запрашиваем: сравнение
+ * живёт внутри одного сезона, а выборка когорты недешёвая.
+ */
+export const useSwimmerSeasonRanks = (id: number | null, season: number | null, enabled = true) =>
+  useJson<SwimmerSeasonRanks>(
+    id != null && season != null && enabled
+      ? `/api/swimmers/${id}/season-ranks?season=${seasonParam(season)}`
+      : null);
 
 export const useSwimmerProgress = (id: number | null, disciplineKey: string | null) =>
   useJson<SwimmerProgress>(

@@ -41,6 +41,10 @@
   font-family: var(--deep-font-display);
   font-size: 31px; line-height: 1.1; color: var(--deep-text);
   overflow: hidden; text-overflow: ellipsis;
+  /* Физический left, а не `start`: у имени `dir="auto"`, и на иврите `start` означает
+     ПРАВЫЙ край — имя уезжало вправо от остальной шапки. Сам dir нужен, чтобы имя
+     отрисовалось справа налево; выравнивание блока к нему отношения не имеет. */
+  text-align: left;
 }
 .deep-hero__age {
   font-size: 12.5px; font-weight: 800; color: var(--deep-text-faint);
@@ -75,7 +79,6 @@
   font-size: 11px; font-weight: 800; color: var(--deep-text-mute);
   white-space: nowrap;
 }
-.deep-chip--gold { background: var(--deep-gold-chip); border-color: var(--deep-gold-border); color: var(--deep-gold); }
 .deep-chip--accent { background: var(--deep-accent-chip); border-color: var(--deep-accent-border); color: var(--deep-accent); }
 .deep-chip--ow { background: var(--deep-ow-chip); border-color: var(--deep-ow-border); color: var(--deep-ow); }
 .deep-club-chip {
@@ -101,6 +104,9 @@
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 12px 10px; border-radius: var(--deep-radius-tile);
   background: var(--deep-card-bg); border: 1px solid var(--deep-card-border);
+  /* Без min-width:0 колонка `1fr` не сжимается уже своего контента, и широкая плитка
+     достижений выталкивала соседнюю за экран (мобайл 375). */
+  min-width: 0;
 }
 .deep-kpi-value {
   font-family: var(--deep-font-display); font-size: 27px; line-height: 1;
@@ -110,6 +116,28 @@
   font-size: 9.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
   color: var(--deep-text-faint);
 }
+/* ── Плитка достижений (docs/swimmer-achievements-tile.md) ───────────────── */
+
+/* Подпись охвата НАД цифрами: без неё «SB 3» непонятно за какой период. */
+.deep-kpi-scope {
+  font-size: 9px; font-weight: 900; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--deep-text-ghost);
+}
+.deep-achv {
+  display: flex; align-items: baseline; justify-content: center;
+  gap: 14px; min-height: 34px; flex-wrap: wrap; min-width: 0;
+}
+.deep-achv__stat { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.deep-achv__num {
+  font-family: var(--deep-font-display); font-size: 22px; line-height: 1;
+  color: var(--deep-accent); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.deep-achv__num--gold { color: var(--deep-gold); }
+.deep-achv__cap {
+  font-size: 9px; font-weight: 800; letter-spacing: .04em;
+  color: var(--deep-text-faint); white-space: nowrap;
+}
+
 .deep-kpi-medals { display: flex; align-items: center; gap: 6px; min-height: 28px; }
 .deep-kpi-level { display: flex; align-items: center; justify-content: center; min-height: 32px; }
 /* Нулевой номинал приглушён, но не спрятан: пустая полка — тоже факт (§2) */
@@ -250,12 +278,122 @@
   margin-bottom: 6px;
 }
 
+/* ── Полоса фильтров таба Results ────────────────────────────────────────── */
+/* flex-wrap, а не скролл: на 375px чипы переносятся на вторую строку, и ни один
+   не оказывается за краем экрана. */
+
+.deep-filters { margin-bottom: 12px; }
+.deep-filter-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.deep-filter-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border-radius: var(--deep-radius-pill);
+  background: var(--deep-card-bg-raised); border: 1px solid var(--deep-card-border);
+  color: var(--deep-text-mute); cursor: pointer;
+  font-size: 12px; font-weight: 800;
+  /* Тап-таргет мобайла — как у плиток-табов (deep-theme.css) */
+  min-height: 36px;
+}
+.deep-filter-chip:hover { color: var(--deep-text); }
+.deep-filter-chip--active {
+  background: var(--deep-accent-chip); border-color: var(--deep-accent-border);
+  color: var(--deep-accent); box-shadow: var(--deep-accent-glow);
+}
+.deep-filter-chip__badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  /* Кольцо по currentColor, а не своя заливка: бейдж наследует цвет чипа и потому
+     читается в обеих темах и в обоих состояниях — правило парных токенов. */
+  border: 1px solid currentColor; color: inherit;
+  font-size: 10px; font-weight: 900; font-variant-numeric: tabular-nums;
+}
+.deep-filter-caption {
+  margin-top: 8px;
+  font-size: 11px; font-weight: 700; color: var(--deep-text-faint);
+}
+
+/* ── Season best: место среди сверстников ────────────────────────────────── */
+
+/* Заметка «карусель говорит одно, цифры про другое» — не украшение, а обязательная
+   оговорка: без неё адрес ?season=all и сезонные места молча противоречат друг другу. */
+.deep-scope-note {
+  margin-bottom: 10px; padding: 8px 12px;
+  border-radius: var(--deep-radius-row);
+  border: 1px dashed var(--deep-card-border);
+  background: var(--deep-card-bg-raised);
+  font-size: 11.5px; font-weight: 700; color: var(--deep-text-mute);
+}
+.deep-scope-note strong { color: var(--deep-accent); font-weight: 900; }
+
+/* Колонка Event — картиночная плита фиксированной ширины, поэтому колонка фиксирована,
+   а тянется столбец времени. */
+.deep-event-plate {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  width: 86px; flex: none;   /* в строке результата line1 — flex-контейнер, плита не жмётся */
+}
+.deep-event-plate__pool {
+  font-size: 10px; font-weight: 800; color: var(--deep-text-faint);
+  letter-spacing: -.03em; white-space: nowrap;
+}
+
+.deep-rank-row { grid-template-columns: 56px 90px minmax(0, 1fr) 62px 84px; }
+/* Строка-ссылка: тот же приём, что у списка стартов (deep-meet-row) — кликается вся
+   строка, а не мелкая стрелка справа. */
+.deep-rank-row--link { text-decoration: none; color: inherit; }
+.deep-rank-row--link:hover { background: var(--deep-card-bg); border-color: var(--deep-card-border); }
+.deep-rank-row--link:hover .deep-rank-row__go { opacity: 1; }
+.deep-rank-row__go {
+  margin-left: 6px; opacity: .35; color: var(--deep-accent);
+  font-weight: 900; transition: opacity .12s ease;
+}
+
+.deep-rank-place {
+  font-family: var(--deep-font-display); font-size: 15px;
+  color: var(--deep-text-mute); font-variant-numeric: tabular-nums;
+}
+/* Первое место в группе — золото, как медаль: это и есть носитель бейджа SB */
+.deep-rank-place--first { color: var(--deep-gold); }
+/* SB — заливное золото с тёмным текстом, как медальные кружки: тот же «физический
+   объект» в обеих темах. Обводка золотом по золотому фону (как у BEST по accent) давала
+   контраст 3.19 при 10px bold — ниже 4.5, замерено в браузере. */
+.deep-chip-sb {
+  margin-left: 6px;
+  padding: 1px 8px; border-radius: var(--deep-radius-pill);
+  background: var(--deep-gold-bar); color: #3b2600;
+  font-size: 10px; font-weight: 900;
+}
+
+/* ── Официальные рекорды: секция НАД таблицей личников ───────────────────── */
+/* Отделена рамкой и золотом: строка справочника федерации и «моё лучшее за карьеру» —
+   разные вещи, и путать их на одном экране нельзя. */
+
+.deep-records-block {
+  margin-bottom: 16px; padding-bottom: 14px;
+  border-bottom: 1px solid var(--deep-card-border-soft);
+}
+.deep-record-row {
+  display: grid; grid-template-columns: 26px 86px minmax(0, 1fr) auto;
+  align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: var(--deep-radius-row);
+  background: var(--deep-gold-soft); border: 1px solid var(--deep-gold-border);
+}
+.deep-record-row__crown { font-size: 16px; text-align: center; }
+.deep-record-row__scope { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.deep-record-row__region {
+  font-size: 12px; font-weight: 900; color: var(--deep-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.deep-record-row__date { font-size: 10.5px; font-weight: 700; color: var(--deep-text-faint); }
+.deep-record-row__time {
+  font-family: var(--deep-font-display); font-size: 17px; color: var(--deep-gold);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Records & PB (§7) ───────────────────────────────────────────────────── */
 
 .deep-pb-table { display: flex; flex-direction: column; gap: 4px; }
 .deep-pb-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) 110px minmax(0, 1.6fr) 56px 80px 90px;
+  grid-template-columns: 90px 110px minmax(0, 1.6fr) 56px 80px 90px;
   align-items: center; gap: 10px;
   padding: 9px 12px; border-radius: var(--deep-radius-row);
   background: var(--deep-card-bg-row); border: 1px solid var(--deep-card-border-soft);
@@ -315,13 +453,35 @@
 @media (max-width: 900px) {
   .deep-hero { grid-template-columns: auto minmax(0, 1fr); gap: 14px; padding: 14px; }
   .deep-kpi-row { grid-column: 1 / -1; }
+  /* Два счётчика рядом не влезают в треть 375px: ставим их столбиком — плитка растёт
+     вверх, а не выталкивает соседнюю за край экрана. */
+  .deep-achv { flex-direction: column; align-items: center; gap: 6px; }
+  .deep-achv__num { font-size: 18px; }
   .deep-hero__avatar { width: 76px; height: 76px; font-size: 27px; }
   .deep-hero__name { font-size: 21px; }
   /* Все действия ≥44px — правило хендоффа для тач-целей */
   .deep-hero-action { width: 44px; height: 44px; }
 
-  .deep-pb-row { grid-template-columns: minmax(0, 1fr) 92px 70px 80px; }
+  .deep-pb-row { grid-template-columns: 62px minmax(0, 1fr) 58px 62px; gap: 8px; }
   .deep-pb-where, .deep-pb-pts { display: none; }
+
+  /* Season best: «из скольких» — главный столбец панели, на мобайле уступает
+     последний («behind leader»), а не он. Иначе от таблицы остаётся одно место
+     без группы, ради которой она и заведена. */
+  .deep-rank-row { grid-template-columns: 30px 62px minmax(0, 1fr) 40px; gap: 8px; }
+  .deep-rank-row .deep-pb-pts { display: block; font-size: 10.5px; }
+  .deep-rank-row > :last-child { display: none; }
+  /* Плита ужимается: на 375 рядом с ней должны уместиться время и обе дельты, а время —
+     главное в таблице. При 86px на него оставалось 22px. */
+  .deep-event-plate { width: 62px; }
+  .deep-event-plate .deep-stroke-plate { width: 62px; height: 38px; }
+  .deep-event-plate .deep-stroke-plate img { max-height: 30px; max-width: 52px; }
+  .deep-event-plate .deep-stroke-plate__dist { font-size: 11px; top: 1px; right: 3px; }
+  .deep-event-plate__pool { font-size: 9px; }
+
+  /* Корона на 375 съедает колонку, а золотой фон строки и так говорит «рекорд» */
+  .deep-record-row { grid-template-columns: 62px minmax(0, 1fr) auto; gap: 8px; }
+  .deep-record-row__crown { display: none; }
   .deep-meet-row { grid-template-columns: 78px minmax(0, 1fr) auto; }
   .deep-meet-row__stats { display: none; }
   .deep-media-grid { grid-template-columns: repeat(3, 1fr); }

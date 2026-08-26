@@ -20,11 +20,27 @@ import type { NormativeLevelInfo } from '../../../utils/interfaces/normative-lev
  * «Sign in». Заглушек «войдите» внутри контентных блоков нет (§10 хендоффа).
  */
 
+/**
+ * Вход плитки достижений. Правила, что и когда показывать, — в
+ * `docs/swimmer-achievements-tile.md`; здесь только отрисовка.
+ */
+export interface HeroAchievements {
+  /** Подпись сверху: «All time» либо метка сезона («2025/26»). */
+  scopeLabel: string;
+  /** Официальные рекорды — ВСЕГДА за карьеру: у записи справочника нет сезона. */
+  records: number;
+  /** Первых мест среди сверстников в сезоне, за который посчитаны места. */
+  seasonBests: number;
+  /** За какой сезон посчитаны season bests — может отличаться от scopeLabel в режиме ∞. */
+  seasonBestsLabel: string;
+}
+
 interface Props {
   profile: SwimmerProfile;
   summary: SwimmerSummary | null;
   /** Лучший достигнутый уровень — считает страница из лучших времён (нормативы клиентские). */
   level: NormativeLevelInfo | null;
+  achievements: HeroAchievements;
 }
 
 /** ♡ избранное + ★ «это я». Гостю — полоса с приглашением войти (GuestFavoritesCta). */
@@ -72,13 +88,72 @@ function Actions({ swimmerId }: { swimmerId: number }) {
   );
 }
 
-function Kpi({ summary, level }: { summary: SwimmerSummary | null; level: NormativeLevelInfo | null }) {
+/** Одна цифра плитки достижений: значение сверху, подпись под ним. */
+function Stat({ value, caption, gold = false, title }: {
+  value: React.ReactNode; caption: string; gold?: boolean; title?: string;
+}) {
+  return (
+    <span className="deep-achv__stat" title={title}>
+      <span className={`deep-achv__num${gold ? ' deep-achv__num--gold' : ''}`}>{value}</span>
+      <span className="deep-achv__cap">{caption}</span>
+    </span>
+  );
+}
+
+/**
+ * Плитка достижений (правила — docs/swimmer-achievements-tile.md).
+ * Коротко: есть рекорды и/или season bests — показываем их; нет ни того ни другого —
+ * старты и очки, чтобы плитка не пустовала.
+ */
+function AchievementsTile({ a, summary }: { a: HeroAchievements; summary: SwimmerSummary | null }) {
+  const hasAny = a.records > 0 || a.seasonBests > 0;
+
+  return (
+    <div className="deep-kpi-tile">
+      <div className="deep-kpi-scope">{a.scopeLabel}</div>
+      <div className="deep-achv">
+        {hasAny ? (
+          <>
+            {a.records > 0 && (
+              <Stat
+                value={<>🏆 {a.records}</>}
+                caption={a.records === 1 ? 'record' : 'records'}
+                gold
+                title="Official records held — all time: the federation register has no season"
+              />
+            )}
+            {a.seasonBests > 0 && (
+              <Stat
+                value={<>SB {a.seasonBests}</>}
+                caption={a.seasonBests === 1 ? 'season best' : 'season bests'}
+                gold
+                title={`Fastest in the age group — season ${a.seasonBestsLabel}`}
+              />
+            )}
+          </>
+        ) : (
+          <>
+            <Stat value={summary ? summary.competitionCount : '—'} caption="meets" />
+            <Stat
+              value={summary ? summary.points.toLocaleString('en-US') : '—'}
+              caption="points"
+            />
+          </>
+        )}
+      </div>
+      <div className="deep-kpi-label">{hasAny ? 'Achievements' : 'Activity'}</div>
+    </div>
+  );
+}
+
+function Kpi({ summary, level, achievements }: {
+  summary: SwimmerSummary | null;
+  level: NormativeLevelInfo | null;
+  achievements: HeroAchievements;
+}) {
   return (
     <div className="deep-kpi-row">
-      <div className="deep-kpi-tile">
-        <div className="deep-kpi-value">{summary ? summary.points.toLocaleString('en-US') : '—'}</div>
-        <div className="deep-kpi-label">Points</div>
-      </div>
+      <AchievementsTile a={achievements} summary={summary} />
 
       <div className="deep-kpi-tile">
         {/* Нулевые номиналы приглушены, а не спрятаны: пустая полка это тоже факт (§2). */}
@@ -109,6 +184,9 @@ function Kpi({ summary, level }: { summary: SwimmerSummary | null; level: Normat
               levelName={level.currentLevel}
               styleType="gauge"
               styleSize="size-2"
+              // Полоса мастерса под дугой — тот же признак, что в строках результата.
+              isMasters={!!level.normativeAgeGroup}
+              normativeAgeGroup={level.normativeAgeGroup}
               progressPercent={level.progressToNextLevel}
               nextTime={level.nextTime}
               showProgress
@@ -124,9 +202,8 @@ function Kpi({ summary, level }: { summary: SwimmerSummary | null; level: Normat
   );
 }
 
-function SwimmerHero({ profile, summary, level }: Props) {
+function SwimmerHero({ profile, summary, level, achievements }: Props) {
   const initial = (profile.fullName.trim().charAt(0) || '?').toUpperCase();
-  const records = profile.recordsHeld ?? 0;
 
   return (
     <div className="deep-hero">
@@ -147,14 +224,10 @@ function SwimmerHero({ profile, summary, level }: Props) {
       </div>
 
       <div className="deep-hero__main">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 dir="auto" className="deep-hero__name">{profile.fullName}</h1>
-          {records > 0 && (
-            <span className="deep-chip deep-chip--gold" title="Official records held">
-              🏆 {records} {records === 1 ? 'record' : 'records'}
-            </span>
-          )}
-        </div>
+        {/* Чип «🏆 N records» у имени снят: счётчик рекордов живёт в плитке достижений
+            (docs/swimmer-achievements-tile.md), и одна и та же цифра в шапке дважды —
+            это не акцент, а шум. */}
+        <h1 dir="auto" className="deep-hero__name">{profile.fullName}</h1>
 
         <div className="deep-hero__age">
           {profile.ageInSeason != null
@@ -192,7 +265,7 @@ function SwimmerHero({ profile, summary, level }: Props) {
         </div>
       </div>
 
-      <Kpi summary={summary} level={level} />
+      <Kpi summary={summary} level={level} achievements={achievements} />
     </div>
   );
 }
