@@ -53,12 +53,19 @@ try {
   }
 
   if (styleType === 'icon-len') {
+    const len = String(styleLen ?? '');
+    // Дистанции бывают четырёх- и пятизначные: чемпионат на 3 км в бассейне, открытая
+    // вода (1600/5000/10000). При общем кегле такая подпись не влезала в узкую плитку,
+    // а стояла она ВЫШЕ своей коробки (`margin-top: -10px`) — и там, где у карточки
+    // `overflow: hidden`, её просто срезало. Теперь подпись прижата внутрь угла, а длинным
+    // числам уменьшается кегль.
+    const lenClass =
+      len.length >= 5 ? 'style-len--xl' : len.length >= 4 ? 'style-len--long' : '';
+
     return (
       <div className={`dv-swimm-icon relative flex flex-col items-center space-y-1 text-gray-800 ${className}`}>
         {img}
-        <div className="absolute right-0">
-          <div className="style-len text-red-700">{styleLen}</div>
-        </div>
+        <div className={`style-len text-red-700 ${lenClass}`}>{len}</div>
       </div>
     );
   }
