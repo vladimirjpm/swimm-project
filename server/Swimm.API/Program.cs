@@ -1,5 +1,7 @@
+using System.IO.Compression;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.RateLimiting;
@@ -21,6 +23,25 @@ var builder = WebApplication.CreateBuilder(args);
 // appsettings.Local.json — gitignored, для локального переключения на другую БД.
 // Перекрывает appsettings.json и appsettings.{Environment}.json.
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
+
+// Сжатие ответов. Замер 2026-08-25: справочники, которые тянет КАЖДАЯ страница
+// (records + normative-standards), весят 1.9 МБ несжатыми и 118 КБ в gzip — 94%.
+// ⚠ Только application/json, и это НЕ экономия ради экономии: HTML админки отдаётся с
+// antiforgery-токеном, а сжатый ответ с секретом плюс подконтрольный злоумышленнику ввод —
+// это BREACH. Публичный JSON секретов не несёт, поэтому его жмём и по HTTPS тоже.
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+    options.MimeTypes = new[] { "application/json" };
+});
+// Optimal, а не Fastest: у brotli Fastest — это quality 1, он на справочниках проигрывает
+// даже gzip. Замер на 971 КБ: Fastest 83 КБ / 3 мс, Optimal 60 КБ / 5 мс. Два миллисекунды
+// за четверть трафика — выгодный размен, тем более что справочники живут в кэше браузера
+// по 5 минут и жмутся редко.
+builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Optimal);
+builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Optimal);
 
 builder.Services.AddMemoryCache();
 builder.Services.AddApplication();
@@ -858,6 +879,9 @@ if (args.Contains("--backfill-discovery-orgcompid"))
 if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 
+// До статики и эндпоинтов: иначе middleware не увидит ответ, который надо сжать.
+app.UseResponseCompression();
+
 app.UseRouting();
 
 app.UseRateLimiter();
@@ -980,6 +1004,7 @@ app.Use(async (context, next) =>
                 "clubs" => "/results_main.html",     // /clubs без id — пусть падает штатно
                 "my-media" => "/media.html",
                 "about" => "/about.html",
+                "season-best" => "/season-best.html",   // весь фильтр в query
                 _ => null,
             },
             >= 2 => seg[0] switch
