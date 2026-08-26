@@ -190,6 +190,7 @@ public static string Label(string? waterKind, string? poolType);   // «Open wat
 | `RecordDiffService` | ⚠ Гейт `PoolTypes.IsValid` ставить здесь — один шов на все источники (правка критика; в плане был `RecordsImportController`) |
 | `DataChecks/InvariantDataChecks.cs` + `DependencyInjection.cs:104` | Две проверки из §4 |
 | `DashboardStatusService.cs:251-291` | Исключить `openwater` из «двух зачётов одной роли за сезон»: два морских старта (Эйлат + Кинерет) законны |
+| `SeasonBestRepository.cs` | **Уже сделано 2026-08-26 по временному маркеру** (`StandingKindOverride='openwater'`, константа `OpenWaterOverride`): море исключено из списка `/season-best`, из национального season best и из селектора дисциплины. Когда появится `WaterKind` — заменить условие на поле, комментарий у константы это оговаривает |
 
 ### Ф4. Данные и приёмка
 

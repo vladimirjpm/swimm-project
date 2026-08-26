@@ -9,6 +9,8 @@
   `member_swimmer_ids`, членство через `RelayMembers`, чек-лист отладки).
 - [`../docs/media-page.md`](../docs/media-page.md) — My media / медиа (`media.html`,
   Add link, `useUserMedia`/`useAllMyMedia`/`useCompetitionMedia`, публикации, footguns).
+- [`../docs/ui-components.md`](../docs/ui-components.md) — **реестр UI-компонентов**: что
+  уже есть, какие пропы, чего сознательно нет. Читай ПЕРЕД тем, как верстать новую ячейку.
 
 ## Стек
 
@@ -47,8 +49,8 @@ npm --prefix client run build      # prebuild авто-генерит club-icons
   `sportsmen-details`, …). Каждая фича = папка.
 - `projects/components/` — переиспользуемые блоки фич (filter-section, popup, data-source-ddl).
 - `projects/components/mix/` — **атомарные ячейки/иконки**. Конвенция: одна папка = один мелкий
-  компонент (`club-icon/`, `date-icon/`, `medal-icon/` …), экспортится как `UI_*`. Их ~25 и
-  они однотипны — не описывай каждую отдельно.
+  компонент (`club-icon/`, `date-icon/`, `medal-icon/` …), экспортится как `UI_*`. Их ~30, и
+  все перечислены в [`../docs/ui-components.md`](../docs/ui-components.md) — здесь не дублируем.
 - `store/store.ts` — **весь Redux в одном файле**: единый `rootSlice` + единственный reducer
   `updateState` (мердж `Partial<StateInterface>`). Новых slice нет — добавляй поле в
   `StateInterface` + `initialState`. Хуки: `useAppDispatch`, `useAppSelector`.
@@ -85,6 +87,23 @@ npm --prefix client run build      # prebuild авто-генерит club-icons
 `http://localhost:5078`, поэтому относительные `fetch('/api/...')` работают как same-origin
 (куки/antiforgery без CORS). Запусти API на :5078 (через Visual Studio или `dotnet run`) + `npm run dev`.
 Точечные API-вызовы уже есть (напр. избранное в [`hooks/useFavorites.ts`](src/hooks/useFavorites.ts)).
+
+## Правило: сначала ищи компонент, потом верстай
+
+**Перед тем как сверстать ячейку, строку, бейдж или плашку — проверь реестр
+[`../docs/ui-components.md`](../docs/ui-components.md).** Там перечислены все `UI_*` из
+`components/mix/`, крупные блоки (карусель сезонов, табы, карточка фильтра, полоса
+выбранных фильтров) и отдельным разделом — то, чего сознательно нет.
+
+Причина не в красоте: своя вёрстка молча теряет поведение, которое компонент уже несёт, —
+пометку «время под вопросом», фоллбек эмблемы клуба через манифест, единый формат даты,
+пояснение к раунду, направление RTL-строки. Расходится это не сразу, а через месяц на новом
+экране, и чинится потом в пяти местах.
+
+Порядок: нашёл компонент → бери его (почти у всех есть `className` / `*ClassName` для
+перекраски). Не нашёл → проверь §6 реестра, вдруг отсутствие уже обдумано. Написал своё →
+впиши строку в §6 с причиной. Завёл новый `UI_*` → впиши в §1–§4. **Обновление реестра —
+часть работы, а не необязательный довесок.**
 
 ## Правило: время заплыва — только через `UI_SwimTime`
 
