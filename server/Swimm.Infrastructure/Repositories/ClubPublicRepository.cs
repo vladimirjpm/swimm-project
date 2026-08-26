@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
@@ -245,6 +246,11 @@ public class ClubPublicRepository : IClubPublicRepository
     /// слоты, где первый — наш (решение Влада 2026-08-01). Исключение SuspectReason
     /// обязательно: помеченная ошибка протокола не должна делать клуб «первым в стране».
     /// Эстафеты исключены — слот про личное время.
+    ///
+    /// Открытая вода тоже исключена (решение Влада 2026-08-26): море — настоящий чемпионат
+    /// (поэтому в медалях и «Championships» оно осталось, Р21), но слот «первый в Израиле»
+    /// сравнивает ВРЕМЯ, а морское время несравнимо с бассейновым — течение, трасса, старт.
+    /// Признак площадки пока временный, см. <see cref="StandingKinds.OpenWater"/>.
     /// </summary>
     private async Task<(List<LeaderRow> Leaders, int Meets)> LeadersAsync(
         int resolvedClubId, string? poolType, DateTime start, DateTime endExclusive, int seasonYear)
@@ -254,6 +260,7 @@ public class ClubPublicRepository : IClubPublicRepository
                         && !r.TimeFail
                         && r.RelayId == null
                         && r.SuspectReason == null
+                        && r.Competition.StandingKindOverride != StandingKinds.OpenWater
                         && r.CompetitionDate >= start
                         && r.CompetitionDate < endExclusive);
 

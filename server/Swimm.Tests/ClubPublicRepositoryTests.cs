@@ -59,8 +59,15 @@ public class ClubPublicRepositoryTests
         InternationalPoints = 700
     };
 
-    private static Competition MakeCompetition(string poolType, string date = "15/02/2026") =>
-        new() { Name = "Meet", Date = date, PoolType = poolType };
+    private static Competition MakeCompetition(
+        string poolType, string date = "15/02/2026", string? standingKindOverride = null) =>
+        new()
+        {
+            Name = "Meet",
+            Date = date,
+            PoolType = poolType,
+            StandingKindOverride = standingKindOverride,
+        };
 
     /* ─────────────────────────── Ростер ─────────────────────────── */
 
@@ -241,6 +248,36 @@ public class ClubPublicRepositoryTests
         // У соперника тот же слот — лидерский, значит его карточка его покажет.
         var rivalCard = await Repo(db).GetSeasonBestAsync(rival.Id, poolType: null, season: 2025);
         Assert.Equal(55_000, Assert.Single(Assert.Single(rivalCard.Data).Items).TimeMs);
+    }
+
+    [Fact]
+    public async Task SeasonBest_OpenWaterSwimsDoNotMakeSlots()
+    {
+        // Море — настоящий чемпионат (медали и «Championships» за ним остаются), но слот
+        // «первый в Израиле» сравнивает ВРЕМЯ, а морское с бассейновым несравнимо: течение,
+        // трасса, старт. Решение Влада 2026-08-26, docs/data-integrity.md §9.
+        using var db = CreateDb(nameof(SeasonBest_OpenWaterSwimsDoNotMakeSlots));
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var swimmer = MakeSwimmer(club, "Ours", "One", 2016);
+        db.AddRange(club, swimmer);
+        var pool = MakeCompetition("25m");
+        var sea = MakeCompetition("25m", standingKindOverride: "openwater");
+        db.AddRange(pool, sea, FreestyleStyle());
+        await db.SaveChangesAsync();
+
+        db.AddRange(
+            Swim(pool, club, swimmer, new DateTime(2026, 2, 15), timeMs: 60_000),
+            Swim(sea, club, swimmer, new DateTime(2026, 2, 20), timeMs: 55_000, distance: "5000"));
+        await db.SaveChangesAsync();
+
+        var card = await Repo(db).GetSeasonBestAsync(club.Id, poolType: null, season: 2025);
+
+        // Остался ровно бассейновый слот; морская пятёрка своего слота не завела.
+        var group = Assert.Single(card.Data);
+        Assert.Equal("100", group.Distance);
+        Assert.Equal(1, card.Total);
+        // Стартов в расчёте тоже один: море не должно раздувать знаменатель «среди N стартов».
+        Assert.Equal(1, card.Meets);
     }
 
     [Fact]
