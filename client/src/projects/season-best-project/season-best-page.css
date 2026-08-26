@@ -1,16 +1,219 @@
-/* Страница /season-best — пока заготовка. Токены темы берём из deep-theme.css: экран
-   должен выглядеть частью того же продукта, что и страница спортсмена, откуда сюда ведут
-   ссылки. Своих цветов не заводим — только раскладка. */
+/* Страница /season-best. Токены — только из deep-theme.css: экран должен выглядеть частью
+   того же продукта, что и страница спортсмена, откуда сюда ведут ссылки. Своих цветов не
+   заводим, здесь только раскладка и размеры.
 
-.sb-head { margin-bottom: 16px; }
-.sb-head__title {
-  font-family: var(--deep-font-display); font-size: 24px; line-height: 1.15;
-  color: var(--deep-text);
+   Раскладка скопирована со страницы results (сайдбар фильтров + контент, на мобайле сайдбар
+   сворачивается), но покрашена в deep — см. комментарий в components/sb-filters.tsx. */
+
+.sb-page { max-width: 1180px; margin: 0 auto; padding: 18px 16px 48px; color: var(--deep-text); }
+
+.sb-topline { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.sb-head__title { font-family: var(--deep-font-display); font-size: 24px; line-height: 1.15; color: var(--deep-text); }
+.sb-head__sub { margin-top: 4px; font-size: 12px; font-weight: 700; color: var(--deep-text-faint); }
+
+/* ── Раскладка: сайдбар + контент ──────────────────────────────────────────── */
+
+.sb-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 16px; align-items: start; }
+.sb-side { display: block; }
+/* Кнопка раскрытия фильтров нужна только там, где сайдбара нет (мобайл). */
+.sb-filters-toggle { display: none; }
+.sb-content { min-width: 0; }
+
+/* ── Сайдбар фильтров ──────────────────────────────────────────────────────── */
+
+.sb-filters { display: flex; flex-direction: column; gap: 8px; }
+.sb-filters__head { display: flex; align-items: center; justify-content: space-between; padding: 0 2px 2px; }
+.sb-filters__title { font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--deep-text-ghost); }
+.sb-filters__reset { font-size: 11px; font-weight: 800; color: var(--deep-accent); background: none; border: none; cursor: pointer; padding: 2px 4px; }
+.sb-filters__reset:hover { text-decoration: underline; }
+
+/* Панель фильтров — ОБЩАЯ с results (Ф4). Своих карточек, сегментных кнопок и списка
+   клубов у страницы больше нет: `sb-filters.tsx` вместе с двойником `SbCard` снесён,
+   остались только токены — панель приезжает в deep-палитре, потому что переопределены
+   локальные переменные `--fc-*` и `--fseg-*`, а не потому что у неё своя вёрстка.
+
+   ⚠ Переопределяем на `.sb-filters`, а НЕ на корне страницы: класс `.fseg` живёт ещё и в
+   таблице результатов, и оверрайд на `:root` перекрасил бы заодно её. */
+.sb-filters {
+  --fc-bg: var(--deep-card-bg);
+  --fc-border: var(--deep-card-border);
+  --fc-title: var(--deep-text);
+  --fc-summary: var(--deep-text-faint);
+  --fc-summary-active: var(--deep-accent);
+  --fc-chevron: var(--deep-text-ghost);
+  --fc-radius: var(--deep-radius-tile);
+
+  --fseg-bg: var(--deep-card-bg-raised);
+  --fseg-border: var(--deep-card-border);
+  --fseg-text: var(--deep-text-mute);
+  --fseg-hover-border: var(--deep-accent-border);
+  --fseg-hover-text: var(--deep-text);
+  --fseg-active-bg: var(--deep-accent-chip);
+  --fseg-active-border: var(--deep-accent-border);
+  --fseg-active-text: var(--deep-accent);
 }
-.sb-head__sub {
-  margin-top: 4px;
-  font-size: 12px; font-weight: 700; color: var(--deep-text-faint);
+
+/* Список клубов в сайдбаре 300px: без предела высоты полсотни клубов уводят карточку
+   на два экрана. `filter-club-list` — зацепка, которую даёт общий компонент. */
+.sb-filters .filter-club-list { max-height: 260px; overflow-y: auto; }
+/* Ивритские названия клубов внутри LTR-строки: то же, что делает `dir="auto"`, но на
+   строке — иначе точки и сокращения («ב. ב.») уезжают не на ту сторону. */
+.sb-filters .filter-club-list > button { unicode-bidi: plaintext; text-align: left; }
+
+/* Иконка стиля в общей кнопке: у страницы своя, более крупная пропорция.
+   Бокс фиксирован по высоте НАМЕРЕННО — исходники разной ширины (breaststroke.png 877px
+   против 300px у остальных), при `height:auto` кнопки скачут по высоте. */
+.sb-filters .fseg img { max-width: 150px; height: 46px; object-fit: contain; }
+
+/* ── Шапка фильтров (полоса выбранного) ────────────────────────────────────── */
+
+.sb-bar { margin-bottom: 12px; }
+
+/* Полоса выбранного — ДВЕ строки на всех ширинах (решение Влада 2026-08-26; на results
+   двухстрочный вид только мобильный). Сверху мелко всё, что «All», снизу крупно и по
+   центру — выбранное. Пустая строка не рендерится вовсе, её рисует не CSS, а компонент. */
+.sb-bar__row { display: flex; flex-wrap: wrap; gap: 6px; }
+.sb-bar__row--idle { justify-content: center; }
+.sb-bar__row--active { margin-top: 6px; justify-content: center; }
+
+.sb-bar__chip { display: flex; flex-direction: column; align-items: center; gap: 2px; border-radius: 10px; }
+.sb-bar__label { font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--deep-text-ghost); }
+.sb-bar__value {
+  font-weight: 800; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center;
 }
+
+/* Неактивное: мельче, приглушено, ужимается — оно не должно спорить с выбранным. */
+.sb-bar__chip--idle {
+  padding: 4px 10px;
+  background: var(--deep-card-bg-row); border: 1px solid var(--deep-card-border-soft);
+}
+.sb-bar__chip--idle .sb-bar__label { font-size: 8px; }
+.sb-bar__chip--idle .sb-bar__value { font-size: 10.5px; font-weight: 700; color: var(--deep-text-faint); }
+
+/* Выбранное: крупнее и акцентом. */
+.sb-bar__chip--active {
+  padding: 6px 14px;
+  background: var(--deep-accent-chip); border: 1px solid var(--deep-accent-border);
+}
+.sb-bar__chip--active .sb-bar__value { font-size: 14px; color: var(--deep-accent); }
+
+/* Чип Event — одна картинка без подписи и БЕЗ слова «EVENT» над ней (решение Влада
+   2026-08-26): подпись только съедала место, которое нужно самой картинке. Поэтому чип
+   шире и выше остальных, а бокс картинки фиксирован — по той же причине, что и в
+   сайдбаре: исходники разной пропорции. */
+.sb-bar__chip--event { padding: 4px 16px; }
+.sb-chip__event { display: flex; align-items: center; justify-content: center; min-width: 0; }
+.sb-chip__event-icon { width: 118px; flex: none; }
+.sb-chip__event-icon img { display: block; width: 100%; height: 46px; object-fit: contain; }
+/* Число дистанции у `icon-len` печатается поверх картинки — на крупной иконке ему нужен
+   свой кегль, иначе оно остаётся мелким пятном в углу. */
+.sb-chip__event-icon .style-len { font-size: 17px; line-height: 17px; font-weight: 900; }
+
+/* ── Шапка списка ──────────────────────────────────────────────────────────── */
+
+.sb-listhead { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+.sb-listhead__meta { min-width: 0; }
+.sb-listhead__title { font-family: var(--deep-font-display); font-size: 15px; color: var(--deep-text); }
+.sb-listhead__hint { margin-top: 3px; font-size: 11.5px; font-weight: 700; color: var(--deep-text-faint); }
+
+/* ── Список ────────────────────────────────────────────────────────────────── */
+
+.sb-list { display: flex; flex-direction: column; gap: 4px; }
+.sb-row {
+  display: grid;
+  /* Набор колонок собирает компонент из включённых модулей и кладёт в --sb-cols; мобайл
+     переопределяет его ниже — inline-стиль так переопределить нельзя. */
+  grid-template-columns: var(--sb-cols);
+  align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: var(--deep-radius-row);
+  background: var(--deep-card-bg-row); border: 1px solid var(--deep-card-border-soft);
+  font-size: 12px; font-variant-numeric: tabular-nums;
+  color: inherit; text-decoration: none;
+}
+/* Мягкая заливка по полу — как в таблице результатов. Стоит ДО --me и :hover, чтобы
+   подсветка «это я» и наведение перекрывали пол, а не спорили с ним. */
+.sb-row--male { background: var(--deep-male-soft); border-color: var(--deep-male-border); }
+.sb-row--female { background: var(--deep-female-soft); border-color: var(--deep-female-border); }
+.sb-row:hover { background: var(--deep-card-bg); border-color: var(--deep-card-border); }
+/* Ховер перекрашивает фон, но метку строки-из-ссылки не трогает — иначе она пропадала под курсором. */
+.sb-row--linked:hover { border-color: var(--deep-accent-border); }
+.sb-row--head {
+  background: transparent; border-color: transparent;
+  font-size: 9.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--deep-text-ghost);
+}
+.sb-row--head:hover { background: transparent; border-color: transparent; }
+/* Строка пловца, с чьей страницы пришли (`?swimmer=`). Это НЕ «я»: адрес недоверенный,
+   ссылку мог переслать кто угодно, поэтому метка молчаливая — только подсветка, без бейджа.
+   ⚠ Фон не красим: строки уже покрашены по полу, и акцентная заливка поверх розовой давала
+   грязный оттенок, в котором подсвеченная строка читалась хуже соседей. Полоса нарисована
+   inset-тенью, а не border-left: настоящая рамка сдвинула бы сетку. */
+.sb-row--linked {
+  box-shadow: inset 4px 0 0 var(--deep-accent), var(--deep-accent-glow);
+  border-color: var(--deep-accent-border);
+}
+.sb-row--linked .sb-swimmer__name { color: var(--deep-text); }
+/* Повторный заплыв того же человека приглушён, но НЕ спрятан: он законно занимает место. */
+.sb-row--repeat .sb-swimmer__name { color: var(--deep-text-mute); }
+
+.sb-place { font-family: var(--deep-font-display); font-size: 15px; color: var(--deep-text-mute); }
+.sb-place--first { color: var(--deep-gold); }
+
+/* Ячейка пловца: первая строка — блок `UI_SwimmerNameCell` (эмблема + имя + клуб) и, если
+   это повторный заплыв, чип попытки; вторая (только мобайл) — соревнование и дата.
+
+   ⚠ Ячейка принудительно LTR и по левому краю: имена и клубы приходят на иврите, и без
+   этого весь блок разворачивался вправо — эмблема уезжала к правому краю колонки, а
+   столбец переставал читаться сверху вниз. Само направление ТЕКСТА при этом сохраняется
+   через `unicode-bidi: plaintext` ниже: он делает то же, что `dir="auto"`, но на строке, а
+   не на контейнере (пунктуация и обрезка многоточием остаются на правильной стороне). */
+.sb-swimmer {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0;
+  direction: ltr; text-align: left;
+}
+.sb-swimmer__name, .sb-swimmer__club, .sb-swimmer__meet, .sb-meet {
+  unicode-bidi: plaintext; text-align: left;
+}
+.sb-swimmer > :first-child { flex: 1 1 auto; min-width: 0; }
+/* Имя — главное в строке после времени, поэтому кегль близкий к нему (15px против 12.5px
+   у остальных ячеек): на 12.5px оно терялось между эмблемой и временем. */
+.sb-swimmer__name {
+  font-size: 15px; font-weight: 900; line-height: 1.2; color: var(--deep-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sb-swimmer__attempt {
+  flex: none; padding: 1px 7px; border-radius: var(--deep-radius-pill);
+  background: var(--deep-card-bg-raised); border: 1px solid var(--deep-card-border);
+  font-size: 9.5px; font-weight: 800; color: var(--deep-text-faint);
+}
+.sb-swimmer__club {
+  font-size: 11.5px; color: var(--deep-text-faint);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Соревнование + дата второй строкой — только на мобайле, где отдельных колонок нет. */
+.sb-swimmer__meet { display: none; flex-basis: 100%; font-size: 10.5px; color: var(--deep-text-ghost); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sb-time { display: flex; align-items: center; gap: 6px; font-family: var(--deep-font-display); font-size: 15px; color: var(--deep-text); }
+.sb-gap { font-weight: 800; color: var(--deep-text-ghost); }
+.sb-points { font-weight: 800; color: var(--deep-text-mute); }
+.sb-meet { color: var(--deep-text-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Дату рисует UI_DateIcon (row-style-1) — красим её текст токеном темы. */
+.sb-date { color: var(--deep-text-ghost); font-size: 11px; font-weight: 700; }
+.sb-chip__pool-label { font-size: 12px; font-weight: 800; color: var(--deep-accent); }
+
+.sb-more {
+  width: 100%; margin-top: 10px; padding: 11px;
+  border-radius: var(--deep-radius-row); border: 1px solid var(--deep-card-border);
+  background: var(--deep-card-bg); color: var(--deep-accent);
+  font-size: 12px; font-weight: 800; cursor: pointer;
+}
+.sb-more:hover:not(:disabled) { background: var(--deep-accent-soft); border-color: var(--deep-accent-border); }
+.sb-more:disabled { color: var(--deep-text-ghost); cursor: default; }
+
+.sb-note { margin-top: 12px; font-size: 10.5px; font-weight: 700; line-height: 1.6; color: var(--deep-text-ghost); }
+
+/* ── Пустые состояния ──────────────────────────────────────────────────────── */
 
 .sb-empty {
   padding: 40px 20px; text-align: center;
@@ -18,15 +221,38 @@
   border: 1px dashed var(--deep-card-border);
   background: var(--deep-card-bg);
 }
-.sb-empty__title {
-  font-family: var(--deep-font-display); font-size: 16px; color: var(--deep-text-mute);
+.sb-empty__title { font-family: var(--deep-font-display); font-size: 16px; color: var(--deep-text-mute); }
+.sb-empty__text { margin: 8px auto 0; max-width: 46ch; font-size: 13px; line-height: 1.6; color: var(--deep-text-faint); }
+
+/* ── Мобайл ────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 1023px) {
+  .sb-layout { grid-template-columns: minmax(0, 1fr); }
+  /* Сайдбара нет — фильтры прячутся за кнопку, как шторка на странице results. */
+  .sb-filters-toggle {
+    display: block; width: 100%; padding: 11px;
+    border-radius: var(--deep-radius-row); border: 1px solid var(--deep-card-border);
+    background: var(--deep-card-bg); color: var(--deep-text);
+    font-size: 12.5px; font-weight: 800; cursor: pointer;
+  }
+  .sb-side { display: none; }
+  .sb-side--open { display: block; }
 }
-.sb-empty__text {
-  margin: 8px auto 0; max-width: 46ch;
-  font-size: 13px; line-height: 1.6; color: var(--deep-text-faint);
+
+@media (max-width: 767px) {
+  /* Meet и Date отдельными колонками не помещаются — уходят второй строкой под имя.
+     Прятать их нельзя: это ответ на вопрос «где и когда». */
+  .sb-row { grid-template-columns: 34px minmax(0, 1fr) 92px !important; gap: 8px; }
+  .sb-gap, .sb-points, .sb-meet, .sb-date { display: none; }
+  .sb-swimmer__meet { display: block; }
+  .sb-row--head { font-size: 9px; }
+  .sb-row--head > :nth-child(n + 4) { display: none; }
+
+  .sb-place { font-size: 13px; }
+  .sb-time { font-size: 13px; }
+  /* На 375px колонка имени ~175px — кегль чуть меньше десктопного, но не 12.5px. */
+  .sb-swimmer__name { font-size: 13.5px; }
+  .sb-swimmer__club { font-size: 10.5px; }
+  .sb-topline { flex-direction: column; gap: 8px; }
+  .sb-head__title { font-size: 20px; }
 }
-.sb-empty__back {
-  display: inline-block; margin-top: 16px;
-  font-size: 12px; font-weight: 800; color: var(--deep-accent); text-decoration: none;
-}
-.sb-empty__back:hover { text-decoration: underline; }
