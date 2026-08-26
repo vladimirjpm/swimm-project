@@ -70,7 +70,7 @@ public class LogligLinkService(
         var candidates = new List<LogligCandidateInfo>();
         foreach (var logligId in candidateIds)
         {
-            var card = await logligClient.GetPlayerCardAsync(logligId, ct);
+            var card = await logligClient.GetPlayerCardAsync(logligId, ct: ct);
             if (card is null) continue;
 
             var report = matchService.Match(card, swimmer.BirthYear, clubName, localResults);
@@ -96,7 +96,7 @@ public class LogligLinkService(
         if (swimmer.LogligIdStatus == "Verified")
             return new LogligLinkResult(false, "Пловец уже привязан — сначала отвяжите", searchProvider.IsConfigured, []);
 
-        var card = await logligClient.GetPlayerCardAsync(logligId, ct);
+        var card = await logligClient.GetPlayerCardAsync(logligId, ct: ct);
         if (card is null)
             return new LogligLinkResult(false, $"Карточка loglig #{logligId} недоступна", searchProvider.IsConfigured, []);
 

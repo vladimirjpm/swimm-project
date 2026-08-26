@@ -20,7 +20,7 @@ namespace Swimm.API.Controllers;
 public class DiscoveryAdminController : ControllerBase
 {
     private readonly ICompetitionDiscoveryService _discovery;
-    private readonly ICompetitionDiscoveryProvider _provider;
+    private readonly IDiscoveryPreviewService _previews;
     private readonly IResultSourceProvider _sourceProvider;
     private readonly ISwimmerNameSyncService _nameSync;
     private readonly IImportJobQueue _jobs;
@@ -29,12 +29,16 @@ public class DiscoveryAdminController : ControllerBase
     private readonly IImportRecordPreviewService _recordPreview;
     private readonly IOfficialClubStandingService _clubStandings;
     private readonly IPointRulesAdminRepository _rules;
+    private readonly IRegulationFetchService _regulationFetch;
+    private readonly IBulkPullService _bulkPull;
+    private readonly IPreviewRecordCheckService _recordCheck;
+    private readonly ILogligStampService _logligStamp;
     private readonly IAdminAuditService _audit;
     private readonly ILogger<DiscoveryAdminController> _logger;
 
     public DiscoveryAdminController(
         ICompetitionDiscoveryService discovery,
-        ICompetitionDiscoveryProvider provider,
+        IDiscoveryPreviewService previews,
         IResultSourceProvider sourceProvider,
         ISwimmerNameSyncService nameSync,
         IImportJobQueue jobs,
@@ -43,11 +47,15 @@ public class DiscoveryAdminController : ControllerBase
         IImportRecordPreviewService recordPreview,
         IOfficialClubStandingService clubStandings,
         IPointRulesAdminRepository rules,
+        IRegulationFetchService regulationFetch,
+        IBulkPullService bulkPull,
+        IPreviewRecordCheckService recordCheck,
+        ILogligStampService logligStamp,
         IAdminAuditService audit,
         ILogger<DiscoveryAdminController> logger)
     {
         _discovery = discovery;
-        _provider = provider;
+        _previews = previews;
         _sourceProvider = sourceProvider;
         _nameSync = nameSync;
         _jobs = jobs;
@@ -56,6 +64,10 @@ public class DiscoveryAdminController : ControllerBase
         _recordPreview = recordPreview;
         _clubStandings = clubStandings;
         _rules = rules;
+        _regulationFetch = regulationFetch;
+        _bulkPull = bulkPull;
+        _recordCheck = recordCheck;
+        _logligStamp = logligStamp;
         _audit = audit;
         _logger = logger;
     }
@@ -108,111 +120,34 @@ public class DiscoveryAdminController : ControllerBase
     [IgnoreAntiforgeryToken] // GET-скачивание файла; мутаций нет
     public async Task<IActionResult> DownloadPdf(int id, [FromQuery] string language = "he", CancellationToken ct = default)
     {
-        var (pdf, fileName, error) = await FetchPdfAsync(id, language, refreshIfMissing: false, ct);
-        if (pdf is null) return BadRequest(new { error });
-        return File(pdf, "application/pdf", fileName);
+        var p = await _previews.FetchProtocolAsync(id, language, refreshIfMissing: false, ct);
+        if (p.Pdf is null) return BadRequest(new { error = p.Error });
+        return File(p.Pdf, "application/pdf", p.FileName);
     }
 
     /// <summary>«Затянуть»: скачать оба PDF из loglig (HE + EN) и прогнать через парсер → превью.
-    /// EN-экспорт может отсутствовать — тогда молча парсим только HE (языки видны в бэйджах).</summary>
+    /// Вся работа — в <see cref="IDiscoveryPreviewService"/>: её же зовёт пакетный забор.</summary>
     [HttpPost("{id:int}/preview")]
     public async Task<IActionResult> Preview(int id, CancellationToken ct = default)
     {
-        var (pdfHe, fileNameHe, errorHe) = await FetchPdfAsync(id, "he", refreshIfMissing: true, ct);
-        var (pdfEn, fileNameEn, _) = await FetchPdfAsync(id, "en", refreshIfMissing: false, ct);
-        if (pdfHe is null && pdfEn is null) return BadRequest(new { error = errorHe });
-
-        // Основной файл — HE (канонические имена); EN вторым даёт LastNameEn/FirstNameEn.
-        // Если HE недоступен (маловероятно) — парсим EN-only.
-        var language = pdfHe != null ? "he" : "en";
-        var primary = pdfHe ?? pdfEn!;
-        var primaryName = pdfHe != null ? fileNameHe : fileNameEn;
-        var languages = new List<string>();
-        if (pdfHe != null) languages.Add("he");
-        if (pdfEn != null) languages.Add("en");
-
-        ParsedCompetition parsed;
-        try
-        {
-            using var ms = new MemoryStream(primary);
-            using var msEn = pdfHe != null && pdfEn != null ? new MemoryStream(pdfEn) : null;
-            parsed = await _sourceProvider.ParseAsync(new ResultSourceRequest(
-                ms, primaryName, "IsrOrg",
-                IsAward: false, PoolType: null,
-                SecondaryStream: msEn, SecondaryFileName: msEn != null ? fileNameEn : null,
-                ExtraFiles: null,
-                Country: null, Language: language));
-        }
-        catch (InvalidOperationException ex) when (pdfHe != null && pdfEn != null)
-        {
-            // Пара не склеилась (разный порядок записей и т.п.) — деградируем до HE-only,
-            // EN-имена добираются потом кнопкой «Синхр. языки» после починки.
-            _logger.LogWarning(ex, "Discovery: двуязычная пара не склеилась (id={Id}), парсим HE-only", id);
-            languages.Remove("en");
-            using var ms = new MemoryStream(pdfHe);
-            try
-            {
-                parsed = await _sourceProvider.ParseAsync(new ResultSourceRequest(
-                    ms, fileNameHe, "IsrOrg",
-                    IsAward: false, PoolType: null,
-                    SecondaryStream: null, SecondaryFileName: null, ExtraFiles: null,
-                    Country: null, Language: "he"));
-            }
-            catch (InvalidOperationException ex2)
-            {
-                return BadRequest(new { error = ex2.Message });
-            }
-        }
-        catch (InvalidOperationException ex)
-        {
-            // «No competitions found in PDF» = у соревнования нет протокола (страница пустая).
-            // Это не сбой, который стоит повторить, а факт «тянуть нечего» — помечаем строку,
-            // чтобы её не пробовали затянуть снова и снова.
-            if (LooksLikeEmptySource(ex.Message))
-                await _discovery.SetEmptySourceAsync(id, true, "auto", ct);
-            return BadRequest(new { error = ex.Message });
-        }
-
-        if (parsed.ResultCount == 0)
-        {
-            await _discovery.SetEmptySourceAsync(id, true, "auto", ct);
-            return BadRequest(new { error = "Парсер не распознал ни одного результата — формат протокола изменился? (B4)" });
-        }
-
-        // Разобралось — значит протокол всё-таки есть: снимаем прежнюю пометку «пусто»
-        // (файл могли выложить позже, и строка не должна оставаться зачёркнутой навсегда).
-        await _discovery.SetEmptySourceAsync(id, false, "auto", ct);
-
-        await _discovery.AddLanguagesAsync(id, languages, ct);
-
-        // Официальный клубный зачёт: есть ли он и по какой шкале. Кладём В КЭШ вместе с превью —
-        // из него потом заводится правило кнопкой, и второй поход в loglig (десяток запросов
-        // ради той же шкалы) был бы лишним.
-        var standingProbe = await ProbeClubStandingAsync(id, ct);
-
-        var previewId = Guid.NewGuid();
-        _cache.Set(PreviewCacheKey(previewId),
-            new DiscoveryPreviewEntry(parsed, primaryName, id, standingProbe), TimeSpan.FromMinutes(15));
-
-        var existingMatches = await _import.FindExistingCompetitionsAsync(parsed.Competitions);
-        var existingCompetitionId = existingMatches.FirstOrDefault(m => m.ExistingCompetitionId != null)?.ExistingCompetitionId;
-
-        // Сколько рекордов побьёт файл (Б2). Считается ДО «Применить»: настоящий рекорд —
-        // событие редкое, а десяток разом почти всегда значит, что протокол разобрался неверно.
-        var recordPreview = await _recordPreview.AnalyzeAsync(parsed.ResultsJson, ct);
+        var p = await _previews.PreviewAsync(id, ct);
+        if (p.Error != null) return BadRequest(new { error = p.Error });
 
         return Ok(new
         {
-            previewId,
-            format = parsed.Format,
-            resultCount = parsed.ResultCount,
-            competitions = parsed.Competitions,
-            warnings = parsed.Warnings,
-            languages,
-            existingCompetitionId,
-            existingCompetitions = existingMatches,
-            recordPreview,
-            officialClubStanding = StandingResponse(standingProbe, parsed)
+            previewId = p.PreviewId,
+            format = p.Parsed!.Format,
+            resultCount = p.Parsed.ResultCount,
+            competitions = p.Parsed.Competitions,
+            warnings = p.Parsed.Warnings,
+            languages = p.Languages,
+            existingCompetitionId = p.ExistingCompetitionId,
+            existingCompetitions = p.ExistingCompetitions,
+            recordPreview = p.RecordPreview,
+            officialClubStanding = StandingResponse(p.ClubStanding, p.Parsed),
+            // Флаги соревнования (медали, чемпионат, мастерс, «зачёт не ведётся», бассейн)
+            // с обоснованиями. Предложение — галочки в превью изменяемы.
+            flags = p.Flags
         });
     }
 
@@ -233,12 +168,139 @@ public class DiscoveryAdminController : ControllerBase
     }
 
     /// <summary>
-    /// Сообщения парсера, означающие «в файле ничего нет». Держим списком, а не подстрокой
-    /// «not found»: иначе под пометку попали бы сетевые и форматные сбои, которые надо повторять.
+    /// Ленивая проверка подозрительных заплывов превью по карточкам loglig: то ли это время,
+    /// что напечатано в протоколе. Отдельным запросом, а не внутри превью — карточки тянутся
+    /// по одной на пловца, и разбор из-за них ждать не должен.
     /// </summary>
-    private static bool LooksLikeEmptySource(string message) =>
-        message.Contains("No competitions found", StringComparison.OrdinalIgnoreCase)
-        || message.Contains("0 lines extracted", StringComparison.OrdinalIgnoreCase);
+    [HttpPost("preview/{previewId:guid}/record-check")]
+    public async Task<IActionResult> RecordCheck(Guid previewId, CancellationToken ct = default)
+        => Ok(await _recordCheck.CheckAsync(previewId, ct));
+
+    public sealed record StampLogligRequest(int OrgCompId);
+
+    /// <summary>
+    /// Проставить пловцам соревнования loglig-id из его же протокола. На импорте это делается
+    /// само (настройка `LogligStampOnImport`); кнопка нужна для уже импортированных стартов —
+    /// их сотня, а привязок в базе меньше сотни на 5.5 тысяч пловцов.
+    /// </summary>
+    [HttpPost("stamp-loglig")]
+    public async Task<IActionResult> StampLoglig([FromBody] StampLogligRequest request, CancellationToken ct)
+    {
+        var report = await _logligStamp.StampFromProtocolAsync(request.OrgCompId, ct);
+
+        if (report.Stamped > 0)
+            await _audit.LogAsync("swimmer.stamp-loglig", "Competition", request.OrgCompId.ToString(),
+                $"compID {request.OrgCompId}: {report.Message}",
+                new { request.OrgCompId, report.Stamped, report.AlreadyLinked, report.NotFound, report.Skipped }, ct);
+
+        return Ok(report);
+    }
+
+    // ── Пакетное затягивание (docs/plans/bulk-pull-plan.md) ───────────────────
+
+    public sealed record BulkPullStartRequest(int[] Ids, bool IncludeChampionships = false);
+
+    /// <summary>
+    /// Затянуть пачкой всё, что видно в текущей выборке фильтров. Работа фоновая: ответ
+    /// отдаёт batchId, дальше панель поллит состояние.
+    /// </summary>
+    [HttpPost("bulk-pull")]
+    public async Task<IActionResult> BulkPull([FromBody] BulkPullStartRequest request, CancellationToken ct)
+    {
+        if (request.Ids is null || request.Ids.Length == 0)
+            return BadRequest(new { error = "Список пуст — нечего затягивать." });
+
+        var batch = await _bulkPull.StartAsync(request.Ids, request.IncludeChampionships, ct);
+
+        await _audit.LogAsync("competition.bulk-pull", "DiscoveredCompetition", null,
+            $"Пакетное затягивание: {batch.Total} строк"
+            + (request.IncludeChampionships ? " (включая чемпионаты)" : "")
+            + (batch.SkippedChampionships.Count > 0 ? $", исключено чемпионатов: {batch.SkippedChampionships.Count}" : ""),
+            new { batch.BatchId, batch.Total, request.IncludeChampionships, batch.SkippedChampionships }, ct);
+
+        return Accepted(batch);
+    }
+
+    /// <summary>Состояние пачки — поллинг панели.</summary>
+    [HttpGet("bulk-pull/{batchId:guid}")]
+    [IgnoreAntiforgeryToken] // GET-чтение статуса, мутаций нет
+    public IActionResult BulkPullStatus(Guid batchId)
+    {
+        var batch = _bulkPull.GetStatus(batchId);
+        return batch is null
+            ? NotFound(new { error = "Пачка не найдена — возможно, приложение перезапускалось. Затяните заново." })
+            : Ok(batch);
+    }
+
+    public sealed record BulkImportRequest(Guid BatchId, int[] Ids);
+
+    /// <summary>
+    /// Импортировать отмеченные строки пачки. Категория всем одна (results-8-99),
+    /// перезапись и удаление лишнего не применяются никогда.
+    /// </summary>
+    [HttpPost("bulk-import")]
+    public async Task<IActionResult> BulkImport([FromBody] BulkImportRequest request, CancellationToken ct)
+    {
+        if (request.Ids is null || request.Ids.Length == 0)
+            return BadRequest(new { error = "Не отмечено ни одной строки." });
+
+        var result = await _bulkPull.ImportAsync(request.BatchId, request.Ids, ct);
+
+        // Основания решений (цитаты регламента) уезжают в аудит: в пачке галочки ставятся
+        // автоматически, и проверить «почему» должно быть можно постфактум.
+        var batch = _bulkPull.GetStatus(request.BatchId);
+        var imported = batch?.Rows.Where(r => request.Ids.Contains(r.DiscoveredId)).Select(r => new
+        {
+            r.DiscoveredId, r.OrgCompId, r.Name, verdict = r.Verdict.ToString(),
+            r.HasMedals, r.RegulationUrl, r.PointRuleClubsId, r.RegulationFindings
+        }).ToList();
+
+        await _audit.LogAsync("competition.bulk-import", "DiscoveredCompetition", null,
+            $"Пакетный импорт: в очередь {result.Queued}"
+            + (result.Skipped.Count > 0 ? $", пропущено {result.Skipped.Count}" : ""),
+            new { request.BatchId, result.Queued, result.Skipped, rows = imported }, ct);
+
+        return Ok(result);
+    }
+
+    public sealed record RegulationRequest(int? DiscoveredId, int? OrgCompId);
+
+    /// <summary>
+    /// Забрать регламент (תקנון) САМИ и разобрать — без файла от админа.
+    ///
+    /// Регламент лежит не на isr.org.il, а на loglig: на странице соревнования стоит ссылка
+    /// «תקנון» → <c>ShowLeagueDoc/{docId}</c> (PDF). Поэтому вход — loglig-id из «входящих»;
+    /// у соревнования, которого нет во «входящих» (PDF-импорт), взять его неоткуда — там
+    /// остаётся загрузка файла руками.
+    /// </summary>
+    [HttpPost("regulation")]
+    public async Task<IActionResult> Regulation([FromBody] RegulationRequest request, CancellationToken ct = default)
+    {
+        var rows = await _discovery.GetAllAsync(ct);
+        var row = request.DiscoveredId is int did
+            ? rows.FirstOrDefault(d => d.Id == did)
+            : rows.FirstOrDefault(d => d.OrgCompId == request.OrgCompId);
+
+        if (row is null)
+            return NotFound(new { error = "Соревнования нет во «входящих» — регламент можно только приложить файлом." });
+
+        if (row.LogligId is not int logligId)
+            return BadRequest(new { error = "У строки ещё не загружены детали (нет loglig-id) — нажмите «Затянуть» или «Обновить»." });
+
+        var fetched = await _regulationFetch.FetchAsync(logligId, ct);
+        if (!fetched.Found)
+            return BadRequest(new { error = fetched.Error, url = fetched.Url });
+
+        var a = fetched.Analysis!;
+        return Ok(new
+        {
+            url = fetched.Url,
+            hasMedals = a.HasMedals,
+            hasClubStanding = a.HasClubStanding,
+            isChampionship = a.IsChampionship,
+            findings = a.Findings
+        });
+    }
 
     /// <summary>«Синхронизировать языки»: скачать оба PDF, склеить пару и дозаполнить
     /// EN/HE-имена пловцов в БД по уже импортированным результатам (без переимпорта).</summary>
@@ -248,10 +310,12 @@ public class DiscoveryAdminController : ControllerBase
         // Ошибки пишем в LastError записи — тост в админке живёт секунды, строка таблицы — нет.
         _logger.LogInformation("Discovery sync-languages: старт (id={Id})", id);
 
-        var (pdfHe, fileNameHe, errorHe) = await FetchPdfAsync(id, "he", refreshIfMissing: true, ct);
-        if (pdfHe is null) return await SyncFailedAsync(id, $"HE-протокол недоступен: {errorHe}", ct);
-        var (pdfEn, fileNameEn, errorEn) = await FetchPdfAsync(id, "en", refreshIfMissing: false, ct);
-        if (pdfEn is null) return await SyncFailedAsync(id, $"EN-экспорт недоступен: {errorEn}", ct);
+        var he = await _previews.FetchProtocolAsync(id, "he", refreshIfMissing: true, ct);
+        if (he.Pdf is null) return await SyncFailedAsync(id, $"HE-протокол недоступен: {he.Error}", ct);
+        var en = await _previews.FetchProtocolAsync(id, "en", refreshIfMissing: false, ct);
+        if (en.Pdf is null) return await SyncFailedAsync(id, $"EN-экспорт недоступен: {en.Error}", ct);
+        var (pdfHe, fileNameHe) = (he.Pdf, he.FileName);
+        var (pdfEn, fileNameEn) = (en.Pdf, en.FileName);
 
         ParsedCompetition parsed;
         try
@@ -319,23 +383,27 @@ public class DiscoveryAdminController : ControllerBase
     [HttpPost("import")]
     public async Task<IActionResult> Import([FromBody] DiscoveryImportRequest request, CancellationToken ct)
     {
-        var key = PreviewCacheKey(request.PreviewId);
-        if (!_cache.TryGetValue(key, out DiscoveryPreviewEntry? entry) || entry == null)
-            return NotFound(new { error = "Превью не найдено или истекло (15 мин)" });
+        var entry = _previews.GetEntry(request.PreviewId);
+        if (entry == null)
+            return NotFound(new { error = $"Превью не найдено или истекло ({_previews.EntryLifetime.TotalMinutes:0} мин)" });
 
-        _cache.Remove(key);
+        _previews.RemoveEntry(request.PreviewId);
 
-        ImportEventOptions? eventOptions = null;
-        if (request.EventId.HasValue || !string.IsNullOrWhiteSpace(request.NewEventName)
-            || request.OverwriteExisting || request.PointRuleClubsId.HasValue)
-        {
-            // Правило клубных очков приезжает из превью: там оно подставлено по шкале
-            // официального зачёта. Без него соревнование ушло бы на автоподбор по дате —
-            // ровно так зимний чемпионат 2025 получил чужую шкалу (§10.3 плана).
-            eventOptions = new ImportEventOptions(
-                request.EventId, request.NewEventName, request.OverwriteExisting, request.DeleteMissing,
-                request.PointRuleClubsId);
-        }
+        // Правило клубных очков приезжает из превью: там оно подставлено по шкале
+        // официального зачёта. Без него соревнование ушло бы на автоподбор по дате —
+        // ровно так зимний чемпионат 2025 получил чужую шкалу (§10.3 плана).
+        //
+        // Опции собираем ВСЕГДА: кроме события и перезаписи в них теперь едут флаги
+        // соревнования (медали, чемпионат, мастерс, «зачёт не ведётся», бассейн), а они
+        // бывают заданы и без всего остального.
+        var eventOptions = new ImportEventOptions(
+            request.EventId, request.NewEventName, request.OverwriteExisting, request.DeleteMissing,
+            request.PointRuleClubsId,
+            IsAward: request.IsAward,
+            IsChampionship: request.IsChampionship,
+            IsMasters: request.IsMasters,
+            ClubPointsDisabled: request.ClubPointsDisabled,
+            PoolType: request.PoolType);
 
         // compID сайта — штампуется в Competition.OrgCompId для связи Discovery ↔ Competitions.
         var discoveredOrgCompId = (await _discovery.GetAllAsync(ct))
@@ -356,26 +424,6 @@ public class DiscoveryAdminController : ControllerBase
 
         // Статус imported проставляет фоновый обработчик после успешного завершения job (A1).
         return Accepted(new { jobId });
-    }
-
-    /// <summary>
-    /// Официальный клубный зачёт соревнования. Сбой проверки превью не роняет: затянуть
-    /// протокол важнее, чем узнать про зачёт — вернём «не проверено».
-    /// </summary>
-    private async Task<OfficialClubStandingProbe?> ProbeClubStandingAsync(int discoveredId, CancellationToken ct)
-    {
-        var row = (await _discovery.GetAllAsync(ct)).FirstOrDefault(d => d.Id == discoveredId);
-        if (row?.LogligId is not int logligId) return null;
-
-        try
-        {
-            return await _clubStandings.ProbeAsync(logligId, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Discovery: не удалось проверить клубный зачёт для строки {Id}", discoveredId);
-            return null;
-        }
     }
 
     /// <summary>
@@ -438,8 +486,9 @@ public class DiscoveryAdminController : ControllerBase
     [HttpPost("club-rule")]
     public async Task<IActionResult> CreateClubRule([FromBody] CreateClubRuleRequest request, CancellationToken ct)
     {
-        if (!_cache.TryGetValue(PreviewCacheKey(request.PreviewId), out DiscoveryPreviewEntry? entry) || entry == null)
-            return NotFound(new { error = "Превью не найдено или истекло (15 мин)" });
+        var entry = _previews.GetEntry(request.PreviewId);
+        if (entry == null)
+            return NotFound(new { error = $"Превью не найдено или истекло ({_previews.EntryLifetime.TotalMinutes:0} мин)" });
 
         var probe = entry.ClubStanding;
         if (probe is null || !probe.HasStanding || probe.Scale.Count == 0)
@@ -485,44 +534,6 @@ public class DiscoveryAdminController : ControllerBase
 
     public sealed record CreateClubRuleRequest(Guid PreviewId, string? Version);
 
-    private async Task<(byte[]? pdf, string fileName, string? error)> FetchPdfAsync(
-        int id, string language, bool refreshIfMissing, CancellationToken ct)
-    {
-        var all = await _discovery.GetAllAsync(ct);
-        var row = all.FirstOrDefault(d => d.Id == id);
-        if (row is null) return (null, "", "Запись не найдена");
-
-        var logligId = row.LogligId;
-        if (logligId is null)
-        {
-            if (!refreshIfMissing)
-                return (null, "", "Детали не загружены — нажмите «Затянуть» (нет loglig-id).");
-
-            // Детали могли ещё не загружаться — пробуем один раз.
-            var refreshed = await _discovery.RefreshDetailsAsync(id, ct);
-            logligId = refreshed?.LogligId;
-            if (logligId is null)
-                return (null, "", refreshed?.LastError ?? "Результаты не опубликованы (нет loglig-id).");
-        }
-
-        var culture = language == "en" ? "en-US" : "he-IL";
-        try
-        {
-            var pdf = await _provider.FetchResultsPdfAsync(logligId.Value, culture, ct);
-            return (pdf, $"isrorg-{row.OrgCompId}-loglig-{logligId}-{language}.pdf", null);
-        }
-        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
-        {
-            _logger.LogWarning(ex, "Discovery: не удалось скачать PDF logligId={LogligId}", logligId);
-            return (null, "", ex.Message);
-        }
-    }
-
-    private static string PreviewCacheKey(Guid previewId) => $"discovery-preview:{previewId}";
-
-    private sealed record DiscoveryPreviewEntry(
-        ParsedCompetition Parsed, string FileName, int DiscoveredId, OfficialClubStandingProbe? ClubStanding);
-
     public sealed record SetStatusRequest(string Status);
 
     public sealed record SetDisciplineRequest(string Discipline);
@@ -535,5 +546,11 @@ public class DiscoveryAdminController : ControllerBase
         bool OverwriteExisting = false,
         bool DeleteMissing = false,
         IReadOnlyList<ImportSuspectFlag>? SuspectFlags = null,
-        int? PointRuleClubsId = null);
+        int? PointRuleClubsId = null,
+        // Флаги соревнования из превью: null = «не трогать» (см. ImportEventOptions).
+        bool? IsAward = null,
+        bool? IsChampionship = null,
+        bool? IsMasters = null,
+        bool? ClubPointsDisabled = null,
+        string? PoolType = null);
 }

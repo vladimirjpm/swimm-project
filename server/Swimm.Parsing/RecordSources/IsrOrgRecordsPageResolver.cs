@@ -13,8 +13,15 @@ namespace Swimm.Parsing.RecordSources;
 /// <param name="PoolType">«50m» / «25m».</param>
 /// <param name="IsMasters">true — мастерс, false — בוגרים ונוער (наш age-источник).</param>
 /// <param name="UpdatedOn">Дата обновления из имени файла, если она там есть (dd_MM_yyyy).</param>
+/// <param name="Trusted">
+/// false — подпись ссылки и имя файла ПРОТИВОРЕЧАТ друг другу, и какая из них права, машине
+/// не решить. Живой случай (2026-08-24): на странице федерации ссылка
+/// «שיאי מאסטרס: בריכת 25 מטר» ведёт на «שיאי ישראל בריכה ארוכה 17_08_2026.pdf» — файл НЕ
+/// мастерс и НЕ короткой воды. Автозагрузка такую ссылку не берёт (см. <see cref="Pick"/>),
+/// но из списка она не пропадает: админ должен видеть, что сломано на сайте, а не у нас.
+/// </param>
 public sealed record IsrOrgRecordsLink(
-    string Url, string Label, string PoolType, bool IsMasters, DateOnly? UpdatedOn);
+    string Url, string Label, string PoolType, bool IsMasters, DateOnly? UpdatedOn, bool Trusted = true);
 
 /// <summary>
 /// Резолвер актуальных PDF-ссылок со страницы «שיאי ישראל» (data.asp?id=1013).
@@ -29,6 +36,15 @@ public sealed record IsrOrgRecordsLink(
 /// </summary>
 public class IsrOrgRecordsPageResolver : IRecordSourceLinksProvider
 {
+    // Иврит держим ЮНИКОД-ЭСКЕЙПАМИ, как в HebrewTextHelper: литералом в этот файл уже
+    // затёк невидимый U+0008 (backspace) — он встал в начало PoolRx, и регэксп не совпадал
+    // НИКОГДА. Бассейн молча определялся только по имени файла, а битая ссылка на сайте
+    // федерации проехала незамеченной (docs/data-integrity.md, И-15).
+    private const string Metr = "\u05DE\u05D8\u05E8";            // מטר
+    private const string Masters = "\u05DE\u05D0\u05E1\u05D8\u05E8\u05E1";   // מאסטרס
+    private const string Arukha = "\u05D0\u05E8\u05D5\u05DB\u05D4";   // ארוכה — длинная
+    private const string Ktzara = "\u05E7\u05E6\u05E8\u05D4";          // קצרה — короткая
+
     // <a ... href="...pdf" ...>подпись</a> — страница простая, статический HTML без SPA.
     private static readonly Regex AnchorRx = new(
         """<a\b[^>]*?href\s*=\s*["']([^"']+?\.pdf)["'][^>]*>(.*?)</a>""",
@@ -40,7 +56,7 @@ public class IsrOrgRecordsPageResolver : IRecordSourceLinksProvider
     // («... - 4_25.pdf» — это месяц_год), поэтому дата опциональна.
     // «בריכת 50 מטר» / «25 מטר» — бассейн в подписи ссылки.
     private static readonly Regex PoolRx = new(
-        @"(50|25)\s*מטר", RegexOptions.Compiled);
+        "(50|25)\\s*" + Metr, RegexOptions.Compiled);
 
     private static readonly Regex FileDateRx = new(
         @"(?<d>\d{2})_(?<m>\d{2})_(?<y>\d{4})", RegexOptions.Compiled);
@@ -74,7 +90,7 @@ public class IsrOrgRecordsPageResolver : IRecordSourceLinksProvider
     {
         var links = await ResolveAsync(PageUrl, ct);
         return links
-            .Select(l => new RecordSourceLinkDto(l.Url, l.Label, l.PoolType, l.IsMasters, l.UpdatedOn))
+            .Select(l => new RecordSourceLinkDto(l.Url, l.Label, l.PoolType, l.IsMasters, l.UpdatedOn, l.Trusted))
             .ToList();
     }
 
@@ -113,24 +129,42 @@ public class IsrOrgRecordsPageResolver : IRecordSourceLinksProvider
 
             // Имя файла нужно расшифрованным: в href иврит приходит percent-encoded.
             var fileName = Uri.UnescapeDataString(abs.AbsolutePath);
-            var haystack = label + " " + fileName;
 
-            var pool = PoolOf(haystack);
+            // Подпись — то, что федерация ОБЕЩАЕТ; имя файла — то, что она реально отдаёт.
+            // Читаем врозь, чтобы поймать расхождение (см. Trusted).
+            var poolByLabel = PoolOf(label);
+            var poolByFile = PoolOf(fileName);
+            var pool = poolByLabel ?? poolByFile;
             if (pool is null) continue;   // не справочник рекордов — просто чужой PDF на странице
 
-            var isMasters = haystack.Contains("מאסטרס", StringComparison.Ordinal);
+            var mastersByLabel = label.Contains(Masters, StringComparison.Ordinal);
+            var mastersByFile = fileName.Contains(Masters, StringComparison.Ordinal);
+
+            // Ссылке верим, только если подпись и файл не спорят. Спор — реальность, а не
+            // теория: на 2026-08-24 «שיאי מאסטרס: בריכת 25 מטר» вело на файл длинной воды и
+            // НЕ мастерс. Молчаливое доверие любому из двух источников означало бы скормить
+            // парсеру мастерс-рекордов справочник בוגרים ונוער.
+            var trusted = (poolByLabel is null || poolByFile is null || poolByLabel == poolByFile)
+                          && mastersByLabel == mastersByFile;
 
             links.Add(new IsrOrgRecordsLink(
-                abs.AbsoluteUri, label, pool, isMasters, UpdatedOnOf(fileName)));
+                abs.AbsoluteUri, label, pool, mastersByLabel, UpdatedOnOf(fileName), trusted));
         }
 
         return links;
     }
 
-    /// <summary>Выбор одной ссылки: нужный бассейн + нужная семья (masters/age). null — не нашлась.</summary>
+    /// <summary>
+    /// Выбор одной ссылки: нужный бассейн + нужная семья (masters/age). null — не нашлась.
+    ///
+    /// Ссылки с расхождением подписи и файла (<c>Trusted == false</c>) автозагрузке не
+    /// достаются: лучше «файл не найден, грузите руками», чем молча разобрать чужой
+    /// справочник и записать его в рекорды.
+    /// </summary>
     public static IsrOrgRecordsLink? Pick(
         IReadOnlyList<IsrOrgRecordsLink> links, bool isMasters, string poolType) =>
-        links.FirstOrDefault(l => l.IsMasters == isMasters
+        links.FirstOrDefault(l => l.Trusted
+                                  && l.IsMasters == isMasters
                                   && string.Equals(l.PoolType, poolType, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
@@ -145,8 +179,8 @@ public class IsrOrgRecordsPageResolver : IRecordSourceLinksProvider
         var m = PoolRx.Match(haystack);
         if (m.Success) return m.Groups[1].Value + "m";
 
-        if (haystack.Contains("ארוכה", StringComparison.Ordinal)) return "50m";
-        if (haystack.Contains("קצרה", StringComparison.Ordinal)) return "25m";
+        if (haystack.Contains(Arukha, StringComparison.Ordinal)) return "50m";
+        if (haystack.Contains(Ktzara, StringComparison.Ordinal)) return "25m";
 
         return null;
     }

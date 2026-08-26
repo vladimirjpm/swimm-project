@@ -86,6 +86,28 @@ public sealed record NationalAgeRecordRow(
     string Time, int? TimeMs, string? Holder, string AgeKey, string? IssueReason = null);
 
 /// <summary>
+/// Официальный рекорд, который держит пловец, — строка справочника <c>Records</c>.
+/// ⚠ Связь только ПО ИМЕНИ держателя: у <c>Record</c> нет <c>SwimmerId</c> (решение §6.1
+/// плана). Тёзка заберёт чужой рекорд, и подпись витрины обязана это признавать.
+///
+/// <paramref name="IssueReason"/> обязателен по инварианту И11: раз показано время, рядом
+/// должен быть признак его качества — справочник федерации тоже ошибается
+/// (<c>Sys_RecordIssues</c>, качество <c>record</c>).
+/// </summary>
+public sealed record HeldRecordRow(
+    string RegionType, string RegionCode, string Category, string AgeKey, string Gender,
+    string PoolType, string Style, string Distance, string Time, string? RecordDate,
+    string? IssueReason);
+
+/// <summary>
+/// Лучшее время ОДНОГО сверстника в одной дисциплине за сезон — вход для фильтра «Season best».
+/// Когорта собирается по году рождения; пол в отдельное поле не выносится, потому что он уже
+/// внутри <paramref name="DisciplineKey"/>: девочки и мальчики одного года никогда не попадут
+/// в один ключ, и отдельный фильтр по полу был бы вторым способом задать то же самое.
+/// </summary>
+public sealed record PeerSeasonBest(int SwimmerId, string DisciplineKey, int TimeMs);
+
+/// <summary>
 /// Общий сезонный шов страниц спортсмена и клуба (фаза 10.1): «результаты → сезоны»,
 /// лучшее в сезоне и детекция личных рекордов. Считать это дважды по-разному нельзя —
 /// поэтому один хелпер на обе страницы.

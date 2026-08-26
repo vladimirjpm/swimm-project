@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <link href="/style/css?v=NcPC4kktwv43cYo6ETrb9sqhv-zBDYIz55Mp4WFnub81" rel="stylesheet"/>
+
+<link href="/Content/css/bootstrap-rtl.css" rel="stylesheet"/>
+    <script src="/Resources/Messages.js"></script>
+
+    <link href="/style/site?v=wTwbaWormSGo9UHM4vjVXdeWgaa7Vz5TOWJt3sVvEaU1" rel="stylesheet"/>
+
+    
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.3.1/css/all.css" integrity="sha384-mzrmE5qonljUremFsqc01SB46JvROS7bZs3IO2EmfFsd15uHvIt+Y8vEf7N7fWAU" crossorigin="anonymous">
+
+    <script src="/Scripts/sweetalert.min.js"></script>
+    <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCjLbmhIJnJ5rSLgd7acl-pXSd6CQdgvMg&libraries=places"></script>
+</head>
+<body>
+    <div id="navbar" class="navbar-collapse">
+        <div class="flags">
+            <select id="front-language-select" class="form-control" style="max-width: 180px;">
+                <option value="he" selected>&#1506;&#1489;&#1512;&#1497;&#1514;</option>
+                <option value="en" >English</option>
+                <option value="uk" >&#1059;&#1082;&#1088;&#1072;&#1111;&#1085;&#1089;&#1100;&#1082;&#1080;&#1081;</option>
+                <option value="fr" >Fran&#231;ais</option>
+                <option value="es" >Espa&#241;ol</option>
+                <option value="ar" >&#1575;&#1604;&#1593;&#1585;&#1576;&#1610;&#1577;</option>
+            </select>
+        </div>
+    </div>
+    <div class="container body-content" style="max-width:1150px">
+        <div class="row">
+            <div class="col-sm-12" id="render-body">
+                
+
+<div class="modal-dialog modal-lg modal-result-custom-width">
+<div class="modal-content" style="padding: 18px;">
+    <div class="swimming-export-actions" style="display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
+<form action="/LeagueTable/ExportSwimmingDisciplineResults?leagueId=13627" method="post">            <button id="excelBtnExp" type="submit" class="allow-readonly btn btn-primary" style="margin-left:15px;">
+                <i class="glyphicon glyphicon-open"></i>
+                PDF
+                <i class="fa fa-spin fa-spinner exportLSloading"
+                   style="visibility: hidden;">
+                </i>
+            </button>
+<input data-val="true" data-val-number="The field DisciplineCompetitionId must be a number." data-val-required="השדה DisciplineCompetitionId נדרש." id="DisciplineCompetitionId" name="DisciplineCompetitionId" type="hidden" value="72968" /></form>
+<form action="/LeagueTable/ExportSwimmingDisciplineResults?leagueId=13627&amp;IsSplitResults=True" method="post">            <button id="excelBtnExpSplit" type="submit" class="allow-readonly btn btn-primary" style="margin-left:15px;">
+                <i class="glyphicon glyphicon-open"></i>
+                זמני ביניים
+                <i class="fa fa-spin fa-spinner exportLSloading"
+                   style="visibility: hidden;">
+                </i>
+            </button>
+<input data-val="true" data-val-number="The field DisciplineCompetitionId must be a number." data-val-required="השדה DisciplineCompetitionId נדרש." id="DisciplineCompetitionId" name="DisciplineCompetitionId" type="hidden" value="72968" /></form>    </div>
+<div class="print_id" id="print_id" data-print-title="">
+
+<style>
+    td, th {
+        text-align: center;
+    }
+    .modal-result-custom-width {
+        width: 100%;
+    }
+    .format6cell {
+        border: 1px solid #dddddd !important;
+        height: 35px;
+        min-width: 30px;
+        max-width: 30px;
+    }
+    .format6th {
+        min-width: 90px;
+        max-width: 90px;
+    }
+    @media screen and ( min-width: 1500px) {
+    .modal-result-custom-width {
+        max-width: 1500px;
+        width: 100%;
+    }
+    @page {size: auto; margin: 5mm;}
+    }
+    }
+
+            </style>
+<div class="main-title disciplines-title">
+    <table class="borderless disciplines-title" style="width: 100%;">
+        <tr>
+            <td style="vertical-align: middle; text-align: left;" colspan="3" rowspan="3">
+    <img src="https://loglig.com/assets/union/logo_10032020094946824.jpg" class="img-circle keep-for-print" style="max-height:7rem;max-width:11rem;" alt=""/>
+            </td>
+            <td style="text-align: right;" colspan="4">
+                <h3 style="margin-top: 0px; margin-bottom: 0px;">
+                    איגוד השחייה בישראל
+                </h3>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="3" style="text-align:right;">
+                <h4 style="margin-top: 0px; margin-bottom: 0px;">
+                        אליפות ישראל &quot; ארנה&quot; חורף נוער ובוגרים 2025 - 23/12/2025
+                </h4>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="3" style="text-align:right;">
+                <h4 style="margin-top: 0px; margin-bottom: 0px;">1500 חופשי -  נשים 13-99 - תוצאות</h4>
+            </td>
+        </tr>
+    </table>
+</div>
+<div class="table-responsive">
+    <table class="table res-table">
+        <thead>
+        <tr class="disciplines-title">
+            <th>מיקום</th>
+            <th>שם מלא</th>
+                            <th>שנת לידה</th>
+            <th>
+                אגודה
+            </th>
+                <th>מקצה</th>
+                    <th>מסלול</th>
+            <th style="text-align: center;">תוצאות</th>
+                            <th>ניקוד</th>
+
+                    <th>ניקוד אישי</th>
+                    <th>ניקוד קבוצתי</th>
+                                </tr>
+        </thead>
+        <tbody>
+
+                <tr>
+                    <td>גמר ישיר</td>
+                </tr>
+                <tr>
+                        <td>1</td>
+                                        <td>
+                                <a href="/Players/Details/109926?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    אמילי גולוס
+                                </a>
+                    </td>
+                                            <td>
+2008                        </td>
+                    <td>
+TLV SWIM                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            5
+                        </td>
+                    <td style="direction: ltr;">
+16:31.53                    </td>
+                                            <td style="direction: ltr;">
+                            768
+                        </td>
+                                                <td style="direction: ltr;">
+                                5
+                            </td>
+                            <td style="direction: ltr;">
+                                25
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>2</td>
+                                        <td>
+                                <a href="/Players/Details/110078?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    אופק אדיר
+                                </a>
+                    </td>
+                                            <td>
+2006                        </td>
+                    <td>
+הפועל בת ים                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            4
+                        </td>
+                    <td style="direction: ltr;">
+16:45.68                    </td>
+                                            <td style="direction: ltr;">
+                            736
+                        </td>
+                                                <td style="direction: ltr;">
+                                3
+                            </td>
+                            <td style="direction: ltr;">
+                                22
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>3</td>
+                                        <td>
+                                <a href="/Players/Details/110847?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    עומר שורץ
+                                </a>
+                    </td>
+                                            <td>
+2006                        </td>
+                    <td>
+מכבי קרית ביאליק                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            3
+                        </td>
+                    <td style="direction: ltr;">
+17:06.98                    </td>
+                                            <td style="direction: ltr;">
+                            691
+                        </td>
+                                                <td style="direction: ltr;">
+                                2
+                            </td>
+                            <td style="direction: ltr;">
+                                20
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>4</td>
+                                        <td>
+                                <a href="/Players/Details/110757?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    ליאורה קליטצ&#39;וק
+                                </a>
+                    </td>
+                                            <td>
+2010                        </td>
+                    <td>
+הפועל בת ים                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            6
+                        </td>
+                    <td style="direction: ltr;">
+17:31.80                    </td>
+                                            <td style="direction: ltr;">
+                            643
+                        </td>
+                                                <td style="direction: ltr;">
+                                1
+                            </td>
+                            <td style="direction: ltr;">
+                                18
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>5</td>
+                                        <td>
+                                <a href="/Players/Details/110267?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    רבקה אנדרוביץ
+                                </a>
+                    </td>
+                                            <td>
+2009                        </td>
+                    <td>
+הפועל אולימפ נתניה                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            2
+                        </td>
+                    <td style="direction: ltr;">
+17:36.37                    </td>
+                                            <td style="direction: ltr;">
+                            635
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                17
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>6</td>
+                                        <td>
+                                <a href="/Players/Details/127523?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    איילה לוי
+                                </a>
+                    </td>
+                                            <td>
+2011                        </td>
+                    <td>
+מכבי קרית ביאליק                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            6
+                        </td>
+                    <td style="direction: ltr;">
+17:40.19                    </td>
+                                            <td style="direction: ltr;">
+                            628
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                16
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>7</td>
+                                        <td>
+                                <a href="/Players/Details/111514?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    איילה שהם
+                                </a>
+                    </td>
+                                            <td>
+2008                        </td>
+                    <td>
+מכבי קרית ביאליק                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            2
+                        </td>
+                    <td style="direction: ltr;">
+17:59.84                    </td>
+                                            <td style="direction: ltr;">
+                            595
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                15
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>8</td>
+                                        <td>
+                                <a href="/Players/Details/133028?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    עמליה יוקלס
+                                </a>
+                    </td>
+                                            <td>
+2011                        </td>
+                    <td>
+TLV SWIM                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            8
+                        </td>
+                    <td style="direction: ltr;">
+18:06.89                    </td>
+                                            <td style="direction: ltr;">
+                            583
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                14
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>9</td>
+                                        <td>
+                                <a href="/Players/Details/113051?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    נועה קליש
+                                </a>
+                    </td>
+                                            <td>
+2009                        </td>
+                    <td>
+מכבי פ.מ. רעות                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            8
+                        </td>
+                    <td style="direction: ltr;">
+18:07.35                    </td>
+                                            <td style="direction: ltr;">
+                            582
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                13
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>10</td>
+                                        <td>
+                                <a href="/Players/Details/146594?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    גיל הירש
+                                </a>
+                    </td>
+                                            <td>
+2010                        </td>
+                    <td>
+בני הרצליה                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            7
+                        </td>
+                    <td style="direction: ltr;">
+18:10.32                    </td>
+                                            <td style="direction: ltr;">
+                            578
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                12
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>11</td>
+                                        <td>
+                                <a href="/Players/Details/146590?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    מאיה סול
+                                </a>
+                    </td>
+                                            <td>
+2011                        </td>
+                    <td>
+בני הרצליה                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            7
+                        </td>
+                    <td style="direction: ltr;">
+18:14.74                    </td>
+                                            <td style="direction: ltr;">
+                            571
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                10
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>12</td>
+                                        <td>
+                                <a href="/Players/Details/156614?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    רנטה אגלאוטין 
+                                </a>
+                    </td>
+                                            <td>
+2011                        </td>
+                    <td>
+הפועל בת ים                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            0
+                        </td>
+                    <td style="direction: ltr;">
+18:19.49                    </td>
+                                            <td style="direction: ltr;">
+                            563
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                9
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>13</td>
+                                        <td>
+                                <a href="/Players/Details/176136?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    תמר ארואטי
+                                </a>
+                    </td>
+                                            <td>
+2011                        </td>
+                    <td>
+מכבי וייסגל רחובות                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            9
+                        </td>
+                    <td style="direction: ltr;">
+18:19.51                    </td>
+                                            <td style="direction: ltr;">
+                            563
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                8
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>14</td>
+                                        <td>
+                                <a href="/Players/Details/101631?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    אנה גורבנקו
+                                </a>
+                    </td>
+                                            <td>
+2012                        </td>
+                    <td>
+מכבי קרית ביאליק                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            3
+                        </td>
+                    <td style="direction: ltr;">
+18:20.19                    </td>
+                                            <td style="direction: ltr;">
+                            562
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                7
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>15</td>
+                                        <td>
+                                <a href="/Players/Details/146052?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    גבי  כהן
+                                </a>
+                    </td>
+                                            <td>
+2012                        </td>
+                    <td>
+הפועל ירושלים                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            5
+                        </td>
+                    <td style="direction: ltr;">
+18:27.88                    </td>
+                                            <td style="direction: ltr;">
+                            550
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                6
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>16</td>
+                                        <td>
+                                <a href="/Players/Details/113178?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    אדוה ברקוביץ
+                                </a>
+                    </td>
+                                            <td>
+2010                        </td>
+                    <td>
+מכבי קרית ביאליק                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            3
+                        </td>
+                    <td style="direction: ltr;">
+18:31.13                    </td>
+                                            <td style="direction: ltr;">
+                            546
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                5
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>17</td>
+                                        <td>
+                                <a href="/Players/Details/110155?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    לירי נידם
+                                </a>
+                    </td>
+                                            <td>
+2009                        </td>
+                    <td>
+בני הרצליה                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            9
+                        </td>
+                    <td style="direction: ltr;">
+18:33.97                    </td>
+                                            <td style="direction: ltr;">
+                            541
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                4
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>18</td>
+                                        <td>
+                                <a href="/Players/Details/110149?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    נטלי שרה מקליס
+                                </a>
+                    </td>
+                                            <td>
+2009                        </td>
+                    <td>
+מכבי א.ס. רמת השרון                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            4
+                        </td>
+                    <td style="direction: ltr;">
+18:35.46                    </td>
+                                            <td style="direction: ltr;">
+                            539
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                3
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>19</td>
+                                        <td>
+                                <a href="/Players/Details/110722?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    פילאר מריה חשמה
+                                </a>
+                    </td>
+                                            <td>
+2009                        </td>
+                    <td>
+הפועל בת ים                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            1
+                        </td>
+                    <td style="direction: ltr;">
+18:35.64                    </td>
+                                            <td style="direction: ltr;">
+                            539
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                2
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>20</td>
+                                        <td>
+                                <a href="/Players/Details/113074?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    נעה אלבו
+                                </a>
+                    </td>
+                                            <td>
+2009                        </td>
+                    <td>
+מכבי קרית אונו                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            1
+                        </td>
+                    <td style="direction: ltr;">
+18:44.38                    </td>
+                                            <td style="direction: ltr;">
+                            527
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                1
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>21</td>
+                                        <td>
+                                <a href="/Players/Details/110723?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    פרלה חשמה
+                                </a>
+                    </td>
+                                            <td>
+2009                        </td>
+                    <td>
+הפועל בת ים                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            5
+                        </td>
+                    <td style="direction: ltr;">
+18:45.42                    </td>
+                                            <td style="direction: ltr;">
+                            525
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>22</td>
+                                        <td>
+                                <a href="/Players/Details/176088?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    אמה יולזרי
+                                </a>
+                    </td>
+                                            <td>
+2011                        </td>
+                    <td>
+הפועל בת ים                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            0
+                        </td>
+                    <td style="direction: ltr;">
+18:49.65                    </td>
+                                            <td style="direction: ltr;">
+                            519
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>23</td>
+                                        <td>
+                                <a href="/Players/Details/131253?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    נועה גלפרין
+                                </a>
+                    </td>
+                                            <td>
+2011                        </td>
+                    <td>
+מכבי קרית אונו                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            1
+                        </td>
+                    <td style="direction: ltr;">
+18:53.11                    </td>
+                                            <td style="direction: ltr;">
+                            514
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>24</td>
+                                        <td>
+                                <a href="/Players/Details/164391?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    שירי הוכמן 
+                                </a>
+                    </td>
+                                            <td>
+2011                        </td>
+                    <td>
+הפועל אולימפ נתניה                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            7
+                        </td>
+                    <td style="direction: ltr;">
+18:57.45                    </td>
+                                            <td style="direction: ltr;">
+                            509
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>25</td>
+                                        <td>
+                                <a href="/Players/Details/164360?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    נועה היבל
+                                </a>
+                    </td>
+                                            <td>
+2011                        </td>
+                    <td>
+מכבי א.ס. רמת השרון                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            4
+                        </td>
+                    <td style="direction: ltr;">
+18:58.25                    </td>
+                                            <td style="direction: ltr;">
+                            508
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>26</td>
+                                        <td>
+                                <a href="/Players/Details/123194?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    שחף אדיר
+                                </a>
+                    </td>
+                                            <td>
+2011                        </td>
+                    <td>
+מכבי א.ס. רמת השרון                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            6
+                        </td>
+                    <td style="direction: ltr;">
+19:13.03                    </td>
+                                            <td style="direction: ltr;">
+                            488
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                
+                            </td>
+                                                        </tr>
+                <tr>
+                        <td>27</td>
+                                        <td>
+                                <a href="/Players/Details/146588?seasonId=1715"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    מעיין עתיר
+                                </a>
+                    </td>
+                                            <td>
+2011                        </td>
+                    <td>
+בני הרצליה                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            2
+                        </td>
+                    <td style="direction: ltr;">
+19:16.69                    </td>
+                                            <td style="direction: ltr;">
+                            484
+                        </td>
+                                                <td style="direction: ltr;">
+                                0
+                            </td>
+                            <td style="direction: ltr;">
+                                
+                            </td>
+                                                        </tr>
+        </tbody>
+    </table>
+</div>
+
+
+</div>
+
+
+
+</div>
+</div>
+
+
+
+            </div>
+        </div>
+        <footer style="margin-top: 5px; margin-left: 15px;">
+            <a href="https://loglig.com" style="color:#333333">
+                <div class="pull-left bot-title">Powered By</div>
+                <img src="/content/img/logo.png" class="pull-left bot-logo" alt="Powered By LogLig" />
+                <div class="clearfix"></div>
+            </a>
+        </footer>
+    </div>
+
+    <script src="/bundles/jquery?v=Wc4RAEumdPDf8Jyydt3C5wAbts7LJsFIjFtKQV1-0Rs1"></script>
+
+    <script src="/bundles/bootstrap?v=V_pN0RpLuiw5-I9jzrpkivcREDeKkccW_PY6pZ2LOG41"></script>
+
+    <script src="/Scripts/bootstrap-jquery3-modal-fix.js"></script>
+    <script src="/bundles/main?v=WGEYe5PuR-CJjUNsTuB9FvARWnHP-9omsadQbADdXGU1"></script>
+
+    <script src="/bundles/jquery-ui?v=nmuMA-O4C0zphhL2ApoyudBi4v4VCXr0cCFlFmBK2eU1"></script>
+
+    <script src="/Scripts/commonLib.js"></script>
+    <script>
+        $(function () {
+            frontLib.init();
+
+            $(document).off("change", "#front-language-select").on("change", "#front-language-select", function () {
+                var selectedLang = $(this).val();
+                var targetUrl = "/Common/SetCulture" + "?lang=" + encodeURIComponent(selectedLang);
+                window.location.href = targetUrl;
+            });
+        });
+    </script>
+    
+    <script type="text/javascript" src="/Scripts/App/PrintSchedule.js"></script>
+
+</body>
+</html>

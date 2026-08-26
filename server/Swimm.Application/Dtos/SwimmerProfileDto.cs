@@ -82,6 +82,14 @@ public class SwimmerProfileDto
     [JsonPropertyName("recordsHeld")]
     public int RecordsHeld { get; set; }
 
+    /// <summary>
+    /// Сами рекорды, которые он держит, — из них же считается <see cref="RecordsHeld"/>.
+    /// Едут вместе со счётчиком, а не отдельным запросом: у подавляющего большинства
+    /// пловцов список пуст, а разъехаться числу и списку нельзя.
+    /// </summary>
+    [JsonPropertyName("records")]
+    public List<SwimmerHeldRecordDto> Records { get; set; } = [];
+
     /// <summary>Сезоны с заплывами, от свежих к старым; ровно один — isDisplayDefault.</summary>
     [JsonPropertyName("seasons")]
     public List<SwimmerSeasonOptionDto> Seasons { get; set; } = [];

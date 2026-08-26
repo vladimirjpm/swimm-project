@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -238,6 +238,9 @@ public class JsonImportService : IImportService
         var verifiedNewCompetitions = new HashSet<int>();
         // Ordered list of competition keys touched in this import (for ImportHistory)
         var touchedCompetitionKeys = new List<string>();
+        // Соревнования, которым уже применили флаги из превью (по одному разу на соревнование,
+        // а не на каждую строку файла).
+        var flagsAppliedTo = new HashSet<int>();
         // Соревнования, у которых уже были результаты в БД и импорт продолжен в upsert-режиме
         // (ImportEventOptions.OverwriteExisting=true) — по ним после основного цикла запускаем
         // матчинг/UPDATE/DELETE-с-защитой (import-upsert-plan.md, шаг 2).
@@ -341,13 +344,32 @@ public class JsonImportService : IImportService
                 // индекс построен по уже нормализованному Competition.PoolType из БД, а item.PoolType
                 // приходит из файла в сыром виде ("25"/"25m") — сравнивать нужно нормализованное с
                 // нормализованным, иначе тот же промах мимо кэша, что и с Name/SubName.
-                var compKey = ImportCompetitionMatcher.Key(displayName, item.Date ?? string.Empty, NormalizePoolType(item.PoolType));
+                // Длина бассейна: решение из превью главнее распознанного парсером. Подменяем
+                // ДО ключа — бассейн входит в уникальный ключ соревнования, и правка «потом»
+                // означала бы второй Competition с тем же именем и датой.
+                var poolType = NormalizePoolType(eventOptions?.PoolType ?? item.PoolType);
+                var compKey = ImportCompetitionMatcher.Key(displayName, item.Date ?? string.Empty, poolType);
 
                 // Д2: день, привязанный к тому же compID, узнаём ПО ДАТЕ — даже если название
                 // разошлось. Кладём находку в кэш под именным ключом, чтобы весь дальнейший
                 // цикл (upsert-пометка, категории, touched) работал как обычно.
                 if (linkedDaysByDate.TryGetValue(item.Date ?? string.Empty, out var linkedDay))
                     competitionCache.TryAdd(compKey, linkedDay);
+
+                // Соревнование уже есть (перезатягивание, дописывание дня): флаги из превью —
+                // свежее решение человека, применяем и к нему. Не заданные (null) не трогаем.
+                //
+                // ⚠ Индекс соревнований построен AsNoTracking (он для поиска дублей), и правка
+                // его сущностей НЕ сохранится. Поэтому берём отслеживаемую копию — по одному
+                // запросу на соревнование, а не на каждую из тысяч строк файла.
+                if (eventOptions != null
+                    && competitionCache.TryGetValue(compKey, out var existingComp)
+                    && existingComp.Id != 0
+                    && flagsAppliedTo.Add(existingComp.Id))
+                {
+                    var tracked = await _db.Competitions.FirstOrDefaultAsync(c => c.Id == existingComp.Id);
+                    if (tracked != null) ApplyCompetitionFlags(tracked, eventOptions);
+                }
 
                 if (!competitionCache.TryGetValue(compKey, out var competition))
                 {
@@ -359,9 +381,11 @@ public class JsonImportService : IImportService
                         // но если такой файл однажды заедет — он не притворится плаванием.
                         Discipline = Disciplines.GuessFromName(displayName),
                         Date = item.Date ?? string.Empty,
-                        PoolType = NormalizePoolType(item.PoolType),
-                        IsMasters = isMasters || (item.IsMasters ?? false),
-                        IsAward = isAward || (item.IsAward ?? false),
+                        PoolType = poolType,
+                        IsMasters = eventOptions?.IsMasters ?? (isMasters || (item.IsMasters ?? false)),
+                        IsAward = eventOptions?.IsAward ?? (isAward || (item.IsAward ?? false)),
+                        IsChampionship = eventOptions?.IsChampionship ?? false,
+                        ClubPointsDisabled = eventOptions?.ClubPointsDisabled ?? false,
                         ShowCombineAllResults = showCombine,
                         EventId = targetEvent?.Id,
                         SubName = targetEvent != null ? (item.Competition ?? string.Empty) : null,
@@ -1824,6 +1848,18 @@ public class JsonImportService : IImportService
 
     private static string Truncate(string s, int maxLen)
         => s.Length <= maxLen ? s : s[..maxLen] + "...";
+
+    /// <summary>
+    /// Флаги соревнования из превью на существующую запись. null = «не трогать»: превью не
+    /// обязано знать про поля, которых в нём нет, и не должно их обнулять.
+    /// </summary>
+    private static void ApplyCompetitionFlags(Competition competition, ImportEventOptions options)
+    {
+        if (options.IsAward is bool award) competition.IsAward = award;
+        if (options.IsChampionship is bool championship) competition.IsChampionship = championship;
+        if (options.IsMasters is bool masters) competition.IsMasters = masters;
+        if (options.ClubPointsDisabled is bool clubOff) competition.ClubPointsDisabled = clubOff;
+    }
 
     private static string NormalizePoolType(string? pt)
     {

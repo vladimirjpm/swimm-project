@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -108,6 +108,9 @@ public class DashboardStatusServiceTests
         public Task<bool> AcceptAsync(int findingId, string? note, CancellationToken ct = default) =>
             throw new NotSupportedException();
         public Task<int?> FixSwimmerGenderAsync(int findingId, string gender, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<int?> SetSwimmerGenderAsync(int swimmerId, string gender, CancellationToken ct = default) =>
             throw new NotSupportedException();
 
         public Task<int?> AlignSwimmerGenderAsync(int findingId, string gender, CancellationToken ct = default) =>

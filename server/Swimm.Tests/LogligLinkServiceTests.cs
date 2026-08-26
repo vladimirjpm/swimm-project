@@ -38,16 +38,28 @@ public class LogligLinkServiceTests
     /// <summary>Фейк клиента карточек: словарь id → карточка (null/нет ключа — карточка недоступна).</summary>
     private sealed class FakeLogligClient(IReadOnlyDictionary<int, LogligPlayerCard?> cards) : ILogligClient
     {
-        public Task<LogligPlayerCard?> GetPlayerCardAsync(int logligId, CancellationToken ct = default)
+        public Task<LogligPlayerCard?> GetPlayerCardAsync(int logligId, int? seasonId = null, CancellationToken ct = default)
             => Task.FromResult(cards.TryGetValue(logligId, out var card) ? card : null);
 
-        public string BuildPublicProfileUrl(int logligId)
+        public string BuildPublicProfileUrl(int logligId, int? seasonId = null, bool resultsTab = false)
             => $"https://loglig.com:2053/Players/Details/{logligId}?seasonId=1715";
 
         // Клубный зачёт соревнований этим тестам не нужен — привязка пловцов его не трогает.
         public Task<LogligCompetitionStanding?> GetCompetitionStandingAsync(
             int logligId, int scaleSampleEvents = 12, CancellationToken ct = default)
             => Task.FromResult<LogligCompetitionStanding?>(null);
+
+        // Регламент соревнований этим тестам не нужен — привязка пловцов его не трогает.
+        public Task<LogligRegulationDoc?> GetRegulationAsync(int logligId, CancellationToken ct = default)
+            => Task.FromResult<LogligRegulationDoc?>(null);
+
+        public Task<IReadOnlyList<LogligParticipant>> GetCompetitionParticipantsAsync(
+            int competitionLogligId, IReadOnlyCollection<string>? wanted = null,
+            int maxEvents = 60, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<LogligParticipant>>([]);
+
+        public Task<int?> GetCompetitionSeasonIdAsync(int competitionLogligId, CancellationToken ct = default)
+            => Task.FromResult<int?>(null);
     }
 
     /// <summary>Фейк сверки: решение по id карточки, заданное словарём в тесте.</summary>

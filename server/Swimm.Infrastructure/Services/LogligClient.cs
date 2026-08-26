@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Validation;
 
 namespace Swimm.Infrastructure.Services;
 
@@ -36,12 +37,19 @@ public partial class LogligClient : ILogligClient
         _seasonId = configuration.GetValue("Loglig:SeasonId", DefaultSeasonId);
     }
 
-    public string BuildPublicProfileUrl(int logligId) =>
-        $"{BaseUrl}/Players/Details/{logligId}?seasonId={_seasonId}";
+    /// <summary>
+    /// Ссылка на карточку. seasonId обязателен (без него страница отдаёт 500); по умолчанию
+    /// берём сезон из конфига, но вызывающий может попросить сезон конкретного соревнования.
+    /// <paramref name="resultsTab"/> открывает сразу вкладку результатов — с неё и сверяют время.
+    /// </summary>
+    public string BuildPublicProfileUrl(int logligId, int? seasonId = null, bool resultsTab = false) =>
+        $"{BaseUrl}/Players/Details/{logligId}?seasonId={seasonId ?? _seasonId}"
+        + (resultsTab ? "&tab=results" : "");
 
-    public async Task<LogligPlayerCard?> GetPlayerCardAsync(int logligId, CancellationToken ct = default)
+    public async Task<LogligPlayerCard?> GetPlayerCardAsync(
+        int logligId, int? seasonId = null, CancellationToken ct = default)
     {
-        var url = BuildPublicProfileUrl(logligId);
+        var url = BuildPublicProfileUrl(logligId, seasonId);
         try
         {
             var client = _httpClientFactory.CreateClient("loglig");
@@ -183,6 +191,164 @@ public partial class LogligClient : ILogligClient
         return new LogligCompetitionStanding(true, scale);
     }
 
+    /// <summary>
+    /// seasonId соревнования со страницы `AthleticsDisciplines/{logligId}`. Тот же разбор,
+    /// что и в клубном зачёте (<see cref="ParseSeasonId"/>): у прошлых сезонов номер свой, и
+    /// карточка пловца с чужим сезоном покажет не те результаты.
+    /// </summary>
+    public async Task<int?> GetCompetitionSeasonIdAsync(
+        int competitionLogligId, CancellationToken ct = default)
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient("loglig");
+            var response = await client.GetAsync(
+                $"{BaseUrl}/LeagueTable/AthleticsDisciplines/{competitionLogligId}", ct);
+            if (!response.IsSuccessStatusCode) return null;
+
+            return ParseSeasonId(await response.Content.ReadAsStringAsync(ct));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "loglig: не удалось узнать сезон соревнования {LogligId}", competitionLogligId);
+            return null;
+        }
+    }
+
+    // ── Регламент соревнования (תקנון) ────────────────────────────────────────
+
+    /// <summary>
+    /// Регламент со страницы соревнования: ссылка «תקנון» ведёт на <c>ShowLeagueDoc/{docId}</c>
+    /// и отдаёт PDF. Ссылка стоит НЕ у всех соревнований — null тогда норма, а не сбой.
+    ///
+    /// Анти-SSRF, как и везде в клиенте: наружу уходит только int (logligId и вынутый из
+    /// разметки docId), URL собирается из <see cref="BaseUrl"/> здесь же.
+    /// </summary>
+    public async Task<LogligRegulationDoc?> GetRegulationAsync(int logligId, CancellationToken ct = default)
+    {
+        var client = _httpClientFactory.CreateClient("loglig");
+
+        string page;
+        try
+        {
+            var response = await client.GetAsync($"{BaseUrl}/LeagueTable/AthleticsDisciplines/{logligId}", ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("loglig: страница соревнования {LogligId} недоступна (регламент), статус {StatusCode}",
+                    logligId, (int)response.StatusCode);
+                return null;
+            }
+            page = await response.Content.ReadAsStringAsync(ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "loglig: ошибка запроса страницы соревнования {LogligId} (регламент)", logligId);
+            return null;
+        }
+
+        if (ParseRegulationDocId(page) is not int docId)
+            return null;
+
+        var url = $"{BaseUrl}/LeagueTable/ShowLeagueDoc/{docId}";
+        try
+        {
+            var response = await client.GetAsync(url, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("loglig: регламент {DocId} недоступен, статус {StatusCode}",
+                    docId, (int)response.StatusCode);
+                return null;
+            }
+
+            var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+            if (bytes.Length == 0) return null;
+
+            return new LogligRegulationDoc(docId, url, $"takanon-{docId}.pdf", bytes);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "loglig: ошибка скачивания регламента {DocId}", docId);
+            return null;
+        }
+    }
+
+    // ── Участники соревнования (loglig-id из протокола) ───────────────────────
+
+    /// <summary>
+    /// Проходит заплывы соревнования и собирает «имя → loglig-id». Ключевое: страницу заплыва
+    /// берём БЕЗ <c>isModal=True</c> — в модальной (печатной) версии имена не ссылки, и id
+    /// там взять неоткуда.
+    ///
+    /// Обход дорогой (у чемпионата под сотню заплывов), поэтому вызывающий передаёт, кого
+    /// ищет: как только все найдены, обход прекращается. Для 13 подозрительных строк реально
+    /// уходит несколько запросов, а не весь протокол.
+    /// </summary>
+    public async Task<IReadOnlyList<LogligParticipant>> GetCompetitionParticipantsAsync(
+        int competitionLogligId,
+        IReadOnlyCollection<string>? wanted = null,
+        int maxEvents = 60,
+        CancellationToken ct = default)
+    {
+        var client = _httpClientFactory.CreateClient("loglig");
+
+        string page;
+        try
+        {
+            var response = await client.GetAsync(
+                $"{BaseUrl}/LeagueTable/AthleticsDisciplines/{competitionLogligId}", ct);
+            if (!response.IsSuccessStatusCode) return [];
+            page = await response.Content.ReadAsStringAsync(ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "loglig: страница соревнования {LogligId} недоступна (участники)", competitionLogligId);
+            return [];
+        }
+
+        var found = new Dictionary<int, LogligParticipant>();
+        var stillWanted = wanted is null ? null : new HashSet<string>(wanted);
+
+        foreach (var eventId in ParseEventIds(page).Take(Math.Max(1, maxEvents)))
+        {
+            if (stillWanted is { Count: 0 }) break;
+            ct.ThrowIfCancellationRequested();
+
+            string html;
+            try
+            {
+                var response = await client.GetAsync(
+                    $"{BaseUrl}/LeagueTable/AthleticsDisciplineResults/{eventId}?showCategories=True", ct);
+                if (!response.IsSuccessStatusCode) continue;
+                html = await response.Content.ReadAsStringAsync(ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "loglig: заплыв {EventId} недоступен (участники)", eventId);
+                continue;
+            }
+
+            foreach (var p in ParseEventParticipants(html))
+            {
+                found[p.LogligId] = p;
+                stillWanted?.Remove(ParticipantKey(p.FullName, p.BirthYear));
+            }
+        }
+
+        return [.. found.Values];
+    }
+
+    /// <summary>
+    /// Ключ поиска участника: нормализованный НАБОР токенов имени + год рождения. Набор,
+    /// потому что порядок «имя фамилия» у сайта и у нашего протокола не совпадает; год —
+    /// потому что тёзки среди детей обычное дело.
+    /// </summary>
+    public static string ParticipantKey(string fullName, int? birthYear) =>
+        TokenNameMatcher.Key(NameTokens(fullName), birthYear);
+
+    /// <summary>Нормализованные токены имени — общая с дедупом нормализация (иврит, гереш).</summary>
+    public static IReadOnlyCollection<string> NameTokens(string fullName) =>
+        SwimmerDedupService.Normalize(fullName).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
     // ── Парсинг (чистые функции, тестируются на фикстуре) ──────────────────────
 
     [GeneratedRegex("""<div class="pld-hero-top">.*?<h1>([^<]*)</h1>""", RegexOptions.Singleline)]
@@ -224,6 +390,49 @@ public partial class LogligClient : ILogligClient
     [GeneratedRegex("""AthleticsDisciplineResults/(\d+)""")]
     private static partial Regex EventIdRx();
 
+    /// <summary>
+    /// Участники со страницы заплыва: ссылка на карточку + имя, год рождения — из следующей
+    /// ячейки той же строки (у эстафет её нет, тогда null).
+    /// </summary>
+    internal static IReadOnlyList<LogligParticipant> ParseEventParticipants(string html)
+    {
+        var result = new List<LogligParticipant>();
+
+        foreach (Match row in TableRowRx().Matches(html))
+        {
+            var m = PlayerLinkRx().Match(row.Groups[1].Value);
+            if (!m.Success || !int.TryParse(m.Groups[1].Value, out var logligId)) continue;
+
+            // Пробелы схлопываем ТАК ЖЕ, как в ячейках: на сайте встречается «אליה  מאשה גדול»
+            // с двойным пробелом, и без этого имя не совпадало с ячейкой — год рождения
+            // (он в соседней колонке) оставался неизвестным, а с ним ломалось сопоставление.
+            var name = WhitespaceRx().Replace(
+                WebUtility.HtmlDecode(TagRx().Replace(m.Groups[2].Value, " ")).Trim(), " ");
+            if (name.Length == 0) continue;
+
+            // Год рождения — первая ячейка ПОСЛЕ имени, если это четыре цифры. Брать «первое
+            // число в строке» нельзя: слева стоит место (1, 2, 3…).
+            var cells = Cells(row.Groups[1].Value);
+            var nameIndex = cells.FindIndex(c => c.Contains(name, StringComparison.Ordinal));
+            int? birthYear = null;
+            if (nameIndex >= 0 && nameIndex + 1 < cells.Count
+                && int.TryParse(cells[nameIndex + 1], out var year) && year is >= 1900 and <= 2100)
+                birthYear = year;
+
+            result.Add(new LogligParticipant(logligId, name, birthYear));
+        }
+
+        return result;
+    }
+
+    /// <summary>Имя-ссылка в таблице результатов: /Players/Details/{id} + текст ссылки.</summary>
+    [GeneratedRegex("""<a[^>]*href="/Players/Details/(\d+)[^"]*"[^>]*>(.*?)</a>""", RegexOptions.Singleline)]
+    private static partial Regex PlayerLinkRx();
+
+    /// <summary>Ссылка «תקנון» → ShowLeagueDoc/{id}. Текст ссылки бывает с пробелами вокруг.</summary>
+    [GeneratedRegex("""ShowLeagueDoc/(\d+)"[^>]*>\s*[^<]*תקנון""", RegexOptions.Singleline)]
+    private static partial Regex RegulationDocRx();
+
     [GeneratedRegex("""<tr[^>]*>(.*?)</tr>""", RegexOptions.Singleline)]
     private static partial Regex TableRowRx();
 
@@ -241,6 +450,17 @@ public partial class LogligClient : ILogligClient
     internal static int? ParseSeasonId(string html)
     {
         var m = SeasonIdRx().Match(html);
+        return m.Success && int.TryParse(m.Groups[1].Value, out var id) ? id : null;
+    }
+
+    /// <summary>
+    /// Id регламента со страницы соревнования. Ссылок на документы на странице может быть
+    /// несколько, поэтому берём ту, у которой текст — «תקנון» (иврит тут В ПРЯМОМ порядке:
+    /// это HTML, а не извлечённый из PDF текст).
+    /// </summary>
+    internal static int? ParseRegulationDocId(string html)
+    {
+        var m = RegulationDocRx().Match(html);
         return m.Success && int.TryParse(m.Groups[1].Value, out var id) ? id : null;
     }
 

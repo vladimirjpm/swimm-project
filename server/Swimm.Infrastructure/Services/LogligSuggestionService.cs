@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
 using Swimm.Domain.Entities;
@@ -92,7 +92,7 @@ public class LogligSuggestionService(
         {
             ct.ThrowIfCancellationRequested();
 
-            var card = await logligClient.GetPlayerCardAsync(swimmer.LogligId!.Value, ct);
+            var card = await logligClient.GetPlayerCardAsync(swimmer.LogligId!.Value, ct: ct);
             if (card is null)
             {
                 // Карточка недоступна (сеть/вёрстка/чужой сезон) — не решаем, проверим в следующий раз.

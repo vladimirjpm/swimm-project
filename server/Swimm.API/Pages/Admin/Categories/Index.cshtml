@@ -26,6 +26,7 @@
                 <th>Key</th>
                 <th>Название</th>
                 <th>עברית</th>
+                <th>Возраст</th>
                 <th class="text-right">Порядок</th>
                 <th class="text-right">Соревнований</th>
                 <th></th>
@@ -57,6 +58,13 @@
                     </td>
                     <td dir="rtl" class="text-admin-text-muted">
                         @(string.IsNullOrEmpty(c.NameHe) ? "—" : c.NameHe)
+                    </td>
+                    @* Возрастная полоса: по ней категория подбирается сама, когда возраст
+                       назван в названии соревнования цифрами («לגילאי 8-11»). *@
+                    <td class="whitespace-nowrap tabular-nums text-admin-text-muted">
+                        @(c.MinAge is null
+                            ? "—"
+                            : c.MaxAge is null ? $"{c.MinAge}+" : $"{c.MinAge}–{c.MaxAge}")
                     </td>
                     <td class="text-right tabular-nums">@c.DisplayOrder</td>
                     <td class="text-right tabular-nums">

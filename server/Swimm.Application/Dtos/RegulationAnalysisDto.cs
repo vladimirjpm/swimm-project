@@ -29,3 +29,20 @@ public sealed record RegulationAnalysisDto(
     bool IsChampionship,
     IReadOnlyList<RegulationFindingDto> Findings,
     string? Error = null);
+
+/// <summary>
+/// Итог САМОСТОЯТЕЛЬНОГО забора регламента с loglig (в отличие от разбора файла, который
+/// приложил админ).
+/// </summary>
+/// <param name="Found">Регламент найден и прочитан; иначе <paramref name="Analysis"/> пуст.</param>
+/// <param name="Url">Адрес PDF на loglig — основание, которое видит админ и хранит аудит.</param>
+/// <param name="Analysis">Находки анализатора; null — регламента нет или он не прочитался.</param>
+/// <param name="Error">
+/// Почему не получилось: «ссылки на регламент нет» — обычное дело (её ставят не всем), это
+/// НЕ сбой, который стоит повторять.
+/// </param>
+public sealed record RegulationFetchDto(
+    bool Found,
+    string? Url,
+    RegulationAnalysisDto? Analysis,
+    string? Error = null);

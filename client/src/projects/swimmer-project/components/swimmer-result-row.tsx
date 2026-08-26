@@ -2,7 +2,7 @@ import React from 'react';
 import UI_SwimTime, { swimFlaggedRowProps } from '../../components/mix/swim-time/swim-time';
 import UI_PrelimLabel from '../../components/mix/prelim-label/prelim-label';
 import UI_MedalIcon from '../../components/mix/medal-icon/medal-icon';
-import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
+import EventPlate from './event-plate';
 import UI_NormativeLevelIcon from '../../components/mix/normative-level-icon/normative-level-icon';
 import Helper from '../../../utils/helpers/data-helper';
 import type { SwimQualityDto, CompetitionRef } from '../use-swimmer-page';
@@ -36,8 +36,17 @@ export interface ResultRowData {
   date: string;
   competition: CompetitionRef;
   resultId: number;
-  /** Чип BEST — только в табе Results (в Progress истории личников своя разметка). */
-  badge?: 'best' | 'pb' | null;
+  /**
+   * Мастерс-старт: у разряда своя таблица нормативов с возрастными полосами. Без него
+   * время ветерана меряется юношеской шкалой и дуга уровня показывает чужой разряд.
+   */
+  isMasters?: boolean;
+  /**
+   * Чип у времени: BEST — лучшее в сезоне, PB — личный рекорд на графике прогресса,
+   * SB — первое место среди сверстников сезона. SB сильнее BEST и ЗАМЕЩАЕТ его: одна
+   * строка не носит два чипа, иначе «первый в группе» терялся бы среди BEST у всех строк.
+   */
+  badge?: 'best' | 'pb' | 'sb' | null;
 }
 
 /** Ссылка на конкретный заплыв в таблице результатов (NAV-контракт хендоффа). */
@@ -71,6 +80,9 @@ function SwimmerResultRow({ row, swimmerId, gender }: Props) {
         styleName: row.stroke ?? '',
         distance: `${row.distance}m`,
         time: Helper.parseTimeToSeconds(row.time),
+        // Возраст хелпер сам разложит в полосу мастерса («45» → «45-49»).
+        isMaster: !!row.isMasters,
+        ageGroup: row.ageInSeason != null ? String(row.ageInSeason) : null,
       })
     : null;
 
@@ -92,17 +104,14 @@ function SwimmerResultRow({ row, swimmerId, gender }: Props) {
           {row.ageInSeason != null && <span className="deep-result-row__age">age {row.ageInSeason}</span>}
         </div>
 
-        <div className="deep-stroke-plate">
-          <UI_SwimmStyleIcon styleName={row.stroke ?? ''} styleType="icon-notext" />
-          <span className="deep-stroke-plate__dist">{row.distance}</span>
-        </div>
+        <EventPlate stroke={row.stroke} distance={row.distance} poolType={row.poolType} />
 
         <div className="deep-result-row__meet">
+          {/* Бассейн переехал в плиту события — второй подписи «50m pool» тут больше нет. */}
           <div className="deep-result-row__meet-name" dir="auto">
             {row.competition.isChampionship && <span aria-hidden="true">🏆 </span>}
             {row.competition.name}
           </div>
-          <div className="deep-result-row__meet-sub">{row.poolType} pool</div>
         </div>
 
         <div className="deep-result-row__time">
@@ -115,6 +124,9 @@ function SwimmerResultRow({ row, swimmerId, gender }: Props) {
           />
           {row.badge === 'best' && !row.quality && <span className="deep-chip-best">BEST</span>}
           {row.badge === 'pb' && !row.quality && <span className="deep-chip-best">PB</span>}
+          {row.badge === 'sb' && !row.quality && (
+            <span className="deep-chip-sb" title="Fastest in the age group this season">SB</span>
+          )}
         </div>
       </div>
 
@@ -133,6 +145,10 @@ function SwimmerResultRow({ row, swimmerId, gender }: Props) {
               styleName={row.stroke ?? ''}
               styleLen={row.distance}
               poolType={row.poolType}
+              // Полоса мастерса под дугой: «MS 45-49». Без неё непонятно, по какой шкале
+              // считан разряд, — остальные экраны продукта её показывают.
+              isMasters={!!row.isMasters}
+              normativeAgeGroup={levelInfo.normativeAgeGroup}
               progressPercent={levelInfo.progressToNextLevel}
               nextTime={levelInfo.nextTime}
               disableClick

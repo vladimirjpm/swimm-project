@@ -66,6 +66,27 @@
                 <span class="text-xs text-admin-text-muted">Порядок отображения</span>
                 <input asp-for="Input.DisplayOrder" type="number" class="admin-input" autocomplete="off" />
             </label>
+
+            @* Возрастная полоса: по ней подбираются категории, когда возраст назван в
+               названии соревнования цифрами («לגילאי 8-11»). Пусто = категория не про
+               возраст (Maccabiah) либо полоса открыта сверху (Adults 17+). *@
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Возраст с</span>
+                <input asp-for="Input.MinAge" type="number" min="0" max="99" class="admin-input"
+                       autocomplete="off" placeholder="8" />
+                <span class="text-[11px] text-admin-text-muted">
+                    Лестница: Kids 8–11, Young 11–14, Juniors 14–17, Adults 17+. Пусто — категория не про возраст.
+                </span>
+            </label>
+
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Возраст по</span>
+                <input asp-for="Input.MaxAge" type="number" min="0" max="99" class="admin-input"
+                       autocomplete="off" placeholder="11" />
+                <span class="text-[11px] text-admin-text-muted">
+                    Пусто — полоса открыта сверху (как Adults 17+).
+                </span>
+            </label>
         </div>
 
         <div class="mt-5 flex gap-3">

@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Swimm.Domain.Entities;
 
 namespace Swimm.Infrastructure.Data;
@@ -286,10 +286,10 @@ public class SwimmDbContext : DbContext
                 // נוער Juniors, בוגרים Adults, мастерс Masters. Ключи приведены к подписям
                 // (миграция CategoryLadderRenameAndHebrew) — старые ?category= уводятся
                 // алиасами в results-categories.ts.
-                new Category { Id = 3, Key = "results-kids-team",      Name = "Kids",    NameHe = "ילדים",  DisplayOrder = 1, Badge = "K" },
-                new Category { Id = 4, Key = "results-youth-team",     Name = "Young",   NameHe = "צעירים", DisplayOrder = 2, Badge = "Y" },
-                new Category { Id = 1, Key = "results-junior-results", Name = "Juniors", NameHe = "נוער",   DisplayOrder = 3, Badge = "J" },
-                new Category { Id = 7, Key = "results-main",           Name = "Adults",  NameHe = "בוגרים", DisplayOrder = 4, Badge = "A" },
+                new Category { Id = 3, Key = "results-kids-team",      Name = "Kids",    NameHe = "ילדים",  DisplayOrder = 1, Badge = "K", MinAge = 8,  MaxAge = 11 },
+                new Category { Id = 4, Key = "results-youth-team",     Name = "Young",   NameHe = "צעירים", DisplayOrder = 2, Badge = "Y", MinAge = 11, MaxAge = 14 },
+                new Category { Id = 1, Key = "results-junior-results", Name = "Juniors", NameHe = "נוער",   DisplayOrder = 3, Badge = "J", MinAge = 14, MaxAge = 17 },
+                new Category { Id = 7, Key = "results-main",           Name = "Adults",  NameHe = "בוגרים", DisplayOrder = 4, Badge = "A", MinAge = 17 },
                 new Category { Id = 2, Key = "results-masters",        Name = "Masters", NameHe = "מסטרס",  DisplayOrder = 5, Badge = "M" }
             );
         });

@@ -23,8 +23,9 @@ public class AdminSettingsServiceTests
 
         // 6 базовых + 3 HubGroups (фаза 8.1) + 2 Discovery (фаза 6: Enabled/IntervalHours)
         // + RecordAgeAxis (ось возраста для сверки с рекордами) + DebugDetails (общий
-        // тумблер отладочных подробностей) — оба 2026-08-22.
-        Assert.Equal(13, all.Count);
+        // тумблер отладочных подробностей) — оба 2026-08-22
+        // + LogligStampOnImport (штамповка loglig-id пловцам после импорта, 2026-08-23).
+        Assert.Equal(14, all.Count);
     }
 
     [Fact]

@@ -198,7 +198,87 @@ public class IsrOrgParser : IFormatParser
             }
         }
 
+        // Проход 3: прелимы РАЗБИТЫ ПО ВОЗРАСТНЫМ ПОЛОСАМ, а финал у них ОДИН общий —
+        // формат зимнего чемпионата נוער ובוגרים (26/12/2025): утром «גברים 19-99»,
+        // «גברים 17-18», «בנים 16», «בנים 15» отдельными событиями, вечером один
+        // «גברים 14-99» на 30 человек (финалы А/Б/В). Ни точный ключ (полосы разные),
+        // ни попарный проход 2 (финал крупнее любой отдельной полосы) их не парят,
+        // поэтому все пять событий оставались без типа: пловец, попавший в финал,
+        // показывался ДВАЖДЫ — своим утренним заплывом и вечерним, и оба с местом 1.
+        //
+        // Признак пары — полоса заголовка, а не только состав: возрастная полоса позднего
+        // события ПОКРЫВАЕТ полосы нескольких ранних, те между собой не пересекаются
+        // (настоящее разбиение отбора), а состав позднего лежит в их объединении.
+        // Программы Маккабиады («open», «para», «U17») так не склеятся: их «возраст» —
+        // не числовая полоса, и до проверки состава дело не доходит.
+        foreach (var g in Enumerable.Range(0, comps.Count).GroupBy(i =>
+                     (comps[i].Date, comps[i].EventStyleName, comps[i].EventStyleLen, comps[i].EventStyleGender)))
+        {
+            var idxs = g.ToList();
+            if (idxs.Count < 3) continue;
+
+            for (int jj = 1; jj < idxs.Count; jj++)
+            {
+                int j = idxs[jj];
+                if (types[j] is not null) continue;
+                if (ParseAgeBand(comps[j].EventStyleAge) is not { } wide) continue;
+                if (participants[j].Count == 0) continue;
+
+                // Полосы-кандидаты: раньше по документу, без типа, строго уже общей.
+                var bands = new List<int>();
+                for (int ii = 0; ii < jj; ii++)
+                {
+                    int i = idxs[ii];
+                    if (types[i] is not null) continue;
+                    if (ParseAgeBand(comps[i].EventStyleAge) is not { } band) continue;
+                    if (band.Min < wide.Min || band.Max > wide.Max) continue;
+                    if (band.Min == wide.Min && band.Max == wide.Max) continue;
+                    bands.Add(i);
+                }
+                if (bands.Count < 2) continue;
+
+                // Полосы отбора не пересекаются; пересечение означало бы разные ПРОГРАММЫ
+                // («17» внутри «open»), а не разбиение одного отбора.
+                var ranges = bands.Select(i => ParseAgeBand(comps[i].EventStyleAge)!.Value).ToList();
+                bool overlapping = false;
+                for (int a = 0; a < ranges.Count && !overlapping; a++)
+                    for (int b = a + 1; b < ranges.Count && !overlapping; b++)
+                        overlapping = ranges[a].Min <= ranges[b].Max && ranges[b].Min <= ranges[a].Max;
+                if (overlapping) continue;
+
+                var union = new HashSet<string>();
+                foreach (var i in bands) union.UnionWith(participants[i]);
+                if (participants[j].Count >= union.Count) continue;
+                if (participants[j].Count(union.Contains) / (double)participants[j].Count < 0.9) continue;
+
+                types[j] = HeatTypes.Final;
+                foreach (var i in bands) types[i] = HeatTypes.Prelim;
+            }
+        }
+
         return types;
+    }
+
+    /// <summary>
+    /// Возрастная полоса из заголовка события: «15» → 15–15, «17-18» → 17–18, «14-99» → 14–99.
+    /// Нечисловые категории («open», «para», «shabbat», пусто) полосой не являются — null.
+    /// Двузначным ограничением отсекаются суммарные полосы masters-эстафет («120-159»):
+    /// это не возраст пловца, и складывать их с возрастными нельзя.
+    /// </summary>
+    private static (int Min, int Max)? ParseAgeBand(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        var v = raw.Trim();
+
+        var m = AgeBandRx.Match(v);
+        if (m.Success)
+        {
+            var min = int.Parse(m.Groups[1].Value);
+            var max = int.Parse(m.Groups[2].Value);
+            return min <= max ? (min, max) : null;
+        }
+
+        return int.TryParse(v, out var single) && single is > 0 and < 100 ? (single, single) : null;
     }
 
     /// <summary>

@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -164,6 +164,18 @@ public static class DependencyInjection
         // «Входящие» автозабора isr.org.il (фаза 6); провайдер живёт в Swimm.Parsing
         services.AddScoped<ICompetitionDiscoveryService, CompetitionDiscoveryService>();
 
+        // «Затянуть» одну строку входящих — общий путь одиночной кнопки и пакетного забора
+        services.AddScoped<IDiscoveryPreviewService, DiscoveryPreviewService>();
+
+        // Пакетное затягивание: пачка живёт дольше HTTP-запроса, поэтому синглтон
+        services.AddSingleton<IBulkPullService, BulkPullService>();
+
+        // Ленивая сверка подозрительных заплывов превью с карточками loglig
+        services.AddScoped<IPreviewRecordCheckService, PreviewRecordCheckService>();
+
+        // Штамповка loglig-id пловцам по протоколу соревнования (после импорта)
+        services.AddScoped<ILogligStampService, LogligStampService>();
+
         // «Синхронизация языков» из Discovery: EN/HE-имена пловцов из двуязычной пары PDF
         services.AddScoped<ISwimmerNameSyncService, SwimmerNameSyncService>();
 
@@ -186,6 +198,7 @@ public static class DependencyInjection
         services.AddScoped<ILogligClient, LogligClient>();
         services.AddScoped<ILogligMatchService, LogligMatchService>();
         services.AddScoped<IOfficialClubStandingService, OfficialClubStandingService>();
+        services.AddScoped<IRegulationFetchService, RegulationFetchService>();
 
         // Поиск кандидатов Loglig ID (шаг 4): serper.dev вместо закрытого Google CSE. Graceful —
         // пустой CandidateSearch:ApiKey отключает поиск (см. SerperCandidateSearchProvider).

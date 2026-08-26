@@ -74,6 +74,13 @@ public interface IDataCheckRunner
     Task<int?> FixSwimmerGenderAsync(int findingId, string gender, CancellationToken ct = default);
 
     /// <summary>
+    /// То же самое, но по САМОМУ пловцу, без находки: пол проставляют ещё и из превью
+    /// затягивания, где реестр проверок ещё не отрабатывал (соревнование не импортировано).
+    /// Возвращает число поправленных строк результата; null — пловца нет или пол неверный.
+    /// </summary>
+    Task<int?> SetSwimmerGenderAsync(int swimmerId, string gender, CancellationToken ct = default);
+
+    /// <summary>
     /// Выровнять пол пловца по находке `results.gender-vs-card`: ставит выбранный пол в
     /// карточку И приводит к нему ВСЕ его личные строки. Эстафеты не трогает — там пол
     /// команды, а не человека. Возвращает число поправленных строк; null — находка не

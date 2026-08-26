@@ -1,5 +1,7 @@
-﻿using System.Threading.RateLimiting;
+using System.IO.Compression;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.RateLimiting;
@@ -21,6 +23,25 @@ var builder = WebApplication.CreateBuilder(args);
 // appsettings.Local.json — gitignored, для локального переключения на другую БД.
 // Перекрывает appsettings.json и appsettings.{Environment}.json.
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
+
+// Сжатие ответов. Замер 2026-08-25: справочники, которые тянет КАЖДАЯ страница
+// (records + normative-standards), весят 1.9 МБ несжатыми и 118 КБ в gzip — 94%.
+// ⚠ Только application/json, и это НЕ экономия ради экономии: HTML админки отдаётся с
+// antiforgery-токеном, а сжатый ответ с секретом плюс подконтрольный злоумышленнику ввод —
+// это BREACH. Публичный JSON секретов не несёт, поэтому его жмём и по HTTPS тоже.
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+    options.MimeTypes = new[] { "application/json" };
+});
+// Optimal, а не Fastest: у brotli Fastest — это quality 1, он на справочниках проигрывает
+// даже gzip. Замер на 971 КБ: Fastest 83 КБ / 3 мс, Optimal 60 КБ / 5 мс. Два миллисекунды
+// за четверть трафика — выгодный размен, тем более что справочники живут в кэше браузера
+// по 5 минут и жмутся редко.
+builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Optimal);
+builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Optimal);
 
 builder.Services.AddMemoryCache();
 builder.Services.AddApplication();
@@ -199,6 +220,24 @@ if (args.Contains("--probe-club-standings"))
     Console.WriteLine(
         $"\nИтог: проверено {report.Checked}, с официальным зачётом {report.WithStanding}, " +
         $"без него {report.WithoutStanding}, не удалось проверить {report.Unknown}");
+    return;
+}
+
+// Штамповка loglig-id пловцам по протоколам:
+//   dotnet run -- --stamp-loglig-ids
+// На импорте это делается само (настройка LogligStampOnImport); прогон нужен для стартов,
+// импортированных раньше. Идёт по страницам заплывов на loglig — небыстро; соревнования,
+// где все пловцы уже привязаны, пропускаются без обращения к сайту.
+if (args.Contains("--stamp-loglig-ids"))
+{
+    using var scope = app.Services.CreateScope();
+    var svc = scope.ServiceProvider.GetRequiredService<ILogligStampService>();
+    var report = await svc.BackfillAsync();
+
+    foreach (var line in report.Lines) Console.WriteLine(line);
+    Console.WriteLine(
+        $"\nИтог: соревнований {report.Competitions}, привязано {report.Stamped}, " +
+        $"не нашлось {report.NotFound}, пропущено {report.Skipped}");
     return;
 }
 
@@ -437,6 +476,73 @@ if (args.Contains("--repull"))
         Console.WriteLine("  " + line);
     if (result.ErrorMessages.Count > 0)
         Console.WriteLine("ОШИБКИ: " + string.Join("; ", result.ErrorMessages.Take(5)));
+    return;
+}
+
+// Обновление справочника рекордов В ПРАВИЛЬНОМ ПОРЯДКЕ:
+//   dotnet run -- --records-refresh [--dry-run]
+//
+// Порядок здесь — не деталь реализации, а САМО ПРАВИЛО (решение Влада 2026-08-24).
+// На country/ISR/open пишут ДВА источника с одним ключом упсерта: отчёт NR World Aquatics
+// (есть по всем 246 странам, но по Израилю отстал местами на 10 лет — 50 на спине 50 м у
+// них 24.60 от 2016 против 24.36 от 14/08/2026 у федерации) и PDF isr.org.il. Побеждает
+// применённый ПОСЛЕДНИМ, поэтому Израиль идёт вторым: World Aquatics приносит широту
+// (мировые рекорды + всё, чего у федерации нет), федерация поверх возвращает свои свежие.
+//
+// Ровно поэтому источники перечислены списком, а не запускаются как попало из админки:
+// перепутанный порядок молча откатывает 19 национальных рекордов.
+// Подробности — docs/data-integrity.md, И-13.
+if (args.Contains("--records-refresh"))
+{
+    var dryRun = args.Contains("--dry-run");
+    using var scope = app.Services.CreateScope();
+    var providers = scope.ServiceProvider.GetServices<IRecordSourceProvider>()
+        .ToDictionary(p => p.Source, StringComparer.OrdinalIgnoreCase);
+    var diffService = scope.ServiceProvider.GetRequiredService<IRecordDiffService>();
+
+    string[] order = ["worldrecords", "isrorg-age"];
+    foreach (var sourceKey in order)
+    {
+        if (!providers.TryGetValue(sourceKey, out var provider))
+        {
+            Console.Error.WriteLine($"Источник '{sourceKey}' не зарегистрирован — пропуск");
+            continue;
+        }
+
+        Console.WriteLine($"\n=== {sourceKey} ===");
+        IReadOnlyList<Swimm.Application.Dtos.ParsedRecordDto> parsed;
+        try
+        {
+            parsed = await provider.FetchAsync(
+                new Swimm.Application.Dtos.RecordSourceRequest(sourceKey, null, null, null, null, null));
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"  не скачалось: {ex.Message}");
+            continue;
+        }
+
+        var diff = await diffService.BuildDiffAsync(sourceKey, parsed);
+        Console.WriteLine($"  строк из источника: {parsed.Count}; без изменений {diff.UnchangedCount}, "
+            + $"изменится {diff.ChangedCount}, новых {diff.AddedCount}, нет в источнике {diff.MissingInSourceCount}");
+        foreach (var e in diff.Changed.Take(30))
+            Console.WriteLine($"    {e.RegionType,-7} {e.RegionCode,-3} {e.Gender,-6} {e.PoolType,-4} "
+                + $"{e.Style,-18} {e.Distance,-7} {e.OldTime ?? "(пусто)",9} -> {e.NewTime,9}");
+        if (diff.ChangedCount > 30) Console.WriteLine($"    … ещё {diff.ChangedCount - 30}");
+        foreach (var e in diff.Added.Take(15))
+            Console.WriteLine($"    + {e.RegionType,-7} {e.RegionCode,-3} {e.Gender,-6} {e.PoolType,-4} "
+                + $"{e.Style,-18} {e.Distance,-7} {e.NewTime,9}");
+
+        if (dryRun) { Console.WriteLine("  --dry-run: не применяю"); continue; }
+
+        var applied = await diffService.ApplyAsync(
+            new Swimm.Application.Dtos.RecordDiffApplyRequest(diff.DiffId, ApplyAdded: true, ApplyChanged: true));
+        Console.WriteLine(applied.Success
+            ? $"  применено: {applied.AppliedCount}"
+            : $"  ОШИБКА: {applied.Error}");
+    }
+
+    Console.WriteLine("\nГотово. Израиль обновлён ПОСЛЕ World Aquatics — иначе его рекорды откатятся.");
     return;
 }
 
@@ -773,6 +879,9 @@ if (args.Contains("--backfill-discovery-orgcompid"))
 if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 
+// До статики и эндпоинтов: иначе middleware не увидит ответ, который надо сжать.
+app.UseResponseCompression();
+
 app.UseRouting();
 
 app.UseRateLimiter();
@@ -895,6 +1004,7 @@ app.Use(async (context, next) =>
                 "clubs" => "/results_main.html",     // /clubs без id — пусть падает штатно
                 "my-media" => "/media.html",
                 "about" => "/about.html",
+                "season-best" => "/season-best.html",   // весь фильтр в query
                 _ => null,
             },
             >= 2 => seg[0] switch

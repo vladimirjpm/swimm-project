@@ -147,4 +147,101 @@ public class IsrOrgHeatTypeTests
 
         Assert.All(types, t => Assert.Null(t));
     }
+
+    // ── Отбор разбит по возрастным полосам, финал у них ОДИН общий ──────────────────
+
+    [Fact]
+    public void AgeBandPrelims_WithOneCombinedFinal_ArePaired()
+    {
+        // Зимний чемпионат נוער ובוגרים, 26/12/2025, 50 вольным мужчины: утром четыре
+        // отдельных события («בנים 15», «בנים 16», «גברים 17-18», «גברים 19-99»),
+        // вечером один «גברים 14-99» на 30 человек — финалы А/Б/В.
+        //
+        // Точный ключ их не парит (полосы разные), попарный проход тоже (финал крупнее
+        // любой отдельной полосы), и до фикса все пять событий оставались без типа:
+        // финалист показывался ДВАЖДЫ — утренним заплывом и вечерним, оба с местом 1.
+        var band15 = Enumerable.Range(1, 60).ToArray();
+        var band16 = Enumerable.Range(101, 53).ToArray();
+        var band1718 = Enumerable.Range(201, 51).ToArray();
+        var band1999 = Enumerable.Range(301, 28).ToArray();
+        int[] final = [301, 302, 303, 201, 202, 203, 204, 101, 102, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+                       11, 12, 13, 14, 15, 205, 206, 103, 104, 304, 305];
+
+        var types = IsrOrgParser.AssignHeatTypes(
+        [
+            Comp("26/12/2025", len: "50", gender: "male", age: "15", swimmers: band15),
+            Comp("26/12/2025", len: "50", gender: "male", age: "16", swimmers: band16),
+            Comp("26/12/2025", len: "50", gender: "male", age: "17-18", swimmers: band1718),
+            Comp("26/12/2025", len: "50", gender: "male", age: "19-99", swimmers: band1999),
+            Comp("26/12/2025", len: "50", gender: "male", age: "14-99", swimmers: final),
+        ]);
+
+        Assert.Equal(["prelim", "prelim", "prelim", "prelim", "final"], types);
+    }
+
+    [Fact]
+    public void AgeBandPrelims_FinalWithOutsiders_NotPaired()
+    {
+        // Если в позднем событии половина пловцов не стартовала утром — это не финал
+        // этих полос, а самостоятельный заплыв. Метки не ставим.
+        var types = IsrOrgParser.AssignHeatTypes(
+        [
+            Comp("26/12/2025", len: "50", gender: "male", age: "15", swimmers: [1, 2, 3, 4, 5, 6, 7, 8]),
+            Comp("26/12/2025", len: "50", gender: "male", age: "16", swimmers: [11, 12, 13, 14, 15, 16]),
+            Comp("26/12/2025", len: "50", gender: "male", age: "14-99", swimmers: [1, 2, 11, 51, 52, 53]),
+        ]);
+
+        Assert.All(types, t => Assert.Null(t));
+    }
+
+    [Fact]
+    public void OverlappingBands_AreProgrammes_NotPrelimSplit()
+    {
+        // Полосы отбора не пересекаются по определению. Пересечение («14-15» и «15-16»
+        // делят возраст 15) означает разные ПРОГРАММЫ, а не разбиение одного отбора.
+        //
+        // Состав позднего события набран из ОБЕИХ полос сразу, поэтому попарное правило
+        // (проход 2) молчит — сработать могло бы только правило полос, и оно обязано
+        // отказаться из-за пересечения.
+        var types = IsrOrgParser.AssignHeatTypes(
+        [
+            Comp("26/12/2025", len: "50", gender: "male", age: "14-15", swimmers: [1, 2, 3, 4, 5, 6, 7, 8]),
+            Comp("26/12/2025", len: "50", gender: "male", age: "15-16", swimmers: [5, 6, 7, 8, 9, 10, 11, 12]),
+            Comp("26/12/2025", len: "50", gender: "male", age: "14-99", swimmers: [1, 2, 9, 10]),
+        ]);
+
+        Assert.All(types, t => Assert.Null(t));
+    }
+
+    [Fact]
+    public void NonNumericCategories_AreNeverTreatedAsAgeBands()
+    {
+        // Маккабиада: «U17 Boys», «Men Para», «Men» — три программы одной дисциплины.
+        // Состав позднего события набран из двух ранних (попарное правило молчит), но
+        // «open»/«para» возрастной полосой не являются, поэтому правило полос к ним не
+        // применяется вовсе — три программы остаются тремя программами.
+        var types = IsrOrgParser.AssignHeatTypes(
+        [
+            Comp("05/07/2026", len: "50", gender: "male", age: "17", swimmers: [1, 2, 3, 4, 5, 6, 7, 8]),
+            Comp("05/07/2026", len: "50", gender: "male", age: "para", swimmers: [21, 22, 23, 24, 25, 26]),
+            Comp("05/07/2026", len: "50", gender: "male", age: "open", swimmers: [1, 2, 21, 22]),
+        ]);
+
+        Assert.All(types, t => Assert.Null(t));
+    }
+
+    [Fact]
+    public void MastersRelayCumulativeBands_AreNotAges()
+    {
+        // «120-159» у masters-эстафет — СУММА возрастов команды, а не возраст пловца.
+        // Складывать такие полосы с возрастными нельзя, поэтому полосами они не считаются.
+        var types = IsrOrgParser.AssignHeatTypes(
+        [
+            Comp("05/07/2026", len: "4X50", gender: "male", age: "120-159", swimmers: [1, 2, 3, 4]),
+            Comp("05/07/2026", len: "4X50", gender: "male", age: "160-199", swimmers: [5, 6, 7, 8]),
+            Comp("05/07/2026", len: "4X50", gender: "male", age: "100-399", swimmers: [1, 5]),
+        ]);
+
+        Assert.All(types, t => Assert.Null(t));
+    }
 }

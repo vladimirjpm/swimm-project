@@ -1,0 +1,32 @@
+/* Страница /season-best — пока заготовка. Токены темы берём из deep-theme.css: экран
+   должен выглядеть частью того же продукта, что и страница спортсмена, откуда сюда ведут
+   ссылки. Своих цветов не заводим — только раскладка. */
+
+.sb-head { margin-bottom: 16px; }
+.sb-head__title {
+  font-family: var(--deep-font-display); font-size: 24px; line-height: 1.15;
+  color: var(--deep-text);
+}
+.sb-head__sub {
+  margin-top: 4px;
+  font-size: 12px; font-weight: 700; color: var(--deep-text-faint);
+}
+
+.sb-empty {
+  padding: 40px 20px; text-align: center;
+  border-radius: var(--deep-radius-card);
+  border: 1px dashed var(--deep-card-border);
+  background: var(--deep-card-bg);
+}
+.sb-empty__title {
+  font-family: var(--deep-font-display); font-size: 16px; color: var(--deep-text-mute);
+}
+.sb-empty__text {
+  margin: 8px auto 0; max-width: 46ch;
+  font-size: 13px; line-height: 1.6; color: var(--deep-text-faint);
+}
+.sb-empty__back {
+  display: inline-block; margin-top: 16px;
+  font-size: 12px; font-weight: 800; color: var(--deep-accent); text-decoration: none;
+}
+.sb-empty__back:hover { text-decoration: underline; }

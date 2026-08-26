@@ -86,6 +86,57 @@ public class IsrOrgRecordsPageResolverTests(Xunit.Abstractions.ITestOutputHelper
         Assert.Equal("50m", short50.PoolType);
     }
 
+    /// <summary>
+    /// Бассейн берётся ИЗ ПОДПИСИ, а не из имени файла. Проверка не теоретическая: в регэксп
+    /// PoolRx литералом затёк невидимый U+0008, он не совпадал никогда, и бассейн молча
+    /// определялся только по имени файла. Пока подпись и файл согласны, ошибку не видно —
+    /// поэтому тест кормит ссылку, где они РАСХОДЯТСЯ (docs/data-integrity.md, И-15).
+    /// </summary>
+    [Fact]
+    public void PoolComesFromTheLabel_NotOnlyFromTheFileName()
+    {
+        const string html = """
+            <a href="/pics/%D7%A9%D7%99%D7%90%D7%99%20%D7%99%D7%A9%D7%A8%D7%90%D7%9C%20%D7%91%D7%A8%D7%99%D7%9B%D7%94%20%D7%90%D7%A8%D7%95%D7%9B%D7%94%2017_08_2026.pdf">שיאי ישראל בוגרים ונוער: בריכת 25 מטר</a>
+            """;
+
+        var link = Assert.Single(IsrOrgRecordsPageResolver.ParseLinks(html, PageUri));
+
+        Assert.Equal("25m", link.PoolType);   // подпись говорит 25 м, имя файла — «ארוכה» (длинная)
+        Assert.False(link.Trusted);            // …и раз они спорят, ссылке не верим
+    }
+
+    /// <summary>
+    /// Живая поломка на стороне федерации (2026-08-24): ссылка «שיאי מאסטרס: בריכת 25 מטר»
+    /// ведёт на «שיאי ישראל בריכה ארוכה» — файл НЕ мастерс и НЕ короткой воды. Автозагрузка
+    /// обязана отказаться: скормить парсеру мастерс-рекордов справочник בוגרים ונוער хуже,
+    /// чем честно сказать «не нашлось, грузите руками».
+    /// </summary>
+    [Fact]
+    public void BrokenSiteLink_IsNotPickedForAutoFetch()
+    {
+        const string html = """
+            <a href="/pics/%D7%A9%D7%99%D7%90%D7%99%D7%9D%20%D7%9E%D7%90%D7%A1%D7%98%D7%A8%D7%A1%20%D7%90%D7%A8%D7%95%D7%9B%D7%94%20-%204_25.pdf">שיאי מאסטרס: בריכת 50 מטר</a>
+            <a href="/pics/%D7%A9%D7%99%D7%90%D7%99%20%D7%99%D7%A9%D7%A8%D7%90%D7%9C%20%D7%91%D7%A8%D7%99%D7%9B%D7%94%20%D7%90%D7%A8%D7%95%D7%9B%D7%94%2017_08_2026.pdf">שיאי מאסטרס: בריכת 25 מטר</a>
+            """;
+
+        var links = IsrOrgRecordsPageResolver.ParseLinks(html, PageUri);
+
+        // Целая ссылка мастерс-50 берётся как обычно…
+        Assert.NotNull(IsrOrgRecordsPageResolver.Pick(links, isMasters: true, "50m"));
+        // …а битая мастерс-25 автозагрузке не достаётся.
+        Assert.Null(IsrOrgRecordsPageResolver.Pick(links, isMasters: true, "25m"));
+
+        // Но из СПИСКА не исчезает: админ должен видеть, что сломано у федерации, а не у нас.
+        Assert.Contains(links, l => !l.Trusted && l.PoolType == "25m" && l.IsMasters);
+    }
+
+    [Fact]
+    public void GoodPage_HasNoBrokenLinks()
+    {
+        // Контроль на нормальной фикстуре: доверие не должно теряться на ровном месте.
+        Assert.All(IsrOrgRecordsPageResolver.ParseLinks(PageHtml, PageUri), l => Assert.True(l.Trusted));
+    }
+
     [Fact]
     public void EnsureWhitelisted_RejectsForeignHost()
     {

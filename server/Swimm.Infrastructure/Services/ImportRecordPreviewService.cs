@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
@@ -60,7 +60,9 @@ public class ImportRecordPreviewService(SwimmDbContext db, ISettingsService? set
                     Gender = b.Row.Gender,
                     Time = b.Row.TimeOriginal,
                     RecordTime = b.Rec.Time,
-                    RecordHolder = b.Rec.HolderName ?? ""
+                    RecordHolder = b.Rec.HolderName ?? "",
+                    BirthYear = b.Row.BirthYear,
+                    PoolType = b.Row.PoolType
                 }).ToList()
             };
         }

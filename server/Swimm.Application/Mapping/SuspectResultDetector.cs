@@ -33,7 +33,11 @@ public sealed record SuspectCandidateRow(
     /// <summary>Пол ПЛОВЦА из карточки (male/female); null или пусто — не заполнен.
     /// Опора правила «пол результата расходится с полом пловца»: она прямее, чем
     /// большинство по заплывам этого соревнования.</summary>
-    string? SwimmerGender = null);
+    string? SwimmerGender = null,
+    /// <summary>Бассейн соревнования (25m / 50m). Обязателен правилу «быстрее мирового
+    /// рекорда»: рекордов на дистанцию ДВА — короткой и длинной воды, и разница между ними
+    /// больше, чем разрыв между сильным пловцом и рекордсменом (И-13).</summary>
+    string? PoolType = null);
 
 /// <summary>
 /// Заплыв пловца из его личной истории (для правила «выброс относительно себя»).
@@ -57,37 +61,18 @@ public sealed record SuspectVerdict(long ResultId, string Reason, string Note);
 /// </summary>
 public static class SuspectResultDetector
 {
-    /// <summary>
-    /// Мировые рекорды на 2026 — нижняя граница физически возможного. Ключ —
-    /// "пол|стиль|дистанция". Пол обязателен: женские рекорды на 5–8% медленнее мужских,
-    /// и по мужскому порогу женские ошибки проходят незамеченными (реальный случай —
-    /// 00:53.42 на 100 м баттерфляем у Ophir RAKAH: быстрее женского рекорда 54.60,
-    /// но медленнее мужского 47.78).
-    ///
-    /// Правило грубое и потому надёжное: ловит не «слишком быстро для этого пловца», а
-    /// «быстрее, чем плавал кто-либо на планете» — возраст и уровень тут не нужны.
-    /// </summary>
-    private static readonly Dictionary<string, int> WorldBestMs = new()
-    {
-        ["male|freestyle|50"] = 20_910,       ["female|freestyle|50"] = 23_610,
-        ["male|freestyle|100"] = 46_400,      ["female|freestyle|100"] = 51_710,
-        ["male|freestyle|200"] = 102_000,     ["female|freestyle|200"] = 112_230,
-        ["male|freestyle|400"] = 220_070,     ["female|freestyle|400"] = 235_380,
-        ["male|freestyle|800"] = 452_270,     ["female|freestyle|800"] = 484_790,
-        ["male|freestyle|1500"] = 866_700,    ["female|freestyle|1500"] = 920_480,
-        ["male|backstroke|50"] = 23_550,      ["female|backstroke|50"] = 26_860,
-        ["male|backstroke|100"] = 51_600,     ["female|backstroke|100"] = 57_130,
-        ["male|backstroke|200"] = 111_920,    ["female|backstroke|200"] = 123_140,
-        ["male|breaststroke|50"] = 25_950,    ["female|breaststroke|50"] = 28_370,
-        ["male|breaststroke|100"] = 56_880,   ["female|breaststroke|100"] = 64_130,
-        ["male|breaststroke|200"] = 125_480,  ["female|breaststroke|200"] = 137_550,
-        ["male|butterfly|50"] = 21_320,       ["female|butterfly|50"] = 24_430,
-        ["male|butterfly|100"] = 47_780,      ["female|butterfly|100"] = 54_600,
-        ["male|butterfly|200"] = 110_340,     ["female|butterfly|200"] = 121_810,
-        ["male|individual_medley|100"] = 49_280,  ["female|individual_medley|100"] = 56_510,
-        ["male|individual_medley|200"] = 113_700, ["female|individual_medley|200"] = 126_120,
-        ["male|individual_medley|400"] = 243_280, ["female|individual_medley|400"] = 264_380,
-    };
+    /* ── Порог «быстрее, чем плавал кто-либо на планете» ──────────────────────────
+     * Мировые рекорды приходят СНАРУЖИ, из того же справочника Records, что показывает
+     * попап Normative Info (см. WorldBestReference). Своя копия в коде разъезжается со
+     * справочником молча: прежний список из 36 строк содержал 20 рекордов длинной воды,
+     * 3 короткой и 13 протухших — и про бассейн не знал вовсе (docs/data-integrity.md, И-13).
+     *
+     * Правило грубое и потому надёжное: ловит не «слишком быстро для этого пловца», а
+     * «быстрее всех на планете» — возраст и уровень тут не нужны. Пол в ключе обязателен:
+     * женские рекорды на 5–8% медленнее мужских, и по мужскому порогу женские ошибки
+     * проходят незамеченными (00:53.42 на 100 м баттерфляем у Ophir RAKAH: быстрее
+     * женского рекорда, но медленнее мужского).
+     */
 
     /// <summary>
     /// Запаса нет: помечаем всё быстрее мирового рекорда. Настоящий новый мировой рекорд на
@@ -167,9 +152,14 @@ public static class SuspectResultDetector
     /// Заплывы пловцов по их Id — своя история за пределами этого соревнования тоже.
     /// null/пусто — правило «выброс относительно себя» просто не работает (остальные живут).
     /// </param>
+    /// <param name="worldBests">
+    /// Справочник мировых рекордов из БД (<see cref="WorldBestReference"/>). null/пустой —
+    /// правила 1 и 2 молчат: обвинять «быстрее рекорда», не зная рекорда, нельзя.
+    /// </param>
     public static List<SuspectVerdict> Detect(
         IReadOnlyCollection<SuspectCandidateRow> rows,
-        IReadOnlyDictionary<int, IReadOnlyList<PersonalSwim>>? personalHistory = null)
+        IReadOnlyDictionary<int, IReadOnlyList<PersonalSwim>>? personalHistory = null,
+        WorldBestReference? worldBests = null)
     {
         var verdicts = new Dictionary<long, SuspectVerdict>();
 
@@ -186,14 +176,23 @@ public static class SuspectResultDetector
                 verdicts[row.ResultId] = new SuspectVerdict(row.ResultId, reason, note);
         }
 
+        var wr = worldBests ?? WorldBestReference.Empty;
+
         // 1. Быстрее мирового рекорда — самое надёжное правило, идёт первым.
+        //    Рекорд берётся ПО БАССЕЙНУ заплыва: короткая вода на 1.5–4% быстрее длинной,
+        //    и сверка 25-метрового результата с рекордом 50 м обвиняла нормальные заплывы
+        //    (И-13). Если рекорда своего бассейна в справочнике нет, порог берётся из
+        //    короткой воды — он мягче — и пометка об этом ГОВОРИТ.
         foreach (var row in timed)
         {
-            if (!TryWorldBest(row.Gender, row.StyleName, TrimDistance(row.Distance), out var best))
+            if (!wr.TryGet(row.Gender, row.StyleName, TrimDistance(row.Distance), row.PoolType,
+                    out var best, out var poolNote))
                 continue;
             if (row.TimeMilliseconds!.Value >= best * WorldBestTolerance) continue;
+            var poolUsed = WorldBestReference.PoolLabel(poolNote is null ? row.PoolType : WorldBestReference.ShortCourse);
             Flag(row, SuspectReasons.TimeVsDistance,
-                $"{Fmt(row.TimeMilliseconds.Value)} на {row.Distance} м {row.StyleName} — быстрее мирового рекорда ({Fmt(best)})");
+                $"{Fmt(row.TimeMilliseconds.Value)} на {row.Distance} м {row.StyleName} — быстрее мирового рекорда "
+                + $"{poolUsed} ({Fmt(best)}){FallbackSuffix(poolNote)}");
         }
 
         // 2. Время уровня одной ноги эстафеты: быстрее, чем возможно на этой дистанции, но
@@ -203,13 +202,16 @@ public static class SuspectResultDetector
         {
             var dist = TrimDistance(row.Distance);
             if (!int.TryParse(dist, out var meters) || meters < 100) continue;
-            if (!TryWorldBest(row.Gender, row.StyleName, meters.ToString(), out var best)) continue;
-            if (!TryWorldBest(row.Gender, row.StyleName, (meters / 2).ToString(), out var half)) continue;
+            if (!wr.TryGet(row.Gender, row.StyleName, meters.ToString(), row.PoolType, out var best, out var note))
+                continue;
+            if (!wr.TryGet(row.Gender, row.StyleName, (meters / 2).ToString(), row.PoolType, out var half, out var halfNote))
+                continue;
             var ms = row.TimeMilliseconds!.Value;
             if (ms >= best * WorldBestTolerance) continue;
             if (ms < half * WorldBestTolerance) continue;
             Flag(row, SuspectReasons.RelayTimeInIndividual,
-                $"{Fmt(ms)} на {row.Distance} м — похоже на время отрезка {meters / 2} м, а не всей дистанции");
+                $"{Fmt(ms)} на {row.Distance} м — похоже на время отрезка {meters / 2} м, а не всей дистанции"
+                + FallbackSuffix(note ?? halfNote));
         }
 
         // 3. Выброс относительно своей дисциплины В СВОЕЙ возрастной ступени.
@@ -352,16 +354,8 @@ public static class SuspectResultDetector
         return row.TimeMilliseconds!.Value >= peers.Min() * HeatPlausibleFactor;
     }
 
-    /// <summary>
-    /// Порог по полу. Для смешанных/неизвестных ("none", mix) берём мужской — он быстрее,
-    /// то есть требование мягче: лучше пропустить, чем пометить корректную строку с
-    /// неопределённым полом.
-    /// </summary>
-    private static bool TryWorldBest(string gender, string style, string distance, out int best)
-    {
-        var key = gender is "male" or "female" ? gender : "male";
-        return WorldBestMs.TryGetValue($"{key}|{style}|{distance}", out best);
-    }
+    /// <summary>Пояснение к пометке, если порог взят не из бассейна заплыва.</summary>
+    private static string FallbackSuffix(string? note) => note is null ? string.Empty : $"; {note}";
 
     /// <summary>Results.Distance приходит и как "100", и как "100m".</summary>
     private static string TrimDistance(string distance)

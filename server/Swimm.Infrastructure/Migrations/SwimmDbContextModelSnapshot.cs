@@ -203,6 +203,12 @@ namespace Swimm.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<int?>("MaxAge")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("MinAge")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -226,6 +232,8 @@ namespace Swimm.Infrastructure.Migrations
                             Badge = "K",
                             DisplayOrder = 1,
                             Key = "results-kids-team",
+                            MaxAge = 11,
+                            MinAge = 8,
                             Name = "Kids",
                             NameHe = "ילדים"
                         },
@@ -235,6 +243,8 @@ namespace Swimm.Infrastructure.Migrations
                             Badge = "Y",
                             DisplayOrder = 2,
                             Key = "results-youth-team",
+                            MaxAge = 14,
+                            MinAge = 11,
                             Name = "Young",
                             NameHe = "צעירים"
                         },
@@ -244,6 +254,8 @@ namespace Swimm.Infrastructure.Migrations
                             Badge = "J",
                             DisplayOrder = 3,
                             Key = "results-junior-results",
+                            MaxAge = 17,
+                            MinAge = 14,
                             Name = "Juniors",
                             NameHe = "נוער"
                         },
@@ -253,6 +265,7 @@ namespace Swimm.Infrastructure.Migrations
                             Badge = "A",
                             DisplayOrder = 4,
                             Key = "results-main",
+                            MinAge = 17,
                             Name = "Adults",
                             NameHe = "בוגרים"
                         },

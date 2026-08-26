@@ -3,6 +3,7 @@ using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
+using Swimm.Domain;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -147,15 +148,15 @@ public class SwimmerPageRepository : ISwimmerPageRepository
         };
     }
 
-    public async Task<int> CountRecordsHeldAsync(int swimmerId)
+    public async Task<IReadOnlyList<HeldRecordRow>> GetRecordsHeldAsync(int swimmerId)
     {
-        if (swimmerId <= 0) return 0;
+        if (swimmerId <= 0) return [];
 
         var s = await _read.Swimmers.AsNoTracking()
             .Where(x => x.Id == swimmerId)
             .Select(x => new { x.FirstName, x.LastName, x.FirstNameEn, x.LastNameEn })
             .FirstOrDefaultAsync();
-        if (s is null) return 0;
+        if (s is null) return [];
 
         // Оба порядка имени и EN-вариант — как в именном пути карьеры: в справочнике рекордов
         // держатель записан строкой и порядок частей не гарантирован.
@@ -168,10 +169,40 @@ public class SwimmerPageRepository : ISwimmerPageRepository
             .Where(n => n.Length > 1)
             .Distinct()
             .ToList();
-        if (names.Count == 0) return 0;
+        if (names.Count == 0) return [];
 
-        return await _read.Records.AsNoTracking()
-            .CountAsync(r => r.HolderName != null && names.Contains(r.HolderName));
+        var records = await _read.Records.AsNoTracking()
+            .Where(r => r.HolderName != null && names.Contains(r.HolderName))
+            .Select(r => new
+            {
+                r.RegionType, r.RegionCode, r.Category, r.AgeKey, r.Gender,
+                r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate,
+            })
+            .ToListAsync();
+        if (records.Count == 0) return [];
+
+        // Претензии тянем целиком: таблица штучная (единицы строк), а сузить её запросом
+        // нельзя — рекорды пловца разбросаны по регионам, категориям и ступеням.
+        var issues = (await _read.RecordIssues.AsNoTracking()
+                .Where(i => i.Status == RecordIssueStatuses.Open
+                            || i.Status == RecordIssueStatuses.Reported
+                            || i.Status == RecordIssueStatuses.Accepted)
+                .Select(i => new { i.PoolType, i.Style, i.Distance, i.FlaggedTime, i.Reason })
+                .ToListAsync())
+            .GroupBy(i => IssueKey(i.PoolType, i.Style, i.Distance, i.FlaggedTime))
+            .ToDictionary(g => g.Key, g => g.First().Reason);
+
+        return records
+            .OrderBy(r => r.RegionType == "country" ? 0 : 1)   // страна выше клубной/иной ступени
+            .ThenBy(r => r.Distance.Length).ThenBy(r => r.Distance)
+            .Select(r =>
+            {
+                issues.TryGetValue(IssueKey(r.PoolType, r.Style, r.Distance, r.Time), out var issue);
+                return new HeldRecordRow(
+                    r.RegionType, r.RegionCode, r.Category, r.AgeKey, r.Gender,
+                    r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate, issue);
+            })
+            .ToList();
     }
 
     public async Task<IReadOnlyDictionary<string, int>> GetClubBestMsAsync(int clubId)
@@ -209,6 +240,54 @@ public class SwimmerPageRepository : ISwimmerPageRepository
 
         await _cache.SetAsync(key, best, Ttl);
         return best;
+    }
+
+    public async Task<IReadOnlyList<PeerSeasonBest>> GetAgeCohortSeasonBestsAsync(
+        int seasonStartYear, int birthYear)
+    {
+        if (birthYear <= 0) return [];
+
+        // Ключ КОГОРТЫ, а не пловца: у 326 сверстников 2017 года одна и та же выборка,
+        // и считать её 326 раз незачем.
+        var key = $"age-cohort-season-bests:{seasonStartYear}:{birthYear}";
+        var cached = await _cache.GetAsync<List<PeerSeasonBest>>(key);
+        if (cached is not null) return cached;
+
+        var (start, endExclusive) = SeasonMath.RangeOf(seasonStartYear);
+
+        // Группировка в SQL: наружу выходит «лучшее сверстника в дисциплине», а не все его
+        // заплывы (замер на живой базе: 81k строк → 2.3k групп, 16 мс). Отбор строк — те же
+        // правила, что у SeasonAggregator.IsCountable.
+        var grouped = await _read.Results.AsNoTracking()
+            .Where(r => r.CompetitionDate >= start
+                        && r.CompetitionDate < endExclusive
+                        && r.Swimmer.BirthYear == birthYear
+                        && r.RelayId == null
+                        && !r.TimeFail
+                        && r.SuspectReason == null
+                        && r.TimeMillisecond > 0)
+            .GroupBy(r => new { r.SwimmerId, r.StyleId, r.Distance, r.Competition.PoolType, r.Gender })
+            .Select(g => new
+            {
+                g.Key.SwimmerId,
+                g.Key.StyleId,
+                g.Key.Distance,
+                g.Key.PoolType,
+                g.Key.Gender,
+                Ms = g.Min(x => x.TimeMillisecond),
+            })
+            .ToListAsync();
+
+        var rows = grouped
+            .Where(g => g.Ms is > 0)
+            .Select(g => new PeerSeasonBest(
+                g.SwimmerId,
+                SeasonAggregator.DisciplineKey(g.StyleId, g.Distance, g.PoolType, g.Gender),
+                g.Ms!.Value))
+            .ToList();
+
+        await _cache.SetAsync(key, rows, Ttl);
+        return rows;
     }
 
     public async Task<IReadOnlyDictionary<string, NationalAgeRecordRow>> GetNationalAgeRecordsAsync(
