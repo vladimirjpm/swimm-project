@@ -340,4 +340,111 @@ public class SwimmerPageBuilderTests
         Assert.Empty(progress.Points);
         Assert.Equal("нет-такой", progress.DisciplineKey);
     }
+
+    // ── Season best: место среди сверстников ─────────────────────────────────
+
+    /// <summary>Лучшее время сверстника в дисциплине; ключ собирается так же, как в репозитории.</summary>
+    private static PeerSeasonBest Peer(int swimmerId, int ms, int styleId = 1, string distance = "100") =>
+        new(swimmerId, SeasonAggregator.DisciplineKey(styleId, distance, "25m", "male"), ms);
+
+    [Fact]
+    public void SeasonRanks_CountsPlaceAmongPeers_AndLabelsTheGroup()
+    {
+        var rows = new[] { Row(1, "2026-02-16", ms: 60000) };
+        var cohort = new[]
+        {
+            Peer(Swimmer, 60000),
+            Peer(7, 58000),      // быстрее — он первый
+            Peer(8, 61000),
+        };
+
+        var dto = SwimmerPageBuilder.SeasonRanks(rows, season: 2025, birthYear: 2017, "male", cohort);
+
+        var rank = Assert.Single(dto.Rows);
+        Assert.Equal(2, rank.Rank);
+        Assert.Equal(3, rank.PeerCount);
+        Assert.Equal(58000, rank.LeaderTimeMs);
+        Assert.Equal(2000, rank.GapToLeaderMs);
+        Assert.Equal(9, dto.Age);              // сезон 2025/26 → возраст по 2026
+        Assert.Equal("boys 9", dto.GroupLabel);
+    }
+
+    [Fact]
+    public void SeasonRanks_EqualTimes_ShareThePlace()
+    {
+        // Спортивный ранжир: двое с одинаковым временем оба вторые, следующий — четвёртый.
+        var rows = new[] { Row(1, "2026-02-16", ms: 60000) };
+        var cohort = new[] { Peer(Swimmer, 60000), Peer(7, 59000), Peer(8, 60000), Peer(9, 61000) };
+
+        var dto = SwimmerPageBuilder.SeasonRanks(rows, season: 2025, birthYear: 2017, "male", cohort);
+
+        Assert.Equal(2, Assert.Single(dto.Rows).Rank);
+    }
+
+    [Fact]
+    public void SeasonRanks_FastestInTheGroup_IsFirst()
+    {
+        var rows = new[] { Row(1, "2026-02-16", ms: 58000) };
+        var cohort = new[] { Peer(Swimmer, 58000), Peer(7, 59000) };
+
+        var dto = SwimmerPageBuilder.SeasonRanks(rows, season: 2025, birthYear: 2017, "female", cohort);
+
+        var rank = Assert.Single(dto.Rows);
+        Assert.Equal(1, rank.Rank);
+        Assert.Equal(0, rank.GapToLeaderMs);
+        Assert.Equal("girls 9", dto.GroupLabel);
+    }
+
+    [Fact]
+    public void SeasonRanks_CareerScope_HasNoPlaces()
+    {
+        // «Где я среди сверстников» живёт внутри сезона: за карьеру сравнивать не с чем.
+        var rows = new[] { Row(1, "2026-02-16") };
+
+        var dto = SwimmerPageBuilder.SeasonRanks(rows, season: null, birthYear: 2017, "male", []);
+
+        Assert.Empty(dto.Rows);
+        Assert.Null(dto.Age);
+        Assert.Equal("career", dto.Label);
+    }
+
+    [Fact]
+    public void SeasonRanks_DisciplineMissingFromCohort_IsSkipped_NotDeclaredFirst()
+    {
+        // Своей строки в когорте нет (год рождения в справочнике разъехался) — молча объявить
+        // первое место нельзя: цифра выглядела бы достижением, не будучи им.
+        var rows = new[] { Row(1, "2026-02-16", ms: 60000) };
+
+        var dto = SwimmerPageBuilder.SeasonRanks(rows, season: 2025, birthYear: 2017, "male", []);
+
+        Assert.Empty(dto.Rows);
+    }
+
+    [Fact]
+    public void SeasonRanks_SkipsDsqAndFlaggedSwims_LikeBestTimes()
+    {
+        // Отбор строк тот же, что у /best-times: DSQ и помеченное время местом не награждаются.
+        var rows = new[]
+        {
+            Row(1, "2026-02-16", ms: 55000, timeFail: true),
+            Row(2, "2026-02-16", styleId: 2, ms: 55000, suspect: "personal_outlier"),
+            Row(3, "2026-02-16", ms: 60000),
+        };
+        var cohort = new[] { Peer(Swimmer, 60000), Peer(7, 59000) };
+
+        var dto = SwimmerPageBuilder.SeasonRanks(rows, season: 2025, birthYear: 2017, "male", cohort);
+
+        Assert.Equal(2, Assert.Single(dto.Rows).Rank);
+    }
+
+    [Fact]
+    public void SeasonRanks_AdultGroup_IsCalledWomen_NotGirls()
+    {
+        var rows = new[] { Row(1, "2026-02-16", ms: 60000) };
+        var cohort = new[] { Peer(Swimmer, 60000) };
+
+        var dto = SwimmerPageBuilder.SeasonRanks(rows, season: 2025, birthYear: 2001, "female", cohort);
+
+        Assert.Equal("women 25", dto.GroupLabel);
+    }
 }

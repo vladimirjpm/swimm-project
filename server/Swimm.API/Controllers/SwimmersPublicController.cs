@@ -72,7 +72,29 @@ public class SwimmersPublicController : ControllerBase
         dto.AgeInSeason = SeasonMath.AgeInSeason(displaySeason, dto.BirthYear);
 
         dto.AgeGroup = await _swims.GetLadderGroupAsync(rows.Select(r => r.CompetitionId));
-        dto.RecordsHeld = await _swims.CountRecordsHeldAsync(id);
+        // Счётчик и список — из ОДНОГО запроса: разными они рано или поздно разошлись бы,
+        // и бейдж «4 records» стоял бы над секцией с тремя строками.
+        var held = await _swims.GetRecordsHeldAsync(id);
+        dto.Records = held.Select(r => new SwimmerHeldRecordDto
+        {
+            RegionType = r.RegionType,
+            RegionCode = r.RegionCode,
+            Category = r.Category,
+            AgeKey = r.AgeKey,
+            Gender = r.Gender,
+            PoolType = r.PoolType,
+            Stroke = r.Style,
+            // Справочник пишет «200m», протокол — «200». Клиент рисует дистанцию одной
+            // плитой для обоих источников, поэтому «m» снимаем здесь — та же нормализация,
+            // что в SeasonAggregator.DisciplineKey.
+            Distance = r.Distance.TrimEnd('m', 'M'),
+            Time = r.Time,
+            Date = r.RecordDate,
+            Quality = r.IssueReason is null
+                ? null
+                : new SwimQualityDto { Kind = "record", Reason = r.IssueReason },
+        }).ToList();
+        dto.RecordsHeld = dto.Records.Count;
 
         // Открытая вода появится, когда заведут Competition.WaterKind
         // (docs/plans/open-water-course-plan.md): третьего PoolType не будет.
@@ -150,6 +172,35 @@ public class SwimmersPublicController : ControllerBase
             : new Dictionary<string, NationalAgeRecordRow>();
 
         return SwimmerPageBuilder.PersonalBests(rows, poolType, clubBest, records);
+    }
+
+    /// <summary>
+    /// Фильтр «Season best» таба Results: где пловец стоит среди сверстников (тот же год
+    /// рождения, тот же пол) по лучшим временам сезона. Строки результатов НЕ дублируются —
+    /// клиент склеивает ответ с <c>/best-times</c> того же сезона по <c>disciplineKey</c>.
+    /// <c>?season=all</c> — мест нет: сравнение живёт внутри одного сезона.
+    /// </summary>
+    [HttpGet("/api/swimmers/{id:int}/season-ranks")]
+    public async Task<IActionResult> GetSeasonRanks(int id, [FromQuery] string? season = null)
+        => await this.CachedJson(_cache,
+            $"http:swimmer:{id}:season-ranks:{season ?? "default"}",
+            () => BuildSeasonRanksAsync(id, season),
+            PayloadTtl, CacheControlValue);
+
+    private async Task<SwimmerSeasonRankDto> BuildSeasonRanksAsync(int id, string? season)
+    {
+        var rows = await _swims.GetSwimsAsync(id);
+        var profile = await _results.GetSwimmerProfileAsync(id);
+        var selected = await ResolveSeasonAsync(rows, season);
+
+        // Когорта тянется только под конкретный сезон: за карьеру сравнивать не с чем, а
+        // выборка недешёвая (её ключ — сезон + год рождения, общий на всех сверстников).
+        var cohort = selected is int year && profile is not null
+            ? await _swims.GetAgeCohortSeasonBestsAsync(year, profile.BirthYear)
+            : [];
+
+        return SwimmerPageBuilder.SeasonRanks(
+            rows, selected, profile?.BirthYear ?? 0, profile?.Gender, cohort);
     }
 
     /// <summary>

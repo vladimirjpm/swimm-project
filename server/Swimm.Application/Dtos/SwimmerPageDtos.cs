@@ -191,6 +191,67 @@ public sealed class SwimmerBestTimeDto
     /// <summary>Это же время — лучшее за всю карьеру, а не только за сезон.</summary>
     [JsonPropertyName("isCareerBest")]
     public bool IsCareerBest { get; set; }
+
+    /// <summary>
+    /// Заплыв был на МАСТЕРС-старте (<c>Competition.IsMasters</c>). Нужен разряду: у мастерса
+    /// своя таблица нормативов с возрастными полосами, и без флага время 45-летней женщины
+    /// меряется юношеской шкалой — 00:31.47 на 50 на спине даёт «первый взрослый» вместо МСМК.
+    /// </summary>
+    [JsonPropertyName("isMasters")]
+    public bool IsMasters { get; set; }
+
+}
+
+/// <summary>
+/// Официальный рекорд, который держит пловец, — секция над таблицей личников.
+/// Это НЕ то же, что <c>holdsNationalAgeRecord</c> у личника: там сравнение по времени с
+/// рекордом своей ступени, здесь — строка справочника, где держателем записан он сам.
+/// </summary>
+public sealed class SwimmerHeldRecordDto
+{
+    /// <summary>country | club | world — уровень рекорда.</summary>
+    [JsonPropertyName("regionType")]
+    public string RegionType { get; set; } = string.Empty;
+
+    /// <summary>alpha-3 региона («ISR»).</summary>
+    [JsonPropertyName("regionCode")]
+    public string RegionCode { get; set; } = string.Empty;
+
+    /// <summary>age | open | masters — ось справочника.</summary>
+    [JsonPropertyName("category")]
+    public string Category { get; set; } = string.Empty;
+
+    /// <summary>Возрастная ступень («12»); пусто у открытой категории.</summary>
+    [JsonPropertyName("ageKey")]
+    public string AgeKey { get; set; } = string.Empty;
+
+    [JsonPropertyName("gender")]
+    public string Gender { get; set; } = string.Empty;
+
+    [JsonPropertyName("poolType")]
+    public string PoolType { get; set; } = string.Empty;
+
+    /// <summary>Стиль СТРОКОЙ, как в справочнике (у Record нет StyleId).</summary>
+    [JsonPropertyName("stroke")]
+    public string Stroke { get; set; } = string.Empty;
+
+    [JsonPropertyName("distance")]
+    public string Distance { get; set; } = string.Empty;
+
+    /// <summary>Время как напечатано в справочнике — его и показывает UI_SwimTime.</summary>
+    [JsonPropertyName("time")]
+    public string Time { get; set; } = string.Empty;
+
+    /// <summary>Дата установления, как в справочнике (формат не гарантирован).</summary>
+    [JsonPropertyName("date")]
+    public string? Date { get; set; }
+
+    /// <summary>
+    /// Качество САМОЙ записи справочника (kind = record). Инвариант И11: показано время —
+    /// показан и признак его качества.
+    /// </summary>
+    [JsonPropertyName("quality")]
+    public SwimQualityDto? Quality { get; set; }
 }
 
 /// <summary>Ссылка на соревнование в строке результата.</summary>
@@ -319,6 +380,10 @@ public sealed class SwimmerProgressPointDto
     [JsonPropertyName("ageInSeason")]
     public int? AgeInSeason { get; set; }
 
+    /// <summary>Мастерс-старт: у разряда своя таблица нормативов (см. SwimmerBestTimeDto).</summary>
+    [JsonPropertyName("isMasters")]
+    public bool IsMasters { get; set; }
+
     [JsonPropertyName("season")]
     public int Season { get; set; }
 
@@ -394,4 +459,68 @@ public sealed class SwimmerSummaryDto
     /// </summary>
     [JsonPropertyName("competitions")]
     public List<SwimmerCompetitionDto> Competitions { get; set; } = [];
+}
+
+/// <summary>
+/// Фильтр «Season best» страницы спортсмена: где пловец стоит СРЕДИ СВЕРСТНИКОВ — пловцов
+/// того же года рождения и того же пола — по лучшим временам выбранного сезона.
+///
+/// Ответ намеренно НЕ повторяет строки результатов: клиент уже держит их из
+/// <c>/best-times</c> за тот же сезон и склеивает по <c>disciplineKey</c>. Второй набор тех же
+/// строк означал бы два места, где «лучшее время сезона» определяется заново, — ровно та
+/// ошибка, ради которой заведён <see cref="Swimm.Application.Mapping.SwimmerPageBuilder"/>.
+/// </summary>
+public sealed class SwimmerSeasonRankDto
+{
+    /// <summary>Год начала сезона; null — сезон не выбран (режим карьеры), места не считаются.</summary>
+    [JsonPropertyName("season")]
+    public int? Season { get; set; }
+
+    [JsonPropertyName("label")]
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>Возраст В СЕЗОНЕ (SeasonMath.AgeInSeason). null — года рождения нет в базе.</summary>
+    [JsonPropertyName("age")]
+    public int? Age { get; set; }
+
+    /// <summary>male | female | null — пол, по которому собрана группа сверстников.</summary>
+    [JsonPropertyName("gender")]
+    public string? Gender { get; set; }
+
+    /// <summary>Готовая подпись группы («girls 9»): её обязан показать UI рядом с местом.</summary>
+    [JsonPropertyName("groupLabel")]
+    public string? GroupLabel { get; set; }
+
+    [JsonPropertyName("rows")]
+    public List<SwimmerDisciplineRankDto> Rows { get; set; } = [];
+}
+
+/// <summary>
+/// Место в одной дисциплине среди сверстников. Ключ тот же, что у строки <c>/best-times</c>.
+/// Равные времена делят место (спортивный ранжир): двое по 41.23 — оба вторые, следующий четвёртый.
+/// </summary>
+public sealed class SwimmerDisciplineRankDto
+{
+    [JsonPropertyName("disciplineKey")]
+    public string DisciplineKey { get; set; } = string.Empty;
+
+    /// <summary>Место среди сверстников, 1 — быстрейший в группе (тогда же и бейдж SB).</summary>
+    [JsonPropertyName("rank")]
+    public int Rank { get; set; }
+
+    /// <summary>Сколько сверстников вообще плавало эту дисциплину в сезоне (включая самого).</summary>
+    [JsonPropertyName("peerCount")]
+    public int PeerCount { get; set; }
+
+    /// <summary>Время пловца, мс — то же, что в строке /best-times; здесь для самопроверки клиента.</summary>
+    [JsonPropertyName("timeMs")]
+    public int TimeMs { get; set; }
+
+    /// <summary>Лучшее время группы, мс.</summary>
+    [JsonPropertyName("leaderTimeMs")]
+    public int LeaderTimeMs { get; set; }
+
+    /// <summary>Отставание от лидера группы, мс. 0 — он сам лидер.</summary>
+    [JsonPropertyName("gapToLeaderMs")]
+    public int GapToLeaderMs { get; set; }
 }

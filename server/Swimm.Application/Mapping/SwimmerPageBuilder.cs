@@ -167,6 +167,7 @@ public static class SwimmerPageBuilder
                     Competition = CompetitionRef(r),
                     ResultId = r.ResultId,
                     IsCareerBest = careerBest.TryGetValue(key, out var best) && best.ResultId == r.ResultId,
+                    IsMasters = r.IsMasters,
                 };
             })
             .ToList();
@@ -234,6 +235,95 @@ public static class SwimmerPageBuilder
     }
 
     /// <summary>
+    /// Фильтр «Season best»: место пловца среди СВЕРСТНИКОВ в каждой дисциплине, где он плавал
+    /// в выбранном сезоне. Сверстники — пловцы того же года рождения; пол разделяет сам ключ
+    /// дисциплины, поэтому отдельного фильтра по полу тут нет.
+    ///
+    /// Ранжир спортивный: равные времена делят место (двое по 41.23 — оба вторые, следующий
+    /// четвёртый). Ровно поэтому место считается «сколько строго быстрее + 1», а не позицией
+    /// в отсортированном списке — иначе один из двух одинаковых был бы объявлен быстрее.
+    ///
+    /// Своё лучшее берётся ТЕМ ЖЕ <see cref="BestPerDiscipline"/>, что и строки
+    /// <c>/best-times</c>: иначе «первое место» и «лучшее время сезона» могли бы указывать
+    /// на разные заплывы.
+    /// </summary>
+    public static SwimmerSeasonRankDto SeasonRanks(
+        IReadOnlyList<SeasonSwimRow> allRows,
+        int? season,
+        int birthYear,
+        string? gender,
+        IReadOnlyList<PeerSeasonBest> cohort)
+    {
+        var age = season is int s ? SeasonMath.AgeInSeason(s, birthYear) : null;
+        var sex = NormalizeGender(gender);
+        var dto = new SwimmerSeasonRankDto
+        {
+            Season = season,
+            Label = season is null ? "career" : SeasonMath.Label(season.Value),
+            Age = age,
+            Gender = sex,
+            GroupLabel = PeerGroupLabel(age, sex),
+        };
+
+        // Карьера — не сезон: «где я среди сверстников» имеет смысл только внутри одного
+        // сезона, потому что сравниваются лучшие времена ЭТОГО сезона.
+        if (season is null || age is null) return dto;
+
+        var byDiscipline = cohort
+            .GroupBy(p => p.DisciplineKey)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        foreach (var (key, mine) in BestPerDiscipline(InSeason(allRows, season)))
+        {
+            var ms = mine.TimeMilliseconds!.Value;
+            if (!byDiscipline.TryGetValue(key, out var peers))
+            {
+                // Своей же строки в когорте нет — значит когорту собрали по другому году
+                // рождения (в справочнике он мог поменяться). Молча выдавать «первое место»
+                // нельзя: это ровно тот случай, когда цифра выглядит достижением, не будучи им.
+                continue;
+            }
+
+            dto.Rows.Add(new SwimmerDisciplineRankDto
+            {
+                DisciplineKey = key,
+                Rank = peers.Count(p => p.TimeMs < ms) + 1,
+                PeerCount = peers.Select(p => p.SwimmerId).Distinct().Count(),
+                TimeMs = ms,
+                LeaderTimeMs = peers.Min(p => p.TimeMs),
+                GapToLeaderMs = ms - peers.Min(p => p.TimeMs),
+            });
+        }
+
+        dto.Rows = dto.Rows.OrderBy(r => r.Rank).ThenByDescending(r => r.PeerCount).ToList();
+        return dto;
+    }
+
+    /// <summary>
+    /// Подпись группы сверстников для UI: «girls 9», у взрослых — «women 25» (иначе
+    /// мастерс читался бы как «boys 45»). null — возраст или пол неизвестны.
+    /// </summary>
+    private static string? PeerGroupLabel(int? age, string? gender)
+    {
+        if (age is not int a || gender is null) return null;
+        var noun = gender == "female"
+            ? (a >= AdultAge ? "women" : "girls")
+            : (a >= AdultAge ? "men" : "boys");
+        return $"{noun} {a}";
+    }
+
+    /// <summary>С этого возраста группа называется «women/men», а не «girls/boys».</summary>
+    private const int AdultAge = 18;
+
+    /// <summary>Пол к виду ключа дисциплины. В базе он живёт и как «male», и как «M».</summary>
+    private static string? NormalizeGender(string? gender) => gender?.Trim().ToLowerInvariant() switch
+    {
+        "male" or "m" => "male",
+        "female" or "f" => "female",
+        _ => null,
+    };
+
+    /// <summary>
     /// Таб Progress: все заплывы одной дисциплины по возрастанию даты.
     /// Личник отмечается по РАЗВЁРТКЕ линии (running best внутри этой же дисциплины), а не
     /// по карьерной детекции с категорией: на графике «личник» значит «в этот день я поплыл
@@ -276,6 +366,7 @@ public static class SwimmerPageBuilder
                 HeatType = r.HeatType,
                 Season = SeasonAggregator.SeasonOf(r),
                 AgeInSeason = SeasonMath.AgeInSeason(SeasonAggregator.SeasonOf(r), birthYear),
+                IsMasters = r.IsMasters,
                 Competition = CompetitionRef(r),
                 ResultId = r.ResultId,
             };

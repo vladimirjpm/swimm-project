@@ -54,11 +54,13 @@ public interface ISwimmerPageRepository
     Task<SwimmerAgeGroupDto?> GetLadderGroupAsync(IEnumerable<int> competitionIds);
 
     /// <summary>
-    /// Сколько официальных рекордов держит пловец — бейдж «🏆 N records».
+    /// Официальные рекорды, которые держит пловец: и бейдж «🏆 N records» (это просто
+    /// <c>Count</c>), и секция рекордов в панели считаются ОТСЮДА — счётчик и список,
+    /// собранные разными запросами, рано или поздно разошлись бы.
     /// ⚠ Связь только ПО ИМЕНИ: у <c>Record</c> нет <c>SwimmerId</c> (решение §6.1 плана,
     /// та же погрешность, что у Record wall клуба). Тёзка заберёт чужой рекорд.
     /// </summary>
-    Task<int> CountRecordsHeldAsync(int swimmerId);
+    Task<IReadOnlyList<HeldRecordRow>> GetRecordsHeldAsync(int swimmerId);
 
     /// <summary>
     /// Лучшее время клуба в каждой дисциплине (ключ — <c>SeasonAggregator.DisciplineKey</c>
@@ -68,6 +70,21 @@ public interface ISwimmerPageRepository
     /// Эстафеты, DSQ и помеченные времена исключены.
     /// </summary>
     Task<IReadOnlyDictionary<string, int>> GetClubBestMsAsync(int clubId);
+
+    /// <summary>
+    /// Лучшие времена ВСЕЙ ВОЗРАСТНОЙ КОГОРТЫ за сезон — вход для фильтра «Season best»:
+    /// по строке на пару (сверстник × дисциплина). Когорта — все пловцы с тем же
+    /// <paramref name="birthYear"/>; пол разделяет их сам ключ дисциплины.
+    ///
+    /// Минимум считается в SQL: «где я среди сверстников» — это сравнение с их лучшими
+    /// временами, а не со списком всех заплывов. Кэш ключуется КОГОРТОЙ, а не пловцом
+    /// (<c>{сезон}:{год рождения}</c>), поэтому все сверстники делят одну запись — иначе
+    /// одна и та же выборка считалась бы заново на каждую открытую страницу.
+    ///
+    /// Отбор строк — те же правила, что у <see cref="SeasonAggregator.IsCountable"/>:
+    /// DSQ, помеченные времена и эстафеты в места не идут.
+    /// </summary>
+    Task<IReadOnlyList<PeerSeasonBest>> GetAgeCohortSeasonBestsAsync(int seasonStartYear, int birthYear);
 
     /// <summary>
     /// Официальные рекорды страны по ВОЗРАСТНОЙ ступени (<c>Category = age</c>) для колонки
