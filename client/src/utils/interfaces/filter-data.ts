@@ -1,3 +1,5 @@
+// ⚠ Копия типа, которую сейчас никто не импортирует: рабочий живёт в
+// `projects/components/filter-section/filter-types.ts`. Правишь один — правь оба.
 export interface FilterData {
   pool_type: string[];
   gender: string[];
@@ -6,5 +8,6 @@ export interface FilterData {
 
 export interface SwimmingStyle {
   style_name: string;
-  style_len: number[];
+  /** Строки — как в `filter-data.js` («50», «4X50»). */
+  style_len: string[];
 }

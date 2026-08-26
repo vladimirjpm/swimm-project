@@ -1,64 +1,34 @@
-import React, { useMemo } from 'react';
-import {
-  rootActions,
-  useAppDispatch,
-  useAppSelector,
-} from '../../../store/store';
+import React from 'react';
 import UI_SwimmStyleIcon from '../mix/swimm-style-icon/swimm-style-icon';
-import { getFilterData } from './filter-types';
-import { useFilteredByTypeResults } from './use-filtered-results';
+import { useFilterHost } from './filter-host';
 import FilterCard from './filter-card';
 import FilterDistance from './filter-distance';
-import { useResultsLoadMode } from '../../../hooks/useResultsLoadMode';
-import { useFilterHints } from '../../../hooks/useFilterHints';
 
+/**
+ * Стиль плавания. Значения, список стилей и доступность — через хост (Ф3): сам компонент
+ * не знает ни про стор, ни про то, что в paged-режиме доступность приходит из filter-hints.
+ *
+ * Дистанции выбранного стиля рисует `FilterDistance` — колонкой справа, внутри этой же
+ * карточки: на узком сайдбаре они переносятся вниз.
+ */
 const FilterSwimmingStyle: React.FC = () => {
-  const dispatch = useAppDispatch();
-  const filters = useAppSelector((state) => state.filterSelected);
-  const filterData = getFilterData();
-  const filteredByTypeResults = useFilteredByTypeResults();
-  const mode = useResultsLoadMode();
-  // Paged: на клиенте только текущая страница — доступность стилей не вычислить из неё,
-  // источник — filter-hints (контракт 3.2 §4). Глобальный (не per-competition) список,
-  // но в паре с serverной фильтрацией по styleName это не даёт ложных disabled.
-  const styleHints = useFilterHints('style', '', 50, mode === 'paged');
+  const { values, set, options, isAvailable } = useFilterHost();
+  const styleName = values.style_name ?? '';
+  const styleLen = values.style_len;
 
-  const availableStyleNames = useMemo(() => {
-    if (mode === 'paged') return new Set(styleHints);
-    const set = new Set<string>();
-    filteredByTypeResults.forEach((r) => {
-      if (r.event_style_name) set.add(r.event_style_name);
-    });
-    return set;
-  }, [mode, styleHints, filteredByTypeResults]);
+  if (options.styles.length === 0) return null;
 
-  if (!filterData) return null;
-
-  const updateFilter = (style_name: string) => {
-    dispatch(
-      rootActions.updateState({
-        filterSelected: { ...filters, style_name },
-      }),
-    );
-  };
-
-  const resetFilter = () => {
-    dispatch(
-      rootActions.updateState({
-        filterSelected: { ...filters, style_name: '', style_len: 0 },
-      }),
-    );
-  };
-
-  const summary = filters.style_name
-    ? `${filters.style_name}${filters.style_len ? ` · ${filters.style_len}m` : ''}`
+  const styleLabel =
+    options.styles.find((s) => s.style_name === styleName)?.label ?? styleName;
+  const summary = styleName
+    ? `${styleLabel}${styleLen ? ` · ${styleLen}m` : ''}`
     : 'All';
 
   return (
     <FilterCard
       title="Swimming Style"
       summary={summary}
-      isActive={!!filters.style_name}
+      isActive={!!styleName}
       defaultOpen
     >
       {/* Колонки стиль | дистанция; на узком сайдбаре дистанции переносятся вниз */}
@@ -66,22 +36,24 @@ const FilterSwimmingStyle: React.FC = () => {
         <div className="flex flex-col gap-2">
           <button
             className={`fseg flex items-center justify-center ${
-              !filters.style_name ? 'fseg-active' : ''
+              !styleName ? 'fseg-active' : ''
             }`}
-            onClick={resetFilter}
+            onClick={() => set({ style_name: '', style_len: 0 })}
           >
             All
           </button>
-          {filterData.style_list.map((style) => {
-            const disabled = !availableStyleNames.has(style.style_name);
+          {options.styles.map((style) => {
+            const disabled = isAvailable
+              ? !isAvailable('style', style.style_name)
+              : false;
             return (
               <button
                 key={style.style_name}
                 disabled={disabled}
                 className={`fseg flex items-center justify-between ${
-                  filters.style_name === style.style_name ? 'fseg-active' : ''
+                  styleName === style.style_name ? 'fseg-active' : ''
                 }`}
-                onClick={() => !disabled && updateFilter(style.style_name)}
+                onClick={() => !disabled && set({ style_name: style.style_name })}
               >
                 <UI_SwimmStyleIcon
                   className="w-20"

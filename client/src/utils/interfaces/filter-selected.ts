@@ -10,7 +10,10 @@ export interface FilterSelected {
   club: string;
   gender: string;
   style_name: string;
-  style_len:number;
+  /** Дистанция дисциплины. Строка — не поблажка, а факт: `filter_data` отдаёт дистанции
+   *  строками, включая эстафетные «4X50», и стор всегда хранил именно их. Тип, обещавший
+   *  только число, эту правду скрывал; `Number('4X50')` даёт NaN. */
+  style_len: number | string;
    training_table: {
     mode: TrainingTableMode; // 'groupByName' | 'groupBySet | 'showTable'
   };
