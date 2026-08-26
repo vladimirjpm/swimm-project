@@ -311,6 +311,15 @@ public class JsonImportService : IImportService
                 var styleName = NormalizeStyleName(item.EventStyleName);
                 if (!styleCache.TryGetValue(styleName, out var style))
                 {
+                    // Новый ключ вне канона — почти всегда мусор из шапки протокола
+                    // («מטר_חופשי» от «3000 МЕТРОВ вольным»). Такой стиль не покажет ни одна
+                    // витрина, а импорт раньше молчал, и соревнование пропадало незаметно.
+                    // Данные не подменяем — говорим вслух (docs/data-integrity.md §9).
+                    if (!Strokes.IsCanonical(styleName))
+                        diagnosticLog.Add(
+                            $"⚠ Style: новый неканонический ключ '{styleName}' (из '{item.EventStyleName}') — " +
+                            "витрины показывают только канонические стили, проверь заголовок протокола");
+
                     style = new Style { Name = styleName };
                     _db.Styles.Add(style);
                     await _db.SaveChangesAsync(); // need ID immediately for ResultRecord.StyleId

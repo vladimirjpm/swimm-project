@@ -803,7 +803,7 @@ public static class IsrOrgCompetitionParser
 
                         if (current != null) yield return current;
 
-                        var styleNorm = HebrewTextHelper.StyleMapHE.GetValueOrDefault(pendingRelayStyleHe!, pendingRelayStyleHe!);
+                        var styleNorm = HebrewTextHelper.ResolveStyle(pendingRelayStyleHe!);
                         styleNorm = HebrewTextHelper.NormalizeStyleName(styleNorm);
 
                         currentIsRelay = true;
@@ -887,7 +887,7 @@ public static class IsrOrgCompetitionParser
                         }
 
                         var genderNorm = HebrewTextHelper.NormalizeGenderHE(genderRaw.Trim());
-                        var styleNorm = HebrewTextHelper.StyleMapHE.GetValueOrDefault(pendingEventStyle!, pendingEventStyle!);
+                        var styleNorm = HebrewTextHelper.ResolveStyle(pendingEventStyle!);
                         styleNorm = HebrewTextHelper.NormalizeStyleName(styleNorm);
 
                         current = new IsrOrgCompetitionResult(
@@ -1167,7 +1167,7 @@ public static class IsrOrgCompetitionParser
                         var genderNorm = HebrewTextHelper.NormalizeGenderHE(match.Groups["gender"].Value.Trim());
                         string lenRelay = $"{legs}X{legLen}";
                         var styleHe = match.Groups["style"].Value.Trim();
-                        var styleNorm = HebrewTextHelper.StyleMapHE.GetValueOrDefault(styleHe, styleHe);
+                        var styleNorm = HebrewTextHelper.ResolveStyle(styleHe);
                         styleNorm = HebrewTextHelper.NormalizeStyleName(styleNorm);
                         var ageGroup = match.Groups["age"].Value;
 
@@ -1208,7 +1208,7 @@ public static class IsrOrgCompetitionParser
 
                         var styleHeCat = rmCat.Groups["style"].Value.Trim();
                         var styleNormCat = HebrewTextHelper.NormalizeStyleName(
-                            HebrewTextHelper.StyleMapHE.GetValueOrDefault(styleHeCat, styleHeCat));
+                            HebrewTextHelper.ResolveStyle(styleHeCat));
 
                         current = new IsrOrgCompetitionResult(
                             Competition: HebrewTextHelper.NormalizeHebrewLine(lines[0].Trim()),
@@ -1460,7 +1460,7 @@ public static class IsrOrgCompetitionParser
                         Event: line,
                         EventStyleName: HebrewTextHelper.NormalizeStyleName(
                             isHE
-                                ? HebrewTextHelper.StyleMapHE.GetValueOrDefault(m.Groups["style"].Value, m.Groups["style"].Value)
+                                ? HebrewTextHelper.ResolveStyle(m.Groups["style"].Value)
                                 : m.Groups["style"].Value),
                         EventStyleLen: len,
                         EventStyleGender: genderNorm,
@@ -1556,7 +1556,7 @@ public static class IsrOrgCompetitionParser
                         Date: dat_relay,
                         Event: pendingEventLine ?? string.Empty,
                         EventStyleName: HebrewTextHelper.NormalizeStyleName(
-                            HebrewTextHelper.StyleMapHE.GetValueOrDefault(styleHePending, styleHePending)),
+                            HebrewTextHelper.ResolveStyle(styleHePending)),
                         EventStyleLen: pendingRelayLen,
                         EventStyleGender: "none",
                         EventStyleAge: string.Empty,
