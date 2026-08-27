@@ -43,6 +43,10 @@ public class SwimmDbContext : DbContext
     /* === Результаты === */
     public DbSet<ResultRecord> Results => Set<ResultRecord>();
 
+    /* === Стартовый протокол: заявки (публично) + журнал заборов (Sys_) === */
+    public DbSet<CompetitionEntry> CompetitionEntries => Set<CompetitionEntry>();
+    public DbSet<StartListPull> StartListPulls => Set<StartListPull>();
+
     /* === Клубный зачёт соревнования (материализованный; страница клуба, Фаза 10) === */
     public DbSet<ClubCompetitionStanding> ClubCompetitionStandings => Set<ClubCompetitionStanding>();
     public DbSet<CompetitionNote> CompetitionNotes => Set<CompetitionNote>();
@@ -327,6 +331,54 @@ public class SwimmDbContext : DbContext
         });
 
         // Реестр спорных записей справочника рекордов (docs/plans/records-quality-plan.md).
+        // --- Стартовый протокол (docs/plans/start-list-plan.md) ---
+
+        modelBuilder.Entity<CompetitionEntry>(entity =>
+        {
+            entity.ToTable("CompetitionEntries");
+
+            // Дата дня — календарная, как CompetitionDate у результата: значения приходят из
+            // разбора с Kind=Unspecified, и timestamptz на них падал бы. А вот HeatStartAt —
+            // наоборот момент времени (Kind=Utc), и остаётся timestamptz по умолчанию.
+            entity.Property(e => e.CompDate)
+                .HasColumnType("timestamp without time zone");
+
+            // Restrict, как у Results: заявка держит пловца и клуб от удаления.
+            entity.HasOne(e => e.Swimmer)
+                .WithMany()
+                .HasForeignKey(e => e.SwimmerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Club)
+                .WithMany()
+                .HasForeignKey(e => e.ClubId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Style)
+                .WithMany()
+                .HasForeignKey(e => e.StyleId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // А вот справочная строка соревнования и результат могут исчезнуть при перезаливке
+            // протокола — заявку это переживает, связь просто обнуляется. Иначе переимпорт
+            // соревнования упирался бы в чужой FK.
+            entity.HasOne(e => e.Competition)
+                .WithMany()
+                .HasForeignKey(e => e.CompetitionId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.Result)
+                .WithMany()
+                .HasForeignKey(e => e.ResultId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // Sys_-таблица: журнал заборов — наша кухня, публичной роли не нужен.
+        modelBuilder.Entity<StartListPull>(entity =>
+        {
+            entity.ToTable("Sys_StartListPulls");
+        });
+
         // Sys_-таблица: это НАША внутренняя кухня, а не данные федерации — публичной роли
         // swimm_ro она не нужна. Ошибки источника мы не чиним, а помечаем здесь.
         modelBuilder.Entity<RecordIssue>(entity =>

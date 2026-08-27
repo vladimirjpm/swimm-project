@@ -12,6 +12,7 @@ Categories
 CategoryCompetitions
 ClubCompetitionStandings
 Clubs
+CompetitionEntries
 CompetitionEvents
 CompetitionNoteTexts
 CompetitionNotes
@@ -40,6 +41,7 @@ Sys_ImportHistory            # происхождение данных, кото
 Sys_ImportReconciliation     # сверка импорта (фаза Д1)
 Sys_RecordIssues             # пометки спорных официальных рекордов (видны на витрине)
 Sys_RecordVerifications      # результат работы над качеством справочника рекордов
+Sys_StartListPulls           # журнал заборов стартового протокола (что и когда приехало)
 
 # ── НЕ переносится и почему ────────────────────────────────────────────────
 #
