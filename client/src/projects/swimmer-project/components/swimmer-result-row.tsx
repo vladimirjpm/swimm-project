@@ -84,10 +84,11 @@ function SwimmerResultRow({ row, swimmerId, gender }: Props) {
         isAward: isMedal,
         caption: row.ageInSeason != null ? `age ${row.ageInSeason}` : null,
       }}
-      // Человек один и тот же на всей странице, поэтому слот идентичности занимает
-      // соревнование — оно и отличает строки друг от друга.
+      // Соревнование — во второй линии, рядом с датой: это ответ на «где и когда», а не
+      // идентичность строки. В первой линии оно растягивало карточку и расталкивало
+      // плитку и время по краям экрана (решение Влада 2026-08-27).
       competition={{ name: row.competition.name, isChampionship: row.competition.isChampionship }}
-      meetPlacement="line1"
+      meetPlacement="line2"
       date={row.date}
       points={row.points ?? null}
       level={{ gender, ageInSeason: row.ageInSeason, isMasters: !!row.isMasters }}

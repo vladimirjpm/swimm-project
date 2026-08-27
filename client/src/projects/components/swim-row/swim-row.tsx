@@ -285,7 +285,7 @@ function SwimRow({
           ) : (
             meetSide === 'line1' &&
             competition && (
-              <span className="swim-row__meet-name" dir="auto">
+              <span className="swim-row__meet-name" dir="auto" title={competition.name}>
                 {competition.isChampionship && <span aria-hidden="true">🏆 </span>}
                 {competition.name}
               </span>
@@ -336,8 +336,9 @@ function SwimRow({
                     fontClassName="swim-row__date"
                   />
                 )}
+                {/* Длинные названия стартов обрезаются многоточием — полное остаётся в title. */}
                 {meetSide === 'line2' && competition && (
-                  <span className="swim-row__meet-inline" dir="auto">
+                  <span className="swim-row__meet-inline" dir="auto" title={competition.name}>
                     {date ? '· ' : ''}
                     {competition.isChampionship && <span aria-hidden="true">🏆 </span>}
                     {competition.name}

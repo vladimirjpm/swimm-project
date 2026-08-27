@@ -374,7 +374,7 @@ export function SeasonBestPanel({
                   name: row.competition.name,
                   isChampionship: row.competition.isChampionship,
                 }}
-                meetPlacement="line1"
+                meetPlacement="line2"
                 date={row.date}
                 points={row.points ?? null}
                 gapMs={rank.gapToLeaderMs}
@@ -531,7 +531,7 @@ export function PersonalBestsPanel({
                 name: r.competition.name,
                 isChampionship: r.competition.isChampionship,
               }}
-              meetPlacement="line1"
+              meetPlacement="line2"
               date={r.date}
               points={r.points ?? null}
               // Возраста заплыва в личниках нет (это лучшее за КАРЬЕРУ), но обычной шкале
