@@ -67,6 +67,7 @@ public static class DependencyInjection
         services.AddScoped<IResultTransferService, ResultTransferService>();
         services.AddScoped<IClubAdminRepository, ClubAdminRepository>();
         services.AddScoped<IClubPublicRepository, ClubPublicRepository>();
+        services.AddScoped<IStartListPublicRepository, StartListPublicRepository>();
         services.AddScoped<IClubOverviewRepository, ClubOverviewRepository>();
         services.AddScoped<ISeasonBestRepository, SeasonBestRepository>();
         services.AddScoped<ISwimmerPageRepository, SwimmerPageRepository>();
@@ -103,6 +104,7 @@ public static class DependencyInjection
         services.AddScoped<IDataCheck, EmptyRelayCheck>();
         services.AddScoped<IDataCheck, MergedSessionsCheck>();
         services.AddScoped<IDataCheck, OfficialClubPointsMismatchCheck>();
+        services.AddScoped<IDataCheck, NoShowUnmatchedCheck>();
         services.AddScoped<ILogligEventPullService, LogligEventPullService>();
         services.AddScoped<ILogligRelayBandService, LogligRelayBandService>();
         services.AddScoped<IDataCheck, SwimmerDedupCheck>();
@@ -170,6 +172,9 @@ public static class DependencyInjection
 
         // «Входящие» автозабора isr.org.il (фаза 6); провайдер живёт в Swimm.Parsing
         services.AddScoped<ICompetitionDiscoveryService, CompetitionDiscoveryService>();
+        services.AddScoped<IStartListPullService, StartListPullService>();
+        services.AddScoped<IStartListStitchService, StartListStitchService>();
+        services.AddScoped<IStartListScheduleService, StartListScheduleService>();
 
         // «Затянуть» одну строку входящих — общий путь одиночной кнопки и пакетного забора
         services.AddScoped<IDiscoveryPreviewService, DiscoveryPreviewService>();

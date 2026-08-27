@@ -143,6 +143,11 @@
         // что импортированы раньше (их сотня, а привязок в базе почти нет).
         if (imported)
             sb.Append($"<button onclick=\"discStampLoglig({s.OrgCompId}, this)\" class=\"{btn}\" title=\"Проставить пловцам loglig-id по протоколу соревнования\">Loglig-id</button> ");
+        // Стартовый протокол (docs/plans/start-list-plan.md, С5): нужен в первую очередь
+        // будущим стартам (у прошедших уже есть результаты, но на них удобно проверять
+        // забор), поэтому рисуется всем не скрытым строкам, не только imported/finished.
+        if (s.Status != "ignored")
+            sb.Append($"<button onclick=\"discStartList({s.DiscoveredId}, this)\" class=\"{btn}\" title=\"Затянуть стартовый протокол (программа + заявки) с loglig\">Стартовый протокол</button> ");
         sb.Append($"<a href=\"{api}/{s.DiscoveredId}/pdf\" class=\"{btn}\">PDF</a> ");
         // Ручная пометка «нет протокола»: PDF на сайте бывает пустым (страница без единой
         // строки), и без пометки строка выглядит обычной «новой» — её пробуют затянуть снова.
@@ -1986,6 +1991,30 @@ else
                     info.textContent = `Loglig-id (compID ${orgCompId}): ${r.message}`;
                 } catch (e) {
                     info.textContent = `Loglig-id (compID ${orgCompId}): ОШИБКА — ${e.message}`;
+                } finally {
+                    btn.disabled = false;
+                }
+            };
+
+            // Стартовый протокол (С5): забор одного соревнования — под две сотни запросов
+            // с паузой, поэтому долго; кнопку гасим и показываем сводку в общий info.
+            // Status empty — ожидаемое (нет loglig-id / посев не сделан), не ошибка.
+            window.discStartList = async (id, btn) => {
+                btn.disabled = true;
+                info.textContent = `Стартовый протокол: тяну с loglig… (может занять несколько минут)`;
+                try {
+                    const r = await apiJson(`${API}/${id}/start-list`, { method: 'POST' });
+                    if (r.status === 'error') {
+                        info.textContent = `Стартовый протокол (compID ${r.orgCompId}): ОШИБКА — ${r.error || 'неизвестная ошибка'}`;
+                    } else if (r.status === 'empty') {
+                        info.textContent = `Стартовый протокол (compID ${r.orgCompId}): ${r.error || 'пусто'}`;
+                    } else {
+                        info.textContent = `Стартовый протокол (compID ${r.orgCompId}): ${r.status} — `
+                            + `заплывов ${r.eventsFetched}/${r.events}, строк ${r.entries}; `
+                            + `новых ${r.added}, пересев ${r.moved}, снялись ${r.removed}, без изменений ${r.unchanged}`;
+                    }
+                } catch (e) {
+                    info.textContent = `Стартовый протокол: ОШИБКА — ${e.message}`;
                 } finally {
                     btn.disabled = false;
                 }

@@ -21,6 +21,18 @@ public interface ICompetitionDiscoveryService
     /// <summary>Догрузить детали (venue, logligId) для записи; сохраняет LastError при сбое.</summary>
     Task<DiscoveredCompetitionDto?> RefreshDetailsAsync(int id, CancellationToken ct = default);
 
+    /// <summary>
+    /// Дочитать детальные страницы будущих стартов, у которых ещё нет loglig-id.
+    /// Возвращает (проверено, добыто).
+    /// </summary>
+    Task<(int Checked, int Resolved)> RefreshUpcomingDetailsAsync(
+        int daysAhead, CancellationToken ct = default);
+
+    /// <summary>OrgCompId (compID isr.org.il) записи «входящих» по её Id. null — записи нет.
+    /// Нужен контроллерам, которым для вызова другого сервиса (стартовый протокол) нужна
+    /// идентичность по OrgCompId, а маршрут адресует записи по Id, как соседние методы.</summary>
+    Task<int?> GetOrgCompIdAsync(int id, CancellationToken ct = default);
+
     /// <summary>Сменить статус (new | imported | ignored). false — записи нет или статус неизвестен.</summary>
     Task<bool> SetStatusAsync(int id, string status, CancellationToken ct = default);
 

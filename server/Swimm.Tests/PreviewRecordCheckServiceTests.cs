@@ -54,6 +54,10 @@ public class PreviewRecordCheckServiceTests
             => throw new NotSupportedException();
         public Task<DiscoveredCompetitionDto?> RefreshDetailsAsync(int id, CancellationToken ct = default)
             => throw new NotSupportedException();
+        public Task<(int Checked, int Resolved)> RefreshUpcomingDetailsAsync(int daysAhead, CancellationToken ct = default)
+            => throw new NotSupportedException();
+        public Task<int?> GetOrgCompIdAsync(int id, CancellationToken ct = default)
+            => throw new NotSupportedException();
         public Task<bool> SetStatusAsync(int id, string status, CancellationToken ct = default) => Task.FromResult(true);
         public Task<bool> SetDisciplineAsync(int id, string discipline, CancellationToken ct = default) => Task.FromResult(true);
         public Task<IReadOnlyList<DiscoveryBackfillRow>> BackfillImportedOrgCompIdsAsync(bool apply, CancellationToken ct = default)

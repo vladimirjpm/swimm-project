@@ -50,6 +50,12 @@ public class AdminSettingsService : ISettingsService
                 "Автозабор isr.org.il: true — фоновая проверка списка соревнований по расписанию"),
             new("DiscoveryIntervalHours", "12", "int", "admin",
                 "Интервал фоновой проверки isr.org.il в часах (минимум 1)"),
+            new("StartListEnabled", "false", "bool", "admin",
+                "Автозабор стартового протокола (docs/plans/start-list-plan.md): true — фоновый " +
+                "проход добывает logligId будущих стартов и тянет их стартовые протоколы по расписанию"),
+            new("StartListDaysAhead", "14", "int", "admin",
+                "Окно вперёд (в днях) для автозабора стартового протокола: сколько дней до старта " +
+                "считается «предстоящим» для догрузки деталей/протокола"),
             new("LogligStampOnImport", "true", "bool", "admin",
                 "После импорта проставлять пловцам loglig-id из протокола соревнования " +
                 "(на странице заплыва loglig имя — ссылка на карточку). Уже привязанных не " +

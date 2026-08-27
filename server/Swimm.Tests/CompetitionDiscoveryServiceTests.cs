@@ -27,8 +27,13 @@ public class CompetitionDiscoveryServiceTests
             return Task.FromResult<IReadOnlyList<DiscoveredListItem>>(finished ? Finished : Upcoming);
         }
 
+        /// <summary>OrgCompId, для которого FetchDetailsAsync должен упасть (тест «одна строка не роняет прогон»).</summary>
+        public HashSet<int> FailFor { get; } = [];
+
         public Task<DiscoveredDetails> FetchDetailsAsync(int orgCompId, CancellationToken ct = default)
-            => Task.FromResult(new DiscoveredDetails("N", "V", 123, 1));
+            => FailFor.Contains(orgCompId)
+                ? throw new HttpRequestException("сеть недоступна")
+                : Task.FromResult(new DiscoveredDetails("N", "V", 123, 1));
 
         public Task<byte[]> FetchResultsPdfAsync(int logligId, string culture = "he-IL", CancellationToken ct = default)
             => throw new NotSupportedException();
@@ -284,5 +289,99 @@ public class CompetitionDiscoveryServiceTests
         // Повторный вызов — идемпотентно.
         var again = await svc.BackfillImportedOrgCompIdsAsync(apply: true);
         Assert.Equal("AlreadyLinked", again.Single().Action);
+    }
+
+    // ── С2: догрузка деталей будущих стартов (docs/tasks/start-list-ops-sonnet.md) ──────
+
+    [Fact]
+    public async Task RefreshUpcomingDetailsAsync_OnlyFutureRowsWithoutLogligId_WithinWindow()
+    {
+        await using var db = CreateDb(nameof(RefreshUpcomingDetailsAsync_OnlyFutureRowsWithoutLogligId_WithinWindow));
+        var today = DateTime.UtcNow.Date;
+        db.DiscoveredCompetitions.AddRange(
+            new DiscoveredCompetition // будущий, без loglig-id, в окне — берём
+            {
+                Id = 1, OrgCompId = 1, Name = "В окне", DateStart = today.AddDays(5), DateEnd = today.AddDays(5),
+                Status = DiscoveredCompetitionStatus.New
+            },
+            new DiscoveredCompetition // будущий, без loglig-id, ЗА окном — не берём
+            {
+                Id = 2, OrgCompId = 2, Name = "За окном", DateStart = today.AddDays(30), DateEnd = today.AddDays(30),
+                Status = DiscoveredCompetitionStatus.New
+            },
+            new DiscoveredCompetition // прошедший, без loglig-id — не берём (решение 3)
+            {
+                Id = 3, OrgCompId = 3, Name = "Прошедший", DateStart = today.AddDays(-5), DateEnd = today.AddDays(-5),
+                Status = DiscoveredCompetitionStatus.New
+            },
+            new DiscoveredCompetition // будущий, уже с loglig-id — не берём
+            {
+                Id = 4, OrgCompId = 4, Name = "Уже есть", DateStart = today.AddDays(3), DateEnd = today.AddDays(3),
+                Status = DiscoveredCompetitionStatus.New, LogligId = 999
+            },
+            new DiscoveredCompetition // будущий, но ignored — не берём
+            {
+                Id = 5, OrgCompId = 5, Name = "Скрыт", DateStart = today.AddDays(2), DateEnd = today.AddDays(2),
+                Status = DiscoveredCompetitionStatus.Ignored
+            });
+        await db.SaveChangesAsync();
+
+        var svc = CreateService(db, new FakeProvider());
+        var (checkedCount, resolved) = await svc.RefreshUpcomingDetailsAsync(daysAhead: 14);
+
+        Assert.Equal(1, checkedCount);
+        Assert.Equal(1, resolved);
+        Assert.Equal(123, (await db.DiscoveredCompetitions.SingleAsync(d => d.Id == 1)).LogligId);
+        // Остальные не тронуты.
+        Assert.Null((await db.DiscoveredCompetitions.SingleAsync(d => d.Id == 2)).LogligId);
+        Assert.Null((await db.DiscoveredCompetitions.SingleAsync(d => d.Id == 3)).LogligId);
+        Assert.Equal(999, (await db.DiscoveredCompetitions.SingleAsync(d => d.Id == 4)).LogligId);
+    }
+
+    [Fact]
+    public async Task RefreshUpcomingDetailsAsync_OneRowFails_RestStillProcessed()
+    {
+        await using var db = CreateDb(nameof(RefreshUpcomingDetailsAsync_OneRowFails_RestStillProcessed));
+        var today = DateTime.UtcNow.Date;
+        db.DiscoveredCompetitions.AddRange(
+            new DiscoveredCompetition
+            {
+                Id = 1, OrgCompId = 1, Name = "Падает", DateStart = today.AddDays(1), DateEnd = today.AddDays(1),
+                Status = DiscoveredCompetitionStatus.New
+            },
+            new DiscoveredCompetition
+            {
+                Id = 2, OrgCompId = 2, Name = "Ок", DateStart = today.AddDays(2), DateEnd = today.AddDays(2),
+                Status = DiscoveredCompetitionStatus.New
+            });
+        await db.SaveChangesAsync();
+
+        var provider = new FakeProvider();
+        provider.FailFor.Add(1);
+        var svc = CreateService(db, provider);
+
+        var (checkedCount, resolved) = await svc.RefreshUpcomingDetailsAsync(daysAhead: 14);
+
+        Assert.Equal(2, checkedCount);
+        Assert.Equal(1, resolved); // строка 2 добыта, несмотря на сбой строки 1
+        Assert.Null((await db.DiscoveredCompetitions.SingleAsync(d => d.Id == 1)).LogligId);
+        Assert.NotNull((await db.DiscoveredCompetitions.SingleAsync(d => d.Id == 1)).LastError);
+        Assert.Equal(123, (await db.DiscoveredCompetitions.SingleAsync(d => d.Id == 2)).LogligId);
+    }
+
+    [Fact]
+    public async Task GetOrgCompIdAsync_ReturnsOrgCompId_OrNullWhenMissing()
+    {
+        await using var db = CreateDb(nameof(GetOrgCompIdAsync_ReturnsOrgCompId_OrNullWhenMissing));
+        db.DiscoveredCompetitions.Add(new DiscoveredCompetition
+        {
+            Id = 10, OrgCompId = 16786, Name = "X",
+            DateStart = DateTime.UtcNow, DateEnd = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var svc = CreateService(db, new FakeProvider());
+        Assert.Equal(16786, await svc.GetOrgCompIdAsync(10));
+        Assert.Null(await svc.GetOrgCompIdAsync(999));
     }
 }
