@@ -23,6 +23,7 @@ public class JsonImportService : IImportService
     private readonly ICompetitionRecalculationService? _recalc;
     private readonly ICacheService _cache;
     private readonly IDataCheckRunner? _checks;
+    private readonly IStartListStitchService? _stitch;
 
     private static readonly string[] ClearableTables =
         ["Results", "GalleryItems", "Galleries", "Relays", "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "CompetitionEvents", "Countries"];
@@ -39,12 +40,14 @@ public class JsonImportService : IImportService
     /// </param>
     public JsonImportService(SwimmDbContext db, ICacheService cache,
         ICompetitionRecalculationService? recalc = null,
-        IDataCheckRunner? checks = null)
+        IDataCheckRunner? checks = null,
+        IStartListStitchService? stitch = null)
     {
         _db    = db;
         _cache = cache;
         _recalc = recalc;
         _checks = checks;
+        _stitch = stitch;
     }
 
     public string[] GetClearableTables() => ClearableTables;
@@ -1056,6 +1059,33 @@ public class JsonImportService : IImportService
         catch (Exception ex)
         {
             diagnosticLog.Add($"Согласование пола пловцов не выполнено ({ex.GetType().Name}: {ex.Message}). Импорт сохранён.");
+        }
+
+        // Сшивка стартового протокола с результатами (шаг С9, docs/plans/start-list-plan.md):
+        // заявка получает свой результат либо становится неявкой. Идёт ДО прогона проверок,
+        // чтобы entries.no-show-unmatched увидел уже проставленные статусы. Как и соседи —
+        // после коммита и в try/catch: сшивка не имеет права уронить импорт.
+        if (_stitch is not null && touchedCompetitionKeys.Count > 0)
+        {
+            try
+            {
+                _db.ChangeTracker.Clear();
+                var touchedIds = touchedCompetitionKeys
+                    .Select(k => competitionCache[k].Id).Distinct().ToList();
+                var stitched = await _stitch.StitchCompetitionsAsync(touchedIds);
+
+                foreach (var s in stitched.Where(s => s.Entries > 0))
+                    diagnosticLog.Add(
+                        $"Стартовый протокол {s.OrgCompId}: заявок {s.Entries}, проплыли {s.Swum}, " +
+                        $"без результата {s.NoShow}" +
+                        (s.MatchedByDiscipline > 0 ? $" (по дисциплине, не по дорожке: {s.MatchedByDiscipline})" : "")
+                        + (s.Unlinked > 0 ? $", не привязано к дню {s.Unlinked}" : ""));
+            }
+            catch (Exception ex)
+            {
+                diagnosticLog.Add(
+                    $"Сшивка стартового протокола не выполнена ({ex.GetType().Name}: {ex.Message}). Импорт сохранён.");
+            }
         }
 
         // Прогон всех проверок данных (Д5, решение Р13). После коммита и в try/catch — прибор
