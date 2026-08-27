@@ -127,6 +127,32 @@ const FOOTNOTE: Record<SwimQualityKind, InfoText> = {
 export const swimGapLabel = (ms?: number | null): string | null =>
   ms == null || ms <= 0 ? null : `+${(ms / 1000).toFixed(2)}`;
 
+/**
+ * Сравнение этого времени с эталоном — отставание от лидера среза, от лучшего в клубе,
+ * от национального возрастного рекорда. Все они — СВОЙСТВА ВРЕМЕНИ, а не отдельные
+ * ячейки строки: цифра читается только рядом со временем, к которому относится, иначе её
+ * приходится объяснять заголовком колонки.
+ *
+ * НЕЧЕГО ПОКАЗЫВАТЬ — НЕ ПОКАЗЫВАЕМ: если эталона в данных нет (`ms` пуст и `holds`
+ * не взведён), строка не рисуется вовсе. Голый прочерк был понятен в таблице с
+ * заголовками колонок; в карточке заголовков нет, и он ничего не значит.
+ */
+export interface SwimTimeDelta {
+  /** Подпись слева от числа («Δ club»). Без неё — одно число, как у отставания от лидера. */
+  label?: string;
+  /** На сколько мс это время хуже эталона. null и без `holds` — строка не рисуется. */
+  ms?: number | null;
+  /** Эталон принадлежит этому же пловцу — вместо числа печатается «record». */
+  holds?: boolean;
+  /** Качество самого эталона (спорный официальный рекорд) — значок рядом. */
+  quality?: SwimQuality | null;
+  /** Пояснение на наведении: что именно взято за эталон. */
+  title?: string;
+}
+
+/** Есть ли что показывать: без эталона строка не рисуется. */
+export const hasSwimDelta = (d: SwimTimeDelta): boolean => !!d.holds || d.ms != null;
+
 interface SwimTimeProps {
   time: string;
   /** null/undefined — время в порядке, значок не рисуется. */
@@ -151,26 +177,54 @@ interface SwimTimeProps {
    * к которому относится, иначе её приходится объяснять заголовком колонки.
    */
   gapMs?: number | null;
-  /** Кегль и цвет отставания — типографика за вызывающим экраном. */
+  /**
+   * Остальные сравнения с эталонами — каждое своей строкой под временем
+   * («Δ club +13.39», «Δ Israel record»). Пустые отбрасываются, см. `hasSwimDelta`.
+   */
+  deltas?: SwimTimeDelta[];
+  /** Кегль и цвет строк сравнения — типографика за вызывающим экраном. */
   gapClassName?: string;
 }
 
 const UI_SwimTime: React.FC<SwimTimeProps> = ({
   time, quality, className = '', marker = 'icon', chipSize = 'md',
-  gapMs = null, gapClassName = '',
+  gapMs = null, deltas, gapClassName = '',
 }) => {
   const [open, setOpen] = React.useState(false);
 
-  const gap = swimGapLabel(gapMs);
-  // Отставание встаёт ВТОРОЙ СТРОКОЙ под временем (решение Влада 2026-08-27): в строку с
-  // цифрами оно лезло в ширину узкой колонки времени и спорило с ними кеглем.
-  const gapNode = gap && (
-    <span
-      className={`block leading-none text-[11px] font-extrabold ${gapClassName}`}
-      title="Behind the leader"
-    >
-      {gap}
-    </span>
+  // Все сравнения с эталонами идут одним списком и встают СТРОКАМИ ПОД временем
+  // (решение Влада 2026-08-27): в строку с цифрами они лезли в ширину узкой
+  // колонки времени и спорили с ними кеглем. Отставание от лидера — такая же строка,
+  // просто без подписи, поэтому `gapMs` — сахар над тем же механизмом.
+  const allDeltas: SwimTimeDelta[] = [
+    ...(gapMs != null && gapMs > 0 ? [{ ms: gapMs, title: 'Behind the leader' }] : []),
+    ...(deltas ?? []),
+  ].filter(hasSwimDelta);
+
+  const gapNode = allDeltas.length > 0 && (
+    <>
+      {allDeltas.map((d, i) => (
+        <span
+          key={i}
+          className={`block leading-none text-[11px] font-extrabold ${gapClassName}`}
+          title={d.title}
+        >
+          {d.label && (
+            <span className="mr-1 text-[9px] font-bold uppercase tracking-wide opacity-70">
+              {d.label}
+            </span>
+          )}
+          {d.holds ? (
+            <span className="swim-time__delta--holds">record</span>
+          ) : (
+            swimGapLabel(d.ms)
+          )}
+          {/* Спорный ЭТАЛОН — значок с той же объяснялкой; вложенный вызов без своих
+              сравнений, поэтому рекурсии нет. */}
+          {d.quality && <UI_SwimTime time="" quality={d.quality} marker="icon" />}
+        </span>
+      ))}
+    </>
   );
 
   if (!quality) {

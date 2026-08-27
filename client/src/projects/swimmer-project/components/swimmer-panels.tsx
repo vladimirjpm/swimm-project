@@ -408,14 +408,6 @@ export function SeasonBestPanel({
   );
 }
 
-/** Дельта в мс → «+0.44» / «record». Отрицательная дельта означает «быстрее эталона». */
-function DeltaCell({ ms, holds }: { ms?: number | null; holds: boolean }) {
-  if (holds) return <span className="deep-delta deep-delta--holds">record</span>;
-  if (ms == null) return <span className="deep-delta deep-delta--none">—</span>;
-  const seconds = (ms / 1000).toFixed(2);
-  return <span className="deep-delta">+{seconds}</span>;
-}
-
 /**
  * Подпись рекорда: «Israel · age 12» / «Israel · masters». Ступень показываем только там,
  * где она есть, — у открытой категории AgeKey пустой.
@@ -538,21 +530,23 @@ export function PersonalBestsPanel({
               // Возраста заплыва в личниках нет (это лучшее за КАРЬЕРУ), но обычной шкале
               // нормативов он и не нужен — она зависит только от пола, бассейна и дистанции.
               level={{ gender }}
-              extras={
-                <>
-                  <span className="deep-pb-delta">
-                    <span className="deep-pb-delta__label">Δ club</span>
-                    <DeltaCell ms={r.deltaToClubBestMs} holds={r.holdsClubBest} />
-                  </span>
-                  <span className="deep-pb-delta">
-                    <span className="deep-pb-delta__label">Δ Israel</span>
-                    <DeltaCell ms={r.deltaToNationalAgeRecordMs} holds={r.holdsNationalAgeRecord} />
-                    {r.nationalAgeRecordQuality && (
-                      <UI_SwimTime time="" quality={r.nationalAgeRecordQuality} marker="icon" />
-                    )}
-                  </span>
-                </>
-              }
+              // Дельты — свойство ВРЕМЕНИ, поэтому едут в компонент времени и встают
+              // строками под ним. Там же пустые отбрасываются: нет эталона — нет строки.
+              deltas={[
+                {
+                  label: 'Δ club',
+                  ms: r.deltaToClubBestMs,
+                  holds: r.holdsClubBest,
+                  title: 'Compared with the best time in the club, among the meets we imported',
+                },
+                {
+                  label: 'Δ Israel',
+                  ms: r.deltaToNationalAgeRecordMs,
+                  holds: r.holdsNationalAgeRecord,
+                  quality: r.nationalAgeRecordQuality,
+                  title: 'Compared with the national age record',
+                },
+              ]}
             />
           ))}
         </div>

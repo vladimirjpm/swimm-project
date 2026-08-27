@@ -218,16 +218,9 @@
    выравнивание не нужно. На мобайле ограничение снимается (см. медиазапрос ниже). */
 .deep-swim-row { max-width: 50%; }
 
-/* Дельты личников во второй линии: подпись обязана ехать рядом со значением — колонок,
-   к которым могла бы прилипнуть шапка таблицы, у карточек нет. */
-.deep-pb-delta { display: inline-flex; align-items: center; gap: 4px; }
-.deep-pb-delta__label {
-  font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--deep-text-ghost);
-}
-.deep-delta { font-weight: 800; color: var(--deep-text-ghost); }
-.deep-delta--holds { color: var(--deep-gold); }
-.deep-delta--none { color: var(--deep-text-ghost); opacity: .6; }
+/* «record» в сравнении с эталоном — золотом: эталон принадлежит самому пловцу.
+   Строки сравнений рисует `UI_SwimTime` под временем, здесь только цвет. */
+.deep-swim-row .swim-time__delta--holds { color: var(--deep-gold); }
 
 /* ── Официальные рекорды: секция НАД таблицей личников ───────────────────── */
 /* Отделена золотом: строка справочника федерации и «моё лучшее за карьеру» — разные вещи,

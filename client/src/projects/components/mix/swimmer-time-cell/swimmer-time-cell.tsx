@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import '../text-effect/text-effect.css';
-import UI_SwimTime, { SwimQuality } from '../swim-time/swim-time';
+import UI_SwimTime, { SwimQuality, SwimTimeDelta } from '../swim-time/swim-time';
 
 const TIME_SPLIT_SEPARATOR = '›';
 
@@ -27,7 +27,9 @@ interface UI_SwimmerTimeCellProps {
   qualityMarker?: 'icon' | 'chip';
   /** Отставание от лидера в мс — рисует `UI_SwimTime` сразу за временем. */
   gapMs?: number | null;
-  /** Кегль и цвет отставания. */
+  /** Остальные сравнения с эталонами (Δ клуб, Δ Израиль) — строками под временем. */
+  deltas?: SwimTimeDelta[];
+  /** Кегль и цвет строк сравнения. */
   gapClassName?: string;
 }
 
@@ -43,6 +45,7 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
   quality = null,
   qualityMarker = 'icon',
   gapMs = null,
+  deltas,
   gapClassName = '',
 }) => {
   const [splitOpen, setSplitOpen] = useState(false);
@@ -88,6 +91,7 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
             marker={qualityMarker}
             chipSize="sm"
             gapMs={gapMs}
+            deltas={deltas}
             gapClassName={gapClassName}
           />
           {time_fail && <span className="text-red-500 ml-1">*</span>}
@@ -104,6 +108,7 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
             marker={qualityMarker}
             chipSize="sm"
             gapMs={gapMs}
+            deltas={deltas}
             gapClassName={gapClassName}
           />
           {time_fail && <span className="text-red-500 ml-1">*</span>}

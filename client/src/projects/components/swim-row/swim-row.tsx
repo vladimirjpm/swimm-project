@@ -4,7 +4,7 @@ import React from 'react';
 import './swim-row.css';
 import UI_SwimmerTimeCell from '../mix/swimmer-time-cell/swimmer-time-cell';
 import { swimFlaggedRowProps } from '../mix/swim-time/swim-time';
-import type { SwimQuality } from '../mix/swim-time/swim-time';
+import type { SwimQuality, SwimTimeDelta } from '../mix/swim-time/swim-time';
 import UI_MedalIcon from '../mix/medal-icon/medal-icon';
 import UI_PrelimLabel from '../mix/prelim-label/prelim-label';
 import UI_SwimmStyleIcon from '../mix/swimm-style-icon/swimm-style-icon';
@@ -139,6 +139,12 @@ export interface SwimRowProps {
    */
   gapMs?: number | null;
 
+  /**
+   * Остальные сравнения с эталонами — туда же, под время: Δ клуб, Δ Израиль.
+   * Пустые (эталона в данных нет) компонент времени отбрасывает сам.
+   */
+  deltas?: SwimTimeDelta[];
+
   /** Редкие ячейки второй линии: «of 12», Δ клуб, Δ Израиль, «2nd swim». */
   extras?: React.ReactNode;
 
@@ -203,6 +209,7 @@ function SwimRow({
   points,
   level = null,
   gapMs,
+  deltas,
   extras,
   href,
   onOpenMedia,
@@ -310,6 +317,7 @@ function SwimRow({
             time_fail={!!timeFail}
             time_fail_note={timeFailNote ?? null}
             gapMs={gapMs}
+            deltas={deltas}
             gapClassName="swim-row__gap"
             firstLineClassName="swim-row__time-value"
             secondLineClassName="swim-row__time-sub"
