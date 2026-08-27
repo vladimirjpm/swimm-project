@@ -30,6 +30,11 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
     private const string EventResultsUrlTemplate =
         "https://loglig.com:2053/LeagueTable/AthleticsDisciplineResults/{0}?isModal=True&showCategories=True";
 
+    /// <summary>Стартовый протокол одного заплыва. Языка у вьюхи нет: <c>culture</c> и
+    /// <c>Accept-Language</c> она игнорирует, имена всегда на иврите (проверено 27.08.2026).</summary>
+    private const string StartListUrlTemplate =
+        "https://loglig.com:2053/LeagueTable/StartList/{0}?isModal=True";
+
     private const string PdfUrlTemplate =
         "https://loglig.com/Leagues/ExportSwimmingCompetitionResults?competitionId={0}&culture={1}&isSplitResults=false&isByHeat=false";
 
@@ -119,6 +124,47 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
             ev.Rows.Select(r => new LogligResultRowDto(
                 r.Position, r.Round, r.Category, r.FullName, r.BirthYear, r.Club, r.Heat, r.Lane,
                 r.Time, r.FailNote, r.InternationalPoints, r.PersonalPoints, r.ClubPoints)).ToList());
+    }
+
+    public async Task<IReadOnlyList<LogligDisciplineGridRowDto>> FetchDisciplineGridAsync(
+        int logligId, CancellationToken ct = default)
+    {
+        var html = await GetStringAsync(
+            string.Format(CultureInfo.InvariantCulture, EventListUrlTemplate, logligId),
+            $"loglig-grid-{logligId}", ct);
+
+        var rows = Parsers.Loglig.LogligStartListParser.ParseDisciplineGrid(html);
+        if (rows.Count == 0)
+            throw new InvalidOperationException(
+                $"loglig: в сетке заплывов соревнования {logligId} не распознано ни одной строки — " +
+                "вёрстка страницы AthleticsDisciplines изменилась или программа ещё не опубликована.");
+
+        return rows.Select(r => new LogligDisciplineGridRowDto(
+            r.DisciplineId, r.EventNumber, r.DisciplineRaw, r.Category, r.StyleName, r.Distance,
+            r.Gender, r.AgeBand, r.IsRelay, r.MinTime, r.StartAtLocal, r.Registered, r.Participants))
+            .ToList();
+    }
+
+    public async Task<LogligStartListDto> FetchStartListAsync(int disciplineId, CancellationToken ct = default)
+    {
+        var html = await GetStringAsync(
+            string.Format(CultureInfo.InvariantCulture, StartListUrlTemplate, disciplineId),
+            $"loglig-startlist-{disciplineId}", ct);
+
+        var sl = Parsers.Loglig.LogligStartListParser.ParseStartList(html);
+
+        // Ноль строк — законно (в заплыв никто не записался), а вот пустая шапка значит,
+        // что разобрать не удалось вовсе: это уже сломанная вёрстка, и молчать про неё нельзя.
+        if (string.IsNullOrWhiteSpace(sl.DisciplineRaw))
+            throw new InvalidOperationException(
+                $"loglig: у стартового протокола заплыва {disciplineId} не распознана шапка — " +
+                "вёрстка страницы StartList изменилась.");
+
+        return new LogligStartListDto(
+            sl.CompetitionName, sl.Date, sl.DisciplineRaw, sl.StyleName, sl.Distance, sl.IsRelay,
+            sl.Rows.Select(r => new LogligStartListRowDto(
+                r.Heat, r.Lane, r.LogligId, r.FullName, r.BirthYear, r.Club, r.SeedTime, r.Round,
+                r.HeatStartAt?.ToString("HH:mm", CultureInfo.InvariantCulture))).ToList());
     }
 
     // ── Парсинг (чистые функции, тестируются на снапшотах) ──────────────────

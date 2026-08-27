@@ -38,6 +38,13 @@ public class CompetitionDiscoveryServiceTests
 
         public Task<LogligEventResultsDto> FetchEventResultsAsync(int eventId, CancellationToken ct = default)
             => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<LogligDisciplineGridRowDto>> FetchDisciplineGridAsync(
+            int logligId, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        public Task<LogligStartListDto> FetchStartListAsync(int disciplineId, CancellationToken ct = default)
+            => throw new NotSupportedException();
     }
 
     private static SwimmDbContext CreateDb(string name) =>
