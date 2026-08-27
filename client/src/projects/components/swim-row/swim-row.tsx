@@ -12,6 +12,7 @@ import UI_PoolIcon from '../mix/pool-icon/pool-icon';
 import UI_DateIcon from '../mix/date-icon/date-icon';
 import UI_SwimmerNameCell from '../mix/swimmer-name-cell/swimmer-name-cell';
 import UI_NormativeLevelIcon from '../mix/normative-level-icon/normative-level-icon';
+import UI_RankOfPeers from '../mix/rank-of-peers/rank-of-peers';
 import Helper from '../../../utils/helpers/data-helper';
 
 /**
@@ -66,6 +67,11 @@ export interface SwimRowPlace {
   isAward?: boolean;
   /** rank: первое место — это и есть season best, красится золотом. */
   isFirst?: boolean;
+  /**
+   * rank: сколько всего ровесников в круге сравнения — подпись «of 36» ПОД местом.
+   * Без неё «#1» не отличает первого из тридцати шести от первого из двух.
+   */
+  peerCount?: number | null;
 }
 
 export interface SwimRowLevel {
@@ -163,9 +169,13 @@ function PlaceCell({ place, heatType }: { place?: SwimRowPlace; heatType?: strin
       )}
       {kind === 'circle' && <span className="swim-row__circle">{value ?? '—'}</span>}
       {kind === 'rank' && (
-        <span className={`swim-row__rank${place?.isFirst ? ' swim-row__rank--first' : ''}`}>
-          #{value}
-        </span>
+        <UI_RankOfPeers
+          rank={Number(value)}
+          peerCount={place?.peerCount}
+          isFirst={place?.isFirst}
+          className={`swim-row__rank${place?.isFirst ? ' swim-row__rank--first' : ''}`}
+          captionClassName="swim-row__caption"
+        />
       )}
       {kind === 'none' && <span className="swim-row__circle swim-row__circle--empty">—</span>}
       <UI_PrelimLabel heatType={heatType} className="swim-row__caption" />

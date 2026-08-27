@@ -3,6 +3,7 @@ import UI_SwimTime from '../../components/mix/swim-time/swim-time';
 import UI_MedalIcon from '../../components/mix/medal-icon/medal-icon';
 import SwimmerResultRow, { type ResultRowData } from './swimmer-result-row';
 import SwimRow from '../../components/swim-row/swim-row';
+import { MIN_PEERS_FOR_RANK } from '../../components/mix/rank-of-peers/rank-of-peers';
 import { routes } from '../../../utils/routes';
 import { seasonLabel } from '../../../utils/helpers/season-helper';
 import type {
@@ -26,7 +27,8 @@ import type { SwimmerHeldRecord } from '../use-swimmer-profile';
  * является. Само место сервер отдаёт как есть — прятать данные нельзя, но и хвастаться ими
  * тоже; поэтому порог живёт здесь, в одном месте на оба вида.
  */
-const MIN_PEERS_FOR_SB = 2;
+/** Порог один на продукт и живёт рядом с подписью «alone», которую он же включает. */
+const MIN_PEERS_FOR_SB = MIN_PEERS_FOR_RANK;
 
 /** Первое место в группе, которое действительно является местом (см. MIN_PEERS_FOR_SB). */
 export const holdsSeasonBest = (r: SwimmerDisciplineRank) =>
@@ -368,7 +370,14 @@ export function SeasonBestPanel({
                 quality={row.quality}
                 splits={row.splits}
                 // Место среди СВЕРСТНИКОВ, а не в протоколе: медальный кружок тут соврал бы.
-                place={{ kind: 'rank', value: rank.rank, isFirst: holds }}
+                // «of 36» стоит ПОД местом, а не во второй линии: две цифры читаются только
+                // вместе — «#1» без круга не отличает первого из 36 от первого из двух.
+                place={{
+                  kind: 'rank',
+                  value: rank.rank,
+                  isFirst: holds,
+                  peerCount: rank.peerCount,
+                }}
                 badge={holds ? 'sb' : null}
                 competition={{
                   name: row.competition.name,
@@ -383,14 +392,7 @@ export function SeasonBestPanel({
                   ageInSeason: row.ageInSeason,
                   isMasters: !!row.isMasters,
                 }}
-                extras={
-                  <>
-                    <span>
-                      {rank.peerCount < MIN_PEERS_FOR_SB ? 'alone' : `of ${rank.peerCount}`}
-                    </span>
-                    <span className="deep-rank-go" aria-hidden="true">→</span>
-                  </>
-                }
+                extras={<span className="deep-rank-go" aria-hidden="true">→</span>}
               />
             );
           })}

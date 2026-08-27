@@ -72,7 +72,9 @@ a.swim-row:hover {
 /* Место в сезонном рейтинге. Медальный кружок здесь соврал бы: медалей за него не дают. */
 .swim-row__rank {
   font-family: var(--sr-num-font, inherit);
-  font-size: 15px;
+  /* Крупнее прочих подписей строки (решение Влада 2026-08-27): место в рейтинге —
+     главное, ради чего открывают панель, а на 15px оно терялось рядом с плиткой. */
+  font-size: 18px;
   font-weight: 900;
   color: var(--sr-text-mute, var(--theme-mode-text-secondary));
   font-variant-numeric: tabular-nums;

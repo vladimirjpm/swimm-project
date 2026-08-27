@@ -44,6 +44,7 @@
 | `UI_PoolIcon` | бассейн: svg-дорожки либо подпись-«дорожка» `--25m--` / `-----50m-----` | `styleType`, `label`, `labelClassName`, `iconWidth` |
 | `UI_DateIcon` | дату: `cube` (плитка), `row-style-1` («30 Jul 2026»), `row-style-2` | `date` — `DD/MM/YYYY` ИЛИ ISO `YYYY-MM-DD` (оба формата реально есть в продукте: статика и API), `styleType`, `fontClassName` (⚠ иначе подставит свой серый мимо токенов) |
 | `UI_PositionBadge` | кружок места; 1-2-3 красит медалью при `isAward` | `position`, `fallbackIndex`, `size`, `isAward` |
+| `UI_RankOfPeers` | место в РЕЙТИНГЕ и круг сравнения: «#7» и под ним «of 36» | `rank`, `peerCount` (null — подписи нет), `isFirst`, `className`, `captionClassName`. Держит правило «alone» (меньше `MIN_PEERS_FOR_RANK` = 2 ровесников — сравнивать не с кем) и подпись для скринридера. ⚠ Не путать с `UI_PositionBadge`: тот про место В ПРОТОКОЛЕ и красит 1-2-3 медалью, а в сезонном рейтинге медалей не дают |
 | `UI_MedalIcon` | медаль | `place`, `styleSize='medal-16'\|'medal-24'\|'medal-40'` |
 | `UI_AgeLabel` | «age: 13» + бейдж программы (`para`, `mix`) + `?` при неизвестном поле | `age`, `eventCategory`, `isRelay`, `gender`, `ageGroup` |
 | `UI_SwimmerTimeCell` | время + сплиты + отметка о незачёте | `time`, `time_split`, `time_fail`, `time_fail_note`, `qualityMarker` |
