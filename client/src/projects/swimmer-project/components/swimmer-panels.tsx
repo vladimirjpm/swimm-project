@@ -537,7 +537,7 @@ export function PersonalBestsPanel({
                   label: 'Δ club',
                   ms: r.deltaToClubBestMs,
                   holds: r.holdsClubBest,
-                  title: 'Compared with the best time in the club, among the meets we imported',
+                  title: 'Compared with the best time in the club among swimmers of the same age',
                 },
                 {
                   label: 'Δ Israel',
@@ -553,8 +553,9 @@ export function PersonalBestsPanel({
       )}
 
       <div className="deep-legend deep-legend--block">
-        «record» — the best time in our database belongs to this swimmer. Club deltas are
-        computed from the meets we have imported, not from an official club record list.
+        Both deltas compare with the same age step. «record» means the best time in our
+        database belongs to this swimmer. Club deltas are computed from the meets we have
+        imported, not from an official club record list.
       </div>
     </>
   );

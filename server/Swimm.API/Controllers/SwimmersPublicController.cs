@@ -158,14 +158,17 @@ public class SwimmersPublicController : ControllerBase
         var profile = await _results.GetSwimmerProfileAsync(id);
         if (profile is null || rows.Count == 0) return [];
 
-        var clubBest = profile.ClubId is int clubId
-            ? await _swims.GetClubBestMsAsync(clubId)
-            : new Dictionary<string, int>();
-
-        // Возраст берём тот же, что подписан в шапке: колонка отвечает на вопрос «сколько
-        // мне осталось до рекорда МОЕЙ ступени», а не «до ступени того года, когда я плыл».
+        // Возраст берём тот же, что подписан в шапке: обе дельты отвечают на вопрос «сколько
+        // мне осталось до эталона МОЕЙ ступени», а не «до ступени того года, когда я плыл».
         var displaySeason = await DefaultSeasonAsync(rows) ?? SeasonMath.CurrentStartYear();
         var age = SeasonMath.AgeInSeason(displaySeason, profile.BirthYear);
+
+        // ОБЕ дельты считаются по ОДНОЙ и той же ступени (решение Влада 2026-08-27):
+        // раньше клубная брала минимум по всему клубу любого возраста, и две цифры рядом
+        // меряли разное, выглядя одинаково. Нет года рождения — нет ни одной из них.
+        var clubBest = profile.ClubId is int clubId && age is int clubAge
+            ? await _swims.GetClubBestMsAsync(clubId, clubAge)
+            : new Dictionary<string, int>();
 
         var records = age is int a
             ? await _swims.GetNationalAgeRecordsAsync(profile.CountryCode, profile.Gender, a)
