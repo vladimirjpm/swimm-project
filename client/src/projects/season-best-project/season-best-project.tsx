@@ -8,7 +8,7 @@ import AppTopbar from '../components/app-topbar/app-topbar';
 import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import DeepSeasonCarousel from '../components/deep/season-carousel';
 import { parseSeasonBestQuery } from '../../utils/routes';
-import { seasonLabel } from '../../utils/helpers/season-helper';
+import { peerGroupLabel, seasonLabel } from '../../utils/helpers/season-helper';
 import { useSeasonBestList, useSeasonBestOptions } from '../../hooks/useSeasonBestList';
 import SEASON_BEST_MODULES from './season-best-modules';
 import { strokeLabel, type SbFilters } from './sb-filters-model';
@@ -37,24 +37,9 @@ import SbList from './components/sb-list';
 const MODULES = SEASON_BEST_MODULES;
 const PAGE_SIZE = 50;
 
-/**
- * Подпись группы сверстников — та же формула, что на сервере (SwimmerPageBuilder).
- *
- * Три оси возраста дают три разные подписи: год («girls 12»), взрослый хвост («men 21+») и
- * мастерская группа («masters 45-49»), где пол в подпись не идёт — группа уже сама себе круг.
- */
-function groupLabel(
-  filters: Pick<SbFilters, 'age' | 'ageTo' | 'ageGroup' | 'gender'>,
-): string | null {
-  if (filters.ageGroup) return `masters ${filters.ageGroup}`;
-  const { age, gender } = filters;
-  if (age == null) return null;
-  const label = filters.ageTo != null ? `${age}+` : String(age);
-  if (gender == null) return `age ${label}`;
-  const adult = age >= 18;
-  const noun = gender === 'female' ? (adult ? 'women' : 'girls') : (adult ? 'men' : 'boys');
-  return `${noun} ${label}`;
-}
+/** Подпись группы сверстников — общий `peerGroupLabel`, зеркало серверного SwimmerPageBuilder. */
+const groupLabel = (filters: Pick<SbFilters, 'age' | 'ageTo' | 'ageGroup' | 'gender'>) =>
+  peerGroupLabel(filters);
 
 function SeasonBestProject() {
   useTheme();

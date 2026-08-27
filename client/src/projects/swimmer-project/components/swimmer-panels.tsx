@@ -5,7 +5,7 @@ import SwimmerResultRow, { type ResultRowData } from './swimmer-result-row';
 import SwimRow from '../../components/swim-row/swim-row';
 import { MIN_PEERS_FOR_RANK } from '../../components/mix/rank-of-peers/rank-of-peers';
 import { routes } from '../../../utils/routes';
-import { seasonLabel } from '../../../utils/helpers/season-helper';
+import { peerGroupLabel, seasonLabel } from '../../../utils/helpers/season-helper';
 import type {
   SwimmerBestTime, SwimmerCompetition, SwimmerDisciplineRank, SwimmerPersonalBest, SwimmerProgress,
   SwimmerSeasonRanks, SwimmerSummary,
@@ -466,7 +466,7 @@ function HeldRecordsSection({ records }: { records: SwimmerHeldRecord[] }) {
  * сверху: это разные вещи — рекорд из справочника федерации и «моё лучшее за карьеру».
  */
 export function PersonalBestsPanel({
-  rows, poolType, onPoolType, records, gender, state,
+  rows, poolType, onPoolType, records, gender, age, state,
 }: {
   rows: SwimmerPersonalBest[] | null;
   poolType: string;
@@ -474,8 +474,15 @@ export function PersonalBestsPanel({
   records?: SwimmerHeldRecord[] | null;
   /** Нормативы у мужчин и женщин разные — без пола дуга уровня врёт. */
   gender: 'male' | 'female';
+  /** Возраст в витринном сезоне — тот же, по которому сервер считал обе дельты. */
+  age?: number | null;
   state: PanelLoad;
 }) {
+  // Круг сравнения называется в САМОЙ подписи дельты (решение Влада 2026-08-27):
+  // «Δ club» без круга читалось как сравнение со всем клубом, а оно теперь внутри своей
+  // возрастной ступени и своего пола. Подпись — та же, что у панели Season best.
+  const peers = peerGroupLabel({ age, gender });
+
   return (
     <>
       {records && records.length > 0 && <HeldRecordsSection records={records} />}
@@ -534,13 +541,13 @@ export function PersonalBestsPanel({
               // строками под ним. Там же пустые отбрасываются: нет эталона — нет строки.
               deltas={[
                 {
-                  label: 'Δ club',
+                  label: peers ? `Δ club · ${peers}` : 'Δ club',
                   ms: r.deltaToClubBestMs,
                   holds: r.holdsClubBest,
                   title: 'Compared with the best time in the club among swimmers of the same age',
                 },
                 {
-                  label: 'Δ Israel',
+                  label: peers ? `Δ Israel · ${peers}` : 'Δ Israel',
                   ms: r.deltaToNationalAgeRecordMs,
                   holds: r.holdsNationalAgeRecord,
                   quality: r.nationalAgeRecordQuality,
@@ -553,8 +560,8 @@ export function PersonalBestsPanel({
       )}
 
       <div className="deep-legend deep-legend--block">
-        Both deltas compare with the same age step. «record» means the best time in our
-        database belongs to this swimmer. Club deltas are computed from the meets we have
+        Both deltas compare within the same age and gender. «record» means the best time in
+        our database belongs to this swimmer. Club deltas are computed from the meets we have
         imported, not from an official club record list.
       </div>
     </>

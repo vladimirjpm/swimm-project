@@ -73,3 +73,30 @@ export function seasonLabel(startYear: number): string {
   const short = (y: number) => String(y % 100).padStart(2, '0');
   return `${startYear}/${short(startYear + 1)}`;
 }
+
+/**
+ * Подпись круга сверстников: «girls 12», «men 21+», «masters 45-49». Та же формула, что у
+ * серверного `SwimmerPageBuilder` — и единственная на клиенте: подпись появляется уже на трёх
+ * экранах (`/season-best`, панель Season best, дельты личников), и три копии одних и тех же
+ * существительных разошлись бы на первой же правке.
+ *
+ * Три оси возраста дают три разные подписи: год («girls 12»), взрослый хвост («men 21+») и
+ * мастерская группа («masters 45-49»), где пол в подпись не идёт — группа уже сама себе круг.
+ */
+export function peerGroupLabel(input: {
+  age?: number | null;
+  /** Задана — возрастной хвост «21+» (верхняя граница есть только у него). */
+  ageTo?: number | null;
+  /** Возрастная группа мастерского протокола («45-49»). */
+  ageGroup?: string | null;
+  gender?: 'male' | 'female' | null;
+}): string | null {
+  if (input.ageGroup) return `masters ${input.ageGroup}`;
+  const { age, gender } = input;
+  if (age == null) return null;
+  const label = input.ageTo != null ? `${age}+` : String(age);
+  if (gender == null) return `age ${label}`;
+  const adult = age >= 18;
+  const noun = gender === 'female' ? (adult ? 'women' : 'girls') : (adult ? 'men' : 'boys');
+  return `${noun} ${label}`;
+}
