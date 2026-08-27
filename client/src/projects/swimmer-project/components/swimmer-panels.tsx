@@ -478,10 +478,13 @@ export function PersonalBestsPanel({
   age?: number | null;
   state: PanelLoad;
 }) {
-  // Круг сравнения называется в САМОЙ подписи дельты (решение Влада 2026-08-27):
-  // «Δ club» без круга читалось как сравнение со всем клубом, а оно теперь внутри своей
-  // возрастной ступени и своего пола. Подпись — та же, что у панели Season best.
+  // Круг сравнения называется ОДИН РАЗ — в подписи панели (решение Влада 2026-08-27).
+  // Он один и тот же у ОБЕИХ дельт и у всех строк, и повторять «girls 12» дважды в каждой
+  // строке — шум. Формулировка та же, что у панели Season best и шапки /season-best.
   const peers = peerGroupLabel({ age, gender });
+  const hint = peers
+    ? `career best per distance · deltas among ${peers}`
+    : 'career best per distance';
 
   return (
     <>
@@ -489,7 +492,7 @@ export function PersonalBestsPanel({
 
       <PanelHead
         title="Personal bests"
-        hint="career best per distance"
+        hint={hint}
         right={
           <div className="deep-seg" role="group" aria-label="Pool length">
             {['25m', '50m'].map((p) => (
@@ -541,17 +544,21 @@ export function PersonalBestsPanel({
               // строками под ним. Там же пустые отбрасываются: нет эталона — нет строки.
               deltas={[
                 {
-                  label: peers ? `Δ club · ${peers}` : 'Δ club',
+                  label: 'Δ club',
                   ms: r.deltaToClubBestMs,
                   holds: r.holdsClubBest,
-                  title: 'Compared with the best time in the club among swimmers of the same age',
+                  title: peers
+                    ? `Compared with the best time in the club among ${peers}`
+                    : 'Compared with the best time in the club among swimmers of the same age and gender',
                 },
                 {
-                  label: peers ? `Δ Israel · ${peers}` : 'Δ Israel',
+                  label: 'Δ Israel',
                   ms: r.deltaToNationalAgeRecordMs,
                   holds: r.holdsNationalAgeRecord,
                   quality: r.nationalAgeRecordQuality,
-                  title: 'Compared with the national age record',
+                  title: peers
+                    ? `Compared with the national record for ${peers}`
+                    : 'Compared with the national age record',
                 },
               ]}
             />
