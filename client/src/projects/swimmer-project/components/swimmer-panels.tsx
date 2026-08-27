@@ -392,7 +392,6 @@ export function SeasonBestPanel({
                   ageInSeason: row.ageInSeason,
                   isMasters: !!row.isMasters,
                 }}
-                extras={<span className="deep-rank-go" aria-hidden="true">→</span>}
               />
             );
           })}

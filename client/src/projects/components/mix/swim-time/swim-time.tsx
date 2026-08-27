@@ -116,6 +116,17 @@ const FOOTNOTE: Record<SwimQualityKind, InfoText> = {
   },
 };
 
+/**
+ * «+2.73» — насколько это время хуже лучшего в срезе. Формат один на продукт и живёт
+ * рядом со временем: это его свойство, а не отдельная ячейка строки.
+ *
+ * У самого лидера отставания НЕТ — возвращается null и не рисуется ничего.
+ * Прочерк был осмыслен в таблице с заголовком колонки «Behind leader»; в карточке
+ * заголовков нет, и голое «—» ничего не значит.
+ */
+export const swimGapLabel = (ms?: number | null): string | null =>
+  ms == null || ms <= 0 ? null : `+${(ms / 1000).toFixed(2)}`;
+
 interface SwimTimeProps {
   time: string;
   /** null/undefined — время в порядке, значок не рисуется. */
@@ -134,13 +145,42 @@ interface SwimTimeProps {
    * Цвета у обоих одни и те же токены `--theme-flag-*` — разный только кегль.
    */
   chipSize?: 'sm' | 'md';
+  /**
+   * Отставание от лидера среза в мс — печатается «+2.73» СРАЗУ ЗА временем.
+   * Здесь, а не отдельной ячейкой строки: цифра читается только рядом со временем,
+   * к которому относится, иначе её приходится объяснять заголовком колонки.
+   */
+  gapMs?: number | null;
+  /** Кегль и цвет отставания — типографика за вызывающим экраном. */
+  gapClassName?: string;
 }
 
 const UI_SwimTime: React.FC<SwimTimeProps> = ({
   time, quality, className = '', marker = 'icon', chipSize = 'md',
+  gapMs = null, gapClassName = '',
 }) => {
   const [open, setOpen] = React.useState(false);
-  if (!quality) return <span className={className}>{time}</span>;
+
+  const gap = swimGapLabel(gapMs);
+  // Отставание встаёт ВТОРОЙ СТРОКОЙ под временем (решение Влада 2026-08-27): в строку с
+  // цифрами оно лезло в ширину узкой колонки времени и спорило с ними кеглем.
+  const gapNode = gap && (
+    <span
+      className={`block leading-none text-[11px] font-extrabold ${gapClassName}`}
+      title="Behind the leader"
+    >
+      {gap}
+    </span>
+  );
+
+  if (!quality) {
+    return (
+      <>
+        <span className={className}>{time}</span>
+        {gapNode}
+      </>
+    );
+  }
 
   // Карточки и строки раскрываются по клику — объяснялка не должна их трогать.
   const openInfo = (e: React.MouseEvent) => {
@@ -152,6 +192,7 @@ const UI_SwimTime: React.FC<SwimTimeProps> = ({
   return (
     <>
       <span className={className}>{time}</span>
+      {gapNode}
       {marker === 'chip' ? (
         <button
           type="button"

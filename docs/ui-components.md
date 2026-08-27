@@ -19,7 +19,7 @@
 
 | Компонент | Рисует | Почему обязателен |
 |---|---|---|
-| `UI_SwimTime` | время заплыва | **Единственный разрешённый способ вывести время.** Несёт признак «время под вопросом» (`protocol` / `record`) и объяснение к нему на EN/RU/HE. Пропы: `time`, `quality`, `marker='icon'\|'chip'`, `chipSize='sm'\|'md'`. Рядом живёт `swimFlaggedRowProps(quality)` — оформление строки-носителя (caution-лента, title/aria-label). Правило и причина — [`client/CLAUDE.md`](../client/CLAUDE.md) |
+| `UI_SwimTime` | время заплыва | **Единственный разрешённый способ вывести время.** Несёт признак «время под вопросом» (`protocol` / `record`) и объяснение к нему на EN/RU/HE. Пропы: `time`, `quality`, `marker='icon'\|'chip'`, `chipSize='sm'\|'md'`, `gapMs` + `gapClassName` — отставание от лидера «+2.73» ПОД временем второй строкой (это свойство времени, а не ячейка строки; у лидера не рисуется вовсе, формат — `swimGapLabel`). Рядом живёт `swimFlaggedRowProps(quality)` — оформление строки-носителя (caution-лента, title/aria-label). Правило и причина — [`client/CLAUDE.md`](../client/CLAUDE.md) |
 | `UI_PrelimLabel` | пометка `[prelim]` | Единственное место, где живут цвет и текст пометки предварительных заплывов |
 | `UI_RoundLabel` | пометка раунда (`[final]`, `[age final]`) | Единственное место с текстом и пояснением, чем раунды отличаются в зачёте |
 
@@ -47,7 +47,7 @@
 | `UI_RankOfPeers` | место в РЕЙТИНГЕ и круг сравнения: «#7» и под ним «of 36» | `rank`, `peerCount` (null — подписи нет), `isFirst`, `className`, `captionClassName`. Держит правило «alone» (меньше `MIN_PEERS_FOR_RANK` = 2 ровесников — сравнивать не с кем) и подпись для скринридера. ⚠ Не путать с `UI_PositionBadge`: тот про место В ПРОТОКОЛЕ и красит 1-2-3 медалью, а в сезонном рейтинге медалей не дают |
 | `UI_MedalIcon` | медаль | `place`, `styleSize='medal-16'\|'medal-24'\|'medal-40'` |
 | `UI_AgeLabel` | «age: 13» + бейдж программы (`para`, `mix`) + `?` при неизвестном поле | `age`, `eventCategory`, `isRelay`, `gender`, `ageGroup` |
-| `UI_SwimmerTimeCell` | время + сплиты + отметка о незачёте | `time`, `time_split`, `time_fail`, `time_fail_note`, `qualityMarker` |
+| `UI_SwimmerTimeCell` | время + сплиты + отметка о незачёте | `time`, `time_split`, `time_fail`, `time_fail_note`, `qualityMarker`, `gapMs`/`gapClassName` (пробрасываются в `UI_SwimTime`) |
 | `UI_ExpectedTimeDiff` | разницу с ожидаемым временем | `time`, `expected_time` |
 | `UI_NormativeLevelIcon` | значок разряда | `levelName`, `styleName`, `styleLen`, `poolType`, `normativeAgeGroup` |
 | `UI_LevelProgress` | прогресс до следующего разряда | `currentTime`, `nextTime`, `progressPercent` |

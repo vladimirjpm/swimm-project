@@ -236,8 +236,11 @@ a.swim-row:hover {
   font-weight: 800;
   color: var(--sr-text-mute, var(--theme-mode-text-secondary));
 }
+/* Отставание от лидера стоит внутри ячейки времени, ВТОРОЙ СТРОКОЙ под цифрами: кегль
+   мельче времени и цвет приглушён — это справка к времени, а не второе время. */
 .swim-row__gap {
-  flex: none;
+  margin-top: 2px;
+  font-size: 11px;
   font-weight: 800;
   color: var(--sr-text-ghost, var(--theme-mode-text-muted));
 }

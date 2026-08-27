@@ -25,6 +25,10 @@ interface UI_SwimmerTimeCellProps {
    * иначе подпись не влезает в узкую колонку времени и ломает сетку строки.
    */
   qualityMarker?: 'icon' | 'chip';
+  /** Отставание от лидера в мс — рисует `UI_SwimTime` сразу за временем. */
+  gapMs?: number | null;
+  /** Кегль и цвет отставания. */
+  gapClassName?: string;
 }
 
 const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
@@ -38,6 +42,8 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
   isRecordHolder = false,
   quality = null,
   qualityMarker = 'icon',
+  gapMs = null,
+  gapClassName = '',
 }) => {
   const [splitOpen, setSplitOpen] = useState(false);
 
@@ -76,7 +82,14 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
           className={`${firstLineClassName} ${stacked ? stackedClass : 'flex items-center gap-1'} cursor-pointer select-none`}
           onClick={handleToggle}
         >
-          <UI_SwimTime time={time} quality={quality} marker={qualityMarker} chipSize="sm" />
+          <UI_SwimTime
+            time={time}
+            quality={quality}
+            marker={qualityMarker}
+            chipSize="sm"
+            gapMs={gapMs}
+            gapClassName={gapClassName}
+          />
           {time_fail && <span className="text-red-500 ml-1">*</span>}
           <span
             className={`theme-text-muted transition-transform duration-200 ${splitOpen ? 'rotate-180' : ''}`}
@@ -85,7 +98,14 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
         </div>
       ) : (
         <div className={`${firstLineClassName} ${stackedClass}`}>
-          <UI_SwimTime time={time} quality={quality} marker={qualityMarker} chipSize="sm" />
+          <UI_SwimTime
+            time={time}
+            quality={quality}
+            marker={qualityMarker}
+            chipSize="sm"
+            gapMs={gapMs}
+            gapClassName={gapClassName}
+          />
           {time_fail && <span className="text-red-500 ml-1">*</span>}
         </div>
       )}

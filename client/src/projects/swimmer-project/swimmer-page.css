@@ -218,14 +218,6 @@
    выравнивание не нужно. На мобайле ограничение снимается (см. медиазапрос ниже). */
 .deep-swim-row { max-width: 50%; }
 
-/* Стрелка «строка открывает список» — тот же приём, что у списка стартов: кликается вся
-   строка, а не мелкая стрелка справа. */
-.deep-rank-go {
-  margin-left: 6px; opacity: .35; color: var(--deep-accent);
-  font-weight: 900; transition: opacity .12s ease;
-}
-.deep-swim-row:hover .deep-rank-go { opacity: 1; }
-
 /* Дельты личников во второй линии: подпись обязана ехать рядом со значением — колонок,
    к которым могла бы прилипнуть шапка таблицы, у карточек нет. */
 .deep-pb-delta { display: inline-flex; align-items: center; gap: 4px; }

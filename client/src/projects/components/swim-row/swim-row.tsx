@@ -133,7 +133,10 @@ export interface SwimRowProps {
   /** Дуга уровня считается ВНУТРИ строки (одна реализация на продукт). null — не показывать. */
   level?: SwimRowLevel | null;
 
-  /** Отставание от лидера в мс; формат («+2.73») живёт внутри строки — один на продукт. */
+  /**
+   * Отставание от лидера в мс. Печатается СРАЗУ ЗА ВРЕМЕНЕМ — это его свойство,
+   * а не отдельная ячейка строки, и формат держит сам `UI_SwimTime` (`swimGapLabel`).
+   */
   gapMs?: number | null;
 
   /** Редкие ячейки второй линии: «of 12», Δ клуб, Δ Израиль, «2nd swim». */
@@ -145,10 +148,6 @@ export interface SwimRowProps {
   onOpenMedia?: (() => void) | null;
   className?: string;
 }
-
-/** «+2.73» — отставание от лидера; у самого лидера прочерк. Формат один на продукт. */
-export const swimRowGapLabel = (ms?: number | null): string =>
-  ms == null || ms <= 0 ? '—' : `+${(ms / 1000).toFixed(2)}`;
 
 /** «individual_medley» → «individual medley»: ключ стиля приходит машинным. */
 export const swimRowStrokeLabel = (stroke?: string | null): string =>
@@ -241,7 +240,6 @@ function SwimRow({
     !!date ||
     (meetSide === 'line2' && !!competition) ||
     !!extras ||
-    gapMs != null ||
     !!onOpenMedia ||
     !!levelInfo;
 
@@ -311,6 +309,8 @@ function SwimRow({
             time_split={splits ?? ''}
             time_fail={!!timeFail}
             time_fail_note={timeFailNote ?? null}
+            gapMs={gapMs}
+            gapClassName="swim-row__gap"
             firstLineClassName="swim-row__time-value"
             secondLineClassName="swim-row__time-sub"
             className="swim-row__time-cell"
@@ -359,7 +359,6 @@ function SwimRow({
           </div>
 
           {extras && <span className="swim-row__extras">{extras}</span>}
-          {gapMs != null && <span className="swim-row__gap">{swimRowGapLabel(gapMs)}</span>}
 
           {onOpenMedia && (
             <button
