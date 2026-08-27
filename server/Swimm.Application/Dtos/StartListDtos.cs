@@ -10,6 +10,11 @@ namespace Swimm.Application.Dtos;
 /// Один предстоящий заплыв пловца — строка стартового протокола для витрины
 /// (docs/plans/start-list-plan.md §4).
 /// </summary>
+/// <param name="OrgCompId">
+/// compID соревнования этого заплыва. Нужен, чтобы построить ссылку на стартовый протокол,
+/// когда строка приходит ВНЕ контекста одного соревнования: «ближайшие старты» избранных
+/// смешивают несколько разных стартов, и по одной строке иначе не понять, куда вести.
+/// </param>
 /// <param name="SeedTime">
 /// Посевное время как напечатано («01:42.72»); null — «NT», пловец эту дистанцию ещё не плыл.
 /// </param>
@@ -28,6 +33,8 @@ namespace Swimm.Application.Dtos;
 /// <param name="Status">entered | swum | no-show — см. <c>CompetitionEntryStatus</c>.</param>
 public sealed record StartListSwimDto(
     [property: JsonPropertyName("id")] long Id,
+    [property: JsonPropertyName("org_comp_id")] int OrgCompId,
+    [property: JsonPropertyName("comp_name")] string CompName,
     [property: JsonPropertyName("org_discipline_id")] int OrgDisciplineId,
     [property: JsonPropertyName("event_number")] int? EventNumber,
     [property: JsonPropertyName("distance")] string Distance,

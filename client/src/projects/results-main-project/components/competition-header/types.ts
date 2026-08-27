@@ -2,7 +2,7 @@
 // DTO зеркалят server/Swimm.Application/Dtos/CompetitionOverviewDto.cs (snake_case).
 
 // 'overview' — мастер-детейл с цветными модулями (design_handoff_competition_overview2, 9d/9f).
-export type CompetitionTab = 'overview' | 'swims' | 'clubs' | 'records' | 'media';
+export type CompetitionTab = 'overview' | 'swims' | 'clubs' | 'records' | 'media' | 'startlist';
 
 export interface OverviewSummary {
   result_count: number;
@@ -152,6 +152,9 @@ export interface OverviewRecord {
 
 export interface CompetitionOverview {
   summary: OverviewSummary;
+  /** compID сайта федерации — адрес стартового протокола. null — соревнование завели
+   *  руками, штампа нет: таб Start list не показываем (шаг 0, start-list-ui-sonnet.md). */
+  org_comp_id?: number | null;
   /**
    * Наградное ли соревнование (Competition.IsAward). У ненаградных (лиги, отборы) места в
    * протоколе есть, а медалей нет — Overview прячет всё медальное: Most decorated, медали
@@ -192,4 +195,7 @@ export interface CompetitionHeaderProps {
   onTabChange(tab: CompetitionTab): void;
   /** Число публичных медиа соревнования (бейдж таба Media); null — ещё не известно. */
   mediaCount: number | null;
+  /** Число заявок стартового протокола (бейдж таба Start list); null — ещё не известно
+   *  или таба нет (org_comp_id пуст). */
+  startListEntries?: number | null;
 }

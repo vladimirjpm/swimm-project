@@ -30,6 +30,15 @@ export const routes = {
   results: () => '/results',
   competition: (id: string | number) => `/competitions/${enc(String(id))}`,
   competitionsList: () => '/competitions',
+  /**
+   * Предстоящее соревнование (стартовый протокол, ещё не проходило — своей карточки в
+   * `Competitions` у него нет). Отдельный сегмент `upcoming`, а НЕ `/competitions/{orgCompId}`:
+   * `orgCompId` (id сайта федерации) и наш `Competitions.Id` — два разных пространства чисел,
+   * `/competitions/{id}` молча открыл(а) бы чужое соревнование, если числа совпали (решение
+   * С7б, docs/tasks/start-list-ui-sonnet.md). Адрес переживает импорт протокола: когда
+   * соревнование появится в обычном списке, старая ссылка обязана продолжать работать.
+   */
+  competitionUpcoming: (orgCompId: string | number) => `/competitions/upcoming/${enc(String(orgCompId))}`,
 
   groupsList: () => '/groups',
   group: (slug: string) => `/groups/${enc(slug)}`,
@@ -149,6 +158,9 @@ export interface RouteIdentity {
   groupResults: boolean;
   /** id соревнования из /competitions/{id} ('last' допустим). */
   competitionId: string | null;
+  /** orgCompId (id сайта федерации) из /competitions/upcoming/{orgCompId} — соревнование
+   *  ещё не проходило, своей строки в Competitions нет (решение С7б). */
+  upcomingOrgCompId: number | null;
   /** id пловца из /swimmers/{id}. */
   swimmerId: number | null;
   /** id клуба из /clubs/{id}. */
@@ -169,6 +181,7 @@ export function parseRoute(pathname: string = window.location.pathname): RouteId
     groupSlug: null,
     groupResults: false,
     competitionId: null,
+    upcomingOrgCompId: null,
     swimmerId: null,
     clubId: null,
   };
@@ -176,6 +189,9 @@ export function parseRoute(pathname: string = window.location.pathname): RouteId
   if (seg[0] === 'groups' && seg[1]) {
     id.groupSlug = decodeURIComponent(seg[1]);
     id.groupResults = seg[2] === 'results';
+  } else if (seg[0] === 'competitions' && seg[1] === 'upcoming' && seg[2]) {
+    const n = Number(decodeURIComponent(seg[2]));
+    id.upcomingOrgCompId = Number.isFinite(n) && n > 0 ? n : null;
   } else if (seg[0] === 'competitions' && seg[1]) {
     id.competitionId = decodeURIComponent(seg[1]);
   } else if (seg[0] === 'swimmers' && seg[1]) {

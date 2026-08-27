@@ -15,6 +15,7 @@ export default function CompetitionHeader({
   activeTab,
   onTabChange,
   mediaCount,
+  startListEntries,
   onAddMedia,
   source,
   onChangeClick,
@@ -58,6 +59,7 @@ export default function CompetitionHeader({
         activeTab={activeTab}
         onTabChange={onTabChange}
         mediaCount={mediaCount}
+        startListEntries={startListEntries}
       />
       {/* Combine All Results — полоса сразу под табами, перед контентом таба (handoff 12b).
           Сама решает, рендериться ли (только там, где тумблер был доступен раньше). */}

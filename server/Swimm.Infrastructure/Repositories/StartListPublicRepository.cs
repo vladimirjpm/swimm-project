@@ -220,6 +220,8 @@ public class StartListPublicRepository : IStartListPublicRepository
 
     private static StartListSwimDto ToSwim(CompetitionEntry e) => new(
         e.Id,
+        e.OrgCompId,
+        e.CompName,
         e.OrgDisciplineId,
         e.OrgEventNumber,
         e.Distance,

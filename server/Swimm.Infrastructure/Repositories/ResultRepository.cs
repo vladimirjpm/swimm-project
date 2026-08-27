@@ -355,6 +355,17 @@ public class ResultRepository : IResultRepository
             .ThenBy(d => ParseDayDate(d.Date))
             .ToList();
 
+        // compID федерации для таба Start list (шаг С7 плана start-list-plan.md): берём у
+        // первого дня в выборке — Competition.OrgCompId, а если пуст (штамп многодневки
+        // стоит на событии, см. CompetitionIdentity) — Competition.Event.OrgCompId.
+        var firstCompetitionId = days.Select(d => d.CompetitionId).FirstOrDefault();
+        var orgCompId = firstCompetitionId != 0
+            ? await _db.Competitions.AsNoTracking()
+                .Where(c => c.Id == firstCompetitionId)
+                .Select(c => c.OrgCompId ?? (c.Event != null ? c.Event.OrgCompId : null))
+                .FirstOrDefaultAsync()
+            : null;
+
         var resultCount = days.Sum(d => d.ResultCount);
         // Личные пловцы; эстафетные строки не раздувают счётчик участников.
         var swimmerCount = await query.Where(r => r.RelayId == null)
@@ -842,6 +853,7 @@ public class ResultRepository : IResultRepository
 
         var overview = new CompetitionOverviewDto
         {
+            OrgCompId = orgCompId,
             Summary = new OverviewSummaryDto
             {
                 ResultCount = resultCount,

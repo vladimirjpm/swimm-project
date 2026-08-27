@@ -12,9 +12,12 @@ interface Props {
   activeTab: CompetitionTab;
   onTabChange(tab: CompetitionTab): void;
   mediaCount: number | null;
+  /** Число заявок стартового протокола; таб рисуется только когда есть org_comp_id
+   *  (шаг 1.1, start-list-ui-sonnet.md) — по образцу условного таба Records. */
+  startListEntries?: number | null;
 }
 
-export default function CompetitionTabs({ overview, activeTab, onTabChange, mediaCount }: Props) {
+export default function CompetitionTabs({ overview, activeTab, onTabChange, mediaCount, startListEntries }: Props) {
   const tabs: { tab: CompetitionTab; label: string; count?: number | null }[] = [
     { tab: 'overview', label: 'Overview' },
     { tab: 'swims', label: 'Swims', count: overview?.summary.result_count },
@@ -24,6 +27,11 @@ export default function CompetitionTabs({ overview, activeTab, onTabChange, medi
       ? [{ tab: 'records' as const, label: 'Records', count: overview.records.length }]
       : []),
     { tab: 'media', label: 'Media', count: mediaCount },
+    // Start list — только когда у соревнования есть org_comp_id: без него стартовому
+    // протоколу неоткуда взяться (решение 1, шаг 0 задания).
+    ...(overview?.org_comp_id != null
+      ? [{ tab: 'startlist' as const, label: 'Start list', count: startListEntries }]
+      : []),
   ];
 
   return (

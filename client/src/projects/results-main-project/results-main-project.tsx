@@ -20,6 +20,9 @@ import CompetitionOverview2 from './components/competition-header/overview2/comp
 import CompetitionClubs from './components/competition-header/competition-clubs';
 import CompetitionMedia from './components/competition-header/competition-media';
 import CompetitionRecords from './components/competition-header/competition-records';
+import StartListTab from './components/start-list/start-list-tab';
+import { useStartListProgramme } from './components/start-list/use-start-list';
+import UpcomingCompetitionPage from './components/start-list/upcoming-competition-page';
 import { useCompetitionOverview } from './components/competition-header/use-competition-overview';
 import { useCompetitionAddMedia } from './components/competition-header/use-competition-add-media';
 import type { CompetitionTab } from './components/competition-header/types';
@@ -233,7 +236,7 @@ function ResultsMain() {
   // === Шапка соревнования + табы (design_handoff_competition_overview, вариант 1b) ===
   // Только вне группы и вне тренировок. ?tab=overview|swims|clubs|records|media в URL
   // (в group-режиме ?tab= — свой, trainings/competitions, они не пересекаются).
-  const VALID_COMP_TABS: CompetitionTab[] = ['overview', 'swims', 'clubs', 'records', 'media'];
+  const VALID_COMP_TABS: CompetitionTab[] = ['overview', 'swims', 'clubs', 'records', 'media', 'startlist'];
   const [compTab, setCompTab] = useState<CompetitionTab>(() => {
     const t = new URLSearchParams(window.location.search).get('tab') as CompetitionTab | null;
     return !groupSlug && t && VALID_COMP_TABS.includes(t) ? t : 'overview';
@@ -262,6 +265,11 @@ function ResultsMain() {
 
   const { overview: compOverview, loading: compOverviewLoading } =
     useCompetitionOverview(!groupSlug && !isTraining ? compSourceParams : undefined);
+
+  // Таб Start list (С7): счётчик заявок для бейджа таба. Программу грузим только когда
+  // org_comp_id уже известен из Overview — иначе таба всё равно нет (см. competition-tabs.tsx).
+  const startListOrgCompId = compOverview?.org_comp_id ?? null;
+  const { data: startListProgramme } = useStartListProgramme(startListOrgCompId);
 
   // Ленивый Swims (design_handoff_competition_overview): в режиме соревнования тяжёлый
   // фетч /api/results откладываем, пока не пришёл Overview (prefetch в фоне) или пока
@@ -403,6 +411,14 @@ function ResultsMain() {
     [filters, isTraining]
   );
 
+  // /competitions/upcoming/{orgCompId} (С7б, шаг 3): соревнование ещё не проходило, своей
+  // строки в Competitions нет — обычная шапка/селектор/табы тут ни к чему, только Start list.
+  // Ранний возврат ПОСЛЕ всех хуков выше — правило хуков не нарушено.
+  const upcomingOrgCompId = parseRoute().upcomingOrgCompId;
+  if (upcomingOrgCompId != null) {
+    return <UpcomingCompetitionPage orgCompId={upcomingOrgCompId} />;
+  }
+
   return (
     // Горизонтальных паддингов у корня НЕТ (handoff v2, 5a): полосы-фоны идут
     // край-в-край, ширину держит PAGE_CONTAINER внутри полос и вокруг контента.
@@ -450,6 +466,7 @@ function ResultsMain() {
                       activeTab={compTab}
                       onTabChange={handleCompTabChange}
                       mediaCount={compMediaItems.length}
+                      startListEntries={startListProgramme?.entries}
                       onAddMedia={auth.isAuthenticated && addMedia.canAdd ? addMedia.openModal : undefined}
                       source={source}
                       onChangeClick={togglePanel}
@@ -517,6 +534,8 @@ function ResultsMain() {
             onAddMedia={addMedia.openModal}
             addingMedia={addMedia.loadingSwimmers}
           />
+        ) : compTab === 'startlist' ? (
+          startListOrgCompId != null && <StartListTab orgCompId={startListOrgCompId} />
         ) : (
           <CompetitionRecords overview={compOverview} onOpenSwim={handleOpenSwim} />
         )

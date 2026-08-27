@@ -14,6 +14,15 @@ public sealed class CompetitionOverviewDto
     [JsonPropertyName("summary")] public OverviewSummaryDto Summary { get; init; } = new();
 
     /// <summary>
+    /// compID сайта федерации — адрес, по которому живёт стартовый протокол
+    /// (<c>GET /api/start-list/{orgCompId}</c>). Источник: <c>Competition.OrgCompId</c>,
+    /// а у дня многодневки, если там пусто, — <c>Competition.Event.OrgCompId</c> (штамп
+    /// многодневки стоит на событии, см. <c>CompetitionIdentity</c>). <c>null</c> —
+    /// соревнование завели руками, штампа нет: таб Start list клиент не показывает.
+    /// </summary>
+    [JsonPropertyName("org_comp_id")] public int? OrgCompId { get; init; }
+
+    /// <summary>
     /// Соревнование наградное (<c>Competition.IsAward</c>) — то есть места в протоколе означают
     /// награждение. У ненаградных (лиги, отборы, «результаты дня») места есть, но медалей нет,
     /// и клиент прячет всё медальное: Most decorated, медали в клубном зачёте, High Point.
