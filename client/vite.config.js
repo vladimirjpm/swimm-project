@@ -59,8 +59,11 @@ const cleanUrlRewrite = () => ({
 
 export default defineConfig(({ command }) => ({
   // In dev we serve at '/', but we also accept '/swimm-project/*' via middleware.
-  // In production builds we use relative paths so the same dist works on Azure and GH Pages.
-  base: command === 'serve' ? '/' : './',
+  // Прод — ВСЕГДА '/': сборка раздаётся из wwwroot API с корня одного origin, и чистые URL
+  // двухсегментные (/swimmers/{id}). При относительном base браузер попросил бы
+  // /swimmers/swimmer.js и получил 404 — страница не грузилась бы вовсе. Прежнее './' было
+  // ради GitHub Pages; тот деплой снесён в d3b25ab. Не откатывать (docs/plans/azure-deploy-plan.md Б2).
+  base: '/',
   plugins: [react(), tailwindcss(), swimmProjectPrefixRewrite(), cleanUrlRewrite()],
   // Dev-прокси на API (Swimm.API, http://localhost:5078): относительные запросы клиента
   // (/api/*, /auth/*) уходят на бэкенд как same-origin — куки и antiforgery работают без CORS.

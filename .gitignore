@@ -47,3 +47,7 @@ obj/
 .DS_Store
 Thumbs.db
 .gstack/
+
+# Дамп бизнес-данных для наполнения прода (server/db/dump-seed.sh).
+# 14 МБ строк из боевой базы — в репозитории им не место.
+server/db/seed-data.sql

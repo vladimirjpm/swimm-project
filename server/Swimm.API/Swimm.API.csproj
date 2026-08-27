@@ -30,6 +30,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Локальные конфиги НИКОГДА не едут в publish: в Development.json лежат живые ключи
+         (Google ClientSecret, serper) и DevAdminBypass, а Local.json подключается ПОСЛЕ
+         переменных окружения и перебил бы прод-строки подключения.
+         Страховка работает и при ручном publish с машины, а не только в чистом CI.
+         docs/plans/azure-deploy-plan.md Б7. -->
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+    <Content Update="appsettings.Local.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Swimm.Application\Swimm.Application.csproj" />
     <ProjectReference Include="..\Swimm.Infrastructure\Swimm.Infrastructure.csproj" />
     <ProjectReference Include="..\Swimm.Parsing\Swimm.Parsing.csproj" />
@@ -39,6 +49,42 @@
        Без Node билд не падает: собранный wwwroot/css/admin.min.css коммитится в репо. -->
   <Target Name="BuildAdminCss" BeforeTargets="Build" Condition="Exists('$(MSBuildProjectDirectory)\node_modules')">
     <Exec Command="npm run css:build" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
+  <!-- ══ Прод-сборка клиента внутрь wwwroot ══════════════════════════════════════════
+       Один origin: App Service раздаёт React-клиент из wwwroot этого же приложения
+       (ROADMAP «Хостинг»). Без этого шага publish даёт сайт, где живы только /Admin/*,
+       а все публичные чистые URL отдают 404 — docs/plans/azure-deploy-plan.md Б1.
+
+       ⚠ Только на Publish, НЕ на Build: иначе каждый локальный `dotnet build` тянул бы
+       npm-сборку и упирался в build-lock (см. корневой CLAUDE.md).
+       `-p:SkipClientBuild=true` пропускает шаг, если dist уже собран отдельно. -->
+  <PropertyGroup>
+    <ClientDir>$(MSBuildProjectDirectory)/../../client</ClientDir>
+  </PropertyGroup>
+
+  <!-- Копируем ПОСЛЕ Publish, а не через ResolvedFileToPublish: конвейер static web assets
+       сам управляет содержимым wwwroot, и добавление своих записей в него молча выбрасывало
+       css/admin.min.css — админка уезжала в прод без единого стиля. -->
+  <Target Name="PublishClientApp" AfterTargets="Publish" Condition="'$(SkipClientBuild)' != 'true'">
+    <Exec Command="npm ci" WorkingDirectory="$(ClientDir)" Condition="!Exists('$(ClientDir)/node_modules')" />
+    <Exec Command="npm run build" WorkingDirectory="$(ClientDir)" />
+
+    <ItemGroup>
+      <!-- data/json и data/excel — наследие Фазы 2 (15 МБ), их не читает ни один модуль
+           клиента; в артефакт деплоя не берём. -->
+      <ClientDistFile Include="$(ClientDir)/dist/**/*"
+                      Exclude="$(ClientDir)/dist/data/json/**/*;$(ClientDir)/dist/data/excel/**/*" />
+    </ItemGroup>
+
+    <Error Condition="'@(ClientDistFile)' == ''"
+           Text="Сборка клиента пуста: $(ClientDir)/dist не существует или не содержит файлов." />
+
+    <Copy SourceFiles="@(ClientDistFile)"
+          DestinationFiles="@(ClientDistFile->'$(PublishDir)wwwroot/%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+
+    <Message Importance="high" Text="Клиент опубликован в $(PublishDir)wwwroot: @(ClientDistFile->Count()) файлов." />
   </Target>
 
 </Project>

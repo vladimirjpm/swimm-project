@@ -2,6 +2,8 @@ using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Repositories;
@@ -135,7 +137,12 @@ public static class DependencyInjection
         }
         else
         {
-            services.AddSingleton<IEmailSender, LoggingEmailSender>();
+            // Тело письма (с одноразовым токеном) уходит в лог ТОЛЬКО в Development.
+            // IHostEnvironment резолвим необязательно: AddInfrastructure должен оставаться
+            // самодостаточным и вне хоста (в тестах его в контейнере нет — тогда false).
+            services.AddSingleton<IEmailSender>(sp => new LoggingEmailSender(
+                sp.GetRequiredService<ILogger<LoggingEmailSender>>(),
+                logBody: sp.GetService<IHostEnvironment>()?.IsDevelopment() ?? false));
         }
 
         services.AddScoped<ILocalAuthService, LocalAuthService>();
