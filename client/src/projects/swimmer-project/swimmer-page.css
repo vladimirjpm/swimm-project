@@ -163,7 +163,6 @@
   border: 1px dashed var(--deep-card-border);
   background: var(--deep-card-bg); color: var(--deep-text-mute);
 }
-.deep-list { display: flex; flex-direction: column; gap: 6px; }
 
 /* ── Шапка сводки сезона (§5) ────────────────────────────────────────────── */
 
@@ -180,71 +179,71 @@
 .deep-season-banner__sub { font-size: 11px; font-weight: 800; opacity: .8; margin-top: 3px; }
 .deep-season-banner__medals { display: flex; align-items: center; gap: 7px; }
 
-/* ── Строка результата (§6) ──────────────────────────────────────────────── */
+/* ── Строки заплыва (§6, §7) ─────────────────────────────────────────────── */
 
-.deep-result-row {
-  display: block; padding: 10px 12px;
-  border-radius: var(--deep-radius-row);
-  background: var(--deep-card-bg-row);
-  border: 1px solid var(--deep-card-border-soft);
-  text-decoration: none; color: inherit;
+/* Все списки заплывов страницы рисует ОДИН общий `SwimRow`
+   (docs/plans/swim-row-shared-component-plan.md): Best time, Progress, Season best,
+   Personal bests и официальные рекорды. Своей вёрстки строки у страницы больше нет —
+   deep-палитра приезжает в компонент ТОЛЬКО токенами `--sr-*` и только на контейнере
+   списка: покрасить корень страницы значило бы задеть соседнюю вёрстку. */
+.deep-list {
+  display: flex; flex-direction: column; gap: 6px;
+
+  --sr-radius: var(--deep-radius-row);
+  --sr-bg: var(--deep-card-bg-row);
+  --sr-bg-hover: var(--deep-card-bg);
+  --sr-border: var(--deep-card-border-soft);
+  --sr-border-hover: var(--deep-card-border);
+  --sr-text: var(--deep-text);
+  --sr-text-mute: var(--deep-text-mute);
+  --sr-text-faint: var(--deep-text-faint);
+  --sr-text-ghost: var(--deep-text-ghost);
+  --sr-divider: var(--deep-card-border-soft);
+  --sr-circle-bg: var(--deep-card-bg-raised);
+  --sr-circle-border: var(--deep-card-border);
+  --sr-num-font: var(--deep-font-display);
+  --sr-accent: var(--deep-accent);
+  --sr-gold: var(--deep-gold);
+  --sr-gold-chip-bg: var(--deep-gold-bar);
+  --sr-gold-chip-text: #3b2600;
+  --sr-chip-bg: var(--deep-accent-chip);
+  --sr-chip-border: var(--deep-accent-border);
+  --sr-chip-text: var(--deep-accent);
 }
-.deep-result-row:hover { background: var(--deep-card-bg); }
-.deep-result-row__line1 { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.deep-result-row__place {
-  width: 52px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px;
+
+/* Стрелка «строка открывает список» — тот же приём, что у списка стартов: кликается вся
+   строка, а не мелкая стрелка справа. */
+.deep-rank-go {
+  margin-left: 6px; opacity: .35; color: var(--deep-accent);
+  font-weight: 900; transition: opacity .12s ease;
 }
-.deep-result-row__age { font-size: 9.5px; font-weight: 800; color: var(--deep-text-ghost); }
-.deep-place-circle {
-  display: flex; align-items: center; justify-content: center;
-  width: 34px; height: 34px; border-radius: 999px;
-  background: var(--deep-card-bg-raised); border: 1px solid var(--deep-card-border);
-  font-size: 13px; font-weight: 900; color: var(--deep-text-mute);
-  font-variant-numeric: tabular-nums;
+.deep-swim-row:hover .deep-rank-go { opacity: 1; }
+
+/* Дельты личников во второй линии: подпись обязана ехать рядом со значением — колонок,
+   к которым могла бы прилипнуть шапка таблицы, у карточек нет. */
+.deep-pb-delta { display: inline-flex; align-items: center; gap: 4px; }
+.deep-pb-delta__label {
+  font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--deep-text-ghost);
 }
-/* Плита стиля — белая подложка и красная дистанция одинаковы в обеих темах:
-   это знак, а не поверхность темы (правило хендоффа). */
-.deep-stroke-plate {
-  position: relative; flex: none;
-  width: 86px; height: 52px; border-radius: 10px;
-  background: #fff; display: flex; align-items: center; justify-content: center;
-  overflow: hidden;
+.deep-delta { font-weight: 800; color: var(--deep-text-ghost); }
+.deep-delta--holds { color: var(--deep-gold); }
+.deep-delta--none { color: var(--deep-text-ghost); opacity: .6; }
+
+/* ── Официальные рекорды: секция НАД таблицей личников ───────────────────── */
+/* Отделена золотом: строка справочника федерации и «моё лучшее за карьеру» — разные вещи,
+   и путать их на одном экране нельзя. Строка та же самая, отличается только палитрой. */
+
+.deep-records-block {
+  margin-bottom: 16px; padding-bottom: 14px;
+  border-bottom: 1px solid var(--deep-card-border-soft);
 }
-.deep-stroke-plate img { max-height: 42px; max-width: 74px; }
-.deep-stroke-plate__dist {
-  position: absolute; top: 2px; right: 5px;
-  font-size: 12px; font-weight: 900; color: #dc2626;
-  text-shadow: 0 0 2px #fff, 0 0 4px #fff;
-  font-variant-numeric: tabular-nums;
+.deep-record-row {
+  --sr-bg: var(--deep-gold-soft);
+  --sr-bg-hover: var(--deep-gold-soft);
+  --sr-border: var(--deep-gold-border);
+  --sr-text: var(--deep-gold);
 }
-.deep-result-row__meet { flex: 1; min-width: 0; }
-.deep-result-row__meet-name {
-  font-size: 12.5px; font-weight: 900; color: var(--deep-text);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.deep-result-row__meet-sub { font-size: 11px; color: var(--deep-text-faint); margin-top: 2px; }
-.deep-result-row__time {
-  flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
-}
-.deep-result-row__time-value {
-  font-family: var(--deep-font-display); font-size: 22px; color: var(--deep-text);
-  font-variant-numeric: tabular-nums;
-}
-.deep-chip-best {
-  padding: 1px 8px; border-radius: var(--deep-radius-pill);
-  background: var(--deep-accent-chip); border: 1px solid var(--deep-accent-border);
-  font-size: 10px; font-weight: 900; color: var(--deep-accent);
-}
-.deep-result-row__line2 {
-  display: flex; align-items: center; gap: 12px;
-  margin: 8px 0 0 46px; padding-top: 7px;
-  border-top: 1px solid var(--deep-card-border-soft);
-  font-size: 11px; color: var(--deep-text-faint);
-  font-variant-numeric: tabular-nums;
-}
-.deep-result-row__splits { flex: 1; min-width: 0; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.deep-result-row__points { font-size: 11.5px; font-weight: 900; color: var(--deep-text-mute); }
-.deep-result-row__level { margin-left: auto; display: flex; align-items: center; }
 
 /* ── Список стартов (Season / History) ───────────────────────────────────── */
 
@@ -324,95 +323,6 @@
 }
 .deep-scope-note strong { color: var(--deep-accent); font-weight: 900; }
 
-/* Колонка Event — картиночная плита фиксированной ширины, поэтому колонка фиксирована,
-   а тянется столбец времени. */
-.deep-event-plate {
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  width: 86px; flex: none;   /* в строке результата line1 — flex-контейнер, плита не жмётся */
-}
-.deep-event-plate__pool {
-  font-size: 10px; font-weight: 800; color: var(--deep-text-faint);
-  letter-spacing: -.03em; white-space: nowrap;
-}
-
-.deep-rank-row { grid-template-columns: 56px 90px minmax(0, 1fr) 62px 84px; }
-/* Строка-ссылка: тот же приём, что у списка стартов (deep-meet-row) — кликается вся
-   строка, а не мелкая стрелка справа. */
-.deep-rank-row--link { text-decoration: none; color: inherit; }
-.deep-rank-row--link:hover { background: var(--deep-card-bg); border-color: var(--deep-card-border); }
-.deep-rank-row--link:hover .deep-rank-row__go { opacity: 1; }
-.deep-rank-row__go {
-  margin-left: 6px; opacity: .35; color: var(--deep-accent);
-  font-weight: 900; transition: opacity .12s ease;
-}
-
-.deep-rank-place {
-  font-family: var(--deep-font-display); font-size: 15px;
-  color: var(--deep-text-mute); font-variant-numeric: tabular-nums;
-}
-/* Первое место в группе — золото, как медаль: это и есть носитель бейджа SB */
-.deep-rank-place--first { color: var(--deep-gold); }
-/* SB — заливное золото с тёмным текстом, как медальные кружки: тот же «физический
-   объект» в обеих темах. Обводка золотом по золотому фону (как у BEST по accent) давала
-   контраст 3.19 при 10px bold — ниже 4.5, замерено в браузере. */
-.deep-chip-sb {
-  margin-left: 6px;
-  padding: 1px 8px; border-radius: var(--deep-radius-pill);
-  background: var(--deep-gold-bar); color: #3b2600;
-  font-size: 10px; font-weight: 900;
-}
-
-/* ── Официальные рекорды: секция НАД таблицей личников ───────────────────── */
-/* Отделена рамкой и золотом: строка справочника федерации и «моё лучшее за карьеру» —
-   разные вещи, и путать их на одном экране нельзя. */
-
-.deep-records-block {
-  margin-bottom: 16px; padding-bottom: 14px;
-  border-bottom: 1px solid var(--deep-card-border-soft);
-}
-.deep-record-row {
-  display: grid; grid-template-columns: 26px 86px minmax(0, 1fr) auto;
-  align-items: center; gap: 10px;
-  padding: 8px 12px; border-radius: var(--deep-radius-row);
-  background: var(--deep-gold-soft); border: 1px solid var(--deep-gold-border);
-}
-.deep-record-row__crown { font-size: 16px; text-align: center; }
-.deep-record-row__scope { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.deep-record-row__region {
-  font-size: 12px; font-weight: 900; color: var(--deep-text);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.deep-record-row__date { font-size: 10.5px; font-weight: 700; color: var(--deep-text-faint); }
-.deep-record-row__time {
-  font-family: var(--deep-font-display); font-size: 17px; color: var(--deep-gold);
-  font-variant-numeric: tabular-nums;
-}
-
-/* ── Records & PB (§7) ───────────────────────────────────────────────────── */
-
-.deep-pb-table { display: flex; flex-direction: column; gap: 4px; }
-.deep-pb-row {
-  display: grid;
-  grid-template-columns: 90px 110px minmax(0, 1.6fr) 56px 80px 90px;
-  align-items: center; gap: 10px;
-  padding: 9px 12px; border-radius: var(--deep-radius-row);
-  background: var(--deep-card-bg-row); border: 1px solid var(--deep-card-border-soft);
-  font-size: 12px; font-variant-numeric: tabular-nums;
-}
-.deep-pb-row--head {
-  background: transparent; border-color: transparent;
-  font-size: 9.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--deep-text-ghost);
-}
-.deep-pb-event { font-weight: 900; color: var(--deep-text); }
-.deep-pb-time { font-family: var(--deep-font-display); font-size: 15px; color: var(--deep-text); }
-.deep-pb-where { color: var(--deep-text-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.deep-pb-date { color: var(--deep-text-ghost); }
-.deep-pb-pts { font-weight: 800; color: var(--deep-text-mute); }
-.deep-delta { font-weight: 800; color: var(--deep-text-ghost); }
-.deep-delta--holds { color: var(--deep-gold); }
-.deep-delta--none { color: var(--deep-text-ghost); opacity: .6; }
-
 /* ── Progress (§8) ───────────────────────────────────────────────────────── */
 
 .deep-discipline-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
@@ -462,32 +372,9 @@
   /* Все действия ≥44px — правило хендоффа для тач-целей */
   .deep-hero-action { width: 44px; height: 44px; }
 
-  .deep-pb-row { grid-template-columns: 62px minmax(0, 1fr) 58px 62px; gap: 8px; }
-  .deep-pb-where, .deep-pb-pts { display: none; }
-
-  /* Season best: «из скольких» — главный столбец панели, на мобайле уступает
-     последний («behind leader»), а не он. Иначе от таблицы остаётся одно место
-     без группы, ради которой она и заведена. */
-  .deep-rank-row { grid-template-columns: 30px 62px minmax(0, 1fr) 40px; gap: 8px; }
-  .deep-rank-row .deep-pb-pts { display: block; font-size: 10.5px; }
-  .deep-rank-row > :last-child { display: none; }
-  /* Плита ужимается: на 375 рядом с ней должны уместиться время и обе дельты, а время —
-     главное в таблице. При 86px на него оставалось 22px. */
-  .deep-event-plate { width: 62px; }
-  .deep-event-plate .deep-stroke-plate { width: 62px; height: 38px; }
-  .deep-event-plate .deep-stroke-plate img { max-height: 30px; max-width: 52px; }
-  .deep-event-plate .deep-stroke-plate__dist { font-size: 11px; top: 1px; right: 3px; }
-  .deep-event-plate__pool { font-size: 9px; }
-
-  /* Корона на 375 съедает колонку, а золотой фон строки и так говорит «рекорд» */
-  .deep-record-row { grid-template-columns: 62px minmax(0, 1fr) auto; gap: 8px; }
-  .deep-record-row__crown { display: none; }
   .deep-meet-row { grid-template-columns: 78px minmax(0, 1fr) auto; }
   .deep-meet-row__stats { display: none; }
   .deep-media-grid { grid-template-columns: repeat(3, 1fr); }
 
-  .deep-result-row__line1 { flex-wrap: wrap; }
-  .deep-result-row__meet { order: 3; flex-basis: 100%; margin-left: 46px; }
-  .deep-result-row__time { margin-left: auto; }
-  .deep-result-row__line2 { margin-left: 0; flex-wrap: wrap; }
+  /* Строка заплыва перекладывает свои слоты сама — медиазапрос живёт в `swim-row.css`. */
 }

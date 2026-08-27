@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import UI_SwimTime from '../../components/mix/swim-time/swim-time';
 import UI_MedalIcon from '../../components/mix/medal-icon/medal-icon';
-import EventPlate from './event-plate';
 import SwimmerResultRow, { type ResultRowData } from './swimmer-result-row';
+import SwimRow from '../../components/swim-row/swim-row';
 import { routes } from '../../../utils/routes';
 import { seasonLabel } from '../../../utils/helpers/season-helper';
 import type {
@@ -275,11 +275,7 @@ export function ResultsPanel({
   );
 }
 
-/** «+3420» мс → «+3.42»; 0 — сам лидер. */
-function gapLabel(ms: number): string {
-  if (ms <= 0) return '—';
-  return `+${(ms / 1000).toFixed(2)}`;
-}
+/* Отставание от лидера форматирует сама строка (`swimRowGapLabel`) — формат один на продукт. */
 
 /**
  * Фильтр Season best: не «моё лучшее время», а МЕСТО среди сверстников — пловцов того же
@@ -322,6 +318,10 @@ export function SeasonBestPanel({
 
   const byKey = new Map(rows.map((r) => [r.disciplineKey, r]));
   const ranked = ranks.rows.filter((r) => byKey.has(r.disciplineKey));
+  // Пол группы сверстников — вход дуги уровня: нормативы у мужчин и женщин разные,
+  // а в ответе он приходит свободной строкой.
+  const rankGender: 'male' | 'female' | 'none' =
+    ranks.gender === 'male' || ranks.gender === 'female' ? ranks.gender : 'none';
 
   return (
     <>
@@ -341,23 +341,17 @@ export function SeasonBestPanel({
       {ranked.length === 0 ? (
         <PanelEmpty>No comparable swims in this season yet.</PanelEmpty>
       ) : (
-        <div className="deep-pb-table">
-          <div className="deep-pb-row deep-rank-row deep-pb-row--head">
-            <span>Place</span>
-            <span>Event</span>
-            <span>Best time</span>
-            <span>Group</span>
-            <span>Behind leader</span>
-          </div>
+        <div className="deep-list">
           {ranked.map((rank) => {
             const row = byKey.get(rank.disciplineKey)!;
+            const holds = holdsSeasonBest(rank);
             return (
               // Вся строка — ссылка на список этой связки: адрес несёт сезон, возраст, пол,
               // стиль, дистанцию и бассейн, чтобы страница открылась сразу на нужном срезе,
               // а не на своих умолчаниях.
-              <a
+              <SwimRow
                 key={rank.disciplineKey}
-                className="deep-pb-row deep-rank-row deep-rank-row--link"
+                className="deep-swim-row"
                 href={routes.seasonBest({
                   season,
                   age: ranks.age,
@@ -367,25 +361,37 @@ export function SeasonBestPanel({
                   poolType: row.poolType,
                   swimmerId,
                 })}
-              >
-                <span
-                  className={`deep-rank-place${holdsSeasonBest(rank) ? ' deep-rank-place--first' : ''}`}
-                >
-                  #{rank.rank}
-                </span>
-                <EventPlate stroke={row.stroke} distance={row.distance} poolType={row.poolType} />
-                <span className="deep-pb-time">
-                  <UI_SwimTime time={row.time ?? '—'} quality={row.quality} marker="chip" chipSize="sm" />
-                  {holdsSeasonBest(rank) && !row.quality && <span className="deep-chip-sb">SB</span>}
-                </span>
-                <span className="deep-pb-pts">
-                  {rank.peerCount < MIN_PEERS_FOR_SB ? 'alone' : `of ${rank.peerCount}`}
-                </span>
-                <span className="deep-delta">
-                  {gapLabel(rank.gapToLeaderMs)}
-                  <span className="deep-rank-row__go" aria-hidden="true">→</span>
-                </span>
-              </a>
+                stroke={row.stroke ?? ''}
+                distance={row.distance}
+                poolType={row.poolType}
+                time={row.time}
+                quality={row.quality}
+                splits={row.splits}
+                // Место среди СВЕРСТНИКОВ, а не в протоколе: медальный кружок тут соврал бы.
+                place={{ kind: 'rank', value: rank.rank, isFirst: holds }}
+                badge={holds ? 'sb' : null}
+                competition={{
+                  name: row.competition.name,
+                  isChampionship: row.competition.isChampionship,
+                }}
+                meetPlacement="line1"
+                date={row.date}
+                points={row.points ?? null}
+                gapMs={rank.gapToLeaderMs}
+                level={{
+                  gender: rankGender,
+                  ageInSeason: row.ageInSeason,
+                  isMasters: !!row.isMasters,
+                }}
+                extras={
+                  <>
+                    <span>
+                      {rank.peerCount < MIN_PEERS_FOR_SB ? 'alone' : `of ${rank.peerCount}`}
+                    </span>
+                    <span className="deep-rank-go" aria-hidden="true">→</span>
+                  </>
+                }
+              />
             );
           })}
         </div>
@@ -435,19 +441,22 @@ function HeldRecordsSection({ records }: { records: SwimmerHeldRecord[] }) {
       />
       <div className="deep-list">
         {records.map((r, i) => (
-          <div key={`${r.regionCode}-${r.category}-${r.ageKey}-${r.stroke}-${r.distance}-${i}`}
-            className="deep-record-row"
-          >
-            <span className="deep-record-row__crown" aria-hidden="true">🏆</span>
-            <EventPlate stroke={r.stroke} distance={r.distance} poolType={r.poolType} />
-            <span className="deep-record-row__scope">
-              <span className="deep-record-row__region">{recordScope(r)}</span>
-              {r.date && <span className="deep-record-row__date">{r.date}</span>}
-            </span>
-            <span className="deep-record-row__time">
-              <UI_SwimTime time={r.time} quality={r.quality} marker="chip" chipSize="sm" />
-            </span>
-          </div>
+          <SwimRow
+            key={`${r.regionCode}-${r.category}-${r.ageKey}-${r.stroke}-${r.distance}-${i}`}
+            className="deep-swim-row deep-record-row"
+            stroke={r.stroke ?? ''}
+            distance={r.distance}
+            poolType={r.poolType}
+            time={r.time}
+            quality={r.quality}
+            // Места у записи справочника нет: это не заплыв протокола, а строка реестра.
+            place={{ kind: 'none' }}
+            // «🏆 ISR · age 12» — область и ступень рекорда встают на место старта: именно
+            // они отвечают на вопрос «чей это рекорд».
+            competition={{ name: recordScope(r), isChampionship: true }}
+            meetPlacement="line1"
+            date={r.date}
+          />
         ))}
       </div>
       <div className="deep-legend deep-legend--block">
@@ -464,12 +473,14 @@ function HeldRecordsSection({ records }: { records: SwimmerHeldRecord[] }) {
  * сверху: это разные вещи — рекорд из справочника федерации и «моё лучшее за карьеру».
  */
 export function PersonalBestsPanel({
-  rows, poolType, onPoolType, records, state,
+  rows, poolType, onPoolType, records, gender, state,
 }: {
   rows: SwimmerPersonalBest[] | null;
   poolType: string;
   onPoolType: (pool: string) => void;
   records?: SwimmerHeldRecord[] | null;
+  /** Нормативы у мужчин и женщин разные — без пола дуга уровня врёт. */
+  gender: 'male' | 'female';
   state: PanelLoad;
 }) {
   return (
@@ -503,39 +514,45 @@ export function PersonalBestsPanel({
       ) : rows.length === 0 ? (
         <PanelEmpty>No results in this pool yet.</PanelEmpty>
       ) : (
-        <div className="deep-pb-table">
-          <div className="deep-pb-row deep-pb-row--head">
-            <span>Event</span>
-            <span>Best time</span>
-            <span>Where and when</span>
-            <span>Pts</span>
-            <span>Δ club</span>
-            <span>Δ Israel</span>
-          </div>
+        <div className="deep-list">
           {rows.map((r) => (
-            <div key={r.resultId} className="deep-pb-row">
-              <EventPlate stroke={r.stroke} distance={r.distance} poolType={r.poolType} />
-              <span className="deep-pb-time">
-                <UI_SwimTime time={r.time ?? '—'} quality={r.quality} marker="chip" chipSize="sm" />
-              </span>
-              <span className="deep-pb-where" dir="auto">
-                {r.competition.isChampionship && <span aria-hidden="true">🏆 </span>}
-                {r.competition.name}
-                <span className="deep-pb-date"> · {r.date}</span>
-              </span>
-              <span className="deep-pb-pts">{r.points ?? '—'}</span>
-              <span><DeltaCell ms={r.deltaToClubBestMs} holds={r.holdsClubBest} /></span>
-              <span>
-                <DeltaCell ms={r.deltaToNationalAgeRecordMs} holds={r.holdsNationalAgeRecord} />
-                {r.nationalAgeRecordQuality && (
-                  <UI_SwimTime
-                    time=""
-                    quality={r.nationalAgeRecordQuality}
-                    marker="icon"
-                  />
-                )}
-              </span>
-            </div>
+            <SwimRow
+              key={r.resultId}
+              className="deep-swim-row"
+              stroke={r.stroke ?? ''}
+              distance={r.distance}
+              poolType={r.poolType}
+              time={r.time}
+              quality={r.quality}
+              // У личного рекорда места нет вовсе — прочерк держит колонку, чтобы плитки
+              // дисциплин стояли в ряд.
+              place={{ kind: 'none' }}
+              competition={{
+                name: r.competition.name,
+                isChampionship: r.competition.isChampionship,
+              }}
+              meetPlacement="line1"
+              date={r.date}
+              points={r.points ?? null}
+              // Возраста заплыва в личниках нет (это лучшее за КАРЬЕРУ), но обычной шкале
+              // нормативов он и не нужен — она зависит только от пола, бассейна и дистанции.
+              level={{ gender }}
+              extras={
+                <>
+                  <span className="deep-pb-delta">
+                    <span className="deep-pb-delta__label">Δ club</span>
+                    <DeltaCell ms={r.deltaToClubBestMs} holds={r.holdsClubBest} />
+                  </span>
+                  <span className="deep-pb-delta">
+                    <span className="deep-pb-delta__label">Δ Israel</span>
+                    <DeltaCell ms={r.deltaToNationalAgeRecordMs} holds={r.holdsNationalAgeRecord} />
+                    {r.nationalAgeRecordQuality && (
+                      <UI_SwimTime time="" quality={r.nationalAgeRecordQuality} marker="icon" />
+                    )}
+                  </span>
+                </>
+              }
+            />
           ))}
         </div>
       )}

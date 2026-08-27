@@ -42,7 +42,7 @@
 |---|---|---|
 | `UI_SwimmStyleIcon` | картинку стиля; `icon-len` печатает дистанцию поверх | `styleName`, `styleLen`, `styleType='icon-notext'\|'icon-text'\|'icon-len'` |
 | `UI_PoolIcon` | бассейн: svg-дорожки либо подпись-«дорожка» `--25m--` / `-----50m-----` | `styleType`, `label`, `labelClassName`, `iconWidth` |
-| `UI_DateIcon` | дату: `cube` (плитка), `row-style-1` («30 Jul 2026»), `row-style-2` | `date` (`DD/MM/YYYY`), `styleType`, `fontClassName` (⚠ иначе подставит свой серый мимо токенов) |
+| `UI_DateIcon` | дату: `cube` (плитка), `row-style-1` («30 Jul 2026»), `row-style-2` | `date` — `DD/MM/YYYY` ИЛИ ISO `YYYY-MM-DD` (оба формата реально есть в продукте: статика и API), `styleType`, `fontClassName` (⚠ иначе подставит свой серый мимо токенов) |
 | `UI_PositionBadge` | кружок места; 1-2-3 красит медалью при `isAward` | `position`, `fallbackIndex`, `size`, `isAward` |
 | `UI_MedalIcon` | медаль | `place`, `styleSize='medal-16'\|'medal-24'\|'medal-40'` |
 | `UI_AgeLabel` | «age: 13» + бейдж программы (`para`, `mix`) + `?` при неизвестном поле | `age`, `eventCategory`, `isRelay`, `gender`, `ageGroup` |
@@ -73,8 +73,8 @@
 | `FilterCard` | `components/filter-section/filter-card.tsx` | сворачиваемую карточку фильтра (название + сводка + шеврон). **Тем-нейтральна**: цвета в токенах `--fc-*` с фоллбеком на `--theme-*`, страница переопределяет их у себя (так `/season-best` красит панель в deep). CSS сегментных кнопок карточка привозит сама |
 | `Filter*` + `FilterHost` | `components/filter-section/` | **общий сайдбар фильтров: results и `/season-best`**. Состав панели = список JSX-строк, выключить фильтр = убрать строку. `FilterSwimmingStyle` (+`FilterDistance`), `FilterPoolType`, `FilterGender`, `FilterAge`, `FilterClub`, `FilterResetButton` работают на любой странице; `FilterPositionButtons`, `FilterLevelButtons`, `FilterEventDate`, `FilterEventCategory`, `FilterNameDropdown` пока только на results (стор напрямую) |
 | `FilterHost` | `components/filter-section/filter-host.tsx` | **шов панели**: `values` / `set` / `options` / `isAvailable?` / `reset`. Отвечает за фильтр на вопросы «откуда значения, куда писать, откуда опции». Провайдера нет — работает Redux-хост results (`ReduxFilterHost`); чужой источник подставляется через `<FilterHostProvider host={…}>` (`/season-best` держит срез в адресе, см. `season-best-project/sb-filter-host.ts`) |
+| `SwimRow` | `components/swim-row/` | **СТРОКУ ЗАПЛЫВА — везде.** Две линии: место · плитка стиля с красной дистанцией · кто/где · время; ниже — очки, дата, дуга уровня. Место бывает четырёх видов (`place.kind`): `medal` (протокол), `circle` (prelim), `rank` (`#7` в сезонном рейтинге), `none` (личный рекорд). Задан `swimmer` — в линии 1 встаёт `UI_SwimmerNameCell`, а соревнование уезжает во вторую. Дуга уровня и формат отставания (`gapMs` → «+2.73») считаются ВНУТРИ строки — одна реализация на продукт. **Тем-нейтральна**: цвета в `--sr-*` с фоллбеком на `--theme-*`; deep-страницы переопределяют токены НА КОНТЕЙНЕРЕ списка (`.deep-list`, `.sb-list`), не на корне страницы. План и решения — [`docs/plans/swim-row-shared-component-plan.md`](plans/swim-row-shared-component-plan.md) |
 | `ResultsFilteredInfo` | `results-table/components/` | шапку фильтров — полосу выбранных значений |
-| `EventPlate` | `swimmer-project/components/event-plate.tsx` | плашку «стиль + дистанция + бассейн». ⚠ Стили лежат в `swimmer-page.css` — на чужой странице разъедется, пока их не вынесут в общий файл |
 | `UI_InfoPopup` | `components/info-popup/` | значок «?» с пояснением на EN/RU/HE |
 
 ## 6. Чего пока нет — и это проверено
@@ -84,10 +84,8 @@
 
 | Что | Где верстается руками | Почему не компонент |
 |---|---|---|
-| Очки FINA / клубные очки («431 PTS») | таблица результатов, список `/season-best` | одна цифра с подписью, поведения за ней нет |
-| Место в **витринном** рейтинге (`#7`) | `/season-best` (`.sb-place`) | `UI_PositionBadge` показывает место **в протоколе** и красит 1-2-3 медалью. В сезонном рейтинге медалей не дают, и медальный кружок соврал бы: там первое место — это season best, а не золото |
-| Отставание от лидера («+2.73») | `/season-best`, панель Season best у пловца | `UI_ExpectedTimeDiff` про другое — разницу с ожидаемым временем одного пловца |
-| Номер попытки («2nd swim») | `/season-best` | появилось в одном месте; станет вторым — вынести |
+| Очки FINA / клубные очки («431 PTS») | таблица результатов | одна цифра с подписью, поведения за ней нет. В строке заплыва их уже печатает `SwimRow` (проп `points`) |
+| Строка заплыва в **My media** (`MySwimRow`) | `my-media-project/components/swim-list.tsx` | Не `SwimRow` сознательно: там двухлинейная карточка результата, а здесь плотная таблица управления медиа с колоночной шапкой, зоной действий на 330px и разворачиваемой панелью медиа. Карточка втрое выше и сломала бы колонки, а слот под каждый угол — ровно то, от чего отказался план `SwimRow`. ⚠ Называлась `SwimRow` и столкнулась именем с общей — переименована 2026-08-27. Общие ячейки (время + `swimFlaggedRowProps`, иконка стиля, дата) в ней используются |
 | Полоса чипов «выбранные фильтры» | `ResultsFilteredInfo` (results) и `sb-filter-bar` (`/season-best`) | **последний оставшийся дубль панели фильтров**: правила одни (All мельче, две строки), палитры разные — `--theme-*` против `--deep-*`. Сводится тем же приёмом, что и сами фильтры (токены + хост), задача не начата |
 
 ---

@@ -5,7 +5,13 @@ import UI_PrelimLabel from '../prelim-label/prelim-label';
 
 interface UI_DateIconProps {
   styleType?: 'cube'  | 'row-style-1' | 'row-style-2';
-  date?: string; // формат: 'DD-MM-YYYY'
+  /**
+   * Дата в ОДНОМ из двух видов: 'DD/MM/YYYY' (таблица результатов, статика)
+   * или ISO 'YYYY-MM-DD' (API страницы пловца, My media). Два формата живут в
+   * продукте реально, и разбирать их обязан компонент — иначе каждый вызывающий пишет
+   * своё преобразование (или печатает сырую ISO-строку, как было в My media).
+   */
+  date?: string;
   paddingClass?: string;
   className?: string;
   fontClassName?: string; // переопределяет текстовый стиль (size/weight/color) для row-style-1
@@ -17,6 +23,11 @@ interface UI_DateIconProps {
 
 const parseCustomDate = (dateStr?: string): Date => {
   if (!dateStr) return new Date();
+
+  // ISO 'YYYY-MM-DD' — так дату отдаёт API. Разбираем полями, а не `new Date(str)`:
+  // конструктор читает ISO-дату как UTC и в отрицательных часовых поясах сдвигает день назад.
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (iso) return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
 
   const [day, month, year] = dateStr.split('/').map(Number);
   return new Date(year, month - 1, day);

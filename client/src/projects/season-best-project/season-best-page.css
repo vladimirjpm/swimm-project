@@ -119,87 +119,69 @@
 
 /* ── Список ────────────────────────────────────────────────────────────────── */
 
-.sb-list { display: flex; flex-direction: column; gap: 4px; }
-.sb-row {
-  display: grid;
-  /* Набор колонок собирает компонент из включённых модулей и кладёт в --sb-cols; мобайл
-     переопределяет его ниже — inline-стиль так переопределить нельзя. */
-  grid-template-columns: var(--sb-cols);
-  align-items: center; gap: 10px;
-  padding: 9px 12px; border-radius: var(--deep-radius-row);
-  background: var(--deep-card-bg-row); border: 1px solid var(--deep-card-border-soft);
-  font-size: 12px; font-variant-numeric: tabular-nums;
-  color: inherit; text-decoration: none;
+/* Строку рисует ОБЩИЙ `SwimRow` (docs/plans/swim-row-shared-component-plan.md) — та же, что
+   в карточке спортсмена и на странице пловца. Своей вёрстки строки у этой страницы больше
+   нет; страница задаёт ей палитру deep ТОЛЬКО токенами `--sr-*` и только на своём
+   контейнере: покрасить корень страницы значило бы задеть соседнюю вёрстку. */
+.sb-list {
+  display: flex; flex-direction: column; gap: 4px;
+
+  --sr-radius: var(--deep-radius-row);
+  --sr-bg: var(--deep-card-bg-row);
+  --sr-bg-hover: var(--deep-card-bg);
+  --sr-border: var(--deep-card-border-soft);
+  --sr-border-hover: var(--deep-card-border);
+  --sr-text: var(--deep-text);
+  --sr-text-mute: var(--deep-text-mute);
+  --sr-text-faint: var(--deep-text-faint);
+  --sr-text-ghost: var(--deep-text-ghost);
+  --sr-divider: var(--deep-card-border-soft);
+  --sr-circle-bg: var(--deep-card-bg-raised);
+  --sr-circle-border: var(--deep-card-border);
+  --sr-num-font: var(--deep-font-display);
+  --sr-accent: var(--deep-accent);
+  --sr-gold: var(--deep-gold);
+  --sr-gold-chip-bg: var(--deep-gold-bar);
+  --sr-gold-chip-text: #3b2600;
+  --sr-chip-bg: var(--deep-accent-chip);
+  --sr-chip-border: var(--deep-accent-border);
+  --sr-chip-text: var(--deep-accent);
 }
-/* Мягкая заливка по полу — как в таблице результатов. Стоит ДО --me и :hover, чтобы
-   подсветка «это я» и наведение перекрывали пол, а не спорили с ним. */
-.sb-row--male { background: var(--deep-male-soft); border-color: var(--deep-male-border); }
-.sb-row--female { background: var(--deep-female-soft); border-color: var(--deep-female-border); }
-.sb-row:hover { background: var(--deep-card-bg); border-color: var(--deep-card-border); }
-/* Ховер перекрашивает фон, но метку строки-из-ссылки не трогает — иначе она пропадала под курсором. */
-.sb-row--linked:hover { border-color: var(--deep-accent-border); }
-.sb-row--head {
-  background: transparent; border-color: transparent;
-  font-size: 9.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--deep-text-ghost);
-}
-.sb-row--head:hover { background: transparent; border-color: transparent; }
+
+/* Мягкая заливка по полу — как в таблице результатов. Красим ТОКЕНЫ строки, а не её фон
+   напрямую: строка берёт цвета только из токенов, и прямая заливка спорила бы с ними в
+   зависимости от порядка файлов в бандле. Стоит ДО подсветки и ховера, чтобы они
+   перекрывали пол, а не спорили с ним. */
+.sb-swim-row--male { --sr-bg: var(--deep-male-soft); --sr-border: var(--deep-male-border); }
+.sb-swim-row--female { --sr-bg: var(--deep-female-soft); --sr-border: var(--deep-female-border); }
+
 /* Строка пловца, с чьей страницы пришли (`?swimmer=`). Это НЕ «я»: адрес недоверенный,
    ссылку мог переслать кто угодно, поэтому метка молчаливая — только подсветка, без бейджа.
    ⚠ Фон не красим: строки уже покрашены по полу, и акцентная заливка поверх розовой давала
-   грязный оттенок, в котором подсвеченная строка читалась хуже соседей. Полоса нарисована
-   inset-тенью, а не border-left: настоящая рамка сдвинула бы сетку. */
-.sb-row--linked {
+   грязный оттенок. Полоса нарисована inset-тенью, а не border-left: настоящая рамка
+   сдвинула бы содержимое строки. */
+.sb-swim-row--linked {
   box-shadow: inset 4px 0 0 var(--deep-accent), var(--deep-accent-glow);
-  border-color: var(--deep-accent-border);
+  --sr-border: var(--deep-accent-border);
+  /* Ховер перекрашивает фон, но метку строки-из-ссылки не трогает — иначе она пропадала
+     под курсором. */
+  --sr-border-hover: var(--deep-accent-border);
 }
-.sb-row--linked .sb-swimmer__name { color: var(--deep-text); }
 /* Повторный заплыв того же человека приглушён, но НЕ спрятан: он законно занимает место. */
-.sb-row--repeat .sb-swimmer__name { color: var(--deep-text-mute); }
+.sb-swim-row--repeat .swim-row__swimmer-name { color: var(--deep-text-mute); }
 
-.sb-place { font-family: var(--deep-font-display); font-size: 15px; color: var(--deep-text-mute); }
-.sb-place--first { color: var(--deep-gold); }
+/* Имя — главное в строке после времени, поэтому кегль крупнее общего (15px против 12.5px):
+   на 12.5px оно терялось между эмблемой и временем. */
+.sb-swim-row .swim-row__swimmer-name { font-size: 15px; }
+.sb-swim-row .swim-row__swimmer-club { font-size: 11.5px; }
 
-/* Ячейка пловца: первая строка — блок `UI_SwimmerNameCell` (эмблема + имя + клуб) и, если
-   это повторный заплыв, чип попытки; вторая (только мобайл) — соревнование и дата.
-
-   ⚠ Ячейка принудительно LTR и по левому краю: имена и клубы приходят на иврите, и без
-   этого весь блок разворачивался вправо — эмблема уезжала к правому краю колонки, а
-   столбец переставал читаться сверху вниз. Само направление ТЕКСТА при этом сохраняется
-   через `unicode-bidi: plaintext` ниже: он делает то же, что `dir="auto"`, но на строке, а
-   не на контейнере (пунктуация и обрезка многоточием остаются на правильной стороне). */
-.sb-swimmer {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0;
-  direction: ltr; text-align: left;
-}
-.sb-swimmer__name, .sb-swimmer__club, .sb-swimmer__meet, .sb-meet {
-  unicode-bidi: plaintext; text-align: left;
-}
-.sb-swimmer > :first-child { flex: 1 1 auto; min-width: 0; }
-/* Имя — главное в строке после времени, поэтому кегль близкий к нему (15px против 12.5px
-   у остальных ячеек): на 12.5px оно терялось между эмблемой и временем. */
-.sb-swimmer__name {
-  font-size: 15px; font-weight: 900; line-height: 1.2; color: var(--deep-text);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.sb-swimmer__attempt {
-  flex: none; padding: 1px 7px; border-radius: var(--deep-radius-pill);
+/* Номер попытки повторного заплыва — во второй линии, слотом `extras`. */
+.sb-attempt {
+  padding: 1px 7px; border-radius: var(--deep-radius-pill);
   background: var(--deep-card-bg-raised); border: 1px solid var(--deep-card-border);
   font-size: 9.5px; font-weight: 800; color: var(--deep-text-faint);
 }
-.sb-swimmer__club {
-  font-size: 11.5px; color: var(--deep-text-faint);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-/* Соревнование + дата второй строкой — только на мобайле, где отдельных колонок нет. */
-.sb-swimmer__meet { display: none; flex-basis: 100%; font-size: 10.5px; color: var(--deep-text-ghost); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.sb-time { display: flex; align-items: center; gap: 6px; font-family: var(--deep-font-display); font-size: 15px; color: var(--deep-text); }
-.sb-gap { font-weight: 800; color: var(--deep-text-ghost); }
-.sb-points { font-weight: 800; color: var(--deep-text-mute); }
-.sb-meet { color: var(--deep-text-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Дату рисует UI_DateIcon (row-style-1) — красим её текст токеном темы. */
-.sb-date { color: var(--deep-text-ghost); font-size: 11px; font-weight: 700; }
 .sb-chip__pool-label { font-size: 12px; font-weight: 800; color: var(--deep-accent); }
 
 .sb-more {
@@ -240,19 +222,10 @@
 }
 
 @media (max-width: 767px) {
-  /* Meet и Date отдельными колонками не помещаются — уходят второй строкой под имя.
-     Прятать их нельзя: это ответ на вопрос «где и когда». */
-  .sb-row { grid-template-columns: 34px minmax(0, 1fr) 92px !important; gap: 8px; }
-  .sb-gap, .sb-points, .sb-meet, .sb-date { display: none; }
-  .sb-swimmer__meet { display: block; }
-  .sb-row--head { font-size: 9px; }
-  .sb-row--head > :nth-child(n + 4) { display: none; }
-
-  .sb-place { font-size: 13px; }
-  .sb-time { font-size: 13px; }
-  /* На 375px колонка имени ~175px — кегль чуть меньше десктопного, но не 12.5px. */
-  .sb-swimmer__name { font-size: 13.5px; }
-  .sb-swimmer__club { font-size: 10.5px; }
+  /* Строка сама перекладывает свои слоты на узком экране (`swim-row.css`) — здесь
+     остаётся только кегль имени: на 375px его колонка ~175px. */
+  .sb-swim-row .swim-row__swimmer-name { font-size: 13.5px; }
+  .sb-swim-row .swim-row__swimmer-club { font-size: 10.5px; }
   .sb-topline { flex-direction: column; gap: 8px; }
   .sb-head__title { font-size: 20px; }
 }

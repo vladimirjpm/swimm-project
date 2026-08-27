@@ -1,0 +1,279 @@
+/* Общая строка заплыва (`SwimRow`).
+
+   ПАЛИТРА в токенах `--sr-*` с фоллбеком на палитру results (`--theme-*`) — тот же приём,
+   что у `FilterCard`. На results/карточке спортсмена ничего переопределять не нужно;
+   deep-страница задаёт `--sr-*` НА СВОЁМ КОНТЕЙНЕРЕ (`.deep-list`, `.sb-list`), а не на
+   корне страницы, иначе перекрасится соседняя вёрстка.
+
+   ГЕОМЕТРИЯ намеренно НЕ токенизирована: строка обязана выглядеть одинаково на всех пяти
+   поверхностях — ради этого её и сводили в одну. */
+
+.swim-row {
+  display: block;
+  padding: 10px 12px;
+  border-radius: var(--sr-radius, 14px);
+  background: var(--sr-bg, var(--theme-mode-input-bg));
+  border: 1px solid var(--sr-border, transparent);
+  color: var(--sr-text, var(--theme-mode-text));
+  text-decoration: none;
+}
+a.swim-row:hover {
+  background: var(--sr-bg-hover, var(--sr-bg, var(--theme-mode-input-bg)));
+  border-color: var(--sr-border-hover, var(--sr-border, transparent));
+}
+/* Caution-лента спорного времени рисуется по левому краю — освобождаем ей место. */
+.swim-row--flagged { padding-left: 20px; }
+
+/* ── Линия 1 ─────────────────────────────────────────────────────────────── */
+
+.swim-row__line1 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.swim-row__place {
+  width: 52px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.swim-row__caption {
+  font-size: 9.5px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--sr-text-ghost, var(--theme-mode-text-muted));
+}
+/* Место без награды (prelim) — кружок, а не медаль: это ранжир сессии. */
+.swim-row__circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--sr-circle-bg, var(--theme-mode-surface));
+  border: 1px solid var(--sr-circle-border, var(--theme-mode-border));
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--sr-text-mute, var(--theme-mode-text-secondary));
+  font-variant-numeric: tabular-nums;
+}
+/* Личный рекорд: места нет вовсе — прочерк держит колонку, чтобы плитки стиля стояли в ряд. */
+.swim-row__circle--empty {
+  background: transparent;
+  border-color: transparent;
+  color: var(--sr-text-ghost, var(--theme-mode-text-muted));
+}
+/* Место в сезонном рейтинге. Медальный кружок здесь соврал бы: медалей за него не дают. */
+.swim-row__rank {
+  font-family: var(--sr-num-font, inherit);
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--sr-text-mute, var(--theme-mode-text-secondary));
+  font-variant-numeric: tabular-nums;
+}
+/* Первое место в рейтинге — золото: это и есть носитель бейджа SB. */
+.swim-row__rank--first { color: var(--sr-gold, #d99e0b); }
+
+/* Плитка дисциплины. Белая подложка и красная дистанция одинаковы в обеих темах: это знак,
+   а не поверхность темы (правило хендоффа). */
+.swim-row__event {
+  width: 86px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.swim-row__plate {
+  position: relative;
+  width: 86px;
+  height: 52px;
+  border-radius: 10px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  /* Кегль плитки: подпись дистанции у `UI_SwimmStyleIcon` считается от него (1.25em). */
+  font-size: 12px;
+}
+.swim-row__plate-icon {
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+}
+.swim-row__plate-icon img {
+  max-height: 42px;
+  max-width: 74px;
+}
+.swim-row__pool {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+  color: var(--sr-text-faint, var(--theme-mode-text-muted));
+}
+
+/* Средний слот: имя пловца (там, где строки про РАЗНЫХ людей) либо название старта. */
+.swim-row__mid {
+  flex: 1;
+  min-width: 0;
+}
+.swim-row__meet-name,
+.swim-row__swimmer-name {
+  font-size: 12.5px;
+  font-weight: 900;
+  color: var(--sr-text, var(--theme-mode-text));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Ивритские имена и названия: разворачиваем ТЕКСТ, а не контейнер — `dir` на обёртке
+     уносил эмблему клуба к правому краю. */
+  unicode-bidi: plaintext;
+}
+.swim-row__swimmer-club {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sr-text-faint, var(--theme-mode-text-muted));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  unicode-bidi: plaintext;
+}
+
+.swim-row__time {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+.swim-row__time-cell { text-align: right; }
+.swim-row__time-value {
+  font-family: var(--sr-num-font, inherit);
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--sr-text, var(--theme-mode-text));
+  font-variant-numeric: tabular-nums;
+}
+.swim-row__time-sub { font-size: 10px; }
+
+/* Чипы достижений. SB ЗАМЕЩАЕТ BEST — две плашки на одной строке не встречаются. */
+.swim-row__chip {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--sr-chip-bg, color-mix(in srgb, var(--theme-primary) 14%, transparent));
+  border: 1px solid var(--sr-chip-border, var(--theme-primary));
+  font-size: 10px;
+  font-weight: 900;
+  color: var(--sr-chip-text, var(--theme-primary));
+}
+/* SB — заливное золото с тёмным текстом, как медальные кружки: тот же «физический объект»
+   в обеих темах. Обводка золотом по золотому давала контраст ниже 4.5 при 10px bold. */
+.swim-row__chip--sb {
+  background: var(--sr-gold-chip-bg, #fbbf24);
+  border-color: transparent;
+  color: var(--sr-gold-chip-text, #3b2600);
+}
+
+/* ── Линия 2 ─────────────────────────────────────────────────────────────── */
+
+.swim-row__line2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 0 46px;
+  padding-top: 7px;
+  border-top: 1px solid var(--sr-divider, var(--theme-mode-border));
+  font-size: 11px;
+  color: var(--sr-text-faint, var(--theme-mode-text-muted));
+  font-variant-numeric: tabular-nums;
+}
+.swim-row__line2-main {
+  flex: 1;
+  min-width: 0;
+}
+.swim-row__points {
+  font-size: 11px;
+  color: var(--sr-text-mute, var(--theme-mode-text-secondary));
+}
+.swim-row__points strong {
+  font-weight: 900;
+  color: var(--sr-text, var(--theme-mode-text));
+}
+.swim-row__when {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin-top: 1px;
+}
+.swim-row__date {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sr-text-faint, var(--theme-mode-text-muted));
+}
+.swim-row__meet-inline {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sr-text-faint, var(--theme-mode-text-muted));
+  unicode-bidi: plaintext;
+}
+.swim-row__extras {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  color: var(--sr-text-mute, var(--theme-mode-text-secondary));
+}
+.swim-row__gap {
+  flex: none;
+  font-weight: 800;
+  color: var(--sr-text-ghost, var(--theme-mode-text-muted));
+}
+.swim-row__media {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--sr-accent, var(--theme-primary));
+  transition: opacity 0.12s ease;
+}
+.swim-row__media:hover { opacity: 0.8; }
+.swim-row__level {
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+.swim-row__level-none { color: var(--sr-text-ghost, var(--theme-mode-text-muted)); }
+
+/* ── Мобайл ──────────────────────────────────────────────────────────────── */
+/* Один компонент + медиазапрос, а не два компонента: средний слот уезжает своей строкой
+   под место и плитку, время остаётся справа. */
+
+@media (max-width: 767px) {
+  .swim-row { padding: 9px 10px; }
+  .swim-row--flagged { padding-left: 18px; }
+  .swim-row__line1 { flex-wrap: wrap; gap: 10px; }
+  .swim-row__place { width: 44px; }
+  .swim-row__event { width: 68px; }
+  .swim-row__plate { width: 68px; height: 44px; }
+  .swim-row__plate-icon img { max-height: 34px; max-width: 58px; }
+  /* Средний слот уезжает своей строкой ТОЛЬКО там, где рядом стоит плитка дисциплины:
+     без плитки места хватает, а имя пловца — главное в строке и не должно падать под время. */
+  .swim-row:not(.swim-row--no-event) .swim-row__mid { order: 3; flex-basis: 100%; margin-left: 0; }
+  .swim-row__time { margin-left: auto; }
+  .swim-row__time-value { font-size: 18px; }
+  .swim-row__line2 { margin-left: 0; flex-wrap: wrap; gap: 8px; }
+}

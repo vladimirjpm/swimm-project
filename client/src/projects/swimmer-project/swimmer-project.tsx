@@ -351,6 +351,7 @@ function SwimmerProject() {
                         poolType={poolType}
                         onPoolType={setPoolType}
                         records={profile.records}
+                        gender={gender}
                         state={personalBests}
                       />
                     )}

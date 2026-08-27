@@ -45,6 +45,13 @@ export interface SeasonBestModules {
   gapInRow: boolean;
   /** Номер попытки у повторных заплывов одного пловца («2nd swim»). */
   attemptInRow: boolean;
+  /** Плитка дисциплины в строке.
+   *  ВЫКЛЮЧЕНА: дисциплина здесь ОДНА на весь список и уже названа шапкой страницы
+   *  и чипом Event, а пятьдесят одинаковых плиток отнимают место у имени пловца. */
+  disciplineInRow: boolean;
+  /** Дуга уровня справа во второй линии (решение Влада: строка одинакова
+   *  на всех экранах, цена — список становится выше). */
+  levelInRow: boolean;
 
   /** Строка-оговорка под списком: места считаются среди импортированного. */
   footerNote: boolean;
@@ -67,6 +74,8 @@ export const SEASON_BEST_MODULES: SeasonBestModules = {
   pointsInRow: true,
   gapInRow: true,
   attemptInRow: true,
+  disciplineInRow: false,
+  levelInRow: true,
 
   footerNote: true,
 };

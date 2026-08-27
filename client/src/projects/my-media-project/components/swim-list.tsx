@@ -4,7 +4,8 @@ import { fetchPublishTargets, PublishTargetDto } from '../use-all-my-media';
 import { MySwimDto, SwimMediaDto } from '../use-my-swims';
 import { STATUS_COLORS, CardStatus, derivedCardStatus, hpCardCls } from './status-styles';
 import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
-import UI_SwimTime from '../../components/mix/swim-time/swim-time';
+import UI_SwimTime, { swimFlaggedRowProps } from '../../components/mix/swim-time/swim-time';
+import UI_DateIcon from '../../components/mix/date-icon/date-icon';
 
 // Список заплывов, сгруппированный по соревнованиям — ядро My media v3
 // (README design_handoff_my_swims_v3,1 §7). Desktop: строки с фикс. колонками
@@ -210,9 +211,24 @@ function MediaLine({
   );
 }
 
-/* ── Swim row (desktop) ──────────────────────────────────────────────────── */
+/* ── Строка заплыва My media ──────────────────────────────────────────────────── */
 
-function SwimRow({ swim, showSwimmerName, swimmerName, cb }: {
+/**
+ * Это НЕ общая строка заплыва `SwimRow` (`components/swim-row/`). Раньше она звалась
+ * так же и читалась как шестая копия той же строки — поэтому переименована.
+ *
+ * Почему не сведена в общую: общая строка — двухлинейная КАРТОЧКА результата, а
+ * здесь — ПЛОТНАЯ ТАБЛИЦА управления медиа: фиксированные колонки под своей шапкой
+ * (PLACE / SWIM / TIME / DATE / congrats / MEDIA), зона действий на 330px и разворачиваемая
+ * панель медиа под строкой. Карточка втрое выше и ломает выравнивание по колонкам, а
+ * чтобы вместить медиа-кнопки, RELAY, метку PB и тап-по-строке, в общий компонент
+ * пришлось бы добавить слот на каждый угол — ровно то, от чего план общей строки
+ * отказался (§3.1 `docs/plans/swim-row-shared-component-plan.md`).
+ *
+ * Общее берётся ячейками: `UI_SwimmStyleIcon`, `UI_SwimTime` вместе с
+ * `swimFlaggedRowProps` (носитель спорного времени) и `UI_DateIcon` (формат даты один на продукт).
+ */
+function MySwimRow({ swim, showSwimmerName, swimmerName, cb }: {
   swim: MySwimDto;
   showSwimmerName: boolean;
   swimmerName: string;
@@ -224,11 +240,18 @@ function SwimRow({ swim, showSwimmerName, swimmerName, cb }: {
   const hasMedia = swim.media.length > 0;
   const noVideo = videos.length === 0;
 
+  // Спорное время (И11): чип рисует `UI_SwimTime`, а НОСИТЕЛЬ — сама строка:
+  // caution-лента слева плюс полный текст в title/aria-label. До этого строка My media
+  // обвязки не несла — ровно тот случай, ради которого хелпер и заводили.
+  const quality = swim.suspect_reason ? { kind: 'protocol' as const, reason: swim.suspect_reason } : null;
+  const flagged = swimFlaggedRowProps(quality);
+
   return (
     <>
       {/* Desktop row */}
       <div
-        className="hidden items-center gap-3 px-5 py-[10px] sm:flex"
+        {...flagged}
+        className={`hidden items-center gap-3 px-5 py-[10px] sm:flex${flagged.className ? ` ${flagged.className}` : ''}`}
         style={{ background: noVideo ? 'rgba(2,10,24,0.25)' : 'transparent' }}
       >
         <span className="w-[26px] shrink-0 text-center text-[14px] leading-tight">
@@ -260,13 +283,18 @@ function SwimRow({ swim, showSwimmerName, swimmerName, cb }: {
         </span>
         <span className="hp-mono w-[84px] shrink-0 text-[13.5px] font-extrabold text-[#7dd3fc]">
           {swim.time_fail ? 'DSQ' : (
-            <UI_SwimTime
-              time={swim.time}
-              quality={swim.suspect_reason ? { kind: 'protocol', reason: swim.suspect_reason } : null}
-            />
+            <UI_SwimTime time={swim.time} quality={quality} />
           )}
         </span>
-        <span className="hp-mono w-[92px] shrink-0 text-[10.5px] text-[rgba(203,224,240,0.45)]">{swim.date}</span>
+        {/* Дата — общим `UI_DateIcon`, а не сырой ISO-строкой из API: формат даты живёт
+            в одном месте, а «2026-07-30» здесь спорило с «30 JUL 2026» на всех остальных экранах. */}
+        <span className="w-[92px] shrink-0">
+          <UI_DateIcon
+            styleType="row-style-1"
+            date={swim.date}
+            fontClassName="hp-mono text-[10.5px] text-[rgba(203,224,240,0.45)]"
+          />
+        </span>
         <span className="w-[52px] shrink-0">
           <CheerChip swim={swim} emphasized={swim.is_pb} onToggle={() => cb.onToggleCheer(swim)} />
         </span>
@@ -300,7 +328,8 @@ function SwimRow({ swim, showSwimmerName, swimmerName, cb }: {
 
       {/* Mobile row */}
       <div
-        className="flex cursor-pointer items-center gap-2.5 px-4 py-[10px] sm:hidden"
+        {...flagged}
+        className={`flex cursor-pointer items-center gap-2.5 px-4 py-[10px] sm:hidden${flagged.className ? ` ${flagged.className}` : ''}`}
         style={{ background: noVideo ? 'rgba(2,10,24,0.25)' : 'transparent' }}
         onClick={() => hasMedia && cb.onOpenActions(swim)}
       >
@@ -323,10 +352,7 @@ function SwimRow({ swim, showSwimmerName, swimmerName, cb }: {
           <span className="mt-0.5 flex items-center gap-2">
             <span className="hp-mono text-[12px] font-extrabold text-[#7dd3fc]">
               {swim.time_fail ? 'DSQ' : (
-                <UI_SwimTime
-                  time={swim.time}
-                  quality={swim.suspect_reason ? { kind: 'protocol', reason: swim.suspect_reason } : null}
-                />
+                <UI_SwimTime time={swim.time} quality={quality} />
               )}
             </span>
             <span className="text-[10px] text-[rgba(203,224,240,0.45)]">
@@ -446,7 +472,7 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, cb 
 
       <div className="divide-y divide-[rgba(125,211,252,0.08)]">
         {swims.map((s) => (
-          <SwimRow
+          <MySwimRow
             key={s.result_id}
             swim={s}
             showSwimmerName={showSwimmerName}

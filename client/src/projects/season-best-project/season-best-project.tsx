@@ -241,9 +241,8 @@ function SeasonBestProject() {
               </div>
             ) : (
               <>
-                {/* Плашки события здесь НЕТ намеренно: дисциплина уже названа в шапке
-                    страницы и в чипе Event, а `EventPlate` вдобавок опирается на стили из
-                    swimmer-page.css, которых на этой странице нет (решение Влада 2026-08-26). */}
+                {/* Плитка дисциплины в строке выключена флагом `disciplineInRow`: дисциплина
+                    одна на весь срез и уже названа шапкой и чипом Event. */}
                 <div className="sb-listhead">
                   <div className="sb-listhead__meta">
                     <div className="sb-listhead__title">
@@ -262,6 +261,9 @@ function SeasonBestProject() {
                 <SbList
                   rows={data.data}
                   modules={MODULES}
+                  stroke={filters.stroke ?? ''}
+                  distance={filters.distance ?? ''}
+                  isMasters={filters.ageGroup != null}
                   highlightSwimmerId={query.swimmerId}
                 />
 
