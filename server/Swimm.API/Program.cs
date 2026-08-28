@@ -1216,7 +1216,11 @@ app.Use(async (context, next) =>
 
 app.UseDefaultFiles(new DefaultFilesOptions
 {
-    DefaultFileNames = new List<string> { "home.html", "index.html" }
+    // Порядок значим. В ПРОДЕ publish кладёт сюда клиента, и `/` отдаёт его витрину.
+    // ЛОКАЛЬНО клиента в wwwroot нет (он живёт на Vite :5173), и `/` откатывается на
+    // admin-home.html — серверную страницу входа в админку. Один и тот же адрес показывает
+    // ту сторону, которая в этом окружении вообще есть.
+    DefaultFileNames = new List<string> { "home.html", "admin-home.html", "index.html" }
 });
 app.UseStaticFiles(new StaticFileOptions
 {

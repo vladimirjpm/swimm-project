@@ -82,9 +82,9 @@ definition of done.
 
 ### Admin/home CSS (Tailwind v4)
 
-The admin panel (`/Admin/*`) and `wwwroot/home.html` share one compiled bundle,
+The admin panel (`/Admin/*`) and `wwwroot/admin-home.html` share one compiled bundle,
 `wwwroot/css/admin.min.css`, built from `Styles/admin.css` (source: `@import "tailwindcss"` +
-`@theme` tokens + `@source` scans of `Pages/Admin/**/*.cshtml`/`.cs` and `wwwroot/home.html`).
+`@theme` tokens + `@source` scans of `Pages/Admin/**/*.cshtml`/`.cs` and `wwwroot/admin-home.html`).
 
 ```bash
 cd server/Swimm.API
@@ -97,7 +97,7 @@ npm run css:watch    # rebuild on save while iterating
 `node_modules` exists; if it doesn't (CI/no-Node machines), the build just uses the already-committed
 `admin.min.css`. That's why **`admin.min.css` is committed** — don't gitignore it, and re-run
 `npm run css:build` and commit the result whenever you add new Tailwind classes to Admin pages or
-`home.html`. There is no other CSS for these pages — the old per-page stylesheets
+`admin-home.html`. There is no other CSS for these pages — the old per-page stylesheets
 (`admin-all.css`, `db.css`, `import.css`, `settings.css`, `api.css`, `home.css`, `db-banner.css`)
 were removed; anything they styled either became Tailwind utility classes inline or was folded into
 `Styles/admin.css`'s `@layer components`.
