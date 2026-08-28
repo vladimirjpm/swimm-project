@@ -71,7 +71,8 @@ dotnet run --project server/Swimm.API -- --migrate
 
 ### DB-роли (least-privilege)
 
-Рантайм работает под ограниченными ролями, миграции — под owner. См. `server/db/setup-roles.sql`
+Рантайм работает под ограниченными ролями, миграции — под owner.
+См. `server/db/01-roles.sql` (роли, до миграций) и `server/db/02-grants.sql` (гранты, после)
 (запустить один раз на БД). Connection strings в appsettings:
 - `MigrationConnection` (owner `swimm`) — DDL, только миграции;
 - `AdminConnection` (`swimm_rw`) — DML рантайма (auth, admin, импорт), без DDL;
