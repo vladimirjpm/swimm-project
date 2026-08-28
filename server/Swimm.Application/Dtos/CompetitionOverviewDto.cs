@@ -23,6 +23,16 @@ public sealed class CompetitionOverviewDto
     [JsonPropertyName("org_comp_id")] public int? OrgCompId { get; init; }
 
     /// <summary>
+    /// Все источники стартового протокола соревнования — по одному на compID федерации
+    /// (таблица <c>CompetitionSources</c>). Их бывает несколько: окружные протоколы одного
+    /// чемпионата лежат под разными compID, а у нас это один старт из нескольких дней.
+    /// Пустой список — привязок нет; клиент тогда падает на скалярный <see cref="OrgCompId"/>,
+    /// а если пуст и он — таба Start list нет. Один элемент — подтабы не рисуются.
+    /// </summary>
+    [JsonPropertyName("start_list_sources")]
+    public IReadOnlyList<OverviewStartListSourceDto> StartListSources { get; init; } = [];
+
+    /// <summary>
     /// Соревнование наградное (<c>Competition.IsAward</c>) — то есть места в протоколе означают
     /// награждение. У ненаградных (лиги, отборы, «результаты дня») места есть, но медалей нет,
     /// и клиент прячет всё медальное: Most decorated, медали в клубном зачёте, High Point.
@@ -105,6 +115,27 @@ public sealed class OverviewDayDto
     [JsonPropertyName("day_number")] public int? DayNumber { get; init; }
     [JsonPropertyName("sub_name")] public string? SubName { get; init; }
     [JsonPropertyName("result_count")] public int ResultCount { get; init; }
+}
+
+/// <summary>
+/// Один источник стартового протокола: compID федерации плюс подпись подтаба.
+/// Подпись — ДАТА И НОМЕР («16/02 · #2»), а не имя протокола: имена окружных стартов у
+/// федерации на иврите, а видимый UI у нас только английский. Полное имя уходит в тултип.
+/// </summary>
+public sealed class OverviewStartListSourceDto
+{
+    /// <summary>compID на isr.org.il — адрес <c>GET /api/start-list/{orgCompId}</c>.</summary>
+    [JsonPropertyName("org_comp_id")] public int OrgCompId { get; init; }
+    /// <summary>Наш день соревнования, к которому привязан источник.</summary>
+    [JsonPropertyName("competition_id")] public int CompetitionId { get; init; }
+    /// <summary>Порядковый номер источника в подтабах, с единицы.</summary>
+    [JsonPropertyName("index")] public int Index { get; init; }
+    /// <summary>Дата протокола, dd/MM (как в подписи подтаба). null — даты у привязки нет.</summary>
+    [JsonPropertyName("date")] public string? Date { get; init; }
+    /// <summary>Имя протокола у федерации — только для тултипа.</summary>
+    [JsonPropertyName("source_name")] public string? SourceName { get; init; }
+    /// <summary>Сколько заявок затянуто (0 — привязка есть, забора ещё не было).</summary>
+    [JsonPropertyName("entry_count")] public int EntryCount { get; init; }
 }
 
 public sealed class OverviewBestSwimDto

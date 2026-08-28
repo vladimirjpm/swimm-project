@@ -44,6 +44,25 @@ public interface IStartListPublicRepository
         int orgCompId, int clubId, CancellationToken ct = default);
 
     /// <summary>
+    /// Поиск пловца по имени внутри соревнования — «когда плывёт мой ребёнок», если его
+    /// нет в избранных. Ищет по НЕСКОЛЬКИМ compID сразу: один наш старт бывает собран из
+    /// нескольких протоколов федерации (окружные чемпионаты), и родителю всё равно, в
+    /// каком из них его пловец.
+    ///
+    /// Ищет и по английскому имени, и по ивритскому: у пловцов, заведённых стартовым
+    /// протоколом, английского имени ещё нет, а ищут их именно те, кто читает иврит.
+    /// </summary>
+    Task<IReadOnlyList<StartListSwimmerHitDto>> SearchSwimmersAsync(
+        IReadOnlyCollection<int> orgCompIds, string query, int limit, CancellationToken ct = default);
+
+    /// <summary>
+    /// Все заплывы пловца по НЕСКОЛЬКИМ источникам сразу (карточка «когда плывёт мой» на
+    /// соревновании из нескольких протоколов). null — заявок нет ни в одном.
+    /// </summary>
+    Task<StartListSwimmerDto?> GetSwimmerAcrossAsync(
+        IReadOnlyCollection<int> orgCompIds, int swimmerId, CancellationToken ct = default);
+
+    /// <summary>
     /// Ближайшие старты нескольких пловцов — основа блока «мои избранные» (шаг С8).
     /// Отдаёт только то, что ещё впереди относительно <paramref name="from"/>.
     /// </summary>

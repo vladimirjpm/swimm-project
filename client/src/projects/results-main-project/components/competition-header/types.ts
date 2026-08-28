@@ -150,11 +150,28 @@ export interface OverviewRecord {
   result_id: number | null;
 }
 
+/** Один источник стартового протокола: compID + подпись подтаба (дата и номер). */
+export interface StartListSource {
+  org_comp_id: number;
+  competition_id: number;
+  /** Порядковый номер подтаба с единицы — назначает сервер, чтобы не зависеть от порядка массива. */
+  index: number;
+  /** dd/MM для подписи; null — даты у привязки нет. */
+  date: string | null;
+  /** Имя протокола у федерации (иврит) — только в title-тултип, не в подпись. */
+  source_name: string | null;
+  entry_count: number;
+}
+
 export interface CompetitionOverview {
   summary: OverviewSummary;
   /** compID сайта федерации — адрес стартового протокола. null — соревнование завели
    *  руками, штампа нет: таб Start list не показываем (шаг 0, start-list-ui-sonnet.md). */
   org_comp_id?: number | null;
+  /** Все источники стартового протокола — по одному compID федерации на подтаб. У окружных
+   *  чемпионатов их несколько на одно соревнование. Пусто — привязок нет, падаем на
+   *  org_comp_id; пусто и там — таба Start list нет. Один элемент — подтабы не рисуем. */
+  start_list_sources?: StartListSource[];
   /**
    * Наградное ли соревнование (Competition.IsAward). У ненаградных (лиги, отборы) места в
    * протоколе есть, а медалей нет — Overview прячет всё медальное: Most decorated, медали

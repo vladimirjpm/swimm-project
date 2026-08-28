@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type {
-  StartListEventHeats, StartListProgramme, StartListSwim, StartListSwimmer, UpcomingCompetition,
+  StartListEventHeats, StartListProgramme, StartListSwim, StartListSwimmer,
+  StartListSwimmerHit, UpcomingCompetition,
 } from './types';
 
 // Все /api/start-list/* — анонимные, ETag + Cache-Control: max-age=30 (сервер). Автообновления
@@ -65,6 +66,24 @@ export function useStartListEvent(orgCompId: number | null, orgDisciplineId: num
 export function useStartListSwimmer(orgCompId: number | null, swimmerId: number | null) {
   const url = orgCompId != null && swimmerId != null
     ? `/api/start-list/${orgCompId}/swimmers/${swimmerId}`
+    : null;
+  return useJson<StartListSwimmer>(url);
+}
+
+/** Поиск пловца по имени внутри соревнования — по ВСЕМ его источникам сразу.
+ *  Запрос короче двух символов не шлём: сервер на него всё равно отдаёт пусто. */
+export function useStartListSearch(orgCompIds: number[], query: string) {
+  const q = query.trim();
+  const url = q.length >= 2 && orgCompIds.length > 0
+    ? `/api/start-list/search?${orgCompIds.map((id) => `orgCompId=${id}`).join('&')}&q=${encodeURIComponent(q)}`
+    : null;
+  return useJson<StartListSwimmerHit[]>(url);
+}
+
+/** Карточка пловца по всем источникам соревнования (зум 3 составного старта). */
+export function useStartListSwimmerAcross(orgCompIds: number[], swimmerId: number | null) {
+  const url = swimmerId != null && orgCompIds.length > 0
+    ? `/api/start-list/swimmers/${swimmerId}?${orgCompIds.map((id) => `orgCompId=${id}`).join('&')}`
     : null;
   return useJson<StartListSwimmer>(url);
 }

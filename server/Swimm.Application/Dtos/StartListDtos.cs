@@ -45,6 +45,12 @@ public sealed record StartListSwimDto(
     [property: JsonPropertyName("is_relay")] bool IsRelay,
     [property: JsonPropertyName("heat")] int Heat,
     [property: JsonPropertyName("lane")] int Lane,
+    /// <summary>
+    /// Календарный день заплыва. Отдаётся отдельно от <c>HeatStartAt</c>: время заплыву
+    /// могут не назначить вовсе, а «в какой день плывёт» — главный вопрос поиска по
+    /// соревнованию, собранному из нескольких дней (окружные протоколы).
+    /// </summary>
+    [property: JsonPropertyName("comp_date")] DateTime CompDate,
     [property: JsonPropertyName("heat_start_at")] DateTime? HeatStartAt,
     [property: JsonPropertyName("round")] string? Round,
     [property: JsonPropertyName("seed_time")] string? SeedTime,
@@ -129,6 +135,20 @@ public sealed record StartListEventHeatsDto(
     [property: JsonPropertyName("event")] StartListEventDto Event,
     [property: JsonPropertyName("heats")] IReadOnlyList<StartListHeatDto> Heats,
     [property: JsonPropertyName("updated_at")] DateTime? UpdatedAt);
+
+/// <summary>
+/// Найденный пловец — строка выдачи поиска по имени внутри соревнования.
+/// </summary>
+/// <param name="Swims">Сколько заплывов заявлено (по всем источникам сразу).</param>
+/// <param name="Days">Даты дней, в которые он плывёт: главный ответ поиска.</param>
+public sealed record StartListSwimmerHitDto(
+    [property: JsonPropertyName("swimmer_id")] int SwimmerId,
+    [property: JsonPropertyName("swimmer_name")] string SwimmerName,
+    [property: JsonPropertyName("birth_year")] int? BirthYear,
+    [property: JsonPropertyName("club_name")] string ClubName,
+    [property: JsonPropertyName("swims")] int Swims,
+    [property: JsonPropertyName("days")] IReadOnlyList<DateTime> Days,
+    [property: JsonPropertyName("first_start_at")] DateTime? FirstStartAt);
 
 /// <summary>
 /// Карточка пловца на соревновании (зум 3) — главный экран для родителя.

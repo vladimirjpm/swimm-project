@@ -37,6 +37,7 @@ GRANT SELECT ON
     "CompetitionNoteTexts",
     "CompetitionNotes",
     "CompetitionResultUrls",
+    "CompetitionSources",
     "Competitions",
     "Countries",
     "Galleries",

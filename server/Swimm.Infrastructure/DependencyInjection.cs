@@ -188,6 +188,9 @@ public static class DependencyInjection
         // Штамповка loglig-id пловцам по протоколу соревнования (после импорта)
         services.AddScoped<ILogligStampService, LogligStampService>();
 
+        // Привязка соревнования к его compID-источникам стартового протокола (админка).
+        services.AddScoped<ICompetitionSourceAdminService, CompetitionSourceAdminService>();
+
         // «Синхронизация языков» из Discovery: EN/HE-имена пловцов из двуязычной пары PDF
         services.AddScoped<ISwimmerNameSyncService, SwimmerNameSyncService>();
 

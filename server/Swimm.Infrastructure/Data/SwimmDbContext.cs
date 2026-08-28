@@ -46,6 +46,9 @@ public class SwimmDbContext : DbContext
     /* === Стартовый протокол: заявки (публично) + журнал заборов (Sys_) === */
     public DbSet<CompetitionEntry> CompetitionEntries => Set<CompetitionEntry>();
     public DbSet<StartListPull> StartListPulls => Set<StartListPull>();
+    /// <summary>Из каких compID федерации состоит стартовый протокол соревнования (их бывает
+    /// несколько на один старт — окружные протоколы, см. <see cref="CompetitionSource"/>).</summary>
+    public DbSet<CompetitionSource> CompetitionSources => Set<CompetitionSource>();
 
     /* === Клубный зачёт соревнования (материализованный; страница клуба, Фаза 10) === */
     public DbSet<ClubCompetitionStanding> ClubCompetitionStandings => Set<ClubCompetitionStanding>();
@@ -377,6 +380,22 @@ public class SwimmDbContext : DbContext
         modelBuilder.Entity<StartListPull>(entity =>
         {
             entity.ToTable("Sys_StartListPulls");
+        });
+
+        // Источники стартового протокола. ПУБЛИЧНАЯ таблица (без Sys_): её читает овервью
+        // соревнования под swimm_ro. Каскад от Competition: привязка без дня бессмысленна.
+        modelBuilder.Entity<CompetitionSource>(entity =>
+        {
+            entity.ToTable("CompetitionSources");
+
+            // Календарная дата протокола, как CompDate у заявки — приходит с Kind=Unspecified.
+            entity.Property(e => e.SourceDate)
+                .HasColumnType("timestamp without time zone");
+
+            entity.HasOne(e => e.Competition)
+                .WithMany()
+                .HasForeignKey(e => e.CompetitionId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Sys_-таблица: это НАША внутренняя кухня, а не данные федерации — публичной роли

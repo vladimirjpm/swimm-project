@@ -184,6 +184,61 @@ public class StartListPublicRepositoryTests
         Assert.Null(await new StartListPublicRepository(db).GetSwimmerAsync(OrgCompId, 999));
     }
 
+    /// <summary>
+    /// Составное соревнование: один наш старт собран из НЕСКОЛЬКИХ compID федерации
+    /// (окружные протоколы). Карточка обязана собрать заплывы пловца из всех источников
+    /// и упорядочить их по дню, а не по источнику: родителю это один календарь.
+    /// </summary>
+    [Fact]
+    public async Task SwimmerAcross_MergesSourcesAndOrdersByDay()
+    {
+        await using var db = await SeedAsync(nameof(SwimmerAcross_MergesSourcesAndOrdersByDay));
+
+        // Второй источник, ДЕНЬ РАНЬШЕ: если бы порядок шёл по compID или по порядку
+        // аргументов, этот заплыв встал бы в конец.
+        db.CompetitionEntries.Add(new CompetitionEntry
+        {
+            Id = 100,
+            OrgCompId = 16789,
+            CompDate = new DateTime(2026, 2, 15),
+            CompName = "Чемпионат — север",
+            OrgDisciplineId = 77001,
+            OrgEventNumber = 3,
+            SwimmerId = 10,
+            ClubId = 1,
+            StyleId = 1,
+            Distance = "50",
+            Gender = "female",
+            Heat = 1,
+            Lane = 2,
+            HeatStartAt = new DateTime(2026, 2, 15, 9, 0, 0, DateTimeKind.Utc),
+            Round = "timed-final",
+            SeedTimeOriginal = "",
+            PulledAt = new DateTime(2026, 2, 14, 20, 0, 0, DateTimeKind.Utc)
+        });
+        await db.SaveChangesAsync();
+
+        var card = await new StartListPublicRepository(db)
+            .GetSwimmerAcrossAsync([OrgCompId, 16789], 10);
+
+        Assert.NotNull(card);
+        Assert.Equal(3, card!.Swims.Count);
+        Assert.Equal([77001, 76321, 76322], card.Swims.Select(s => s.OrgDisciplineId).ToArray());
+        // Первый старт — самый ранний ПО ВСЕМ источникам, из него считается «приезжать к».
+        Assert.Equal(new DateTime(2026, 2, 15, 9, 0, 0, DateTimeKind.Utc), card.FirstStartAt);
+        // Каждая строка помнит СВОЙ источник: ссылка внутрь (заплыв) идёт по нему.
+        Assert.Equal(16789, card.Swims[0].OrgCompId);
+        Assert.Equal(OrgCompId, card.Swims[1].OrgCompId);
+    }
+
+    [Fact]
+    public async Task SwimmerAcross_NoSources_IsNull()
+    {
+        await using var db = await SeedAsync(nameof(SwimmerAcross_NoSources_IsNull));
+
+        Assert.Null(await new StartListPublicRepository(db).GetSwimmerAcrossAsync([], 10));
+    }
+
     // ── Клуб и «ближайшие» ───────────────────────────────────────────────────
 
     [Fact]

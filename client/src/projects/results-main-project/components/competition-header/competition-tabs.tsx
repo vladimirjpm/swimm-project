@@ -27,9 +27,10 @@ export default function CompetitionTabs({ overview, activeTab, onTabChange, medi
       ? [{ tab: 'records' as const, label: 'Records', count: overview.records.length }]
       : []),
     { tab: 'media', label: 'Media', count: mediaCount },
-    // Start list — только когда у соревнования есть org_comp_id: без него стартовому
-    // протоколу неоткуда взяться (решение 1, шаг 0 задания).
-    ...(overview?.org_comp_id != null
+    // Start list — когда у соревнования есть хоть один источник протокола: привязки в
+    // CompetitionSources (у окружных чемпионатов их несколько) либо, у соревнований до
+    // этой таблицы, скалярный org_comp_id. Нет ни того ни другого — таба нет.
+    ...(overview?.start_list_sources?.length || overview?.org_comp_id != null
       ? [{ tab: 'startlist' as const, label: 'Start list', count: startListEntries }]
       : []),
   ];

@@ -617,6 +617,16 @@ else
                                             data-title="@rowTitle"
                                             title="Проверить достоверность результатов">⚑ Проверить качество</button>
                                 }
+                                @* Источники стартового протокола: у окружных чемпионатов их
+                                   несколько на один наш старт, и собрать их может только человек
+                                   (docs/plans/start-list-plan.md, решение от 2026-08-28). *@
+                                @if (head != null)
+                                {
+                                    <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 sources-btn"
+                                            data-competition-id="@head.Id"
+                                            data-title="@rowTitle"
+                                            title="Из каких compID федерации собирается стартовый протокол">⇄ Источники</button>
+                                }
                                 @Html.Raw(u.Site != null ? SiteActions(u.Site, imported: u.Db != null) : "")
                             </div>
 
@@ -941,6 +951,56 @@ else
 
         <div id="quality-found" class="mt-3"></div>
         <div id="quality-body" class="mt-4 max-h-[60vh] overflow-y-auto"></div>
+    </div>
+</dialog>
+@* Стартовый протокол (С5): забор идёт минутами, а раньше отчёт писался в «sync-info»
+   в шапке страницы — прокрученному вниз пользователю казалось, что кнопка мертва.
+   Модалка не закрывается сама: по ней и снимают диагностику при ошибке. *@
+<dialog id="startlist-modal"
+        class="m-auto w-[min(48rem,calc(100vw-2rem))] rounded-lg border border-admin-border bg-admin-surface p-0 text-admin-text shadow-xl shadow-black/50">
+    <div class="p-5">
+        <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+                <h2 class="text-base font-semibold text-white">Стартовый протокол</h2>
+                <div id="startlist-title" class="mt-0.5 truncate text-sm text-admin-text-muted"></div>
+            </div>
+            <button type="button" id="startlist-close" class="admin-btn admin-btn-ghost py-1 px-2.5">Закрыть</button>
+        </div>
+        <div id="startlist-status" class="mt-3 text-[13px]"></div>
+        <pre id="startlist-log"
+             class="mt-3 max-h-[50vh] overflow-auto whitespace-pre-wrap break-words rounded border border-admin-border bg-admin-bg p-3 text-[12px] leading-relaxed text-admin-text-muted"></pre>
+        <div class="mt-3 flex items-center gap-2">
+            <button type="button" id="startlist-copy" class="admin-btn admin-btn-ghost py-1 px-3">Скопировать отчёт</button>
+            <span id="startlist-copy-hint" class="text-[11px] text-admin-text-muted"></span>
+        </div>
+    </div>
+</dialog>
+
+
+
+@* Источники стартового протокола соревнования: какие compID федерации в него входят.
+   Один наш старт бывает собран из нескольких протоколов (окружные чемпионаты), поэтому
+   привязка — список, а не поле. *@
+<dialog id="sources-modal"
+        class="m-auto w-[min(52rem,calc(100vw-2rem))] rounded-lg border border-admin-border bg-admin-surface p-0 text-admin-text shadow-xl shadow-black/50">
+    <div class="p-5">
+        <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+                <h2 class="text-base font-semibold text-white">Источники стартового протокола</h2>
+                <div id="sources-title" class="mt-0.5 truncate text-sm text-admin-text-muted"></div>
+            </div>
+            <button type="button" id="sources-close" class="admin-btn admin-btn-ghost py-1 px-2.5">Закрыть</button>
+        </div>
+
+        <p class="mt-3 text-[12px] text-admin-text-muted">
+            Из каких compID федерации собирается таб «Start list». Импорт привязывает свой
+            compID сам; руками добавляют остальные — например четыре окружных протокола одного
+            чемпионата. Привязка ничего не тянет: после неё нажмите «Стартовый протокол»
+            на строке источника во «Входящих».
+        </p>
+
+        <div id="sources-status" class="mt-3 text-[13px]"></div>
+        <div id="sources-body" class="mt-3 max-h-[60vh] overflow-y-auto"></div>
     </div>
 </dialog>
 
@@ -1997,24 +2057,89 @@ else
             };
 
             // Стартовый протокол (С5): забор одного соревнования — под две сотни запросов
-            // с паузой, поэтому долго; кнопку гасим и показываем сводку в общий info.
+            // с паузой, поэтому долго. Отчёт идёт в модалку (а не в «sync-info» в шапке:
+            // со прокрученной вниз страницы его не видно, и кнопка кажется мёртвой).
+            // Модалка не закрывается сама — при ошибке из неё копируют диагностику.
             // Status empty — ожидаемое (нет loglig-id / посев не сделан), не ошибка.
+            const slDlg = document.getElementById('startlist-modal');
+            const slTitle = document.getElementById('startlist-title');
+            const slStatus = document.getElementById('startlist-status');
+            const slLog = document.getElementById('startlist-log');
+            let slReport = '';
+
+            const slLine = (t) => {
+                slReport += t + '\n';
+                slLog.textContent = slReport;
+                slLog.scrollTop = slLog.scrollHeight;
+            };
+            const slSet = (text, cls) => {
+                slStatus.textContent = text;
+                slStatus.className = 'mt-3 text-[13px] ' + cls;
+            };
+            document.getElementById('startlist-close')
+                .addEventListener('click', () => slDlg.close());
+            document.getElementById('startlist-copy').addEventListener('click', async () => {
+                const hint = document.getElementById('startlist-copy-hint');
+                try {
+                    await navigator.clipboard.writeText(slReport);
+                    hint.textContent = 'Скопировано';
+                } catch {
+                    hint.textContent = 'Не вышло — выделите текст выше вручную';
+                }
+            });
+
             window.discStartList = async (id, btn) => {
                 btn.disabled = true;
-                info.textContent = `Стартовый протокол: тяну с loglig… (может занять несколько минут)`;
+                const url = `${API}/${id}/start-list`;
+                slReport = '';
+                slLog.textContent = '';
+                slTitle.textContent = discName(id);
+                slSet('Тяну с loglig… (может занять несколько минут)', 'text-admin-text-muted');
+                slLine(`POST ${url}`);
+                slLine(`Соревнование: ${discName(id)} (discoveredId ${id})`);
+                if (!slDlg.open) slDlg.showModal();
                 try {
-                    const r = await apiJson(`${API}/${id}/start-list`, { method: 'POST' });
+                    // Свой fetch, а не apiJson: при ошибке нужны код ответа и сырое тело —
+                    // именно их Влад присылает на разбор.
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'X-XSRF-TOKEN': _csrfToken }
+                    });
+                    const raw = await res.text();
+                    slLine(`HTTP ${res.status} ${res.statusText}`);
+                    let r = null;
+                    try { r = JSON.parse(raw); } catch { /* не JSON */ }
+
+                    if (!res.ok) {
+                        slSet(`ОШИБКА HTTP ${res.status} — ${r?.error ?? res.statusText}`, 'text-red-400');
+                        slLine('Ответ сервера:');
+                        slLine(raw || '(пустое тело)');
+                        return;
+                    }
+                    if (!r) {
+                        slSet('ОШИБКА: сервер вернул не JSON', 'text-red-400');
+                        slLine(raw || '(пустое тело)');
+                        return;
+                    }
+                    slLine('Ответ сервера:');
+                    slLine(JSON.stringify(r, null, 2));
+
                     if (r.status === 'error') {
-                        info.textContent = `Стартовый протокол (compID ${r.orgCompId}): ОШИБКА — ${r.error || 'неизвестная ошибка'}`;
+                        slSet(`ОШИБКА (compID ${r.orgCompId}) — ${r.error || 'неизвестная ошибка'}`, 'text-red-400');
                     } else if (r.status === 'empty') {
-                        info.textContent = `Стартовый протокол (compID ${r.orgCompId}): ${r.error || 'пусто'}`;
+                        slSet(`Пусто (compID ${r.orgCompId}): ${r.error || 'нечего тянуть'}`, 'text-amber-400');
                     } else {
-                        info.textContent = `Стартовый протокол (compID ${r.orgCompId}): ${r.status} — `
+                        slSet(`Готово (compID ${r.orgCompId}): ${r.status} — `
                             + `заплывов ${r.eventsFetched}/${r.events}, строк ${r.entries}; `
-                            + `новых ${r.added}, пересев ${r.moved}, снялись ${r.removed}, без изменений ${r.unchanged}`;
+                            + `новых ${r.added}, пересев ${r.moved}, снялись ${r.removed}, `
+                            + `без изменений ${r.unchanged}`, 'text-emerald-400');
                     }
                 } catch (e) {
-                    info.textContent = `Стартовый протокол: ОШИБКА — ${e.message}`;
+                    // Сеть/прерванный запрос: HTTP-кода нет, но имя и текст ошибки есть.
+                    slSet(`ОШИБКА запроса — ${e.name}: ${e.message}`, 'text-red-400');
+                    slLine(`Исключение: ${e.name}: ${e.message}`);
+                    if (e.stack) slLine(e.stack);
                 } finally {
                     btn.disabled = false;
                 }
@@ -2281,5 +2406,145 @@ else
 
             document.getElementById('quality-close').addEventListener('click', () => dlg.close());
         })();
+
+        // ── Источники стартового протокола (CompetitionSourcesAdminController) ───
+        // Один наш старт бывает собран из НЕСКОЛЬКИХ compID федерации: окружные чемпионаты
+        // 8-11 лежат под четырьмя. Импорт знает только тот compID, из которого пришёл файл,
+        // остальные привязывают здесь — иначе таб Start list показывает один округ из четырёх.
+        (function () {
+            const API = '/api/admin/competition-sources';
+            const dlg = document.getElementById('sources-modal');
+            if (!dlg) return;
+            const titleEl = document.getElementById('sources-title');
+            const statusEl = document.getElementById('sources-status');
+            const body = document.getElementById('sources-body');
+
+            const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c =>
+                ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+            const setStatus = (text, cls) => {
+                statusEl.textContent = text;
+                statusEl.className = 'mt-3 text-[13px] ' + (cls || 'text-admin-text-muted');
+            };
+
+            async function api(url, opts = {}) {
+                opts.headers = { 'X-XSRF-TOKEN': _csrfToken, ...(opts.headers ?? {}) };
+                const res = await fetch(url, { credentials: 'same-origin', ...opts });
+                let payload = null;
+                try { payload = await res.json(); } catch { /* пустое тело */ }
+                if (!res.ok) throw new Error(payload?.error ?? `HTTP ${res.status} ${res.statusText}`);
+                return payload;
+            }
+
+            function render(view) {
+                titleEl.textContent = view.competitionName;
+
+                // Селект дня: источник принадлежит конкретному дню многодневки. У однодневного
+                // соревнования выбора нет, но селект оставляем — так один путь кода.
+                const dayOptions = view.days.map(d =>
+                    `<option value="${d.competitionId}">${d.dayNumber ? 'День ' + d.dayNumber + ' · ' : ''}${esc(d.date)}</option>`
+                ).join('');
+
+                const linkedRows = view.linked.length
+                    ? view.linked.map(l => `
+                        <tr>
+                            <td class="whitespace-nowrap">
+                                <a href="https://isr.org.il/comp.asp?compID=${l.orgCompId}" target="_blank" rel="noopener"
+                                   class="text-admin-accent hover:underline">${l.orgCompId} ↗</a>
+                            </td>
+                            <td class="whitespace-nowrap text-admin-text-muted">${esc(l.date ?? '—')}</td>
+                            <td dir="rtl" style="text-align:left" class="text-admin-text-muted">${esc(l.sourceName ?? '—')}</td>
+                            <td class="text-right tabular-nums">${l.entries}</td>
+                            <td class="col-actions text-right whitespace-nowrap">
+                                <button type="button" class="admin-btn admin-btn-danger py-1 px-2.5 src-unlink"
+                                        data-comp="${l.competitionId}" data-org="${l.orgCompId}">Отвязать</button>
+                            </td>
+                        </tr>`).join('')
+                    : '<tr><td colspan="5" class="text-admin-text-muted">Привязок нет — таба Start list у соревнования не будет.</td></tr>';
+
+                const candidateRows = view.candidates.length
+                    ? view.candidates.map(c => `
+                        <tr>
+                            <td class="whitespace-nowrap">
+                                <a href="https://isr.org.il/comp.asp?compID=${c.orgCompId}" target="_blank" rel="noopener"
+                                   class="text-admin-accent hover:underline">${c.orgCompId} ↗</a>
+                                ${c.linkedElsewhere ? '<span class="ml-1 text-[10px] font-bold text-amber-400" title="Этот compID уже привязан к ДРУГОМУ соревнованию">занят</span>' : ''}
+                            </td>
+                            <td class="whitespace-nowrap text-admin-text-muted">${esc(c.date)}</td>
+                            <td dir="rtl" style="text-align:left" class="text-admin-text-muted">${esc(c.name)}</td>
+                            <td class="text-admin-text-muted">${esc(c.status)}</td>
+                            <td class="col-actions text-right whitespace-nowrap">
+                                <button type="button" class="admin-btn admin-btn-primary py-1 px-2.5 src-link"
+                                        data-org="${c.orgCompId}">Привязать</button>
+                            </td>
+                        </tr>`).join('')
+                    : '<tr><td colspan="5" class="text-admin-text-muted">Кандидатов в датах этого соревнования нет.</td></tr>';
+
+                body.innerHTML = `
+                    <div class="text-[12px] font-semibold text-admin-text-muted">Привязано</div>
+                    <table class="admin-table mt-1"><tbody>${linkedRows}</tbody></table>
+
+                    <div class="mt-4 flex items-center gap-2">
+                        <div class="text-[12px] font-semibold text-admin-text-muted">Кандидаты из «Входящих»</div>
+                        <span class="text-[11px] text-admin-text-muted">привязать к дню:</span>
+                        <select id="src-day" class="admin-input py-1 px-2 text-[13px] w-auto">${dayOptions}</select>
+                    </div>
+                    <table class="admin-table mt-1"><tbody>${candidateRows}</tbody></table>`;
+            }
+
+            async function load(id) {
+                setStatus('Загружаю…');
+                try {
+                    render(await api(`${API}/${id}`));
+                    setStatus('');
+                } catch (e) {
+                    setStatus(`ОШИБКА — ${e.message}`, 'text-red-400');
+                }
+            }
+
+            document.getElementById('sources-close').addEventListener('click', () => dlg.close());
+
+            document.querySelectorAll('.sources-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    titleEl.textContent = btn.dataset.title || '';
+                    body.innerHTML = '';
+                    setStatus('');
+                    if (!dlg.open) dlg.showModal();
+                    load(Number(btn.dataset.competitionId));
+                });
+            });
+
+            // Делегирование: строки таблиц перерисовываются после каждой правки.
+            body.addEventListener('click', async (e) => {
+                const link = e.target.closest('.src-link');
+                const unlink = e.target.closest('.src-unlink');
+                if (!link && !unlink) return;
+
+                // Привязываем к ВЫБРАННОМУ дню, отвязываем — от того, где привязка лежит.
+                const targetComp = link
+                    ? Number(document.getElementById('src-day').value)
+                    : Number(unlink.dataset.comp);
+                const orgCompId = Number((link ?? unlink).dataset.org);
+                const url = `${API}/${link ? 'link' : 'unlink'}`;
+
+                (link ?? unlink).disabled = true;
+                setStatus(link ? `Привязываю ${orgCompId}…` : `Отвязываю ${orgCompId}…`);
+                try {
+                    const view = await api(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ competitionId: targetComp, orgCompId })
+                    });
+                    render(view);
+                    setStatus(link
+                        ? `compID ${orgCompId} привязан. Теперь затяните его стартовый протокол во «Входящих».`
+                        : `compID ${orgCompId} отвязан. Заявки остались в базе.`, 'text-emerald-400');
+                } catch (err) {
+                    setStatus(`ОШИБКА — ${err.message}`, 'text-red-400');
+                    (link ?? unlink).disabled = false;
+                }
+            });
+        })();
+
     </script>
 }

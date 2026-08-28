@@ -50,6 +50,12 @@ plus repo-specific footguns.
 - **Don't commit or push unless asked.** Default branch is `master`; branch first if asked to commit.
 - **Comments/identifiers in this codebase are bilingual (RU prose, EN identifiers).** Mirror the
   local style of the file you edit.
+- **Имена пловцов и названия клубов на витрине — ИВРИТСКИЕ по умолчанию, всегда** (решение
+  Влада, 28.08.2026).
+  Английское имя показывается только как фоллбек (ивритского в базе нет) или по явному
+  запросу языка; порядок в коде `FirstName/LastName` → `FirstNameEn/LastNameEn`, не наоборот.
+  Правилу «видимый UI только на английском» это не противоречит: то правило про строки
+  интерфейса, а имя человека — данные.
 
 ## Build & run
 
@@ -118,10 +124,15 @@ docker exec -it swimm-postgres psql -U swimm -d swimm          # interactive
 docker exec swimm-postgres psql -U swimm -d swimm -c '<SQL>'   # one-off (note the quoted "Identifiers")
 ```
 
-**Least-privilege roles** (`server/db/setup-roles.sql`, run once): owner `swimm` (DDL/migrations),
+**Least-privilege roles** (`server/db/01-roles.sql` → миграции → `server/db/02-grants.sql`;
+порядок обязателен, см. ниже): owner `swimm` (DDL/migrations),
 `swimm_rw` (runtime DML), `swimm_ro` (public read — `SELECT` on business tables only, no `Sys_*`).
 Connection strings in `server/Swimm.API/appsettings.json`; each falls back to `DefaultConnection`
-if unset. Read-only public path uses `SwimmReadDbContext`; everything that writes or touches
+if unset. ⚠ **Порядок на чистой БД жёсткий и не переставляется:** `01-roles.sql` → `--migrate`
+→ `02-grants.sql`. Гранты ссылаются на таблицы, которых до миграций нет, а миграции — на роль
+`swimm_ro`, которой нет до первого шага. Список публичных таблиц живёт только в `02-grants.sql`.
+Наполнение прод-БД — `dump-seed.sh` / `restore-seed.sh` (что переносится и что нет — в
+`server/db/seed-tables.txt`). Read-only public path uses `SwimmReadDbContext`; everything that writes or touches
 `Sys_*` uses `SwimmDbContext`.
 
 ## Migrations

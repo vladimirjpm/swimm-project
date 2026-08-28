@@ -134,3 +134,15 @@ export function matchesSearch(swim: StartListSwim, query: string): boolean {
     swim.club_name.toLowerCase().includes(q)
   );
 }
+
+/**
+ * День соревнования короткой подписью — «Mon 16 Feb». Формат один на весь стартовый
+ * протокол: он стоит и в подписи дня программы, и в выдаче поиска, и в шапке группы
+ * заплывов карточки пловца, а три разных формата одной даты на одном экране читаются
+ * как три разные даты.
+ */
+export function dayLabel(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short' });
+}

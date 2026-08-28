@@ -268,8 +268,16 @@ function ResultsMain() {
 
   // Таб Start list (С7): счётчик заявок для бейджа таба. Программу грузим только когда
   // org_comp_id уже известен из Overview — иначе таба всё равно нет (см. competition-tabs.tsx).
-  const startListOrgCompId = compOverview?.org_comp_id ?? null;
+  // Источников бывает несколько (окружные протоколы одного чемпионата) — первый из них и
+  // есть тот, что открывается по умолчанию; подтабы внутри таба переключают остальные.
+  const startListSources = compOverview?.start_list_sources ?? [];
+  const startListOrgCompId = startListSources[0]?.org_comp_id ?? compOverview?.org_comp_id ?? null;
   const { data: startListProgramme } = useStartListProgramme(startListOrgCompId);
+  // Бейдж таба — заявки ВСЕХ источников: иначе у четырёхокружного чемпионата в бейдже
+  // стояла бы четверть числа. Счётчики приходят с овервью, лишних запросов нет.
+  const startListEntries = startListSources.length
+    ? startListSources.reduce((sum, s) => sum + s.entry_count, 0)
+    : startListProgramme?.entries;
 
   // Ленивый Swims (design_handoff_competition_overview): в режиме соревнования тяжёлый
   // фетч /api/results откладываем, пока не пришёл Overview (prefetch в фоне) или пока
@@ -466,7 +474,7 @@ function ResultsMain() {
                       activeTab={compTab}
                       onTabChange={handleCompTabChange}
                       mediaCount={compMediaItems.length}
-                      startListEntries={startListProgramme?.entries}
+                      startListEntries={startListEntries}
                       onAddMedia={auth.isAuthenticated && addMedia.canAdd ? addMedia.openModal : undefined}
                       source={source}
                       onChangeClick={togglePanel}
@@ -535,7 +543,7 @@ function ResultsMain() {
             addingMedia={addMedia.loadingSwimmers}
           />
         ) : compTab === 'startlist' ? (
-          startListOrgCompId != null && <StartListTab orgCompId={startListOrgCompId} />
+          startListOrgCompId != null && <StartListTab orgCompId={startListOrgCompId} sources={startListSources} />
         ) : (
           <CompetitionRecords overview={compOverview} onOpenSwim={handleOpenSwim} />
         )

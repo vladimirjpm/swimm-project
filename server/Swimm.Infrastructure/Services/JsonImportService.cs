@@ -942,6 +942,34 @@ public class JsonImportService : IImportService
                     diagnosticLog.Add($"Идентичность: событие {evId} помечено compID {oc}");
                 }
             }
+
+            // Источник стартового протокола (CompetitionSources). Отдельная от штампа связь:
+            // штамп на соревновании ОДИН (AK уникален), а источников у старта бывает несколько
+            // — окружные протоколы одного чемпионата лежат под разными compID. Заводим здесь,
+            // чтобы у нового соревнования таб Start list появлялся сам, без похода в админку.
+            var linked = await _db.CompetitionSources
+                .AnyAsync(cs => cs.CompetitionId == primary.Id && cs.OrgCompId == oc);
+            if (!linked)
+            {
+                var disc = await _db.DiscoveredCompetitions.AsNoTracking()
+                    .Where(d => d.OrgCompId == oc)
+                    .Select(d => new { d.Name, d.DateStart })
+                    .FirstOrDefaultAsync();
+                _db.CompetitionSources.Add(new CompetitionSource
+                {
+                    CompetitionId = primary.Id,
+                    OrgCompId = oc,
+                    // Дата — календарная, поэтому из «Входящих» берём её как Unspecified:
+                    // колонка timestamp without time zone, а DateStart там timestamptz.
+                    SourceDate = disc != null
+                        ? DateTime.SpecifyKind(disc.DateStart, DateTimeKind.Unspecified)
+                        : NullableDate(primary.Date),
+                    SourceName = disc?.Name ?? primary.SubName ?? primary.Name,
+                    SortOrder = 0
+                });
+                await _db.SaveChangesAsync();
+                diagnosticLog.Add($"Стартовый протокол: соревнование {primary.Id} ← источник compID {oc}");
+            }
         }
 
         // Запись в историю импортов — одна запись на весь импорт файла
@@ -1924,6 +1952,13 @@ public class JsonImportService : IImportService
             "medley" or "im" or "individual" => "individual_medley",
             _ => norm
         };
+    }
+
+    /// <summary>Дата дня для привязки источника; непарсимая — null (подтаб подпишется днём).</summary>
+    private static DateTime? NullableDate(string? date)
+    {
+        var d = ParseDate(date);
+        return d == DateTime.MinValue ? null : DateTime.SpecifyKind(d, DateTimeKind.Unspecified);
     }
 
     private static DateTime ParseDate(string? date)

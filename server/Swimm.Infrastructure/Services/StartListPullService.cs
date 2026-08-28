@@ -324,7 +324,14 @@ public sealed class StartListPullService : IStartListPullService
 
             // Дата дня — из САМОГО заплыва, если источник её назначил: у многодневки день
             // зашит в дату старта, и это точнее, чем DateStart всего события.
-            var compDate = (ev.StartAtLocal?.Date ?? discovered.DateStart.Date);
+            //
+            // SpecifyKind обязателен на фоллбеке: DateStart приходит из timestamptz и несёт
+            // Kind=Utc, а колонка CompDate — календарная (timestamp without time zone), и
+            // Npgsql на такой паре бросает ArgumentException. Ловится только на протоколах,
+            // где хоть у одного заплыва не назначено время старта (пример — compID 16787:
+            // соседние округа того же чемпионата затянулись, а этот падал).
+            var compDate = DateTime.SpecifyKind(
+                ev.StartAtLocal?.Date ?? discovered.DateStart.Date, DateTimeKind.Unspecified);
 
             drafts.Add(new EntryDraft(
                 discovered.OrgCompId, compDate, discovered.Name,

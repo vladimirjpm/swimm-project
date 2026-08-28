@@ -18,6 +18,9 @@ export interface StartListSwim {
   is_relay: boolean;
   heat: number;
   lane: number;
+  /** Календарный день заплыва — отдельно от heat_start_at: времени может не быть вовсе,
+   *  а «в какой день» — главный ответ поиска по составному соревнованию. */
+  comp_date: string;
   /** UTC, может быть null — заплыву ещё не назначили время (решение 3, «≈»). */
   heat_start_at: string | null;
   round: string | null;
@@ -86,6 +89,18 @@ export interface StartListSwimmer {
   first_start_at: string | null;
   swims: StartListSwim[];
   updated_at: string | null;
+}
+
+/** Строка выдачи поиска по имени внутри соревнования (все источники сразу). */
+export interface StartListSwimmerHit {
+  swimmer_id: number;
+  swimmer_name: string;
+  birth_year: number | null;
+  club_name: string;
+  swims: number;
+  /** Дни, в которые он плывёт. */
+  days: string[];
+  first_start_at: string | null;
 }
 
 /** Предстоящее соревнование в общем списке `/competitions` (С7б, решение В9). */

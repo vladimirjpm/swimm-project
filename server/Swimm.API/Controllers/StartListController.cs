@@ -32,6 +32,9 @@ public class StartListController : ControllerBase
     private const int DefaultUpcomingCompetitionDays = 60;
     private const int MaxSwimmerIds = 50;
 
+    /// <summary>Потолок источников в одном запросе: у составного чемпионата их единицы.</summary>
+    private const int MaxOrgCompIds = 20;
+
     private readonly IStartListPublicRepository _startList;
     private readonly ICacheService _cache;
 
@@ -125,5 +128,48 @@ public class StartListController : ControllerBase
             $"http:start-list:upcoming:{from:yyyy-MM-dd}:{days}:{string.Join(',', ids.Order())}",
             () => _startList.GetUpcomingAsync(ids, from, days, ct),
             PayloadTtl, CacheControlValue);
+    }
+
+    /// <summary>
+    /// Поиск пловца по имени внутри соревнования: «когда плывёт мой», если его нет в
+    /// избранных. Источников (compID) может быть несколько — окружные протоколы одного
+    /// чемпионата, — поэтому параметр повторяемый, как swimmerId у «ближайших».
+    /// </summary>
+    [HttpGet("search")]
+    public async Task<IActionResult> Search(
+        [FromQuery] int[] orgCompId, [FromQuery] string q = "", [FromQuery] int limit = 20,
+        CancellationToken ct = default)
+    {
+        var ids = orgCompId.Distinct().Take(MaxOrgCompIds).ToArray();
+        if (ids.Length == 0) return BadRequest("Укажите хотя бы один orgCompId.");
+
+        var query = (q ?? string.Empty).Trim();
+        // Короткий запрос — не ошибка, а «ещё печатают»: отдаём пустой список, чтобы поле
+        // ввода не показывало ошибку на первом же символе.
+        if (query.Length < 2) return Ok(Array.Empty<object>());
+
+        return await this.CachedJson(_cache,
+            $"http:start-list:search:{string.Join(',', ids.Order())}:{query.ToLowerInvariant()}:{limit}",
+            () => _startList.SearchSwimmersAsync(ids, query, limit, ct),
+            PayloadTtl, CacheControlValue);
+    }
+
+    /// <summary>
+    /// Карточка пловца сразу по нескольким источникам — та же выдача, что
+    /// <c>{orgCompId}/swimmers/{id}</c>, но для соревнования из нескольких протоколов:
+    /// заплывы всех дней в одном календаре.
+    /// </summary>
+    [HttpGet("swimmers/{swimmerId:int}")]
+    public async Task<IActionResult> GetSwimmerAcross(
+        int swimmerId, [FromQuery] int[] orgCompId, CancellationToken ct = default)
+    {
+        var ids = orgCompId.Distinct().Take(MaxOrgCompIds).ToArray();
+        if (ids.Length == 0) return BadRequest("Укажите хотя бы один orgCompId.");
+
+        var payload = await _startList.GetSwimmerAcrossAsync(ids, swimmerId, ct);
+        if (payload is null) return NotFound();
+
+        Response.Headers.CacheControl = CacheControlValue;
+        return Ok(payload);
     }
 }

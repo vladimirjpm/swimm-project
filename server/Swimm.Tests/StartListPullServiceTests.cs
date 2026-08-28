@@ -92,6 +92,31 @@ public class StartListPullServiceTests
 
     // ── Основной путь ────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Регрессия: у заплыва не назначено время старта → дата дня берётся из «Входящих»,
+    /// а там DateStart приходит из timestamptz с Kind=Utc. Колонка CompDate календарная,
+    /// и Npgsql на такой паре бросал ArgumentException — забор падал целиком (пример из
+    /// жизни: compID 16787, соседние округа того же чемпионата затянулись нормально).
+    /// InMemory-провайдер исключения не бросает, поэтому проверяем сам Kind.
+    /// </summary>
+    [Fact]
+    public async Task Pull_EventWithoutStartTime_CompDateIsCalendarKind()
+    {
+        await using var db = await SeedAsync(nameof(Pull_EventWithoutStartTime_CompDateIsCalendarKind));
+        db.DiscoveredCompetitions.Single().DateStart =
+            DateTime.SpecifyKind(new DateTime(2026, 2, 16), DateTimeKind.Utc);
+        await db.SaveChangesAsync();
+
+        var provider = new FakeProvider(
+            [Event(76321, startAt: null)],
+            new() { [76321] = StartList(Row(2, 5, 297591, "אביגייל יבסייב", heatStart: null)) });
+
+        var report = await Service(db, provider).PullAsync(OrgCompId);
+
+        Assert.Equal(StartListPullStatus.Ok, report.Status);
+        Assert.Equal(DateTimeKind.Unspecified, (await db.CompetitionEntries.SingleAsync()).CompDate.Kind);
+    }
+
     [Fact]
     public async Task Pull_WritesEntries_AndKeepsCompetitionsUntouched()
     {

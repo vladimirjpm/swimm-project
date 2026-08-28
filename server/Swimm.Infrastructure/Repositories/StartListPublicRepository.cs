@@ -143,7 +143,7 @@ public class StartListPublicRepository : IStartListPublicRepository
         var first = rows[0].Swimmer;
         return new StartListSwimmerDto(
             orgCompId, rows[0].CompName, swimmerId,
-            SwimmerName(first), first.BirthYear, rows[0].Club.Name,
+            SwimmerName(first), first.BirthYear, ClubName(rows[0].Club),
             swims.Min(s => s.HeatStartAt),
             swims,
             rows.Max(e => e.PulledAt));
@@ -193,6 +193,79 @@ public class StartListPublicRepository : IStartListPublicRepository
             .ToList();
     }
 
+    public async Task<IReadOnlyList<StartListSwimmerHitDto>> SearchSwimmersAsync(
+        IReadOnlyCollection<int> orgCompIds, string query, int limit, CancellationToken ct = default)
+    {
+        var q = query.Trim();
+        // Один символ находит пол-соревнования — выдача бесполезна, а запрос дорогой.
+        if (q.Length < 2 || orgCompIds.Count == 0) return [];
+
+        var ids = orgCompIds.Distinct().ToList();
+
+        // Ищем и по английскому имени, и по ивритскому: у пловцов, заведённых стартовым
+        // протоколом, английского имени ещё нет (в источнике его не печатают).
+        var rows = await BaseQuery()
+            .Where(e => ids.Contains(e.OrgCompId))
+            .Where(e =>
+                EF.Functions.ILike(e.Swimmer.FirstName + " " + e.Swimmer.LastName, $"%{q}%")
+                || EF.Functions.ILike(e.Swimmer.LastName + " " + e.Swimmer.FirstName, $"%{q}%")
+                || EF.Functions.ILike(e.Swimmer.FirstNameEn + " " + e.Swimmer.LastNameEn, $"%{q}%")
+                || EF.Functions.ILike(e.Swimmer.LastNameEn + " " + e.Swimmer.FirstNameEn, $"%{q}%"))
+            .ToListAsync(ct);
+
+        // Группировка в памяти по той же причине, что в GetUpcomingCompetitionsAsync:
+        // Distinct().Count() внутри группы EF транслирует не всегда, а объём тут — заявки
+        // одного соревнования, отфильтрованные по имени.
+        return rows
+            .GroupBy(e => e.SwimmerId)
+            .Select(g =>
+            {
+                var first = g.First();
+                return new StartListSwimmerHitDto(
+                    g.Key,
+                    SwimmerName(first.Swimmer),
+                    first.Swimmer.BirthYear > 0 ? first.Swimmer.BirthYear : null,
+                    ClubName(first.Club),
+                    g.Count(),
+                    g.Select(e => e.CompDate).Distinct().OrderBy(d => d).ToList(),
+                    g.Where(e => e.HeatStartAt != null).Min(e => e.HeatStartAt));
+            })
+            .OrderBy(h => h.SwimmerName)
+            .Take(Math.Clamp(limit, 1, 50))
+            .ToList();
+    }
+
+    public async Task<StartListSwimmerDto?> GetSwimmerAcrossAsync(
+        IReadOnlyCollection<int> orgCompIds, int swimmerId, CancellationToken ct = default)
+    {
+        if (orgCompIds.Count == 0) return null;
+        var ids = orgCompIds.Distinct().ToList();
+
+        var rows = await BaseQuery()
+            .Where(e => ids.Contains(e.OrgCompId) && e.SwimmerId == swimmerId)
+            .ToListAsync(ct);
+        if (rows.Count == 0) return null;
+
+        // Порядок — по дню, затем по времени старта: соревнование из нескольких протоколов
+        // читается как один календарь, а не как склейка источников.
+        var swims = rows
+            .OrderBy(e => e.CompDate)
+            .ThenBy(e => e.HeatStartAt ?? DateTime.MaxValue)
+            .ThenBy(e => e.OrgEventNumber ?? int.MaxValue)
+            .Select(ToSwim)
+            .ToList();
+
+        var first = rows[0];
+        return new StartListSwimmerDto(
+            // OrgCompId карточки — тот источник, где у пловца ПЕРВЫЙ старт: одного числа
+            // тут больше не хватает, а ссылки внутрь (заплыв) идут по org_comp_id строки.
+            swims[0].OrgCompId, first.CompName, swimmerId,
+            SwimmerName(first.Swimmer), first.Swimmer.BirthYear, ClubName(first.Club),
+            swims.Where(s => s.HeatStartAt != null).Min(s => s.HeatStartAt),
+            swims,
+            rows.Max(e => e.PulledAt));
+    }
+
     // ── Общее ────────────────────────────────────────────────────────────────
 
     private IQueryable<CompetitionEntry> BaseQuery() =>
@@ -232,6 +305,7 @@ public class StartListPublicRepository : IStartListPublicRepository
         IsRelay(e.Distance),
         e.Heat,
         e.Lane,
+        e.CompDate,
         e.HeatStartAt,
         e.Round,
         e.SeedTimeOriginal.Length > 0 ? e.SeedTimeOriginal : null,
@@ -240,7 +314,7 @@ public class StartListPublicRepository : IStartListPublicRepository
         SwimmerName(e.Swimmer),
         e.Swimmer.BirthYear > 0 ? e.Swimmer.BirthYear : null,
         e.ClubId,
-        e.Club.Name,
+        ClubName(e.Club),
         e.ResultId,
         e.Status);
 
@@ -252,9 +326,19 @@ public class StartListPublicRepository : IStartListPublicRepository
     private static bool IsRelay(string distance) =>
         distance.Contains('X', StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>Имя одной строкой. Английское — если заполнено: витрина проекта англоязычная.</summary>
+    /// <summary>Название клуба. ИВРИТСКОЕ по умолчанию — то же правило, что у имени.</summary>
+    private static string ClubName(Club c) => c.Name.Length > 0 ? c.Name : c.NameEn;
+
+    /// <summary>
+    /// Имя одной строкой. ИВРИТСКОЕ по умолчанию — правило Влада от 28.08.2026: имена
+    /// пловцов показываются так, как они напечатаны в протоколе федерации, и родитель ищет
+    /// ребёнка глазами именно по ним. Английское — только фоллбек, когда ивритского нет.
+    ///
+    /// Это НЕ отменяет «UI только English»: то правило про строки интерфейса (подписи,
+    /// кнопки, статусы), а имя человека — данные, а не интерфейс.
+    /// </summary>
     private static string SwimmerName(Swimmer s) =>
-        (s.FirstNameEn.Length > 0 || s.LastNameEn.Length > 0)
-            ? $"{s.FirstNameEn} {s.LastNameEn}".Trim()
-            : $"{s.FirstName} {s.LastName}".Trim();
+        (s.FirstName.Length > 0 || s.LastName.Length > 0)
+            ? $"{s.FirstName} {s.LastName}".Trim()
+            : $"{s.FirstNameEn} {s.LastNameEn}".Trim();
 }
