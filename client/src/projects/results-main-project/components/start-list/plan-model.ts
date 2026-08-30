@@ -141,12 +141,32 @@ export interface PlanRowEntry {
   /** true — это выбранный пловец (золото), false — попал через клуб (cyan). */
   mine: boolean;
   isRelay: boolean;
-  /** «leg 2» — какая нога у ВЫБРАННОГО пловца в этой команде; null, если он тут не плывёт. */
-  leg: string | null;
   /** entered | swum | no-show. */
   status: string;
   /** Посев этой заявки; null — «NT». */
   seedTime: string | null;
+  /**
+   * Состав команды-эстафеты: все её ноги, отсортированные по id заявки (решение Влада
+   * 30.08.2026, «вариант A» — состав виден без нажатий).
+   *
+   * Пусто у личного заплыва И у эстафеты, про которую источник состава не дал: следя за
+   * ОДНИМ пловцом, клиент получает только его ногу (`/swimmers/{id}`), а не всю четвёрку —
+   * четыре имени приходят, когда следят за клубом (`/{comp}/clubs/{id}`). Показывать список
+   * из одного человека нельзя: он читался бы как «команда из одного».
+   *
+   * Порядок — по id, а не «нога 1..4»: колонки порядка ног в схеме нет (`CompetitionEntry`),
+   * id лишь отражает порядок затягивания протокола. Поэтому имена идут перечислением, БЕЗ
+   * нумерации: печатать «leg 3» значило бы утверждать то, чего мы не знаем.
+   */
+  members: PlanRowMember[];
+}
+
+/** Одна нога команды-эстафеты в составе строки. */
+export interface PlanRowMember {
+  id: number;
+  name: string;
+  /** true — это пловец из состава плана; он выделяется в перечислении. */
+  mine: boolean;
 }
 
 /** Строка D3: один заплыв — одна строка, сколько бы выбранных в нём ни плыло. */
@@ -181,17 +201,22 @@ export function bandLabel(gender: string, ageBand: string | null): string {
  *
  * 1. **Ноги эстафеты → одна команда.** У эстафеты четыре строки с одинаковыми
  *    заплывом+дорожкой и разными пловцами — это одна команда (тот же приём, что
- *    `mergeRelayLanes` в зуме 2). Если среди ног есть выбранный пловец, у команды
- *    появляется пометка «leg N» — иначе непонятно, где в ней «мой».
+ *    `mergeRelayLanes` в зуме 2). Состав команды сохраняется в `members`, и выбранный
+ *    пловец в нём выделяется — иначе непонятно, где в ней «мой».
  * 2. **Несколько выбранных в ОДНОМ заплыве → одна строка** (правило хендоффа §1.3):
  *    время и дисциплина общие, имена идут столбиком, у каждого своя дорожка. Ключ —
  *    `compID + дисциплина + заплыв`: номера дисциплин у разных протоколов совпадают.
  */
 export function groupPlanRows(swims: readonly PlanSwim[]): PlanRow[] {
   const rows = new Map<string, PlanRow>();
-  // Ноги одной команды: ключ заплыв+дорожка+клуб, как в mergeRelayLanes. Считаем ноги,
-  // чтобы знать, какая по счёту — «моя».
-  const teams = new Map<string, { entry: PlanRowEntry; legs: number }>();
+  // Ноги одной команды: ключ заплыв+дорожка+клуб, как в mergeRelayLanes.
+  //
+  // Номера ног («leg 3») здесь СОЗНАТЕЛЬНО не считаются: порядка ног в схеме нет
+  // (`CompetitionEntry` без колонки порядка), а счёт по приходу строк давал ложь — в срезе
+  // клуба ноги приезжают в произвольном порядке, а следя за одним пловцом клиент видит
+  // только его ногу и всегда получал «leg 1». Ответ на «где мой в этой четвёрке» даёт
+  // выделение его имени в составе (`members`), а не выдуманный номер.
+  const teams = new Map<string, { entry: PlanRowEntry }>();
 
   for (const { swim, mine } of swims) {
     const rowKey = `${swim.org_comp_id}:${swim.org_discipline_id}:${swim.heat}`;
@@ -222,9 +247,9 @@ export function groupPlanRows(swims: readonly PlanSwim[]): PlanRow[] {
         lane: swim.lane,
         mine,
         isRelay: false,
-        leg: null,
         status: swim.status,
         seedTime: swim.seed_time,
+        members: [],
       });
       continue;
     }
@@ -232,11 +257,8 @@ export function groupPlanRows(swims: readonly PlanSwim[]): PlanRow[] {
     const teamKey = `${rowKey}:${swim.lane}:${swim.club_id}`;
     const team = teams.get(teamKey);
     if (team) {
-      team.legs += 1;
-      // Ногу выбранного помечаем ОДИН раз — первую его же: «leg 2» это ответ на «где мой
-      // в этой четвёрке», а не перечисление всех ног.
-      if (mine && team.entry.leg === null) team.entry.leg = `leg ${team.legs}`;
       team.entry.mine = team.entry.mine || mine;
+      team.entry.members.push({ id: swim.id, name: swim.swimmer_name, mine });
       continue;
     }
 
@@ -246,12 +268,20 @@ export function groupPlanRows(swims: readonly PlanSwim[]): PlanRow[] {
       lane: swim.lane,
       mine,
       isRelay: true,
-      leg: mine ? 'leg 1' : null,
       status: swim.status,
       seedTime: swim.seed_time,
+      // Имя ноги, а не команды: в `name` у эстафеты стоит клуб, состав живёт отдельно.
+      members: [{ id: swim.id, name: swim.swimmer_name, mine }],
     };
-    teams.set(teamKey, { entry, legs: 1 });
+    teams.set(teamKey, { entry });
     row.entries.push(entry);
+  }
+
+  // Состав команды — по id заявки: источник отдаёт ноги в произвольном порядке (сортировка
+  // API идёт по времени/событию/дорожке, а внутри дорожки ноги равны). Порядок протокола
+  // отражает только порядок затягивания, то есть id; он же даёт устойчивую выдачу.
+  for (const { entry } of teams.values()) {
+    entry.members.sort((a, b) => a.id - b.id);
   }
 
   // Внутри строки: сперва «мои», потом по дорожке — свой ребёнок должен читаться первым.

@@ -105,9 +105,20 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
   // старта подтабы это разные протоколы одного и того же чемпионата.
   const { plan: savedPlan, save, loading: planLoading } = useStartListPlan(orgCompId);
 
+  // Состав, приехавший ССЫЛКОЙ (?plan=s10,c506). Показываем его, но в свой план НЕ пишем:
+  // человек мог открыть чужую ссылку из чата, и подменять ему собственный состав нельзя —
+  // это происходит только когда он сам нажмёт Edit (правило Т10).
+  //
+  // Считается ДО useEffectivePlan: пловцов из ссылки надо загрузить, иначе у получателя
+  // (у которого их нет ни в избранном, ни в своём плане) карточка пустая — см.
+  // `alsoLoadSwimmerIds`.
+  const [sharedPlan, setSharedPlan] = useState(
+    () => parsePlanParam(new URLSearchParams(window.location.search).get('plan')),
+  );
+
   // Действующий состав и данные под него — один расчёт на пикер, карточку и на решение
   // «какой экран открыть первым» (useEffectivePlan).
-  const effective = useEffectivePlan(allOrgCompIds, savedPlan);
+  const effective = useEffectivePlan(allOrgCompIds, savedPlan, sharedPlan?.swimmer_ids ?? []);
   const planLabel = planSummary(effective.plan);
 
   const openPicker = useCallback(() => setState((s) => ({ ...s, zoom: 'picker' })), []);
@@ -120,12 +131,6 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
   const { mode } = useMode();
   const deepThemeClass = mode === 'dark' ? 'theme-deep' : 'theme-deep-light';
 
-  // Состав, приехавший ССЫЛКОЙ (?plan=s10,c506). Показываем его, но в свой план НЕ пишем:
-  // человек мог открыть чужую ссылку из чата, и подменять ему собственный состав нельзя —
-  // это происходит только когда он сам нажмёт Edit (правило Т10).
-  const [sharedPlan, setSharedPlan] = useState(
-    () => parsePlanParam(new URLSearchParams(window.location.search).get('plan')),
-  );
   const shownPlan = sharedPlan ?? effective.plan;
 
   // Ссылка «поделиться» — этот же адрес плюс состав. Строится от ТЕКУЩЕГО адреса, чтобы

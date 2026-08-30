@@ -17,7 +17,21 @@ import type { StartListPlan } from './use-start-list-plan';
  * — сохранённый пустой план значит «я всё снял сам». Избранные дают лишь ДЕФОЛТ, и только
  * те из них, кто на этом старте реально заявлен.
  */
-export function useEffectivePlan(orgCompIds: number[], saved: StartListPlan | null) {
+export function useEffectivePlan(
+  orgCompIds: number[],
+  saved: StartListPlan | null,
+  /**
+   * Пловцы, которых надо ЗАГРУЗИТЬ, но которые в состав не входят — состав, приехавший
+   * ссылкой (`?plan=`). Ссылку открывает чужой человек: этих пловцов нет ни в его
+   * избранном, ни в его сохранённом плане, и без них карточка приходила пустой
+   * («Nothing on this day»), а чип состава показывал `#6601` вместо имени.
+   *
+   * На сам состав это не влияет: правило «ссылка не перезаписывает план получателя»
+   * держится тем, что `sharedPlan` показывается мимо `plan`, а в дефолт из избранного
+   * попадают только избранные (`defaultPlanFromFavorites`).
+   */
+  alsoLoadSwimmerIds: readonly number[] = [],
+) {
   const { favorites, primarySwimmerId } = useFavoritesContext();
 
   const favSwimmerIds = useMemo(
@@ -32,8 +46,8 @@ export function useEffectivePlan(orgCompIds: number[], saved: StartListPlan | nu
   // Карточки грузим и на избранных, и на тех, кого добавили поиском: и те и другие могут
   // оказаться в составе, а имя с днями нужно обоим экранам.
   const rowIds = useMemo(
-    () => [...new Set([...favSwimmerIds, ...(saved?.swimmer_ids ?? [])])],
-    [favSwimmerIds.join(','), (saved?.swimmer_ids ?? []).join(',')],
+    () => [...new Set([...favSwimmerIds, ...(saved?.swimmer_ids ?? []), ...alsoLoadSwimmerIds])],
+    [favSwimmerIds.join(','), (saved?.swimmer_ids ?? []).join(','), [...alsoLoadSwimmerIds].join(',')],
   );
 
   const { data: swimmers, loading: swimmersLoading } = useStartListSwimmers(orgCompIds, rowIds);
