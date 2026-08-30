@@ -54,6 +54,9 @@ export interface StartListEvent {
 export interface StartListDay {
   date: string;
   events: StartListEvent[];
+  /** Начало разминки в этот день (UTC) — вводится руками в админке (Т1). Из него считается
+   *  «приезжать к» (минус 30 минут). null — не введено, блок ARRIVE BY не рисуется. */
+  warm_up_at: string | null;
 }
 
 export interface StartListProgramme {
@@ -62,6 +65,9 @@ export interface StartListProgramme {
   days: StartListDay[];
   entries: number;
   updated_at: string | null;
+  /** Чемпионат ли это — одно из трёх условий блока ARRIVE BY. Значение действующее:
+   *  ручная правка админа сильнее того, что определил забор по регламенту. */
+  is_championship: boolean;
 }
 
 export interface StartListHeat {
@@ -89,6 +95,15 @@ export interface StartListSwimmer {
   first_start_at: string | null;
   swims: StartListSwim[];
   updated_at: string | null;
+}
+
+/** Клуб на соревновании — строка секции «follow a whole club» пикера (Т2). */
+export interface StartListClub {
+  club_id: number;
+  club_name: string;
+  swimmers: number;
+  /** Заплывы клуба; ноги эстафеты — ОДИН заплыв, а не четыре (склейка на сервере). */
+  entries: number;
 }
 
 /** Строка выдачи поиска по имени внутри соревнования (все источники сразу). */

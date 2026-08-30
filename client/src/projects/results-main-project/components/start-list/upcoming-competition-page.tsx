@@ -20,12 +20,14 @@ export default function UpcomingCompetitionPage({ orgCompId }: { orgCompId: numb
   const { data } = useStartListProgramme(orgCompId);
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--theme-mode-page-bg)' }}>
+    // Цвет текста — парным токеном фона (правило парных токенов, client/CLAUDE.md):
+    // без него в dark заголовок и подпись оставались тёмными по тёмному.
+    <div style={{ minHeight: '100vh', background: 'var(--theme-mode-page-bg)', color: 'var(--theme-mode-text)' }}>
       <AppTopbar />
       <div className={PAGE_CONTAINER}>
         <div className="mt-4 mb-3">
           <h1 className="text-xl font-black">{data?.comp_name ?? 'Upcoming competition'}</h1>
-          <p className="text-xs opacity-60">
+          <p className="text-xs" style={{ color: 'var(--theme-mode-text-secondary)' }}>
             This meet has not started yet — results are not available. Showing the start list only.
           </p>
         </div>

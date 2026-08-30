@@ -4,8 +4,12 @@
 
 import type { StartListEvent, StartListSwim } from './types';
 
-/** Минуты «на разминку» до первого старта — эвристика, не данные источника (решение шага 1.4). */
-export const ARRIVE_BUFFER_MINUTES = 45;
+/**
+ * За сколько приезжать до начала разминки (шаг Т8, §2 хендоффа). Не эвристика: время самой
+ * разминки берётся из справки о старте, которую админ вводит по регламенту, а эти 30 минут
+ * — правило витрины, одно на все соревнования.
+ */
+export const WARM_UP_LEAD_MINUTES = 30;
 
 /** «≈14:45» по местному времени браузера; null/невалидная дата → «time TBA» (заплыву время
  *  ещё не назначили — это норма, не ошибка данных). */
@@ -18,15 +22,26 @@ export function formatApproxTime(iso: string | null | undefined): string {
   return `≈${hh}:${mm}`;
 }
 
-/** Время «приезжать к» — первый старт минус буфер разминки; null, если старта ещё нет. */
-export function arriveByTime(firstStartIso: string | null | undefined): string | null {
-  if (!firstStartIso) return null;
-  const d = new Date(firstStartIso);
+/** «08:00» — час без «≈»: разминка назначена регламентом, а не плавает вместе с заплывами. */
+export function formatExactTime(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  const arrive = new Date(d.getTime() - ARRIVE_BUFFER_MINUTES * 60_000);
-  const hh = String(arrive.getHours()).padStart(2, '0');
-  const mm = String(arrive.getMinutes()).padStart(2, '0');
-  return `${hh}:${mm}`;
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/**
+ * «Приезжать к» — начало разминки минус <see cref="WARM_UP_LEAD_MINUTES"/>.
+ *
+ * ⚠ Считается ТОЛЬКО от разминки. Прежняя версия брала первый старт минус 45 минут — число
+ * было выдумано, а витрина показывала его как точное; теперь без введённой разминки блока
+ * просто нет (шаг Т8).
+ */
+export function arriveByWarmUp(warmUpIso: string | null | undefined): string | null {
+  if (!warmUpIso) return null;
+  const d = new Date(warmUpIso);
+  if (Number.isNaN(d.getTime())) return null;
+  return formatExactTime(new Date(d.getTime() - WARM_UP_LEAD_MINUTES * 60_000).toISOString());
 }
 
 /**
