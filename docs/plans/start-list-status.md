@@ -4,10 +4,10 @@
 Замысел, разбор развилок и обоснования — в [`start-list-plan.md`](start-list-plan.md);
 здесь только «что есть сейчас, как этим пользоваться и что осталось».
 
-**Состояние на 28.08.2026: С1–С10 сделаны, тесты 1542/1542, 10 коммитов в ветке
-`season-best-list-and-shared-filters`, НЕ запушено. Не сделан С0 — см. §6.
-Сверху доделано: НЕСКОЛЬКО ИСТОЧНИКОВ на одно соревнование (§7) — таблица
-`CompetitionSources`, подтабы в табе Start list, кнопка «⇄ Источники» в админке.**
+**Состояние на 30.08.2026: С1–С10 сделаны + РЕДИЗАЙН ТАБА Т1–Т12 (личный план «билет»),
+тесты 1573/1573, ветка `season-best-list-and-shared-filters`, НЕ запушено.
+Не сделан С0 — см. §6. Замысел редизайна и его решения —
+[`start-list-ticket-plan.md`](start-list-ticket-plan.md).**
 
 ---
 
@@ -16,8 +16,13 @@
 Перед соревнованием тянем с loglig стартовый протокол — кто, в каком заплыве, на какой
 дорожке и во сколько плывёт, — и показываем это родителю по ссылке, без логина.
 
-Три уровня одного экрана: программа дня → заплыв с дорожками → карточка пловца
-(«первый старт ≈11:24, приезжать к 10:39»). Плюс срез клуба и «ближайшие старты» избранных.
+**Главный экран таба — личный план («билет»)**: за кем следить (несколько пловцов + клубы
+целиком), дни-чипы, первый старт крупно, строки заплывов формата D3 и — на чемпионате
+залогиненному — «во сколько приезжать». Он открывается САМ, как только состав известен:
+сохранённый план либо дефолт из избранного.
+
+Под ним остались три уровня приближения: программа дня → заплыв с дорожками → карточка
+пловца. Плюс срез клуба, «ближайшие старты» избранных и экран «протокол ещё не опубликован».
 
 ---
 
@@ -52,7 +57,9 @@
 | Карточка пловца (ссылка родителю) | `…/competitions/upcoming/{orgCompId}?swimmer={swimmerId}` |
 | Конкретный заплыв | `…?heat={orgDisciplineId}` |
 | У импортированного соревнования | `http://localhost:5173/competitions/{id}?tab=startlist` |
+| **Соревнование целиком (все дни и протоколы)** | `http://localhost:5173/results?eventId={eventId}&tab=startlist` |
 | Конкретный источник составного старта | `…?tab=startlist&src={orgCompId}` |
+| **Готовый план ссылкой** (Т10) | `…?tab=startlist&plan=s{swimmerId},c{clubId}` |
 
 ⚠ `{orgCompId}` — это **compID сайта федерации**, а не наш `Competitions.Id`. Разные
 пространства чисел; отдельный сегмент `upcoming` их и разводит.
@@ -64,6 +71,8 @@ GET /api/start-list/competitions?days=60          предстоящие сор�
 GET /api/start-list/{orgCompId}                   программа дня
 GET /api/start-list/{orgCompId}/events/{id}       заплыв с дорожками
 GET /api/start-list/{orgCompId}/swimmers/{id}     карточка пловца
+GET /api/start-list/{orgCompId}/clubs             клубы старта со счётчиками (Т2)
+GET /api/start-list/clubs?orgCompId=1&orgCompId=2  то же по всем источникам (Т2)
 GET /api/start-list/{orgCompId}/clubs/{id}        срез клуба
 GET /api/start-list/upcoming?swimmerId=1&days=21  ближайшие старты (favorites)
 GET /api/start-list/search?orgCompId=1&q=ivan       поиск пловца по имени (все источники)
@@ -106,7 +115,9 @@ English» это не противоречит: то — про строки и�
 | Расписание | `StartListScheduleService.cs` (логика) + `Swimm.API/BackgroundServices/CompetitionDiscoveryBackgroundService.cs` (только тик) |
 | Сшивка | `StartListStitchService.cs`, вызов в конце `JsonImportService`; проверка `DataChecks/StartListDataChecks.cs` |
 | Публичный API | `Swimm.API/Controllers/StartListController.cs`, `Repositories/StartListPublicRepository.cs` |
-| Клиент | `client/src/projects/results-main-project/components/start-list/` (5 файлов), `swimmer-project/components/swimmer-upcoming-starts.tsx` |
+| Клиент | `client/src/projects/results-main-project/components/start-list/` (маршрутизатор `start-list-tab.tsx`; экраны плана `following-picker` / `plan-card` / `swim-row-d3` / `not-published`; зумы `programme-zoom` / `heat-zoom` / `swimmer-zoom`; чистая модель `plan-model.ts`; швы `use-start-list*.ts`), `swimmer-project/components/swimmer-upcoming-starts.tsx` |
+| Справка о старте (чемпионат + разминка) | `Swimm.Domain/Entities/CompetitionMeetInfo.cs`, `Infrastructure/Services/MeetInfoAdminService.cs`, миграция `20260829181829_CompetitionMeetInfo`; кнопка «Разминка» на `/Admin/Competitions` |
+| Личный план пользователя | `Swimm.Domain/Entities/UserStartListPlan.cs`, `Repositories/StartListPlanRepository.cs`, `Swimm.API/Controllers/StartListPlansController.cs`, миграция `20260830050653_UserStartListPlans` |
 | Источники (compID→соревнование) | `Swimm.Domain/Entities/CompetitionSource.cs`, `Swimm.Infrastructure/Services/CompetitionSourceAdminService.cs`, `Swimm.API/Controllers/CompetitionSourcesAdminController.cs` |
 | Задания исполнителю | `docs/tasks/start-list-{ops,ui}-sonnet.md` |
 

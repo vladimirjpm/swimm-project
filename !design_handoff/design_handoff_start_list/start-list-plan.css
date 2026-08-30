@@ -1,0 +1,72 @@
+/* start-list-plan.css — токены и классы-рецепты карточки плана «3a Ticket + Following».
+   Маппинг хардкодов макета (Start List.dc.html) на токены тем.
+   Личное золото — существующие --theme-personal-* (уже в client/src/index.css);
+   cyan/структура — Deep-пары (deep-theme.css). Хардкоды из макета в коде запрещены. */
+
+/* ── Маппинг цветов макета → токены ─────────────────────────────
+   #fffdf6                → var(--theme-personal-bg)
+   rgba(212,175,55,.45)   → var(--theme-personal-border)
+   #8a6d1a                → var(--theme-personal-accent)
+   rgba(212,175,55,.18)   → var(--theme-personal-badge-bg)
+   #0e7490 / #22d3ee      → var(--deep-accent)  (light / dark)
+   rgba(14,116,144,.07)   → var(--deep-accent-soft)
+   rgba(14,116,144,.4)    → var(--deep-accent-border)
+   #04283e                → var(--deep-text)
+   #7b95a3                → var(--deep-text-mute)
+   #9db0bb                → var(--deep-text-faint)
+   #fff / #f9fbfd         → var(--deep-card-bg) / var(--deep-card-bg-raised)
+   #e0ecf2                → var(--deep-card-border)
+   #eef4f8                → var(--deep-divider)
+   #b91c1c (дистанция)    → цвет из UI_SwimmStyleIcon, не переопределять
+   Archivo Black          → var(--deep-font-display)                       */
+
+/* ── Билет ── */
+.sl-ticket { background: var(--theme-personal-bg); border: 1px solid var(--theme-personal-border); border-radius: 18px; overflow: hidden; position: relative; }
+.sl-ticket__perforation { border-top: 2px dashed var(--theme-personal-border); position: relative; }
+.sl-ticket__notch { position: absolute; top: -9px; width: 18px; height: 18px; border-radius: 999px; background: var(--deep-page-bg); }
+.sl-ticket__notch--left { left: -9px; border-right: 1px solid var(--theme-personal-border); }
+.sl-ticket__notch--right { right: -9px; border-left: 1px solid var(--theme-personal-border); }
+.sl-hero-time { font-family: var(--deep-font-display); font-size: 44px; line-height: 1; color: var(--deep-text); font-variant-numeric: tabular-nums; }
+.sl-hero-label { font-size: 9.5px; font-weight: 900; letter-spacing: .09em; color: var(--theme-personal-accent); }
+.sl-arrive-by { background: var(--theme-personal-badge-bg); border-radius: 12px; padding: 8px 12px; }
+.sl-arrive-by__time { font-family: var(--deep-font-display); font-size: 20px; color: var(--theme-personal-accent); font-variant-numeric: tabular-nums; }
+
+/* ── Дни-чипы (мелкие, 1-я строка карточки) ── */
+.sl-day { border-radius: 10px; padding: 5px 4px; font-size: 11px; font-weight: 800; background: var(--deep-card-bg); border: 1px solid var(--deep-card-border); color: var(--deep-text); }
+.sl-day--active { background: var(--theme-personal-bg); border-color: var(--theme-personal-border); color: var(--theme-personal-accent); font-weight: 900; }
+.sl-day--empty { opacity: .35; pointer-events: none; } /* НИКТО из выбранных не плывёт */
+
+/* ── Чипы состава (2-я строка) ── */
+.sl-chip { white-space: nowrap; border-radius: 999px; padding: 6px 11px; font-size: 12.5px; font-weight: 800; cursor: pointer; }
+.sl-chip--favorite { color: var(--theme-personal-accent); background: var(--theme-personal-badge-bg); border: 1px solid var(--theme-personal-border); }
+.sl-chip--club { color: var(--deep-accent); background: var(--deep-accent-soft); border: 1px solid var(--deep-accent-border); }
+.sl-chip--edit { color: var(--deep-accent-ink); background: var(--deep-accent); border: 1px solid var(--deep-accent); font-weight: 900; }
+
+/* ── Строка заплыва, формат D3: grid 74px | 1fr ── */
+.sl-row { display: grid; grid-template-columns: 74px minmax(0,1fr); gap: 10px; align-items: center; padding: 10px; border-radius: 12px; background: var(--deep-card-bg); border: 1px solid var(--theme-personal-border); }
+.sl-row--favorite { background: var(--theme-personal-bg); }
+.sl-row--no-show { opacity: .45; }              /* + line-through на имени + бейдж */
+.sl-row__time { align-self: stretch; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: var(--deep-divider); font-family: var(--deep-font-display); font-size: 16px; color: var(--deep-text); font-variant-numeric: tabular-nums; }
+.sl-row--favorite .sl-row__time { background: var(--theme-personal-badge-bg); }
+/* 1-я строка правой колонки: UI_SwimmStyleIcon (icon-len, ~54px) + метка */
+.sl-row__meta { font-size: 12.5px; font-weight: 800; color: var(--deep-text); } /* «Girls 9 · H3 · 1:24.90 PB» — БЕЗ nowrap */
+/* строки имён: по одной на пловца; в групповом заплыве несколько */
+.sl-row__name { font-size: 15px; font-weight: 800; color: var(--deep-text); text-align: left; } /* dir="auto"; фаворит: 900 + ⭐ */
+.sl-row__lane { font-family: var(--deep-font-display); font-size: 15px; font-variant-numeric: tabular-nums; color: var(--deep-accent); }
+.sl-row--favorite .sl-row__lane { color: var(--theme-personal-accent); }
+.sl-tag { font-size: 10px; font-weight: 900; color: var(--deep-accent); } /* · CLUB / · RELAY */
+
+/* ── Статусы ── */
+.sl-badge-no-show { font-size: 9px; font-weight: 900; letter-spacing: .06em; color: var(--deep-text-mute); background: var(--deep-divider); border-radius: 999px; padding: 3px 8px; }
+.sl-badge-swum { font-size: 9px; font-weight: 900; letter-spacing: .06em; color: var(--deep-accent); background: var(--deep-accent-soft); border-radius: 999px; padding: 3px 8px; }
+.sl-badge-pb { font-size: 10px; font-weight: 900; color: var(--theme-personal-accent); background: var(--theme-personal-badge-bg); border-radius: 999px; padding: 2px 7px; }
+
+/* ── Пикер Following ── */
+.sl-pick-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--deep-card-bg); border: 1px solid var(--deep-card-border); cursor: pointer; }
+.sl-pick-row--selected { background: var(--theme-personal-bg); border-color: var(--theme-personal-border); }
+.sl-checkbox { width: 20px; height: 20px; border-radius: 6px; border: 1px solid var(--deep-card-border); background: var(--deep-card-bg); }
+.sl-checkbox--checked { background: var(--theme-personal-accent); color: #fff; border-color: var(--theme-personal-accent); }
+.sl-cta { background: var(--deep-accent); color: var(--deep-accent-ink); border-radius: 12px; padding: 12px; font-size: 13px; font-weight: 900; text-align: center; }
+
+/* Share link в шапке */
+.sl-share { background: var(--deep-accent); color: var(--deep-accent-ink); border-radius: 999px; padding: 6px 12px; font-size: 11.5px; font-weight: 900; }
