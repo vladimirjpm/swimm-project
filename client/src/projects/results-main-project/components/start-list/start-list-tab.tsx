@@ -191,7 +191,11 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
   }, [planLoading, effective.loading, effective.isEmpty, state.zoom]);
 
   return (
-    <div className={deepThemeClass}>
+    // Цвет текста задаётся ЯВНО: на контейнере страницы результатов висит легаси-класс
+    // `.dolphine-training`, а в `results-table.css` он красит текст в green — и всё, что
+    // своего цвета не ставит, наследовало его. Карточка плана красит себя сама, поэтому
+    // зелёной была только программа. Токен парный фону таба (`--deep-page-bg`).
+    <div className={deepThemeClass} style={{ color: 'var(--deep-text)' }}>
       {/* Единственная кнопка входа/выхода личного плана. На экранах плана она ведёт назад,
           на остальных — внутрь: у родителя один вопрос за раз, и два способа попасть в
           одно место только путают. */}

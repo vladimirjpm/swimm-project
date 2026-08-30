@@ -87,6 +87,56 @@ export function swimLabel(distance: string, styleName: string): string {
   return `${distanceLabel(distance)} ${strokeLabel(styleName)}`;
 }
 
+/** Дисциплина программы: «50m freestyle» и все её заплывы по возрастам. */
+export interface ProgrammeGroup {
+  /** `50|freestyle` — дистанция и стиль, ключ группировки. */
+  key: string;
+  distance: string;
+  styleName: string;
+  /** События этой дисциплины в порядке времени (см. `sortEvents`). */
+  events: StartListEvent[];
+  /** Сумма заявок по всем возрастам дисциплины. */
+  entries: number;
+  /** Время первого события — по нему группа стоит в ленте дня. */
+  startAt: string | null;
+}
+
+/**
+ * Программа дня, сгруппированная по дисциплине (решение Влада 30.08.2026).
+ *
+ * Плоский список по времени — это восемьдесят почти одинаковых строк, в которых «50m
+ * freestyle» повторяется восемь раз подряд, по разу на возраст. Родитель ищет в нём
+ * дисциплину глазами. Сгруппированный: «50m freestyle» один раз, внутри — во сколько и
+ * какая группа плывёт.
+ *
+ * Порядок групп — по ПЕРВОМУ событию, то есть хронологический: день не должен перестать
+ * читаться сверху вниз только потому, что строки собрали в пачки. Внутри группы порядок
+ * тот же `sortEvents` (без времени — в хвост по номеру заплыва).
+ */
+export function groupEventsByDiscipline(events: StartListEvent[]): ProgrammeGroup[] {
+  const groups = new Map<string, ProgrammeGroup>();
+
+  for (const e of sortEvents(events)) {
+    const key = `${e.distance}|${e.style_name}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        key,
+        distance: e.distance,
+        styleName: e.style_name,
+        events: [],
+        entries: 0,
+        startAt: e.start_at,
+      };
+      groups.set(key, group);
+    }
+    group.events.push(e);
+    group.entries += e.entries;
+  }
+
+  return [...groups.values()];
+}
+
 /** Строка ленты зума 1 (макет §4.1): «≈HH:MM · #номер · дистанция + стиль · категория». */
 export function eventLineLabel(e: StartListEvent): string {
   const num = e.event_number != null ? `#${e.event_number}` : '#—';

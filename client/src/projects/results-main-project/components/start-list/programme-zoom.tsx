@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import UI_SwimmStyleIcon from '../../../components/mix/swimm-style-icon/swimm-style-icon';
 import NotPublished from './not-published';
 import RefreshBar from './refresh-bar';
 import { useStartListProgramme } from './use-start-list';
-import { dayLabel, formatApproxTime, formatExactTime, sortEvents, swimLabel } from './start-list-helpers';
+import { bandLabel } from './plan-model';
+import { dayLabel, formatApproxTime, formatExactTime, groupEventsByDiscipline, swimLabel } from './start-list-helpers';
 
 /**
  * Зум 1 — программа соревнования по времени (§4.1 плана), умолчание таба.
@@ -58,12 +60,12 @@ export default function ProgrammeZoom({ orgCompId, startsLabel, notify, onPublis
   }
 
   const day = data.days[dayIdx] ?? data.days[0];
-  const events = day ? sortEvents(day.events) : [];
+  const groups = day ? groupEventsByDiscipline(day.events) : [];
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="text-sm font-bold">{data.comp_name} · {data.entries} entries</div>
+      <div className="mb-2 text-[12.5px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
+        {data.comp_name} · {data.entries} entries
       </div>
       <RefreshBar updatedAt={data.updated_at} onRefresh={refresh} />
       {data.days.length > 1 && (
@@ -73,35 +75,80 @@ export default function ProgrammeZoom({ orgCompId, startsLabel, notify, onPublis
               key={d.date}
               type="button"
               onClick={() => setDayIdx(i)}
-              className={`rounded-full border px-3 py-1 text-xs font-bold ${i === dayIdx ? 'opacity-100' : 'opacity-60'}`}
-              style={{ borderColor: 'var(--theme-mode-border-input)' }}
+              className="rounded-full border px-3 py-1 text-xs font-black"
+              style={{
+                borderColor: i === dayIdx ? 'var(--deep-accent-border)' : 'var(--deep-card-border)',
+                background: i === dayIdx ? 'var(--deep-accent-soft)' : 'transparent',
+                color: i === dayIdx ? 'var(--deep-accent)' : 'var(--deep-text-mute)',
+              }}
             >
               {dayLabel(d.date)}
             </button>
           ))}
         </div>
       )}
-      <div className="divide-y" style={{ borderColor: 'var(--theme-mode-border-input)' }}>
-        {events.map((e) => (
-          <button
-            key={e.org_discipline_id}
-            type="button"
-            onClick={() => onOpenEvent(e.org_discipline_id)}
-            className="flex w-full items-center gap-3 py-2.5 text-left"
-          >
-            <div className="w-16 shrink-0 text-sm font-black">{formatApproxTime(e.start_at)}</div>
-            <div className="w-10 shrink-0 text-center text-sm font-extrabold opacity-80">
-              {e.event_number != null ? `#${e.event_number}` : '—'}
-            </div>
-            <div className="min-w-0 flex-1 text-sm">
-              {swimLabel(e.distance, e.style_name)} {e.event_category ? `· ${e.event_category}` : ''}
-            </div>
-            <div className="shrink-0 text-xs opacity-70">{e.entries} entries</div>
-            <div className="shrink-0 opacity-40">›</div>
-          </button>
-        ))}
-        {events.length === 0 && <div className="py-4 text-center text-sm opacity-60">Nothing scheduled for this day.</div>}
-      </div>
+
+      {/* Дисциплина = карточка, внутри — её возрасты. Оформление то же, что у строки плана
+          (D3): плитка времени слева, метки справа — чтобы два экрана таба читались как один. */}
+      {groups.map((g) => (
+        <div
+          key={g.key}
+          className="mb-2 rounded-[12px] border p-2.5"
+          style={{ background: 'var(--deep-card-bg)', borderColor: 'var(--deep-card-border)' }}
+        >
+          <div className="flex items-center gap-2">
+            <UI_SwimmStyleIcon
+              styleName={g.styleName}
+              styleType="icon-len"
+              styleLen={g.distance}
+              className="w-[72px] shrink-0 text-[16px] sm:w-[84px] sm:text-[18px]"
+            />
+            {/* Заголовок переносится, а не обрезается: «100m individual medley» на узком
+                экране не влезает, и «100m individual …» — худшее из двух зол. */}
+            <span className="min-w-0 flex-1 text-[13px] font-extrabold leading-[1.25]">
+              {swimLabel(g.distance, g.styleName)}
+            </span>
+            <span className="shrink-0 text-[11px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
+              <span className="hidden sm:inline">
+                {g.events.length} {g.events.length === 1 ? 'event' : 'events'} ·{' '}
+              </span>
+              {g.entries} entries
+            </span>
+          </div>
+
+          {g.events.map((e) => (
+            <button
+              key={e.org_discipline_id}
+              type="button"
+              onClick={() => onOpenEvent(e.org_discipline_id)}
+              className="mt-1.5 flex w-full items-baseline gap-2 text-left"
+              dir="ltr"
+            >
+              <span
+                className="w-[74px] shrink-0 text-[13px] font-black tabular-nums"
+                style={{ fontFamily: 'var(--deep-font-display)' }}
+              >
+                {formatApproxTime(e.start_at)}
+              </span>
+              {/* Категория ПО-АНГЛИЙСКИ: `event_category` источника ивритский («בנות 11»),
+                  и на витрину он не идёт — то же правило, что в строке плана. */}
+              <span className="min-w-0 flex-1 truncate text-[14px] font-bold">
+                {bandLabel(e.gender, e.age_band)}
+              </span>
+              <span className="shrink-0 text-[11px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
+                {e.event_number != null ? `#${e.event_number} · ` : ''}{e.entries} entries
+              </span>
+              <span className="shrink-0 text-[13px] font-black" style={{ color: 'var(--deep-accent)' }}>›</span>
+            </button>
+          ))}
+        </div>
+      ))}
+
+      {groups.length === 0 && (
+        <div className="py-4 text-center text-sm" style={{ color: 'var(--deep-text-mute)' }}>
+          Nothing scheduled for this day.
+        </div>
+      )}
     </div>
   );
 }
