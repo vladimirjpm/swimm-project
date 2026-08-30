@@ -82,6 +82,14 @@ public class StartListPublicRepository : IStartListPublicRepository
         var rows = await BaseQuery().Where(e => e.OrgCompId == orgCompId).ToListAsync(ct);
         if (rows.Count == 0) return null;
 
+        // Справка о старте (Т1): чемпионат + разминка по дням. Её может не быть вовсе —
+        // тогда флаг false, а разминки null, и блок ARRIVE BY на витрине не рисуется.
+        var meet = await _read.CompetitionMeetInfos.AsNoTracking()
+            .Include(m => m.WarmUps)
+            .FirstOrDefaultAsync(m => m.OrgCompId == orgCompId, ct);
+        var warmUps = meet?.WarmUps.ToDictionary(w => w.Date.Date, w => w.WarmUpAt)
+            ?? new Dictionary<DateTime, DateTime>();
+
         var days = rows
             .GroupBy(e => e.CompDate.Date)
             .OrderBy(g => g.Key)
@@ -93,12 +101,14 @@ public class StartListPublicRepository : IStartListPublicRepository
                     // программы, иначе они молча всплыли бы в начало дня.
                     .OrderBy(e => e.StartAt ?? DateTime.MaxValue)
                     .ThenBy(e => e.EventNumber ?? int.MaxValue)
-                    .ToList())
+                    .ToList(),
+                warmUps.TryGetValue(day.Key, out var warmUp) ? warmUp : null)
             )
             .ToList();
 
         return new StartListProgrammeDto(
-            orgCompId, rows[0].CompName, days, rows.Count, rows.Max(e => e.PulledAt));
+            orgCompId, rows[0].CompName, days, rows.Count, rows.Max(e => e.PulledAt),
+            meet?.ChampionshipEffective ?? false);
     }
 
     public async Task<StartListEventHeatsDto?> GetEventAsync(
@@ -161,6 +171,42 @@ public class StartListPublicRepository : IStartListPublicRepository
             .ThenBy(e => e.OrgEventNumber ?? int.MaxValue)
             .ThenBy(e => e.Lane)
             .Select(ToSwim)
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<StartListClubDto>> GetClubsAsync(
+        IReadOnlyCollection<int> orgCompIds, CancellationToken ct = default)
+    {
+        // Группировка в памяти, как в GetUpcomingCompetitionsAsync и по той же причине:
+        // счётчики строятся на Distinct().Count() внутри группы, а такую проекцию EF
+        // транслирует не всегда — и падает уже на живой БД, тогда как in-memory провайдер
+        // выполняет её как обычный LINQ. Объём — заявки одного старта (тысячи строк).
+        var rows = await _read.CompetitionEntries.AsNoTracking()
+            .Where(e => orgCompIds.Contains(e.OrgCompId))
+            .Select(e => new
+            {
+                e.ClubId,
+                Name = e.Club.Name,
+                NameEn = e.Club.NameEn,
+                e.SwimmerId,
+                e.OrgCompId,
+                e.OrgDisciplineId,
+                e.Heat,
+                e.Lane
+            })
+            .ToListAsync(ct);
+
+        return rows
+            .GroupBy(r => r.ClubId)
+            .Select(g => new StartListClubDto(
+                g.Key,
+                g.First().Name.Length > 0 ? g.First().Name : g.First().NameEn,
+                g.Select(r => r.SwimmerId).Distinct().Count(),
+                // Ключ заплыва — вместе с OrgCompId: у составного старта номера дисциплин
+                // принадлежат РАЗНЫМ протоколам и совпадают между ними.
+                g.Select(r => (r.OrgCompId, r.OrgDisciplineId, r.Heat, r.Lane)).Distinct().Count()))
+            .OrderByDescending(c => c.Entries)
+            .ThenBy(c => c.ClubName)
             .ToList();
     }
 

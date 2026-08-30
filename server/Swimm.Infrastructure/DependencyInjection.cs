@@ -72,6 +72,8 @@ public static class DependencyInjection
         services.AddScoped<ISeasonBestRepository, SeasonBestRepository>();
         services.AddScoped<ISwimmerPageRepository, SwimmerPageRepository>();
         services.AddScoped<IUserFavoriteRepository, UserFavoriteRepository>();
+        // Персональный план на соревнование в табе Start list (Т3)
+        services.AddScoped<IStartListPlanRepository, StartListPlanRepository>();
         services.AddScoped<IUserMediaRepository, UserMediaRepository>();
         services.AddScoped<IMySwimsRepository, MySwimsRepository>();
         services.AddScoped<IReactionRepository, ReactionRepository>();
@@ -175,6 +177,8 @@ public static class DependencyInjection
         services.AddScoped<IStartListPullService, StartListPullService>();
         services.AddScoped<IStartListStitchService, StartListStitchService>();
         services.AddScoped<IStartListScheduleService, StartListScheduleService>();
+        // Справка о старте: разминка руками + переопределение флага «чемпионат» (Т1)
+        services.AddScoped<IMeetInfoAdminService, MeetInfoAdminService>();
 
         // «Затянуть» одну строку входящих — общий путь одиночной кнопки и пакетного забора
         services.AddScoped<IDiscoveryPreviewService, DiscoveryPreviewService>();

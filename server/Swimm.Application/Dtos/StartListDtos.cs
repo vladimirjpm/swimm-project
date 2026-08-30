@@ -102,9 +102,15 @@ public sealed record StartListEventDto(
     [property: JsonPropertyName("heats")] int Heats);
 
 /// <summary>Один день программы. У однодневного старта он единственный.</summary>
+/// <param name="WarmUpAt">
+/// Начало разминки в этот день (UTC) — из <c>CompetitionMeetInfos</c>/<c>CompetitionWarmUps</c>,
+/// вводится руками в админке (шаг Т1). Из него витрина считает «приезжать к» (минус 30 минут).
+/// null — не введено, и это обычное состояние: блок ARRIVE BY тогда не рисуется.
+/// </param>
 public sealed record StartListDayDto(
     [property: JsonPropertyName("date")] DateTime Date,
-    [property: JsonPropertyName("events")] IReadOnlyList<StartListEventDto> Events);
+    [property: JsonPropertyName("events")] IReadOnlyList<StartListEventDto> Events,
+    [property: JsonPropertyName("warm_up_at")] DateTime? WarmUpAt = null);
 
 /// <summary>
 /// Программа соревнования целиком (зум 1).
@@ -114,12 +120,17 @@ public sealed record StartListDayDto(
 /// посев меняется до последнего дня, а механизма дожать изменение до уже открытой страницы
 /// в проекте нет (§5 плана).
 /// </param>
+/// <param name="IsChampionship">
+/// Чемпионат ли это — одно из трёх условий блока ARRIVE BY (шаг Т1). Значение действующее:
+/// ручная правка администратора сильнее того, что определил забор по регламенту.
+/// </param>
 public sealed record StartListProgrammeDto(
     [property: JsonPropertyName("org_comp_id")] int OrgCompId,
     [property: JsonPropertyName("comp_name")] string CompName,
     [property: JsonPropertyName("days")] IReadOnlyList<StartListDayDto> Days,
     [property: JsonPropertyName("entries")] int Entries,
-    [property: JsonPropertyName("updated_at")] DateTime? UpdatedAt);
+    [property: JsonPropertyName("updated_at")] DateTime? UpdatedAt,
+    [property: JsonPropertyName("is_championship")] bool IsChampionship = false);
 
 /// <summary>Один заплыв с дорожками (зум 2): «с кем плывёт мой».</summary>
 public sealed record StartListHeatDto(
@@ -135,6 +146,25 @@ public sealed record StartListEventHeatsDto(
     [property: JsonPropertyName("event")] StartListEventDto Event,
     [property: JsonPropertyName("heats")] IReadOnlyList<StartListHeatDto> Heats,
     [property: JsonPropertyName("updated_at")] DateTime? UpdatedAt);
+
+/// <summary>
+/// Клуб на соревновании — строка секции «follow a whole club» пикера (шаг Т2).
+/// </summary>
+/// <param name="ClubName">
+/// Ивритское имя по умолчанию, английское — фоллбек: то же правило, что у имён пловцов
+/// (решение Влада 28.08.2026). Название клуба — данные, а не строка интерфейса.
+/// </param>
+/// <param name="Swimmers">Сколько РАЗНЫХ пловцов клуба заявлено.</param>
+/// <param name="Entries">
+/// Сколько заплывов клуба в программе. Ноги эстафеты — ОДИН заплыв, а не четыре: у команды
+/// четыре строки с одной парой заплыв+дорожка, и считать их порознь значит завышать клуб
+/// с эстафетами (та же склейка, что <c>mergeRelayLanes</c> на витрине).
+/// </param>
+public sealed record StartListClubDto(
+    [property: JsonPropertyName("club_id")] int ClubId,
+    [property: JsonPropertyName("club_name")] string ClubName,
+    [property: JsonPropertyName("swimmers")] int Swimmers,
+    [property: JsonPropertyName("entries")] int Entries);
 
 /// <summary>
 /// Найденный пловец — строка выдачи поиска по имени внутри соревнования.

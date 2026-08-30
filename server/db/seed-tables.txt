@@ -14,9 +14,12 @@ ClubCompetitionStandings
 Clubs
 CompetitionEntries
 CompetitionEvents
+CompetitionMeetInfos
 CompetitionNoteTexts
 CompetitionNotes
 CompetitionResultUrls
+CompetitionSources
+CompetitionWarmUps
 Competitions
 Countries
 Galleries
@@ -48,7 +51,7 @@ Sys_StartListPulls           # журнал заборов стартового 
 # Аккаунты и всё, что на них висит — в проде заводятся заново:
 #   Sys_AppUsers, Sys_AppUserRoles, Sys_UserExternalLogins, Sys_UserLocalCredentials,
 #   Sys_UserSecurityTokens, Sys_UserLoginHistory, Sys_UserFavorites, Sys_UserMedia,
-#   Sys_UserMediaPublications, Sys_UserReactions
+#   Sys_UserMediaPublications, Sys_UserReactions, Sys_UserStartListPlans
 #
 # Журнал действий администраторов (ActorName / ActorUserId / IpAddress):
 #   Sys_AdminAudit

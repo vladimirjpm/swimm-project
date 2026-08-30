@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
@@ -38,22 +39,26 @@ public sealed class StartListPullService : IStartListPullService
     private const string NoClubName = "No club";
 
     /// <summary>
-    /// Источник печатает время старта БЕЗ часового пояса — это местное израильское время.
-    /// Перевод в UTC делается здесь, один раз: дальше по системе ходит уже момент времени.
+    /// Как часто перечитывать регламент. Забор идемпотентен и запускается хоть каждый час
+    /// (посев меняется до последнего дня), а регламент за это время не меняется — качать
+    /// PDF на каждый прогон значит платить за одно и то же.
     /// </summary>
-    private static readonly TimeZoneInfo IsraelTimeZone = ResolveIsraelTimeZone();
+    private static readonly TimeSpan RegulationRecheckAfter = TimeSpan.FromDays(7);
 
     private readonly SwimmDbContext _db;
     private readonly ICompetitionDiscoveryProvider _provider;
+    private readonly IRegulationFetchService _regulations;
     private readonly ILogger<StartListPullService> _logger;
 
     public StartListPullService(
         SwimmDbContext db,
         ICompetitionDiscoveryProvider provider,
+        IRegulationFetchService regulations,
         ILogger<StartListPullService> logger)
     {
         _db = db;
         _provider = provider;
+        _regulations = regulations;
         _logger = logger;
     }
 
@@ -72,6 +77,11 @@ public sealed class StartListPullService : IStartListPullService
             return await FinishAsync(Empty(orgCompId, null,
                 "У соревнования нет loglig-id: детальная страница ещё не читалась либо на ней " +
                 "нет iframe. Нажмите «Обновить» во «Входящих»."), ct);
+
+        // Справка о старте (Т1): чемпионат ли это — по регламенту. Делается ДО заплывов и
+        // независимо от того, сделан ли посев: флаг нужен табу Start list и тогда, когда
+        // тянуть ещё нечего. Свои ошибки эта ветка глотает — регламент не повод завалить забор.
+        await RefreshMeetInfoAsync(orgCompId, logligId, ct);
 
         IReadOnlyList<LogligDisciplineGridRowDto> grid;
         try
@@ -147,6 +157,53 @@ public sealed class StartListPullService : IStartListPullService
             match.Added.Count, match.Moved.Count, match.Removed.Count, match.Matched.Count,
             resolution.SwimmersCreated, resolution.SwimmersStamped, resolution.ClubsUnmatched,
             pulledAt), ct);
+    }
+
+    // ── Справка о старте (Т1) ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Обновляет <see cref="CompetitionMeetInfo"/> по регламенту: чемпионат ли это.
+    ///
+    /// Три вещи, которые тут важны:
+    /// 1. <b>Ручную правку не трогаем.</b> Пишем только <c>IsChampionship</c> — то, что
+    ///    определил анализатор; решение админа живёт в <c>IsChampionshipOverride</c> и
+    ///    переживает любое число перезаборов.
+    /// 2. <b>Разминку не трогаем вовсе</b> — она вводится руками (решение Влада 29.08.2026).
+    /// 3. <b>«Регламента нет» не значит «не чемпионат».</b> Не прочитали — оставляем прошлое
+    ///    значение: обнулять флаг из-за оборванной сети значит менять вид витрины на пустом месте.
+    /// </summary>
+    private async Task RefreshMeetInfoAsync(int orgCompId, int logligId, CancellationToken ct)
+    {
+        try
+        {
+            var info = await _db.CompetitionMeetInfos
+                .FirstOrDefaultAsync(m => m.OrgCompId == orgCompId, ct);
+
+            var now = DateTime.UtcNow;
+            if (info?.RegulationCheckedAt is DateTime checkedAt &&
+                now - checkedAt < RegulationRecheckAfter)
+                return;
+
+            var fetched = await _regulations.FetchAsync(logligId, ct);
+
+            if (info is null)
+            {
+                info = new CompetitionMeetInfo { OrgCompId = orgCompId };
+                _db.CompetitionMeetInfos.Add(info);
+            }
+
+            info.RegulationCheckedAt = now;
+            info.UpdatedAt = now;
+            if (fetched.Url is { Length: > 0 }) info.RegulationUrl = fetched.Url;
+            if (fetched.Analysis is { } analysis) info.IsChampionship = analysis.IsChampionship;
+
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex,
+                "Стартовый протокол {OrgCompId}: справку о старте обновить не удалось", orgCompId);
+        }
     }
 
     // ── Справочники ──────────────────────────────────────────────────────────
@@ -398,33 +455,12 @@ public sealed class StartListPullService : IStartListPullService
         if (heatStartHhmm is { Length: > 0 } && TimeOnly.TryParse(heatStartHhmm, out var heatTime))
             local = eventStart.Date + heatTime.ToTimeSpan();
 
-        try
-        {
-            return TimeZoneInfo.ConvertTimeToUtc(
-                DateTime.SpecifyKind(local, DateTimeKind.Unspecified), IsraelTimeZone);
-        }
-        catch (ArgumentException)
-        {
-            return null;
-        }
+        // Пояс и перевод — общие с ручным вводом разминки (Т1), см. IsraelTime.
+        return IsraelTime.ToUtc(local);
     }
 
     private static int? ParseSeedMs(string? seed) =>
         seed is null ? null : LogligClient.ParseTimeToMilliseconds(seed);
-
-    private static TimeZoneInfo ResolveIsraelTimeZone()
-    {
-        // IANA-идентификатор работает и на Windows (.NET 6+ ходит в ICU), но у машин с
-        // отключённым ICU остаётся только windows-имя — поэтому фоллбек, а не одно имя.
-        foreach (var id in new[] { "Asia/Jerusalem", "Israel Standard Time" })
-        {
-            try { return TimeZoneInfo.FindSystemTimeZoneById(id); }
-            catch (TimeZoneNotFoundException) { }
-            catch (InvalidTimeZoneException) { }
-        }
-
-        return TimeZoneInfo.Utc;
-    }
 
     // ── Журнал заборов ───────────────────────────────────────────────────────
 

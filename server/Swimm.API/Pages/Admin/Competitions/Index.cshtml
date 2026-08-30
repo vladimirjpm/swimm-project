@@ -148,6 +148,11 @@
         // забор), поэтому рисуется всем не скрытым строкам, не только imported/finished.
         if (s.Status != "ignored")
             sb.Append($"<button onclick=\"discStartList({s.DiscoveredId}, this)\" class=\"{btn}\" title=\"Затянуть стартовый протокол (программа + заявки) с loglig\">Стартовый протокол</button> ");
+        // Справка о старте (Т1): время разминки руками + переопределение флага «чемпионат».
+        // Из неё таб Start list считает «во сколько приезжать», и нужна она тем же будущим
+        // стартам, что и кнопка выше, — поэтому стоит рядом и по тому же условию.
+        if (s.Status != "ignored")
+            sb.Append($"<button onclick=\"discMeetInfo({s.DiscoveredId})\" class=\"{btn}\" title=\"Разминка по дням (из регламента, руками) и флаг «чемпионат»\">Разминка</button> ");
         sb.Append($"<a href=\"{api}/{s.DiscoveredId}/pdf\" class=\"{btn}\">PDF</a> ");
         // Ручная пометка «нет протокола»: PDF на сайте бывает пустым (страница без единой
         // строки), и без пометки строка выглядит обычной «новой» — её пробуют затянуть снова.
@@ -973,6 +978,34 @@ else
             <button type="button" id="startlist-copy" class="admin-btn admin-btn-ghost py-1 px-3">Скопировать отчёт</button>
             <span id="startlist-copy-hint" class="text-[11px] text-admin-text-muted"></span>
         </div>
+    </div>
+</dialog>
+
+@* Справка о старте (Т1, docs/plans/start-list-ticket-plan.md): разминка по дням и флаг
+   «чемпионат». Разминка вводится РУКАМИ из регламента — автоматического источника у неё
+   нет; флаг ставит забор, здесь его можно только переопределить. *@
+<dialog id="meetinfo-modal"
+        class="m-auto w-[min(40rem,calc(100vw-2rem))] rounded-lg border border-admin-border bg-admin-surface p-0 text-admin-text shadow-xl shadow-black/50">
+    <div class="p-5">
+        <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+                <h2 class="text-base font-semibold text-white">Разминка и тип старта</h2>
+                <div id="meetinfo-title" class="mt-0.5 truncate text-sm text-admin-text-muted"></div>
+            </div>
+            <button type="button" id="meetinfo-close" class="admin-btn admin-btn-ghost py-1 px-2.5">Закрыть</button>
+        </div>
+
+        <div id="meetinfo-body" class="mt-4 text-[13px]"></div>
+
+        <div class="mt-4 flex items-center gap-2">
+            <button type="button" id="meetinfo-save" class="admin-btn admin-btn-primary py-1 px-3">Сохранить</button>
+            <span id="meetinfo-hint" class="text-[11px] text-admin-text-muted"></span>
+        </div>
+        <p class="mt-3 text-[11px] leading-relaxed text-admin-text-muted">
+            Время — местное, из регламента (תקנון). Витрина показывает «приезжать к» за
+            30 минут до разминки, и только на чемпионате — залогиненному, отметившему
+            «I'm coming». Пустое поле стирает время дня.
+        </p>
     </div>
 </dialog>
 
@@ -2144,6 +2177,87 @@ else
                     btn.disabled = false;
                 }
             };
+
+            // Справка о старте (Т1): разминка по дням руками + переопределение флага
+            // «чемпионат». Флаг сам ставит забор по регламенту — здесь он только показан,
+            // а меняется отдельным полем: иначе следующий перезабор затёр бы решение админа.
+            const miDlg = document.getElementById('meetinfo-modal');
+            const miBody = document.getElementById('meetinfo-body');
+            const miHint = document.getElementById('meetinfo-hint');
+            let miId = null;
+
+            const miDay = (iso) => new Date(iso).toLocaleDateString('ru-RU',
+                { weekday: 'short', day: '2-digit', month: 'short' });
+
+            const miRender = (info) => {
+                const auto = info.isChampionship ? 'чемпионат' : 'не чемпионат';
+                const ovr = info.isChampionshipOverride;
+                const reg = info.regulationUrl
+                    ? `<a href="${info.regulationUrl}" target="_blank" rel="noopener" class="underline">регламент</a>`
+                    : '<span class="text-admin-text-muted">регламента нет</span>';
+
+                const days = info.days.map(d => `
+                    <div class="flex items-center gap-3 py-1.5">
+                        <div class="w-40 shrink-0">${miDay(d.date)}
+                            <span class="text-[11px] text-admin-text-muted">${d.entries ? d.entries + ' заявок' : 'заявок нет'}</span>
+                        </div>
+                        <input type="time" data-date="${d.date}" value="${d.warmUpLocal ?? ''}"
+                               class="bg-transparent border border-admin-border rounded px-2 py-1 text-[13px]">
+                    </div>`).join('');
+
+                miBody.innerHTML = `
+                    <div class="rounded border border-admin-border p-3">
+                        <div>Забор по регламенту: <b>${auto}</b> · ${reg}</div>
+                        <label class="mt-2 flex items-center gap-2">
+                            <span>Переопределить:</span>
+                            <select id="meetinfo-override" class="bg-transparent border border-admin-border rounded px-2 py-1 text-[13px]">
+                                <option value=""${ovr == null ? ' selected' : ''}>как определил забор</option>
+                                <option value="true"${ovr === true ? ' selected' : ''}>чемпионат</option>
+                                <option value="false"${ovr === false ? ' selected' : ''}>не чемпионат</option>
+                            </select>
+                        </label>
+                        <div class="mt-1 text-[11px] text-admin-text-muted">Витрина видит: <b>${info.championshipEffective ? 'чемпионат' : 'не чемпионат'}</b></div>
+                    </div>
+                    <div class="mt-3 font-semibold">Начало разминки по дням</div>
+                    ${days || '<div class="text-admin-text-muted">Дней не нашлось: ни заявок, ни дат во «Входящих».</div>'}`;
+            };
+
+            document.getElementById('meetinfo-close').addEventListener('click', () => miDlg.close());
+
+            window.discMeetInfo = async (id) => {
+                miId = id;
+                miHint.textContent = '';
+                miBody.textContent = 'Загружаю…';
+                document.getElementById('meetinfo-title').textContent = discName(id);
+                if (!miDlg.open) miDlg.showModal();
+                try {
+                    miRender(await apiJson(`${API}/${id}/meet-info`));
+                } catch (e) {
+                    miBody.textContent = `Не вышло: ${e.message}`;
+                }
+            };
+
+            document.getElementById('meetinfo-save').addEventListener('click', async (e) => {
+                if (miId == null) return;
+                const btn = e.currentTarget;
+                const ovr = document.getElementById('meetinfo-override')?.value ?? '';
+                const days = [...miBody.querySelectorAll('input[data-date]')]
+                    .map(i => ({ date: i.dataset.date, warmUpLocal: i.value || null }));
+                btn.disabled = true;
+                miHint.textContent = 'Сохраняю…';
+                try {
+                    const info = await apiJson(`${API}/${miId}/meet-info`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ isChampionshipOverride: ovr === '' ? null : ovr === 'true', days })
+                    });
+                    miRender(info);
+                    miHint.textContent = 'Сохранено';
+                } catch (err) {
+                    miHint.textContent = `Не вышло: ${err.message}`;
+                } finally {
+                    btn.disabled = false;
+                }
+            });
 
             document.getElementById('btn-cancel-preview').addEventListener('click', () => {
                 preview = null;

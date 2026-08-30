@@ -31,7 +31,7 @@ public class StartListPublicRepositoryTests
         db.AddRange(club, other, free, back);
 
         db.Swimmers.AddRange(
-            new Swimmer { Id = 10, LastName = "Баренцев", FirstName = "Даня", LastNameEn = "Barentsev", FirstNameEn = "Dan", BirthYear = 2016 },
+            new Swimmer { Id = 10, LastName = "Тестовый", FirstName = "Пловец", LastNameEn = "Test", FirstNameEn = "Swimmer", BirthYear = 2016 },
             new Swimmer { Id = 11, LastName = "Второй", FirstName = "Пловец", BirthYear = 2016 },
             new Swimmer { Id = 12, LastName = "Третий", FirstName = "Пловец", BirthYear = 2016 });
 
@@ -126,6 +126,138 @@ public class StartListPublicRepositoryTests
         Assert.Null(await new StartListPublicRepository(db).GetProgrammeAsync(999));
     }
 
+    /// <summary>
+    /// Справки о старте (Т1) может не быть вовсе, и это обычное состояние: чемпионат тогда
+    /// false, разминка null — блок ARRIVE BY на витрине просто не рисуется.
+    /// </summary>
+    [Fact]
+    public async Task Programme_WithoutMeetInfo_HasNoChampionshipAndNoWarmUp()
+    {
+        await using var db = await SeedAsync(nameof(Programme_WithoutMeetInfo_HasNoChampionshipAndNoWarmUp));
+
+        var p = await new StartListPublicRepository(db).GetProgrammeAsync(OrgCompId);
+
+        Assert.False(p!.IsChampionship);
+        Assert.All(p.Days, d => Assert.Null(d.WarmUpAt));
+    }
+
+    /// <summary>
+    /// Разминка ложится в СВОЙ день: у многодневки их несколько, и «приезжать к» второго дня
+    /// не имеет отношения к первому. Заодно проверяем, что действующий флаг чемпионата —
+    /// ручная правка, а не то, что определил забор.
+    /// </summary>
+    [Fact]
+    public async Task Programme_CarriesWarmUpPerDay_AndOverriddenChampionship()
+    {
+        await using var db = await SeedAsync(nameof(Programme_CarriesWarmUpPerDay_AndOverriddenChampionship));
+        db.CompetitionMeetInfos.Add(new CompetitionMeetInfo
+        {
+            OrgCompId = OrgCompId,
+            IsChampionship = false,
+            IsChampionshipOverride = true,
+            WarmUps =
+            {
+                new CompetitionWarmUp
+                {
+                    OrgCompId = OrgCompId,
+                    Date = new DateTime(2026, 2, 20),
+                    WarmUpAt = new DateTime(2026, 2, 20, 6, 30, 0, DateTimeKind.Utc)
+                }
+            }
+        });
+        await db.SaveChangesAsync();
+
+        var p = await new StartListPublicRepository(db).GetProgrammeAsync(OrgCompId);
+
+        Assert.True(p!.IsChampionship);
+        Assert.Null(p.Days[0].WarmUpAt);
+        Assert.Equal(new DateTime(2026, 2, 20, 6, 30, 0, DateTimeKind.Utc), p.Days[1].WarmUpAt);
+    }
+
+    // ── Клубы соревнования (Т2): секция «follow a whole club» ────────────────
+
+    [Fact]
+    public async Task Clubs_CountSwimmersAndSwims_OrderedByEntries()
+    {
+        await using var db = await SeedAsync(nameof(Clubs_CountSwimmersAndSwims_OrderedByEntries));
+
+        var clubs = await new StartListPublicRepository(db).GetClubsAsync([OrgCompId]);
+
+        Assert.Equal(2, clubs.Count);
+
+        // Клуб 1: пловцы 10 (два заплыва) и 12 (эстафета) → 2 пловца, 3 заплыва.
+        Assert.Equal(1, clubs[0].ClubId);
+        Assert.Equal("Дельфин Нетания", clubs[0].ClubName);
+        Assert.Equal(2, clubs[0].Swimmers);
+        Assert.Equal(3, clubs[0].Entries);
+
+        // Клуб 2 меньше — значит ниже: пикер показывает первыми тех, у кого народу больше.
+        Assert.Equal(2, clubs[1].ClubId);
+        Assert.Equal(1, clubs[1].Swimmers);
+        Assert.Equal(1, clubs[1].Entries);
+    }
+
+    /// <summary>
+    /// Эстафета в источнике — ЧЕТЫРЕ строки с одной парой заплыв+дорожка. Это один заплыв
+    /// команды: считать ноги порознь значит завышать счётчик клуба вчетверо (та же склейка,
+    /// что `mergeRelayLanes` на витрине). А вот пловцов в ней действительно четверо.
+    /// </summary>
+    [Fact]
+    public async Task Clubs_RelayLegsCountAsOneSwim_ButFourSwimmers()
+    {
+        await using var db = await SeedAsync(nameof(Clubs_RelayLegsCountAsOneSwim_ButFourSwimmers));
+        db.Swimmers.AddRange(
+            new Swimmer { Id = 13, LastName = "Нога", FirstName = "Вторая", BirthYear = 2016 },
+            new Swimmer { Id = 14, LastName = "Нога", FirstName = "Третья", BirthYear = 2016 },
+            new Swimmer { Id = 15, LastName = "Нога", FirstName = "Четвёртая", BirthYear = 2016 });
+        // Те же дисциплина/заплыв/дорожка, что у строки 4 из сида — остальные ноги команды.
+        db.CompetitionEntries.AddRange(
+            Entry(5, 76401, ev: 40, styleId: 1, dist: "4X50", heat: 1, lane: 6, swimmer: 13, club: 1,
+                at: new DateTime(2026, 2, 20, 10, 0, 0, DateTimeKind.Utc), seed: "", day: new DateTime(2026, 2, 20)),
+            Entry(6, 76401, ev: 40, styleId: 1, dist: "4X50", heat: 1, lane: 6, swimmer: 14, club: 1,
+                at: new DateTime(2026, 2, 20, 10, 0, 0, DateTimeKind.Utc), seed: "", day: new DateTime(2026, 2, 20)),
+            Entry(7, 76401, ev: 40, styleId: 1, dist: "4X50", heat: 1, lane: 6, swimmer: 15, club: 1,
+                at: new DateTime(2026, 2, 20, 10, 0, 0, DateTimeKind.Utc), seed: "", day: new DateTime(2026, 2, 20)));
+        await db.SaveChangesAsync();
+
+        var club = (await new StartListPublicRepository(db).GetClubsAsync([OrgCompId])).First(c => c.ClubId == 1);
+
+        Assert.Equal(3, club.Entries);    // два личных + ОДНА эстафета, а не четыре
+        Assert.Equal(5, club.Swimmers);   // 10, 12, 13, 14, 15
+    }
+
+    /// <summary>
+    /// Составной старт: номера дисциплин принадлежат РАЗНЫМ протоколам федерации и между
+    /// ними совпадают. Если ключ заплыва не включает compID, два разных заплыва схлопнутся
+    /// в один и счётчик клуба занизится.
+    /// </summary>
+    [Fact]
+    public async Task Clubs_AcrossSources_DoesNotMergeSameDisciplineNumbers()
+    {
+        await using var db = await SeedAsync(nameof(Clubs_AcrossSources_DoesNotMergeSameDisciplineNumbers));
+        var second = Entry(8, 76321, ev: 5, styleId: 1, dist: "50", heat: 1, lane: 4, swimmer: 10, club: 1,
+            at: new DateTime(2026, 2, 21, 8, 6, 0, DateTimeKind.Utc), seed: "", day: new DateTime(2026, 2, 21));
+        second.OrgCompId = OrgCompId + 1;   // соседний окружной протокол того же чемпионата
+        db.CompetitionEntries.Add(second);
+        await db.SaveChangesAsync();
+
+        var repo = new StartListPublicRepository(db);
+        var single = (await repo.GetClubsAsync([OrgCompId])).First(c => c.ClubId == 1);
+        var across = (await repo.GetClubsAsync([OrgCompId, OrgCompId + 1])).First(c => c.ClubId == 1);
+
+        Assert.Equal(3, single.Entries);
+        Assert.Equal(4, across.Entries);   // а не 3: заплывы разных протоколов не схлопнулись
+        Assert.Equal(2, across.Swimmers);  // пловец один и тот же — он не удваивается
+    }
+
+    [Fact]
+    public async Task Clubs_UnknownCompetition_IsEmpty()
+    {
+        await using var db = await SeedAsync(nameof(Clubs_UnknownCompetition_IsEmpty));
+
+        Assert.Empty(await new StartListPublicRepository(db).GetClubsAsync([999]));
+    }
+
     // ── Зум 2: заплыв ────────────────────────────────────────────────────────
 
     [Fact]
@@ -153,7 +285,9 @@ public class StartListPublicRepositoryTests
         var card = await new StartListPublicRepository(db).GetSwimmerAsync(OrgCompId, 10);
 
         Assert.NotNull(card);
-        Assert.Equal("Dan Barentsev", card!.SwimmerName);   // витрина проекта англоязычная
+        // Имя — данные, а не интерфейс: показываем родное (у живых данных — ивритское),
+        // английское остаётся фоллбеком (правило Влада 28.08.2026, см. SwimmerName).
+        Assert.Equal("Пловец Тестовый", card!.SwimmerName);
         Assert.Equal(2, card.Swims.Count);
         Assert.Equal(76321, card.Swims[0].OrgDisciplineId);
         Assert.Equal(76322, card.Swims[1].OrgDisciplineId);

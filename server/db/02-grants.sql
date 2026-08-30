@@ -34,10 +34,12 @@ GRANT SELECT ON
     "Clubs",
     "CompetitionEntries",
     "CompetitionEvents",
+    "CompetitionMeetInfos",
     "CompetitionNoteTexts",
     "CompetitionNotes",
     "CompetitionResultUrls",
     "CompetitionSources",
+    "CompetitionWarmUps",
     "Competitions",
     "Countries",
     "Galleries",
@@ -68,7 +70,7 @@ GRANT SELECT ON "Sys_RecordIssues" TO swimm_ro;
 
 -- ── Проверка ────────────────────────────────────────────────────────────────
 \echo ''
-\echo 'Гранты применены. Таблиц, доступных swimm_ro на чтение (ожидается 27):'
+\echo 'Гранты применены. Таблиц, доступных swimm_ro на чтение (ожидается 30):'
 SELECT count(DISTINCT table_name) AS ro_tables
   FROM information_schema.table_privileges
  WHERE grantee = 'swimm_ro' AND privilege_type = 'SELECT';

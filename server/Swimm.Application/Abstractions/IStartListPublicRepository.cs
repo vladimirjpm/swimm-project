@@ -44,6 +44,17 @@ public interface IStartListPublicRepository
         int orgCompId, int clubId, CancellationToken ct = default);
 
     /// <summary>
+    /// Клубы соревнования со счётчиками — секция «follow a whole club» пикера (шаг Т2).
+    /// Как и поиск, работает по НЕСКОЛЬКИМ compID сразу: составной старт (окружные протоколы)
+    /// — это один клубный список, а не четыре.
+    ///
+    /// Порядок — по числу заплывов, потом по имени: пикер показывает первыми тех, у кого
+    /// на этом старте реально много народу.
+    /// </summary>
+    Task<IReadOnlyList<StartListClubDto>> GetClubsAsync(
+        IReadOnlyCollection<int> orgCompIds, CancellationToken ct = default);
+
+    /// <summary>
     /// Поиск пловца по имени внутри соревнования — «когда плывёт мой ребёнок», если его
     /// нет в избранных. Ищет по НЕСКОЛЬКИМ compID сразу: один наш старт бывает собран из
     /// нескольких протоколов федерации (окружные чемпионаты), и родителю всё равно, в

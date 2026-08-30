@@ -87,8 +87,28 @@ public class StartListPullServiceTests
         return db;
     }
 
-    private static StartListPullService Service(SwimmDbContext db, ICompetitionDiscoveryProvider provider) =>
-        new(db, provider, NullLogger<StartListPullService>.Instance);
+    /// <summary>
+    /// Регламент-заглушка. По умолчанию — «ссылки на регламент нет»: это самый частый
+    /// живой ответ, и забор обязан работать без него.
+    /// </summary>
+    private sealed class FakeRegulations(RegulationFetchDto? result = null) : IRegulationFetchService
+    {
+        public int Calls { get; private set; }
+
+        public Task<RegulationFetchDto> FetchAsync(int logligId, CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.FromResult(result ?? new RegulationFetchDto(false, null, null, "регламента нет"));
+        }
+    }
+
+    private static RegulationFetchDto Championship(bool isChampionship, string url = "https://loglig/reg.pdf") =>
+        new(true, url, new RegulationAnalysisDto(false, false, isChampionship, []));
+
+    private static StartListPullService Service(
+        SwimmDbContext db, ICompetitionDiscoveryProvider provider,
+        IRegulationFetchService? regulations = null) =>
+        new(db, provider, regulations ?? new FakeRegulations(), NullLogger<StartListPullService>.Instance);
 
     // ── Основной путь ────────────────────────────────────────────────────────
 
@@ -425,5 +445,92 @@ public class StartListPullServiceTests
         Assert.Equal(1, pull.Entries);
         Assert.Equal(1, pull.Added);
         Assert.Null(pull.Error);
+    }
+
+    // ── Справка о старте: чемпионат по регламенту + разминка руками (Т1) ──────
+
+    [Fact]
+    public async Task Pull_WritesChampionshipFlagFromRegulation()
+    {
+        await using var db = await SeedAsync(nameof(Pull_WritesChampionshipFlagFromRegulation));
+        var provider = new FakeProvider([Event(76321)], new() { [76321] = StartList(Row(1, 3, 1, "Пловец")) });
+
+        await Service(db, provider, new FakeRegulations(Championship(true))).PullAsync(OrgCompId);
+
+        var info = await db.CompetitionMeetInfos.SingleAsync();
+        Assert.Equal(OrgCompId, info.OrgCompId);
+        Assert.True(info.IsChampionship);
+        Assert.True(info.ChampionshipEffective);
+        Assert.Equal("https://loglig/reg.pdf", info.RegulationUrl);
+        Assert.NotNull(info.RegulationCheckedAt);
+    }
+
+    /// <summary>
+    /// Главное, ради чего заведён <c>IsChampionshipOverride</c>: забор идемпотентен и
+    /// запускается до последнего дня. Если бы он писал в то же поле, ручное решение админа
+    /// («это не чемпионат») жило бы до следующего прогона. Разминку забор не трогает вовсе —
+    /// она вводится руками.
+    /// </summary>
+    [Fact]
+    public async Task Pull_DoesNotOverwriteManualOverrideOrWarmUps()
+    {
+        var day = new DateTime(2026, 2, 19);
+        await using var db = await SeedAsync(nameof(Pull_DoesNotOverwriteManualOverrideOrWarmUps), d =>
+            d.CompetitionMeetInfos.Add(new CompetitionMeetInfo
+            {
+                OrgCompId = OrgCompId,
+                IsChampionship = false,
+                IsChampionshipOverride = false,
+                WarmUps = { new CompetitionWarmUp { OrgCompId = OrgCompId, Date = day, WarmUpAt = new DateTime(2026, 2, 19, 6, 0, 0, DateTimeKind.Utc) } }
+            }));
+
+        var provider = new FakeProvider([Event(76321)], new() { [76321] = StartList(Row(1, 3, 1, "Пловец")) });
+        await Service(db, provider, new FakeRegulations(Championship(true))).PullAsync(OrgCompId);
+
+        var info = await db.CompetitionMeetInfos.Include(m => m.WarmUps).SingleAsync();
+        Assert.True(info.IsChampionship);              // что определил забор
+        Assert.False(info.IsChampionshipOverride);     // что решил админ
+        Assert.False(info.ChampionshipEffective);      // показываем решение админа
+        Assert.Equal(new DateTime(2026, 2, 19, 6, 0, 0, DateTimeKind.Utc), info.WarmUps.Single().WarmUpAt);
+    }
+
+    /// <summary>
+    /// «Регламента нет» — не то же самое, что «не чемпионат»: ссылку на תקנון ставят не всем,
+    /// и оборванная сеть не должна менять вид витрины.
+    /// </summary>
+    [Fact]
+    public async Task Pull_RegulationMissing_KeepsPreviousChampionshipFlag()
+    {
+        await using var db = await SeedAsync(nameof(Pull_RegulationMissing_KeepsPreviousChampionshipFlag), d =>
+            d.CompetitionMeetInfos.Add(new CompetitionMeetInfo
+            {
+                OrgCompId = OrgCompId,
+                IsChampionship = true,
+                // Смотрели давно — значит пойдём смотреть снова.
+                RegulationCheckedAt = DateTime.UtcNow.AddDays(-30)
+            }));
+
+        var provider = new FakeProvider([Event(76321)], new() { [76321] = StartList(Row(1, 3, 1, "Пловец")) });
+        await Service(db, provider).PullAsync(OrgCompId);
+
+        Assert.True((await db.CompetitionMeetInfos.SingleAsync()).IsChampionship);
+    }
+
+    /// <summary>Свежую справку не перечитываем: регламент не меняется, а PDF качается.</summary>
+    [Fact]
+    public async Task Pull_FreshMeetInfo_DoesNotRefetchRegulation()
+    {
+        await using var db = await SeedAsync(nameof(Pull_FreshMeetInfo_DoesNotRefetchRegulation), d =>
+            d.CompetitionMeetInfos.Add(new CompetitionMeetInfo
+            {
+                OrgCompId = OrgCompId,
+                RegulationCheckedAt = DateTime.UtcNow.AddHours(-1)
+            }));
+
+        var regulations = new FakeRegulations(Championship(true));
+        var provider = new FakeProvider([Event(76321)], new() { [76321] = StartList(Row(1, 3, 1, "Пловец")) });
+        await Service(db, provider, regulations).PullAsync(OrgCompId);
+
+        Assert.Equal(0, regulations.Calls);
     }
 }

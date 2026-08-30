@@ -101,6 +101,35 @@ public class StartListController : ControllerBase
             PayloadTtl, CacheControlValue);
     }
 
+    /// <summary>
+    /// Клубы соревнования со счётчиками — секция «follow a whole club» пикера (шаг Т2):
+    /// «מכבי חיפה · 42 swimmers · 96 entries».
+    /// </summary>
+    [HttpGet("{orgCompId:int}/clubs")]
+    public async Task<IActionResult> GetClubs(int orgCompId, CancellationToken ct) =>
+        await this.CachedJson(_cache,
+            $"http:start-list:{orgCompId}:clubs",
+            () => _startList.GetClubsAsync([orgCompId], ct),
+            PayloadTtl, CacheControlValue);
+
+    /// <summary>
+    /// То же по нескольким источникам сразу — у составного старта (окружные протоколы)
+    /// клубный список один на все compID, а не по одному на каждый. Форма запроса та же,
+    /// что у поиска: повторяемый <c>orgCompId</c>.
+    /// </summary>
+    [HttpGet("clubs")]
+    public async Task<IActionResult> GetClubsAcross(
+        [FromQuery] int[] orgCompId, CancellationToken ct = default)
+    {
+        var ids = orgCompId.Distinct().Take(MaxOrgCompIds).ToArray();
+        if (ids.Length == 0) return BadRequest("Укажите хотя бы один orgCompId.");
+
+        return await this.CachedJson(_cache,
+            $"http:start-list:clubs:{string.Join(',', ids.Order())}",
+            () => _startList.GetClubsAsync(ids, ct),
+            PayloadTtl, CacheControlValue);
+    }
+
     /// <summary>Кто из клуба плывёт на этом старте.</summary>
     [HttpGet("{orgCompId:int}/clubs/{clubId:int}")]
     public async Task<IActionResult> GetClub(int orgCompId, int clubId, CancellationToken ct) =>
