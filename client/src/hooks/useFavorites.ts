@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { fetchAntiforgeryToken, invalidateTokenCache } from '../utils/antiforgery';
 import { useAuth } from './useAuth';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -23,27 +24,6 @@ interface FavoritesState {
   /** Множество ID пловцов в избранном */
   favoriteSwimmerIds: Set<number>;
   loading: boolean;
-}
-
-// ── Antiforgery token cache ──────────────────────────────────────────────────
-
-let cachedToken: string | null = null;
-
-async function fetchAntiforgeryToken(): Promise<string | null> {
-  if (cachedToken) return cachedToken;
-  try {
-    const r = await fetch('/api/antiforgery/token', { credentials: 'include' });
-    if (!r.ok) return null;
-    const data = await r.json();
-    cachedToken = data.token ?? null;
-    return cachedToken;
-  } catch {
-    return null;
-  }
-}
-
-function invalidateTokenCache() {
-  cachedToken = null;
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
