@@ -99,6 +99,16 @@ npm run css:build    # regenerate wwwroot/css/admin.min.css after changing Tailw
 npm run css:watch    # rebuild on save while iterating
 ```
 
+⚠️ **Не пиши в Admin-разметке `[#hex]/opacity`** (`border-[#66bb6a]/30`, `bg-[#4fc3f7]/10`).
+Tailwind гонит такой цвет через oklab и печатает результат ЧИСЛАМИ
+(`oklab(71.8488% -.115896 .0814871/.3)`), а последний разряд у него разный на Windows и на
+Linux-раннере. Бандл коммитится и сверяется в CI **побайтово** (job «Бандл админки
+пересобран»), поэтому такая строка роняет CI навсегда: пересборка на Windows возвращает
+«свою» цифру. Пиши форму `[rgba(...)]` — `border-[rgba(102,187,106,0.3)]`: она компилируется
+в обычный hex с альфой (`#66bb6a4d`), одинаковый везде. Пойман 31.08.2026, чинилось заменой
+двух классов в `Api.cshtml` и `Index.cshtml`. (Токеновые `color-mix(in oklab, …)`, которые
+Tailwind печатает текстом, безопасны — их считает браузер.)
+
 `dotnet build` auto-runs `css:build` via an MSBuild target (`BeforeTargets="Build"`) **if**
 `node_modules` exists; if it doesn't (CI/no-Node machines), the build just uses the already-committed
 `admin.min.css`. That's why **`admin.min.css` is committed** — don't gitignore it, and re-run
