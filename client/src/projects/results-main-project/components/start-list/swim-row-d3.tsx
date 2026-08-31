@@ -8,14 +8,21 @@ import type { PlanRow } from './plan-model';
 /**
  * Строка заплыва в карточке плана — формат **D3** (шаг Т7, хендофф §1.3).
  *
- * Сетка `74px | 1fr`: слева плитка времени во всю высоту, справа — содержимое заплыва.
- * Главное число строки — ВРЕМЯ СТАРТА, поэтому оно и стоит отдельной плиткой; номер
- * заплыва в неё не идёт, иначе плитка читается как два числа сразу.
+ * **Две раскладки одного и того же DOM**, переключаются на `sm:` (640px):
  *
- * **Правый столбик — «где в протоколе»** (правка 30.08.2026): сверху категория, под ней
- * `Heat N`, под ними дорожка каждого участника — `Line 4`, на узком экране `L4`. Три
- * подписи об одном и том же месте стоят одной колонкой у правого края, а не растащены по
- * строке: глаз ищет «мой заплыв, моя дорожка» в одном месте.
+ * - **Мобильная — вариант 4c** (задание Влада 31.08.2026): время полосой СВЕРХУ во всю
+ *   ширину и крупно (30px), под ним строка «иконка стиля + категория/заплыв», дальше
+ *   линейка-разделитель и участники. Узкий экран — основной вид таба, и плитка времени
+ *   слева съедала на нём треть ширины у имён.
+ * - **Широкая — как была**: сетка `74px | 1fr`, время плиткой слева во всю высоту.
+ *
+ * Раскладки НЕ разведены на два блока: данные и обработчики были бы продублированы, а
+ * расходятся такие копии на первой же правке (прецедент — пять копий строки результата,
+ * сведённых в `SwimRow`). Всё, что отличается, отличается классами `sm:`.
+ *
+ * **Правый столбик — «где в протоколе»**: категория, под ней `Heat N`, под ними дорожка
+ * каждого участника — `Line 4`, на узком экране `L4`. Три подписи об одном и том же месте
+ * стоят одной колонкой у правого края, а не растащены по строке.
  *
  * **Посев — у ИМЕНИ, а не в шапке строки**: он у каждого участника свой, и одно число в
  * шапке врало бы про остальных. На узком экране посев уходит под имя, на широком стоит
@@ -40,10 +47,12 @@ export default function SwimRowD3({ row, showNames, onClick }: {
   const scheduled = row.startAt != null;
 
   return (
+    // `overflow-hidden` — ради мобильной полосы времени: она идёт до краёв карточки, и без
+    // обрезки её углы вылезали бы за скругление рамки. На `sm:` возвращается сетка.
     <button
       type="button"
       onClick={onClick}
-      className="mb-2 grid w-full items-center gap-2.5 rounded-[12px] border p-2.5 text-left last:mb-0"
+      className="mb-2 w-full overflow-hidden rounded-[12px] border text-left last:mb-0 sm:grid sm:items-center sm:gap-2.5 sm:overflow-visible sm:p-2.5"
       style={{
         gridTemplateColumns: '74px minmax(0,1fr)',
         background: row.mine ? 'var(--theme-personal-bg)' : 'var(--deep-card-bg)',
@@ -51,9 +60,9 @@ export default function SwimRowD3({ row, showNames, onClick }: {
         borderStyle: scheduled ? 'solid' : 'dashed',
       }}
     >
-      {/* Плитка времени — на всю высоту строки. */}
+      {/* Время: полоса сверху на узком экране, плитка во всю высоту на широком. */}
       <span
-        className="flex h-full items-center justify-center rounded-[10px] py-2 text-[16px] font-black tabular-nums"
+        className="flex w-full items-center justify-center px-[14px] py-[7px] text-[30px] font-black leading-none tabular-nums sm:h-full sm:w-auto sm:rounded-[10px] sm:px-0 sm:py-2 sm:text-[16px] sm:leading-normal"
         style={{
           fontFamily: 'var(--deep-font-display)',
           background: row.mine ? 'var(--theme-personal-badge-bg)' : 'var(--deep-divider)',
@@ -62,40 +71,62 @@ export default function SwimRowD3({ row, showNames, onClick }: {
         {scheduled ? formatApproxTime(row.startAt) : '—'}
       </span>
 
-      <span className="min-w-0">
+      {/* Контентный блок: на узком экране у него свои поля (12/16), на широком их даёт
+          padding самой карточки. */}
+      <span className="block min-w-0 px-4 py-3 sm:p-0">
         {/* Шапка: слева дисциплина той же плиткой, что и на строке результата, справа —
             верх правого столбика (категория + заплыв). */}
-        <span className="flex items-center gap-2">
+        <span className="flex items-stretch gap-2 sm:items-center">
           <UI_SwimmStyleIcon
             styleName={row.styleName}
             styleType="icon-len"
             styleLen={row.distance}
-            // Кегль подписи дистанции в компоненте задан в em (1.25em), поэтому размер
-            // числа задаётся здесь — вместе с шириной плитки, иначе «100» на увеличенной
-            // иконке выглядит потерянным.
-            className="w-[96px] shrink-0 text-[18px] sm:w-[84px] sm:text-[20px]"
+            // Дистанция СПРАВА от иконки, а не поверх неё (решение Влада 31.08.2026): на
+            // плитке этой ширины число ложилось прямо на пловца и спорило с рисунком.
+            lenPlacement="right"
+            // Кегль подписи задан в компоненте как 1.25em от плитки, поэтому размер числа
+            // задаётся здесь, вместе с шириной. На УЗКОМ экране он вдвое крупнее (28px →
+            // «100» рисуется 35px): там иконка идёт во всю ширину, и дистанция читается
+            // наравне с категорией. На широком остаётся прежним.
+            className="w-[104px] shrink-0 text-[28px] sm:w-[84px] sm:text-[16px]"
           />
           {!scheduled && (
             <span className="min-w-0 truncate text-[11px] font-bold opacity-60">not scheduled</span>
           )}
-          <span className="ml-auto flex shrink-0 flex-col items-end leading-[1.15]">
-            <span className="text-[12.5px] font-extrabold">{bandLabel(row.gender, row.ageBand)}</span>
+          {/* Правый столбик на узком экране тянется во всю высоту строки с иконкой:
+              категория стоит по центру, `Heat N` прижат к низу (правка 31.08.2026).
+              На широком остаётся прежняя пара строк подряд. */}
+          <span className="ml-auto flex shrink-0 flex-col items-end whitespace-nowrap leading-[1.15]">
+            <span className="my-auto text-[12.5px] font-black sm:my-0 sm:font-extrabold">
+              {bandLabel(row.gender, row.ageBand)}
+            </span>
             <span className="text-[11px] font-bold opacity-70">Heat {row.heat}</span>
           </span>
         </span>
+
+        {/* Линейка между дисциплиной и участниками — только на узком экране: там строка
+            иконки идёт во всю ширину и без неё имена липнут к ней. На широком роль
+            разделителя играет сама сетка. */}
+        <span
+          className="mb-[2px] mt-[10px] block h-px sm:hidden"
+          style={{ background: 'var(--deep-card-border)' }}
+        />
 
         {/* Участники столбиком. Между разными участниками зазор больше, чем внутри одного:
             иначе имя второго читается продолжением первого. */}
         {row.entries.map((e, i) => (
           <React.Fragment key={e.id}>
-          <span className={`flex items-baseline gap-2 ${i === 0 ? 'mt-1.5' : 'mt-3'}`} dir="ltr">
+          <span
+            className={`flex items-center gap-[10px] py-[9px] sm:items-baseline sm:gap-2 sm:py-0 ${i === 0 ? 'sm:mt-1.5' : 'sm:mt-3'}`}
+            dir="ltr"
+          >
             {/* Метка «чей это пловец» — ОТДЕЛЬНАЯ колонка, а не приписка внутри имени.
                 Имена ивритские: значок внутри строки имени двунаправленный алгоритм
                 уносит на противоположный край — звезда оказывалась справа от имени, а
                 «CLUB» слева. Своя колонка фиксированной ширины держит метки на одном
                 месте при любом языке имени и выравнивает начала имён столбиком. */}
             <span
-              className={`w-[34px] shrink-0 font-black uppercase ${e.mine ? 'text-[13px] leading-none' : 'text-[10px]'}`}
+              className={`w-[34px] shrink-0 font-black uppercase tracking-[.04em] ${e.mine ? 'text-[13px] leading-none' : 'text-[10px]'}`}
               style={{
                 color: e.mine ? 'var(--theme-personal-accent)' : 'var(--deep-accent)',
                 // Оптическая правка: у эмодзи ⭐ своя боковая пазуха внутри квадрата, из-за
@@ -108,10 +139,12 @@ export default function SwimRowD3({ row, showNames, onClick }: {
             </span>
 
             {/* Имя и посев: на широком экране в строку, на узком посев уходит под имя. */}
-            <span className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-baseline sm:gap-2">
+            <span className="flex min-w-0 flex-1 flex-col gap-px sm:flex-row sm:items-baseline sm:gap-2">
               {showNames && (
                 <span
-                  className={`min-w-0 truncate text-[15px] ${e.mine ? 'font-black' : 'font-bold'}`}
+                  // Имя на узком экране крупнее на 30% (15 → 19.5px): это главное слово
+                  // строки, а места под него там больше — посев ушёл на строку ниже.
+                  className={`min-w-0 truncate text-[19.5px] sm:text-[15px] ${e.mine ? 'font-black' : 'font-extrabold'}`}
                   style={{
                     textDecoration: e.status === 'no-show' ? 'line-through' : undefined,
                     opacity: e.status === 'no-show' ? 0.6 : undefined,
@@ -121,9 +154,18 @@ export default function SwimRowD3({ row, showNames, onClick }: {
                   {e.name}
                 </span>
               )}
-              <span className="shrink-0 text-[11.5px] font-bold opacity-70">
+              {/* Посев: на узком экране подпись приглушена, а само время — основным цветом
+                  (макет 4c). На широком остаётся как было — вся пара в 70% прозрачности. */}
+              <span className="shrink-0 text-[10.5px] font-bold text-[color:var(--deep-text-mute)] sm:text-[11.5px] sm:text-[color:inherit] sm:opacity-70">
                 {e.seedTime
-                  ? <><span className="mr-0.5 text-[9px] uppercase opacity-80">seed</span><UI_SwimTime time={e.seedTime} /></>
+                  ? (
+                    <>
+                      <span className="mr-1 uppercase sm:mr-0.5 sm:text-[9px] sm:opacity-80">seed</span>
+                      <span className="font-extrabold tabular-nums text-[color:var(--deep-text)] sm:font-bold sm:text-[color:inherit]">
+                        <UI_SwimTime time={e.seedTime} />
+                      </span>
+                    </>
+                  )
                   : 'NT'}
               </span>
             </span>
@@ -156,7 +198,7 @@ export default function SwimRowD3({ row, showNames, onClick }: {
               должно идти в порядке состава, а не разворачиваться по первому имени. */}
           {e.members.length > 1 && (
             <span
-              className="mt-1 block pl-[42px] text-[12.5px] font-bold leading-[1.5]"
+              className="mt-1 block pl-[44px] text-[12.5px] font-bold leading-[1.5] sm:pl-[42px]"
               style={{ color: 'var(--deep-text-mute)' }}
               dir="ltr"
             >

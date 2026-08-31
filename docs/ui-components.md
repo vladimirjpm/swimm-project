@@ -40,7 +40,7 @@
 
 | Компонент | Рисует | Ключевые пропы |
 |---|---|---|
-| `UI_SwimmStyleIcon` | картинку стиля; `icon-len` печатает дистанцию поверх | `styleName`, `styleLen`, `styleType='icon-notext'\|'icon-text'\|'icon-len'` |
+| `UI_SwimmStyleIcon` | картинку стиля; `icon-len` печатает дистанцию | `styleName`, `styleLen`, `styleType='icon-notext'\|'icon-text'\|'icon-len'`, `lenPlacement='overlay'\|'below'\|'right'` — ГДЕ стоит дистанция в `icon-len` (31.08.2026): поверх иконки в углу (дефолт, как было всегда), строкой под ней или столбиком справа. Дефолт трогать нельзя — `overlay` стоит на дюжине экранов. Вне иконки подложка и жёсткие мобильные 19px снимаются: они были нужны, только пока число лежало НА рисунке. Размер плитки и кегль числа задаёт `className` вызывающего (число — 1.25em от плитки) |
 | `UI_PoolIcon` | бассейн: svg-дорожки либо подпись-«дорожка» `--25m--` / `-----50m-----` | `styleType`, `label`, `labelClassName`, `iconWidth` |
 | `UI_DateIcon` | дату: `cube` (плитка), `row-style-1` («30 Jul 2026»), `row-style-2` | `date` — `DD/MM/YYYY` ИЛИ ISO `YYYY-MM-DD` (оба формата реально есть в продукте: статика и API), `styleType`, `fontClassName` (⚠ иначе подставит свой серый мимо токенов) |
 | `UI_PositionBadge` | кружок места; 1-2-3 красит медалью при `isAward` | `position`, `fallbackIndex`, `size`, `isAward` |
