@@ -4,6 +4,7 @@ import FollowingPicker from './following-picker';
 import PlanCard from './plan-card';
 import HeatZoom from './heat-zoom';
 import ProgrammeZoom from './programme-zoom';
+import ShareButton from './share-button';
 import SourceTabs from './source-tabs';
 import SwimmerFinder from './swimmer-finder';
 import SwimmerZoom from './swimmer-zoom';
@@ -135,10 +136,25 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
 
   // Ссылка «поделиться» — этот же адрес плюс состав. Строится от ТЕКУЩЕГО адреса, чтобы
   // ссылка вела ровно на то соревнование, которое человек и смотрит.
+  //
+  // ОТКРЫТЫЙ ПЛОВЕЦ ВХОДИТ В СОСТАВ ссылки (правка 31.08.2026): нашёл ребёнка поиском,
+  // открыл его карточку, нажал «Share» — получатель должен увидеть план именно с ним, а не
+  // пустой. Пловец добавляется К составу, а не вместо него: свой ребёнок из плана из ссылки
+  // не пропадает.
+  //
+  // `?swimmer=`/`?heat=` из ссылки вычищаются: получателю открывается КАРТОЧКА ПЛАНА, а не
+  // тот зум, в котором стоял отправитель. Пустой состав в адрес не пишем вовсе — иначе
+  // ссылка несла бы `plan=` ни с чем и получатель видел бы пустой билет.
+  const sharePlan = state.zoom === 'swimmer' && state.swimmerId != null
+    ? { ...shownPlan, swimmer_ids: [...new Set([...shownPlan.swimmer_ids, state.swimmerId])] }
+    : shownPlan;
+
   const shareUrl = (() => {
     const url = new URL(window.location.href);
     url.searchParams.set('tab', 'startlist');
-    url.searchParams.set('plan', serializePlanParam(shownPlan));
+    const param = serializePlanParam(sharePlan);
+    if (param) url.searchParams.set('plan', param);
+    else url.searchParams.delete('plan');
     url.searchParams.delete('swimmer');
     url.searchParams.delete('heat');
     return url.toString();
@@ -221,6 +237,17 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
             sub={planLabel ?? 'choose who to follow'}
             personal
           />
+        </div>
+      )}
+
+      {/* «Поделиться» есть на ВСЕХ экранах таба, а не только в плане (правка 31.08.2026):
+          ссылкой делятся ровно тогда, когда нашли ответ, — а нашли его чаще всего в
+          карточке пловца, куда ведёт поиск. В карточке плана кнопка своя, в её шапке рядом
+          с меткой «Shared plan», поэтому здесь она только вне плана — двух одинаковых
+          кнопок на экране быть не должно. */}
+      {published !== false && !inPlan && (
+        <div className="mb-2 flex justify-end">
+          <ShareButton url={shareUrl} />
         </div>
       )}
 

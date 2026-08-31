@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useFavoritesContext } from '../../../../hooks/favorites-context';
 import { useStartListSearch } from './use-start-list';
 import { dayLabel, formatApproxTime } from './start-list-helpers';
@@ -21,6 +21,26 @@ export default function SwimmerFinder({ orgCompIds, onOpenSwimmer }: {
   const { isAuthenticated, favorites, primarySwimmerId } = useFavoritesContext();
   const [query, setQuery] = useState('');
   const { data: hits, loading } = useStartListSearch(orgCompIds, query);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Выбор пловца — из выдачи или из чипа избранного.
+   *
+   * Выдачу ОБЯЗАТЕЛЬНО схлопываем (баг 31.08.2026): карточка пловца рисуется НИЖЕ этой
+   * панели, а список результатов оставался раскрытым поверх неё во весь экран — на
+   * телефоне выглядело так, будто тап не сработал вовсе, хотя `?swimmer=` в адрес уже
+   * ушёл. Заодно убираем фокус с поля, иначе экранная клавиатура закрывает то, ради чего
+   * человек и нажимал.
+   */
+  const pick = useCallback((swimmerId: number) => {
+    setQuery('');
+    inputRef.current?.blur();
+    onOpenSwimmer(swimmerId);
+    // Скролл — на следующий кадр: до перерисовки выдача ещё занимает высоту, и прокрутка
+    // остановилась бы на старом месте.
+    requestAnimationFrame(() => rootRef.current?.scrollIntoView({ block: 'start' }));
+  }, [onOpenSwimmer]);
 
   // Избранные-пловцы (клубы в эту панель не идут: у клуба нет «во сколько плывёт»).
   // Primary — первым: это «я», и он нужен чаще остальных.
@@ -29,7 +49,7 @@ export default function SwimmerFinder({ orgCompIds, onOpenSwimmer }: {
     .sort((a, b) => Number(b.swimmer_id === primarySwimmerId) - Number(a.swimmer_id === primarySwimmerId));
 
   return (
-    <div className="mb-3">
+    <div className="mb-3" ref={rootRef}>
       {isAuthenticated && favSwimmers.length > 0 && (
         // Цвета — те же токены --theme-personal-*, что у полосы «FAVORITES» в шапке
         // соревнования: одна и та же вещь на странице обязана выглядеть одинаково.
@@ -50,7 +70,7 @@ export default function SwimmerFinder({ orgCompIds, onOpenSwimmer }: {
             <button
               key={f.swimmer_id}
               type="button"
-              onClick={() => onOpenSwimmer(f.swimmer_id as number)}
+              onClick={() => pick(f.swimmer_id as number)}
               className="rounded-full px-2.5 py-1 text-[12px] font-bold"
               style={{
                 background: 'var(--theme-personal-badge-bg)',
@@ -65,6 +85,7 @@ export default function SwimmerFinder({ orgCompIds, onOpenSwimmer }: {
       )}
 
       <input
+        ref={inputRef}
         type="search"
         placeholder="Find a swimmer by name — when do they swim?"
         value={query}
@@ -85,7 +106,7 @@ export default function SwimmerFinder({ orgCompIds, onOpenSwimmer }: {
             <button
               key={h.swimmer_id}
               type="button"
-              onClick={() => onOpenSwimmer(h.swimmer_id)}
+              onClick={() => pick(h.swimmer_id)}
               className="flex w-full items-center gap-3 border-b px-3 py-2 text-left last:border-b-0"
               style={{ borderColor: 'var(--theme-mode-border-input)' }}
             >
