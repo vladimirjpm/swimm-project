@@ -196,24 +196,32 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
     // своего цвета не ставит, наследовало его. Карточка плана красит себя сама, поэтому
     // зелёной была только программа. Токен парный фону таба (`--deep-page-bg`).
     <div className={deepThemeClass} style={{ color: 'var(--deep-text)' }}>
-      {/* Единственная кнопка входа/выхода личного плана. На экранах плана она ведёт назад,
-          на остальных — внутрь: у родителя один вопрос за раз, и два способа попасть в
-          одно место только путают. */}
+      {/* Два таба вместо одной кнопки-переключателя (решение Влада 30.08.2026). Кнопка
+          меняла надпись по состоянию («My plan» ↔ «← Back to the programme»), и по ней не
+          было видно, что экрана ДВА и какой сейчас открыт. Табы показывают оба сразу.
+
+          Не `DeepTabs`: тот собран как «папка», сросшаяся с панелью контента
+          (`border-bottom: none`, `margin-bottom: -1px`, парная `.deep-tabs-panel`), а
+          карточка-билет внутрь панели не встаёт — её вырезы-полукруги закрашены фоном
+          СТРАНИЦЫ, и на панели они превратились бы в чужие кружки. Отступление записано
+          в docs/ui-components.md §6. */}
       {published !== false && (
-      <button
-        type="button"
-        onClick={inPlan ? backToProgramme : hasPlan ? openPlan : openPicker}
-        className="mb-2 w-full rounded-[12px] border px-3 py-2 text-[13px] font-black"
-        style={{
-          background: 'var(--theme-personal-bg)',
-          borderColor: 'var(--theme-personal-border)',
-          color: 'var(--theme-personal-accent)',
-        }}
-      >
-        {inPlan
-          ? '← Back to the programme'
-          : planLabel ? `⭐ My plan — ${planLabel}` : '⭐ Choose who to follow'}
-      </button>
+        <div className="mb-2 mt-2 grid grid-cols-2 gap-2" role="tablist" aria-label="Start list view">
+          <StartListViewTab
+            active={!inPlan}
+            onClick={backToProgramme}
+            label="All programme"
+            sub="everyone at this meet"
+          />
+          {/* Таб плана всегда в цвете избранного — это «мои», а не просто второй экран. */}
+          <StartListViewTab
+            active={inPlan}
+            onClick={hasPlan ? openPlan : openPicker}
+            label="⭐ My plan"
+            sub={planLabel ?? 'choose who to follow'}
+            personal
+          />
+        </div>
       )}
 
       {/* Панель «найти своего» — над зумами: это вход в таб для того, кто пришёл по одному
@@ -281,5 +289,50 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * Плитка-таб «какой экран таба смотрим»: программа целиком или личный план.
+ *
+ * Активная — залитая своим цветом, неактивная — прозрачная и приглушённая, но того же
+ * оттенка: у плана он золотой (цвет избранного), у программы — обычный акцент таба.
+ * Подпись второй строкой отвечает на «а что там»: у плана это состав («1 swimmer + 1
+ * club»), у программы — что она про всех.
+ */
+function StartListViewTab({ active, onClick, label, sub, personal = false }: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  sub: string;
+  /** true — таб личного плана: цвет избранного вместо акцента таба. */
+  personal?: boolean;
+}) {
+  const accent = personal ? 'var(--theme-personal-accent)' : 'var(--deep-accent)';
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className="rounded-[12px] border px-3 py-2 text-left"
+      style={{
+        background: active
+          ? (personal ? 'var(--theme-personal-bg)' : 'var(--deep-accent-soft)')
+          : 'transparent',
+        borderColor: active
+          ? (personal ? 'var(--theme-personal-border)' : 'var(--deep-accent-border)')
+          : 'var(--deep-card-border)',
+        color: accent,
+        // Неактивный таб глушим целиком, а не подменой цвета: оттенок должен остаться
+        // узнаваемым (золото = «мои»), иначе он перестаёт читаться как тот же экран.
+        opacity: active ? 1 : 0.55,
+      }}
+    >
+      <span className="block truncate text-[13px] font-black">{label}</span>
+      <span className="block truncate text-[11px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
+        {sub}
+      </span>
+    </button>
   );
 }
