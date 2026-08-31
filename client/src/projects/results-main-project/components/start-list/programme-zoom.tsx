@@ -64,9 +64,8 @@ export default function ProgrammeZoom({ orgCompId, startsLabel, notify, onPublis
 
   return (
     <div>
-      <div className="mb-2 text-[12.5px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
-        {data.comp_name} · {data.entries} entries
-      </div>
+      {/* Заголовок-счётчик («N entries · имя протокола») уехал в зону фильтров 5d — он
+          нужен и в режиме плана, а тут был только на программе. */}
       <RefreshBar updatedAt={data.updated_at} onRefresh={refresh} />
       {data.days.length > 1 && (
         <div className="mb-3 flex flex-wrap gap-1.5">

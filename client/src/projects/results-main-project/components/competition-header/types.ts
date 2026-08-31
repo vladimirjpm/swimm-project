@@ -158,6 +158,8 @@ export interface StartListSource {
   index: number;
   /** dd/MM для подписи; null — даты у привязки нет. */
   date: string | null;
+  /** Та же дата в ISO (yyyy-MM-dd) — из неё чип сессии считает день недели («Sun 15/02»). */
+  date_iso: string | null;
   /** Имя протокола у федерации (иврит) — только в title-тултип, не в подпись. */
   source_name: string | null;
   entry_count: number;

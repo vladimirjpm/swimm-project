@@ -1,18 +1,21 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import '../../../components/deep/deep-theme.css';
+import FilterZone from './filter-zone';
+import type { FilterZoneSession } from './filter-zone';
 import FollowingPicker from './following-picker';
 import PlanCard from './plan-card';
 import HeatZoom from './heat-zoom';
 import ProgrammeZoom from './programme-zoom';
-import ShareButton from './share-button';
-import SourceTabs from './source-tabs';
-import SwimmerFinder from './swimmer-finder';
 import SwimmerZoom from './swimmer-zoom';
+import { useStartListClubSwims } from './use-start-list';
 import { useStartListPlan } from './use-start-list-plan';
 import { useEffectivePlan } from './use-effective-plan';
 import { useMode } from '../../../../hooks/useMode';
 import { useAuth } from '../../../../hooks/useAuth';
-import { parsePlanParam, planSummary, serializePlanParam } from './plan-model';
+import { useFavoritesContext } from '../../../../hooks/favorites-context';
+import {
+  assemblePlanSwims, parsePlanParam, planRowsBySession, serializePlanParam,
+} from './plan-model';
 import type { StartListSource } from '../competition-header/types';
 
 /**
@@ -120,7 +123,6 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
   // Действующий состав и данные под него — один расчёт на пикер, карточку и на решение
   // «какой экран открыть первым» (useEffectivePlan).
   const effective = useEffectivePlan(allOrgCompIds, savedPlan, sharedPlan?.swimmer_ids ?? []);
-  const planLabel = planSummary(effective.plan);
 
   const openPicker = useCallback(() => setState((s) => ({ ...s, zoom: 'picker' })), []);
   const openPlan = useCallback(() => setState((s) => ({ ...s, zoom: 'plan' })), []);
@@ -176,6 +178,92 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
   const inPlan = state.zoom === 'picker' || state.zoom === 'plan';
   const hasPlan = !effective.isEmpty || sharedPlan != null;
 
+  // ── Данные зоны фильтров (5d) ────────────────────────────────────────────────
+  // Заплывы плана собираются ЗДЕСЬ, а не в карточке: их число нужно чипам сессий и
+  // сегменту «My plan · N» ещё до того, как карточка открыта. Карточка получает готовый
+  // список пропом — второй такой же расчёт внутри неё разъехался бы с чипами.
+  const { data: clubSwims, loading: clubSwimsLoading } = useStartListClubSwims(allOrgCompIds, shownPlan.club_ids);
+  const planSwims = useMemo(
+    () => assemblePlanSwims(effective.swimmers, clubSwims, shownPlan.swimmer_ids),
+    [effective.swimmers, clubSwims, shownPlan.swimmer_ids.join(',')],
+  );
+  const planRows = useMemo(() => planRowsBySession(planSwims), [planSwims]);
+  const planSwimsTotal = useMemo(
+    () => [...planRows.values()].reduce((sum, n) => sum + n, 0),
+    [planRows],
+  );
+  // Поиск в режиме плана сужается до СВОИХ — включая тех, кто попал в план через клуб:
+  // берём id из собранных заплывов, а не из plan.swimmer_ids.
+  const planSwimmerIds = useMemo(
+    () => new Set(planSwims.map((s) => s.swim.swimmer_id)),
+    [planSwims],
+  );
+
+  // Сессия = один протокол федерации. Сервер отдаёт хотя бы одну всегда (синтетическую по
+  // org_comp_id, когда привязок в CompetitionSources нет), но подстраховка дешевле бага.
+  const sessions: FilterZoneSession[] = useMemo(() => {
+    const list = sources.length > 0 ? sources : [];
+    if (list.length === 0) {
+      return [{ orgCompId, index: 1, date: null, dateIso: null, sourceName: null, entries: 0, mine: planRows.get(orgCompId) ?? 0 }];
+    }
+    return list.map((s) => ({
+      orgCompId: s.org_comp_id,
+      index: s.index,
+      date: s.date,
+      dateIso: s.date_iso,
+      sourceName: s.source_name,
+      entries: s.entry_count,
+      mine: planRows.get(s.org_comp_id) ?? 0,
+    }));
+  }, [sources, orgCompId, planRows]);
+
+  const { favorites, primarySwimmerId: favPrimaryId } = useFavoritesContext();
+  // Строка 3 в All — избранные: пловцы, заявленные на этом старте, и избранные клубы.
+  // Показывать того, кого в протоколе нет, значит обещать заплывы, которых не будет.
+  const favSwimmers = useMemo(() => favorites
+    .filter((f) => f.swimmer_id != null && effective.swimmers[f.swimmer_id as number])
+    .sort((a, b) => Number(b.swimmer_id === favPrimaryId) - Number(a.swimmer_id === favPrimaryId))
+    .map((f) => ({
+      id: f.swimmer_id as number,
+      // Имя чипа — из карточки протокола, а не из избранного: в избранном оно могло быть
+      // сохранено на другом языке, а на витрине имена ивритские (правило проекта).
+      name: effective.swimmers[f.swimmer_id as number]?.swimmer_name ?? f.swimmer_name ?? `#${f.swimmer_id}`,
+      favorite: true,
+    })),
+    [favorites, effective.swimmers, favPrimaryId]);
+  const favClubs = useMemo(() => effective.clubs
+    .filter((c) => effective.favClubIds.includes(c.club_id))
+    .map((c) => ({ id: c.club_id, name: c.club_name, swimmers: c.swimmers })),
+    [effective.clubs, effective.favClubIds]);
+
+  const planSwimmerChips = shownPlan.swimmer_ids.map((id) => ({
+    id,
+    name: effective.swimmers[id]?.swimmer_name ?? `#${id}`,
+  }));
+  const planClubChips = shownPlan.club_ids.map((id) => {
+    const club = effective.clubs.find((c) => c.club_id === id);
+    return { id, name: club?.club_name ?? `#${id}`, swimmers: club?.swimmers ?? 0 };
+  });
+
+  // Переключение режима зоны. «My plan» с пустым составом ведёт в пикер: карточке нечего
+  // показывать, пока не выбран никто.
+  const setMode = useCallback((next: 'all' | 'plan') => {
+    if (next === 'all') backToProgramme();
+    else if (hasPlan) openPlan();
+    else openPicker();
+  }, [backToProgramme, hasPlan, openPlan, openPicker]);
+
+  // Выбор сессии. В All это смена ИСТОЧНИКА и возврат на программу (heat/swimmer
+  // принадлежат прошлому протоколу). В плане экран тот же, меняется только фильтр —
+  // сбрасывать зум там нечего и незачем.
+  const selectSession = useCallback((next: number) => {
+    if (!inPlan) { selectSource(next); return; }
+    const url = new URL(window.location.href);
+    url.searchParams.set('src', String(next));
+    window.history.replaceState(null, '', url.toString());
+    setActiveSource(next);
+  }, [inPlan, selectSource]);
+
   // Экран «протокол не опубликован» (Т9): подписка «Notify me» живёт в плане и только у
   // залогиненного — гостю её негде хранить. Рассылки за флагом пока нет, он копится.
   const { isAuthenticated } = useAuth();
@@ -212,49 +300,35 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
     // своего цвета не ставит, наследовало его. Карточка плана красит себя сама, поэтому
     // зелёной была только программа. Токен парный фону таба (`--deep-page-bg`).
     <div className={deepThemeClass} style={{ color: 'var(--deep-text)' }}>
-      {/* Два таба вместо одной кнопки-переключателя (решение Влада 30.08.2026). Кнопка
-          меняла надпись по состоянию («My plan» ↔ «← Back to the programme»), и по ней не
-          было видно, что экрана ДВА и какой сейчас открыт. Табы показывают оба сразу.
+      {/* ЗОНА ФИЛЬТРОВ (вариант 5d/5dm, !design_handoff/FILTER-ZONE-5D) — одна панель на
+          оба режима таба: сегмент All programme / My plan, чипы сессий, поиск, люди.
+          До неё это были пять разных блоков (плитки-переключатель, строка Share, панель
+          «найти своего», подтабы источников и дни-чипы внутри карточки плана) высотой
+          ~400px.
 
-          Не `DeepTabs`: тот собран как «папка», сросшаяся с панелью контента
-          (`border-bottom: none`, `margin-bottom: -1px`, парная `.deep-tabs-panel`), а
-          карточка-билет внутрь панели не встаёт — её вырезы-полукруги закрашены фоном
-          СТРАНИЦЫ, и на панели они превратились бы в чужие кружки. Отступление записано
-          в docs/ui-components.md §6. */}
+          Липкой панель НЕ сделана, хотя переключатель до 5d липнул: в 5dm зона ~230px, и
+          вместе с компакт-баром шапки она съедала бы почти половину экрана телефона.
+          Открытый вопрос — см. итог работы. */}
       {published !== false && (
-        <div className="mb-2 mt-2 grid grid-cols-2 gap-2" role="tablist" aria-label="Start list view">
-          <StartListViewTab
-            active={!inPlan}
-            onClick={backToProgramme}
-            label="All programme"
-            sub="everyone at this meet"
-          />
-          {/* Таб плана всегда в цвете избранного — это «мои», а не просто второй экран. */}
-          <StartListViewTab
-            active={inPlan}
-            onClick={hasPlan ? openPlan : openPicker}
-            label="⭐ My plan"
-            sub={planLabel ?? 'choose who to follow'}
-            personal
-          />
-        </div>
-      )}
-
-      {/* «Поделиться» есть на ВСЕХ экранах таба, а не только в плане (правка 31.08.2026):
-          ссылкой делятся ровно тогда, когда нашли ответ, — а нашли его чаще всего в
-          карточке пловца, куда ведёт поиск. В карточке плана кнопка своя, в её шапке рядом
-          с меткой «Shared plan», поэтому здесь она только вне плана — двух одинаковых
-          кнопок на экране быть не должно. */}
-      {published !== false && !inPlan && (
-        <div className="mb-2 flex justify-end">
-          <ShareButton url={shareUrl} />
-        </div>
-      )}
-
-      {/* Панель «найти своего» — над зумами: это вход в таб для того, кто пришёл по одному
-          вопросу «когда плывёт мой». На экранах плана она лишняя — там уже свой состав. */}
-      {!inPlan && published !== false && (
-        <SwimmerFinder orgCompIds={allOrgCompIds} onOpenSwimmer={openSwimmer} />
+        <FilterZone
+          mode={inPlan ? 'plan' : 'all'}
+          onModeChange={setMode}
+          planSwims={planSwimsTotal}
+          sessions={sessions}
+          activeOrgCompId={effectiveOrgCompId}
+          onSelectSession={selectSession}
+          shareUrl={shareUrl}
+          orgCompIds={allOrgCompIds}
+          onOpenSwimmer={openSwimmer}
+          planSwimmerIds={planSwimmerIds}
+          favSwimmers={favSwimmers}
+          favClubs={favClubs}
+          planSwimmers={planSwimmerChips}
+          planClubs={planClubChips}
+          onRemoveSwimmer={(id) => saveOwn({ ...shownPlan, swimmer_ids: shownPlan.swimmer_ids.filter((x) => x !== id) })}
+          onRemoveClub={(id) => saveOwn({ ...shownPlan, club_ids: shownPlan.club_ids.filter((x) => x !== id) })}
+          onEditPlan={openPicker}
+        />
       )}
 
       {state.zoom === 'picker' && (
@@ -276,23 +350,12 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
         <PlanCard
           orgCompIds={allOrgCompIds}
           plan={shownPlan}
-          swimmers={effective.swimmers}
-          clubs={effective.clubs}
-          planLoading={effective.loading}
-          shareUrl={shareUrl}
+          swims={planSwims}
+          activeOrgCompId={effectiveOrgCompId}
+          loading={effective.loading || clubSwimsLoading}
           shared={sharedPlan != null}
           onChange={saveOwn}
-          onEdit={openPicker}
           onOpenHeat={openHeatFromSwimmer}
-        />
-      )}
-      {/* Подтабы источников относятся к зумам, а не к пикеру: там выбирают, ЗА КЕМ следить,
-          и «какой протокол смотрим» на этом экране ничего не значит. */}
-      {sources.length > 1 && !inPlan && (
-        <SourceTabs
-          sources={sources}
-          activeOrgCompId={effectiveOrgCompId}
-          onSelect={selectSource}
         />
       )}
       {state.zoom === 'programme' && (
@@ -316,50 +379,5 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
         />
       )}
     </div>
-  );
-}
-
-/**
- * Плитка-таб «какой экран таба смотрим»: программа целиком или личный план.
- *
- * Активная — залитая своим цветом, неактивная — прозрачная и приглушённая, но того же
- * оттенка: у плана он золотой (цвет избранного), у программы — обычный акцент таба.
- * Подпись второй строкой отвечает на «а что там»: у плана это состав («1 swimmer + 1
- * club»), у программы — что она про всех.
- */
-function StartListViewTab({ active, onClick, label, sub, personal = false }: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  sub: string;
-  /** true — таб личного плана: цвет избранного вместо акцента таба. */
-  personal?: boolean;
-}) {
-  const accent = personal ? 'var(--theme-personal-accent)' : 'var(--deep-accent)';
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={active}
-      onClick={onClick}
-      className="rounded-[12px] border px-3 py-2 text-left"
-      style={{
-        background: active
-          ? (personal ? 'var(--theme-personal-bg)' : 'var(--deep-accent-soft)')
-          : 'transparent',
-        borderColor: active
-          ? (personal ? 'var(--theme-personal-border)' : 'var(--deep-accent-border)')
-          : 'var(--deep-card-border)',
-        color: accent,
-        // Неактивный таб глушим целиком, а не подменой цвета: оттенок должен остаться
-        // узнаваемым (золото = «мои»), иначе он перестаёт читаться как тот же экран.
-        opacity: active ? 1 : 0.55,
-      }}
-    >
-      <span className="block truncate text-[13px] font-black">{label}</span>
-      <span className="block truncate text-[11px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
-        {sub}
-      </span>
-    </button>
   );
 }

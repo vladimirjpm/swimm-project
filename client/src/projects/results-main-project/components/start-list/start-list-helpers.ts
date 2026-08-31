@@ -211,3 +211,21 @@ export function dayLabel(iso: string): string {
   if (Number.isNaN(d.getTime())) return '';
   return d.toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short' });
 }
+
+/**
+ * Подпись чипа сессии — «Sun 15/02 · #1» (зона фильтров 5d).
+ *
+ * День недели ВНУТРИ чипа обязателен: у окружного чемпионата на одну дату приходится две
+ * сессии, и «15/02» без номера их не различает, а без дня недели родителю приходится
+ * сверяться с календарём. Год для расчёта дня недели есть только в ISO-дате (`date_iso`),
+ * `date` приходит как dd/MM — поэтому без ISO день недели просто опускаем, а не угадываем.
+ */
+export function sessionLabel(iso: string | null, ddmm: string | null, index: number): string {
+  const d = iso ? new Date(iso) : null;
+  const weekday = d && !Number.isNaN(d.getTime())
+    ? d.toLocaleDateString(undefined, { weekday: 'short' })
+    : null;
+  const date = [weekday, ddmm].filter(Boolean).join(' ');
+  return date ? `${date} · #${index}` : `#${index}`;
+}
+

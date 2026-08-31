@@ -27,14 +27,23 @@ export default function ShareButton({ url }: { url: string }) {
     }
   };
 
+  const label = state === 'copied' ? 'Link copied' : state === 'failed' ? 'Copy failed' : 'Share link ↗';
+
   return (
+    // Мобайл (5dm) — круглая кнопка 42×42 с одной стрелкой: в строку с сегмент-контролом
+    // полноразмерная пилюля не влезает и выталкивает её за край экрана. От 640px — обычная
+    // пилюля с подписью. Состояние («скопировано») одно на оба вида, поэтому это ОДНА
+    // кнопка с адаптивной подписью, а не две по брейкпойнту.
     <button
       type="button"
       onClick={share}
-      className="shrink-0 rounded-full px-3 py-1.5 text-[11.5px] font-black"
+      aria-label={label}
+      title={label}
+      className="flex h-[42px] w-[42px] flex-none items-center justify-center rounded-full text-[15px] font-black sm:h-auto sm:w-auto sm:px-3 sm:py-1.5 sm:text-[11.5px]"
       style={{ background: 'var(--deep-accent)', color: 'var(--deep-accent-ink)' }}
     >
-      {state === 'copied' ? 'Link copied' : state === 'failed' ? 'Copy failed' : 'Share link ↗'}
+      <span className="sm:hidden" aria-hidden>{state === 'idle' ? '↗' : '✓'}</span>
+      <span className="hidden sm:inline">{label}</span>
     </button>
   );
 }

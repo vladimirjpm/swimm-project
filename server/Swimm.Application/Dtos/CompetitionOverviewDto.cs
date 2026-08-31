@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace Swimm.Application.Dtos;
 
@@ -132,6 +132,12 @@ public sealed class OverviewStartListSourceDto
     [JsonPropertyName("index")] public int Index { get; init; }
     /// <summary>Дата протокола, dd/MM (как в подписи подтаба). null — даты у привязки нет.</summary>
     [JsonPropertyName("date")] public string? Date { get; init; }
+    /// <summary>
+    /// Та же дата в ISO (yyyy-MM-dd). Нужна витрине, чтобы посчитать ДЕНЬ НЕДЕЛИ в чипе
+    /// сессии («Sun 15/02 · #1», зона фильтров 5d): по <see cref="Date"/> без года его не
+    /// вычислить. Формат календарный, как у ключа дня в стартовом протоколе.
+    /// </summary>
+    [JsonPropertyName("date_iso")] public string? DateIso { get; init; }
     /// <summary>Имя протокола у федерации — только для тултипа.</summary>
     [JsonPropertyName("source_name")] public string? SourceName { get; init; }
     /// <summary>Сколько заявок затянуто (0 — привязка есть, забора ещё не было).</summary>

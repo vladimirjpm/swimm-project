@@ -126,6 +126,20 @@ export function planDays(programmeDays: readonly string[], swims: readonly PlanS
   }));
 }
 
+/**
+ * Сколько СТРОК плана приходится на каждую сессию (протокол) — счётчик чипа сессии в зоне
+ * фильтров 5d. Считаем строки, а не заявки, по той же причине, что и в `planDays`: ноги
+ * эстафеты и несколько выбранных в одном заплыве складываются в одну строку, и число на
+ * чипе спорило бы с тем, что видно под ним.
+ */
+export function planRowsBySession(swims: readonly PlanSwim[]): Map<number, number> {
+  const by = new Map<number, number>();
+  for (const row of groupPlanRows(swims)) {
+    by.set(row.orgCompId, (by.get(row.orgCompId) ?? 0) + 1);
+  }
+  return by;
+}
+
 /** Первый старт плана в этот день — из него строится hero карточки (и ARRIVE BY в Т8). */
 export function firstSwimOfDay(swims: readonly PlanSwim[], day: string): PlanSwim | null {
   return swims.find((s) => s.swim.comp_date.slice(0, 10) === day && s.swim.heat_start_at) ?? null;

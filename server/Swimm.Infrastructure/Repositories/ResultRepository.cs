@@ -975,6 +975,7 @@ public class ResultRepository : IResultRepository
                     CompetitionId = firstDay?.CompetitionId ?? 0,
                     Index = 1,
                     Date = ShortDay(firstDay?.Date),
+                    DateIso = IsoDay(firstDay?.Date),
                     SourceName = firstDay?.SubName,
                     EntryCount = await CountEntriesAsync(fallbackOrgCompId.Value)
                 }
@@ -997,6 +998,8 @@ public class ResultRepository : IResultRepository
             Index = i + 1,
             Date = s.SourceDate?.ToString("dd/MM", CultureInfo.InvariantCulture)
                    ?? ShortDay(days.FirstOrDefault(d => d.CompetitionId == s.CompetitionId)?.Date),
+            DateIso = s.SourceDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                      ?? IsoDay(days.FirstOrDefault(d => d.CompetitionId == s.CompetitionId)?.Date),
             SourceName = s.SourceName,
             EntryCount = counts.TryGetValue(s.OrgCompId, out var c) ? c : 0
         }).ToList();
@@ -1010,6 +1013,13 @@ public class ResultRepository : IResultRepository
         => date is not null && DateTime.TryParseExact(date, "dd/MM/yyyy", CultureInfo.InvariantCulture,
                DateTimeStyles.None, out var d)
             ? d.ToString("dd/MM", CultureInfo.InvariantCulture)
+            : null;
+
+    /// <summary>Дата дня dd/MM/yyyy → yyyy-MM-dd; непарсимая → null. День недели чипа сессии.</summary>
+    private static string? IsoDay(string? date)
+        => date is not null && DateTime.TryParseExact(date, "dd/MM/yyyy", CultureInfo.InvariantCulture,
+               DateTimeStyles.None, out var d)
+            ? d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
             : null;
 
     /// <summary>Дата дня dd/MM/yyyy → DateTime для сортировки; непарсимая → MaxValue (в конец).</summary>
