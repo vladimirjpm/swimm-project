@@ -110,9 +110,19 @@ const useIsMobile = () => {
   );
   React.useEffect(() => {
     const mq = window.matchMedia('(max-width: 639px)');
-    const onChange = (e: MediaQueryListEvent) => setMobile(e.matches);
+    const onChange = () => setMobile(mq.matches);
+    // Синхронизируемся сразу: между вычислением начального состояния и подпиской
+    // ширина могла измениться, и тогда состояние осталось бы навсегда неверным.
+    onChange();
     mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
+    // Подписка на resize — страховка: при программной смене метрик вьюпорта (devtools,
+    // эмуляция устройства) событие change у matchMedia приходит не всегда, и селектор
+    // рисовал мобильный sheet на десктопе (эталон — useIsSmUp в gender-age-table).
+    window.addEventListener('resize', onChange);
+    return () => {
+      mq.removeEventListener('change', onChange);
+      window.removeEventListener('resize', onChange);
+    };
   }, []);
   return mobile;
 };
@@ -259,6 +269,50 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
   React.useEffect(() => {
     if (!panelOpen) setCatMenuOpen(false);
   }, [panelOpen]);
+
+  /**
+   * Геометрия десктопного дропдауна в координатах ВЬЮПОРТА (см. комментарий у разметки).
+   *
+   * `top` — под тем, что реально занимает верх экрана: под hero шапки, пока он виден, и
+   * под липкой шапкой (`--comp-sticky-chrome-h`, её публикует компакт-бар соревнования),
+   * когда hero уехал. Hero ищем по `data-comp-hero`, а не по «первому ребёнку»: разметку
+   * шапки даёт чужой компонент через renderHeader, и опираться на её структуру нельзя.
+   *
+   * Пересчитываем на скролл и resize, пока панель открыта: она висит над страницей, и её
+   * место меняется вместе с шапкой.
+   */
+  const [dropBox, setDropBox] = React.useState<
+    { top: number; left: number; width: number; maxHeight: number } | null
+  >(null);
+  React.useLayoutEffect(() => {
+    if (!panelOpen || isMobile) { setDropBox(null); return undefined; }
+    const measure = () => {
+      const wrap = wrapRef.current;
+      if (!wrap) return;
+      const wrapRect = wrap.getBoundingClientRect();
+      const hero = wrap.querySelector('[data-comp-hero]');
+      const heroBottom = hero ? hero.getBoundingClientRect().bottom : wrapRect.bottom;
+      const chrome = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--comp-sticky-chrome-h'),
+      ) || 0;
+      const top = Math.max(heroBottom, chrome) + 10;
+      setDropBox({
+        top,
+        left: wrapRect.left,
+        width: wrapRect.width,
+        // Нижний отступ 16px — чтобы панель не липла к краю экрана. Пол в 240px: на совсем
+        // низком окне лучше дать панели вылезти, чем схлопнуть её в полоску.
+        maxHeight: Math.max(240, window.innerHeight - top - 16),
+      });
+    };
+    measure();
+    window.addEventListener('scroll', measure, { passive: true });
+    window.addEventListener('resize', measure);
+    return () => {
+      window.removeEventListener('scroll', measure);
+      window.removeEventListener('resize', measure);
+    };
+  }, [panelOpen, isMobile]);
 
   // Body scroll lock, пока открыт мобильный sheet
   React.useEffect(() => {
@@ -912,13 +966,21 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
     : null;
 
   // Карточка панели: inline (deep-link ?category=) и desktop-дропдаун
-  const panel = (inline: boolean) => (
+  /**
+   * Панель выбора. `maxHeight` задаёт дропдаун, который считает, сколько места осталось до
+   * низа экрана: без ограничения список соревнований рос как хотел и уезжал за нижний край
+   * (баг 31.08.2026 — у залогиненного, с персональной полосой в шапке, за экраном
+   * оказывалась половина панели). Скроллится ТОЛЬКО список: табы, поиск и сезон должны
+   * остаться на виду.
+   */
+  const panel = (inline: boolean, maxHeight?: number) => (
     <div
       className="dv-data-source rounded-[18px] px-[22px] py-5 max-sm:px-3.5"
       style={{
         background: 'var(--theme-mode-surface)',
         border: '1px solid var(--theme-mode-border)',
         boxShadow: 'var(--theme-mode-card-shadow)',
+        ...(maxHeight != null ? { maxHeight, display: 'flex', flexDirection: 'column' as const } : null),
       }}
     >
       <div className="mb-3.5 flex items-center justify-between">
@@ -946,7 +1008,9 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
         {champToggle}
         {seasonSelect}
       </div>
-      {listBody}
+      {maxHeight != null
+        ? <div className="min-h-0 flex-1 overflow-y-auto">{listBody}</div>
+        : listBody}
     </div>
   );
 
@@ -1032,12 +1096,28 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
     return (
       <div ref={wrapRef} className="relative">
         {renderHeader(() => setPanelOpen((v) => !v), panelOpen, selectedSourceObj)}
-        {panelOpen && !isMobile && (
+        {panelOpen && !isMobile && dropBox && (
+          // Дропдаун привязан к ВЬЮПОРТУ, а не к низу шапки (баг 31.08.2026).
+          //
+          // Было `absolute; top: calc(100% + 10px)` — то есть под ВСЕЙ шапкой: hero +
+          // персональная полоса + табы. У залогиненного это ~400px, панель начиналась
+          // ниже середины экрана и наполовину уходила за нижний край. Плюс с приездом
+          // компакт-бара (16b) «Change» стало можно нажать, прокрутив шапку прочь, —
+          // и панель открывалась там, где её не видно вовсе.
+          //
+          // Теперь `fixed` под тем, что реально сверху: под hero, пока он на экране, и
+          // под компакт-баром, когда шапка уехала (см. dropBox). Ширина и левый край —
+          // от контейнера шапки, чтобы панель не разъезжалась с ней по ширине страницы.
           <div
-            className="dv-sel-panel-drop absolute left-0 right-0 z-20"
-            style={{ top: 'calc(100% + 10px)', filter: 'drop-shadow(0 18px 30px rgba(0,0,0,0.16))' }}
+            className="dv-sel-panel-drop fixed z-[70]"
+            style={{
+              top: dropBox.top,
+              left: dropBox.left,
+              width: dropBox.width,
+              filter: 'drop-shadow(0 18px 30px rgba(0,0,0,0.16))',
+            }}
           >
-            {panel(false)}
+            {panel(false, dropBox.maxHeight)}
           </div>
         )}
         {panelOpen && isMobile && sheet}
