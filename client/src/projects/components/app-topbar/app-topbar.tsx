@@ -218,7 +218,10 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
 
   return (
     // Полоса остаётся LTR и на RTL-страницах (правило хендоффа).
-    <header dir="ltr" className="sticky top-0 z-50 bg-[var(--theme-topbar-bg)]">
+    // data-app-topbar — крючок для тех, кому нужна ВЫСОТА липкой полосы (стики-бар
+    // соревнования считает от неё смещение для своих липких строк). Мерить по нему, а не
+    // хардкодить 46px: высота задаётся классом ниже и может измениться.
+    <header dir="ltr" data-app-topbar className="sticky top-0 z-50 bg-[var(--theme-topbar-bg)]">
       {/* Фон полосы — край-в-край; содержимое в общем контейнере (handoff v2, 5a). */}
       <div className={`${PAGE_CONTAINER} flex h-[46px] items-center justify-between gap-4`}>
         <TopbarLogo />
