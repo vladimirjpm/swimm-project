@@ -10,7 +10,7 @@ import SwimmerZoom from './swimmer-zoom';
 import { useStartListClubSwims } from './use-start-list';
 import { useStartListPlan } from './use-start-list-plan';
 import { useEffectivePlan } from './use-effective-plan';
-import { useMode } from '../../../../hooks/useMode';
+import { useDeepThemeClass } from '../../../components/deep/use-deep-theme-class';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useFavoritesContext } from '../../../../hooks/favorites-context';
 import {
@@ -34,7 +34,9 @@ import type { StartListSource } from '../competition-header/types';
  * нет (решение 7) — вместо него «Updated HH:MM» + Refresh на каждом экране.
  */
 
-type Zoom = 'programme' | 'heat' | 'swimmer' | 'picker' | 'plan';
+// 'picker' здесь больше нет: правка состава стала МОДАЛКОЙ поверх текущего экрана
+// (решение Влада 31.08.2026), и отдельной ветки маршрутизатора ей не нужно.
+type Zoom = 'programme' | 'heat' | 'swimmer' | 'plan';
 
 interface Props {
   orgCompId: number;
@@ -124,15 +126,20 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
   // «какой экран открыть первым» (useEffectivePlan).
   const effective = useEffectivePlan(allOrgCompIds, savedPlan, sharedPlan?.swimmer_ids ?? []);
 
-  const openPicker = useCallback(() => setState((s) => ({ ...s, zoom: 'picker' })), []);
+  // Пикер — модалка поверх экрана; под ней остаётся карточка плана, к которой человек и
+  // вернётся. Пустой состав тоже открывает карточку: она честно скажет, что никого нет.
+  const [pickerOpen, setPickerOpen] = useState(false);
   const openPlan = useCallback(() => setState((s) => ({ ...s, zoom: 'plan' })), []);
+  const openPicker = useCallback(() => {
+    setState((s) => ({ ...s, zoom: 'plan' }));
+    setPickerOpen(true);
+  }, []);
   const backToProgramme = useCallback(() => setState((s) => ({ ...s, zoom: 'programme' })), []);
 
   // Токены темы Deep (`--deep-*`) объявлены НА КЛАССЕ, а не на :root, поэтому их надо
   // включить на контейнере — иначе весь принятый дизайн таба (карточки, cyan-акценты)
   // рисуется пустыми переменными. Пара light↔dark идёт за глобальным режимом страницы.
-  const { mode } = useMode();
-  const deepThemeClass = mode === 'dark' ? 'theme-deep' : 'theme-deep-light';
+  const deepThemeClass = useDeepThemeClass();
 
   const shownPlan = sharedPlan ?? effective.plan;
 
@@ -175,7 +182,7 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
 
   // Экраны личного плана — пикер и карточка. Пустой состав карточке показывать нечего,
   // поэтому вход ведёт в пикер, пока в плане никого нет.
-  const inPlan = state.zoom === 'picker' || state.zoom === 'plan';
+  const inPlan = state.zoom === 'plan';
   const hasPlan = !effective.isEmpty || sharedPlan != null;
 
   // ── Данные зоны фильтров (5d) ────────────────────────────────────────────────
@@ -250,6 +257,8 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
   const setMode = useCallback((next: 'all' | 'plan') => {
     if (next === 'all') backToProgramme();
     else if (hasPlan) openPlan();
+    // Состав пуст — сразу поверх карточки открываем пикер: показывать пустой билет и
+    // ждать, что человек сам найдёт «Add swimmer», неправильно.
     else openPicker();
   }, [backToProgramme, hasPlan, openPlan, openPicker]);
 
@@ -331,7 +340,7 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
         />
       )}
 
-      {state.zoom === 'picker' && (
+      {pickerOpen && (
         <FollowingPicker
           orgCompIds={allOrgCompIds}
           plan={shownPlan}
@@ -342,7 +351,8 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
           primarySwimmerId={effective.primarySwimmerId}
           loading={effective.loading}
           onChange={saveOwn}
-          onShowPlan={hasPlan ? openPlan : backToProgramme}
+          onShowPlan={() => { setPickerOpen(false); openPlan(); }}
+          onClose={() => setPickerOpen(false)}
         />
       )}
 

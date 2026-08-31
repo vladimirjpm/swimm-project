@@ -1,4 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { useDeepThemeClass } from '../../../components/deep/use-deep-theme-class';
 import { useFavoritesContext } from '../../../../hooks/favorites-context';
 import { useStartListSearch } from './use-start-list';
 import { dayLabel } from './start-list-helpers';
@@ -7,10 +9,17 @@ import type { StartListClub, StartListSwimmer } from './types';
 import type { StartListPlan } from './use-start-list-plan';
 
 /**
- * Экран S1 «Following» — вход в личный план (шаг Т5, макет `Start List.dc.html`, секция 3a).
+ * «Following» — ЗА КЕМ следить на этом старте (шаг Т5, макет `Start List.dc.html`,
+ * секция 3a). Несколько избранных сразу плюс клуб целиком — раньше режим был один и
+ * жёсткий: «primary favorite», один пловец.
  *
- * Отвечает на один вопрос: ЗА КЕМ следить на этом старте. Несколько избранных сразу плюс
- * клуб целиком — раньше режим был один и жёсткий: «primary favorite», один пловец.
+ * МОДАЛКА, а не отдельный экран таба (решение Влада 31.08.2026). Правка состава — короткий
+ * заход «добавить своего и вернуться», и уводить ради него с карточки плана незачем: под
+ * попапом остаётся то, к чему человек и вернётся. Заодно ушла третья ветка в маршрутизаторе
+ * таба (`zoom === 'picker'`), которая существовала только ради этого экрана.
+ *
+ * Кнопка «Show my plan» прижата к низу попапа: список избранных и клубов длинный, и в
+ * конце его кнопку сперва надо было доскроллить.
  *
  * Что здесь важно и не переизобретается:
  *
@@ -24,7 +33,7 @@ import type { StartListPlan } from './use-start-list-plan';
  */
 export default function FollowingPicker({
   orgCompIds, plan, swimmers, clubs, rowIds, favClubIds: favClubIdList, primarySwimmerId,
-  loading, onChange, onShowPlan,
+  loading, onChange, onShowPlan, onClose,
 }: {
   orgCompIds: number[];
   /** ДЕЙСТВУЮЩИЙ состав: сохранённый план либо дефолт из избранного (useEffectivePlan). */
@@ -38,11 +47,27 @@ export default function FollowingPicker({
   loading: boolean;
   /** Состав уходит наверх ЦЕЛИКОМ: первая же правка материализует дефолт вместе с ней. */
   onChange: (next: StartListPlan) => void;
+  /** Кнопка внизу попапа: закрыть и показать карточку плана. */
   onShowPlan: () => void;
+  onClose: () => void;
 }) {
   const { isAuthenticated, favorites } = useFavoritesContext();
   const [query, setQuery] = useState('');
   const [allClubs, setAllClubs] = useState(false);
+  // Токены темы — на своём контейнере: попап живёт в портале, снаружи контейнера таба.
+  const deepThemeClass = useDeepThemeClass();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    // Скролл страницы под попапом гасим — иначе палец листает протокол, а не список.
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
 
   const favClubIds = new Set(favClubIdList);
   const swimmersLoading = loading;
@@ -72,11 +97,44 @@ export default function FollowingPicker({
   const shownRest = allClubs ? orderedClubs.rest : orderedClubs.rest.slice(0, 5);
   const summary = planSummary(plan);
 
-  return (
-    // Цвет текста — парным токеном поверхности (правило парных токенов, client/CLAUDE.md):
-    // строки пикера стоят на карточках Deep, а не на фоне страницы, и наследованный цвет
-    // в dark оказывался тёмным по тёмному.
-    <div className="pb-24" style={{ color: 'var(--deep-text)' }}>
+  return createPortal(
+    // Подложка. Ниже мобильного sheet селектора (z-130) и глобального Popup, выше кнопки
+    // «наверх» (110) и переключателя темы (120) — иначе они торчали бы поверх попапа.
+    <div
+      className={`fixed inset-0 z-[125] flex items-end justify-center sm:items-center ${deepThemeClass}`}
+      style={{ background: 'var(--theme-mode-overlay)' }}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Who to follow"
+    >
+      {/* Панель. На телефоне снизу во всю ширину, от 640px — по центру. Внутри колонка:
+          шапка и футер стоят, список между ними скроллится, поэтому кнопка «Show my plan»
+          всегда у нижнего края попапа. Цвет текста — парным токеном поверхности (правило
+          парных токенов, client/CLAUDE.md): строки пикера стоят на карточках Deep, и
+          наследованный цвет в dark оказывался тёмным по тёмному. */}
+      <div
+        className="flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[18px] sm:w-[min(92vw,560px)] sm:rounded-[18px]"
+        style={{ background: 'var(--deep-page-bg)', color: 'var(--deep-text)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="flex flex-none items-center justify-between gap-2 border-b px-4 py-3"
+          style={{ borderColor: 'var(--deep-divider)' }}
+        >
+          <span className="text-[14px] font-black">Who to follow</span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="flex h-9 w-9 flex-none items-center justify-center rounded-full text-[15px] font-black"
+            style={{ background: 'var(--deep-card-bg)', color: 'var(--deep-text-mute)' }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
       <SectionTitle
         title="Favorites"
         note={plan.swimmer_ids.length > 0 ? `${plan.swimmer_ids.length} selected` : undefined}
@@ -185,17 +243,33 @@ export default function FollowingPicker({
         </button>
       )}
 
-      {/* CTA — «показать мой план». Пока состав пуст, показывать нечего. */}
-      <button
-        type="button"
-        onClick={onShowPlan}
-        disabled={summary === null}
-        className="mt-5 w-full rounded-[12px] px-3 py-3 text-[13px] font-black disabled:opacity-40"
-        style={{ background: 'var(--deep-accent)', color: 'var(--deep-accent-ink)' }}
-      >
-        {summary ? `Show my plan — ${summary}` : 'Pick someone to follow'}
-      </button>
-    </div>
+        </div>
+
+        {/* CTA — «показать мой план»: стоит у нижнего края попапа и не уезжает со списком.
+            Пока состав пуст, показывать нечего. */}
+        <div
+          className="flex-none border-t px-4 pt-3"
+          style={{
+            borderColor: 'var(--deep-divider)',
+            background: 'var(--deep-page-bg)',
+            // На телефоне попап прижат к низу экрана — уводим кнопку из-под домашней
+            // полосы iOS. `pb-safe` в проекте не определён (мёртвый класс), поэтому явно.
+            paddingBottom: 'calc(12px + env(safe-area-inset-bottom))',
+          }}
+        >
+          <button
+            type="button"
+            onClick={onShowPlan}
+            disabled={summary === null}
+            className="w-full rounded-[12px] px-3 py-3 text-[13px] font-black disabled:opacity-40"
+            style={{ background: 'var(--deep-accent)', color: 'var(--deep-accent-ink)' }}
+          >
+            {summary ? `Show my plan — ${summary}` : 'Pick someone to follow'}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
