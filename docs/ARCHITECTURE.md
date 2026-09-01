@@ -134,24 +134,34 @@ Application → реализация в Infrastructure → регистраци�
 
 ## 6. Клиент
 
-- Роутера нет; экраны — через Redux (`store.ts`, единый `rootSlice`). Точка входа результатов —
-  `results_main.html?category=&competitionId=`.
+- SPA-роутера нет; экраны — через Redux (`store.ts`, единый `rootSlice`), а «страницы» это
+  **отдельные html в корне `client/`** (multi-page Vite, `rollupOptions.input`): `home`,
+  `results_main`, `competitions`, `groups`, `swimmer`, `club`, `media`, `season-best`, `about`.
+- **Наружу — чистые URL, не `.html`**: `/results`, `/competitions/{id}`, `/swimmers/{id}`,
+  `/clubs/{id}`, `/groups/{slug}`, `/season-best`, `/my-media`. Контракт живёт в ОДНОМ месте —
+  `client/src/utils/routes.ts` (`routes.*()` генерят, `parseRoute()` разбирает), и у него
+  **три синхронных зеркала**: сам `routes.ts`, `cleanUrlRewrite` в `vite.config.js` (dev) и
+  rewrite-middleware в `Program.cs` перед `UseStaticFiles` (прод). Правило: в путь — только
+  идентичность ресурса, вид (`tab`, `filter`, `club`, `swim`, `cat`, `season`) — в query.
 - Единственный шов выбора данных — `filter-data-source-ddl.tsx` (уже на `/api/*`).
-- **Убрать `<script src="/data/normative*.js">`** — helpers (`helper-normative.ts`) переходят
-  на `/api/records` + `/api/normative-standards` с кэшем по образцу `CategoryHelper`
-  (fetch → localStorage/память → fallback). Глобальные `window.normative*` исчезают.
+- ~~Убрать `<script src="/data/normative*.js">`~~ — **сделано (фаза 2.7)**: статики нет,
+  нормативы и рекорды идут через `/api/records` + `/api/normative-standards` с прогревом
+  `RecordsHelper.warmUp()` в точке входа страницы. Глобальных `window.normative*` больше нет.
 - Фильтрация при больших датасетах уезжает на сервер: клиент не выкачивает все страницы
   `/api/results`, а передаёт фильтры query-параметрами (бэкенд уже принимает их в
   `ResultFilter` — клиент просто не пользуется). Переключение — админ-настройка
   `ResultsLoadMode` (`full`/`paged` принудительно, `client` = выбор через `?loadMode=`),
-  доставляется клиенту через `GET /api/client-config` → `ResultsLoadModeHelper`;
-  `paged`-ветка наполняется в фазе 3.2.
+  доставляется клиенту через `GET /api/client-config` → `ResultsLoadModeHelper`.
+  `paged`-ветка наполнена в фазе 3.2 (фаза 3 закрыта целиком).
 - Auth-состояние: `/auth/me` (уже используется в `useFavorites`) → выделить в общий
   `useAuth`-хук при добавлении логин-UI.
 
 ## 7. Бэклог рефакторинга (технический долг, вне фаз — брать попутно)
 
-1. `client/src/pages/*` — мёртвые маршруты без роутера: удалить или подключить осознанно.
+1. ~~`client/src/pages/*` — мёртвые маршруты без роутера~~ — **неверно, не трогать**: это
+   ЖИВЫЕ точки входа multi-page-сборки (`home-page.tsx`, `results-main-page.tsx`,
+   `club-page.tsx`, `swimmer-page.tsx` …), каждая перечислена в `rollupOptions.input`
+   `vite.config.js`. Удаление сломает сборку соответствующей страницы.
 2. Следы CRA (`reportWebVitals`, `react-app-env.d.ts`, `setupTests.ts`) — удалить.
 3. `data-helper2.js` и прочий JS среди TS — типизировать при первом же касании.
 4. Поле стора `debigConfig` (опечатка) — переименовать одним атомарным PR со всеми ссылками.
