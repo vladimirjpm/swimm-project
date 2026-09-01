@@ -12,7 +12,8 @@ import RecordsHelper from '../utils/helpers/records-helper';
 const pageParams = new URLSearchParams(window.location.search);
 applyResultsCategory(pageParams.get('category') ?? pageParams.get('cat'));
 
-// Прогрев рекордов/нормативов с сервера (fallback на window.normative_* пока не загрузится)
+// Прогрев рекордов/нормативов с сервера: до первого ответа справочники пустые
+// («нет данных»), глобальных window.normative_* больше нет — статику снесли в фазе 2.7.
 RecordsHelper.warmUp();
 
 const container = document.getElementById('root')!;

@@ -437,8 +437,10 @@ BEST (два чипа на строке — и «первый в группе» 
 
 ### Плита события — один блок на всю страницу
 
-Событие рисуется ОДНИМ компонентом `EventPlate`
-([components/event-plate.tsx](../../client/src/projects/swimmer-project/components/event-plate.tsx)):
+⚠ **Устарело:** отдельного `EventPlate` больше нет — плита события уехала внутрь общей
+строки заплыва [`SwimRow`](../../client/src/projects/components/swim-row/swim-row.tsx)
+(фаза 13.2, `event-plate.tsx` удалён). Ниже — как это было задумано и как выглядит сейчас
+внутри строки. Событие рисуется ОДНИМ компонентом:
 `UI_SwimmStyleIcon` (иконка стиля) + дистанция + `UI_PoolIcon` («--25m--»/«-----50m-----»).
 Его показывают все три места, где встречается событие: строка результата (Best time, Progress)
 и колонка Event обеих таблиц (Season best, Records).

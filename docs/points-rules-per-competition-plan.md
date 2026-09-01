@@ -9,7 +9,7 @@
 [`SwimmDbContext.cs:257`](../server/Swimm.Infrastructure/Data/SwimmDbContext.cs).
 Выбор правила — **только по дате и scope**: `EffectiveFrom <= дата соревнования`,
 scope `masters`/`non-masters`/`all`, свежайшее выигрывает, при равной дате scope-специфичное
-бьёт `all` ([`ClubPointsScoring.cs`](../server/Swimm.Infrastructure/Services/ClubPointsScoring.cs)).
+бьёт `all` ([`PointRulesClubsScoring.cs`](../server/Swimm.Infrastructure/Services/PointRulesClubsScoring.cs)).
 Привязки к соревнованию **нет**. Очки нигде не хранятся — считаются на лету.
 
 Применяется в трёх местах, и логика продублирована:
@@ -320,8 +320,8 @@ legacy-ветка байт-в-байт как сейчас. `OverviewHighPointDt
 ## 6. Клиент после материализации
 
 Клиент не считает ничего. Тоггл **«Combine All Results»**
-([`filter-recalculate.tsx`](../client/src/projects/components/filter-section/filter-recalculate.tsx),
-в state — `filterSelected.is_recalculated`) переключает, из какого поля берутся место и очки:
+([`combine-bar.tsx`](../client/src/projects/results-main-project/components/competition-header/combine-bar.tsx) —
+переехал из фильтров в полосу под табами шапки; в state — `filterSelected.is_recalculated`) переключает, из какого поля берутся место и очки:
 
 ```
 выкл:  Place ← position          Points ← club_points
