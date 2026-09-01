@@ -308,7 +308,10 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
     // `.dolphine-training`, а в `results-table.css` он красит текст в green — и всё, что
     // своего цвета не ставит, наследовало его. Карточка плана красит себя сама, поэтому
     // зелёной была только программа. Токен парный фону таба (`--deep-page-bg`).
-    <div className={deepThemeClass} style={{ color: 'var(--deep-text)' }}>
+    // Узкая колонка: полезных пикселей в строке заплыва ~230, и на широком мониторе лента
+    // растягивалась вчетверо шире, чем ей нужно. Лесенка `content-box-*` — в index.css,
+    // сменить ширину = сменить одно слово в классе.
+    <div className={`${deepThemeClass} content-box-xs`} style={{ color: 'var(--deep-text)' }}>
       {/* ЗОНА ФИЛЬТРОВ (вариант 5d/5dm, !design_handoff/FILTER-ZONE-5D) — одна панель на
           оба режима таба: сегмент All programme / My plan, чипы сессий, поиск, люди.
           До неё это были пять разных блоков (плитки-переключатель, строка Share, панель
