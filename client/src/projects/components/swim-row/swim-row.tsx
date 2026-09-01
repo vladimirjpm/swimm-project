@@ -116,6 +116,8 @@ export interface SwimRowProps {
   swimmer?: {
     name: string;
     club?: string | null;
+    /** Id клуба — эмблема становится ссылкой на /clubs/{id}. Нет id — просто картинка. */
+    clubId?: number | null;
     showClubIcon?: boolean;
   } | null;
 
@@ -289,6 +291,7 @@ function SwimRow({
             <UI_SwimmerNameCell
               firstName={swimmer.name}
               club={swimmer.club ?? undefined}
+              clubId={swimmer.clubId}
               showClubIcon={swimmer.showClubIcon}
               clubIconSide="left"
               clubIconWidth="10"

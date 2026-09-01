@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace Swimm.Application.Dtos;
 
@@ -11,6 +11,12 @@ namespace Swimm.Application.Dtos;
 public sealed class ClubSummaryDto
 {
     [JsonPropertyName("club")] public string Club { get; init; } = "";
+    /// <summary>
+    /// Id клуба — адрес его страницы (<c>/clubs/{id}</c>): по имени она не открывается.
+    /// Зачёт ключуется ИМЕНЕМ (ClubStandingKey.ByName), поэтому у строки-тёзки здесь id
+    /// первого встреченного клуба; дубли клубов вычищены (см. club-merge), тёзок нет.
+    /// </summary>
+    [JsonPropertyName("clubId")] public int ClubId { get; init; }
     [JsonPropertyName("points")] public int Points { get; init; }
     /// <summary>Уникальные пловцы клуба в выборке — по <c>SwimmerId</c>, не по фамилии.</summary>
     [JsonPropertyName("swimmerCount")] public int SwimmerCount { get; init; }

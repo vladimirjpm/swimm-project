@@ -12,6 +12,8 @@ export default class HelperClub {
     results: Result[],
   ): Promise<{
     club: string;
+    /** Id клуба — для ссылки на /clubs/{id}; 0 у статических источников без club_id. */
+    clubId: number;
     points: number;
     swimmerCount: number;
     successfulCount: number;
@@ -22,6 +24,7 @@ export default class HelperClub {
     const map = new Map<
       string,
       {
+        clubId: number;
         points: number;
         swimmerSet: Set<string>;
         successfulCount: number;
@@ -53,6 +56,9 @@ export default class HelperClub {
       const entry =
         map.get(club) ||
         {
+          // Ключ сводки — ИМЯ клуба (историческое, вместе с эстафетными командами), поэтому
+          // id берём у первой строки клуба: он нужен только адресом страницы /clubs/{id}.
+          clubId: 0,
           points: 0,
           swimmerSet: new Set<string>(),
           successfulCount: 0,
@@ -60,6 +66,8 @@ export default class HelperClub {
           silver: 0,
           bronze: 0,
         };
+
+      if (!entry.clubId && item.club_id) entry.clubId = item.club_id;
 
       // Используем вычисленные очки из системы начисления
       entry.points += clubPoints;
@@ -92,6 +100,7 @@ export default class HelperClub {
     return Array.from(map.entries())
       .map(([club, data]) => ({
         club,
+        clubId: data.clubId,
         points: data.points,
         swimmerCount: data.swimmerSet.size,
         successfulCount: data.successfulCount,

@@ -89,6 +89,7 @@ function SbRow({ row, modules, stroke, distance, isMasters, highlightSwimmerId }
       swimmer={{
         name,
         club: modules.clubInRow ? club : null,
+        clubId: row.club_id,
         showClubIcon: modules.clubLogoInRow,
       }}
       competition={modules.meetInRow && row.competition ? { name: row.competition } : null}

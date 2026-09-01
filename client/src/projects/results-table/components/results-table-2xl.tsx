@@ -75,6 +75,7 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
             firstNameEn={res.first_name_en}
             lastNameEn={res.last_name_en}
             club={res.club}
+            clubId={res.club_id}
             isRelay={res.is_relay}
             relaySwimmersList={res.relay_swimmers}
             relaySwimmersName={res.relay_swimmers_name}
@@ -96,7 +97,7 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
 
       {showClub && (
         <div className="col-span-1">
-          <UI_ClubIcon clubName={res.club} className="text-xs text-center" iconWidth="10" styleType="icon-notext" />
+          <UI_ClubIcon clubName={res.club} clubId={res.club_id} className="text-xs text-center" iconWidth="10" styleType="icon-notext" />
         </div>
       )}
 

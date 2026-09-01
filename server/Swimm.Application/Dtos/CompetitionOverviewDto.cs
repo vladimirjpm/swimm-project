@@ -153,6 +153,8 @@ public sealed class OverviewBestSwimDto
     [JsonPropertyName("first_name_en")] public string FirstNameEn { get; init; } = "";
     [JsonPropertyName("last_name_en")] public string LastNameEn { get; init; } = "";
     [JsonPropertyName("club")] public string Club { get; init; } = "";
+    /// <summary>Id клуба — адрес страницы клуба (<c>/clubs/{id}</c>); по имени она не открывается.</summary>
+    [JsonPropertyName("club_id")] public int ClubId { get; init; }
     [JsonPropertyName("style_name")] public string StyleName { get; init; } = "";
     [JsonPropertyName("distance")] public string Distance { get; init; } = "";
     [JsonPropertyName("gender")] public string Gender { get; init; } = "";
@@ -174,6 +176,8 @@ public sealed class OverviewMedalistDto
     [JsonPropertyName("first_name_en")] public string FirstNameEn { get; init; } = "";
     [JsonPropertyName("last_name_en")] public string LastNameEn { get; init; } = "";
     [JsonPropertyName("club")] public string Club { get; init; } = "";
+    /// <summary>Id клуба — адрес страницы клуба (<c>/clubs/{id}</c>).</summary>
+    [JsonPropertyName("club_id")] public int ClubId { get; init; }
     [JsonPropertyName("gold")] public int Gold { get; init; }
     [JsonPropertyName("silver")] public int Silver { get; init; }
     [JsonPropertyName("bronze")] public int Bronze { get; init; }
@@ -234,6 +238,8 @@ public sealed class OverviewHighPointDto
     [JsonPropertyName("first_name_en")] public string FirstNameEn { get; init; } = "";
     [JsonPropertyName("last_name_en")] public string LastNameEn { get; init; } = "";
     [JsonPropertyName("club")] public string Club { get; init; } = "";
+    /// <summary>Id клуба — адрес страницы клуба (<c>/clubs/{id}</c>).</summary>
+    [JsonPropertyName("club_id")] public int ClubId { get; init; }
     /// <summary>Сумма international points по личным заплывам на соревновании.</summary>
     [JsonPropertyName("points")] public int Points { get; init; }
     /// <summary>true — ничья по очкам в этом (возраст × пол): наград несколько.</summary>

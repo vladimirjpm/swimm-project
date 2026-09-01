@@ -51,6 +51,7 @@ export default function ModuleCardFavorites({ onOpenSwimsScoped, onOpenClub }: P
         firstNameEn: best?.first_name_en ?? '',
         lastNameEn: best?.last_name_en ?? '',
         club: best?.club ?? '',
+        clubId: best?.club_id ?? null,
         ageGroup: best?.age_group ?? '',
         best,
         medals,
@@ -101,6 +102,7 @@ export default function ModuleCardFavorites({ onOpenSwimsScoped, onOpenClub }: P
                       firstNameEn={c.firstNameEn}
                       lastNameEn={c.lastNameEn}
                       club={c.club}
+                      clubId={c.clubId}
                       showClubIcon
                       clubIconSide="left"
                       clubIconWidth="10"

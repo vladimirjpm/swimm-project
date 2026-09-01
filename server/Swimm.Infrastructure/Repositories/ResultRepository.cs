@@ -308,6 +308,7 @@ public class ResultRepository : IResultRepository
             .Select(c => new ClubSummaryDto
             {
                 Club = c.ClubKey,
+                ClubId = c.ClubId,
                 Points = c.Points,
                 SwimmerCount = c.SwimmerCount,
                 SuccessfulCount = c.ScoringSwims,
@@ -400,6 +401,7 @@ public class ResultRepository : IResultRepository
                  FirstNameEn = r.Swimmer.FirstNameEn,
                  LastNameEn = r.Swimmer.LastNameEn,
                  Club = r.Club.Name,
+                 ClubId = r.ClubId,
                  StyleName = r.Style.Name,
                  Distance = r.Distance,
                  Gender = r.Gender,
@@ -432,6 +434,7 @@ public class ResultRepository : IResultRepository
                 r.Swimmer.FirstNameEn,
                 r.Swimmer.LastNameEn,
                 Club = r.Club.Name,
+                r.ClubId,
                 r.Gender,
                 // Prelim: протокольное место не медаль (ранжир сессии); объединённое место,
                 // если оно лежит на prelim-строке (лучший заплыв был утром), остаётся.
@@ -450,7 +453,7 @@ public class ResultRepository : IResultRepository
             .ToListAsync())
             .Select(r => new MedalRow(
                 r.SwimmerId, r.FirstName, r.LastName, r.FirstNameEn, r.LastNameEn,
-                r.Club, r.Gender, r.Position, false,
+                r.Club, r.ClubId, r.Gender, r.Position, false,
                 $"{r.SwimmerId}|{r.StyleName}|{r.Distance}|{r.EventStyleAge}", r.Round));
 
         // Эстафетная медаль принадлежит ВСЕЙ команде — разворачиваем строку на ноги через
@@ -463,6 +466,7 @@ public class ResultRepository : IResultRepository
             {
                 r.RelayId,
                 Club = r.Club.Name,
+                r.ClubId,
                 Position = filter.Combined && r.Competition.ShowCombineAllResults
                     ? (r.CombinedPlace ?? (r.HeatType == "prelim" || r.HeatType == "extra" ? null : r.Position))
                     : (r.HeatType == "prelim" || r.HeatType == "extra" ? null : r.Position)
@@ -478,13 +482,14 @@ public class ResultRepository : IResultRepository
                     m.Swimmer.FirstNameEn,
                     m.Swimmer.LastNameEn,
                     r.Club,
+                    r.ClubId,
                     m.Swimmer.Gender,
                     r.Position
                 })
             .ToListAsync())
             .Select(r => new MedalRow(
                 r.SwimmerId, r.FirstName, r.LastName, r.FirstNameEn, r.LastNameEn,
-                r.Club, r.Gender, r.Position, true));
+                r.Club, r.ClubId, r.Gender, r.Position, true));
 
         // Медаль возрастной ступени одна, даже если ступень разыграна дважды за день
         // (утренний зачёт + вечерний финал): раунды схлопываются по лучшему месту.
@@ -510,6 +515,7 @@ public class ResultRepository : IResultRepository
                     FirstNameEn = g.First().FirstNameEn,
                     LastNameEn = g.First().LastNameEn,
                     Club = g.First().Club,
+                    ClubId = g.First().ClubId,
                     Gold = g.Count(r => r.Position == 1),
                     Silver = g.Count(r => r.Position == 2),
                     Bronze = g.Count(r => r.Position == 3),
@@ -538,6 +544,7 @@ public class ResultRepository : IResultRepository
                     FirstNameEn = m.FirstNameEn,
                     LastNameEn = m.LastNameEn,
                     Club = m.Club,
+                    ClubId = m.ClubId,
                     Gold = m.Gold,
                     Silver = m.Silver,
                     Bronze = m.Bronze,
@@ -576,6 +583,7 @@ public class ResultRepository : IResultRepository
                 r.Swimmer.FirstNameEn,
                 r.Swimmer.LastNameEn,
                 Club = r.Club.Name,
+                r.ClubId,
                 r.Gender,
                 r.Swimmer.BirthYear,
                 Year = r.CompetitionDate.Year,
@@ -639,6 +647,7 @@ public class ResultRepository : IResultRepository
                 g.First().FirstNameEn,
                 g.First().LastNameEn,
                 g.First().Club,
+                g.First().ClubId,
                 Age = g.First().Year - g.First().BirthYear,
                 g.First().AgeGroup,
                 Points = g.Sum(r => r.InternationalPoints)
@@ -663,6 +672,7 @@ public class ResultRepository : IResultRepository
                     FirstNameEn = x.FirstNameEn,
                     LastNameEn = x.LastNameEn,
                     Club = x.Club,
+                    ClubId = x.ClubId,
                     Points = x.Points,
                     IsTie = tie
                 });
@@ -757,6 +767,7 @@ public class ResultRepository : IResultRepository
                         FirstNameEn = src.FirstNameEn,
                         LastNameEn = src.LastNameEn,
                         Club = src.Club,
+                        ClubId = src.ClubId,
                         Points = w.Points,
                         IsTie = w.IsTie,
                         RuleVersion = hpRule.Version,
@@ -1676,6 +1687,7 @@ public class ResultRepository : IResultRepository
         string FirstNameEn,
         string LastNameEn,
         string Club,
+        int ClubId,
         string? Gender,
         int? Position,
         bool IsRelay,

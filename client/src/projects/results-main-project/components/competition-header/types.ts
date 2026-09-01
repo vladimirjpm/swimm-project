@@ -28,6 +28,8 @@ export interface OverviewBestSwim {
   first_name_en: string;
   last_name_en: string;
   club: string;
+  /** Id клуба — ссылка на /clubs/{id} с эмблемы. */
+  club_id: number;
   style_name: string;
   distance: string;
   gender: string;
@@ -44,6 +46,8 @@ export interface OverviewBestSwim {
 /** Строка клубного зачёта — контракт /api/club-summary (useClubSummary). */
 export interface OverviewClub {
   club: string;
+  /** Id клуба — ссылка на /clubs/{id}. */
+  clubId: number;
   points: number;
   swimmerCount: number;
   successfulCount: number;
@@ -103,6 +107,8 @@ export interface OverviewMedalist {
   first_name_en: string;
   last_name_en: string;
   club: string;
+  /** Id клуба — ссылка на /clubs/{id} с эмблемы. */
+  club_id: number;
   gold: number;
   silver: number;
   bronze: number;
@@ -125,6 +131,8 @@ export interface OverviewHighPoint {
   first_name_en: string;
   last_name_en: string;
   club: string;
+  /** Id клуба — ссылка на /clubs/{id} с эмблемы. */
+  club_id: number;
   points: number;
   is_tie: boolean;
   /** Правило требует «только финалы», но признака типа заплыва в данных нет —

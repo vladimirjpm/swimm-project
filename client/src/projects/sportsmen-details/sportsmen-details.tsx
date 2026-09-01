@@ -217,7 +217,7 @@ function SportsmenDetails() {
                   className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full p-[2px]'
                   style={{ background: '#ffffff', boxShadow: '0 0 0 2px color-mix(in srgb, var(--theme-primary) 40%, transparent)' }}
                 >
-                  <UI_ClubIcon clubName={firstResult.club} iconWidth='full' styleType="icon-notext" />
+                  <UI_ClubIcon clubName={firstResult.club} clubId={firstResult.club_id} iconWidth='full' styleType="icon-notext" />
                 </span>
                 <span className='truncate text-xs font-bold' style={{ color: 'var(--theme-mode-text-secondary)' }}>
                   {firstResult.club}

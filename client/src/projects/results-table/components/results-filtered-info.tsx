@@ -140,10 +140,10 @@ function ResultsFilteredInfo({
       shortLabel: 'Club',
       active: !showClub && !!firstResult?.club,
       desktopValue: firstResult?.club && (
-        <UI_ClubIcon clubName={firstResult.club} className="text-xs" iconWidth="10" styleType="icon-text-bottom" />
+        <UI_ClubIcon clubName={firstResult.club} clubId={firstResult.club_id} className="text-xs" iconWidth="10" styleType="icon-text-bottom" />
       ),
       mobileValue: firstResult?.club && (
-        <UI_ClubIcon clubName={firstResult.club} className="text-[10px]" iconWidth="8" styleType="icon-text-bottom" />
+        <UI_ClubIcon clubName={firstResult.club} clubId={firstResult.club_id} className="text-[10px]" iconWidth="8" styleType="icon-text-bottom" />
       ),
     },
     {

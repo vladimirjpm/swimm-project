@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useAppSelector } from '../../../../store/store';
 import { useClubSummary } from '../../../../hooks/useClubSummary';
+import { routes } from '../../../../utils/routes';
 import type { Result } from '../../../../utils/interfaces/results';
 
 // Таб Clubs: клубный зачёт источника (/api/club-summary, фаза 3.4) + drill-down по клубу:
@@ -132,6 +133,11 @@ export default function CompetitionClubs({ sourceParams, onOpenSwimsForClub }: P
 
   const pointsTotal = pointRows.reduce((sum, r) => sum + r.points, 0);
   const selectedSummary = selectedClub ? clubs.find((c) => c.club === selectedClub) : null;
+  // Id клуба для ссылки на его страницу: сперва из зачёта (сервер отдаёт clubId), затем из
+  // загруженных строк. Второй путь нужен эстафетным командам и старым источникам, где
+  // ключ зачёта — имя, а id приходит только со строкой результата. Нет ни там, ни там
+  // (псевдоклуб/статический источник) — ссылки просто нет, панель остаётся прежней.
+  const selectedClubId = selectedSummary?.clubId || clubRows.find((r) => r.club_id)?.club_id || null;
   // Загруженных строк меньше, чем в зачёте (paged-режим / фильтр) — сумма разбора не сойдётся
   // с рейтингом клуба. Молча расходиться нельзя: это ровно тот случай, когда цифру идут проверять.
   const partial = !!selectedSummary && pointsTotal !== selectedSummary.points;
@@ -208,6 +214,15 @@ export default function CompetitionClubs({ sourceParams, onOpenSwimsForClub }: P
                 >
                   Open in Swims →
                 </button>
+              )}
+              {selectedClubId && (
+                <a
+                  href={routes.club(selectedClubId)}
+                  className="text-[12px] font-extrabold hover:underline"
+                  style={{ color: 'var(--theme-primary)' }}
+                >
+                  Open in club page →
+                </a>
               )}
               <button
                 type="button"
