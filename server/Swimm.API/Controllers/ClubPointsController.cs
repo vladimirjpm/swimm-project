@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Swimm.API.Http;
 using Swimm.Application.Abstractions;
 
@@ -22,7 +22,8 @@ public class ClubPointsController : ControllerBase
 
     /// <summary>
     /// Возвращает все правила начисления клубных очков со шкалой мест.
-    /// Структура ответа зеркалит client/public/data/config/club-points-config.json.
+    /// Структура ответа зеркалит клиентский интерфейс PointsRule (исторически — статику
+    /// client/public/data/config/club-points-config.json, удалена: правила идут только отсюда).
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetRules()

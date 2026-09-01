@@ -1,10 +1,11 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace Swimm.Application.Dtos;
 
 /// <summary>
 /// DTO одного правила начисления клубных очков.
-/// Структура намеренно зеркалит club-points-config.json (клиентский интерфейс PointsRule).
+/// Структура намеренно зеркалит клиентский интерфейс PointsRule (в прошлом — статика
+/// club-points-config.json; она удалена, правила приходят только этим эндпоинтом).
 /// </summary>
 public sealed class ClubPointsRuleDto
 {

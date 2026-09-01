@@ -88,7 +88,7 @@ dotnet run --project server/Swimm.API -- --migrate
 (через `SwimmReadDbContext` + кэш `ICacheService`; JSON-форма совпадает с клиентскими интерфейсами):
 - `GET /api/results` — результаты, фильтры + пагинация (`{page,pageSize,hasMore,data}`); `data` =
   клиентский `Result`.
-- `GET /api/club-points` — правила очков (`{rules:[...]}`), заменяет `club-points-config.json`.
+- `GET /api/club-points` — правила очков (`{rules:[...]}`); статика `club-points-config.json` удалена.
 - `GET /api/categories`, `GET /api/categories/{key}` — категории и их соревнования (заменили
   `sources-config*.json`, файл удалён). Клиент читает через `CategoryHelper` только для отображения
   (name/badge); канонические ключи категорий (`all`/`kids8_11`/`young11_14`/`juniors`/`adults`/`masters`) и URL-контракт
