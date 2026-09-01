@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
@@ -23,7 +23,9 @@ public class SeasonBestRepositoryTests
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options);
 
-    private static SeasonBestRepository Repo(SwimmReadDbContext db) => new(db);
+    /// <summary>Витринный сезон подставляется явно — см. <see cref="FakeShowcaseSeasonProvider"/>.</summary>
+    private static SeasonBestRepository Repo(SwimmReadDbContext db, int showcase = 2025) =>
+        new(db, new FakeShowcaseSeasonProvider(showcase));
 
     private static Style FreestyleStyle() => new() { Id = 100, Name = "freestyle" };
 
@@ -689,5 +691,121 @@ public class SeasonBestRepositoryTests
         var freestyle = Assert.Single(res.Events);      // мусорный стиль отфильтрован
         Assert.Equal("freestyle", freestyle.Style);
         Assert.Equal(["50", "100"], freestyle.Distances);  // дистанции по возрастанию
+    }
+
+    /// <summary>
+    /// GUARD (баг 01.09.2026): без явного <c>?season=</c> страница берёт ВИТРИННЫЙ сезон.
+    /// Календарный <c>SeasonMath.CurrentStartYear()</c> 1 сентября уходит в сезон, где по
+    /// определению нет ни одного старта, и витрина показывает пустоту.
+    /// </summary>
+    [Fact]
+    public async Task DefaultSeason_ComesFromShowcase_NotCalendar()
+    {
+        using var db = CreateDb(nameof(DefaultSeason_ComesFromShowcase_NotCalendar));
+        var style = FreestyleStyle();
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var comp = MakeCompetition(date: "15/02/2020");
+        var kid = MakeSwimmer(club, "Kid", 2010);                // 10 лет в сезоне 2019/20
+        db.AddRange(club, comp, style, kid);
+        db.Add(Swim(comp, club, kid, style, new DateTime(2020, 2, 15), timeMs: 30_000));
+        await db.SaveChangesAsync();
+
+        var card = await Repo(db, showcase: 2019)
+            .GetNationalSeasonBestAsync("freestyle", "50", null, season: null);
+        var list = await Repo(db, showcase: 2019).GetSeasonBestListAsync(new SeasonBestListQuery
+        {
+            Style = "freestyle",
+            Distance = "50",
+        });
+
+        Assert.Equal("2019/20", card.SeasonLabel);
+        Assert.Single(card.Data);
+        Assert.Equal("2019/20", list.SeasonLabel);
+        Assert.Single(list.Data);
+    }
+
+    /// <summary>
+    /// Умолчание карусели — витринный сезон, а не просто самый свежий с данными: иначе
+    /// первый импортированный старт нового сезона перебросил бы страницу в него.
+    /// </summary>
+    [Fact]
+    public async Task OptionsDefaultSeason_IsShowcase_NotLatestWithData()
+    {
+        using var db = CreateDb(nameof(OptionsDefaultSeason_IsShowcase_NotLatestWithData));
+        var style = FreestyleStyle();
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var older = MakeCompetition(date: "15/02/2020");
+        var newer = MakeCompetition(date: "15/02/2025");
+        var kid = MakeSwimmer(club, "Kid", 2010);
+        db.AddRange(club, older, newer, style, kid);
+        db.Add(Swim(older, club, kid, style, new DateTime(2020, 2, 15), timeMs: 30_000));
+        db.Add(Swim(newer, club, kid, style, new DateTime(2025, 2, 15), timeMs: 29_000));
+        await db.SaveChangesAsync();
+
+        var res = await Repo(db, showcase: 2019).GetSeasonBestOptionsAsync();
+
+        var preferred = Assert.Single(res.Seasons, s => s.IsDisplayDefault);
+        Assert.Equal(2019, preferred.Season);
+    }
+
+    /// <summary>
+    /// Витринного сезона может не быть в списке (данных за него ещё нет) — тогда умолчание
+    /// падает на самый свежий сезон с данными, а не теряется вовсе.
+    /// </summary>
+    [Fact]
+    public async Task OptionsDefaultSeason_FallsBackToLatest_WhenShowcaseHasNoData()
+    {
+        using var db = CreateDb(nameof(OptionsDefaultSeason_FallsBackToLatest_WhenShowcaseHasNoData));
+        var style = FreestyleStyle();
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var comp = MakeCompetition(date: "15/02/2020");
+        var kid = MakeSwimmer(club, "Kid", 2010);
+        db.AddRange(club, comp, style, kid);
+        db.Add(Swim(comp, club, kid, style, new DateTime(2020, 2, 15), timeMs: 30_000));
+        await db.SaveChangesAsync();
+
+        var res = await Repo(db, showcase: 2024).GetSeasonBestOptionsAsync();
+
+        var preferred = Assert.Single(res.Seasons, s => s.IsDisplayDefault);
+        Assert.Equal(2019, preferred.Season);
+    }
+
+    /// <summary>
+    /// Заметка витрины доезжает до ВСЕХ ответов страницы: карточка, список и опции.
+    /// Пропустишь один — и там, где пользователь стоит, объяснения не будет.
+    /// </summary>
+    [Fact]
+    public async Task ShowcaseNotice_ReachesCardListAndOptions()
+    {
+        using var db = CreateDb(nameof(ShowcaseNotice_ReachesCardListAndOptions));
+        var style = FreestyleStyle();
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var comp = MakeCompetition(date: "15/02/2020");
+        var kid = MakeSwimmer(club, "Kid", 2010);
+        db.AddRange(club, comp, style, kid);
+        db.Add(Swim(comp, club, kid, style, new DateTime(2020, 2, 15), timeMs: 30_000));
+        await db.SaveChangesAsync();
+
+        var notice = new ShowcaseSeasonNoticeDto
+        {
+            ShowingSeason = 2019,
+            ShowingLabel = "2019/20",
+            PendingSeason = 2020,
+            PendingLabel = "2020/21",
+            WinterStarts = "18/02/2021",
+        };
+        SeasonBestRepository Repo() => new(db, new FakeShowcaseSeasonProvider(2019, notice));
+
+        var card = await Repo().GetNationalSeasonBestAsync("freestyle", "50", null, season: null);
+        var list = await Repo().GetSeasonBestListAsync(new SeasonBestListQuery
+        {
+            Style = "freestyle",
+            Distance = "50",
+        });
+        var options = await Repo().GetSeasonBestOptionsAsync();
+
+        Assert.Equal("2020/21", card.SeasonNotice?.PendingLabel);
+        Assert.Equal("2020/21", list.SeasonNotice?.PendingLabel);
+        Assert.Equal("18/02/2021", options.SeasonNotice?.WinterStarts);
     }
 }

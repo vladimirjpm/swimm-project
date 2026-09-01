@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
@@ -74,27 +74,6 @@ public class SwimmerPageRepository : ISwimmerPageRepository
 
         await _cache.SetAsync(key, rows, Ttl);
         return rows;
-    }
-
-    public async Task<IReadOnlyList<DateTime>> GetWinterChampionshipDatesAsync()
-    {
-        var key = "winter-championship-dates";
-        var cached = await _cache.GetAsync<List<DateTime>>(key);
-        if (cached is not null) return cached;
-
-        var raw = await _read.Competitions.AsNoTracking()
-            .Where(c => c.IsChampionship)
-            .Select(c => new { c.Date, c.PoolType, c.StandingKindOverride })
-            .ToListAsync();
-
-        var dates = raw
-            .Where(c => StandingKinds.Resolve(true, c.PoolType, c.StandingKindOverride) == StandingKinds.Winter)
-            .Select(c => ParseDate(c.Date))
-            .Where(d => d != DateTime.MinValue)
-            .ToList();
-
-        await _cache.SetAsync(key, dates, Ttl);
-        return dates;
     }
 
     public async Task<IReadOnlyDictionary<int, string?>> GetStandingKindsAsync(

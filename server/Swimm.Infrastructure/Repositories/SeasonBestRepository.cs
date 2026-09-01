@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
@@ -16,9 +16,15 @@ public class SeasonBestRepository : ISeasonBestRepository
 {
     private readonly SwimmReadDbContext _read;
 
-    public SeasonBestRepository(SwimmReadDbContext read)
+    /// <summary>
+    /// Умолчание сезона — витринное (docs/season-boundary-rule.md), не календарное.
+    /// </summary>
+    private readonly IShowcaseSeasonProvider _showcase;
+
+    public SeasonBestRepository(SwimmReadDbContext read, IShowcaseSeasonProvider showcase)
     {
         _read = read;
+        _showcase = showcase;
     }
 
     /// <summary>Строка-кандидат: всё, что нужно и для отбора лидера, и для ответа.</summary>
@@ -30,7 +36,9 @@ public class SeasonBestRepository : ISeasonBestRepository
     public async Task<SeasonBestNationalDto> GetNationalSeasonBestAsync(
         string style, string distance, string? poolType, int? season, CancellationToken ct = default)
     {
-        var seasonYear = season ?? SeasonMath.CurrentStartYear();
+        // Сезон не задан — берём ВИТРИННЫЙ (после последнего зимнего чемпионата), а не
+        // календарный: 1 сентября календарь уходит в сезон без единого старта.
+        var seasonYear = season ?? await _showcase.CurrentStartYearAsync(ct);
         var (start, endExclusive) = SeasonMath.RangeOf(seasonYear);
 
         var query = _read.Results.AsNoTracking()
@@ -117,6 +125,8 @@ public class SeasonBestRepository : ISeasonBestRepository
         {
             Season = seasonYear,
             SeasonLabel = SeasonMath.Label(seasonYear),
+            // Пояснение «сезон откроется после зимнего чемпионата» — одно на все витрины SB.
+            SeasonNotice = await _showcase.PendingNoticeAsync(ct),
             Style = style,
             Distance = distance,
             PoolType = string.IsNullOrWhiteSpace(poolType) ? null : poolType,
@@ -152,7 +162,8 @@ public class SeasonBestRepository : ISeasonBestRepository
     public async Task<SeasonBestListDto> GetSeasonBestListAsync(
         SeasonBestListQuery query, CancellationToken ct = default)
     {
-        var seasonYear = query.Season ?? SeasonMath.CurrentStartYear();
+        // Умолчание — витринный сезон, как и в GetNationalSeasonBestAsync выше.
+        var seasonYear = query.Season ?? await _showcase.CurrentStartYearAsync(ct);
         var (start, endExclusive) = SeasonMath.RangeOf(seasonYear);
 
         var style = (query.Style ?? "").Trim();
@@ -326,6 +337,8 @@ public class SeasonBestRepository : ISeasonBestRepository
         {
             Season = seasonYear,
             SeasonLabel = SeasonMath.Label(seasonYear),
+            // Пояснение «сезон откроется после зимнего чемпионата» — одно на все витрины SB.
+            SeasonNotice = await _showcase.PendingNoticeAsync(ct),
             Style = style,
             Distance = distance,
             PoolType = string.IsNullOrWhiteSpace(query.PoolType) ? null : query.PoolType,
@@ -369,7 +382,14 @@ public class SeasonBestRepository : ISeasonBestRepository
             .OrderByDescending(s => s.Season)
             .ToList();
 
-        if (seasons.Count > 0) seasons[0].IsDisplayDefault = true;
+        // Умолчание карусели — ВИТРИННЫЙ сезон (docs/season-boundary-rule.md), а не просто
+        // самый свежий с данными: иначе первый же импортированный октябрьский старт
+        // перебрасывал бы страницу в едва начавшийся сезон. Витринного сезона может не
+        // оказаться в списке (данных за него ещё нет) — тогда самый свежий, что есть.
+        var showcase = await _showcase.CurrentStartYearAsync(ct);
+        var notice = await _showcase.PendingNoticeAsync(ct);
+        var preferred = seasons.FirstOrDefault(s => s.Season == showcase) ?? seasons.FirstOrDefault();
+        if (preferred is not null) preferred.IsDisplayDefault = true;
 
         var pairs = await _read.Results.AsNoTracking()
             .Where(r => r.TimeMillisecond != null
@@ -436,6 +456,8 @@ public class SeasonBestRepository : ISeasonBestRepository
         return new SeasonBestOptionsDto
         {
             Seasons = seasons,
+            // Карусель стоит на прошлом сезоне — заметка объясняет, почему нового ещё нет.
+            SeasonNotice = notice,
             Events = events,
             Pools = pools.OrderBy(p => p).ToList(),
             // Сортировка по НИЖНЕЙ границе: строковая ставила бы «100+» между «19-24» и «25-29».

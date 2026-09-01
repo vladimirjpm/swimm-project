@@ -173,6 +173,14 @@ public sealed class ClubSeasonBestDto
     [JsonPropertyName("meets")]
     public int Meets { get; set; }
 
+
+    /// <summary>
+    /// Новый сезон уже идёт, но витрина держит прошлый — пояснение «season best откроется
+    /// после зимнего чемпионата» (docs/season-boundary-rule.md). null — объяснять нечего.
+    /// </summary>
+    [JsonPropertyName("season_notice")]
+    public ShowcaseSeasonNoticeDto? SeasonNotice { get; set; }
+
     [JsonPropertyName("data")]
     public List<ClubSeasonBestGroupDto> Data { get; set; } = [];
 }

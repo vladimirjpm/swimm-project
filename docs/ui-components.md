@@ -63,6 +63,7 @@
 | `UI_Toggle` | тумблер на три положения (`no` / `regular` / `masters`) |
 | `UI_ModeToggle` | переключатель Light/Dark (fixed внизу справа) |
 | `UI_ThemeDevTool` | dev-панель тем (видна только при `?themes`) |
+| `UI_SeasonNotice` | оговорку витрины season best «новый сезон откроется после зимнего чемпионата» (`season_notice` в ответах API). Текст один на пять экранов — клуб (карточка + тултип плитки), страница результатов, `/season-best`, страница пловца; формулировка живёт в `showcaseNoticeText`. `season` — сезон, на котором стоит витрина (null = выбрала она сама), `show="pending"` — там, где сезон диктует контекст, а не умолчание. Правило — [`docs/season-boundary-rule.md`](season-boundary-rule.md) |
 
 ## 5. Крупные блоки (не в `mix/`)
 

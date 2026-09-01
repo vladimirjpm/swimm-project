@@ -1,4 +1,4 @@
-/* Страница спортсмена — рецепты блоков поверх общих токенов Deep
+﻿/* Страница спортсмена — рецепты блоков поверх общих токенов Deep
    (../components/deep/deep-theme.css). Здесь ТОЛЬКО var(--deep-*): фиксированных hex на
    тем-зависимых поверхностях быть не должно, иначе блок не переносится в светлую тему
    и на другие страницы (правило хендоффа §«Темы»).
@@ -304,16 +304,8 @@
 
 /* ── Season best: место среди сверстников ────────────────────────────────── */
 
-/* Заметка «карусель говорит одно, цифры про другое» — не украшение, а обязательная
-   оговорка: без неё адрес ?season=all и сезонные места молча противоречат друг другу. */
-.deep-scope-note {
-  margin-bottom: 10px; padding: 8px 12px;
-  border-radius: var(--deep-radius-row);
-  border: 1px dashed var(--deep-card-border);
-  background: var(--deep-card-bg-raised);
-  font-size: 11.5px; font-weight: 700; color: var(--deep-text-mute);
-}
-.deep-scope-note strong { color: var(--deep-accent); font-weight: 900; }
+/* Заметка-оговорка `.deep-scope-note` переехала в deep-theme.css: её просит уже не только
+   эта страница (карточка Season best клуба, /season-best), а рецепт должен быть один. */
 
 /* ── Progress (§8) ───────────────────────────────────────────────────────── */
 

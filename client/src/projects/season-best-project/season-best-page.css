@@ -1,4 +1,4 @@
-/* Страница /season-best. Токены — только из deep-theme.css: экран должен выглядеть частью
+﻿/* Страница /season-best. Токены — только из deep-theme.css: экран должен выглядеть частью
    того же продукта, что и страница спортсмена, откуда сюда ведут ссылки. Своих цветов не
    заводим, здесь только раскладка и размеры.
 
@@ -228,4 +228,15 @@
   .sb-swim-row .swim-row__swimmer-club { font-size: 10.5px; }
   .sb-topline { flex-direction: column; gap: 8px; }
   .sb-head__title { font-size: 20px; }
+}
+
+/* Оговорка «новый сезон откроется после зимнего чемпионата» (docs/season-boundary-rule.md).
+   Пунктир, а не акцентная плашка: это сноска к сезону, а не предупреждение об ошибке. */
+.sb-season-note {
+  margin-bottom: 12px; padding: 9px 13px;
+  border: 1px dashed var(--deep-card-border);
+  border-radius: 12px;
+  background: var(--deep-card-bg-raised);
+  font-size: 12px; font-weight: 700; line-height: 1.45;
+  color: var(--deep-text-mute);
 }

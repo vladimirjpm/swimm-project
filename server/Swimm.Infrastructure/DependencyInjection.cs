@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -70,6 +70,10 @@ public static class DependencyInjection
         services.AddScoped<IStartListPublicRepository, StartListPublicRepository>();
         services.AddScoped<IClubOverviewRepository, ClubOverviewRepository>();
         services.AddScoped<ISeasonBestRepository, SeasonBestRepository>();
+        // Витринный сезон — ОДИН на продукт (docs/season-boundary-rule.md): его спрашивают
+        // и клуб, и страница пловца, и /season-best. Копия расчёта в любом из них снова
+        // разъедется с правилом — так и появился баг 2026-09-01.
+        services.AddScoped<IShowcaseSeasonProvider, ShowcaseSeasonProvider>();
         services.AddScoped<ISwimmerPageRepository, SwimmerPageRepository>();
         services.AddScoped<IUserFavoriteRepository, UserFavoriteRepository>();
         // Персональный план на соревнование в табе Start list (Т3)

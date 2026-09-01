@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { ShowcaseSeasonNotice } from '../utils/helpers/season-helper';
 
 /**
  * Season best — GET /api/clubs/{id}/season-best?pool=&season=.
@@ -54,6 +55,8 @@ interface ClubSeasonBestResponse {
   total: number;
   /** Сколько соревнований сезона вошло в расчёт лидерства. */
   meets: number;
+  /** «Новый сезон откроется после зимнего чемпионата»; null — сезон открыт. */
+  season_notice: ShowcaseSeasonNotice | null;
   data: ClubSeasonBestGroup[];
 }
 
@@ -64,6 +67,11 @@ export interface UseClubSeasonBestResult {
   total: number;
   /** Сколько стартов вошло в расчёт — обязательная подпись под заголовком. */
   meets: number;
+  /**
+   * Витрина держит прошлый сезон (сентябрь–февраль) — карточка ОБЯЗАНА это сказать: иначе
+   * прошлогодние времена выглядят как сегодняшние (docs/season-boundary-rule.md).
+   */
+  notice: ShowcaseSeasonNotice | null;
   loading: boolean;
   error: string | null;
 }
@@ -76,6 +84,7 @@ export function useClubSeasonBest(
   const [seasonLabel, setSeasonLabel] = useState('');
   const [total, setTotal] = useState(0);
   const [meets, setMeets] = useState(0);
+  const [notice, setNotice] = useState<ShowcaseSeasonNotice | null>(null);
   const [loading, setLoading] = useState<boolean>(clubId != null);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,6 +112,7 @@ export function useClubSeasonBest(
           setSeasonLabel(json.season_label);
           setTotal(json.total);
           setMeets(json.meets);
+          setNotice(json.season_notice ?? null);
         }
       })
       .catch((e: Error) => {
@@ -121,5 +131,5 @@ export function useClubSeasonBest(
     };
   }, [clubId, pool]);
 
-  return { groups, seasonLabel, total, meets, loading, error };
+  return { groups, seasonLabel, total, meets, notice, loading, error };
 }

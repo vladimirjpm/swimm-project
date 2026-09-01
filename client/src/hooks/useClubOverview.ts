@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { ShowcaseSeasonNotice } from '../utils/helpers/season-helper';
 
 /**
  * Сборный ответ страницы клуба — GET /api/clubs/{id}/overview?season=&group=.
@@ -39,6 +40,11 @@ export interface ClubKpi {
   season_bests: number;
   /** Метка витринного сезона, «2025/26» (docs/season-boundary-rule.md). */
   showcase_season: string | null;
+  /**
+   * «Новый сезон откроется после зимнего чемпионата»; null — сезон открыт. Плитка season
+   * bests подписана прошлым сезоном, и без этой оговорки цифра выглядит протухшей.
+   */
+  season_notice: ShowcaseSeasonNotice | null;
 }
 
 export interface ClubSeasonOption {

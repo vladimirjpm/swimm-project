@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
@@ -202,22 +202,5 @@ public class SwimmerPageRepositoryTests
         Assert.Empty(await Repo(db).GetSwimsAsync(999));
         Assert.Empty(await Repo(db).GetSwimsAsync(0));
         Assert.Empty(await Repo(db).GetSwimsAsync(-1));
-    }
-
-    [Fact]
-    public async Task WinterChampionshipDates_OnlyChampionshipsInShortCourse()
-    {
-        await using var db = CreateDb(nameof(WinterChampionshipDates_OnlyChampionshipsInShortCourse));
-        db.AddRange(
-            Comp("Winter champs", "16/02/2026", PoolTypes.Short, championship: true),
-            Comp("Summer champs", "15/07/2026", PoolTypes.Long, championship: true),
-            Comp("League", "10/12/2025", PoolTypes.Short),                       // не чемпионат
-            Comp("Open water champs", "27/04/2026", PoolTypes.Short, championship: true,
-                overrideKind: StandingKinds.OpenWater));                          // роль переопределена
-        await db.SaveChangesAsync();
-
-        var dates = await Repo(db).GetWinterChampionshipDatesAsync();
-
-        Assert.Equal([new DateTime(2026, 2, 16)], dates);
     }
 }

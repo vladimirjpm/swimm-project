@@ -445,3 +445,17 @@
   .deep-wheel__slot { transition: none; }
   .deep-wheel__row { transition: none !important; }
 }
+
+/* ── Заметка-оговорка ────────────────────────────────────────────────────────
+   Строка, которой витрина объясняет расхождение между тем, что просили, и тем, что
+   показано: «карусель на ∞, а места считаются в одном сезоне», «новый сезон идёт, но
+   season best откроется после зимнего чемпионата» (docs/season-boundary-rule.md).
+   Не украшение: без неё пустая или прошлогодняя витрина читается как поломка. */
+.deep-scope-note {
+  margin-bottom: 10px; padding: 8px 12px;
+  border-radius: var(--deep-radius-row);
+  border: 1px dashed var(--deep-card-border);
+  background: var(--deep-card-bg-raised);
+  font-size: 11.5px; font-weight: 700; color: var(--deep-text-mute);
+}
+.deep-scope-note strong { color: var(--deep-accent); font-weight: 900; }

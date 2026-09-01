@@ -3,6 +3,7 @@ import { useClubSeasonBest, type ClubSeasonBestItem } from '../../../hooks/useCl
 import { routes } from '../../../utils/routes';
 import { ClubRecordCard, ClubRecordSection, ClubRecordTile, type PoolFilter } from './club-record-card';
 import { compareDiscipline, groupByAge } from './age-sections';
+import UI_SeasonNotice from '../../components/mix/season-notice/season-notice';
 
 /**
  * Season best — заплывы пловцов клуба, которые в этом сезоне ЛУЧШИЕ ПО СТРАНЕ в своём слоте
@@ -38,7 +39,7 @@ function tileDiscipline(it: ClubSeasonBestItem): string {
 
 function ClubRecords({ clubId }: Props) {
   const [pool, setPool] = useState<PoolFilter>('all');
-  const { groups, seasonLabel, total, meets, loading } = useClubSeasonBest(
+  const { groups, seasonLabel, total, meets, notice, loading } = useClubSeasonBest(
     clubId,
     pool === 'all' ? null : pool,
   );
@@ -65,13 +66,28 @@ function ClubRecords({ clubId }: Props) {
   return (
     <ClubRecordCard
       title={seasonLabel ? `Season ${seasonLabel} best` : 'Season best'}
-      subtitle={`Club swimmers ranked #1 in Israel this season · among ${meets} meets in our database`}
+      // «this season» тут врало бы с сентября по февраль: показан витринный сезон, а идёт
+      // уже следующий. Называем сезон по имени, пока оно известно.
+      subtitle={
+        seasonLabel
+          ? `Club swimmers ranked #1 in Israel in ${seasonLabel} · among ${meets} meets in our database`
+          : `Club swimmers ranked #1 in Israel this season · among ${meets} meets in our database`
+      }
       count={total}
       countLabel="SB in IL"
       pool={pool}
       onPool={setPool}
       isEmpty={groups.length === 0 && !loading}
-      emptyText="No national-best times this season"
+      // Сезон называем по имени: с сентября по февраль «this season» врало бы — показан
+      // прошлый сезон, а не идущий (docs/season-boundary-rule.md).
+      emptyText={
+        seasonLabel
+          ? `No national-best times in ${seasonLabel}`
+          : 'No national-best times this season'
+      }
+      // Карточка всегда стоит на витринном сезоне (сезон она не выбирает), поэтому season
+      // не передаём — заметка сама скажет, что показан прошлый.
+      notice={<UI_SeasonNotice notice={notice} />}
       // Секции сами задают внутреннюю сетку, поэтому внешняя не нужна.
       plainBody
     >

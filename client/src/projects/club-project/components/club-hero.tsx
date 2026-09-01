@@ -2,6 +2,7 @@ import React from 'react';
 import type { ClubKpi, ClubProfile } from '../../../hooks/useClubOverview';
 import UI_ClubLogo from '../../components/mix/club-logo/club-logo';
 import UI_FlagEmoji from '../../components/mix/flag-icon/flag-icon';
+import { showcaseNoticeText } from '../../../utils/helpers/season-helper';
 
 /**
  * Hero страницы клуба: логотип (или инициалы — это штатный вид, а не пустое состояние),
@@ -78,6 +79,10 @@ function ClubHero({ club, kpi }: Props) {
           label="Season bests"
           value={kpi.season_bests}
           hint={kpi.showcase_season ? `season ${kpi.showcase_season}` : 'this season'}
+          // Сентябрь-февраль: подпись говорит «season 2025/26», хотя идёт уже 2026/27.
+          // Плитка узкая, полную оговорку в неё не вложить — отдаём её тултипом, тем же
+          // текстом, что стоит плашкой над карточкой Season best (docs/season-boundary-rule.md).
+          title={showcaseNoticeText(kpi.season_notice) ?? undefined}
         />
         <Kpi label="Swimmers" value={club.swimmer_count} hint="current roster" />
       </div>
@@ -105,14 +110,17 @@ function Kpi({
   value,
   hint,
   gold,
+  title,
 }: {
   label: string;
   value: number | string;
   hint: string;
   gold?: boolean;
+  /** Нативный тултип плитки — для оговорки, которая в подпись не влезает. */
+  title?: string;
 }) {
   return (
-    <div>
+    <div title={title}>
       <div
         className="text-[34px] leading-none"
         style={{

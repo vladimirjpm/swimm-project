@@ -3,6 +3,7 @@ import UI_SwimTime from '../../components/mix/swim-time/swim-time';
 import UI_MedalIcon from '../../components/mix/medal-icon/medal-icon';
 import SwimmerResultRow, { type ResultRowData } from './swimmer-result-row';
 import SwimRow from '../../components/swim-row/swim-row';
+import UI_SeasonNotice from '../../components/mix/season-notice/season-notice';
 import { MIN_PEERS_FOR_RANK } from '../../components/mix/rank-of-peers/rank-of-peers';
 import { routes } from '../../../utils/routes';
 import { peerGroupLabel, seasonLabel } from '../../../utils/helpers/season-helper';
@@ -316,7 +317,19 @@ export function SeasonBestPanel({
   if (!ranks.groupLabel) {
     return <PanelEmpty>No birth year on file, so there is no age group to compare with.</PanelEmpty>;
   }
-  if (rows.length === 0) return <PanelEmpty>No swims in this season yet.</PanelEmpty>;
+
+  // Пустая панель в сентябре — это не «нет заплывов», а «сезон ещё не открыт»: оговорка
+  // обязана стоять и здесь, иначе пловец читает пустоту как поломку.
+  const seasonNote = <UI_SeasonNotice notice={ranks.season_notice} season={season} />;
+
+  if (rows.length === 0) {
+    return (
+      <>
+        {seasonNote}
+        <PanelEmpty>No swims in this season yet.</PanelEmpty>
+      </>
+    );
+  }
 
   const byKey = new Map(rows.map((r) => [r.disciplineKey, r]));
   const ranked = ranks.rows.filter((r) => byKey.has(r.disciplineKey));
@@ -339,6 +352,11 @@ export function SeasonBestPanel({
           season — showing <strong>{ranks.label}</strong>.
         </div>
       )}
+
+      {/* Сентябрь–февраль: витрина ещё держит прошлый сезон. Без этой строки пловец видит
+          прошлогодние места как сегодняшние — или пустоту, если выбрал новый сезон руками
+          (docs/season-boundary-rule.md). */}
+      {seasonNote}
 
       {ranked.length === 0 ? (
         <PanelEmpty>No comparable swims in this season yet.</PanelEmpty>

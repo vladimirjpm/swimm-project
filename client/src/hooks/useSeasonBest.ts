@@ -9,6 +9,7 @@
  * бесплатны — отдельного клиентского кэша здесь нет.
  */
 import { useEffect, useState } from 'react';
+import type { ShowcaseSeasonNotice } from '../utils/helpers/season-helper';
 
 export interface SeasonBestApiItem {
   gender: 'male' | 'female';
@@ -32,6 +33,8 @@ export interface SeasonBestApiResponse {
   distance: string;
   pool_type?: string | null;
   meets: number;
+  /** «Новый сезон откроется после зимнего чемпионата»; null — сезон открыт. */
+  season_notice: ShowcaseSeasonNotice | null;
   data: SeasonBestApiItem[];
 }
 

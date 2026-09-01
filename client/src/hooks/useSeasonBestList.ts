@@ -9,6 +9,7 @@
  * Ответы кэшируются на сервере сутки и отдаются с ETag, поэтому своего кэша тут нет.
  */
 import { useEffect, useState } from 'react';
+import type { ShowcaseSeasonNotice } from '../utils/helpers/season-helper';
 
 export interface SeasonBestListItem {
   place: number;
@@ -64,6 +65,8 @@ export interface SeasonBestListResponse {
   swimmers: number;
   meets: number;
   clubs: SeasonBestClubOption[];
+  /** «Новый сезон откроется после зимнего чемпионата»; null — сезон открыт. */
+  season_notice: ShowcaseSeasonNotice | null;
   data: SeasonBestListItem[];
 }
 
@@ -81,6 +84,11 @@ export interface SeasonBestEventOption {
 
 export interface SeasonBestOptions {
   seasons: SeasonBestSeasonOption[];
+  /**
+   * Витрина держит прошлый сезон — карусель по умолчанию стоит на нём, и страница обязана
+   * объяснить почему (docs/season-boundary-rule.md). null — сезон открыт.
+   */
+  season_notice: ShowcaseSeasonNotice | null;
   events: SeasonBestEventOption[];
   /** Возрастные группы мастерских протоколов; пусто — мастерских стартов в базе нет. */
   age_groups: string[];

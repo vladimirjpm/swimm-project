@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
@@ -29,10 +29,20 @@ public class ClubOverviewRepository : IClubOverviewRepository
     /// </summary>
     private readonly IClubPublicRepository? _clubs;
 
-    public ClubOverviewRepository(SwimmReadDbContext read, IClubPublicRepository? clubs = null)
+    /// <summary>
+    /// Витринный сезон плитки «season bests». Необязателен по той же причине, что и
+    /// <see cref="_clubs"/>: без него плитки остаются нулями (см. FillHeroTilesAsync).
+    /// </summary>
+    private readonly IShowcaseSeasonProvider? _showcase;
+
+    public ClubOverviewRepository(
+        SwimmReadDbContext read,
+        IClubPublicRepository? clubs = null,
+        IShowcaseSeasonProvider? showcase = null)
     {
         _read = read;
         _clubs = clubs;
+        _showcase = showcase;
     }
 
     /// <summary>Строка зачёта клуба вместе с контекстом соревнования.</summary>
@@ -243,19 +253,16 @@ public class ClubOverviewRepository : IClubOverviewRepository
 
         // Витринный сезон: самый свежий сезон, чей последний зимний чемпионат уже проплыли —
         // по всей базе, а не только по стартам этого клуба (граница общая для продукта).
-        var winterDates = await _read.Competitions.AsNoTracking()
-            .Where(c => c.IsChampionship)
-            .Select(c => new { c.Date, c.PoolType, c.StandingKindOverride })
-            .ToListAsync();
+        // Считает его ОДИН шов на весь продукт (IShowcaseSeasonProvider): здесь стояла своя
+        // копия запроса зимних дат, и правило жило ровно в двух местах из пяти.
+        if (_showcase is null) return;
 
-        var (showcaseStart, showcaseEnd) = ShowcaseSeason.RangeOf(
-            winterDates
-                .Where(c => StandingKinds.Resolve(true, c.PoolType, c.StandingKindOverride) == StandingKinds.Winter)
-                .Select(c => ParseDate(c.Date))
-                .Where(d => d != DateTime.MinValue),
-            DateTime.UtcNow);
+        var showcaseYear = await _showcase.CurrentStartYearAsync();
+        var (showcaseStart, showcaseEnd) = SeasonMath.RangeOf(showcaseYear);
 
-        kpi.ShowcaseSeason = SeasonMath.Label(SeasonMath.StartYearOf(showcaseStart));
+        kpi.ShowcaseSeason = SeasonMath.Label(showcaseYear);
+        // Плитка подписана прошлым сезоном — заметка объясняет, почему не текущим.
+        kpi.SeasonNotice = await _showcase.PendingNoticeAsync();
 
         if (_clubs is null) return;
         kpi.Records = (await _clubs.GetRecordWallAsync(clubId, null)).Data.Count;

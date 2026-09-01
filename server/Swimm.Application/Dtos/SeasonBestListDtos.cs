@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace Swimm.Application.Dtos;
 
@@ -77,6 +77,13 @@ public sealed class SeasonBestListDto
     /// <summary>Год НАЧАЛА сезона: 2025 = сезон 2025/26.</summary>
     [JsonPropertyName("season")]
     public int Season { get; set; }
+
+    /// <summary>
+    /// Новый сезон уже идёт, но витрина держит прошлый — пояснение «season best откроется
+    /// после зимнего чемпионата» (docs/season-boundary-rule.md). null — объяснять нечего.
+    /// </summary>
+    [JsonPropertyName("season_notice")]
+    public ShowcaseSeasonNoticeDto? SeasonNotice { get; set; }
 
     [JsonPropertyName("season_label")]
     public string SeasonLabel { get; set; } = "";
@@ -265,6 +272,13 @@ public sealed class SeasonBestOptionsDto
 {
     [JsonPropertyName("seasons")]
     public List<SeasonBestSeasonOptionDto> Seasons { get; set; } = new();
+
+    /// <summary>
+    /// Новый сезон уже идёт, но витрина держит прошлый — пояснение «season best откроется
+    /// после зимнего чемпионата» (docs/season-boundary-rule.md). null — объяснять нечего.
+    /// </summary>
+    [JsonPropertyName("season_notice")]
+    public ShowcaseSeasonNoticeDto? SeasonNotice { get; set; }
 
     [JsonPropertyName("events")]
     public List<SeasonBestEventOptionDto> Events { get; set; } = new();

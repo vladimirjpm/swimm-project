@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Repositories;
@@ -20,7 +21,9 @@ public class ClubPublicRepositoryTests
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options);
 
-    private static ClubPublicRepository Repo(SwimmReadDbContext db) => new(db);
+    /// <summary>Витринный сезон подставляется явно — см. <see cref="FakeShowcaseSeasonProvider"/>.</summary>
+    private static ClubPublicRepository Repo(SwimmReadDbContext db, int showcase = 2025) =>
+        new(db, new FakeShowcaseSeasonProvider(showcase));
 
     private static Swimmer MakeSwimmer(
         Club club, string lastNameEn, string firstNameEn, int birthYear, string? gender = "M") => new()
@@ -619,5 +622,56 @@ public class ClubPublicRepositoryTests
 
         var roster = await Repo(db).GetRosterAsync(resolved!.Value, 1, 50, null, null, null, null);
         Assert.Single(roster.Data);
+    }
+
+    /// <summary>
+    /// GUARD (баг 01.09.2026): сезон по умолчанию карточка спрашивает у ВИТРИННОГО шва, а не
+    /// считает календарно. Данные сеются в заведомо старый сезон 2019/20 — с
+    /// <c>SeasonMath.CurrentStartYear()</c> карточка была бы пуста в любой день года, а не
+    /// только на переходе даты, из-за которого баг и заметили.
+    /// </summary>
+    [Fact]
+    public async Task SeasonBest_DefaultSeason_ComesFromShowcase_NotCalendar()
+    {
+        using var db = CreateDb(nameof(SeasonBest_DefaultSeason_ComesFromShowcase_NotCalendar));
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var kid = MakeSwimmer(club, "Ours", "One", 2010);        // 10 лет в сезоне 2019/20
+        var comp = MakeCompetition("25m", date: "15/02/2020");
+        db.AddRange(club, kid, comp, FreestyleStyle());
+        await db.SaveChangesAsync();
+        db.Add(Swim(comp, club, kid, new DateTime(2020, 2, 15), timeMs: 60_000));
+        await db.SaveChangesAsync();
+
+        var card = await Repo(db, showcase: 2019).GetSeasonBestAsync(club.Id, poolType: null, season: null);
+
+        Assert.Equal(2019, card.Season);
+        Assert.Equal("2019/20", card.SeasonLabel);
+        Assert.Equal(1, card.Total);
+    }
+
+    /// <summary>
+    /// Заметка «сезон откроется после зимнего чемпионата» обязана доехать до карточки:
+    /// без неё карточка в сентябре показывает прошлый сезон молча (docs/season-boundary-rule.md).
+    /// </summary>
+    [Fact]
+    public async Task SeasonBest_CarriesShowcaseNotice()
+    {
+        using var db = CreateDb(nameof(SeasonBest_CarriesShowcaseNotice));
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        db.Add(club);
+        await db.SaveChangesAsync();
+
+        var notice = new ShowcaseSeasonNoticeDto
+        {
+            ShowingSeason = 2019,
+            ShowingLabel = "2019/20",
+            PendingSeason = 2020,
+            PendingLabel = "2020/21",
+        };
+        var repo = new ClubPublicRepository(db, new FakeShowcaseSeasonProvider(2019, notice));
+
+        var card = await repo.GetSeasonBestAsync(club.Id, poolType: null, season: null);
+
+        Assert.Equal("2020/21", card.SeasonNotice?.PendingLabel);
     }
 }

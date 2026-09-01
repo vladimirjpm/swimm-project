@@ -11,6 +11,7 @@ import { parseSeasonBestQuery } from '../../utils/routes';
 import { peerGroupLabel, seasonLabel } from '../../utils/helpers/season-helper';
 import { useSeasonBestList, useSeasonBestOptions } from '../../hooks/useSeasonBestList';
 import SEASON_BEST_MODULES from './season-best-modules';
+import UI_SeasonNotice from '../components/mix/season-notice/season-notice';
 import { strokeLabel, type SbFilters } from './sb-filters-model';
 import { useSeasonBestFilterHost } from './sb-filter-host';
 import SbFilterPanel from './components/sb-filter-panel';
@@ -197,6 +198,15 @@ function SeasonBestProject() {
                 latinNames={MODULES.latinNames}
               />
             )}
+
+            {/* Оговорка про витринный сезон стоит НАД списком и над пустым состоянием:
+                она объясняет и «почему сезон прошлый», и «почему в новом пусто». Заметка
+                приходит и в опциях, и в самом списке — берём то, что уже загружено. */}
+            <UI_SeasonNotice
+              notice={data?.season_notice ?? options.data?.season_notice ?? null}
+              season={filters.season}
+              className="sb-season-note"
+            />
 
             {!hasEvent ? (
               // Дисциплина не выбрана — списка нет и быть не может. Говорим это прямо и

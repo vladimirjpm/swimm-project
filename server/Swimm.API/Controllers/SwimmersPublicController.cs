@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Swimm.API.Http;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -26,6 +26,13 @@ public class SwimmersPublicController : ControllerBase
     private readonly IResultRepository _results;
     private readonly ICacheService _cache;
 
+    /// <summary>
+    /// Витринный сезон — общий шов продукта (docs/season-boundary-rule.md). Раньше страница
+    /// считала его сама из дат зимних чемпионатов; правило от этого жило в двух местах и
+    /// разъехалось с карточками клуба и /season-best.
+    /// </summary>
+    private readonly IShowcaseSeasonProvider _showcase;
+
     private const string CacheControlValue = "public, max-age=60";
     private static readonly TimeSpan PayloadTtl = TimeSpan.FromMinutes(5);
 
@@ -33,11 +40,13 @@ public class SwimmersPublicController : ControllerBase
     private const string AllSeasons = "all";
 
     public SwimmersPublicController(
-        ISwimmerPageRepository swims, IResultRepository results, ICacheService cache)
+        ISwimmerPageRepository swims, IResultRepository results, ICacheService cache,
+        IShowcaseSeasonProvider showcase)
     {
         _swims = swims;
         _results = results;
         _cache = cache;
+        _showcase = showcase;
     }
 
     /// <summary>
@@ -61,8 +70,7 @@ public class SwimmersPublicController : ControllerBase
         var dto = (await _results.GetSwimmerProfileAsync(id))!;
         var rows = await _swims.GetSwimsAsync(id);
 
-        var showcase = ShowcaseSeason.StartYearOf(
-            await _swims.GetWinterChampionshipDatesAsync(), DateTime.UtcNow);
+        var showcase = await _showcase.CurrentStartYearAsync();
 
         dto.Seasons = SwimmerPageBuilder.Seasons(rows, showcase, SeasonMath.CurrentStartYear());
 
@@ -202,8 +210,13 @@ public class SwimmersPublicController : ControllerBase
             ? await _swims.GetAgeCohortSeasonBestsAsync(year, profile.BirthYear)
             : [];
 
-        return SwimmerPageBuilder.SeasonRanks(
+        var dto = SwimmerPageBuilder.SeasonRanks(
             rows, selected, profile?.BirthYear ?? 0, profile?.Gender, cohort);
+
+        // Пока новый сезон не открыт витриной, панель Season best обязана сказать это вслух:
+        // у пловца в сентябре ещё нет заплывов, и пустая панель иначе читается как поломка.
+        dto.SeasonNotice = await _showcase.PendingNoticeAsync();
+        return dto;
     }
 
     /// <summary>
@@ -247,8 +260,7 @@ public class SwimmersPublicController : ControllerBase
     {
         if (rows.Count == 0) return null;
 
-        var showcase = ShowcaseSeason.StartYearOf(
-            await _swims.GetWinterChampionshipDatesAsync(), DateTime.UtcNow);
+        var showcase = await _showcase.CurrentStartYearAsync();
 
         var seasons = SwimmerPageBuilder.Seasons(rows, showcase, SeasonMath.CurrentStartYear());
         return seasons.FirstOrDefault(s => s.IsDisplayDefault)?.Season;

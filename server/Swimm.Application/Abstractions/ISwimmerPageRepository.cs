@@ -1,4 +1,4 @@
-using Swimm.Application.Dtos;
+﻿using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 
 namespace Swimm.Application.Abstractions;
@@ -28,13 +28,6 @@ public interface ISwimmerPageRepository
     /// состояние, а не ошибка.
     /// </summary>
     Task<IReadOnlyList<SeasonSwimRow>> GetSwimsAsync(int swimmerId);
-
-    /// <summary>
-    /// Даты ПРОШЕДШИХ и будущих зимних чемпионатов (все ступени) — вход для
-    /// <see cref="Swimm.Domain.ShowcaseSeason"/>. Граница витрины общая для продукта,
-    /// поэтому считается по всем чемпионатам базы, а не по стартам конкретного пловца.
-    /// </summary>
-    Task<IReadOnlyList<DateTime>> GetWinterChampionshipDatesAsync();
 
     /// <summary>
     /// Роль соревнования в сезоне (<c>winter</c>/<c>summer</c>/<c>openwater</c>/null) —
