@@ -23,7 +23,8 @@
         "--urls",
         "http://localhost:5078"
       ],
-      "port": 5078
+      "port": 5078,
+      "autoPort": false
     },
     {
       "name": "swimm-api-5079",
