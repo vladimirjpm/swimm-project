@@ -20,8 +20,15 @@ namespace Swimm.Tests;
 /// </summary>
 public class SwimTimeQualityInvariantTests
 {
-    /// <summary>Имена свойств, которые считаются «временем заплыва».</summary>
-    private static readonly string[] TimeProps = ["Time", "TimeOriginal"];
+    /// <summary>
+    /// Имена свойств, которые считаются «временем заплыва».
+    ///
+    /// <c>SeedTime</c> добавлен вместе со стартовыми протоколами (docs/plans/start-list-plan.md):
+    /// посевное время — личный рекорд пловца С ДРУГОГО старта, по которому его посеяли.
+    /// Показать его как время этого заплыва — ровно та ошибка, ради которой И11 и написан,
+    /// а само оно образует ТРЕТИЙ класс качества после протокола и справочника рекордов.
+    /// </summary>
+    private static readonly string[] TimeProps = ["Time", "TimeOriginal", "SeedTime"];
 
     /// <summary>Имена свойств, которые считаются признаком качества.</summary>
     private static readonly string[] QualityProps = ["SuspectReason", "IssueReason", "Quality"];
@@ -49,6 +56,7 @@ public class SwimTimeQualityInvariantTests
         ["ImportRecordPreviewRow"] = "строка файла на превью импорта — в БД её ещё нет",
         ["ParsedRecordDto"] = "разобранная строка внешней выгрузки рекордов до импорта",
         ["LogligResultRowDto"] = "сырая строка пособытийного источника loglig до импорта — в БД её ещё нет",
+        ["LogligStartListRowDto"] = "сырая строка стартового протокола loglig до забора — качество присваивается при показе (StartListSwimDto.Quality)",
 
         // ── Тренировки — наши собственные замеры: ни протокола, ни рекорда, «качество
         //    источника» к ним неприменимо (см. §3C плана).

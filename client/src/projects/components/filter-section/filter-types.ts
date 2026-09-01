@@ -7,7 +7,9 @@ export type FilterData = {
   gender: string[];
   style_list: {
     style_name: string;
-    style_len: number[];
+    /** Строки, а не числа: в `filter-data.js` дистанции лежат как «50», «1500», «4X50».
+     *  Тип, обещавший числа, скрывал эстафеты — `Number('4X50')` даёт NaN. */
+    style_len: string[];
   }[];
 };
 

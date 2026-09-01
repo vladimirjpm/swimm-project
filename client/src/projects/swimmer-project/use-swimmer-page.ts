@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { ShowcaseSeasonNotice } from '../../utils/helpers/season-helper';
 
 /**
  * Данные табов страницы спортсмена (docs/plans/athlete-page-plan.md §3).
@@ -126,6 +127,8 @@ export interface SwimmerSeasonRanks {
   gender?: string | null;
   /** Подпись группы («girls 9») — её обязан показать UI рядом с местом. */
   groupLabel?: string | null;
+  /** «Новый сезон откроется после зимнего чемпионата»; null — сезон открыт. */
+  season_notice?: ShowcaseSeasonNotice | null;
   rows: SwimmerDisciplineRank[];
 }
 

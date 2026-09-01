@@ -73,6 +73,7 @@ function BestSwimPanel({ swim, gender, onOpenSwim }: {
           firstNameEn={swim.first_name_en}
           lastNameEn={swim.last_name_en}
           club={swim.club}
+          clubId={swim.club_id}
           showClubIcon
           clubIconSide="left"
           clubIconWidth="10"
@@ -141,6 +142,7 @@ function MedalistPanel({ medalists, gender, onOpenClub }: {
               firstNameEn={m.first_name_en}
               lastNameEn={m.last_name_en}
               club={m.club}
+              clubId={m.club_id}
               showClubIcon
               clubIconSide="left"
               clubIconWidth="10"

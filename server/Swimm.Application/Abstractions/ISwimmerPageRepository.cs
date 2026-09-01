@@ -1,4 +1,4 @@
-using Swimm.Application.Dtos;
+﻿using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 
 namespace Swimm.Application.Abstractions;
@@ -30,13 +30,6 @@ public interface ISwimmerPageRepository
     Task<IReadOnlyList<SeasonSwimRow>> GetSwimsAsync(int swimmerId);
 
     /// <summary>
-    /// Даты ПРОШЕДШИХ и будущих зимних чемпионатов (все ступени) — вход для
-    /// <see cref="Swimm.Domain.ShowcaseSeason"/>. Граница витрины общая для продукта,
-    /// поэтому считается по всем чемпионатам базы, а не по стартам конкретного пловца.
-    /// </summary>
-    Task<IReadOnlyList<DateTime>> GetWinterChampionshipDatesAsync();
-
-    /// <summary>
     /// Роль соревнования в сезоне (<c>winter</c>/<c>summer</c>/<c>openwater</c>/null) —
     /// та же, что на странице клуба (<c>StandingKinds.Resolve</c>): выводится из
     /// <c>IsChampionship</c> + <c>PoolType</c>, ручное исключение — <c>StandingKindOverride</c>.
@@ -63,13 +56,22 @@ public interface ISwimmerPageRepository
     Task<IReadOnlyList<HeldRecordRow>> GetRecordsHeldAsync(int swimmerId);
 
     /// <summary>
-    /// Лучшее время клуба в каждой дисциплине (ключ — <c>SeasonAggregator.DisciplineKey</c>
-    /// без категории), посчитанное ПО НАШЕЙ БАЗЕ. Это не «клубный рекорд» из справочника:
-    /// у <c>Record</c> нет <c>ClubId</c>, и стена рекордов клуба связана с ним по названию.
-    /// Отсюда обязательная подпись витрины «among N meets in our database».
-    /// Эстафеты, DSQ и помеченные времена исключены.
+    /// Лучшее время клуба СРЕДИ ПЛОВЦОВ ОДНОГО ВОЗРАСТА в каждой дисциплине
+    /// (ключ — <c>SeasonAggregator.DisciplineKey</c> без категории), посчитанное ПО НАШЕЙ БАЗЕ.
+    ///
+    /// Возраст обязателен (решение Влада 2026-08-27): без него девятилетка сравнивалась
+    /// с самым быстрым в клубе за всю историю, то есть со взрослым, и цифра ничего не говорила.
+    /// Теперь обе дельты карточки (клуб и страна) меряют ОДНУ и ту же возрастную ступень.
+    ///
+    /// Возраст чужих заплывов считается ПО СЕЗОНУ ЗАПЛЫВА (<see cref="SeasonMath.AgeInSeason"/>),
+    /// а не по календарю: осенние и весенние старты одного человека обязаны лежать
+    /// в одной ступени.
+    ///
+    /// Это не «клубный рекорд» из справочника: у <c>Record</c> нет <c>ClubId</c>, и стена
+    /// рекордов клуба связана с ним по названию. Отсюда обязательная подпись витрины
+    /// «among N meets in our database». Эстафеты, DSQ и помеченные времена исключены.
     /// </summary>
-    Task<IReadOnlyDictionary<string, int>> GetClubBestMsAsync(int clubId);
+    Task<IReadOnlyDictionary<string, int>> GetClubBestMsAsync(int clubId, int age);
 
     /// <summary>
     /// Лучшие времена ВСЕЙ ВОЗРАСТНОЙ КОГОРТЫ за сезон — вход для фильтра «Season best»:

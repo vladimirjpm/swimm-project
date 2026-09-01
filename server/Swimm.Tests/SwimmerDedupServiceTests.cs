@@ -196,6 +196,77 @@ public class SwimmerDedupServiceTests
     }
 
     [Fact]
+    public async Task DeleteOrphans_SwimmerWithStartListEntryOnly_NotDeleted()
+    {
+        // Новичок, заведённый из СТАРТОВОГО протокола: он ещё ни разу не плыл, поэтому не
+        // числится нигде, кроме заявки. Тот же класс ошибки, что с RelayMembers, только
+        // раньше — чистка сирот удаляла бы ровно тех детей, ради родителей которых фича
+        // и делается (docs/plans/start-list-plan.md §2, вариант C).
+        await using var db = CreateDb(nameof(DeleteOrphans_SwimmerWithStartListEntryOnly_NotDeleted));
+        var club = new Club { Name = "Клуб" };
+        var style = new Style { Name = "freestyle" };
+        var swimmer = S("Новичок", "Заявлен", 2016);
+        db.AddRange(club, style, swimmer);
+        await db.SaveChangesAsync();
+
+        db.CompetitionEntries.Add(new CompetitionEntry
+        {
+            OrgCompId = 16786,
+            CompDate = new DateTime(2026, 2, 19),
+            CompName = "Старт, который ещё не проплыли",
+            SwimmerId = swimmer.Id,
+            ClubId = club.Id,
+            StyleId = style.Id,
+            Distance = "100",
+            Gender = "female",
+            OrgDisciplineId = 76321,
+            Heat = 2,
+            Lane = 5
+        });
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerDedupService(db).DeleteOrphansAsync(null);
+
+        Assert.Equal(0, report.Deleted);
+        Assert.Equal(1, await db.Swimmers.CountAsync(s => s.Id == swimmer.Id));
+    }
+
+    [Fact]
+    public async Task FindCandidates_SwimmerWithStartListEntryOnly_NotListedAsOrphan()
+    {
+        // Список и удаление ходят через один OrphanQuery — проверяем оба конца, иначе админ
+        // видит заявленного ребёнка в «сиротах» и жмёт «удалить всех».
+        await using var db = CreateDb(nameof(FindCandidates_SwimmerWithStartListEntryOnly_NotListedAsOrphan));
+        var club = new Club { Name = "Клуб" };
+        var style = new Style { Name = "freestyle" };
+        var entered = S("Новичок", "Заявлен", 2016);
+        var realOrphan = S("Настоящая", "Сирота", 2016);
+        db.AddRange(club, style, entered, realOrphan);
+        await db.SaveChangesAsync();
+
+        db.CompetitionEntries.Add(new CompetitionEntry
+        {
+            OrgCompId = 16786,
+            CompDate = new DateTime(2026, 2, 19),
+            CompName = "Старт",
+            SwimmerId = entered.Id,
+            ClubId = club.Id,
+            StyleId = style.Id,
+            Distance = "100",
+            Gender = "female",
+            OrgDisciplineId = 76321,
+            Heat = 1,
+            Lane = 4
+        });
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerDedupService(db).FindCandidatesAsync();
+
+        Assert.DoesNotContain(report.Orphans, o => o.Id == entered.Id);
+        Assert.Contains(report.Orphans, o => o.Id == realOrphan.Id);
+    }
+
+    [Fact]
     public async Task DeleteOrphans_SwimmerWithRelayLegOnly_NotDeleted()
     {
         // Ребёнок плавает ТОЛЬКО эстафеты: личных результатов нет, но он живой пловец.

@@ -725,7 +725,7 @@
                 onclick="event.stopPropagation();toggleActive(${u.id},${!u.isActive})">${u.isActive ? 'Disable' : 'Enable'}</button>`;
 
             const rowCls = sel
-                ? 'border-b border-white/[.08] cursor-pointer bg-[#4fc3f7]/10'
+                ? 'border-b border-white/[.08] cursor-pointer bg-[rgba(79,195,247,0.1)]'
                 : 'border-b border-white/[.08] cursor-pointer hover:bg-white/[.04] transition-colors';
 
             return `<tr class="${rowCls}" data-uid="${u.id}" onclick="openDetail(${u.id})">

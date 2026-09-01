@@ -18,6 +18,7 @@ import {
 } from './use-swimmer-page';
 import SwimmerHero from './components/swimmer-hero';
 import SwimmerMediaPanel from './components/swimmer-media-panel';
+import SwimmerUpcomingStarts from './components/swimmer-upcoming-starts';
 import {
   HistoryPanel, holdsSeasonBest, PanelEmpty, PersonalBestsPanel, ProgressPanel, ResultsFilters,
   ResultsPanel, SeasonBestPanel, SeasonPanel, type ResultsView,
@@ -271,6 +272,8 @@ function SwimmerProject() {
               achievements={achievements}
             />
 
+            <SwimmerUpcomingStarts swimmerId={profile.id} />
+
             {/* Одна карусель на всю страницу: сезон выбирается раз и читается всеми табами. */}
             <DeepSeasonCarousel
               seasons={profile.seasons ?? []}
@@ -351,6 +354,8 @@ function SwimmerProject() {
                         poolType={poolType}
                         onPoolType={setPoolType}
                         records={profile.records}
+                        gender={gender}
+                        age={profile.ageInSeason}
                         state={personalBests}
                       />
                     )}

@@ -119,7 +119,17 @@ namespace Swimm.Infrastructure.Migrations
 
             // Открываем SELECT для роли swimm_ro (публичный read-путь).
             // Без этого гранта SwimmReadDbContext (swimm_ro) не сможет читать таблицы.
-            migrationBuilder.Sql("GRANT SELECT ON \"ClubPointsRules\", \"ClubPointsRuleEntries\" TO swimm_ro;");
+            // Роль swimm_ro может отсутствовать (чистая БД, CI, дев без setup-roles):
+            // тогда грант молча пропускаем, иначе `--migrate` падает на пустой базе.
+            // Базовый набор грантов — server/db/02-grants.sql.
+            migrationBuilder.Sql(@"
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'swimm_ro') THEN
+                        GRANT SELECT ON ""ClubPointsRules"", ""ClubPointsRuleEntries"" TO swimm_ro;
+                    END IF;
+                END$$;
+            ");
         }
 
         /// <inheritdoc />

@@ -2,7 +2,7 @@
 // DTO зеркалят server/Swimm.Application/Dtos/CompetitionOverviewDto.cs (snake_case).
 
 // 'overview' — мастер-детейл с цветными модулями (design_handoff_competition_overview2, 9d/9f).
-export type CompetitionTab = 'overview' | 'swims' | 'clubs' | 'records' | 'media';
+export type CompetitionTab = 'overview' | 'swims' | 'clubs' | 'records' | 'media' | 'startlist';
 
 export interface OverviewSummary {
   result_count: number;
@@ -28,6 +28,8 @@ export interface OverviewBestSwim {
   first_name_en: string;
   last_name_en: string;
   club: string;
+  /** Id клуба — ссылка на /clubs/{id} с эмблемы. */
+  club_id: number;
   style_name: string;
   distance: string;
   gender: string;
@@ -44,6 +46,8 @@ export interface OverviewBestSwim {
 /** Строка клубного зачёта — контракт /api/club-summary (useClubSummary). */
 export interface OverviewClub {
   club: string;
+  /** Id клуба — ссылка на /clubs/{id}. */
+  clubId: number;
   points: number;
   swimmerCount: number;
   successfulCount: number;
@@ -103,6 +107,8 @@ export interface OverviewMedalist {
   first_name_en: string;
   last_name_en: string;
   club: string;
+  /** Id клуба — ссылка на /clubs/{id} с эмблемы. */
+  club_id: number;
   gold: number;
   silver: number;
   bronze: number;
@@ -125,6 +131,8 @@ export interface OverviewHighPoint {
   first_name_en: string;
   last_name_en: string;
   club: string;
+  /** Id клуба — ссылка на /clubs/{id} с эмблемы. */
+  club_id: number;
   points: number;
   is_tie: boolean;
   /** Правило требует «только финалы», но признака типа заплыва в данных нет —
@@ -150,8 +158,30 @@ export interface OverviewRecord {
   result_id: number | null;
 }
 
+/** Один источник стартового протокола: compID + подпись подтаба (дата и номер). */
+export interface StartListSource {
+  org_comp_id: number;
+  competition_id: number;
+  /** Порядковый номер подтаба с единицы — назначает сервер, чтобы не зависеть от порядка массива. */
+  index: number;
+  /** dd/MM для подписи; null — даты у привязки нет. */
+  date: string | null;
+  /** Та же дата в ISO (yyyy-MM-dd) — из неё чип сессии считает день недели («Sun 15/02»). */
+  date_iso: string | null;
+  /** Имя протокола у федерации (иврит) — только в title-тултип, не в подпись. */
+  source_name: string | null;
+  entry_count: number;
+}
+
 export interface CompetitionOverview {
   summary: OverviewSummary;
+  /** compID сайта федерации — адрес стартового протокола. null — соревнование завели
+   *  руками, штампа нет: таб Start list не показываем (шаг 0, start-list-ui-sonnet.md). */
+  org_comp_id?: number | null;
+  /** Все источники стартового протокола — по одному compID федерации на подтаб. У окружных
+   *  чемпионатов их несколько на одно соревнование. Пусто — привязок нет, падаем на
+   *  org_comp_id; пусто и там — таба Start list нет. Один элемент — подтабы не рисуем. */
+  start_list_sources?: StartListSource[];
   /**
    * Наградное ли соревнование (Competition.IsAward). У ненаградных (лиги, отборы) места в
    * протоколе есть, а медалей нет — Overview прячет всё медальное: Most decorated, медали
@@ -192,4 +222,7 @@ export interface CompetitionHeaderProps {
   onTabChange(tab: CompetitionTab): void;
   /** Число публичных медиа соревнования (бейдж таба Media); null — ещё не известно. */
   mediaCount: number | null;
+  /** Число заявок стартового протокола (бейдж таба Start list); null — ещё не известно
+   *  или таба нет (org_comp_id пуст). */
+  startListEntries?: number | null;
 }

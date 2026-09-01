@@ -12,12 +12,8 @@ import { routes } from '../../utils/routes';
 import UI_ClubIcon from '../components/mix/club-icon/club-icon';
 import UI_NormativeLevelIcon from '../components/mix/normative-level-icon/normative-level-icon';
 import UI_MedalIcon from '../components/mix/medal-icon/medal-icon';
-import UI_PrelimLabel from '../components/mix/prelim-label/prelim-label';
+import SwimRow from '../components/swim-row/swim-row';
 import UI_PositionBadge from '../components/mix/position-badge/position-badge';
-import ResultRowDateInfo from '../results-table/components/result-row-date-info';
-import UI_PoolIcon from '../components/mix/pool-icon/pool-icon';
-import UI_SwimmerTimeCell from '../components/mix/swimmer-time-cell/swimmer-time-cell';
-import { swimFlaggedRowProps } from '../components/mix/swim-time/swim-time';
 import UI_FlagEmoji from '../components/mix/flag-icon/flag-icon';
 import UI_RecordCount from '../components/mix/record-count/record-count';
 import UI_SwimmerGallery from '../components/mix/swimmer-gallery/swimmer-gallery';
@@ -221,7 +217,7 @@ function SportsmenDetails() {
                   className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full p-[2px]'
                   style={{ background: '#ffffff', boxShadow: '0 0 0 2px color-mix(in srgb, var(--theme-primary) 40%, transparent)' }}
                 >
-                  <UI_ClubIcon clubName={firstResult.club} iconWidth='full' styleType="icon-notext" />
+                  <UI_ClubIcon clubName={firstResult.club} clubId={firstResult.club_id} iconWidth='full' styleType="icon-notext" />
                 </span>
                 <span className='truncate text-xs font-bold' style={{ color: 'var(--theme-mode-text-secondary)' }}>
                   {firstResult.club}
@@ -522,16 +518,6 @@ function AllTimeBests({ career }: { career: AthleteCareer }) {
   const rows = useMemo(() => career.bestByStyle.map((b) => {
     const isMaster = Helper.isResultMasters(b.isMasters, b.eventStyleAge);
     const resolvedGender = Helper.resolveGender(b.gender);
-    const levelInfo = Helper.getNormativeLevelInfo({
-      gender: resolvedGender === 'none' ? 'male' : resolvedGender,
-      poolType: Helper.resolvePoolType(b.pool),
-      styleName: b.stroke,
-      distance: `${b.distance}m`,
-      time: Helper.parseTimeToSeconds(b.time),
-      isMaster,
-      ageGroup: b.ageGroup,
-      event_style_age: b.eventStyleAge,
-    });
 
     return {
       position: b.position,
@@ -550,7 +536,12 @@ function AllTimeBests({ career }: { career: AthleteCareer }) {
       // Каждая строка all-time — из СВОЕГО соревнования, поэтому award-eligibility
       // берём по-строчно (b.isAward), а не общим флагом на весь список.
       is_award: b.isAward,
-      levelInfo,
+      // Вход дуги уровня: считает её сама строка (`SwimRow`), но пол и мастерс здесь
+      // известны точнее, чем из самого заплыва — пол берётся по карьере, а неизвестный
+      // («none») подменяется на мужскую шкалу, как было до объединения строки.
+      levelGender: resolvedGender === 'none' ? 'male' : resolvedGender,
+      levelIsMaster: isMaster,
+      levelAgeGroup: b.ageGroup,
     };
   }), [career.bestByStyle]);
 
@@ -966,19 +957,13 @@ function TopResultsTabs({
   );
 }
 
-/** "16/02/2026" → "16 Feb 2026" (дата заплыва в строке результата). */
-const formatDayMonthYear = (date?: string): string => {
-  if (!date) return '';
-  const parts = date.split('/');
-  if (parts.length !== 3) return date;
-  const dt = new Date(Number(parts[2]), Number(parts[1]) - 1, 1);
-  if (isNaN(dt.getTime())) return date;
-  return `${Number(parts[0])} ${dt.toLocaleString('en', { month: 'short' })} ${parts[2]}`;
-};
-
-// Строка результата в 2 линии (design_handoff_athlete_card §5):
-// линия 1 — место/возраст, картинка стиля с дистанцией, время;
-// линия 2 — сплиты/очки/дата слева, дуга уровня справа.
+// Строка результата карточки — общий `SwimRow`
+// (docs/plans/swim-row-shared-component-plan.md).
+//
+// Эта карточка была ЭТАЛОНОМ строки заплыва, поэтому её перевели ПЕРВОЙ: пока компонент не
+// воспроизводит вид здесь один в один, разносить его по чужим экранам нельзя. Вся вёрстка
+// двух линий (место, плитка стиля, время, очки, дата, дуга уровня) уехала внутрь компонента;
+// здесь остаётся только раскладка данных карточки по его пропам.
 function ResultsTable({
   results,
   isMastersSource,
@@ -995,12 +980,9 @@ function ResultsTable({
   /** Название соревнования рядом с датой — только там, где строки реально смешивают разные соревнования (all-time) */
   showCompetition?: boolean;
 }) {
-  const base = import.meta.env.BASE_URL;
-
   return (
     <ul className="flex flex-col gap-2.5">
       {results.map((res, index) => {
-        const levelInfo = res.levelInfo;
         const hasPoints =
           res.international_points !== undefined &&
           res.international_points !== null &&
@@ -1016,119 +998,48 @@ function ResultsTable({
         const rowId = typeof res.id === 'number' ? res.id : null;
         const hasMedia = rowId != null && !!mediaResultIds?.has(rowId);
 
-        // Спорное время (гибрид 15d): та же обвязка, что у строки таблицы результатов —
-        // лента слева + полный текст в title/aria-label; чип рисует UI_SwimTime.
+        // Спорное время (гибрид 15d): чип и обвязку строки рисует сам SwimRow.
         const quality = res.suspect_reason ? { kind: 'protocol' as const, reason: res.suspect_reason } : null;
-        const flagProps = swimFlaggedRowProps(quality);
+
+        // Пол и мастерс для дуги уровня. All-time кладёт их в строку сам (там пол известен
+        // по карьере и «none» подменяется на male, как было до объединения); у таба
+        // «это соревнование» они выводятся из самого заплыва.
+        const levelGender = res.levelGender ?? Helper.resolveGender(res.event_style_gender);
+        const levelIsMaster =
+          res.levelIsMaster ?? Helper.isResultMasters(isMastersSource, res.event_style_age);
 
         return (
-          <li
-            key={index}
-            {...flagProps}
-            className={`flex flex-col gap-2 rounded-[14px] py-3 pr-3 ${
-              quality ? `${flagProps.className} swim-flagged-row--rounded pl-5` : 'pl-3'
-            }`}
-            style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)' }}
-          >
-            {/* Линия 1: место+возраст · стиль с дистанцией · время */}
-            <div className="flex items-center gap-3">
-              <div className="flex shrink-0 flex-col items-center gap-1">
-                <UI_MedalIcon place={String(res.position ?? index + 1)} styleType={rowIsAward ? 'icon-place' : 'icon-noplace'} styleSize="medal-40" />
-                <UI_PrelimLabel heatType={res.heat_type} />
-                {res.event_style_age && (
-                  <div className="text-[10px]" style={{ color: 'var(--theme-mode-text-muted)' }}>
-                    age: <strong style={{ color: 'var(--theme-mode-text)' }}>{res.event_style_age}</strong>
-                  </div>
-                )}
-              </div>
-              <div className="relative w-[86px] shrink-0">
-                {/* Белая подложка иконки стиля — статусная, не зависит от темы (TASK.md §Темы) */}
-                <img
-                  src={`${base}images/swimm-style-icon/${String(res.event_style_name || '').replaceAll(' ', '-')}.png`}
-                  alt={res.event_style_name}
-                  className="block w-[86px] rounded-[7px] p-1"
-                  style={{ background: '#ffffff' }}
-                  onError={(e) => {
-                    e.currentTarget.src = `${base}images/swimm-style-icon/no-swim.png`;
-                  }}
-                />
-                <span
-                  className="absolute -top-[7px] -right-[5px] text-[15px] font-black"
-                  style={{ color: '#e53935', textShadow: '0 1px 2px rgba(255,255,255,0.7)' }}
-                >
-                  {res.event_style_len}
-                </span>
-                <UI_PoolIcon styleType="icon-text-center" label={res.pool_type} labelClassName="text-xs" className="mt-1" />
-              </div>
-              <div className="flex-1" />
-              <UI_SwimmerTimeCell
-                time={res.time}
-                quality={quality}
-                qualityMarker="chip"
-                time_split={res.time_split}
-                time_fail={res.time_fail}
-                time_fail_note={res.time_fail_note}
-                firstLineClassName="text-xl font-extrabold tabular-nums"
-                secondLineClassName="text-[10px]"
-                className="text-right"
-              />
-            </div>
-
-            {/* Линия 2: сплиты (если есть) / очки / дата — слева; дуга уровня — справа */}
-            <div
-              className="flex items-center gap-2.5 pl-[46px] pt-2"
-              style={{ borderTop: '1px solid var(--theme-mode-border)' }}
-            >
-              <div className="min-w-0 flex-1">
-                {hasPoints && (
-                  <div className="mt-px text-[11px]" style={{ color: 'var(--theme-mode-text-secondary)' }}>
-                    Points: <strong style={{ color: 'var(--theme-mode-text)' }}>{res.international_points}</strong>
-                  </div>
-                )}
-                <div className="mt-px" style={{ color: 'var(--theme-mode-text-secondary)' }}>
-                  <ResultRowDateInfo
-                    date={res.date}
-                    competition={res.competition}
-                    showCompetition={showCompetition}
-                    className="justify-start"
-                  />
-                </div>
-              </div>
-
-              {/* Медиа заплыва (2A): иконка «есть видео» — только просмотр уже загруженного
-                  медиа (owner-view). Добавление медиа с этой страницы убрано (см. задание). */}
-              {hasMedia && (
-                <button
-                  type="button"
-                  onClick={() => onOpenMedia?.(rowId!)}
-                  title="Open video"
-                  className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full transition-opacity hover:opacity-80"
-                  style={{ background: 'var(--theme-primary)' }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="#fff">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </button>
-              )}
-
-              {levelInfo?.currentLevel ? (
-                <UI_NormativeLevelIcon
-                  levelName={levelInfo.currentLevel}
-                  styleType="gauge"
-                  styleSize="size-2"
-                  className="shrink-0"
-                  styleName={res.event_style_name}
-                  styleLen={res.event_style_len}
-                  poolType={res.pool_type}
-                  isMasters={Helper.isResultMasters(isMastersSource, res.event_style_age)}
-                  normativeAgeGroup={levelInfo.normativeAgeGroup}
-                  progressPercent={levelInfo.progressToNextLevel}
-                  nextTime={levelInfo.nextTime}
-                />
-              ) : (
-                <span style={{ color: 'var(--theme-mode-text-muted)' }}>—</span>
-              )}
-            </div>
+          <li key={index}>
+            <SwimRow
+              stroke={res.event_style_name}
+              distance={String(res.event_style_len ?? '')}
+              poolType={res.pool_type}
+              time={res.time}
+              quality={quality}
+              splits={res.time_split}
+              timeFail={res.time_fail}
+              timeFailNote={res.time_fail_note}
+              heatType={res.heat_type}
+              place={{
+                kind: 'medal',
+                value: res.position ?? index + 1,
+                isAward: rowIsAward,
+                caption: res.event_style_age ? `age ${res.event_style_age}` : null,
+              }}
+              // Человек в карточке один и тот же, поэтому слот идентичности пуст, а
+              // соревнование стоит во второй линии рядом с датой — как было.
+              competition={showCompetition && res.competition ? { name: res.competition } : null}
+              meetPlacement="line2"
+              date={res.date}
+              points={hasPoints ? res.international_points : null}
+              level={{
+                gender: levelGender,
+                ageInSeason: res.event_style_age,
+                ageGroup: res.levelAgeGroup ?? null,
+                isMasters: levelIsMaster,
+              }}
+              onOpenMedia={hasMedia ? () => onOpenMedia?.(rowId) : null}
+            />
           </li>
         );
       })}

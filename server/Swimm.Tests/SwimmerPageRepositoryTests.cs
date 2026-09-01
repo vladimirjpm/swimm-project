@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
@@ -50,12 +50,12 @@ public class SwimmerPageRepositoryTests
 
     private static ResultRecord Swim(
         Competition c, Swimmer s, Style st, DateTime date, int ms,
-        int? position = null, int points = 0, int? relayId = null) => new()
+        int? position = null, int points = 0, int? relayId = null, int clubId = 0) => new()
         {
             CompetitionId = c.Id,
             SwimmerId = s.Id,
             StyleId = st.Id,
-            ClubId = 0,
+            ClubId = clubId,
             RelayId = relayId,
             CompetitionDate = date,
             Distance = "100",
@@ -146,6 +146,54 @@ public class SwimmerPageRepositoryTests
         Assert.Single(rows);
     }
 
+    /// <summary>
+    /// Клубный эталон для дельты «Δ club» считается СРЕДИ СВОЕГО ВОЗРАСТА
+    /// (решение Влада 2026-08-27). До этого брался минимум по всему клубу, и
+    /// двенадцатилетка сравнивалась со взрослым — цифра ничего не говорила.
+    ///
+    /// Второе, что стережёт этот тест: возраст берётся ПО СЕЗОНУ ЗАПЛЫВА, а не по
+    /// календарному году. Заплыв октября 2025 у пловца 2014 года — это сезон 2025/26 и
+    /// ступень 12, хотя «год заплыва минус год рождения» дало бы 11 и выкинуло бы его
+    /// из выборки. Формула в репозитории обязана совпадать с <c>SeasonMath.AgeInSeason</c>.
+    /// </summary>
+    [Fact]
+    public async Task ClubBest_IsScopedToTheSameAgeStep_AndUsesSeasonAge()
+    {
+        await using var db = CreateDb(nameof(ClubBest_IsScopedToTheSameAgeStep_AndUsesSeasonAge));
+        const int clubId = 7;
+
+        var style = new Style { Name = "freestyle" };
+        var winter = Comp("Winter", "16/02/2026");
+        var autumn = Comp("Autumn league", "12/10/2025");
+        var kidSpring = new Swimmer { FirstName = "Анна", LastName = "Весна", BirthYear = 2014 };
+        var kidAutumn = new Swimmer { FirstName = "Ольга", LastName = "Осень", BirthYear = 2014 };
+        var adult = new Swimmer { FirstName = "Мария", LastName = "Взрослая", BirthYear = 2008 };
+        db.AddRange(style, winter, autumn, kidSpring, kidAutumn, adult);
+        await db.SaveChangesAsync();
+
+        db.AddRange(
+            Swim(winter, kidSpring, style, new DateTime(2026, 2, 16), 61000, clubId: clubId),
+            // Октябрьский старт того же сезона — тоже ступень 12 и самый быстрый среди них.
+            Swim(autumn, kidAutumn, style, new DateTime(2025, 10, 12), 59000, clubId: clubId),
+            // Взрослая быстрее всех, но в детскую ступень попасть не должна.
+            Swim(winter, adult, style, new DateTime(2026, 2, 16), 55000, clubId: clubId),
+            // Чужой клуб — не считается вовсе.
+            Swim(winter, kidSpring, style, new DateTime(2026, 2, 16), 50000, clubId: clubId + 1));
+        await db.SaveChangesAsync();
+
+        var kids = await Repo(db).GetClubBestMsAsync(clubId, 12);
+        Assert.Equal(59000, Assert.Single(kids).Value);
+
+        var adults = await Repo(db).GetClubBestMsAsync(clubId, 18);
+        Assert.Equal(55000, Assert.Single(adults).Value);
+
+        // В клубе нет семнадцатилетних — эталона нет, и строка дельты на карточке не рисуется.
+        Assert.Empty(await Repo(db).GetClubBestMsAsync(clubId, 17));
+
+        // Год рождения не заполнен → ступени нет; вызов без возраста ничего не возвращает.
+        Assert.Empty(await Repo(db).GetClubBestMsAsync(clubId, 0));
+    }
+
     [Fact]
     public async Task UnknownSwimmer_ReturnsEmpty_NotNull()
     {
@@ -154,22 +202,5 @@ public class SwimmerPageRepositoryTests
         Assert.Empty(await Repo(db).GetSwimsAsync(999));
         Assert.Empty(await Repo(db).GetSwimsAsync(0));
         Assert.Empty(await Repo(db).GetSwimsAsync(-1));
-    }
-
-    [Fact]
-    public async Task WinterChampionshipDates_OnlyChampionshipsInShortCourse()
-    {
-        await using var db = CreateDb(nameof(WinterChampionshipDates_OnlyChampionshipsInShortCourse));
-        db.AddRange(
-            Comp("Winter champs", "16/02/2026", PoolTypes.Short, championship: true),
-            Comp("Summer champs", "15/07/2026", PoolTypes.Long, championship: true),
-            Comp("League", "10/12/2025", PoolTypes.Short),                       // не чемпионат
-            Comp("Open water champs", "27/04/2026", PoolTypes.Short, championship: true,
-                overrideKind: StandingKinds.OpenWater));                          // роль переопределена
-        await db.SaveChangesAsync();
-
-        var dates = await Repo(db).GetWinterChampionshipDatesAsync();
-
-        Assert.Equal([new DateTime(2026, 2, 16)], dates);
     }
 }

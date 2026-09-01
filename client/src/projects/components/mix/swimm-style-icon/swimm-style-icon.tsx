@@ -6,6 +6,18 @@ interface UI_SwimmStyleIconProps {
   styleName: string;
   styleLen?: string;
   styleType?: 'icon-notext' | 'icon-text' | 'icon-len';
+  /**
+   * Где стоит дистанция в режиме `icon-len` (добавлено 31.08.2026):
+   *
+   * - `overlay` — **по умолчанию**, как было всегда: числом поверх иконки в правом верхнем
+   *   углу. Плотно, но число ложится на рисунок и на узкой плитке спорит с ним.
+   * - `below` — строкой ПОД иконкой. Число не перекрывает рисунок и читается как подпись.
+   * - `right` — столбиком справа от иконки, когда по высоте места нет, а по ширине есть.
+   *
+   * Дефолт менять нельзя: `overlay` стоит на дюжине экранов (таблица результатов, My media,
+   * карточки), и смена умолчания переставила бы число сразу везде.
+   */
+  lenPlacement?: 'overlay' | 'below' | 'right';
   className?: string; // ✅ Добавлен className
 }
 
@@ -13,6 +25,7 @@ const UI_SwimmStyleIcon: React.FC<UI_SwimmStyleIconProps> = ({
   styleName,
   styleLen = '',
   styleType = 'icon-notext',
+  lenPlacement = 'overlay',
   className = '', // ✅ Значение по умолчанию
 }) => {
   const dispatch = useAppDispatch();
@@ -53,11 +66,26 @@ try {
   }
 
   if (styleType === 'icon-len') {
+    const len = String(styleLen ?? '');
+    // Дистанции бывают четырёх- и пятизначные: чемпионат на 3 км в бассейне, открытая
+    // вода (1600/5000/10000). Раньше подпись стояла ВЫШЕ своей коробки
+    // (`margin-top: -10px`) и там, где у карточки `overflow: hidden`, её срезало.
+    // Теперь она прижата внутрь угла; кегль уменьшается только у пятизначной — она одна
+    // не помещается в самую узкую плитку (чип заплыва My media, 46px).
+
+    // Раскладка зависит от места дистанции: `right` ставит её в строку с иконкой, остальные
+    // оставляют колонку. `relative` нужен только `overlay` — абсолютной подписи.
+    const box = lenPlacement === 'right'
+      ? 'flex flex-row items-center gap-1.5'
+      : 'relative flex flex-col items-center space-y-1';
+
     return (
-      <div className={`dv-swimm-icon relative flex flex-col items-center space-y-1 text-gray-800 ${className}`}>
+      <div className={`dv-swimm-icon ${box} text-gray-800 ${className}`}>
         {img}
-        <div className="absolute right-0">
-          <div className="style-len text-red-700">{styleLen}</div>
+        <div
+          className={`style-len style-len--${lenPlacement} text-red-700 ${len.length >= 5 ? 'style-len--xl' : ''}`}
+        >
+          {len}
         </div>
       </div>
     );

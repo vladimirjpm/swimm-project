@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
@@ -17,9 +18,16 @@ public class ClubPublicRepository : IClubPublicRepository
 {
     private readonly SwimmReadDbContext _read;
 
-    public ClubPublicRepository(SwimmReadDbContext read)
+    /// <summary>
+    /// Витринный сезон для карточки Season best — только он, календарный
+    /// <c>SeasonMath.CurrentStartYear()</c> здесь запрещён (docs/season-boundary-rule.md).
+    /// </summary>
+    private readonly IShowcaseSeasonProvider _showcase;
+
+    public ClubPublicRepository(SwimmReadDbContext read, IShowcaseSeasonProvider showcase)
     {
         _read = read;
+        _showcase = showcase;
     }
 
     public async Task<int?> ResolveClubIdAsync(int clubId)
@@ -165,7 +173,12 @@ public class ClubPublicRepository : IClubPublicRepository
         // Глобальный фильтр сезона страницы она не слушает — иначе при «all seasons»
         // название врало бы, а плитка возраста теряла бы смысл (в 2019-м пловцу было 8,
         // сейчас 15 — «лучшее в 10 лет за всю историю» это уже рекорд клуба, не сезон).
-        var seasonYear = season ?? SeasonMath.CurrentStartYear();
+        //
+        // ⚠ Умолчание — ВИТРИННЫЙ сезон, а не календарный (docs/season-boundary-rule.md):
+        // до зимнего чемпионата новый сезон показывать нечем. С 01.08 по 31.08.2026 здесь
+        // стоял SeasonMath.CurrentStartYear(), и 1 сентября карточка опустела — календарь
+        // шагнул в сезон, в котором ещё нет ни одного старта.
+        var seasonYear = season ?? await _showcase.CurrentStartYearAsync();
         var range = SeasonMath.RangeOf(seasonYear);
 
         var (leaders, meets) = await LeadersAsync(
@@ -218,6 +231,9 @@ public class ClubPublicRepository : IClubPublicRepository
         {
             Season = seasonYear,
             SeasonLabel = SeasonMath.Label(seasonYear),
+            // Сентябрь–февраль: новый сезон идёт, а карточка показывает прошлый. Без этой
+            // заметки пустая (или «прошлогодняя») карточка читается как поломка.
+            SeasonNotice = await _showcase.PendingNoticeAsync(),
             Total = groups.Sum(g => g.Items.Count),
             Meets = meets,
             Data = groups
@@ -245,6 +261,11 @@ public class ClubPublicRepository : IClubPublicRepository
     /// слоты, где первый — наш (решение Влада 2026-08-01). Исключение SuspectReason
     /// обязательно: помеченная ошибка протокола не должна делать клуб «первым в стране».
     /// Эстафеты исключены — слот про личное время.
+    ///
+    /// Открытая вода тоже исключена (решение Влада 2026-08-26): море — настоящий чемпионат
+    /// (поэтому в медалях и «Championships» оно осталось, Р21), но слот «первый в Израиле»
+    /// сравнивает ВРЕМЯ, а морское время несравнимо с бассейновым — течение, трасса, старт.
+    /// Признак площадки пока временный, см. <see cref="StandingKinds.OpenWater"/>.
     /// </summary>
     private async Task<(List<LeaderRow> Leaders, int Meets)> LeadersAsync(
         int resolvedClubId, string? poolType, DateTime start, DateTime endExclusive, int seasonYear)
@@ -254,6 +275,7 @@ public class ClubPublicRepository : IClubPublicRepository
                         && !r.TimeFail
                         && r.RelayId == null
                         && r.SuspectReason == null
+                        && r.Competition.StandingKindOverride != StandingKinds.OpenWater
                         && r.CompetitionDate >= start
                         && r.CompetitionDate < endExclusive);
 

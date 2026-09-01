@@ -27,6 +27,8 @@ export interface GenderAgeEntry {
   firstName: string;
   lastName?: string;
   club?: string;
+  /** Id клуба — эмблема становится ссылкой на /clubs/{id}. Нет id — просто картинка. */
+  clubId?: number | null;
   /** Значение к показу СТРОКОЙ: время ("00:34.10") или очки ("987"). */
   value: string;
   /** Качество времени (И11): для рекордов — открытая претензия к записи справочника. */
@@ -141,6 +143,7 @@ function Cell({ entries, gender, showClubIcon, showDate, stacked }: {
             firstName={entry.firstName}
             lastName={entry.lastName}
             club={entry.club}
+            clubId={entry.clubId}
             showClubIcon={showClubIcon}
             clubIconSide={isMale ? 'left' : 'right'}
             rowJustify={isMale ? 'start' : 'end'}

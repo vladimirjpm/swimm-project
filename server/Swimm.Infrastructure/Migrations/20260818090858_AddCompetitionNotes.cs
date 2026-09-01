@@ -70,8 +70,17 @@ namespace Swimm.Infrastructure.Migrations
 
             // Примечание читает публичная витрина (попап «Points system»), а не только админка,
             // поэтому таблицы БЕЗ префикса Sys_ и нужен явный grant роли публичного чтения.
-            migrationBuilder.Sql(
-                "GRANT SELECT ON \"CompetitionNotes\", \"CompetitionNoteTexts\" TO swimm_ro;");
+            // Роль swimm_ro может отсутствовать (чистая БД, CI, дев без setup-roles):
+            // тогда грант молча пропускаем, иначе `--migrate` падает на пустой базе.
+            // Базовый набор грантов — server/db/02-grants.sql.
+            migrationBuilder.Sql(@"
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'swimm_ro') THEN
+                        GRANT SELECT ON ""CompetitionNotes"", ""CompetitionNoteTexts"" TO swimm_ro;
+                    END IF;
+                END$$;
+            ");
 
             // Переезд объяснения, которое успели написать колонкой Competitions.ClubPointsVerifiedNote
             // (английский текст лета-2025): сначала переносим, потом роняем колонку — держать два

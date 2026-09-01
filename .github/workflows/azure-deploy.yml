@@ -1,0 +1,150 @@
+name: Деплой на Azure App Service
+
+# ТОЛЬКО по кнопке (решение В13). Автодеплой на пуш сознательно не включаем, пока
+# не пройдена приёмка и нет staging-слота: план B1 слотов не поддерживает, деплой =
+# кратковременный рестарт живого сайта.
+#
+# Что нужно завести один раз:
+#   Secret  AZURE_WEBAPP_PUBLISH_PROFILE  — «Get publish profile» на странице App Service
+#   Var     AZURE_WEBAPP_NAME             — имя App Service (можно переопределить вводом)
+#
+# Миграции здесь НЕ применяются — это отдельный ручной шаг (решение роадмапа:
+# автомиграции при старте нет). Порядок первого запуска — docs/plans/azure-deploy-plan.md §6.
+on:
+  workflow_dispatch:
+    inputs:
+      webapp_name:
+        description: 'Имя App Service (пусто = переменная AZURE_WEBAPP_NAME)'
+        required: false
+        type: string
+
+concurrency:
+  group: deploy-azure
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Собрать и выложить
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Куда деплоим
+        id: target
+        run: |
+          NAME="${{ inputs.webapp_name }}"
+          [ -z "$NAME" ] && NAME="${{ vars.AZURE_WEBAPP_NAME }}"
+          if [ -z "$NAME" ]; then
+            echo "::error::Не задано имя App Service: заполни ввод webapp_name или переменную AZURE_WEBAPP_NAME."
+            exit 1
+          fi
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "Деплой в $NAME (коммит ${GITHUB_SHA:0:7})"
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Node нужен самому publish: таргет PublishClientApp в Swimm.API.csproj собирает
+      # клиент и кладёт dist в wwwroot. Отдельным шагом клиент здесь НЕ собираем —
+      # пусть путь до артефакта будет ровно тот же, что и при локальном dotnet publish.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Кэш NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('server/**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      # InformationalVersion уезжает в /version — по нему видно, что крутится в проде.
+      - name: dotnet publish
+        run: |
+          dotnet publish server/Swimm.API -c Release -o publish \
+            -p:InformationalVersion=${{ github.sha }}
+
+      # Проверяем артефакт ДО выкладки. Оба сценария уже случались вживую:
+      # клиент не доезжал в wwwroot, а бандл админки исчезал из-за конфликта
+      # с конвейером static web assets.
+      - name: Проверка артефакта
+        run: |
+          fail=0
+
+          pages=$(ls publish/wwwroot/*.html 2>/dev/null | wc -l)
+          if [ "$pages" -lt 8 ]; then
+            echo "::error::В publish/wwwroot только $pages html-страниц — сборка клиента не доехала."
+            fail=1
+          fi
+
+          for f in publish/wwwroot/css/admin.min.css publish/wwwroot/swimmer.js publish/wwwroot/data/filter-data.js; do
+            if [ ! -f "$f" ]; then
+              echo "::error::Нет обязательного файла: $f"
+              fail=1
+            fi
+          done
+
+          # Локальные конфиги содержат живые ключи и DevAdminBypass — в артефакте их быть не должно.
+          for f in publish/appsettings.Development.json publish/appsettings.Local.json; do
+            if [ -f "$f" ]; then
+              echo "::error::В артефакт попал локальный конфиг: $f"
+              fail=1
+            fi
+          done
+
+          if grep -rq 'src="\./' publish/wwwroot/swimmer.html; then
+            echo "::error::Относительные пути к ассетам — вложенные чистые URL отдадут 404."
+            fail=1
+          fi
+
+          echo "Страниц: $pages, размер wwwroot: $(du -sh publish/wwwroot | cut -f1)"
+          exit $fail
+
+      - name: Выкладка
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ steps.target.outputs.name }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: publish
+
+      # App Service поднимается не мгновенно, а на B1 ещё и холодный старт.
+      - name: Дымовая проверка
+        run: |
+          BASE="https://${{ steps.target.outputs.name }}.azurewebsites.net"
+
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$BASE/healthz" || true)
+            [ "$code" = "200" ] && break
+            echo "  попытка $i: /healthz -> $code"
+            sleep 10
+          done
+
+          if [ "$code" != "200" ]; then
+            echo "::error::/healthz так и не ответил 200 (последний код: $code)."
+            exit 1
+          fi
+
+          version=$(curl -s --max-time 20 "$BASE/version")
+          echo "$version"
+          if ! echo "$version" | grep -q "${GITHUB_SHA}"; then
+            echo "::warning::/version не содержит ${GITHUB_SHA:0:7} — возможно, инстанс ещё отдаёт прежний пакет."
+          fi
+
+          ready=$(curl -s --max-time 20 "$BASE/readyz" || true)
+          echo "$ready"
+          echo "$ready" | grep -q '"database":"up"' \
+            || echo "::warning::БД недоступна — проверь ConnectionStrings__* и firewall Flexible Server."
+
+          {
+            echo "### Задеплоено"
+            echo ""
+            echo "- Сайт: $BASE"
+            echo "- Коммит: \`${GITHUB_SHA:0:7}\`"
+            echo "- \`/version\`: \`$version\`"
+            echo "- \`/readyz\`: \`$ready\`"
+          } >> "$GITHUB_STEP_SUMMARY"

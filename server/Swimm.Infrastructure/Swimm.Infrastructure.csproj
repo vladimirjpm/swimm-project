@@ -12,6 +12,9 @@
     </PackageReference>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
+    <!-- IHostEnvironment: LoggingEmailSender пишет тело письма в лог только в Development
+         (в теле одноразовые токены сброса пароля). Abstractions — без рантайм-веса. -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
   </ItemGroup>
 
   <ItemGroup>

@@ -9,6 +9,8 @@ interface SwimmerNameCellProps {
   firstNameEn?: string;
   lastNameEn?: string;
   club?: string;
+  /** Id клуба — задан, эмблема клуба становится ссылкой на /clubs/{id} (UI_ClubIcon). */
+  clubId?: number | null;
   isRelay?: boolean;
   relaySwimmersName?: string;
   relaySwimmersList?: RelaySwimmer[];
@@ -37,6 +39,7 @@ const UI_SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
   firstNameEn,
   lastNameEn,
   club,
+  clubId,
   isRelay,
   relaySwimmersName,
   relaySwimmersList,
@@ -128,11 +131,11 @@ const UI_SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
       {showRightClubIcon ? (
         <div className={`rowJustify flex items-center gap-2 ${rowJustify === 'end' ? 'justify-end' : 'justify-start'}`}>
           {clubIconSide === 'left' && (
-            <UI_ClubIcon clubName={club!} className="shrink-0" iconWidth={clubIconWidth} styleType="icon-notext" />
+            <UI_ClubIcon clubName={club!} clubId={clubId} className="shrink-0" iconWidth={clubIconWidth} styleType="icon-notext" />
           )}
           {nameBlock}
           {clubIconSide === 'right' && (
-            <UI_ClubIcon clubName={club!} className="shrink-0" iconWidth={clubIconWidth} styleType="icon-notext" />
+            <UI_ClubIcon clubName={club!} clubId={clubId} className="shrink-0" iconWidth={clubIconWidth} styleType="icon-notext" />
           )}
         </div>
       ) : nameBlock}

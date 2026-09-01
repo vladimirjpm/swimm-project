@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace Swimm.Application.Dtos;
 
@@ -490,6 +490,13 @@ public sealed class SwimmerSeasonRankDto
     /// <summary>Готовая подпись группы («girls 9»): её обязан показать UI рядом с местом.</summary>
     [JsonPropertyName("groupLabel")]
     public string? GroupLabel { get; set; }
+
+    /// <summary>
+    /// Новый сезон уже идёт, но витрина держит прошлый — пояснение «season best откроется
+    /// после зимнего чемпионата» (docs/season-boundary-rule.md). null — объяснять нечего.
+    /// </summary>
+    [JsonPropertyName("season_notice")]
+    public ShowcaseSeasonNoticeDto? SeasonNotice { get; set; }
 
     [JsonPropertyName("rows")]
     public List<SwimmerDisciplineRankDto> Rows { get; set; } = [];

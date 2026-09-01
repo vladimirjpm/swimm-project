@@ -7,8 +7,9 @@ import './competition-tile.css';
 // Каждый слот скрывается отдельно, если данных нет; без возраста — модификатор --no-age.
 
 interface Props extends CompetitionTileData {
-  /** 'responsive' — полный габарит, ниже 640px сам ужимается до xs (шапка соревнования). */
-  size?: 'responsive' | 'md' | 'sm' | 'xs';
+  /** 'responsive' — полный габарит, ниже 640px сам ужимается до xs (шапка соревнования).
+   *  'mini' — 34×42 для стики-компакт-бара мобайла (16b). */
+  size?: 'responsive' | 'md' | 'sm' | 'xs' | 'mini';
 }
 
 const SIZE_CLASS: Record<NonNullable<Props['size']>, string> = {
@@ -16,6 +17,7 @@ const SIZE_CLASS: Record<NonNullable<Props['size']>, string> = {
   md: '',
   sm: 'comp-tile--sm',
   xs: 'comp-tile--xs',
+  mini: 'comp-tile--mini',
 };
 
 export default function CompetitionTile({

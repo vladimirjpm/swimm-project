@@ -114,6 +114,41 @@ public static class HebrewTextHelper
         };
     }
 
+    /// <summary>
+    /// Стиль из ивритского куска заголовка — с ЗАПАСОМ на лишние слова вокруг.
+    ///
+    /// Прежде вызывающие писали <c>StyleMapHE.GetValueOrDefault(raw, raw)</c>, то есть точное
+    /// совпадение со словарём, а иначе — сырой текст. Заголовок «3000 מטר חופשי» («3000
+    /// МЕТРОВ вольным») давал стиль «מטר חופשי», и в справочнике <c>Styles</c> заводился ключ
+    /// `מטר_חופשי`; на витрине такой стиль не канонический, и весь чемпионат Израиля на 3 км
+    /// в бассейне пропадал из селектора дисциплины. Второй такой ключ — `חופשי_נוקאוט`
+    /// («вольный, нокаут-раунды») с чемпионата в открытой воде.
+    ///
+    /// Ищем ПО ТОКЕНАМ, а не подстрокой: «גב» (спина) — двухбуквенное слово, и подстрочный
+    /// поиск ловил бы его внутри чужих слов. Пары токенов проверяются раньше одиночных —
+    /// «מעורב אישי» (комплекс) должен победить одиночное «מעורב».
+    /// </summary>
+    public static string ResolveStyle(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
+
+        var text = raw.Trim();
+        if (StyleMapHE.TryGetValue(text, out var exact)) return NormalizeStyleName(exact);
+
+        var tokens = text.Split([' ', '_', '-', '	'], StringSplitOptions.RemoveEmptyEntries);
+
+        for (var i = 0; i + 1 < tokens.Length; i++)
+            if (StyleMapHE.TryGetValue(tokens[i] + " " + tokens[i + 1], out var pair))
+                return NormalizeStyleName(pair);
+
+        foreach (var token in tokens)
+            if (StyleMapHE.TryGetValue(token, out var single))
+                return NormalizeStyleName(single);
+
+        // Не иврит (английские заголовки) или неизвестное слово — отдаём как есть, как и раньше.
+        return NormalizeStyleName(text);
+    }
+
     public static string NormalizeStyleName(string? styleName)
     {
         if (string.IsNullOrWhiteSpace(styleName)) return string.Empty;

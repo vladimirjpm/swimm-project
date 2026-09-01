@@ -4,7 +4,7 @@
    а также .cs-файлы (например ApiCatalog.cs), где встречаются arbitrary-value классы. */
 @source "../Pages/Admin/**/*.cshtml";
 @source "../Pages/Admin/**/*.cs";
-@source "../wwwroot/home.html";
+@source "../wwwroot/admin-home.html";
 
 /* Dark-first тема админки (независима от client-тем training/competition). */
 @theme {

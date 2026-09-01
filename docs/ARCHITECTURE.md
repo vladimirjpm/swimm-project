@@ -73,8 +73,9 @@ Application → реализация в Infrastructure → регистраци�
   `SwimmReadDbContext` (роль `swimm_ro`, NoTracking) — только публичное чтение через
   `ResultRepository` и будущий `RecordRepository`; `SwimmDbContext` (роль `swimm_rw`) — всё,
   что пишет или трогает `Sys_*`.
-- **Новая публичная таблица ⇒ обязательный грант** `swimm_ro` в `server/db/setup-roles.sql`
-  (fail-closed: забыл грант — публичный путь падает, это намеренно).
+- **Новая публичная таблица ⇒ обязательный грант** `swimm_ro` в **двух** местах:
+  `server/db/02-grants.sql` (единственный список) и в самой миграции, обёрнутый в проверку
+  существования роли (fail-closed: забыл грант — публичный путь падает, это намеренно).
 - **Рекорды живут в БД** (таблицы `Records`/`NormativeStandards`, фаза 2). Модель `Records` —
   три независимые оси, расширяемые на любые страны/континенты/категории без изменения схемы:
   территория (`RegionType` world/continent/country + `RegionCode` ''/EU/ISR/…) → категория

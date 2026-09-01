@@ -73,3 +73,94 @@ export function seasonLabel(startYear: number): string {
   const short = (y: number) => String(y % 100).padStart(2, '0');
   return `${startYear}/${short(startYear + 1)}`;
 }
+
+/**
+ * Подпись круга сверстников: «girls 12», «men 21+», «masters 45-49». Та же формула, что у
+ * серверного `SwimmerPageBuilder` — и единственная на клиенте: подпись появляется уже на трёх
+ * экранах (`/season-best`, панель Season best, дельты личников), и три копии одних и тех же
+ * существительных разошлись бы на первой же правке.
+ *
+ * Три оси возраста дают три разные подписи: год («girls 12»), взрослый хвост («men 21+») и
+ * мастерская группа («masters 45-49»), где пол в подпись не идёт — группа уже сама себе круг.
+ */
+export function peerGroupLabel(input: {
+  age?: number | null;
+  /** Задана — возрастной хвост «21+» (верхняя граница есть только у него). */
+  ageTo?: number | null;
+  /** Возрастная группа мастерского протокола («45-49»). */
+  ageGroup?: string | null;
+  gender?: 'male' | 'female' | null;
+}): string | null {
+  if (input.ageGroup) return `masters ${input.ageGroup}`;
+  const { age, gender } = input;
+  if (age == null) return null;
+  const label = input.ageTo != null ? `${age}+` : String(age);
+  if (gender == null) return `age ${label}`;
+  const adult = age >= 18;
+  const noun = gender === 'female' ? (adult ? 'women' : 'girls') : (adult ? 'men' : 'boys');
+  return `${noun} ${label}`;
+}
+
+/**
+ * Заметка витрины «новый сезон уже идёт, но season best откроется после зимнего чемпионата»
+ * (`season_notice` в ответах API, docs/season-boundary-rule.md).
+ *
+ * Приходит ТОЛЬКО в окне между началом календарного сезона и последним зимним чемпионатом;
+ * вне окна сервер шлёт null, и витрины о границе молчат.
+ */
+export interface ShowcaseSeasonNotice {
+  /** Сезон, который витрина показывает вместо нового. */
+  showing_season: number;
+  showing_label: string;
+  /** Сезон, который уже идёт по календарю, но ещё не открыт. */
+  pending_season: number;
+  pending_label: string;
+  /**
+   * dd/MM/yyyy ближайшего зимнего чемпионата ждущего сезона; null — расписания ещё нет.
+   * ⚠ Это НЕ дата переключения витрины: переключает её ПОСЛЕДНИЙ чемпионат всех ступеней.
+   */
+  winter_starts: string | null;
+}
+
+/**
+ * Что сказать пользователю про сезон, на котором он стоит:
+ *  • `holding` — витрина показывает прошлый сезон, потому что новый ещё не открыт;
+ *  • `pending` — он сам выбрал новый сезон, и данных там пока нет и не будет до чемпионата;
+ *  • `null`   — объяснять нечего (сезон открыт или выбран какой-то третий, старый).
+ *
+ * `season === null` значит «сезон выбрала витрина» — это всегда показываемый (`holding`).
+ */
+export function showcaseNoticeKind(
+  notice: ShowcaseSeasonNotice | null | undefined,
+  season?: number | null,
+): 'holding' | 'pending' | null {
+  if (!notice) return null;
+  if (season == null || season === notice.showing_season) return 'holding';
+  if (season === notice.pending_season) return 'pending';
+  return null;
+}
+
+/**
+ * Готовая фраза заметки — ОДНА на все витрины season best. Держим её строкой, а не разметкой,
+ * потому что она нужна и как текст плашки, и как нативный тултип у плитки шапки клуба; две
+ * формулировки одного факта разошлись бы на первой правке.
+ *
+ * Дату называем «когда начинаются чемпионаты», а не «когда откроется»: переключает витрину
+ * ПОСЛЕДНИЙ зимний чемпионат всех ступеней, а они плывут врозь (мастерс в январе, возрастные
+ * в феврале) — точного дня мы не знаем и не обещаем.
+ */
+export function showcaseNoticeText(
+  notice: ShowcaseSeasonNotice | null | undefined,
+  season?: number | null,
+): string | null {
+  const kind = showcaseNoticeKind(notice, season);
+  if (!kind || !notice) return null;
+
+  const when = notice.winter_starts ? ` (they start ${notice.winter_starts})` : '';
+
+  return kind === 'holding'
+    ? `Season ${notice.pending_label} has started, but season bests open only after the winter `
+      + `championships${when} — showing ${notice.showing_label} until then.`
+    : `Season bests for ${notice.pending_label} open after the winter championships${when}. `
+      + `Until then the season on show is ${notice.showing_label}.`;
+}

@@ -15,6 +15,7 @@ import FilterClub from './filter-club';
 import FilterEventDate from './filter-event-date';
 import FilterEventCategory from './filter-event-category';
 import { getFilterData } from './filter-types';
+import { ReduxFilterHost } from './filter-host';
 
 const FilterSection: React.FC = () => {
   const filters = useAppSelector((state) => state.filterSelected);
@@ -33,41 +34,47 @@ const FilterSection: React.FC = () => {
   }
 
   return (
-    <div className="dv-filter p-4 rounded-lg">
-      {isDebug && (
-        <div className="text-sm text-[var(--theme-mode-text-secondary)] mb-2">
-          <strong>Active Filters: </strong>
-          <code>
-            {Object.entries(filters)
-              .filter(
-                ([_, value]) =>
-                  value !== 'all' &&
-                  value !== '' &&
-                  value !== 0 &&
-                  value !== undefined &&
-                  value !== null,
-              )
-              .map(([key, value]) => `<div>${key}: ${value}</div>`)}
-          </code>
-        </div>
-      )}
+    /* Один хост на панель (Ф2): дорогая часть — опции, скан выборки, подсказки фильтров —
+       считается здесь ОДИН раз, фильтры внутри берут готовый хост из контекста. Без
+       провайдера они тоже работают: `useFilterHost()` соберёт Redux-хост на месте, но уже
+       по копии на фильтр. */
+    <ReduxFilterHost>
+      <div className="dv-filter p-4 rounded-lg">
+        {isDebug && (
+          <div className="text-sm text-[var(--theme-mode-text-secondary)] mb-2">
+            <strong>Active Filters: </strong>
+            <code>
+              {Object.entries(filters)
+                .filter(
+                  ([_, value]) =>
+                    value !== 'all' &&
+                    value !== '' &&
+                    value !== 0 &&
+                    value !== undefined &&
+                    value !== null,
+                )
+                .map(([key, value]) => `<div>${key}: ${value}</div>`)}
+            </code>
+          </div>
+        )}
 
-      <FilterActivity />
-      <FilterResetButton />
-      <FilterSwimmingStyle />
-      <FilterEventDate />
-      <FilterEventCategory />
-      {/* Combine All Results в фильтрах больше нет: он стал полосой под табами шапки
-          соревнования на всех брейкпоинтах (combine-bar.tsx, handoff 12b). */}
-      {/* <FilterDateDropdown /> */}
-      <FilterNameDropdown />
-      <FilterPositionButtons />
-      <FilterLevelButtons />
-      <FilterPoolType />
-      <FilterGender />
-      <FilterAge />
-      <FilterClub />
-    </div>
+        <FilterActivity />
+        <FilterResetButton />
+        <FilterSwimmingStyle />
+        <FilterEventDate />
+        <FilterEventCategory />
+        {/* Combine All Results в фильтрах больше нет: он стал полосой под табами шапки
+            соревнования на всех брейкпоинтах (combine-bar.tsx, handoff 12b). */}
+        {/* <FilterDateDropdown /> */}
+        <FilterNameDropdown />
+        <FilterPositionButtons />
+        <FilterLevelButtons />
+        <FilterPoolType />
+        <FilterGender />
+        <FilterAge />
+        <FilterClub />
+      </div>
+    </ReduxFilterHost>
   );
 };
 

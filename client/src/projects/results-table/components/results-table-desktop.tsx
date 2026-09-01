@@ -104,6 +104,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
           firstName={res.first_name}
           lastName={res.last_name}
           club={res.club}
+          clubId={res.club_id}
           isRelay={res.is_relay}
           relaySwimmersList={res.relay_swimmers}
           relaySwimmersName={res.relay_swimmers_name}
@@ -123,7 +124,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
       {showClub && (
         <div className="self-center flex justify-center">
           <div style={{ width: 30, height: 30 }}>
-            <UI_ClubIcon clubName={res.club} iconWidth="full" styleType="icon-notext" />
+            <UI_ClubIcon clubName={res.club} clubId={res.club_id} iconWidth="full" styleType="icon-notext" />
           </div>
         </div>
       )}

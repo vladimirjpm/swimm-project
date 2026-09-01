@@ -34,6 +34,8 @@ public class DiscoveryAdminController : ControllerBase
     private readonly IPreviewRecordCheckService _recordCheck;
     private readonly ILogligStampService _logligStamp;
     private readonly IAdminAuditService _audit;
+    private readonly IStartListPullService _startList;
+    private readonly IMeetInfoAdminService _meetInfo;
     private readonly ILogger<DiscoveryAdminController> _logger;
 
     public DiscoveryAdminController(
@@ -52,6 +54,8 @@ public class DiscoveryAdminController : ControllerBase
         IPreviewRecordCheckService recordCheck,
         ILogligStampService logligStamp,
         IAdminAuditService audit,
+        IStartListPullService startList,
+        IMeetInfoAdminService meetInfo,
         ILogger<DiscoveryAdminController> logger)
     {
         _discovery = discovery;
@@ -69,6 +73,8 @@ public class DiscoveryAdminController : ControllerBase
         _recordCheck = recordCheck;
         _logligStamp = logligStamp;
         _audit = audit;
+        _startList = startList;
+        _meetInfo = meetInfo;
         _logger = logger;
     }
 
@@ -100,6 +106,52 @@ public class DiscoveryAdminController : ControllerBase
     {
         var dto = await _discovery.RefreshDetailsAsync(id, ct);
         return dto is null ? NotFound(new { error = "Запись не найдена" }) : Ok(dto);
+    }
+
+    /// <summary>
+    /// Затянуть стартовый протокол (docs/plans/start-list-plan.md, шаг С5). id — как у соседей,
+    /// Sys_DiscoveredCompetitions.Id; идентичность самого забора — OrgCompId. Статус empty
+    /// (посев не сделан / нет loglig-id) — ожидаемое состояние источника, не ошибка.
+    /// </summary>
+    [HttpPost("{id:int}/start-list")]
+    public async Task<IActionResult> PullStartList(int id, CancellationToken ct)
+    {
+        var orgCompId = await _discovery.GetOrgCompIdAsync(id, ct);
+        if (orgCompId is null) return NotFound(new { error = "Запись не найдена" });
+
+        var report = await _startList.PullAsync(orgCompId.Value, ct);
+        return Ok(report);
+    }
+
+    /// <summary>
+    /// Справка о старте (шаг Т1): чемпионат + разминка по дням. Читается редактором в
+    /// модале «Разминка» на строке соревнования.
+    /// </summary>
+    [HttpGet("{id:int}/meet-info")]
+    [IgnoreAntiforgeryToken] // GET, мутаций нет
+    public async Task<IActionResult> GetMeetInfo(int id, CancellationToken ct)
+    {
+        var orgCompId = await _discovery.GetOrgCompIdAsync(id, ct);
+        if (orgCompId is null) return NotFound(new { error = "Запись не найдена" });
+
+        var info = await _meetInfo.GetAsync(orgCompId.Value, ct);
+        return info is null ? NotFound(new { error = "Соревнование неизвестно" }) : Ok(info);
+    }
+
+    /// <summary>
+    /// Сохранить справку. Пишутся ТОЛЬКО ручные поля: время разминки и переопределение
+    /// флага «чемпионат». Сам флаг ставит забор по регламенту — сюда он не приходит,
+    /// иначе следующий же перезабор затёр бы решение админа.
+    /// </summary>
+    [HttpPost("{id:int}/meet-info")]
+    public async Task<IActionResult> SaveMeetInfo(
+        int id, [FromBody] MeetInfoSaveRequest request, CancellationToken ct)
+    {
+        var orgCompId = await _discovery.GetOrgCompIdAsync(id, ct);
+        if (orgCompId is null) return NotFound(new { error = "Запись не найдена" });
+
+        var info = await _meetInfo.SaveAsync(orgCompId.Value, request, ct);
+        return info is null ? NotFound(new { error = "Соревнование неизвестно" }) : Ok(info);
     }
 
     [HttpPost("{id:int}/status")]

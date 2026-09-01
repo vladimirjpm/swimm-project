@@ -28,6 +28,11 @@ interface CardProps {
   onPool: (pool: PoolFilter) => void;
   /** Показывается вместо сетки, когда данных нет и загрузка кончилась. */
   emptyText: string;
+  /**
+   * Оговорка над телом карточки — например «сезон откроется после зимнего чемпионата»
+   * (UI_SeasonNotice). Стоит ВЫШЕ пустого состояния: она объясняет и пустоту тоже.
+   */
+  notice?: React.ReactNode;
   isEmpty: boolean;
   /**
    * true — тело рисует владелец сам (Season best: секции дисциплин со своими рядами).
@@ -38,7 +43,8 @@ interface CardProps {
 }
 
 function ClubRecordCard({
-  title, subtitle, count, countLabel, pool, onPool, emptyText, isEmpty, plainBody, children,
+  title, subtitle, count, countLabel, pool, onPool, emptyText, isEmpty, notice, plainBody,
+  children,
 }: CardProps) {
   return (
     <section className="deep-card mb-4">
@@ -66,6 +72,8 @@ function ClubRecordCard({
           </div>
         </div>
       </div>
+
+      {notice ? <div className="mt-4">{notice}</div> : null}
 
       {isEmpty ? (
         <div className="mt-4 text-[13px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>

@@ -50,6 +50,12 @@ plus repo-specific footguns.
 - **Don't commit or push unless asked.** Default branch is `master`; branch first if asked to commit.
 - **Comments/identifiers in this codebase are bilingual (RU prose, EN identifiers).** Mirror the
   local style of the file you edit.
+- **Имена пловцов и названия клубов на витрине — ИВРИТСКИЕ по умолчанию, всегда** (решение
+  Влада, 28.08.2026).
+  Английское имя показывается только как фоллбек (ивритского в базе нет) или по явному
+  запросу языка; порядок в коде `FirstName/LastName` → `FirstNameEn/LastNameEn`, не наоборот.
+  Правилу «видимый UI только на английском» это не противоречит: то правило про строки
+  интерфейса, а имя человека — данные.
 
 ## Build & run
 
@@ -82,9 +88,9 @@ definition of done.
 
 ### Admin/home CSS (Tailwind v4)
 
-The admin panel (`/Admin/*`) and `wwwroot/home.html` share one compiled bundle,
+The admin panel (`/Admin/*`) and `wwwroot/admin-home.html` share one compiled bundle,
 `wwwroot/css/admin.min.css`, built from `Styles/admin.css` (source: `@import "tailwindcss"` +
-`@theme` tokens + `@source` scans of `Pages/Admin/**/*.cshtml`/`.cs` and `wwwroot/home.html`).
+`@theme` tokens + `@source` scans of `Pages/Admin/**/*.cshtml`/`.cs` and `wwwroot/admin-home.html`).
 
 ```bash
 cd server/Swimm.API
@@ -93,11 +99,21 @@ npm run css:build    # regenerate wwwroot/css/admin.min.css after changing Tailw
 npm run css:watch    # rebuild on save while iterating
 ```
 
+⚠️ **Не пиши в Admin-разметке `[#hex]/opacity`** (`border-[#66bb6a]/30`, `bg-[#4fc3f7]/10`).
+Tailwind гонит такой цвет через oklab и печатает результат ЧИСЛАМИ
+(`oklab(71.8488% -.115896 .0814871/.3)`), а последний разряд у него разный на Windows и на
+Linux-раннере. Бандл коммитится и сверяется в CI **побайтово** (job «Бандл админки
+пересобран»), поэтому такая строка роняет CI навсегда: пересборка на Windows возвращает
+«свою» цифру. Пиши форму `[rgba(...)]` — `border-[rgba(102,187,106,0.3)]`: она компилируется
+в обычный hex с альфой (`#66bb6a4d`), одинаковый везде. Пойман 31.08.2026, чинилось заменой
+двух классов в `Api.cshtml` и `Index.cshtml`. (Токеновые `color-mix(in oklab, …)`, которые
+Tailwind печатает текстом, безопасны — их считает браузер.)
+
 `dotnet build` auto-runs `css:build` via an MSBuild target (`BeforeTargets="Build"`) **if**
 `node_modules` exists; if it doesn't (CI/no-Node machines), the build just uses the already-committed
 `admin.min.css`. That's why **`admin.min.css` is committed** — don't gitignore it, and re-run
 `npm run css:build` and commit the result whenever you add new Tailwind classes to Admin pages or
-`home.html`. There is no other CSS for these pages — the old per-page stylesheets
+`admin-home.html`. There is no other CSS for these pages — the old per-page stylesheets
 (`admin-all.css`, `db.css`, `import.css`, `settings.css`, `api.css`, `home.css`, `db-banner.css`)
 were removed; anything they styled either became Tailwind utility classes inline or was folded into
 `Styles/admin.css`'s `@layer components`.
@@ -118,10 +134,15 @@ docker exec -it swimm-postgres psql -U swimm -d swimm          # interactive
 docker exec swimm-postgres psql -U swimm -d swimm -c '<SQL>'   # one-off (note the quoted "Identifiers")
 ```
 
-**Least-privilege roles** (`server/db/setup-roles.sql`, run once): owner `swimm` (DDL/migrations),
+**Least-privilege roles** (`server/db/01-roles.sql` → миграции → `server/db/02-grants.sql`;
+порядок обязателен, см. ниже): owner `swimm` (DDL/migrations),
 `swimm_rw` (runtime DML), `swimm_ro` (public read — `SELECT` on business tables only, no `Sys_*`).
 Connection strings in `server/Swimm.API/appsettings.json`; each falls back to `DefaultConnection`
-if unset. Read-only public path uses `SwimmReadDbContext`; everything that writes or touches
+if unset. ⚠ **Порядок на чистой БД жёсткий и не переставляется:** `01-roles.sql` → `--migrate`
+→ `02-grants.sql`. Гранты ссылаются на таблицы, которых до миграций нет, а миграции — на роль
+`swimm_ro`, которой нет до первого шага. Список публичных таблиц живёт только в `02-grants.sql`.
+Наполнение прод-БД — `dump-seed.sh` / `restore-seed.sh` (что переносится и что нет — в
+`server/db/seed-tables.txt`). Read-only public path uses `SwimmReadDbContext`; everything that writes or touches
 `Sys_*` uses `SwimmDbContext`.
 
 ## Migrations

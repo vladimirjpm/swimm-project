@@ -1,24 +1,25 @@
 import React from 'react';
-import UI_SwimTime, { swimFlaggedRowProps } from '../../components/mix/swim-time/swim-time';
-import UI_PrelimLabel from '../../components/mix/prelim-label/prelim-label';
-import UI_MedalIcon from '../../components/mix/medal-icon/medal-icon';
-import EventPlate from './event-plate';
-import UI_NormativeLevelIcon from '../../components/mix/normative-level-icon/normative-level-icon';
-import Helper from '../../../utils/helpers/data-helper';
+import SwimRow from '../../components/swim-row/swim-row';
 import type { SwimQualityDto, CompetitionRef } from '../use-swimmer-page';
 
 /**
- * Строка результата страницы спортсмена (BLOCKS.md §6) — общая для табов Results и Progress.
+ * Строка результата страницы спортсмена — ПЕРЕХОДНИК к общему `SwimRow`
+ * (docs/plans/swim-row-shared-component-plan.md).
  *
- * Линия 1: место + возраст · плита стиля с дистанцией · соревнование · время.
- * Линия 2: сплиты · очки · дата, справа дуга уровня.
+ * Своей вёрстки здесь больше нет: две линии рисует общий компонент, тот же, что в карточке
+ * спортсмена и в списке `/season-best`. Файл остался ради того, что принадлежит ИМЕННО этой
+ * странице и не должно уезжать в общий компонент:
+ *  • NAV-контракт `swimHref` — адрес заплыва в таблице результатов;
+ *  • раскладка `ResultRowData` (форма ответа `/best-times` и `/progress`) по пропам строки.
+ * Оба таба, Results и Progress, зовут его, поэтому копия этой раскладки была бы вторым
+ * местом, где живёт одно и то же.
  *
- * Правила, которые нельзя потерять:
- *  • время выводится ТОЛЬКО через UI_SwimTime, носитель спорной строки — swimFlaggedRowProps
- *    (иначе признак качества пропадёт на новом экране — ради этого шов и заводили);
- *  • у соревнования всегда есть название, у чемпионата перед ним 🏆 (по флагу с сервера,
- *    а не по разбору названия);
- *  • вся строка — настоящая ссылка на заплыв в таблице результатов.
+ * Что поменялось при переезде (осознанно):
+ *  • дисциплину рисует иконка стиля с красной дистанцией вместо плиты `EventPlate`
+ *    (решение Влада §7 п.1);
+ *  • сплиты уехали под время сворачиваемым блоком — как в карточке спортсмена;
+ *  • у помеченного «под вопросом» заплыва больше нет дуги уровня: он не показывается как
+ *    достижение (правило `UI_SwimTime`), а бейджа у него не было и раньше.
  */
 
 export interface ResultRowData {
@@ -53,14 +54,6 @@ export interface ResultRowData {
 const swimHref = (row: ResultRowData, swimmerId: number) =>
   `/results?competitionId=${row.competition.id}&tab=swims&swimmerId=${swimmerId}&resultId=${row.resultId}`;
 
-/** «2026-04-27» → «27 APR 2026». Строка приходит ISO, отображение — как в макете. */
-const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-function formatDate(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  if (!y || !m || !d) return iso;
-  return `${String(d).padStart(2, '0')} ${MONTHS[m - 1]} ${y}`;
-}
-
 interface Props {
   row: ResultRowData;
   swimmerId: number;
@@ -69,94 +62,37 @@ interface Props {
 }
 
 function SwimmerResultRow({ row, swimmerId, gender }: Props) {
-  const flagged = swimFlaggedRowProps(row.quality);
-
-  // Уровень считает клиент из NormativeStandard — вторая реализация на сервере
-  // разъехалась бы с этой (правило плана §2).
-  const levelInfo = row.time
-    ? Helper.getNormativeLevelInfo({
-        gender,
-        poolType: Helper.resolvePoolType(row.poolType),
-        styleName: row.stroke ?? '',
-        distance: `${row.distance}m`,
-        time: Helper.parseTimeToSeconds(row.time),
-        // Возраст хелпер сам разложит в полосу мастерса («45» → «45-49»).
-        isMaster: !!row.isMasters,
-        ageGroup: row.ageInSeason != null ? String(row.ageInSeason) : null,
-      })
-    : null;
+  // Prelim-место — ранжир сессии, не медаль (Р34): кружок вместо медали.
+  const isMedal =
+    row.place != null && row.place >= 1 && row.place <= 3 && row.heatType !== 'prelim';
 
   return (
-    <a
-      {...flagged}
+    <SwimRow
+      className="deep-swim-row"
       href={swimHref(row, swimmerId)}
-      className={`deep-result-row${flagged.className ? ` ${flagged.className}` : ''}`}
-    >
-      <div className="deep-result-row__line1">
-        <div className="deep-result-row__place">
-          {/* Prelim-место — ранжир сессии, не медаль (Р34): кружок вместо медали. */}
-          {row.place != null && row.place >= 1 && row.place <= 3 && row.heatType !== 'prelim' ? (
-            <UI_MedalIcon place={String(row.place)} styleType="icon-place" styleSize="medal-40" />
-          ) : (
-            <span className="deep-place-circle">{row.place ?? '—'}</span>
-          )}
-          <UI_PrelimLabel heatType={row.heatType} className="deep-result-row__age" />
-          {row.ageInSeason != null && <span className="deep-result-row__age">age {row.ageInSeason}</span>}
-        </div>
-
-        <EventPlate stroke={row.stroke} distance={row.distance} poolType={row.poolType} />
-
-        <div className="deep-result-row__meet">
-          {/* Бассейн переехал в плиту события — второй подписи «50m pool» тут больше нет. */}
-          <div className="deep-result-row__meet-name" dir="auto">
-            {row.competition.isChampionship && <span aria-hidden="true">🏆 </span>}
-            {row.competition.name}
-          </div>
-        </div>
-
-        <div className="deep-result-row__time">
-          <UI_SwimTime
-            time={row.time ?? '—'}
-            quality={row.quality}
-            marker="chip"
-            chipSize="sm"
-            className="deep-result-row__time-value"
-          />
-          {row.badge === 'best' && !row.quality && <span className="deep-chip-best">BEST</span>}
-          {row.badge === 'pb' && !row.quality && <span className="deep-chip-best">PB</span>}
-          {row.badge === 'sb' && !row.quality && (
-            <span className="deep-chip-sb" title="Fastest in the age group this season">SB</span>
-          )}
-        </div>
-      </div>
-
-      <div className="deep-result-row__line2">
-        <span className="deep-result-row__splits">{row.splits || ''}</span>
-        <span className="deep-result-row__points">
-          Points: {row.points != null ? row.points : '—'}
-        </span>
-        <span className="deep-result-row__date">{formatDate(row.date)}</span>
-        <span className="deep-result-row__level">
-          {levelInfo && levelInfo.currentLevel !== 'none' && !row.quality && (
-            <UI_NormativeLevelIcon
-              levelName={levelInfo.currentLevel}
-              styleType="gauge"
-              styleSize="size-2"
-              styleName={row.stroke ?? ''}
-              styleLen={row.distance}
-              poolType={row.poolType}
-              // Полоса мастерса под дугой: «MS 45-49». Без неё непонятно, по какой шкале
-              // считан разряд, — остальные экраны продукта её показывают.
-              isMasters={!!row.isMasters}
-              normativeAgeGroup={levelInfo.normativeAgeGroup}
-              progressPercent={levelInfo.progressToNextLevel}
-              nextTime={levelInfo.nextTime}
-              disableClick
-            />
-          )}
-        </span>
-      </div>
-    </a>
+      stroke={row.stroke ?? ''}
+      distance={row.distance}
+      poolType={row.poolType}
+      time={row.time}
+      quality={row.quality}
+      splits={row.splits}
+      badge={row.badge ?? null}
+      heatType={row.heatType}
+      place={{
+        kind: isMedal ? 'medal' : 'circle',
+        value: row.place,
+        isAward: isMedal,
+        caption: row.ageInSeason != null ? `age ${row.ageInSeason}` : null,
+      }}
+      // Соревнование — во второй линии, рядом с датой: это ответ на «где и когда», а не
+      // идентичность строки. В первой линии оно растягивало карточку и расталкивало
+      // плитку и время по краям экрана (решение Влада 2026-08-27).
+      competition={{ name: row.competition.name, isChampionship: row.competition.isChampionship }}
+      meetPlacement="line2"
+      date={row.date}
+      points={row.points ?? null}
+      level={{ gender, ageInSeason: row.ageInSeason, isMasters: !!row.isMasters }}
+    />
   );
 }
 

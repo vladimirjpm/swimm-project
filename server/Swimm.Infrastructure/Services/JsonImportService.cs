@@ -23,6 +23,7 @@ public class JsonImportService : IImportService
     private readonly ICompetitionRecalculationService? _recalc;
     private readonly ICacheService _cache;
     private readonly IDataCheckRunner? _checks;
+    private readonly IStartListStitchService? _stitch;
 
     private static readonly string[] ClearableTables =
         ["Results", "GalleryItems", "Galleries", "Relays", "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "CompetitionEvents", "Countries"];
@@ -39,12 +40,14 @@ public class JsonImportService : IImportService
     /// </param>
     public JsonImportService(SwimmDbContext db, ICacheService cache,
         ICompetitionRecalculationService? recalc = null,
-        IDataCheckRunner? checks = null)
+        IDataCheckRunner? checks = null,
+        IStartListStitchService? stitch = null)
     {
         _db    = db;
         _cache = cache;
         _recalc = recalc;
         _checks = checks;
+        _stitch = stitch;
     }
 
     public string[] GetClearableTables() => ClearableTables;
@@ -311,6 +314,15 @@ public class JsonImportService : IImportService
                 var styleName = NormalizeStyleName(item.EventStyleName);
                 if (!styleCache.TryGetValue(styleName, out var style))
                 {
+                    // Новый ключ вне канона — почти всегда мусор из шапки протокола
+                    // («מטר_חופשי» от «3000 МЕТРОВ вольным»). Такой стиль не покажет ни одна
+                    // витрина, а импорт раньше молчал, и соревнование пропадало незаметно.
+                    // Данные не подменяем — говорим вслух (docs/data-integrity.md §9).
+                    if (!Strokes.IsCanonical(styleName))
+                        diagnosticLog.Add(
+                            $"⚠ Style: новый неканонический ключ '{styleName}' (из '{item.EventStyleName}') — " +
+                            "витрины показывают только канонические стили, проверь заголовок протокола");
+
                     style = new Style { Name = styleName };
                     _db.Styles.Add(style);
                     await _db.SaveChangesAsync(); // need ID immediately for ResultRecord.StyleId
@@ -930,6 +942,34 @@ public class JsonImportService : IImportService
                     diagnosticLog.Add($"Идентичность: событие {evId} помечено compID {oc}");
                 }
             }
+
+            // Источник стартового протокола (CompetitionSources). Отдельная от штампа связь:
+            // штамп на соревновании ОДИН (AK уникален), а источников у старта бывает несколько
+            // — окружные протоколы одного чемпионата лежат под разными compID. Заводим здесь,
+            // чтобы у нового соревнования таб Start list появлялся сам, без похода в админку.
+            var linked = await _db.CompetitionSources
+                .AnyAsync(cs => cs.CompetitionId == primary.Id && cs.OrgCompId == oc);
+            if (!linked)
+            {
+                var disc = await _db.DiscoveredCompetitions.AsNoTracking()
+                    .Where(d => d.OrgCompId == oc)
+                    .Select(d => new { d.Name, d.DateStart })
+                    .FirstOrDefaultAsync();
+                _db.CompetitionSources.Add(new CompetitionSource
+                {
+                    CompetitionId = primary.Id,
+                    OrgCompId = oc,
+                    // Дата — календарная, поэтому из «Входящих» берём её как Unspecified:
+                    // колонка timestamp without time zone, а DateStart там timestamptz.
+                    SourceDate = disc != null
+                        ? DateTime.SpecifyKind(disc.DateStart, DateTimeKind.Unspecified)
+                        : NullableDate(primary.Date),
+                    SourceName = disc?.Name ?? primary.SubName ?? primary.Name,
+                    SortOrder = 0
+                });
+                await _db.SaveChangesAsync();
+                diagnosticLog.Add($"Стартовый протокол: соревнование {primary.Id} ← источник compID {oc}");
+            }
         }
 
         // Запись в историю импортов — одна запись на весь импорт файла
@@ -1047,6 +1087,33 @@ public class JsonImportService : IImportService
         catch (Exception ex)
         {
             diagnosticLog.Add($"Согласование пола пловцов не выполнено ({ex.GetType().Name}: {ex.Message}). Импорт сохранён.");
+        }
+
+        // Сшивка стартового протокола с результатами (шаг С9, docs/plans/start-list-plan.md):
+        // заявка получает свой результат либо становится неявкой. Идёт ДО прогона проверок,
+        // чтобы entries.no-show-unmatched увидел уже проставленные статусы. Как и соседи —
+        // после коммита и в try/catch: сшивка не имеет права уронить импорт.
+        if (_stitch is not null && touchedCompetitionKeys.Count > 0)
+        {
+            try
+            {
+                _db.ChangeTracker.Clear();
+                var touchedIds = touchedCompetitionKeys
+                    .Select(k => competitionCache[k].Id).Distinct().ToList();
+                var stitched = await _stitch.StitchCompetitionsAsync(touchedIds);
+
+                foreach (var s in stitched.Where(s => s.Entries > 0))
+                    diagnosticLog.Add(
+                        $"Стартовый протокол {s.OrgCompId}: заявок {s.Entries}, проплыли {s.Swum}, " +
+                        $"без результата {s.NoShow}" +
+                        (s.MatchedByDiscipline > 0 ? $" (по дисциплине, не по дорожке: {s.MatchedByDiscipline})" : "")
+                        + (s.Unlinked > 0 ? $", не привязано к дню {s.Unlinked}" : ""));
+            }
+            catch (Exception ex)
+            {
+                diagnosticLog.Add(
+                    $"Сшивка стартового протокола не выполнена ({ex.GetType().Name}: {ex.Message}). Импорт сохранён.");
+            }
         }
 
         // Прогон всех проверок данных (Д5, решение Р13). После коммита и в try/catch — прибор
@@ -1885,6 +1952,13 @@ public class JsonImportService : IImportService
             "medley" or "im" or "individual" => "individual_medley",
             _ => norm
         };
+    }
+
+    /// <summary>Дата дня для привязки источника; непарсимая — null (подтаб подпишется днём).</summary>
+    private static DateTime? NullableDate(string? date)
+    {
+        var d = ParseDate(date);
+        return d == DateTime.MinValue ? null : DateTime.SpecifyKind(d, DateTimeKind.Unspecified);
     }
 
     private static DateTime ParseDate(string? date)

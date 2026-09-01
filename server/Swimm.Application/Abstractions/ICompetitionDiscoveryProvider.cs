@@ -32,4 +32,23 @@ public interface ICompetitionDiscoveryProvider
 
     /// <summary>Результаты одного события: секции с раундом, места, времена и официальные очки.</summary>
     Task<LogligEventResultsDto> FetchEventResultsAsync(int eventId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Сетка заплывов дня (та же страница AthleticsDisciplines, что у <see cref="FetchEventIdsAsync"/>,
+    /// но разобранная целиком): программа, категории, ВРЕМЯ СТАРТА каждого заплыва и счётчики
+    /// «записалось / участвует».
+    ///
+    /// Зачем отдельно от <see cref="FetchEventIdsAsync"/>: тот берёт id только из кнопок
+    /// результатов, а у предстоящего соревнования их ещё нет — то есть ровно там, где нужен
+    /// стартовый протокол, он вернул бы ноль. Здесь id берётся из любой кнопки строки.
+    /// </summary>
+    Task<IReadOnlyList<LogligDisciplineGridRowDto>> FetchDisciplineGridAsync(
+        int logligId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Стартовый протокол одного заплыва: кто, в каком заплыве, на какой дорожке и во сколько.
+    /// Пустой список строк — законный ответ (в заплыв никто не записался), в отличие от
+    /// <see cref="FetchEventIdsAsync"/>, где ноль означает сломанную вёрстку.
+    /// </summary>
+    Task<LogligStartListDto> FetchStartListAsync(int disciplineId, CancellationToken ct = default);
 }

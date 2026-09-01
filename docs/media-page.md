@@ -33,7 +33,7 @@ client/media.html → client/src/pages/media-page.tsx → MyMedia (my-media.tsx)
 - `client/src/projects/my-media-project/components/add-link-modal.tsx` — попап добавления
   ссылки (3 шага/single-step, см. §5).
 - `client/src/projects/my-media-project/components/swim-list.tsx` — список заплывов,
-  сгруппированный по соревнованиям (`CompetitionGroup` → `SwimRow` → развёрнутая
+  сгруппированный по соревнованиям (`CompetitionGroup` → `MySwimRow` → развёрнутая
   `MediaLine` с inline share).
 - `client/src/projects/my-media-project/components/media-card.tsx` — карточка
   «Unlinked media» (медиа без привязки к заплыву).

@@ -66,10 +66,19 @@
 .comp-tile--xs .comp-tile__letter { font-size: 21px; }
 .comp-tile--xs .comp-tile__age    { height: 17px; font-size: 10px; }
 
+/* Мини (34×42) — стики-компакт-бар мобильной шапки (STICKY-HEADER-MOBILE-16B) */
+.comp-tile--mini { width: 34px; height: 42px; border-radius: 9px; }
+.comp-tile--mini .comp-tile__icons  { height: 13px; gap: 2px; }
+.comp-tile--mini .comp-tile__season { font-size: 7px; }
+.comp-tile--mini .comp-tile__cup    { font-size: 9px; }
+.comp-tile--mini .comp-tile__letter { font-size: 14px; }
+.comp-tile--mini .comp-tile__age    { height: 11px; font-size: 7px; }
+
 /* Без возрастной группы (masters, открытый старт) — ленты нет, плитка ниже */
 .comp-tile--no-age { height: 64px; }
 .comp-tile--no-age.comp-tile--sm { height: 56px; }
 .comp-tile--no-age.comp-tile--xs { height: 48px; }
+.comp-tile--no-age.comp-tile--mini { height: 34px; }
 
 /* Без кубка (не чемпионат) — в полосе только сезон, выравнивание по центру сохраняется */
 

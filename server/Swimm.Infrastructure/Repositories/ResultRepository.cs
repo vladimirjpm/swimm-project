@@ -308,6 +308,7 @@ public class ResultRepository : IResultRepository
             .Select(c => new ClubSummaryDto
             {
                 Club = c.ClubKey,
+                ClubId = c.ClubId,
                 Points = c.Points,
                 SwimmerCount = c.SwimmerCount,
                 SuccessfulCount = c.ScoringSwims,
@@ -355,6 +356,23 @@ public class ResultRepository : IResultRepository
             .ThenBy(d => ParseDayDate(d.Date))
             .ToList();
 
+        // compID федерации для таба Start list (шаг С7 плана start-list-plan.md): берём у
+        // первого дня в выборке — Competition.OrgCompId, а если пуст (штамп многодневки
+        // стоит на событии, см. CompetitionIdentity) — Competition.Event.OrgCompId.
+        var firstCompetitionId = days.Select(d => d.CompetitionId).FirstOrDefault();
+        var orgCompId = firstCompetitionId != 0
+            ? await _db.Competitions.AsNoTracking()
+                .Where(c => c.Id == firstCompetitionId)
+                .Select(c => c.OrgCompId ?? (c.Event != null ? c.Event.OrgCompId : null))
+                .FirstOrDefaultAsync()
+            : null;
+
+        // Источники стартового протокола (CompetitionSources): у окружных чемпионатов их
+        // несколько на одно соревнование, и подтабы таба Start list строятся по ним.
+        // Совместимость: привязок ещё может не быть — тогда список выводим из скалярного
+        // OrgCompId, и клиент видит ровно один источник, как до этой таблицы.
+        var startListSources = await BuildStartListSourcesAsync(days, orgCompId);
+
         var resultCount = days.Sum(d => d.ResultCount);
         // Личные пловцы; эстафетные строки не раздувают счётчик участников.
         var swimmerCount = await query.Where(r => r.RelayId == null)
@@ -383,6 +401,7 @@ public class ResultRepository : IResultRepository
                  FirstNameEn = r.Swimmer.FirstNameEn,
                  LastNameEn = r.Swimmer.LastNameEn,
                  Club = r.Club.Name,
+                 ClubId = r.ClubId,
                  StyleName = r.Style.Name,
                  Distance = r.Distance,
                  Gender = r.Gender,
@@ -415,6 +434,7 @@ public class ResultRepository : IResultRepository
                 r.Swimmer.FirstNameEn,
                 r.Swimmer.LastNameEn,
                 Club = r.Club.Name,
+                r.ClubId,
                 r.Gender,
                 // Prelim: протокольное место не медаль (ранжир сессии); объединённое место,
                 // если оно лежит на prelim-строке (лучший заплыв был утром), остаётся.
@@ -433,7 +453,7 @@ public class ResultRepository : IResultRepository
             .ToListAsync())
             .Select(r => new MedalRow(
                 r.SwimmerId, r.FirstName, r.LastName, r.FirstNameEn, r.LastNameEn,
-                r.Club, r.Gender, r.Position, false,
+                r.Club, r.ClubId, r.Gender, r.Position, false,
                 $"{r.SwimmerId}|{r.StyleName}|{r.Distance}|{r.EventStyleAge}", r.Round));
 
         // Эстафетная медаль принадлежит ВСЕЙ команде — разворачиваем строку на ноги через
@@ -446,6 +466,7 @@ public class ResultRepository : IResultRepository
             {
                 r.RelayId,
                 Club = r.Club.Name,
+                r.ClubId,
                 Position = filter.Combined && r.Competition.ShowCombineAllResults
                     ? (r.CombinedPlace ?? (r.HeatType == "prelim" || r.HeatType == "extra" ? null : r.Position))
                     : (r.HeatType == "prelim" || r.HeatType == "extra" ? null : r.Position)
@@ -461,13 +482,14 @@ public class ResultRepository : IResultRepository
                     m.Swimmer.FirstNameEn,
                     m.Swimmer.LastNameEn,
                     r.Club,
+                    r.ClubId,
                     m.Swimmer.Gender,
                     r.Position
                 })
             .ToListAsync())
             .Select(r => new MedalRow(
                 r.SwimmerId, r.FirstName, r.LastName, r.FirstNameEn, r.LastNameEn,
-                r.Club, r.Gender, r.Position, true));
+                r.Club, r.ClubId, r.Gender, r.Position, true));
 
         // Медаль возрастной ступени одна, даже если ступень разыграна дважды за день
         // (утренний зачёт + вечерний финал): раунды схлопываются по лучшему месту.
@@ -493,6 +515,7 @@ public class ResultRepository : IResultRepository
                     FirstNameEn = g.First().FirstNameEn,
                     LastNameEn = g.First().LastNameEn,
                     Club = g.First().Club,
+                    ClubId = g.First().ClubId,
                     Gold = g.Count(r => r.Position == 1),
                     Silver = g.Count(r => r.Position == 2),
                     Bronze = g.Count(r => r.Position == 3),
@@ -521,6 +544,7 @@ public class ResultRepository : IResultRepository
                     FirstNameEn = m.FirstNameEn,
                     LastNameEn = m.LastNameEn,
                     Club = m.Club,
+                    ClubId = m.ClubId,
                     Gold = m.Gold,
                     Silver = m.Silver,
                     Bronze = m.Bronze,
@@ -559,6 +583,7 @@ public class ResultRepository : IResultRepository
                 r.Swimmer.FirstNameEn,
                 r.Swimmer.LastNameEn,
                 Club = r.Club.Name,
+                r.ClubId,
                 r.Gender,
                 r.Swimmer.BirthYear,
                 Year = r.CompetitionDate.Year,
@@ -622,6 +647,7 @@ public class ResultRepository : IResultRepository
                 g.First().FirstNameEn,
                 g.First().LastNameEn,
                 g.First().Club,
+                g.First().ClubId,
                 Age = g.First().Year - g.First().BirthYear,
                 g.First().AgeGroup,
                 Points = g.Sum(r => r.InternationalPoints)
@@ -646,6 +672,7 @@ public class ResultRepository : IResultRepository
                     FirstNameEn = x.FirstNameEn,
                     LastNameEn = x.LastNameEn,
                     Club = x.Club,
+                    ClubId = x.ClubId,
                     Points = x.Points,
                     IsTie = tie
                 });
@@ -740,6 +767,7 @@ public class ResultRepository : IResultRepository
                         FirstNameEn = src.FirstNameEn,
                         LastNameEn = src.LastNameEn,
                         Club = src.Club,
+                        ClubId = src.ClubId,
                         Points = w.Points,
                         IsTie = w.IsTie,
                         RuleVersion = hpRule.Version,
@@ -842,6 +870,8 @@ public class ResultRepository : IResultRepository
 
         var overview = new CompetitionOverviewDto
         {
+            OrgCompId = orgCompId,
+            StartListSources = startListSources,
             Summary = new OverviewSummaryDto
             {
                 ResultCount = resultCount,
@@ -912,6 +942,96 @@ public class ResultRepository : IResultRepository
         // Без этого зачёт по полу игнорировал бы тоггл и расходился с общим.
         Combined = f.Combined
     };
+
+    /// <summary>
+    /// Источники стартового протокола соревнования для подтабов таба Start list.
+    ///
+    /// Порядок ровно тот, в котором подтабы нумеруются, поэтому он фиксирован здесь, а не
+    /// на клиенте: SortOrder → дата → compID. Номер (<c>index</c>) назначается тут же — на
+    /// клиенте он оказался бы производным от порядка массива и «поехал» бы при любой
+    /// пересортировке.
+    ///
+    /// Когда привязок нет (а их нет у всех соревнований, заведённых до CompetitionSources),
+    /// возвращаем один синтетический источник из скалярного OrgCompId. Так у клиента ОДИН
+    /// путь кода вместо двух, и старые соревнования продолжают показывать свой протокол.
+    /// </summary>
+    private async Task<List<OverviewStartListSourceDto>> BuildStartListSourcesAsync(
+        IReadOnlyList<OverviewDayDto> days, int? fallbackOrgCompId)
+    {
+        var dayIds = days.Select(d => d.CompetitionId).ToList();
+
+        var links = dayIds.Count > 0
+            ? await _db.CompetitionSources.AsNoTracking()
+                .Where(s => dayIds.Contains(s.CompetitionId))
+                .Select(s => new { s.CompetitionId, s.OrgCompId, s.SourceDate, s.SourceName, s.SortOrder })
+                .ToListAsync()
+            : [];
+
+        var ordered = links
+            .OrderBy(s => s.SortOrder)
+            .ThenBy(s => s.SourceDate ?? DateTime.MaxValue)
+            .ThenBy(s => s.OrgCompId)
+            .ToList();
+
+        // Синтетический источник вместо пустого списка — см. сводку метода.
+        if (ordered.Count == 0)
+        {
+            if (fallbackOrgCompId is null) return [];
+            var firstDay = days.FirstOrDefault();
+            return
+            [
+                new OverviewStartListSourceDto
+                {
+                    OrgCompId = fallbackOrgCompId.Value,
+                    CompetitionId = firstDay?.CompetitionId ?? 0,
+                    Index = 1,
+                    Date = ShortDay(firstDay?.Date),
+                    DateIso = IsoDay(firstDay?.Date),
+                    SourceName = firstDay?.SubName,
+                    EntryCount = await CountEntriesAsync(fallbackOrgCompId.Value)
+                }
+            ];
+        }
+
+        // Счётчики заявок одним запросом: подтаб подписан числом, а заборов может не быть
+        // вовсе (привязка сделана, кнопку ещё не нажимали) — тогда честный ноль.
+        var orgIds = ordered.Select(s => s.OrgCompId).Distinct().ToList();
+        var counts = await _db.CompetitionEntries.AsNoTracking()
+            .Where(e => orgIds.Contains(e.OrgCompId))
+            .GroupBy(e => e.OrgCompId)
+            .Select(g => new { OrgCompId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.OrgCompId, x => x.Count);
+
+        return ordered.Select((s, i) => new OverviewStartListSourceDto
+        {
+            OrgCompId = s.OrgCompId,
+            CompetitionId = s.CompetitionId,
+            Index = i + 1,
+            Date = s.SourceDate?.ToString("dd/MM", CultureInfo.InvariantCulture)
+                   ?? ShortDay(days.FirstOrDefault(d => d.CompetitionId == s.CompetitionId)?.Date),
+            DateIso = s.SourceDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                      ?? IsoDay(days.FirstOrDefault(d => d.CompetitionId == s.CompetitionId)?.Date),
+            SourceName = s.SourceName,
+            EntryCount = counts.TryGetValue(s.OrgCompId, out var c) ? c : 0
+        }).ToList();
+    }
+
+    private async Task<int> CountEntriesAsync(int orgCompId)
+        => await _db.CompetitionEntries.AsNoTracking().CountAsync(e => e.OrgCompId == orgCompId);
+
+    /// <summary>dd/MM/yyyy → dd/MM для подписи подтаба; непарсимая дата → null.</summary>
+    private static string? ShortDay(string? date)
+        => date is not null && DateTime.TryParseExact(date, "dd/MM/yyyy", CultureInfo.InvariantCulture,
+               DateTimeStyles.None, out var d)
+            ? d.ToString("dd/MM", CultureInfo.InvariantCulture)
+            : null;
+
+    /// <summary>Дата дня dd/MM/yyyy → yyyy-MM-dd; непарсимая → null. День недели чипа сессии.</summary>
+    private static string? IsoDay(string? date)
+        => date is not null && DateTime.TryParseExact(date, "dd/MM/yyyy", CultureInfo.InvariantCulture,
+               DateTimeStyles.None, out var d)
+            ? d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+            : null;
 
     /// <summary>Дата дня dd/MM/yyyy → DateTime для сортировки; непарсимая → MaxValue (в конец).</summary>
     private static DateTime ParseDayDate(string date)
@@ -1567,6 +1687,7 @@ public class ResultRepository : IResultRepository
         string FirstNameEn,
         string LastNameEn,
         string Club,
+        int ClubId,
         string? Gender,
         int? Position,
         bool IsRelay,

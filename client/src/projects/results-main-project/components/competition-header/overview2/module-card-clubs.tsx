@@ -169,7 +169,7 @@ export default function ModuleCardClubs({
             {/* Лого клуба-чемпиона; UI_ClubIcon сам падает на no-club.png, полосатый
                 плейсхолдер с инициалами остаётся подложкой. */}
             <span className="ov2-logo h-[76px] w-[76px] text-[15px]">
-              <UI_ClubIcon clubName={leader.club} iconWidth="full" />
+              <UI_ClubIcon clubName={leader.club} clubId={leader.clubId} iconWidth="full" />
             </span>
           </span>
           <span dir="auto" className="text-[17px] font-black leading-[1.25] text-wrap-pretty">{leader.club}</span>

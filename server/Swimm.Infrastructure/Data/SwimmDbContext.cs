@@ -43,6 +43,16 @@ public class SwimmDbContext : DbContext
     /* === Результаты === */
     public DbSet<ResultRecord> Results => Set<ResultRecord>();
 
+    /* === Стартовый протокол: заявки (публично) + журнал заборов (Sys_) === */
+    public DbSet<CompetitionEntry> CompetitionEntries => Set<CompetitionEntry>();
+    public DbSet<StartListPull> StartListPulls => Set<StartListPull>();
+    /// <summary>Из каких compID федерации состоит стартовый протокол соревнования (их бывает
+    /// несколько на один старт — окружные протоколы, см. <see cref="CompetitionSource"/>).</summary>
+    public DbSet<CompetitionSource> CompetitionSources => Set<CompetitionSource>();
+    /// <summary>Справка о ПРЕДСТОЯЩЕМ старте: чемпионат ли и во сколько разминка (Т1).</summary>
+    public DbSet<CompetitionMeetInfo> CompetitionMeetInfos => Set<CompetitionMeetInfo>();
+    public DbSet<CompetitionWarmUp> CompetitionWarmUps => Set<CompetitionWarmUp>();
+
     /* === Клубный зачёт соревнования (материализованный; страница клуба, Фаза 10) === */
     public DbSet<ClubCompetitionStanding> ClubCompetitionStandings => Set<ClubCompetitionStanding>();
     public DbSet<CompetitionNote> CompetitionNotes => Set<CompetitionNote>();
@@ -69,6 +79,9 @@ public class SwimmDbContext : DbContext
 
     /* === Фавориты и медиа пользователей === */
     public DbSet<UserFavorite> UserFavorites => Set<UserFavorite>();
+    /// <summary>Персональный план на соревнование в табе Start list (Т3): за кем следит
+    /// пользователь. Приватная таблица — плана нет в публичном read-пути.</summary>
+    public DbSet<UserStartListPlan> UserStartListPlans => Set<UserStartListPlan>();
     public DbSet<UserMedia> UserMedia => Set<UserMedia>();
     public DbSet<UserMediaPublication> UserMediaPublications => Set<UserMediaPublication>();
 
@@ -327,6 +340,101 @@ public class SwimmDbContext : DbContext
         });
 
         // Реестр спорных записей справочника рекордов (docs/plans/records-quality-plan.md).
+        // --- Стартовый протокол (docs/plans/start-list-plan.md) ---
+
+        modelBuilder.Entity<CompetitionEntry>(entity =>
+        {
+            entity.ToTable("CompetitionEntries");
+
+            // Дата дня — календарная, как CompetitionDate у результата: значения приходят из
+            // разбора с Kind=Unspecified, и timestamptz на них падал бы. А вот HeatStartAt —
+            // наоборот момент времени (Kind=Utc), и остаётся timestamptz по умолчанию.
+            entity.Property(e => e.CompDate)
+                .HasColumnType("timestamp without time zone");
+
+            // Restrict, как у Results: заявка держит пловца и клуб от удаления.
+            entity.HasOne(e => e.Swimmer)
+                .WithMany()
+                .HasForeignKey(e => e.SwimmerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Club)
+                .WithMany()
+                .HasForeignKey(e => e.ClubId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Style)
+                .WithMany()
+                .HasForeignKey(e => e.StyleId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // А вот справочная строка соревнования и результат могут исчезнуть при перезаливке
+            // протокола — заявку это переживает, связь просто обнуляется. Иначе переимпорт
+            // соревнования упирался бы в чужой FK.
+            entity.HasOne(e => e.Competition)
+                .WithMany()
+                .HasForeignKey(e => e.CompetitionId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.Result)
+                .WithMany()
+                .HasForeignKey(e => e.ResultId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // Sys_-таблица: журнал заборов — наша кухня, публичной роли не нужен.
+        modelBuilder.Entity<StartListPull>(entity =>
+        {
+            entity.ToTable("Sys_StartListPulls");
+        });
+
+        // Источники стартового протокола. ПУБЛИЧНАЯ таблица (без Sys_): её читает овервью
+        // соревнования под swimm_ro. Каскад от Competition: привязка без дня бессмысленна.
+        modelBuilder.Entity<CompetitionSource>(entity =>
+        {
+            entity.ToTable("CompetitionSources");
+
+            // Календарная дата протокола, как CompDate у заявки — приходит с Kind=Unspecified.
+            entity.Property(e => e.SourceDate)
+                .HasColumnType("timestamp without time zone");
+
+            entity.HasOne(e => e.Competition)
+                .WithMany()
+                .HasForeignKey(e => e.CompetitionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Справка о предстоящем старте. ПУБЛИЧНАЯ (без Sys_): из неё таб Start list считает
+        // «во сколько приезжать», а публичный путь ходит под swimm_ro. Ключ — OrgCompId, без
+        // FK на Competitions: справочной строки у будущего соревнования ещё нет (§3.1 плана).
+        modelBuilder.Entity<CompetitionMeetInfo>(entity =>
+        {
+            entity.ToTable("CompetitionMeetInfos");
+            entity.HasKey(e => e.OrgCompId);
+            entity.Property(e => e.OrgCompId).ValueGeneratedNever();
+            entity.Property(e => e.RegulationUrl).HasMaxLength(500);
+
+            // Действующее значение считается на лету — колонки под него нет.
+            entity.Ignore(e => e.ChampionshipEffective);
+        });
+
+        modelBuilder.Entity<CompetitionWarmUp>(entity =>
+        {
+            entity.ToTable("CompetitionWarmUps");
+
+            // Ключ — «соревнование + день»: двух разминок в один день не бывает, и суррогатный
+            // id тут только позволил бы им завестись.
+            entity.HasKey(e => new { e.OrgCompId, e.Date });
+
+            // Календарный день, как CompDate у заявки: Kind=Unspecified, timestamptz упал бы.
+            entity.Property(e => e.Date).HasColumnType("timestamp without time zone");
+
+            entity.HasOne(e => e.MeetInfo)
+                .WithMany(m => m.WarmUps)
+                .HasForeignKey(e => e.OrgCompId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // Sys_-таблица: это НАША внутренняя кухня, а не данные федерации — публичной роли
         // swimm_ro она не нужна. Ошибки источника мы не чиним, а помечаем здесь.
         modelBuilder.Entity<RecordIssue>(entity =>
@@ -721,6 +829,22 @@ public class SwimmDbContext : DbContext
 
             // Partial unique indexes создаются вручную в миграции через migrationBuilder.Sql
             // (UX_UserFav_OnePrimary, UX_UserFav_Swimmer, UX_UserFav_Club).
+        });
+
+        // Персональный план на соревнование (Т3). Sys_ и БЕЗ гранта swimm_ro: заявки публичны,
+        // а «за кем я слежу и приду ли я» — нет (§8 плана стартового протокола).
+        modelBuilder.Entity<UserStartListPlan>(entity =>
+        {
+            entity.ToTable("Sys_UserStartListPlans");
+
+            // Один план на пару «пользователь + соревнование»: состав пишется целиком,
+            // и второй строке взяться неоткуда — кроме как из гонки двух вкладок.
+            entity.HasIndex(e => new { e.UserId, e.OrgCompId }).IsUnique();
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // --- Медиа пользователей (Phase 2; таблица создана в Phase 1, эндпоинты — нет) ---

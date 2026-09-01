@@ -1,50 +1,39 @@
 import React from 'react';
-import {
-  rootActions,
-  useAppDispatch,
-  useAppSelector,
-} from '../../../store/store';
 import Helper from '../../../utils/helpers/data-helper';
-import { getFilterData } from './filter-types';
+import { useFilterHost } from './filter-host';
 import FilterCard from './filter-card';
 
+/** Тип бассейна. Значения и опции — через хост (Ф2).
+ *
+ *  Сравнение идёт через `Helper.resolvePoolType`, а не строкой: одно и то же значение
+ *  приходит написанным по-разному ('25', '25m', 'SCM'). */
 const FilterPoolType: React.FC = () => {
-  const dispatch = useAppDispatch();
-  const filters = useAppSelector((state) => state.filterSelected);
-  const filterData = getFilterData();
+  const { values, set, options } = useFilterHost();
+  const poolType = values.pool_type ?? 'all';
 
-  if (!filterData) return null;
+  if (options.poolTypes.length === 0) return null;
 
-  const updateFilter = (pool_type: string) => {
-    dispatch(
-      rootActions.updateState({
-        filterSelected: { ...filters, pool_type },
-      }),
-    );
-  };
-
-  const isActive = filters.pool_type !== 'all';
+  const isActive = poolType !== 'all';
 
   return (
     <FilterCard
       title="Pool Type"
-      summary={isActive ? filters.pool_type : 'All'}
+      summary={isActive ? poolType : 'All'}
       isActive={isActive}
     >
       <div className="flex flex-wrap gap-2">
-        {filterData.pool_type.map((type) => (
+        {options.poolTypes.map((type) => (
           <button
             key={type}
             className={`fseg ${
-              (type === 'all' && filters.pool_type === 'all') ||
+              (type === 'all' && poolType === 'all') ||
               (type !== 'all' &&
-                filters.pool_type !== 'all' &&
-                Helper.resolvePoolType(filters.pool_type) ===
-                  Helper.resolvePoolType(type))
+                poolType !== 'all' &&
+                Helper.resolvePoolType(poolType) === Helper.resolvePoolType(type))
                 ? 'fseg-active'
                 : ''
             }`}
-            onClick={() => updateFilter(type)}
+            onClick={() => set({ pool_type: type })}
           >
             {type}
           </button>

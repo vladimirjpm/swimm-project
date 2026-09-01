@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
@@ -74,27 +74,6 @@ public class SwimmerPageRepository : ISwimmerPageRepository
 
         await _cache.SetAsync(key, rows, Ttl);
         return rows;
-    }
-
-    public async Task<IReadOnlyList<DateTime>> GetWinterChampionshipDatesAsync()
-    {
-        var key = "winter-championship-dates";
-        var cached = await _cache.GetAsync<List<DateTime>>(key);
-        if (cached is not null) return cached;
-
-        var raw = await _read.Competitions.AsNoTracking()
-            .Where(c => c.IsChampionship)
-            .Select(c => new { c.Date, c.PoolType, c.StandingKindOverride })
-            .ToListAsync();
-
-        var dates = raw
-            .Where(c => StandingKinds.Resolve(true, c.PoolType, c.StandingKindOverride) == StandingKinds.Winter)
-            .Select(c => ParseDate(c.Date))
-            .Where(d => d != DateTime.MinValue)
-            .ToList();
-
-        await _cache.SetAsync(key, dates, Ttl);
-        return dates;
     }
 
     public async Task<IReadOnlyDictionary<int, string?>> GetStandingKindsAsync(
@@ -205,22 +184,34 @@ public class SwimmerPageRepository : ISwimmerPageRepository
             .ToList();
     }
 
-    public async Task<IReadOnlyDictionary<string, int>> GetClubBestMsAsync(int clubId)
+    public async Task<IReadOnlyDictionary<string, int>> GetClubBestMsAsync(int clubId, int age)
     {
-        if (clubId <= 0) return new Dictionary<string, int>();
+        if (clubId <= 0 || age <= 0) return new Dictionary<string, int>();
 
-        var key = $"club-best-ms:{clubId}";
+        // Возраст В КЛЮЧЕ кэша: выборка разная для каждой ступени, и общий ключ отдавал бы
+        // девятилетке минимум семнадцатилетних.
+        var key = $"club-best-ms:{clubId}:age{age}";
         var cached = await _cache.GetAsync<Dictionary<string, int>>(key);
         if (cached is not null) return cached;
 
         // Группировка в SQL: у крупного клуба полторы тысячи строк, тянуть их ради минимума
-        // незачем. Отбор строк — те же правила, что у SeasonAggregator.IsCountable.
+        // незачем. Отбор строк — те же правила, что у SeasonAggregator.IsCountable, плюс возраст.
+        //
+        // Возраст считается ПО СЕЗОНУ ЗАПЛЫВА, а не по календарному году — то же правило,
+        // что в SeasonMath.AgeInSeason, развёрнутое выражением: хелпер — обычный C#-метод,
+        // и EF его в SQL не переведёт. Формула обязана остаться тождественной хелперу: разойдутся —
+        // дельта клуба и дельта страны начнут мерять разные ступени (сторож — в Swimm.Tests).
         var grouped = await _read.Results.AsNoTracking()
             .Where(r => r.ClubId == clubId
                         && r.RelayId == null
                         && !r.TimeFail
                         && r.SuspectReason == null
-                        && r.TimeMillisecond > 0)
+                        && r.TimeMillisecond > 0
+                        && r.Swimmer.BirthYear > 0
+                        && (r.CompetitionDate.Month >= SeasonMath.SeasonStartMonth
+                                ? r.CompetitionDate.Year
+                                : r.CompetitionDate.Year - 1)
+                            + 1 - r.Swimmer.BirthYear == age)
             .GroupBy(r => new { r.StyleId, r.Distance, r.Competition.PoolType, r.Gender })
             .Select(g => new
             {

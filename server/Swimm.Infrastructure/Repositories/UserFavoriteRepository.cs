@@ -27,11 +27,20 @@ public class UserFavoriteRepository : IUserFavoriteRepository
                 Id = f.Id,
                 TargetType = f.TargetType,
                 SwimmerId = f.SwimmerId,
-                SwimmerName = f.Swimmer != null
-                    ? f.Swimmer.LastName + " " + f.Swimmer.FirstName
-                    : null,
+                // Имя пловца — ИВРИТСКОЕ по умолчанию (правило Влада от 28.08.2026):
+                // имена показываются так, как напечатаны в протоколе федерации. Английское —
+                // фоллбек, когда ивритского нет. Правило «UI только English» этому не
+                // противоречит: оно про строки интерфейса, а имя человека — данные.
+                SwimmerName = f.Swimmer == null
+                    ? null
+                    : (f.Swimmer.LastName.Length > 0 || f.Swimmer.FirstName.Length > 0)
+                        ? (f.Swimmer.LastName + " " + f.Swimmer.FirstName).Trim()
+                        : (f.Swimmer.LastNameEn + " " + f.Swimmer.FirstNameEn).Trim(),
                 ClubId = f.ClubId,
-                ClubName = f.Club != null ? f.Club.Name : null,
+                // Клуб — по тому же правилу, что имя: иврит по умолчанию, EN фоллбеком.
+                ClubName = f.Club == null
+                    ? null
+                    : (f.Club.Name.Length > 0 ? f.Club.Name : f.Club.NameEn),
                 IsPrimary = f.IsPrimary,
                 SortOrder = f.SortOrder,
                 CreatedAt = f.CreatedAt
@@ -72,11 +81,20 @@ public class UserFavoriteRepository : IUserFavoriteRepository
                 Id = f.Id,
                 TargetType = f.TargetType,
                 SwimmerId = f.SwimmerId,
-                SwimmerName = f.Swimmer != null
-                    ? f.Swimmer.LastName + " " + f.Swimmer.FirstName
-                    : null,
+                // Имя пловца — ИВРИТСКОЕ по умолчанию (правило Влада от 28.08.2026):
+                // имена показываются так, как напечатаны в протоколе федерации. Английское —
+                // фоллбек, когда ивритского нет. Правило «UI только English» этому не
+                // противоречит: оно про строки интерфейса, а имя человека — данные.
+                SwimmerName = f.Swimmer == null
+                    ? null
+                    : (f.Swimmer.LastName.Length > 0 || f.Swimmer.FirstName.Length > 0)
+                        ? (f.Swimmer.LastName + " " + f.Swimmer.FirstName).Trim()
+                        : (f.Swimmer.LastNameEn + " " + f.Swimmer.FirstNameEn).Trim(),
                 ClubId = f.ClubId,
-                ClubName = f.Club != null ? f.Club.Name : null,
+                // Клуб — по тому же правилу, что имя: иврит по умолчанию, EN фоллбеком.
+                ClubName = f.Club == null
+                    ? null
+                    : (f.Club.Name.Length > 0 ? f.Club.Name : f.Club.NameEn),
                 IsPrimary = f.IsPrimary,
                 SortOrder = f.SortOrder,
                 CreatedAt = f.CreatedAt

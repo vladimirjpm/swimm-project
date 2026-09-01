@@ -31,7 +31,11 @@ server/
   Swimm.Infrastructure/     EF Core DbContext, migrations, services, repositories
   Swimm.API/                Controllers, DI, middleware, Razor Pages admin
   Swimm.Parsing/            PDF/HTML protocol parsers (class library)
-  db/setup-roles.sql        Least-privilege DB roles (run once per database)
+  db/01-roles.sql           Least-privilege DB roles (run BEFORE migrations)
+  db/02-grants.sql          Table grants for those roles (run AFTER migrations)
+  db/seed-tables.txt        Which tables are carried to production (and which are not)
+  db/dump-seed.sh           Dump business data for seeding production
+  db/restore-seed.sh        Load that dump into a migrated database
   docker-compose.yml        Local PostgreSQL
 ```
 
@@ -50,11 +54,15 @@ server/
 # 1. Start PostgreSQL  → localhost:5445 (host port; 5432 inside the container)
 docker compose -f server/docker-compose.yml up -d
 
-# 2. Create least-privilege DB roles (once per database)
-docker exec -i swimm-postgres psql -U swimm -d swimm < server/db/setup-roles.sql
+# 2. Create least-privilege DB roles (once per database) — BEFORE migrations,
+#    so that future tables inherit grants and migration-time GRANTs find the roles
+docker exec -i swimm-postgres psql -U swimm -d swimm   -v rw_password=swimm_rw_local_dev -v ro_password=swimm_ro_local_dev   < server/db/01-roles.sql
 
 # 3. Apply migrations (owner role; applies and exits)
 dotnet run --project server/Swimm.API -- --migrate
+
+# 3b. Grant the read role access to public tables — AFTER migrations
+docker exec -i swimm-postgres psql -U swimm -d swimm < server/db/02-grants.sql
 
 # 4. Run the API  → http://localhost:5078
 dotnet run --project server/Swimm.API
@@ -94,8 +102,10 @@ Configured in `server/Swimm.API/appsettings.json`; each falls back to `DefaultCo
 | `AdminConnection`     | `swimm_rw`  | runtime writes (auth, admin, import) — no DDL |
 | `ReadConnection`      | `swimm_ro`  | public results browsing — `SELECT` on business tables only |
 
-Adding a **new public table** read by anonymous users? Add a `GRANT SELECT` line for `swimm_ro`
-in [`server/db/setup-roles.sql`](server/db/setup-roles.sql) (the read role is fail-closed by design).
+Adding a **new public table** read by anonymous users? Two places, both required:
+add it to [`server/db/02-grants.sql`](server/db/02-grants.sql) (the single list) **and** add a
+guarded `GRANT SELECT` in its migration. The read role is fail-closed by design — forget the
+grant and the public path breaks loudly instead of silently widening read access.
 
 ---
 

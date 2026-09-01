@@ -10,6 +10,10 @@ import {
 } from '../../utils/helpers/competition-source';
 import { routes } from '../../utils/routes';
 import { seasonLabel, seasonStartYear } from '../../utils/helpers/season-helper';
+import { useUpcomingCompetitions, useUpcomingStarts } from '../results-main-project/components/start-list/use-start-list';
+import { useAuth } from '../../hooks/useAuth';
+import { useFavorites } from '../../hooks/useFavorites';
+import { formatApproxTime, swimLabel } from '../results-main-project/components/start-list/start-list-helpers';
 
 type CompetitionLink = {
   href: string;
@@ -168,6 +172,91 @@ function MeetsSection() {
   );
 }
 
+// Секция «Upcoming» (С7б, решение В9 от 2026-08-27): предстоящие старты, у которых ещё нет
+// своей карточки в Competitions (не проходили) — источник GET /api/start-list/competitions.
+// Пусто → секции нет вовсе (а не «нет предстоящих»).
+function UpcomingSection() {
+  const { data, loading } = useUpcomingCompetitions(60);
+  if (loading || !data || data.length === 0) return null;
+
+  return (
+    <section className="relative px-4 pt-[38px] lg:px-16 lg:pt-16" aria-label="Upcoming">
+      <p className="mb-[14px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[#7dd3fc] lg:text-[13px] lg:tracking-[0.3em]">
+        Start lists are in
+      </p>
+      <h2 className="mb-[18px] text-[26px] font-black tracking-[-0.02em] text-[#f3f8fd] lg:mb-6 lg:text-[36px]">
+        Upcoming
+      </h2>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:gap-[18px]">
+        {data.map((c) => (
+          <a
+            key={c.org_comp_id}
+            href={routes.competitionUpcoming(c.org_comp_id)}
+            className="hp-card-std flex min-h-[110px] flex-col justify-between gap-2 rounded-[16px] border border-[#7dd3fc]/[0.22] p-4 text-inherit no-underline shadow-[0_18px_44px_rgba(2,10,24,0.45)] backdrop-blur-[14px] transition-[transform,border-color,box-shadow] duration-[180ms] ease-out hover:-translate-y-1 hover:border-[#7dd3fc]/80"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <span
+                dir="rtl"
+                className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-extrabold text-[#f3f8fd]"
+                style={{ textAlign: 'left' }}
+              >
+                {c.comp_name}
+              </span>
+              <span className="hp-mono flex shrink-0 items-center gap-1 rounded-[7px] border border-[#7dd3fc]/40 px-2 py-[3px] text-[11px] font-extrabold text-[#7dd3fc]">
+                {new Date(c.date_start).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}
+                {c.date_end && c.date_end !== c.date_start
+                  ? `–${new Date(c.date_end).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}`
+                  : ''}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-[12px] text-[#cbe0f0]/75">
+              <span>{c.entries} entries · {c.swimmers} swimmers</span>
+              {c.days > 1 && (
+                <span className="hp-mono rounded-[7px] border border-[#7dd3fc]/40 px-1.5 py-[2px] text-[10px] font-extrabold text-[#7dd3fc]">
+                  {c.days} days
+                </span>
+              )}
+            </div>
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// Избранные пловцы залогиненного — ближайшие старты (С8.4). Живёт на /competitions,
+// а не на главной (вне скоупа — В9 говорит только про общий список соревнований).
+function FavoritesUpcomingSection() {
+  const auth = useAuth();
+  const { favoriteSwimmerIds } = useFavorites();
+  const swimmerIds = React.useMemo(() => Array.from(favoriteSwimmerIds), [favoriteSwimmerIds]);
+  const { data } = useUpcomingStarts(auth.isAuthenticated ? swimmerIds : []);
+
+  if (!auth.isAuthenticated || !data || data.length === 0) return null;
+
+  return (
+    <section className="relative px-4 pt-[38px] lg:px-16" aria-label="Your favorites — upcoming starts">
+      <h2 className="mb-[14px] text-[18px] font-black tracking-[-0.02em] text-[#f3f8fd]">
+        Your favorites — upcoming starts
+      </h2>
+      <div className="flex flex-col gap-2">
+        {data.map((s) => (
+          <a
+            key={s.id}
+            href={`${routes.competitionUpcoming(s.org_comp_id)}?tab=startlist&swimmer=${s.swimmer_id}`}
+            className="hp-card-std flex items-center justify-between gap-3 rounded-[12px] border border-[#7dd3fc]/[0.22] px-4 py-2.5 text-inherit no-underline"
+          >
+            <span className="text-[13px] font-bold">{s.swimmer_name}</span>
+            <span className="text-[12px] text-[#cbe0f0]/75">
+              {formatApproxTime(s.heat_start_at)} · {swimLabel(s.distance, s.style_name)}
+            </span>
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function Competitions() {
   return (
     <div className="home-page relative min-h-screen overflow-x-clip pb-[96px] text-[#f3f8fd]">
@@ -219,6 +308,8 @@ function Competitions() {
         ))}
       </section>
 
+      <FavoritesUpcomingSection />
+      <UpcomingSection />
       <MeetsSection />
 
       <RecordTicker />

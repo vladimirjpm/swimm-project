@@ -1,7 +1,9 @@
-using System.Net;
+﻿using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Repositories;
@@ -65,10 +67,17 @@ public static class DependencyInjection
         services.AddScoped<IResultTransferService, ResultTransferService>();
         services.AddScoped<IClubAdminRepository, ClubAdminRepository>();
         services.AddScoped<IClubPublicRepository, ClubPublicRepository>();
+        services.AddScoped<IStartListPublicRepository, StartListPublicRepository>();
         services.AddScoped<IClubOverviewRepository, ClubOverviewRepository>();
         services.AddScoped<ISeasonBestRepository, SeasonBestRepository>();
+        // Витринный сезон — ОДИН на продукт (docs/season-boundary-rule.md): его спрашивают
+        // и клуб, и страница пловца, и /season-best. Копия расчёта в любом из них снова
+        // разъедется с правилом — так и появился баг 2026-09-01.
+        services.AddScoped<IShowcaseSeasonProvider, ShowcaseSeasonProvider>();
         services.AddScoped<ISwimmerPageRepository, SwimmerPageRepository>();
         services.AddScoped<IUserFavoriteRepository, UserFavoriteRepository>();
+        // Персональный план на соревнование в табе Start list (Т3)
+        services.AddScoped<IStartListPlanRepository, StartListPlanRepository>();
         services.AddScoped<IUserMediaRepository, UserMediaRepository>();
         services.AddScoped<IMySwimsRepository, MySwimsRepository>();
         services.AddScoped<IReactionRepository, ReactionRepository>();
@@ -101,6 +110,7 @@ public static class DependencyInjection
         services.AddScoped<IDataCheck, EmptyRelayCheck>();
         services.AddScoped<IDataCheck, MergedSessionsCheck>();
         services.AddScoped<IDataCheck, OfficialClubPointsMismatchCheck>();
+        services.AddScoped<IDataCheck, NoShowUnmatchedCheck>();
         services.AddScoped<ILogligEventPullService, LogligEventPullService>();
         services.AddScoped<ILogligRelayBandService, LogligRelayBandService>();
         services.AddScoped<IDataCheck, SwimmerDedupCheck>();
@@ -135,7 +145,12 @@ public static class DependencyInjection
         }
         else
         {
-            services.AddSingleton<IEmailSender, LoggingEmailSender>();
+            // Тело письма (с одноразовым токеном) уходит в лог ТОЛЬКО в Development.
+            // IHostEnvironment резолвим необязательно: AddInfrastructure должен оставаться
+            // самодостаточным и вне хоста (в тестах его в контейнере нет — тогда false).
+            services.AddSingleton<IEmailSender>(sp => new LoggingEmailSender(
+                sp.GetRequiredService<ILogger<LoggingEmailSender>>(),
+                logBody: sp.GetService<IHostEnvironment>()?.IsDevelopment() ?? false));
         }
 
         services.AddScoped<ILocalAuthService, LocalAuthService>();
@@ -163,6 +178,11 @@ public static class DependencyInjection
 
         // «Входящие» автозабора isr.org.il (фаза 6); провайдер живёт в Swimm.Parsing
         services.AddScoped<ICompetitionDiscoveryService, CompetitionDiscoveryService>();
+        services.AddScoped<IStartListPullService, StartListPullService>();
+        services.AddScoped<IStartListStitchService, StartListStitchService>();
+        services.AddScoped<IStartListScheduleService, StartListScheduleService>();
+        // Справка о старте: разминка руками + переопределение флага «чемпионат» (Т1)
+        services.AddScoped<IMeetInfoAdminService, MeetInfoAdminService>();
 
         // «Затянуть» одну строку входящих — общий путь одиночной кнопки и пакетного забора
         services.AddScoped<IDiscoveryPreviewService, DiscoveryPreviewService>();
@@ -175,6 +195,9 @@ public static class DependencyInjection
 
         // Штамповка loglig-id пловцам по протоколу соревнования (после импорта)
         services.AddScoped<ILogligStampService, LogligStampService>();
+
+        // Привязка соревнования к его compID-источникам стартового протокола (админка).
+        services.AddScoped<ICompetitionSourceAdminService, CompetitionSourceAdminService>();
 
         // «Синхронизация языков» из Discovery: EN/HE-имена пловцов из двуязычной пары PDF
         services.AddScoped<ISwimmerNameSyncService, SwimmerNameSyncService>();

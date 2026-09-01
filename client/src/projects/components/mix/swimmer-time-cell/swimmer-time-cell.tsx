@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import '../text-effect/text-effect.css';
-import UI_SwimTime, { SwimQuality } from '../swim-time/swim-time';
+import UI_SwimTime, { SwimQuality, SwimTimeDelta } from '../swim-time/swim-time';
 
 const TIME_SPLIT_SEPARATOR = '›';
 
@@ -25,6 +25,12 @@ interface UI_SwimmerTimeCellProps {
    * иначе подпись не влезает в узкую колонку времени и ломает сетку строки.
    */
   qualityMarker?: 'icon' | 'chip';
+  /** Отставание от лидера в мс — рисует `UI_SwimTime` сразу за временем. */
+  gapMs?: number | null;
+  /** Остальные сравнения с эталонами (Δ клуб, Δ Израиль) — строками под временем. */
+  deltas?: SwimTimeDelta[];
+  /** Кегль и цвет строк сравнения. */
+  gapClassName?: string;
 }
 
 const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
@@ -38,6 +44,9 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
   isRecordHolder = false,
   quality = null,
   qualityMarker = 'icon',
+  gapMs = null,
+  deltas,
+  gapClassName = '',
 }) => {
   const [splitOpen, setSplitOpen] = useState(false);
 
@@ -76,7 +85,15 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
           className={`${firstLineClassName} ${stacked ? stackedClass : 'flex items-center gap-1'} cursor-pointer select-none`}
           onClick={handleToggle}
         >
-          <UI_SwimTime time={time} quality={quality} marker={qualityMarker} chipSize="sm" />
+          <UI_SwimTime
+            time={time}
+            quality={quality}
+            marker={qualityMarker}
+            chipSize="sm"
+            gapMs={gapMs}
+            deltas={deltas}
+            gapClassName={gapClassName}
+          />
           {time_fail && <span className="text-red-500 ml-1">*</span>}
           <span
             className={`theme-text-muted transition-transform duration-200 ${splitOpen ? 'rotate-180' : ''}`}
@@ -85,7 +102,15 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
         </div>
       ) : (
         <div className={`${firstLineClassName} ${stackedClass}`}>
-          <UI_SwimTime time={time} quality={quality} marker={qualityMarker} chipSize="sm" />
+          <UI_SwimTime
+            time={time}
+            quality={quality}
+            marker={qualityMarker}
+            chipSize="sm"
+            gapMs={gapMs}
+            deltas={deltas}
+            gapClassName={gapClassName}
+          />
           {time_fail && <span className="text-red-500 ml-1">*</span>}
         </div>
       )}

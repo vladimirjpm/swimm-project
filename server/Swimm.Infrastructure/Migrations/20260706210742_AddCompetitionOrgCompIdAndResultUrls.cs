@@ -47,7 +47,17 @@ namespace Swimm.Infrastructure.Migrations
                 "ALTER TABLE \"CompetitionResultUrls\" ADD CONSTRAINT \"FK_CompetitionResultUrls_Competitions_OrgCompId\" " +
                 "FOREIGN KEY (\"OrgCompId\") REFERENCES \"Competitions\" (\"OrgCompId\") ON DELETE CASCADE;");
 
-            migrationBuilder.Sql("GRANT SELECT ON \"CompetitionResultUrls\" TO swimm_ro;");
+            // Роль swimm_ro может отсутствовать (чистая БД, CI, дев без setup-roles):
+            // тогда грант молча пропускаем, иначе `--migrate` падает на пустой базе.
+            // Базовый набор грантов — server/db/02-grants.sql.
+            migrationBuilder.Sql(@"
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'swimm_ro') THEN
+                        GRANT SELECT ON ""CompetitionResultUrls"" TO swimm_ro;
+                    END IF;
+                END$$;
+            ");
         }
 
         /// <inheritdoc />

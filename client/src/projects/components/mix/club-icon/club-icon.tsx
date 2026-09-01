@@ -1,6 +1,7 @@
 import './club-icon.css';
 import { useAppDispatch } from '../../../../store/store';
 import React, { useEffect, useMemo, useState } from 'react';
+import { routes } from '../../../../utils/routes';
 
 type ClubIconsManifest = {
   files?: string[];
@@ -26,6 +27,11 @@ const loadClubIconsManifest = (baseUrl: string) => {
 
 interface UI_ClubIconProps {
   clubName: string;
+  /**
+   * Id клуба. Задан — эмблема становится ссылкой на /clubs/{id}; не задан — просто картинка
+   * (у статических источников и у части агрегатов id клуба в данных нет, см. club_id в ResultDto).
+   */
+  clubId?: number | null;
   className?: string;
   iconWidth: string;
   styleType?: 'icon-notext' | 'icon-text-bottom' | 'icon-text-right';
@@ -33,6 +39,7 @@ interface UI_ClubIconProps {
 
 const UI_ClubIcon: React.FC<UI_ClubIconProps> = ({
   clubName,
+  clubId,
   className = '',
   iconWidth,
   styleType = 'icon-notext',
@@ -101,10 +108,41 @@ const UI_ClubIcon: React.FC<UI_ClubIconProps> = ({
     />
   );
 
+  // Эмблема ведёт на страницу клуба (/clubs/{id}). Это НЕ <a>, а span с role="link":
+  // эмблему почти везде рисуют внутри чего-то кликабельного — строка `SwimRow` целиком
+  // обёрнута в <a href="/swimmers/{id}", карточки Overview — в <button>. Вложенный <a>
+  // там невалиден (React ругается validateDOMNesting) и активируется браузерами
+  // по-разному. Навигацию поэтому делаем руками, а внешний клик глушим:
+  //  • stopPropagation — чтобы клик не поймал свой onClick строки/карточки;
+  //  • preventDefault — чтобы не сработал переход внешней ссылки-обёртки.
+  // Ctrl/Cmd/Shift-клик и средняя кнопка открывают клуб в новой вкладке.
+  const clubHref = clubId != null && clubId > 0 ? routes.club(clubId) : null;
+
+  const goToClub = (e: React.MouseEvent | React.KeyboardEvent, newTab: boolean) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (newTab) window.open(clubHref!, '_blank', 'noopener');
+    else window.location.href = clubHref!;
+  };
+
+  const imgNode = clubHref ? (
+    <span
+      role="link"
+      tabIndex={0}
+      title={`${resolvedTitle} — open club page`}
+      className="inline-flex cursor-pointer items-center justify-center"
+      onClick={(e) => goToClub(e, e.metaKey || e.ctrlKey || e.shiftKey)}
+      onAuxClick={(e) => { if (e.button === 1) goToClub(e, true); }}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') goToClub(e, false); }}
+    >
+      {img}
+    </span>
+  ) : img;
+
   if (styleType === 'icon-text-bottom') {
     return (
       <div className={`dv-club-icon flex flex-col items-center space-y-1 text-[var(--theme-mode-text)] text-base  ${className}`}>
-        {img}
+        {imgNode}
         <span className="w-fit text-2xl truncate overflow-hidden">{clubName}</span>
       </div>
     );
@@ -113,7 +151,7 @@ const UI_ClubIcon: React.FC<UI_ClubIconProps> = ({
   if (styleType === 'icon-text-right') {
     return (
       <div className={`dv-club-icon flex flex-row items-center gap-2 text-[var(--theme-mode-text)] text-base w-${iconWidth} h-${iconWidth} ${className}`}>
-        {img}
+        {imgNode}
         <span className="w-fit text-2xl truncate overflow-hidden">{clubName}</span>
       </div>
     );
@@ -121,7 +159,7 @@ const UI_ClubIcon: React.FC<UI_ClubIconProps> = ({
 
   return (
     <div className={`dv-club-icon h-auto flex items-center justify-center text-[var(--theme-mode-text)] w-${iconWidth} h-${iconWidth} ${className}`}>
-      {img}
+      {imgNode}
     </div>
   );
 };

@@ -148,7 +148,7 @@ export default function CompetitionOverview2({
       // Лого клуба-лидера кругом (handoff v3): UI_ClubIcon сам падает на no-club.png,
       // без клуба остаётся полосатый плейсхолдер с инициалами.
       medal: leaderClub
-        ? <UI_ClubIcon clubName={leaderClub.club} iconWidth="full" />
+        ? <UI_ClubIcon clubName={leaderClub.club} clubId={leaderClub.clubId} iconWidth="full" />
         : '—',
       medalIsLogo: true,
       name: leaderClub?.club ?? '—',

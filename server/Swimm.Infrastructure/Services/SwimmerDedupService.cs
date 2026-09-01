@@ -149,12 +149,17 @@ public class SwimmerDedupService(SwimmDbContext db) : ISwimmerDedupService
 
     /// <summary>Критерий сироты — единственное место, где он живёт (Решение 1 в задаче B2).
     /// Ничего не ссылается: ни результаты, ни ноги эстафет, ни группы (админ/пользовательские),
-    /// ни избранное, ни медиа, ни тренировки, ни привязанный аккаунт. Синтетика (SYNTH-)
-    /// исключена заранее.
+    /// ни избранное, ни медиа, ни тренировки, ни заявки, ни привязанный аккаунт.
+    /// Синтетика (SYNTH-) исключена заранее.
     ///
     /// ⚠ RelayMembers обязателен: ребёнок может плавать ТОЛЬКО эстафеты и не иметь ни одного
     /// личного результата — без этой проверки он выглядел сиротой (2026-08-02: 102 из 109).
-    /// Удаление отбивал FK RESTRICT, но полагаться на это нельзя.</summary>
+    /// Удаление отбивал FK RESTRICT, но полагаться на это нельзя.
+    ///
+    /// ⚠ CompetitionEntries — тот же класс ошибки, и он появился раньше, чем данные: пловец,
+    /// заведённый из СТАРТОВОГО протокола, до первого своего заплыва не числится нигде больше.
+    /// Без этой строки чистка сирот удаляла бы ровно тех новичков, ради родителей которых
+    /// фича и делается (docs/plans/start-list-plan.md §2, вариант C).</summary>
     private IQueryable<Swimm.Domain.Entities.Swimmer> OrphanQuery() =>
         db.Swimmers.AsNoTracking()
             .Where(s => s.SwimmerOrgId == null || !s.SwimmerOrgId.StartsWith("SYNTH-"))
@@ -166,6 +171,7 @@ public class SwimmerDedupService(SwimmDbContext db) : ISwimmerDedupService
                 && !db.UserMedia.Any(m => m.SwimmerId == s.Id)
                 && !db.HubGroupMedia.Any(m => m.SwimmerId == s.Id)
                 && !db.TrainingResults.Any(t => t.SwimmerId == s.Id)
+                && !db.CompetitionEntries.Any(e => e.SwimmerId == s.Id)
                 && !db.AppUsers.Any(u => u.SwimmerId == s.Id));
 
     /// <summary>Нормализация как в dedup-report.sql: trim/lower, финальные ивритские буквы,

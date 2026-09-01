@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace Swimm.Application.Dtos;
 
@@ -12,6 +12,25 @@ namespace Swimm.Application.Dtos;
 public sealed class CompetitionOverviewDto
 {
     [JsonPropertyName("summary")] public OverviewSummaryDto Summary { get; init; } = new();
+
+    /// <summary>
+    /// compID сайта федерации — адрес, по которому живёт стартовый протокол
+    /// (<c>GET /api/start-list/{orgCompId}</c>). Источник: <c>Competition.OrgCompId</c>,
+    /// а у дня многодневки, если там пусто, — <c>Competition.Event.OrgCompId</c> (штамп
+    /// многодневки стоит на событии, см. <c>CompetitionIdentity</c>). <c>null</c> —
+    /// соревнование завели руками, штампа нет: таб Start list клиент не показывает.
+    /// </summary>
+    [JsonPropertyName("org_comp_id")] public int? OrgCompId { get; init; }
+
+    /// <summary>
+    /// Все источники стартового протокола соревнования — по одному на compID федерации
+    /// (таблица <c>CompetitionSources</c>). Их бывает несколько: окружные протоколы одного
+    /// чемпионата лежат под разными compID, а у нас это один старт из нескольких дней.
+    /// Пустой список — привязок нет; клиент тогда падает на скалярный <see cref="OrgCompId"/>,
+    /// а если пуст и он — таба Start list нет. Один элемент — подтабы не рисуются.
+    /// </summary>
+    [JsonPropertyName("start_list_sources")]
+    public IReadOnlyList<OverviewStartListSourceDto> StartListSources { get; init; } = [];
 
     /// <summary>
     /// Соревнование наградное (<c>Competition.IsAward</c>) — то есть места в протоколе означают
@@ -98,6 +117,33 @@ public sealed class OverviewDayDto
     [JsonPropertyName("result_count")] public int ResultCount { get; init; }
 }
 
+/// <summary>
+/// Один источник стартового протокола: compID федерации плюс подпись подтаба.
+/// Подпись — ДАТА И НОМЕР («16/02 · #2»), а не имя протокола: имена окружных стартов у
+/// федерации на иврите, а видимый UI у нас только английский. Полное имя уходит в тултип.
+/// </summary>
+public sealed class OverviewStartListSourceDto
+{
+    /// <summary>compID на isr.org.il — адрес <c>GET /api/start-list/{orgCompId}</c>.</summary>
+    [JsonPropertyName("org_comp_id")] public int OrgCompId { get; init; }
+    /// <summary>Наш день соревнования, к которому привязан источник.</summary>
+    [JsonPropertyName("competition_id")] public int CompetitionId { get; init; }
+    /// <summary>Порядковый номер источника в подтабах, с единицы.</summary>
+    [JsonPropertyName("index")] public int Index { get; init; }
+    /// <summary>Дата протокола, dd/MM (как в подписи подтаба). null — даты у привязки нет.</summary>
+    [JsonPropertyName("date")] public string? Date { get; init; }
+    /// <summary>
+    /// Та же дата в ISO (yyyy-MM-dd). Нужна витрине, чтобы посчитать ДЕНЬ НЕДЕЛИ в чипе
+    /// сессии («Sun 15/02 · #1», зона фильтров 5d): по <see cref="Date"/> без года его не
+    /// вычислить. Формат календарный, как у ключа дня в стартовом протоколе.
+    /// </summary>
+    [JsonPropertyName("date_iso")] public string? DateIso { get; init; }
+    /// <summary>Имя протокола у федерации — только для тултипа.</summary>
+    [JsonPropertyName("source_name")] public string? SourceName { get; init; }
+    /// <summary>Сколько заявок затянуто (0 — привязка есть, забора ещё не было).</summary>
+    [JsonPropertyName("entry_count")] public int EntryCount { get; init; }
+}
+
 public sealed class OverviewBestSwimDto
 {
     [JsonPropertyName("result_id")] public long ResultId { get; init; }
@@ -107,6 +153,8 @@ public sealed class OverviewBestSwimDto
     [JsonPropertyName("first_name_en")] public string FirstNameEn { get; init; } = "";
     [JsonPropertyName("last_name_en")] public string LastNameEn { get; init; } = "";
     [JsonPropertyName("club")] public string Club { get; init; } = "";
+    /// <summary>Id клуба — адрес страницы клуба (<c>/clubs/{id}</c>); по имени она не открывается.</summary>
+    [JsonPropertyName("club_id")] public int ClubId { get; init; }
     [JsonPropertyName("style_name")] public string StyleName { get; init; } = "";
     [JsonPropertyName("distance")] public string Distance { get; init; } = "";
     [JsonPropertyName("gender")] public string Gender { get; init; } = "";
@@ -128,6 +176,8 @@ public sealed class OverviewMedalistDto
     [JsonPropertyName("first_name_en")] public string FirstNameEn { get; init; } = "";
     [JsonPropertyName("last_name_en")] public string LastNameEn { get; init; } = "";
     [JsonPropertyName("club")] public string Club { get; init; } = "";
+    /// <summary>Id клуба — адрес страницы клуба (<c>/clubs/{id}</c>).</summary>
+    [JsonPropertyName("club_id")] public int ClubId { get; init; }
     [JsonPropertyName("gold")] public int Gold { get; init; }
     [JsonPropertyName("silver")] public int Silver { get; init; }
     [JsonPropertyName("bronze")] public int Bronze { get; init; }
@@ -188,6 +238,8 @@ public sealed class OverviewHighPointDto
     [JsonPropertyName("first_name_en")] public string FirstNameEn { get; init; } = "";
     [JsonPropertyName("last_name_en")] public string LastNameEn { get; init; } = "";
     [JsonPropertyName("club")] public string Club { get; init; } = "";
+    /// <summary>Id клуба — адрес страницы клуба (<c>/clubs/{id}</c>).</summary>
+    [JsonPropertyName("club_id")] public int ClubId { get; init; }
     /// <summary>Сумма international points по личным заплывам на соревновании.</summary>
     [JsonPropertyName("points")] public int Points { get; init; }
     /// <summary>true — ничья по очкам в этом (возраст × пол): наград несколько.</summary>

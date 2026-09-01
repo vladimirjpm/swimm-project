@@ -26,4 +26,30 @@ public interface ISeasonBestRepository
     /// </summary>
     Task<SeasonBestNationalDto> GetNationalSeasonBestAsync(
         string style, string distance, string? poolType, int? season, CancellationToken ct = default);
+
+    /// <summary>
+    /// Ранжированный список одной дисциплины за сезон — страница <c>/season-best</c>.
+    ///
+    /// Отличие от <see cref="GetNationalSeasonBestAsync"/>: там одна строка на ступень
+    /// возраста, здесь — все заплывы ВНУТРИ выбранного среза, по времени. Эстафеты, TimeFail
+    /// и помеченные <c>SuspectReason</c> отброшены так же, но есть два отличия:
+    ///
+    /// • дедупа по пловцу по умолчанию НЕТ: один человек законно занимает и первое место, и
+    ///   третье — это его разные старты за сезон (решение Влада 2026-08-26);
+    /// • masters НЕ исключены совсем, а живут отдельным срезом (<see cref="SeasonBestListQuery.Masters"/>):
+    ///   либо мастерские старты с осью «возрастная группа», либо обычные с осью «возраст в
+    ///   сезоне». Смешать их нельзя — иначе в одном рейтинге окажутся 12-летние и 47-летние
+    ///   (решение Влада 2026-08-26; у <see cref="GetNationalSeasonBestAsync"/> masters
+    ///   по-прежнему не участвуют вовсе).
+    /// </summary>
+    Task<SeasonBestListDto> GetSeasonBestListAsync(
+        SeasonBestListQuery query, CancellationToken ct = default);
+
+    /// <summary>
+    /// Чем наполнять карусель сезонов и селектор дисциплины на странице <c>/season-best</c>:
+    /// сезоны с данными, стили с реально проплытыми дистанциями и возрастные группы
+    /// мастерских протоколов (вторая шкала возраста). Группа, чья подпись не сходится с
+    /// возрастами людей в ней, в опции не попадает — см. docs/data-integrity.md §9.
+    /// </summary>
+    Task<SeasonBestOptionsDto> GetSeasonBestOptionsAsync(CancellationToken ct = default);
 }

@@ -1,13 +1,53 @@
 .dv-swimm-icon{color:goldenrod}
-.dv-swimm-icon .style-len{ margin-top: -10px;}
+
+/* Дистанция поверх иконки стиля. Прижата к правому верхнему углу САМОЙ иконки: раньше она
+   вытягивалась наружу отрицательным margin и на карточках с `overflow: hidden` обрезалась.
+
+   Кегль — 1.25em от плитки (решение Влада 2026-08-26): подпись должна читаться, а не
+   прятаться. Уменьшается только пятизначная («10000»): при 1.25em она шире самой узкой
+   плитки, в которой этот компонент живёт (чип заплыва My media — 46px). */
+.dv-swimm-icon .style-len{
+  position: absolute;
+  top: 0;
+  right: 0;
+  max-width: 100%;
+  font-size: 1.25em;
+  line-height: 1;
+  white-space: nowrap;
+}
+.dv-swimm-icon .style-len--xl{ font-size: 0.85em; }
+
+/* Дистанция НЕ поверх иконки (проп `lenPlacement`, 31.08.2026): под ней или справа от неё.
+   Тогда она обычный элемент потока — снимаем абсолютное позиционирование и подложку:
+   подложка была нужна лишь чтобы число читалось НА рисунке. */
+.dv-swimm-icon .style-len--below,
+.dv-swimm-icon .style-len--right{
+  position: static;
+  background: none;
+  border-radius: 0;
+  padding: 0;
+}
 
 @media (max-width: 767px){
   .dv-swimm-icon .style-len{
-        margin-top: -5px;
-        font-size: 20px;
-        line-height: 20px;
+        font-size: 19px;
         background: rgba(255, 255, 255, 0.5);
         border-radius: 30%;
         padding: 0 2px;
   }
+  /* На мобайле кегль задан в пикселях, поэтому и уменьшение — тоже в пикселях. */
+  .dv-swimm-icon .style-len--xl{ font-size: 14px; }
+
+  /* Вне иконки кегль остаётся относительным и на мобайле: жёсткие 19px были ответом на
+     «число тонет в рисунке», а под иконкой оно ни с чем не конкурирует — и должно
+     масштабироваться вместе с плиткой, как задал вызывающий. */
+  .dv-swimm-icon .style-len--below,
+  .dv-swimm-icon .style-len--right{
+    font-size: 1.25em;
+    background: none;
+    border-radius: 0;
+    padding: 0;
+  }
+  .dv-swimm-icon .style-len--below.style-len--xl,
+  .dv-swimm-icon .style-len--right.style-len--xl{ font-size: 0.85em; }
 }

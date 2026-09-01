@@ -33,7 +33,7 @@ export default function ModuleCardHpa({ overview }: Props) {
     byBucket.set(bucketOf(a), e);
   }
   const toEntry = (a: OverviewHighPoint): GenderAgeEntry => ({
-    firstName: a.first_name, lastName: a.last_name, club: a.club,
+    firstName: a.first_name, lastName: a.last_name, club: a.club, clubId: a.club_id,
     value: String(a.points), swimmerId: a.swimmer_id,
   });
   const rows: GenderAgeRow[] = buckets.map((b) => {

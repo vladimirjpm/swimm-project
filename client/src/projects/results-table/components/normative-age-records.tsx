@@ -4,6 +4,8 @@ import RecordsHelper, { maxUpdatedAtLabel } from '../../../utils/helpers/records
 import { HOME_REGION } from '../../../utils/constants/home-region';
 import { recordStepAge, ageInSeason } from '../../../utils/helpers/season-helper';
 import useSeasonBest, { SeasonBestApiItem } from '../../../hooks/useSeasonBest';
+import UI_SeasonNotice from '../../components/mix/season-notice/season-notice';
+import type { ShowcaseSeasonNotice } from '../../../utils/helpers/season-helper';
 import UI_GenderAgeTable, { GenderAgeEntry, GenderAgeRow } from '../../components/mix/gender-age-table/gender-age-table';
 import { timeToMs } from '../../../utils/helpers/recalculate-positions';
 
@@ -231,6 +233,8 @@ function renderTabbedCard(
   seasonLabel: string | undefined,
   active: CardTab | null,
   onChange: (tab: CardTab) => void,
+  seasonNotice: ShowcaseSeasonNotice | null,
+  season: number | null | undefined,
 ) {
   const rows = active === 'season' ? seasonRows : recordRows;
   return (
@@ -242,6 +246,22 @@ function renderTabbedCard(
         seasonRows={seasonRows}
         seasonLabel={seasonLabel}
       />
+      {/* Оговорка нужна только у открытого таба Season best: в свёрнутом виде видны одни
+          подписи, и целый абзац под ними был бы шумом.
+
+          show="pending" — потому что сезон здесь диктует ОТКРЫТОЕ СОРЕВНОВАНИЕ, а не
+          умолчание витрины: у протокола 2025/26 таб честно показывает свой сезон, и
+          «показываем прошлый» было бы неправдой. Объяснять нужно только пустоту в новом
+          сезоне (docs/season-boundary-rule.md). */}
+      {active === 'season' && (
+        <UI_SeasonNotice
+          notice={seasonNotice}
+          season={season}
+          show="pending"
+          className="mt-3 rounded-xl border border-dashed border-[#e9edf3] dark:border-[#28344a] bg-[#f7f9fc] dark:bg-[#182235] px-3 py-2 text-[11.5px] font-bold leading-snug text-[#6b7686] dark:text-[#93a4bd]"
+        />
+      )}
+
       {active && (
       <div className="mt-3 sm:mt-4">
         <UI_GenderAgeTable
@@ -412,6 +432,10 @@ function NormativeAgeRecords({ gender, poolType, styleName, styleLen, age, seaso
       isSingleAge ? (activeTab ?? 'records') : activeTab,
       // Тап по открытому табу сворачивает карточку обратно; по другому — переключает.
       (tab) => setActiveTab(prev => (prev === tab ? null : tab)),
+      // Сезон витрины ещё не переключился на новый — таб обязан это объяснить, иначе
+      // «Season best 2025/26» в разгар 2026/27 читается как протухшие данные.
+      seasonBest?.season_notice ?? null,
+      season,
     );
   }
 

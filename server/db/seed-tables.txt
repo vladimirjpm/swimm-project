@@ -1,0 +1,76 @@
+# Таблицы, которые переносятся в прод дампом (решение Р3, docs/plans/azure-deploy-plan.md Б11).
+#
+# Читается и dump-seed.sh, и restore-seed.sh — список ровно один, разъехаться не может.
+# Пустые строки и строки с # игнорируются. Порядок значения не имеет.
+#
+# Правило отбора механическое, а не на глаз:
+#   переносим таблицу, если у неё НЕТ внешнего ключа на Sys_AppUsers
+#   И нет колонки-актора (ActorName / ActorUserId / IpAddress / Email).
+#
+# ── Бизнес-данные ──────────────────────────────────────────────────────────
+Categories
+CategoryCompetitions
+ClubCompetitionStandings
+Clubs
+CompetitionEntries
+CompetitionEvents
+CompetitionMeetInfos
+CompetitionNoteTexts
+CompetitionNotes
+CompetitionResultUrls
+CompetitionSources
+CompetitionWarmUps
+Competitions
+Countries
+Galleries
+GalleryItems
+NormativeStandards
+PointRulesClubs
+PointRulesClubsEntries
+PointRulesSwimmers
+PointRulesSwimmersEntries
+Records
+RelayMembers
+Relays
+Results
+Styles
+Swimmers
+
+# ── Sys_*, в которых нет персональных данных ───────────────────────────────
+# Это выстраданная ручная работа, воспроизвести её заново нечем.
+Sys_DedupIgnoredPairs        # решения «эти двое НЕ дубли» — иначе дедуп начнётся заново
+Sys_DiscoveredCompetitions   # реестр найденных стартов + OrgCompId (кросс-линк админки)
+Sys_ImportHistory            # происхождение данных, которые мы переносим
+Sys_ImportReconciliation     # сверка импорта (фаза Д1)
+Sys_RecordIssues             # пометки спорных официальных рекордов (видны на витрине)
+Sys_RecordVerifications      # результат работы над качеством справочника рекордов
+Sys_StartListPulls           # журнал заборов стартового протокола (что и когда приехало)
+
+# ── НЕ переносится и почему ────────────────────────────────────────────────
+#
+# Аккаунты и всё, что на них висит — в проде заводятся заново:
+#   Sys_AppUsers, Sys_AppUserRoles, Sys_UserExternalLogins, Sys_UserLocalCredentials,
+#   Sys_UserSecurityTokens, Sys_UserLoginHistory, Sys_UserFavorites, Sys_UserMedia,
+#   Sys_UserMediaPublications, Sys_UserReactions, Sys_UserStartListPlans
+#
+# Журнал действий администраторов (ActorName / ActorUserId / IpAddress):
+#   Sys_AdminAudit
+#
+# HubGroups и HubGroupMembers — ЕДИНСТВЕННАЯ FK через границу:
+#   HubGroups.OwnerUserId NOT NULL → Sys_AppUsers. Без владельца группа не вставится.
+#   Локально это одна тестовая группа на 19 участников — в проде создаётся заново
+#   за минуту. Вместе с ними не едут и привязанные к пользователям:
+#   Sys_HubGroupAdmins, Sys_HubGroupUserMembers, Sys_HubGroupClubRequests, Sys_HubGroupMedia
+#
+# Приватные тренировки групп (привязаны к HubGroups и к пользователям):
+#   Sys_TrainingSessions, Sys_TrainingResults
+#
+# Заполняются кодом при старте — перенос дал бы конфликт первичных ключей:
+#   Sys_AppRoles, Sys_DebugOptions
+#
+# Журнал проверок целостности — должен отражать прогоны В ПРОДЕ, а не локальные.
+# Восстанавливается первым запуском реестра на /Admin/Health:
+#   Sys_DataCheckRuns, Sys_DataCheckFindings, Sys_DataCheckStates
+#
+# Временные хвосты ручных операций — дропнуть перед снятием дампа:
+#   tmp_*

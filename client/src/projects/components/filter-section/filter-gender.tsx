@@ -1,42 +1,31 @@
 import React from 'react';
-import {
-  rootActions,
-  useAppDispatch,
-  useAppSelector,
-} from '../../../store/store';
-import { getFilterData } from './filter-types';
+import { useFilterHost } from './filter-host';
 import FilterCard from './filter-card';
 
+const genderLabel = (gen: string) =>
+  gen === 'male' ? 'M' : gen === 'female' ? 'W' : 'All';
+
+/** Пол. Значения и опции — через хост (Ф2), поэтому карточка одинаково работает
+ *  и на results (Redux), и на странице с состоянием в адресе. */
 const FilterGender: React.FC = () => {
-  const dispatch = useAppDispatch();
-  const filters = useAppSelector((state) => state.filterSelected);
-  const filterData = getFilterData();
+  const { values, set, options } = useFilterHost();
+  const gender = values.gender ?? 'all';
 
-  if (!filterData) return null;
-
-  const updateFilter = (gender: string) => {
-    dispatch(
-      rootActions.updateState({
-        filterSelected: { ...filters, gender },
-      }),
-    );
-  };
-
-  const genderLabel = (gen: string) =>
-    gen === 'male' ? 'M' : gen === 'female' ? 'W' : 'All';
+  // Опций нет — карточку не рисуем (на results это значит, что не загрузился filter_data).
+  if (options.genders.length === 0) return null;
 
   return (
     <FilterCard
       title="Gender"
-      summary={genderLabel(filters.gender)}
-      isActive={filters.gender !== 'all'}
+      summary={genderLabel(gender)}
+      isActive={gender !== 'all'}
     >
       <div className="flex flex-wrap gap-2">
-        {filterData.gender.map((gen) => (
+        {options.genders.map((gen) => (
           <button
             key={gen}
-            className={`fseg ${filters.gender === gen ? 'fseg-active' : ''}`}
-            onClick={() => updateFilter(gen)}
+            className={`fseg ${gender === gen ? 'fseg-active' : ''}`}
+            onClick={() => set({ gender: gen })}
           >
             {genderLabel(gen)}
           </button>

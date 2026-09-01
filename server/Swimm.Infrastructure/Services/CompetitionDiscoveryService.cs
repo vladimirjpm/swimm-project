@@ -126,6 +126,57 @@ public class CompetitionDiscoveryService(
         return ToDto(row, null);
     }
 
+    /// <summary>
+    /// С2 (docs/plans/start-list-plan.md): дочитать детали будущих стартов без loglig-id —
+    /// без этого весь конвейер стартового протокола начать нечем. Ошибка по одной строке не
+    /// роняет прогон, RefreshDetailsAsync уже пишет её в LastError.
+    /// </summary>
+    public async Task<(int Checked, int Resolved)> RefreshUpcomingDetailsAsync(
+        int daysAhead, CancellationToken ct = default)
+    {
+        var today = DateTime.UtcNow.Date;
+        var horizon = today.AddDays(daysAhead);
+
+        var candidates = await db.DiscoveredCompetitions
+            .Where(d => d.LogligId == null
+                && d.Status != DiscoveredCompetitionStatus.Ignored
+                && d.DateStart >= today
+                && d.DateStart <= horizon)
+            .Select(d => d.Id)
+            .ToListAsync(ct);
+
+        var resolved = 0;
+        foreach (var id in candidates)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                var dto = await RefreshDetailsAsync(id, ct);
+                if (dto?.LogligId is not null) resolved++;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // RefreshDetailsAsync сам ловит сетевые исключения и пишет LastError — сюда
+                // долетают только неожиданные обёртки; логируем и идём дальше.
+                // Отмену НЕ глотаем (TaskCanceledException — её наследник): при остановке
+                // приложения обход обязан прекратиться сразу, а не спустя ещё одну строку.
+                logger.LogWarning(ex, "Discovery: RefreshUpcomingDetailsAsync упала на строке {Id}", id);
+            }
+        }
+
+        logger.LogInformation(
+            "Discovery: догрузка деталей будущих стартов (окно {Days} дн.) — проверено {Checked}, добыто {Resolved}",
+            daysAhead, candidates.Count, resolved);
+        return (candidates.Count, resolved);
+    }
+
+    public async Task<int?> GetOrgCompIdAsync(int id, CancellationToken ct = default)
+        => await db.DiscoveredCompetitions
+            .AsNoTracking()
+            .Where(d => d.Id == id)
+            .Select(d => (int?)d.OrgCompId)
+            .FirstOrDefaultAsync(ct);
+
     public async Task<bool> SetStatusAsync(int id, string status, CancellationToken ct = default)
     {
         if (status is not (DiscoveredCompetitionStatus.New

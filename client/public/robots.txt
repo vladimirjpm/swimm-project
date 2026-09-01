@@ -1,3 +1,15 @@
 # https://www.robotstxt.org/robotstxt.html
+#
+# Страницы с поимённой информацией о спортсменах (в т.ч. несовершеннолетних) закрыты от
+# индексации — решение Р6, docs/plans/azure-deploy-plan.md Б14. Снимать только вместе с
+# политикой приватности и решением по В4 (кто оператор данных).
 User-agent: *
-Disallow:
+Disallow: /results
+Disallow: /competitions
+Disallow: /swimmers/
+Disallow: /clubs/
+Disallow: /groups/
+Disallow: /my-media
+Disallow: /season-best
+Disallow: /Admin/
+Disallow: /admin/

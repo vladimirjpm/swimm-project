@@ -18,6 +18,14 @@ public static class StandingKinds
 {
     public const string Winter = "winter";
     public const string Summer = "summer";
+    /// <summary>
+    /// Открытая вода. ⚠ До появления поля площадки (<c>Competition.WaterKind</c>,
+    /// docs/plans/open-water-course-plan.md) это же значение в
+    /// <c>Competition.StandingKindOverride</c> служит ЕДИНСТВЕННЫМ признаком морского
+    /// старта — по нему витрины отличают море от бассейна (решение Р20,
+    /// docs/data-integrity.md §9). Значит, защита ровно настолько надёжна, насколько
+    /// аккуратно проставлен override: непомеченный морской старт снова смешается с бассейном.
+    /// </summary>
     public const string OpenWater = "openwater";
 
     /// <summary>Значение <c>StandingKindOverride</c>, явно исключающее соревнование из зачёта.</summary>

@@ -1,6 +1,9 @@
 using System.IO.Compression;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
@@ -15,6 +18,7 @@ using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using System.Globalization;
+using System.Reflection;
 using Swimm.Infrastructure;
 using Swimm.Parsing;
 
@@ -22,7 +26,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 // appsettings.Local.json — gitignored, для локального переключения на другую БД.
 // Перекрывает appsettings.json и appsettings.{Environment}.json.
-builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
+// ⚠ ТОЛЬКО в Development: провайдер добавляется ПОСЛЕ переменных окружения (их подключил
+// CreateBuilder), то есть в проде этот файл перебил бы строки подключения из App Service.
+// docs/plans/azure-deploy-plan.md Б7.
+if (builder.Environment.IsDevelopment())
+    builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
 
 // Сжатие ответов. Замер 2026-08-25: справочники, которые тянет КАЖДАЯ страница
 // (records + normative-standards), весят 1.9 МБ несжатыми и 118 КБ в gzip — 94%.
@@ -43,6 +51,32 @@ builder.Services.AddResponseCompression(options =>
 builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Optimal);
 builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Optimal);
 
+// ── За обратным прокси (Azure App Service) ──────────────────────────────────────────────
+// App Service терминирует TLS и проксирует внутрь по HTTP. Без этого Request.Scheme == http,
+// а значит: Google собирает redirect_uri на http:// и вход ломается; ссылки подтверждения
+// почты и сброса пароля уезжают битыми (AuthController.BaseUrl); rate-limiter партиционирует
+// по RemoteIpAddress и схлопывается в один общий лимит на всех клиентов.
+// KnownIPNetworks/KnownProxies чистим: фронтенд App Service не в приватной сети, и с непустым
+// списком заголовки молча игнорируются. docs/plans/azure-deploy-plan.md Б5.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+// ── Data Protection ─────────────────────────────────────────────────────────────────────
+// Этим кольцом ключей шифруются auth-кука (Swimm.Auth) и antiforgery-токены. По умолчанию
+// оно живёт в файловой системе контейнера: на App Service это значит «новые ключи после
+// каждого деплоя и рестарта» → у всех слетают сессии, а мутации в админке начинают падать
+// на antiforgery. Явное имя приложения обязательно: без него ключи не переживают смену пути.
+// Каталог задаётся DataProtection:KeysDir (в проде — персистентный /home/...); пусто =
+// поведение по умолчанию, для дева это нормально. docs/plans/azure-deploy-plan.md Б6.
+var dpBuilder = builder.Services.AddDataProtection().SetApplicationName("Swimm");
+var dpKeysDir = builder.Configuration["DataProtection:KeysDir"];
+if (!string.IsNullOrWhiteSpace(dpKeysDir))
+    dpBuilder.PersistKeysToFileSystem(new DirectoryInfo(dpKeysDir));
+
 builder.Services.AddMemoryCache();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -60,6 +94,7 @@ builder.Services.AddCors(options =>
             .AllowCredentials());
 });
 
+builder.Services.AddProblemDetails();
 builder.Services.AddControllers();
 builder.Services.AddRazorPages();
 
@@ -109,7 +144,17 @@ builder.Services.AddRateLimiter(options =>
 });
 // Antiforgery: header-based (double-submit) для защиты admin-мутаций.
 // Клиент читает токен из JS-переменной, генерируемой в _Layout.cshtml, и посылает в этом заголовке.
-builder.Services.AddAntiforgery(options => options.HeaderName = "X-XSRF-TOKEN");
+// В проде кука уходит только по HTTPS; в деве сайт живёт на http://localhost, поэтому
+// SameAsRequest — иначе локальный вход перестал бы работать.
+var secureCookiePolicy = builder.Environment.IsDevelopment()
+    ? CookieSecurePolicy.SameAsRequest
+    : CookieSecurePolicy.Always;
+
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-XSRF-TOKEN";
+    options.Cookie.SecurePolicy = secureCookiePolicy;
+});
 
 // Authentication: Cookie + (опционально) Google
 var googleSection = builder.Configuration.GetSection("Authentication:Google");
@@ -129,6 +174,7 @@ var authBuilder = builder.Services
     {
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = secureCookiePolicy;
         options.Cookie.Name = "Swimm.Auth";
         options.LoginPath = "/auth/login";
         options.LogoutPath = "/auth/logout";
@@ -144,6 +190,7 @@ var authBuilder = builder.Services
     {
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = secureCookiePolicy;
         options.Cookie.Name = "Swimm.External";
         options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
     });
@@ -179,6 +226,53 @@ if (args.Contains("--migrate"))
     scope.ServiceProvider.GetRequiredService<IDbMigrator>().Migrate();
     return;
 }
+// Выдать роль Admin по email. Нужен на первом запуске в проде: после деплоя админка
+// недостижима, пока у кого-то нет роли, а сделать это было нечем, кроме ручного INSERT
+// в прод-БД. docs/plans/azure-deploy-plan.md Б12.
+//   dotnet run -- --grant-admin you@example.com
+// Пользователь должен уже существовать — сначала войди на сайте через Google.
+if (args.Contains("--grant-admin"))
+{
+    var emailIndex = Array.IndexOf(args, "--grant-admin") + 1;
+    if (emailIndex >= args.Length || args[emailIndex].StartsWith("--"))
+    {
+        Console.Error.WriteLine("Usage: dotnet run -- --grant-admin <email>");
+        Environment.ExitCode = 2;
+        return;
+    }
+
+    var email = args[emailIndex];
+    using var scope = app.Services.CreateScope();
+    var admin = scope.ServiceProvider.GetRequiredService<IAdminRepository>();
+
+    var user = (await admin.GetUsersAsync())
+        .FirstOrDefault(u => string.Equals(u.Email, email, StringComparison.OrdinalIgnoreCase));
+
+    if (user is null)
+    {
+        Console.Error.WriteLine($"Пользователь {email} не найден. Сначала войди на сайте — аккаунт создаётся при первом входе.");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    // RoleId=1 — Admin (сид ролей в SwimmDbContext: 1 Admin, 2 User, 3 Coach).
+    var result = await admin.AddRoleAsync(user.Id, roleId: 1);
+    switch (result)
+    {
+        case RoleOperationResult.Ok:
+            Console.WriteLine($"Роль Admin выдана: {email} (id {user.Id}). Сессии сброшены — войди заново.");
+            break;
+        case RoleOperationResult.AlreadyAssigned:
+            Console.WriteLine($"У {email} роль Admin уже есть — ничего не менял.");
+            break;
+        default:
+            Console.Error.WriteLine($"Не удалось выдать роль: {result}");
+            Environment.ExitCode = 1;
+            break;
+    }
+    return;
+}
+
 
 // Пересчёт объединённых мест «Combine All Results» во всех соревнованиях с этим флагом:
 //   dotnet run -- --recalc-combined
@@ -220,6 +314,83 @@ if (args.Contains("--probe-club-standings"))
     Console.WriteLine(
         $"\nИтог: проверено {report.Checked}, с официальным зачётом {report.WithStanding}, " +
         $"без него {report.WithoutStanding}, не удалось проверить {report.Unknown}");
+    return;
+}
+
+// Дочитать детали будущих стартов без loglig-id (docs/plans/start-list-plan.md, шаг С2):
+//   dotnet run -- --refresh-upcoming [--days 14]
+// Без этого у будущего старта нет logligId, и стартовый протокол начать нечем.
+if (args.Contains("--refresh-upcoming"))
+{
+    var daysAhead = 14;
+    var daysIndex = Array.IndexOf(args, "--days");
+    if (daysIndex >= 0 && daysIndex + 1 < args.Length && int.TryParse(args[daysIndex + 1], out var d))
+        daysAhead = d;
+
+    using var scope = app.Services.CreateScope();
+    var svc = scope.ServiceProvider.GetRequiredService<ICompetitionDiscoveryService>();
+    var (checkedCount, resolved) = await svc.RefreshUpcomingDetailsAsync(daysAhead);
+
+    Console.WriteLine($"Догрузка деталей будущих стартов (окно {daysAhead} дн.): проверено {checkedCount}, добыто {resolved}");
+    return;
+}
+
+// Затянуть СТАРТОВЫЙ протокол соревнования (docs/plans/start-list-plan.md, шаг С4):
+//   dotnet run -- --pull-start-list <orgCompId>
+// orgCompId — compID на isr.org.il. Соревнование должно быть во «Входящих» и иметь loglig-id
+// (иначе вернётся статус empty — см. §1.6 плана, риск №1). Идёт по страницам заплывов,
+// у чемпионата это под две сотни запросов с вежливой паузой; повтор идемпотентен.
+if (args.Contains("--pull-start-list"))
+{
+    var idIndex = Array.IndexOf(args, "--pull-start-list") + 1;
+    if (idIndex >= args.Length || !int.TryParse(args[idIndex], out var pullOrgCompId))
+    {
+        Console.Error.WriteLine("Использование: --pull-start-list <orgCompId>");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    using var scope = app.Services.CreateScope();
+    var svc = scope.ServiceProvider.GetRequiredService<IStartListPullService>();
+    var report = await svc.PullAsync(pullOrgCompId);
+
+    Console.WriteLine(
+        $"Стартовый протокол {report.OrgCompId} (loglig {report.LogligId?.ToString() ?? "—"}): {report.Status}");
+    if (report.Error is not null) Console.WriteLine($"  {report.Error}");
+    Console.WriteLine(
+        $"  заплывов {report.EventsFetched}/{report.Events}, строк {report.Entries}; " +
+        $"новых {report.Added}, пересев {report.Moved}, снялись {report.Removed}, без изменений {report.Unchanged}");
+    Console.WriteLine(
+        $"  пловцов заведено {report.SwimmersCreated}, loglig-id проставлено {report.SwimmersStamped}, " +
+        $"клуб не опознан у строк: {report.ClubsUnmatched}");
+    return;
+}
+
+// Сшить заявки стартового протокола с результатами (шаг С9):
+//   dotnet run -- --stitch-start-list <orgCompId>
+// На импорте это делается само; прогон нужен для соревнований, чьи протоколы загрузили
+// раньше, чем появился стартовый. Идемпотентно.
+if (args.Contains("--stitch-start-list"))
+{
+    var idIndex = Array.IndexOf(args, "--stitch-start-list") + 1;
+    if (idIndex >= args.Length || !int.TryParse(args[idIndex], out var stitchOrgCompId))
+    {
+        Console.Error.WriteLine("Использование: --stitch-start-list <orgCompId>");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    using var scope = app.Services.CreateScope();
+    var svc = scope.ServiceProvider.GetRequiredService<IStartListStitchService>();
+    var report = await svc.StitchAsync(stitchOrgCompId);
+
+    Console.WriteLine(
+        $"Сшивка {report.OrgCompId}: дней {report.Days}, заявок {report.Entries}, " +
+        $"привязано к дню {report.Linked}, проплыли {report.Swum}, без результата {report.NoShow}");
+    if (report.MatchedByDiscipline > 0)
+        Console.WriteLine($"  сматчено по дисциплине, а не по дорожке: {report.MatchedByDiscipline}");
+    if (report.Unlinked > 0)
+        Console.WriteLine($"  не удалось отнести ни к одному дню: {report.Unlinked}");
     return;
 }
 
@@ -876,8 +1047,23 @@ if (args.Contains("--backfill-discovery-orgcompid"))
     return;
 }
 
+// ПЕРВЫМ в конвейере: остальные middleware (и OAuth, и rate-limiter) должны видеть уже
+// исправленные Scheme и RemoteIpAddress. docs/plans/azure-deploy-plan.md Б5.
+app.UseForwardedHeaders();
+
 if (!app.Environment.IsDevelopment())
-    app.UseHttpsRedirection();
+{
+    // Без этого в Production при исключении отдавалась пустая страница: developer exception
+    // page выключена, а своего обработчика не было. Для /api/* — ProblemDetails (JSON),
+    // для остальных — минимальная страница с кодом.
+    app.UseExceptionHandler("/error");
+    app.UseStatusCodePagesWithReExecute("/error", "?code={0}");
+    app.UseHsts();
+    // /healthz — мимо HTTPS-редиректа: health-check App Service считает инстанс здоровым
+    // только на 2xx, а 307 сочтёт отказом и начнёт перезапускать живой процесс.
+    app.UseWhen(ctx => !ctx.Request.Path.StartsWithSegments("/healthz"),
+        branch => branch.UseHttpsRedirection());
+}
 
 // До статики и эндпоинтов: иначе middleware не увидит ответ, который надо сжать.
 app.UseResponseCompression();
@@ -923,7 +1109,13 @@ app.Use(async (context, next) =>
         && !context.Request.Path.StartsWithSegments("/admin")
         && !context.Request.Path.StartsWithSegments("/api/admin")
         && !context.Request.Path.StartsWithSegments("/auth")
-        && !context.Request.Path.StartsWithSegments("/signin-google"))
+        && !context.Request.Path.StartsWithSegments("/signin-google")
+        // Служебные пути мимо заглушки: иначе health-check App Service получит 503 и
+        // перезапустит инстанс ровно тогда, когда мы сами включили режим обслуживания.
+        && !context.Request.Path.StartsWithSegments("/healthz")
+        && !context.Request.Path.StartsWithSegments("/readyz")
+        && !context.Request.Path.StartsWithSegments("/version")
+        && !context.Request.Path.StartsWithSegments("/error"))
     {
         if (context.User.IsInRole("Admin")) { await next(); return; }
 
@@ -1024,7 +1216,11 @@ app.Use(async (context, next) =>
 
 app.UseDefaultFiles(new DefaultFilesOptions
 {
-    DefaultFileNames = new List<string> { "home.html", "index.html" }
+    // Порядок значим. В ПРОДЕ publish кладёт сюда клиента, и `/` отдаёт его витрину.
+    // ЛОКАЛЬНО клиента в wwwroot нет (он живёт на Vite :5173), и `/` откатывается на
+    // admin-home.html — серверную страницу входа в админку. Один и тот же адрес показывает
+    // ту сторону, которая в этом окружении вообще есть.
+    DefaultFileNames = new List<string> { "home.html", "admin-home.html", "index.html" }
 });
 app.UseStaticFiles(new StaticFileOptions
 {
@@ -1050,6 +1246,57 @@ app.MapGet("/api/antiforgery/token", (IAntiforgery af, HttpContext ctx) =>
 app.MapGet("/api/db-status",
     (DbStatusService s) => Results.Ok(new { available = s.IsAvailable }))
     .AllowAnonymous();
+// ── Служебные эндпоинты ─────────────────────────────────────────────────────────────────
+// /healthz — liveness для health-check App Service. Намеренно НЕ трогает БД: иначе просадка
+// базы приводила бы к перезапуску веб-инстанса, который сам по себе жив.
+app.MapGet("/healthz", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
+
+// /readyz — readiness для алертов и ручной диагностики. Статус БД уже посчитан фоновым
+// пингом (DbPingBackgroundService), поэтому проба бесплатная.
+app.MapGet("/readyz", (DbStatusService s) => s.IsAvailable
+        ? Results.Ok(new { status = "ready", database = "up" })
+        : Results.Json(new { status = "degraded", database = "down" }, statusCode: StatusCodes.Status503ServiceUnavailable))
+    .AllowAnonymous();
+
+// /version — что именно крутится в проде. Значение проставляется на сборке
+// (-p:InformationalVersion=<sha>), локально — версия сборки.
+app.MapGet("/version", () => Results.Ok(new
+{
+    version = Assembly.GetEntryAssembly()?
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown",
+    environment = app.Environment.EnvironmentName,
+})).AllowAnonymous();
+
+// /error — единая точка для UseExceptionHandler и UseStatusCodePagesWithReExecute (Production).
+// До этого в проде необработанное исключение отдавало пользователю пустую страницу.
+app.Map("/error", (HttpContext ctx) =>
+{
+    var handled = ctx.Features.Get<IExceptionHandlerPathFeature>();
+    var status = handled is not null
+        ? StatusCodes.Status500InternalServerError
+        : int.TryParse(ctx.Request.Query["code"], out var c) && c is >= 400 and < 600
+            ? c
+            : StatusCodes.Status500InternalServerError;
+
+    var originalPath = handled?.Path
+        ?? ctx.Features.Get<IStatusCodeReExecuteFeature>()?.OriginalPath
+        ?? string.Empty;
+
+    // Клиенту API нужен машиночитаемый ответ, человеку — страница.
+    if (originalPath.StartsWith("/api", StringComparison.OrdinalIgnoreCase))
+        return Results.Problem(statusCode: status, title: status == 404 ? "Not found" : "Request failed");
+
+    var title = status == 404 ? "Page not found" : "Something went wrong";
+    return Results.Content($$"""
+        <!DOCTYPE html>
+        <html lang="en"><head><meta charset="utf-8"><title>{{title}}</title>
+        <style>body{font-family:system-ui,sans-serif;display:flex;justify-content:center;align-items:center;
+        height:100vh;margin:0;background:#0d1418;color:#e3edf1}.b{text-align:center}.b h1{font-size:3rem;margin:0 0 .5rem}
+        .b p{color:#9aacb6;margin:0 0 1.5rem}.b a{color:#4cbfc9}</style></head>
+        <body><div class="b"><h1>{{status}}</h1><p>{{title}}.</p><a href="/">Back to home</a></div></body></html>
+        """, "text/html; charset=utf-8", statusCode: status);
+}).AllowAnonymous();
+
 
 // Публичная конфигурация клиента (не секреты!). resultsLoadMode: full/paged — принудительный
 // режим загрузки результатов (?loadMode= игнорируется), client — режим выбирает клиент.
@@ -1073,5 +1320,46 @@ app.MapGet("/api/client-config",
         }
     }))
     .AllowAnonymous();
+
+// ── Диагностика конфигурации на старте ──────────────────────────────────────────────────
+// Все эти вещи в проде отказывают МОЛЧА: без Google-секрета выключается вход (а вместе с ним
+// и админка), без SMTP письма с одноразовыми токенами уходят в лог, забытая AdminConnection
+// молча роняет рантайм на owner-роль. Пусть отказ будет видно в логе App Service.
+// docs/plans/azure-deploy-plan.md A2.
+if (!app.Environment.IsDevelopment())
+{
+    var startupLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Swimm.Startup");
+    var cfg = app.Configuration;
+
+    if (!googleEnabled)
+        startupLog.LogCritical(
+            "Google OAuth ВЫКЛЮЧЕН: не задан Authentication__Google__ClientSecret. Вход через Google не работает, а /admin для анонима ведёт именно туда — админка недостижима.");
+
+    if (string.IsNullOrWhiteSpace(cfg["Email:Smtp:Host"]))
+        startupLog.LogCritical(
+            "SMTP НЕ НАСТРОЕН (пуст Email__Smtp__Host): письма подтверждения почты и сброса пароля никуда не уходят. Регистрация и восстановление доступа в проде не работают.");
+
+    foreach (var name in new[] { "DefaultConnection", "MigrationConnection", "AdminConnection", "ReadConnection" })
+    {
+        var cs = cfg.GetConnectionString(name);
+        if (string.IsNullOrWhiteSpace(cs))
+            startupLog.LogWarning(
+                "Строка подключения {Name} не задана — используется фоллбек на DefaultConnection. Для AdminConnection/ReadConnection это значит работу под owner-ролью мимо least-privilege.", name);
+        else if (cs.Contains("localhost", StringComparison.OrdinalIgnoreCase) || cs.Contains("127.0.0.1"))
+            startupLog.LogCritical(
+                "Строка подключения {Name} указывает на localhost вне Development — почти наверняка забыли задать ConnectionStrings__{Name} в App Service.", name, name);
+        else if (!cs.Contains("SslMode", StringComparison.OrdinalIgnoreCase))
+            startupLog.LogWarning(
+                "В строке подключения {Name} не задан SslMode. Azure Database for PostgreSQL требует TLS — добавь SslMode=Require.", name);
+    }
+
+    if (cfg["AllowedHosts"] is null or "*")
+        startupLog.LogWarning(
+            "AllowedHosts = \"*\": ссылки в письмах строятся из заголовка Host, то есть их можно подделать. Сузь до реального хоста прода.");
+
+    if (string.IsNullOrWhiteSpace(cfg["DataProtection:KeysDir"]))
+        startupLog.LogWarning(
+            "DataProtection:KeysDir не задан — кольцо ключей лежит в эфемерной файловой системе. После деплоя или рестарта у всех слетят сессии и сломается antiforgery в админке.");
+}
 
 app.Run();

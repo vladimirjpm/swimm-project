@@ -1,4 +1,4 @@
-@page
+﻿@page
 @using Swimm.API.Pages.Admin.Shared
 @model Swimm.API.Pages.Admin.ApiModel
 @{
@@ -563,7 +563,7 @@ async function runApi(btn, method, urlTemplate, paramMap, defaultMode) {
             : `<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold ${statusOk ? 'bg-[rgba(102,187,106,0.2)] text-[#66bb6a]' : 'bg-[rgba(255,167,38,0.2)] text-[#ffa726]'}">✓ ${approved}/${withHistory}</span>`;
 
         return `
-        <div class="rounded-lg border border-[#66bb6a]/30 bg-[rgba(102,187,106,0.08)] hover:bg-[rgba(102,187,106,0.13)] cursor-pointer px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1"
+        <div class="rounded-lg border border-[rgba(102,187,106,0.3)] bg-[rgba(102,187,106,0.08)] hover:bg-[rgba(102,187,106,0.13)] cursor-pointer px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1"
              onclick="toggleEvent(${eventId})" data-event-summary="${eventId}">
             <span class="chevron text-[#66bb6a] w-3 inline-block">▸</span>
             <span class="font-semibold text-[#e0e0e0] max-w-[340px] truncate" title="${esc(eventName)}">${esc(eventName)}</span>

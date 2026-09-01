@@ -1,25 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-
-// ── Antiforgery token cache (та же механика, что и useUserMedia/useFavorites) ──
-
-let cachedToken: string | null = null;
-
-async function fetchAntiforgeryToken(): Promise<string | null> {
-  if (cachedToken) return cachedToken;
-  try {
-    const r = await fetch('/api/antiforgery/token', { credentials: 'include' });
-    if (!r.ok) return null;
-    const data = await r.json();
-    cachedToken = data.token ?? null;
-    return cachedToken;
-  } catch {
-    return null;
-  }
-}
-
-function invalidateTokenCache() {
-  cachedToken = null;
-}
+import { fetchAntiforgeryToken, invalidateTokenCache } from '../utils/antiforgery';
 
 // ── Извлечение ID из вставленной строки (анти-SSRF: на сервер уходит только число) ─
 

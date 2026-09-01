@@ -7,7 +7,11 @@
   gap: 10px;
 }
 
-/* Сегментные кнопки фильтра (по прототипу drawer'а из design_handoff_theme_modes) */
+/* Сегментные кнопки фильтра (по прототипу drawer'а из design_handoff_theme_modes).
+
+   Палитра — в локальных токенах `--fseg-*` с фоллбеком на `--theme-*` (Ф1 плана
+   docs/plans/filters-reusable-panel-plan.md): на results ничего не меняется, а deep-страница
+   переопределяет токены у себя и получает те же кнопки в своих цветах. Геометрия общая. */
 .fseg {
   font-size: 13px;
   font-weight: 700;
@@ -15,24 +19,24 @@
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
-  border: 1px solid var(--theme-mode-border-input);
-  background-color: var(--theme-mode-input-bg);
-  color: var(--theme-mode-text);
+  border: 1px solid var(--fseg-border, var(--theme-mode-border-input));
+  background-color: var(--fseg-bg, var(--theme-mode-input-bg));
+  color: var(--fseg-text, var(--theme-mode-text));
 }
 
 .fseg:hover:not(:disabled) {
-  border-color: var(--theme-primary);
-  color: var(--theme-primary);
+  border-color: var(--fseg-hover-border, var(--theme-primary));
+  color: var(--fseg-hover-text, var(--theme-primary));
 }
 
 .fseg-active {
-  border-color: var(--theme-border-active);
-  background-color: var(--theme-bg-active);
-  color: var(--theme-text-active);
+  border-color: var(--fseg-active-border, var(--theme-border-active));
+  background-color: var(--fseg-active-bg, var(--theme-bg-active));
+  color: var(--fseg-active-text, var(--theme-text-active));
 }
 
 .fseg-active:hover:not(:disabled) {
-  color: var(--theme-text-active);
+  color: var(--fseg-active-text, var(--theme-text-active));
 }
 
 .fseg:disabled {

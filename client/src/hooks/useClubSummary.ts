@@ -3,6 +3,8 @@ import { useAppSelector } from '../store/store';
 
 export interface ClubSummary {
   club: string;
+  /** Id клуба — адрес его страницы (/clubs/{id}); по имени она не открывается. */
+  clubId: number;
   points: number;
   swimmerCount: number;
   successfulCount: number;

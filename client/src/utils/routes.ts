@@ -30,6 +30,15 @@ export const routes = {
   results: () => '/results',
   competition: (id: string | number) => `/competitions/${enc(String(id))}`,
   competitionsList: () => '/competitions',
+  /**
+   * Предстоящее соревнование (стартовый протокол, ещё не проходило — своей карточки в
+   * `Competitions` у него нет). Отдельный сегмент `upcoming`, а НЕ `/competitions/{orgCompId}`:
+   * `orgCompId` (id сайта федерации) и наш `Competitions.Id` — два разных пространства чисел,
+   * `/competitions/{id}` молча открыл(а) бы чужое соревнование, если числа совпали (решение
+   * С7б, docs/tasks/start-list-ui-sonnet.md). Адрес переживает импорт протокола: когда
+   * соревнование появится в обычном списке, старая ссылка обязана продолжать работать.
+   */
+  competitionUpcoming: (orgCompId: string | number) => `/competitions/upcoming/${enc(String(orgCompId))}`,
 
   groupsList: () => '/groups',
   group: (slug: string) => `/groups/${enc(slug)}`,
@@ -62,16 +71,29 @@ export const routes = {
     distance?: string | null;
     /** «25m» / «50m» — времена разных бассейнов несравнимы, поэтому это часть адреса. */
     poolType?: string | null;
+    /** Верхняя граница возраста; у витрины задана только для хвоста «21+». */
+    ageTo?: number | null;
+    /** Возрастная группа мастерского протокола («25-29»); задана ⇒ срез мастерский. */
+    ageGroup?: string | null;
+    /** Клуб среза (`club_id`). Ссылки со страницы спортсмена его не задают — он появляется,
+     *  когда срез уже сузили на самой странице. */
+    clubId?: number | null;
+    /** true — «по одному лучшему заплыву на пловца». */
+    bestPerSwimmer?: boolean;
     /** Кого подсветить в списке; на выбор самого списка не влияет. */
     swimmerId?: number | null;
   }) => {
     const params = new URLSearchParams();
     params.set('season', String(q.season));
     if (q.age != null) params.set('age', String(q.age));
+    if (q.ageTo != null) params.set('age_to', String(q.ageTo));
+    if (q.ageGroup) params.set('age_group', q.ageGroup);
     if (q.gender) params.set('gender', q.gender);
     if (q.stroke) params.set('stroke', q.stroke);
     if (q.distance) params.set('distance', String(q.distance).replace(/m$/i, ''));
     if (q.poolType) params.set('pool', q.poolType);
+    if (q.clubId != null) params.set('club', String(q.clubId));
+    if (q.bestPerSwimmer) params.set('best', 'true');
     if (q.swimmerId != null) params.set('swimmer', String(q.swimmerId));
     return `/season-best?${params.toString()}`;
   },
@@ -88,10 +110,18 @@ export const routes = {
 export interface SeasonBestQuery {
   season: number | null;
   age: number | null;
+  /** Верх диапазона возраста; у витрины это хвост «21+» (age=21, age_to=99). */
+  ageTo: number | null;
+  /** Возрастная группа мастерского протокола; задана ⇒ страница показывает мастерский срез. */
+  ageGroup: string | null;
   gender: 'male' | 'female' | null;
   stroke: string | null;
   distance: string | null;
   poolType: string | null;
+  /** Клуб среза — id, а не имя: страница фильтрует по `club_id`. */
+  clubId: number | null;
+  /** true — «по одному лучшему заплыву на пловца» (`?best=true`). */
+  bestPerSwimmer: boolean;
   swimmerId: number | null;
 }
 
@@ -106,10 +136,16 @@ export function parseSeasonBestQuery(search: string = window.location.search): S
   return {
     season: num('season'),
     age: num('age'),
+    ageTo: num('age_to'),
+    ageGroup: p.get('age_group') || null,
     gender: gender === 'male' || gender === 'female' ? gender : null,
     stroke: p.get('stroke') || null,
     distance: p.get('distance') || null,
     poolType: p.get('pool') || null,
+    // Клуб и режим строк страница в адрес ПИСАЛА, но не читала — присланная ссылка
+    // открывалась без выбранного клуба. Читаем оба (2026-08-26).
+    clubId: num('club'),
+    bestPerSwimmer: p.get('best') === 'true',
     swimmerId: num('swimmer'),
   };
 }
@@ -122,6 +158,9 @@ export interface RouteIdentity {
   groupResults: boolean;
   /** id соревнования из /competitions/{id} ('last' допустим). */
   competitionId: string | null;
+  /** orgCompId (id сайта федерации) из /competitions/upcoming/{orgCompId} — соревнование
+   *  ещё не проходило, своей строки в Competitions нет (решение С7б). */
+  upcomingOrgCompId: number | null;
   /** id пловца из /swimmers/{id}. */
   swimmerId: number | null;
   /** id клуба из /clubs/{id}. */
@@ -142,6 +181,7 @@ export function parseRoute(pathname: string = window.location.pathname): RouteId
     groupSlug: null,
     groupResults: false,
     competitionId: null,
+    upcomingOrgCompId: null,
     swimmerId: null,
     clubId: null,
   };
@@ -149,6 +189,9 @@ export function parseRoute(pathname: string = window.location.pathname): RouteId
   if (seg[0] === 'groups' && seg[1]) {
     id.groupSlug = decodeURIComponent(seg[1]);
     id.groupResults = seg[2] === 'results';
+  } else if (seg[0] === 'competitions' && seg[1] === 'upcoming' && seg[2]) {
+    const n = Number(decodeURIComponent(seg[2]));
+    id.upcomingOrgCompId = Number.isFinite(n) && n > 0 ? n : null;
   } else if (seg[0] === 'competitions' && seg[1]) {
     id.competitionId = decodeURIComponent(seg[1]);
   } else if (seg[0] === 'swimmers' && seg[1]) {
