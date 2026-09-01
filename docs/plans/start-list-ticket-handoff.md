@@ -1,6 +1,7 @@
 # Таб Start list — редизайн «3a Ticket»: передача в новый чат
 
-Дата: 30.08.2026. Ветка `season-best-list-and-shared-filters`, **4 коммита, НЕ запушено**.
+Дата: 30.08.2026; четыре коммита той работы **в `master`** (ветку `season-best-list-and-shared-filters`
+слили через PR #10 и удалили).
 Читать это первым, если продолжаешь работу над табом. Обоснования решений — в
 [`start-list-ticket-plan.md`](start-list-ticket-plan.md), состояние всей фичи —
 в [`start-list-status.md`](start-list-status.md), принятый макет —
