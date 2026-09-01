@@ -85,8 +85,13 @@ dotnet run --project server/Swimm.API -- --seed-dolphin-training \
   --group 17 [--force]
 ```
 
-Дальше (не сделано): приватный эндпоинт/UI показа тренировок группы (через
-`HubGroupPermissionService`) + `Sys_SwimmerAccountLinks` (привязка аккаунта по инвайту).
+Дальше (не сделано **на день постановки**; см. [`README.md`](README.md)): приватный
+эндпоинт/UI показа тренировок группы (через `HubGroupPermissionService`) +
+`Sys_SwimmerAccountLinks` (привязка аккаунта по инвайту).
+
+> ⚠ Сверено 2026-09-01: тренировки **сделаны** — `GET /api/hub-groups/{slug}/trainings`
+> проверяет права через `HubGroupPermissionService`, на клиенте есть `training-table`.
+> `Sys_SwimmerAccountLinks` по-прежнему НЕ существует — привязки аккаунта по инвайту нет.
 
 ## Открытые мелочи (решить при реализации)
 
