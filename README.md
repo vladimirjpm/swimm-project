@@ -24,7 +24,7 @@ backed by **PostgreSQL**.
 ## Repository layout
 
 ```
-client/                     React + TypeScript SPA (public results browser)
+client/                     React + TypeScript client (multi-page Vite, no SPA router)
 server/
   Swimm.Domain/             POCO entities (no EF/ASP.NET)
   Swimm.Application/        Interfaces (Abstractions/), DTOs, mapping

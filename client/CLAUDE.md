@@ -86,6 +86,10 @@ npm --prefix client run build      # prebuild авто-генерит club-icons
 **Дев-связка с API:** в [`vite.config.js`](vite.config.js) есть proxy `/api`,`/auth` →
 `http://localhost:5078`, поэтому относительные `fetch('/api/...')` работают как same-origin
 (куки/antiforgery без CORS). Запусти API на :5078 (через Visual Studio или `dotnet run`) + `npm run dev`.
+**Другой инстанс API** — переменная окружения `SWIMM_API_TARGET` (`vite.config.js` подставляет её
+вместо `http://localhost:5078`): нужна, когда :5078 занят чужой сборкой и глушить её нельзя —
+подними вторую на :5079 и запусти `SWIMM_API_TARGET=http://localhost:5079 npm run dev`
+(готовая связка — конфиги `swimm-api-5079` / `client-5079` в `.claude/launch.json`).
 Точечные API-вызовы уже есть (напр. избранное в [`hooks/useFavorites.ts`](src/hooks/useFavorites.ts)).
 
 ## Правило: сначала ищи компонент, потом верстай

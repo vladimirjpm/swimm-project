@@ -109,8 +109,13 @@ dotnet run --project server/Swimm.API -- --migrate
 - **Новый репозиторий** → интерфейс в `Swimm.Application/Abstractions/`, реализация в `Swimm.Infrastructure/Repositories/`, регистрация в `AddInfrastructure()`.
 - **Новая сущность или FK** → всегда добавить миграцию командой выше, не дожидаясь отдельной просьбы.
 - **Контроллеры** не должны ссылаться на `SwimmDbContext` или любые Infrastructure-типы напрямую.
-- **Новый/изменённый API-эндпоинт** → обновить `server/Swimm.API/wwwroot/admin/api.html`.
-- **Изменение `GET /api/admin/db-schema`** → обновить `server/Swimm.API/wwwroot/admin/db.html`.
+- **Новый/изменённый API-эндпоинт** → обновить страницу-справочник админки
+  `server/Swimm.API/Pages/Admin/Api.cshtml` и её описание `docs/admin-pages/api.md`.
+  (Старых `wwwroot/admin/*.html` больше нет — админка целиком на Razor Pages.)
+- **Изменение `GET /api/admin/db-schema`** → обновить `server/Swimm.API/Pages/Admin/Db.cshtml`
+  и `docs/admin-pages/db.md`.
+- **Новая страница админки** → завести `docs/admin-pages/<route>.md` и строку в
+  `docs/admin-pages/README.md` — это часть definition of done.
 - **Кириллица битая (`?`)** в C#/SQL/XML-summary → переписать по смыслу на корректный русский.
 
 ### Dev Workflow
@@ -119,8 +124,8 @@ dotnet run --project server/Swimm.API -- --migrate
 # API (Debug — Smart App Control обходится через dotnet dll, не apphost):
 dotnet run --project server/Swimm.API
 
-# PostgreSQL:
-docker compose up -d   # postgres:16, хост-порт 5445 (внутри контейнера 5432)
+# PostgreSQL (compose-файл лежит в server/, не в корне):
+docker compose -f server/docker-compose.yml up -d   # postgres:16, хост-порт 5445 (внутри 5432)
 
 # Google OAuth:  server/Swimm.API/appsettings.Development.json  (gitignored)
 ```

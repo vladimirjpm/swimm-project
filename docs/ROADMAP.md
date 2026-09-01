@@ -329,41 +329,41 @@ Razor + Tailwind, Competitions/Categories CRUD, фоновый импорт.)
 страницей-агрегатом. Дизайн и спека: `docs/tasks/hubgroups-phase1-2-sonnet.md`.
 **Модель ролей/участия (зафиксированные решения) — `docs/hubgroups-architecture.md`.**
 
-- ☑ 8.1. Схема: `HubGroup`/`HubGroupMember` (бизнес-таблицы, grant `swimm_ro`), миграция
+- ✅ 8.1. Схема: `HubGroup`/`HubGroupMember` (бизнес-таблицы, grant `swimm_ro`), миграция
   `AddHubGroups`; настройки `HubGroupCreationPolicy`/`HubGroupMaxPerUser`/`HubGroupVisibility`
   с enum-валидацией.
-- ☑ 8.2. Админ-CRUD `/Admin/HubGroups`: форма группы (slug-автогенерация, ссылки, привязка
+- ✅ 8.2. Админ-CRUD `/Admin/HubGroups`: форма группы (slug-автогенерация, ссылки, привязка
   к клубу), участники с ролями member/captain/coach и поиском по справочнику.
-- ☑ 8.3. Публичный API: `GET /api/hub-groups` (ETag-кэш, ключ включает Visibility),
+- ✅ 8.3. Публичный API: `GET /api/hub-groups` (ETag-кэш, ключ включает Visibility),
   `GET /api/hub-groups/{slug}` — инфо + участники + 25 последних заплывов + «рекорды группы»
   (лучшее время по оси стиль+дистанция+бассейн+пол, без эстафет/DSQ); инвалидация кэша
   из админ-CRUD.
-- ☑ 8.4. Клиент `groups.html` (+ пункт Groups в хедере): список карточек, страница группы;
+- ✅ 8.4. Клиент `groups.html` (+ пункт Groups в хедере): список карточек, страница группы;
   виртуальная группа «Моё избранное» (`/api/hub-groups/favorites`, `[Authorize]`) — тот же
   экран поверх `Sys_UserFavorites`.
-- ☑ 8.5. Внутренний зачёт группы: сезонный рейтинг участников по клубным очкам
+- ✅ 8.5. Внутренний зачёт группы: сезонный рейтинг участников по клубным очкам
   (`ClubPointsRule`/`Entry`, правило по дате+scope; DSQ/эстафеты не в счёте), сезон
   с 1 сентября (`season_label`), поле `standings` в `HubGroupDetailsDto`, карточка
   **Season standings** на странице группы. Работает и для favorites. «Ближайшие старты»
   отложены до фазы 6 (будущих соревнований в БД нет).
-- ☑ 8.6. Самообслуживание: enforcement `CreationPolicy=coach/any` + лимит `HubGroupMaxPerUser`
+- ✅ 8.6. Самообслуживание: enforcement `CreationPolicy=coach/any` + лимит `HubGroupMaxPerUser`
   по владельцу; пользовательский API `[Authorize]` (создать/править/удалить свою группу,
   участники, со-тренеры) поверх общей логики с `HubGroupAdminService`; со-тренеры
   (`Sys_HubGroupManagers`, права проверяются в одном хелпере); приватность per-group
   (владелец/со-тренер видят свою скрытую группу через rw-контекст); клиентская панель
   «Моя группа». Заявки на вступление вынесены из скоупа.
-- ☑ 8.7. Официальные клубные группы: `HubGroup.IsOfficial` (одна на клуб), заявки
+- ✅ 8.7. Официальные клубные группы: `HubGroup.IsOfficial` (одна на клуб), заявки
   `Sys_HubGroupClubRequests`, админ-одобрение (транзакция: official+ClubId+роль Coach+email),
   бейдж «Official Group of {Club}». Термин «со-тренер» упразднён → **админы группы**
   (`Sys_HubGroupAdmins`, рефактор из `Sys_HubGroupManagers`).
-- ☑ 8.8. Участники-аккаунты: `Sys_HubGroupUserMembers` (приватно), самозапись в публичные
+- ✅ 8.8. Участники-аккаунты: `Sys_HubGroupUserMembers` (приватно), самозапись в публичные
   группы (`Status='active'`), добавление владельцем/админом по email; списки «владею/админю»
   и «участвую» раздельно.
-- ☑ 8.9. Локальные пловцы и приватные тренировки: `Swimmer.Origin='isr'|'local'` (фантом =
+- ✅ 8.9. Локальные пловцы и приватные тренировки: `Swimmer.Origin='isr'|'local'` (фантом =
   обычный Swimmer), тренировки в `Sys_TrainingSessions`/`Sys_TrainingResults` (НЕ Results);
   единый хаб `results_main.html?group=<slug>&tab=trainings|competitions` (доступ к тренировкам
   решает сервер: владелец/админ/участник-аккаунт).
-- ☑ 8.10. Шапка хаба (вариант 1) + галерея группы: богатая шапка из `HubGroupDetails`
+- ✅ 8.10. Шапка хаба (вариант 1) + галерея группы: богатая шапка из `HubGroupDetails`
   (иконка, official-бейдж, links-чипы, счётчик) с табами Overview/Members/Records (ссылки на
   groups.html) и Competitions/🔒Trainings (локальный toggle; Activity-фильтр в group-режиме
   убран — дублировал toggle); `Sys_HubGroupMedia` — медиа-ссылки (image/video/album,
