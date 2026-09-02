@@ -41,6 +41,14 @@ export interface FilterSelected {
   show_prelims?: boolean;
   // Recalculate positions across all days (best time per swimmer per event)
   is_recalculated?: boolean;
+  /**
+   * Диплинк «заплывы одного пловца в этом протоколе» (`?swimmerId=` в URL,
+   * `routes.competitionSwims`). От `swimmer_scope` отличается тем, что пловец задан явно
+   * и потому работает и гостю: скоуп берёт своих/избранных, а этот — того, на кого
+   * привели со страницы пловца или из H2H. Матчинг — `HelperSwimmer.resultBelongsToSwimmer`
+   * (эстафеты попадают по составу ног). null/undefined — фильтр выключен.
+   */
+  swimmer_id?: number | null;
   // Scope by viewer's swimmers (?filter= в URL, персональная полоса шапки соревнования):
   // 'my' — primary favorite, 'favorites' — все избранные. Только залогиненному.
   swimmer_scope?: 'all' | 'my' | 'favorites';

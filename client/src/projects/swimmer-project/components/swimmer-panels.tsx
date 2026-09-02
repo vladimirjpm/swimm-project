@@ -107,7 +107,7 @@ function CompetitionRow({ meet, swimmerId }: { meet: SwimmerCompetition; swimmer
   return (
     <a
       className="deep-meet-row"
-      href={`/results?competitionId=${meet.competitionId}&tab=swims&swimmerId=${swimmerId}`}
+      href={routes.competitionSwims(meet.competitionId, { swimmerId })}
     >
       <span className="deep-meet-row__date">{meet.date}</span>
       <span className="deep-meet-row__name" dir="auto">
