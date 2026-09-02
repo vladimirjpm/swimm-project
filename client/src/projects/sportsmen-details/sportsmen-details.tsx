@@ -9,13 +9,12 @@ import { useLogligStatus } from '../../hooks/useLogligStatus';
 import Helper from '../../utils/helpers/data-helper'
 import { HelperMedia } from '../../utils/helpers';
 import { routes } from '../../utils/routes';
-import UI_ClubIcon from '../components/mix/club-icon/club-icon';
 import UI_NormativeLevelIcon from '../components/mix/normative-level-icon/normative-level-icon';
 import UI_MedalIcon from '../components/mix/medal-icon/medal-icon';
 import SwimRow from '../components/swim-row/swim-row';
 import UI_PositionBadge from '../components/mix/position-badge/position-badge';
-import UI_FlagEmoji from '../components/mix/flag-icon/flag-icon';
 import UI_RecordCount from '../components/mix/record-count/record-count';
+import UI_SwimmerIdentityCard from '../components/mix/swimmer-identity/swimmer-identity-card';
 import UI_SwimmerGallery from '../components/mix/swimmer-gallery/swimmer-gallery';
 import { GalleryItem } from '../../utils/interfaces/results';
 import { applyCombinedPositions } from '../../utils/helpers/recalculate-positions';
@@ -53,7 +52,9 @@ function SportsmenDetails() {
   const selectedSource = useAppSelector((state) => state.dataSourceSelected);
   const isMastersSource = !!selectedSource?.is_masters;
   const isAwardSource = !!selectedSource?.is_award;
-  const { isAuthenticated, primarySwimmerId, favoriteSwimmerIds, setMeBySwimmer, toggleFavoriteSwimmer } = useFavoritesContext();
+  // Состояние ♡/★ живёт внутри `UI_SwimmerIdentityCard` (общий хук семейства); здесь
+  // остался только флаг «залогинен» — от него зависят «Мои ссылки» и CTA внизу попапа.
+  const { isAuthenticated } = useFavoritesContext();
   const { openLoginModal } = useLoginModal();
 
   // Режим карточки: данные этого соревнования / карьерные (all-time).
@@ -86,9 +87,6 @@ function SportsmenDetails() {
   //console.log('firstResult sportsmen:', firstResult);
 
   const swimmerId = (firstResult as any)?.swimmer_id as number | undefined;
-  const isMe = isAuthenticated && swimmerId != null && swimmerId === primarySwimmerId;
-  const isFav = isAuthenticated && swimmerId != null && favoriteSwimmerIds.has(swimmerId);
-  const canMark = isAuthenticated && swimmerId != null;
   // Гость (фаза 4.5): вместо звезды/сердечка и «Моих ссылок» — компактный CTA «войти».
   const showGuestCta = !isAuthenticated && swimmerId != null;
 
@@ -110,7 +108,6 @@ function SportsmenDetails() {
     setOpenMediaResultId(null);
   }, [filters.selected_name]);
 
-  const base = import.meta.env.BASE_URL;
   const gender = firstResult.event_style_gender || 'female';
   // alpha-3 из данных (ISR…) конвертирует сам UI_FlagEmoji; дефолт — Израиль.
   const countryCode = firstResult.country || 'il';
@@ -121,110 +118,35 @@ function SportsmenDetails() {
         className='section-top flex flex-col w-full max-h-[90vh] rounded-[22px] overflow-hidden border border-[var(--theme-mode-modal-border)]'
         style={{ background: 'var(--theme-mode-surface)', boxShadow: 'var(--theme-mode-modal-shadow)' }}
       >
-          {/* Identity-бар (design_handoff_athlete_card §1): фото 76px + флаг,
-              справа RTL — имя, возраст, чип клуба */}
-          <div className='relative px-[18px] pt-4 pb-3.5 flex gap-3.5 items-center' style={{ background: 'var(--theme-mode-hero-grad)' }}>
-            <div className='flex flex-col items-center gap-2 shrink-0'>
-              <div className='relative'>
-                <img
-                  src={`${base}images/swimmers/default-${gender}.png`}
-                  alt={filters.selected_name}
-                  className='block h-[76px] w-[76px] rounded-full object-cover'
-                  style={{ border: '3px solid var(--theme-primary)', background: '#fff' }}
-                  onError={(e) => {
-                    e.currentTarget.src = `${base}images/swimmers/default-female.png`;
-                  }}
-                />
-                <div className='absolute -bottom-1.5 -right-1' style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.5))' }}>
-                  <UI_FlagEmoji countryCode={countryCode} size={'28x21'} className='rounded' />
-                </div>
-              </div>
-              {/* избранное / «это я» — компактно под фото (фича favorites, вне хендоффа) */}
-              {canMark && (
-                <div className='flex items-center gap-1.5'>
-                  <button
-                    type="button"
-                    onClick={() => toggleFavoriteSwimmer(swimmerId!)}
-                    title={isFav ? 'Remove from favorites' : 'Add to favorites'}
-                    aria-pressed={isFav}
-                    className="w-8 h-8 rounded-full inline-flex items-center justify-center leading-none hover:scale-110 transition-transform"
-                    style={{ background: 'rgba(255,255,255,0.9)', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}
-                  >
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill={isFav ? '#e23b5a' : 'none'} stroke={isFav ? '#e23b5a' : '#9aa3af'} strokeWidth="2">
-                      <path d="M12 21s-7.5-4.6-10-9.3C.4 8.3 2 5 5.2 5c2 0 3.3 1.1 4.1 2.3C10.1 6.1 11.4 5 13.4 5 16.6 5 18.2 8.3 16.6 11.7 14.1 16.4 12 21 12 21z" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMeBySwimmer(swimmerId!)}
-                    title={isMe ? 'This is me — unmark' : 'Mark: this is me'}
-                    aria-pressed={isMe}
-                    className="w-8 h-8 rounded-full inline-flex items-center justify-center leading-none hover:scale-110 transition-transform"
-                    style={{ background: isMe ? '#fff6da' : 'rgba(255,255,255,0.75)', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}
-                  >
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill={isMe ? '#f5b800' : 'none'} stroke={isMe ? '#d99a00' : '#9aa3af'} strokeWidth="1.8" strokeLinejoin="round">
-                      <path d="M12 2.5l2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 21.3l-5.8 3.05 1.1-6.45-4.7-4.6 6.5-.95z" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-              {showGuestCta && (
-                <button
-                  type="button"
-                  onClick={openLoginModal}
-                  title="Sign in to save favorites"
-                  className="w-8 h-8 rounded-full inline-flex items-center justify-center leading-none hover:scale-110 transition-transform"
-                  style={{ background: 'rgba(255,255,255,0.9)', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}
-                >
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9aa3af" strokeWidth="2">
-                    <path d="M12 21s-7.5-4.6-10-9.3C.4 8.3 2 5 5.2 5c2 0 3.3 1.1 4.1 2.3C10.1 6.1 11.4 5 13.4 5 16.6 5 18.2 8.3 16.6 11.7 14.1 16.4 12 21 12 21z" />
-                  </svg>
-                </button>
-              )}
-              {swimmerId != null && (
-                <LogligSuggestBadge
-                  status={logligStatus.status}
-                  profileUrl={logligStatus.profileUrl}
-                  isAuthenticated={isAuthenticated}
-                  suggest={logligStatus.suggest}
-                />
-              )}
-            </div>
-            <div className='flex-1 min-w-0 flex flex-col gap-1.5 items-end'>
-              <div dir='rtl' className='text-xl font-extrabold leading-tight truncate max-w-full' style={{ color: 'var(--theme-mode-text)' }}>
-                {filters.selected_name}
-              </div>
-              <div className='flex items-center gap-2 text-[11px] font-semibold' style={{ color: 'var(--theme-mode-text-muted)' }}>
-                <UI_RecordCount swimmerName={filters.selected_name} />
-                <span>{firstResult.event_style_age} year ({firstResult.birth_year})</span>
-              </div>
-              {/* Диплинк на самостоятельную страницу пловца (swimmer.html?swimmer=<id>). */}
-              {swimmerId != null && (
-                <a
-                  href={routes.swimmer(swimmerId)}
-                  className='text-[11px] font-bold hover:underline'
-                  style={{ color: 'var(--theme-primary)' }}
-                >
-                  Open full profile →
-                </a>
-              )}
-              <div
-                dir='rtl'
-                className='flex items-center gap-2 rounded-full py-1 pl-3.5 pr-[5px] max-w-full'
-                style={{ background: 'var(--theme-mode-input-bg)' }}
-              >
-                <span
-                  className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full p-[2px]'
-                  style={{ background: '#ffffff', boxShadow: '0 0 0 2px color-mix(in srgb, var(--theme-primary) 40%, transparent)' }}
-                >
-                  <UI_ClubIcon clubName={firstResult.club} clubId={firstResult.club_id} iconWidth='full' styleType="icon-notext" />
-                </span>
-                <span className='truncate text-xs font-bold' style={{ color: 'var(--theme-mode-text-secondary)' }}>
-                  {firstResult.club}
-                </span>
-              </div>
-            </div>
-          </div>
+          {/* Identity-бар (design_handoff_athlete_card §1) — общий компонент семейства
+              `UI_SwimmerIdentity*`: тот же «кто это», что в шапке страницы пловца, только
+              в раскладке попапа. Хвосты попапа приезжают слотами: бейдж loglig под
+              аватаром, счётчик рекордов в строке возраста. */}
+          <UI_SwimmerIdentityCard
+            identity={{
+              id: swimmerId ?? null,
+              name: filters.selected_name,
+              birthYear: Number(firstResult.birth_year) || null,
+              // `event_style_age` — возрастная ГРУППА заплыва, она бывает диапазоном
+              // («17-18»): подпись отдаём готовой, а не числом.
+              ageLabel: firstResult.event_style_age
+                ? `${firstResult.event_style_age} year (${firstResult.birth_year})`
+                : null,
+              clubName: firstResult.club,
+              clubId: firstResult.club_id,
+              countryCode,
+              gender,
+            }}
+            meta={swimmerId != null && (
+              <LogligSuggestBadge
+                status={logligStatus.status}
+                profileUrl={logligStatus.profileUrl}
+                isAuthenticated={isAuthenticated}
+                suggest={logligStatus.suggest}
+              />
+            )}
+            extra={<UI_RecordCount swimmerName={filters.selected_name} />}
+          />
 
           {/* Три плитки статистики: Points / Medals / Level — карьерные данные (§2) */}
           <div className='grid grid-cols-3 gap-[7px] px-3.5 pt-2'>

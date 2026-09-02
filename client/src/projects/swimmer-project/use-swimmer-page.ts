@@ -101,6 +101,11 @@ export interface SwimmerPersonalBest {
   nationalAgeRecordTime?: string | null;
   nationalAgeRecordQuality?: SwimQualityDto | null;
   nationalAgeKey?: string | null;
+  /**
+   * Чем мерили: «age 14», «masters 45-49», «open». У взрослых эталон — мастерская полоса
+   * или ОТКРЫТЫЙ рекорд страны, и подпись «national age record» там была бы неправдой.
+   */
+  nationalRecordScope?: string | null;
 }
 
 /**
@@ -157,6 +162,100 @@ export interface SwimmerProgress {
   distance: string;
   poolType: string;
   points: SwimmerProgressPoint[];
+}
+
+/** Строка выдачи поиска пловцов (селектор соперника таба H2H). */
+export interface SwimmerSearchHit {
+  id: number;
+  /** Имя уже выбрано сервером по правилу проекта: иврит, английский — фоллбеком. */
+  name: string;
+  /** 0 — года рождения в базе нет. */
+  birthYear: number;
+  gender?: string | null;
+  clubName?: string | null;
+}
+
+/** Одна сторона сравнения — мини-карточка шапки и её статы. */
+export interface SwimmerCompareSide {
+  id: number;
+  name: string;
+  birthYear?: number | null;
+  gender?: string | null;
+  clubName?: string | null;
+  /** Возраст в сезоне сравнения; null — режим карьеры или года рождения нет. */
+  ageInSeason?: number | null;
+  /** Сколько дисциплин пловец возглавляет среди сверстников; за карьеру всегда 0. */
+  seasonBests: number;
+  medals: MedalCounts;
+  /** Лучшие очки FINA за один заплыв периода. */
+  bestPoints: number;
+  /**
+   * Рекорды по классам: национальный, возрастные ступени, мастерские полосы. ⚠ Всегда за
+   * карьеру: у записи справочника нет сезона, и карусель на эти цифры не влияет.
+   */
+  records?: { national: number; age: number; masters: number };
+}
+
+/** Лучший заплыв одной стороны на одной дистанции за период сравнения. */
+export interface SwimmerCompareSwim {
+  time?: string | null;
+  timeMs?: number | null;
+  /** Признак качества времени — пуст, пока в сравнение идут только зачётные заплывы. */
+  quality?: SwimQualityDto | null;
+  points?: number | null;
+  date: string;
+  competition?: CompetitionRef | null;
+  resultId: number;
+  /** Бейдж SB: быстрейший среди сверстников в этой дисциплине (только внутри сезона). */
+  isSeasonBest?: boolean;
+  /**
+   * Рекорд, который бьёт это время: national / age / masters, либо null. Класс ОДИН —
+   * старший (national > age > masters): два бейджа на одном времени не показываем.
+   */
+  record?: { kind: 'national' | 'age' | 'masters'; scope?: string | null } | null;
+}
+
+/** Пара времён одной дистанции в ОДНОМ бассейне — единица сравнения. */
+export interface SwimmerComparePool {
+  poolType: string;
+  mine?: SwimmerCompareSwim | null;
+  rival?: SwimmerCompareSwim | null;
+  /** «Моё минус соперника», мс: отрицательное — быстрее хозяин страницы. null — плавал один. */
+  deltaMs?: number | null;
+}
+
+/**
+ * Строка сравнения — стиль × дистанция, бассейны внутри. `key` — стиль|дистанция БЕЗ пола
+ * (в отличие от `disciplineKey` остальных табов): иначе у разнополой пары не совпала бы ни
+ * одна дистанция. Бассейна в ключе тоже нет: «50 брасс» — одна дистанция, но 25м и 50м
+ * сравниваются порознь, каждый своей парой времён.
+ */
+export interface SwimmerCompareRow {
+  key: string;
+  styleId: number;
+  stroke?: string | null;
+  distance: string;
+  pools: SwimmerComparePool[];
+}
+
+export interface SwimmerCompare {
+  season: number | null;
+  label: string;
+  mine: SwimmerCompareSide;
+  rival: SwimmerCompareSide;
+  rows: SwimmerCompareRow[];
+  /** Сколько пар «дистанция × бассейн» плавали оба — только на них есть разрыв. */
+  sharedCount: number;
+  mineFaster: number;
+  rivalFaster: number;
+  ties: number;
+  /**
+   * Сезон, за который посчитаны SB. В режиме ∞ он НЕ равен периоду сравнения: места среди
+   * сверстников живут внутри сезона, поэтому за карьеру считаются за витринный — и подпись
+   * обязана это сказать, иначе цифра читается как «за всё время».
+   */
+  seasonBestSeason?: number | null;
+  seasonBestLabel?: string | null;
 }
 
 /**
@@ -278,6 +377,39 @@ export const useSwimmerSeasonRanks = (id: number | null, season: number | null, 
     id != null && season != null && enabled
       ? `/api/swimmers/${id}/season-ranks?season=${seasonParam(season)}`
       : null);
+
+/**
+ * Таб H2H: сравнение с выбранным пловцом за тот же период, что показывают остальные табы.
+ * Без соперника запроса нет — панель до выбора показывает только поиск.
+ */
+export const useSwimmerCompare = (
+  id: number | null, rivalId: number | null, season: number | null, enabled = true,
+) =>
+  useJson<SwimmerCompare>(
+    id != null && rivalId != null && enabled
+      ? `/api/swimmers/${id}/compare?rivalId=${rivalId}&season=${seasonParam(season)}`
+      : null);
+
+/**
+ * Подсказки поиска пловцов. Запрос уходит через паузу после последней буквы: селектор
+ * дёргается на каждый символ, а ILIKE «%x%» по всем именам — не тот запрос, который стоит
+ * слать по десять раз на слово. Ответы кэширует общий кэш файла, поэтому возврат к уже
+ * набранному запросу мгновенный.
+ */
+export function useSwimmerSearch(query: string, debounceMs = 250) {
+  const [debounced, setDebounced] = useState('');
+
+  useEffect(() => {
+    const q = query.trim();
+    // Один символ сервер и так не ищет — не тратим на него запрос.
+    if (q.length < 2) { setDebounced(''); return; }
+    const timer = setTimeout(() => setDebounced(q), debounceMs);
+    return () => clearTimeout(timer);
+  }, [query, debounceMs]);
+
+  return useJson<SwimmerSearchHit[]>(
+    debounced ? `/api/swimmers/search?q=${encodeURIComponent(debounced)}` : null);
+}
 
 export const useSwimmerProgress = (id: number | null, disciplineKey: string | null) =>
   useJson<SwimmerProgress>(

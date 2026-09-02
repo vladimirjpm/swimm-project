@@ -452,8 +452,11 @@ API, решения, «как вернуться»). Дизайн-материа
 - ✅ 10.2. **Спортсмен: API** — профиль с сезонами, `summary`, `best-times`, `personal-bests`,
   `progress` поверх общего шва `ISwimmerPageRepository` (этапы A1–A4).
   Попутно: `/api/athletes/career` научился искать **по id**, имя осталось алиасом для попапа.
-- ✅ 10.3. **Страница спортсмена** по макету 2a: карусель сезонов + шесть табов
-  (Season · Results · Records & PB · Progress · Media · History), этапы A5–A6.
+- ✅ 10.3. **Страница спортсмена** по макету 2a: карусель сезонов + табы, этапы A5–A6.
+  Сначала было шесть (Season · Results · Records & PB · Progress · Media · History), сейчас
+  четыре — **Season · Results · Media · H2H**: Records & PB и Progress стали фильтрами
+  внутри Results, а History снят (он дублировал Season в режиме ∞) и заменён head-to-head — сравнением
+  с выбранным пловцом. Подробности — `docs/plans/athlete-page-plan.md` §11–12.
 - ✅ 10.4. **Клуб: идентичность.** Новый ресурс `/clubs/{id}` — html-точка входа +
   **три зеркала контракта** (`routes.ts`, `cleanUrlRewrite` в `vite.config.js`,
   rewrite-middleware в `Program.cs`). Сейчас `club` — фильтр в query, не идентичность.
@@ -624,6 +627,12 @@ API, решения, «как вернуться»). Дизайн-материа
   таблицы результатов, `SwimRow`, карточки Overview, таб Clubs. Контракт и решения —
   [competition-overview-cards.md](competition-overview-cards.md),
   [ui-components.md](ui-components.md).
+- ✅ 13.6. **Head-to-head одним экраном на двух местах** (02.09.2026): таб `?tab=h2h`
+  страницы пловца и отдельная страница `/h2h?a=&b=&season=` — это ОДИН компонент
+  `UI_H2HCompare`, а не две вёрстки. Слот стороны — данные (`onClear: null` = «сменить
+  нельзя»), ширину экран решает по своему контейнеру (`@container`), а не по вьюпорту.
+  План и решения — [plans/h2h-page-plan.md](plans/h2h-page-plan.md), устройство таба —
+  [plans/athlete-page-plan.md](plans/athlete-page-plan.md) §12.
 
 ## Хостинг — решение (2026-07-15, зафиксировано, не реализовано)
 

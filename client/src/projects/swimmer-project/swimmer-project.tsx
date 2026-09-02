@@ -13,14 +13,14 @@ import Helper from '../../utils/helpers/data-helper';
 import { seasonLabel } from '../../utils/helpers/season-helper';
 import { useSwimmerProfile } from './use-swimmer-profile';
 import {
-  useSwimmerBestTimes, useSwimmerPersonalBests, useSwimmerProgress, useSwimmerSeasonRanks,
-  useSwimmerSummary,
+  useSwimmerBestTimes, useSwimmerCompare, useSwimmerPersonalBests, useSwimmerProgress,
+  useSwimmerSearch, useSwimmerSeasonRanks, useSwimmerSummary,
 } from './use-swimmer-page';
 import SwimmerHero from './components/swimmer-hero';
 import SwimmerMediaPanel from './components/swimmer-media-panel';
 import SwimmerUpcomingStarts from './components/swimmer-upcoming-starts';
 import {
-  HistoryPanel, holdsSeasonBest, PanelEmpty, PersonalBestsPanel, ProgressPanel, ResultsFilters,
+  H2HPanel, holdsSeasonBest, PanelEmpty, PersonalBestsPanel, ProgressPanel, ResultsFilters,
   ResultsPanel, SeasonBestPanel, SeasonPanel, type ResultsView,
 } from './components/swimmer-panels';
 
@@ -29,7 +29,11 @@ import {
  * (`!design_handoff/design_handoff_athlete_page/`, план docs/plans/athlete-page-plan.md).
  *
  * Устройство: Hero с KPI → ОДНА карусель сезонов на всю страницу → ЧЕТЫРЕ плитки-таба
- * (Season · Results · Media · History) → панель. Сезон выбирается один раз, все табы читают его.
+ * (Season · Results · Media · H2H) → панель. Сезон выбирается один раз, все табы читают его.
+ *
+ * Таба History здесь больше нет (2026-09-01): он показывал ТОТ ЖЕ список стартов, что Season
+ * в режиме ∞, отличаясь одной группировкой по сезонам, — она переехала внутрь Season, а
+ * плитку занял H2H (head-to-head).
  *
  * Внутри Results — полоса фильтров вместо отдельных табов: Best time · Season best ·
  * Records · Progress. Раньше «Records & PB» и «Progress» были плитками верхнего уровня;
@@ -41,8 +45,8 @@ import {
  * routes.ts — в путь только идентичность ресурса. Поэтому всё это переживает перезагрузку.
  */
 
-type SwimmerTab = 'season' | 'results' | 'media' | 'history';
-const TABS: SwimmerTab[] = ['season', 'results', 'media', 'history'];
+type SwimmerTab = 'season' | 'results' | 'media' | 'h2h';
+const TABS: SwimmerTab[] = ['season', 'results', 'media', 'h2h'];
 const isTab = (v: string | null | undefined): v is SwimmerTab =>
   v != null && (TABS as string[]).includes(v);
 
@@ -56,6 +60,20 @@ const isView = (v: string | null | undefined): v is ResultsView =>
  * запрошенного вида значит тихо соврать.
  */
 const LEGACY_TAB_VIEW: Record<string, ResultsView> = { pb: 'records', progress: 'progress' };
+
+/**
+ * Снятые табы, у которых есть НАСЛЕДНИК: `?tab=history` открывает Season за всю карьеру —
+ * ровно то, что History и показывал. Ссылки на него разошлись, и молча открывать Results
+ * (умолчание) значило бы тихо потерять запрошенный экран.
+ */
+const LEGACY_TAB_ALIAS: Record<string, SwimmerTab> = { history: 'season', rivals: 'h2h' };
+
+/** `?rival=` — с кем сравнивать в табе H2H. Мусор и «сам с собой» → соперника нет. */
+function rivalFromQuery(selfId: number | null): number | null {
+  const raw = new URLSearchParams(window.location.search).get('rival');
+  const n = raw != null ? Number(raw) : NaN;
+  return Number.isFinite(n) && n > 0 && n !== selfId ? n : null;
+}
 
 /** `?season=` в состояние: «all» и мусор → null (карьера), число → сезон. */
 function seasonFromQuery(): number | null | undefined {
@@ -87,8 +105,10 @@ function SwimmerProject() {
 
   const [tab, setTab] = useState<SwimmerTab>(() => {
     const t = new URLSearchParams(window.location.search).get('tab');
-    // Снятые табы (`?tab=pb`) тоже приземляются на Results — вид подхватит `view` ниже.
-    return isTab(t) ? t : 'results';
+    if (isTab(t)) return t;
+    // Снятый таб с наследником (`?tab=history` → Season за карьеру); `?tab=pb` и
+    // `?tab=progress` приземляются на Results — вид подхватит `view` ниже.
+    return (t != null && LEGACY_TAB_ALIAS[t]) || 'results';
   });
 
   const [view, setView] = useState<ResultsView>(() => {
@@ -100,7 +120,19 @@ function SwimmerProject() {
   });
 
   // undefined — сезон ещё не выбран (ждём витринный из профиля), null — режим All.
-  const [season, setSeason] = useState<number | null | undefined>(seasonFromQuery);
+  const [season, setSeason] = useState<number | null | undefined>(() => {
+    const fromQuery = seasonFromQuery();
+    if (fromQuery !== undefined) return fromQuery;
+    // Старая ссылка на History — это «за всю карьеру»: без этого она открывала бы список
+    // одного сезона под тем же адресом.
+    const legacy = new URLSearchParams(window.location.search).get('tab');
+    return legacy != null && LEGACY_TAB_ALIAS[legacy] ? null : undefined;
+  });
+
+  // Соперник таба H2H живёт в адресе (`?rival=`) по той же причине, что сезон и таб:
+  // сравнение — это то, чем делятся ссылкой.
+  const [rivalId, setRivalId] = useState<number | null>(() => rivalFromQuery(swimmerId));
+  const [rivalQuery, setRivalQuery] = useState('');
 
   // Умолчание — ВИТРИННЫЙ сезон: до зимних чемпионатов это прошлый сезон, а не свежий
   // (docs/season-boundary-rule.md). Сервер помечает его isDisplayDefault.
@@ -110,11 +142,17 @@ function SwimmerProject() {
     setSeason(preferred.season);
   }, [profile, season]);
 
-  const writeQuery = (next: { tab?: SwimmerTab; season?: number | null; view?: ResultsView }) => {
+  const writeQuery = (
+    next: { tab?: SwimmerTab; season?: number | null; view?: ResultsView; rival?: number | null },
+  ) => {
     const url = new URL(window.location.href);
     if (next.tab !== undefined) {
       if (next.tab === 'results') url.searchParams.delete('tab');
       else url.searchParams.set('tab', next.tab);
+    }
+    if (next.rival !== undefined) {
+      if (next.rival == null) url.searchParams.delete('rival');
+      else url.searchParams.set('rival', String(next.rival));
     }
     if (next.view !== undefined) {
       // Умолчания в адресе не держим: `?view=best` это тот же адрес, что без него.
@@ -131,13 +169,25 @@ function SwimmerProject() {
   const handleView = (next: ResultsView) => { setView(next); writeQuery({ view: next }); };
   const handleSeason = (next: number | null) => { setSeason(next); writeQuery({ season: next }); };
 
+  const handleRival = (next: number | null) => {
+    setRivalId(next);
+    // Строку поиска чистим вместе с выбором: она уже сделала своё дело, а оставленный
+    // запрос снова раскрывал бы выдачу поверх таблицы на следующем кадре.
+    setRivalQuery('');
+    writeQuery({ rival: next });
+  };
+
   // Сезон ещё не определён — запросы не шлём: иначе первый кадр уехал бы за карьеру,
   // а вторым пришёл бы сезон, и панель дважды перерисовалась бы другими цифрами.
   const seasonReady = season !== undefined;
   const activeSeason = seasonReady ? season : null;
 
   const summary = useSwimmerSummary(swimmerId, activeSeason, seasonReady);
-  const career = useSwimmerSummary(swimmerId, null, seasonReady && tab === 'history');
+
+  // Сравнение и поиск живут в табе H2H: пока его не открыли, запросов нет.
+  const onH2H = tab === 'h2h';
+  const compare = useSwimmerCompare(swimmerId, rivalId, activeSeason, seasonReady && onH2H);
+  const rivalHits = useSwimmerSearch(onH2H && rivalId == null ? rivalQuery : '');
   const bestTimes = useSwimmerBestTimes(swimmerId, activeSeason, seasonReady);
 
   const onResults = tab === 'results';
@@ -304,10 +354,12 @@ function SwimmerProject() {
                   },
                   { id: 'media', icon: '▶', label: 'Media', sub: 'photos and video' },
                   {
-                    id: 'history',
-                    icon: '🗓',
-                    label: 'History',
-                    sub: profile.seasons?.length ? `${profile.seasons.length} seasons` : 'career',
+                    id: 'h2h',
+                    icon: '⚔',
+                    label: 'H2H',
+                    sub: compare.data
+                      ? `vs ${compare.data.rival.name}`
+                      : 'compare with a swimmer',
                   },
                 ]}
               />
@@ -374,8 +426,21 @@ function SwimmerProject() {
                   </>
                 )}
                 {seasonReady && tab === 'media' && <SwimmerMediaPanel swimmerId={profile.id} />}
-                {seasonReady && tab === 'history' && (
-                  <HistoryPanel career={career.data} swimmerId={profile.id} state={career} />
+                {seasonReady && tab === 'h2h' && (
+                  <H2HPanel
+                    compare={compare.data}
+                    query={rivalQuery}
+                    onQuery={setRivalQuery}
+                    hits={rivalHits.data}
+                    hitsState={rivalHits}
+                    onPick={handleRival}
+                    onClear={() => handleRival(null)}
+                    rivalId={rivalId}
+                    swimmerId={profile.id}
+                    profileName={profile.fullName}
+                    season={activeSeason}
+                    state={compare}
+                  />
                 )}
               </div>
             </div>

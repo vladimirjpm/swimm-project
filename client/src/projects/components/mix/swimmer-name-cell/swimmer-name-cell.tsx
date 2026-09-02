@@ -1,6 +1,7 @@
 import React from 'react';
 import { RelaySwimmer } from '../../../../utils/interfaces/results';
 import UI_ClubIcon from '../club-icon/club-icon';
+import UI_RecordBadge, { type RecordKind } from '../record-badge/record-badge';
 import '../text-effect/text-effect.css';
 
 interface SwimmerNameCellProps {
@@ -28,7 +29,10 @@ interface SwimmerNameCellProps {
   /** Классы блока «имя/клуб». По умолч. flex-1 (иконка к краю); задай фикс-ширину
    *  (напр. 'w-[120px] min-w-0'), чтобы иконка встала столбиком близко к тексту. */
   nameBlockClassName?: string;
+  /** Пловец ДЕРЖИТ рекорд этой дистанции (матч по имени в справочнике). */
   isRecordHolder?: boolean;
+  /** Класс рекорда: мастерская полоса или возрастная ступень — справочники у них разные. */
+  recordKind?: RecordKind;
   /** primary-избранное («это я») — бейдж ★ ME рядом с именем */
   isMe?: boolean;
 }
@@ -53,6 +57,7 @@ const UI_SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
   rowJustify = 'start',
   nameBlockClassName = 'min-w-0 flex-1',
   isRecordHolder = false,
+  recordKind = 'age',
   isMe = false,
 }) => {
   const displayName = isRelay
@@ -117,15 +122,12 @@ const UI_SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
       className={`${className} ${onClick ? 'cursor-pointer' : ''}`}
       onClick={onClick ? (e) => { e.stopPropagation(); onClick(); } : undefined}
     >
+      {/* Держатель рекорда этой дистанции. Пометка «HOLDER» обязательна: бейдж стоит у
+          ИМЕНИ в общем списке заплывов, и без неё «REC·M» читается как «этот заплыв —
+          рекорд», хотя речь про человека. */}
       {isRecordHolder && (
         <div className="mb-1 flex">
-          <span
-            title="Holds the record for this event"
-            className="flex-shrink-0 whitespace-nowrap rounded-lg border px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide"
-            style={{ color: '#b07d0a', borderColor: '#e8c66a', background: 'var(--theme-mode-surface)' }}
-          >
-            👑 RECORD
-          </span>
+          <UI_RecordBadge kind={recordKind} isHolder />
         </div>
       )}
       {showRightClubIcon ? (

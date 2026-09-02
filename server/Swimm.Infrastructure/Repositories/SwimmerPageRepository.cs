@@ -233,6 +233,72 @@ public class SwimmerPageRepository : ISwimmerPageRepository
         return best;
     }
 
+    public async Task<IReadOnlyList<SwimmerSearchHitDto>> SearchSwimmersAsync(string query, int limit)
+    {
+        var q = (query ?? string.Empty).Trim();
+        // Один символ находит пол-базы: выдача бесполезна, а ILIKE «%x%» идёт сканом.
+        if (q.Length < 2) return [];
+
+        // Слова запроса ищутся КАЖДОЕ в любом из четырёх полей имени: «כהן דניאל» и
+        // «Daniel Cohen» должны находить одного и того же пловца независимо от порядка.
+        var words = q.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (words.Length == 0) return [];
+
+        var take = Math.Clamp(limit, 1, 30);
+        var key = $"swimmer-search:{take}:{string.Join('', words).ToLowerInvariant()}";
+        var cached = await _cache.GetAsync<List<SwimmerSearchHitDto>>(key);
+        if (cached is not null) return cached;
+
+        var swimmers = _read.Swimmers.AsNoTracking();
+        foreach (var word in words)
+        {
+            var pattern = $"%{word}%";
+            swimmers = swimmers.Where(s =>
+                EF.Functions.ILike(s.LastName, pattern)
+                || EF.Functions.ILike(s.FirstName, pattern)
+                || EF.Functions.ILike(s.LastNameEn, pattern)
+                || EF.Functions.ILike(s.FirstNameEn, pattern));
+        }
+
+        var rows = await swimmers
+            // Составные «пловцы» из ног эстафет (имя списком через запятую) — не люди:
+            // страницы у них нет, и сравнивать с ними нечего. Тот же отсев, что в поиске
+            // участников группы (HubGroupAdminService.SearchSwimmersAsync).
+            .Where(s => !EF.Functions.ILike(s.LastName, "%,%") && !EF.Functions.ILike(s.FirstName, "%,%"))
+            .OrderBy(s => s.LastName).ThenBy(s => s.FirstName)
+            .Take(take)
+            .Select(s => new
+            {
+                s.Id,
+                s.FirstName,
+                s.LastName,
+                s.FirstNameEn,
+                s.LastNameEn,
+                s.BirthYear,
+                s.Gender,
+                ClubName = s.Club != null ? s.Club.Name : null,
+            })
+            .ToListAsync();
+
+        var hits = rows.Select(s =>
+        {
+            // Имя на витрине ивритское, английское — только фоллбеком (правило проекта).
+            var he = $"{s.FirstName} {s.LastName}".Trim();
+            var en = $"{s.FirstNameEn} {s.LastNameEn}".Trim();
+            return new SwimmerSearchHitDto
+            {
+                Id = s.Id,
+                Name = he.Length > 0 ? he : en,
+                BirthYear = s.BirthYear,
+                Gender = s.Gender,
+                ClubName = s.ClubName,
+            };
+        }).ToList();
+
+        await _cache.SetAsync(key, hits, Ttl);
+        return hits;
+    }
+
     public async Task<IReadOnlyList<PeerSeasonBest>> GetAgeCohortSeasonBestsAsync(
         int seasonStartYear, int birthYear)
     {
@@ -281,22 +347,31 @@ public class SwimmerPageRepository : ISwimmerPageRepository
         return rows;
     }
 
-    public async Task<IReadOnlyDictionary<string, NationalAgeRecordRow>> GetNationalAgeRecordsAsync(
-        string? regionCode, string? gender, int age)
-    {
-        var region = string.IsNullOrWhiteSpace(regionCode) ? "ISR" : regionCode.Trim().ToUpperInvariant();
-        var sex = NormalizeGender(gender);
-        if (sex is null || age <= 0) return new Dictionary<string, NationalAgeRecordRow>();
+    public Task<IReadOnlyDictionary<string, NationalAgeRecordRow>> GetNationalAgeRecordsAsync(
+        string? regionCode, string? gender, int age) =>
+        age <= 0
+            ? Task.FromResult<IReadOnlyDictionary<string, NationalAgeRecordRow>>(
+                new Dictionary<string, NationalAgeRecordRow>())
+            : GetNationalRecordsAsync(regionCode, gender, "age", age.ToString());
 
-        var ageKey = age.ToString();
-        var key = $"national-age-records:{region}:{sex}:{ageKey}";
+    public async Task<IReadOnlyDictionary<string, NationalAgeRecordRow>> GetNationalRecordsAsync(
+        string? regionCode, string? gender, string category, string ageKey)
+    {
+        var region = NormalizeRegion(regionCode);
+        var sex = NormalizeGender(gender);
+        if (sex is null || string.IsNullOrWhiteSpace(category)) {
+            return new Dictionary<string, NationalAgeRecordRow>();
+        }
+
+        ageKey ??= string.Empty;
+        var key = $"national-records:{region}:{sex}:{category}:{ageKey}";
         var cached = await _cache.GetAsync<Dictionary<string, NationalAgeRecordRow>>(key);
         if (cached is not null) return cached;
 
         var records = await _read.Records.AsNoTracking()
             .Where(r => r.RegionType == "country"
                         && r.RegionCode == region
-                        && r.Category == "age"
+                        && r.Category == category
                         && r.AgeKey == ageKey
                         && r.Gender == sex)
             .Select(r => new { r.Style, r.Distance, r.PoolType, r.Time, r.HolderName })
@@ -318,7 +393,7 @@ public class SwimmerPageRepository : ISwimmerPageRepository
         var issues = (await _read.RecordIssues.AsNoTracking()
                 .Where(i => i.RegionType == "country"
                             && i.RegionCode == region
-                            && i.Category == "age"
+                            && i.Category == category
                             && i.Gender == sex
                             && (i.Status == RecordIssueStatuses.Open
                                 || i.Status == RecordIssueStatuses.Reported
@@ -361,6 +436,27 @@ public class SwimmerPageRepository : ISwimmerPageRepository
     /// подавляющего большинства и «M»/«F» у горстки строк (урок страницы клуба: фильтр по
     /// «M»/«F» вернул полтора десятка пловцов на всю базу).
     /// </summary>
+    /// <summary>
+    /// Код страны к виду справочника рекордов (alpha-3).
+    ///
+    /// ⚠ СТОРОЖ, а не рабочая логика. В `Countries` жили ДВА Израиля — «ISR» (id 10) и «IL»
+    /// (id 111), на второй смотрели 791 пловец и 3466 результатов, и рекорды им не
+    /// находились вовсе: они лежат под «ISR» (поймано 02.09.2026 на пловце 62098). Страны
+    /// склеены в тот же день (docs/data-integrity.md §14), но правило проекта —
+    /// **alpha-3 в данных, alpha-2 только флагам** — держится не схемой, а договорённостью,
+    /// поэтому приведение остаётся: заведётся alpha-2 снова — витрина не онемеет.
+    /// </summary>
+    private static string NormalizeRegion(string? regionCode)
+    {
+        var code = (regionCode ?? string.Empty).Trim().ToUpperInvariant();
+        return code switch
+        {
+            "" => "ISR",
+            "IL" => "ISR",
+            _ => code,
+        };
+    }
+
     private static string? NormalizeGender(string? gender) => gender?.Trim().ToLowerInvariant() switch
     {
         "male" or "m" => "male",

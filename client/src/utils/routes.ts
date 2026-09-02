@@ -97,7 +97,62 @@ export const routes = {
     if (q.swimmerId != null) params.set('swimmer', String(q.swimmerId));
     return `/season-best?${params.toString()}`;
   },
+
+  /**
+   * Страница head-to-head: сравнение ДВУХ пловцов бок о бок (`docs/plans/h2h-page-plan.md`).
+   * Тот же экран, что таб `?tab=h2h` страницы пловца, но выбираются оба.
+   *
+   * Всё в query по той же причине, что у `/season-best`: идентичности в пути у сравнения
+   * нет — адресом его делает пара, а «ещё никто не выбран» тоже законный адрес (`/h2h`),
+   * и в пути он потребовал бы второго формата.
+   */
+  h2h: (q: { a?: number | null; b?: number | null; season?: number | null | 'all' } = {}) => {
+    const params = new URLSearchParams();
+    if (q.a != null) params.set('a', String(q.a));
+    if (q.b != null) params.set('b', String(q.b));
+    // `season=all` — режим карьеры; отсутствие параметра означает «сезон ещё не выбран»,
+    // и это РАЗНЫЕ состояния (то же различие, что у карусели страницы пловца).
+    if (q.season != null) params.set('season', q.season === 'all' ? 'all' : String(q.season));
+    const query = params.toString();
+    return query ? `/h2h?${query}` : '/h2h';
+  },
 };
+
+/**
+ * Адрес страницы `/h2h`, разобранный из query. Живёт рядом с генератором намеренно: писать
+ * и читать один адрес в разных местах значит завести два контракта.
+ *
+ * Мусор даёт null, а не бросает: это витрина, а не форма. `a === b` тоже даёт null во
+ * втором слоте — сравнение с самим собой не значит ничего.
+ */
+export interface H2HQuery {
+  /** Левый пловец; null — слот пуст. */
+  a: number | null;
+  /** Правый пловец; null — слот пуст. */
+  b: number | null;
+  /** Год начала сезона; null — «за карьеру» (`season=all`); undefined — не задан. */
+  season: number | null | undefined;
+}
+
+export function parseH2HQuery(search = window.location.search): H2HQuery {
+  const params = new URLSearchParams(search);
+  const id = (key: string): number | null => {
+    const raw = params.get(key);
+    const n = raw != null ? Number(raw) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+
+  const a = id('a');
+  const b = id('b');
+  const rawSeason = params.get('season');
+  const season = rawSeason == null
+    ? undefined
+    : rawSeason === 'all'
+      ? null
+      : (Number.isFinite(Number(rawSeason)) && Number(rawSeason) > 0 ? Number(rawSeason) : undefined);
+
+  return { a, b: b != null && b === a ? null : b, season };
+}
 
 /**
  * Фильтр страницы `/season-best`, разобранный из query. Живёт рядом с генератором

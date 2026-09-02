@@ -1,0 +1,33 @@
+/* Страница `/h2h` — обвязка вокруг общего экрана сравнения (`components/mix/h2h/`).
+   Здесь только «рама»: заголовок и отступы. Сам экран приносит свои стили и сам решает,
+   в какую ширину ужиматься (`@container h2h`), поэтому раму можно менять свободно. */
+
+.h2h-page { display: flex; flex-direction: column; gap: 14px; }
+
+.h2h-page__head { display: flex; flex-direction: column; gap: 4px; }
+.h2h-page__title {
+  font-family: var(--deep-font-display); font-size: 24px; line-height: 1.1;
+  color: var(--deep-text);
+}
+.h2h-page__hint { font-size: 12px; font-weight: 700; color: var(--deep-text-faint); }
+
+.h2h-page__notice {
+  padding: 12px 14px; border-radius: var(--deep-radius-tile);
+  background: var(--deep-card-bg-raised); border: 1px solid var(--deep-card-border);
+  font-size: 12.5px; font-weight: 700; color: var(--deep-text-mute);
+}
+
+/* Пикер страницы: подпись «какую сторону заполняем» — без неё непонятно, куда попадёт
+   выбранный пловец (пикер один на оба слота). */
+.h2h-page__picker { display: flex; flex-direction: column; gap: 8px; }
+.h2h-page__picker-cap {
+  font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--deep-text-ghost);
+}
+.h2h-page__picker-cap strong { color: var(--deep-accent); }
+
+.h2h-page__profile-link {
+  align-self: flex-start;
+  font-size: 11.5px; font-weight: 800; color: var(--deep-accent); text-decoration: none;
+}
+.h2h-page__profile-link:hover { text-decoration: underline; }

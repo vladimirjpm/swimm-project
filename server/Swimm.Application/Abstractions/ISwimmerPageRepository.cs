@@ -95,4 +95,28 @@ public interface ISwimmerPageRepository
     /// </summary>
     Task<IReadOnlyDictionary<string, NationalAgeRecordRow>> GetNationalAgeRecordsAsync(
         string? regionCode, string? gender, int age);
+
+    /// <summary>
+    /// Срез справочника рекордов по ЛЮБОЙ ступени: <c>("age","12")</c>, <c>("masters","45-49")</c>,
+    /// <c>("open","")</c>. Ключ словаря — тот же ключ дисциплины, что у заплывов.
+    ///
+    /// Обобщение <see cref="GetNationalAgeRecordsAsync"/>, который умел только детские ступени
+    /// (<c>age/{возраст}</c>). У взрослых рекорды лежат в <c>masters/{полоса}</c> и
+    /// <c>open</c> — с числовым ключом они не находились вовсе, и бейдж рекорда у мастерсов
+    /// не появлялся никогда (поймано 02.09.2026 на паре 7424 × 62098).
+    ///
+    /// Какая ступень относится к заплыву, решает НЕ репозиторий, а
+    /// <see cref="SwimmerPageBuilder.RecordStepsOf"/> — по тем же правилам, что детектор
+    /// рекордов соревнования.
+    /// </summary>
+    Task<IReadOnlyDictionary<string, NationalAgeRecordRow>> GetNationalRecordsAsync(
+        string? regionCode, string? gender, string category, string ageKey);
+
+    /// <summary>
+    /// Публичный поиск пловцов по имени — селектор соперника таба H2H.
+    /// Ищет по всем четырём полям имени (иврит и английский): у пловцов из стартовых
+    /// протоколов английского имени ещё нет, у части старых импортов — наоборот.
+    /// Запрос короче двух символов не выполняется: выдача бесполезна, а скан дорогой.
+    /// </summary>
+    Task<IReadOnlyList<SwimmerSearchHitDto>> SearchSwimmersAsync(string query, int limit);
 }

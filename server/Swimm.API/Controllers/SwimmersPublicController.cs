@@ -33,6 +33,13 @@ public class SwimmersPublicController : ControllerBase
     /// </summary>
     private readonly IShowcaseSeasonProvider _showcase;
 
+    /// <summary>
+    /// Ось возраста справочника рекордов (`RecordAgeAxis` из /Admin/Settings): по ней бейдж
+    /// «REC» находит свою ступень. Читается ТЕМ ЖЕ хелпером, что детектор рекордов
+    /// соревнования, — вторая копия разбора разъехалась бы с первой.
+    /// </summary>
+    private readonly ISettingsService _settings;
+
     private const string CacheControlValue = "public, max-age=60";
     private static readonly TimeSpan PayloadTtl = TimeSpan.FromMinutes(5);
 
@@ -41,12 +48,13 @@ public class SwimmersPublicController : ControllerBase
 
     public SwimmersPublicController(
         ISwimmerPageRepository swims, IResultRepository results, ICacheService cache,
-        IShowcaseSeasonProvider showcase)
+        IShowcaseSeasonProvider showcase, ISettingsService settings)
     {
         _swims = swims;
         _results = results;
         _cache = cache;
         _showcase = showcase;
+        _settings = settings;
     }
 
     /// <summary>
@@ -178,11 +186,14 @@ public class SwimmersPublicController : ControllerBase
             ? await _swims.GetClubBestMsAsync(clubId, clubAge)
             : new Dictionary<string, int>();
 
-        var records = age is int a
-            ? await _swims.GetNationalAgeRecordsAsync(profile.CountryCode, profile.Gender, a)
-            : new Dictionary<string, NationalAgeRecordRow>();
+        // Ступени справочника — ПО ЗАПЛЫВАМ, как в сравнении: мастерский старт меряется
+        // полосой «45-49», обычный взрослый — открытым рекордом страны, ребёнок — своей
+        // возрастной ступенью. Один запрос «age/{возраст}» оставлял всех взрослых без дельты.
+        var axis = RecordAgeAxisSetting.From(_settings);
+        var records = await RecordStepsAsync(rows, profile, axis);
 
-        return SwimmerPageBuilder.PersonalBests(rows, poolType, clubBest, records);
+        return SwimmerPageBuilder.PersonalBests(
+            rows, poolType, clubBest, records, profile?.BirthYear ?? 0, axis);
     }
 
     /// <summary>
@@ -247,6 +258,121 @@ public class SwimmersPublicController : ControllerBase
     /// docs/season-boundary-rule.md). Мусор в параметре трактуем как умолчание, а не как 400:
     /// это витрина, а не форма.
     /// </summary>
+    /// <summary>
+    /// Поиск пловца для селектора таба H2H. Публичный: пловцы и их результаты и так
+    /// открыты, ничего сверх того, что уже отдаёт страница, здесь нет.
+    /// </summary>
+    [HttpGet("/api/swimmers/search")]
+    public async Task<IActionResult> Search([FromQuery] string? q = null, [FromQuery] int limit = 12)
+    {
+        var query = (q ?? string.Empty).Trim();
+        // Пустой и односимвольный запрос — не ошибка, а «ещё не набрали»: селектор просит
+        // подсказки на каждой букве, и 400 в консоли на каждый первый символ бесполезен.
+        if (query.Length < 2) return Ok(Array.Empty<SwimmerSearchHitDto>());
+
+        return Ok(await _swims.SearchSwimmersAsync(query, limit));
+    }
+
+    /// <summary>
+    /// Таб H2H: лучшие времена хозяина страницы и выбранного соперника бок о бок за один
+    /// период — сезон карусели либо <c>?season=all</c> (карьера).
+    /// 404 — соперника нет; <paramref name="rivalId"/> = <paramref name="id"/> отклоняем:
+    /// сравнение с самим собой не значит ничего.
+    /// </summary>
+    [HttpGet("/api/swimmers/{id:int}/compare")]
+    public async Task<IActionResult> GetCompare(
+        int id, [FromQuery] int rivalId, [FromQuery] string? season = null)
+    {
+        if (rivalId <= 0 || rivalId == id) return BadRequest(new { error = "rivalId" });
+
+        var rivalProfile = await _results.GetSwimmerProfileAsync(rivalId);
+        if (rivalProfile is null) return NotFound();
+
+        return await this.CachedJson(_cache,
+            $"http:swimmer:{id}:compare:{rivalId}:{season ?? "default"}",
+            async () =>
+            {
+                // Обе выборки идут через тот же кэшированный шов, что и остальные табы:
+                // страница соперника, открытая следом, читает уже готовые заплывы.
+                var mineRows = await _swims.GetSwimsAsync(id);
+                var rivalRows = await _swims.GetSwimsAsync(rivalId);
+                var mineProfile = await _results.GetSwimmerProfileAsync(id);
+
+                // Сезон приземляется на заплывы ХОЗЯИНА страницы: карусель сверху — его,
+                // и таб обязан показывать тот же период, что остальные табы страницы.
+                var selected = await ResolveSeasonAsync(mineRows, season);
+
+                // Места среди сверстников живут внутри сезона: в режиме ∞ считаем их за
+                // ВИТРИННЫЙ сезон (как фильтр «Season best» страницы пловца), а подпись
+                // ответа говорит, за какой именно.
+                var sbSeason = selected ?? await _showcase.CurrentStartYearAsync();
+                var axis = RecordAgeAxisSetting.From(_settings);
+
+                var mine = await CompareSideAsync(mineRows, mineProfile, selected, sbSeason, axis);
+                var rival = await CompareSideAsync(rivalRows, rivalProfile, selected, sbSeason, axis);
+                return SwimmerPageBuilder.Compare(mine, rival, selected, sbSeason, axis);
+            },
+            PayloadTtl, CacheControlValue);
+    }
+
+    /// <summary>
+    /// Вход одной стороны сравнения: заплывы, профиль, СВОЯ когорта сверстников и СВОЙ срез
+    /// справочника рекордов. Своя у каждого, потому что год рождения и возрастная ступень у
+    /// соперника другие — общий срез выдал бы ему чужие бейджи.
+    ///
+    /// Когорта тянется только под конкретный сезон (за карьеру сравнивать не с чем) и
+    /// кэшируется НА ГРУППУ, а не на пловца, поэтому вторая сторона обычно достаётся даром.
+    /// </summary>
+    private async Task<SwimmerPageBuilder.SwimmerCompareInput> CompareSideAsync(
+        IReadOnlyList<SeasonSwimRow> rows, SwimmerProfileDto? profile, int? season,
+        int? seasonBestSeason, RecordAgeAxis axis)
+    {
+        // Когорта нужна под сезон, за который считаются места: в режиме ∞ это витринный.
+        var cohort = seasonBestSeason is int year && profile is { BirthYear: > 0 }
+            ? await _swims.GetAgeCohortSeasonBestsAsync(year, profile.BirthYear)
+            : [];
+
+        var records = await RecordStepsAsync(SwimmerPageBuilder.InSeason(rows, season), profile, axis);
+
+        // Что пловец ДЕРЖИТ — отдельный вопрос от «бьёт ли показанное время рекорд»:
+        // рекордный заплыв может быть поставлен до периода импорта, и счётчики шапки
+        // обязаны его учитывать (тот же список, что в плитке достижений профиля).
+        var held = profile is null ? [] : await _swims.GetRecordsHeldAsync(profile.Id);
+
+        return new SwimmerPageBuilder.SwimmerCompareInput(rows, profile, cohort, records, held);
+    }
+
+    /// <summary>
+    /// Срезы справочника рекордов для набора заплывов: ступени собираются ПО ЗАПЛЫВАМ
+    /// (<see cref="SwimmerPageBuilder.RecordStepsOf"/>), а не по возрасту пловца, потому что
+    /// мастерский старт меряется полосой возраста, обычный взрослый — открытым рекордом
+    /// страны, а ребёнок — своей возрастной ступенью.
+    ///
+    /// Один и тот же набор нужен и личникам, и сравнению — отсюда общий метод: две копии
+    /// правил разъехались бы, и «Δ Israel» на одной странице спорила бы с бейджем на другой.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<
+        SwimmerPageBuilder.RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>>> RecordStepsAsync(
+        IReadOnlyList<SeasonSwimRow> rows, SwimmerProfileDto? profile, RecordAgeAxis axis)
+    {
+        var records = new Dictionary<
+            SwimmerPageBuilder.RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>>();
+        if (profile is null) return records;
+
+        var steps = rows
+            .Where(SeasonAggregator.IsCountable)
+            .SelectMany(r => SwimmerPageBuilder.RecordStepsOf(r, profile.BirthYear, axis))
+            .Distinct();
+
+        foreach (var step in steps)
+        {
+            records[step] = await _swims.GetNationalRecordsAsync(
+                profile.CountryCode, profile.Gender, step.Category, step.AgeKey);
+        }
+
+        return records;
+    }
+
     private async Task<int?> ResolveSeasonAsync(IReadOnlyList<SeasonSwimRow> rows, string? season)
     {
         if (string.Equals(season, AllSeasons, StringComparison.OrdinalIgnoreCase)) return null;

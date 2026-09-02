@@ -17,10 +17,12 @@ public class SwimmerPageBuilderTests
         long id, string date, int styleId = 1, string distance = "100",
         int? ms = 60000, int? position = null, int points = 0, bool isAward = true,
         int competitionId = 1, int? eventId = null, bool isRelay = false,
-        string pool = "25m", string? suspect = null, bool timeFail = false) => new(
+        string pool = "25m", string? suspect = null, bool timeFail = false,
+        bool isMasters = false) => new(
             id, Swimmer, competitionId, DateTime.Parse(date), styleId, distance, "male", pool,
             null, ms, timeFail, suspect, isRelay)
         {
+            IsMasters = isMasters,
             Position = position,
             InternationalPoints = points,
             IsAward = isAward,
@@ -230,19 +232,36 @@ public class SwimmerPageBuilderTests
 
     // ── Таб Records & PB: дельты (A3) ────────────────────────────────────────────
 
+    /// <summary>
+    /// Срез справочника одной ступени. Ступеней несколько, потому что «свой рекорд» зависит
+    /// от ЗАПЛЫВА: мастерский старт меряется полосой возраста, обычный взрослый — открытым
+    /// рекордом страны, ребёнок — своей возрастной ступенью.
+    /// </summary>
+    private static IReadOnlyDictionary<
+        SwimmerPageBuilder.RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>> Step(
+        string category, string ageKey, string key, NationalAgeRecordRow record) =>
+        new Dictionary<SwimmerPageBuilder.RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>>
+        {
+            [new SwimmerPageBuilder.RecordStep(category, ageKey)] =
+                new Dictionary<string, NationalAgeRecordRow> { [key] = record },
+        };
+
+    private static IReadOnlyDictionary<
+        SwimmerPageBuilder.RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>> NoRecords() =>
+        new Dictionary<SwimmerPageBuilder.RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>>();
+
     [Fact]
     public void PersonalBests_DeltasToClubBestAndNationalRecord()
     {
         var rows = new[] { Row(1, "2026-02-16", ms: 59000) };
         var key = SeasonAggregator.DisciplineKey(rows[0]);
 
+        // Заплыв 2026 года у пловца 2014 г.р. (ось календарная) — ступень age/12.
         var pbs = SwimmerPageBuilder.PersonalBests(
             rows, poolType: null,
             clubBestMs: new Dictionary<string, int> { [key] = 58500 },
-            nationalRecords: new Dictionary<string, NationalAgeRecordRow>
-            {
-                [key] = new("58.00", 58000, "Кто-то", "12"),
-            });
+            nationalRecords: Step("age", "12", key, new("58.00", 58000, "Кто-то", "12")),
+            birthYear: 2014);
 
         var pb = Assert.Single(pbs);
         Assert.Equal(500, pb.DeltaToClubBestMs);
@@ -261,16 +280,75 @@ public class SwimmerPageBuilderTests
         var pbs = SwimmerPageBuilder.PersonalBests(
             rows, poolType: null,
             clubBestMs: new Dictionary<string, int> { [key] = 58000 },   // он же и есть лучший
-            nationalRecords: new Dictionary<string, NationalAgeRecordRow>
-            {
-                [key] = new("58.50", 58500, "Тёзка", "12"),
-            });
+            nationalRecords: Step("age", "12", key, new("58.50", 58500, "Тёзка", "12")),
+            birthYear: 2014);
 
         var pb = Assert.Single(pbs);
         Assert.True(pb.HoldsClubBest);
         Assert.Equal(0, pb.DeltaToClubBestMs);
         Assert.True(pb.HoldsNationalAgeRecord);      // быстрее рекорда — держит его
         Assert.Equal(-500, pb.DeltaToNationalAgeRecordMs);
+    }
+
+    [Fact]
+    public void PersonalBests_MastersSwim_IsMeasuredByItsBand_NotByChildStep()
+    {
+        // Мастерс 45 лет: эталон — masters/45-49. С детской ступенью «age/45» дельта была
+        // пустой у всех взрослых (поймано 02.09.2026 на пловце 7424).
+        var rows = new[] { Row(1, "2026-02-16", ms: 59000, isMasters: true) };
+        var key = SeasonAggregator.DisciplineKey(rows[0]);
+
+        var byBand = SwimmerPageBuilder.PersonalBests(
+            rows, poolType: null, clubBestMs: new Dictionary<string, int>(),
+            nationalRecords: Step("masters", "45-49", key, new("00:60.00", 60000, null, "45-49")),
+            birthYear: 1981);
+
+        var pb = Assert.Single(byBand);
+        Assert.True(pb.HoldsNationalAgeRecord);
+        Assert.Equal("masters 45-49", pb.NationalRecordScope);
+
+        // Тот же рекорд в детской ступени к мастерскому заплыву не относится.
+        var byChildStep = SwimmerPageBuilder.PersonalBests(
+            rows, poolType: null, clubBestMs: new Dictionary<string, int>(),
+            nationalRecords: Step("age", "45", key, new("00:60.00", 60000, null, "45")),
+            birthYear: 1981);
+
+        Assert.Null(Assert.Single(byChildStep).NationalRecordScope);
+    }
+
+    [Fact]
+    public void PersonalBests_Adult_FallsBackToOpenRecord()
+    {
+        // Взрослый не-мастерс: ступени «age/29» в справочнике нет, эталон — открытый рекорд.
+        var rows = new[] { Row(1, "2026-02-16", ms: 59000) };
+        var key = SeasonAggregator.DisciplineKey(rows[0]);
+
+        var pbs = SwimmerPageBuilder.PersonalBests(
+            rows, poolType: null, clubBestMs: new Dictionary<string, int>(),
+            nationalRecords: Step("open", "", key, new("00:58.00", 58000, null, "")),
+            birthYear: 1997);
+
+        var pb = Assert.Single(pbs);
+        Assert.Equal(1000, pb.DeltaToNationalAgeRecordMs);
+        Assert.Equal("open", pb.NationalRecordScope);
+    }
+
+    [Fact]
+    public void PersonalBests_Child_IsNotComparedWithTheOpenRecord()
+    {
+        // Девятилетней открытый рекорд страны не эталон: детская лестница справочника
+        // начинается с 10, и без отсечки в её личниках появлялась «Δ Israel +19.18».
+        var rows = new[] { Row(1, "2026-02-16", ms: 59000) };
+        var key = SeasonAggregator.DisciplineKey(rows[0]);
+
+        var pbs = SwimmerPageBuilder.PersonalBests(
+            rows, poolType: null, clubBestMs: new Dictionary<string, int>(),
+            nationalRecords: Step("open", "", key, new("00:24.46", 24460, null, "")),
+            birthYear: 2017);
+
+        var pb = Assert.Single(pbs);
+        Assert.Null(pb.NationalRecordScope);
+        Assert.Null(pb.DeltaToNationalAgeRecordMs);
     }
 
     [Fact]
@@ -282,8 +360,8 @@ public class SwimmerPageBuilderTests
             Row(2, "2026-07-16", ms: 61000, pool: "50m"),
         };
 
-        var shortCourse = SwimmerPageBuilder.PersonalBests(rows, "25m", new Dictionary<string, int>(), new Dictionary<string, NationalAgeRecordRow>());
-        var longCourse = SwimmerPageBuilder.PersonalBests(rows, "50m", new Dictionary<string, int>(), new Dictionary<string, NationalAgeRecordRow>());
+        var shortCourse = SwimmerPageBuilder.PersonalBests(rows, "25m", new Dictionary<string, int>(), NoRecords());
+        var longCourse = SwimmerPageBuilder.PersonalBests(rows, "50m", new Dictionary<string, int>(), NoRecords());
 
         Assert.Equal(59000, Assert.Single(shortCourse).TimeMs);
         Assert.Equal(61000, Assert.Single(longCourse).TimeMs);

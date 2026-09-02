@@ -1,4 +1,4 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.DataProtection;
@@ -1197,6 +1197,7 @@ app.Use(async (context, next) =>
                 "my-media" => "/media.html",
                 "about" => "/about.html",
                 "season-best" => "/season-best.html",   // весь фильтр в query
+                "h2h" => "/h2h.html",                   // сравнение двух пловцов, пара в query
                 _ => null,
             },
             >= 2 => seg[0] switch

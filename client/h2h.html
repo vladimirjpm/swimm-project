@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Поимённые данные спортсменов, в т.ч. несовершеннолетних — из поиска закрыто.
+         Решение Р6 + В3-бис, docs/plans/azure-deploy-plan.md Б14. Парная запись — client/public/robots.txt. -->
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Head to head</title>
+    <!-- Линки на CSS вручную НЕ нужны, Vite добавит их сам благодаря import в TSX -->
+  </head>
+  <body class="min-h-screen bg-gray-50">
+    <div id="h2h-page"></div>
+    <script type="module" src="/src/pages/h2h-page.tsx"></script>
+  </body>
+</html>

@@ -2,14 +2,21 @@ import React, { useState } from 'react';
 import UI_SwimTime from '../../components/mix/swim-time/swim-time';
 import UI_MedalIcon from '../../components/mix/medal-icon/medal-icon';
 import SwimmerResultRow, { type ResultRowData } from './swimmer-result-row';
-import SwimRow from '../../components/swim-row/swim-row';
+import SwimRow, { swimRowStrokeLabel } from '../../components/swim-row/swim-row';
+import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
+import UI_PoolIcon from '../../components/mix/pool-icon/pool-icon';
 import UI_SeasonNotice from '../../components/mix/season-notice/season-notice';
 import { MIN_PEERS_FOR_RANK } from '../../components/mix/rank-of-peers/rank-of-peers';
+import { useFavoritesContext } from '../../../hooks/favorites-context';
+import UI_H2HCompare, { h2hScopeLabel } from '../../components/mix/h2h/h2h-compare';
+import UI_H2HRivalPicker from '../../components/mix/h2h/h2h-rival-picker';
+import UI_RecordBadge, { type RecordKind } from '../../components/mix/record-badge/record-badge';
+import type { H2HSlot } from '../../components/mix/h2h/h2h.types';
 import { routes } from '../../../utils/routes';
 import { peerGroupLabel, seasonLabel } from '../../../utils/helpers/season-helper';
 import type {
-  SwimmerBestTime, SwimmerCompetition, SwimmerDisciplineRank, SwimmerPersonalBest, SwimmerProgress,
-  SwimmerSeasonRanks, SwimmerSummary,
+  SwimmerBestTime, SwimmerCompare, SwimmerCompetition, SwimmerDisciplineRank,
+  SwimmerPersonalBest, SwimmerProgress, SwimmerSearchHit, SwimmerSeasonRanks, SwimmerSummary,
 } from '../use-swimmer-page';
 import type { SwimmerHeldRecord } from '../use-swimmer-profile';
 
@@ -123,22 +130,65 @@ function CompetitionRow({ meet, swimmerId }: { meet: SwimmerCompetition; swimmer
   );
 }
 
-/** Таб Season: сводка сезона + его старты (❄/☀ выведены из самих соревнований). */
+/**
+ * Сезон старта из его даты: сезон начинается осенью, поэтому сентябрь и позже принадлежат
+ * сезону года начала. Тот же счёт, что у SeasonMath на сервере.
+ */
+const seasonOfDate = (date: string) => {
+  const [y, m] = date.split('-').map(Number);
+  return m >= 9 ? y : y - 1;
+};
+
+/**
+ * Таб Season: сводка периода + его старты (❄/☀ выведены из самих соревнований).
+ *
+ * В режиме ∞ (карусель на «все сезоны») старты разложены ПО СЕЗОНАМ — это всё, чем таб
+ * History отличался от этой панели, и ради одной группировки второй таб с тем же запросом
+ * не нужен (решение Влада 2026-09-01).
+ */
 export function SeasonPanel({
   summary, swimmerId, state,
 }: { summary: SwimmerSummary | null; swimmerId: number; state: PanelLoad }) {
   if (state.error) return <PanelEmpty>Could not load this season.</PanelEmpty>;
   if (!summary) return <PanelEmpty>{noDataText(state.loading, 'No data for this season.')}</PanelEmpty>;
 
+  const career = summary.season == null;
+  const groups = new Map<number, SwimmerCompetition[]>();
+  if (career) {
+    summary.competitions.forEach((meet) => {
+      const s = seasonOfDate(meet.date);
+      if (!groups.has(s)) groups.set(s, []);
+      groups.get(s)!.push(meet);
+    });
+  }
+
   return (
     <>
       <SeasonBanner summary={summary} />
       <PanelHead
-        title="Competitions"
-        hint={`${summary.competitionCount} meets · ${summary.personalBests} personal bests`}
+        title={career ? 'Career' : 'Competitions'}
+        hint={career
+          ? `${groups.size} season${groups.size === 1 ? '' : 's'} · ${summary.competitionCount} meets`
+            + ` · ${summary.personalBests} personal bests`
+          : `${summary.competitionCount} meets · ${summary.personalBests} personal bests`}
       />
       {summary.competitions.length === 0 ? (
-        <PanelEmpty>No swims in this season yet.</PanelEmpty>
+        <PanelEmpty>{career ? 'No competitions yet.' : 'No swims in this season yet.'}</PanelEmpty>
+      ) : career ? (
+        [...groups.entries()].sort((a, b) => b[0] - a[0]).map(([season, meets]) => (
+          <div key={season} className="deep-history-season">
+            <div className="deep-history-season__label">{seasonLabel(season)}</div>
+            <div className="deep-list">
+              {meets.map((meet) => (
+                <CompetitionRow
+                  key={`${meet.eventId ?? 'c'}-${meet.competitionId}`}
+                  meet={meet}
+                  swimmerId={swimmerId}
+                />
+              ))}
+            </div>
+          </div>
+        ))
       ) : (
         <div className="deep-list">
           {summary.competitions.map((meet) => (
@@ -427,6 +477,13 @@ export function SeasonBestPanel({
 }
 
 /**
+ * Класс рекорда по категории справочника — вход общего `UI_RecordBadge`. Правило одно на
+ * продукт: золото носит только национальный (`open`), возрастные и мастерские — серебро.
+ */
+const recordKindOf = (category: string): RecordKind =>
+  (category === 'open' ? 'national' : category === 'masters' ? 'masters' : 'age');
+
+/**
  * Подпись рекорда: «Israel · age 12» / «Israel · masters». Ступень показываем только там,
  * где она есть, — у открытой категории AgeKey пустой.
  */
@@ -467,6 +524,9 @@ function HeldRecordsSection({ records }: { records: SwimmerHeldRecord[] }) {
             competition={{ name: recordScope(r), isChampionship: true }}
             meetPlacement="line1"
             date={r.date}
+            // Класс рекорда — тем же бейджем, что в H2H и в таблице результатов: подпись
+            // «ISR · masters» отвечает на вопрос «какая ступень», бейдж — «какого веса».
+            extras={<UI_RecordBadge kind={recordKindOf(r.category)} scope={recordScope(r)} />}
           />
         ))}
       </div>
@@ -574,9 +634,14 @@ export function PersonalBestsPanel({
                   ms: r.deltaToNationalAgeRecordMs,
                   holds: r.holdsNationalAgeRecord,
                   quality: r.nationalAgeRecordQuality,
-                  title: peers
-                    ? `Compared with the national record for ${peers}`
-                    : 'Compared with the national age record',
+                  // Ступень приходит с сервера («age 14», «masters 45-49», «open»): у
+                  // взрослых эталон — полоса или ОТКРЫТЫЙ рекорд страны, и подпись про
+                  // «возрастной рекорд» там врала бы.
+                  title: r.nationalRecordScope
+                    ? `Compared with the national record — ${r.nationalRecordScope}`
+                    : (peers
+                      ? `Compared with the national record for ${peers}`
+                      : 'Compared with the national record'),
                 },
               ]}
             />
@@ -720,40 +785,134 @@ export function ProgressPanel({
   );
 }
 
-/** Таб History: сезоны и старты карьеры (тот же summary, но за всё время). */
-export function HistoryPanel({
-  career, swimmerId, state,
-}: { career: SwimmerSummary | null; swimmerId: number; state: PanelLoad }) {
-  if (state.error) return <PanelEmpty>Could not load the career history.</PanelEmpty>;
-  if (!career) return <PanelEmpty>{noDataText(state.loading, 'No career data yet.')}</PanelEmpty>;
-  if (career.competitions.length === 0) return <PanelEmpty>No competitions yet.</PanelEmpty>;
+/**
+ * Таб H2H (head-to-head) страницы пловца.
+ *
+ * Сам экран — общий `UI_H2HCompare` (`components/mix/h2h/`), тот же, что будет на странице
+ * `/h2h` (план — `docs/plans/h2h-page-plan.md`). Здесь остаётся только то, что специфично
+ * для ТАБА: левый слот занят хозяином страницы и несменяем (`onClear: null`), правый —
+ * соперник из адреса, а выбор ищет именно соперника.
+ *
+ * Соперник выбирается ВРУЧНУЮ (решение Влада 2026-09-01): таб отвечает на вопрос «как я
+ * против ВОТ ЭТОГО пловца», а не «кто мои соперники», — автосписка соседей по времени нет.
+ */
+export function H2HPanel({
+  compare, query, onQuery, hits, hitsState, onPick, onClear, rivalId, swimmerId, profileName,
+  season, state,
+}: {
+  compare: SwimmerCompare | null;
+  /** Строка поиска — состояние живёт на странице, чтобы переживать смену сезона. */
+  query: string;
+  onQuery: (q: string) => void;
+  hits: SwimmerSearchHit[] | null;
+  hitsState: PanelLoad;
+  onPick: (id: number) => void;
+  onClear: () => void;
+  /** Выбранный соперник; null — показываем слот выбора. */
+  rivalId: number | null;
+  /** Хозяин страницы: его самого из избранного убираем — сравнивать с собой нечего. */
+  swimmerId: number;
+  /** Имя хозяина страницы: слот рисуется ещё до того, как приедет сравнение. */
+  profileName: string;
+  /** Сезон карусели — уезжает в ссылку на страницу `/h2h`, чтобы она открыла тот же период. */
+  season: number | null;
+  state: PanelLoad;
+}) {
+  const { isAuthenticated, favorites, favoriteSwimmerIds, toggleFavoriteSwimmer } =
+    useFavoritesContext();
+  // Пустой слот — кнопка «выбрать»: попапа у него нет (выбор и так стоит под ним), поэтому
+  // клик просто уводит курсор в поиск. Иначе слот выглядел бы нажимаемым и не делал ничего.
+  const searchRef = React.useRef<HTMLInputElement>(null);
 
-  // Группировка по сезону — из даты старта: сезон начинается осенью, поэтому месяцы
-  // сентября и позже принадлежат сезону года начала (SeasonMath на сервере, тот же счёт).
-  const seasonOf = (date: string) => {
-    const [y, m] = date.split('-').map(Number);
-    return m >= 9 ? y : y - 1;
-  };
-  const groups = new Map<number, SwimmerCompetition[]>();
-  career.competitions.forEach((meet) => {
-    const s = seasonOf(meet.date);
-    if (!groups.has(s)) groups.set(s, []);
-    groups.get(s)!.push(meet);
+  const favoriteRivals = favorites
+    .filter((f) => f.target_type === 'swimmer' && f.swimmer_id != null && f.swimmer_id !== swimmerId)
+    // Порядок пользователя: «Me» первым, дальше его сортировка.
+    .sort((a, b) => Number(b.is_primary) - Number(a.is_primary) || a.sort_order - b.sort_order)
+    .map((f) => ({ id: f.swimmer_id!, name: f.swimmer_name ?? `#${f.swimmer_id}` }));
+
+  // Себя соперником не предлагаем: сервер такой запрос отклоняет (rivalId == id), а в
+  // выдаче собственное имя выглядит как приглашение сравнить себя с собой.
+  const rivalHits = hits?.filter((h) => h.id !== swimmerId) ?? null;
+
+  const picker = (
+    <UI_H2HRivalPicker
+      favorites={favoriteRivals}
+      query={query}
+      onQuery={onQuery}
+      hits={rivalHits}
+      loading={hitsState.loading}
+      error={hitsState.error}
+      onPick={onPick}
+      inputRef={searchRef}
+    />
+  );
+
+  /** Чип макета: «9 y · 2017». Возраст без года рождения не показываем — его нечем проверить. */
+  const ageLabel = (side: SwimmerCompare['mine']) =>
+    (side.ageInSeason != null && (side.birthYear ?? 0) > 0
+      ? `${side.ageInSeason} y · ${side.birthYear}`
+      : (side.birthYear ?? 0) > 0 ? `b. ${side.birthYear}` : null);
+
+  const favProps = (id: number) => ({
+    isFavorite: isAuthenticated ? favoriteSwimmerIds.has(id) : null,
+    onToggleFavorite: () => toggleFavoriteSwimmer(id),
   });
+
+  // Левый слот — хозяин страницы: имя берём из compare, когда оно уже приехало (там же клуб
+  // и возраст), иначе из профиля, чтобы карточка не ждала запроса.
+  const left: H2HSlot = {
+    kind: 'swimmer',
+    swimmer: compare
+      ? {
+        id: compare.mine.id,
+        name: compare.mine.name || profileName,
+        club: compare.mine.clubName,
+        ageLabel: ageLabel(compare.mine),
+      }
+      : { id: swimmerId, name: profileName },
+    ...favProps(swimmerId),
+    // Хозяина страницы сменить нельзя — это его профиль.
+    onClear: null,
+  };
+
+  const right: H2HSlot = rivalId == null
+    ? { kind: 'empty', onPick: () => searchRef.current?.focus() }
+    : {
+      kind: 'swimmer',
+      swimmer: compare
+        ? {
+          id: compare.rival.id,
+          name: compare.rival.name || `#${rivalId}`,
+          club: compare.rival.clubName,
+          ageLabel: ageLabel(compare.rival),
+        }
+        : { id: rivalId, name: `#${rivalId}` },
+      ...favProps(rivalId),
+      // Крестик — это «выбрать другого», а не «просто убрать»: сразу уводим курсор в поиск.
+      onClear: () => { onClear(); window.setTimeout(() => searchRef.current?.focus(), 0); },
+    };
 
   return (
     <>
-      <PanelHead title="Career" hint={`${groups.size} seasons · ${career.competitionCount} meets`} />
-      {[...groups.entries()].sort((a, b) => b[0] - a[0]).map(([season, meets]) => (
-        <div key={season} className="deep-history-season">
-          <div className="deep-history-season__label">{seasonLabel(season)}</div>
-          <div className="deep-list">
-            {meets.map((meet) => (
-              <CompetitionRow key={`${meet.eventId ?? 'c'}-${meet.competitionId}`} meet={meet} swimmerId={swimmerId} />
-            ))}
-          </div>
-        </div>
-      ))}
+      {/* Кнопки «Clear» в шапке нет: сбросить соперника можно крестиком на его карточке —
+          тем же жестом, что на странице `/h2h`. Два одинаковых действия рядом заставляли бы
+          выбирать между ними на ровном месте.
+
+          Справа — выход на полную страницу сравнения: тот же экран, но там сменяемы ОБЕ
+          стороны. Пару и сезон уносим с собой, иначе переход стоил бы повторного выбора. */}
+      <PanelHead
+        title="Compare"
+        hint={compare ? h2hScopeLabel(compare) : 'pick a swimmer to put your best times side by side'}
+        right={(
+          <a
+            className="h2h-open"
+            href={routes.h2h({ a: swimmerId, b: rivalId, season: season == null ? 'all' : season })}
+          >
+            Full page →
+          </a>
+        )}
+      />
+      <UI_H2HCompare left={left} right={right} compare={compare} state={state} picker={picker} />
     </>
   );
 }
