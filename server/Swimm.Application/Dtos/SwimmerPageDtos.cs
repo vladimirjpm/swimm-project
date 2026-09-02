@@ -602,6 +602,17 @@ public sealed class SwimmerCompareDto
 
     [JsonPropertyName("ties")]
     public int Ties { get; set; }
+
+    /// <summary>
+    /// Сезон, за который посчитаны SB. В режиме ∞ он НЕ равен периоду сравнения: места среди
+    /// сверстников живут внутри сезона, поэтому за карьеру они считаются за витринный — и
+    /// UI обязан сказать это подписью, иначе цифра выглядит как «за всё время».
+    /// </summary>
+    [JsonPropertyName("seasonBestSeason")]
+    public int? SeasonBestSeason { get; set; }
+
+    [JsonPropertyName("seasonBestLabel")]
+    public string? SeasonBestLabel { get; set; }
 }
 
 /// <summary>Шапка одной стороны сравнения.</summary>

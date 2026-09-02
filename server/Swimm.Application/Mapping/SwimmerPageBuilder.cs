@@ -385,8 +385,13 @@ public static class SwimmerPageBuilder
     /// пустой при полных данных с обеих сторон.
     /// </summary>
     public static SwimmerCompareDto Compare(
-        SwimmerCompareInput mineInput, SwimmerCompareInput rivalInput, int? season)
+        SwimmerCompareInput mineInput, SwimmerCompareInput rivalInput, int? season,
+        int? seasonBestSeason = null, RecordAgeAxis axis = RecordAgeAxis.Calendar)
     {
+        // Места среди сверстников живут ВНУТРИ сезона. В режиме ∞ показывать их всё равно
+        // надо (иначе рекордсмен выглядит пустым), поэтому считаем их за витринный сезон —
+        // ровно как фильтр «Season best» страницы пловца, который в ∞ делает то же самое.
+        var sbSeason = season ?? seasonBestSeason;
         var mineSeason = InSeason(mineInput.Rows, season);
         var rivalSeason = InSeason(rivalInput.Rows, season);
         var mine = BestPerPairDiscipline(mineSeason);
@@ -394,8 +399,8 @@ public static class SwimmerPageBuilder
 
         // Бейджи считаются ОДИН раз на сторону и раздаются строкам по ключу дисциплины
         // (с полом — в справочниках и когортах он есть, в отличие от ключа пары).
-        var mineFlags = Flags(mineSeason, mineInput, season);
-        var rivalFlags = Flags(rivalSeason, rivalInput, season);
+        var mineFlags = Flags(mineInput, season, sbSeason, axis);
+        var rivalFlags = Flags(rivalInput, season, sbSeason, axis);
 
         var dto = new SwimmerCompareDto
         {
@@ -403,6 +408,8 @@ public static class SwimmerPageBuilder
             Label = season is null ? "career" : SeasonMath.Label(season.Value),
             Mine = Side(mineInput.Profile, season, mineSeason, mineFlags),
             Rival = Side(rivalInput.Profile, season, rivalSeason, rivalFlags),
+            SeasonBestSeason = sbSeason,
+            SeasonBestLabel = sbSeason is int y ? SeasonMath.Label(y) : null,
         };
 
         // Пара времён на КАЖДЫЙ бассейн — это и есть единица сравнения. Строку из них
@@ -484,7 +491,7 @@ public static class SwimmerPageBuilder
         AgeInSeason = season is int s && profile is { BirthYear: > 0 }
             ? SeasonMath.AgeInSeason(s, profile.BirthYear)
             : null,
-        SeasonBests = flags.SeasonBestKeys.Count,
+        SeasonBests = flags.SeasonBests,
         Medals = Medals(rows),
         BestPoints = rows.Where(SeasonAggregator.IsCountable)
             .Select(r => r.InternationalPoints)
@@ -508,7 +515,7 @@ public static class SwimmerPageBuilder
             Date = row.CompetitionDate.ToString("yyyy-MM-dd"),
             Competition = CompetitionRef(row),
             ResultId = row.ResultId,
-            IsSeasonBest = flags.SeasonBestKeys.Contains(key),
+            IsSeasonBest = flags.SeasonBestResultIds.Contains(row.ResultId),
             HoldsRecord = flags.RecordKeys.Contains(key),
         };
     }
@@ -523,10 +530,52 @@ public static class SwimmerPageBuilder
         IReadOnlyList<SeasonSwimRow> Rows,
         SwimmerProfileDto? Profile,
         IReadOnlyList<PeerSeasonBest> Cohort,
-        IReadOnlyDictionary<string, NationalAgeRecordRow> Records);
+        /// <summary>
+        /// Срезы справочника ПО СТУПЕНЯМ: ключ — («age»,«12») / («masters»,«45-49») /
+        /// («open»,«»), значение — рекорды этой ступени по ключу дисциплины. Ступеней
+        /// несколько, потому что «свой рекорд» зависит от ЗАПЛЫВА: мастерский старт
+        /// меряется полосой возраста, обычный — детской ступенью либо открытым рекордом.
+        /// </summary>
+        IReadOnlyDictionary<RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>> Records);
 
-    /// <summary>Ключи дисциплин, где у стороны бейдж SB / REC.</summary>
-    private sealed record CompareFlags(HashSet<string> SeasonBestKeys, HashSet<string> RecordKeys);
+    /// <summary>Ступень справочника рекордов: пара «категория × возрастной ключ».</summary>
+    public readonly record struct RecordStep(string Category, string AgeKey);
+
+    /// <summary>
+    /// Ступени справочника, к которым относится ЗАПЛЫВ. Правила те же, что у детектора
+    /// рекордов соревнования (<see cref="CompetitionRecordsDetector"/>): открытый рекорд
+    /// страны плюс возрастная ступень — мастерская полоса для мастерского старта, иначе
+    /// детская ступень по возрасту. Разъедутся правила — бейдж «REC» на странице начнёт
+    /// спорить с карточкой «New records» соревнования.
+    ///
+    /// Возраст берётся по той же оси, что у детектора (<see cref="RecordAgeAxis"/>):
+    /// справочник ведёт федерация, и по умолчанию мы сверяемся в её системе координат.
+    /// </summary>
+    public static IEnumerable<RecordStep> RecordStepsOf(
+        SeasonSwimRow row, int birthYear, RecordAgeAxis axis)
+    {
+        yield return new RecordStep("open", string.Empty);
+
+        if (birthYear <= 0) yield break;
+
+        var age = axis == RecordAgeAxis.Season
+            ? SeasonMath.AgeInSeason(SeasonAggregator.SeasonOf(row), birthYear)
+            : row.CompetitionDate.Year - birthYear;
+        if (age is not int years || years is < 5 or > 120) yield break;
+
+        yield return row.IsMasters
+            // Masters: диапазонный ключ «45-49» — нижняя граница кратна 5, ширина 5.
+            ? new RecordStep("masters", $"{years / 5 * 5}-{years / 5 * 5 + 4}")
+            : new RecordStep("age", years.ToString());
+    }
+
+    /// <summary>
+    /// Бейджи стороны. SB держится по <c>ResultId</c>, а не по дисциплине: в режиме ∞ строка
+    /// показывает КАРЬЕРНОЕ лучшее, а место среди сверстников посчитано за витринный сезон, и
+    /// это разные заплывы. Бейдж ставим, только когда это ОДИН и тот же заплыв, — иначе он
+    /// обещал бы первое место времени, которое в том сезоне не показывали.
+    /// </summary>
+    private sealed record CompareFlags(HashSet<long> SeasonBestResultIds, HashSet<string> RecordKeys, int SeasonBests);
 
     /// <summary>
     /// Бейджи стороны: где она быстрейшая среди сверстников (SB) и где держит официальный
@@ -537,18 +586,21 @@ public static class SwimmerPageBuilder
     /// бейджа нет вовсе: сравнение живёт внутри одного сезона.
     /// </summary>
     private static CompareFlags Flags(
-        IReadOnlyList<SeasonSwimRow> rows, SwimmerCompareInput input, int? season)
+        SwimmerCompareInput input, int? season, int? sbSeason, RecordAgeAxis axis)
     {
-        var seasonBests = new HashSet<string>();
+        var seasonBestIds = new HashSet<long>();
         var records = new HashSet<string>();
-        var best = BestPerDiscipline(rows);
+        var shownBest = BestPerDiscipline(InSeason(input.Rows, season));
+        var seasonBests = 0;
 
-        if (season is not null && input.Cohort.Count > 0)
+        // Места считаются по лучшему времени СЕЗОНА (за карьеру их не бывает), а бейдж
+        // достаётся показанному заплыву только если это он и есть.
+        if (sbSeason is int sb && input.Cohort.Count > 0)
         {
             var byDiscipline = input.Cohort.GroupBy(p => p.DisciplineKey)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-            foreach (var (key, row) in best)
+            foreach (var (key, row) in BestPerDiscipline(InSeason(input.Rows, sb)))
             {
                 if (!byDiscipline.TryGetValue(key, out var peers)) continue;
 
@@ -557,20 +609,30 @@ public static class SwimmerPageBuilder
                 var peerCount = peers.Select(p => p.SwimmerId).Distinct().Count();
                 // «Первый среди одного» — не достижение: тот же порог, что у остальных
                 // экранов (MIN_PEERS_FOR_RANK на клиенте).
-                if (rank == 1 && peerCount >= MinPeersForSeasonBest) seasonBests.Add(key);
+                if (rank != 1 || peerCount < MinPeersForSeasonBest) continue;
+
+                seasonBests++;
+                seasonBestIds.Add(row.ResultId);
             }
         }
 
-        foreach (var (key, row) in best)
+        var birthYear = input.Profile?.BirthYear ?? 0;
+        foreach (var (key, row) in shownBest)
         {
-            if (input.Records.TryGetValue(key, out var record) && record.TimeMs is int recordMs
-                && row.TimeMilliseconds!.Value <= recordMs)
+            // Ступень зависит от ЗАПЛЫВА: мастерский старт меряется полосой возраста,
+            // обычный — детской ступенью, и оба сверяются ещё с открытым рекордом страны.
+            foreach (var step in RecordStepsOf(row, birthYear, axis))
             {
+                if (!input.Records.TryGetValue(step, out var slice)) continue;
+                if (!slice.TryGetValue(key, out var record) || record.TimeMs is not int recordMs) continue;
+                if (row.TimeMilliseconds!.Value > recordMs) continue;
+
                 records.Add(key);
+                break;
             }
         }
 
-        return new CompareFlags(seasonBests, records);
+        return new CompareFlags(seasonBestIds, records, seasonBests);
     }
 
     /// <summary>Меньше двух сверстников — места нет, бейдж SB не выдаётся.</summary>

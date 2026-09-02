@@ -19,7 +19,7 @@ public class SwimmerCompareTests
         int styleId = 1, string distance = "100", string pool = "25m",
         int? ms = 60000, int points = 0, bool isRelay = false,
         string? suspect = null, bool timeFail = false,
-        int? position = null, bool isAward = false) => new(
+        int? position = null, bool isAward = false, bool isMasters = false) => new(
             id, swimmerId, 1, DateTime.Parse(date), styleId, distance, gender, pool,
             null, ms, timeFail, suspect, isRelay)
         {
@@ -27,6 +27,7 @@ public class SwimmerCompareTests
             CompetitionName = "Meet 1",
             Position = position,
             IsAward = isAward,
+            IsMasters = isMasters,
         };
 
     private static SwimmerProfileDto Profile(int id, string name, int birthYear, string gender) => new()
@@ -41,8 +42,24 @@ public class SwimmerCompareTests
     private static SwimmerPageBuilder.SwimmerCompareInput Input(
         SeasonSwimRow[] rows, SwimmerProfileDto profile,
         IReadOnlyList<PeerSeasonBest>? cohort = null,
-        IReadOnlyDictionary<string, NationalAgeRecordRow>? records = null) =>
-        new(rows, profile, cohort ?? [], records ?? new Dictionary<string, NationalAgeRecordRow>());
+        IReadOnlyDictionary<
+            SwimmerPageBuilder.RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>>? records = null) =>
+        new(rows, profile, cohort ?? [],
+            records ?? new Dictionary<
+                SwimmerPageBuilder.RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>>());
+
+    /// <summary>Срез справочника одной ступени: («age»,«14») и так далее.</summary>
+    private static IReadOnlyDictionary<
+        SwimmerPageBuilder.RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>> Step(
+        string category, string ageKey, string disciplineKey, int timeMs) =>
+        new Dictionary<SwimmerPageBuilder.RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>>
+        {
+            [new SwimmerPageBuilder.RecordStep(category, ageKey)] =
+                new Dictionary<string, NationalAgeRecordRow>
+                {
+                    [disciplineKey] = new("00:60.00", timeMs, Holder: null, AgeKey: ageKey),
+                },
+        };
 
     [Fact]
     public void Compare_DifferentGenders_StillPairsTheSameDistance()
@@ -271,9 +288,10 @@ public class SwimmerCompareTests
     }
 
     [Fact]
-    public void Compare_SeasonBestBadge_IsNeverShownForCareer()
+    public void Compare_SeasonBestBadge_ForCareerIsCountedForShowcaseSeason()
     {
-        // Режим ∞: сравнение со сверстниками живёт внутри сезона, за карьеру бейджа нет.
+        // Режим ∞: места среди сверстников живут внутри сезона, но прятать их нельзя —
+        // считаем за ВИТРИННЫЙ сезон (как фильтр Season best) и говорим это подписью.
         var mine = new[] { Row(1, 10, "2026-02-01", "male", ms: 59000) };
         var rival = new[] { Row(2, 20, "2026-02-01", "male", ms: 61000) };
         var key = SeasonAggregator.DisciplineKey(1, "100", "25m", "male");
@@ -282,23 +300,47 @@ public class SwimmerCompareTests
         var dto = SwimmerPageBuilder.Compare(
             Input(mine, Profile(10, "Mine", 2012, "male"), cohort),
             Input(rival, Profile(20, "Rival", 2012, "male")),
-            season: null);
+            season: null, seasonBestSeason: 2025);
 
+        Assert.True(dto.Rows.Single().Pools.Single().Mine!.IsSeasonBest);
+        Assert.Equal(1, dto.Mine.SeasonBests);
+        Assert.Equal(2025, dto.SeasonBestSeason);
+        Assert.Equal("2025/26", dto.SeasonBestLabel);
+    }
+
+    [Fact]
+    public void Compare_SeasonBestBadge_NotOnACareerBestFromAnotherSeason()
+    {
+        // Карьерное лучшее из ПРОШЛОГО сезона: место посчитано за витринный, и бейдж на
+        // чужом заплыве обещал бы первое место времени, которого в том сезоне не было.
+        var mine = new[]
+        {
+            Row(1, 10, "2025-02-01", "male", ms: 55000),   // карьерное лучшее, сезон 2024/25
+            Row(2, 10, "2026-02-01", "male", ms: 59000),   // лучшее витринного сезона
+        };
+        var rival = new[] { Row(3, 20, "2026-02-01", "male", ms: 61000) };
+        var key = SeasonAggregator.DisciplineKey(1, "100", "25m", "male");
+        var cohort = new List<PeerSeasonBest> { new(10, key, 59000), new(99, key, 60000) };
+
+        var dto = SwimmerPageBuilder.Compare(
+            Input(mine, Profile(10, "Mine", 2012, "male"), cohort),
+            Input(rival, Profile(20, "Rival", 2012, "male")),
+            season: null, seasonBestSeason: 2025);
+
+        // Показано карьерное 55.00 — бейджа на нём нет, хотя счётчик стороны место засчитал.
         Assert.False(dto.Rows.Single().Pools.Single().Mine!.IsSeasonBest);
-        Assert.Equal(0, dto.Mine.SeasonBests);
+        Assert.Equal(1, dto.Mine.SeasonBests);
     }
 
     [Fact]
     public void Compare_RecordBadge_IsDecidedByTimeNotByName()
     {
         // Рекорд ступени 60.00: моё 59.0 не медленнее → REC; время соперника 61.0 — нет.
+        // Ось календарная (дефолт): заплыв 2026 года, 2012 г.р. → ступень age/14.
         var mine = new[] { Row(1, 10, "2026-02-01", "male", ms: 59000) };
         var rival = new[] { Row(2, 20, "2026-02-01", "male", ms: 61000) };
         var key = SeasonAggregator.DisciplineKey(1, "100", "25m", "male");
-        var records = new Dictionary<string, NationalAgeRecordRow>
-        {
-            [key] = new("00:60.00", 60000, Holder: null, AgeKey: "14"),
-        };
+        var records = Step("age", "14", key, 60000);
 
         var dto = SwimmerPageBuilder.Compare(
             Input(mine, Profile(10, "Mine", 2012, "male"), records: records),
@@ -308,6 +350,46 @@ public class SwimmerCompareTests
         var pool = dto.Rows.Single().Pools.Single();
         Assert.True(pool.Mine!.HoldsRecord);
         Assert.False(pool.Rival!.HoldsRecord);
+    }
+
+    [Fact]
+    public void Compare_RecordBadge_MastersSwimIsMeasuredByItsBand()
+    {
+        // Мастерс 45 лет: его рекорд лежит в masters/45-49, а НЕ в age/45 — с числовым
+        // ключом бейдж не находился никогда (баг, пойманный на паре 7424 × 62098).
+        var mine = new[] { Row(1, 10, "2026-02-01", "female", ms: 59000, isMasters: true) };
+        var rival = new[] { Row(2, 20, "2026-02-01", "female", ms: 61000, isMasters: true) };
+        var key = SeasonAggregator.DisciplineKey(1, "100", "25m", "female");
+
+        var band = SwimmerPageBuilder.Compare(
+            Input(mine, Profile(10, "Mine", 1981, "female"), records: Step("masters", "45-49", key, 60000)),
+            Input(rival, Profile(20, "Rival", 1981, "female")),
+            season: 2025);
+        Assert.True(band.Rows.Single().Pools.Single().Mine!.HoldsRecord);
+
+        // Тот же рекорд, положенный в детскую ступень, к мастерскому заплыву не относится.
+        var childStep = SwimmerPageBuilder.Compare(
+            Input(mine, Profile(10, "Mine", 1981, "female"), records: Step("age", "45", key, 60000)),
+            Input(rival, Profile(20, "Rival", 1981, "female")),
+            season: 2025);
+        Assert.False(childStep.Rows.Single().Pools.Single().Mine!.HoldsRecord);
+    }
+
+    [Fact]
+    public void Compare_RecordBadge_AdultUsesOpenRecord()
+    {
+        // Взрослый не-мастерс: детской ступени age/29 в справочнике нет, зато есть открытый
+        // рекорд страны — по нему бейдж и считается.
+        var mine = new[] { Row(1, 10, "2026-02-01", "male", ms: 59000) };
+        var rival = new[] { Row(2, 20, "2026-02-01", "male", ms: 61000) };
+        var key = SeasonAggregator.DisciplineKey(1, "100", "25m", "male");
+
+        var dto = SwimmerPageBuilder.Compare(
+            Input(mine, Profile(10, "Mine", 1997, "male"), records: Step("open", "", key, 60000)),
+            Input(rival, Profile(20, "Rival", 1997, "male")),
+            season: 2025);
+
+        Assert.True(dto.Rows.Single().Pools.Single().Mine!.HoldsRecord);
     }
 
     [Fact]

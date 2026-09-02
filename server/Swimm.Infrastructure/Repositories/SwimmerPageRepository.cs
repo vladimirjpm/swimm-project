@@ -347,22 +347,31 @@ public class SwimmerPageRepository : ISwimmerPageRepository
         return rows;
     }
 
-    public async Task<IReadOnlyDictionary<string, NationalAgeRecordRow>> GetNationalAgeRecordsAsync(
-        string? regionCode, string? gender, int age)
+    public Task<IReadOnlyDictionary<string, NationalAgeRecordRow>> GetNationalAgeRecordsAsync(
+        string? regionCode, string? gender, int age) =>
+        age <= 0
+            ? Task.FromResult<IReadOnlyDictionary<string, NationalAgeRecordRow>>(
+                new Dictionary<string, NationalAgeRecordRow>())
+            : GetNationalRecordsAsync(regionCode, gender, "age", age.ToString());
+
+    public async Task<IReadOnlyDictionary<string, NationalAgeRecordRow>> GetNationalRecordsAsync(
+        string? regionCode, string? gender, string category, string ageKey)
     {
         var region = string.IsNullOrWhiteSpace(regionCode) ? "ISR" : regionCode.Trim().ToUpperInvariant();
         var sex = NormalizeGender(gender);
-        if (sex is null || age <= 0) return new Dictionary<string, NationalAgeRecordRow>();
+        if (sex is null || string.IsNullOrWhiteSpace(category)) {
+            return new Dictionary<string, NationalAgeRecordRow>();
+        }
 
-        var ageKey = age.ToString();
-        var key = $"national-age-records:{region}:{sex}:{ageKey}";
+        ageKey ??= string.Empty;
+        var key = $"national-records:{region}:{sex}:{category}:{ageKey}";
         var cached = await _cache.GetAsync<Dictionary<string, NationalAgeRecordRow>>(key);
         if (cached is not null) return cached;
 
         var records = await _read.Records.AsNoTracking()
             .Where(r => r.RegionType == "country"
                         && r.RegionCode == region
-                        && r.Category == "age"
+                        && r.Category == category
                         && r.AgeKey == ageKey
                         && r.Gender == sex)
             .Select(r => new { r.Style, r.Distance, r.PoolType, r.Time, r.HolderName })
@@ -384,7 +393,7 @@ public class SwimmerPageRepository : ISwimmerPageRepository
         var issues = (await _read.RecordIssues.AsNoTracking()
                 .Where(i => i.RegionType == "country"
                             && i.RegionCode == region
-                            && i.Category == "age"
+                            && i.Category == category
                             && i.Gender == sex
                             && (i.Status == RecordIssueStatuses.Open
                                 || i.Status == RecordIssueStatuses.Reported

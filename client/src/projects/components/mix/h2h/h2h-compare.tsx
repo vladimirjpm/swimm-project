@@ -183,8 +183,11 @@ const UI_H2HCompare: React.FC<Props> = ({
         leftFaster={compare.mineFaster}
         rightFaster={compare.rivalFaster}
         ties={compare.ties}
-        // За карьеру мест среди сверстников нет — строка не рисуется, а не показывает 0:0.
-        showSeasonBests={compare.season != null}
+        // В режиме ∞ места посчитаны за витринный сезон — говорим это прямо в подписи
+        // строки, иначе цифра выглядит как «первых мест за всю карьеру».
+        seasonBestsLabel={compare.season == null && compare.seasonBestLabel
+          ? `season bests · ${compare.seasonBestLabel}`
+          : 'season bests'}
         onSwap={onSwap}
       />
 

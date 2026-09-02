@@ -236,6 +236,13 @@ export interface SwimmerCompare {
   mineFaster: number;
   rivalFaster: number;
   ties: number;
+  /**
+   * Сезон, за который посчитаны SB. В режиме ∞ он НЕ равен периоду сравнения: места среди
+   * сверстников живут внутри сезона, поэтому за карьеру считаются за витринный — и подпись
+   * обязана это сказать, иначе цифра читается как «за всё время».
+   */
+  seasonBestSeason?: number | null;
+  seasonBestLabel?: string | null;
 }
 
 /**

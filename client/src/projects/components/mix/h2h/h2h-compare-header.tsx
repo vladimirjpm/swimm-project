@@ -31,8 +31,11 @@ interface Props {
   leftFaster: number;
   rightFaster: number;
   ties: number;
-  /** Показывать ли строку season bests: за карьеру мест среди сверстников нет. */
-  showSeasonBests?: boolean;
+  /**
+   * Подпись строки season bests. В режиме ∞ места посчитаны за ВИТРИННЫЙ сезон, а не за
+   * карьеру, и подпись обязана это сказать — иначе цифра читается как «за всё время».
+   */
+  seasonBestsLabel?: string;
   /** Поменять стороны местами; не задан — кнопки нет. */
   onSwap?: () => void;
 }
@@ -42,7 +45,7 @@ const winnerOf = (left: number, right: number): H2HWinner =>
   left === right ? null : (left > right ? 'left' : 'right');
 
 const UI_H2HCompareHeader: React.FC<Props> = ({
-  left, right, leftFaster, rightFaster, ties, showSeasonBests = true, onSwap,
+  left, right, leftFaster, rightFaster, ties, seasonBestsLabel = 'season bests', onSwap,
 }) => (
   <div className="h2h-compare">
     <div className="h2h-row">
@@ -68,14 +71,12 @@ const UI_H2HCompareHeader: React.FC<Props> = ({
     </div>
 
     <div className="h2h-stats">
-      {showSeasonBests && (
-        <UI_H2HStatRow
-          label="season bests"
-          left={left.seasonBests}
-          right={right.seasonBests}
-          winner={winnerOf(left.seasonBests, right.seasonBests)}
-        />
-      )}
+      <UI_H2HStatRow
+        label={seasonBestsLabel}
+        left={left.seasonBests}
+        right={right.seasonBests}
+        winner={winnerOf(left.seasonBests, right.seasonBests)}
+      />
       <UI_H2HStatRow
         label="medals"
         left={<UI_H2HMedalTriple medals={left.medals} />}
