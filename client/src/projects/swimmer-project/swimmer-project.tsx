@@ -438,6 +438,7 @@ function SwimmerProject() {
                     rivalId={rivalId}
                     swimmerId={profile.id}
                     profileName={profile.fullName}
+                    season={activeSeason}
                     state={compare}
                   />
                 )}

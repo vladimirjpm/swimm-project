@@ -782,7 +782,7 @@ export function ProgressPanel({
  */
 export function H2HPanel({
   compare, query, onQuery, hits, hitsState, onPick, onClear, rivalId, swimmerId, profileName,
-  state,
+  season, state,
 }: {
   compare: SwimmerCompare | null;
   /** Строка поиска — состояние живёт на странице, чтобы переживать смену сезона. */
@@ -798,6 +798,8 @@ export function H2HPanel({
   swimmerId: number;
   /** Имя хозяина страницы: слот рисуется ещё до того, как приедет сравнение. */
   profileName: string;
+  /** Сезон карусели — уезжает в ссылку на страницу `/h2h`, чтобы она открыла тот же период. */
+  season: number | null;
   state: PanelLoad;
 }) {
   const { isAuthenticated, favorites, favoriteSwimmerIds, toggleFavoriteSwimmer } =
@@ -878,10 +880,21 @@ export function H2HPanel({
     <>
       {/* Кнопки «Clear» в шапке нет: сбросить соперника можно крестиком на его карточке —
           тем же жестом, что на странице `/h2h`. Два одинаковых действия рядом заставляли бы
-          выбирать между ними на ровном месте. */}
+          выбирать между ними на ровном месте.
+
+          Справа — выход на полную страницу сравнения: тот же экран, но там сменяемы ОБЕ
+          стороны. Пару и сезон уносим с собой, иначе переход стоил бы повторного выбора. */}
       <PanelHead
         title="Compare"
         hint={compare ? h2hScopeLabel(compare) : 'pick a swimmer to put your best times side by side'}
+        right={(
+          <a
+            className="h2h-open"
+            href={routes.h2h({ a: swimmerId, b: rivalId, season: season == null ? 'all' : season })}
+          >
+            Full page →
+          </a>
+        )}
       />
       <UI_H2HCompare left={left} right={right} compare={compare} state={state} picker={picker} />
     </>

@@ -306,6 +306,17 @@
 .h2h-hit__meta { font-size: 11px; font-weight: 700; color: var(--deep-text-faint); white-space: nowrap; }
 .h2h-hint { padding: 8px 10px; font-size: 11.5px; font-weight: 700; color: var(--deep-text-faint); }
 
+/* Выход на полную страницу сравнения из таба. Выглядит как пилюля рядом с заголовком —
+   это переход, а не действие над данными, поэтому без акцентной заливки. */
+.h2h-open {
+  display: inline-flex; align-items: center; padding: 5px 11px; min-height: 30px;
+  border-radius: var(--deep-radius-pill);
+  background: var(--deep-card-bg-raised); border: 1px solid var(--deep-card-border);
+  color: var(--deep-text-mute); font-size: 11px; font-weight: 800;
+  text-decoration: none; white-space: nowrap;
+}
+.h2h-open:hover { color: var(--deep-accent); border-color: var(--deep-accent-border); }
+
 /* Сброс выбранного соперника — кнопка в шапке панели. */
 .h2h-clear {
   padding: 5px 11px; min-height: 30px; border-radius: var(--deep-radius-pill);
