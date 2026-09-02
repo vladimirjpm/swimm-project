@@ -357,7 +357,7 @@ public class SwimmerPageRepository : ISwimmerPageRepository
     public async Task<IReadOnlyDictionary<string, NationalAgeRecordRow>> GetNationalRecordsAsync(
         string? regionCode, string? gender, string category, string ageKey)
     {
-        var region = string.IsNullOrWhiteSpace(regionCode) ? "ISR" : regionCode.Trim().ToUpperInvariant();
+        var region = NormalizeRegion(regionCode);
         var sex = NormalizeGender(gender);
         if (sex is null || string.IsNullOrWhiteSpace(category)) {
             return new Dictionary<string, NationalAgeRecordRow>();
@@ -436,6 +436,24 @@ public class SwimmerPageRepository : ISwimmerPageRepository
     /// подавляющего большинства и «M»/«F» у горстки строк (урок страницы клуба: фильтр по
     /// «M»/«F» вернул полтора десятка пловцов на всю базу).
     /// </summary>
+    /// <summary>
+    /// Код страны к виду справочника рекордов (alpha-3). ⚠ В `Countries` ДВА Израиля:
+    /// «ISR» (id 10, «Israel») и «IL» (id 111) — на второй смотрит 791 пловец, и рекорды
+    /// им не находились вовсе, потому что лежат под «ISR» (поймано 02.09.2026 на пловце
+    /// 62098). Это дыра ДАННЫХ; здесь только защита витрины, чтобы она не молчала, пока
+    /// страны не склеены (docs/plans/h2h-page-plan.md §8-тер).
+    /// </summary>
+    private static string NormalizeRegion(string? regionCode)
+    {
+        var code = (regionCode ?? string.Empty).Trim().ToUpperInvariant();
+        return code switch
+        {
+            "" => "ISR",
+            "IL" => "ISR",
+            _ => code,
+        };
+    }
+
     private static string? NormalizeGender(string? gender) => gender?.Trim().ToLowerInvariant() switch
     {
         "male" or "m" => "male",

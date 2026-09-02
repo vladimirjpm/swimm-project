@@ -345,6 +345,14 @@ public sealed class SwimmerPersonalBestDto
     /// <summary>Возрастная ступень рекорда, с которой сравнивали («12»).</summary>
     [JsonPropertyName("nationalAgeKey")]
     public string? NationalAgeKey { get; set; }
+
+    /// <summary>
+    /// Ступень справочника, которой мерили: «age 14», «masters 45-49», «open». Нужна подписи:
+    /// у взрослых эталон — мастерская полоса или ОТКРЫТЫЙ рекорд страны, и «national age
+    /// record» там читалось бы неправдой. null — сравнивать было не с чем.
+    /// </summary>
+    [JsonPropertyName("nationalRecordScope")]
+    public string? NationalRecordScope { get; set; }
 }
 
 /// <summary>Точка графика прогресса — один заплыв в выбранной дисциплине.</summary>

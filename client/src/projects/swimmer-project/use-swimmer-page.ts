@@ -101,6 +101,11 @@ export interface SwimmerPersonalBest {
   nationalAgeRecordTime?: string | null;
   nationalAgeRecordQuality?: SwimQualityDto | null;
   nationalAgeKey?: string | null;
+  /**
+   * Чем мерили: «age 14», «masters 45-49», «open». У взрослых эталон — мастерская полоса
+   * или ОТКРЫТЫЙ рекорд страны, и подпись «national age record» там была бы неправдой.
+   */
+  nationalRecordScope?: string | null;
 }
 
 /**

@@ -175,15 +175,26 @@ public static class SwimmerPageBuilder
 
     /// <summary>
     /// Таб Records &amp; PB: личный рекорд за карьеру в каждой дисциплине выбранного бассейна
-    /// плюс дельты до лучшего времени клуба и до рекорда страны своего возраста.
+    /// плюс дельты до лучшего времени клуба и до рекорда страны.
     /// «Держит рекорд» определяется по ВРЕМЕНИ (не медленнее рекорда), а не по имени
     /// держателя: имена в справочнике строковые и у тёзок совпадают.
+    ///
+    /// Ступень справочника выбирается ПО ЗАПЛЫВУ (<see cref="RecordStepsOf"/>), а не по
+    /// возрасту пловца: у мастерского старта эталон — полоса «45-49», у обычного взрослого
+    /// — открытый рекорд страны, у ребёнка — его возрастная ступень. Пока спрашивалась одна
+    /// ступень «age/{возраст}», у всех взрослых дельта была пустой (поймано 02.09.2026).
+    ///
+    /// Приоритет — возрастная ступень: она ближе пловцу, чем открытый рекорд страны, и
+    /// именно её он может держать. Открытый берётся, когда возрастной ступени нет в
+    /// справочнике (у взрослых её и не бывает).
     /// </summary>
     public static List<SwimmerPersonalBestDto> PersonalBests(
         IReadOnlyList<SeasonSwimRow> allRows,
         string? poolType,
         IReadOnlyDictionary<string, int> clubBestMs,
-        IReadOnlyDictionary<string, NationalAgeRecordRow> nationalRecords)
+        IReadOnlyDictionary<RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>> nationalRecords,
+        int birthYear = 0,
+        RecordAgeAxis axis = RecordAgeAxis.Calendar)
     {
         var scoped = poolType is null
             ? allRows
@@ -218,15 +229,32 @@ public static class SwimmerPageBuilder
                     dto.DeltaToClubBestMs = ms - club;
                 }
 
-                if (nationalRecords.TryGetValue(key, out var record) && record.TimeMs is int recordMs)
+                // Возрастная ступень впереди открытой: «свой» рекорд ближе, чем рекорд
+                // страны без возраста, и держать пловец может именно его.
+                var steps = RecordStepsOf(r, birthYear, axis)
+                    .OrderBy(step => step.Category == "open" ? 1 : 0)
+                    .ToList();
+
+                foreach (var step in steps)
                 {
+                    // Открытый рекорд страны — эталон ВЗРОСЛОГО. Девятилетней он не эталон,
+                    // а шум: детская лестница в справочнике начинается с 10, и без этой
+                    // отсечки в её личниках появлялась «Δ Israel +19.18» до взрослого
+                    // рекорда. Держит она его или нет, показывает бейдж, а не дельта.
+                    if (step.Category == "open" && !IsAdultSwim(r, birthYear, axis)) continue;
+
+                    if (!nationalRecords.TryGetValue(step, out var slice)) continue;
+                    if (!slice.TryGetValue(key, out var record) || record.TimeMs is not int recordMs) continue;
+
                     dto.HoldsNationalAgeRecord = ms <= recordMs;
                     dto.DeltaToNationalAgeRecordMs = ms - recordMs;
                     dto.NationalAgeRecordTime = record.Time;
                     dto.NationalAgeKey = record.AgeKey;
+                    dto.NationalRecordScope = RecordScopeLabel(step);
                     dto.NationalAgeRecordQuality = record.IssueReason is null
                         ? null
                         : new SwimQualityDto { Kind = "record", Reason = record.IssueReason };
+                    break;
                 }
 
                 return dto;
@@ -540,6 +568,29 @@ public static class SwimmerPageBuilder
 
     /// <summary>Ступень справочника рекордов: пара «категория × возрастной ключ».</summary>
     public readonly record struct RecordStep(string Category, string AgeKey);
+
+    /// <summary>
+    /// Взрослый ли это заплыв: мастерский старт либо возраст выше детской лестницы
+    /// справочника (она идёт по 18 включительно). От этого зависит, годится ли открытый
+    /// рекорд страны как эталон дельты.
+    /// </summary>
+    private static bool IsAdultSwim(SeasonSwimRow row, int birthYear, RecordAgeAxis axis)
+    {
+        if (row.IsMasters) return true;
+        if (birthYear <= 0) return false;
+
+        var age = axis == RecordAgeAxis.Season
+            ? SeasonMath.AgeInSeason(SeasonAggregator.SeasonOf(row), birthYear)
+            : row.CompetitionDate.Year - birthYear;
+        return age is int years && years > TopChildStepAge;
+    }
+
+    /// <summary>Верх детской лестницы справочника («age/18»); дальше только open и masters.</summary>
+    private const int TopChildStepAge = 18;
+
+    /// <summary>Подпись ступени для UI: «age 14», «masters 45-49», «open».</summary>
+    public static string RecordScopeLabel(RecordStep step) =>
+        string.IsNullOrEmpty(step.AgeKey) ? step.Category : $"{step.Category} {step.AgeKey}";
 
     /// <summary>
     /// Ступени справочника, к которым относится ЗАПЛЫВ. Правила те же, что у детектора

@@ -623,9 +623,14 @@ export function PersonalBestsPanel({
                   ms: r.deltaToNationalAgeRecordMs,
                   holds: r.holdsNationalAgeRecord,
                   quality: r.nationalAgeRecordQuality,
-                  title: peers
-                    ? `Compared with the national record for ${peers}`
-                    : 'Compared with the national age record',
+                  // Ступень приходит с сервера («age 14», «masters 45-49», «open»): у
+                  // взрослых эталон — полоса или ОТКРЫТЫЙ рекорд страны, и подпись про
+                  // «возрастной рекорд» там врала бы.
+                  title: r.nationalRecordScope
+                    ? `Compared with the national record — ${r.nationalRecordScope}`
+                    : (peers
+                      ? `Compared with the national record for ${peers}`
+                      : 'Compared with the national record'),
                 },
               ]}
             />

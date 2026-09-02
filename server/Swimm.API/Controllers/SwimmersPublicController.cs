@@ -186,11 +186,14 @@ public class SwimmersPublicController : ControllerBase
             ? await _swims.GetClubBestMsAsync(clubId, clubAge)
             : new Dictionary<string, int>();
 
-        var records = age is int a
-            ? await _swims.GetNationalAgeRecordsAsync(profile.CountryCode, profile.Gender, a)
-            : new Dictionary<string, NationalAgeRecordRow>();
+        // Ступени справочника — ПО ЗАПЛЫВАМ, как в сравнении: мастерский старт меряется
+        // полосой «45-49», обычный взрослый — открытым рекордом страны, ребёнок — своей
+        // возрастной ступенью. Один запрос «age/{возраст}» оставлял всех взрослых без дельты.
+        var axis = RecordAgeAxisSetting.From(_settings);
+        var records = await RecordStepsAsync(rows, profile, axis);
 
-        return SwimmerPageBuilder.PersonalBests(rows, poolType, clubBest, records);
+        return SwimmerPageBuilder.PersonalBests(
+            rows, poolType, clubBest, records, profile?.BirthYear ?? 0, axis);
     }
 
     /// <summary>
@@ -329,26 +332,40 @@ public class SwimmersPublicController : ControllerBase
             ? await _swims.GetAgeCohortSeasonBestsAsync(year, profile.BirthYear)
             : [];
 
-        // Ступени справочника собираем ПО ЗАПЛЫВАМ периода, а не по возрасту пловца:
-        // мастерский старт меряется полосой («45-49»), обычный — детской ступенью, и оба
-        // сверяются с открытым рекордом страны. Раньше спрашивалась одна ступень «age/возраст»,
-        // поэтому у взрослых бейдж рекорда не появлялся никогда.
-        var steps = SwimmerPageBuilder.InSeason(rows, season)
-            .Where(SeasonAggregator.IsCountable)
-            .SelectMany(r => SwimmerPageBuilder.RecordStepsOf(r, profile?.BirthYear ?? 0, axis))
-            .Distinct()
-            .ToList();
+        var records = await RecordStepsAsync(SwimmerPageBuilder.InSeason(rows, season), profile, axis);
 
+        return new SwimmerPageBuilder.SwimmerCompareInput(rows, profile, cohort, records);
+    }
+
+    /// <summary>
+    /// Срезы справочника рекордов для набора заплывов: ступени собираются ПО ЗАПЛЫВАМ
+    /// (<see cref="SwimmerPageBuilder.RecordStepsOf"/>), а не по возрасту пловца, потому что
+    /// мастерский старт меряется полосой возраста, обычный взрослый — открытым рекордом
+    /// страны, а ребёнок — своей возрастной ступенью.
+    ///
+    /// Один и тот же набор нужен и личникам, и сравнению — отсюда общий метод: две копии
+    /// правил разъехались бы, и «Δ Israel» на одной странице спорила бы с бейджем на другой.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<
+        SwimmerPageBuilder.RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>>> RecordStepsAsync(
+        IReadOnlyList<SeasonSwimRow> rows, SwimmerProfileDto? profile, RecordAgeAxis axis)
+    {
         var records = new Dictionary<
             SwimmerPageBuilder.RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>>();
+        if (profile is null) return records;
+
+        var steps = rows
+            .Where(SeasonAggregator.IsCountable)
+            .SelectMany(r => SwimmerPageBuilder.RecordStepsOf(r, profile.BirthYear, axis))
+            .Distinct();
+
         foreach (var step in steps)
         {
-            if (profile is null) break;
             records[step] = await _swims.GetNationalRecordsAsync(
                 profile.CountryCode, profile.Gender, step.Category, step.AgeKey);
         }
 
-        return new SwimmerPageBuilder.SwimmerCompareInput(rows, profile, cohort, records);
+        return records;
     }
 
     private async Task<int?> ResolveSeasonAsync(IReadOnlyList<SeasonSwimRow> rows, string? season)
