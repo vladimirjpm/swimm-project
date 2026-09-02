@@ -46,16 +46,29 @@
   display: grid; grid-template-columns: minmax(0, 1fr) 200px minmax(0, 1fr);
   align-items: center; gap: 14px;
 }
-.h2h-score { text-align: center; }
+.h2h-score {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  text-align: center;
+}
 .h2h-score__value {
   font-family: var(--deep-font-display); font-size: 30px; color: var(--deep-accent);
   font-variant-numeric: tabular-nums;
 }
 .h2h-score__cap { font-size: 11px; font-weight: 600; color: var(--deep-text-faint); }
 .h2h-vs {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
   text-align: center; font-family: var(--deep-font-display); font-size: 22px;
   color: var(--deep-text-ghost);
 }
+/* Поменять стороны местами. Кнопка стоит МЕЖДУ карточками — она про пару, а не про одну
+   из сторон; у таба её нет (левый там хозяин профиля). */
+.h2h-swap {
+  width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--deep-card-bg-raised); border: 1px solid var(--deep-card-border);
+  color: var(--deep-text-mute); font-family: inherit; font-size: 13px;
+}
+.h2h-swap:hover { color: var(--deep-accent); border-color: var(--deep-accent-border); }
 
 /* ── Мини-карточка спортсмена ─────────────────────────────────────────────── */
 
@@ -106,6 +119,15 @@
 .h2h-mini--left .h2h-mini__fav { left: 10px; }
 .h2h-mini--right .h2h-mini__fav { right: 10px; }
 .h2h-mini__fav--on { color: var(--deep-danger); text-shadow: 0 0 8px var(--deep-danger-soft); }
+/* «Сменить пловца» — во ВНУТРЕННЕМ углу (со стороны центра), чтобы не спорить с сердечком
+   во внешнем. Появляется только у сменяемой стороны: в табе её нет вовсе. */
+.h2h-mini__clear {
+  position: absolute; top: 8px; font-size: 12px; line-height: 1; cursor: pointer;
+  background: none; border: 0; padding: 0; color: var(--deep-text-ghost);
+}
+.h2h-mini--left .h2h-mini__clear { right: 10px; }
+.h2h-mini--right .h2h-mini__clear { left: 10px; }
+.h2h-mini__clear:hover { color: var(--deep-text-mute); }
 
 /* ── Пустой слот «выбери соперника» ───────────────────────────────────────── */
 

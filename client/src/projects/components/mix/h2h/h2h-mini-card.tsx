@@ -20,9 +20,17 @@ interface Props {
   /** null — избранное недоступно (гость), сердечко не рисуется вовсе. */
   isFavorite?: boolean | null;
   onToggleFavorite?: () => void;
+  /**
+   * Сброс стороны. Не задан — карточку сменить нельзя (в табе левый это хозяин профиля),
+   * и кнопки нет вовсе: в макете её тоже нет, она появилась вместе со страницей `/h2h`,
+   * где сменяемы обе стороны.
+   */
+  onClear?: (() => void) | null;
 }
 
-const UI_H2HMiniCard: React.FC<Props> = ({ swimmer, align, isFavorite = null, onToggleFavorite }) => {
+const UI_H2HMiniCard: React.FC<Props> = ({
+  swimmer, align, isFavorite = null, onToggleFavorite, onClear = null,
+}) => {
   const avatar = (
     <span className="h2h-mini__avatar">
       {swimmer.avatarUrl
@@ -50,6 +58,16 @@ const UI_H2HMiniCard: React.FC<Props> = ({ swimmer, align, isFavorite = null, on
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite?.(); }}
         >
           {isFavorite ? '♥' : '♡'}
+        </button>
+      )}
+      {onClear && (
+        <button
+          type="button"
+          className="h2h-mini__clear"
+          title="Choose another swimmer"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClear(); }}
+        >
+          ✕
         </button>
       )}
       {align === 'left' ? <>{text}{avatar}</> : <>{avatar}{text}</>}

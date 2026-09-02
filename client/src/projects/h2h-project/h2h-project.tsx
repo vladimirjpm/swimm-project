@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import '../../index.css';
 import '../components/deep/deep-theme.css';
 import './h2h-page.css';
@@ -7,39 +7,40 @@ import { useMode } from '../../hooks/useMode';
 import AppTopbar from '../components/app-topbar/app-topbar';
 import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import UI_H2HCompare, { h2hScopeLabel } from '../components/mix/h2h/h2h-compare';
+import UI_H2HRivalPicker from '../components/mix/h2h/h2h-rival-picker';
 import type { H2HSlot } from '../components/mix/h2h/h2h.types';
-import { parseH2HQuery } from '../../utils/routes';
+import { parseH2HQuery, routes } from '../../utils/routes';
+import { useFavoritesContext } from '../../hooks/favorites-context';
 import { useSwimmerProfile, type SwimmerProfile } from '../swimmer-project/use-swimmer-profile';
-import { useSwimmerCompare } from '../swimmer-project/use-swimmer-page';
+import { useSwimmerCompare, useSwimmerSearch } from '../swimmer-project/use-swimmer-page';
+import { H2H_DEFAULT_LEFT } from './h2h-settings';
 
 /**
  * Страница `/h2h?a=&b=&season=` — сравнение ДВУХ пловцов
  * (план: `docs/plans/h2h-page-plan.md`).
  *
  * Экран здесь тот же, что в табе `?tab=h2h` страницы пловца, — общий `UI_H2HCompare`.
- * Разница только в слотах: на странице сменяемы ОБА, а на табе левый занят хозяином
- * профиля. Компонент об этой разнице не знает: он видит данные слотов, а не режим.
+ * Разница только в слотах: тут сменяемы ОБА и есть «поменять местами», а на табе левый
+ * занят хозяином профиля. Компонент об этой разнице не знает: он видит данные слотов.
  *
- * Этап X3 — каркас и адрес: страница открывается, читает пару из query и показывает
- * сравнение, если оба заданы. Выбор пловцов (два слота, пикер, «ME» по умолчанию) —
- * этап X4, карусель сезонов — X5.
+ * Выбор устроен как «активный слот»: пикер один, а какую сторону он заполнит — решает
+ * последний клик по пустому слоту или крестику. Два пикера рядом читались бы как два
+ * разных поиска, хотя ищут они одно и то же.
  */
 
+/** Какую сторону сейчас заполняет пикер. */
+type ActiveSide = 'a' | 'b';
+
 /** Профиль → занятый слот шапки. Возраст без года рождения не показываем — его нечем проверить. */
-function slotOf(profile: SwimmerProfile): H2HSlot {
+function slotSwimmer(profile: SwimmerProfile) {
   return {
-    kind: 'swimmer',
-    swimmer: {
-      id: profile.id,
-      name: profile.fullName,
-      club: profile.clubName,
-      ageLabel: profile.ageInSeason != null && profile.birthYear > 0
-        ? `${profile.ageInSeason} y · ${profile.birthYear}`
-        : profile.birthYear > 0 ? `b. ${profile.birthYear}` : null,
-      avatarUrl: profile.avatarUrl,
-    },
-    // Избранное на странице появится вместе с выбором сторон (X4).
-    isFavorite: null,
+    id: profile.id,
+    name: profile.fullName,
+    club: profile.clubName,
+    ageLabel: profile.ageInSeason != null && profile.birthYear > 0
+      ? `${profile.ageInSeason} y · ${profile.birthYear}`
+      : profile.birthYear > 0 ? `b. ${profile.birthYear}` : null,
+    avatarUrl: profile.avatarUrl,
   };
 }
 
@@ -48,14 +49,32 @@ function H2HProject() {
   const { mode } = useMode();
   const themeClass = mode === 'dark' ? 'theme-deep' : 'theme-deep-light';
 
-  // Адрес читается ОДИН раз: дальше состояние ведёт страница, а в query оно пишется
-  // обратно (X4). Тот же приём, что на странице спортсмена.
-  const query = useMemo(() => parseH2HQuery(), []);
-  const [aId] = useState<number | null>(query.a);
-  const [bId] = useState<number | null>(query.b);
+  const {
+    isAuthenticated, favorites, primarySwimmerId, favoriteSwimmerIds, toggleFavoriteSwimmer,
+  } = useFavoritesContext();
 
-  // Сезон: `undefined` в адресе — «не задан», подставляем карьеру, пока нет карусели (X5).
+  // Адрес читается ОДИН раз: дальше состояние ведёт страница, а в query пишется обратно.
+  const query = useMemo(() => parseH2HQuery(), []);
+  const [aId, setAId] = useState<number | null>(query.a);
+  const [bId, setBId] = useState<number | null>(query.b);
+  const [active, setActive] = useState<ActiveSide>(query.a == null ? 'a' : 'b');
+  const [search, setSearch] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Сезон: `undefined` в адресе — «не задан», пока это карьера (карусель — этап X5).
   const season = query.season === undefined ? null : query.season;
+
+  /**
+   * «ME» в левом слоте — только когда адрес молчит про `a` (H2H_DEFAULT_LEFT).
+   * В адрес это НЕ пишется: пустая страница должна оставаться `/h2h`, иначе ссылкой на неё
+   * человек передал бы своего пловца.
+   */
+  useEffect(() => {
+    if (H2H_DEFAULT_LEFT !== 'me') return;
+    if (query.a != null || aId != null || primarySwimmerId == null) return;
+    setAId(primarySwimmerId);
+    setActive('b');
+  }, [primarySwimmerId, query.a, aId]);
 
   const aState = useSwimmerProfile(aId);
   const bState = useSwimmerProfile(bId);
@@ -63,16 +82,111 @@ function H2HProject() {
   const bProfile = bState.status === 'ok' ? bState.profile : null;
 
   const compare = useSwimmerCompare(aId, bId, season, aId != null && bId != null);
+  const found = useSwimmerSearch(search);
+  // Уже занятые стороны из выдачи убираем: выбор «того же самого» во второй слот выглядел
+  // бы как перескок пловца через центр, а сравнения с самим собой всё равно не бывает.
+  const hits = useMemo(
+    () => (found.data ?? []).filter((h) => h.id !== aId && h.id !== bId),
+    [found.data, aId, bId],
+  );
 
-  const left: H2HSlot = aProfile
-    ? slotOf(aProfile)
-    : { kind: 'empty', label: 'בחר שחיין · choose a swimmer' };
-  const right: H2HSlot = bProfile
-    ? slotOf(bProfile)
-    : { kind: 'empty', label: 'בחר יריב · choose a rival' };
+  /** Пара в адресе: пустые слоты не пишем — `/h2h` это законное «ещё никого». */
+  const writeQuery = (next: { a?: number | null; b?: number | null }) => {
+    const url = new URL(window.location.href);
+    const apply = (key: string, value: number | null | undefined) => {
+      if (value === undefined) return;
+      if (value == null) url.searchParams.delete(key);
+      else url.searchParams.set(key, String(value));
+    };
+    apply('a', next.a);
+    apply('b', next.b);
+    window.history.replaceState(null, '', url.toString());
+  };
+
+  const pick = (id: number) => {
+    // Тот же пловец с другой стороны — не сравнение, а зеркало: молча меняем стороны
+    // местами вместо того, чтобы поставить его дважды.
+    if (active === 'a') {
+      const nextB = bId === id ? aId : bId;
+      setAId(id); setBId(nextB); writeQuery({ a: id, b: nextB });
+      setActive(nextB == null ? 'b' : 'a');
+    } else {
+      const nextA = aId === id ? bId : aId;
+      setBId(id); setAId(nextA); writeQuery({ a: nextA, b: id });
+      setActive('a');
+    }
+    setSearch('');
+  };
+
+  const clear = (side: ActiveSide) => {
+    if (side === 'a') { setAId(null); writeQuery({ a: null }); } else { setBId(null); writeQuery({ b: null }); }
+    setActive(side);
+    setSearch('');
+    // Фокус в поиск: крестик — это «выбрать другого», а не «просто убрать».
+    window.setTimeout(() => searchRef.current?.focus(), 0);
+  };
+
+  const swap = () => {
+    setAId(bId); setBId(aId);
+    writeQuery({ a: bId, b: aId });
+  };
+
+  const focusSlot = (side: ActiveSide) => {
+    setActive(side);
+    searchRef.current?.focus();
+  };
+
+  const favProps = (id: number) => ({
+    isFavorite: isAuthenticated ? favoriteSwimmerIds.has(id) : null,
+    onToggleFavorite: () => toggleFavoriteSwimmer(id),
+  });
+
+  const slotOf = (side: ActiveSide, profile: SwimmerProfile | null, id: number | null): H2HSlot => {
+    if (id == null) {
+      return {
+        kind: 'empty',
+        label: side === 'a' ? 'בחר שחיין · choose a swimmer' : 'בחר יריב · choose a rival',
+        onPick: () => focusSlot(side),
+      };
+    }
+    return {
+      kind: 'swimmer',
+      // Профиль ещё едет — показываем слот с номером, чтобы шапка не прыгала при загрузке.
+      swimmer: profile ? slotSwimmer(profile) : { id, name: `#${id}` },
+      ...favProps(id),
+      onClear: () => clear(side),
+    };
+  };
+
+  // Избранное как быстрый выбор: обе стороны, уже занятые, из списка убираем.
+  const favoriteChips = favorites
+    .filter((f) => f.target_type === 'swimmer' && f.swimmer_id != null
+      && f.swimmer_id !== aId && f.swimmer_id !== bId)
+    .sort((x, y) => Number(y.is_primary) - Number(x.is_primary) || x.sort_order - y.sort_order)
+    .map((f) => ({ id: f.swimmer_id!, name: f.swimmer_name ?? `#${f.swimmer_id}` }));
 
   const notFound = (aId != null && aState.status === 'notfound')
     || (bId != null && bState.status === 'notfound');
+
+  const picker = (
+    <div className="h2h-page__picker">
+      <div className="h2h-page__picker-cap">
+        Choosing the <strong>{active === 'a' ? 'left' : 'right'}</strong> swimmer
+      </div>
+      <UI_H2HRivalPicker
+        favorites={favoriteChips}
+        query={search}
+        onQuery={setSearch}
+        hits={found.data ? hits : null}
+        loading={found.loading}
+        error={found.error}
+        onPick={pick}
+        inputRef={searchRef}
+        // Нашли, но всех отфильтровали — значит найденный уже стоит в слоте.
+        emptyText={(found.data?.length ?? 0) > 0 ? 'Already on the board.' : 'Nobody found.'}
+      />
+    </div>
+  );
 
   return (
     <div className={themeClass} style={{ background: 'var(--deep-page-bg)', minHeight: '100vh' }}>
@@ -96,12 +210,21 @@ function H2HProject() {
           {notFound && <div className="h2h-page__notice">Swimmer not found.</div>}
 
           <UI_H2HCompare
-            left={left}
-            right={right}
+            left={slotOf('a', aProfile, aId)}
+            right={slotOf('b', bProfile, bId)}
             compare={compare.data}
             state={compare}
+            picker={picker}
             emptyHint="Pick two swimmers to compare."
+            // Менять стороны местами можно только когда есть что менять.
+            onSwap={aId != null && bId != null ? swap : undefined}
           />
+
+          {aId != null && bId != null && (
+            <a className="h2h-page__profile-link" href={routes.swimmer(aId)}>
+              Open profile of the left swimmer →
+            </a>
+          )}
         </div>
       </main>
     </div>

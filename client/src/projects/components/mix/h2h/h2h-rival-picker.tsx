@@ -32,10 +32,16 @@ interface Props {
   onPick: (id: number) => void;
   /** Ссылка на поле поиска: по ней пустой слот переводит фокус, когда его нажали. */
   inputRef?: React.Ref<HTMLInputElement>;
+  /**
+   * Текст пустой выдачи. Вызывающий может отфильтровать уже выбранных, и тогда «никого не
+   * нашлось» — неправда: нашёлся, но он уже на доске.
+   */
+  emptyText?: string;
 }
 
 const UI_H2HRivalPicker: React.FC<Props> = ({
   favorites, query, onQuery, hits, loading, error, onPick, inputRef,
+  emptyText = 'Nobody found.',
 }) => (
   <div className="h2h-picker">
     {favorites.length > 0 && (
@@ -67,7 +73,7 @@ const UI_H2HRivalPicker: React.FC<Props> = ({
         ) : !hits ? (
           <div className="h2h-hint">{loading ? 'Loading…' : 'Type at least two letters.'}</div>
         ) : hits.length === 0 ? (
-          <div className="h2h-hint">Nobody found.</div>
+          <div className="h2h-hint">{emptyText}</div>
         ) : (
           hits.map((hit) => (
             <button key={hit.id} type="button" className="h2h-hit" onClick={() => onPick(hit.id)}>

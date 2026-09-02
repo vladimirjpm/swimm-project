@@ -812,12 +812,16 @@ export function H2HPanel({
     .sort((a, b) => Number(b.is_primary) - Number(a.is_primary) || a.sort_order - b.sort_order)
     .map((f) => ({ id: f.swimmer_id!, name: f.swimmer_name ?? `#${f.swimmer_id}` }));
 
+  // Себя соперником не предлагаем: сервер такой запрос отклоняет (rivalId == id), а в
+  // выдаче собственное имя выглядит как приглашение сравнить себя с собой.
+  const rivalHits = hits?.filter((h) => h.id !== swimmerId) ?? null;
+
   const picker = (
     <UI_H2HRivalPicker
       favorites={favoriteRivals}
       query={query}
       onQuery={onQuery}
-      hits={hits}
+      hits={rivalHits}
       loading={hitsState.loading}
       error={hitsState.error}
       onPick={onPick}
@@ -866,17 +870,18 @@ export function H2HPanel({
         }
         : { id: rivalId, name: `#${rivalId}` },
       ...favProps(rivalId),
-      onClear,
+      // Крестик — это «выбрать другого», а не «просто убрать»: сразу уводим курсор в поиск.
+      onClear: () => { onClear(); window.setTimeout(() => searchRef.current?.focus(), 0); },
     };
 
   return (
     <>
+      {/* Кнопки «Clear» в шапке нет: сбросить соперника можно крестиком на его карточке —
+          тем же жестом, что на странице `/h2h`. Два одинаковых действия рядом заставляли бы
+          выбирать между ними на ровном месте. */}
       <PanelHead
         title="Compare"
         hint={compare ? h2hScopeLabel(compare) : 'pick a swimmer to put your best times side by side'}
-        right={rivalId != null ? (
-          <button type="button" className="h2h-clear" onClick={onClear}>Clear</button>
-        ) : undefined}
       />
       <UI_H2HCompare left={left} right={right} compare={compare} state={state} picker={picker} />
     </>

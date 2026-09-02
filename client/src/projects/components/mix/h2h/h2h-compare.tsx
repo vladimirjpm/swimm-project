@@ -6,6 +6,7 @@ import UI_H2HCompareHeader from './h2h-compare-header';
 import UI_H2HEventCard from './h2h-event-card';
 import UI_H2HPoolRow from './h2h-pool-row';
 import UI_H2HDivider from './h2h-divider';
+import UI_H2HSwap from './h2h-swap';
 import type { H2HSlot } from './h2h.types';
 import type { SwimmerCompare, SwimmerCompareSwim } from '../../../swimmer-project/use-swimmer-page';
 
@@ -32,6 +33,11 @@ interface Props {
   picker?: React.ReactNode;
   /** Текст пустого состояния, когда выбраны не оба. */
   emptyHint?: React.ReactNode;
+  /**
+   * Поменять стороны местами. Не задан — кнопки нет: в табе левый это хозяин профиля,
+   * и «поменять местами» означало бы уехать с его страницы.
+   */
+  onSwap?: () => void;
 }
 
 /**
@@ -72,11 +78,14 @@ function Slot({ slot, align }: { slot: H2HSlot; align: 'left' | 'right' }) {
       align={align}
       isFavorite={slot.isFavorite ?? null}
       onToggleFavorite={slot.onToggleFavorite}
+      onClear={slot.onClear ?? null}
     />
   );
 }
 
-const UI_H2HCompare: React.FC<Props> = ({ left, right, compare, state, picker, emptyHint }) => {
+const UI_H2HCompare: React.FC<Props> = ({
+  left, right, compare, state, picker, emptyHint, onSwap,
+}) => {
   const bothPicked = left.kind === 'swimmer' && right.kind === 'swimmer';
 
   // Пока выбраны не оба — только слоты и выбор: сравнивать нечего, и шапка со статами
@@ -86,7 +95,10 @@ const UI_H2HCompare: React.FC<Props> = ({ left, right, compare, state, picker, e
       <div className="h2h-scope">
         <div className="h2h-row h2h-row--slots">
           <Slot slot={left} align="left" />
-          <div className="h2h-vs">vs</div>
+          <div className="h2h-vs">
+            vs
+            <UI_H2HSwap onSwap={onSwap} />
+          </div>
           <Slot slot={right} align="right" />
         </div>
         {picker}
@@ -157,6 +169,7 @@ const UI_H2HCompare: React.FC<Props> = ({ left, right, compare, state, picker, e
           bestPoints: compare.mine.bestPoints,
           isFavorite: left.isFavorite ?? null,
           onToggleFavorite: left.onToggleFavorite,
+          onClear: left.onClear ?? null,
         }}
         right={{
           swimmer: right.swimmer,
@@ -165,12 +178,14 @@ const UI_H2HCompare: React.FC<Props> = ({ left, right, compare, state, picker, e
           bestPoints: compare.rival.bestPoints,
           isFavorite: right.isFavorite ?? null,
           onToggleFavorite: right.onToggleFavorite,
+          onClear: right.onClear ?? null,
         }}
         leftFaster={compare.mineFaster}
         rightFaster={compare.rivalFaster}
         ties={compare.ties}
         // За карьеру мест среди сверстников нет — строка не рисуется, а не показывает 0:0.
         showSeasonBests={compare.season != null}
+        onSwap={onSwap}
       />
 
       {compare.rows.length === 0 ? (
