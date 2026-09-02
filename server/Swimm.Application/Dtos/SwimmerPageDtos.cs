@@ -663,6 +663,14 @@ public sealed class SwimmerCompareSideDto
     /// <summary>Лучшие очки FINA за один заплыв периода. 0 — зачётных заплывов нет.</summary>
     [JsonPropertyName("bestPoints")]
     public int BestPoints { get; set; }
+
+    /// <summary>
+    /// Сколько официальных рекордов держит пловец — тот же счётчик, что в плитке достижений
+    /// профиля. ⚠ ВСЕГДА за карьеру: у записи справочника нет сезона, поэтому карусель на
+    /// эту цифру не влияет (решение плана страницы спортсмена, §11).
+    /// </summary>
+    [JsonPropertyName("recordsHeld")]
+    public int RecordsHeld { get; set; }
 }
 
 /// <summary>

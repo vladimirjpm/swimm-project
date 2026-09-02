@@ -520,6 +520,9 @@ public static class SwimmerPageBuilder
             ? SeasonMath.AgeInSeason(s, profile.BirthYear)
             : null,
         SeasonBests = flags.SeasonBests,
+        // Рекорды берём из профиля: их считает справочник по имени держателя, а не наши
+        // заплывы, — и это единственная цифра шапки, которая НЕ зависит от периода.
+        RecordsHeld = profile?.RecordsHeld ?? 0,
         Medals = Medals(rows),
         BestPoints = rows.Where(SeasonAggregator.IsCountable)
             .Select(r => r.InternationalPoints)

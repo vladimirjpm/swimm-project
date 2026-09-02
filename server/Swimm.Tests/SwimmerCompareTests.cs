@@ -30,12 +30,14 @@ public class SwimmerCompareTests
             IsMasters = isMasters,
         };
 
-    private static SwimmerProfileDto Profile(int id, string name, int birthYear, string gender) => new()
+    private static SwimmerProfileDto Profile(
+        int id, string name, int birthYear, string gender, int recordsHeld = 0) => new()
     {
         Id = id,
         FullName = name,
         BirthYear = birthYear,
         Gender = gender,
+        RecordsHeld = recordsHeld,
     };
 
     /// <summary>Сторона сравнения без когорты и справочника — их проверяют отдельные тесты.</summary>
@@ -416,6 +418,28 @@ public class SwimmerCompareTests
         Assert.Equal(1, dto.Mine.Medals.Bronze);
         Assert.Equal(700, dto.Mine.BestPoints);
         Assert.Equal(480, dto.Rival.BestPoints);
+    }
+
+    [Fact]
+    public void Compare_SideCarriesRecordsHeld_FromProfileNotFromPeriod()
+    {
+        // Рекорды приходят из профиля (справочник, матч по имени держателя) и НЕ зависят от
+        // выбранного периода: у записи справочника нет сезона.
+        var mine = new[] { Row(1, 10, "2026-02-01", "male", ms: 59000) };
+        var rival = new[] { Row(2, 20, "2026-02-01", "male", ms: 61000) };
+
+        var season = SwimmerPageBuilder.Compare(
+            Input(mine, Profile(10, "Mine", 2012, "male", recordsHeld: 15)),
+            Input(rival, Profile(20, "Rival", 2012, "male", recordsHeld: 5)),
+            season: 2025);
+        Assert.Equal(15, season.Mine.RecordsHeld);
+        Assert.Equal(5, season.Rival.RecordsHeld);
+
+        var career = SwimmerPageBuilder.Compare(
+            Input(mine, Profile(10, "Mine", 2012, "male", recordsHeld: 15)),
+            Input(rival, Profile(20, "Rival", 2012, "male", recordsHeld: 5)),
+            season: null);
+        Assert.Equal(15, career.Mine.RecordsHeld);
     }
 
     [Fact]

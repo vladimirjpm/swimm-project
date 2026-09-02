@@ -18,6 +18,8 @@ export interface H2HSide {
   seasonBests: number;
   medals: H2HMedals;
   bestPoints: number;
+  /** Официальные рекорды — ВСЕГДА за карьеру: у записи справочника нет сезона. */
+  recordsHeld?: number;
   /** null — избранное недоступно (гость): сердечко не рисуется. */
   isFavorite?: boolean | null;
   onToggleFavorite?: () => void;
@@ -77,6 +79,18 @@ const UI_H2HCompareHeader: React.FC<Props> = ({
         right={right.seasonBests}
         winner={winnerOf(left.seasonBests, right.seasonBests)}
       />
+      {/* Рекорды — только когда они есть хотя бы у одного: строка «0 : 0» ничего не
+          сообщает, а место в шапке дорогое. Подпись «all time» обязательна: соседняя
+          строка посчитана за сезон, и без неё цифры читались бы как один период. */}
+      {(left.recordsHeld ?? 0) + (right.recordsHeld ?? 0) > 0 && (
+        <UI_H2HStatRow
+          label="records · all time"
+          left={left.recordsHeld ?? 0}
+          right={right.recordsHeld ?? 0}
+          winner={winnerOf(left.recordsHeld ?? 0, right.recordsHeld ?? 0)}
+        />
+      )}
+
       <UI_H2HStatRow
         label="medals"
         left={<UI_H2HMedalTriple medals={left.medals} />}
