@@ -25,3 +25,27 @@ export interface H2HSwimmer {
   ageLabel?: string | null;
   avatarUrl?: string | null;
 }
+
+/**
+ * Слот стороны сравнения: занят пловцом либо пуст. Это ДАННЫЕ, а не режим экрана —
+ * `UI_H2HCompare` не знает слов «таб» и «страница».
+ *
+ * «Сторону нельзя сменить» (в табе левый — хозяин страницы) выражается через `onClear: null`,
+ * а не через флаг варианта: иначе каждый новый контекст добавлял бы ветку внутрь компонента.
+ */
+export type H2HSlot =
+  | {
+      kind: 'swimmer';
+      swimmer: H2HSwimmer;
+      /** null — избранное недоступно (гость): сердечко не рисуется. */
+      isFavorite?: boolean | null;
+      onToggleFavorite?: () => void;
+      /** null — слот несменяемый; иначе кнопка сброса стороны. */
+      onClear?: (() => void) | null;
+    }
+  | {
+      kind: 'empty';
+      /** Подпись слота; по умолчанию — «выбери соперника» из макета. */
+      label?: string;
+      onPick?: () => void;
+    };

@@ -12,6 +12,25 @@
    • красный (`--deep-danger`) = только favorite (♥);
    • glow — только у включённого сердечка; плашка победителя без свечения. */
 
+/* ── Корень экрана ────────────────────────────────────────────────────────── */
+
+/* Обёртка всего сравнения. Её ставит сам компонент, а не вызывающий: на неё повесится
+   `container-type` (этап X2 плана), и забытая обёртка означала бы экран, который не
+   ужимается. Отступы между блоками — здесь же, чтобы таб и страница выглядели одинаково. */
+.h2h-scope { display: flex; flex-direction: column; gap: 12px; }
+.h2h-events { display: flex; flex-direction: column; gap: 8px; }
+.h2h-legend {
+  display: block; margin-top: 2px; line-height: 1.5;
+  font-size: 10.5px; font-weight: 800; color: var(--deep-text-ghost);
+}
+.h2h-empty {
+  padding: 18px 4px; text-align: center;
+  font-size: 12.5px; font-weight: 700; color: var(--deep-text-faint);
+}
+/* Ряд слотов до выбора: та же сетка, что у шапки сравнения — экран не «прыгает», когда
+   пловец выбран и слот превращается в карточку. */
+.h2h-row--slots { align-items: stretch; }
+
 /* ── Шапка сравнения: карточка · центр · карточка ──────────────────────────── */
 
 .h2h-compare { display: flex; flex-direction: column; gap: 16px; }
