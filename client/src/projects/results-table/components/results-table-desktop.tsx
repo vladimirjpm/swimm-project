@@ -16,6 +16,7 @@ import UI_RoundLabel from '../../components/mix/round-label/round-label';
 import ResultRowDateInfo from './result-row-date-info';
 import UI_AddVideoIcon from '../../components/mix/add-video-icon/add-video-icon';
 import HelperResults from '../../../utils/helpers/helper-results';
+import UI_SeasonBestBadge from '../../components/mix/season-best-badge/season-best-badge';
 
 const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
   res,
@@ -33,6 +34,9 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
   isAwardSource,
   isRecordHolder,
   isRecordTime,
+  recordHolderMark,
+  recordTimeMark,
+  isSeasonBestTime,
   isPrimaryFavorite,
   isFavorite,
   onToggleFavorite,
@@ -112,7 +116,8 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
           firstLineClassName="text-[15px] font-bold overflow-hidden text-[var(--theme-mode-text)]"
           secondLineClassName="text-xs text-[var(--theme-mode-text-secondary)]"
           isRecordHolder={isRecordHolder}
-          recordKind={isMastersResult ? 'masters' : 'age'}
+          recordKind={recordHolderMark?.kind ?? (isMastersResult ? 'masters' : 'age')}
+          recordScope={recordHolderMark?.scope ?? undefined}
           isMe={isPrimaryFavorite}
         />
         {showDate && (
@@ -150,10 +155,12 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
           firstLineClassName="text-[21px] font-bold tabular-nums tracking-tight flex justify-start"
           secondLineClassName="text-xs justify-start"
           isRecordHolder={isRecordTime}
-          recordKind={isMastersResult ? 'masters' : 'age'}
+          recordKind={recordTimeMark?.kind ?? (isMastersResult ? 'masters' : 'age')}
+          recordScope={recordTimeMark?.scope ?? undefined}
           quality={res.suspect_reason ? { kind: 'protocol', reason: res.suspect_reason } : null}
           qualityMarker="chip"
         />
+        {isSeasonBestTime && <UI_SeasonBestBadge className="mt-0.5" />}
       </div>
 
       {/* LEVEL (gauge) */}

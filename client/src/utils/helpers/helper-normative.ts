@@ -8,6 +8,26 @@ import RecordsHelper from './records-helper';
 
 export type PoolType = '25m_pool' | '50m_pool';
 
+/**
+ * Класс рекорда, с которым сверился заплыв: национальный (`open` в справочнике), возрастная
+ * ступень или мастерская полоса. Совпадает с `RecordKind` бейджа `UI_RecordBadge` минус
+ * мировой — мировые рекорды витрина протокола не проверяет.
+ */
+export type RecordMarkKind = 'national' | 'age' | 'masters';
+
+export interface RecordMark {
+  kind: RecordMarkKind;
+  /** Ступень для подсказки: «14» у возрастной, «45-49» у мастерской, null у национального. */
+  scope: string | null;
+}
+
+/**
+ * Верх детской лестницы справочника: дальше только `open` и `masters`. Зеркало серверной
+ * константы `SwimmerPageBuilder.TopChildStepAge` — разъедутся, и один и тот же заплыв
+ * получит разные бейджи в протоколе и на странице пловца.
+ */
+const TOP_CHILD_STEP_AGE = 18;
+
 type Normatives = {
   normatives: Record<
     Gender,
@@ -216,7 +236,32 @@ export default class HelperNormative {
    * Finds the record entry for a given event (gender/pool/style/distance/age).
    * Shared lookup logic for isRecordHolder and isRecordTime.
    */
-  private static findRecord({
+  private static findRecord(params: {
+    gender: string;
+    poolType: string;
+    styleName: string;
+    distance: string;
+    age: string | number | null | undefined;
+    isMasters: boolean;
+  }) {
+    return HelperNormative.findRecordSteps(params)[0]?.record ?? null;
+  }
+
+  /**
+   * Ступени справочника, с которыми сверяется ЭТОТ заплыв, от старшего класса к младшему.
+   *
+   * Зеркало серверного `SwimmerPageBuilder.RecordStepsOf`: справочник трёхосевой, и ступень
+   * зависит от заплыва, а не только от возраста пловца — у мастерского старта это полоса
+   * «45-49», у обычного взрослого открытый рекорд страны (`open`), у ребёнка его возрастная
+   * ступень. Пока спрашивалась одна ступень «возраст», взрослые не получали бейджа вовсе:
+   * держатель национального рекорда выглядел в протоколе обычным первым номером
+   * (поймано 02.09.2026 на 00:56.73 Горбенко, 100 спина 25м).
+   *
+   * ⚠ Открытый рекорд — эталон ВЗРОСЛОГО. Ребёнку он не эталон, а шум: детская лестница
+   * справочника кончается на 18, и сверять с ним девятилетнюю бессмысленно (та же отсечка
+   * `IsAdultSwim` на сервере).
+   */
+  private static findRecordSteps({
     gender,
     poolType,
     styleName,
@@ -230,37 +275,118 @@ export default class HelperNormative {
     distance: string;
     age: string | number | null | undefined;
     isMasters: boolean;
-  }) {
-    if (!styleName || !distance) return null;
-
-    const data = isMasters
-      ? RecordsHelper.getMastersRecords()
-      : RecordsHelper.getAgeRecords();
-    if (!data?.normatives) return null;
+  }): { kind: RecordMarkKind; scope: string | null; record: any }[] {
+    if (!styleName || !distance) return [];
 
     const resolvedPool = HelperNormative.resolvePoolType(poolType);
-    const distanceData = (data.normatives as any)?.[gender]?.[resolvedPool]?.[styleName]?.[distance];
-    if (!distanceData) return null;
-
     const ageStr = age != null ? String(age).trim() : '';
-    if (!ageStr) return null;
+    const ageNum = parseInt(ageStr, 10);
+    const isAdult = isMasters || (!isNaN(ageNum) && ageNum > TOP_CHILD_STEP_AGE);
+    const steps: { kind: RecordMarkKind; scope: string | null; record: any }[] = [];
 
-    let record = distanceData[ageStr];
+    // 1. Национальный (open) — старший класс, поэтому первым.
+    if (isAdult) {
+      const openCell = (RecordsHelper.getOpenRecords().normatives as any)
+        ?.[gender]?.[resolvedPool]?.[styleName]?.[distance]?.NR;
+      if (openCell) steps.push({ kind: 'national', scope: null, record: openCell });
+    }
 
-    if (!record && isMasters) {
-      const ageNum = parseInt(ageStr, 10);
-      if (!isNaN(ageNum)) {
+    // 2. Возрастная ступень (обычный старт) либо мастерская полоса (мастерский).
+    const data = isMasters ? RecordsHelper.getMastersRecords() : RecordsHelper.getAgeRecords();
+    const distanceData = (data?.normatives as any)?.[gender]?.[resolvedPool]?.[styleName]?.[distance];
+    if (distanceData && ageStr) {
+      let record = distanceData[ageStr];
+      let scope: string | null = ageStr;
+
+      // Полоса мастерса задана диапазоном («45-49») — точного ключа по возрасту в ней нет.
+      if (!record && isMasters && !isNaN(ageNum)) {
         for (const key of Object.keys(distanceData)) {
           const m = key.match(/^(\d+)-(\d+)$/);
           if (m && ageNum >= Number(m[1]) && ageNum <= Number(m[2])) {
             record = distanceData[key];
+            scope = key;
             break;
           }
         }
       }
+
+      if (record) steps.push({ kind: isMasters ? 'masters' : 'age', scope, record });
     }
 
-    return record ?? null;
+    return steps;
+  }
+
+  /**
+   * Рекорд, который БЬЁТ это время, либо null. Класс один — старший из подходящих
+   * (национальный > возрастной > мастерский): два бейджа на одном времени не показываем.
+   */
+  static recordMarkForTime({
+    time,
+    gender,
+    poolType,
+    styleName,
+    distance,
+    age,
+    isMasters,
+  }: {
+    time: string;
+    gender: string;
+    poolType: string;
+    styleName: string;
+    distance: string;
+    age: string | number | null | undefined;
+    isMasters: boolean;
+  }): RecordMark | null {
+    if (!time) return null;
+    const swimmerTime = HelperTime.parseTimeToSeconds(time);
+    if (!isFinite(swimmerTime)) return null;
+
+    for (const step of HelperNormative.findRecordSteps({ gender, poolType, styleName, distance, age, isMasters })) {
+      const recordTime = HelperTime.parseTimeToSeconds(step.record?.time);
+      if (isFinite(recordTime) && swimmerTime <= recordTime) {
+        return { kind: step.kind, scope: step.scope };
+      }
+    }
+    return null;
+  }
+
+  /** Рекорд, который ДЕРЖИТ этот пловец в этой дисциплине, либо null (старший класс). */
+  static recordMarkForHolder({
+    swimmerName,
+    gender,
+    poolType,
+    styleName,
+    distance,
+    age,
+    isMasters,
+  }: {
+    swimmerName: string;
+    gender: string;
+    poolType: string;
+    styleName: string;
+    distance: string;
+    age: string | number | null | undefined;
+    isMasters: boolean;
+  }): RecordMark | null {
+    if (!swimmerName) return null;
+
+    for (const step of HelperNormative.findRecordSteps({ gender, poolType, styleName, distance, age, isMasters })) {
+      if (HelperNormative.sameHolder(swimmerName, step.record?.name)) {
+        return { kind: step.kind, scope: step.scope };
+      }
+    }
+    return null;
+  }
+
+  /** Имя пловца и имя держателя — с поправкой на порядок «фамилия имя» в справочнике. */
+  private static sameHolder(swimmerName: string, holderName: string | null | undefined): boolean {
+    if (!holderName) return false;
+    const nameA = swimmerName.trim();
+    const nameB = holderName.trim();
+    if (nameA === nameB) return true;
+
+    const parts = nameA.split(/\s+/);
+    return parts.length === 2 && parts[1] + ' ' + parts[0] === nameB;
   }
 
   /**
@@ -283,22 +409,9 @@ export default class HelperNormative {
     age: string | number | null | undefined;
     isMasters: boolean;
   }): boolean {
-    if (!swimmerName) return false;
-
-    const record = HelperNormative.findRecord({ gender, poolType, styleName, distance, age, isMasters });
-    if (!record?.name) return false;
-
-    const nameA = swimmerName.trim();
-    const nameB = record.name.trim();
-    if (nameA === nameB) return true;
-
-    const partsA = nameA.split(/\s+/);
-    if (partsA.length === 2) {
-      const reversed = `${partsA[1]} ${partsA[0]}`;
-      if (reversed === nameB) return true;
-    }
-
-    return false;
+    return HelperNormative.recordMarkForHolder({
+      swimmerName, gender, poolType, styleName, distance, age, isMasters,
+    }) != null;
   }
 
   /**
@@ -321,15 +434,9 @@ export default class HelperNormative {
     age: string | number | null | undefined;
     isMasters: boolean;
   }): boolean {
-    if (!time) return false;
-
-    const record = HelperNormative.findRecord({ gender, poolType, styleName, distance, age, isMasters });
-    if (!record?.time) return false;
-
-    const swimmerTime = HelperTime.parseTimeToSeconds(time);
-    const recordTime = HelperTime.parseTimeToSeconds(record.time);
-
-    return isFinite(swimmerTime) && isFinite(recordTime) && swimmerTime <= recordTime;
+    return HelperNormative.recordMarkForTime({
+      time, gender, poolType, styleName, distance, age, isMasters,
+    }) != null;
   }
 
   /**

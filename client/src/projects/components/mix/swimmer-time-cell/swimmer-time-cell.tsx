@@ -21,6 +21,8 @@ interface UI_SwimmerTimeCellProps {
    * одним достижением.
    */
   recordKind?: RecordKind;
+  /** Ступень рекорда для подсказки: «14» у возрастного, «45-49» у мастерского. */
+  recordScope?: string | null;
   /**
    * Качество времени (docs/plans/swim-time-quality-everywhere-plan.md). null — всё в порядке.
    * Значок и объяснение рисует `UI_SwimTime` — единственный шов вывода времени.
@@ -51,6 +53,7 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
   className = '',
   isRecordHolder = false,
   recordKind = 'age',
+  recordScope,
   quality = null,
   qualityMarker = 'icon',
   gapMs = null,
@@ -83,7 +86,7 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
           три класса и одно правило цвета — золото только национальному. */}
       {isRecordHolder && (
         <div className="mb-1 flex justify-start">
-          <UI_RecordBadge kind={recordKind} isNew />
+          <UI_RecordBadge kind={recordKind} scope={recordScope} isNew />
         </div>
       )}
       {formattedTimeSplit ? (

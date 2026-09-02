@@ -15,6 +15,7 @@ import { ResultsTableRowProps } from './types';
 import ResultRowDateInfo from './result-row-date-info';
 import UI_AddVideoIcon from '../../components/mix/add-video-icon/add-video-icon';
 import HelperResults from '../../../utils/helpers/helper-results';
+import UI_SeasonBestBadge from '../../components/mix/season-best-badge/season-best-badge';
 
 const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
   res,
@@ -32,6 +33,9 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
   isAwardSource,
   isRecordHolder,
   isRecordTime,
+  recordHolderMark,
+  recordTimeMark,
+  isSeasonBestTime,
   isPrimaryFavorite,
   isFavorite,
   onToggleFavorite,
@@ -106,7 +110,8 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
                 secondLineClassName="text-sm mt-0.5 text-[var(--theme-mode-text-secondary)]"
                 showClubIcon={false}
                 isRecordHolder={isRecordHolder}
-          recordKind={isMastersResult ? 'masters' : 'age'}
+          recordKind={recordHolderMark?.kind ?? (isMastersResult ? 'masters' : 'age')}
+          recordScope={recordHolderMark?.scope ?? undefined}
               />
               {showDate && (
                 <ResultRowDateInfo date={res.date} competition={res.competition} showCompetition={showCompetition} />
@@ -134,10 +139,12 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
                 secondLineClassName="text-xs justify-center"
                 className="text-right"
                 isRecordHolder={isRecordTime}
-          recordKind={isMastersResult ? 'masters' : 'age'}
+          recordKind={recordTimeMark?.kind ?? (isMastersResult ? 'masters' : 'age')}
+          recordScope={recordTimeMark?.scope ?? undefined}
           quality={res.suspect_reason ? { kind: 'protocol', reason: res.suspect_reason } : null}
           qualityMarker="chip"
               />
+              {isSeasonBestTime && <UI_SeasonBestBadge className="mt-0.5" />}
               {showEvent && (
                 <UI_SwimmStyleIcon
                   styleName={res.event_style_name}

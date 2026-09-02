@@ -30,6 +30,8 @@ export default class Helper {
   static isResultMasters = HelperNormative.isResultMasters;
   static isRecordHolder = HelperNormative.isRecordHolder;
   static isRecordTime = HelperNormative.isRecordTime;
+  static recordMarkForHolder = HelperNormative.recordMarkForHolder;
+  static recordMarkForTime = HelperNormative.recordMarkForTime;
   static getSwimmerRecords = HelperNormative.getSwimmerRecords;
 
   // === Results ===
