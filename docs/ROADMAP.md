@@ -627,6 +627,12 @@ API, решения, «как вернуться»). Дизайн-материа
   таблицы результатов, `SwimRow`, карточки Overview, таб Clubs. Контракт и решения —
   [competition-overview-cards.md](competition-overview-cards.md),
   [ui-components.md](ui-components.md).
+- ✅ 13.6. **Head-to-head одним экраном на двух местах** (02.09.2026): таб `?tab=h2h`
+  страницы пловца и отдельная страница `/h2h?a=&b=&season=` — это ОДИН компонент
+  `UI_H2HCompare`, а не две вёрстки. Слот стороны — данные (`onClear: null` = «сменить
+  нельзя»), ширину экран решает по своему контейнеру (`@container`), а не по вьюпорту.
+  План и решения — [plans/h2h-page-plan.md](plans/h2h-page-plan.md), устройство таба —
+  [plans/athlete-page-plan.md](plans/athlete-page-plan.md) §12.
 
 ## Хостинг — решение (2026-07-15, зафиксировано, не реализовано)
 
