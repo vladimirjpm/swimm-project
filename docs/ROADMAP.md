@@ -452,8 +452,11 @@ API, решения, «как вернуться»). Дизайн-материа
 - ✅ 10.2. **Спортсмен: API** — профиль с сезонами, `summary`, `best-times`, `personal-bests`,
   `progress` поверх общего шва `ISwimmerPageRepository` (этапы A1–A4).
   Попутно: `/api/athletes/career` научился искать **по id**, имя осталось алиасом для попапа.
-- ✅ 10.3. **Страница спортсмена** по макету 2a: карусель сезонов + шесть табов
-  (Season · Results · Records & PB · Progress · Media · History), этапы A5–A6.
+- ✅ 10.3. **Страница спортсмена** по макету 2a: карусель сезонов + табы, этапы A5–A6.
+  Сначала было шесть (Season · Results · Records & PB · Progress · Media · History), сейчас
+  четыре — **Season · Results · Media · H2H**: Records & PB и Progress стали фильтрами
+  внутри Results, а History снят (он дублировал Season в режиме ∞) и заменён head-to-head — сравнением
+  с выбранным пловцом. Подробности — `docs/plans/athlete-page-plan.md` §11–12.
 - ✅ 10.4. **Клуб: идентичность.** Новый ресурс `/clubs/{id}` — html-точка входа +
   **три зеркала контракта** (`routes.ts`, `cleanUrlRewrite` в `vite.config.js`,
   rewrite-middleware в `Program.cs`). Сейчас `club` — фильтр в query, не идентичность.
