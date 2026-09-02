@@ -30,14 +30,12 @@ public class SwimmerCompareTests
             IsMasters = isMasters,
         };
 
-    private static SwimmerProfileDto Profile(
-        int id, string name, int birthYear, string gender, int recordsHeld = 0) => new()
+    private static SwimmerProfileDto Profile(int id, string name, int birthYear, string gender) => new()
     {
         Id = id,
         FullName = name,
         BirthYear = birthYear,
         Gender = gender,
-        RecordsHeld = recordsHeld,
     };
 
     /// <summary>Сторона сравнения без когорты и справочника — их проверяют отдельные тесты.</summary>
@@ -45,10 +43,16 @@ public class SwimmerCompareTests
         SeasonSwimRow[] rows, SwimmerProfileDto profile,
         IReadOnlyList<PeerSeasonBest>? cohort = null,
         IReadOnlyDictionary<
-            SwimmerPageBuilder.RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>>? records = null) =>
+            SwimmerPageBuilder.RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>>? records = null,
+        IReadOnlyList<HeldRecordRow>? held = null) =>
         new(rows, profile, cohort ?? [],
             records ?? new Dictionary<
-                SwimmerPageBuilder.RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>>());
+                SwimmerPageBuilder.RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>>(),
+            held ?? []);
+
+    /// <summary>Строка справочника «этот пловец держит рекорд» — вход счётчиков шапки.</summary>
+    private static HeldRecordRow Held(string category, string ageKey = "") =>
+        new("country", "ISR", category, ageKey, "female", "25m", "freestyle", "50m", "00:27.00", null, null);
 
     /// <summary>Срез справочника одной ступени: («age»,«14») и так далее.</summary>
     private static IReadOnlyDictionary<
@@ -350,8 +354,8 @@ public class SwimmerCompareTests
             season: 2025);
 
         var pool = dto.Rows.Single().Pools.Single();
-        Assert.True(pool.Mine!.HoldsRecord);
-        Assert.False(pool.Rival!.HoldsRecord);
+        Assert.Equal("age", pool.Mine!.Record?.Kind);
+        Assert.Null(pool.Rival!.Record);
     }
 
     [Fact]
@@ -367,14 +371,14 @@ public class SwimmerCompareTests
             Input(mine, Profile(10, "Mine", 1981, "female"), records: Step("masters", "45-49", key, 60000)),
             Input(rival, Profile(20, "Rival", 1981, "female")),
             season: 2025);
-        Assert.True(band.Rows.Single().Pools.Single().Mine!.HoldsRecord);
+        Assert.Equal("masters", band.Rows.Single().Pools.Single().Mine!.Record?.Kind);
 
         // Тот же рекорд, положенный в детскую ступень, к мастерскому заплыву не относится.
         var childStep = SwimmerPageBuilder.Compare(
             Input(mine, Profile(10, "Mine", 1981, "female"), records: Step("age", "45", key, 60000)),
             Input(rival, Profile(20, "Rival", 1981, "female")),
             season: 2025);
-        Assert.False(childStep.Rows.Single().Pools.Single().Mine!.HoldsRecord);
+        Assert.Null(childStep.Rows.Single().Pools.Single().Mine!.Record);
     }
 
     [Fact]
@@ -391,7 +395,7 @@ public class SwimmerCompareTests
             Input(rival, Profile(20, "Rival", 1997, "male")),
             season: 2025);
 
-        Assert.True(dto.Rows.Single().Pools.Single().Mine!.HoldsRecord);
+        Assert.Equal("national", dto.Rows.Single().Pools.Single().Mine!.Record?.Kind);
     }
 
     [Fact]
@@ -421,25 +425,60 @@ public class SwimmerCompareTests
     }
 
     [Fact]
-    public void Compare_SideCarriesRecordsHeld_FromProfileNotFromPeriod()
+    public void Compare_SideCountsHeldRecords_ByClass_AndNotByPeriod()
     {
-        // Рекорды приходят из профиля (справочник, матч по имени держателя) и НЕ зависят от
-        // выбранного периода: у записи справочника нет сезона.
+        // Классы НЕ складываются в одну цифру: у подростка десяток возрастных ступеней
+        // одного достижения, у взрослого — один национальный (хендофф §5). И период на них
+        // не влияет: у записи справочника нет сезона.
         var mine = new[] { Row(1, 10, "2026-02-01", "male", ms: 59000) };
         var rival = new[] { Row(2, 20, "2026-02-01", "male", ms: 61000) };
+        var mineHeld = new[] { Held("open"), Held("age", "14"), Held("age", "15"), Held("masters", "45-49") };
 
         var season = SwimmerPageBuilder.Compare(
-            Input(mine, Profile(10, "Mine", 2012, "male", recordsHeld: 15)),
-            Input(rival, Profile(20, "Rival", 2012, "male", recordsHeld: 5)),
+            Input(mine, Profile(10, "Mine", 2012, "male"), held: mineHeld),
+            Input(rival, Profile(20, "Rival", 2012, "male")),
             season: 2025);
-        Assert.Equal(15, season.Mine.RecordsHeld);
-        Assert.Equal(5, season.Rival.RecordsHeld);
+
+        Assert.Equal(1, season.Mine.Records.National);
+        Assert.Equal(2, season.Mine.Records.Age);
+        Assert.Equal(1, season.Mine.Records.Masters);
+        Assert.Equal(0, season.Rival.Records.National);
 
         var career = SwimmerPageBuilder.Compare(
-            Input(mine, Profile(10, "Mine", 2012, "male", recordsHeld: 15)),
-            Input(rival, Profile(20, "Rival", 2012, "male", recordsHeld: 5)),
+            Input(mine, Profile(10, "Mine", 2012, "male"), held: mineHeld),
+            Input(rival, Profile(20, "Rival", 2012, "male")),
             season: null);
-        Assert.Equal(15, career.Mine.RecordsHeld);
+        Assert.Equal(1, career.Mine.Records.National);
+        Assert.Equal(2, career.Mine.Records.Age);
+    }
+
+    [Fact]
+    public void Compare_RecordBadge_ShowsTheSeniorClassOnly()
+    {
+        // Время бьёт и возрастную ступень, и национальный рекорд — бейдж один, старший.
+        var mine = new[] { Row(1, 10, "2026-02-01", "male", ms: 55000) };
+        var rival = new[] { Row(2, 20, "2026-02-01", "male", ms: 61000) };
+        var key = SeasonAggregator.DisciplineKey(1, "100", "25m", "male");
+
+        var records = new Dictionary<
+            SwimmerPageBuilder.RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>>
+        {
+            [new SwimmerPageBuilder.RecordStep("age", "14")] = new Dictionary<string, NationalAgeRecordRow>
+            {
+                [key] = new("00:59.00", 59000, null, "14"),
+            },
+            [new SwimmerPageBuilder.RecordStep("open", "")] = new Dictionary<string, NationalAgeRecordRow>
+            {
+                [key] = new("00:56.00", 56000, null, ""),
+            },
+        };
+
+        var dto = SwimmerPageBuilder.Compare(
+            Input(mine, Profile(10, "Mine", 2012, "male"), records: records),
+            Input(rival, Profile(20, "Rival", 2012, "male")),
+            season: 2025);
+
+        Assert.Equal("national", dto.Rows.Single().Pools.Single().Mine!.Record?.Kind);
     }
 
     [Fact]

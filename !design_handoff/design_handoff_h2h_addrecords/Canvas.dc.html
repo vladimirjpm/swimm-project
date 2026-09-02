@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+<style>
+body { margin:0; background:#031220; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+a { color:#22d3ee; text-decoration:none; } a:hover { color:#67e8f9; }
+</style>
+</helmet>
+
+<section style="padding:48px 48px 0;display:flex;flex-direction:column;gap:14px;">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <span style="background:#22d3ee;color:#04182b;font-weight:900;font-size:13px;border-radius:8px;padding:4px 10px;">2</span>
+    <span style="color:rgba(255,255,255,.55);font-size:13px;font-weight:600;">Бейджи рекордов: национальный vs «малые» (Age records, Masters)</span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,400px);gap:20px;align-items:start;">
+    <div id="2a"><div style="display:flex;flex-direction:column;gap:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px 18px;">
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:rgba(255,255,255,.4);">2a · Одна метка, разный вес</div>
+  <div style="display:grid;grid-template-columns:120px 1fr;align-items:center;gap:12px;"><span style="font-size:12px;color:rgba(255,255,255,.55);">Национальный</span><div style="display:flex;justify-content:flex-end;"><div style="display:inline-block;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.35);border-radius:10px;padding:5px 16px;text-align:right;"><div style="display:flex;align-items:center;gap:6px;white-space:nowrap;justify-content:flex-end;"><span style="font-size:19px;font-weight:800;color:#22d3ee;font-variant-numeric:tabular-nums;">00:49.64</span><span style="display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:900;letter-spacing:.5px;border-radius:4px;padding:1px 5px;color:#fbbf24;background:rgba(251,191,36,.14);border:1px solid rgba(251,191,36,.45);">REC</span></div><div style="font-size:11.5px;color:rgba(255,255,255,.45);">2026-07-16</div></div></div></div><div style="display:grid;grid-template-columns:120px 1fr;align-items:center;gap:12px;"><span style="font-size:12px;color:rgba(255,255,255,.55);">Age record</span><div style="display:flex;justify-content:flex-end;"><div style="display:inline-block;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.35);border-radius:10px;padding:5px 16px;text-align:right;"><div style="display:flex;align-items:center;gap:6px;white-space:nowrap;justify-content:flex-end;"><span style="font-size:19px;font-weight:800;color:#22d3ee;font-variant-numeric:tabular-nums;">00:49.64</span><span style="display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:900;letter-spacing:.5px;border-radius:4px;padding:1px 5px;color:#fbbf24;border:1px solid rgba(251,191,36,.45);opacity:.85;">REC</span></div><div style="font-size:11.5px;color:rgba(255,255,255,.45);">2026-07-16 · age 9</div></div></div></div><div style="display:grid;grid-template-columns:120px 1fr;align-items:center;gap:12px;"><span style="font-size:12px;color:rgba(255,255,255,.55);">Masters</span><div style="display:flex;justify-content:flex-end;"><div style="display:inline-block;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.35);border-radius:10px;padding:5px 16px;text-align:right;"><div style="display:flex;align-items:center;gap:6px;white-space:nowrap;justify-content:flex-end;"><span style="font-size:19px;font-weight:800;color:#22d3ee;font-variant-numeric:tabular-nums;">00:49.64</span><span style="display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:900;letter-spacing:.5px;border-radius:4px;padding:1px 5px;color:#fbbf24;border:1px solid rgba(251,191,36,.45);opacity:.85;">REC</span></div><div style="font-size:11.5px;color:rgba(255,255,255,.45);">2026-07-16 · M40</div></div></div></div><div style="display:grid;grid-template-columns:120px 1fr;align-items:center;gap:12px;"><span style="font-size:12px;color:rgba(255,255,255,.55);">Season best</span><div style="display:flex;justify-content:flex-end;"><div style="display:inline-block;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.35);border-radius:10px;padding:5px 16px;text-align:right;"><div style="display:flex;align-items:center;gap:6px;white-space:nowrap;justify-content:flex-end;"><span style="font-size:19px;font-weight:800;color:#22d3ee;font-variant-numeric:tabular-nums;">00:48.52</span><span style="display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:900;letter-spacing:.5px;border-radius:4px;padding:1px 5px;color:#22d3ee;border:1px solid rgba(34,211,238,.45);">SB</span></div><div style="font-size:11.5px;color:rgba(255,255,255,.45);">2026-07-16</div></div></div></div>
+</div></div><div id="2b"><div style="display:flex;flex-direction:column;gap:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px 18px;">
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:rgba(255,255,255,.4);">2b · Суффикс, малые — серебро</div>
+  <div style="display:grid;grid-template-columns:120px 1fr;align-items:center;gap:12px;"><span style="font-size:12px;color:rgba(255,255,255,.55);">Национальный</span><div style="display:flex;justify-content:flex-end;"><div style="display:inline-block;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.35);border-radius:10px;padding:5px 16px;text-align:right;"><div style="display:flex;align-items:center;gap:6px;white-space:nowrap;justify-content:flex-end;"><span style="font-size:19px;font-weight:800;color:#22d3ee;font-variant-numeric:tabular-nums;">00:49.64</span><span style="display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:900;letter-spacing:.5px;border-radius:4px;padding:1px 5px;color:#fbbf24;background:rgba(251,191,36,.14);border:1px solid rgba(251,191,36,.45);">REC</span></div><div style="font-size:11.5px;color:rgba(255,255,255,.45);">2026-07-16</div></div></div></div><div style="display:grid;grid-template-columns:120px 1fr;align-items:center;gap:12px;"><span style="font-size:12px;color:rgba(255,255,255,.55);">Age record</span><div style="display:flex;justify-content:flex-end;"><div style="display:inline-block;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.35);border-radius:10px;padding:5px 16px;text-align:right;"><div style="display:flex;align-items:center;gap:6px;white-space:nowrap;justify-content:flex-end;"><span style="font-size:19px;font-weight:800;color:#22d3ee;font-variant-numeric:tabular-nums;">00:49.64</span><span style="display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:900;letter-spacing:.5px;border-radius:4px;padding:1px 5px;color:#cbd5e1;background:rgba(203,213,225,.10);border:1px solid rgba(203,213,225,.4);">REC<span style="opacity:.7;font-weight:800;">·9y</span></span></div><div style="font-size:11.5px;color:rgba(255,255,255,.45);">2026-07-16</div></div></div></div><div style="display:grid;grid-template-columns:120px 1fr;align-items:center;gap:12px;"><span style="font-size:12px;color:rgba(255,255,255,.55);">Masters</span><div style="display:flex;justify-content:flex-end;"><div style="display:inline-block;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.35);border-radius:10px;padding:5px 16px;text-align:right;"><div style="display:flex;align-items:center;gap:6px;white-space:nowrap;justify-content:flex-end;"><span style="font-size:19px;font-weight:800;color:#22d3ee;font-variant-numeric:tabular-nums;">00:49.64</span><span style="display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:900;letter-spacing:.5px;border-radius:4px;padding:1px 5px;color:#cbd5e1;background:rgba(203,213,225,.10);border:1px solid rgba(203,213,225,.4);">REC<span style="opacity:.7;font-weight:800;">·M40</span></span></div><div style="font-size:11.5px;color:rgba(255,255,255,.45);">2026-07-16</div></div></div></div><div style="display:grid;grid-template-columns:120px 1fr;align-items:center;gap:12px;"><span style="font-size:12px;color:rgba(255,255,255,.55);">Season best</span><div style="display:flex;justify-content:flex-end;"><div style="display:inline-block;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.35);border-radius:10px;padding:5px 16px;text-align:right;"><div style="display:flex;align-items:center;gap:6px;white-space:nowrap;justify-content:flex-end;"><span style="font-size:19px;font-weight:800;color:#22d3ee;font-variant-numeric:tabular-nums;">00:48.52</span><span style="display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:900;letter-spacing:.5px;border-radius:4px;padding:1px 5px;color:#22d3ee;border:1px solid rgba(34,211,238,.45);">SB</span></div><div style="font-size:11.5px;color:rgba(255,255,255,.45);">2026-07-16</div></div></div></div>
+</div></div><div id="2c"><div style="display:flex;flex-direction:column;gap:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px 18px;">
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:rgba(255,255,255,.4);">2c · Глиф: ★ большой, ☆ малый</div>
+  <div style="display:grid;grid-template-columns:120px 1fr;align-items:center;gap:12px;"><span style="font-size:12px;color:rgba(255,255,255,.55);">Национальный</span><div style="display:flex;justify-content:flex-end;"><div style="display:inline-block;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.35);border-radius:10px;padding:5px 16px;text-align:right;"><div style="display:flex;align-items:center;gap:6px;white-space:nowrap;justify-content:flex-end;"><span style="font-size:19px;font-weight:800;color:#22d3ee;font-variant-numeric:tabular-nums;">00:49.64</span><span style="display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:900;letter-spacing:.5px;border-radius:4px;padding:1px 5px;color:#fbbf24;background:rgba(251,191,36,.14);border:1px solid rgba(251,191,36,.45);"><span style="font-size:11px;line-height:1;">★</span>REC</span></div><div style="font-size:11.5px;color:rgba(255,255,255,.45);">2026-07-16</div></div></div></div><div style="display:grid;grid-template-columns:120px 1fr;align-items:center;gap:12px;"><span style="font-size:12px;color:rgba(255,255,255,.55);">Age record</span><div style="display:flex;justify-content:flex-end;"><div style="display:inline-block;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.35);border-radius:10px;padding:5px 16px;text-align:right;"><div style="display:flex;align-items:center;gap:6px;white-space:nowrap;justify-content:flex-end;"><span style="font-size:19px;font-weight:800;color:#22d3ee;font-variant-numeric:tabular-nums;">00:49.64</span><span style="display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:900;letter-spacing:.5px;border-radius:4px;padding:1px 5px;color:#fbbf24;border:1px solid rgba(251,191,36,.45);"><span style="font-size:11px;line-height:1;">☆</span>AGE</span></div><div style="font-size:11.5px;color:rgba(255,255,255,.45);">2026-07-16</div></div></div></div><div style="display:grid;grid-template-columns:120px 1fr;align-items:center;gap:12px;"><span style="font-size:12px;color:rgba(255,255,255,.55);">Masters</span><div style="display:flex;justify-content:flex-end;"><div style="display:inline-block;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.35);border-radius:10px;padding:5px 16px;text-align:right;"><div style="display:flex;align-items:center;gap:6px;white-space:nowrap;justify-content:flex-end;"><span style="font-size:19px;font-weight:800;color:#22d3ee;font-variant-numeric:tabular-nums;">00:49.64</span><span style="display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:900;letter-spacing:.5px;border-radius:4px;padding:1px 5px;color:#fbbf24;border:1px solid rgba(251,191,36,.45);"><span style="font-size:11px;line-height:1;">☆</span>MST</span></div><div style="font-size:11.5px;color:rgba(255,255,255,.45);">2026-07-16</div></div></div></div><div style="display:grid;grid-template-columns:120px 1fr;align-items:center;gap:12px;"><span style="font-size:12px;color:rgba(255,255,255,.55);">Season best</span><div style="display:flex;justify-content:flex-end;"><div style="display:inline-block;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.35);border-radius:10px;padding:5px 16px;text-align:right;"><div style="display:flex;align-items:center;gap:6px;white-space:nowrap;justify-content:flex-end;"><span style="font-size:19px;font-weight:800;color:#22d3ee;font-variant-numeric:tabular-nums;">00:48.52</span><span style="display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:900;letter-spacing:.5px;border-radius:4px;padding:1px 5px;color:#22d3ee;border:1px solid rgba(34,211,238,.45);">SB</span></div><div style="font-size:11.5px;color:rgba(255,255,255,.45);">2026-07-16</div></div></div></div>
+</div></div>
+  </div>
+</section>
+
+<section style="padding:48px;display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+
+  <!-- ============ 1b — шапка: мини-карточки спортсменов ============ -->
+  <div id="1b" style="width:860px;display:flex;flex-direction:column;gap:14px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="background:#22d3ee;color:#04182b;font-weight:900;font-size:13px;border-radius:8px;padding:4px 10px;">1b</span>
+      <span style="color:rgba(255,255,255,.55);font-size:13px;font-weight:600;">1c + шапка «карточка спортсмена»: аватар, возраст, season bests в мини-таблице</span>
+    </div>
+    <div style="background:#04182b;border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:22px 24px;display:flex;flex-direction:column;gap:16px;">
+      <div style="display:grid;grid-template-columns:1fr 200px 1fr;align-items:center;gap:14px;">
+        <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:14px;justify-content:flex-end;position:relative;"><span title="Favorite" style="position:absolute;top:8px;left:10px;font-size:16px;line-height:1;color:#f87171;cursor:pointer;text-shadow:0 0 8px rgba(248,113,113,.45);">♥</span><div style="display:flex;flex-direction:column;gap:3px;min-width:0;align-items:stretch;text-align:right;flex:1;">
+      <span dir="auto" style="color:#fff;font-weight:800;font-size:16px;">סבינה ברנצב</span>
+      <span dir="auto" style="color:rgba(255,255,255,.5);font-size:12px;">הפועל דולפין נתניה</span>
+      <span style="align-self:flex-end;font-size:11px;font-weight:800;color:#7b93a8;border:1px solid rgba(255,255,255,.15);border-radius:999px;padding:1px 9px;white-space:nowrap;">9 y · 2017</span>
+    </div><div style="width:72px;height:72px;border-radius:50%;border:2px solid rgba(34,211,238,.45);overflow:hidden;flex:none;background:#0a2740;"><img src="assets/avatar-placeholder.png" alt="" style="width:100%;height:100%;object-fit:cover;"></div></div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="text-align:center;">
+          <div style="font-family:'Archivo Black',sans-serif;font-size:30px;color:#22d3ee;">3–2</div>
+          <div style="color:rgba(255,255,255,.45);font-size:11px;font-weight:600;">faster times</div>
+        </div>
+          
+        </div>
+        <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:14px;position:relative;"><span title="Add to favorites" style="position:absolute;top:8px;right:10px;font-size:16px;line-height:1;color:rgba(255,255,255,.3);cursor:pointer;">♡</span><div style="width:72px;height:72px;border-radius:50%;border:2px solid rgba(34,211,238,.45);overflow:hidden;flex:none;background:#0a2740;"><img src="assets/avatar-placeholder.png" alt="" style="width:100%;height:100%;object-fit:cover;"></div><div style="display:flex;flex-direction:column;gap:3px;min-width:0;flex:1;align-items:stretch;text-align:left;">
+      <span dir="auto" style="color:#fff;font-weight:800;font-size:16px;">פלג פרופיס</span>
+      <span dir="auto" style="color:rgba(255,255,255,.5);font-size:12px;">הפועל עמק חפר</span>
+      <span style="align-self:flex-start;font-size:11px;font-weight:800;color:#7b93a8;border:1px solid rgba(255,255,255,.15);border-radius:999px;padding:1px 9px;white-space:nowrap;">9 y · 2017</span>
+    </div></div>
+      </div>
+      <div style="border-top:1px solid rgba(255,255,255,.08);border-bottom:1px solid rgba(255,255,255,.08);padding:12px 0;display:flex;flex-direction:column;gap:10px;">
+        <div style="display:grid;grid-template-columns:1fr 200px 1fr;align-items:center;gap:14px;">
+        <span style="text-align:right;font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;color:#22d3ee;">7</span>
+        <span style="text-align:center;font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.4);">season bests</span>
+        <span style="text-align:left;font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;color:#fff;">5</span>
+      </div>
+          <div style="display:grid;grid-template-columns:1fr 200px 1fr;align-items:center;gap:14px;">
+        <span style="display:flex;align-items:center;gap:5px;justify-content:flex-end;"><span style="display:inline-flex;align-items:center;gap:3px;"><span style="font-size:18px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;">1</span><span style="display:inline-flex;align-items:center;gap:2px;font-size:9.5px;font-weight:900;letter-spacing:.5px;border-radius:4px;padding:1px 5px;white-space:nowrap;color:#fbbf24;background:rgba(251,191,36,.14);border:1px solid rgba(251,191,36,.45);">REC</span></span><span style="display:inline-flex;align-items:center;gap:3px;"><span style="font-size:15px;font-weight:800;color:rgba(255,255,255,.75);font-variant-numeric:tabular-nums;">4</span><span style="display:inline-flex;align-items:center;gap:2px;font-size:9.5px;font-weight:900;letter-spacing:.5px;border-radius:4px;padding:1px 5px;white-space:nowrap;color:#cbd5e1;background:rgba(203,213,225,.10);border:1px solid rgba(203,213,225,.4);">REC<span style="opacity:.7;font-weight:800;">·AGE</span></span></span><span style="display:inline-flex;align-items:center;gap:3px;"><span style="font-size:15px;font-weight:800;color:rgba(255,255,255,.75);font-variant-numeric:tabular-nums;">0</span><span style="display:inline-flex;align-items:center;gap:2px;font-size:9.5px;font-weight:900;letter-spacing:.5px;border-radius:4px;padding:1px 5px;white-space:nowrap;color:#cbd5e1;background:rgba(203,213,225,.10);border:1px solid rgba(203,213,225,.4);">REC<span style="opacity:.7;font-weight:800;">·M</span></span></span></span>
+        <span style="text-align:center;font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.4);">records · all time</span>
+        <span style="display:flex;align-items:center;gap:5px;justify-content:flex-start;"><span style="display:inline-flex;align-items:center;gap:3px;"><span style="font-size:18px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;">0</span><span style="display:inline-flex;align-items:center;gap:2px;font-size:9.5px;font-weight:900;letter-spacing:.5px;border-radius:4px;padding:1px 5px;white-space:nowrap;color:#fbbf24;background:rgba(251,191,36,.14);border:1px solid rgba(251,191,36,.45);">REC</span></span><span style="display:inline-flex;align-items:center;gap:3px;"><span style="font-size:15px;font-weight:800;color:rgba(255,255,255,.75);font-variant-numeric:tabular-nums;">2</span><span style="display:inline-flex;align-items:center;gap:2px;font-size:9.5px;font-weight:900;letter-spacing:.5px;border-radius:4px;padding:1px 5px;white-space:nowrap;color:#cbd5e1;background:rgba(203,213,225,.10);border:1px solid rgba(203,213,225,.4);">REC<span style="opacity:.7;font-weight:800;">·AGE</span></span></span><span style="display:inline-flex;align-items:center;gap:3px;"><span style="font-size:15px;font-weight:800;color:rgba(255,255,255,.75);font-variant-numeric:tabular-nums;">0</span><span style="display:inline-flex;align-items:center;gap:2px;font-size:9.5px;font-weight:900;letter-spacing:.5px;border-radius:4px;padding:1px 5px;white-space:nowrap;color:#cbd5e1;background:rgba(203,213,225,.10);border:1px solid rgba(203,213,225,.4);">REC<span style="opacity:.7;font-weight:800;">·M</span></span></span></span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 200px 1fr;align-items:center;gap:14px;">
+        <span style="display:flex;justify-content:flex-end;"><span style="display:inline-flex;gap:3px;justify-content:center;"><span style="width:20px;height:20px;border-radius:50%;background:linear-gradient(180deg,#fbbf24,#b45309);border:1px solid rgba(251,191,36,.6);color:#04182b;font-size:10.5px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex:none;">4</span><span style="width:20px;height:20px;border-radius:50%;background:linear-gradient(180deg,#e5e7eb,#9ca3af);border:1px solid rgba(229,231,235,.5);color:#04182b;font-size:10.5px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex:none;">2</span><span style="width:20px;height:20px;border-radius:50%;background:linear-gradient(180deg,#f0a36a,#9a5b2d);border:1px solid rgba(240,163,106,.5);color:#04182b;font-size:10.5px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex:none;">4</span></span></span>
+        <span style="text-align:center;font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.4);">medals</span>
+        <span style="display:flex;justify-content:flex-start;"><span style="display:inline-flex;gap:3px;justify-content:center;"><span style="width:20px;height:20px;border-radius:50%;background:linear-gradient(180deg,#fbbf24,#b45309);border:1px solid rgba(251,191,36,.6);color:#04182b;font-size:10.5px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex:none;">2</span><span style="width:20px;height:20px;border-radius:50%;background:linear-gradient(180deg,#e5e7eb,#9ca3af);border:1px solid rgba(229,231,235,.5);color:#04182b;font-size:10.5px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex:none;">5</span><span style="width:20px;height:20px;border-radius:50%;background:linear-gradient(180deg,#f0a36a,#9a5b2d);border:1px solid rgba(240,163,106,.5);color:#04182b;font-size:10.5px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex:none;">1</span></span></span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 200px 1fr;align-items:center;gap:14px;">
+        <span style="text-align:right;font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;color:#22d3ee;">512</span>
+        <span style="text-align:center;font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.4);">best FINA pts</span>
+        <span style="text-align:left;font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;color:#fff;">486</span>
+      </div>
+      </div>
+      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:14px;">
+          <div style="height:1px;background:rgba(255,255,255,.08);"></div>
+          <img src="assets/style-icon-placeholder.png" alt="" style="width:132px;height:90px;object-fit:cover;object-position:top;border-radius:10px;">
+          <div style="height:1px;background:rgba(255,255,255,.08);"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 120px 1fr;align-items:center;gap:10px;">
+          <div style="text-align:right;"><div style="font-size:19px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;">00:41.97</div><div style="font-size:11.5px;color:rgba(255,255,255,.4);">2025-12-22</div></div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#7b93a8;white-space:nowrap;">--25m--</span><span style="font-size:12.5px;font-weight:700;color:rgba(255,255,255,.55);font-variant-numeric:tabular-nums;">+1.76</span></div>
+          <div style="text-align:left;"><div style="display:inline-block;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.35);border-radius:10px;padding:5px 16px;text-align:left;"><div style="display:flex;align-items:center;gap:6px;white-space:nowrap;justify-content:flex-start;font-size:19px;font-weight:800;color:#22d3ee;font-variant-numeric:tabular-nums;">00:40.21 <span style="display:inline-flex;align-items:center;font-size:9.5px;font-weight:900;letter-spacing:.5px;color:#22d3ee;border:1px solid rgba(34,211,238,.45);border-radius:4px;padding:1px 5px;vertical-align:2px;">SB</span></div><div style="font-size:11.5px;color:rgba(255,255,255,.45);">2026-02-16</div></div></div>
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:14px;">
+          <div style="height:1px;background:rgba(255,255,255,.08);"></div>
+          <img src="assets/style-icon-placeholder.png" alt="" style="width:132px;height:90px;object-fit:cover;object-position:top;border-radius:10px;">
+          <div style="height:1px;background:rgba(255,255,255,.08);"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 120px 1fr;align-items:center;gap:10px;">
+          <div style="text-align:right;"><div style="font-size:19px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;">01:32.68</div><div style="font-size:11.5px;color:rgba(255,255,255,.4);">2026-06-16</div></div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#7b93a8;white-space:nowrap;">--25m--</span><span style="font-size:12.5px;font-weight:700;color:rgba(255,255,255,.55);font-variant-numeric:tabular-nums;">+2.07</span></div>
+          <div style="text-align:left;"><div style="display:inline-block;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.35);border-radius:10px;padding:5px 16px;text-align:left;"><div style="font-size:19px;font-weight:800;color:#22d3ee;font-variant-numeric:tabular-nums;">01:30.61</div><div style="font-size:11.5px;color:rgba(255,255,255,.45);">2026-06-16</div></div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 120px 1fr;align-items:center;gap:10px;">
+          <div style="text-align:right;"><div style="font-size:19px;font-weight:800;color:rgba(255,255,255,.3);">—</div></div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#7b93a8;white-space:nowrap;">-----50m-----</span></div>
+          <div style="text-align:left;"><div style="font-size:19px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;">01:24.26</div><div style="font-size:11.5px;color:rgba(255,255,255,.4);">2026-07-16</div></div>
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:14px;">
+          <div style="height:1px;background:rgba(255,255,255,.08);"></div>
+          <img src="assets/style-icon-placeholder.png" alt="" style="width:132px;height:90px;object-fit:cover;object-position:top;border-radius:10px;">
+          <div style="height:1px;background:rgba(255,255,255,.08);"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 120px 1fr;align-items:center;gap:10px;">
+          <div style="text-align:right;"><div style="display:inline-block;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.35);border-radius:10px;padding:5px 16px;text-align:right;"><div style="display:flex;align-items:center;gap:6px;white-space:nowrap;justify-content:flex-end;font-size:19px;font-weight:800;color:#22d3ee;font-variant-numeric:tabular-nums;">00:48.52 <span style="display:inline-flex;align-items:center;font-size:9.5px;font-weight:900;letter-spacing:.5px;color:#22d3ee;border:1px solid rgba(34,211,238,.45);border-radius:4px;padding:1px 5px;vertical-align:2px;">SB</span></div><div style="font-size:11.5px;color:rgba(255,255,255,.45);">2026-02-06</div></div></div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#7b93a8;white-space:nowrap;">--25m--</span><span style="font-size:12.5px;font-weight:700;color:#22d3ee;font-variant-numeric:tabular-nums;">−5.19</span></div>
+          <div style="text-align:left;"><div style="font-size:19px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;">00:53.71</div><div style="font-size:11.5px;color:rgba(255,255,255,.4);">2026-06-16</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 120px 1fr;align-items:center;gap:10px;">
+          <div style="text-align:right;"><div style="display:inline-block;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.35);border-radius:10px;padding:5px 16px;text-align:right;"><div style="display:flex;align-items:center;gap:6px;white-space:nowrap;justify-content:flex-end;font-size:19px;font-weight:800;color:#22d3ee;font-variant-numeric:tabular-nums;">00:49.64 <span style="display:inline-flex;align-items:center;gap:2px;font-size:9.5px;font-weight:900;letter-spacing:.5px;border-radius:4px;padding:1px 5px;white-space:nowrap;color:#cbd5e1;background:rgba(203,213,225,.10);border:1px solid rgba(203,213,225,.4);vertical-align:2px;">REC<span style="opacity:.7;font-weight:800;">·AGE</span></span></div><div style="font-size:11.5px;color:rgba(255,255,255,.45);">2026-07-16</div></div></div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#7b93a8;white-space:nowrap;">-----50m-----</span><span style="font-size:12.5px;font-weight:700;color:#22d3ee;font-variant-numeric:tabular-nums;">−2.56</span></div>
+          <div style="text-align:left;"><div style="font-size:19px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;">00:52.20</div><div style="font-size:11.5px;color:rgba(255,255,255,.4);">2026-07-16</div></div>
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:14px;">
+          <div style="height:1px;background:rgba(255,255,255,.08);"></div>
+          <img src="assets/style-icon-placeholder.png" alt="" style="width:132px;height:90px;object-fit:cover;object-position:top;border-radius:10px;">
+          <div style="height:1px;background:rgba(255,255,255,.08);"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 120px 1fr;align-items:center;gap:10px;">
+          <div style="text-align:right;"><div style="display:inline-block;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.35);border-radius:10px;padding:5px 16px;text-align:right;"><div style="display:flex;align-items:center;gap:6px;white-space:nowrap;justify-content:flex-end;font-size:19px;font-weight:800;color:#22d3ee;font-variant-numeric:tabular-nums;">01:43.33 <span style="display:inline-flex;align-items:center;font-size:9.5px;font-weight:900;letter-spacing:.5px;color:#22d3ee;border:1px solid rgba(34,211,238,.45);border-radius:4px;padding:1px 5px;vertical-align:2px;">SB</span></div><div style="font-size:11.5px;color:rgba(255,255,255,.45);">2026-02-06</div></div></div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#7b93a8;white-space:nowrap;">--25m--</span><span style="font-size:12.5px;font-weight:700;color:#22d3ee;font-variant-numeric:tabular-nums;">−8.55</span></div>
+          <div style="text-align:left;"><div style="font-size:19px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;">01:51.88</div><div style="font-size:11.5px;color:rgba(255,255,255,.4);">2025-12-18</div></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:2px;">
+        <div style="height:1px;flex:1;background:rgba(255,255,255,.08);"></div>
+        <span style="font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:rgba(255,255,255,.35);">Only one swimmer</span>
+        <div style="height:1px;flex:1;background:rgba(255,255,255,.08);"></div>
+      </div>
+      <div style="background:rgba(255,255,255,.02);border:1px dashed rgba(255,255,255,.10);opacity:.9;border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:14px;">
+          <div style="height:1px;background:rgba(255,255,255,.08);"></div>
+          <img src="assets/style-icon-placeholder.png" alt="" style="width:132px;height:90px;object-fit:cover;object-position:top;border-radius:10px;filter:grayscale(.4);">
+          <div style="height:1px;background:rgba(255,255,255,.08);"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 120px 1fr;align-items:center;gap:10px;">
+          <div style="text-align:right;"><div style="font-size:19px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;">00:44.87</div><div style="font-size:11.5px;color:rgba(255,255,255,.4);">2026-07-16</div></div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#7b93a8;white-space:nowrap;">-----50m-----</span></div>
+          <div style="text-align:left;"><div style="font-size:19px;font-weight:800;color:rgba(255,255,255,.3);">—</div></div>
+        </div>
+      </div>
+      
+      <div style="display:flex;align-items:center;gap:10px;margin-top:10px;">
+        <div style="height:1px;flex:1;background:rgba(255,255,255,.08);"></div>
+        <span style="font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:rgba(255,255,255,.35);">State — выбран только левый</span>
+        <div style="height:1px;flex:1;background:rgba(255,255,255,.08);"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:grid;grid-template-columns:1fr 200px 1fr;align-items:center;gap:14px;">
+        <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:14px;justify-content:flex-end;position:relative;"><span title="Favorite" style="position:absolute;top:8px;left:10px;font-size:16px;line-height:1;color:#f87171;cursor:pointer;text-shadow:0 0 8px rgba(248,113,113,.45);">♥</span><div style="display:flex;flex-direction:column;gap:3px;min-width:0;align-items:stretch;text-align:right;flex:1;">
+      <span dir="auto" style="color:#fff;font-weight:800;font-size:16px;">סבינה ברנצב</span>
+      <span dir="auto" style="color:rgba(255,255,255,.5);font-size:12px;">הפועל דולפין נתניה</span>
+      <span style="align-self:flex-end;font-size:11px;font-weight:800;color:#7b93a8;border:1px solid rgba(255,255,255,.15);border-radius:999px;padding:1px 9px;white-space:nowrap;">9 y · 2017</span>
+    </div><div style="width:72px;height:72px;border-radius:50%;border:2px solid rgba(34,211,238,.45);overflow:hidden;flex:none;background:#0a2740;"><img src="assets/avatar-placeholder.png" alt="" style="width:100%;height:100%;object-fit:cover;"></div></div>
+        <div style="text-align:center;color:rgba(255,255,255,.3);font-family:'Archivo Black',sans-serif;font-size:22px;">vs</div>
+        <div style="border:1px dashed rgba(255,255,255,.18);border-radius:14px;padding:12px 16px;display:flex;align-items:center;justify-content:center;gap:10px;min-height:96px;">
+      <span style="width:44px;height:44px;border-radius:50%;border:1px dashed rgba(255,255,255,.25);color:rgba(255,255,255,.4);font-size:20px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex:none;">＋</span>
+      <span style="color:rgba(255,255,255,.45);font-size:13px;font-weight:700;">בחר יריב · choose a rival</span>
+    </div>
+      </div>
+      </div>
+      
+      <div style="display:flex;align-items:center;gap:10px;margin-top:10px;">
+        <div style="height:1px;flex:1;background:rgba(255,255,255,.08);"></div>
+        <span style="font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:rgba(255,255,255,.35);">State — никто не выбран</span>
+        <div style="height:1px;flex:1;background:rgba(255,255,255,.08);"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:grid;grid-template-columns:1fr 200px 1fr;align-items:center;gap:14px;">
+        <div style="border:1px dashed rgba(255,255,255,.18);border-radius:14px;padding:12px 16px;display:flex;align-items:center;justify-content:center;gap:10px;min-height:96px;">
+      <span style="width:44px;height:44px;border-radius:50%;border:1px dashed rgba(255,255,255,.25);color:rgba(255,255,255,.4);font-size:20px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex:none;">＋</span>
+      <span style="color:rgba(255,255,255,.45);font-size:13px;font-weight:700;">בחר שחיין · swimmer 1</span>
+    </div>
+        <div style="text-align:center;color:rgba(255,255,255,.3);font-family:'Archivo Black',sans-serif;font-size:22px;">vs</div>
+        <div style="border:1px dashed rgba(255,255,255,.18);border-radius:14px;padding:12px 16px;display:flex;align-items:center;justify-content:center;gap:10px;min-height:96px;">
+      <span style="width:44px;height:44px;border-radius:50%;border:1px dashed rgba(255,255,255,.25);color:rgba(255,255,255,.4);font-size:20px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex:none;">＋</span>
+      <span style="color:rgba(255,255,255,.45);font-size:13px;font-weight:700;">בחר יריב · swimmer 2</span>
+    </div>
+      </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+</x-dc>
+</body>
+</html>

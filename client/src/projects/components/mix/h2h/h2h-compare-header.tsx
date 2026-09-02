@@ -4,7 +4,8 @@ import UI_H2HMiniCard from './h2h-mini-card';
 import UI_H2HStatRow from './h2h-stat-row';
 import UI_H2HMedalTriple from './h2h-medal-triple';
 import UI_H2HSwap from './h2h-swap';
-import type { H2HMedals, H2HSwimmer, H2HWinner } from './h2h.types';
+import UI_H2HRecordCounts from './h2h-record-counts';
+import type { H2HMedals, H2HRecordCounts, H2HSwimmer, H2HWinner } from './h2h.types';
 
 /**
  * Шапка сравнения (макет 1b, §1–2): две зеркальные мини-карточки со счётом между ними,
@@ -18,8 +19,8 @@ export interface H2HSide {
   seasonBests: number;
   medals: H2HMedals;
   bestPoints: number;
-  /** Официальные рекорды — ВСЕГДА за карьеру: у записи справочника нет сезона. */
-  recordsHeld?: number;
+  /** Рекорды по классам — ВСЕГДА за карьеру: у записи справочника нет сезона. */
+  records?: H2HRecordCounts;
   /** null — избранное недоступно (гость): сердечко не рисуется. */
   isFavorite?: boolean | null;
   onToggleFavorite?: () => void;
@@ -41,6 +42,12 @@ interface Props {
   /** Поменять стороны местами; не задан — кнопки нет. */
   onSwap?: () => void;
 }
+
+const EMPTY_RECORDS: H2HRecordCounts = { national: 0, age: 0, masters: 0 };
+
+/** Есть ли что показывать в строке рекордов. */
+const recordsTotal = (r?: H2HRecordCounts) =>
+  (r?.national ?? 0) + (r?.age ?? 0) + (r?.masters ?? 0);
 
 /** Победитель строки: больше — лучше; равенство подсветки не даёт. */
 const winnerOf = (left: number, right: number): H2HWinner =>
@@ -79,15 +86,15 @@ const UI_H2HCompareHeader: React.FC<Props> = ({
         right={right.seasonBests}
         winner={winnerOf(left.seasonBests, right.seasonBests)}
       />
-      {/* Рекорды — только когда они есть хотя бы у одного: строка «0 : 0» ничего не
-          сообщает, а место в шапке дорогое. Подпись «all time» обязательна: соседняя
-          строка посчитана за сезон, и без неё цифры читались бы как один период. */}
-      {(left.recordsHeld ?? 0) + (right.recordsHeld ?? 0) > 0 && (
+      {/* Рекорды — три класса в ряд (хендофф §5), и только когда они есть хотя бы у
+          одного: пустой ряд из нулей ничего не сообщает, а место в шапке дорогое.
+          Подпись «all time» обязательна: соседняя строка посчитана за сезон. */}
+      {recordsTotal(left.records) + recordsTotal(right.records) > 0 && (
         <UI_H2HStatRow
           label="records · all time"
-          left={left.recordsHeld ?? 0}
-          right={right.recordsHeld ?? 0}
-          winner={winnerOf(left.recordsHeld ?? 0, right.recordsHeld ?? 0)}
+          left={<UI_H2HRecordCounts counts={left.records ?? EMPTY_RECORDS} align="left" />}
+          right={<UI_H2HRecordCounts counts={right.records ?? EMPTY_RECORDS} align="right" />}
+          raw
         />
       )}
 

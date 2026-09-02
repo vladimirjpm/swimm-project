@@ -3,6 +3,7 @@ import './h2h.css';
 import UI_PoolIcon from '../pool-icon/pool-icon';
 import UI_H2HTimeCell from './h2h-time-cell';
 import type { SwimQuality } from '../swim-time/swim-time';
+import type { RecordKind } from '../record-badge/record-badge';
 
 /**
  * Одна полоса карточки заплыва — ОДИН бассейн (макет 1b, §3): время слева · метка бассейна
@@ -15,7 +16,7 @@ export interface H2HPoolSide {
   time?: string | null;
   date?: string | null;
   quality?: SwimQuality | null;
-  badge?: 'SB' | 'REC' | null;
+  badge?: 'SB' | { record: RecordKind; scope?: string | null } | null;
 }
 
 interface Props {

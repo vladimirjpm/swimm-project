@@ -53,10 +53,13 @@ export const h2hScopeLabel = (compare: SwimmerCompare): string => {
     : `${scope} · nothing they both swam in the same pool`;
 };
 
-/** Бейдж строки: рекорд весомее места среди сверстников, поэтому REC перебивает SB. */
-const badgeOf = (swim: SwimmerCompareSwim): 'SB' | 'REC' | null => {
-  if (swim.holdsRecord) return 'REC';
-  return swim.isSeasonBest ? 'SB' : null;
+/**
+ * Бейдж строки. Рекорд весомее места среди сверстников, поэтому он перебивает SB, а два
+ * бейджа на одном времени не показываются вовсе (хендофф §5).
+ */
+const badgeOf = (swim: SwimmerCompareSwim) => {
+  if (swim.record) return { record: swim.record.kind, scope: swim.record.scope };
+  return swim.isSeasonBest ? ('SB' as const) : null;
 };
 
 /** Ссылка на протокол заплыва — тот же адрес, что открывают строки остальных табов. */
@@ -167,7 +170,7 @@ const UI_H2HCompare: React.FC<Props> = ({
           seasonBests: compare.mine.seasonBests,
           medals: compare.mine.medals,
           bestPoints: compare.mine.bestPoints,
-          recordsHeld: compare.mine.recordsHeld,
+          records: compare.mine.records,
           isFavorite: left.isFavorite ?? null,
           onToggleFavorite: left.onToggleFavorite,
           onClear: left.onClear ?? null,
@@ -177,7 +180,7 @@ const UI_H2HCompare: React.FC<Props> = ({
           seasonBests: compare.rival.seasonBests,
           medals: compare.rival.medals,
           bestPoints: compare.rival.bestPoints,
-          recordsHeld: compare.rival.recordsHeld,
+          records: compare.rival.records,
           isFavorite: right.isFavorite ?? null,
           onToggleFavorite: right.onToggleFavorite,
           onClear: right.onClear ?? null,

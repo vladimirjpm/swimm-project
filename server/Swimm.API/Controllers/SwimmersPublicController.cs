@@ -334,7 +334,12 @@ public class SwimmersPublicController : ControllerBase
 
         var records = await RecordStepsAsync(SwimmerPageBuilder.InSeason(rows, season), profile, axis);
 
-        return new SwimmerPageBuilder.SwimmerCompareInput(rows, profile, cohort, records);
+        // Что пловец ДЕРЖИТ — отдельный вопрос от «бьёт ли показанное время рекорд»:
+        // рекордный заплыв может быть поставлен до периода импорта, и счётчики шапки
+        // обязаны его учитывать (тот же список, что в плитке достижений профиля).
+        var held = profile is null ? [] : await _swims.GetRecordsHeldAsync(profile.Id);
+
+        return new SwimmerPageBuilder.SwimmerCompareInput(rows, profile, cohort, records, held);
     }
 
     /// <summary>

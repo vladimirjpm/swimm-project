@@ -1,6 +1,7 @@
 import React from 'react';
 import './h2h.css';
 import UI_SwimTime, { type SwimQuality } from '../swim-time/swim-time';
+import UI_RecordBadge, { type RecordKind } from '../record-badge/record-badge';
 
 /**
  * Ячейка времени одной стороны (макет 1b, §3).
@@ -17,8 +18,11 @@ interface Props {
   date?: string | null;
   quality?: SwimQuality | null;
   isWinner?: boolean;
-  /** SB — быстрейший среди сверстников, REC — держит рекорд своей ступени. */
-  badge?: 'SB' | 'REC' | null;
+  /**
+   * Бейдж: `'SB'` — быстрейший среди сверстников, либо рекорд с его классом. Вместе они не
+   * показываются — рекорд важнее (хендофф §5), выбор делает вызывающий.
+   */
+  badge?: 'SB' | { record: RecordKind; scope?: string | null } | null;
   side: 'left' | 'right';
 }
 
@@ -37,8 +41,9 @@ const UI_H2HTimeCell: React.FC<Props> = ({
     <>
       <div className="h2h-time__line">
         <UI_SwimTime time={time} quality={quality} className="h2h-time__value" />
-        {badge && (
-          <span className={`h2h-badge h2h-badge--${badge === 'SB' ? 'sb' : 'rec'}`}>{badge}</span>
+        {badge === 'SB' && <span className="h2h-badge h2h-badge--sb">SB</span>}
+        {badge && badge !== 'SB' && (
+          <UI_RecordBadge kind={badge.record} scope={badge.scope} />
         )}
       </div>
       {date && <div className="h2h-time__date">{date}</div>}

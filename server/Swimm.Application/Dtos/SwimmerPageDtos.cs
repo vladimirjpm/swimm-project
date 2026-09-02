@@ -623,6 +623,25 @@ public sealed class SwimmerCompareDto
     public string? SeasonBestLabel { get; set; }
 }
 
+/// <summary>
+/// Счётчики удерживаемых рекордов по классам. Считаются по справочнику (матч ПО ИМЕНИ
+/// держателя), а не по нашим заплывам: рекорд может быть поставлен до периода импорта.
+/// </summary>
+public sealed class SwimmerRecordCountsDto
+{
+    /// <summary>Национальные рекорды страны (категория <c>open</c>) — «REC».</summary>
+    [JsonPropertyName("national")]
+    public int National { get; set; }
+
+    /// <summary>Возрастные ступени (категория <c>age</c>) — «REC·AGE».</summary>
+    [JsonPropertyName("age")]
+    public int Age { get; set; }
+
+    /// <summary>Мастерские полосы (категория <c>masters</c>) — «REC·M».</summary>
+    [JsonPropertyName("masters")]
+    public int Masters { get; set; }
+}
+
 /// <summary>Шапка одной стороны сравнения.</summary>
 public sealed class SwimmerCompareSideDto
 {
@@ -664,13 +683,16 @@ public sealed class SwimmerCompareSideDto
     [JsonPropertyName("bestPoints")]
     public int BestPoints { get; set; }
 
-    /// <summary>
-    /// Сколько официальных рекордов держит пловец — тот же счётчик, что в плитке достижений
-    /// профиля. ⚠ ВСЕГДА за карьеру: у записи справочника нет сезона, поэтому карусель на
-    /// эту цифру не влияет (решение плана страницы спортсмена, §11).
+/// <summary>
+    /// Рекорды, которые пловец держит, РАЗДЕЛЁННЫЕ ПО КЛАССАМ (хендофф
+    /// `design_handoff_h2h_addrecords` §5): национальный весит иначе, чем возрастной, и
+    /// одной цифрой они складываться не должны — у подростка десяток возрастных ступеней
+    /// одного и того же достижения, а у взрослого один национальный.
+    ///
+    /// ⚠ ВСЕГДА за карьеру: у записи справочника нет сезона, карусель на эти цифры не влияет.
     /// </summary>
-    [JsonPropertyName("recordsHeld")]
-    public int RecordsHeld { get; set; }
+    [JsonPropertyName("records")]
+    public SwimmerRecordCountsDto Records { get; set; } = new();
 }
 
 /// <summary>
@@ -727,6 +749,19 @@ public sealed class SwimmerComparePoolDto
     public int? DeltaMs { get; set; }
 }
 
+/// <summary>
+/// Пометка «это время бьёт рекорд». <paramref name="Scope"/> — ступень справочника
+/// («age 14», «masters 45-49»): в бейдж НЕ выводится, живёт в подсказке при наведении.
+/// </summary>
+public sealed class SwimRecordMarkDto
+{
+    [JsonPropertyName("kind")]
+    public string Kind { get; set; } = "national";
+
+    [JsonPropertyName("scope")]
+    public string? Scope { get; set; }
+}
+
 /// <summary>Лучший заплыв одной стороны на одной дистанции за период сравнения.</summary>
 public sealed class SwimmerCompareSwimDto
 {
@@ -766,10 +801,13 @@ public sealed class SwimmerCompareSwimDto
     public bool IsSeasonBest { get; set; }
 
     /// <summary>
-    /// Бейдж REC: время не медленнее официального рекорда страны для СВОЕЙ возрастной
-    /// ступени. Определяется по времени, а не по имени держателя, — имена в справочнике
-    /// строковые и у тёзок совпадают (то же правило, что в личниках).
+    /// Рекорд, который бьёт это время: <c>national</c> / <c>age</c> / <c>masters</c>.
+    /// null — не бьёт ни одного.
+    ///
+    /// Определяется по ВРЕМЕНИ (не медленнее рекорда ступени), а не по имени держателя:
+    /// имена в справочнике строковые и у тёзок совпадают. Классы не складываются — показывается
+    /// СТАРШИЙ (national &gt; age &gt; masters), как требует хендофф §5.
     /// </summary>
-    [JsonPropertyName("holdsRecord")]
-    public bool HoldsRecord { get; set; }
+    [JsonPropertyName("record")]
+    public SwimRecordMarkDto? Record { get; set; }
 }
