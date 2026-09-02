@@ -82,6 +82,7 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
             onClick={handleNameClick}
             firstLineClassName="text-xl font-bold text-[var(--theme-mode-text)]"
             isRecordHolder={isRecordHolder}
+          recordKind={isMastersResult ? 'masters' : 'age'}
           />
           <UI_FavoriteControls
             className="ml-1"
@@ -119,6 +120,7 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
           time_fail_note={res.time_fail_note}
           firstLineClassName="text-xl font-bold tabular-nums"
           isRecordHolder={isRecordTime}
+          recordKind={isMastersResult ? 'masters' : 'age'}
           quality={res.suspect_reason ? { kind: 'protocol', reason: res.suspect_reason } : null}
           qualityMarker="chip"
         />

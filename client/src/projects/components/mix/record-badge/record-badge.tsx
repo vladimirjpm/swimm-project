@@ -19,6 +19,13 @@ interface Props {
   kind: RecordKind;
   /** Ступень справочника — уходит в `title`, на экране не показывается. */
   scope?: string | null;
+  /**
+   * Рекорд установлен ЭТИМ заплывом («★ REC»). Отличается от обычного бейджа тем, что
+   * отвечает на другой вопрос: не «чей рекорд на этой дистанции», а «здесь и сейчас он
+   * побит». Раньше это была отдельная золотая плашка «★ NEW RECORD» в таблице результатов;
+   * бейдж стал общим, но событие осталось событием — отсюда звезда и заливка.
+   */
+  isNew?: boolean;
   className?: string;
 }
 
@@ -34,14 +41,18 @@ const TITLE: Record<RecordKind, string> = {
   masters: 'Masters record',
 };
 
-const UI_RecordBadge: React.FC<Props> = ({ kind, scope, className = '' }) => (
-  <span
-    className={`rec-badge rec-badge--${kind} ${className}`.trim()}
-    title={scope ? `${TITLE[kind]} — ${scope}` : TITLE[kind]}
-  >
-    REC
-    {SUFFIX[kind] && <span className="rec-badge__suffix">{SUFFIX[kind]}</span>}
-  </span>
-);
+const UI_RecordBadge: React.FC<Props> = ({ kind, scope, isNew = false, className = '' }) => {
+  const title = `${isNew ? 'New ' : ''}${isNew ? TITLE[kind].toLowerCase() : TITLE[kind]}`;
+  return (
+    <span
+      className={`rec-badge rec-badge--${kind}${isNew ? ' rec-badge--new' : ''} ${className}`.trim()}
+      title={scope ? `${title} — ${scope}` : title}
+    >
+      {isNew && <span className="rec-badge__star" aria-hidden="true">★</span>}
+      REC
+      {SUFFIX[kind] && <span className="rec-badge__suffix">{SUFFIX[kind]}</span>}
+    </span>
+  );
+};
 
 export default UI_RecordBadge;

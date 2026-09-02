@@ -112,6 +112,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
           firstLineClassName="text-[15px] font-bold overflow-hidden text-[var(--theme-mode-text)]"
           secondLineClassName="text-xs text-[var(--theme-mode-text-secondary)]"
           isRecordHolder={isRecordHolder}
+          recordKind={isMastersResult ? 'masters' : 'age'}
           isMe={isPrimaryFavorite}
         />
         {showDate && (
@@ -149,6 +150,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
           firstLineClassName="text-[21px] font-bold tabular-nums tracking-tight flex justify-start"
           secondLineClassName="text-xs justify-start"
           isRecordHolder={isRecordTime}
+          recordKind={isMastersResult ? 'masters' : 'age'}
           quality={res.suspect_reason ? { kind: 'protocol', reason: res.suspect_reason } : null}
           qualityMarker="chip"
         />

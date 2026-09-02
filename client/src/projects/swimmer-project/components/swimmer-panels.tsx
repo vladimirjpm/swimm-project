@@ -10,6 +10,7 @@ import { MIN_PEERS_FOR_RANK } from '../../components/mix/rank-of-peers/rank-of-p
 import { useFavoritesContext } from '../../../hooks/favorites-context';
 import UI_H2HCompare, { h2hScopeLabel } from '../../components/mix/h2h/h2h-compare';
 import UI_H2HRivalPicker from '../../components/mix/h2h/h2h-rival-picker';
+import UI_RecordBadge, { type RecordKind } from '../../components/mix/record-badge/record-badge';
 import type { H2HSlot } from '../../components/mix/h2h/h2h.types';
 import { routes } from '../../../utils/routes';
 import { peerGroupLabel, seasonLabel } from '../../../utils/helpers/season-helper';
@@ -476,6 +477,13 @@ export function SeasonBestPanel({
 }
 
 /**
+ * Класс рекорда по категории справочника — вход общего `UI_RecordBadge`. Правило одно на
+ * продукт: золото носит только национальный (`open`), возрастные и мастерские — серебро.
+ */
+const recordKindOf = (category: string): RecordKind =>
+  (category === 'open' ? 'national' : category === 'masters' ? 'masters' : 'age');
+
+/**
  * Подпись рекорда: «Israel · age 12» / «Israel · masters». Ступень показываем только там,
  * где она есть, — у открытой категории AgeKey пустой.
  */
@@ -516,6 +524,9 @@ function HeldRecordsSection({ records }: { records: SwimmerHeldRecord[] }) {
             competition={{ name: recordScope(r), isChampionship: true }}
             meetPlacement="line1"
             date={r.date}
+            // Класс рекорда — тем же бейджем, что в H2H и в таблице результатов: подпись
+            // «ISR · masters» отвечает на вопрос «какая ступень», бейдж — «какого веса».
+            extras={<UI_RecordBadge kind={recordKindOf(r.category)} scope={recordScope(r)} />}
           />
         ))}
       </div>

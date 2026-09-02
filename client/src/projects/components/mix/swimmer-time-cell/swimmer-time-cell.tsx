@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import '../text-effect/text-effect.css';
 import UI_SwimTime, { SwimQuality, SwimTimeDelta } from '../swim-time/swim-time';
+import UI_RecordBadge, { type RecordKind } from '../record-badge/record-badge';
 
 const TIME_SPLIT_SEPARATOR = '›';
 
@@ -12,7 +13,14 @@ interface UI_SwimmerTimeCellProps {
   firstLineClassName?: string;
   secondLineClassName?: string;
   className?: string;
+  /** Это время БЬЁТ действующий рекорд (не «пловец держит рекорд» — см. UI_SwimmerNameCell). */
   isRecordHolder?: boolean;
+  /**
+   * Класс рекорда для бейджа. Мастерский старт меряется мастерской полосой, обычный —
+   * возрастной ступенью: справочник у них разный, и одинаковым бейджем они выглядели бы
+   * одним достижением.
+   */
+  recordKind?: RecordKind;
   /**
    * Качество времени (docs/plans/swim-time-quality-everywhere-plan.md). null — всё в порядке.
    * Значок и объяснение рисует `UI_SwimTime` — единственный шов вывода времени.
@@ -42,6 +50,7 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
   secondLineClassName = 'text-xs',
   className = '',
   isRecordHolder = false,
+  recordKind = 'age',
   quality = null,
   qualityMarker = 'icon',
   gapMs = null,
@@ -70,14 +79,11 @@ const UI_SwimmerTimeCell: React.FC<UI_SwimmerTimeCellProps> = ({
 
   return (
     <div className={className}>
+      {/* Рекорд, побитый ЭТИМ заплывом. Бейдж общий на весь продукт (UI_RecordBadge):
+          три класса и одно правило цвета — золото только национальному. */}
       {isRecordHolder && (
         <div className="mb-1 flex justify-start">
-          <span
-            className="inline-flex items-center gap-1 rounded-[7px] px-1.5 py-0.5 text-[8.5px] font-extrabold tracking-wide text-white"
-            style={{ background: 'linear-gradient(135deg,#f0b429,#c8860a)', boxShadow: '0 2px 8px rgba(200,134,10,0.45)' }}
-          >
-            ★ NEW RECORD
-          </span>
+          <UI_RecordBadge kind={recordKind} isNew />
         </div>
       )}
       {formattedTimeSplit ? (

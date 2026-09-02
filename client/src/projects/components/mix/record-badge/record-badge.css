@@ -4,7 +4,13 @@
    медали). Возрастные ступени и мастерские полосы — серебро: у подростка десяток возрастных
    рекордов одного и того же достижения, и золотом они обесценили бы настоящий национальный.
 
-   Цвета серебра/золота — физические, одинаковые в обеих темах (как медальные кружки). */
+   ⚠ ЦВЕТА ПАРНЫЕ ПО ТЕМЕ, а не фиксированные, как у медальных кружков. Медаль — физический
+   объект на любом фоне, а бейдж это текст: значения хендоффа (dark) на светлой таблице
+   результатов давали серебро по белому и не читались вовсе (поймано 02.09.2026). Светлая
+   пара берёт те же оттенки на два шага темнее.
+
+   Переключатель — `data-mode` на <html> (общий для всех страниц, ставит `useMode`), поэтому
+   бейдж одинаково работает и на deep-страницах, и в палитре results. */
 
 .rec-badge {
   display: inline-flex; align-items: center; white-space: nowrap;
@@ -14,10 +20,40 @@
 /* Суффикс класса («·AGE», «·M») — тот же бейдж, но тише: сначала читается «REC». */
 .rec-badge__suffix { opacity: .7; font-weight: 800; }
 
+/* ── Светлая тема (по умолчанию) ─────────────────────────────────────────── */
+
 .rec-badge--national {
-  color: #fbbf24; background: rgba(251,191,36,.14); border: 1px solid rgba(251,191,36,.45);
+  color: #b17d11; background: rgba(217,164,32,.14); border: 1px solid rgba(178,125,17,.45);
 }
 .rec-badge--age,
 .rec-badge--masters {
-  color: #cbd5e1; background: rgba(203,213,225,.10); border: 1px solid rgba(203,213,225,.4);
+  color: #64748b; background: rgba(100,116,139,.10); border: 1px solid rgba(100,116,139,.35);
 }
+
+/* ── Тёмная тема — значения хендоффа ─────────────────────────────────────── */
+
+[data-mode="dark"] .rec-badge--national {
+  color: #fbbf24; background: rgba(251,191,36,.14); border-color: rgba(251,191,36,.45);
+}
+[data-mode="dark"] .rec-badge--age,
+[data-mode="dark"] .rec-badge--masters {
+  color: #cbd5e1; background: rgba(203,213,225,.10); border-color: rgba(203,213,225,.4);
+}
+
+/* ── «Рекорд побит ЗДЕСЬ» ────────────────────────────────────────────────── */
+
+/* Событие, а не свойство дистанции: заливка вместо контура, чтобы в длинной таблице
+   результатов его было видно с прокрутки. Класс рекорда сохраняется — звезда добавляется
+   к нему, а не заменяет. Заливка тёмная в обеих темах, текст белый: это акцент. */
+.rec-badge--new { gap: 3px; color: #fff; border-color: transparent; }
+.rec-badge--new.rec-badge--national,
+[data-mode="dark"] .rec-badge--new.rec-badge--national {
+  color: #fff; background: linear-gradient(135deg,#f0b429,#c8860a); border-color: transparent;
+}
+.rec-badge--new.rec-badge--age,
+.rec-badge--new.rec-badge--masters,
+[data-mode="dark"] .rec-badge--new.rec-badge--age,
+[data-mode="dark"] .rec-badge--new.rec-badge--masters {
+  color: #fff; background: linear-gradient(135deg,#94a3b8,#64748b); border-color: transparent;
+}
+.rec-badge__star { font-size: 8.5px; line-height: 1; }

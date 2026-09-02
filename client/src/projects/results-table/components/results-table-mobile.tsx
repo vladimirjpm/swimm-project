@@ -106,6 +106,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
                 secondLineClassName="text-sm mt-0.5 text-[var(--theme-mode-text-secondary)]"
                 showClubIcon={false}
                 isRecordHolder={isRecordHolder}
+          recordKind={isMastersResult ? 'masters' : 'age'}
               />
               {showDate && (
                 <ResultRowDateInfo date={res.date} competition={res.competition} showCompetition={showCompetition} />
@@ -133,6 +134,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
                 secondLineClassName="text-xs justify-center"
                 className="text-right"
                 isRecordHolder={isRecordTime}
+          recordKind={isMastersResult ? 'masters' : 'age'}
           quality={res.suspect_reason ? { kind: 'protocol', reason: res.suspect_reason } : null}
           qualityMarker="chip"
               />
