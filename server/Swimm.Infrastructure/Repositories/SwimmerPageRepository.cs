@@ -233,6 +233,72 @@ public class SwimmerPageRepository : ISwimmerPageRepository
         return best;
     }
 
+    public async Task<IReadOnlyList<SwimmerSearchHitDto>> SearchSwimmersAsync(string query, int limit)
+    {
+        var q = (query ?? string.Empty).Trim();
+        // Один символ находит пол-базы: выдача бесполезна, а ILIKE «%x%» идёт сканом.
+        if (q.Length < 2) return [];
+
+        // Слова запроса ищутся КАЖДОЕ в любом из четырёх полей имени: «כהן דניאל» и
+        // «Daniel Cohen» должны находить одного и того же пловца независимо от порядка.
+        var words = q.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (words.Length == 0) return [];
+
+        var take = Math.Clamp(limit, 1, 30);
+        var key = $"swimmer-search:{take}:{string.Join('', words).ToLowerInvariant()}";
+        var cached = await _cache.GetAsync<List<SwimmerSearchHitDto>>(key);
+        if (cached is not null) return cached;
+
+        var swimmers = _read.Swimmers.AsNoTracking();
+        foreach (var word in words)
+        {
+            var pattern = $"%{word}%";
+            swimmers = swimmers.Where(s =>
+                EF.Functions.ILike(s.LastName, pattern)
+                || EF.Functions.ILike(s.FirstName, pattern)
+                || EF.Functions.ILike(s.LastNameEn, pattern)
+                || EF.Functions.ILike(s.FirstNameEn, pattern));
+        }
+
+        var rows = await swimmers
+            // Составные «пловцы» из ног эстафет (имя списком через запятую) — не люди:
+            // страницы у них нет, и сравнивать с ними нечего. Тот же отсев, что в поиске
+            // участников группы (HubGroupAdminService.SearchSwimmersAsync).
+            .Where(s => !EF.Functions.ILike(s.LastName, "%,%") && !EF.Functions.ILike(s.FirstName, "%,%"))
+            .OrderBy(s => s.LastName).ThenBy(s => s.FirstName)
+            .Take(take)
+            .Select(s => new
+            {
+                s.Id,
+                s.FirstName,
+                s.LastName,
+                s.FirstNameEn,
+                s.LastNameEn,
+                s.BirthYear,
+                s.Gender,
+                ClubName = s.Club != null ? s.Club.Name : null,
+            })
+            .ToListAsync();
+
+        var hits = rows.Select(s =>
+        {
+            // Имя на витрине ивритское, английское — только фоллбеком (правило проекта).
+            var he = $"{s.FirstName} {s.LastName}".Trim();
+            var en = $"{s.FirstNameEn} {s.LastNameEn}".Trim();
+            return new SwimmerSearchHitDto
+            {
+                Id = s.Id,
+                Name = he.Length > 0 ? he : en,
+                BirthYear = s.BirthYear,
+                Gender = s.Gender,
+                ClubName = s.ClubName,
+            };
+        }).ToList();
+
+        await _cache.SetAsync(key, hits, Ttl);
+        return hits;
+    }
+
     public async Task<IReadOnlyList<PeerSeasonBest>> GetAgeCohortSeasonBestsAsync(
         int seasonStartYear, int birthYear)
     {

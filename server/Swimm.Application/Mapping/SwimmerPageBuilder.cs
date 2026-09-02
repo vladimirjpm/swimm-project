@@ -1,4 +1,4 @@
-using Swimm.Application.Dtos;
+﻿using Swimm.Application.Dtos;
 using Swimm.Domain;
 
 namespace Swimm.Application.Mapping;
@@ -373,6 +373,225 @@ public static class SwimmerPageBuilder
         }).ToList();
 
         return dto;
+    }
+
+    /// <summary>
+    /// Таб H2H: лучшие времена двух пловцов бок о бок за один период (сезон карусели или
+    /// карьера при <paramref name="season"/> = null).
+    ///
+    /// Ключ строки — БЕЗ пола, в отличие от <c>disciplineKey</c> остальных табов: пол там
+    /// нужен, чтобы «50 вольным» мальчиков и девочек не сливались в справочниках, а здесь он
+    /// ровно наоборот — разнополая пара не совпала бы ни одной строкой, и таблица вышла бы
+    /// пустой при полных данных с обеих сторон.
+    /// </summary>
+    public static SwimmerCompareDto Compare(
+        SwimmerCompareInput mineInput, SwimmerCompareInput rivalInput, int? season)
+    {
+        var mineSeason = InSeason(mineInput.Rows, season);
+        var rivalSeason = InSeason(rivalInput.Rows, season);
+        var mine = BestPerPairDiscipline(mineSeason);
+        var rival = BestPerPairDiscipline(rivalSeason);
+
+        // Бейджи считаются ОДИН раз на сторону и раздаются строкам по ключу дисциплины
+        // (с полом — в справочниках и когортах он есть, в отличие от ключа пары).
+        var mineFlags = Flags(mineSeason, mineInput, season);
+        var rivalFlags = Flags(rivalSeason, rivalInput, season);
+
+        var dto = new SwimmerCompareDto
+        {
+            Season = season,
+            Label = season is null ? "career" : SeasonMath.Label(season.Value),
+            Mine = Side(mineInput.Profile, season, mineSeason, mineFlags),
+            Rival = Side(rivalInput.Profile, season, rivalSeason, rivalFlags),
+        };
+
+        // Пара времён на КАЖДЫЙ бассейн — это и есть единица сравнения. Строку из них
+        // собираем ниже, но считать «кто быстрее» можно только здесь: 25м и 50м несравнимы.
+        var pools = mine.Keys.Union(rival.Keys).Select(key =>
+        {
+            mine.TryGetValue(key, out var m);
+            rival.TryGetValue(key, out var r);
+            // Заголовок берём с той стороны, что есть: у общей пары стиль, дистанция и
+            // бассейн одинаковы по построению ключа, а у односторонней выбора нет.
+            var shape = m ?? r!;
+            return new
+            {
+                shape.StyleId,
+                Stroke = shape.StyleName,
+                shape.Distance,
+                Pool = new SwimmerComparePoolDto
+                {
+                    PoolType = shape.PoolType,
+                    Mine = Swim(m, mineFlags),
+                    Rival = Swim(r, rivalFlags),
+                    DeltaMs = m is not null && r is not null
+                        ? m.TimeMilliseconds!.Value - r.TimeMilliseconds!.Value
+                        : null,
+                },
+            };
+        }).ToList();
+
+        // «50 брасс» — ОДНА дистанция: 25м и 50м складываются в одну строку своими парами
+        // времён, а не в две строки, которые читались бы как две разные дистанции.
+        var rows = pools
+            .GroupBy(x => new { x.StyleId, x.Distance })
+            .Select(g => new SwimmerCompareRowDto
+            {
+                Key = $"{g.Key.StyleId}|{g.Key.Distance}",
+                StyleId = g.Key.StyleId,
+                Stroke = g.First().Stroke,
+                Distance = g.Key.Distance,
+                // Короткая вода первой: в ней плавают чаще, и строка открывается тем
+                // бассейном, где у обоих скорее всего есть время.
+                Pools = g.Select(x => x.Pool)
+                    .OrderBy(x => string.Equals(x.PoolType, "25m", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                    .ThenBy(x => x.PoolType)
+                    .ToList(),
+            })
+            .ToList();
+
+        // Строки, где есть что сравнивать, — сверху; внутри порядок тот же, что у остальных
+        // табов страницы (очки убывают), чтобы они не «прыгали» при смене сезона.
+        dto.Rows = rows
+            .OrderByDescending(r => r.Pools.Any(p => p.DeltaMs is not null))
+            .ThenByDescending(r => r.Pools.Max(p => Math.Max(p.Mine?.Points ?? 0, p.Rival?.Points ?? 0)))
+            .ThenBy(r => r.Stroke)
+            .ToList();
+
+        // Счёт — ПО БАССЕЙНАМ: 50 брасс в 25м и в 50м это два разных сравнения, и складывать
+        // их в одно значило бы потерять половину результата.
+        var shared = pools.Select(x => x.Pool).Where(p => p.DeltaMs is not null).ToList();
+        dto.SharedCount = shared.Count;
+        dto.MineFaster = shared.Count(p => p.DeltaMs < 0);
+        dto.RivalFaster = shared.Count(p => p.DeltaMs > 0);
+        dto.Ties = shared.Count(p => p.DeltaMs == 0);
+        return dto;
+    }
+
+    /// <summary>
+    /// Шапка одной стороны сравнения: имя уже выбрано репозиторием (иврит → EN), статы —
+    /// за тот же период, что и времена (медали только там, где их вручали).
+    /// </summary>
+    private static SwimmerCompareSideDto Side(
+        SwimmerProfileDto? profile, int? season,
+        IReadOnlyList<SeasonSwimRow> rows, CompareFlags flags) => new()
+    {
+        Id = profile?.Id ?? 0,
+        Name = profile?.FullName ?? string.Empty,
+        BirthYear = profile is { BirthYear: > 0 } ? profile.BirthYear : null,
+        Gender = profile?.Gender,
+        ClubName = profile?.ClubName,
+        AgeInSeason = season is int s && profile is { BirthYear: > 0 }
+            ? SeasonMath.AgeInSeason(s, profile.BirthYear)
+            : null,
+        SeasonBests = flags.SeasonBestKeys.Count,
+        Medals = Medals(rows),
+        BestPoints = rows.Where(SeasonAggregator.IsCountable)
+            .Select(r => r.InternationalPoints)
+            .DefaultIfEmpty(0)
+            .Max(),
+    };
+
+    private static SwimmerCompareSwimDto? Swim(SeasonSwimRow? row, CompareFlags flags)
+    {
+        if (row is null) return null;
+
+        var key = SeasonAggregator.DisciplineKey(row);
+        return new SwimmerCompareSwimDto
+        {
+            Time = row.TimeOriginal,
+            TimeMs = row.TimeMilliseconds,
+            // Тем же хелпером, что и остальные табы: сегодня отбор помеченных сюда не пускает,
+            // но признак обязан ехать из ОДНОГО места (инвариант И11).
+            Quality = Quality(row),
+            Points = row.InternationalPoints,
+            Date = row.CompetitionDate.ToString("yyyy-MM-dd"),
+            Competition = CompetitionRef(row),
+            ResultId = row.ResultId,
+            IsSeasonBest = flags.SeasonBestKeys.Contains(key),
+            HoldsRecord = flags.RecordKeys.Contains(key),
+        };
+    }
+
+    /// <summary>
+    /// Вход одной стороны сравнения. Собран в запись, потому что сторон две и у каждой
+    /// ЧЕТЫРЕ независимых источника: заплывы, профиль, своя когорта сверстников (год
+    /// рождения у соперника другой) и свой срез справочника рекордов (своя возрастная
+    /// ступень). Шесть позиционных аргументов на вызов путались бы местами.
+    /// </summary>
+    public sealed record SwimmerCompareInput(
+        IReadOnlyList<SeasonSwimRow> Rows,
+        SwimmerProfileDto? Profile,
+        IReadOnlyList<PeerSeasonBest> Cohort,
+        IReadOnlyDictionary<string, NationalAgeRecordRow> Records);
+
+    /// <summary>Ключи дисциплин, где у стороны бейдж SB / REC.</summary>
+    private sealed record CompareFlags(HashSet<string> SeasonBestKeys, HashSet<string> RecordKeys);
+
+    /// <summary>
+    /// Бейджи стороны: где она быстрейшая среди сверстников (SB) и где держит официальный
+    /// рекорд своей возрастной ступени (REC).
+    ///
+    /// SB считается ТОЙ ЖЕ арифметикой, что фильтр «Season best» (<see cref="SeasonRanks"/>):
+    /// место — «сколько строго быстрее + 1», группа — свой год рождения и пол. За карьеру
+    /// бейджа нет вовсе: сравнение живёт внутри одного сезона.
+    /// </summary>
+    private static CompareFlags Flags(
+        IReadOnlyList<SeasonSwimRow> rows, SwimmerCompareInput input, int? season)
+    {
+        var seasonBests = new HashSet<string>();
+        var records = new HashSet<string>();
+        var best = BestPerDiscipline(rows);
+
+        if (season is not null && input.Cohort.Count > 0)
+        {
+            var byDiscipline = input.Cohort.GroupBy(p => p.DisciplineKey)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            foreach (var (key, row) in best)
+            {
+                if (!byDiscipline.TryGetValue(key, out var peers)) continue;
+
+                var ms = row.TimeMilliseconds!.Value;
+                var rank = peers.Count(p => p.TimeMs < ms) + 1;
+                var peerCount = peers.Select(p => p.SwimmerId).Distinct().Count();
+                // «Первый среди одного» — не достижение: тот же порог, что у остальных
+                // экранов (MIN_PEERS_FOR_RANK на клиенте).
+                if (rank == 1 && peerCount >= MinPeersForSeasonBest) seasonBests.Add(key);
+            }
+        }
+
+        foreach (var (key, row) in best)
+        {
+            if (input.Records.TryGetValue(key, out var record) && record.TimeMs is int recordMs
+                && row.TimeMilliseconds!.Value <= recordMs)
+            {
+                records.Add(key);
+            }
+        }
+
+        return new CompareFlags(seasonBests, records);
+    }
+
+    /// <summary>Меньше двух сверстников — места нет, бейдж SB не выдаётся.</summary>
+    private const int MinPeersForSeasonBest = 2;
+
+    /// <summary>
+    /// Лучший зачётный заплыв в каждой дисциплине ПАРЫ — ключ без пола (см. Compare).
+    /// Помеченные, DSQ и эстафеты сюда не попадают: их отсекает <c>IsCountable</c>.
+    /// </summary>
+    private static Dictionary<string, SeasonSwimRow> BestPerPairDiscipline(IEnumerable<SeasonSwimRow> rows)
+    {
+        var best = new Dictionary<string, SeasonSwimRow>();
+        foreach (var row in rows)
+        {
+            if (!SeasonAggregator.IsCountable(row)) continue;
+            var key = SeasonAggregator.DisciplineKey(row.StyleId, row.Distance, row.PoolType, gender: null);
+            if (!best.TryGetValue(key, out var cur)
+                || row.TimeMilliseconds!.Value < cur.TimeMilliseconds!.Value)
+                best[key] = row;
+        }
+        return best;
     }
 
     /// <summary>Лучший зачётный заплыв в каждой дисциплине (без категории заплыва).</summary>

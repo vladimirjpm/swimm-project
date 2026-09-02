@@ -95,4 +95,12 @@ public interface ISwimmerPageRepository
     /// </summary>
     Task<IReadOnlyDictionary<string, NationalAgeRecordRow>> GetNationalAgeRecordsAsync(
         string? regionCode, string? gender, int age);
+
+    /// <summary>
+    /// Публичный поиск пловцов по имени — селектор соперника таба H2H.
+    /// Ищет по всем четырём полям имени (иврит и английский): у пловцов из стартовых
+    /// протоколов английского имени ещё нет, у части старых импортов — наоборот.
+    /// Запрос короче двух символов не выполняется: выдача бесполезна, а скан дорогой.
+    /// </summary>
+    Task<IReadOnlyList<SwimmerSearchHitDto>> SearchSwimmersAsync(string query, int limit);
 }

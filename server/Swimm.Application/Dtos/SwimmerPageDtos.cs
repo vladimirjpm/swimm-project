@@ -531,3 +531,218 @@ public sealed class SwimmerDisciplineRankDto
     [JsonPropertyName("gapToLeaderMs")]
     public int GapToLeaderMs { get; set; }
 }
+
+/// <summary>
+/// Строка публичного поиска пловцов (<c>GET /api/swimmers/search</c>) — селектор соперника
+/// таба H2H. Имя приходит УЖЕ выбранным по правилу проекта: иврит, английский — только
+/// фоллбеком; клиенту решать это заново нечем (у него нет обеих пар полей).
+/// </summary>
+public sealed class SwimmerSearchHitDto
+{
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Год рождения; 0 — в базе не заполнен (у пловцов из стартовых протоколов бывает).</summary>
+    [JsonPropertyName("birthYear")]
+    public int BirthYear { get; set; }
+
+    [JsonPropertyName("gender")]
+    public string? Gender { get; set; }
+
+    [JsonPropertyName("clubName")]
+    public string? ClubName { get; set; }
+}
+
+/// <summary>
+/// Таб H2H: лучшие времена двух пловцов бок о бок за один период. Соперник выбирается
+/// вручную через поиск — автоматического списка «кто рядом» здесь нет (решение Влада
+/// 2026-09-01), поэтому и когорта сверстников не тянется.
+///
+/// Период — тот же, что у остальных табов: сезон карусели либо ∞ (карьера).
+/// </summary>
+public sealed class SwimmerCompareDto
+{
+    /// <summary>Год начала сезона; null — сравнение за карьеру.</summary>
+    [JsonPropertyName("season")]
+    public int? Season { get; set; }
+
+    [JsonPropertyName("label")]
+    public string Label { get; set; } = string.Empty;
+
+    [JsonPropertyName("mine")]
+    public SwimmerCompareSideDto Mine { get; set; } = new();
+
+    [JsonPropertyName("rival")]
+    public SwimmerCompareSideDto Rival { get; set; } = new();
+
+    /// <summary>
+    /// Дистанции, где плавал хотя бы один из двоих: строка на связку стиль × дистанция,
+    /// бассейны внутри неё. Сначала те, где есть что сравнивать, дальше односторонние.
+    /// </summary>
+    [JsonPropertyName("rows")]
+    public List<SwimmerCompareRowDto> Rows { get; set; } = [];
+
+    /// <summary>
+    /// Сколько пар «дистанция × бассейн» плавали ОБА — заголовок панели говорит это вслух.
+    /// Считается по бассейнам, а не по строкам: 50 брасс в 25м и в 50м — два разных
+    /// сравнения, и схлопнуть их в одно значило бы потерять половину результата.
+    /// </summary>
+    [JsonPropertyName("sharedCount")]
+    public int SharedCount { get; set; }
+
+    /// <summary>Из общих пар: где быстрее хозяин страницы / соперник / поровну.</summary>
+    [JsonPropertyName("mineFaster")]
+    public int MineFaster { get; set; }
+
+    [JsonPropertyName("rivalFaster")]
+    public int RivalFaster { get; set; }
+
+    [JsonPropertyName("ties")]
+    public int Ties { get; set; }
+}
+
+/// <summary>Шапка одной стороны сравнения.</summary>
+public sealed class SwimmerCompareSideDto
+{
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("birthYear")]
+    public int? BirthYear { get; set; }
+
+    [JsonPropertyName("gender")]
+    public string? Gender { get; set; }
+
+    [JsonPropertyName("clubName")]
+    public string? ClubName { get; set; }
+
+    /// <summary>Возраст В СЕЗОНЕ сравнения (SeasonMath.AgeInSeason); null — за карьеру или без года рождения.</summary>
+    [JsonPropertyName("ageInSeason")]
+    public int? AgeInSeason { get; set; }
+
+    // ── Статы шапки (макет H2H, три строки между линиями) ──────────────────────
+    // Считаются за ТОТ ЖЕ период, что и времена ниже: иначе шапка и таблица говорили бы
+    // о разном, а подписи, объясняющей расхождение, в макете нет.
+
+    /// <summary>
+    /// Сколько дисциплин пловец возглавляет среди СВЕРСТНИКОВ (тот же год рождения и пол).
+    /// За карьеру не считается — сравнение живёт внутри сезона, и в режиме ∞ здесь 0.
+    /// </summary>
+    [JsonPropertyName("seasonBests")]
+    public int SeasonBests { get; set; }
+
+    /// <summary>Медали периода — только там, где их вручали (<c>Competition.IsAward</c>).</summary>
+    [JsonPropertyName("medals")]
+    public MedalCountsDto Medals { get; set; } = new();
+
+    /// <summary>Лучшие очки FINA за один заплыв периода. 0 — зачётных заплывов нет.</summary>
+    [JsonPropertyName("bestPoints")]
+    public int BestPoints { get; set; }
+}
+
+/// <summary>
+/// Одна дистанция в сравнении — <b>стиль × дистанция</b>, бассейны внутри (25м и 50м своими
+/// парами времён). Ключ строится БЕЗ пола (в отличие от <c>disciplineKey</c> остальных
+/// табов): иначе у разнополой пары не совпала бы ни одна строка и таблица вышла бы пустой
+/// при полном наборе данных с обеих сторон.
+///
+/// Почему бассейн ВНУТРИ строки, а не в её ключе: «50 брасс» — одна дистанция, и двумя
+/// строками она читалась бы как две разные. Но сравнивать 25м с 50м нельзя — в короткой воде
+/// время быстрее по устройству бассейна, — поэтому пары времён остаются раздельными, каждая
+/// со своим разрывом.
+/// </summary>
+public sealed class SwimmerCompareRowDto
+{
+    /// <summary>стиль|дистанция — общий ключ строки; ни бассейну, ни полу здесь не место.</summary>
+    [JsonPropertyName("key")]
+    public string Key { get; set; } = string.Empty;
+
+    [JsonPropertyName("styleId")]
+    public int StyleId { get; set; }
+
+    [JsonPropertyName("stroke")]
+    public string? Stroke { get; set; }
+
+    [JsonPropertyName("distance")]
+    public string Distance { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Бассейны, где эту дистанцию плавал хотя бы один из двоих: 25м впереди 50м, пустых
+    /// (никто не плавал) в списке нет.
+    /// </summary>
+    [JsonPropertyName("pools")]
+    public List<SwimmerComparePoolDto> Pools { get; set; } = [];
+}
+
+/// <summary>Пара времён одной дистанции в ОДНОМ бассейне — единица сравнения.</summary>
+public sealed class SwimmerComparePoolDto
+{
+    [JsonPropertyName("poolType")]
+    public string PoolType { get; set; } = string.Empty;
+
+    [JsonPropertyName("mine")]
+    public SwimmerCompareSwimDto? Mine { get; set; }
+
+    [JsonPropertyName("rival")]
+    public SwimmerCompareSwimDto? Rival { get; set; }
+
+    /// <summary>
+    /// Разрыв в мс, «моё минус соперника»: отрицательный — хозяин страницы быстрее.
+    /// null — в этом бассейне дистанцию плавал только один, сравнивать не с чем.
+    /// </summary>
+    [JsonPropertyName("deltaMs")]
+    public int? DeltaMs { get; set; }
+}
+
+/// <summary>Лучший заплыв одной стороны на одной дистанции за период сравнения.</summary>
+public sealed class SwimmerCompareSwimDto
+{
+    /// <summary>Время как напечатано в протоколе — его и показывает UI_SwimTime.</summary>
+    [JsonPropertyName("time")]
+    public string? Time { get; set; }
+
+    [JsonPropertyName("timeMs")]
+    public int? TimeMs { get; set; }
+
+    /// <summary>
+    /// Признак качества времени (инвариант И11). Сегодня он всегда пуст: в сравнение идут
+    /// только зачётные заплывы, а помеченные отсекает <c>IsCountable</c>. Поле всё равно
+    /// есть и заполняется из того же места, что везде, — ослабнет отбор, и признак поедет
+    /// на витрину сам, а не «когда вспомнят».
+    /// </summary>
+    [JsonPropertyName("quality")]
+    public SwimQualityDto? Quality { get; set; }
+
+    [JsonPropertyName("points")]
+    public int? Points { get; set; }
+
+    [JsonPropertyName("date")]
+    public string Date { get; set; } = string.Empty;
+
+    [JsonPropertyName("competition")]
+    public SwimmerCompetitionRefDto? Competition { get; set; }
+
+    [JsonPropertyName("resultId")]
+    public long ResultId { get; set; }
+
+    /// <summary>
+    /// Бейдж SB: пловец быстрейший среди сверстников в этой дисциплине. Порог «хотя бы двое
+    /// в группе» тот же, что на остальных экранах: «первый среди одного» — не достижение.
+    /// </summary>
+    [JsonPropertyName("isSeasonBest")]
+    public bool IsSeasonBest { get; set; }
+
+    /// <summary>
+    /// Бейдж REC: время не медленнее официального рекорда страны для СВОЕЙ возрастной
+    /// ступени. Определяется по времени, а не по имени держателя, — имена в справочнике
+    /// строковые и у тёзок совпадают (то же правило, что в личниках).
+    /// </summary>
+    [JsonPropertyName("holdsRecord")]
+    public bool HoldsRecord { get; set; }
+}
