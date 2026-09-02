@@ -22,9 +22,14 @@
 
 /* ── Светлая тема (по умолчанию) ─────────────────────────────────────────── */
 
+/* Мировой и национальный — золото: правило «золото только рекордам страны и выше».
+   Мировой отличается насыщенностью рамки, а не другим цветом: это соседние ступени одной
+   лестницы, и разные цвета читались бы как разные сущности. */
+.rec-badge--world,
 .rec-badge--national {
   color: #b17d11; background: rgba(217,164,32,.14); border: 1px solid rgba(178,125,17,.45);
 }
+.rec-badge--world { border-width: 1.5px; }
 .rec-badge--age,
 .rec-badge--masters {
   color: #64748b; background: rgba(100,116,139,.10); border: 1px solid rgba(100,116,139,.35);
@@ -32,6 +37,7 @@
 
 /* ── Тёмная тема — значения хендоффа ─────────────────────────────────────── */
 
+[data-mode="dark"] .rec-badge--world,
 [data-mode="dark"] .rec-badge--national {
   color: #fbbf24; background: rgba(251,191,36,.14); border-color: rgba(251,191,36,.45);
 }
@@ -46,7 +52,9 @@
    результатов его было видно с прокрутки. Класс рекорда сохраняется — звезда добавляется
    к нему, а не заменяет. Заливка тёмная в обеих темах, текст белый: это акцент. */
 .rec-badge--new { gap: 3px; color: #fff; border-color: transparent; }
+.rec-badge--new.rec-badge--world,
 .rec-badge--new.rec-badge--national,
+[data-mode="dark"] .rec-badge--new.rec-badge--world,
 [data-mode="dark"] .rec-badge--new.rec-badge--national {
   color: #fff; background: linear-gradient(135deg,#f0b429,#c8860a); border-color: transparent;
 }
@@ -56,4 +64,6 @@
 [data-mode="dark"] .rec-badge--new.rec-badge--masters {
   color: #fff; background: linear-gradient(135deg,#94a3b8,#64748b); border-color: transparent;
 }
-.rec-badge__star { font-size: 8.5px; line-height: 1; }
+/* Отступ звезде задан margin-ом, а не gap контейнера: «REC» — текстовый узел, а не
+   элемент, и flex-gap между ними не работает (получалось «★REC·M»). */
+.rec-badge__star { font-size: 8.5px; line-height: 1; margin-right: 3px; }

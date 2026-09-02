@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useClubRecordWall, type ClubOfficialRecord } from '../../../hooks/useClubRecordWall';
 import { ClubRecordCard, ClubRecordSection, ClubRecordTile, type PoolFilter } from './club-record-card';
 import { compareDiscipline, groupByAge } from './age-sections';
+import UI_RecordBadge, { type RecordKind } from '../../components/mix/record-badge/record-badge';
 
 /**
  * Record wall — ОФИЦИАЛЬНЫЕ рекорды, числящиеся за клубом: национальные, возрастные,
@@ -22,25 +23,23 @@ interface Props {
 }
 
 /**
- * Подпись ступени: чем «выше» рекорд, тем ярче плашка (см. TONE ниже).
- * Возраста здесь нет — он вынесен в заголовок секции (карточка режется по ступеням).
+ * Класс рекорда для общего `UI_RecordBadge`. Мировой рекорд живёт в `region_type`, а не в
+ * `category`, — поэтому он проверяется первым.
  */
-function scopeLabel(r: ClubOfficialRecord): string {
-  if (r.region_type === 'world') return 'World record';
-  const region = r.region_code ? r.region_code.toUpperCase() : 'National';
-  return r.category === 'masters' ? `${region} masters` : `${region} record`;
+function recordKindOf(r: ClubOfficialRecord): RecordKind {
+  if (r.region_type === 'world') return 'world';
+  if (r.category === 'masters') return 'masters';
+  return r.category === 'open' ? 'national' : 'age';
 }
 
-const TONE: Record<string, string> = {
-  world: 'var(--deep-gold)',
-  open: 'var(--deep-gold)',
-  age: 'var(--deep-accent)',
-  masters: 'var(--deep-text-mute)',
-};
-
-function toneOf(r: ClubOfficialRecord): string {
-  if (r.region_type === 'world') return TONE.world;
-  return TONE[r.category] ?? 'var(--deep-text-mute)';
+/**
+ * Подпись рядом с бейджем: откуда рекорд. Класс («какого он веса») несёт бейдж, здесь —
+ * только область, иначе строка повторяла бы одно и то же дважды.
+ * Возраста нет: он в заголовке секции — карточка режется по ступеням.
+ */
+function scopeLabel(r: ClubOfficialRecord): string {
+  if (r.region_type === 'world') return 'World';
+  return r.region_code ? r.region_code.toUpperCase() : 'National';
 }
 
 function ClubRecordWall({ clubId }: Props) {
@@ -85,8 +84,19 @@ function ClubRecordWall({ clubId }: Props) {
                 // индекс в хвосте страхует от дублей источника.
                 key={`${r.region_type}-${r.category}-${r.age_key}-${r.style}-${r.distance}-${r.pool_type}-${r.gender}-${i}`}
                 gender={r.gender}
-                topLine={scopeLabel(r)}
-                topTone={toneOf(r)}
+                // Класс рекорда — тем же бейджем, что в H2H, таблице результатов и на
+                // стене пловца. Цветную подпись он заменил целиком: цвет ступени жил
+                // ТОЛЬКО здесь и спорил с продуктовым правилом (cyan = «быстрее», а не
+                // «возрастной рекорд»).
+                topLine={(
+                  <span className="flex items-center gap-1.5">
+                    <UI_RecordBadge
+                      kind={recordKindOf(r)}
+                      scope={r.age_key ? `${r.category} ${r.age_key}` : r.category}
+                    />
+                    <span className="truncate">{scopeLabel(r)}</span>
+                  </span>
+                )}
                 // Style в Records — сырой ключ (individual_medley), это только косметика.
                 secondLine={`${r.distance} ${r.style.replace(/_/g, ' ')} · ${r.pool_type.toUpperCase()}`}
                 time={r.time}
