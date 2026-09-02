@@ -1,0 +1,112 @@
+/* Семейство `UI_SwimmerIdentity*` — «кто этот пловец» на трёх экранах.
+   Здесь стили ВАРИАНТА HERO (шапка страницы `/swimmers/{id}`), потому что он держит их в
+   CSS; вариант карточки-попапа стилизован утилитами по палитре results прямо в разметке —
+   так он и жил, и переписывание вида при выносе было бы отдельным риском.
+
+   Классы намеренно сохранили имена `deep-*`: они уже стоят в снимках вёрстки и в правилах
+   темы, а переименование при переезде смешало бы «где лежит» с «как выглядит».
+
+   ТОКЕНЫ: только `var(--deep-*)` — фиксированных hex на тем-зависимых поверхностях быть не
+   должно, иначе шапка не переносится в светлую тему. Исключения (белый круг под эмблемой,
+   флаг) — физические объекты, одинаковые в обеих темах. */
+
+/* ── Hero (BLOCKS.md §1) ──────────────────────────────────────────────────── */
+
+.deep-hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 700px;
+  gap: 22px;
+  align-items: center;
+  padding: 20px 24px 18px;
+  border-radius: var(--deep-radius-card);
+  background: var(--deep-hero-grad);
+  border: 1px solid var(--deep-card-border);
+  margin-bottom: 16px;
+}
+.deep-hero__id { display: flex; flex-direction: column; align-items: center; gap: 9px; }
+.deep-hero__avatar-box { position: relative; }
+.deep-hero__avatar {
+  display: flex; align-items: center; justify-content: center;
+  width: 96px; height: 96px; border-radius: 999px; object-fit: cover;
+  border: 3px solid var(--deep-accent-border);
+  background: var(--deep-card-bg-raised);
+  font-family: var(--deep-font-display); font-size: 34px; color: var(--deep-accent);
+}
+.deep-hero__flag {
+  position: absolute; right: -2px; bottom: -2px;
+  padding: 2px; border-radius: 4px;
+  background: var(--deep-card-bg-raised);
+  border: 1px solid var(--deep-card-border);
+  box-shadow: var(--deep-card-shadow);
+  line-height: 0;
+}
+.deep-hero__main { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.deep-hero__name {
+  font-family: var(--deep-font-display);
+  font-size: 31px; line-height: 1.1; color: var(--deep-text);
+  overflow: hidden; text-overflow: ellipsis;
+  /* Физический left, а не `start`: у имени `dir="auto"`, и на иврите `start` означает
+     ПРАВЫЙ край — имя уезжало вправо от остальной шапки. Сам dir нужен, чтобы имя
+     отрисовалось справа налево; выравнивание блока к нему отношения не имеет. */
+  text-align: left;
+}
+.deep-hero__age {
+  font-size: 12.5px; font-weight: 800; color: var(--deep-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.deep-hero-action {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: 999px;
+  background: var(--deep-card-bg-raised);
+  border: 1px solid var(--deep-card-border);
+  color: var(--deep-text-mute);
+  cursor: pointer;
+}
+.deep-hero-action--fav { color: var(--deep-danger); border-color: var(--deep-danger-soft); }
+.deep-hero-action--me {
+  color: var(--deep-gold);
+  background: var(--deep-gold-chip);
+  border-color: var(--deep-gold-border);
+}
+.deep-hero-cta {
+  padding: 7px 12px; border-radius: var(--deep-radius-pill);
+  background: var(--deep-accent-chip); border: 1px solid var(--deep-accent-border);
+  color: var(--deep-accent); font-size: 11px; font-weight: 800; cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Чипы шапки */
+.deep-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: var(--deep-radius-pill);
+  background: var(--deep-card-bg-raised); border: 1px solid var(--deep-card-border);
+  font-size: 11px; font-weight: 800; color: var(--deep-text-mute);
+  white-space: nowrap;
+}
+.deep-chip--accent { background: var(--deep-accent-chip); border-color: var(--deep-accent-border); color: var(--deep-accent); }
+.deep-chip--ow { background: var(--deep-ow-chip); border-color: var(--deep-ow-border); color: var(--deep-ow); }
+.deep-club-chip {
+  display: inline-flex; align-items: center; gap: 8px; min-width: 0;
+  padding: 4px 12px 4px 4px; border-radius: var(--deep-radius-pill);
+  background: var(--deep-card-bg-raised); border: 1px solid var(--deep-card-border);
+  font-size: 12px; font-weight: 800; color: var(--deep-text);
+  text-decoration: none; max-width: 320px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.deep-club-chip:hover { background: var(--deep-card-bg); }
+/* Белый круг под лого — физический объект, одинаков в обеих темах */
+.deep-club-chip__logo {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 999px; flex: none;
+  background: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,.25);
+}
+
+/* ── Мобайл 390 ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .deep-hero { grid-template-columns: auto minmax(0, 1fr); gap: 14px; padding: 14px; }
+  .deep-hero__avatar { width: 76px; height: 76px; font-size: 27px; }
+  .deep-hero__name { font-size: 21px; }
+  /* Все действия ≥44px — правило хендоффа для тач-целей */
+  .deep-hero-action { width: 44px; height: 44px; }
+}
