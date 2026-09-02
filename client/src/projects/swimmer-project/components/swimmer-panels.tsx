@@ -2,14 +2,24 @@ import React, { useState } from 'react';
 import UI_SwimTime from '../../components/mix/swim-time/swim-time';
 import UI_MedalIcon from '../../components/mix/medal-icon/medal-icon';
 import SwimmerResultRow, { type ResultRowData } from './swimmer-result-row';
-import SwimRow from '../../components/swim-row/swim-row';
+import SwimRow, { swimRowStrokeLabel } from '../../components/swim-row/swim-row';
+import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
+import UI_PoolIcon from '../../components/mix/pool-icon/pool-icon';
 import UI_SeasonNotice from '../../components/mix/season-notice/season-notice';
 import { MIN_PEERS_FOR_RANK } from '../../components/mix/rank-of-peers/rank-of-peers';
+import { useFavoritesContext } from '../../../hooks/favorites-context';
+import UI_H2HMiniCard from '../../components/mix/h2h/h2h-mini-card';
+import UI_H2HEmptySlot from '../../components/mix/h2h/h2h-empty-slot';
+import UI_H2HCompareHeader from '../../components/mix/h2h/h2h-compare-header';
+import UI_H2HEventCard from '../../components/mix/h2h/h2h-event-card';
+import UI_H2HPoolRow from '../../components/mix/h2h/h2h-pool-row';
+import UI_H2HDivider from '../../components/mix/h2h/h2h-divider';
+import UI_H2HRivalPicker from '../../components/mix/h2h/h2h-rival-picker';
 import { routes } from '../../../utils/routes';
 import { peerGroupLabel, seasonLabel } from '../../../utils/helpers/season-helper';
 import type {
-  SwimmerBestTime, SwimmerCompetition, SwimmerDisciplineRank, SwimmerPersonalBest, SwimmerProgress,
-  SwimmerSeasonRanks, SwimmerSummary,
+  SwimmerBestTime, SwimmerCompare, SwimmerCompareSwim, SwimmerCompetition, SwimmerDisciplineRank,
+  SwimmerPersonalBest, SwimmerProgress, SwimmerSearchHit, SwimmerSeasonRanks, SwimmerSummary,
 } from '../use-swimmer-page';
 import type { SwimmerHeldRecord } from '../use-swimmer-profile';
 
@@ -123,22 +133,65 @@ function CompetitionRow({ meet, swimmerId }: { meet: SwimmerCompetition; swimmer
   );
 }
 
-/** Таб Season: сводка сезона + его старты (❄/☀ выведены из самих соревнований). */
+/**
+ * Сезон старта из его даты: сезон начинается осенью, поэтому сентябрь и позже принадлежат
+ * сезону года начала. Тот же счёт, что у SeasonMath на сервере.
+ */
+const seasonOfDate = (date: string) => {
+  const [y, m] = date.split('-').map(Number);
+  return m >= 9 ? y : y - 1;
+};
+
+/**
+ * Таб Season: сводка периода + его старты (❄/☀ выведены из самих соревнований).
+ *
+ * В режиме ∞ (карусель на «все сезоны») старты разложены ПО СЕЗОНАМ — это всё, чем таб
+ * History отличался от этой панели, и ради одной группировки второй таб с тем же запросом
+ * не нужен (решение Влада 2026-09-01).
+ */
 export function SeasonPanel({
   summary, swimmerId, state,
 }: { summary: SwimmerSummary | null; swimmerId: number; state: PanelLoad }) {
   if (state.error) return <PanelEmpty>Could not load this season.</PanelEmpty>;
   if (!summary) return <PanelEmpty>{noDataText(state.loading, 'No data for this season.')}</PanelEmpty>;
 
+  const career = summary.season == null;
+  const groups = new Map<number, SwimmerCompetition[]>();
+  if (career) {
+    summary.competitions.forEach((meet) => {
+      const s = seasonOfDate(meet.date);
+      if (!groups.has(s)) groups.set(s, []);
+      groups.get(s)!.push(meet);
+    });
+  }
+
   return (
     <>
       <SeasonBanner summary={summary} />
       <PanelHead
-        title="Competitions"
-        hint={`${summary.competitionCount} meets · ${summary.personalBests} personal bests`}
+        title={career ? 'Career' : 'Competitions'}
+        hint={career
+          ? `${groups.size} season${groups.size === 1 ? '' : 's'} · ${summary.competitionCount} meets`
+            + ` · ${summary.personalBests} personal bests`
+          : `${summary.competitionCount} meets · ${summary.personalBests} personal bests`}
       />
       {summary.competitions.length === 0 ? (
-        <PanelEmpty>No swims in this season yet.</PanelEmpty>
+        <PanelEmpty>{career ? 'No competitions yet.' : 'No swims in this season yet.'}</PanelEmpty>
+      ) : career ? (
+        [...groups.entries()].sort((a, b) => b[0] - a[0]).map(([season, meets]) => (
+          <div key={season} className="deep-history-season">
+            <div className="deep-history-season__label">{seasonLabel(season)}</div>
+            <div className="deep-list">
+              {meets.map((meet) => (
+                <CompetitionRow
+                  key={`${meet.eventId ?? 'c'}-${meet.competitionId}`}
+                  meet={meet}
+                  swimmerId={swimmerId}
+                />
+              ))}
+            </div>
+          </div>
+        ))
       ) : (
         <div className="deep-list">
           {summary.competitions.map((meet) => (
@@ -720,40 +773,216 @@ export function ProgressPanel({
   );
 }
 
-/** Таб History: сезоны и старты карьеры (тот же summary, но за всё время). */
-export function HistoryPanel({
-  career, swimmerId, state,
-}: { career: SwimmerSummary | null; swimmerId: number; state: PanelLoad }) {
-  if (state.error) return <PanelEmpty>Could not load the career history.</PanelEmpty>;
-  if (!career) return <PanelEmpty>{noDataText(state.loading, 'No career data yet.')}</PanelEmpty>;
-  if (career.competitions.length === 0) return <PanelEmpty>No competitions yet.</PanelEmpty>;
+/**
+ * Таб H2H (head-to-head) — макет 1b из `!design_handoff/design_handoff_h2h/`.
+ *
+ * Экран собран из семейства `UI_H2H*` (`components/mix/h2h/`): шапка сравнения с двумя
+ * зеркальными мини-карточками и статами, карточки заплывов с полосой на каждый бассейн,
+ * разделитель «only one swimmer» и выбор соперника (избранное + поиск).
+ *
+ * Соперник выбирается ВРУЧНУЮ (решение Влада 2026-09-01): таб отвечает на вопрос «как я
+ * против ВОТ ЭТОГО пловца», а не «кто мои соперники», — автосписка соседей по времени тут
+ * нет. Сравнивать можно с кем угодно, включая другой год рождения и другой пол.
+ */
+export function H2HPanel({
+  compare, query, onQuery, hits, hitsState, onPick, onClear, rivalId, swimmerId, profileName,
+  state,
+}: {
+  compare: SwimmerCompare | null;
+  /** Строка поиска — состояние живёт на странице, чтобы переживать смену сезона. */
+  query: string;
+  onQuery: (q: string) => void;
+  hits: SwimmerSearchHit[] | null;
+  hitsState: PanelLoad;
+  onPick: (id: number) => void;
+  onClear: () => void;
+  /** Выбранный соперник; null — показываем слот выбора. */
+  rivalId: number | null;
+  /** Хозяин страницы: его самого из избранного убираем — сравнивать с собой нечего. */
+  swimmerId: number;
+  /** Имя хозяина страницы: слот «vs» рисуется ещё до того, как приедет сравнение. */
+  profileName: string;
+  state: PanelLoad;
+}) {
+  const { isAuthenticated, favorites, favoriteSwimmerIds, toggleFavoriteSwimmer } =
+    useFavoritesContext();
+  // Пустой слот — кнопка «выбрать»: попапа у него нет (выбор и так стоит под ним), поэтому
+  // клик просто уводит курсор в поиск. Иначе слот выглядел бы нажимаемым и не делал ничего.
+  const searchRef = React.useRef<HTMLInputElement>(null);
 
-  // Группировка по сезону — из даты старта: сезон начинается осенью, поэтому месяцы
-  // сентября и позже принадлежат сезону года начала (SeasonMath на сервере, тот же счёт).
-  const seasonOf = (date: string) => {
-    const [y, m] = date.split('-').map(Number);
-    return m >= 9 ? y : y - 1;
-  };
-  const groups = new Map<number, SwimmerCompetition[]>();
-  career.competitions.forEach((meet) => {
-    const s = seasonOf(meet.date);
-    if (!groups.has(s)) groups.set(s, []);
-    groups.get(s)!.push(meet);
+  const favoriteRivals = favorites
+    .filter((f) => f.target_type === 'swimmer' && f.swimmer_id != null && f.swimmer_id !== swimmerId)
+    // Порядок пользователя: «Me» первым, дальше его сортировка.
+    .sort((a, b) => Number(b.is_primary) - Number(a.is_primary) || a.sort_order - b.sort_order)
+    .map((f) => ({ id: f.swimmer_id!, name: f.swimmer_name ?? `#${f.swimmer_id}` }));
+
+  const picker = (
+    <UI_H2HRivalPicker
+      favorites={favoriteRivals}
+      query={query}
+      onQuery={onQuery}
+      hits={hits}
+      loading={hitsState.loading}
+      error={hitsState.error}
+      onPick={onPick}
+      inputRef={searchRef}
+    />
+  );
+
+  // Соперник не выбран: слева хозяин страницы, справа пустой слот. Состояния «никто не
+  // выбран» здесь не бывает — левый всегда известен, это его страница.
+  if (rivalId == null) {
+    return (
+      <>
+        <PanelHead title="Compare" hint="pick a swimmer to put your best times side by side" />
+        <div className="h2h-row" style={{ marginBottom: 12 }}>
+          <UI_H2HMiniCard
+            swimmer={{ id: swimmerId, name: profileName }}
+            align="left"
+            isFavorite={isAuthenticated ? favoriteSwimmerIds.has(swimmerId) : null}
+            onToggleFavorite={() => toggleFavoriteSwimmer(swimmerId)}
+          />
+          <div className="h2h-vs">vs</div>
+          <UI_H2HEmptySlot onClick={() => searchRef.current?.focus()} />
+        </div>
+        {picker}
+      </>
+    );
+  }
+
+  if (state.error) {
+    return (
+      <>
+        <PanelHead title="Compare" />
+        {picker}
+        <PanelEmpty>Could not load this comparison.</PanelEmpty>
+      </>
+    );
+  }
+  if (!compare) {
+    return (
+      <>
+        <PanelHead title="Compare" />
+        {picker}
+        <PanelEmpty>{noDataText(state.loading, 'No comparison yet.')}</PanelEmpty>
+      </>
+    );
+  }
+
+  const scope = compare.season == null ? 'career bests' : `best times of season ${compare.label}`;
+  const shared = compare.sharedCount;
+  const both = compare.rows.filter((r) => r.pools.some((p) => p.deltaMs != null));
+  const oneSided = compare.rows.filter((r) => !r.pools.some((p) => p.deltaMs != null));
+
+  const side = (s: SwimmerCompare['mine'], own: boolean) => ({
+    swimmer: {
+      id: s.id,
+      name: s.name || `#${s.id}`,
+      club: s.clubName,
+      // Чип макета: «9 y · 2017». Возраст без года рождения не показываем — его нечем
+      // проверить читателю.
+      ageLabel: s.ageInSeason != null && (s.birthYear ?? 0) > 0
+        ? `${s.ageInSeason} y · ${s.birthYear}`
+        : (s.birthYear ?? 0) > 0 ? `b. ${s.birthYear}` : null,
+    },
+    seasonBests: s.seasonBests,
+    medals: s.medals,
+    bestPoints: s.bestPoints,
+    isFavorite: isAuthenticated ? favoriteSwimmerIds.has(s.id) : null,
+    onToggleFavorite: () => toggleFavoriteSwimmer(s.id),
+    own,
   });
+
+  const eventCard = (row: SwimmerCompare['rows'][number], isOneSided: boolean) => (
+    <UI_H2HEventCard
+      key={row.key}
+      stroke={row.stroke}
+      distance={row.distance}
+      oneSided={isOneSided}
+    >
+      {row.pools.map((pool) => (
+        <UI_H2HPoolRow
+          key={pool.poolType}
+          poolType={pool.poolType}
+          left={pool.mine ? {
+            time: pool.mine.time,
+            date: pool.mine.date,
+            quality: pool.mine.quality,
+            badge: badgeOf(pool.mine),
+          } : null}
+          right={pool.rival ? {
+            time: pool.rival.time,
+            date: pool.rival.date,
+            quality: pool.rival.quality,
+            badge: badgeOf(pool.rival),
+          } : null}
+          deltaMs={pool.deltaMs}
+          // Клик по полосе ведёт в протокол заплыва — того из двух, чей он: у общей пары
+          // берём свой (страница принадлежит хозяину).
+          href={swimHref(pool.mine ?? pool.rival, pool.mine ? compare.mine.id : compare.rival.id)}
+        />
+      ))}
+    </UI_H2HEventCard>
+  );
 
   return (
     <>
-      <PanelHead title="Career" hint={`${groups.size} seasons · ${career.competitionCount} meets`} />
-      {[...groups.entries()].sort((a, b) => b[0] - a[0]).map(([season, meets]) => (
-        <div key={season} className="deep-history-season">
-          <div className="deep-history-season__label">{seasonLabel(season)}</div>
-          <div className="deep-list">
-            {meets.map((meet) => (
-              <CompetitionRow key={`${meet.eventId ?? 'c'}-${meet.competitionId}`} meet={meet} swimmerId={swimmerId} />
-            ))}
-          </div>
+      <PanelHead
+        title="Compare"
+        hint={shared > 0
+          ? `${scope} · ${shared} comparable swim${shared === 1 ? '' : 's'}`
+          : `${scope} · nothing you both swam in the same pool`}
+        right={(
+          <button type="button" className="h2h-clear" onClick={onClear}>
+            Clear
+          </button>
+        )}
+      />
+
+      <UI_H2HCompareHeader
+        left={side(compare.mine, true)}
+        right={side(compare.rival, false)}
+        leftFaster={compare.mineFaster}
+        rightFaster={compare.rivalFaster}
+        ties={compare.ties}
+        // За карьеру мест среди сверстников нет — строка не рисуется, а не показывает 0:0.
+        showSeasonBests={compare.season != null}
+      />
+
+      {compare.rows.length === 0 ? (
+        <PanelEmpty>Neither of you has a counted swim in this period.</PanelEmpty>
+      ) : (
+        <div className="deep-list" style={{ marginTop: 12 }}>
+          {both.map((row) => eventCard(row, false))}
+
+          {oneSided.length > 0 && <UI_H2HDivider text="only one swimmer" />}
+          {oneSided.map((row) => eventCard(row, true))}
         </div>
-      ))}
+      )}
+
+      <div className="deep-legend deep-legend--block">
+        One card per distance, one line per pool: the best time each of you swam there. Short
+        course and long course are never compared with each other — a 25m time is faster by the
+        pool alone. The gap is yours minus theirs, so a negative number means you are faster.
+        SB marks the fastest time among swimmers born the same year; REC means the time is not
+        slower than the national record of that age. Relays, DSQ and flagged swims are left out.
+      </div>
+
+      <div style={{ marginTop: 12 }}>{picker}</div>
     </>
   );
+}
+
+/** Бейдж строки: рекорд весомее места среди сверстников, поэтому REC перебивает SB. */
+function badgeOf(swim: SwimmerCompareSwim): 'SB' | 'REC' | null {
+  if (swim.holdsRecord) return 'REC';
+  return swim.isSeasonBest ? 'SB' : null;
+}
+
+/** Ссылка на протокол заплыва — тот же адрес, что открывают строки остальных табов. */
+function swimHref(swim: SwimmerCompareSwim | null | undefined, swimmerId: number): string | undefined {
+  const competitionId = swim?.competition?.id;
+  return competitionId != null
+    ? `/results?competitionId=${competitionId}&tab=swims&swimmerId=${swimmerId}`
+    : undefined;
 }

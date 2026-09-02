@@ -6,96 +6,10 @@
    Исключения, одинаковые в обеих темах, потому что это физические объекты и знаки:
    белая подложка плиты стиля, красная дистанция поверх неё, флаг страны. */
 
-/* ── Hero (BLOCKS.md §1) ──────────────────────────────────────────────────── */
-
-.deep-hero {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) 700px;
-  gap: 22px;
-  align-items: center;
-  padding: 20px 24px 18px;
-  border-radius: var(--deep-radius-card);
-  background: var(--deep-hero-grad);
-  border: 1px solid var(--deep-card-border);
-  margin-bottom: 16px;
-}
-.deep-hero__id { display: flex; flex-direction: column; align-items: center; gap: 9px; }
-.deep-hero__avatar-box { position: relative; }
-.deep-hero__avatar {
-  display: flex; align-items: center; justify-content: center;
-  width: 96px; height: 96px; border-radius: 999px; object-fit: cover;
-  border: 3px solid var(--deep-accent-border);
-  background: var(--deep-card-bg-raised);
-  font-family: var(--deep-font-display); font-size: 34px; color: var(--deep-accent);
-}
-.deep-hero__flag {
-  position: absolute; right: -2px; bottom: -2px;
-  padding: 2px; border-radius: 4px;
-  background: var(--deep-card-bg-raised);
-  border: 1px solid var(--deep-card-border);
-  box-shadow: var(--deep-card-shadow);
-  line-height: 0;
-}
-.deep-hero__main { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
-.deep-hero__name {
-  font-family: var(--deep-font-display);
-  font-size: 31px; line-height: 1.1; color: var(--deep-text);
-  overflow: hidden; text-overflow: ellipsis;
-  /* Физический left, а не `start`: у имени `dir="auto"`, и на иврите `start` означает
-     ПРАВЫЙ край — имя уезжало вправо от остальной шапки. Сам dir нужен, чтобы имя
-     отрисовалось справа налево; выравнивание блока к нему отношения не имеет. */
-  text-align: left;
-}
-.deep-hero__age {
-  font-size: 12.5px; font-weight: 800; color: var(--deep-text-faint);
-  font-variant-numeric: tabular-nums;
-}
-.deep-hero-action {
-  display: flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px; border-radius: 999px;
-  background: var(--deep-card-bg-raised);
-  border: 1px solid var(--deep-card-border);
-  color: var(--deep-text-mute);
-  cursor: pointer;
-}
-.deep-hero-action--fav { color: var(--deep-danger); border-color: var(--deep-danger-soft); }
-.deep-hero-action--me {
-  color: var(--deep-gold);
-  background: var(--deep-gold-chip);
-  border-color: var(--deep-gold-border);
-}
-.deep-hero-cta {
-  padding: 7px 12px; border-radius: var(--deep-radius-pill);
-  background: var(--deep-accent-chip); border: 1px solid var(--deep-accent-border);
-  color: var(--deep-accent); font-size: 11px; font-weight: 800; cursor: pointer;
-  white-space: nowrap;
-}
-
-/* Чипы шапки */
-.deep-chip {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 4px 10px; border-radius: var(--deep-radius-pill);
-  background: var(--deep-card-bg-raised); border: 1px solid var(--deep-card-border);
-  font-size: 11px; font-weight: 800; color: var(--deep-text-mute);
-  white-space: nowrap;
-}
-.deep-chip--accent { background: var(--deep-accent-chip); border-color: var(--deep-accent-border); color: var(--deep-accent); }
-.deep-chip--ow { background: var(--deep-ow-chip); border-color: var(--deep-ow-border); color: var(--deep-ow); }
-.deep-club-chip {
-  display: inline-flex; align-items: center; gap: 8px; min-width: 0;
-  padding: 4px 12px 4px 4px; border-radius: var(--deep-radius-pill);
-  background: var(--deep-card-bg-raised); border: 1px solid var(--deep-card-border);
-  font-size: 12px; font-weight: 800; color: var(--deep-text);
-  text-decoration: none; max-width: 320px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.deep-club-chip:hover { background: var(--deep-card-bg); }
-/* Белый круг под лого — физический объект, одинаков в обеих темах */
-.deep-club-chip__logo {
-  display: flex; align-items: center; justify-content: center;
-  width: 26px; height: 26px; border-radius: 999px; flex: none;
-  background: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,.25);
-}
+/* ── Hero: сама шапка переехала в общий компонент ─────────────────────────
+   Разметка и стили идентичности (аватар, имя, возраст, клуб, ♡/★) живут в
+   `../components/mix/swimmer-identity/` — там же карточка попапа и будущий мини-вариант.
+   Здесь остались только KPI-плитки: это статистика страницы, а не «кто этот пловец». */
 
 /* ── KPI-плитки (§2) ──────────────────────────────────────────────────────── */
 
@@ -237,7 +151,7 @@
   --sr-text: var(--deep-gold);
 }
 
-/* ── Список стартов (Season / History) ───────────────────────────────────── */
+/* ── Список стартов (таб Season; в режиме ∞ — с подзаголовками сезонов) ──── */
 
 .deep-meet-row {
   display: grid; grid-template-columns: 92px minmax(0, 1fr) auto auto;
@@ -342,25 +256,25 @@
   color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.6);
 }
 
+/* ── H2H (таб сравнения) ──────────────────────────────────────────────────
+   Весь экран живёт в общем семействе `../components/mix/h2h/` вместе со своими стилями —
+   здесь не осталось ничего. */
+
 /* ── Мобайл 390 (§«Мобайл») ──────────────────────────────────────────────── */
 
 @media (max-width: 900px) {
-  .deep-hero { grid-template-columns: auto minmax(0, 1fr); gap: 14px; padding: 14px; }
   .deep-kpi-row { grid-column: 1 / -1; }
   /* Два счётчика рядом не влезают в треть 375px: ставим их столбиком — плитка растёт
      вверх, а не выталкивает соседнюю за край экрана. */
   .deep-achv { flex-direction: column; align-items: center; gap: 6px; }
   .deep-achv__num { font-size: 18px; }
-  .deep-hero__avatar { width: 76px; height: 76px; font-size: 27px; }
-  .deep-hero__name { font-size: 21px; }
-  /* Все действия ≥44px — правило хендоффа для тач-целей */
-  .deep-hero-action { width: 44px; height: 44px; }
 
   /* Половина ширины имеет смысл только на широком экране: на 375px строка и так узкая. */
   .deep-swim-row { max-width: none; }
   .deep-meet-row { grid-template-columns: 78px minmax(0, 1fr) auto; }
   .deep-meet-row__stats { display: none; }
   .deep-media-grid { grid-template-columns: repeat(3, 1fr); }
+
 
   /* Строка заплыва перекладывает свои слоты сама — медиазапрос живёт в `swim-row.css`. */
 }

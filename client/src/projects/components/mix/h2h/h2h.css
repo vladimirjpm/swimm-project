@@ -1,0 +1,294 @@
+/* Head-to-head (таб H2H страницы пловца) — макет 1b из
+   `!design_handoff/design_handoff_h2h/` (`Canvas.dc.html` + `H2H-COMPONENTS.md`).
+
+   Хардкод-цвета макета — значения ТЁМНОЙ темы Deep; здесь они переведены в парные токены
+   `--deep-*`, поэтому светлая тема получается сама. Исключения — медальные кружки: медаль
+   физический объект, её градиенты одинаковы в обеих темах (токены `--deep-gold-grad` и
+   рядом), как и на остальных экранах.
+
+   Правила палитры из хендоффа, которые нельзя размывать:
+   • cyan (`--deep-accent`) = «быстрее / лидер»;
+   • gold (`--deep-gold`) = только медали и бейдж REC;
+   • красный (`--deep-danger`) = только favorite (♥);
+   • glow — только у включённого сердечка; плашка победителя без свечения. */
+
+/* ── Шапка сравнения: карточка · центр · карточка ──────────────────────────── */
+
+.h2h-compare { display: flex; flex-direction: column; gap: 16px; }
+.h2h-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) 200px minmax(0, 1fr);
+  align-items: center; gap: 14px;
+}
+.h2h-score { text-align: center; }
+.h2h-score__value {
+  font-family: var(--deep-font-display); font-size: 30px; color: var(--deep-accent);
+  font-variant-numeric: tabular-nums;
+}
+.h2h-score__cap { font-size: 11px; font-weight: 600; color: var(--deep-text-faint); }
+.h2h-vs {
+  text-align: center; font-family: var(--deep-font-display); font-size: 22px;
+  color: var(--deep-text-ghost);
+}
+
+/* ── Мини-карточка спортсмена ─────────────────────────────────────────────── */
+
+.h2h-mini {
+  position: relative; display: flex; align-items: center; gap: 14px;
+  padding: 12px 16px; border-radius: var(--deep-radius-tile);
+  background: var(--deep-card-bg); border: 1px solid var(--deep-card-border);
+  text-decoration: none; color: inherit; min-width: 0;
+}
+.h2h-mini:hover { background: var(--deep-card-bg-raised); }
+/* Фото всегда К ЦЕНТРУ шапки: у левой карточки текст идёт первым и жмётся вправо. */
+.h2h-mini--left { justify-content: flex-end; }
+.h2h-mini__avatar {
+  width: 72px; height: 72px; border-radius: 50%; flex: none; overflow: hidden;
+  border: 2px solid var(--deep-accent-border); background: var(--deep-card-bg-raised);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--deep-font-display); font-size: 26px; color: var(--deep-accent);
+}
+.h2h-mini__avatar img { width: 100%; height: 100%; object-fit: cover; }
+/* ⚠ `align-items: stretch` + text-align, а НЕ flex-end: иврит-спаны берут max-content и
+   наезжают на фото (поймано в макете, повторено здесь сознательно). */
+.h2h-mini__text {
+  display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1;
+  align-items: stretch;
+}
+.h2h-mini--left .h2h-mini__text { text-align: right; }
+.h2h-mini--right .h2h-mini__text { text-align: left; }
+.h2h-mini__name {
+  font-size: 16px; font-weight: 800; color: var(--deep-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.h2h-mini__club {
+  font-size: 12px; color: var(--deep-text-mute);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.h2h-mini__age {
+  font-size: 11px; font-weight: 800; color: var(--deep-text-faint);
+  border: 1px solid var(--deep-card-border); border-radius: var(--deep-radius-pill);
+  padding: 1px 9px; white-space: nowrap;
+}
+.h2h-mini--left .h2h-mini__age { align-self: flex-end; }
+.h2h-mini--right .h2h-mini__age { align-self: flex-start; }
+/* Сердечко — во ВНЕШНЕМ углу карточки, чтобы не спорить с фото, смотрящим в центр. */
+.h2h-mini__fav {
+  position: absolute; top: 8px; font-size: 16px; line-height: 1; cursor: pointer;
+  background: none; border: 0; padding: 0; color: var(--deep-text-ghost);
+}
+.h2h-mini--left .h2h-mini__fav { left: 10px; }
+.h2h-mini--right .h2h-mini__fav { right: 10px; }
+.h2h-mini__fav--on { color: var(--deep-danger); text-shadow: 0 0 8px var(--deep-danger-soft); }
+
+/* ── Пустой слот «выбери соперника» ───────────────────────────────────────── */
+
+.h2h-slot {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 96px; padding: 12px 16px; width: 100%;
+  border: 1px dashed var(--deep-card-border); border-radius: var(--deep-radius-tile);
+  background: none; color: var(--deep-text-faint); cursor: pointer;
+  font-size: 13px; font-weight: 700;
+}
+.h2h-slot:hover { border-color: var(--deep-accent-border); color: var(--deep-text-mute); }
+.h2h-slot__plus {
+  width: 44px; height: 44px; border-radius: 50%; flex: none;
+  border: 1px dashed var(--deep-card-border);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 800; color: var(--deep-text-ghost);
+}
+
+/* ── Статы шапки ──────────────────────────────────────────────────────────── */
+
+.h2h-stats {
+  display: flex; flex-direction: column; gap: 10px; padding: 12px 0;
+  border-top: 1px solid var(--deep-divider); border-bottom: 1px solid var(--deep-divider);
+}
+.h2h-stat__label {
+  text-align: center; font-size: 10px; font-weight: 800; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--deep-text-faint);
+}
+.h2h-stat__value {
+  font-size: 18px; font-weight: 800; color: var(--deep-text);
+  font-variant-numeric: tabular-nums;
+}
+.h2h-stat__value--win { color: var(--deep-accent); }
+.h2h-stat__value--left { text-align: right; }
+.h2h-stat__value--right { text-align: left; }
+.h2h-stat__medals { display: flex; }
+.h2h-stat__medals--left { justify-content: flex-end; }
+.h2h-stat__medals--right { justify-content: flex-start; }
+
+/* Медальная тройка. Градиенты — физические объекты, одни в обеих темах. */
+.h2h-medals { display: inline-flex; gap: 3px; }
+.h2h-medal {
+  width: 20px; height: 20px; border-radius: 50%; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10.5px; font-weight: 900; color: #04182b;
+}
+.h2h-medal--gold { background: linear-gradient(180deg,#fbbf24,#b45309); border: 1px solid rgba(251,191,36,.6); }
+.h2h-medal--silver { background: linear-gradient(180deg,#e5e7eb,#9ca3af); border: 1px solid rgba(229,231,235,.5); }
+.h2h-medal--bronze { background: linear-gradient(180deg,#f0a36a,#9a5b2d); border: 1px solid rgba(240,163,106,.5); }
+
+/* ── Карточка заплыва ─────────────────────────────────────────────────────── */
+
+.h2h-event {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 14px 18px; border-radius: var(--deep-radius-tile);
+  background: var(--deep-card-bg-raised); border: 1px solid var(--deep-card-border-soft);
+}
+/* Односторонняя карточка приглушена и обведена пунктиром: сравнивать в ней нечего. */
+.h2h-event--one-sided {
+  background: var(--deep-card-bg-row); border: 1px dashed var(--deep-card-border-soft);
+  opacity: .9;
+}
+.h2h-event__head {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center; gap: 14px;
+}
+.h2h-event__hairline { height: 1px; background: var(--deep-divider); }
+/* Дистанцию и стиль несёт САМА иконка (в ней число дистанции) — текстовой подписи нет.
+   Белая подложка обязательна: PNG стилей нарисованы под светлый фон. */
+.h2h-event__icon {
+  width: 132px; height: 90px; border-radius: 10px; overflow: hidden; flex: none;
+  background: #fff; display: flex; align-items: center; justify-content: center;
+  font-size: 15px;
+}
+.h2h-event--one-sided .h2h-event__icon { filter: grayscale(.4); }
+.h2h-event__icon img { max-height: 76px; max-width: 118px; }
+
+.h2h-pool {
+  display: grid; grid-template-columns: minmax(0, 1fr) 120px minmax(0, 1fr);
+  align-items: center; gap: 10px;
+  text-decoration: none; color: inherit;
+}
+.h2h-pool__mid { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.h2h-pool__label {
+  font-size: 11px; font-weight: 800; letter-spacing: .5px;
+  color: var(--deep-text-faint); white-space: nowrap;
+}
+.h2h-pool__delta {
+  font-size: 12.5px; font-weight: 700; color: var(--deep-text-mute);
+  font-variant-numeric: tabular-nums;
+}
+.h2h-pool__delta--win { color: var(--deep-accent); }
+
+/* ── Ячейка времени ───────────────────────────────────────────────────────── */
+
+.h2h-time--left { text-align: right; }
+.h2h-time--right { text-align: left; }
+.h2h-time__empty { font-size: 19px; font-weight: 800; color: var(--deep-text-ghost); }
+.h2h-time__value {
+  font-size: 19px; font-weight: 800; color: var(--deep-text);
+  font-variant-numeric: tabular-nums;
+}
+.h2h-time__date { font-size: 11.5px; color: var(--deep-text-faint); }
+/* Победитель — плашка без свечения (glow в макете только у сердечка). */
+.h2h-time__box {
+  display: inline-block; padding: 5px 16px; border-radius: 10px;
+  background: var(--deep-accent-soft); border: 1px solid var(--deep-accent-border);
+}
+.h2h-time__box .h2h-time__value { color: var(--deep-accent); }
+/* nowrap + flex обязательны: иначе бейдж переносится под время (проверено в макете). */
+.h2h-time__line {
+  display: flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+.h2h-time--left .h2h-time__line { justify-content: flex-end; }
+.h2h-time--right .h2h-time__line { justify-content: flex-start; }
+.h2h-badge {
+  display: inline-flex; align-items: center;
+  font-size: 9.5px; font-weight: 900; letter-spacing: .5px;
+  border-radius: 4px; padding: 1px 5px;
+}
+.h2h-badge--sb { color: var(--deep-accent); border: 1px solid var(--deep-accent-border); }
+.h2h-badge--rec {
+  color: var(--deep-gold); background: var(--deep-gold-chip);
+  border: 1px solid var(--deep-gold-border);
+}
+
+/* ── Разделитель «только один пловец» ─────────────────────────────────────── */
+
+.h2h-divider { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
+.h2h-divider__line { height: 1px; flex: 1; background: var(--deep-divider); }
+.h2h-divider__text {
+  font-size: 11px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--deep-text-ghost);
+}
+
+/* ── Выбор соперника: избранное + поиск ───────────────────────────────────── */
+
+.h2h-picker { display: flex; flex-direction: column; gap: 10px; }
+.h2h-picker__favs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.h2h-picker__cap {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--deep-text-ghost);
+}
+.h2h-fav-chip {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  padding: 5px 13px; border-radius: var(--deep-radius-pill);
+  background: var(--deep-danger-soft); border: 1px solid var(--deep-danger-soft);
+  color: var(--deep-text-mute); font-size: 12px; font-weight: 800; cursor: pointer;
+}
+.h2h-fav-chip:hover { color: var(--deep-text); }
+.h2h-fav-chip__heart { color: var(--deep-danger); }
+.h2h-search {
+  width: 100%; min-height: 40px; padding: 10px 18px;
+  border-radius: var(--deep-radius-pill);
+  background: var(--deep-card-bg-raised); border: 1px solid var(--deep-card-border);
+  color: var(--deep-text); font-size: 12.5px; font-weight: 700;
+}
+.h2h-search::placeholder { color: var(--deep-text-ghost); }
+.h2h-search:focus { outline: none; border-color: var(--deep-accent-border); }
+/* Выдача — В ПОТОКЕ, а не поверх: всплывающая уезжала за нижний край страницы, и до
+   последних имён нельзя было доскроллить (поймано на живой странице 01.09.2026). */
+.h2h-hits {
+  max-height: 260px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 2px; padding: 4px;
+  border-radius: var(--deep-radius-tile);
+  background: var(--deep-card-bg-raised); border: 1px solid var(--deep-card-border);
+}
+.h2h-hit {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  width: 100%; padding: 8px 10px; min-height: 36px;
+  border: 0; border-radius: var(--deep-radius-row); background: transparent;
+  color: inherit; cursor: pointer; text-align: start;
+}
+.h2h-hit:hover { background: var(--deep-card-bg-row); }
+.h2h-hit__name { font-size: 12.5px; font-weight: 900; color: var(--deep-text); }
+.h2h-hit__meta { font-size: 11px; font-weight: 700; color: var(--deep-text-faint); white-space: nowrap; }
+.h2h-hint { padding: 8px 10px; font-size: 11.5px; font-weight: 700; color: var(--deep-text-faint); }
+
+/* Сброс выбранного соперника — кнопка в шапке панели. */
+.h2h-clear {
+  padding: 5px 11px; min-height: 30px; border-radius: var(--deep-radius-pill);
+  background: var(--deep-card-bg-raised); border: 1px solid var(--deep-card-border);
+  color: var(--deep-text-mute); font-size: 11px; font-weight: 800; cursor: pointer;
+}
+.h2h-clear:hover { color: var(--deep-text); }
+
+/* ── Мобайл ───────────────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  /* Центральная колонка ужимается, но остаётся между сторонами: сравнение читается
+     только когда обе цифры и разрыв стоят в ряд. */
+  .h2h-row { grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1fr); gap: 8px; }
+  .h2h-score__value { font-size: 22px; }
+  /* Карточка встаёт СТОЛБИКОМ: в 375px на строку остаётся ~120px, и «фото + текст» рядом
+     не помещаются — чип возраста (nowrap) вылезал за экран. Зеркальность сторон при этом
+     теряется, но она и не читается на такой ширине. */
+  .h2h-mini { flex-direction: column; padding: 10px 8px; gap: 6px; justify-content: center; }
+  .h2h-mini__avatar { width: 52px; height: 52px; font-size: 20px; }
+  .h2h-mini__text,
+  .h2h-mini--left .h2h-mini__text,
+  .h2h-mini--right .h2h-mini__text { text-align: center; align-items: center; width: 100%; }
+  .h2h-mini__name { font-size: 13px; max-width: 100%; }
+  .h2h-mini__club { font-size: 10.5px; max-width: 100%; }
+  .h2h-mini--left .h2h-mini__age,
+  .h2h-mini--right .h2h-mini__age { align-self: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .h2h-event { padding: 12px; }
+  .h2h-event__icon { width: 96px; height: 66px; }
+  .h2h-event__icon img { max-height: 56px; max-width: 86px; }
+  .h2h-pool { grid-template-columns: minmax(0, 1fr) 84px minmax(0, 1fr); gap: 6px; }
+  .h2h-time__value { font-size: 16px; }
+  .h2h-time__date { display: none; }
+  .h2h-time__box { padding: 4px 10px; }
+}

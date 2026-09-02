@@ -159,6 +159,85 @@ export interface SwimmerProgress {
   points: SwimmerProgressPoint[];
 }
 
+/** Строка выдачи поиска пловцов (селектор соперника таба H2H). */
+export interface SwimmerSearchHit {
+  id: number;
+  /** Имя уже выбрано сервером по правилу проекта: иврит, английский — фоллбеком. */
+  name: string;
+  /** 0 — года рождения в базе нет. */
+  birthYear: number;
+  gender?: string | null;
+  clubName?: string | null;
+}
+
+/** Одна сторона сравнения — мини-карточка шапки и её статы. */
+export interface SwimmerCompareSide {
+  id: number;
+  name: string;
+  birthYear?: number | null;
+  gender?: string | null;
+  clubName?: string | null;
+  /** Возраст в сезоне сравнения; null — режим карьеры или года рождения нет. */
+  ageInSeason?: number | null;
+  /** Сколько дисциплин пловец возглавляет среди сверстников; за карьеру всегда 0. */
+  seasonBests: number;
+  medals: MedalCounts;
+  /** Лучшие очки FINA за один заплыв периода. */
+  bestPoints: number;
+}
+
+/** Лучший заплыв одной стороны на одной дистанции за период сравнения. */
+export interface SwimmerCompareSwim {
+  time?: string | null;
+  timeMs?: number | null;
+  /** Признак качества времени — пуст, пока в сравнение идут только зачётные заплывы. */
+  quality?: SwimQualityDto | null;
+  points?: number | null;
+  date: string;
+  competition?: CompetitionRef | null;
+  resultId: number;
+  /** Бейдж SB: быстрейший среди сверстников в этой дисциплине (только внутри сезона). */
+  isSeasonBest?: boolean;
+  /** Бейдж REC: время не медленнее рекорда страны своей возрастной ступени. */
+  holdsRecord?: boolean;
+}
+
+/** Пара времён одной дистанции в ОДНОМ бассейне — единица сравнения. */
+export interface SwimmerComparePool {
+  poolType: string;
+  mine?: SwimmerCompareSwim | null;
+  rival?: SwimmerCompareSwim | null;
+  /** «Моё минус соперника», мс: отрицательное — быстрее хозяин страницы. null — плавал один. */
+  deltaMs?: number | null;
+}
+
+/**
+ * Строка сравнения — стиль × дистанция, бассейны внутри. `key` — стиль|дистанция БЕЗ пола
+ * (в отличие от `disciplineKey` остальных табов): иначе у разнополой пары не совпала бы ни
+ * одна дистанция. Бассейна в ключе тоже нет: «50 брасс» — одна дистанция, но 25м и 50м
+ * сравниваются порознь, каждый своей парой времён.
+ */
+export interface SwimmerCompareRow {
+  key: string;
+  styleId: number;
+  stroke?: string | null;
+  distance: string;
+  pools: SwimmerComparePool[];
+}
+
+export interface SwimmerCompare {
+  season: number | null;
+  label: string;
+  mine: SwimmerCompareSide;
+  rival: SwimmerCompareSide;
+  rows: SwimmerCompareRow[];
+  /** Сколько пар «дистанция × бассейн» плавали оба — только на них есть разрыв. */
+  sharedCount: number;
+  mineFaster: number;
+  rivalFaster: number;
+  ties: number;
+}
+
 /**
  * Значение `?season=` для запроса: null (режим All) → «all», иначе год начала сезона.
  * Отдельная функция, потому что «сезон не выбран» и «сезон ещё не известен» — разные
@@ -278,6 +357,39 @@ export const useSwimmerSeasonRanks = (id: number | null, season: number | null, 
     id != null && season != null && enabled
       ? `/api/swimmers/${id}/season-ranks?season=${seasonParam(season)}`
       : null);
+
+/**
+ * Таб H2H: сравнение с выбранным пловцом за тот же период, что показывают остальные табы.
+ * Без соперника запроса нет — панель до выбора показывает только поиск.
+ */
+export const useSwimmerCompare = (
+  id: number | null, rivalId: number | null, season: number | null, enabled = true,
+) =>
+  useJson<SwimmerCompare>(
+    id != null && rivalId != null && enabled
+      ? `/api/swimmers/${id}/compare?rivalId=${rivalId}&season=${seasonParam(season)}`
+      : null);
+
+/**
+ * Подсказки поиска пловцов. Запрос уходит через паузу после последней буквы: селектор
+ * дёргается на каждый символ, а ILIKE «%x%» по всем именам — не тот запрос, который стоит
+ * слать по десять раз на слово. Ответы кэширует общий кэш файла, поэтому возврат к уже
+ * набранному запросу мгновенный.
+ */
+export function useSwimmerSearch(query: string, debounceMs = 250) {
+  const [debounced, setDebounced] = useState('');
+
+  useEffect(() => {
+    const q = query.trim();
+    // Один символ сервер и так не ищет — не тратим на него запрос.
+    if (q.length < 2) { setDebounced(''); return; }
+    const timer = setTimeout(() => setDebounced(q), debounceMs);
+    return () => clearTimeout(timer);
+  }, [query, debounceMs]);
+
+  return useJson<SwimmerSearchHit[]>(
+    debounced ? `/api/swimmers/search?q=${encodeURIComponent(debounced)}` : null);
+}
 
 export const useSwimmerProgress = (id: number | null, disciplineKey: string | null) =>
   useJson<SwimmerProgress>(
