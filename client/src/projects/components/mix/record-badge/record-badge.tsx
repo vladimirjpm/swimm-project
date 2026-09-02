@@ -28,6 +28,16 @@ interface Props {
    * бейдж стал общим, но событие осталось событием — отсюда звезда и заливка.
    */
   isNew?: boolean;
+  /**
+   * Пловец ДЕРЖИТ этот рекорд (бейдж стоит у имени в общем списке заплывов). Без пометки
+   * «HOLDER» голый «REC·M» рядом с именем читается как «этот заплыв — рекорд», хотя он
+   * может быть каким угодно: вопрос-то был про человека, а не про строку (замечено Владом
+   * 02.09.2026 на таблице результатов).
+   *
+   * Там, где контекст сам всё объясняет — стена рекордов пловца и клуба, — пометка не
+   * нужна: в списке рекордов иначе и не бывает.
+   */
+  isHolder?: boolean;
   className?: string;
 }
 
@@ -54,14 +64,19 @@ const TITLE: Record<RecordKind, string> = {
   masters: 'Masters record',
 };
 
-const UI_RecordBadge: React.FC<Props> = ({ kind, scope, isNew = false, className = '' }) => {
-  const title = isNew ? `New ${TITLE[kind].toLowerCase()}` : TITLE[kind];
+const UI_RecordBadge: React.FC<Props> = ({
+  kind, scope, isNew = false, isHolder = false, className = '',
+}) => {
+  const title = isNew
+    ? `New ${TITLE[kind].toLowerCase()}`
+    : isHolder ? `Holds the ${TITLE[kind].toLowerCase()}` : TITLE[kind];
   return (
     <span
       className={`rec-badge rec-badge--${kind}${isNew ? ' rec-badge--new' : ''} ${className}`.trim()}
       title={scope ? `${title} — ${scope}` : title}
     >
       {isNew && <span className="rec-badge__star" aria-hidden="true">★</span>}
+      {isHolder && <span className="rec-badge__prefix">HOLDER</span>}
       {LABEL[kind]}
       {SUFFIX[kind] && <span className="rec-badge__suffix">{SUFFIX[kind]}</span>}
     </span>

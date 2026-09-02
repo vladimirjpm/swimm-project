@@ -122,10 +122,12 @@ const UI_SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
       className={`${className} ${onClick ? 'cursor-pointer' : ''}`}
       onClick={onClick ? (e) => { e.stopPropagation(); onClick(); } : undefined}
     >
-      {/* Держатель рекорда этой дистанции. Бейдж общий на весь продукт (UI_RecordBadge). */}
+      {/* Держатель рекорда этой дистанции. Пометка «HOLDER» обязательна: бейдж стоит у
+          ИМЕНИ в общем списке заплывов, и без неё «REC·M» читается как «этот заплыв —
+          рекорд», хотя речь про человека. */}
       {isRecordHolder && (
         <div className="mb-1 flex">
-          <UI_RecordBadge kind={recordKind} />
+          <UI_RecordBadge kind={recordKind} isHolder />
         </div>
       )}
       {showRightClubIcon ? (
