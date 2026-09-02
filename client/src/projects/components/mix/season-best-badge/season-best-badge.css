@@ -1,0 +1,15 @@
+/* Плашка SB. Геометрия — как у UI_RecordBadge (одна строка результатов носит обе), цвет —
+   золото медальных кружков; в обеих темах один и тот же, поэтому пары токенов не нужны. */
+.sb-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #fbbf24;
+  color: #3b2600;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
