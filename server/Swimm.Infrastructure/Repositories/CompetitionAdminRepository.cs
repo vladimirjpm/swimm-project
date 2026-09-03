@@ -776,7 +776,9 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
     /// </summary>
     private async Task ApplyCountryAsync(Competition comp, string? countryCode)
     {
-        var code = (countryCode ?? "").Trim().ToUpperInvariant();
+        // Нормализация ДО поиска — общая с импортом и группами (CountryCodes.Normalize):
+        // alpha-2 в справочнике заводит вторую запись той же страны, docs/data-integrity.md §14.
+        var code = CountryCodes.Normalize(countryCode);
         if (code.Length == 0)
         {
             comp.CountryId = null;

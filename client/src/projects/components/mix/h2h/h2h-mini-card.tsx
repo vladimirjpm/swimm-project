@@ -26,10 +26,15 @@ interface Props {
    * где сменяемы обе стороны.
    */
   onClear?: (() => void) | null;
+  /**
+   * Эту сторону сейчас заполнит выбор в пикере — тонкая акцентная рамка. У ЗАНЯТОЙ
+   * карточки это предупреждение: следующий выбор заменит стоящего здесь пловца.
+   */
+  active?: boolean;
 }
 
 const UI_H2HMiniCard: React.FC<Props> = ({
-  swimmer, align, isFavorite = null, onToggleFavorite, onClear = null,
+  swimmer, align, isFavorite = null, onToggleFavorite, onClear = null, active = false,
 }) => {
   // Портрет — общий `UI_SwimmerAvatar` (он же в шапке страницы пловца и в карточке-попапе):
   // раньше здесь была буква без флага, и один и тот же человек выглядел на двух экранах
@@ -54,7 +59,10 @@ const UI_H2HMiniCard: React.FC<Props> = ({
   );
 
   return (
-    <a className={`h2h-mini h2h-mini--${align}`} href={routes.swimmer(swimmer.id)}>
+    <a
+      className={`h2h-mini h2h-mini--${align}${active ? ' h2h-mini--active' : ''}`}
+      href={routes.swimmer(swimmer.id)}
+    >
       {isFavorite !== null && (
         <button
           type="button"
