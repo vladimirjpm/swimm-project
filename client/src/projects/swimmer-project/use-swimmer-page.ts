@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ShowcaseSeasonNotice } from '../../utils/helpers/season-helper';
+import { H2H_PARAM } from '../../utils/routes';
 
 /**
  * Данные табов страницы спортсмена (docs/plans/athlete-page-plan.md §3).
@@ -387,7 +388,7 @@ export const useSwimmerCompare = (
 ) =>
   useJson<SwimmerCompare>(
     id != null && rivalId != null && enabled
-      ? `/api/swimmers/${id}/compare?rivalId=${rivalId}&season=${seasonParam(season)}`
+      ? `/api/swimmers/${id}/compare?${H2H_PARAM.b}=${rivalId}&season=${seasonParam(season)}`
       : null);
 
 /**

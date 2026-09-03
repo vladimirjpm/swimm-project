@@ -108,8 +108,8 @@ export const routes = {
    */
   h2h: (q: { a?: number | null; b?: number | null; season?: number | null | 'all' } = {}) => {
     const params = new URLSearchParams();
-    if (q.a != null) params.set('a', String(q.a));
-    if (q.b != null) params.set('b', String(q.b));
+    if (q.a != null) params.set(H2H_PARAM.a, String(q.a));
+    if (q.b != null) params.set(H2H_PARAM.b, String(q.b));
     // `season=all` — режим карьеры; отсутствие параметра означает «сезон ещё не выбран»,
     // и это РАЗНЫЕ состояния (то же различие, что у карусели страницы пловца).
     if (q.season != null) params.set('season', q.season === 'all' ? 'all' : String(q.season));
@@ -140,6 +140,23 @@ export const routes = {
 };
 
 /**
+ * Имена сторон сравнения в адресе — ОДНИ на всё h2h: страницу (`/h2h?h2h_a=&h2h_b=`), таб
+ * страницы пловца (`?tab=h2h&h2h_b=`, левый там хозяин профиля) и запрос к API
+ * (`compare?h2h_b=`). Раньше их было три штуки на одно и то же — `a`/`b` на странице,
+ * `rival` в табе, `rivalId` в API (решение Влада 03.09.2026).
+ *
+ * Префикс не украшение: `a` и `b` в общем адресном пространстве витрины ничего не значат,
+ * а рядом с `?tab=h2h&season=` читаются как случайные буквы.
+ */
+export const H2H_PARAM = { a: 'h2h_a', b: 'h2h_b' } as const;
+
+/**
+ * Прежние имена — их принимаем на чтение: ссылки с `?a=&b=` и `?rival=` уже разосланы, а
+ * редиректов у витрины нет (то же решение, что с легаси `?group=`/`?swimmer=`).
+ */
+const H2H_PARAM_LEGACY = { a: 'a', b: 'b' } as const;
+
+/**
  * Адрес страницы `/h2h`, разобранный из query. Живёт рядом с генератором намеренно: писать
  * и читать один адрес в разных местах значит завести два контракта.
  *
@@ -163,8 +180,8 @@ export function parseH2HQuery(search = window.location.search): H2HQuery {
     return Number.isFinite(n) && n > 0 ? n : null;
   };
 
-  const a = id('a');
-  const b = id('b');
+  const a = id(H2H_PARAM.a) ?? id(H2H_PARAM_LEGACY.a);
+  const b = id(H2H_PARAM.b) ?? id(H2H_PARAM_LEGACY.b);
   const rawSeason = params.get('season');
   const season = rawSeason == null
     ? undefined
