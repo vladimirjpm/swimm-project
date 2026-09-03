@@ -130,11 +130,21 @@ export const routes = {
    */
   competitionSwims: (
     competitionId: string | number,
-    q: { swimmerId?: number | null; resultId?: number | null } = {},
+    q: { swimmerId?: number | null; resultId?: number | null; eventId?: number | null } = {},
   ) => {
     const params = new URLSearchParams({ tab: 'swims' });
     if (q.swimmerId != null) params.set('swimmerId', String(q.swimmerId));
     if (q.resultId != null) params.set('swim', String(q.resultId));
+    // Многодневка хранится как НЕСКОЛЬКО `Competitions` под общим `CompetitionEvent`, и
+    // `competitionId` это ОДИН ДЕНЬ. Ссылка «открыть этот старт» обязана вести на весь
+    // турнир: строка сезона у пловца считает 12 заплывов по всем дням, а день показывал
+    // два, и это читалось как потерянные строки (поймано 03.09.2026 на Горбенко,
+    // чемпионат 25–27 мая). Заплыв (`resultId`) — исключение: он в конкретном дне, и
+    // адрес дня точнее.
+    if (q.eventId != null && q.resultId == null) {
+      params.set('eventId', String(q.eventId));
+      return `${routes.results()}?${params.toString()}`;
+    }
     return `${routes.competition(competitionId)}?${params.toString()}`;
   },
 };
