@@ -1,0 +1,707 @@
+/* Хром dev-витрины.
+
+   Собственные токены --uk-*, а НЕ токены приложения: страница переключает data-mode и
+   data-theme на <html>, и если бы хром красился теми же переменными, он менялся бы вместе
+   с образцом. Линейка должна оставаться одинаковой, что бы мы ни мерили. Тёмный — чтобы с
+   первого взгляда было видно: это не сайт.
+
+   Токены приложения тут используются ровно в одном месте — фоны сцены `--surface`/`--page`,
+   которые как раз и обязаны ехать за темой. */
+
+.uk-root {
+  --uk-bg: #10131a;
+  --uk-panel: #171b24;
+  --uk-panel-2: #1d222d;
+  --uk-line: #2a303d;
+  --uk-text: #e6eaf2;
+  --uk-dim: #8d97a8;
+  --uk-accent: #66d9c0;
+  --uk-warn: #ffb454;
+
+  min-height: 100vh;
+  background: var(--uk-bg);
+  color: var(--uk-text);
+  font: 14px/1.55 'Segoe UI', system-ui, sans-serif;
+}
+
+/* Страница целиком принадлежит витрине: фон под ней не должен просвечивать светлым. */
+body:has(> #ui-kit-page) {
+  margin: 0;
+  background: #10131a;
+}
+
+.uk-root code {
+  font-family: Consolas, 'SF Mono', monospace;
+  font-size: 0.92em;
+  color: #9fd0ff;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
+/* ── Шапка ──────────────────────────────────────────────────────────────── */
+.uk-top {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 20px;
+  background: var(--uk-panel);
+  border-bottom: 1px solid var(--uk-line);
+}
+
+.uk-top__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.uk-badge {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--uk-warn);
+  border: 1px solid rgba(255, 180, 84, 0.4);
+  background: rgba(255, 180, 84, 0.1);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.uk-top__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.uk-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--uk-dim);
+}
+
+.uk-select select {
+  background: var(--uk-panel-2);
+  color: var(--uk-text);
+  border: 1px solid var(--uk-line);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font: inherit;
+}
+
+/* ── Кнопки-чипы ────────────────────────────────────────────────────────── */
+/* Обычный чип — строка. В столбик разворачиваются только те, у кого есть подпись-пояснение
+   (<em>), иначе «data-mode: dark» в шапке ломался бы на две строки. */
+.uk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--uk-panel-2);
+  color: var(--uk-text);
+  border: 1px solid var(--uk-line);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font: 12px/1.3 inherit;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.uk-chip:has(em) {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+
+.uk-chip em {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--uk-dim);
+}
+
+.uk-chip:hover {
+  border-color: #3c4658;
+}
+
+.uk-chip.is-active {
+  border-color: var(--uk-accent);
+  background: rgba(102, 217, 192, 0.12);
+  color: #d7fff5;
+}
+
+.uk-chip.is-active em {
+  color: rgba(215, 255, 245, 0.7);
+}
+
+.uk-chip--ghost {
+  background: transparent;
+  color: var(--uk-dim);
+}
+
+.uk-input {
+  width: 100%;
+  margin-top: 6px;
+  background: #0d1017;
+  color: var(--uk-text);
+  border: 1px solid var(--uk-line);
+  border-radius: 8px;
+  padding: 6px 9px;
+  font: 12px/1.4 Consolas, monospace;
+}
+
+.uk-input:focus {
+  outline: none;
+  border-color: var(--uk-accent);
+}
+
+/* Кнопка сохранения вида. Пока есть несохранённое — акцентная, после сохранения гаснет. */
+.uk-save {
+  border-color: var(--uk-line);
+  color: var(--uk-dim);
+}
+
+.uk-save.is-dirty {
+  border-color: var(--uk-accent);
+  color: #d7fff5;
+  background: rgba(102, 217, 192, 0.12);
+}
+
+/* ── Раскладка ──────────────────────────────────────────────────────────── */
+.uk-body {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  align-items: start;
+}
+
+.uk-nav {
+  position: sticky;
+  top: 53px;
+  max-height: calc(100vh - 53px);
+  overflow: auto;
+  padding: 16px 12px 24px;
+  border-right: 1px solid var(--uk-line);
+  background: var(--uk-panel);
+}
+
+.uk-nav__group + .uk-nav__group {
+  margin-top: 18px;
+}
+
+.uk-nav__title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--uk-dim);
+  padding: 0 8px 6px;
+}
+
+.uk-nav__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-left: 2px solid transparent;
+  color: var(--uk-text);
+  padding: 5px 8px;
+  font: 13px/1.4 inherit;
+  cursor: pointer;
+  border-radius: 0 6px 6px 0;
+}
+
+.uk-nav__item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.uk-nav__item--child {
+  padding-left: 22px;
+  font-size: 12px;
+  color: var(--uk-dim);
+}
+
+.uk-nav__item.is-active {
+  border-left-color: var(--uk-accent);
+  background: rgba(102, 217, 192, 0.1);
+  color: #d7fff5;
+}
+
+.uk-nav__foot {
+  margin-top: 24px;
+  padding: 10px 8px 0;
+  border-top: 1px solid var(--uk-line);
+  font-size: 11px;
+  color: var(--uk-dim);
+}
+
+.uk-main {
+  padding: 24px 24px 120px;
+  min-width: 0;
+}
+
+/* ── Секция ─────────────────────────────────────────────────────────────── */
+.uk-section {
+  scroll-margin-top: 70px;
+  padding: 20px 0 32px;
+  border-bottom: 1px solid var(--uk-line);
+}
+
+.uk-section__head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.uk-section__head h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  font-family: Consolas, monospace;
+  color: #ffd9a0;
+}
+
+.uk-anchor {
+  font: 11px/1 Consolas, monospace;
+  color: var(--uk-dim);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--uk-line);
+}
+
+.uk-anchor:hover {
+  color: var(--uk-accent);
+}
+
+.uk-section__lead {
+  margin: 8px 0 0;
+  max-width: 70ch;
+  color: #c3cbd9;
+}
+
+/* Галка «объяснения» в шапке компонента — тот же вид, что у autoclose в пропах. */
+.uk-check--docs {
+  margin-left: auto;
+  font-size: 10px;
+}
+
+.uk-notes {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  max-width: 80ch;
+  color: var(--uk-dim);
+  font-size: 12.5px;
+}
+
+.uk-notes li + li {
+  margin-top: 4px;
+}
+
+.uk-note {
+  margin: 8px 0 0;
+  max-width: 80ch;
+  font-size: 12px;
+  color: var(--uk-dim);
+}
+
+.uk-code {
+  margin: 12px 0 0;
+  background: #0d1017;
+  border: 1px solid var(--uk-line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: 12.5px/1.5 Consolas, monospace;
+  color: #9fd0ff;
+  overflow-x: auto;
+}
+
+/* ── Лесенка content-box ────────────────────────────────────────────────── */
+.uk-ladder {
+  margin-top: 16px;
+  display: grid;
+  gap: 6px;
+}
+
+.uk-ladder__row {
+  scroll-margin-top: 80px;
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) 260px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+}
+
+.uk-ladder__row:target,
+.uk-ladder__row:hover {
+  border-color: var(--uk-line);
+  background: var(--uk-panel);
+}
+
+.uk-ladder__name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font: 13px/1.3 Consolas, monospace;
+  color: #9fd0ff;
+}
+
+.uk-ladder__bar {
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 0 1px,
+    transparent 1px 40px
+  );
+  border-radius: 6px;
+}
+
+.uk-ladder__bar span {
+  display: block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(102, 217, 192, 0.35), rgba(102, 217, 192, 0.12));
+  border: 1px solid rgba(102, 217, 192, 0.4);
+  font: 11px/1.4 Consolas, monospace;
+  text-align: right;
+  color: #d7fff5;
+  white-space: nowrap;
+}
+
+.uk-ladder__use {
+  font-size: 12px;
+  color: var(--uk-dim);
+}
+
+/* Узкий экран: три колонки не помещаются — полоса становится отдельной строкой, иначе
+   число ширины наезжает на подпись «когда применять». */
+@media (max-width: 1000px) {
+  .uk-ladder__row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+}
+
+/* ── Живая проба ────────────────────────────────────────────────────────── */
+.uk-probe {
+  margin-top: 20px;
+}
+
+.uk-probe__page {
+  margin-top: 8px;
+  padding: 14px 0;
+  border: 1px dashed var(--uk-line);
+  border-radius: 10px;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.02) 0 6px,
+    transparent 6px 12px
+  );
+}
+
+.uk-probe__box {
+  padding: 14px;
+  border-radius: 8px;
+  background: rgba(102, 217, 192, 0.14);
+  border: 1px solid rgba(102, 217, 192, 0.45);
+  font: 12px/1.4 Consolas, monospace;
+  color: #d7fff5;
+  text-align: center;
+}
+
+/* ── Песочница компонента ──────────────────────────────────────────────── */
+.uk-play {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 18px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .uk-play {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.uk-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.uk-toolbar__label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--uk-dim);
+  margin-right: 2px;
+}
+
+.uk-scene {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  padding: 24px;
+  border: 1px solid var(--uk-line);
+  border-radius: 12px;
+}
+
+.uk-scene--tight {
+  min-height: 0;
+  padding: 10px;
+}
+
+.uk-scene--surface {
+  background: var(--theme-mode-surface, #fff);
+}
+
+.uk-scene--page {
+  background: var(--theme-mode-page-bg, #f5f5f7);
+}
+
+.uk-scene--white {
+  background: #fff;
+}
+
+.uk-scene--dark {
+  background: #10151d;
+}
+
+.uk-scene--checker {
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #d7dbe2 25%, transparent 25%),
+    linear-gradient(-45deg, #d7dbe2 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #d7dbe2 75%),
+    linear-gradient(-45deg, transparent 75%, #d7dbe2 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+/* Коробка, в которую вызывающий ставит компонент. В режиме «sized» она навязывает ширину —
+   так же, как это делает `w-*` в className на реальных экранах. */
+.uk-stage-box--sized > * {
+  width: 100%;
+}
+
+.uk-scale {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.uk-scale__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font: 10px/1 Consolas, monospace;
+  color: var(--uk-dim);
+}
+
+/* ── Панель пропсов ────────────────────────────────────────────────────── */
+.uk-play__right {
+  background: var(--uk-panel);
+  border: 1px solid var(--uk-line);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.uk-props__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font: 10px/1 inherit;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--uk-dim);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--uk-line);
+}
+
+/* Чекбокс autoclose — свой у каждого пропа, живёт в его шапке. Приглушён, пока не включён:
+   в панели их столько же, сколько пропов, и все разом они спорили бы с именами. */
+.uk-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  font: 9.5px/1 inherit;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--uk-dim);
+  opacity: 0.55;
+  cursor: pointer;
+}
+
+.uk-check:hover,
+.uk-check:has(input:checked) {
+  opacity: 1;
+  color: var(--uk-accent);
+}
+
+.uk-check input {
+  accent-color: var(--uk-accent);
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.uk-prop {
+  border-bottom: 1px solid var(--uk-line);
+}
+
+.uk-prop__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: grab;
+  /* Перетаскивание на pointer-событиях: без этого палец на тач-экране скроллил бы страницу
+     вместо того, чтобы тащить проп. */
+  touch-action: none;
+  /* А без этого мышь тащила бы выделенный текст шапки — собственным перетаскиванием
+     браузера, которое забирает указатель себе. */
+  user-select: none;
+}
+
+.uk-prop__head:active {
+  cursor: grabbing;
+}
+
+/* Ручка перетаскивания. Тащат за всю шапку, ручка — подсказка, что это вообще можно. */
+.uk-prop__grip {
+  flex: none;
+  font-size: 12px;
+  line-height: 1;
+  color: #3c4658;
+  user-select: none;
+}
+
+.uk-prop__head:hover .uk-prop__grip {
+  color: var(--uk-dim);
+}
+
+.uk-prop.is-dragging {
+  opacity: 0.4;
+}
+
+/* Куда встанет отпущенный проп. Полоса сверху, а не рамка вокруг: она показывает МЕСТО
+   вставки, и её не путаешь с обычной подсветкой строки. */
+.uk-prop.is-drop-target {
+  box-shadow: inset 0 2px 0 0 var(--uk-accent);
+}
+
+/* Шапка пропа — она же переключатель. В свёрнутом виде это вся строка: имя и значение,
+   потому что именно их и хотят видеть, когда панель сложена. */
+.uk-prop__toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 0;
+  background: none;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.uk-prop__toggle:hover .uk-prop__name {
+  color: #ffe9c4;
+}
+
+.uk-prop__caret {
+  flex: none;
+  width: 10px;
+  font-size: 10px;
+  color: var(--uk-dim);
+}
+
+.uk-prop__name {
+  font: 13px/1.3 Consolas, monospace;
+  color: #ffd9a0;
+}
+
+/* Значение прижато вправо и обрезается: у className оно бывает в полстроки кода. */
+.uk-prop__value {
+  margin-left: auto;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 11.5px/1.3 Consolas, monospace;
+  color: #9fd0ff;
+}
+
+.uk-prop__body {
+  padding: 0 0 12px 18px;
+}
+
+.uk-prop__doc {
+  font-size: 11.5px;
+  color: var(--uk-dim);
+}
+
+.uk-prop__row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.uk-prop__row .uk-chip {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.uk-snippet {
+  margin-top: 14px;
+}
+
+.uk-snippet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font: 10px/1 inherit;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--uk-dim);
+  margin-bottom: 6px;
+}
+
+.uk-snippet pre {
+  margin: 0;
+  background: #0d1017;
+  border: 1px solid var(--uk-line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: 12px/1.5 Consolas, monospace;
+  color: #9fd0ff;
+  overflow-x: auto;
+}
+
+.uk-snippet__file {
+  margin-top: 6px;
+  font: 10.5px/1.4 Consolas, monospace;
+  color: var(--uk-dim);
+  overflow-wrap: anywhere;
+}
