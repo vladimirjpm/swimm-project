@@ -1,4 +1,5 @@
 import React from 'react';
+import UI_SwimmerAvatar from '../swimmer-avatar/swimmer-avatar';
 import './h2h.css';
 
 /**
@@ -19,6 +20,8 @@ export interface H2HPickerHit {
   name: string;
   birthYear: number;
   clubName?: string | null;
+  /** male | female — от него зависит дефолтный портрет строки (своего фото у поиска нет). */
+  gender?: string | null;
 }
 
 interface Props {
@@ -77,6 +80,10 @@ const UI_H2HRivalPicker: React.FC<Props> = ({
         ) : (
           hits.map((hit) => (
             <button key={hit.id} type="button" className="h2h-hit" onClick={() => onPick(hit.id)}>
+              {/* Портрет тем же компонентом, что в карточках: в списке выбора человек
+                  узнаётся по лицу быстрее, чем по строке. Фото у поиска нет — идёт дефолт
+                  по полу, страна домашняя. */}
+              <UI_SwimmerAvatar gender={hit.gender} name={hit.name} size={28} className="h2h-hit__avatar" />
               <span className="h2h-hit__name" dir="auto">{hit.name}</span>
               <span className="h2h-hit__meta">
                 {hit.birthYear > 0 ? hit.birthYear : '—'}

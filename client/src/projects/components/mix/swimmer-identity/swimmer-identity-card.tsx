@@ -1,6 +1,6 @@
 import React from 'react';
 import UI_ClubIcon from '../club-icon/club-icon';
-import UI_FlagEmoji from '../flag-icon/flag-icon';
+import UI_SwimmerAvatar from '../swimmer-avatar/swimmer-avatar';
 import { useIdentityFavorites } from './swimmer-identity-favorites';
 import { identityAgeLabel, identityDefaultAvatar, type SwimmerIdentity } from './swimmer-identity.types';
 import { routes } from '../../../../utils/routes';
@@ -92,20 +92,15 @@ const UI_SwimmerIdentityCard: React.FC<Props> = ({
       style={{ background: 'var(--theme-mode-hero-grad)' }}
     >
       <div className="flex flex-col items-center gap-2 shrink-0">
-        <div className="relative">
-          <img
-            src={identity.avatarUrl || identityDefaultAvatar(identity.gender, base)}
-            alt={identity.name}
-            className="block h-[76px] w-[76px] rounded-full object-cover"
-            style={{ border: '3px solid var(--theme-primary)', background: '#fff' }}
-            onError={(e) => {
-              e.currentTarget.src = identityDefaultAvatar('female', base);
-            }}
-          />
-          <div className="absolute -bottom-1.5 -right-1" style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.5))' }}>
-            <UI_FlagEmoji countryCode={identity.countryCode ?? 'il'} size={'28x21'} className="rounded" />
-          </div>
-        </div>
+        {/* Портрет с флагом — общий компонент; палитра попапа приходит токенами `--sa-*`. */}
+        <UI_SwimmerAvatar
+          avatarUrl={identity.avatarUrl}
+          gender={identity.gender}
+          countryCode={identity.countryCode}
+          name={identity.name}
+          size={76}
+          className="[--sa-ring:var(--theme-primary)]"
+        />
 
         {identity.id != null && <CardActions swimmerId={identity.id} />}
         {meta}

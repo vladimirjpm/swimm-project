@@ -8,7 +8,7 @@ import AppTopbar from '../components/app-topbar/app-topbar';
 import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import DeepSeasonCarousel from '../components/deep/season-carousel';
 import DeepTabs from '../components/deep/tabs';
-import { parseRoute } from '../../utils/routes';
+import { parseRoute, H2H_PARAM } from '../../utils/routes';
 import Helper from '../../utils/helpers/data-helper';
 import { seasonLabel } from '../../utils/helpers/season-helper';
 import { useSwimmerProfile } from './use-swimmer-profile';
@@ -68,9 +68,16 @@ const LEGACY_TAB_VIEW: Record<string, ResultsView> = { pb: 'records', progress: 
  */
 const LEGACY_TAB_ALIAS: Record<string, SwimmerTab> = { history: 'season', rivals: 'h2h' };
 
-/** `?rival=` — с кем сравнивать в табе H2H. Мусор и «сам с собой» → соперника нет. */
+/**
+ * `?h2h_b=` — с кем сравнивать в табе H2H. Имя общее со страницей `/h2h` (`H2H_PARAM`):
+ * таб — её частный случай, где левая сторона это хозяин профиля, поэтому в адресе только
+ * правая. Прежнее `?rival=` принимаем на чтение — ссылки уже разосланы.
+ *
+ * Мусор и «сам с собой» → соперника нет.
+ */
 function rivalFromQuery(selfId: number | null): number | null {
-  const raw = new URLSearchParams(window.location.search).get('rival');
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get(H2H_PARAM.b) ?? params.get('rival');
   const n = raw != null ? Number(raw) : NaN;
   return Number.isFinite(n) && n > 0 && n !== selfId ? n : null;
 }
@@ -129,7 +136,7 @@ function SwimmerProject() {
     return legacy != null && LEGACY_TAB_ALIAS[legacy] ? null : undefined;
   });
 
-  // Соперник таба H2H живёт в адресе (`?rival=`) по той же причине, что сезон и таб:
+  // Соперник таба H2H живёт в адресе (`?h2h_b=`) по той же причине, что сезон и таб:
   // сравнение — это то, чем делятся ссылкой.
   const [rivalId, setRivalId] = useState<number | null>(() => rivalFromQuery(swimmerId));
   const [rivalQuery, setRivalQuery] = useState('');
@@ -151,8 +158,10 @@ function SwimmerProject() {
       else url.searchParams.set('tab', next.tab);
     }
     if (next.rival !== undefined) {
-      if (next.rival == null) url.searchParams.delete('rival');
-      else url.searchParams.set('rival', String(next.rival));
+      // Легаси-имя вычищаем всегда: иначе адрес нёс бы обоих и читался бы по старому.
+      url.searchParams.delete('rival');
+      if (next.rival == null) url.searchParams.delete(H2H_PARAM.b);
+      else url.searchParams.set(H2H_PARAM.b, String(next.rival));
     }
     if (next.view !== undefined) {
       // Умолчания в адресе не держим: `?view=best` это тот же адрес, что без него.

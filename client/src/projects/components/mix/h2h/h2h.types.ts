@@ -34,6 +34,10 @@ export interface H2HSwimmer {
   /** Готовая подпись чипа: «9 y · 2017». Пусто — чип не рисуется. */
   ageLabel?: string | null;
   avatarUrl?: string | null;
+  /** male | female — от него зависит дефолтный портрет, когда своего фото нет. */
+  gender?: string | null;
+  /** alpha-3 или alpha-2; пусто — домашняя страна (флаг рисуется всегда). */
+  countryCode?: string | null;
 }
 
 /**

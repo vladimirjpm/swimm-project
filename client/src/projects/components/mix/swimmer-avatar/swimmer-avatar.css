@@ -1,0 +1,42 @@
+/* Портрет пловца с флагом. Геометрию (диаметр) задаёт вызывающий инлайном — размеры у
+   шапки, карточки и мини-карточки разные, а всё остальное обязано выглядеть одинаково.
+
+   Цвета — через переменные с фоллбеком: компонент живёт и на Deep-страницах (`--deep-*`
+   переопределены на контейнере), и в попапе результатов с палитрой `--theme-*`. */
+.swimmer-avatar {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  line-height: 0;
+}
+
+.swimmer-avatar__img {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 3px solid var(--sa-ring, var(--deep-accent-border, var(--theme-primary)));
+  background: var(--sa-bg, #fff);
+}
+
+/* Флаг в нижнем внешнем углу — как в карточке-попапе, откуда приём и взят. Подложка нужна
+   на тёмном фоне: без неё тёмные полосы флага сливались с карточкой. */
+.swimmer-avatar__flag {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  /* Доля от портрета, а не фиксированные px: аватар ужимается медиазапросами экранов. */
+  width: 34%;
+  padding: 2px;
+  border-radius: 4px;
+  background: var(--sa-flag-bg, var(--deep-card-bg-raised, #fff));
+  border: 1px solid var(--sa-flag-border, var(--deep-card-border, rgba(0, 0, 0, 0.12)));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  line-height: 0;
+}
+
+.swimmer-avatar__flag img {
+  display: block;
+  width: 100%;
+  height: auto;
+}

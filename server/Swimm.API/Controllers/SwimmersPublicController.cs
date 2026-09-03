@@ -276,26 +276,37 @@ public class SwimmersPublicController : ControllerBase
     /// <summary>
     /// Таб H2H: лучшие времена хозяина страницы и выбранного соперника бок о бок за один
     /// период — сезон карусели либо <c>?season=all</c> (карьера).
-    /// 404 — соперника нет; <paramref name="rivalId"/> = <paramref name="id"/> отклоняем:
-    /// сравнение с самим собой не значит ничего.
+    ///
+    /// Соперник приходит как <c>h2h_b</c> — тем же именем, что в адресе страницы
+    /// (<c>/h2h?h2h_a=&amp;h2h_b=</c>) и таба (<c>?tab=h2h&amp;h2h_b=</c>): на одну сущность
+    /// одно имя во всём h2h (решение Влада 03.09.2026). Левая сторона здесь в пути, поэтому
+    /// <c>h2h_a</c> эндпоинту не нужен. Прежнее <c>rivalId</c> принимаем на чтение — по нему
+    /// уже ходят открытые вкладки.
+    ///
+    /// 404 — соперника нет; соперник = <paramref name="id"/> отклоняем: сравнение с самим
+    /// собой не значит ничего.
     /// </summary>
     [HttpGet("/api/swimmers/{id:int}/compare")]
     public async Task<IActionResult> GetCompare(
-        int id, [FromQuery] int rivalId, [FromQuery] string? season = null)
+        int id,
+        [FromQuery(Name = "h2h_b")] int? h2hB = null,
+        [FromQuery] int? rivalId = null,
+        [FromQuery] string? season = null)
     {
-        if (rivalId <= 0 || rivalId == id) return BadRequest(new { error = "rivalId" });
+        var rivalSwimmerId = h2hB ?? rivalId ?? 0;
+        if (rivalSwimmerId <= 0 || rivalSwimmerId == id) return BadRequest(new { error = "h2h_b" });
 
-        var rivalProfile = await _results.GetSwimmerProfileAsync(rivalId);
+        var rivalProfile = await _results.GetSwimmerProfileAsync(rivalSwimmerId);
         if (rivalProfile is null) return NotFound();
 
         return await this.CachedJson(_cache,
-            $"http:swimmer:{id}:compare:{rivalId}:{season ?? "default"}",
+            $"http:swimmer:{id}:compare:{rivalSwimmerId}:{season ?? "default"}",
             async () =>
             {
                 // Обе выборки идут через тот же кэшированный шов, что и остальные табы:
                 // страница соперника, открытая следом, читает уже готовые заплывы.
                 var mineRows = await _swims.GetSwimsAsync(id);
-                var rivalRows = await _swims.GetSwimsAsync(rivalId);
+                var rivalRows = await _swims.GetSwimsAsync(rivalSwimmerId);
                 var mineProfile = await _results.GetSwimmerProfileAsync(id);
 
                 // Сезон приземляется на заплывы ХОЗЯИНА страницы: карусель сверху — его,

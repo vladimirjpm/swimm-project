@@ -10,7 +10,7 @@ import DeepSeasonCarousel from '../components/deep/season-carousel';
 import UI_H2HCompare, { h2hScopeLabel } from '../components/mix/h2h/h2h-compare';
 import UI_H2HRivalPicker from '../components/mix/h2h/h2h-rival-picker';
 import type { H2HSlot } from '../components/mix/h2h/h2h.types';
-import { parseH2HQuery, routes } from '../../utils/routes';
+import { parseH2HQuery, routes, H2H_PARAM } from '../../utils/routes';
 import { useFavoritesContext } from '../../hooks/favorites-context';
 import {
   useSwimmerProfile, type SwimmerProfile, type SwimmerSeasonOption,
@@ -66,6 +66,8 @@ function slotSwimmer(profile: SwimmerProfile) {
       ? `${profile.ageInSeason} y · ${profile.birthYear}`
       : profile.birthYear > 0 ? `b. ${profile.birthYear}` : null,
     avatarUrl: profile.avatarUrl,
+    gender: profile.gender,
+    countryCode: profile.countryCode,
   };
 }
 
@@ -147,8 +149,13 @@ function H2HProject() {
       if (value == null) url.searchParams.delete(key);
       else url.searchParams.set(key, String(value));
     };
-    apply('a', next.a);
-    apply('b', next.b);
+    // Имена сторон — из общего контракта (`H2H_PARAM`), а не строками здесь: этот же
+    // адрес читает `parseH2HQuery`, и разъехаться им нельзя. Легаси `?a=&b=` вычищаем,
+    // иначе адрес нёс бы обе пары имён.
+    url.searchParams.delete('a');
+    url.searchParams.delete('b');
+    apply(H2H_PARAM.a, next.a);
+    apply(H2H_PARAM.b, next.b);
     // `season=all` — режим карьеры; отсутствие параметра значит «не выбран», и это разные
     // состояния, поэтому ∞ пишется явным словом, а не удалением параметра.
     if (next.season !== undefined) url.searchParams.set('season', next.season == null ? 'all' : String(next.season));

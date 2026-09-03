@@ -660,6 +660,17 @@ public sealed class SwimmerCompareSideDto
     [JsonPropertyName("clubName")]
     public string? ClubName { get; set; }
 
+    /// <summary>
+    /// Фото пловца и его страна — мини-карточка шапки рисует такой же портрет с флагом,
+    /// что и страница спортсмена (`UI_SwimmerAvatar`). Без них соперник выглядел бы
+    /// буквой там, где хозяин страницы выглядит человеком.
+    /// </summary>
+    [JsonPropertyName("avatarUrl")]
+    public string? AvatarUrl { get; set; }
+
+    [JsonPropertyName("countryCode")]
+    public string? CountryCode { get; set; }
+
     /// <summary>Возраст В СЕЗОНЕ сравнения (SeasonMath.AgeInSeason); null — за карьеру или без года рождения.</summary>
     [JsonPropertyName("ageInSeason")]
     public int? AgeInSeason { get; set; }

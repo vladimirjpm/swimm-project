@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ShowcaseSeasonNotice } from '../../utils/helpers/season-helper';
+import { H2H_PARAM } from '../../utils/routes';
 
 /**
  * Данные табов страницы спортсмена (docs/plans/athlete-page-plan.md §3).
@@ -182,6 +183,9 @@ export interface SwimmerCompareSide {
   birthYear?: number | null;
   gender?: string | null;
   clubName?: string | null;
+  /** Фото и страна — для портрета с флагом в мини-карточке шапки. */
+  avatarUrl?: string | null;
+  countryCode?: string | null;
   /** Возраст в сезоне сравнения; null — режим карьеры или года рождения нет. */
   ageInSeason?: number | null;
   /** Сколько дисциплин пловец возглавляет среди сверстников; за карьеру всегда 0. */
@@ -387,7 +391,7 @@ export const useSwimmerCompare = (
 ) =>
   useJson<SwimmerCompare>(
     id != null && rivalId != null && enabled
-      ? `/api/swimmers/${id}/compare?rivalId=${rivalId}&season=${seasonParam(season)}`
+      ? `/api/swimmers/${id}/compare?${H2H_PARAM.b}=${rivalId}&season=${seasonParam(season)}`
       : null);
 
 /**
