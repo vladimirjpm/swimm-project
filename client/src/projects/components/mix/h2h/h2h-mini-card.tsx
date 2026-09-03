@@ -1,7 +1,7 @@
 import React from 'react';
 import './h2h.css';
 import { routes } from '../../../../utils/routes';
-import { identityInitial } from '../swimmer-identity/swimmer-identity.types';
+import UI_SwimmerAvatar from '../swimmer-avatar/swimmer-avatar';
 import type { H2HSwimmer } from './h2h.types';
 
 /**
@@ -31,12 +31,18 @@ interface Props {
 const UI_H2HMiniCard: React.FC<Props> = ({
   swimmer, align, isFavorite = null, onToggleFavorite, onClear = null,
 }) => {
+  // Портрет — общий `UI_SwimmerAvatar` (он же в шапке страницы пловца и в карточке-попапе):
+  // раньше здесь была буква без флага, и один и тот же человек выглядел на двух экранах
+  // по-разному.
   const avatar = (
-    <span className="h2h-mini__avatar">
-      {swimmer.avatarUrl
-        ? <img src={swimmer.avatarUrl} alt="" />
-        : identityInitial(swimmer.name)}
-    </span>
+    <UI_SwimmerAvatar
+      avatarUrl={swimmer.avatarUrl}
+      gender={swimmer.gender}
+      countryCode={swimmer.countryCode}
+      name={swimmer.name}
+      size={72}
+      className="h2h-mini__avatar"
+    />
   );
 
   const text = (

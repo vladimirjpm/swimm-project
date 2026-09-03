@@ -183,6 +183,9 @@ export interface SwimmerCompareSide {
   birthYear?: number | null;
   gender?: string | null;
   clubName?: string | null;
+  /** Фото и страна — для портрета с флагом в мини-карточке шапки. */
+  avatarUrl?: string | null;
+  countryCode?: string | null;
   /** Возраст в сезоне сравнения; null — режим карьеры или года рождения нет. */
   ageInSeason?: number | null;
   /** Сколько дисциплин пловец возглавляет среди сверстников; за карьеру всегда 0. */

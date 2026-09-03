@@ -868,6 +868,9 @@ export function H2HPanel({
         name: compare.mine.name || profileName,
         club: compare.mine.clubName,
         ageLabel: ageLabel(compare.mine),
+        avatarUrl: compare.mine.avatarUrl,
+        gender: compare.mine.gender,
+        countryCode: compare.mine.countryCode,
       }
       : { id: swimmerId, name: profileName },
     ...favProps(swimmerId),
@@ -885,6 +888,9 @@ export function H2HPanel({
           name: compare.rival.name || `#${rivalId}`,
           club: compare.rival.clubName,
           ageLabel: ageLabel(compare.rival),
+          avatarUrl: compare.rival.avatarUrl,
+          gender: compare.rival.gender,
+          countryCode: compare.rival.countryCode,
         }
         : { id: rivalId, name: `#${rivalId}` },
       ...favProps(rivalId),

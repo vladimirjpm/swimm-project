@@ -81,13 +81,9 @@
 .h2h-mini:hover { background: var(--deep-card-bg-raised); }
 /* Фото всегда К ЦЕНТРУ шапки: у левой карточки текст идёт первым и жмётся вправо. */
 .h2h-mini--left { justify-content: flex-end; }
-.h2h-mini__avatar {
-  width: 72px; height: 72px; border-radius: 50%; flex: none; overflow: hidden;
-  border: 2px solid var(--deep-accent-border); background: var(--deep-card-bg-raised);
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--deep-font-display); font-size: 26px; color: var(--deep-accent);
-}
-.h2h-mini__avatar img { width: 100%; height: 100%; object-fit: cover; }
+/* Портрет рисует `UI_SwimmerAvatar` — здесь только то, чем этот экран от него отличается:
+   рамка тоньше (2px против 3px), под цвет карточек шапки. Размер задан пропом. */
+.h2h-mini__avatar .swimmer-avatar__img { border-width: 2px; }
 /* ⚠ `align-items: stretch` + text-align, а НЕ flex-end: иврит-спаны берут max-content и
    наезжают на фото (поймано в макете, повторено здесь сознательно). */
 .h2h-mini__text {
@@ -313,13 +309,17 @@
   background: var(--deep-card-bg-raised); border: 1px solid var(--deep-card-border);
 }
 .h2h-hit {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  /* `center`, а не `baseline`: в строке появился портрет, и по базовой линии текста он
+     съезжал вниз. Имя тянется, мета жмётся вправо — портрет ширины не отдаёт. */
+  display: flex; align-items: center; gap: 10px;
   width: 100%; padding: 8px 10px; min-height: 36px;
   border: 0; border-radius: var(--deep-radius-row); background: transparent;
   color: inherit; cursor: pointer; text-align: start;
 }
 .h2h-hit:hover { background: var(--deep-card-bg-row); }
-.h2h-hit__name { font-size: 12.5px; font-weight: 900; color: var(--deep-text); }
+.h2h-hit__name { font-size: 12.5px; font-weight: 900; color: var(--deep-text); flex: 1; min-width: 0; }
+/* В списке портрет мелкий — рамка в 3px съедала бы лицо. */
+.h2h-hit__avatar .swimmer-avatar__img { border-width: 1px; }
 .h2h-hit__meta { font-size: 11px; font-weight: 700; color: var(--deep-text-faint); white-space: nowrap; }
 .h2h-hint { padding: 8px 10px; font-size: 11.5px; font-weight: 700; color: var(--deep-text-faint); }
 
@@ -357,7 +357,8 @@
      не помещаются — чип возраста (nowrap) вылезал за экран. Зеркальность сторон при этом
      теряется, но она и не читается на такой ширине. */
   .h2h-mini { flex-direction: column; padding: 10px 8px; gap: 6px; justify-content: center; }
-  .h2h-mini__avatar { width: 52px; height: 52px; font-size: 20px; }
+  /* Узкий контейнер: портрет меньше — переопределяем инлайновый размер компонента. */
+  .h2h-mini__avatar { width: 52px !important; height: 52px !important; }
   .h2h-mini__text,
   .h2h-mini--left .h2h-mini__text,
   .h2h-mini--right .h2h-mini__text { text-align: center; align-items: center; width: 100%; }

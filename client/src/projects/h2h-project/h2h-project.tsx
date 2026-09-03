@@ -66,6 +66,8 @@ function slotSwimmer(profile: SwimmerProfile) {
       ? `${profile.ageInSeason} y · ${profile.birthYear}`
       : profile.birthYear > 0 ? `b. ${profile.birthYear}` : null,
     avatarUrl: profile.avatarUrl,
+    gender: profile.gender,
+    countryCode: profile.countryCode,
   };
 }
 

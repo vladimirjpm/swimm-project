@@ -517,6 +517,8 @@ public static class SwimmerPageBuilder
         BirthYear = profile is { BirthYear: > 0 } ? profile.BirthYear : null,
         Gender = profile?.Gender,
         ClubName = profile?.ClubName,
+        AvatarUrl = profile?.AvatarUrl,
+        CountryCode = profile?.CountryCode,
         AgeInSeason = season is int s && profile is { BirthYear: > 0 }
             ? SeasonMath.AgeInSeason(s, profile.BirthYear)
             : null,

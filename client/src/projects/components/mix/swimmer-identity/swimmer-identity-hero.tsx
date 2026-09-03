@@ -1,9 +1,9 @@
 import React from 'react';
 import './swimmer-identity.css';
 import UI_ClubIcon from '../club-icon/club-icon';
-import UI_FlagEmoji from '../flag-icon/flag-icon';
+import UI_SwimmerAvatar from '../swimmer-avatar/swimmer-avatar';
 import { useIdentityFavorites } from './swimmer-identity-favorites';
-import { identityAgeLabel, identityInitial, type SwimmerIdentity } from './swimmer-identity.types';
+import { identityAgeLabel, type SwimmerIdentity } from './swimmer-identity.types';
 import { routes } from '../../../../utils/routes';
 
 /**
@@ -69,20 +69,17 @@ function Actions({ swimmerId }: { swimmerId: number }) {
 const UI_SwimmerIdentityHero: React.FC<Props> = ({ identity, chips, aside }) => (
   <div className="deep-hero">
     <div className="deep-hero__id">
-      <div className="deep-hero__avatar-box">
-        {identity.avatarUrl ? (
-          <img src={identity.avatarUrl} alt="" className="deep-hero__avatar" />
-        ) : (
-          <span className="deep-hero__avatar deep-hero__avatar--empty">
-            {identityInitial(identity.name)}
-          </span>
-        )}
-        {identity.countryCode && (
-          <span className="deep-hero__flag">
-            <UI_FlagEmoji countryCode={identity.countryCode} size="28x21" />
-          </span>
-        )}
-      </div>
+      {/* Портрет — общий `UI_SwimmerAvatar`: он же в карточке-попапе и в мини-карточке H2H.
+          Раньше здесь была буква вместо фото у всех, кто не загрузил своё, и флаг только
+          при заданной стране. */}
+      <UI_SwimmerAvatar
+        avatarUrl={identity.avatarUrl}
+        gender={identity.gender}
+        countryCode={identity.countryCode}
+        name={identity.name}
+        size={96}
+        className="deep-hero__avatar-box"
+      />
       {identity.id != null && <Actions swimmerId={identity.id} />}
     </div>
 
