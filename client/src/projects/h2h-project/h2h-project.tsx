@@ -254,7 +254,7 @@ function H2HProject() {
 
   return (
     <div className={themeClass} style={{ background: 'var(--deep-page-bg)', minHeight: '100vh' }}>
-      <AppTopbar />
+      <AppTopbar active="h2h" />
 
       <main className="mx-auto max-w-[1180px] px-4 py-6" style={{ color: 'var(--deep-text)' }}>
         <div className="mb-4 flex justify-end">
