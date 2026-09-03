@@ -209,14 +209,28 @@
 
 /* Три счётчика рекордов. Национальный крупнее: он весит больше возрастных ступеней, и
    ряд обязан это показывать кеглем, а не только цветом бейджа. */
-.h2h-recs { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.h2h-recs { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .h2h-recs--left { justify-content: flex-end; }
 .h2h-recs--right { justify-content: flex-start; }
-.h2h-recs__item { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+/* ⚠ Правая сторона — ЗЕРКАЛО левой, как и всё в шапке. Зеркалим по правилу «ЦИФРА К
+   ЦЕНТРУ, бейдж снаружи» (решение Влада 03.09.2026): сравнивают цифры, и стоять они
+   должны рядом, а не по краям ряда. Раньше обе стороны рисовались одним порядком
+   «цифра, бейдж», и ряд читался съехавшим: слева бейджи у центра, справа — у внешнего края.
+   Переворачиваем ПОРЯДКОМ, а не второй разметкой: пару у левой стороны и список у правой
+   (в столбике список становится `column`, и переворот пары остаётся — вертикаль зеркалить
+   нечем, классы читаются сверху вниз по старшинству на обеих сторонах). */
+.h2h-recs--left .h2h-recs__item { flex-direction: row-reverse; }
+.h2h-recs--right { flex-direction: row-reverse; }
+.h2h-recs__item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .h2h-recs__num {
   font-size: 15px; font-weight: 800; color: var(--deep-text-mute);
   font-variant-numeric: tabular-nums;
+  /* Ширина под три знака (у подростка бывает 115 возрастных ступеней): цифры сторон стоят
+     друг под другом, и «0» не съезжает к бейджу ближе, чем «95». */
+  min-width: 1.9em;
 }
+.h2h-recs--left .h2h-recs__num { text-align: right; }
+.h2h-recs--right .h2h-recs__num { text-align: left; }
 .h2h-recs__item--major .h2h-recs__num { font-size: 18px; color: var(--deep-text); }
 
 /* Медальная тройка. Градиенты — физические объекты, одни в обеих темах. */
@@ -408,7 +422,7 @@
   /* Три счётчика рекордов в узкой колонке не помещаются в строку и переносились
      вразнобой («0 REC / 0 REC·AGE» и «15 REC·M» на второй линии). Ставим столбиком:
      ряд остаётся симметричным, а классы читаются сверху вниз по старшинству. */
-  .h2h-recs { flex-direction: column; gap: 3px; }
+  .h2h-recs { flex-direction: column; gap: 4px; }
   .h2h-recs--left { align-items: flex-end; }
   .h2h-recs--right { align-items: flex-start; }
   .h2h-recs__num { font-size: 13px; }
