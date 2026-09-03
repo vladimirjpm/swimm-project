@@ -13,10 +13,21 @@ interface Props {
   onClick?: () => void;
   /** Подпись слота; по умолчанию — «выбери соперника» из макета. */
   label?: string;
+  /** Слот, который сейчас заполняет пикер: акцентная рамка + `aria-current`. */
+  active?: boolean;
 }
 
-const UI_H2HEmptySlot: React.FC<Props> = ({ onClick, label = 'בחר יריב · choose a rival' }) => (
-  <button type="button" className="h2h-slot" onClick={onClick}>
+const UI_H2HEmptySlot: React.FC<Props> = ({
+  onClick, label = 'בחר יריב · choose a rival', active = false,
+}) => (
+  <button
+    type="button"
+    className={`h2h-slot${active ? ' h2h-slot--active' : ''}`}
+    // Подпись пикера («choosing the LEFT swimmer») говорит то же словами; для читалки
+    // экрана связь слота с выбором должна быть выражена и разметкой.
+    aria-current={active ? 'true' : undefined}
+    onClick={onClick}
+  >
     <span className="h2h-slot__plus" aria-hidden="true">＋</span>
     <span dir="auto">{label}</span>
   </button>

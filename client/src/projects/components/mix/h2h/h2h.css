@@ -79,6 +79,10 @@
   text-decoration: none; color: inherit; min-width: 0;
 }
 .h2h-mini:hover { background: var(--deep-card-bg-raised); }
+/* Занятая сторона может быть активной: следующий выбор ЗАМЕНИТ стоящего здесь пловца.
+   Поэтому рамка тоньше по смыслу, чем у пустого слота, — это предупреждение, а не
+   приглашение: заливки и свечения нет. */
+.h2h-mini--active { border-color: var(--deep-accent); }
 /* Фото всегда К ЦЕНТРУ шапки: у левой карточки текст идёт первым и жмётся вправо. */
 .h2h-mini--left { justify-content: flex-end; }
 /* Портрет рисует `UI_SwimmerAvatar` — здесь только то, чем этот экран от него отличается:
@@ -111,19 +115,41 @@
 .h2h-mini__fav {
   position: absolute; top: 8px; font-size: 16px; line-height: 1; cursor: pointer;
   background: none; border: 0; padding: 0; color: var(--deep-text-ghost);
+  /* См. z-index у ✕ ниже — та же ловушка перекрытия аватаром. */
+  z-index: 2;
 }
 .h2h-mini--left .h2h-mini__fav { left: 10px; }
 .h2h-mini--right .h2h-mini__fav { right: 10px; }
 .h2h-mini__fav--on { color: var(--deep-danger); text-shadow: 0 0 8px var(--deep-danger-soft); }
 /* «Сменить пловца» — во ВНУТРЕННЕМ углу (со стороны центра), чтобы не спорить с сердечком
    во внешнем. Появляется только у сменяемой стороны: в табе её нет вовсе. */
+/* Размер — це́ль клика, а не украшение: символ ✕ 12px без подложки давал зону ~10×12,
+   в которую на телефоне не попасть (пойман Владом 03.09.2026). Кнопка стала круглой
+   подложкой 28px (в узком контейнере 34px — там палец, а не курсор), символ крупнее. */
 .h2h-mini__clear {
-  position: absolute; top: 8px; font-size: 12px; line-height: 1; cursor: pointer;
+  position: absolute; top: 6px; cursor: pointer;
+  /* ⚠ z-index ОБЯЗАТЕЛЕН, без него кнопки фактически не было. Аватар — `position: relative`
+     и стоит в разметке ПОЗЖЕ кнопки, поэтому при равном стеке (обе `auto`) он ложился
+     СВЕРХУ и съедал клик: `elementFromPoint` в центре ✕ возвращал аватар, клик всплывал
+     до карточки-ссылки и открывал профиль вместо сброса стороны. У левой карточки ✕
+     стоит во внутреннем углу — ровно под фото, поэтому там он не работал совсем
+     (пойман Владом 03.09.2026). */
+  z-index: 2;
+  width: 28px; height: 28px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 15px; line-height: 1;
   background: none; border: 0; padding: 0; color: var(--deep-text-ghost);
+  transition: background-color 120ms ease, color 120ms ease;
 }
-.h2h-mini--left .h2h-mini__clear { right: 10px; }
-.h2h-mini--right .h2h-mini__clear { left: 10px; }
-.h2h-mini__clear:hover { color: var(--deep-text-mute); }
+.h2h-mini--left .h2h-mini__clear { right: 6px; }
+.h2h-mini--right .h2h-mini__clear { left: 6px; }
+/* Подложка появляется только при наведении/нажатии: в покое угол карточки должен
+   оставаться пустым, иначе крестик спорит с сердечком во внешнем углу. */
+.h2h-mini__clear:hover,
+.h2h-mini__clear:focus-visible {
+  color: var(--deep-text); background: var(--deep-card-border);
+}
+.h2h-mini__clear:active { transform: scale(0.92); }
 
 /* ── Пустой слот «выбери соперника» ───────────────────────────────────────── */
 
@@ -135,6 +161,18 @@
   font-size: 13px; font-weight: 700;
 }
 .h2h-slot:hover { border-color: var(--deep-accent-border); color: var(--deep-text-mute); }
+/* Активный слот — тот, который заполнит следующий выбор в пикере. Рамка СПЛОШНАЯ (пунктир
+   у обоих слотов читался бы одинаково), плюс мягкая заливка и свечение: на странице пикер
+   один на две стороны, и до этого связь «куда сейчас пишем» держалась только на подписи
+   «choosing the LEFT swimmer» под слотами. */
+.h2h-slot--active {
+  border-style: solid; border-color: var(--deep-accent);
+  background: var(--deep-accent-soft); color: var(--deep-text);
+  box-shadow: var(--deep-accent-glow);
+}
+.h2h-slot--active .h2h-slot__plus {
+  border-style: solid; border-color: var(--deep-accent); color: var(--deep-accent);
+}
 .h2h-slot__plus {
   width: 44px; height: 44px; border-radius: 50%; flex: none;
   border: 1px dashed var(--deep-card-border);
@@ -351,19 +389,40 @@
 @container h2h (max-width: 780px) {
   /* Центральная колонка ужимается, но остаётся между сторонами: сравнение читается
      только когда обе цифры и разрыв стоят в ряд. */
-  .h2h-row { grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1fr); gap: 8px; }
-  .h2h-score__value { font-size: 22px; }
+  .h2h-row { grid-template-columns: minmax(0, 1fr) 104px minmax(0, 1fr); gap: 8px; }
+  /* Счёт — главная цифра экрана, и в узком варианте она была МЕНЬШЕ, чем в широком
+     (22px против 30px): ужимали всё подряд. Удвоено по просьбе Влада (03.09.2026) —
+     на телефоне «3–2» читается первым, а место под него есть, потому что подписи сторон
+     ушли в столбик. Центральная колонка расширена под кегль, иначе счёт переносился. */
+  .h2h-score__value { font-size: 44px; line-height: 1; }
   /* Карточка встаёт СТОЛБИКОМ: в 375px на строку остаётся ~120px, и «фото + текст» рядом
      не помещаются — чип возраста (nowrap) вылезал за экран. Зеркальность сторон при этом
      теряется, но она и не читается на такой ширине. */
-  .h2h-mini { flex-direction: column; padding: 10px 8px; gap: 6px; justify-content: center; }
+  /* Верхняя полоса отдана кнопкам (♥ и ✕): в столбике первым идёт то текст, то фото —
+     и крупный крестик ложился прямо на имя. Резервируем место, а не двигаем кнопку:
+     угол карточки — единственная позиция, одинаковая для обеих сторон. */
+  .h2h-mini { flex-direction: column; padding: 42px 8px 10px; gap: 6px; justify-content: center; }
   /* Узкий контейнер: портрет меньше — переопределяем инлайновый размер компонента. */
   .h2h-mini__avatar { width: 52px !important; height: 52px !important; }
+  /* ⚠ Порядок в столбике ОДИНАКОВЫЙ у обеих сторон: фото сверху, подписи под ним.
+     Зеркальность разметки (у левой карточки текст идёт первым, чтобы фото смотрело
+     в центр шапки) в ряд читается как симметрия, а в столбик превращается в разнобой —
+     слева фото внизу, справа вверху (поймано Владом 03.09.2026). Правим порядком,
+     а не разметкой: в широком макете зеркальность нужна. */
+  .h2h-mini--left .h2h-mini__avatar { order: -1; }
   .h2h-mini__text,
   .h2h-mini--left .h2h-mini__text,
   .h2h-mini--right .h2h-mini__text { text-align: center; align-items: center; width: 100%; }
   .h2h-mini__name { font-size: 13px; max-width: 100%; }
   .h2h-mini__club { font-size: 10.5px; max-width: 100%; }
+  /* Палец, а не курсор: 34px — минимальная удобная цель, и подложка видна всегда,
+     иначе на тач-экране непонятно, куда жать (наведения там нет). */
+  .h2h-mini__clear {
+    width: 34px; height: 34px; font-size: 17px; top: 4px;
+    background: var(--deep-card-border); color: var(--deep-text-mute);
+  }
+  .h2h-mini--left .h2h-mini__clear { right: 4px; }
+  .h2h-mini--right .h2h-mini__clear { left: 4px; }
   .h2h-mini--left .h2h-mini__age,
   .h2h-mini--right .h2h-mini__age { align-self: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .h2h-event { padding: 12px; }
