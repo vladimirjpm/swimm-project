@@ -442,19 +442,17 @@ public class SwimmerPageRepository : ISwimmerPageRepository
     /// ⚠ СТОРОЖ, а не рабочая логика. В `Countries` жили ДВА Израиля — «ISR» (id 10) и «IL»
     /// (id 111), на второй смотрели 791 пловец и 3466 результатов, и рекорды им не
     /// находились вовсе: они лежат под «ISR» (поймано 02.09.2026 на пловце 62098). Страны
-    /// склеены в тот же день (docs/data-integrity.md §14), но правило проекта —
-    /// **alpha-3 в данных, alpha-2 только флагам** — держится не схемой, а договорённостью,
-    /// поэтому приведение остаётся: заведётся alpha-2 снова — витрина не онемеет.
+    /// склеены в тот же день (docs/data-integrity.md §14), а вход закрыт нормализацией в
+    /// трёх find-or-create (<see cref="CountryCodes.Normalize"/>) — сторож остаётся для
+    /// строк, которые легли в базу ДО этого.
+    ///
+    /// Отличие от общего шва одно: пустой код здесь значит «свой» регион, а не «страны нет»
+    /// — витрина рекордов всегда сравнивает с чем-то, и это Израиль.
     /// </summary>
     private static string NormalizeRegion(string? regionCode)
     {
-        var code = (regionCode ?? string.Empty).Trim().ToUpperInvariant();
-        return code switch
-        {
-            "" => "ISR",
-            "IL" => "ISR",
-            _ => code,
-        };
+        var code = CountryCodes.Normalize(regionCode);
+        return code.Length == 0 ? CountryCodes.Israel : code;
     }
 
     private static string? NormalizeGender(string? gender) => gender?.Trim().ToLowerInvariant() switch

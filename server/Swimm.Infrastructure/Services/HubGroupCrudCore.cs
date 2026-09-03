@@ -1,8 +1,9 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
@@ -61,7 +62,9 @@ public partial class HubGroupCrudCore
     {
         if (countryCode == null) return;
 
-        var code = countryCode.Trim().ToUpperInvariant();
+        // Нормализация ДО поиска — общая с импортом и соревнованиями (CountryCodes.Normalize):
+        // alpha-2 в справочнике заводит вторую запись той же страны, docs/data-integrity.md §14.
+        var code = CountryCodes.Normalize(countryCode);
         if (code.Length == 0)
         {
             group.CountryId = null;

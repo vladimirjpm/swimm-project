@@ -120,6 +120,7 @@ public static class DependencyInjection
         services.AddScoped<IDataCheck, MergedClubStillUsedCheck>();
         services.AddScoped<IDataCheck, SwimmerTwoClubsInCompetitionCheck>();
         services.AddScoped<IDataCheck, CompetitionWithoutClubPointRuleCheck>();
+        services.AddScoped<IDataCheck, CountryDuplicateCheck>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
 
         // Локальный вход (email + пароль)
