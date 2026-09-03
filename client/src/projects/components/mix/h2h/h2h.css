@@ -402,8 +402,6 @@
      и крупный крестик ложился прямо на имя. Резервируем место, а не двигаем кнопку:
      угол карточки — единственная позиция, одинаковая для обеих сторон. */
   .h2h-mini { flex-direction: column; padding: 42px 8px 10px; gap: 6px; justify-content: center; }
-  /* Узкий контейнер: портрет меньше — переопределяем инлайновый размер компонента. */
-  .h2h-mini__avatar { width: 52px !important; height: 52px !important; }
   /* ⚠ Порядок в столбике ОДИНАКОВЫЙ у обеих сторон: фото сверху, подписи под ним.
      Зеркальность разметки (у левой карточки текст идёт первым, чтобы фото смотрело
      в центр шапки) в ряд читается как симметрия, а в столбик превращается в разнобой —
@@ -426,8 +424,6 @@
   .h2h-mini--left .h2h-mini__age,
   .h2h-mini--right .h2h-mini__age { align-self: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .h2h-event { padding: 12px; }
-  .h2h-event__icon { width: 96px; height: 66px; }
-  .h2h-event__icon img { max-height: 56px; max-width: 86px; }
   .h2h-pool { grid-template-columns: minmax(0, 1fr) 84px minmax(0, 1fr); gap: 6px; }
   .h2h-time__value { font-size: 16px; }
   .h2h-time__date { display: none; }
@@ -441,4 +437,19 @@
   .h2h-recs--right { align-items: flex-start; }
   .h2h-recs__num { font-size: 13px; }
   .h2h-recs__item--major .h2h-recs__num { font-size: 15px; }
+}
+
+/* ── Совсем узкий контейнер: телефон ──────────────────────────────────────── */
+
+/* ⚠ ВТОРАЯ ступень, а не продолжение первой. Раскладка (столбик, крупный счёт, скрытая
+   дата) включается уже на 780 — в эту ширину попадает и телефон, и КОЛОНКА СТРАНИЦЫ
+   `/h2h` (`content-box-xs` = ровно 780). Но «мало места» у них разное: на 780 портреты
+   и иконки стилей спокойно живут в полном размере, а ужимались заодно со всем прочим и
+   выглядели на десктопе марками (поймано Владом 03.09.2026).
+   Порог 560 разводит эти случаи: контейнер телефона это ~343px при окне 375. */
+@container h2h (max-width: 560px) {
+  /* Портрет меньше — переопределяем инлайновый размер компонента. */
+  .h2h-mini__avatar { width: 52px !important; height: 52px !important; }
+  .h2h-event__icon { width: 96px; height: 66px; }
+  .h2h-event__icon img { max-height: 56px; max-width: 86px; }
 }
