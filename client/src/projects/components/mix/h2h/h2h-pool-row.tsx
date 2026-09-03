@@ -17,6 +17,8 @@ export interface H2HPoolSide {
   date?: string | null;
   quality?: SwimQuality | null;
   badge?: 'SB' | { record: RecordKind; scope?: string | null } | null;
+  /** Протокол этого заплыва — у КАЖДОЙ стороны свой: времена принадлежат разным людям. */
+  href?: string;
 }
 
 interface Props {
@@ -25,8 +27,6 @@ interface Props {
   right: H2HPoolSide | null;
   /** «Левое минус правое», мс: отрицательное — быстрее левый. null — плавал только один. */
   deltaMs?: number | null;
-  /** Ссылка на заплыв в таблице результатов; без неё полоса не кликабельна. */
-  href?: string;
 }
 
 /**
@@ -36,17 +36,18 @@ interface Props {
 const deltaLabel = (ms: number): string =>
   ms === 0 ? '=' : `${ms < 0 ? '−' : '+'}${(Math.abs(ms) / 1000).toFixed(2)}`;
 
-const UI_H2HPoolRow: React.FC<Props> = ({ poolType, left, right, deltaMs = null, href }) => {
+const UI_H2HPoolRow: React.FC<Props> = ({ poolType, left, right, deltaMs = null }) => {
   const leftWins = deltaMs != null && deltaMs < 0;
   const rightWins = deltaMs != null && deltaMs > 0;
 
-  const body = (
-    <>
+  return (
+    <div className="h2h-pool">
       <UI_H2HTimeCell
         time={left?.time}
         date={left?.date}
         quality={left?.quality}
         badge={left?.badge ?? null}
+        href={left?.href}
         isWinner={leftWins}
         side="left"
       />
@@ -67,15 +68,12 @@ const UI_H2HPoolRow: React.FC<Props> = ({ poolType, left, right, deltaMs = null,
         date={right?.date}
         quality={right?.quality}
         badge={right?.badge ?? null}
+        href={right?.href}
         isWinner={rightWins}
         side="right"
       />
-    </>
+    </div>
   );
-
-  return href
-    ? <a className="h2h-pool" href={href}>{body}</a>
-    : <div className="h2h-pool">{body}</div>;
 };
 
 export default UI_H2HPoolRow;

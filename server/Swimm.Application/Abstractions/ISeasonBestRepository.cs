@@ -42,6 +42,21 @@ public interface ISeasonBestRepository
     ///   (решение Влада 2026-08-26; у <see cref="GetNationalSeasonBestAsync"/> masters
     ///   по-прежнему не участвуют вовсе).
     /// </summary>
+    /// <summary>
+    /// ВСЯ сезонная таблица: «пол × возраст в сезоне × стиль × дистанция × бассейн» →
+    /// лучшее время сезона и число сверстников на ступени.
+    ///
+    /// Нужна затем же, зачем справочник рекордов грузится целиком: строка протокола должна
+    /// уметь проверить себя ЛОКАЛЬНО. Поштучные запросы (<see cref="GetNationalSeasonBestAsync"/>
+    /// на дисциплину) для протокола на сотни строк означали бы десятки запросов, поэтому
+    /// эталон отдаётся одним ответом и кэшируется на сутки.
+    ///
+    /// Состав выборки — тот же, что у <see cref="GetNationalSeasonBestAsync"/> (masters,
+    /// открытая вода, эстафеты, <c>SuspectReason</c> и <c>TimeFail</c> не участвуют): два
+    /// разных определения «лучшего в сезоне» на одном экране спорили бы друг с другом.
+    /// </summary>
+    Task<SeasonBestTableDto> GetSeasonBestTableAsync(int? season, CancellationToken ct = default);
+
     Task<SeasonBestListDto> GetSeasonBestListAsync(
         SeasonBestListQuery query, CancellationToken ct = default);
 

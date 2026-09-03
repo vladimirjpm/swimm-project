@@ -243,6 +243,11 @@
   font-variant-numeric: tabular-nums;
 }
 .h2h-time__date { font-size: 11.5px; color: var(--deep-text-faint); }
+/* Кликабельно ТОЛЬКО само время, а не вся полоса: у левой и правой половины разные
+   заплывы разных людей (см. h2h-time-cell.tsx). Наследуем цвет — ссылка не должна
+   перекрашивать время в синий. */
+.h2h-time__link { display: inline-block; text-decoration: none; color: inherit; }
+.h2h-time__link:hover .h2h-time__value { color: var(--deep-accent); }
 /* Победитель — плашка без свечения (glow в макете только у сердечка). */
 .h2h-time__box {
   display: inline-block; padding: 5px 16px; border-radius: 10px;

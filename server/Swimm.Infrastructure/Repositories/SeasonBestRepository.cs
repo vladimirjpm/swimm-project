@@ -135,6 +135,80 @@ public class SeasonBestRepository : ISeasonBestRepository
         };
     }
 
+    // ── Вся сезонная таблица (эталон для бейджа SB в протоколе) ──────────────────────────
+
+    /// <summary>Ступень таблицы: ключ группировки + агрегаты, считается СУБД.</summary>
+    private sealed record TableRow(
+        string Style, string Distance, string PoolType, string Gender, int Age,
+        int TimeMs, int Peers);
+
+    public async Task<SeasonBestTableDto> GetSeasonBestTableAsync(
+        int? season, CancellationToken ct = default)
+    {
+        var seasonYear = season ?? await _showcase.CurrentStartYearAsync(ct);
+        var (start, endExclusive) = SeasonMath.RangeOf(seasonYear);
+        // Возраст в сезоне = год ОКОНЧАНИЯ сезона − год рождения (SeasonMath.AgeInSeason).
+        // Здесь он нужен внутри SQL — иначе группировку пришлось бы делать в памяти на всём
+        // сезоне (57 тыс. строк на 2025/26), тогда как групп в ответе всего ~1,1 тыс.
+        var ageBase = seasonYear + 1;
+
+        var rows = await _read.Results.AsNoTracking()
+            .Where(r => r.TimeMillisecond != null
+                        && !r.TimeFail
+                        && r.RelayId == null
+                        && r.SuspectReason == null
+                        && !r.Competition.IsMasters
+                        && r.Competition.StandingKindOverride != OpenWaterOverride
+                        // 0 — год рождения не заполнен (в базе такие есть); ступени у них нет.
+                        && r.Swimmer.BirthYear > 0
+                        && r.Competition.PoolType != null
+                        && r.CompetitionDate >= start
+                        && r.CompetitionDate < endExclusive)
+            .GroupBy(r => new
+            {
+                Style = r.Style.Name,
+                r.Distance,
+                PoolType = r.Competition.PoolType!,
+                // Пол — у ПЛОВЦА, а не у строки: Results.Gender это пол зачёта заплыва, и
+                // кривая шапка протокола уводила пловца в чужую колонку витрины.
+                Gender = r.Swimmer.Gender ?? r.Gender,
+                Age = ageBase - r.Swimmer.BirthYear,
+            })
+            .Select(g => new TableRow(
+                g.Key.Style,
+                g.Key.Distance,
+                g.Key.PoolType,
+                g.Key.Gender,
+                g.Key.Age,
+                g.Min(r => r.TimeMillisecond!.Value),
+                g.Select(r => r.SwimmerId).Distinct().Count()))
+            .ToListAsync(ct);
+
+        var items = rows
+            .Select(r => new { Row = r, Gender = NormalizeGender(r.Gender) })
+            // Те же отбраковки, что в SeasonMath.AgeInSeason: возраст ≤ 0 бывает у кривого
+            // года рождения, пол — у пустого поля карточки.
+            .Where(x => x.Gender != null && x.Row.Age > 0)
+            .Select(x => new SeasonBestTableItemDto
+            {
+                Style = x.Row.Style,
+                Distance = x.Row.Distance,
+                PoolType = x.Row.PoolType,
+                Gender = x.Gender!,
+                Age = x.Row.Age,
+                TimeMs = x.Row.TimeMs,
+                Peers = x.Row.Peers,
+            })
+            .ToList();
+
+        return new SeasonBestTableDto
+        {
+            Season = seasonYear,
+            SeasonLabel = SeasonMath.Label(seasonYear),
+            Data = items,
+        };
+    }
+
     // ── Список одной дисциплины (страница /season-best) ──────────────────────────────────
 
     /// <summary>Строка-кандидат списка: всё, что нужно и для ранжирования, и для ответа.</summary>

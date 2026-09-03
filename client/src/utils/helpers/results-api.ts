@@ -17,6 +17,9 @@ export function buildResultsFilterParams(
 
   if (filters.selected_name && filters.selected_name !== 'all') params.name = filters.selected_name;
   if (filters.club && filters.club !== 'all') params.club = filters.club;
+  // Диплинк на заплывы одного пловца (?swimmerId=): в paged-режиме фильтрует сервер —
+  // клиентский матчинг видит только загруженную страницу.
+  if (filters.swimmer_id != null) params.swimmerId = String(filters.swimmer_id);
   if (filters.style_name) params.styleName = filters.style_name;
   if (filters.style_len) params.distance = String(filters.style_len);
   if (filters.gender && filters.gender !== 'all') params.gender = filters.gender;

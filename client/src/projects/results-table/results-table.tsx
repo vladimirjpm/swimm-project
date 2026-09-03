@@ -28,7 +28,9 @@ import { buildResultsFilterParams, fetchResultsPage } from '../../utils/helpers/
 import AddLinkModal from '../my-media-project/components/add-link-modal';
 import { swimFlaggedRowProps } from '../components/mix/swim-time/swim-time';
 import { parseDate } from '../../utils/helpers/competition-source';
-import { seasonStartYear } from '../../utils/helpers/season-helper';
+import { seasonStartYear, ageInSeason } from '../../utils/helpers/season-helper';
+import SeasonBestTable, { timeToMs } from '../../utils/helpers/season-best-table';
+import { useSeasonBestTable } from '../../hooks/useSeasonBestTable';
 import { addUserMedia } from '../my-media-project/use-all-my-media';
 
 function ResultsTable() {
@@ -103,6 +105,12 @@ function ResultsTable() {
     const activityType = activity_type || 'training';
     if (activityType === 'training' && !hasTraining) return false;
     if (activityType === 'competition' && hasTraining) return false;
+
+    // Диплинк на заплывы конкретного пловца (?swimmerId=, routes.competitionSwims).
+    // Явный пловец, поэтому применяется и гостю — в отличие от скоупа ниже.
+    if (filters.swimmer_id != null && !HelperSwimmer.resultBelongsToSwimmer(res, filters.swimmer_id)) {
+      return false;
+    }
 
     // Скоуп «мои/избранные» (персональная полоса шапки соревнования, ?filter=).
     // Гостю или без primary — скоуп молча не применяется (пустая таблица хуже).
@@ -367,6 +375,9 @@ function ResultsTable() {
   const competitionDate = firstResult?.date ? parseDate(firstResult.date) : null;
   const competitionSeason = competitionDate ? seasonStartYear(competitionDate) : null;
   const poolTypeDisplay = showPoolType ? 'all' : (firstResult?.pool_type ?? filters.pool_type);
+  // Эталон для бейджа SB: вся сезонная таблица одним запросом (как справочник рекордов).
+  // Сезон — тот же, что у карточки Season best, то есть сезон открытого протокола.
+  const seasonBestReady = useSeasonBestTable(competitionSeason);
 // Функция обновления фильтров
   const updateFilter = (newFilter: Partial<typeof filters>) => {
       dispatch(rootActions.updateState({ filterSelected: { ...filters, ...newFilter } }));
@@ -508,8 +519,48 @@ function ResultsTable() {
               // иначе бессмыслица (200 вольным за 1:53 у 13-летнего) выглядит достижением.
               // Строку при этом не прячем — протокол напечатан так, как напечатан.
               const isSuspect = !!res.suspect_reason;
-              const isRecordHolder = !isSuspect && Helper.isRecordHolder({ swimmerName, ...recordParams });
-              const isRecordTime = !isSuspect && Helper.isRecordTime({ time: res.time, ...recordParams });
+              // Класс рекорда ищется по ЗАПЛЫВУ, от старшего к младшему (national > age >
+              // masters): у взрослого эталон — открытый рекорд страны, у мастерского старта
+              // полоса возраста, у ребёнка его ступень. Раньше класс задавался догадкой
+              // «masters или age», и держатель национального рекорда выглядел в протоколе
+              // обычным первым номером (поймано 02.09.2026 на 00:56.73 Горбенко).
+              const recordHolderMark = isSuspect
+                ? null
+                : Helper.recordMarkForHolder({ swimmerName, ...recordParams });
+              const recordTimeMark = isSuspect
+                ? null
+                : Helper.recordMarkForTime({ time: res.time, ...recordParams });
+              const isRecordHolder = recordHolderMark != null;
+              const isRecordTime = recordTimeMark != null;
+              // Бейдж SB — «лучшее время страны в этом сезоне на своей ступени». Проверка
+              // локальная по сезонной таблице (та же схема, что у рекорда выше), но ось
+              // возраста тут СЕЗОННАЯ, а не календарная ось справочника: `ageInSeason`, а
+              // не `recordStepAge` (client/CLAUDE.md, footguns).
+              //
+              // Что пропускаем молча: помеченные ошибки протокола, эстафеты, мастерские
+              // старты и строки не из сезона таблицы — ровно тот состав, который сервер
+              // исключил при её расчёте (`GetSeasonBestTableAsync`). Пометить их значило бы
+              // сравнить с эталоном, в который они не входили.
+              const rowDate = res.date ? parseDate(res.date) : null;
+              // Сезон СТРОКИ, а не источника: в сборной выдаче (несколько соревнований)
+              // строка из другого сезона мерялась бы чужим эталоном. Не совпало — бейджа нет.
+              const rowSeason = rowDate ? seasonStartYear(rowDate) : null;
+              const seasonBestAge = seasonBestReady && !isSuspect && !res.is_relay && !isMaster
+                && rowSeason != null && rowSeason === competitionSeason && rowDate
+                ? ageInSeason(res.birth_year, rowDate)
+                : null;
+              const isSeasonBestTime = seasonBestAge != null && competitionSeason != null
+                && SeasonBestTable.isSeasonBest(
+                  competitionSeason,
+                  {
+                    styleName: res.event_style_name,
+                    distance: res.event_style_len,
+                    poolType: res.pool_type,
+                    gender: genderForRecord,
+                    age: seasonBestAge,
+                  },
+                  timeToMs(res.time),
+                );
               const levelInfo = Helper.getNormativeLevelInfo({
                 gender: genderForRecord,
                 poolType: Helper.resolvePoolType(res.pool_type),
@@ -608,6 +659,9 @@ function ResultsTable() {
                       isAwardSource={isAwardSource}
                       isRecordHolder={isRecordHolder}
                       isRecordTime={isRecordTime}
+                      recordHolderMark={recordHolderMark}
+                      recordTimeMark={recordTimeMark}
+                      isSeasonBestTime={isSeasonBestTime}
                       isExpanded={isRowExpanded}
                       onToggleExpand={() => handleToggleRowExpand(resultKey, isRowExpanded)}
                       onAddVideo={onAddVideo}
@@ -637,6 +691,9 @@ function ResultsTable() {
                       isAwardSource={isAwardSource}
                       isRecordHolder={isRecordHolder}
                       isRecordTime={isRecordTime}
+                      recordHolderMark={recordHolderMark}
+                      recordTimeMark={recordTimeMark}
+                      isSeasonBestTime={isSeasonBestTime}
                       onAddVideo={onAddVideo}
                       {...favoriteProps}
                     />

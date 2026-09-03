@@ -808,4 +808,161 @@ public class SeasonBestRepositoryTests
         Assert.Equal("2020/21", list.SeasonNotice?.PendingLabel);
         Assert.Equal("18/02/2021", options.SeasonNotice?.WinterStarts);
     }
+
+    // ── Вся сезонная таблица (эталон бейджа SB в протоколе) ──────────────────────────────
+
+    /// <summary>
+    /// Таблица обязана давать РОВНО то же, что панель одной дисциплины: она и заводилась
+    /// как её оптовый вариант. Разъедутся — бейдж в строке начнёт спорить с карточкой над
+    /// той же таблицей.
+    /// </summary>
+    [Fact]
+    public async Task TableMatchesSingleDisciplineCard()
+    {
+        using var db = CreateDb(nameof(TableMatchesSingleDisciplineCard));
+        var style = FreestyleStyle();
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var comp = MakeCompetition();
+        var fast = MakeSwimmer(club, "Fast", 2012);
+        var slow = MakeSwimmer(club, "Slow", 2012);
+        fast.Gender = "male";
+        slow.Gender = "male";
+
+        db.AddRange(style, club, comp, fast, slow);
+        db.Add(Swim(comp, club, fast, style, new DateTime(2026, 2, 15), timeMs: 28_000));
+        db.Add(Swim(comp, club, slow, style, new DateTime(2026, 2, 15), timeMs: 31_000));
+        await db.SaveChangesAsync();
+
+        var card = await Repo(db).GetNationalSeasonBestAsync("freestyle", "50", "25m", Season);
+        var table = await Repo(db).GetSeasonBestTableAsync(Season);
+
+        var step = Assert.Single(table.Data);
+        var cardItem = Assert.Single(card.Data);
+        Assert.Equal(cardItem.TimeMs, step.TimeMs);
+        Assert.Equal(cardItem.Age, step.Age);
+        Assert.Equal(cardItem.Gender, step.Gender);
+        Assert.Equal("freestyle", step.Style);
+        Assert.Equal("50", step.Distance);
+        Assert.Equal("25m", step.PoolType);
+        // Двое РАЗНЫХ пловцов — порог «первый среди одного» пройден.
+        Assert.Equal(2, step.Peers);
+    }
+
+    /// <summary>
+    /// Два старта одного человека — это один сверстник, а не два: иначе порог
+    /// MIN_PEERS_FOR_SEASON_BEST проходил бы кто угодно, поплавав дважды.
+    /// </summary>
+    [Fact]
+    public async Task TableCountsDistinctSwimmersAsPeers()
+    {
+        using var db = CreateDb(nameof(TableCountsDistinctSwimmersAsPeers));
+        var style = FreestyleStyle();
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var comp = MakeCompetition();
+        var lone = MakeSwimmer(club, "Lone", 2012);
+        lone.Gender = "male";
+
+        db.AddRange(style, club, comp, lone);
+        db.Add(Swim(comp, club, lone, style, new DateTime(2026, 2, 15), timeMs: 28_000));
+        db.Add(Swim(comp, club, lone, style, new DateTime(2026, 3, 15), timeMs: 27_000));
+        await db.SaveChangesAsync();
+
+        var table = await Repo(db).GetSeasonBestTableAsync(Season);
+
+        var step = Assert.Single(table.Data);
+        Assert.Equal(1, step.Peers);
+        Assert.Equal(27_000, step.TimeMs);
+    }
+
+    /// <summary>
+    /// 25м и 50м — разные ступени: одно время в них несравнимо, и слить их значило бы
+    /// выдать бейдж SB короткому бассейну за результат длинного.
+    /// </summary>
+    [Fact]
+    public async Task TableKeepsPoolsApart()
+    {
+        using var db = CreateDb(nameof(TableKeepsPoolsApart));
+        var style = FreestyleStyle();
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var shortPool = MakeCompetition("25m", "15/02/2026");
+        var longPool = MakeCompetition("50m", "16/03/2026");
+        var swimmer = MakeSwimmer(club, "Both", 2012);
+        swimmer.Gender = "male";
+
+        db.AddRange(style, club, shortPool, longPool, swimmer);
+        db.Add(Swim(shortPool, club, swimmer, style, new DateTime(2026, 2, 15), timeMs: 28_000));
+        db.Add(Swim(longPool, club, swimmer, style, new DateTime(2026, 3, 16), timeMs: 30_000));
+        await db.SaveChangesAsync();
+
+        var table = await Repo(db).GetSeasonBestTableAsync(Season);
+
+        Assert.Equal(2, table.Data.Count);
+        Assert.Equal(28_000, Assert.Single(table.Data, x => x.PoolType == "25m").TimeMs);
+        Assert.Equal(30_000, Assert.Single(table.Data, x => x.PoolType == "50m").TimeMs);
+    }
+
+    /// <summary>
+    /// Состав выборки — тот же, что у панели: masters-старты, открытая вода, эстафетные ноги,
+    /// TimeFail и помеченные SuspectReason в эталон не входят. Иначе строка протокола
+    /// сравнивалась бы с временем, которого витрина не признаёт.
+    /// </summary>
+    [Fact]
+    public async Task TableExcludesSameSwimsAsCard()
+    {
+        using var db = CreateDb(nameof(TableExcludesSameSwimsAsCard));
+        var style = FreestyleStyle();
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var regular = MakeCompetition();
+        var masters = MakeCompetition("25m", "16/02/2026", isMasters: true);
+        var openWater = MakeCompetition("25m", "17/02/2026", standingKindOverride: "openwater");
+        var good = MakeSwimmer(club, "Good", 2012);
+        var noisy = MakeSwimmer(club, "Noisy", 2012);
+        good.Gender = "male";
+        noisy.Gender = "male";
+
+        db.AddRange(style, club, regular, masters, openWater, good, noisy);
+        db.Add(Swim(regular, club, good, style, new DateTime(2026, 2, 15), timeMs: 29_000));
+        db.Add(Swim(masters, club, noisy, style, new DateTime(2026, 2, 16), timeMs: 20_000));
+        db.Add(Swim(openWater, club, noisy, style, new DateTime(2026, 2, 17), timeMs: 21_000));
+        db.Add(Swim(regular, club, noisy, style, new DateTime(2026, 2, 15), timeMs: 22_000, relayId: 7));
+        db.Add(Swim(regular, club, noisy, style, new DateTime(2026, 2, 15), timeMs: 23_000, timeFail: true));
+        db.Add(Swim(regular, club, noisy, style, new DateTime(2026, 2, 15), timeMs: 24_000, suspectReason: "bad protocol"));
+        await db.SaveChangesAsync();
+
+        var table = await Repo(db).GetSeasonBestTableAsync(Season);
+
+        var step = Assert.Single(table.Data);
+        Assert.Equal(29_000, step.TimeMs);
+        Assert.Equal(1, step.Peers);
+    }
+
+    /// <summary>
+    /// Ось возраста СЕЗОННАЯ: осенний и весенний старты одного сезона дают один возраст,
+    /// а не два (иначе бейдж уехал бы на соседнюю ступень).
+    /// </summary>
+    [Fact]
+    public async Task TableUsesSeasonAgeAxis()
+    {
+        using var db = CreateDb(nameof(TableUsesSeasonAgeAxis));
+        var style = FreestyleStyle();
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var autumn = MakeCompetition("25m", "15/11/2025");
+        var spring = MakeCompetition("25m", "15/02/2026");
+        var swimmer = MakeSwimmer(club, "Same", 2012);
+        var rival = MakeSwimmer(club, "Rival", 2012);
+        swimmer.Gender = "male";
+        rival.Gender = "male";
+
+        db.AddRange(style, club, autumn, spring, swimmer, rival);
+        db.Add(Swim(autumn, club, swimmer, style, new DateTime(2025, 11, 15), timeMs: 30_000));
+        db.Add(Swim(spring, club, rival, style, new DateTime(2026, 2, 15), timeMs: 29_000));
+        await db.SaveChangesAsync();
+
+        var table = await Repo(db).GetSeasonBestTableAsync(Season);
+
+        var step = Assert.Single(table.Data);
+        Assert.Equal(14, step.Age);   // 2026 − 2012, один на оба старта сезона
+        Assert.Equal(2, step.Peers);
+        Assert.Equal(29_000, step.TimeMs);
+    }
 }

@@ -23,11 +23,17 @@ interface Props {
    * показываются — рекорд важнее (хендофф §5), выбор делает вызывающий.
    */
   badge?: 'SB' | { record: RecordKind; scope?: string | null } | null;
+  /**
+   * Протокол ЭТОГО заплыва. Ссылка живёт у ячейки, а не у строки бассейна: строка держит
+   * времена ДВУХ разных людей, и одна ссылка на обе половины уводила клик по правому
+   * времени в протокол левого пловца (поймано 02.09.2026 на паре 7424/62115).
+   */
+  href?: string;
   side: 'left' | 'right';
 }
 
 const UI_H2HTimeCell: React.FC<Props> = ({
-  time, date, quality, isWinner = false, badge = null, side,
+  time, date, quality, isWinner = false, badge = null, href, side,
 }) => {
   if (!time) {
     return (
@@ -50,9 +56,11 @@ const UI_H2HTimeCell: React.FC<Props> = ({
     </>
   );
 
+  const inner = isWinner ? <div className="h2h-time__box">{body}</div> : body;
+
   return (
     <div className={`h2h-time h2h-time--${side}`}>
-      {isWinner ? <div className="h2h-time__box">{body}</div> : body}
+      {href ? <a className="h2h-time__link" href={href}>{inner}</a> : inner}
     </div>
   );
 };

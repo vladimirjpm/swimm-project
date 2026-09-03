@@ -209,6 +209,9 @@ export function useReduxFilterHost(active = true): FilterHost {
           club: 'all',
           position_filter: 'top',
           level_filter: 'all',
+          // Диплинк «заплывы одного пловца» (?swimmerId=) — тоже фильтр, и «Reset Filters»
+          // обязан его снимать: иначе кнопка врёт, а срез остаётся сужен невидимо.
+          swimmer_id: null,
           event_date: 'all',
           event_category: 'all',
           show_prelims: false,

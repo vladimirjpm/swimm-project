@@ -33,6 +33,8 @@ interface SwimmerNameCellProps {
   isRecordHolder?: boolean;
   /** Класс рекорда: мастерская полоса или возрастная ступень — справочники у них разные. */
   recordKind?: RecordKind;
+  /** Ступень рекорда для подсказки: «14» у возрастного, «45-49» у мастерского. */
+  recordScope?: string | null;
   /** primary-избранное («это я») — бейдж ★ ME рядом с именем */
   isMe?: boolean;
 }
@@ -58,6 +60,7 @@ const UI_SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
   nameBlockClassName = 'min-w-0 flex-1',
   isRecordHolder = false,
   recordKind = 'age',
+  recordScope,
   isMe = false,
 }) => {
   const displayName = isRelay
@@ -127,7 +130,7 @@ const UI_SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
           рекорд», хотя речь про человека. */}
       {isRecordHolder && (
         <div className="mb-1 flex">
-          <UI_RecordBadge kind={recordKind} isHolder />
+          <UI_RecordBadge kind={recordKind} scope={recordScope} isHolder />
         </div>
       )}
       {showRightClubIcon ? (

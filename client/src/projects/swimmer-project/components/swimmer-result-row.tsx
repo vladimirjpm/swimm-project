@@ -1,6 +1,7 @@
 import React from 'react';
 import SwimRow from '../../components/swim-row/swim-row';
 import type { SwimQualityDto, CompetitionRef } from '../use-swimmer-page';
+import { routes } from '../../../utils/routes';
 
 /**
  * Строка результата страницы спортсмена — ПЕРЕХОДНИК к общему `SwimRow`
@@ -52,7 +53,7 @@ export interface ResultRowData {
 
 /** Ссылка на конкретный заплыв в таблице результатов (NAV-контракт хендоффа). */
 const swimHref = (row: ResultRowData, swimmerId: number) =>
-  `/results?competitionId=${row.competition.id}&tab=swims&swimmerId=${swimmerId}&resultId=${row.resultId}`;
+  routes.competitionSwims(row.competition.id, { swimmerId, resultId: row.resultId });
 
 interface Props {
   row: ResultRowData;

@@ -323,6 +323,55 @@ function ResultsMain() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ?swimmerId= (routes.competitionSwims): пришли со страницы пловца или из H2H «показать
+  // этот заплыв в протоколе». Сужаем срез до пловца и снимаем дефолты — иначе freestyle·50m
+  // + Top 10 срезали бы ровно те строки, ради которых пришли (пустая таблица, 2026-09-02).
+  useEffect(() => {
+    if (groupSlug) return;
+    const raw = new URLSearchParams(window.location.search).get('swimmerId');
+    const id = raw != null ? Number(raw) : NaN;
+    if (!Number.isFinite(id) || id <= 0) return;
+    dispatch(rootActions.updateState({
+      filterSelected: {
+        ...filters,
+        swimmer_id: id,
+        style_name: '',
+        style_len: 0,
+        gender: 'all',
+        age: 'all',
+        club: 'all',
+        selected_name: 'all',
+        position_filter: 'all' as const,
+        event_date: 'all',
+        // Диплинк ведут и на предварительный заплыв — по умолчанию они скрыты.
+        show_prelims: true,
+      },
+    }));
+    setCompTab('swims');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Имя для чипа: ищем пловца среди загруженных строк — отдельного запроса он не стоит.
+  // Иврит по умолчанию, английский фоллбеком (правило проекта); эстафету по составу ног
+  // сюда не тянем — у неё в строке имя команды, а не пловца.
+  const linkedSwimmerName = useMemo(() => {
+    const id = filters.swimmer_id;
+    if (id == null) return null;
+    const hit = (selectedSource?.results ?? []).find((r) => r.swimmer_id === id);
+    if (!hit) return null;
+    const he = `${hit.first_name ?? ''} ${hit.last_name ?? ''}`.trim();
+    const en = `${hit.first_name_en ?? ''} ${hit.last_name_en ?? ''}`.trim();
+    return he || en || null;
+  }, [filters.swimmer_id, selectedSource]);
+
+  const clearSwimmerFilter = useCallback(() => {
+    dispatch(rootActions.updateState({ filterSelected: { ...filters, swimmer_id: null } }));
+    const url = new URL(window.location.href);
+    url.searchParams.delete('swimmerId');
+    url.searchParams.delete('swim');
+    window.history.replaceState(null, '', url.toString());
+  }, [dispatch, filters]);
+
   // Персональная полоса → Swims со скоупом my|favorites (+ URL tab/filter).
   const handleOpenSwimsScoped = useCallback((scope: 'my' | 'favorites') => {
     dispatch(rootActions.updateState({ filterSelected: scopedFilterReset(filters, scope) }));
@@ -569,6 +618,33 @@ function ResultsMain() {
             {/* Центральная колонка — результаты (детали теперь попапом, поэтому полная ширина) */}
             {!isTraining && (
               <div className="results-table w-full lg:flex-1 lg:min-w-0 bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] rounded shadow">
+                {/* Активный диплинк «заплывы одного пловца» (?swimmerId=) — чип с крестиком.
+                    Без него срез выглядел бы как поломанная таблица: строк две, а почему —
+                    не видно ни в одном фильтре. Имя берём из первой же строки этого пловца. */}
+                {filters.swimmer_id != null && (
+                  <div className="flex items-center gap-2 px-3 pt-2.5">
+                    <span
+                      className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold"
+                      style={{
+                        background: 'var(--theme-personal-badge-bg)',
+                        color: 'var(--theme-personal-accent)',
+                        border: '1px solid var(--theme-personal-border)',
+                      }}
+                      dir="auto"
+                    >
+                      {`🏊 ${linkedSwimmerName ?? 'One swimmer'}`}
+                      <button
+                        type="button"
+                        onClick={clearSwimmerFilter}
+                        className="cursor-pointer bg-transparent p-0 text-[12px] leading-none"
+                        style={{ color: 'inherit' }}
+                        aria-label="Show all swimmers"
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  </div>
+                )}
                 {/* Активный скоуп «мои/избранные» (?filter=) — чип с крестиком.
                     Только залогиненному: гостю скоуп не применяется (см. results-table). */}
                 {auth.isAuthenticated &&

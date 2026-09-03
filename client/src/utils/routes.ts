@@ -116,6 +116,27 @@ export const routes = {
     const query = params.toString();
     return query ? `/h2h?${query}` : '/h2h';
   },
+
+  /**
+   * Протокол соревнования, открытый на заплывах ОДНОГО пловца (таб Swims).
+   *
+   * Единственный генератор этого адреса: раньше его собирали строкой в трёх местах (строка
+   * заплыва на странице пловца, строка соревнования в Season, ряд H2H) — и все три вели в
+   * пустую таблицу. Причина: `?swimmerId=`/`?resultId=` никто не читал, а дефолтный срез
+   * Swims — freestyle · 50m + Top 10, то есть чужая дисциплина. Теперь параметр применяется
+   * фильтром (`FilterSelected.swimmer_id`, точный матчинг с эстафетами по составу ног), а
+   * `?swim=` подсвечивает и прокручивает нужную строку — тот же ключ, что у диплинка
+   * из Overview/Records.
+   */
+  competitionSwims: (
+    competitionId: string | number,
+    q: { swimmerId?: number | null; resultId?: number | null } = {},
+  ) => {
+    const params = new URLSearchParams({ tab: 'swims' });
+    if (q.swimmerId != null) params.set('swimmerId', String(q.swimmerId));
+    if (q.resultId != null) params.set('swim', String(q.resultId));
+    return `${routes.competition(competitionId)}?${params.toString()}`;
+  },
 };
 
 /**

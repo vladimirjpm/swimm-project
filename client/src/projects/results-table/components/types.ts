@@ -1,6 +1,7 @@
 import { Result } from '../../../utils/interfaces/results';
 import { NormativeLevelInfo } from '../../../utils/interfaces/normative-level-info';
 import { FilterSelected } from '../../../utils/interfaces/filter-selected';
+import { RecordMark } from '../../../utils/helpers/helper-normative';
 
 export interface ResultsTableRowProps {
   res: Result;
@@ -20,6 +21,20 @@ export interface ResultsTableRowProps {
   isAwardSource?: boolean;
   isRecordHolder?: boolean;
   isRecordTime?: boolean;
+  /**
+   * Класс рекорда, который пловец ДЕРЖИТ / который побит ЭТИМ временем: национальный,
+   * возрастной или мастерский. Класс приходит из поиска (`Helper.recordMarkFor*`), а не
+   * выводится из «мастерский ли источник»: взрослый вне мастерса держит открытый рекорд
+   * страны, и догадка помечала его возрастным — то есть никаким.
+   */
+  recordHolderMark?: RecordMark | null;
+  recordTimeMark?: RecordMark | null;
+  /**
+   * Время — лучшее в стране за сезон на своей ступени (пол × возраст в сезоне × дисциплина
+   * × бассейн). Считается в `results-table.tsx` по сезонной таблице `SeasonBestTable`;
+   * это НЕ рекорд, поэтому и бейдж свой (`UI_SeasonBestBadge`).
+   */
+  isSeasonBestTime?: boolean;
   /** Пловец является primary-фаворитом текущего пользователя */
   isPrimaryFavorite?: boolean;
   /** Пловец в избранном (не обязательно primary) */

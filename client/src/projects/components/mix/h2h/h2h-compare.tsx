@@ -9,6 +9,7 @@ import UI_H2HDivider from './h2h-divider';
 import UI_H2HSwap from './h2h-swap';
 import type { H2HSlot } from './h2h.types';
 import type { SwimmerCompare, SwimmerCompareSwim } from '../../../swimmer-project/use-swimmer-page';
+import { routes } from '../../../../utils/routes';
 
 /**
  * ВЕСЬ экран сравнения двух пловцов (head-to-head), макет 1b из
@@ -65,9 +66,8 @@ const badgeOf = (swim: SwimmerCompareSwim) => {
 /** Ссылка на протокол заплыва — тот же адрес, что открывают строки остальных табов. */
 const swimHref = (swim: SwimmerCompareSwim | null | undefined, swimmerId: number) => {
   const competitionId = swim?.competition?.id;
-  return competitionId != null
-    ? `/results?competitionId=${competitionId}&tab=swims&swimmerId=${swimmerId}`
-    : undefined;
+  if (competitionId == null) return undefined;
+  return routes.competitionSwims(competitionId, { swimmerId, resultId: swim?.resultId });
 };
 
 /** Слот как элемент шапки: занятый — мини-карточка, пустой — пунктирный слот. */
@@ -146,17 +146,19 @@ const UI_H2HCompare: React.FC<Props> = ({
             date: pool.mine.date,
             quality: pool.mine.quality,
             badge: badgeOf(pool.mine),
+            // Ссылка у КАЖДОГО времени своя: заплывы принадлежат разным людям и разным
+            // соревнованиям, и одна ссылка на строку вела клик по правому времени в
+            // протокол левого пловца.
+            href: swimHref(pool.mine, compare.mine.id),
           } : null}
           right={pool.rival ? {
             time: pool.rival.time,
             date: pool.rival.date,
             quality: pool.rival.quality,
             badge: badgeOf(pool.rival),
+            href: swimHref(pool.rival, compare.rival.id),
           } : null}
           deltaMs={pool.deltaMs}
-          // Ссылка ведёт в протокол того из двоих, чей это заплыв: у общей пары берём
-          // левого — он же владелец экрана в табе.
-          href={swimHref(pool.mine ?? pool.rival, pool.mine ? compare.mine.id : compare.rival.id)}
         />
       ))}
     </UI_H2HEventCard>

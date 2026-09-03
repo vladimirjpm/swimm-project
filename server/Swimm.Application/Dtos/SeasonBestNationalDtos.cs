@@ -98,3 +98,61 @@ public sealed class SeasonBestNationalItemDto
     [JsonPropertyName("points")]
     public int? Points { get; set; }
 }
+
+/// <summary>
+/// ВСЯ сезонная таблица одним ответом — эталон для пометки строк протокола бейджем SB
+/// (`docs/plans/season-best-in-protocol-plan.md`).
+///
+/// Отличие от <see cref="SeasonBestNationalDto"/> ровно одно: там одна дисциплина со всеми
+/// подробностями лидера (имя, клуб, соревнование — панель их печатает), здесь — все
+/// дисциплины сезона, но только время и число сверстников. Подробности тут не нужны: строка
+/// протокола сверяет СВОЁ время с эталоном, ровно как со справочником рекордов, и лишние
+/// поля раздули бы ответ, который клиент грузит целиком при загрузке страницы.
+/// </summary>
+public sealed class SeasonBestTableDto
+{
+    /// <summary>Год НАЧАЛА сезона (2025 = сезон 2025/26).</summary>
+    [JsonPropertyName("season")]
+    public int Season { get; set; }
+
+    [JsonPropertyName("season_label")]
+    public string SeasonLabel { get; set; } = "";
+
+    /// <summary>Ключи вида «freestyle|100|25m|female|14» → лучшее время ступени.</summary>
+    [JsonPropertyName("data")]
+    public List<SeasonBestTableItemDto> Data { get; set; } = new();
+}
+
+/// <summary>Одна ступень сезонной таблицы: пол × возраст × дисциплина × бассейн.</summary>
+public sealed class SeasonBestTableItemDto
+{
+    /// <summary>Как в Styles.Name: freestyle / backstroke / …</summary>
+    [JsonPropertyName("style")]
+    public string Style { get; set; } = "";
+
+    /// <summary>Как в Results.Distance — без «m»: «50», «100», «1500».</summary>
+    [JsonPropertyName("distance")]
+    public string Distance { get; set; } = "";
+
+    /// <summary>«25m» / «50m»: 25 и 50 — разные времена, в одну ступень их сливать нельзя.</summary>
+    [JsonPropertyName("pool_type")]
+    public string PoolType { get; set; } = "";
+
+    [JsonPropertyName("gender")]
+    public string Gender { get; set; } = "";
+
+    /// <summary>Возраст В СЕЗОНЕ (SeasonMath.AgeInSeason) — ось этой витрины, не календарная.</summary>
+    [JsonPropertyName("age")]
+    public int Age { get; set; }
+
+    [JsonPropertyName("time_ms")]
+    public int TimeMs { get; set; }
+
+    /// <summary>
+    /// Сколько РАЗНЫХ пловцов плыли эту ступень за сезон. Нужен клиенту, чтобы не выдавать
+    /// бейдж «первому среди одного»: тот же порог, что у страницы пловца
+    /// (<c>MinPeersForSeasonBest</c>) и у мест на клиенте (<c>MIN_PEERS_FOR_RANK</c>).
+    /// </summary>
+    [JsonPropertyName("peers")]
+    public int Peers { get; set; }
+}

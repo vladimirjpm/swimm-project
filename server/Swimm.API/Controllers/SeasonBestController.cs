@@ -60,6 +60,25 @@ public class SeasonBestController : ControllerBase
     }
 
     /// <summary>
+    /// ВСЯ сезонная таблица одним ответом — эталон для бейджа SB в строках протокола.
+    ///
+    /// Аналог <c>GET /api/records</c>: клиент грузит её один раз на страницу и дальше
+    /// сверяет каждую строку локально. Поштучные запросы на дисциплину (эндпоинт выше)
+    /// для протокола на сотни строк дали бы десятки запросов.
+    ///
+    /// season — год НАЧАЛА сезона; по умолчанию витринный. Ответ ~1,1 тыс. ступеней,
+    /// кэш и ETag те же, что у остальных витрин.
+    /// </summary>
+    [HttpGet("/api/season-best/table")]
+    public async Task<IActionResult> GetSeasonBestTable([FromQuery] int? season = null)
+    {
+        return await this.CachedJson(_cache,
+            $"http:season-best:table:{season?.ToString() ?? "cur"}",
+            () => _seasonBest.GetSeasonBestTableAsync(season, HttpContext.RequestAborted),
+            PayloadTtl, CacheControlValue);
+    }
+
+    /// <summary>
     /// Ранжированный список одной дисциплины за сезон — страница <c>/season-best</c>.
     ///
     /// Параметры — зеркало query этой страницы (<c>client/src/utils/routes.ts</c>): один и тот

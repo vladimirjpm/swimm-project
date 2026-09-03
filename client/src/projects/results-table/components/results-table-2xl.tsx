@@ -14,6 +14,7 @@ import UI_PositionBadge from '../../components/mix/position-badge/position-badge
 import UI_PrelimLabel from '../../components/mix/prelim-label/prelim-label';
 import UI_RoundLabel from '../../components/mix/round-label/round-label';
 import HelperResults from '../../../utils/helpers/helper-results';
+import UI_SeasonBestBadge from '../../components/mix/season-best-badge/season-best-badge';
 
 const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
   res,
@@ -31,6 +32,9 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
   isAwardSource,
   isRecordHolder,
   isRecordTime,
+  recordHolderMark,
+  recordTimeMark,
+  isSeasonBestTime,
   isPrimaryFavorite,
   isFavorite,
   onToggleFavorite,
@@ -82,7 +86,8 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
             onClick={handleNameClick}
             firstLineClassName="text-xl font-bold text-[var(--theme-mode-text)]"
             isRecordHolder={isRecordHolder}
-          recordKind={isMastersResult ? 'masters' : 'age'}
+          recordKind={recordHolderMark?.kind ?? (isMastersResult ? 'masters' : 'age')}
+          recordScope={recordHolderMark?.scope ?? undefined}
           />
           <UI_FavoriteControls
             className="ml-1"
@@ -120,10 +125,12 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
           time_fail_note={res.time_fail_note}
           firstLineClassName="text-xl font-bold tabular-nums"
           isRecordHolder={isRecordTime}
-          recordKind={isMastersResult ? 'masters' : 'age'}
+          recordKind={recordTimeMark?.kind ?? (isMastersResult ? 'masters' : 'age')}
+          recordScope={recordTimeMark?.scope ?? undefined}
           quality={res.suspect_reason ? { kind: 'protocol', reason: res.suspect_reason } : null}
           qualityMarker="chip"
         />
+        {isSeasonBestTime && <UI_SeasonBestBadge className="mt-0.5" />}
       </div>
 
       {hasInternationalPoints && (
