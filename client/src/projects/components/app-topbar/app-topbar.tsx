@@ -14,7 +14,7 @@ import { PAGE_CONTAINER } from '../../../utils/layout';
  * когда страница хочет управлять auth снаружи. Хендофф писался до useAuth-синглтона.
  */
 
-export type TopbarActivePage = 'home' | 'competitions' | 'groups' | 'normatives' | 'records' | 'about';
+export type TopbarActivePage = 'home' | 'competitions' | 'groups' | 'h2h' | 'normatives' | 'records' | 'about';
 
 export interface AppTopbarProps {
   /** Активный пункт. Не передан (results_main) — ни один пункт не подсвечен. */
@@ -30,6 +30,9 @@ const NAV_LINKS: { label: string; href?: string; key?: TopbarActivePage }[] = [
   { label: 'Home', href: routes.home(), key: 'home' },
   { label: 'Competitions', href: routes.competitionsList(), key: 'competitions' },
   { label: 'Groups', href: routes.groupsList(), key: 'groups' },
+  // Пустой `/h2h` — законный адрес: обе стороны выбираются прямо на экране, поэтому пункт
+  // ведёт именно туда, а не требует сперва найти пловца (решение Влада 03.09.2026).
+  { label: 'Head to head', href: routes.h2h(), key: 'h2h' },
   { label: 'Normatives' },
   { label: 'Records' },
   { label: 'About', href: routes.about(), key: 'about' },
