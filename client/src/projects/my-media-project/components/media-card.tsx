@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { AllUserMediaDto } from '../use-all-my-media';
 import { UserMediaPublicationDto } from '../../../hooks/useUserMedia';
 import { HelperMedia } from '../../../utils/helpers';
-import { hpCardCls, STATUS_COLORS, CardStatus } from './status-styles';
+import { hpCardCls, STATUS_COLORS, CardStatus, visibilityLabel } from './status-styles';
 
 interface Props {
   item: AllUserMediaDto;
@@ -29,10 +29,11 @@ function MediaCard({ item, publications, onOpenLightbox, onDelete, onWithdraw, o
   const chips: { label: string; status: CardStatus }[] =
     publications.length === 0
       ? [{ label: 'private', status: 'private' }]
-      : publications.map((p) => ({
-          label: `${p.hub_group_name} · ${p.status === 'approved' ? 'published' : p.status}${p.status === 'approved' && p.level === 'public' ? ' 🌐' : ''}`,
-          status: p.status === 'approved' ? 'published' : p.status === 'rejected' ? 'rejected' : 'pending',
-        }));
+      : publications.map((p) => {
+          const st: CardStatus = p.status === 'approved' ? 'published' : p.status === 'rejected' ? 'rejected' : 'pending';
+          const seenByAll = p.status === 'approved' && p.level === 'public';
+          return { label: `${p.hub_group_name} · ${visibilityLabel(st, seenByAll)}${seenByAll ? ' 🌐' : ''}`, status: st };
+        });
 
   return (
     // Без overflow-hidden на корне: он резал дропдаун «⋯» (и любой absolute-выпад).

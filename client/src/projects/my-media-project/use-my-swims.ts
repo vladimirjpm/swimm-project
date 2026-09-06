@@ -23,6 +23,16 @@ export interface MySwimDto {
   /** dd/MM/yyyy */
   competition_date: string;
   pool_type: string;
+  /** Канонический таб соревнования — для плитки CompetitionTile в шапке карточки. */
+  category: 'kids8_11' | 'young11_14' | 'juniors' | 'adults' | 'masters' | null;
+  /** Чемпионат Израиля (флаг админки) — кубок в плитке. */
+  is_championship: boolean;
+  /** Пол пловца — ключ ступени рекорда. */
+  gender: string;
+  /** Год рождения — ось возраста ступени рекорда. */
+  birth_year: number | null;
+  /** Возраст события из протокола («45», «13»). */
+  event_style_age: string;
   /** yyyy-MM-dd — день заплыва (многодневные) */
   date: string;
   distance: string;
@@ -38,6 +48,8 @@ export interface MySwimDto {
   suspect_reason?: string | null;
   time_fail: boolean;
   is_pb: boolean;
+  /** Лучшее время сезона; сервер не ставит его там, где уже is_pb. */
+  is_sb: boolean;
   congrats_count: number;
   my_cheer: boolean;
   media: SwimMediaDto[];
@@ -47,6 +59,8 @@ export interface MySwimsResponse {
   swimmers: MySwimmerDto[];
   /** Стартовые годы сезонов (сентябрь–август), по убыванию. */
   seasons: number[];
+  /** Показаны все сезоны сразу (пункт «All» селектора). */
+  all_seasons: boolean;
   season: number;
   swims: MySwimDto[];
   competition_media: SwimMediaDto[];
@@ -54,7 +68,7 @@ export interface MySwimsResponse {
 }
 
 const EMPTY: MySwimsResponse = {
-  swimmers: [], seasons: [], season: 0, swims: [], competition_media: [], unlinked_media: [],
+  swimmers: [], seasons: [], all_seasons: false, season: 0, swims: [], competition_media: [], unlinked_media: [],
 };
 
 export { seasonLabel } from '../../utils/helpers/season-helper';
@@ -64,7 +78,7 @@ export { seasonLabel } from '../../utils/helpers/season-helper';
  * season=null → сервер берёт текущий; reload после add/remove медиа —
  * агрегат дешёвый, точечный merge не оправдан.
  */
-export function useMySwims(season: number | null) {
+export function useMySwims(season: number | 'all' | null) {
   const [data, setData] = useState<MySwimsResponse>(EMPTY);
   const [loading, setLoading] = useState(true);
 

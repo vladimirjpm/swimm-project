@@ -11,12 +11,14 @@ import { useMyMediaModeration } from './use-my-media-moderation';
 import AppTopbar from '../components/app-topbar/app-topbar';
 import UI_SwimmerGallery from '../components/mix/swimmer-gallery/swimmer-gallery';
 import { routes } from '../../utils/routes';
+import HelperSwimmer from '../../utils/helpers/helper-swimmer';
+import { seasonStartYear } from '../../utils/helpers/season-helper';
 import { GalleryItem } from '../../utils/interfaces/results';
 import MediaCard from './components/media-card';
 import AddLinkModal, { AddLinkSwimmerOption } from './components/add-link-modal';
 import ModerationPanel from './components/moderation-panel';
 import SwimList from './components/swim-list';
-import { chipClass, segmentClass, derivedCardStatus, CardStatus, hpCardCls } from './components/status-styles';
+import { chipClass, segmentClass, derivedCardStatus, visibilityLabel, CardStatus, hpCardCls } from './components/status-styles';
 
 // Страница «My media» v3 (swim-centric) — README design_handoff_my_swims_v3,1.
 // Тёмный стиль groups.html/home.html — осознанное решение, не через var(--theme-mode-*).
@@ -56,6 +58,8 @@ function MyMedia() {
 
 type Seg = 'all' | 'with' | 'without';
 type StatusFilter = CardStatus | 'all';
+// Фильтр «куда поднято»: конкретная группа, 'none' — ни в одну (личное), 'all' — не фильтруем.
+type GroupFilter = number | 'all' | 'none';
 
 function MyMediaContent() {
   const auth = useAuth();
@@ -70,11 +74,13 @@ function MyMediaContent() {
   const [tab, setTab] = useState<'media' | 'moderation'>('media');
 
   // ── Фильтры ────────────────────────────────────────────────────────────────
-  const [season, setSeason] = useState<number | null>(null); // null → текущий (сервер)
+  // null → сервер выберет витринный сезон; 'all' → все сезоны сразу.
+  const [season, setSeason] = useState<number | 'all' | null>(null);
   const { data, loading, reload } = useMySwims(season);
   const [swimmerFilter, setSwimmerFilter] = useState<number | 'all'>('all');
   const [seg, setSeg] = useState<Seg>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [groupFilter, setGroupFilter] = useState<GroupFilter>('all');
   const [competitionFilter, setCompetitionFilter] = useState<number | 'all'>('all');
   const [styleFilter, setStyleFilter] = useState<string | 'all'>('all');
   const [distanceFilter, setDistanceFilter] = useState<string | 'all'>('all');
@@ -155,9 +161,56 @@ function MyMediaContent() {
     [swims]
   );
 
+  // ── Группы: «куда я поднял медиа» ─────────────────────────────────────────
+  // Публикации приходят по ВСЕМУ моему медиа (все сезоны), а страница сезонная,
+  // поэтому список чипов берём из публикаций, а счётчики — по медиа этой страницы.
+  const pageMediaIds = useMemo(() => {
+    const ids: number[] = [];
+    for (const sw of swims) for (const m of sw.media) ids.push(m.id);
+    for (const m of competitionMedia) ids.push(m.id);
+    for (const m of unlinkedMedia) ids.push(m.id);
+    return ids;
+  }, [swims, competitionMedia, unlinkedMedia]);
+
+  const groupOptions = useMemo(() => {
+    const names = new Map<number, string>();
+    for (const p of publications) if (!names.has(p.hub_group_id)) names.set(p.hub_group_id, p.hub_group_name);
+    const counts = new Map<number, number>();
+    let notShared = 0;
+    for (const id of pageMediaIds) {
+      const pubs = publicationsByMedia.get(id) ?? [];
+      if (pubs.length === 0) { notShared += 1; continue; }
+      const seen = new Set<number>();
+      for (const p of pubs) {
+        if (seen.has(p.hub_group_id)) continue;
+        seen.add(p.hub_group_id);
+        counts.set(p.hub_group_id, (counts.get(p.hub_group_id) ?? 0) + 1);
+      }
+    }
+    const groups = Array.from(names, ([id, name]) => ({ id, name, count: counts.get(id) ?? 0 }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    return { groups, notShared, total: pageMediaIds.length };
+  }, [publications, publicationsByMedia, pageMediaIds]);
+
+  // Медиа «в группе» при любом статусе заявки (pending/approved/rejected) — статус сужает отдельный фильтр.
+  const mediaMatchesGroup = (mediaId: number) => {
+    if (groupFilter === 'all') return true;
+    const pubs = publicationsByMedia.get(mediaId) ?? [];
+    if (groupFilter === 'none') return pubs.length === 0;
+    return pubs.some((p) => p.hub_group_id === groupFilter);
+  };
+
+  const pickGroup = (v: GroupFilter) => {
+    setGroupFilter(v);
+    // Медиа без заплыва тоже фильтруется — иначе выбранная группа «пропадает» в свёрнутой секции.
+    if (v !== 'all') setUnlinkedOpen(true);
+  };
+
   // ── Фильтрация ────────────────────────────────────────────────────────────
-  // Заплыв принадлежит пловцу, если он владелец строки ИЛИ нога эстафеты (member).
-  const swimBelongsTo = (s: MySwimDto, id: number) => s.swimmer_id === id || s.member_swimmer_ids.includes(id);
+  // Принадлежность заплыва пловцу — ТОЛЬКО через канон-хелпер (docs/relays.md: «новый
+  // фильтр/счётчик по пловцу — зови это, не сравнивай swimmer_id сам»): у эстафеты
+  // swimmer_id это одна нога, остальные ноги теряются.
+  const swimBelongsTo = (s: MySwimDto, id: number) => HelperSwimmer.resultBelongsToSwimmer(s, id);
   const bySwimmer = swimmerFilter === 'all' ? swims : swims.filter((s) => swimBelongsTo(s, swimmerFilter));
 
   const segCount = (k: Seg) =>
@@ -173,6 +226,7 @@ function MyMediaContent() {
     if (competitionFilter !== 'all' && s.competition_id !== competitionFilter) return false;
     if (styleFilter !== 'all' && s.style !== styleFilter) return false;
     if (distanceFilter !== 'all' && s.distance !== distanceFilter) return false;
+    if (groupFilter !== 'all' && !s.media.some((m) => mediaMatchesGroup(m.id))) return false;
     if (dateFrom && s.date < dateFrom) return false;
     if (dateTo && s.date > dateTo) return false;
     if (seg === 'with' && statusFilter !== 'all') {
@@ -184,6 +238,11 @@ function MyMediaContent() {
     return true;
   });
 
+  const visibleCompetitionMedia =
+    groupFilter === 'all' ? competitionMedia : competitionMedia.filter((m) => mediaMatchesGroup(m.id));
+  const visibleUnlinkedMedia =
+    groupFilter === 'all' ? unlinkedMedia : unlinkedMedia.filter((m) => mediaMatchesGroup(m.id));
+
   const activeMoreCount =
     [competitionFilter, styleFilter, distanceFilter].filter((v) => v !== 'all').length +
     (dateFrom || dateTo ? 1 : 0) +
@@ -193,6 +252,7 @@ function MyMediaContent() {
     setSwimmerFilter('all');
     setSeg('all');
     setStatusFilter('all');
+    setGroupFilter('all');
     setCompetitionFilter('all');
     setStyleFilter('all');
     setDistanceFilter('all');
@@ -258,26 +318,34 @@ function MyMediaContent() {
     }
   };
 
+  // Одно место на модал и на инлайн-строку заплыва: сервер запрещает переподачу, пока
+  // публикация в этой группе pending/approved («publication already exists»), поэтому
+  // смена уровня (members ↔ everyone) идёт через withdraw + резаявку.
+  const publishTo = async (
+    mediaId: number, hubGroupId: number, level: 'members' | 'public'
+  ): Promise<{ ok: boolean; error?: string }> => {
+    const active = (publicationsByMedia.get(mediaId) ?? []).find(
+      (p) => p.hub_group_id === hubGroupId && (p.status === 'pending' || p.status === 'approved')
+    );
+    if (active) {
+      if (active.level === level) return { ok: true }; // менять нечего
+      await withdrawPublication(mediaId, hubGroupId);
+    }
+    return submitPublication(mediaId, hubGroupId, level);
+  };
+
   const handlePublish = async () => {
     if (shareTarget == null || shareGroupId === '') return;
     setShareBusy(true);
     setShareError(null);
-    // Сервер запрещает переподачу, пока публикация в этой группе pending/approved —
-    // смена уровня (members ↔ public) только через withdraw + резаявка.
-    const active = (publicationsByMedia.get(shareTarget.id) ?? []).find(
-      (p) => p.hub_group_id === shareGroupId && (p.status === 'pending' || p.status === 'approved')
-    );
-    if (active && active.level !== shareLevel) {
-      await withdrawPublication(shareTarget.id, shareGroupId);
-    }
-    const res = await submitPublication(shareTarget.id, shareGroupId, shareLevel);
+    const res = await publishTo(shareTarget.id, shareGroupId, shareLevel);
     setShareBusy(false);
     if (res.ok) setShareTarget(null);
     else setShareError(res.error ?? 'Could not submit the request');
   };
 
   const submitInlineShare = async (mediaId: number, hubGroupId: number, level: 'members' | 'public'): Promise<boolean> => {
-    const res = await submitPublication(mediaId, hubGroupId, level);
+    const res = await publishTo(mediaId, hubGroupId, level);
     return res.ok;
   };
 
@@ -300,7 +368,22 @@ function MyMediaContent() {
   const totalCount = bySwimmer.length;
   const pendingModCount = moderation.rows.filter((r) => r.status === 'pending').length;
   const effectiveSeason = data.season || new Date().getFullYear();
-  const seasonChoices = data.seasons.length > 0 ? data.seasons : [effectiveSeason];
+  // Выбранный сезон обязан быть в списке: иначе <select> показывает чужую подпись — так
+  // страница и «залипала» на пустом 2026/27, когда данные есть только за 2025/26.
+  const seasonChoices = useMemo(() => {
+    const years = new Set<number>(data.seasons);
+    years.add(effectiveSeason);
+    // Новый (календарный) сезон в списке есть всегда, даже пока стартов в нём нет — по
+    // общему правилу витрины: «новый сезон в селекторе есть, но по умолчанию не выбран»
+    // (docs/season-boundary-rule.md). Выбирает же дефолт сервер — витринным сезоном.
+    years.add(seasonStartYear());
+    return Array.from(years).sort((a, b) => b - a);
+  }, [data.seasons, effectiveSeason]);
+  const seasonValue = season === 'all' || data.all_seasons ? 'all' : String(season ?? effectiveSeason);
+  // Выбран чип пловца — имя должно быть видно и вне чипа: в строках оно скрыто (фильтр же
+  // один на всех), и экран переставал отвечать на вопрос «чьи это заплывы».
+  const selectedSwimmerName = swimmerFilter === 'all' ? null : swimmerNames.get(swimmerFilter) ?? null;
+  const pickSeason = (v: string) => setSeason(v === 'all' ? 'all' : Number(v));
 
   const swimListCallbacks = {
     publicationsByMedia,
@@ -401,7 +484,8 @@ function MyMediaContent() {
                   >
                     {s.name.trim().charAt(0).toUpperCase()}
                   </span>
-                  {s.name} · {swims.filter((x) => swimBelongsTo(x, s.id)).length}
+                  {/* dir только на имени: без изоляции иврит уводит счётчик влево. */}
+                  <span><span dir="auto">{s.name}</span> · {swims.filter((x) => swimBelongsTo(x, s.id)).length}</span>
                 </button>
               ))}
               <button
@@ -412,6 +496,37 @@ function MyMediaContent() {
                 + Add link
               </button>
             </div>
+
+            {/* Group chips — «куда я поднял медиа» (публикации в HubGroups) */}
+            {groupOptions.groups.length > 0 && (
+              <div className="flex items-center gap-2 overflow-x-auto sm:flex-wrap sm:overflow-visible" style={{ scrollbarWidth: 'none' }}>
+                <span className="hp-mono whitespace-nowrap text-[10px] font-extrabold uppercase tracking-[0.1em] text-[rgba(125,211,252,0.7)]">
+                  Shared with
+                </span>
+                <button type="button" onClick={() => pickGroup('all')} className={chipClass(groupFilter === 'all')}>
+                  All · {groupOptions.total}
+                </button>
+                {groupOptions.groups.map((g) => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => pickGroup(g.id)}
+                    className={chipClass(groupFilter === g.id)}
+                    style={g.count === 0 && groupFilter !== g.id ? { opacity: 0.45 } : undefined}
+                    title={g.count === 0 ? 'Nothing from this season is shared with this group' : undefined}
+                  >
+                    <span aria-hidden="true">👥</span>
+                    {/* dir только на имени: с dir на всей кнопке ивритское название уводит счётчик влево. */}
+                    <span><span dir="auto">{g.name}</span> · {g.count}</span>
+                  </button>
+                ))}
+                {groupOptions.notShared > 0 && (
+                  <button type="button" onClick={() => pickGroup('none')} className={chipClass(groupFilter === 'none')}>
+                    Not shared · {groupOptions.notShared}
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Primary filter row (desktop) */}
             <div className="hidden flex-wrap items-center gap-3 sm:flex">
@@ -425,11 +540,12 @@ function MyMediaContent() {
               <label className="hp-mono flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[rgba(125,211,252,0.7)]">
                 Season
                 <select
-                  value={season ?? effectiveSeason}
-                  onChange={(e) => setSeason(Number(e.target.value))}
+                  value={seasonValue}
+                  onChange={(e) => pickSeason(e.target.value)}
                   className="rounded-[8px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-2 py-[6px] text-[12px] normal-case tracking-normal text-[#f3f8fd]"
                 >
-                  {seasonChoices.map((y) => <option key={y} value={y}>{seasonLabel(y)}</option>)}
+                  <option value="all">All seasons</option>
+                  {seasonChoices.map((y) => <option key={y} value={String(y)}>{seasonLabel(y)}</option>)}
                 </select>
               </label>
               <div className="relative">
@@ -479,6 +595,9 @@ function MyMediaContent() {
                 )}
               </div>
               <span className="ml-auto text-[11.5px] font-bold text-[rgba(203,224,240,0.5)]">
+                {selectedSwimmerName && (
+                  <span dir="auto" className="mr-1.5 text-[12.5px] font-black text-[#7dd3fc]">{selectedSwimmerName}</span>
+                )}
                 {filtered.length} {filtered.length === 1 ? 'swim' : 'swims'} · sorted by date ↓
               </span>
             </div>
@@ -499,6 +618,12 @@ function MyMediaContent() {
               >
                 ⚙ Filters {activeMoreCount > 0 ? `(${activeMoreCount})` : ''}
               </button>
+              <p className="m-0 text-[11.5px] font-bold text-[rgba(203,224,240,0.5)]">
+                {selectedSwimmerName && (
+                  <span dir="auto" className="mr-1.5 text-[12.5px] font-black text-[#7dd3fc]">{selectedSwimmerName}</span>
+                )}
+                {filtered.length} {filtered.length === 1 ? 'swim' : 'swims'}
+              </p>
             </div>
 
             {/* Main list / states */}
@@ -521,7 +646,9 @@ function MyMediaContent() {
               </div>
             ) : swims.length === 0 ? (
               <div className="rounded-[16px] border border-dashed border-[rgba(125,211,252,0.25)] p-10 text-center">
-                <p className="m-0 text-[14px] font-bold text-[rgba(203,224,240,0.6)]">No results in season {seasonLabel(effectiveSeason)}</p>
+                <p className="m-0 text-[14px] font-bold text-[rgba(203,224,240,0.6)]">
+                  {data.all_seasons ? 'No results yet' : `No results in season ${seasonLabel(effectiveSeason)}`}
+                </p>
                 {data.seasons.filter((y) => y !== effectiveSeason).slice(0, 1).map((y) => (
                   <button key={y} type="button" onClick={() => setSeason(y)} className="hp-mono mt-3 rounded-[9px] border border-[rgba(125,211,252,0.4)] bg-transparent px-3.5 py-[7px] text-[12px] font-extrabold text-[#7dd3fc]">
                     Season {seasonLabel(y)} →
@@ -538,15 +665,16 @@ function MyMediaContent() {
             ) : (
               <SwimList
                 swims={filtered}
-                competitionMedia={competitionMedia}
+                competitionMedia={visibleCompetitionMedia}
                 showSwimmerName={swimmerFilter === 'all' && data.swimmers.length > 1}
                 swimmerNames={swimmerNames}
+                preferredSwimmerId={swimmerFilter === 'all' ? null : swimmerFilter}
                 {...swimListCallbacks}
               />
             )}
 
             {/* Unlinked media */}
-            {unlinkedMedia.length > 0 && (
+            {visibleUnlinkedMedia.length > 0 && (
               <div className="mt-2">
                 <button
                   type="button"
@@ -554,13 +682,13 @@ function MyMediaContent() {
                   className="hp-mono flex w-full items-center gap-2 rounded-[12px] border border-[rgba(125,211,252,0.25)] bg-transparent px-4 py-[10px] text-left text-[12px] font-extrabold text-[#7dd3fc]"
                 >
                   Unlinked media
-                  <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[9px] bg-[rgba(125,211,252,0.18)] px-1.5 text-[10.5px]">{unlinkedMedia.length}</span>
+                  <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[9px] bg-[rgba(125,211,252,0.18)] px-1.5 text-[10.5px]">{visibleUnlinkedMedia.length}</span>
                   <span className="font-bold normal-case text-[rgba(203,224,240,0.45)]">· club videos and general footage not tied to any swim</span>
                   <span className="ml-auto">{unlinkedOpen ? '▲' : '▼'}</span>
                 </button>
                 {unlinkedOpen && (
                   <div className="mt-3 grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(250px,1fr))' }}>
-                    {unlinkedMedia.map((item) => (
+                    {visibleUnlinkedMedia.map((item) => (
                       <MediaCard
                         key={item.id}
                         item={item}
@@ -730,9 +858,12 @@ function MyMediaContent() {
             <div className="flex flex-col gap-3">
               <FilterSelect
                 label="Season"
-                value={String(season ?? effectiveSeason)}
-                onChange={(v) => setSeason(Number(v))}
-                options={seasonChoices.map((y) => ({ value: String(y), label: seasonLabel(y) }))}
+                value={seasonValue}
+                onChange={pickSeason}
+                options={[
+                  { value: 'all', label: 'All seasons' },
+                  ...seasonChoices.map((y) => ({ value: String(y), label: seasonLabel(y) })),
+                ]}
                 noAll
               />
               <FilterSelect
@@ -794,10 +925,12 @@ function MyMediaContent() {
             {actionsSwim.media.length > 1 && (
               <div className="mt-3 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
                 {actionsSwim.media.map((m, i) => {
-                  const st = derivedCardStatus(publicationsByMedia.get(m.id) ?? []);
+                  const mediaPubs = publicationsByMedia.get(m.id) ?? [];
+                  const st = derivedCardStatus(mediaPubs);
+                  const seenByAll = mediaPubs.some((p) => p.status === 'approved' && p.level === 'public');
                   return (
                     <button key={m.id} type="button" onClick={() => setActionsMediaId(m.id)} className={chipClass(actionsMedia?.id === m.id)}>
-                      {m.media_type === 'image' ? '🖼' : '▶'} {i + 1} · {m.media_type === 'image' ? 'PHOTO' : m.source_type.toUpperCase()} · {st} · ❤ {m.likes_count}
+                      {m.media_type === 'image' ? '🖼' : '▶'} {i + 1} · {m.media_type === 'image' ? 'PHOTO' : m.source_type.toUpperCase()} · {visibilityLabel(st, seenByAll)} · ❤ {m.likes_count}
                     </button>
                   );
                 })}

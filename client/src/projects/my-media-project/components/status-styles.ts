@@ -19,6 +19,12 @@ export function derivedCardStatus(pubs: { status: PublicationStatus }[]): CardSt
   return 'rejected';
 }
 
+/** Кто это видит: private (никто), members (группа), everyone (все); pending/rejected — промежуточные. */
+export function visibilityLabel(status: CardStatus, isPublic: boolean): string {
+  if (status === 'published') return isPublic ? 'everyone' : 'members';
+  return status;
+}
+
 export const hpCardCls =
   'rounded-[16px] border border-[#7dd3fc]/[0.22] bg-[linear-gradient(180deg,rgba(56,189,248,0.08),rgba(8,25,48,0.78))] shadow-[0_24px_60px_rgba(2,10,24,0.5)]';
 

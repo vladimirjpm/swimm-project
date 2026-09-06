@@ -5,6 +5,11 @@ import store from '../store/store';
 import MyMedia from '../projects/my-media-project/my-media';
 import { LoginModalProvider } from '../projects/components/login-modal/login-modal-context';
 import '../index.css';
+import RecordsHelper from '../utils/helpers/records-helper';
+
+// Справочник рекордов нужен странице САМОЙ: страницы — отдельные сборки, прогрев из
+// index.tsx сюда не доедет. Без него бейдж рекорда в строке молча не появится.
+RecordsHelper.warmUp();
 
 const container = document.getElementById('media-page')!;
 const root = createRoot(container);
