@@ -6,6 +6,13 @@ import HelperTime from './helper-time';
 import { ageInSeason } from './season-helper';
 import { recordAgeAxisNow } from './record-age-axis';
 
+/** Минимум для оси возраста: дата заплыва, год рождения, возраст события из протокола. */
+export type RecordStepSource = {
+  date?: string;
+  birth_year?: number | null;
+  event_style_age: string | number;
+};
+
 export default class HelperResults {
   /**
    * Заплывы, которые НЕ дают официального места и по умолчанию скрыты:
@@ -35,7 +42,11 @@ export default class HelperResults {
    * строки в ЧУЖОЙ таблице, и при оси 'calendar' он считается по году заплыва. Осенью
    * числа расходятся на единицу, и это законно (docs/data-integrity.md §13).
    */
-  static recordStepAge(res: Result): string | number {
+  /**
+   * Форма, а не весь `Result`: те же три поля есть у строки My media (`MySwimDto`), и
+   * ступень рекорда обязана считаться одним кодом на обоих экранах.
+   */
+  static recordStepAge(res: RecordStepSource): string | number {
     if (recordAgeAxisNow() === 'season') return HelperResults.ageLabel(res);
 
     const date = parseCompetitionDate(res.date);
@@ -45,7 +56,7 @@ export default class HelperResults {
     return age > 0 ? age : res.event_style_age;
   }
 
-  static ageLabel(res: Result): string | number {
+  static ageLabel(res: RecordStepSource): string | number {
     const date = parseCompetitionDate(res.date);
     const age = res.birth_year ? ageInSeason(res.birth_year, date ?? undefined) : null;
     return age ?? res.event_style_age;

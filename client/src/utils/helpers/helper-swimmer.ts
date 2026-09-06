@@ -58,6 +58,16 @@ const matchesSwimmerName = (res: Result, nameLower: string): boolean => {
   return false;
 };
 
+/**
+ * Минимум, по которому решается принадлежность заплыва пловцу: владелец строки + состав ног.
+ * Форма, а не конкретный DTO: одинаково подходят `Result` (/api/results) и `MySwimDto`
+ * (/api/me/swims) — правило принадлежности в продукте одно, и жить оно должно в одном месте.
+ */
+export interface SwimOwnership {
+  swimmer_id?: number;
+  member_swimmer_ids?: number[] | null;
+}
+
 export default class HelperSwimmer {
   /**
    * Приоритет уровней для сортировки
@@ -83,12 +93,12 @@ export default class HelperSwimmer {
    * чек-лист п.3; репро-баг: 4X50 комплекс Сабины пропадал из ?filter=favorites).
    * Новый фильтр/счётчик по пловцу — зови это, не сравнивай swimmer_id сам.
    */
-  static resultBelongsToSwimmer(res: Result, swimmerId: number): boolean {
+  static resultBelongsToSwimmer(res: SwimOwnership, swimmerId: number): boolean {
     return res.swimmer_id === swimmerId || (res.member_swimmer_ids?.includes(swimmerId) ?? false);
   }
 
   /** То же для набора пловцов (скоуп favorites и т.п.). */
-  static resultBelongsToAny(res: Result, swimmerIds: Iterable<number>): boolean {
+  static resultBelongsToAny(res: SwimOwnership, swimmerIds: Iterable<number>): boolean {
     for (const id of swimmerIds) {
       if (HelperSwimmer.resultBelongsToSwimmer(res, id)) return true;
     }

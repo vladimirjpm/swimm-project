@@ -2,6 +2,7 @@
 using Swimm.Domain;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
@@ -1216,13 +1217,10 @@ public class ResultRepository : IResultRepository
         // Ключи табов соответствуют ступеням (2026-07-31): kids8_11 = «Kids» (8–11),
         // young11_14 = «Young» (11–14), juniors = «Juniors» (נוער), adults = «Adults» (בוגרים).
         // Старые ключи (young8_11, junior) уводятся алиасами в results-categories.ts.
+        // Лестница приоритетов вынесена в общее место (CompetitionCategories.Canonical):
+        // тем же ключом плитку соревнования собирает My media.
         static string? CategoryFor(bool isMasters, HashSet<string>? keys) =>
-            isMasters || keys?.Contains("results-masters") == true ? "masters"
-            : keys?.Contains("results-kids-team") == true ? "kids8_11"
-            : keys?.Contains("results-youth-team") == true ? "young11_14"
-            : keys?.Contains("results-junior-results") == true ? "juniors"
-            : keys?.Contains("results-main") == true ? "adults"
-            : null;
+            CompetitionCategories.Canonical(isMasters, keys);
 
         // Полное членство (сырые Category.Key) — для табов кастомных категорий на клиенте.
         static IReadOnlyList<string> CategoriesFor(HashSet<string>? keys) =>
