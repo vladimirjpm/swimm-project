@@ -58,15 +58,17 @@ public class MediaController : ControllerBase
     /// дефолт — текущий) с медиа, реакциями и PB-флагами + competition-level и unlinked медиа.
     /// </summary>
     [HttpGet("/api/me/swims")]
-    public async Task<IActionResult> GetMySwims([FromQuery] int? season)
+    public async Task<IActionResult> GetMySwims([FromQuery] string? season)
     {
         var userId = CurrentUserId();
         if (userId == null) return Unauthorized();
 
-        // Санити: сезоны вне разумного окна режем до дефолта (текущий сезон).
-        if (season is < 1990 or > 2100) season = null;
+        // «all» — все сезоны сразу; иначе год начала сезона. Санити: значения вне разумного
+        // окна режем до дефолта (витринный сезон, его выбирает репозиторий).
+        var allSeasons = string.Equals(season, "all", StringComparison.OrdinalIgnoreCase);
+        int? seasonYear = !allSeasons && int.TryParse(season, out var y) && y is >= 1990 and <= 2100 ? y : null;
 
-        return Ok(await _mySwims.GetMySwimsAsync(userId.Value, season));
+        return Ok(await _mySwims.GetMySwimsAsync(userId.Value, seasonYear, allSeasons));
     }
 
     /// <summary>Потолок медиа на пользователя — страховка от замусоривания таблицы ботом.</summary>

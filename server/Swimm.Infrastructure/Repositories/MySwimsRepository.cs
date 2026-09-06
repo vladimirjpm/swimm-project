@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Domain;
 using Swimm.Infrastructure.Data;
@@ -15,16 +16,32 @@ namespace Swimm.Infrastructure.Repositories;
 public class MySwimsRepository : IMySwimsRepository
 {
     private readonly SwimmDbContext _db;
+    private readonly ISeasonBestRepository _seasonBest;
+    private readonly IShowcaseSeasonProvider _showcase;
 
-    public MySwimsRepository(SwimmDbContext db)
+    public MySwimsRepository(
+        SwimmDbContext db, ISeasonBestRepository seasonBest, IShowcaseSeasonProvider showcase)
     {
         _db = db;
+        _seasonBest = seasonBest;
+        _showcase = showcase;
     }
+
+    /// <summary>Меньше двух сверстников на ступени — бейджа SB нет (общий порог продукта).</summary>
+    private const int MinPeersForSeasonBest = 2;
 
     /// <summary>Стартовый год сезона (сентябрь–август) для даты. Общий календарь — <see cref="SeasonMath"/>.</summary>
     private static int SeasonOf(DateTime d) => SeasonMath.StartYearOf(d);
 
-    public async Task<MySwimsResponseDto> GetMySwimsAsync(int userId, int? season)
+    /// <summary>Свод пола к ключу ступени — как в <c>SeasonBestRepository</c>, иначе ключи не сойдутся.</summary>
+    private static string? NormalizeGender(string? gender) => gender?.Trim().ToLowerInvariant() switch
+    {
+        "male" or "m" => "male",
+        "female" or "f" => "female",
+        _ => null,
+    };
+
+    public async Task<MySwimsResponseDto> GetMySwimsAsync(int userId, int? season, bool allSeasons = false)
     {
         // 1. Favorite-пловцы (чипы). Primary первым — как в дизайне.
         var swimmers = await _db.UserFavorites
@@ -40,11 +57,15 @@ public class MySwimsRepository : IMySwimsRepository
             })
             .ToListAsync();
 
-        var currentSeason = SeasonOf(DateTime.UtcNow);
+        // Дефолт — ВИТРИННЫЙ сезон, не календарный: 1 сентября календарная граница уводит
+        // страницу в сезон, где стартов ещё нет, и она показывает пустоту
+        // (docs/season-boundary-rule.md, журнал 01.09.2026). Провайдер — общий на продукт.
+        var currentSeason = await _showcase.CurrentStartYearAsync();
         var response = new MySwimsResponseDto
         {
             Swimmers = swimmers,
             Season = season ?? currentSeason,
+            AllSeasons = allSeasons,
         };
         if (swimmers.Count == 0) return response;
 
@@ -72,7 +93,7 @@ public class MySwimsRepository : IMySwimsRepository
         //    по «владельцу» строки: строка привязана к одной ноге, но принадлежит всем.
         var swims = await _db.Results
             .AsNoTracking()
-            .Where(r => r.CompetitionDate >= seasonStart && r.CompetitionDate < seasonEnd
+            .Where(r => (allSeasons || (r.CompetitionDate >= seasonStart && r.CompetitionDate < seasonEnd))
                         && (swimmerIds.Contains(r.SwimmerId)
                             || (r.RelayId != null && _db.RelayMembers.Any(m =>
                                     m.RelayId == r.RelayId && swimmerIds.Contains(m.SwimmerId)))))
@@ -94,6 +115,11 @@ public class MySwimsRepository : IMySwimsRepository
                 Place = r.Position,
                 Points = r.InternationalPoints,
                 Time = r.TimeOriginal,
+                // Пол/год рождения/возраст события — ключи ступени рекорда и SB. Пол берём у
+                // ПЛОВЦА (Results.Gender — фоллбек): кривая шапка протокола уводит в чужую ступень.
+                Gender = r.Swimmer.Gender ?? r.Gender,
+                BirthYear = r.Swimmer.BirthYear,
+                EventStyleAge = r.EventStyleAge,
                 SuspectReason = r.SuspectReason,
                 TimeFail = r.TimeFail,
             })
@@ -118,7 +144,32 @@ public class MySwimsRepository : IMySwimsRepository
 
         var resultIds = swims.Select(s => s.ResultId).ToList();
 
-        // 4. PB: лучшее время пловца за всё время на (стиль, дистанция), индивидуальные заплывы.
+        // 3b. Плитка соревнования в шапке карточки (CompetitionTile) — те же данные, что у
+        //     /api/competitions: канонический таб считает общий CompetitionCategories.Canonical,
+        //     чемпионат — ручной флаг админки. Своей эвристики по названию тут нет и быть не должно.
+        var competitionIds = swims.Select(s => s.CompetitionId).Distinct().ToList();
+        var categoryKeysByComp = (await _db.CategoryCompetitions.AsNoTracking()
+                .Where(cc => competitionIds.Contains(cc.CompetitionId))
+                .Select(cc => new { cc.CompetitionId, cc.Category!.Key })
+                .ToListAsync())
+            .GroupBy(x => x.CompetitionId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Key).ToHashSet());
+        var compFlags = await _db.Competitions.AsNoTracking()
+            .Where(c => competitionIds.Contains(c.Id))
+            .Select(c => new { c.Id, c.IsMasters, c.IsChampionship })
+            .ToListAsync();
+        var flagsById = compFlags.ToDictionary(c => c.Id);
+
+        foreach (var s in swims)
+        {
+            if (!flagsById.TryGetValue(s.CompetitionId, out var flags)) continue;
+            s.IsChampionship = flags.IsChampionship;
+            s.Category = CompetitionCategories.Canonical(
+                flags.IsMasters, categoryKeysByComp.GetValueOrDefault(s.CompetitionId));
+        }
+
+        // 4. PB — личный рекорд: лучшее время пловца за всё время на (стиль, дистанция),
+        //    индивидуальные заплывы. Правило продукта, менять его тут нельзя.
         //    Индекс (SwimmerId, TimeMillisecond) держит выборку дешёвой.
         var bests = await _db.Results
             .AsNoTracking()
@@ -129,13 +180,25 @@ public class MySwimsRepository : IMySwimsRepository
             .ToListAsync();
         var bestByKey = bests.ToDictionary(b => (b.SwimmerId, b.StyleId, b.Distance), b => b.Best);
 
-        // Времена сезонных заплывов для сравнения с PB — TimeMillisecond не в DTO, добираем.
-        var seasonTimes = await _db.Results
+        // Времена сезонных заплывов + поля ступени SB (пол ПЛОВЦА, год рождения, отбраковки
+        // сезонной таблицы) — в DTO их нет, добираем одним запросом.
+        var seasonMeta = await _db.Results
             .AsNoTracking()
             .Where(r => resultIds.Contains(r.Id))
-            .Select(r => new { r.Id, r.TimeMillisecond })
+            .Select(r => new
+            {
+                r.Id,
+                r.TimeMillisecond,
+                Gender = r.Swimmer.Gender ?? r.Gender,
+                r.Swimmer.BirthYear,
+                r.SuspectReason,
+                r.CompetitionDate,
+                IsMasters = r.Competition.IsMasters,
+                StandingKind = r.Competition.StandingKindOverride,
+            })
             .ToListAsync();
-        var timeById = seasonTimes.ToDictionary(t => t.Id, t => t.TimeMillisecond);
+        var timeById = seasonMeta.ToDictionary(t => t.Id, t => t.TimeMillisecond);
+        var metaById = seasonMeta.ToDictionary(t => t.Id);
 
         foreach (var s in swims)
         {
@@ -143,6 +206,42 @@ public class MySwimsRepository : IMySwimsRepository
             if (!timeById.TryGetValue(s.ResultId, out var ms) || ms == null) continue;
             if (bestByKey.TryGetValue((s.SwimmerId, s.StyleId, s.Distance), out var best) && best == ms)
                 s.IsPb = true;
+        }
+
+        // 4b. SB — ОБЩЕЕ правило продукта, а не своё: «быстрейший в стране в этом сезоне на своей
+        //     ступени» (пол × возраст в сезоне × стиль × дистанция × бассейн) при peers >= 2.
+        //     Эталон — ТА ЖЕ таблица, что отдаёт /api/season-best/table и по которой ставит бейдж
+        //     протокол (`SeasonBestRepository.GetSeasonBestTableAsync`, `season-best-table.ts`).
+        //     Личное лучшее время сезона тут ни при чём — за личное отвечает PB.
+        //     Состав таблицы задан сервером: мастерские старты, открытая вода, эстафеты и
+        //     помеченные SuspectReason в неё не входят, поэтому такие строки пропускаем сами —
+        //     иначе сравнили бы с эталоном, в который они не попадали.
+        //     В режиме «All» строки из разных сезонов, поэтому таблиц столько же: заплыв
+        //     меряется ступенью СВОЕГО сезона, иначе прошлогоднее время сравнивалось бы с
+        //     нынешним лидером.
+        var stepsBySeason = new Dictionary<int, Dictionary<(string Style, string Distance, string Pool, string Gender, int Age), (int TimeMs, int Peers)>>();
+        foreach (var year in seasonMeta.Select(m => SeasonOf(m.CompetitionDate)).Distinct())
+        {
+            var table = await _seasonBest.GetSeasonBestTableAsync(year);
+            stepsBySeason[year] = table.Data.ToDictionary(
+                i => (i.Style, i.Distance, i.PoolType, i.Gender, i.Age),
+                i => (i.TimeMs, i.Peers));
+        }
+
+        foreach (var s in swims)
+        {
+            if (s.IsRelay || s.TimeFail) continue;
+            if (!metaById.TryGetValue(s.ResultId, out var meta) || meta.TimeMillisecond == null) continue;
+            if (meta.SuspectReason != null || meta.IsMasters || meta.StandingKind == StandingKinds.OpenWater) continue;
+            var swimSeason = SeasonOf(meta.CompetitionDate);
+            if (!stepsBySeason.TryGetValue(swimSeason, out var stepByKey)) continue;
+            var gender = NormalizeGender(meta.Gender);
+            var age = meta.BirthYear > 0 ? SeasonMath.AgeInSeason(swimSeason, meta.BirthYear) : null;
+            if (gender == null || age == null || string.IsNullOrWhiteSpace(s.PoolType)) continue;
+            if (stepByKey.TryGetValue((s.Style, s.Distance, s.PoolType, gender, age.Value), out var step)
+                && step.Peers >= MinPeersForSeasonBest
+                && step.TimeMs == meta.TimeMillisecond.Value)
+                s.IsSb = true;
         }
 
         // 5. Всё медиа юзера одной выборкой; раскладка по уровням.

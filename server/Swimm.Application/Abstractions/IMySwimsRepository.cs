@@ -9,5 +9,7 @@ namespace Swimm.Application.Abstractions;
 public interface IMySwimsRepository
 {
     /// <param name="season">Стартовый год сезона (2025 → сезон 2025/26); null — текущий сезон.</param>
-    Task<MySwimsResponseDto> GetMySwimsAsync(int userId, int? season);
+    /// <param name="allSeasons">Все сезоны сразу (пункт «All» в селекторе): окно сезона не применяется,
+    /// а бейдж SB каждый заплыв получает по ступени СВОЕГО сезона.</param>
+    Task<MySwimsResponseDto> GetMySwimsAsync(int userId, int? season, bool allSeasons = false);
 }

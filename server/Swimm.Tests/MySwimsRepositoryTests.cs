@@ -1,6 +1,9 @@
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Swimm.Application.Abstractions;
+using Swimm.Application.Dtos;
+using Swimm.Domain;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Repositories;
@@ -15,6 +18,48 @@ namespace Swimm.Tests;
 /// </summary>
 public class MySwimsRepositoryTests
 {
+    /// <summary>
+    /// Репозиторий с фейковыми соседями. Сезонная таблица пустая: эти тесты про состав,
+    /// PB и медиа, а SB считается по общей таблице страны (её проверяет
+    /// <c>SeasonBestRepository</c>), и подсовывать сюда её содержимое значило бы повторять
+    /// чужой тест. Витринный сезон в фейке — календарный, как было до перехода на
+    /// IShowcaseSeasonProvider, чтобы тесты не зависели от даты последнего зимнего чемпионата.
+    /// </summary>
+    private static MySwimsRepository NewRepo(SwimmDbContext db) =>
+        new(db, new EmptySeasonBestRepository(), new CalendarShowcaseSeason());
+
+    private sealed class EmptySeasonBestRepository : ISeasonBestRepository
+    {
+        public Task<SeasonBestTableDto> GetSeasonBestTableAsync(int? season, CancellationToken ct = default) =>
+            Task.FromResult(new SeasonBestTableDto { Season = season ?? 0, SeasonLabel = "", Data = [] });
+
+        public Task<SeasonBestNationalDto> GetNationalSeasonBestAsync(
+            string style, string distance, string? poolType, int? season, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<SeasonBestListDto> GetSeasonBestListAsync(
+            SeasonBestListQuery query, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<SeasonBestOptionsDto> GetSeasonBestOptionsAsync(CancellationToken ct = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class CalendarShowcaseSeason : IShowcaseSeasonProvider
+    {
+        public Task<int> CurrentStartYearAsync(CancellationToken ct = default) =>
+            Task.FromResult(SeasonMath.StartYearOf(DateTime.UtcNow));
+
+        public Task<int> StartYearAtAsync(DateTime now, CancellationToken ct = default) =>
+            Task.FromResult(SeasonMath.StartYearOf(now));
+
+        public Task<ShowcaseSeasonNoticeDto?> PendingNoticeAsync(CancellationToken ct = default) =>
+            Task.FromResult<ShowcaseSeasonNoticeDto?>(null);
+
+        public Task<ShowcaseSeasonNoticeDto?> PendingNoticeAtAsync(DateTime now, CancellationToken ct = default) =>
+            Task.FromResult<ShowcaseSeasonNoticeDto?>(null);
+    }
+
     private static SwimmDbContext CreateDb(string name) =>
         new(new DbContextOptionsBuilder<SwimmDbContext>()
             .UseInMemoryDatabase(name)
@@ -90,7 +135,7 @@ public class MySwimsRepositoryTests
         var user = NewUser("u1@example.com");
         db.AppUsers.Add(user);
         await db.SaveChangesAsync();
-        var repo = new MySwimsRepository(db);
+        var repo = NewRepo(db);
 
         var response = await repo.GetMySwimsAsync(user.Id, season: null);
 
@@ -125,7 +170,7 @@ public class MySwimsRepositoryTests
         db.Results.AddRange(inSeasonBoundary, outOfSeasonBoundary, otherSwimmerResult);
         await db.SaveChangesAsync();
 
-        var repo = new MySwimsRepository(db);
+        var repo = NewRepo(db);
         var response = await repo.GetMySwimsAsync(user.Id, season: 2025);
 
         Assert.Equal(2, response.Swimmers.Count);
@@ -155,7 +200,7 @@ public class MySwimsRepositoryTests
         db.Results.Add(strangerResult);
         await db.SaveChangesAsync();
 
-        var repo = new MySwimsRepository(db);
+        var repo = NewRepo(db);
         var response = await repo.GetMySwimsAsync(user.Id, season: 2025);
 
         Assert.Empty(response.Swims);
@@ -182,7 +227,7 @@ public class MySwimsRepositoryTests
         db.Results.AddRange(relay, individual);
         await db.SaveChangesAsync();
 
-        var repo = new MySwimsRepository(db);
+        var repo = NewRepo(db);
         var response = await repo.GetMySwimsAsync(user.Id, season: 2025);
 
         var relaySwim = response.Swims.Single(s => s.ResultId == relay.Id);
@@ -214,7 +259,7 @@ public class MySwimsRepositoryTests
         db.Results.AddRange(best, worst, failed);
         await db.SaveChangesAsync();
 
-        var repo = new MySwimsRepository(db);
+        var repo = NewRepo(db);
         var response = await repo.GetMySwimsAsync(user.Id, season: 2025);
 
         Assert.True(response.Swims.Single(s => s.ResultId == best.Id).IsPb);
@@ -249,7 +294,7 @@ public class MySwimsRepositoryTests
         db.UserMedia.AddRange(resultMedia, competitionMedia, swimmerMedia, otherUsersMedia);
         await db.SaveChangesAsync();
 
-        var repo = new MySwimsRepository(db);
+        var repo = NewRepo(db);
         var response = await repo.GetMySwimsAsync(user.Id, season: 2025);
 
         var swim = Assert.Single(response.Swims);
@@ -298,7 +343,7 @@ public class MySwimsRepositoryTests
             new UserReaction { UserId = user.Id, Kind = "like", MediaId = media.Id });
         await db.SaveChangesAsync();
 
-        var repo = new MySwimsRepository(db);
+        var repo = NewRepo(db);
         var response = await repo.GetMySwimsAsync(user.Id, season: 2025);
 
         var swim = Assert.Single(response.Swims);
@@ -338,7 +383,7 @@ public class MySwimsRepositoryTests
         db.Results.Add(relayResult);
         await db.SaveChangesAsync();
 
-        var repo = new MySwimsRepository(db);
+        var repo = NewRepo(db);
         var response = await repo.GetMySwimsAsync(user.Id, season: 2025);
 
         // Эстафета пришла, хотя фаворит — только нога, а не владелец строки.
