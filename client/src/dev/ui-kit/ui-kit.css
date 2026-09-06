@@ -503,13 +503,29 @@ body:has(> #ui-kit-page) {
   margin-top: 16px;
 }
 
+/* Копия в шкале — кнопка: клик применяет её ступень, чтобы не искать то же значение в
+   панели пропов. Активная подсвечена, как чипы. */
 .uk-scale__item {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  padding: 4px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 10px;
   font: 10px/1 Consolas, monospace;
   color: var(--uk-dim);
+  cursor: pointer;
+}
+
+.uk-scale__item:hover {
+  border-color: var(--uk-line);
+}
+
+.uk-scale__item.is-active {
+  border-color: var(--uk-accent);
+  color: #d7fff5;
 }
 
 /* ── Панель пропсов ────────────────────────────────────────────────────── */

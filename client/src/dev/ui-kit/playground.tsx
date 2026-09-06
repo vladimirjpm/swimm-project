@@ -68,7 +68,35 @@ const Playground: React.FC<Props> = ({ entry, values, onChange, onReset, panel, 
     .map((p) => specs.get(p.name))
     .filter((s): s is PropSpec => Boolean(s));
 
-  const { bg, width, fontSize } = panel.scene;
+  const { bg } = panel.scene;
+  /**
+   * У компонента со своими размерными пропами ручки сцены пишут прямо в них: иначе на экране
+   * две пары ручек об одном и том же, и вид спорит сам с собой. Пустая строка = «не задано».
+   */
+  const bindWidth = entry.sceneBind?.width;
+  const bindFont = entry.sceneBind?.fontSize;
+  const width = bindWidth ? Number(values[bindWidth] || 0) : panel.scene.width;
+  const fontSize = bindFont ? Number(values[bindFont] || 0) : panel.scene.fontSize;
+
+  const setWidth = (w: number) =>
+    bindWidth ? onChange(bindWidth, w ? String(w) : '') : setScene({ width: w });
+  const setFontSize = (f: number) =>
+    bindFont ? onChange(bindFont, f ? String(f) : '') : setScene({ fontSize: f });
+
+  /**
+   * Ступени тулбара при связке берём из пресетов самого пропа, а не из своего списка: иначе
+   * жмёшь в панели `lenSize: 18`, а в тулбаре подсветиться нечему — тот знает только 12/14/16.
+   * Ноль впереди — это «auto», то есть «проп не задан».
+   */
+  const stepsOf = (propName: string | undefined, fallback: number[]): number[] => {
+    if (!propName) return fallback;
+    const spec = entry.props.find((p) => p.name === propName);
+    const presets = spec && spec.kind === 'text' ? spec.presets ?? [] : [];
+    const numbers = presets.map(Number).filter((n) => Number.isFinite(n) && n > 0);
+    return numbers.length ? [0, ...numbers] : fallback;
+  };
+  const widthSteps = stepsOf(bindWidth, WIDTHS);
+  const fontSteps = stepsOf(bindFont, FONT_SIZES);
   /** Пояснительные тексты панели скрыты вместе с остальными объяснениями компонента. */
   const showDocs = panel.docsOpen;
   const snippet = buildSnippet(entry, values, orderedProps);
@@ -193,14 +221,50 @@ const Playground: React.FC<Props> = ({ entry, values, onChange, onReset, panel, 
     );
   };
 
-  const stage = (w: number) => (
-    <div
-      className={`uk-stage-box${w ? ' uk-stage-box--sized' : ''}`}
-      style={w ? { width: w, fontSize } : { fontSize }}
-    >
-      {entry.render(values)}
-    </div>
-  );
+  /** Ступени шкалы: из реестра, иначе — обычный ряд ширин коробки. */
+  const scaleSteps = entry.scale
+    ? entry.scale.steps
+    : SCALE.map((w) => ({ value: String(w), label: String(w) }));
+
+  const applyScaleStep = (value: string) => {
+    if (!entry.scale) {
+      setWidth(Number(value));
+      return;
+    }
+    // Точечные размеры снимаем: иначе ступень применилась бы, а на сцене ничего не изменилось.
+    entry.scale.clear?.forEach((name) => onChange(name, ''));
+    onChange(entry.scale.prop, value);
+  };
+
+  /** Одна копия для шкалы: ступень подставляется поверх текущих значений. */
+  const scaleStage = (value: string) => {
+    if (entry.scale) {
+      const local = { ...values, [entry.scale.prop]: value };
+      entry.scale.clear?.forEach((name) => {
+        local[name] = '';
+      });
+      return <div className="uk-stage-box">{entry.render(local)}</div>;
+    }
+    return stage(Number(value));
+  };
+
+  /**
+   * `w` — размер этой копии. При связке он уходит в проп компонента, иначе, как раньше,
+   * жмёт коробку снаружи.
+   */
+  const stage = (w: number) => {
+    if (bindWidth) {
+      return <div className="uk-stage-box">{entry.render({ ...values, [bindWidth]: w ? String(w) : '' })}</div>;
+    }
+    return (
+      <div
+        className={`uk-stage-box${w ? ' uk-stage-box--sized' : ''}`}
+        style={w ? { width: w, fontSize } : { fontSize }}
+      >
+        {entry.render(values)}
+      </div>
+    );
+  };
 
   return (
     <div className="uk-play">
@@ -222,26 +286,26 @@ const Playground: React.FC<Props> = ({ entry, values, onChange, onReset, panel, 
         <div className={`uk-scene uk-scene--${bg}`}>{stage(width)}</div>
 
         <div className="uk-toolbar">
-          <span className="uk-toolbar__label">ширина</span>
-          {WIDTHS.map((w) => (
+          <span className="uk-toolbar__label">{bindWidth ? `ширина · ${bindWidth}` : 'ширина'}</span>
+          {widthSteps.map((w) => (
             <button
               key={w}
               type="button"
               className={`uk-chip${width === w ? ' is-active' : ''}`}
-              onClick={() => setScene({ width: w })}
+              onClick={() => setWidth(w)}
             >
               {w === 0 ? 'auto' : `${w}px`}
             </button>
           ))}
-          <span className="uk-toolbar__label">кегль</span>
-          {FONT_SIZES.map((f) => (
+          <span className="uk-toolbar__label">{bindFont ? `кегль · ${bindFont}` : 'кегль'}</span>
+          {fontSteps.map((f) => (
             <button
               key={f}
               type="button"
               className={`uk-chip${fontSize === f ? ' is-active' : ''}`}
-              onClick={() => setScene({ fontSize: f })}
+              onClick={() => setFontSize(f)}
             >
-              {f}
+              {f === 0 ? 'auto' : f}
             </button>
           ))}
         </div>
@@ -255,11 +319,21 @@ const Playground: React.FC<Props> = ({ entry, values, onChange, onReset, panel, 
 
         <div className="uk-scale">
           <span className="uk-toolbar__label">шкала</span>
-          {SCALE.map((w) => (
-            <div key={w} className="uk-scale__item">
-              <div className={`uk-scene uk-scene--${bg} uk-scene--tight`}>{stage(w)}</div>
-              <span>{w}</span>
-            </div>
+          {scaleSteps.map((step) => (
+            <button
+              key={step.value}
+              type="button"
+              className={`uk-scale__item${
+                entry.scale && values[entry.scale.prop] === step.value ? ' is-active' : ''
+              }`}
+              title={`Применить ${entry.scale ? entry.scale.prop : 'размер'} = ${step.value}`}
+              onClick={() => applyScaleStep(step.value)}
+            >
+              <div className={`uk-scene uk-scene--${bg} uk-scene--tight`}>
+                {scaleStage(step.value)}
+              </div>
+              <span>{step.label}</span>
+            </button>
           ))}
         </div>
       </div>
@@ -319,7 +393,7 @@ const Playground: React.FC<Props> = ({ entry, values, onChange, onReset, panel, 
                   <span className="uk-prop__caret">{state.open ? '▾' : '▸'}</span>
                   <span className="uk-prop__name">{spec.name}</span>
                   <span className="uk-prop__value" title={value || 'не задан'}>
-                    {value || '—'}
+                    {(spec.kind === 'enum' && spec.labels?.[value]) || value || '—'}
                   </span>
                 </button>
                 <label
@@ -349,7 +423,7 @@ const Playground: React.FC<Props> = ({ entry, values, onChange, onReset, panel, 
                           className={`uk-chip${value === opt ? ' is-active' : ''}`}
                           onClick={() => pick(spec.name, opt)}
                         >
-                          {opt}
+                          {spec.labels?.[opt] ?? opt}
                           {/* Подпись значения — тоже объяснение: со снятой галкой она
                               остаётся только в подсказке при наведении (title выше). */}
                           {spec.hints?.[opt] && showDocs && <em>{spec.hints[opt]}</em>}
