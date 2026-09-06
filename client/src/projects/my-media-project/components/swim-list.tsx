@@ -274,7 +274,7 @@ function MySwimRow({ swim, showSwimmerName, swimmerName, cb }: {
             styleName={swim.style}
             styleLen={swim.distance}
             styleType="icon-len"
-            className="w-[46px] shrink-0 rounded-[8px] bg-[rgba(226,240,252,0.92)] px-1 py-0.5 text-[15px]"
+            className="src-swim-list w-[46px] shrink-0 rounded-[8px] bg-[rgba(226,240,252,0.92)] px-1 py-0.5 text-[15px]"
           />
           {showSwimmerName && <span className="truncate text-[11px] font-bold text-[rgba(203,224,240,0.5)]">{swimmerName}</span>}
           {swim.is_relay && (
@@ -341,7 +341,7 @@ function MySwimRow({ swim, showSwimmerName, swimmerName, cb }: {
           styleName={swim.style}
           styleLen={swim.distance}
           styleType="icon-len"
-          className="w-[40px] shrink-0 rounded-[8px] bg-[rgba(226,240,252,0.92)] px-1 py-0.5 text-[14px]"
+          className="src-swim-list w-[40px] shrink-0 rounded-[8px] bg-[rgba(226,240,252,0.92)] px-1 py-0.5 text-[14px]"
         />
         <span className="min-w-0 flex-1">
           {swim.is_relay && (

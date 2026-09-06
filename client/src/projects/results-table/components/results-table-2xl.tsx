@@ -110,7 +110,7 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
       {showEvent && (
         <div className="col-span-2">
           <div className="max-w-[100px] mx-auto">
-            <UI_SwimmStyleIcon styleName={res.event_style_name} styleLen={res.event_style_len} styleType="icon-len" className="font-bold text-2xl" />
+            <UI_SwimmStyleIcon styleName={res.event_style_name} styleLen={res.event_style_len} styleType="icon-len" className="src-results-table-2xl font-bold text-2xl" />
           </div>
           {showPoolType && <UI_PoolIcon styleType="icon-text-center" label={res.pool_type} labelClassName="text-xl" />}
         </div>

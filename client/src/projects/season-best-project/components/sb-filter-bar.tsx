@@ -59,7 +59,7 @@ function SbFilterBar({ filters, seasonLabel, clubs, showClub, latinNames }: Prop
             styleName={filters.stroke}
             styleLen={filters.distance ?? ''}
             styleType="icon-len"
-            className="sb-chip__event-icon"
+            className="src-sb-filter-bar sb-chip__event-icon"
           />
         </span>
       ) : 'All',

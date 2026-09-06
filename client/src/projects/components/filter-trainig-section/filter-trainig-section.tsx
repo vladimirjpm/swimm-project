@@ -213,7 +213,7 @@ const FilterTrainigSection: React.FC = () => {
               }
             >
               <UI_SwimmStyleIcon
-                className="w-20"
+                className="src-filter-trainig-section w-20"
                 styleName={style.style_name}
               />
             </button>

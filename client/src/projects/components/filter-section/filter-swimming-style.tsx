@@ -56,7 +56,7 @@ const FilterSwimmingStyle: React.FC = () => {
                 onClick={() => !disabled && set({ style_name: style.style_name })}
               >
                 <UI_SwimmStyleIcon
-                  className="w-20"
+                  className="src-filter-swimming-style w-20"
                   styleName={style.style_name}
                 />
               </button>

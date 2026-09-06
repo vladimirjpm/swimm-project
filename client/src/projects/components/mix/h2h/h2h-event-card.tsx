@@ -29,6 +29,7 @@ const UI_H2HEventCard: React.FC<Props> = ({ stroke, distance, oneSided = false, 
           styleName={stroke ?? ''}
           styleLen={distance}
           styleType="icon-len"
+          className="src-h2h-event-card"
         />
       </div>
       <div className="h2h-event__hairline" />

@@ -139,7 +139,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
       {(showEvent || showPoolType) && (
         <div className="self-center w-[88px] mx-auto [&_img]:w-full [&_img]:h-auto">
           {showEvent && (
-            <UI_SwimmStyleIcon styleName={res.event_style_name} styleLen={res.event_style_len} styleType="icon-len" className="font-bold text-base" />
+            <UI_SwimmStyleIcon styleName={res.event_style_name} styleLen={res.event_style_len} styleType="icon-len" className="src-results-table-desktop result-table-desctop font-bold text-base" />
           )}
           {showPoolType && <UI_PoolIcon styleType="icon-text-center" label={res.pool_type} labelClassName="text-xs" />}
         </div>

@@ -150,7 +150,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
                   styleName={res.event_style_name}
                   styleLen={res.event_style_len}
                   styleType="icon-len"
-                  className="font-bold text-sm max-w-[72px]"
+                  className="src-results-table-mobile font-bold text-sm max-w-[72px]"
                 />
               )}
               {showPoolType && (

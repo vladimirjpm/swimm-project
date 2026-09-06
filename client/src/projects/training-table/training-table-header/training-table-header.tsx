@@ -68,7 +68,7 @@ export default function TrainingTableHeader({
               styleName={firstResult.event_style_name}
               styleLen={firstResult.event_style_len}
               styleType="icon-len"
-              className="font-bold text-6xl w-64"
+              className="src-training-table-header font-bold text-6xl w-64"
             />
           </div>
         )}

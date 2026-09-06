@@ -152,12 +152,12 @@ function ResultsFilteredInfo({
       shortLabel: 'Event',
       active: !showEvent && !!firstResult?.event_style_name,
       desktopValue: firstResult?.event_style_name && (
-        <div className="w-[72px] [&_img]:w-full [&_img]:h-auto">
+        <div className="w-[96px] [&_img]:w-full [&_img]:h-auto">
           <UI_SwimmStyleIcon
             styleName={firstResult.event_style_name}
             styleLen={firstResult.event_style_len}
             styleType="icon-len"
-            className="font-bold text-base"
+            className="src-results-filtered-info font-bold text-base"
           />
         </div>
       ),
@@ -167,7 +167,7 @@ function ResultsFilteredInfo({
             styleName={firstResult.event_style_name}
             styleLen={firstResult.event_style_len}
             styleType="icon-len"
-            className="font-bold text-[13px]"
+            className="src-results-filtered-info font-bold text-[13px]"
           />
         </div>
       ),
