@@ -5,6 +5,7 @@ import UI_ClubIcon from '../../components/mix/club-icon/club-icon';
 import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
 import UI_PoolIcon from '../../components/mix/pool-icon/pool-icon';
 import UI_PrelimLabel from '../../components/mix/prelim-label/prelim-label';
+import FilterBar, { FilterBarChip } from '../../components/filter-section/filter-bar';
 import { Result } from '../../../utils/interfaces/results';
 import {
   PositionFilterValue,
@@ -22,58 +23,16 @@ interface ResultsFilteredInfoProps {
 }
 
 /**
- * Полоса выбранных фильтров (design_handoff_position_filter).
+ * Полоса выбранных фильтров results (design_handoff_position_filter).
  *
- * Правила хендоффа:
- *  - колонка в состоянии «All» не занимает полноценное место (десктоп — узкая, мобайл — мелкий чип);
- *  - Position — шестой фильтр; в состоянии `all` на десктопе колонка не рендерится вовсе;
- *  - мобайл (< 768px) — две строки: сверху мелко всё «All», снизу крупно и по центру выбранное;
- *    пустая нижняя строка не рендерится вообще.
+ * Вёрстку полосы рисует ОБЩИЙ `FilterBar` (Ф1 плана `docs/plans/my-media-filters-plan.md`) —
+ * тот же, что на `/season-best`. Здесь остаётся только сборка чипов: что показать в колонке
+ * Date, Club, Event… Правила хендоффа («All» мельче, две строки на мобайле, пустая строка
+ * не рендерится) живут в компоненте, а не здесь.
  *
- * Кликабелен только чип Position (значений три, попап не нужен — клик прокручивает их по кругу).
- * Остальные чипы остаются некликабельными, как и раньше: их выбор живёт в сайдбаре.
+ * Кликабелен только чип Position (значений три, попап не нужен — клик прокручивает их по
+ * кругу). Остальные чипы некликабельны: их выбор живёт в сайдбаре.
  */
-
-// ——— десктоп
-const D_LABEL =
-  'text-[11px] font-extrabold uppercase tracking-[0.8px] text-[var(--theme-mode-text-muted)]';
-// Все колонки одинаковые и растянуты симметрично: flex-1 basis-0 + одинаковый padding,
-// поэтому ширина делится поровну независимо от того, что внутри (значение или «All»).
-const D_COL = 'flex-1 basis-0 min-w-0 flex flex-col items-center justify-start gap-2 px-3 py-1.5';
-const D_IDLE_VAL = 'text-[20px] font-extrabold text-[var(--theme-mode-text-muted)] leading-none';
-const D_DIV = 'border-r border-[var(--theme-mode-border)]';
-
-// ——— мобайл
-const M_IDLE_CHIP =
-  'flex-1 min-w-0 flex flex-col items-center gap-0.5 px-0.5 py-[5px] rounded-lg ' +
-  'bg-[var(--theme-mode-surface-alt)] border border-[var(--theme-mode-border)]';
-const M_IDLE_LABEL =
-  'text-[8.5px] font-extrabold uppercase tracking-[0.3px] text-[var(--theme-mode-text-muted)] ' +
-  'whitespace-nowrap overflow-hidden text-ellipsis max-w-full';
-const M_IDLE_VAL =
-  'text-[10.5px] font-bold text-[var(--theme-mode-text-muted)] leading-[1.2] ' +
-  'whitespace-nowrap overflow-hidden text-ellipsis max-w-full';
-const M_ACTIVE_CHIP = 'flex flex-col items-center justify-center gap-1 px-3.5 py-[7px] rounded-[10px]';
-const M_ACTIVE_LABEL =
-  'text-[9.5px] font-extrabold uppercase tracking-[0.6px] text-[var(--theme-mode-text-muted)] whitespace-nowrap';
-
-/** Тон активного чипа: синий (обычный фильтр / Top N) или золотой (podium). */
-const activeToneClass = (gold: boolean) =>
-  gold
-    ? 'bg-[var(--theme-personal-badge-bg)] border border-[var(--theme-personal-border)]'
-    : 'bg-[color-mix(in_srgb,var(--theme-primary)_8%,var(--theme-mode-surface))] ' +
-      'border border-[color-mix(in_srgb,var(--theme-primary)_25%,transparent)]';
-
-interface ChipItem {
-  key: string;
-  label: string; // полная подпись (десктоп, нижняя строка мобайла)
-  shortLabel: string; // сокращённая (верхняя строка мобайла)
-  active: boolean;
-  gold?: boolean;
-  desktopValue: React.ReactNode;
-  mobileValue: React.ReactNode;
-  onClick?: () => void;
-}
 
 function ResultsFilteredInfo({
   firstResult,
@@ -109,13 +68,12 @@ function ResultsFilteredInfo({
     </span>
   );
 
-  const items: ChipItem[] = [
+  const chips: FilterBarChip[] = [
     {
       key: 'date',
       label: 'Date',
-      shortLabel: 'Date',
       active: !showDate && !!firstResult?.date,
-      desktopValue: firstResult?.date && (
+      value: firstResult?.date && (
         <UI_DateIcon
           paddingClass="px-1 py-1"
           className="text-xs"
@@ -124,7 +82,7 @@ function ResultsFilteredInfo({
           prelimState={hasPrelims ? (showPrelims ? 'on' : 'off') : undefined}
         />
       ),
-      mobileValue: firstResult?.date && (
+      valueCompact: firstResult?.date && (
         <UI_DateIcon
           paddingClass="px-1 py-0.5"
           className="text-[10px]"
@@ -133,25 +91,26 @@ function ResultsFilteredInfo({
           prelimState={hasPrelims ? (showPrelims ? 'on' : 'off') : undefined}
         />
       ),
+      idleExtra: hasPrelims ? (
+        <UI_PrelimLabel state={showPrelims ? 'on' : 'off'} className="text-[10px]" />
+      ) : undefined,
     },
     {
       key: 'club',
       label: 'Club',
-      shortLabel: 'Club',
       active: !showClub && !!firstResult?.club,
-      desktopValue: firstResult?.club && (
+      value: firstResult?.club && (
         <UI_ClubIcon clubName={firstResult.club} clubId={firstResult.club_id} className="text-xs" iconWidth="10" styleType="icon-text-bottom" />
       ),
-      mobileValue: firstResult?.club && (
+      valueCompact: firstResult?.club && (
         <UI_ClubIcon clubName={firstResult.club} clubId={firstResult.club_id} className="text-[10px]" iconWidth="8" styleType="icon-text-bottom" />
       ),
     },
     {
       key: 'event',
       label: 'Event',
-      shortLabel: 'Event',
       active: !showEvent && !!firstResult?.event_style_name,
-      desktopValue: firstResult?.event_style_name && (
+      value: firstResult?.event_style_name && (
         <div className="w-[96px] [&_img]:w-full [&_img]:h-auto">
           <UI_SwimmStyleIcon
             styleName={firstResult.event_style_name}
@@ -161,7 +120,7 @@ function ResultsFilteredInfo({
           />
         </div>
       ),
-      mobileValue: firstResult?.event_style_name && (
+      valueCompact: firstResult?.event_style_name && (
         <div className="w-[52px] [&_img]:w-full [&_img]:h-auto">
           <UI_SwimmStyleIcon
             styleName={firstResult.event_style_name}
@@ -175,14 +134,13 @@ function ResultsFilteredInfo({
     {
       key: 'age',
       label: 'Age',
-      shortLabel: 'Age',
       active: !showAge && !!firstResult?.event_style_age,
-      desktopValue: (
+      value: (
         <span className="text-2xl font-extrabold text-[var(--theme-mode-text)] leading-none">
           {firstResult?.event_style_age}
         </span>
       ),
-      mobileValue: (
+      valueCompact: (
         <span className="text-[16px] font-extrabold text-[var(--theme-primary)] leading-[1.2]">
           {firstResult?.event_style_age}
         </span>
@@ -191,12 +149,11 @@ function ResultsFilteredInfo({
     {
       key: 'pool',
       label: 'Pool',
-      shortLabel: 'Pool',
       active: !showPoolType && !!firstResult?.pool_type,
-      desktopValue: firstResult?.pool_type && (
+      value: firstResult?.pool_type && (
         <UI_PoolIcon styleType="icon-text-top" label={firstResult.pool_type} iconWidth="40" labelClassName="text-sm" />
       ),
-      mobileValue: firstResult?.pool_type && (
+      valueCompact: firstResult?.pool_type && (
         <UI_PoolIcon styleType="icon-text-top" label={firstResult.pool_type} iconWidth="26" labelClassName="text-[11px]" />
       ),
     },
@@ -205,9 +162,12 @@ function ResultsFilteredInfo({
       label: 'Position',
       shortLabel: 'Pos',
       active: position !== 'all',
-      gold: position === 'podium',
+      tone: position === 'podium' ? 'gold' : 'accent',
       onClick: cyclePosition,
-      desktopValue:
+      // В состоянии «all» колонки Position на десктопе нет вовсе — в отличие от остальных,
+      // у которых «All» означает осмысленное «в выборке все значения».
+      hideWhenIdle: true,
+      value:
         position === 'podium' ? (
           podiumValue('text-[19px]', 'text-[11px]')
         ) : (
@@ -215,7 +175,7 @@ function ResultsFilteredInfo({
             {positionLabel}
           </span>
         ),
-      mobileValue:
+      valueCompact:
         position === 'podium' ? (
           podiumValue('text-[13px]', 'text-[11px]')
         ) : (
@@ -226,83 +186,7 @@ function ResultsFilteredInfo({
     },
   ];
 
-  const idle = items.filter((i) => !i.active);
-  const active = items.filter((i) => i.active);
-
-  // Десктоп: Position в состоянии «all» не рендерится вовсе — в отличие от остальных,
-  // у которых «All» означает осмысленное «в выборке все значения».
-  const desktopItems = items.filter((i) => i.active || i.key !== 'position');
-
-  return (
-    <div className="show-filtered-data mb-4">
-      {/* ——— Десктоп (≥ 768px) */}
-      <div className="hidden md:flex items-stretch justify-center bg-[var(--theme-mode-surface)] border border-[var(--theme-mode-border)] rounded-[14px] shadow-sm px-2 py-4">
-        {desktopItems.map((item, idx) => (
-          // Разделитель — на обёртке, а не на самой колонке: так подсветка активного
-          // Position (скруглённый фон) не съедает вертикальную линию и не ломает ритм.
-          <div
-            key={item.key}
-            className={`flex-1 basis-0 min-w-0 flex ${idx === desktopItems.length - 1 ? '' : D_DIV}`}
-          >
-            <div
-              onClick={item.onClick}
-              className={
-                `${D_COL} ` +
-                (item.active && item.key === 'position'
-                  ? `rounded-[10px] cursor-pointer ${activeToneClass(!!item.gold)}`
-                  : item.onClick
-                    ? 'cursor-pointer'
-                    : '')
-              }
-            >
-              <span className={D_LABEL}>{item.label}</span>
-              {item.active ? item.desktopValue : <span className={D_IDLE_VAL}>All</span>}
-              {item.key === 'date' && !item.active && hasPrelims && (
-                <UI_PrelimLabel state={showPrelims ? 'on' : 'off'} className="text-[10px]" />
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* ——— Мобайл (< 768px): две строки */}
-      <div className="flex md:hidden flex-col gap-2 bg-[var(--theme-mode-surface)] border border-[var(--theme-mode-border)] rounded-xl shadow-sm p-2">
-        {idle.length > 0 && (
-          <div className="flex flex-nowrap gap-1">
-            {idle.map((item) => (
-              <div
-                key={item.key}
-                onClick={item.onClick}
-                className={`${M_IDLE_CHIP}${item.onClick ? ' cursor-pointer' : ''}`}
-              >
-                <span className={M_IDLE_LABEL}>{item.shortLabel}</span>
-                <span className={M_IDLE_VAL}>All</span>
-              </div>
-            ))}
-          </div>
-        )}
-        {active.length > 0 && (
-          <div
-            className={
-              'flex justify-center flex-wrap gap-2 pt-[9px]' +
-              (idle.length > 0 ? ' border-t border-dashed border-[var(--theme-mode-border)]' : '')
-            }
-          >
-            {active.map((item) => (
-              <div
-                key={item.key}
-                onClick={item.onClick}
-                className={`${M_ACTIVE_CHIP} ${activeToneClass(!!item.gold)}${item.onClick ? ' cursor-pointer' : ''}`}
-              >
-                <span className={M_ACTIVE_LABEL}>{item.label}</span>
-                {item.mobileValue}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  return <FilterBar chips={chips} desktop="columns" rows="card" className="show-filtered-data mb-4" />;
 }
 
 export default ResultsFilteredInfo;
