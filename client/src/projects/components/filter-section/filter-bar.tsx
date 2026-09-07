@@ -60,6 +60,19 @@ export interface FilterBarChip {
 interface Props {
   chips: FilterBarChip[];
   /**
+   * Ведущая ячейка — то, что стоит В полосе, но чипом не является: сезон на `/my-media`
+   * (он не фильтр общей модели, а другой запрос к серверу, и переключается своим шагом).
+   * В раскладке `columns` встаёт первой колонкой с разделителем, в двухстрочной — отдельной
+   * строкой над «All».
+   */
+  lead?: React.ReactNode;
+  /**
+   * Приписка справа от ведущей ячейки в двухстрочном виде (на макете это «4 swims · date ↓»).
+   * В раскладке `columns` НЕ рисуется: там та же строка живёт под полосой, и печатает её
+   * страница — полосе про счётчик знать незачем.
+   */
+  aside?: React.ReactNode;
+  /**
    * Как выглядит полоса на ≥768px: `columns` — одна полоса равных колонок с разделителями
    * (results), `rows` — те же две строки, что на мобайле (`/season-best`, решение Влада
    * 2026-08-26: фильтров много, и равные колонки размазывали выбранное между пустыми «All»).
@@ -79,7 +92,7 @@ interface Props {
 const toneClass = (chip: FilterBarChip) =>
   chip.tone === 'gold' ? 'fb__tone--gold' : 'fb__tone--accent';
 
-function FilterBar({ chips, desktop = 'columns', rows = 'card', className }: Props) {
+function FilterBar({ chips, lead, aside, desktop = 'columns', rows = 'card', className }: Props) {
   const idle = chips.filter((c) => !c.active);
   const active = chips.filter((c) => c.active);
   // `hideWhenIdle` действует только на колонки: в двухстрочном виде невыбранный чип живёт
@@ -94,12 +107,18 @@ function FilterBar({ chips, desktop = 'columns', rows = 'card', className }: Pro
     >
       {desktop === 'columns' && (
         <div className="fb__cols">
+          {lead && (
+            <div className="fb__cell fb__cell--lead fb__cell--divided">{lead}</div>
+          )}
           {columnChips.map((chip, i) => (
             // Разделитель — на обёртке, а не на самой колонке: так подложка выбранного
             // (скруглённый фон) не съедает вертикальную линию и не ломает ритм полосы.
             <div
               key={chip.key}
-              className={`fb__cell${i === columnChips.length - 1 ? '' : ' fb__cell--divided'}`}
+              className={
+                `fb__cell${chip.active ? ' fb__cell--active' : ''}` +
+                (i === columnChips.length - 1 ? '' : ' fb__cell--divided')
+              }
             >
               <div
                 onClick={chip.onClick}
@@ -123,6 +142,12 @@ function FilterBar({ chips, desktop = 'columns', rows = 'card', className }: Pro
       )}
 
       <div className="fb__rows">
+        {(lead || aside) && (
+          <div className="fb__row fb__row--lead">
+            {lead}
+            {aside && <span className="fb__aside">{aside}</span>}
+          </div>
+        )}
         {idle.length > 0 && (
           <div className="fb__row fb__row--idle">
             {idle.map((chip) => (

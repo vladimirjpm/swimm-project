@@ -24,6 +24,10 @@
   border-right: 1px solid var(--fb-divider, var(--theme-mode-border));
 }
 
+/* Выбранная колонка может быть шире прочих — но только там, где страница об этом попросит
+   (`--fb-active-grow`). Умолчание 1: на results все колонки равны, и так и должно остаться. */
+.fb__cell--active { flex-grow: var(--fb-active-grow, 1); }
+
 .fb__col {
   flex: 1 1 0%;
   min-width: 0;
@@ -56,6 +60,11 @@
 
 .fb__rows { display: flex; flex-direction: column; }
 .fb__row { display: flex; }
+
+/* Строка ведущей ячейки (сезон + приписка справа). Стоит НАД строкой «All» и разделителем
+   не отбивается: разделитель отделяет невыбранное от выбранного, а сезон — ни то, ни другое. */
+.fb__row--lead { align-items: center; gap: 6px; }
+.fb__aside { margin-left: auto; }
 
 .fb__chip {
   display: flex;

@@ -10,6 +10,14 @@ interface FilterCardProps {
   /** true — фильтр не в дефолте, сводка подсвечивается акцентом темы */
   isActive?: boolean;
   defaultOpen?: boolean;
+  /**
+   * Управляемое раскрытие. Задано — карточка не держит своё состояние, а спрашивает
+   * вызывающего: так полоса выбранных фильтров может раскрыть карточку, по колонке которой
+   * щёлкнули (`docs/plans/my-media-filters-plan.md`, Ф4). Не задано — прежнее поведение,
+   * карточка помнит раскрытость сама.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   children: React.ReactNode;
 }
 
@@ -35,15 +43,23 @@ const FilterCard: React.FC<FilterCardProps> = ({
   summary,
   isActive = false,
   defaultOpen = false,
+  open: openProp,
+  onOpenChange,
   children,
 }) => {
-  const [open, setOpen] = useState(defaultOpen);
+  const [ownOpen, setOwnOpen] = useState(defaultOpen);
+  const controlled = openProp != null;
+  const open = controlled ? openProp : ownOpen;
+  const toggle = () => {
+    if (!controlled) setOwnOpen((o) => !o);
+    onOpenChange?.(!open);
+  };
 
   return (
     <div className="rounded-[var(--fc-radius,0.75rem)] border border-[var(--fc-border,var(--theme-mode-border-drawer))] bg-[var(--fc-bg,var(--theme-mode-surface))] overflow-hidden">
       <div
         className="flex items-center justify-between gap-2 px-[15px] py-[13px] cursor-pointer select-none"
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
       >
         <span className="text-[13px] font-extrabold text-[var(--fc-title,var(--theme-mode-text))] whitespace-nowrap">
           {title}
