@@ -1,5 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import '../home-project/home.css';
+import '../components/deep/deep-theme.css';
+import './my-media.css';
 import { useAuth } from '../../hooks/useAuth';
 import { useLoginModal } from '../components/login-modal/login-modal-context';
 import { useFavorites } from '../../hooks/useFavorites';
@@ -18,7 +20,11 @@ import MediaCard from './components/media-card';
 import AddLinkModal, { AddLinkSwimmerOption } from './components/add-link-modal';
 import ModerationPanel from './components/moderation-panel';
 import SwimList from './components/swim-list';
-import { chipClass, segmentClass, derivedCardStatus, visibilityLabel, CardStatus, hpCardCls } from './components/status-styles';
+import MyMediaFilterPanel, { type Seg, type StatusFilter, type GroupFilter } from './components/my-media-filter-panel';
+import { useMyMediaFilterHost, type MyMediaHostState } from './my-media-filter-host';
+import MobileFiltersDrawer from '../components/filter-section/mobile-filters-drawer';
+import DeepSeasonCarousel from '../components/deep/season-carousel';
+import { chipClass, derivedCardStatus, visibilityLabel, hpCardCls } from './components/status-styles';
 
 // Страница «My media» v3 (swim-centric) — README design_handoff_my_swims_v3,1.
 // Тёмный стиль groups.html/home.html — осознанное решение, не через var(--theme-mode-*).
@@ -56,11 +62,6 @@ function MyMedia() {
   return <MyMediaContent />;
 }
 
-type Seg = 'all' | 'with' | 'without';
-type StatusFilter = CardStatus | 'all';
-// Фильтр «куда поднято»: конкретная группа, 'none' — ни в одну (личное), 'all' — не фильтруем.
-type GroupFilter = number | 'all' | 'none';
-
 function MyMediaContent() {
   const auth = useAuth();
   const favorites = useFavorites();
@@ -86,7 +87,6 @@ function MyMediaContent() {
   const [distanceFilter, setDistanceFilter] = useState<string | 'all'>('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [moreOpen, setMoreOpen] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [unlinkedOpen, setUnlinkedOpen] = useState(false);
 
@@ -243,9 +243,13 @@ function MyMediaContent() {
   const visibleUnlinkedMedia =
     groupFilter === 'all' ? unlinkedMedia : unlinkedMedia.filter((m) => mediaMatchesGroup(m.id));
 
-  const activeMoreCount =
+  // Сколько фильтров ПАНЕЛИ сужают выборку: цифра на кнопке «Filters» и признак для кнопки
+  // сброса. Пловец и сезон не в счёт — они живут наверху страницы и всегда на виду.
+  const activeFilterCount =
     [competitionFilter, styleFilter, distanceFilter].filter((v) => v !== 'all').length +
     (dateFrom || dateTo ? 1 : 0) +
+    (seg !== 'all' ? 1 : 0) +
+    (groupFilter !== 'all' ? 1 : 0) +
     (seg === 'with' && statusFilter !== 'all' ? 1 : 0);
 
   const clearAll = () => {
@@ -379,11 +383,51 @@ function MyMediaContent() {
     years.add(seasonStartYear());
     return Array.from(years).sort((a, b) => b - a);
   }, [data.seasons, effectiveSeason]);
-  const seasonValue = season === 'all' || data.all_seasons ? 'all' : String(season ?? effectiveSeason);
+  // Карусель говорит числом-годом или null (∞ «все сезоны»). Состояние страницы шире:
+  // null в нём означает «сезон выбирает сервер» (витринный), поэтому наружу отдаём уже
+  // посчитанный `effectiveSeason`, а не сырой null — иначе карусель встала бы на ∞.
+  const carouselSeason = season === 'all' || data.all_seasons ? null : season ?? effectiveSeason;
   // Выбран чип пловца — имя должно быть видно и вне чипа: в строках оно скрыто (фильтр же
   // один на всех), и экран переставал отвечать на вопрос «чьи это заплывы».
   const selectedSwimmerName = swimmerFilter === 'all' ? null : swimmerNames.get(swimmerFilter) ?? null;
-  const pickSeason = (v: string) => setSeason(v === 'all' ? 'all' : Number(v));
+  const pickSeason = (v: number | null) => setSeason(v === null ? 'all' : v);
+
+  // Через общий шов идут только стиль и дистанция — единственные фильтры кабинета, для
+  // которых в общей модели есть поля (см. `my-media-filter-host.ts`).
+  const onHostChange = useCallback((patch: Partial<MyMediaHostState>) => {
+    if (patch.style !== undefined) setStyleFilter(patch.style);
+    if (patch.distance !== undefined) setDistanceFilter(patch.distance);
+  }, []);
+  const filterHost = useMyMediaFilterHost({
+    swims,
+    state: { style: styleFilter, distance: distanceFilter },
+    onChange: onHostChange,
+    onReset: clearAll,
+  });
+
+  // Панель одна, а мест у неё два — сайдбар и шторка. Элемент можно переиспользовать:
+  // React смонтирует по экземпляру на место, и раскрытые карточки у них свои.
+  const filterPanel = (
+    <MyMediaFilterPanel
+      host={filterHost}
+      seg={seg}
+      onSeg={(k) => { setSeg(k); if (k !== 'with') setStatusFilter('all'); }}
+      segCount={segCount}
+      statusFilter={statusFilter}
+      onStatus={setStatusFilter}
+      groupFilter={groupFilter}
+      onGroup={pickGroup}
+      groupOptions={groupOptions}
+      competitionFilter={competitionFilter}
+      onCompetition={setCompetitionFilter}
+      competitionOptions={competitionOptions}
+      dateFrom={dateFrom}
+      dateTo={dateTo}
+      onDateFrom={setDateFrom}
+      onDateTo={setDateTo}
+      activeCount={activeFilterCount}
+    />
+  );
 
   const swimListCallbacks = {
     publicationsByMedia,
@@ -497,222 +541,136 @@ function MyMediaContent() {
               </button>
             </div>
 
-            {/* Group chips — «куда я поднял медиа» (публикации в HubGroups) */}
-            {groupOptions.groups.length > 0 && (
-              <div className="flex items-center gap-2 overflow-x-auto sm:flex-wrap sm:overflow-visible" style={{ scrollbarWidth: 'none' }}>
-                <span className="hp-mono whitespace-nowrap text-[10px] font-extrabold uppercase tracking-[0.1em] text-[rgba(125,211,252,0.7)]">
-                  Shared with
-                </span>
-                <button type="button" onClick={() => pickGroup('all')} className={chipClass(groupFilter === 'all')}>
-                  All · {groupOptions.total}
-                </button>
-                {groupOptions.groups.map((g) => (
-                  <button
-                    key={g.id}
-                    type="button"
-                    onClick={() => pickGroup(g.id)}
-                    className={chipClass(groupFilter === g.id)}
-                    style={g.count === 0 && groupFilter !== g.id ? { opacity: 0.45 } : undefined}
-                    title={g.count === 0 ? 'Nothing from this season is shared with this group' : undefined}
-                  >
-                    <span aria-hidden="true">👥</span>
-                    {/* dir только на имени: с dir на всей кнопке ивритское название уводит счётчик влево. */}
-                    <span><span dir="auto">{g.name}</span> · {g.count}</span>
-                  </button>
-                ))}
-                {groupOptions.notShared > 0 && (
-                  <button type="button" onClick={() => pickGroup('none')} className={chipClass(groupFilter === 'none')}>
-                    Not shared · {groupOptions.notShared}
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Primary filter row (desktop) */}
-            <div className="hidden flex-wrap items-center gap-3 sm:flex">
-              <div className="inline-flex overflow-hidden rounded-[10px] border border-[rgba(125,211,252,0.35)]">
-                {(['all', 'with', 'without'] as Seg[]).map((k, i, arr) => (
-                  <button key={k} type="button" onClick={() => { setSeg(k); if (k !== 'with') setStatusFilter('all'); }} className={segmentClass(seg === k, i === arr.length - 1)}>
-                    {k === 'all' ? `All swims · ${segCount('all')}` : k === 'with' ? `With video · ${segCount('with')}` : `Without video · ${segCount('without')}`}
-                  </button>
-                ))}
-              </div>
-              <label className="hp-mono flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[rgba(125,211,252,0.7)]">
-                Season
-                <select
-                  value={seasonValue}
-                  onChange={(e) => pickSeason(e.target.value)}
-                  className="rounded-[8px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-2 py-[6px] text-[12px] normal-case tracking-normal text-[#f3f8fd]"
-                >
-                  <option value="all">All seasons</option>
-                  {seasonChoices.map((y) => <option key={y} value={String(y)}>{seasonLabel(y)}</option>)}
-                </select>
-              </label>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setMoreOpen((v) => !v)}
-                  className="hp-mono rounded-[10px] border border-[rgba(125,211,252,0.3)] bg-transparent px-3 py-[7px] text-[11.5px] font-extrabold text-[rgba(125,211,252,0.7)]"
-                >
-                  More filters {activeMoreCount > 0 ? `(${activeMoreCount}) ` : ''}▾
-                </button>
-                {moreOpen && (
-                  <div className="absolute left-0 top-[38px] z-30 flex w-[320px] flex-col gap-2.5 rounded-[16px] border border-[rgba(125,211,252,0.3)] bg-[linear-gradient(180deg,#0e2138,#081527)] p-3.5 shadow-[0_30px_70px_rgba(0,0,0,0.6)]">
-                    <FilterSelect
-                      label="Competition"
-                      value={competitionFilter === 'all' ? 'all' : String(competitionFilter)}
-                      onChange={(v) => setCompetitionFilter(v === 'all' ? 'all' : Number(v))}
-                      options={competitionOptions.map((c) => ({ value: String(c.id), label: c.name }))}
-                      rtl
-                    />
-                    <FilterSelect label="Style" value={styleFilter} onChange={setStyleFilter} options={styleOptions.map((s) => ({ value: s, label: s }))} />
-                    <FilterSelect label="Distance" value={distanceFilter} onChange={setDistanceFilter} options={distanceOptions.map((d) => ({ value: d, label: `${d}m` }))} />
-                    <div>
-                      <label className="hp-mono mb-1 block text-[10px] font-extrabold uppercase tracking-[0.1em] text-[rgba(125,211,252,0.7)]">Date range</label>
-                      <div className="flex items-center gap-1.5">
-                        <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full rounded-[8px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-2 py-1 text-[11px] text-[#f3f8fd]" style={{ colorScheme: 'dark' }} />
-                        <span className="text-[rgba(203,224,240,0.5)]">–</span>
-                        <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-full rounded-[8px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-2 py-1 text-[11px] text-[#f3f8fd]" style={{ colorScheme: 'dark' }} />
-                      </div>
-                    </div>
-                    {seg === 'with' && (
-                      <div>
-                        <label className="hp-mono mb-1 block text-[10px] font-extrabold uppercase tracking-[0.1em] text-[rgba(125,211,252,0.7)]">Publication status</label>
-                        <div className="flex flex-wrap gap-1.5">
-                          {(['all', 'private', 'pending', 'published', 'rejected'] as StatusFilter[]).map((k) => (
-                            <button key={k} type="button" onClick={() => setStatusFilter(k)} className={chipClass(statusFilter === k)}>
-                              {k === 'all' ? 'All' : k}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <button type="button" onClick={clearAll} className="hp-mono border-none bg-transparent text-[11px] font-extrabold text-[rgba(125,211,252,0.6)]">Reset filters</button>
-                      <button type="button" onClick={() => setMoreOpen(false)} className="hp-mono rounded-[8px] border-none bg-[#7dd3fc] px-3.5 py-[6px] text-[11px] font-extrabold text-[#04101f]">Done</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <span className="ml-auto text-[11.5px] font-bold text-[rgba(203,224,240,0.5)]">
-                {selectedSwimmerName && (
-                  <span dir="auto" className="mr-1.5 text-[12.5px] font-black text-[#7dd3fc]">{selectedSwimmerName}</span>
-                )}
-                {filtered.length} {filtered.length === 1 ? 'swim' : 'swims'} · sorted by date ↓
-              </span>
-            </div>
-
-            {/* Mobile: segment + Filters button */}
-            <div className="flex flex-col gap-2 sm:hidden">
-              <div className="flex overflow-hidden rounded-[10px] border border-[rgba(125,211,252,0.35)]">
-                {(['all', 'with', 'without'] as Seg[]).map((k, i, arr) => (
-                  <button key={k} type="button" onClick={() => { setSeg(k); if (k !== 'with') setStatusFilter('all'); }} className={`flex-1 ${segmentClass(seg === k, i === arr.length - 1)}`}>
-                    {k === 'all' ? 'All' : k === 'with' ? 'With video' : 'No video'}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={() => setMobileFiltersOpen(true)}
-                className="hp-mono flex min-h-[44px] items-center justify-center gap-2 rounded-[10px] border border-[rgba(125,211,252,0.35)] bg-transparent text-[13px] font-extrabold text-[#7dd3fc]"
-              >
-                ⚙ Filters {activeMoreCount > 0 ? `(${activeMoreCount})` : ''}
-              </button>
-              <p className="m-0 text-[11.5px] font-bold text-[rgba(203,224,240,0.5)]">
-                {selectedSwimmerName && (
-                  <span dir="auto" className="mr-1.5 text-[12.5px] font-black text-[#7dd3fc]">{selectedSwimmerName}</span>
-                )}
-                {filtered.length} {filtered.length === 1 ? 'swim' : 'swims'}
-              </p>
-            </div>
-
-            {/* Main list / states */}
-            {loading ? (
-              <div className="flex flex-col gap-4">
-                {[0, 1].map((i) => (
-                  <div key={i} className={`${hpCardCls} h-[140px] animate-pulse`} />
-                ))}
-              </div>
-            ) : data.swimmers.length === 0 ? (
-              <div className={`${hpCardCls} p-[56px_40px] text-center`}>
-                <div className="text-[40px]">⭐</div>
-                <p className="m-0 mt-3 text-[17px] font-black text-[#f3f8fd]">No favorite swimmers yet</p>
-                <p className="mx-auto mt-2 max-w-[380px] text-[13px] leading-[1.5] text-[rgba(203,224,240,0.6)]">
-                  Add a swimmer to favorites — their swims will appear here and you can attach videos.
-                </p>
-                <a href={routes.results()} className="hp-mono mt-[18px] inline-block rounded-[10px] border-none bg-[#38ef8f] px-5 py-[10px] text-[13px] font-extrabold text-[#04101f] no-underline">
-                  Find swimmers →
-                </a>
-              </div>
-            ) : swims.length === 0 ? (
-              <div className="rounded-[16px] border border-dashed border-[rgba(125,211,252,0.25)] p-10 text-center">
-                <p className="m-0 text-[14px] font-bold text-[rgba(203,224,240,0.6)]">
-                  {data.all_seasons ? 'No results yet' : `No results in season ${seasonLabel(effectiveSeason)}`}
-                </p>
-                {data.seasons.filter((y) => y !== effectiveSeason).slice(0, 1).map((y) => (
-                  <button key={y} type="button" onClick={() => setSeason(y)} className="hp-mono mt-3 rounded-[9px] border border-[rgba(125,211,252,0.4)] bg-transparent px-3.5 py-[7px] text-[12px] font-extrabold text-[#7dd3fc]">
-                    Season {seasonLabel(y)} →
-                  </button>
-                ))}
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="rounded-[16px] border border-dashed border-[rgba(125,211,252,0.25)] p-10 text-center">
-                <p className="m-0 text-[14px] font-bold text-[rgba(203,224,240,0.6)]">Nothing matches the filters</p>
-                <button type="button" onClick={clearAll} className="hp-mono mt-3 rounded-[9px] border border-[rgba(125,211,252,0.4)] bg-transparent px-3.5 py-[7px] text-[12px] font-extrabold text-[#7dd3fc]">
-                  Clear all
-                </button>
-              </div>
-            ) : (
-              <SwimList
-                swims={filtered}
-                competitionMedia={visibleCompetitionMedia}
-                showSwimmerName={swimmerFilter === 'all' && data.swimmers.length > 1}
-                swimmerNames={swimmerNames}
-                preferredSwimmerId={swimmerFilter === 'all' ? null : swimmerFilter}
-                {...swimListCallbacks}
+            {/* Сезон — каруселью, а не селектором: это не клиентский фильтр, а другой
+                запрос к серверу, и он обязан оставаться на виду, а не уезжать в панель.
+                ⚠ Карусель из семьи deep, её токены объявлены на классе `.theme-deep`, а не
+                на `:root`. Класс пока прибит гвоздём (страница тёмная жёстко); Ф5 переводит
+                на тему всю страницу, и он переедет на корень через `useDeepThemeClass()`. */}
+            <div className="theme-deep">
+              <DeepSeasonCarousel
+                seasons={seasonChoices.map((y) => ({ season: y, label: seasonLabel(y) }))}
+                season={carouselSeason}
+                onSeason={pickSeason}
               />
-            )}
+            </div>
 
-            {/* Unlinked media */}
-            {visibleUnlinkedMedia.length > 0 && (
-              <div className="mt-2">
-                <button
-                  type="button"
-                  onClick={() => setUnlinkedOpen((v) => !v)}
-                  className="hp-mono flex w-full items-center gap-2 rounded-[12px] border border-[rgba(125,211,252,0.25)] bg-transparent px-4 py-[10px] text-left text-[12px] font-extrabold text-[#7dd3fc]"
-                >
-                  Unlinked media
-                  <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[9px] bg-[rgba(125,211,252,0.18)] px-1.5 text-[10.5px]">{visibleUnlinkedMedia.length}</span>
-                  <span className="font-bold normal-case text-[rgba(203,224,240,0.45)]">· club videos and general footage not tied to any swim</span>
-                  <span className="ml-auto">{unlinkedOpen ? '▲' : '▼'}</span>
-                </button>
-                {unlinkedOpen && (
-                  <div className="mt-3 grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(250px,1fr))' }}>
-                    {visibleUnlinkedMedia.map((item) => (
-                      <MediaCard
-                        key={item.id}
-                        item={item}
-                        publications={publicationsByMedia.get(item.id) ?? []}
-                        onOpenLightbox={() => onPlay(item)}
-                        onDelete={() => handleDelete(item.id)}
-                        onWithdraw={(hubGroupId) => withdrawPublication(item.id, hubGroupId)}
-                        onLinkToSwim={() => setLinkSwimTarget(item)}
-                        onShareWithGroup={() => openShare(item)}
-                      />
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+              {/* Сайдбар фильтров (десктоп). Ширина фиксированная, как на results: строка
+                  заплыва тоже фиксированной ширины, и доля от экрана её ломала бы. */}
+              <aside className="my-media-filters hidden w-[320px] shrink-0 lg:block">
+                {filterPanel}
+              </aside>
+
+              <div className="flex min-w-0 flex-1 flex-col gap-4">
+                {/* Кнопка панели (до lg) и сводка «сколько заплывов сейчас видно» */}
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setMobileFiltersOpen(true)}
+                    className="hp-mono flex min-h-[40px] shrink-0 items-center justify-center gap-2 rounded-[10px] border border-[rgba(125,211,252,0.35)] bg-transparent px-4 text-[13px] font-extrabold text-[#7dd3fc] lg:hidden"
+                    aria-expanded={mobileFiltersOpen}
+                    aria-controls="my-media-filters-sheet"
+                  >
+                    ⚙ Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
+                  </button>
+                  <p className="m-0 text-[11.5px] font-bold text-[rgba(203,224,240,0.5)]">
+                    {selectedSwimmerName && (
+                      <span dir="auto" className="mr-1.5 text-[12.5px] font-black text-[#7dd3fc]">{selectedSwimmerName}</span>
+                    )}
+                    {filtered.length} {filtered.length === 1 ? 'swim' : 'swims'}
+                    <span className="hidden sm:inline"> · sorted by date ↓</span>
+                  </p>
+                </div>
+
+                {/* Main list / states */}
+                {loading ? (
+                  <div className="flex flex-col gap-4">
+                    {[0, 1].map((i) => (
+                      <div key={i} className={`${hpCardCls} h-[140px] animate-pulse`} />
                     ))}
                   </div>
+                ) : data.swimmers.length === 0 ? (
+                  <div className={`${hpCardCls} p-[56px_40px] text-center`}>
+                    <div className="text-[40px]">⭐</div>
+                    <p className="m-0 mt-3 text-[17px] font-black text-[#f3f8fd]">No favorite swimmers yet</p>
+                    <p className="mx-auto mt-2 max-w-[380px] text-[13px] leading-[1.5] text-[rgba(203,224,240,0.6)]">
+                      Add a swimmer to favorites — their swims will appear here and you can attach videos.
+                    </p>
+                    <a href={routes.results()} className="hp-mono mt-[18px] inline-block rounded-[10px] border-none bg-[#38ef8f] px-5 py-[10px] text-[13px] font-extrabold text-[#04101f] no-underline">
+                      Find swimmers →
+                    </a>
+                  </div>
+                ) : swims.length === 0 ? (
+                  <div className="rounded-[16px] border border-dashed border-[rgba(125,211,252,0.25)] p-10 text-center">
+                    <p className="m-0 text-[14px] font-bold text-[rgba(203,224,240,0.6)]">
+                      {data.all_seasons ? 'No results yet' : `No results in season ${seasonLabel(effectiveSeason)}`}
+                    </p>
+                    {data.seasons.filter((y) => y !== effectiveSeason).slice(0, 1).map((y) => (
+                      <button key={y} type="button" onClick={() => setSeason(y)} className="hp-mono mt-3 rounded-[9px] border border-[rgba(125,211,252,0.4)] bg-transparent px-3.5 py-[7px] text-[12px] font-extrabold text-[#7dd3fc]">
+                        Season {seasonLabel(y)} →
+                      </button>
+                    ))}
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div className="rounded-[16px] border border-dashed border-[rgba(125,211,252,0.25)] p-10 text-center">
+                    <p className="m-0 text-[14px] font-bold text-[rgba(203,224,240,0.6)]">Nothing matches the filters</p>
+                    <button type="button" onClick={clearAll} className="hp-mono mt-3 rounded-[9px] border border-[rgba(125,211,252,0.4)] bg-transparent px-3.5 py-[7px] text-[12px] font-extrabold text-[#7dd3fc]">
+                      Clear all
+                    </button>
+                  </div>
+                ) : (
+                  <SwimList
+                    swims={filtered}
+                    competitionMedia={visibleCompetitionMedia}
+                    showSwimmerName={swimmerFilter === 'all' && data.swimmers.length > 1}
+                    swimmerNames={swimmerNames}
+                    preferredSwimmerId={swimmerFilter === 'all' ? null : swimmerFilter}
+                    {...swimListCallbacks}
+                  />
                 )}
-                {unlinkedOpen && (
-                  <button
-                    type="button"
-                    onClick={() => setAddOpen(true)}
-                    className="hp-mono mt-3 rounded-[9px] border border-dashed border-[rgba(56,239,143,0.4)] bg-transparent px-3.5 py-[7px] text-[12px] font-extrabold text-[rgba(56,239,143,0.8)]"
-                  >
-                    + Add link without a swim
-                  </button>
+
+                {/* Unlinked media */}
+                {visibleUnlinkedMedia.length > 0 && (
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setUnlinkedOpen((v) => !v)}
+                      className="hp-mono flex w-full items-center gap-2 rounded-[12px] border border-[rgba(125,211,252,0.25)] bg-transparent px-4 py-[10px] text-left text-[12px] font-extrabold text-[#7dd3fc]"
+                    >
+                      Unlinked media
+                      <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[9px] bg-[rgba(125,211,252,0.18)] px-1.5 text-[10.5px]">{visibleUnlinkedMedia.length}</span>
+                      <span className="font-bold normal-case text-[rgba(203,224,240,0.45)]">· club videos and general footage not tied to any swim</span>
+                      <span className="ml-auto">{unlinkedOpen ? '▲' : '▼'}</span>
+                    </button>
+                    {unlinkedOpen && (
+                      <div className="mt-3 grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(250px,1fr))' }}>
+                        {visibleUnlinkedMedia.map((item) => (
+                          <MediaCard
+                            key={item.id}
+                            item={item}
+                            publications={publicationsByMedia.get(item.id) ?? []}
+                            onOpenLightbox={() => onPlay(item)}
+                            onDelete={() => handleDelete(item.id)}
+                            onWithdraw={(hubGroupId) => withdrawPublication(item.id, hubGroupId)}
+                            onLinkToSwim={() => setLinkSwimTarget(item)}
+                            onShareWithGroup={() => openShare(item)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {unlinkedOpen && (
+                      <button
+                        type="button"
+                        onClick={() => setAddOpen(true)}
+                        className="hp-mono mt-3 rounded-[9px] border border-dashed border-[rgba(56,239,143,0.4)] bg-transparent px-3.5 py-[7px] text-[12px] font-extrabold text-[rgba(56,239,143,0.8)]"
+                      >
+                        + Add link without a swim
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
+            </div>
           </div>
         ) : (
           <ModerationPanel
@@ -847,66 +805,27 @@ function MyMediaContent() {
         />
       )}
 
-      {/* Mobile filters bottom sheet */}
-      {mobileFiltersOpen && (
-        <div className="fixed inset-0 z-[100] flex items-end bg-[rgba(2,10,24,0.72)] backdrop-blur-[4px]" onClick={() => setMobileFiltersOpen(false)}>
-          <div
-            className="max-h-[85vh] w-full overflow-y-auto rounded-t-[20px] border-t border-[rgba(125,211,252,0.3)] bg-[linear-gradient(180deg,#0e2138,#081527)] p-5 text-[#f3f8fd]"
-            onClick={(e) => e.stopPropagation()}
+      {/* Шторка фильтров (до lg) — ОБЩИЙ компонент, тот же, что на results. Внутри та же
+          панель, что в сайдбаре: расходиться им нельзя, иначе телефон и десктоп начнут
+          фильтровать по-разному. */}
+      <MobileFiltersDrawer
+        id="my-media-filters-sheet"
+        className="my-media-filters"
+        variant="sheet"
+        open={mobileFiltersOpen}
+        onClose={() => setMobileFiltersOpen(false)}
+        footer={(
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen(false)}
+            className="hp-mono min-h-[44px] w-full rounded-[10px] border-none bg-[#38ef8f] text-[13px] font-extrabold text-[#04101f]"
           >
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[rgba(125,211,252,0.35)]" />
-            <div className="flex flex-col gap-3">
-              <FilterSelect
-                label="Season"
-                value={seasonValue}
-                onChange={pickSeason}
-                options={[
-                  { value: 'all', label: 'All seasons' },
-                  ...seasonChoices.map((y) => ({ value: String(y), label: seasonLabel(y) })),
-                ]}
-                noAll
-              />
-              <FilterSelect
-                label="Competition"
-                value={competitionFilter === 'all' ? 'all' : String(competitionFilter)}
-                onChange={(v) => setCompetitionFilter(v === 'all' ? 'all' : Number(v))}
-                options={competitionOptions.map((c) => ({ value: String(c.id), label: c.name }))}
-                rtl
-              />
-              <FilterSelect label="Style" value={styleFilter} onChange={setStyleFilter} options={styleOptions.map((s) => ({ value: s, label: s }))} />
-              <FilterSelect label="Distance" value={distanceFilter} onChange={setDistanceFilter} options={distanceOptions.map((d) => ({ value: d, label: `${d}m` }))} />
-              <div>
-                <label className="hp-mono mb-1 block text-[10px] font-extrabold uppercase tracking-[0.1em] text-[rgba(125,211,252,0.7)]">Date range</label>
-                <div className="flex items-center gap-1.5">
-                  <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="min-h-[44px] w-full rounded-[8px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-2 py-1 text-[12px] text-[#f3f8fd]" style={{ colorScheme: 'dark' }} />
-                  <span className="text-[rgba(203,224,240,0.5)]">–</span>
-                  <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="min-h-[44px] w-full rounded-[8px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-2 py-1 text-[12px] text-[#f3f8fd]" style={{ colorScheme: 'dark' }} />
-                </div>
-              </div>
-              {seg === 'with' && (
-                <div>
-                  <p className="hp-mono mb-1.5 text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#7dd3fc]">Publication status</p>
-                  <div className="flex flex-wrap gap-2">
-                    {(['all', 'private', 'pending', 'published', 'rejected'] as StatusFilter[]).map((k) => (
-                      <button key={k} type="button" onClick={() => setStatusFilter(k)} className={chipClass(statusFilter === k)}>
-                        {k === 'all' ? 'All' : k[0].toUpperCase() + k.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <button type="button" onClick={clearAll} className="hp-mono self-start border-none bg-transparent text-[12px] font-extrabold text-[#7dd3fc]">Reset</button>
-              <button
-                type="button"
-                onClick={() => setMobileFiltersOpen(false)}
-                className="hp-mono mt-2 min-h-[44px] w-full rounded-[10px] border-none bg-[#38ef8f] text-[13px] font-extrabold text-[#04101f]"
-              >
-                Show {filtered.length} {filtered.length === 1 ? 'swim' : 'swims'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            Show {filtered.length} {filtered.length === 1 ? 'swim' : 'swims'}
+          </button>
+        )}
+      >
+        {filterPanel}
+      </MobileFiltersDrawer>
 
       {/* Mobile actions bottom sheet */}
       {actionsSwim && (
@@ -965,32 +884,6 @@ function MyMediaContent() {
       )}
 
       <UI_SwimmerGallery gallery={lightboxItems} openIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />
-    </div>
-  );
-}
-
-function FilterSelect({
-  label, value, onChange, options, rtl, noAll,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-  rtl?: boolean;
-  noAll?: boolean;
-}) {
-  return (
-    <div>
-      <label className="hp-mono mb-1 block text-[10px] font-extrabold uppercase tracking-[0.1em] text-[rgba(125,211,252,0.7)]">{label}</label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        dir={rtl ? 'rtl' : undefined}
-        className="w-full rounded-[8px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-2 py-[7px] text-[12px] text-[#f3f8fd]"
-      >
-        {!noAll && <option value="all">All</option>}
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
     </div>
   );
 }

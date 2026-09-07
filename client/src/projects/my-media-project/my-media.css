@@ -1,0 +1,67 @@
+/* Панель фильтров `/my-media` (Ф3 плана docs/plans/my-media-filters-plan.md).
+
+   Панель ОБЩАЯ — та же, что на results и `/season-best`. Своей вёрстки карточек и кнопок у
+   страницы нет, здесь только палитра и мелочи раскладки сайдбара.
+
+   ⚠ ВРЕМЕННО. Блок токенов ниже — перевод общей панели в нынешние жёстко зашитые цвета
+   страницы (hp: #7dd3fc по тёмно-синему). Фаза Ф5 переводит страницу на тему deep, и тогда
+   этот блок целиком заменяется на `var(--deep-*)`, как в `.sb-filters`, — не правь его
+   «под себя», он живёт до Ф5. */
+
+.my-media-filters {
+  --fc-bg: rgba(8, 25, 48, 0.55);
+  --fc-border: rgba(125, 211, 252, 0.22);
+  --fc-title: #f3f8fd;
+  --fc-summary: rgba(203, 224, 240, 0.6);
+  --fc-summary-active: #7dd3fc;
+  --fc-chevron: rgba(203, 224, 240, 0.45);
+  --fc-radius: 14px;
+
+  --fseg-bg: rgba(2, 10, 24, 0.5);
+  --fseg-border: rgba(125, 211, 252, 0.25);
+  --fseg-text: rgba(226, 240, 252, 0.82);
+  --fseg-hover-border: rgba(125, 211, 252, 0.6);
+  --fseg-hover-text: #f3f8fd;
+  --fseg-active-bg: rgba(125, 211, 252, 0.14);
+  --fseg-active-border: #7dd3fc;
+  --fseg-active-text: #7dd3fc;
+
+  /* Мобильная шторка — тот же общий компонент, поэтому и её палитра здесь. */
+  --fdrawer-bg: linear-gradient(180deg, #0e2138, #081527);
+  --fdrawer-text: #f3f8fd;
+  --fdrawer-border: rgba(125, 211, 252, 0.3);
+  --fdrawer-handle: rgba(125, 211, 252, 0.35);
+}
+
+.mmf { display: flex; flex-direction: column; gap: 8px; }
+
+.mmf__head { display: flex; align-items: center; justify-content: space-between; padding: 0 2px 2px; }
+.mmf__title {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: rgba(125, 211, 252, 0.7);
+}
+.mmf__reset {
+  font-size: 11px; font-weight: 800; color: #7dd3fc;
+  background: none; border: none; cursor: pointer; padding: 2px 4px;
+}
+.mmf__reset:hover { text-decoration: underline; }
+
+/* Список в карточке: соревнований и групп бывает по полсотни, без предела высоты карточка
+   уводит сайдбар на два экрана (та же причина, что у списка клубов на `/season-best`). */
+.mmf__list { max-height: 260px; overflow-y: auto; }
+/* Ивритские названия внутри LTR-строки: то же, что делает `dir="auto"`, но на строке —
+   иначе точки и сокращения уезжают не на ту сторону. */
+.mmf__list > button { unicode-bidi: plaintext; text-align: left; }
+
+.mmf__date {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--fseg-border);
+  background: var(--fseg-bg);
+  color: var(--fseg-text);
+  font-size: 12px;
+  /* Иначе браузер рисует нативный пикер даты светлым по светлому. */
+  color-scheme: dark;
+}
+.mmf__dash { color: rgba(203, 224, 240, 0.5); }
