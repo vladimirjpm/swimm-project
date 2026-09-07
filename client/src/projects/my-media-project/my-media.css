@@ -319,3 +319,39 @@
   border-radius: 8px;
   padding: 2px 6px;
 }
+
+/* ── Строка заплыва (Ф6, сетка хендоффа) ──────────────────────────────────────── */
+
+/* Одна сетка на шапку колонок и на строку: разъехаться они не могут по построению.
+   Порядок: место · медаль · плитка стиля · кто/что (тянется) · метка · время · медиа. */
+.mms-row {
+  grid-template-columns: 48px 28px 66px minmax(0, 1fr) 72px 110px 120px;
+  gap: 14px;
+  align-items: center;
+}
+/* Колонка даты появляется только у многодневок — тогда столбцов восемь. */
+.mms-row--dated {
+  grid-template-columns: 48px 28px 66px minmax(0, 1fr) 72px 110px 72px 120px;
+}
+
+/* Плотный вариант: на 1280 рядом с сайдбаром 320 полной сетке уже тесно. Ужимается
+   ровно то, что просил дизайнер, и в его порядке: медиа, метка, плитка. */
+@media (max-width: 1400px) {
+  .mms-row { grid-template-columns: 40px 24px 60px minmax(0, 1fr) 64px 96px 110px; gap: 10px; }
+  .mms-row--dated { grid-template-columns: 40px 24px 60px minmax(0, 1fr) 64px 96px 64px 110px; }
+}
+
+/* Плитка стиля тянется по своей колонке: ширину задаёт сетка, а не размер картинки. */
+.mms-row .src-swim-list { width: 100%; }
+.mms-row .src-swim-list img { width: 100%; height: auto; }
+
+/* Мобильная строка: место+медаль · плитка · время и кто/что · одна кнопка медиа. */
+/* `display` НЕ задаём: строка прячется утилитой `sm:hidden`, а правило той же
+   специфичности из этого файла подключается позже и перебило бы её. */
+.mms-mrow {
+  grid-template-columns: 34px 58px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+.mms-mrow .src-swim-list { width: 100%; }
+.mms-mrow .src-swim-list img { width: 100%; height: auto; }

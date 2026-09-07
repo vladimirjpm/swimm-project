@@ -152,11 +152,10 @@ function pillTitle(pubs: UserMediaPublicationDto[]): string {
  * Считается по ВСЕМ медиа заплыва (у видео и фото публикации могут различаться),
  * подробности по каждой группе — в title.
  */
-function RowVisibility({ swim, publicationsByMedia, compact }: {
+function RowVisibility({ swim, publicationsByMedia }: {
   swim: MySwimDto;
   publicationsByMedia: Map<number, UserMediaPublicationDto[]>;
   /** Мобильная строка: одна строка с обрезкой — там колонка узкая, а высота дороже ширины. */
-  compact?: boolean;
 }) {
   const pubs = swim.media.flatMap((m) => publicationsByMedia.get(m.id) ?? []);
   const status = derivedCardStatus(pubs);
@@ -170,17 +169,6 @@ function RowVisibility({ swim, publicationsByMedia, compact }: {
         : status === 'pending' ? 'pending in' : 'rejected in';
   const tail = groups.length === 0 ? 'only you' : groups.length === 1 ? groups[0] : `${groups.length} groups`;
 
-  if (compact) {
-    return (
-      <span
-        title={pillTitle(pubs)}
-        className="hp-mono inline-block max-w-full truncate rounded-[5px] px-[5px] py-[1px] text-[8.5px] font-extrabold"
-        style={{ color: c.text, border: `1px solid ${c.border}`, background: c.bg }}
-      >
-        {status === 'private' ? 'private' : <>{head}{isPublic ? ' 🌐' : ''} <span dir="auto">{tail}</span></>}
-      </span>
-    );
-  }
 
   return (
     <span
@@ -240,14 +228,14 @@ function LikeChip({ m, onToggle }: { m: SwimMediaDto; onToggle: () => void }) {
   );
 }
 
-function CheerChip({ swim, emphasized, onToggle, stop }: {
-  swim: MySwimDto; emphasized: boolean; onToggle: () => void; stop?: boolean;
+function CheerChip({ swim, emphasized, onToggle }: {
+  swim: MySwimDto; emphasized: boolean; onToggle: () => void;
 }) {
   const on = swim.my_cheer;
   return (
     <button
       type="button"
-      onClick={(e) => { if (stop) e.stopPropagation(); onToggle(); }}
+      onClick={onToggle}
       className="hp-mono whitespace-nowrap rounded-[7px] px-2 py-[3px] text-[10.5px] font-extrabold"
       style={{
         border: `1px solid ${on ? 'var(--t-warn)' : emphasized ? 'var(--t-warn-border)' : 'var(--t-border)'}`,
@@ -381,13 +369,17 @@ function MediaLine({
  * Это НЕ общая строка заплыва `SwimRow` (`components/swim-row/`). Раньше она звалась
  * так же и читалась как шестая копия той же строки — поэтому переименована.
  *
- * Почему не сведена в общую: общая строка — двухлинейная КАРТОЧКА результата, а
- * здесь — ПЛОТНАЯ ТАБЛИЦА управления медиа: фиксированные колонки под своей шапкой
- * (PLACE / SWIM / TIME / DATE / congrats / MEDIA), зона действий на 330px и разворачиваемая
- * панель медиа под строкой. Карточка втрое выше и ломает выравнивание по колонкам, а
- * чтобы вместить медиа-кнопки, RELAY, метку PB и тап-по-строке, в общий компонент
- * пришлось бы добавить слот на каждый угол — ровно то, от чего план общей строки
- * отказался (§3.1 `docs/plans/swim-row-shared-component-plan.md`).
+ * Почему не сведена в общую: общая строка — двухлинейная КАРТОЧКА результата, а здесь —
+ * ПЛОТНАЯ ТАБЛИЦА управления медиа: сетка `48 28 66 1fr 72 110 120` под своей шапкой
+ * (PLACE / SWIM / TIME / MEDIA) и разворачиваемая панель медиа под строкой. Карточка втрое
+ * выше и ломает выравнивание по колонкам, а чтобы вместить медиа-кнопки, RELAY, метку PB и
+ * тап-по-строке, в общий компонент пришлось бы добавить слот на каждый угол — ровно то, от
+ * чего план общей строки отказался (§3.1 `docs/plans/swim-row-shared-component-plan.md`).
+ *
+ * В строке — только короткое и главное (решение Влада 07.09.2026): бейдж «кому это видно»,
+ * поздравления соседей и управление публикациями живут в раскрывающейся панели, а на
+ * мобильной — в нижней шторке действий. Сетка задана в `my-media.css` (`.mms-row`,
+ * `.mms-mrow`), и шапка колонок берёт её же — разъехаться они не могут.
  *
  * Общее берётся ячейками: `UI_SwimmStyleIcon`, `UI_SwimTime` вместе с
  * `swimFlaggedRowProps` (носитель спорного времени) и `UI_DateIcon` (формат даты один на продукт).
@@ -434,51 +426,61 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
 
   return (
     <>
-      {/* Desktop row */}
+      {/* Desktop row — сетка хендоффа `48 28 66 1fr 72 110 120` (Ф6). В строке только
+          короткое и главное (решение Влада 07.09.2026): место, медаль, дисциплина, кто,
+          метка, время и ОДИН чип медиа. Бейдж «кому это видно» и управление публикациями
+          уехали в раскрывающуюся панель — она и есть кнопка «открыть/закрыть». */}
       <div
         {...flagged}
-        className={`hidden items-center gap-3 px-5 py-[10px] sm:flex${flagged.className ? ` ${flagged.className}` : ''}`}
+        className={`mms-row${showDate ? ' mms-row--dated' : ''} hidden px-5 py-[10px] sm:grid${flagged.className ? ` ${flagged.className}` : ''}`}
         style={{ background: noVideo ? 'var(--t-input-bg)' : 'transparent' }}
       >
-        {/* Порядок: место — первым, следом столбик «медаль + метки». Место по центру своей
-            колонки и одного кегля с медалью: после снятия строки очков оно оставалось
-            прижатым влево и съезжало относительно медали. */}
-        <span className="w-[46px] shrink-0 self-center text-center text-[17px] font-black leading-none">
+        <span className="text-center text-[17px] font-black leading-none">
           {swim.place != null ? `#${swim.place}` : '—'}
         </span>
-        <span className="w-[46px] shrink-0 text-center text-[14px] leading-tight">
-          {medal(swim.place)}
-          <BestMark record={recordMark} pb={swim.is_pb} sb={swim.is_sb} stacked />
-        </span>
-        <span className="flex w-[286px] shrink-0 items-center gap-3.5 overflow-hidden pl-2 text-[13.5px] font-extrabold" style={{ color: noVideo ? 'var(--t-text-3)' : 'var(--t-text)' }}>
-          <UI_SwimmStyleIcon
-            styleName={swim.style}
-            styleLen={swim.distance}
-            styleType="icon-len"
-            lenPlacement="below"
-            size={64}
-            className="src-swim-list shrink-0 rounded-[8px] bg-[var(--t-plate)] px-1 py-0.5"
-          />
-          {/* text-left обязателен: dir="auto" у ивритского имени тянет выравнивание вправо,
-              и имена прыгали бы между краями колонки от пловца к пловцу. */}
-          {showSwimmerName && (
-            <span dir="auto" className="min-w-0 flex-1 truncate text-left text-[22px] font-black text-[var(--t-text-2)]">
+        <span className="text-center text-[15px] leading-none">{medal(swim.place)}</span>
+        <UI_SwimmStyleIcon
+          styleName={swim.style}
+          styleLen={swim.distance}
+          styleType="icon-len"
+          lenPlacement="below"
+          size={64}
+          className="src-swim-list rounded-[8px] bg-[var(--t-plate)] px-1 py-0.5"
+        />
+        {/* Средняя колонка тянется. Показан один пловец — имени в строке нет (оно в шапке
+            карточки), и колонку занимает название дисциплины: пустая тянущаяся колонка
+            разрывала бы строку пополам. */}
+        <span className="flex min-w-0 items-center gap-2 overflow-hidden">
+          {showSwimmerName ? (
+            // text-left обязателен: dir="auto" у ивритского имени тянет выравнивание вправо,
+            // и имена прыгали бы между краями колонки от пловца к пловцу.
+            <span dir="auto" className="min-w-0 flex-1 truncate text-left text-[19px] font-black text-[var(--t-text)]">
               {swimmerName}
+            </span>
+          ) : (
+            <span className="min-w-0 flex-1 truncate text-left text-[13.5px] font-extrabold text-[var(--t-text-2)]">
+              {swim.distance}m {styleLabel(swim.style)}
             </span>
           )}
           {swim.is_relay && (
-            <span className="hp-mono ml-1 rounded-[5px] border border-[var(--t-accent-border)] px-1.5 py-[1px] text-[9px] font-extrabold text-[var(--t-accent)]">RELAY</span>
+            <span className="hp-mono shrink-0 rounded-[5px] border border-[var(--t-accent-border)] px-1.5 py-[1px] text-[9px] font-extrabold text-[var(--t-accent)]">RELAY</span>
           )}
         </span>
-        <span className="hp-mono w-[84px] shrink-0 text-[13.5px] font-extrabold text-[var(--t-accent)]">
+        {/* Метка достижения — своей колонкой, а не под медалью: рекорд и PB это про ВРЕМЯ,
+            и стоять им положено рядом с ним. */}
+        <span className="flex items-center justify-end">
+          <BestMark record={recordMark} pb={swim.is_pb} sb={swim.is_sb} />
+        </span>
+        <span className="hp-mono text-[15px] font-extrabold text-[var(--t-accent)]">
           {swim.time_fail ? 'DSQ' : (
             <UI_SwimTime time={swim.time} quality={quality} />
           )}
         </span>
         {/* Дата — общим `UI_DateIcon`, а не сырой ISO-строкой из API: формат даты живёт
-            в одном месте, а «2026-07-30» здесь спорило с «30 JUL 2026» на всех остальных экранах. */}
+            в одном месте, а «2026-07-30» здесь спорило с «30 JUL 2026» на всех остальных
+            экранах. Колонка есть только у многодневок (см. `sameDay`). */}
         {showDate && (
-          <span className="w-[92px] shrink-0">
+          <span>
             <UI_DateIcon
               styleType="row-style-1"
               date={swim.date}
@@ -486,66 +488,44 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
             />
           </span>
         )}
-        {/* Поздравлять нечего, пока нет видео: колонку держим пустой, чтобы строки не поехали. */}
-        <span className="w-[52px] shrink-0">
+        {/* MEDIA — один чип. У заплыва с медиа он же и раскрывает панель, поэтому отдельной
+            кнопки «Manage» больше нет: две кнопки об одном занимали треть строки. */}
+        <span className="flex items-center justify-end gap-1.5">
+          {hasMedia ? (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={expanded}
+              title={expanded ? 'Hide media panel' : 'Share, withdraw, delete this media'}
+              className="hp-mono inline-flex h-[26px] shrink-0 items-center gap-1 rounded-[8px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-2 text-[10.5px] font-extrabold text-[var(--t-accent)]"
+            >
+              {videos.length > 0 ? `▶ ${videos.length}` : `🖼 ${photos.length}`}
+              <Chevron open={expanded} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => cb.onAddVideo(swim)}
+              className="hp-mono shrink-0 rounded-[8px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-2 py-[4px] text-[10.5px] font-extrabold text-[var(--t-accent)]"
+            >
+              + Add video
+            </button>
+          )}
           {!noVideo && <CheerChip swim={swim} emphasized={swim.is_pb} onToggle={() => cb.onToggleCheer(swim)} />}
-        </span>
-        {/* Колонка MEDIA — три фиксированных слота: счётчики · видимость · разворот.
-            Без слотов содержимое разной ширины («+ Add video» против «▶ 1») сдвигало
-            соседние бейджи, и колонка выглядела рваной от строки к строке. */}
-        <span className="flex w-[332px] shrink-0 items-center gap-2">
-          <span className="flex w-[108px] shrink-0 items-center gap-1.5">
-            {videos.length > 0 && (
-              <button type="button" onClick={() => setExpanded((v) => !v)} className="hp-mono rounded-[7px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-2 py-[3px] text-[10.5px] font-extrabold text-[var(--t-accent)]">
-                ▶ {videos.length}
-              </button>
-            )}
-            {photos.length > 0 && (
-              <button type="button" onClick={() => setExpanded((v) => !v)} className="hp-mono rounded-[7px] border border-[var(--t-border)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[var(--t-accent-dim)]">
-                🖼 {photos.length}
-              </button>
-            )}
-            {noVideo && (
-              <button
-                type="button"
-                onClick={() => cb.onAddVideo(swim)}
-                className="hp-mono rounded-[7px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-2.5 py-[4px] text-[10.5px] font-extrabold text-[var(--t-accent)]"
-              >
-                + Add video
-              </button>
-            )}
-          </span>
-          <span className="w-[124px] shrink-0">
-            {hasMedia && <RowVisibility swim={swim} publicationsByMedia={cb.publicationsByMedia} />}
-          </span>
-          <span className="w-[84px] shrink-0 text-right">
-            {hasMedia && (
-              <button
-                type="button"
-                onClick={() => setExpanded((v) => !v)}
-                title={expanded ? 'Hide media panel' : 'Share, withdraw, delete this media'}
-                aria-expanded={expanded}
-                className="hp-mono inline-flex h-[28px] items-center gap-1 rounded-[9px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-2 text-[10.5px] font-extrabold text-[var(--t-accent)]"
-              >
-                {expanded ? 'Hide' : 'Manage'}
-                <Chevron open={expanded} />
-              </button>
-            )}
-          </span>
         </span>
       </div>
 
-      {/* Mobile row */}
+      {/* Mobile row — сетка хендоффа `34 58 1fr auto` (Ф6). Тап по строке открывает
+          нижнюю шторку действий: бейдж «кому видно», поздравления и управление медиа живут
+          там, а в строке остаётся только короткое. */}
       <div
         {...flagged}
-        className={`flex cursor-pointer flex-col px-4 py-[10px] sm:hidden${flagged.className ? ` ${flagged.className}` : ''}`}
+        className={`mms-mrow grid cursor-pointer px-4 py-[10px] sm:hidden${flagged.className ? ` ${flagged.className}` : ''}`}
         style={{ background: noVideo ? 'var(--t-input-bg)' : 'transparent' }}
         onClick={() => hasMedia && cb.onOpenActions(swim)}
       >
-        <div className="flex items-center gap-2.5">
-        {/* На узком экране место, медаль и метка идут ОДНИМ столбиком (на десктопе это две
-            колонки — там ширины хватает). */}
-        <span className="w-[46px] shrink-0 text-center leading-tight">
+        {/* Место, медаль и метка — ОДНИМ столбиком: на узком экране трёх колонок под них нет. */}
+        <span className="text-center leading-tight">
           <span className="block text-[13.5px] font-black leading-none">
             {swim.place != null ? `#${swim.place}` : '—'}
           </span>
@@ -558,71 +538,62 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
           styleType="icon-len"
           lenPlacement="below"
           size={64}
-          className="src-swim-list shrink-0 rounded-[8px] bg-[var(--t-plate)] px-1 py-0.5"
+          className="src-swim-list rounded-[8px] bg-[var(--t-plate)] px-1 py-0.5"
         />
-        <span className="min-w-0 flex-1">
-          {swim.is_relay && (
-            <span className="block">
-              <span className="hp-mono rounded-[5px] border border-[var(--t-accent-border)] px-1 py-[1px] text-[8.5px] font-extrabold text-[var(--t-accent)]">RELAY</span>
-            </span>
-          )}
-          <span className="mt-0.5 flex items-center gap-2">
-            <span className="hp-mono text-[12px] font-extrabold text-[var(--t-accent)]">
-              {swim.time_fail ? 'DSQ' : (
-                <UI_SwimTime time={swim.time} quality={quality} />
-              )}
-            </span>
-          </span>
-        </span>
-        {/* Правый столбик: счётчик медиа · кому видно · поздравления. Бейдж видимости стоит
-            под счётчиком — он про это самое медиа, а не про заплыв. Ширина ограничена, иначе
-            длинное ивритское название группы выдавливало бы время и место. */}
-        <span className="flex max-w-[45%] shrink-0 flex-col items-end gap-1">
-          <span className="flex items-center gap-1.5">
-            {photos.length > 0 && <span className="text-[11px] text-[var(--t-accent-dim)]">🖼</span>}
-            {videos.length > 0 ? (
-              <span className="hp-mono rounded-[7px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-1.5 py-[2px] text-[10px] font-extrabold text-[var(--t-accent)]">▶ {videos.length}</span>
-            ) : (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); cb.onAddVideo(swim); }}
-                className="hp-mono rounded-[7px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-2 py-[3px] text-[10px] font-extrabold text-[var(--t-accent)]"
-              >
-                + Video
-              </button>
+        <span className="min-w-0">
+          <span className="hp-mono block text-[13.5px] font-extrabold text-[var(--t-accent)]">
+            {swim.time_fail ? 'DSQ' : (
+              <UI_SwimTime time={swim.time} quality={quality} />
             )}
           </span>
-          {hasMedia && (
-            <RowVisibility swim={swim} publicationsByMedia={cb.publicationsByMedia} compact />
+          {/* Имя целиком, без многоточия: ивритское имя, укороченное посередине, читается
+              как чужое. Показан один пловец — вместо имени дисциплина. */}
+          <span
+            dir={showSwimmerName ? 'auto' : undefined}
+            className={`mt-0.5 block break-words text-left leading-tight ${
+              showSwimmerName
+                ? 'text-[15px] font-black text-[var(--t-text)]'
+                : 'text-[12px] font-extrabold text-[var(--t-text-2)]'
+            }`}
+          >
+            {showSwimmerName ? swimmerName : `${swim.distance}m ${styleLabel(swim.style)}`}
+          </span>
+          {swim.is_relay && (
+            <span className="hp-mono mt-1 inline-block rounded-[5px] border border-[var(--t-accent-border)] px-1 py-[1px] text-[8.5px] font-extrabold text-[var(--t-accent)]">RELAY</span>
           )}
-          {!noVideo && <CheerChip swim={swim} emphasized={swim.is_pb} onToggle={() => cb.onToggleCheer(swim)} stop />}
-          {hasMedia && (
+        </span>
+        {/* Одна цель нажатия высотой 44 — открыть медиа или добавить видео. */}
+        <span className="flex items-center justify-end">
+          {hasMedia ? (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); cb.onOpenActions(swim); }}
-              title="Open media"
               aria-label="Open media"
-              className="inline-flex h-[28px] w-[28px] items-center justify-center rounded-[9px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] text-[var(--t-accent)]"
+              className="hp-mono inline-flex h-[44px] items-center gap-1 rounded-[10px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-3 text-[11px] font-extrabold text-[var(--t-accent)]"
             >
+              {videos.length > 0 ? `▶ ${videos.length}` : `🖼 ${photos.length}`}
               <Chevron open={false} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); cb.onAddVideo(swim); }}
+              className="hp-mono inline-flex h-[44px] items-center rounded-[10px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-3 text-[11px] font-extrabold text-[var(--t-accent)]"
+            >
+              + Video
             </button>
           )}
         </span>
-        </div>
-        {/* Имя — отдельной строкой под всей строкой и ЦЕЛИКОМ, без обрезки: в средней колонке
-            места нет, а ивритское имя, укороченное многоточием, читается как чужое.
-            Отступ ml-[56px] ставит его ровно под иконку стиля: столбик места 46 + gap 10.
-            Меняешь ширины колонок выше — правь и это число, иначе имя съедет. */}
-        {showSwimmerName && (
-          <span dir="auto" className="mt-1.5 ml-[56px] block break-words text-left text-[22px] font-black leading-tight text-[var(--t-text-2)]">
-            {swimmerName}
-          </span>
-        )}
       </div>
 
       {/* Expanded media panel (desktop) */}
       {expanded && hasMedia && (
         <div className="hidden bg-[var(--t-input-bg)] px-5 py-2 pl-[116px] sm:block">
+          {/* «Кому это видно» — первым: раньше бейдж стоял в строке и занимал 124px у каждой,
+              хотя отвечает на вопрос, который задают, только открыв панель. */}
+          <div className="mb-1">
+            <RowVisibility swim={swim} publicationsByMedia={cb.publicationsByMedia} />
+          </div>
           {[...videos, ...photos].map((m) => (
             <MediaLine key={m.id} m={m} pubs={cb.publicationsByMedia.get(m.id) ?? []} cb={cb} />
           ))}
@@ -658,14 +629,17 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
   // Дата в шапке группы одна на всех — колонку DATE держим только там, где дни разные.
   const showDate = swims.some((s) => !sameDay(first.competition_date, s.date));
   const selectedName = preferredSwimmerId != null ? swimmerNames.get(preferredSwimmerId) ?? null : null;
-  const columns: { label: string; width?: number; center?: boolean }[] = [
-    { label: 'PLACE', width: 46 },
-    { label: '', width: 46 },
-    { label: 'SWIM', width: 286 },
-    { label: 'TIME', width: 84 },
-    ...(showDate ? [{ label: 'DATE', width: 92 }] : []),
-    { label: '🎉', width: 52 },
-    { label: 'MEDIA', width: 332 },
+  // Подписи колонок — ровно по сетке строки (`.mms-row`), поэтому ширины здесь больше нет:
+  // и шапка, и строка тянут её из одного grid-шаблона в `my-media.css`.
+  const columns: { label: string; align?: 'center' | 'right' }[] = [
+    { label: 'PLACE', align: 'center' },
+    { label: '' },
+    { label: 'SWIM', align: 'center' },
+    { label: '' },
+    { label: '' },
+    { label: 'TIME' },
+    ...(showDate ? [{ label: 'DATE' as const }] : []),
+    { label: 'MEDIA', align: 'right' as const },
   ];
 
   return (
@@ -738,13 +712,15 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
         </div>
       )}
 
-      {/* Column header (desktop) */}
-      <div className="hidden items-center gap-3 px-5 py-1.5 sm:flex">
+      {/* Column header (desktop) — та же сетка, что у строки: подписи не могут разъехаться
+          со столбцами, потому что ширины у них общие (`.mms-row` в my-media.css). */}
+      <div className={`mms-row${showDate ? ' mms-row--dated' : ''} hidden px-5 py-1.5 sm:grid`}>
         {columns.map((c, i) => (
           <span
             key={i}
-            className={`hp-mono text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--t-accent-border)]${c.center ? ' text-center' : ''}`}
-            style={{ width: c.width, flex: c.width === undefined ? 1 : undefined, flexShrink: 0 }}
+            className={`hp-mono text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--t-accent-border)]${
+              c.align === 'center' ? ' text-center' : c.align === 'right' ? ' text-right' : ''
+            }`}
           >
             {c.label}
           </span>
