@@ -11,7 +11,17 @@ import FilterDistance from './filter-distance';
  * Дистанции выбранного стиля рисует `FilterDistance` — колонкой справа, внутри этой же
  * карточки: на узком сайдбаре они переносятся вниз.
  */
-const FilterSwimmingStyle: React.FC = () => {
+/**
+ * Раскрытие можно отдать наружу (`open`/`onOpenChange`) — тогда карточку раскрывает страница:
+ * на `/my-media` по клику в полосе выбранных фильтров. Не заданы — как было, карточка
+ * открыта по умолчанию и помнит своё состояние сама.
+ */
+interface Props {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+const FilterSwimmingStyle: React.FC<Props> = ({ open, onOpenChange }) => {
   const { values, set, options, isAvailable } = useFilterHost();
   const styleName = values.style_name ?? '';
   const styleLen = values.style_len;
@@ -30,6 +40,8 @@ const FilterSwimmingStyle: React.FC = () => {
       summary={summary}
       isActive={!!styleName}
       defaultOpen
+      open={open}
+      onOpenChange={onOpenChange}
     >
       {/* Колонки стиль | дистанция; на узком сайдбаре дистанции переносятся вниз */}
       <div className="flex flex-wrap gap-3">

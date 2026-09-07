@@ -1,50 +1,91 @@
-/* Панель фильтров `/my-media` (Ф3 плана docs/plans/my-media-filters-plan.md).
+/* Панель и полоса фильтров `/my-media` (Ф3–Ф4 плана docs/plans/my-media-filters-plan.md,
+   вид — по хендоффу `!design_handoff/design_handoff_my_media_filters`).
 
-   Панель ОБЩАЯ — та же, что на results и `/season-best`. Своей вёрстки карточек и кнопок у
-   страницы нет, здесь только палитра и мелочи раскладки сайдбара.
+   Панель, полоса и шторка ОБЩИЕ — те же, что на results и `/season-best`. Своей вёрстки
+   карточек, кнопок и чипов у страницы нет: здесь только палитра и мелочи раскладки.
 
-   ⚠ ВРЕМЕННО. Блок токенов ниже — перевод общей панели в нынешние жёстко зашитые цвета
-   страницы (hp: #7dd3fc по тёмно-синему). Фаза Ф5 переводит страницу на тему deep, и тогда
-   этот блок целиком заменяется на `var(--deep-*)`, как в `.sb-filters`, — не правь его
-   «под себя», он живёт до Ф5. */
+   ⚠ ВРЕМЕННО. Блок токенов ниже — перевод общих компонентов в нынешние жёстко зашитые цвета
+   страницы. Фаза Ф5 переводит страницу на тему (deep, light + dark) по карте из хендоффа,
+   и тогда правая часть значений заменяется на `var(--deep-*)`, а хексы уходят. Не правь
+   его «под себя» — он живёт до Ф5. */
+
+.my-media-filters,
+.my-media-bar {
+  --t-accent: #7dd3fc;
+  --t-accent-soft: rgba(125, 211, 252, 0.14);
+  --t-accent-ink: #04101f;
+  --t-surface: rgba(8, 25, 48, 0.55);
+  --t-surface2: rgba(125, 211, 252, 0.07);
+  --t-border: rgba(125, 211, 252, 0.22);
+  --t-border-2: rgba(125, 211, 252, 0.12);
+  --t-text: #f3f8fd;
+  --t-text-2: rgba(203, 224, 240, 0.62);
+  --t-text-3: rgba(203, 224, 240, 0.4);
+  --t-plate: #e6f2fb;
+}
 
 .my-media-filters {
-  --fc-bg: rgba(8, 25, 48, 0.55);
-  --fc-border: rgba(125, 211, 252, 0.22);
-  --fc-title: #f3f8fd;
-  --fc-summary: rgba(203, 224, 240, 0.6);
-  --fc-summary-active: #7dd3fc;
-  --fc-chevron: rgba(203, 224, 240, 0.45);
+  --fc-bg: var(--t-surface);
+  --fc-border: var(--t-border);
+  --fc-title: var(--t-text);
+  --fc-summary: var(--t-text-2);
+  --fc-summary-active: var(--t-accent);
+  --fc-chevron: var(--t-text-3);
   --fc-radius: 14px;
 
   --fseg-bg: rgba(2, 10, 24, 0.5);
   --fseg-border: rgba(125, 211, 252, 0.25);
   --fseg-text: rgba(226, 240, 252, 0.82);
   --fseg-hover-border: rgba(125, 211, 252, 0.6);
-  --fseg-hover-text: #f3f8fd;
-  --fseg-active-bg: rgba(125, 211, 252, 0.14);
-  --fseg-active-border: #7dd3fc;
-  --fseg-active-text: #7dd3fc;
+  --fseg-hover-text: var(--t-text);
+  --fseg-active-bg: var(--t-accent-soft);
+  --fseg-active-border: var(--t-accent);
+  --fseg-active-text: var(--t-accent);
 
-  /* Мобильная шторка — тот же общий компонент, поэтому и её палитра здесь. */
+  /* Мобильная шторка и её кнопка — те же общие компоненты, поэтому и палитра здесь. */
   --fdrawer-bg: linear-gradient(180deg, #0e2138, #081527);
-  --fdrawer-text: #f3f8fd;
+  --fdrawer-text: var(--t-text);
   --fdrawer-border: rgba(125, 211, 252, 0.3);
   --fdrawer-handle: rgba(125, 211, 252, 0.35);
 }
 
+/* Полоса выбранных фильтров. Выбранная колонка шире прочих (хендофф): значение в ней —
+   имя пловца или название соревнования, и в равной колонке оно обрезалось бы. */
+.my-media-bar {
+  --fb-bg: var(--t-surface2);
+  --fb-border: var(--t-border);
+  --fb-divider: var(--t-border-2);
+  --fb-label: var(--t-text-3);
+  --fb-idle-text: var(--t-text-2);
+  --fb-active-bg: var(--t-accent-soft);
+  --fb-active-border: var(--t-accent);
+  --fb-active-text: var(--t-accent);
+  --fb-shadow: none;
+  --fb-active-grow: 1.5;
+}
+
+/* Кнопка-пилюля: инверсия акцента, как в хендоффе. */
+.my-media-fab {
+  --fpill-bg: var(--t-accent);
+  --fpill-bg-hover: #a5e0fd;
+  --fpill-ink: var(--t-accent-ink);
+}
+
 .mmf { display: flex; flex-direction: column; gap: 8px; }
 
-.mmf__head { display: flex; align-items: center; justify-content: space-between; padding: 0 2px 2px; }
-.mmf__title {
-  font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
-  color: rgba(125, 211, 252, 0.7);
-}
+/* Сброс — строкой под карточками. Не кнопка-плашка: он не выбор, а отмена всех выборов. */
 .mmf__reset {
-  font-size: 11px; font-weight: 800; color: #7dd3fc;
-  background: none; border: none; cursor: pointer; padding: 2px 4px;
+  align-self: flex-start;
+  padding: 4px 2px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--t-accent);
+  opacity: 0.75;
 }
-.mmf__reset:hover { text-decoration: underline; }
+.mmf__reset:hover { opacity: 1; text-decoration: underline; }
 
 /* Список в карточке: соревнований и групп бывает по полсотни, без предела высоты карточка
    уводит сайдбар на два экрана (та же причина, что у списка клубов на `/season-best`). */
@@ -52,6 +93,39 @@
 /* Ивритские названия внутри LTR-строки: то же, что делает `dir="auto"`, но на строке —
    иначе точки и сокращения уезжают не на ту сторону. */
 .mmf__list > button { unicode-bidi: plaintext; text-align: left; }
+
+/* Строка пловца: инициал · имя · счётчик. Имя тянется, счётчик прижат вправо. */
+.mmf__swimmer { display: flex; align-items: center; gap: 8px; }
+.mmf__initial {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; flex: none;
+  border-radius: 50%;
+  background: rgba(125, 211, 252, 0.16);
+  color: var(--t-accent);
+  font-size: 10px; font-weight: 900;
+}
+.mmf__swimmer-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mmf__count {
+  flex: none;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11.5px; font-weight: 800;
+  color: var(--t-text-2);
+}
+
+/* Карусель сезонов внутри карточки 320px. Своих отступов у полосы 22px по бокам — в
+   сайдбаре это лишние 44px, из-за которых соседние сезоны перестают быть видны вовсе
+   (лента режется `overflow:hidden`, а не переносится). */
+.mmf__season .deep-season-strip { padding: 8px 6px; gap: 4px; border-radius: 10px; }
+
+/* Плашка под иконкой стиля (ответ дизайнера на вопрос про тёмный фон): картинки нарисованы
+   чёрным силуэтом по светлому, и на тёмной кнопке от пловца остаётся одна вода. Плашка —
+   тот же приём, что в строках заплыва этой страницы. Одна картинка на продукт, светлого
+   варианта не заводим. */
+.my-media-filters .fseg img {
+  background: var(--t-plate);
+  border-radius: 8px;
+  padding: 3px 5px;
+}
 
 .mmf__date {
   width: 100%;
@@ -64,4 +138,42 @@
   /* Иначе браузер рисует нативный пикер даты светлым по светлому. */
   color-scheme: dark;
 }
-.mmf__dash { color: rgba(203, 224, 240, 0.5); }
+.mmf__dash { color: var(--t-text-2); }
+
+/* ── Ячейка сезона в полосе (ведущая, `lead`) ─────────────────────────────────── */
+
+/* Это индикатор со стрелками ±1 сезон, а не выбор: выбирают каруселью в панели. */
+.mmb-season { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px 12px; }
+.mmb-season__label {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase;
+  color: var(--t-text-3);
+}
+.mmb-season__row { display: flex; align-items: center; gap: 8px; }
+.mmb-season__step {
+  border: none; background: none; cursor: pointer;
+  padding: 0 2px;
+  font-size: 15px; line-height: 1;
+  color: var(--t-text-2);
+}
+.mmb-season__step:hover:not(:disabled) { color: var(--t-accent); }
+.mmb-season__step:disabled { opacity: 0.3; cursor: default; }
+.mmb-season__value {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 20px; font-weight: 800;
+  color: var(--t-accent);
+  text-shadow: 0 0 18px rgba(125, 211, 252, 0.35);
+}
+
+/* Чип Event в полосе: иконка стиля на плашке, как в панели и в строках заплыва.
+   Бокс фиксирован по высоте — исходники разной пропорции, при `height:auto` колонка скачет. */
+.mmb-event { display: inline-flex; align-items: center; justify-content: center; }
+.mmb-event img {
+  display: block;
+  height: 40px;
+  width: auto;
+  max-width: 120px;
+  object-fit: contain;
+  background: var(--t-plate);
+  border-radius: 8px;
+  padding: 2px 6px;
+}

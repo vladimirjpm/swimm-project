@@ -20,10 +20,15 @@ import MediaCard from './components/media-card';
 import AddLinkModal, { AddLinkSwimmerOption } from './components/add-link-modal';
 import ModerationPanel from './components/moderation-panel';
 import SwimList from './components/swim-list';
-import MyMediaFilterPanel, { type Seg, type StatusFilter, type GroupFilter } from './components/my-media-filter-panel';
+import MyMediaFilterPanel, {
+  DEFAULT_OPEN_CARDS,
+  type Seg, type StatusFilter, type GroupFilter, type MediaCardKey,
+} from './components/my-media-filter-panel';
+import FilterBar, { type FilterBarChip } from '../components/filter-section/filter-bar';
+import FiltersFab from '../components/filter-section/filters-fab';
+import UI_SwimmStyleIcon from '../components/mix/swimm-style-icon/swimm-style-icon';
 import { useMyMediaFilterHost, type MyMediaHostState } from './my-media-filter-host';
 import MobileFiltersDrawer from '../components/filter-section/mobile-filters-drawer';
-import DeepSeasonCarousel from '../components/deep/season-carousel';
 import { chipClass, derivedCardStatus, visibilityLabel, hpCardCls } from './components/status-styles';
 
 // Страница «My media» v3 (swim-centric) — README design_handoff_my_swims_v3,1.
@@ -252,8 +257,9 @@ function MyMediaContent() {
     (groupFilter !== 'all' ? 1 : 0) +
     (seg === 'with' && statusFilter !== 'all' ? 1 : 0);
 
+  // Пловца и сезон сброс НЕ трогает (хендофф): это не сужение выборки, а ответ на вопрос
+  // «чьи заплывы и за какой сезон я смотрю» — сбросить их значит показать чужое.
   const clearAll = () => {
-    setSwimmerFilter('all');
     setSeg('all');
     setStatusFilter('all');
     setGroupFilter('all');
@@ -407,9 +413,153 @@ function MyMediaContent() {
 
   // Панель одна, а мест у неё два — сайдбар и шторка. Элемент можно переиспользовать:
   // React смонтирует по экземпляру на место, и раскрытые карточки у них свои.
+  // Раскрытость карточек держит страница, а не карточка: по колонке полосы нужно раскрыть
+  // именно её карточку. Открытых бывает несколько — это не аккордеон.
+  const [openCards, setOpenCards] = useState<Set<MediaCardKey>>(() => new Set(DEFAULT_OPEN_CARDS));
+  const setCardOpen = useCallback((key: MediaCardKey, open: boolean) => {
+    setOpenCards((prev) => {
+      const next = new Set(prev);
+      if (open) next.add(key); else next.delete(key);
+      return next;
+    });
+  }, []);
+  // Клик по колонке полосы: раскрыть карточку, а на узком экране ещё и открыть шторку —
+  // иначе раскрытая карточка осталась бы за кадром.
+  const revealCard = (key: MediaCardKey) => {
+    setCardOpen(key, true);
+    if (window.matchMedia('(max-width: 1023px)').matches) setMobileFiltersOpen(true);
+  };
+
+  const countLabel = `${filtered.length} ${filtered.length === 1 ? 'swim' : 'swims'}`;
+
+  /** Ячейка сезона в полосе: индикатор со стрелками ±1 сезон. Выбор — каруселью в панели. */
+  const seasonIdx = carouselSeason == null ? -1 : seasonChoices.indexOf(carouselSeason);
+  const seasonCell = (
+    <div className="mmb-season">
+      <span className="mmb-season__label">Season</span>
+      <div className="mmb-season__row">
+        {/* seasonChoices идёт от свежего к старому, поэтому «‹» — это шаг ВПЕРЁД по списку. */}
+        <button
+          type="button"
+          className="mmb-season__step"
+          aria-label="Previous season"
+          disabled={seasonIdx < 0 || seasonIdx >= seasonChoices.length - 1}
+          onClick={() => pickSeason(seasonChoices[seasonIdx + 1])}
+        >
+          ‹
+        </button>
+        <span className="mmb-season__value">
+          {carouselSeason == null ? '∞' : seasonLabel(carouselSeason).slice(2)}
+        </span>
+        <button
+          type="button"
+          className="mmb-season__step"
+          aria-label="Next season"
+          disabled={seasonIdx <= 0}
+          onClick={() => pickSeason(seasonChoices[seasonIdx - 1])}
+        >
+          ›
+        </button>
+      </div>
+    </div>
+  );
+
+  /** Чипы полосы — зеркало панели, по одному на карточку-фильтр (сезон стоит ведущей ячейкой). */
+  const barChips: FilterBarChip[] = [
+    {
+      key: 'swimmer',
+      label: 'Swimmer',
+      active: swimmerFilter !== 'all',
+      value: <span dir="auto">{selectedSwimmerName}</span>,
+      onClick: () => revealCard('swimmers'),
+    },
+    {
+      key: 'video',
+      label: 'Video',
+      active: seg !== 'all',
+      value: seg === 'with' ? 'With video' : 'No video',
+      onClick: () => revealCard('video'),
+    },
+    {
+      key: 'event',
+      label: 'Event',
+      active: styleFilter !== 'all',
+      value: (
+        <span className="mmb-event">
+          <UI_SwimmStyleIcon
+            styleName={styleFilter}
+            styleLen={distanceFilter === 'all' ? '' : distanceFilter}
+            styleType="icon-len"
+            className="src-my-media"
+          />
+        </span>
+      ),
+      onClick: () => revealCard('style'),
+    },
+    {
+      key: 'competition',
+      label: 'Competition',
+      active: competitionFilter !== 'all',
+      value: (
+        <span dir="auto">
+          {competitionOptions.find((c) => c.id === competitionFilter)?.name}
+        </span>
+      ),
+      onClick: () => revealCard('competition'),
+    },
+    {
+      key: 'date',
+      label: 'Date',
+      active: !!(dateFrom || dateTo),
+      value: dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : dateFrom || dateTo,
+      onClick: () => revealCard('date'),
+    },
+    {
+      key: 'group',
+      label: 'Shared with',
+      shortLabel: 'Shared',
+      active: groupFilter !== 'all',
+      value: (
+        <span dir="auto">
+          {groupFilter === 'none'
+            ? 'Not shared'
+            : groupOptions.groups.find((g) => g.id === groupFilter)?.name}
+        </span>
+      ),
+      onClick: () => revealCard('group'),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      active: seg === 'with' && statusFilter !== 'all',
+      value: statusFilter,
+      // Статус живёт только у видео: без него колонка врала бы, что фильтр доступен.
+      hideWhenIdle: seg !== 'with',
+      onClick: () => revealCard('status'),
+    },
+  ];
+
+  const seasonOptions = useMemo(
+    () => seasonChoices.map((y) => ({ season: y, label: seasonLabel(y) })),
+    [seasonChoices],
+  );
+
   const filterPanel = (
     <MyMediaFilterPanel
       host={filterHost}
+      seasons={seasonOptions}
+      season={carouselSeason}
+      onSeason={pickSeason}
+      swimmers={data.swimmers.map((sw) => ({
+        id: sw.id,
+        name: sw.name,
+        count: swims.filter((x) => swimBelongsTo(x, sw.id)).length,
+      }))}
+      swimmerFilter={swimmerFilter}
+      onSwimmer={setSwimmerFilter}
+      totalSwims={swims.length}
+      openCards={openCards}
+      onCardOpenChange={setCardOpen}
       seg={seg}
       onSeg={(k) => { setSeg(k); if (k !== 'with') setStatusFilter('all'); }}
       segCount={segCount}
@@ -515,44 +665,18 @@ function MyMediaContent() {
               </div>
             )}
 
-            {/* Swimmer chips + Add link */}
-            <div className="flex items-center gap-2 overflow-x-auto sm:flex-wrap sm:overflow-visible" style={{ scrollbarWidth: 'none' }}>
-              <button type="button" onClick={() => setSwimmerFilter('all')} className={chipClass(swimmerFilter === 'all')}>
-                All · {swims.length}
-              </button>
-              {data.swimmers.map((s) => (
-                <button key={s.id} type="button" onClick={() => setSwimmerFilter(s.id)} className={chipClass(swimmerFilter === s.id)}>
-                  <span
-                    className="inline-flex h-[17px] w-[17px] items-center justify-center rounded-full text-[8px] font-black"
-                    style={{ background: swimmerFilter === s.id ? 'rgba(4,16,31,0.2)' : '#2c3d52', color: swimmerFilter === s.id ? '#04101f' : '#bfe0f5' }}
-                  >
-                    {s.name.trim().charAt(0).toUpperCase()}
-                  </span>
-                  {/* dir только на имени: без изоляции иврит уводит счётчик влево. */}
-                  <span><span dir="auto">{s.name}</span> · {swims.filter((x) => swimBelongsTo(x, s.id)).length}</span>
-                </button>
-              ))}
+            {/* Наверху остаётся только действие: выбор пловца и сезона уехал в панель
+                фильтров карточками Swimmers и Season (хендофф, решение Влада 07.09.2026). */}
+            <div className="flex items-center justify-end">
               <button
                 type="button"
                 onClick={() => setAddOpen(true)}
-                className="hp-mono ml-auto hidden whitespace-nowrap rounded-[10px] border-none bg-[#38ef8f] px-[18px] py-[9px] text-[13px] font-extrabold text-[#04101f] sm:block"
+                className="hp-mono hidden whitespace-nowrap rounded-[10px] border-none bg-[#7dd3fc] px-[18px] py-[9px] text-[13px] font-extrabold text-[#04101f] sm:block"
               >
                 + Add link
               </button>
             </div>
 
-            {/* Сезон — каруселью, а не селектором: это не клиентский фильтр, а другой
-                запрос к серверу, и он обязан оставаться на виду, а не уезжать в панель.
-                ⚠ Карусель из семьи deep, её токены объявлены на классе `.theme-deep`, а не
-                на `:root`. Класс пока прибит гвоздём (страница тёмная жёстко); Ф5 переводит
-                на тему всю страницу, и он переедет на корень через `useDeepThemeClass()`. */}
-            <div className="theme-deep">
-              <DeepSeasonCarousel
-                seasons={seasonChoices.map((y) => ({ season: y, label: seasonLabel(y) }))}
-                season={carouselSeason}
-                onSeason={pickSeason}
-              />
-            </div>
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
               {/* Сайдбар фильтров (десктоп). Ширина фиксированная, как на results: строка
@@ -562,25 +686,23 @@ function MyMediaContent() {
               </aside>
 
               <div className="flex min-w-0 flex-1 flex-col gap-4">
-                {/* Кнопка панели (до lg) и сводка «сколько заплывов сейчас видно» */}
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setMobileFiltersOpen(true)}
-                    className="hp-mono flex min-h-[40px] shrink-0 items-center justify-center gap-2 rounded-[10px] border border-[rgba(125,211,252,0.35)] bg-transparent px-4 text-[13px] font-extrabold text-[#7dd3fc] lg:hidden"
-                    aria-expanded={mobileFiltersOpen}
-                    aria-controls="my-media-filters-sheet"
-                  >
-                    ⚙ Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
-                  </button>
-                  <p className="m-0 text-[11.5px] font-bold text-[rgba(203,224,240,0.5)]">
-                    {selectedSwimmerName && (
-                      <span dir="auto" className="mr-1.5 text-[12.5px] font-black text-[#7dd3fc]">{selectedSwimmerName}</span>
-                    )}
-                    {filtered.length} {filtered.length === 1 ? 'swim' : 'swims'}
-                    <span className="hidden sm:inline"> · sorted by date ↓</span>
-                  </p>
-                </div>
+                {/* Полоса выбранного — ОБЩИЙ `FilterBar`, тот же, что на results и
+                    `/season-best`. Колонки — зеркало панели: щелчок раскрывает карточку
+                    того фильтра, по которому щёлкнули (на узком экране — открывает шторку). */}
+                <FilterBar
+                  className="my-media-bar"
+                  desktop="columns"
+                  rows="card"
+                  lead={seasonCell}
+                  aside={<span className="text-[11px] font-bold text-[rgba(203,224,240,0.5)]">{countLabel}</span>}
+                  chips={barChips}
+                />
+                <p className="m-0 hidden text-[11.5px] font-bold text-[rgba(203,224,240,0.5)] md:block">
+                  {selectedSwimmerName && (
+                    <span dir="auto" className="mr-1.5 text-[12.5px] font-black text-[#7dd3fc]">{selectedSwimmerName}</span>
+                  )}
+                  {countLabel} · sorted by date ↓
+                </p>
 
                 {/* Main list / states */}
                 {loading ? (
@@ -804,6 +926,18 @@ function MyMediaContent() {
           }}
         />
       )}
+
+      {/* Кнопка-пилюля — общая с results (решение Влада 07.09.2026). Прибита к низу экрана:
+          фильтруют, уже прокрутив список, и кнопка в потоке к этому моменту уезжает. */}
+      <FiltersFab
+        className="my-media-fab"
+        open={mobileFiltersOpen}
+        onToggle={() => setMobileFiltersOpen((v) => !v)}
+        count={activeFilterCount}
+        controls="my-media-filters-sheet"
+        // У шторки свой подвал «Show N swims» — пилюля на открытой шторке легла бы на него.
+        hideWhenOpen
+      />
 
       {/* Шторка фильтров (до lg) — ОБЩИЙ компонент, тот же, что на results. Внутри та же
           панель, что в сайдбаре: расходиться им нельзя, иначе телефон и десктоп начнут

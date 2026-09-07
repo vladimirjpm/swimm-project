@@ -10,6 +10,7 @@ import Popup from '../components/popup/popup';
 import TrainingTable from '../training-table/training-table';
 import FilterTrainigSection from '../components/filter-trainig-section/filter-trainig-section';
 import MobileFiltersDrawer from '../components/filter-section/mobile-filters-drawer';
+import FiltersFab from '../components/filter-section/filters-fab';
 import DataSourceDDL from '../components/filter-data-source-ddl/filter-data-source-ddl';
 import { useTheme } from '../../hooks/useTheme';
 import { useMode } from '../../hooks/useMode';
@@ -55,32 +56,23 @@ function checkIsTraining(selectedSource: any, filters: any) {
 }
 
 /**
- * Плавающая кнопка «Filters / Apply» + общая шторка (Ф2 плана
- * `docs/plans/my-media-filters-plan.md`).
+ * Плавающая кнопка «Filters / Apply» + шторка — обе ОБЩИЕ (Ф2 и Ф4.0 плана
+ * `docs/plans/my-media-filters-plan.md`). Здесь остаётся только связка их состояния:
+ * что рисовать внутри, решает страница.
  *
- * Саму шторку рисует общий `MobileFiltersDrawer` — та же, что в личном кабинете. Здесь
- * остаётся только кнопка: она висит пилюлей поверх таблицы, то есть это хром ЭТОЙ страницы,
- * а не часть шторки (в кабинете триггер — обычная кнопка в потоке).
+ * Счётчик активных фильтров кнопке не передаётся: на results никто такого числа не считает,
+ * а рисовать ноль хуже, чем не рисовать ничего.
  */
 function MobileFiltersLauncher({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      {createPortal(
-        <button
-          type="button"
-          onClick={() => setOpen(v => !v)}
-          className="lg:hidden fixed bottom-4 left-1/2 z-[110] transform -translate-x-1/2 bg-[var(--theme-primary)] hover:bg-[var(--theme-primary-hover)] text-white px-5 py-2 rounded-full shadow-lg flex items-center gap-3 transition-colors"
-          aria-expanded={open}
-          aria-controls="mobile-filters-sheet"
-          title={open ? 'Apply' : 'Filters'}
-        >
-          <span className="font-medium">{open ? 'Apply' : 'Filters'}</span>
-          <span className="text-sm opacity-80">{open ? '▾' : '▴'}</span>
-        </button>,
-        document.body,
-      )}
+      <FiltersFab
+        open={open}
+        onToggle={() => setOpen((v) => !v)}
+        controls="mobile-filters-sheet"
+      />
 
       <MobileFiltersDrawer
         id="mobile-filters-sheet"

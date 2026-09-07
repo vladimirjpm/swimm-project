@@ -85,3 +85,55 @@
   padding: 12px 20px calc(20px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--fdrawer-border, var(--theme-mode-border));
 }
+
+/* ── Плавающая кнопка «Filters» (filters-fab.tsx) ─────────────────────────────── */
+
+/* Одна на две страницы (решение Влада 07.09.2026). Размеры — из хендоффа
+   `!design_handoff/design_handoff_my_media_filters`: 48px высота и радиус 24 вместо
+   прежних ~40 у results — палец попадает надёжнее, и рядом помещается счётчик. */
+.fpill {
+  position: fixed;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 22px;
+  border: none;
+  border-radius: 24px;
+  cursor: pointer;
+  background: var(--fpill-bg, var(--theme-primary));
+  color: var(--fpill-ink, #fff);
+  box-shadow: var(--fpill-shadow, 0 12px 30px rgba(2, 10, 24, 0.45));
+  transition: background-color 0.2s ease;
+}
+
+/* Кнопка мобильная: там, где панель стоит сайдбаром, ей нечего открывать. */
+@media (min-width: 1024px) {
+  .fpill { display: none; }
+}
+
+.fpill:hover { background: var(--fpill-bg-hover, var(--theme-primary-hover, var(--theme-primary))); }
+
+.fpill__label { font-size: 15px; font-weight: 800; }
+
+/* Счётчик активных фильтров: инверсия кнопки, чтобы читался на акценте. */
+.fpill__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--fpill-count-bg, var(--fpill-ink, #fff));
+  color: var(--fpill-count-text, var(--fpill-bg, var(--theme-primary)));
+  font-size: 11px;
+  font-weight: 900;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+.fpill__caret { font-size: 10px; opacity: 0.8; }
