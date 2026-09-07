@@ -466,8 +466,12 @@ function FromMembersGallery({ group }: { group: HubGroupDetails }) {
   if (items.length === 0) return null;
 
   return (
-    <div id="from-members" className="hp-card-std rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]" aria-label="From members">
-      <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">From members</h2>
+    <div id="from-members" className="hp-card-std rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]" aria-label="From members (everyone)">
+      {/* Обе секции «From members» подписаны уровнем — иначе по экрану не отличить, кто
+          увидит поданное видео. Слова и глобус те же, что у уровней публикации в My media
+          (`members` / `everyone 🌐`): один словарь на продукт, а не свой на каждой странице. */}
+      <h2 className="mb-1 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">🌐 From members</h2>
+      <p className="mb-4 text-[11.5px] italic text-[#cbe0f0]/45">Visible to everyone.</p>
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
         {items.map((item) => (
           <GalleryTile
@@ -514,8 +518,12 @@ function MembersPublications({ group }: { group: HubGroupDetails }) {
   if (items.length === 0) return null;
 
   return (
-    <div id="members-publications" className="hp-card-std rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]" aria-label="Members publications">
-      <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">From members</h2>
+    <div id="members-publications" className="hp-card-std rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]" aria-label="From members (members only)">
+      {/* Замок и подпись обязательны: рядом на странице живёт публичная секция с ТЕМ ЖЕ
+          заголовком, и без пометки по экрану не понять, кто увидит поданное видео.
+          Форма пометки — как у соседней «🔒 Reviews», второго диалекта тут заводить нельзя. */}
+      <h2 className="mb-1 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">🔒 From members</h2>
+      <p className="mb-4 text-[11.5px] italic text-[#cbe0f0]/45">Visible to group members only.</p>
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
         {items.map((item) => (
           <GalleryTile
