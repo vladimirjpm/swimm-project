@@ -105,59 +105,59 @@ function AddLinkModal({
     <span
       key={n}
       className="inline-block h-[7px] rounded-[4px] transition-all"
-      style={{ width: n === step ? 18 : 7, background: n <= step ? '#7dd3fc' : 'rgba(125,211,252,0.25)' }}
+      style={{ width: n === step ? 18 : 7, background: n <= step ? 'var(--t-accent)' : 'var(--t-border)' }}
     />
   ));
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(2,10,24,0.72)] backdrop-blur-[4px] sm:items-center"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--t-scrim)] backdrop-blur-[4px] sm:items-center"
       onClick={onClose}
     >
       <div
-        className="max-h-[calc(100vh-60px)] w-[540px] max-w-[calc(100vw-40px)] overflow-y-auto rounded-[20px] border border-[rgba(125,211,252,0.3)] bg-[linear-gradient(180deg,#0e2138,#081527)] p-[22px_24px] font-sans text-[#f3f8fd] shadow-[0_40px_90px_rgba(0,0,0,0.6)]"
+        className="max-h-[calc(100vh-60px)] w-[540px] max-w-[calc(100vw-40px)] overflow-y-auto rounded-[20px] border border-[var(--t-border)] bg-[var(--t-surface-strong)] p-[22px_24px] font-sans text-[var(--t-text)] shadow-[var(--t-shadow)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3">
           <h2 className="m-0 text-[19px] font-black tracking-[-0.02em]">{singleStep ? 'Add media' : 'Add link'}</h2>
           {!singleStep && <div className="ml-1.5 flex gap-[5px]">{stepDots}</div>}
-          {!singleStep && <span className="hp-mono ml-auto text-[11px] font-extrabold text-[rgba(125,211,252,0.6)]">step {step} / 3</span>}
-          <button type="button" onClick={onClose} className={`cursor-pointer border-none bg-transparent p-1 text-[16px] text-[rgba(203,224,240,0.6)] ${singleStep ? 'ml-auto' : ''}`}>✕</button>
+          {!singleStep && <span className="hp-mono ml-auto text-[11px] font-extrabold text-[var(--t-accent-dim)]">step {step} / 3</span>}
+          <button type="button" onClick={onClose} className={`cursor-pointer border-none bg-transparent p-1 text-[16px] text-[var(--t-text-2)] ${singleStep ? 'ml-auto' : ''}`}>✕</button>
         </div>
 
         {singleStep && contextLabel && (
-          <div className="mt-3 rounded-[12px] border border-[rgba(125,211,252,0.25)] bg-[rgba(2,10,24,0.35)] p-[10px_14px] text-[13px]">
+          <div className="mt-3 rounded-[12px] border border-[var(--t-border)] bg-[var(--t-input-bg)] p-[10px_14px] text-[13px]">
             {contextLabel}
           </div>
         )}
 
         {step === 1 && (
           <div className="mt-[18px] flex flex-col gap-[14px]">
-            <label className="text-[12px] font-extrabold uppercase tracking-[0.14em] text-[#7dd3fc]">Paste a link</label>
+            <label className="text-[12px] font-extrabold uppercase tracking-[0.14em] text-[var(--t-accent)]">Paste a link</label>
             <input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://www.youtube.com/watch?v=…"
-              className="hp-mono w-full rounded-[10px] border border-[rgba(125,211,252,0.35)] bg-[rgba(2,10,24,0.5)] p-[12px_14px] text-[13px] text-[#f3f8fd] outline-none"
+              className="hp-mono w-full rounded-[10px] border border-[var(--t-accent-border)] bg-[var(--t-input-bg)] p-[12px_14px] text-[13px] text-[var(--t-text)] outline-none"
             />
             {url.trim().length > 0 && (
               <>
                 <div className="flex items-center gap-[10px]">
-                  <span className="hp-mono whitespace-nowrap rounded-[6px] border border-[rgba(56,239,143,0.45)] bg-[rgba(56,239,143,0.08)] px-[9px] py-[3px] text-[10.5px] font-extrabold text-[#38ef8f]">
+                  <span className="hp-mono whitespace-nowrap rounded-[6px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-[9px] py-[3px] text-[10.5px] font-extrabold text-[var(--t-accent)]">
                     detected · {detected}
                   </span>
                   {isOther && (
-                    <div className="inline-flex overflow-hidden rounded-[8px] border border-[rgba(125,211,252,0.35)]">
+                    <div className="inline-flex overflow-hidden rounded-[8px] border border-[var(--t-accent-border)]">
                       <button type="button" onClick={() => setOtherKind('video')} className={segmentClass(otherKind === 'video', false)}>Video</button>
                       <button type="button" onClick={() => setOtherKind('photo')} className={segmentClass(otherKind === 'photo', true)}>Photo</button>
                     </div>
                   )}
                 </div>
-                <div className="flex aspect-video items-center justify-center rounded-[12px] border border-[rgba(125,211,252,0.2)] bg-[linear-gradient(140deg,#12314f,#0a1c33)]">
+                <div className="flex aspect-video items-center justify-center rounded-[12px] border border-[var(--t-border)] bg-[var(--t-surface2)]">
                   {kind === 'photo' && /^https?:\/\//i.test(url) ? (
                     <img src={url} alt="" className="h-full w-full rounded-[12px] object-cover" />
                   ) : (
-                    <span className="flex h-12 w-12 items-center justify-center rounded-full border border-[rgba(125,211,252,0.4)] bg-[rgba(2,10,24,0.65)] text-[16px] text-[#7dd3fc]">
+                    <span className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--t-accent-border)] bg-[var(--t-scrim)] text-[16px] text-[var(--t-accent)]">
                       {kind === 'photo' ? '🖼' : '▶'}
                     </span>
                   )}
@@ -165,13 +165,13 @@ function AddLinkModal({
               </>
             )}
             <div className="mt-1 flex justify-end gap-2">
-              <button type="button" onClick={onClose} className="hp-mono rounded-[10px] border border-[rgba(125,211,252,0.3)] bg-transparent px-4 py-[9px] text-[12px] font-extrabold text-[rgba(125,211,252,0.7)]">Cancel</button>
+              <button type="button" onClick={onClose} className="hp-mono rounded-[10px] border border-[var(--t-border)] bg-transparent px-4 py-[9px] text-[12px] font-extrabold text-[var(--t-accent-dim)]">Cancel</button>
               <button
                 type="button"
                 disabled={!canNext || (singleStep && saving)}
                 onClick={() => (singleStep ? save('none') : setStep(2))}
                 className="hp-mono rounded-[10px] border-none px-[18px] py-[9px] text-[12px] font-extrabold disabled:cursor-default"
-                style={{ background: canNext ? '#38ef8f' : 'rgba(56,239,143,0.25)', color: canNext ? '#04101f' : 'rgba(4,16,31,0.6)' }}
+                style={{ background: canNext ? 'var(--t-accent)' : 'var(--t-border)', color: canNext ? 'var(--t-accent-ink)' : 'var(--t-input-bg)' }}
               >
                 {singleStep ? 'Save' : 'Next →'}
               </button>
@@ -181,7 +181,7 @@ function AddLinkModal({
 
         {step === 2 && (
           <div className="mt-[18px] flex flex-col gap-[14px]">
-            <label className="text-[12px] font-extrabold uppercase tracking-[0.14em] text-[#7dd3fc]">Whose swim is it?</label>
+            <label className="text-[12px] font-extrabold uppercase tracking-[0.14em] text-[var(--t-accent)]">Whose swim is it?</label>
             <div className="flex flex-col gap-2">
               {swimmers.map((s) => {
                 const active = swimmerId === s.id;
@@ -190,32 +190,32 @@ function AddLinkModal({
                     key={s.id}
                     type="button"
                     onClick={() => setSwimmerId(s.id)}
-                    className="flex min-h-[48px] w-full items-center gap-3 rounded-[12px] p-[10px_14px] text-left font-sans text-[#f3f8fd]"
+                    className="flex min-h-[48px] w-full items-center gap-3 rounded-[12px] p-[10px_14px] text-left font-sans text-[var(--t-text)]"
                     style={{
-                      border: `1px solid ${active ? '#7dd3fc' : 'rgba(125,211,252,0.25)'}`,
-                      background: active ? 'rgba(125,211,252,0.12)' : 'rgba(2,10,24,0.35)',
+                      border: `1px solid ${active ? 'var(--t-accent)' : 'var(--t-border)'}`,
+                      background: active ? 'var(--t-accent-soft)' : 'var(--t-input-bg)',
                     }}
                   >
-                    <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-[#2c3d52] text-[12px] font-black text-[#bfe0f5]">
+                    <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-[var(--t-surface2)] text-[12px] font-black text-[var(--t-text-2)]">
                       {s.name.trim().charAt(0).toUpperCase()}
                     </span>
                     <span className="text-[14px] font-extrabold">{s.name}</span>
-                    <span className="ml-auto text-[11.5px] text-[rgba(203,224,240,0.5)]">{s.hint}</span>
+                    <span className="ml-auto text-[11.5px] text-[var(--t-text-3)]">{s.hint}</span>
                   </button>
                 );
               })}
               {swimmers.length === 0 && (
-                <p className="text-[13px] text-[rgba(203,224,240,0.6)]">No swimmers yet — add a favorite first.</p>
+                <p className="text-[13px] text-[var(--t-text-2)]">No swimmers yet — add a favorite first.</p>
               )}
             </div>
             <div className="mt-1 flex justify-between gap-2">
-              <button type="button" onClick={() => setStep(1)} className="hp-mono rounded-[10px] border border-[rgba(125,211,252,0.3)] bg-transparent px-4 py-[9px] text-[12px] font-extrabold text-[rgba(125,211,252,0.7)]">← Back</button>
+              <button type="button" onClick={() => setStep(1)} className="hp-mono rounded-[10px] border border-[var(--t-border)] bg-transparent px-4 py-[9px] text-[12px] font-extrabold text-[var(--t-accent-dim)]">← Back</button>
               <button
                 type="button"
                 disabled={!canNext}
                 onClick={() => setStep(3)}
                 className="hp-mono rounded-[10px] border-none px-[18px] py-[9px] text-[12px] font-extrabold disabled:cursor-default"
-                style={{ background: canNext ? '#38ef8f' : 'rgba(56,239,143,0.25)', color: canNext ? '#04101f' : 'rgba(4,16,31,0.6)' }}
+                style={{ background: canNext ? 'var(--t-accent)' : 'var(--t-border)', color: canNext ? 'var(--t-accent-ink)' : 'var(--t-input-bg)' }}
               >
                 Next →
               </button>
@@ -225,8 +225,8 @@ function AddLinkModal({
 
         {step === 3 && (
           <div className="mt-[18px] flex flex-col gap-[14px]">
-            <label className="text-[12px] font-extrabold uppercase tracking-[0.14em] text-[#7dd3fc]">
-              Link to a swim <span className="text-[normal] font-bold normal-case tracking-normal text-[rgba(203,224,240,0.45)]">· optional</span>
+            <label className="text-[12px] font-extrabold uppercase tracking-[0.14em] text-[var(--t-accent)]">
+              Link to a swim <span className="text-[normal] font-bold normal-case tracking-normal text-[var(--t-text-3)]">· optional</span>
             </label>
             <div className="flex flex-wrap gap-[6px]">
               {competitions.map((c) => (
@@ -241,7 +241,7 @@ function AddLinkModal({
                 </button>
               ))}
               {competitions.length === 0 && (
-                <p className="text-[12.5px] text-[rgba(203,224,240,0.5)]">No competitions found for this swimmer.</p>
+                <p className="text-[12.5px] text-[var(--t-text-3)]">No competitions found for this swimmer.</p>
               )}
             </div>
             {competitionId != null && (
@@ -253,27 +253,27 @@ function AddLinkModal({
                       key={s.result_id}
                       type="button"
                       onClick={() => setResultId(s.result_id)}
-                      className="flex w-full items-center rounded-[12px] p-[10px_14px] text-left font-sans text-[#f3f8fd]"
+                      className="flex w-full items-center rounded-[12px] p-[10px_14px] text-left font-sans text-[var(--t-text)]"
                       style={{
-                        border: `1px solid ${active ? '#7dd3fc' : 'rgba(125,211,252,0.25)'}`,
-                        background: active ? 'rgba(125,211,252,0.12)' : 'rgba(2,10,24,0.35)',
+                        border: `1px solid ${active ? 'var(--t-accent)' : 'var(--t-border)'}`,
+                        background: active ? 'var(--t-accent-soft)' : 'var(--t-input-bg)',
                       }}
                     >
                       <span className="text-[13px] font-extrabold">{s.distance}m {s.style}</span>
-                      <span className="hp-mono ml-auto text-[12px] font-extrabold text-[#7dd3fc]">{s.time}</span>
+                      <span className="hp-mono ml-auto text-[12px] font-extrabold text-[var(--t-accent)]">{s.time}</span>
                     </button>
                   );
                 })}
               </div>
             )}
             <div className="mt-1 flex justify-between gap-2">
-              <button type="button" onClick={() => setStep(2)} className="hp-mono rounded-[10px] border border-[rgba(125,211,252,0.3)] bg-transparent px-4 py-[9px] text-[12px] font-extrabold text-[rgba(125,211,252,0.7)]">← Back</button>
+              <button type="button" onClick={() => setStep(2)} className="hp-mono rounded-[10px] border border-[var(--t-border)] bg-transparent px-4 py-[9px] text-[12px] font-extrabold text-[var(--t-accent-dim)]">← Back</button>
               <div className="flex flex-wrap justify-end gap-2">
                 <button
                   type="button"
                   disabled={saving}
                   onClick={() => save('none')}
-                  className="hp-mono rounded-[10px] border border-[rgba(125,211,252,0.35)] bg-transparent px-4 py-[9px] text-[12px] font-extrabold text-[#7dd3fc] disabled:opacity-50"
+                  className="hp-mono rounded-[10px] border border-[var(--t-accent-border)] bg-transparent px-4 py-[9px] text-[12px] font-extrabold text-[var(--t-accent)] disabled:opacity-50"
                 >
                   Skip — save as general
                 </button>
@@ -282,7 +282,7 @@ function AddLinkModal({
                     type="button"
                     disabled={saving}
                     onClick={() => save('competition')}
-                    className="hp-mono rounded-[10px] border border-dashed border-[rgba(56,239,143,0.5)] bg-transparent px-4 py-[9px] text-[12px] font-extrabold text-[#38ef8f] disabled:opacity-50"
+                    className="hp-mono rounded-[10px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-4 py-[9px] text-[12px] font-extrabold text-[var(--t-accent)] disabled:opacity-50"
                   >
                     📎 Whole competition
                   </button>
@@ -292,7 +292,7 @@ function AddLinkModal({
                   disabled={resultId == null || saving}
                   onClick={() => save('result')}
                   className="hp-mono rounded-[10px] border-none px-[18px] py-[9px] text-[12px] font-extrabold disabled:cursor-default"
-                  style={{ background: resultId != null ? '#38ef8f' : 'rgba(56,239,143,0.25)', color: resultId != null ? '#04101f' : 'rgba(4,16,31,0.6)' }}
+                  style={{ background: resultId != null ? 'var(--t-accent)' : 'var(--t-border)', color: resultId != null ? 'var(--t-accent-ink)' : 'var(--t-input-bg)' }}
                 >
                   Save
                 </button>

@@ -7,6 +7,7 @@ import { useLoginModal } from '../components/login-modal/login-modal-context';
 import { useFavorites } from '../../hooks/useFavorites';
 import { useMyMediaPublications } from '../../hooks/useUserMedia';
 import { useMyHubGroups } from '../hub-groups-project/use-my-hub-groups';
+import { useDeepThemeClass } from '../components/deep/use-deep-theme-class';
 import { useAllMyMedia, AllUserMediaDto, AddMediaInput } from './use-all-my-media';
 import { useMySwims, MySwimDto, SwimMediaDto, seasonLabel, toggleLike, toggleCheer } from './use-my-swims';
 import { useMyMediaModeration } from './use-my-media-moderation';
@@ -32,29 +33,36 @@ import MobileFiltersDrawer from '../components/filter-section/mobile-filters-dra
 import { chipClass, derivedCardStatus, visibilityLabel, hpCardCls } from './components/status-styles';
 
 // Страница «My media» v3 (swim-centric) — README design_handoff_my_swims_v3,1.
-// Тёмный стиль groups.html/home.html — осознанное решение, не через var(--theme-mode-*).
+// Палитра — тема deep (light + dark), как у страниц пловца, клуба и /season-best: вёрстка
+// просит роли `--t-*`, карта ролей на `--deep-*` живёт в my-media.css (Ф5).
 
 function MyMedia() {
   const auth = useAuth();
   const { openLoginModal } = useLoginModal();
+  // Класс темы deep (`.theme-deep` / `.theme-deep-light`) под текущий режим сайта: токены
+  // `--deep-*` объявлены на классе, а не на `:root`, и без него страница рисуется пустыми
+  // переменными (Ф5).
+  const deep = useDeepThemeClass();
 
   if (auth.loading) {
-    return <div className="min-h-screen bg-[#050e1c]" />;
+    return <div className="min-h-screen bg-[var(--deep-page-bg)]" />;
   }
 
   if (!auth.isAuthenticated) {
     return (
-      <div className="home-page relative flex min-h-screen items-center justify-center overflow-x-clip px-4 text-[#f3f8fd]">
-        <div className="hp-shimmer" aria-hidden="true" />
+      <div
+        className={`my-media ${deep} relative flex min-h-screen items-center justify-center overflow-x-clip px-4 text-[var(--t-text)]`}
+        style={{ background: 'var(--deep-hero-grad)' }}
+      >
         <AppTopbar />
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-full max-w-md rounded-[18px] border border-[rgba(125,211,252,0.22)] bg-[linear-gradient(180deg,rgba(56,189,248,0.08),rgba(8,25,48,0.78))] p-8 text-center shadow-[0_24px_60px_rgba(2,10,24,0.5)]">
-            <h1 className="mb-2 text-lg font-black text-[#f3f8fd]">My media</h1>
-            <p className="mb-4 text-sm text-[rgba(203,224,240,0.7)]">Sign in to manage your media</p>
+          <div className="w-full max-w-md rounded-[18px] border border-[var(--t-border)] bg-[var(--t-card)] p-8 text-center shadow-[var(--t-shadow)]">
+            <h1 className="mb-2 text-lg font-black text-[var(--t-text)]">My media</h1>
+            <p className="mb-4 text-sm text-[var(--t-text-2)]">Sign in to manage your media</p>
             <button
               type="button"
               onClick={openLoginModal}
-              className="hp-mono rounded-[11px] bg-[#38ef8f] px-4 py-2 text-sm font-extrabold text-[#04101f]"
+              className="hp-mono rounded-[11px] bg-[var(--t-accent)] px-4 py-2 text-sm font-extrabold text-[var(--t-accent-ink)]"
             >
               Sign in
             </button>
@@ -64,10 +72,10 @@ function MyMedia() {
     );
   }
 
-  return <MyMediaContent />;
+  return <MyMediaContent deep={deep} />;
 }
 
-function MyMediaContent() {
+function MyMediaContent({ deep }: { deep: string }) {
   const auth = useAuth();
   const favorites = useFavorites();
   const { media: allMedia, remove, add } = useAllMyMedia();
@@ -597,12 +605,11 @@ function MyMediaContent() {
 
   return (
     <div
-      className={`my-media home-page relative min-h-screen overflow-x-clip pb-24 text-[#f3f8fd]${
+      className={`my-media ${deep} relative min-h-screen overflow-x-clip pb-24 text-[var(--t-text)]${
         tab === 'moderation' ? ' my-media--moderation' : ''
       }`}
-      style={{ background: 'linear-gradient(160deg,#0d2036 0%,#0b1b31 45%,#050e1c 100%)' }}
+      style={{ background: 'var(--deep-hero-grad)' }}
     >
-      <div className="hp-shimmer" aria-hidden="true" />
       <AppTopbar />
 
       {/* Шапка (хендофф 2a/2c): имя · заголовок · папки-табы · «+ Add link». Чипы
@@ -651,12 +658,12 @@ function MyMediaContent() {
         {tab === 'media' ? (
           <div className="flex flex-col gap-4">
             {showModeration && pendingModCount > 0 && (
-              <div className="flex items-center gap-3 rounded-[14px] border border-[rgba(255,202,122,0.4)] bg-[linear-gradient(180deg,rgba(255,202,122,0.1),rgba(8,25,48,0.6))] p-[12px_16px]">
-                <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-[11px] bg-[#ffca7a] px-1.5 text-[12px] font-black text-[#3a2a08]">
+              <div className="flex items-center gap-3 rounded-[14px] border border-[var(--t-warn-border)] bg-[var(--t-warn-soft)] p-[12px_16px]">
+                <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-[11px] bg-[var(--t-warn)] px-1.5 text-[12px] font-black text-[var(--t-warn-ink)]">
                   {pendingModCount}
                 </span>
-                <span className="min-w-0 text-[13.5px] font-bold text-[#ffe3b8]">requests are waiting for your approval</span>
-                <button type="button" onClick={() => setTab('moderation')} className="hp-mono ml-auto rounded-[9px] border-none bg-[#ffca7a] px-3.5 py-[7px] text-[12px] font-extrabold text-[#3a2a08]">
+                <span className="min-w-0 text-[13.5px] font-bold text-[var(--t-warn)]">requests are waiting for your approval</span>
+                <button type="button" onClick={() => setTab('moderation')} className="hp-mono ml-auto rounded-[9px] border-none bg-[var(--t-warn)] px-3.5 py-[7px] text-[12px] font-extrabold text-[var(--t-warn-ink)]">
                   Review →
                 </button>
               </div>
@@ -679,12 +686,12 @@ function MyMediaContent() {
                   desktop="columns"
                   rows="card"
                   lead={seasonCell}
-                  aside={<span className="text-[11px] font-bold text-[rgba(203,224,240,0.5)]">{countLabel}</span>}
+                  aside={<span className="text-[11px] font-bold text-[var(--t-text-3)]">{countLabel}</span>}
                   chips={barChips}
                 />
-                <p className="m-0 hidden text-[11.5px] font-bold text-[rgba(203,224,240,0.5)] md:block">
+                <p className="m-0 hidden text-[11.5px] font-bold text-[var(--t-text-3)] md:block">
                   {selectedSwimmerName && (
-                    <span dir="auto" className="mr-1.5 text-[12.5px] font-black text-[#7dd3fc]">{selectedSwimmerName}</span>
+                    <span dir="auto" className="mr-1.5 text-[12.5px] font-black text-[var(--t-accent)]">{selectedSwimmerName}</span>
                   )}
                   {countLabel} · sorted by date ↓
                 </p>
@@ -699,29 +706,29 @@ function MyMediaContent() {
                 ) : data.swimmers.length === 0 ? (
                   <div className={`${hpCardCls} p-[56px_40px] text-center`}>
                     <div className="text-[40px]">⭐</div>
-                    <p className="m-0 mt-3 text-[17px] font-black text-[#f3f8fd]">No favorite swimmers yet</p>
-                    <p className="mx-auto mt-2 max-w-[380px] text-[13px] leading-[1.5] text-[rgba(203,224,240,0.6)]">
+                    <p className="m-0 mt-3 text-[17px] font-black text-[var(--t-text)]">No favorite swimmers yet</p>
+                    <p className="mx-auto mt-2 max-w-[380px] text-[13px] leading-[1.5] text-[var(--t-text-2)]">
                       Add a swimmer to favorites — their swims will appear here and you can attach videos.
                     </p>
-                    <a href={routes.results()} className="hp-mono mt-[18px] inline-block rounded-[10px] border-none bg-[#38ef8f] px-5 py-[10px] text-[13px] font-extrabold text-[#04101f] no-underline">
+                    <a href={routes.results()} className="hp-mono mt-[18px] inline-block rounded-[10px] border-none bg-[var(--t-accent)] px-5 py-[10px] text-[13px] font-extrabold text-[var(--t-accent-ink)] no-underline">
                       Find swimmers →
                     </a>
                   </div>
                 ) : swims.length === 0 ? (
-                  <div className="rounded-[16px] border border-dashed border-[rgba(125,211,252,0.25)] p-10 text-center">
-                    <p className="m-0 text-[14px] font-bold text-[rgba(203,224,240,0.6)]">
+                  <div className="rounded-[16px] border border-dashed border-[var(--t-border)] p-10 text-center">
+                    <p className="m-0 text-[14px] font-bold text-[var(--t-text-2)]">
                       {data.all_seasons ? 'No results yet' : `No results in season ${seasonLabel(effectiveSeason)}`}
                     </p>
                     {data.seasons.filter((y) => y !== effectiveSeason).slice(0, 1).map((y) => (
-                      <button key={y} type="button" onClick={() => setSeason(y)} className="hp-mono mt-3 rounded-[9px] border border-[rgba(125,211,252,0.4)] bg-transparent px-3.5 py-[7px] text-[12px] font-extrabold text-[#7dd3fc]">
+                      <button key={y} type="button" onClick={() => setSeason(y)} className="hp-mono mt-3 rounded-[9px] border border-[var(--t-accent-border)] bg-transparent px-3.5 py-[7px] text-[12px] font-extrabold text-[var(--t-accent)]">
                         Season {seasonLabel(y)} →
                       </button>
                     ))}
                   </div>
                 ) : filtered.length === 0 ? (
-                  <div className="rounded-[16px] border border-dashed border-[rgba(125,211,252,0.25)] p-10 text-center">
-                    <p className="m-0 text-[14px] font-bold text-[rgba(203,224,240,0.6)]">Nothing matches the filters</p>
-                    <button type="button" onClick={clearAll} className="hp-mono mt-3 rounded-[9px] border border-[rgba(125,211,252,0.4)] bg-transparent px-3.5 py-[7px] text-[12px] font-extrabold text-[#7dd3fc]">
+                  <div className="rounded-[16px] border border-dashed border-[var(--t-border)] p-10 text-center">
+                    <p className="m-0 text-[14px] font-bold text-[var(--t-text-2)]">Nothing matches the filters</p>
+                    <button type="button" onClick={clearAll} className="hp-mono mt-3 rounded-[9px] border border-[var(--t-accent-border)] bg-transparent px-3.5 py-[7px] text-[12px] font-extrabold text-[var(--t-accent)]">
                       Clear all
                     </button>
                   </div>
@@ -742,11 +749,11 @@ function MyMediaContent() {
                     <button
                       type="button"
                       onClick={() => setUnlinkedOpen((v) => !v)}
-                      className="hp-mono flex w-full items-center gap-2 rounded-[12px] border border-[rgba(125,211,252,0.25)] bg-transparent px-4 py-[10px] text-left text-[12px] font-extrabold text-[#7dd3fc]"
+                      className="hp-mono flex w-full items-center gap-2 rounded-[12px] border border-[var(--t-border)] bg-transparent px-4 py-[10px] text-left text-[12px] font-extrabold text-[var(--t-accent)]"
                     >
                       Unlinked media
-                      <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[9px] bg-[rgba(125,211,252,0.18)] px-1.5 text-[10.5px]">{visibleUnlinkedMedia.length}</span>
-                      <span className="font-bold normal-case text-[rgba(203,224,240,0.45)]">· club videos and general footage not tied to any swim</span>
+                      <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[9px] bg-[var(--t-accent-soft)] px-1.5 text-[10.5px]">{visibleUnlinkedMedia.length}</span>
+                      <span className="font-bold normal-case text-[var(--t-text-3)]">· club videos and general footage not tied to any swim</span>
                       <span className="ml-auto">{unlinkedOpen ? '▲' : '▼'}</span>
                     </button>
                     {unlinkedOpen && (
@@ -769,7 +776,7 @@ function MyMediaContent() {
                       <button
                         type="button"
                         onClick={() => setAddOpen(true)}
-                        className="hp-mono mt-3 rounded-[9px] border border-dashed border-[rgba(56,239,143,0.4)] bg-transparent px-3.5 py-[7px] text-[12px] font-extrabold text-[rgba(56,239,143,0.8)]"
+                        className="hp-mono mt-3 rounded-[9px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-3.5 py-[7px] text-[12px] font-extrabold text-[var(--t-accent-dim)]"
                       >
                         + Add link without a swim
                       </button>
@@ -792,7 +799,7 @@ function MyMediaContent() {
         <button
           type="button"
           onClick={() => setAddOpen(true)}
-          className="hp-mono fixed bottom-5 left-1/2 z-40 -translate-x-1/2 rounded-full border-none bg-[#38ef8f] px-6 py-3 text-[13px] font-extrabold text-[#04101f] shadow-[0_12px_30px_rgba(0,0,0,0.45)] sm:hidden"
+          className="hp-mono fixed bottom-5 left-1/2 z-40 -translate-x-1/2 rounded-full border-none bg-[var(--t-accent)] px-6 py-3 text-[13px] font-extrabold text-[var(--t-accent-ink)] shadow-[var(--t-shadow)] sm:hidden"
         >
           + Add link
         </button>
@@ -816,8 +823,8 @@ function MyMediaContent() {
           contextLabel={
             <span>
               <b>{addVideoSwim.distance}m {addVideoSwim.style}</b>
-              <span className="hp-mono ml-2 text-[#7dd3fc]">{addVideoSwim.time}</span>
-              <span dir="auto" className="ml-2 text-[rgba(203,224,240,0.55)]">{addVideoSwim.competition_name} · {addVideoSwim.competition_date}</span>
+              <span className="hp-mono ml-2 text-[var(--t-accent)]">{addVideoSwim.time}</span>
+              <span dir="auto" className="ml-2 text-[var(--t-text-2)]">{addVideoSwim.competition_name} · {addVideoSwim.competition_date}</span>
             </span>
           }
           onClose={() => setAddVideoSwim(null)}
@@ -834,7 +841,7 @@ function MyMediaContent() {
           contextLabel={
             <span>
               <b>Competition media</b> 📎
-              <span dir="auto" className="ml-2 text-[rgba(203,224,240,0.55)]">{addCompTarget.name}</span>
+              <span dir="auto" className="ml-2 text-[var(--t-text-2)]">{addCompTarget.name}</span>
             </span>
           }
           onClose={() => setAddCompTarget(null)}
@@ -844,14 +851,14 @@ function MyMediaContent() {
 
       {/* Share with a group — модал (mobile actions sheet + Unlinked) */}
       {shareTarget && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(2,10,24,0.72)] backdrop-blur-[4px]" onClick={() => setShareTarget(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--t-scrim)] backdrop-blur-[4px]" onClick={() => setShareTarget(null)}>
           <div
-            className="w-[420px] max-w-[calc(100vw-40px)] rounded-[16px] border border-[rgba(125,211,252,0.3)] bg-[linear-gradient(180deg,#0e2138,#081527)] p-5 text-[#f3f8fd]"
+            className="w-[420px] max-w-[calc(100vw-40px)] rounded-[16px] border border-[var(--t-border)] bg-[var(--t-surface-strong)] p-5 text-[var(--t-text)]"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="m-0 mb-3 text-[15px] font-black">Share with a group</h3>
             {shareTargets != null && shareTargets.length === 0 && (
-              <p className="text-[12px] text-[rgba(203,224,240,0.6)]">
+              <p className="text-[12px] text-[var(--t-text-2)]">
                 No eligible groups — the swimmer must be in the group's roster and you must be a member.
               </p>
             )}
@@ -860,7 +867,7 @@ function MyMediaContent() {
                 <select
                   value={shareGroupId}
                   onChange={(e) => setShareGroupId(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="rounded-[8px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-2.5 py-2 text-[12px] text-[#f3f8fd]"
+                  className="rounded-[8px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-2.5 py-2 text-[12px] text-[var(--t-text)]"
                 >
                   <option value="">— group —</option>
                   {shareTargets.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -868,24 +875,24 @@ function MyMediaContent() {
                 <select
                   value={shareLevel}
                   onChange={(e) => setShareLevel(e.target.value as 'members' | 'public')}
-                  className="rounded-[8px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-2.5 py-2 text-[12px] text-[#f3f8fd]"
+                  className="rounded-[8px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-2.5 py-2 text-[12px] text-[var(--t-text)]"
                 >
                   <option value="members">Group members</option>
                   <option value="public">Public (visible to everyone)</option>
                 </select>
                 {shareLevel === 'public' && (
-                  <p className="m-0 text-[11px] text-[#ffca7a]">Public = visible to everyone on the internet after approval.</p>
+                  <p className="m-0 text-[11px] text-[var(--t-warn)]">Public = visible to everyone on the internet after approval.</p>
                 )}
-                {shareError && <div className="text-[11.5px] text-[#ef5350]">{shareError}</div>}
+                {shareError && <div className="text-[11.5px] text-[var(--t-danger)]">{shareError}</div>}
                 <div className="flex justify-end gap-2">
-                  <button type="button" onClick={() => setShareTarget(null)} className="hp-mono rounded-[8px] border border-[rgba(125,211,252,0.3)] bg-transparent px-3 py-[7px] text-[11.5px] font-extrabold text-[rgba(125,211,252,0.7)]">
+                  <button type="button" onClick={() => setShareTarget(null)} className="hp-mono rounded-[8px] border border-[var(--t-border)] bg-transparent px-3 py-[7px] text-[11.5px] font-extrabold text-[var(--t-accent-dim)]">
                     Cancel
                   </button>
                   <button
                     type="button"
                     disabled={shareBusy || shareGroupId === ''}
                     onClick={handlePublish}
-                    className="hp-mono rounded-[8px] border-none bg-[#38ef8f] px-3 py-[7px] text-[11.5px] font-extrabold text-[#04101f] disabled:opacity-50"
+                    className="hp-mono rounded-[8px] border-none bg-[var(--t-accent)] px-3 py-[7px] text-[11.5px] font-extrabold text-[var(--t-accent-ink)] disabled:opacity-50"
                   >
                     Submit for approval
                   </button>
@@ -915,7 +922,7 @@ function MyMediaContent() {
       {/* Кнопка-пилюля — общая с results (решение Влада 07.09.2026). Прибита к низу экрана:
           фильтруют, уже прокрутив список, и кнопка в потоке к этому моменту уезжает. */}
       <FiltersFab
-        className="my-media-fab"
+        className={`my-media-fab ${deep}`}
         open={mobileFiltersOpen}
         onToggle={() => setMobileFiltersOpen((v) => !v)}
         count={activeFilterCount}
@@ -929,7 +936,7 @@ function MyMediaContent() {
           фильтровать по-разному. */}
       <MobileFiltersDrawer
         id="my-media-filters-sheet"
-        className="my-media-filters"
+        className={`my-media-filters ${deep}`}
         variant="sheet"
         open={mobileFiltersOpen}
         onClose={() => setMobileFiltersOpen(false)}
@@ -937,7 +944,7 @@ function MyMediaContent() {
           <button
             type="button"
             onClick={() => setMobileFiltersOpen(false)}
-            className="hp-mono min-h-[44px] w-full rounded-[10px] border-none bg-[#38ef8f] text-[13px] font-extrabold text-[#04101f]"
+            className="hp-mono min-h-[44px] w-full rounded-[10px] border-none bg-[var(--t-accent)] text-[13px] font-extrabold text-[var(--t-accent-ink)]"
           >
             Show {filtered.length} {filtered.length === 1 ? 'swim' : 'swims'}
           </button>
@@ -948,17 +955,17 @@ function MyMediaContent() {
 
       {/* Mobile actions bottom sheet */}
       {actionsSwim && (
-        <div className="fixed inset-0 z-[100] flex items-end bg-[rgba(2,10,24,0.72)] backdrop-blur-[4px] sm:hidden" onClick={() => setActionsFor(null)}>
+        <div className="fixed inset-0 z-[100] flex items-end bg-[var(--t-scrim)] backdrop-blur-[4px] sm:hidden" onClick={() => setActionsFor(null)}>
           <div
-            className="w-full rounded-t-[20px] border-t border-[rgba(125,211,252,0.3)] bg-[linear-gradient(180deg,#0e2138,#081527)] p-5 text-[#f3f8fd]"
+            className="w-full rounded-t-[20px] border-t border-[var(--t-border)] bg-[var(--t-surface-strong)] p-5 text-[var(--t-text)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[rgba(125,211,252,0.35)]" />
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--t-accent-border)]" />
             <p className="m-0 text-[15px] font-black">
               {actionsSwim.distance}m {actionsSwim.style}
-              <span className="hp-mono ml-2 text-[#7dd3fc]">{actionsSwim.time}</span>
+              <span className="hp-mono ml-2 text-[var(--t-accent)]">{actionsSwim.time}</span>
             </p>
-            <p dir="auto" className="m-0 mt-1 text-[12px] text-[rgba(203,224,240,0.55)]">{actionsSwim.competition_name} · {actionsSwim.competition_date}</p>
+            <p dir="auto" className="m-0 mt-1 text-[12px] text-[var(--t-text-2)]">{actionsSwim.competition_name} · {actionsSwim.competition_date}</p>
 
             {actionsSwim.media.length > 1 && (
               <div className="mt-3 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
@@ -977,23 +984,23 @@ function MyMediaContent() {
 
             {actionsMedia && (
               <div className="mt-4 flex flex-col gap-2">
-                <button type="button" onClick={() => { onPlay(actionsMedia); setActionsFor(null); }} className="hp-mono min-h-[44px] w-full rounded-[10px] border-none bg-[#7dd3fc] text-[13px] font-extrabold text-[#04101f]">
+                <button type="button" onClick={() => { onPlay(actionsMedia); setActionsFor(null); }} className="hp-mono min-h-[44px] w-full rounded-[10px] border-none bg-[var(--t-accent)] text-[13px] font-extrabold text-[var(--t-accent-ink)]">
                   {actionsMedia.media_type === 'image' ? '🖼 View photo' : '▶ Play'}
                 </button>
-                <button type="button" onClick={() => onToggleLike(actionsMedia)} className="hp-mono min-h-[44px] w-full rounded-[10px] border border-[rgba(255,125,156,0.45)] bg-transparent text-[13px] font-extrabold" style={{ color: actionsMedia.my_like ? '#ff7d9c' : 'rgba(255,125,156,0.7)' }}>
+                <button type="button" onClick={() => onToggleLike(actionsMedia)} className="hp-mono min-h-[44px] w-full rounded-[10px] border border-[var(--t-like-border)] bg-transparent text-[13px] font-extrabold" style={{ color: actionsMedia.my_like ? 'var(--t-like)' : 'var(--t-like)' }}>
                   ❤ {actionsMedia.likes_count}{actionsMedia.my_like ? ' · liked' : ''}
                 </button>
-                <button type="button" onClick={() => { openShare(actionsMedia); setActionsFor(null); }} className="hp-mono min-h-[44px] w-full rounded-[10px] border border-[rgba(125,211,252,0.35)] bg-transparent text-[13px] font-extrabold text-[#7dd3fc]">
+                <button type="button" onClick={() => { openShare(actionsMedia); setActionsFor(null); }} className="hp-mono min-h-[44px] w-full rounded-[10px] border border-[var(--t-accent-border)] bg-transparent text-[13px] font-extrabold text-[var(--t-accent)]">
                   Share with a group
                 </button>
                 {(publicationsByMedia.get(actionsMedia.id) ?? [])
                   .filter((p) => p.status === 'pending' || p.status === 'approved')
                   .map((p) => (
-                    <button key={p.hub_group_id} type="button" onClick={() => withdrawPublication(actionsMedia.id, p.hub_group_id)} className="hp-mono min-h-[44px] w-full rounded-[10px] border border-[rgba(255,202,122,0.45)] bg-transparent text-[13px] font-extrabold text-[#ffca7a]">
+                    <button key={p.hub_group_id} type="button" onClick={() => withdrawPublication(actionsMedia.id, p.hub_group_id)} className="hp-mono min-h-[44px] w-full rounded-[10px] border border-[var(--t-warn-border)] bg-transparent text-[13px] font-extrabold text-[var(--t-warn)]">
                       Withdraw from {p.hub_group_name}
                     </button>
                   ))}
-                <button type="button" onClick={() => { handleDelete(actionsMedia.id); setActionsFor(null); }} className="hp-mono min-h-[44px] w-full rounded-[10px] border border-[rgba(239,83,80,0.45)] bg-transparent text-[13px] font-extrabold text-[#ef5350]">
+                <button type="button" onClick={() => { handleDelete(actionsMedia.id); setActionsFor(null); }} className="hp-mono min-h-[44px] w-full rounded-[10px] border border-[var(--t-danger-border)] bg-transparent text-[13px] font-extrabold text-[var(--t-danger)]">
                   Delete {actionsMedia.media_type === 'image' ? 'photo' : 'video'}
                 </button>
               </div>

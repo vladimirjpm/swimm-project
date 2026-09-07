@@ -1,33 +1,64 @@
-/* Панель и полоса фильтров `/my-media` (Ф3–Ф4 плана docs/plans/my-media-filters-plan.md,
+/* Страница `/my-media`: палитра и раскладка (Ф3–Ф5 плана docs/plans/my-media-filters-plan.md,
    вид — по хендоффу `!design_handoff/design_handoff_my_media_filters`).
 
-   Панель, полоса и шторка ОБЩИЕ — те же, что на results и `/season-best`. Своей вёрстки
-   карточек, кнопок и чипов у страницы нет: здесь только палитра и мелочи раскладки.
+   Панель, полоса, шторка и строка заплыва ОБЩИЕ — те же, что на results и `/season-best`.
+   Своей вёрстки у страницы нет: здесь только карта ролей на палитру и мелочи раскладки.
 
-   ⚠ ВРЕМЕННО. Блок токенов ниже — перевод общих компонентов в нынешние жёстко зашитые цвета
-   страницы. Фаза Ф5 переводит страницу на тему (deep, light + dark) по карте из хендоффа,
-   и тогда правая часть значений заменяется на `var(--deep-*)`, а хексы уходят. Не правь
-   его «под себя» — он живёт до Ф5. */
+   ПАЛИТРА (Ф5). Страница живёт в теме **deep** — той же, что страницы пловца, клуба и
+   `/season-best`, — и переключается вместе со всем сайтом (класс `.theme-deep` /
+   `.theme-deep-light` ставит `useDeepThemeClass()` на корне). Раньше цвета были вбиты
+   хексами в шести файлах (393 литерала) и светлой темы у страницы не было вовсе.
+
+   Роли `--t-*` — прослойка между вёрсткой и палитрой: компоненты просят «акцент», «рамку»,
+   «приглушённый текст», а не конкретный цвет. Хекса здесь ровно один — плашка под иконку
+   стиля: картинки нарисованы чёрным силуэтом по светлому и в тёмной теме требуют светлой
+   подложки в ОБОИХ режимах.
+
+   ⚠ Токены объявлены на ТРЁХ селекторах, а не на одном корне: шторка, пилюля и модалки
+   уходят порталом в `body`, снаружи корня страницы, и там `--t-*` иначе пустые. */
 
 .my-media,
 .my-media-filters,
 .my-media-bar {
-  --t-accent: #7dd3fc;
-  --t-accent-soft: rgba(125, 211, 252, 0.14);
-  --t-accent-ink: #04101f;
-  --t-surface: rgba(8, 25, 48, 0.55);
-  --t-surface2: rgba(125, 211, 252, 0.07);
-  --t-border: rgba(125, 211, 252, 0.22);
-  --t-border-2: rgba(125, 211, 252, 0.12);
-  --t-text: #f3f8fd;
-  --t-text-2: rgba(203, 224, 240, 0.62);
-  --t-text-3: rgba(203, 224, 240, 0.4);
-  --t-plate: #e6f2fb;
-  --t-warn: #ffca7a;
-  --t-warn-soft: rgba(255, 202, 122, 0.1);
-  --t-warn-ink: #3a2a08;
+  --t-accent: var(--deep-accent);
+  --t-accent-dim: color-mix(in srgb, var(--deep-accent) 70%, transparent);
+  --t-accent-border: var(--deep-accent-border);
+  --t-accent-soft: var(--deep-accent-chip);
+  --t-accent-ink: var(--deep-accent-ink);
 
-  /* Акцент РЕЖИМА: в модерации весь верх страницы становится оранжевым — вкладка, линия
+  --t-surface: var(--deep-card-bg);
+  --t-surface2: var(--deep-card-bg-raised);
+  /* Шторка и модалки стоят НАД страницей — им нужен непрозрачный фон, а не полупрозрачная
+     карточка: сквозь неё просвечивал бы список. */
+  --t-surface-strong: var(--deep-panel-bg);
+  --t-card: var(--deep-card-bg);
+  --t-input-bg: var(--deep-card-bg-row);
+  --t-border: var(--deep-card-border);
+  --t-border-2: var(--deep-card-border-soft);
+  --t-scrim: color-mix(in srgb, var(--deep-page-bg) 72%, transparent);
+  --t-shadow: var(--deep-card-shadow);
+
+  --t-text: var(--deep-text);
+  --t-text-2: var(--deep-text-mute);
+  --t-text-3: var(--deep-text-faint);
+
+  --t-plate: #e6f2fb;
+
+  --t-warn: var(--deep-gold);
+  --t-warn-soft: var(--deep-gold-soft);
+  --t-warn-border: var(--deep-gold-border);
+  --t-warn-ink: var(--deep-accent-ink);
+
+  --t-danger: var(--deep-danger);
+  --t-danger-soft: var(--deep-danger-soft);
+  --t-danger-border: color-mix(in srgb, var(--deep-danger) 45%, transparent);
+
+  /* ❤ на медиа — не «опасность» и не акцент: своя роль, чтобы её не перекрасили заодно. */
+  --t-like: var(--deep-female);
+  --t-like-soft: var(--deep-female-soft);
+  --t-like-border: var(--deep-female-border);
+
+  /* Акцент РЕЖИМА: в модерации весь верх страницы становится золотым — вкладка, линия
      под ней и рамка панели. Одно значение на контейнер вместо покраски каждой детали. */
   --mode-accent: var(--t-accent);
   --mode-soft: var(--t-accent-soft);
@@ -137,22 +168,24 @@
   --fc-summary: var(--t-text-2);
   --fc-summary-active: var(--t-accent);
   --fc-chevron: var(--t-text-3);
-  --fc-radius: 14px;
+  --fc-radius: var(--deep-radius-tile);
 
-  --fseg-bg: rgba(2, 10, 24, 0.5);
-  --fseg-border: rgba(125, 211, 252, 0.25);
-  --fseg-text: rgba(226, 240, 252, 0.82);
-  --fseg-hover-border: rgba(125, 211, 252, 0.6);
+  --fseg-bg: var(--t-input-bg);
+  --fseg-border: var(--t-border);
+  --fseg-text: var(--t-text-2);
+  --fseg-hover-border: var(--t-accent-border);
   --fseg-hover-text: var(--t-text);
   --fseg-active-bg: var(--t-accent-soft);
   --fseg-active-border: var(--t-accent);
   --fseg-active-text: var(--t-accent);
 
-  /* Мобильная шторка и её кнопка — те же общие компоненты, поэтому и палитра здесь. */
-  --fdrawer-bg: linear-gradient(180deg, #0e2138, #081527);
+  /* Мобильная шторка — тот же общий компонент, поэтому и её палитра здесь. Фон
+     непрозрачный: сквозь полупрозрачную карточку просвечивал бы список под шторкой. */
+  --fdrawer-bg: var(--t-surface-strong);
   --fdrawer-text: var(--t-text);
-  --fdrawer-border: rgba(125, 211, 252, 0.3);
-  --fdrawer-handle: rgba(125, 211, 252, 0.35);
+  --fdrawer-border: var(--t-border);
+  --fdrawer-handle: var(--t-accent-border);
+  --fdrawer-scrim: var(--t-scrim);
 }
 
 /* Полоса выбранных фильтров. Выбранная колонка шире прочих (хендофф): значение в ней —
@@ -173,8 +206,9 @@
 /* Кнопка-пилюля: инверсия акцента, как в хендоффе. */
 .my-media-fab {
   --fpill-bg: var(--t-accent);
-  --fpill-bg-hover: #a5e0fd;
+  --fpill-bg-hover: var(--deep-accent-hover);
   --fpill-ink: var(--t-accent-ink);
+  --fpill-shadow: var(--t-shadow);
 }
 
 .mmf { display: flex; flex-direction: column; gap: 8px; }
@@ -206,7 +240,7 @@
   display: inline-flex; align-items: center; justify-content: center;
   width: 22px; height: 22px; flex: none;
   border-radius: 50%;
-  background: rgba(125, 211, 252, 0.16);
+  background: var(--t-accent-soft);
   color: var(--t-accent);
   font-size: 10px; font-weight: 900;
 }
@@ -241,9 +275,11 @@
   background: var(--fseg-bg);
   color: var(--fseg-text);
   font-size: 12px;
-  /* Иначе браузер рисует нативный пикер даты светлым по светлому. */
+  /* Нативный пикер даты рисуется системой — режим ему надо назвать явно, иначе в тёмной
+     теме он приходит светлым по светлому. */
   color-scheme: dark;
 }
+.theme-deep-light .mmf__date { color-scheme: light; }
 .mmf__dash { color: var(--t-text-2); }
 
 /* ── Ячейка сезона в полосе (ведущая, `lead`) ─────────────────────────────────── */
@@ -267,7 +303,7 @@
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 20px; font-weight: 800;
   color: var(--t-accent);
-  text-shadow: 0 0 18px rgba(125, 211, 252, 0.35);
+  text-shadow: var(--deep-accent-glow);
 }
 
 /* Чип Event в полосе: иконка стиля на плашке, как в панели и в строках заплыва.

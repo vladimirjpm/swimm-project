@@ -66,8 +66,8 @@ function sameDay(competitionDate: string, swimDate: string): boolean {
  * они старше SB, вставлять их надо сюда же, а не рядом.
  */
 const PB_CHIP =
-  'inline-flex items-center rounded-full border border-[rgba(125,211,252,0.55)] '
-  + 'bg-[rgba(125,211,252,0.14)] px-2 py-[1px] text-[10px] font-black leading-[1.4] text-[#7dd3fc]';
+  'inline-flex items-center rounded-full border border-[var(--t-accent-dim)] '
+  + 'bg-[var(--t-accent-soft)] px-2 py-[1px] text-[10px] font-black leading-[1.4] text-[var(--t-accent)]';
 
 function BestMark({ record = null, pb, sb, stacked = false }: {
   record?: { kind: RecordKind; scope?: string | null } | null;
@@ -213,7 +213,7 @@ function SourceChip({ m, onClick }: { m: SwimMediaDto; onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="hp-mono w-[120px] shrink-0 rounded-[7px] border border-[rgba(125,211,252,0.4)] bg-[rgba(125,211,252,0.08)] px-2 py-[4px] text-left text-[10.5px] font-extrabold text-[#7dd3fc]"
+      className="hp-mono w-[120px] shrink-0 rounded-[7px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-2 py-[4px] text-left text-[10.5px] font-extrabold text-[var(--t-accent)]"
       title={m.media_type === 'image' ? 'Open photo' : 'Play'}
     >
       {label}
@@ -229,9 +229,9 @@ function LikeChip({ m, onToggle }: { m: SwimMediaDto; onToggle: () => void }) {
       onClick={onToggle}
       className="hp-mono rounded-[7px] px-2 py-[3px] text-[10.5px] font-extrabold"
       style={{
-        border: `1px solid ${liked ? 'rgba(255,125,156,0.55)' : 'rgba(125,211,252,0.25)'}`,
-        background: liked ? 'rgba(255,125,156,0.1)' : 'transparent',
-        color: liked ? '#ff7d9c' : m.likes_count > 0 ? 'rgba(203,224,240,0.7)' : 'rgba(203,224,240,0.35)',
+        border: `1px solid ${liked ? 'var(--t-like)' : 'var(--t-border)'}`,
+        background: liked ? 'var(--t-like-soft)' : 'transparent',
+        color: liked ? 'var(--t-like)' : m.likes_count > 0 ? 'var(--t-text-2)' : 'var(--t-text-3)',
       }}
       title={liked ? 'Remove like' : 'Like'}
     >
@@ -250,9 +250,9 @@ function CheerChip({ swim, emphasized, onToggle, stop }: {
       onClick={(e) => { if (stop) e.stopPropagation(); onToggle(); }}
       className="hp-mono whitespace-nowrap rounded-[7px] px-2 py-[3px] text-[10.5px] font-extrabold"
       style={{
-        border: `1px solid ${on ? 'rgba(255,202,122,0.55)' : emphasized ? 'rgba(255,202,122,0.35)' : 'rgba(125,211,252,0.25)'}`,
-        background: on ? 'rgba(255,202,122,0.1)' : 'transparent',
-        color: on ? '#ffca7a' : emphasized ? 'rgba(255,202,122,0.8)' : swim.congrats_count > 0 ? 'rgba(203,224,240,0.7)' : 'rgba(203,224,240,0.35)',
+        border: `1px solid ${on ? 'var(--t-warn)' : emphasized ? 'var(--t-warn-border)' : 'var(--t-border)'}`,
+        background: on ? 'var(--t-warn-soft)' : 'transparent',
+        color: on ? 'var(--t-warn)' : emphasized ? 'var(--t-warn)' : swim.congrats_count > 0 ? 'var(--t-text-2)' : 'var(--t-text-3)',
       }}
       title={on ? 'Remove congrats' : 'Congratulate'}
     >
@@ -327,7 +327,7 @@ function MediaLine({
             <select
               value={group}
               onChange={(e) => setGroup(e.target.value === '' ? '' : Number(e.target.value))}
-              className="rounded-[7px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-1.5 py-[3px] text-[11px] text-[#f3f8fd]"
+              className="rounded-[7px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-1.5 py-[3px] text-[11px] text-[var(--t-text)]"
             >
               <option value="">Group…</option>
               {options.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -335,7 +335,7 @@ function MediaLine({
             <select
               value={level}
               onChange={(e) => setLevel(e.target.value as 'members' | 'public')}
-              className="rounded-[7px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-1.5 py-[3px] text-[11px] text-[#f3f8fd]"
+              className="rounded-[7px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-1.5 py-[3px] text-[11px] text-[var(--t-text)]"
             >
               <option value="members">Members</option>
               <option value="public">Everyone 🌐</option>
@@ -346,7 +346,7 @@ function MediaLine({
               onClick={share}
               title={unchanged ? 'Already shared with this group at this level' : undefined}
               className="hp-mono rounded-[7px] border-none px-2.5 py-[4px] text-[10.5px] font-extrabold disabled:opacity-40"
-              style={{ background: '#38ef8f', color: '#04101f' }}
+              style={{ background: 'var(--t-accent)', color: 'var(--t-accent-ink)' }}
             >
               {current ? 'Update' : 'Share'}
             </button>
@@ -357,7 +357,7 @@ function MediaLine({
             key={p.hub_group_id}
             type="button"
             onClick={() => cb.onWithdraw(m.id, p.hub_group_id)}
-            className="hp-mono rounded-[7px] border border-[rgba(255,202,122,0.45)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[#ffca7a]"
+            className="hp-mono rounded-[7px] border border-[var(--t-warn-border)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[var(--t-warn)]"
             title={`Withdraw from ${p.hub_group_name}`}
           >
             Withdraw
@@ -366,7 +366,7 @@ function MediaLine({
         <button
           type="button"
           onClick={() => cb.onDelete(m.id)}
-          className="hp-mono rounded-[7px] border border-[rgba(239,83,80,0.45)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[#ef5350]"
+          className="hp-mono rounded-[7px] border border-[var(--t-danger-border)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[var(--t-danger)]"
         >
           Delete
         </button>
@@ -438,7 +438,7 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
       <div
         {...flagged}
         className={`hidden items-center gap-3 px-5 py-[10px] sm:flex${flagged.className ? ` ${flagged.className}` : ''}`}
-        style={{ background: noVideo ? 'rgba(2,10,24,0.25)' : 'transparent' }}
+        style={{ background: noVideo ? 'var(--t-input-bg)' : 'transparent' }}
       >
         {/* Порядок: место — первым, следом столбик «медаль + метки». Место по центру своей
             колонки и одного кегля с медалью: после снятия строки очков оно оставалось
@@ -450,27 +450,27 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
           {medal(swim.place)}
           <BestMark record={recordMark} pb={swim.is_pb} sb={swim.is_sb} stacked />
         </span>
-        <span className="flex w-[286px] shrink-0 items-center gap-3.5 overflow-hidden pl-2 text-[13.5px] font-extrabold" style={{ color: noVideo ? 'rgba(226,240,252,0.55)' : '#f3f8fd' }}>
+        <span className="flex w-[286px] shrink-0 items-center gap-3.5 overflow-hidden pl-2 text-[13.5px] font-extrabold" style={{ color: noVideo ? 'var(--t-text-3)' : 'var(--t-text)' }}>
           <UI_SwimmStyleIcon
             styleName={swim.style}
             styleLen={swim.distance}
             styleType="icon-len"
             lenPlacement="below"
             size={64}
-            className="src-swim-list shrink-0 rounded-[8px] bg-[rgba(226,240,252,0.92)] px-1 py-0.5"
+            className="src-swim-list shrink-0 rounded-[8px] bg-[var(--t-plate)] px-1 py-0.5"
           />
           {/* text-left обязателен: dir="auto" у ивритского имени тянет выравнивание вправо,
               и имена прыгали бы между краями колонки от пловца к пловцу. */}
           {showSwimmerName && (
-            <span dir="auto" className="min-w-0 flex-1 truncate text-left text-[22px] font-black text-[rgba(203,224,240,0.75)]">
+            <span dir="auto" className="min-w-0 flex-1 truncate text-left text-[22px] font-black text-[var(--t-text-2)]">
               {swimmerName}
             </span>
           )}
           {swim.is_relay && (
-            <span className="hp-mono ml-1 rounded-[5px] border border-[rgba(125,211,252,0.4)] px-1.5 py-[1px] text-[9px] font-extrabold text-[#7dd3fc]">RELAY</span>
+            <span className="hp-mono ml-1 rounded-[5px] border border-[var(--t-accent-border)] px-1.5 py-[1px] text-[9px] font-extrabold text-[var(--t-accent)]">RELAY</span>
           )}
         </span>
-        <span className="hp-mono w-[84px] shrink-0 text-[13.5px] font-extrabold text-[#7dd3fc]">
+        <span className="hp-mono w-[84px] shrink-0 text-[13.5px] font-extrabold text-[var(--t-accent)]">
           {swim.time_fail ? 'DSQ' : (
             <UI_SwimTime time={swim.time} quality={quality} />
           )}
@@ -482,7 +482,7 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
             <UI_DateIcon
               styleType="row-style-1"
               date={swim.date}
-              fontClassName="hp-mono text-[10.5px] text-[rgba(203,224,240,0.45)]"
+              fontClassName="hp-mono text-[10.5px] text-[var(--t-text-3)]"
             />
           </span>
         )}
@@ -496,12 +496,12 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
         <span className="flex w-[332px] shrink-0 items-center gap-2">
           <span className="flex w-[108px] shrink-0 items-center gap-1.5">
             {videos.length > 0 && (
-              <button type="button" onClick={() => setExpanded((v) => !v)} className="hp-mono rounded-[7px] border border-[rgba(125,211,252,0.45)] bg-[rgba(125,211,252,0.1)] px-2 py-[3px] text-[10.5px] font-extrabold text-[#7dd3fc]">
+              <button type="button" onClick={() => setExpanded((v) => !v)} className="hp-mono rounded-[7px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-2 py-[3px] text-[10.5px] font-extrabold text-[var(--t-accent)]">
                 ▶ {videos.length}
               </button>
             )}
             {photos.length > 0 && (
-              <button type="button" onClick={() => setExpanded((v) => !v)} className="hp-mono rounded-[7px] border border-[rgba(125,211,252,0.25)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[rgba(125,211,252,0.6)]">
+              <button type="button" onClick={() => setExpanded((v) => !v)} className="hp-mono rounded-[7px] border border-[var(--t-border)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[var(--t-accent-dim)]">
                 🖼 {photos.length}
               </button>
             )}
@@ -509,7 +509,7 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
               <button
                 type="button"
                 onClick={() => cb.onAddVideo(swim)}
-                className="hp-mono rounded-[7px] border border-dashed border-[rgba(56,239,143,0.5)] bg-transparent px-2.5 py-[4px] text-[10.5px] font-extrabold text-[#38ef8f]"
+                className="hp-mono rounded-[7px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-2.5 py-[4px] text-[10.5px] font-extrabold text-[var(--t-accent)]"
               >
                 + Add video
               </button>
@@ -525,7 +525,7 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
                 onClick={() => setExpanded((v) => !v)}
                 title={expanded ? 'Hide media panel' : 'Share, withdraw, delete this media'}
                 aria-expanded={expanded}
-                className="hp-mono inline-flex h-[28px] items-center gap-1 rounded-[9px] border border-[rgba(125,211,252,0.35)] bg-[rgba(125,211,252,0.08)] px-2 text-[10.5px] font-extrabold text-[#7dd3fc]"
+                className="hp-mono inline-flex h-[28px] items-center gap-1 rounded-[9px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-2 text-[10.5px] font-extrabold text-[var(--t-accent)]"
               >
                 {expanded ? 'Hide' : 'Manage'}
                 <Chevron open={expanded} />
@@ -539,7 +539,7 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
       <div
         {...flagged}
         className={`flex cursor-pointer flex-col px-4 py-[10px] sm:hidden${flagged.className ? ` ${flagged.className}` : ''}`}
-        style={{ background: noVideo ? 'rgba(2,10,24,0.25)' : 'transparent' }}
+        style={{ background: noVideo ? 'var(--t-input-bg)' : 'transparent' }}
         onClick={() => hasMedia && cb.onOpenActions(swim)}
       >
         <div className="flex items-center gap-2.5">
@@ -558,16 +558,16 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
           styleType="icon-len"
           lenPlacement="below"
           size={64}
-          className="src-swim-list shrink-0 rounded-[8px] bg-[rgba(226,240,252,0.92)] px-1 py-0.5"
+          className="src-swim-list shrink-0 rounded-[8px] bg-[var(--t-plate)] px-1 py-0.5"
         />
         <span className="min-w-0 flex-1">
           {swim.is_relay && (
             <span className="block">
-              <span className="hp-mono rounded-[5px] border border-[rgba(125,211,252,0.4)] px-1 py-[1px] text-[8.5px] font-extrabold text-[#7dd3fc]">RELAY</span>
+              <span className="hp-mono rounded-[5px] border border-[var(--t-accent-border)] px-1 py-[1px] text-[8.5px] font-extrabold text-[var(--t-accent)]">RELAY</span>
             </span>
           )}
           <span className="mt-0.5 flex items-center gap-2">
-            <span className="hp-mono text-[12px] font-extrabold text-[#7dd3fc]">
+            <span className="hp-mono text-[12px] font-extrabold text-[var(--t-accent)]">
               {swim.time_fail ? 'DSQ' : (
                 <UI_SwimTime time={swim.time} quality={quality} />
               )}
@@ -579,14 +579,14 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
             длинное ивритское название группы выдавливало бы время и место. */}
         <span className="flex max-w-[45%] shrink-0 flex-col items-end gap-1">
           <span className="flex items-center gap-1.5">
-            {photos.length > 0 && <span className="text-[11px] text-[rgba(125,211,252,0.55)]">🖼</span>}
+            {photos.length > 0 && <span className="text-[11px] text-[var(--t-accent-dim)]">🖼</span>}
             {videos.length > 0 ? (
-              <span className="hp-mono rounded-[7px] border border-[rgba(125,211,252,0.45)] bg-[rgba(125,211,252,0.1)] px-1.5 py-[2px] text-[10px] font-extrabold text-[#7dd3fc]">▶ {videos.length}</span>
+              <span className="hp-mono rounded-[7px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-1.5 py-[2px] text-[10px] font-extrabold text-[var(--t-accent)]">▶ {videos.length}</span>
             ) : (
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); cb.onAddVideo(swim); }}
-                className="hp-mono rounded-[7px] border border-dashed border-[rgba(56,239,143,0.5)] bg-transparent px-2 py-[3px] text-[10px] font-extrabold text-[#38ef8f]"
+                className="hp-mono rounded-[7px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-2 py-[3px] text-[10px] font-extrabold text-[var(--t-accent)]"
               >
                 + Video
               </button>
@@ -602,7 +602,7 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
               onClick={(e) => { e.stopPropagation(); cb.onOpenActions(swim); }}
               title="Open media"
               aria-label="Open media"
-              className="inline-flex h-[28px] w-[28px] items-center justify-center rounded-[9px] border border-[rgba(125,211,252,0.35)] bg-[rgba(125,211,252,0.08)] text-[#7dd3fc]"
+              className="inline-flex h-[28px] w-[28px] items-center justify-center rounded-[9px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] text-[var(--t-accent)]"
             >
               <Chevron open={false} />
             </button>
@@ -614,7 +614,7 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
             Отступ ml-[56px] ставит его ровно под иконку стиля: столбик места 46 + gap 10.
             Меняешь ширины колонок выше — правь и это число, иначе имя съедет. */}
         {showSwimmerName && (
-          <span dir="auto" className="mt-1.5 ml-[56px] block break-words text-left text-[22px] font-black leading-tight text-[rgba(203,224,240,0.75)]">
+          <span dir="auto" className="mt-1.5 ml-[56px] block break-words text-left text-[22px] font-black leading-tight text-[var(--t-text-2)]">
             {swimmerName}
           </span>
         )}
@@ -622,14 +622,14 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
 
       {/* Expanded media panel (desktop) */}
       {expanded && hasMedia && (
-        <div className="hidden bg-[rgba(2,10,24,0.4)] px-5 py-2 pl-[116px] sm:block">
+        <div className="hidden bg-[var(--t-input-bg)] px-5 py-2 pl-[116px] sm:block">
           {[...videos, ...photos].map((m) => (
             <MediaLine key={m.id} m={m} pubs={cb.publicationsByMedia.get(m.id) ?? []} cb={cb} />
           ))}
           <button
             type="button"
             onClick={() => cb.onAddVideo(swim)}
-            className="hp-mono my-1.5 rounded-[7px] border border-dashed border-[rgba(56,239,143,0.4)] bg-transparent px-2.5 py-[4px] text-[10.5px] font-extrabold text-[rgba(56,239,143,0.8)]"
+            className="hp-mono my-1.5 rounded-[7px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-2.5 py-[4px] text-[10.5px] font-extrabold text-[var(--t-accent-dim)]"
           >
             + Add media
           </button>
@@ -670,7 +670,7 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
 
   return (
     <div className={`${hpCardCls} overflow-hidden`}>
-      <div className="flex flex-wrap items-center gap-2.5 border-b border-[rgba(125,211,252,0.15)] px-4 py-3 sm:px-5">
+      <div className="flex flex-wrap items-center gap-2.5 border-b border-[var(--t-accent-soft)] px-4 py-3 sm:px-5">
         {/* Плитка соревнования — общая CompetitionTile (сезон/кубок · буква категории ·
             возрастная лента). Данные считает общий competitionTileData, своей эвристики по
             названию тут нет: категория и флаг чемпионата приходят с сервера. */}
@@ -692,27 +692,27 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
               отвечать «чьи это заплывы». В режиме All имени нет: в карточке лежат заплывы
               разных избранных, и одно имя над ними было бы враньём. */}
           {selectedName && (
-            <span dir="auto" className="shrink-0 text-[18px] font-black leading-tight text-[#7dd3fc]">
+            <span dir="auto" className="shrink-0 text-[18px] font-black leading-tight text-[var(--t-accent)]">
               {selectedName}
             </span>
           )}
-          <span dir="auto" className="min-w-0 flex-1 text-[15px] font-black leading-tight text-[#f3f8fd] sm:flex-none sm:overflow-hidden sm:text-ellipsis sm:whitespace-nowrap">
+          <span dir="auto" className="min-w-0 flex-1 text-[15px] font-black leading-tight text-[var(--t-text)] sm:flex-none sm:overflow-hidden sm:text-ellipsis sm:whitespace-nowrap">
             {first.competition_name}
           </span>
         </div>
-        <span className="hp-mono text-[11px] font-extrabold text-[#7dd3fc]">{first.competition_date}</span>
-        <span className="text-[11.5px] text-[rgba(203,224,240,0.5)]">{first.pool_type}</span>
+        <span className="hp-mono text-[11px] font-extrabold text-[var(--t-accent)]">{first.competition_date}</span>
+        <span className="text-[11.5px] text-[var(--t-text-3)]">{first.pool_type}</span>
         {anyPodium && <span title="Podium finish">🏅</span>}
         <BestMark pb={anyPb} sb={anySb} />
         <span className="ml-auto flex items-center gap-2">
-          <span className="hidden text-[11px] font-bold text-[rgba(203,224,240,0.45)] sm:inline">
+          <span className="hidden text-[11px] font-bold text-[var(--t-text-3)] sm:inline">
             {swims.length} {swims.length === 1 ? 'swim' : 'swims'} · {videoCount} {videoCount === 1 ? 'video' : 'videos'}
           </span>
           {compMedia.length > 0 && (
             <button
               type="button"
               onClick={() => setMediaOpen((v) => !v)}
-              className="hp-mono rounded-[7px] border border-[rgba(125,211,252,0.35)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[#7dd3fc]"
+              className="hp-mono rounded-[7px] border border-[var(--t-accent-border)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[var(--t-accent)]"
             >
               📎 {compMedia.length} {mediaOpen ? '▴' : '▾'}
             </button>
@@ -720,7 +720,7 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
           <button
             type="button"
             onClick={() => cb.onAddCompMedia(first.competition_id, first.competition_name)}
-            className="hp-mono rounded-[7px] border border-dashed border-[rgba(56,239,143,0.5)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[#38ef8f]"
+            className="hp-mono rounded-[7px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[var(--t-accent)]"
           >
             + Photo/Video
           </button>
@@ -728,8 +728,8 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
       </div>
 
       {mediaOpen && compMedia.length > 0 && (
-        <div className="border-b border-[rgba(125,211,252,0.12)] bg-[rgba(2,10,24,0.35)] px-4 py-2 sm:px-5">
-          <p className="hp-mono m-0 mb-1 text-[9px] font-extrabold uppercase tracking-[0.14em] text-[rgba(125,211,252,0.45)]">
+        <div className="border-b border-[var(--t-accent-soft)] bg-[var(--t-input-bg)] px-4 py-2 sm:px-5">
+          <p className="hp-mono m-0 mb-1 text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--t-accent-border)]">
             Competition media · not tied to a swim
           </p>
           {compMedia.map((m) => (
@@ -743,7 +743,7 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
         {columns.map((c, i) => (
           <span
             key={i}
-            className={`hp-mono text-[9px] font-extrabold uppercase tracking-[0.14em] text-[rgba(125,211,252,0.45)]${c.center ? ' text-center' : ''}`}
+            className={`hp-mono text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--t-accent-border)]${c.center ? ' text-center' : ''}`}
             style={{ width: c.width, flex: c.width === undefined ? 1 : undefined, flexShrink: 0 }}
           >
             {c.label}
@@ -751,7 +751,7 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
         ))}
       </div>
 
-      <div className="divide-y divide-[rgba(125,211,252,0.08)]">
+      <div className="divide-y divide-[var(--t-accent-soft)]">
         {swims.map((s) => (
           <MySwimRow
             key={s.result_id}
