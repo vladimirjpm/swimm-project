@@ -200,6 +200,11 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
           <a href={routes.myMedia()} className={dropdownItemClass}>
             My media
           </a>
+          {/* «My groups» переехали сюда из шапки /my-media (хендофф 2a): там это был чип
+              рядом с заголовком, а ссылка на соседний раздел — дело меню профиля. */}
+          <a href={routes.groupsList()} className={dropdownItemClass}>
+            My groups
+          </a>
           {onLogout ? (
             <button type="button" className={dropdownItemClass} onClick={() => { setUserMenuOpen(false); onLogout(); }}>
               Sign out

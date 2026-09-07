@@ -9,6 +9,7 @@
    и тогда правая часть значений заменяется на `var(--deep-*)`, а хексы уходят. Не правь
    его «под себя» — он живёт до Ф5. */
 
+.my-media,
 .my-media-filters,
 .my-media-bar {
   --t-accent: #7dd3fc;
@@ -22,6 +23,111 @@
   --t-text-2: rgba(203, 224, 240, 0.62);
   --t-text-3: rgba(203, 224, 240, 0.4);
   --t-plate: #e6f2fb;
+  --t-warn: #ffca7a;
+  --t-warn-soft: rgba(255, 202, 122, 0.1);
+  --t-warn-ink: #3a2a08;
+
+  /* Акцент РЕЖИМА: в модерации весь верх страницы становится оранжевым — вкладка, линия
+     под ней и рамка панели. Одно значение на контейнер вместо покраски каждой детали. */
+  --mode-accent: var(--t-accent);
+  --mode-soft: var(--t-accent-soft);
+}
+
+.my-media--moderation {
+  --mode-accent: var(--t-warn);
+  --mode-soft: var(--t-warn-soft);
+}
+
+/* ── Шапка: имя · заголовок · папки-табы · действие (хендофф 2a/2c) ───────────── */
+
+.mm-head {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
+  padding: 28px 48px 0;
+}
+.mm-head__eyebrow {
+  margin: 0 0 6px;
+  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.28em;
+  color: var(--t-accent);
+}
+.mm-head__title {
+  margin: 0;
+  font-size: 40px; font-weight: 900; line-height: 0.95; letter-spacing: -0.04em;
+  color: var(--t-text);
+}
+
+/* Табы — «папки»: активная срастается с панелью под ней, поэтому у неё нет нижней грани,
+   а сама она сдвинута на пиксель вниз, накрывая линию панели. */
+.mm-tabs { display: flex; align-items: flex-end; gap: 6px; margin-left: 16px; }
+.mm-tab {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 10px 20px 12px;
+  border: 1px solid var(--t-border);
+  border-radius: 12px 12px 0 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+.mm-tab--on {
+  z-index: 1;
+  margin-bottom: -1px;
+  padding: 12px 20px 14px;
+  border-color: var(--mode-accent);
+  border-bottom-color: transparent;
+  background: var(--t-surface);
+}
+.mm-tab__title { font-size: 14px; font-weight: 800; color: var(--t-text-2); }
+.mm-tab--on .mm-tab__title { color: var(--mode-accent); }
+.mm-tab__sub {
+  display: flex; align-items: center; gap: 6px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px; font-weight: 800;
+  color: var(--t-text-2);
+}
+.mm-tab__badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 16px; height: 16px; padding: 0 5px;
+  border-radius: 8px;
+  background: var(--t-warn); color: var(--t-warn-ink);
+  font-size: 10px; font-weight: 900;
+}
+.mm-tab__sub--warn { color: var(--t-warn); }
+
+.mm-add {
+  margin: 0 0 12px auto;
+  padding: 10px 18px;
+  border: none; border-radius: 10px;
+  background: var(--t-accent); color: var(--t-accent-ink);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 13px; font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Панель контента: линия сверху продолжает активную вкладку, поэтому левый верхний угол
+   не скруглён — вкладка «влита» в панель. */
+.mm-panel {
+  margin: 0 48px 40px;
+  padding: 20px 20px 24px;
+  border-top: 1px solid var(--mode-accent);
+  border-radius: 0 12px 12px 12px;
+  background: var(--t-surface);
+}
+
+@media (max-width: 1023px) {
+  /* Мобильная шапка (2c): строка «заголовок · имя · действие», под ней две папки во всю
+     ширину. Табы не переносятся: две штуки помещаются даже на 320. */
+  .mm-head { flex-wrap: wrap; gap: 10px; padding: 18px 16px 0; }
+  .mm-head__eyebrow { font-size: 10px; letter-spacing: 0.2em; margin-bottom: 2px; }
+  .mm-head__title { font-size: 24px; }
+  .mm-head__id { display: flex; flex-direction: column-reverse; gap: 2px; }
+  .mm-tabs { order: 3; width: 100%; margin-left: 0; }
+  .mm-tab { flex: 1; padding: 10px 14px 11px; }
+  .mm-tab--on { padding: 12px 14px 13px; }
+  .mm-add { margin: 0; padding: 8px 14px; font-size: 11.5px; }
+  .mm-panel { margin: 0; padding: 12px 16px 20px; border-radius: 0; }
 }
 
 .my-media-filters {

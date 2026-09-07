@@ -596,63 +596,60 @@ function MyMediaContent() {
   const actionsMedia = actionsSwim?.media.find((m) => m.id === actionsMediaId) ?? actionsSwim?.media[0] ?? null;
 
   return (
-    <div className="home-page relative min-h-screen overflow-x-clip pb-24 text-[#f3f8fd]" style={{ background: 'linear-gradient(160deg,#0d2036 0%,#0b1b31 45%,#050e1c 100%)' }}>
+    <div
+      className={`my-media home-page relative min-h-screen overflow-x-clip pb-24 text-[#f3f8fd]${
+        tab === 'moderation' ? ' my-media--moderation' : ''
+      }`}
+      style={{ background: 'linear-gradient(160deg,#0d2036 0%,#0b1b31 45%,#050e1c 100%)' }}
+    >
       <div className="hp-shimmer" aria-hidden="true" />
       <AppTopbar />
 
-      <section className="relative px-5 pt-10 lg:px-16">
-        <p className="mb-3.5 text-[11px] font-extrabold uppercase tracking-[0.28em] text-[#7dd3fc] lg:text-[15px] lg:tracking-[0.3em]">
-          My profile · {auth.displayName || auth.email}
-        </p>
-        <div className="flex flex-wrap items-end gap-6">
-          <h1 className="m-0 text-[32px] font-black leading-[0.92] tracking-[-0.045em] text-[#f3f8fd] lg:text-[56px]">My media</h1>
-          <nav className="flex items-center gap-2 pb-1.5" aria-label="Profile sections">
-            <span className="hp-mono whitespace-nowrap rounded-[8px] border border-[#7dd3fc] bg-[rgba(125,211,252,0.14)] px-3 py-[5px] text-[12px] font-extrabold text-[#7dd3fc]">
-              Media
-            </span>
-            <a href={routes.groupsList()} className="hp-mono whitespace-nowrap rounded-[8px] border border-[rgba(125,211,252,0.3)] px-3 py-[5px] text-[12px] font-extrabold text-[rgba(125,211,252,0.6)] no-underline">
-              My groups ↗
-            </a>
-            <span
-              title="Coming later"
-              className="hp-mono whitespace-nowrap rounded-[8px] border border-dashed border-[rgba(203,224,240,0.25)] px-3 py-[5px] text-[12px] font-extrabold text-[rgba(203,224,240,0.35)]"
-            >
-              Settings · soon
-            </span>
-          </nav>
+      {/* Шапка (хендофф 2a/2c): имя · заголовок · папки-табы · «+ Add link». Чипы
+          `Media` / `My groups ↗` / `Settings · soon` сняты: первый повторял заголовок,
+          второй уехал в меню аватара топбара, третий обещал несуществующее. */}
+      <header className="mm-head">
+        <div className="mm-head__id">
+          <p className="mm-head__eyebrow">My profile · {auth.displayName || auth.email}</p>
+          <h1 className="mm-head__title">My media</h1>
         </div>
-        <p className="mt-4 max-w-[560px] text-[14.5px] leading-[1.55] text-[rgba(226,240,252,0.82)]">
-          Your swims by season — attach videos and photos, share them with groups.
-        </p>
-      </section>
 
-      <section className="relative px-5 pt-[26px] lg:px-16">
-        <div className="flex items-center gap-2.5">
-          <button type="button" onClick={() => setTab('media')} className={
-            `hp-mono inline-flex items-center gap-2 whitespace-nowrap rounded-[12px] border px-[18px] py-[10px] text-[13.5px] font-extrabold ${
-              tab === 'media' ? 'border-[#7dd3fc] bg-[rgba(125,211,252,0.14)] text-[#7dd3fc]' : 'border-[rgba(125,211,252,0.3)] bg-transparent text-[rgba(125,211,252,0.55)]'
-            }`
-          }>
-            My swims <span className="font-bold opacity-65">· {totalCount}</span>
+        <nav className="mm-tabs" aria-label="Profile sections">
+          <button
+            type="button"
+            onClick={() => setTab('media')}
+            className={`mm-tab${tab === 'media' ? ' mm-tab--on' : ''}`}
+            aria-current={tab === 'media' ? 'page' : undefined}
+          >
+            <span className="mm-tab__title">My swims</span>
+            <span className="mm-tab__sub">
+              {totalCount} swims · {data.all_seasons ? '∞' : seasonLabel(effectiveSeason).slice(2)}
+            </span>
           </button>
           {showModeration && (
-            <button type="button" onClick={() => setTab('moderation')} className={
-              `hp-mono inline-flex items-center gap-2 whitespace-nowrap rounded-[12px] border px-[18px] py-[10px] text-[13.5px] font-extrabold ${
-                tab === 'moderation' ? 'border-[#7dd3fc] bg-[rgba(125,211,252,0.14)] text-[#7dd3fc]' : 'border-[rgba(125,211,252,0.3)] bg-transparent text-[rgba(125,211,252,0.55)]'
-              }`
-            }>
-              Moderation
-              {pendingModCount > 0 && (
-                <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[9px] bg-[#ffca7a] px-[5px] text-[10.5px] font-black text-[#3a2a08]">
-                  {pendingModCount}
-                </span>
-              )}
+            <button
+              type="button"
+              onClick={() => setTab('moderation')}
+              className={`mm-tab${tab === 'moderation' ? ' mm-tab--on' : ''}`}
+              aria-current={tab === 'moderation' ? 'page' : undefined}
+            >
+              <span className="mm-tab__title">Moderation</span>
+              <span className={`mm-tab__sub${pendingModCount > 0 ? ' mm-tab__sub--warn' : ''}`}>
+                {pendingModCount > 0 && <span className="mm-tab__badge">{pendingModCount}</span>}
+                {pendingModCount > 0 ? 'waiting' : 'all clear'}
+              </span>
             </button>
           )}
-        </div>
+        </nav>
 
+        <button type="button" className="mm-add" onClick={() => setAddOpen(true)}>
+          + Add link
+        </button>
+      </header>
+
+      <section className="mm-panel">
         {tab === 'media' ? (
-          <div className="mt-[18px] flex flex-col gap-4">
+          <div className="flex flex-col gap-4">
             {showModeration && pendingModCount > 0 && (
               <div className="flex items-center gap-3 rounded-[14px] border border-[rgba(255,202,122,0.4)] bg-[linear-gradient(180deg,rgba(255,202,122,0.1),rgba(8,25,48,0.6))] p-[12px_16px]">
                 <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-[11px] bg-[#ffca7a] px-1.5 text-[12px] font-black text-[#3a2a08]">
@@ -664,18 +661,6 @@ function MyMediaContent() {
                 </button>
               </div>
             )}
-
-            {/* Наверху остаётся только действие: выбор пловца и сезона уехал в панель
-                фильтров карточками Swimmers и Season (хендофф, решение Влада 07.09.2026). */}
-            <div className="flex items-center justify-end">
-              <button
-                type="button"
-                onClick={() => setAddOpen(true)}
-                className="hp-mono hidden whitespace-nowrap rounded-[10px] border-none bg-[#7dd3fc] px-[18px] py-[9px] text-[13px] font-extrabold text-[#04101f] sm:block"
-              >
-                + Add link
-              </button>
-            </div>
 
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
