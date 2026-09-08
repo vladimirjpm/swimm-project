@@ -117,8 +117,25 @@ public class MySwimDto
     [JsonPropertyName("member_swimmer_ids")]
     public List<int> MemberSwimmerIds { get; set; } = new();
 
+    /// <summary>
+    /// Место, КАК НАПЕЧАТАНО в протоколе — включая предварительные заплывы: пловцу важно
+    /// видеть, что утром он был первым. Медаль из этого числа выводить нельзя, для неё есть
+    /// <see cref="IsAward"/>.
+    /// </summary>
     [JsonPropertyName("place")]
     public int? Place { get; set; }
+
+    /// <summary>
+    /// Место, за которое РЕАЛЬНО дают медаль: 1–3 в зачётном заплыве. Ложно у предварительных
+    /// (Р34), у секции «כללי» без возрастной категории (`final-open`, Р43) и у снятых
+    /// (`TimeFail`) — правило медального зачёта, docs/competition-overview-cards.md.
+    /// </summary>
+    [JsonPropertyName("is_award")]
+    public bool IsAward { get; set; }
+
+    /// <summary>Тип заплыва (`prelim` / `final` / …) — для пометки `[prelim]` у места.</summary>
+    [JsonPropertyName("heat_type")]
+    public string? HeatType { get; set; }
 
     [JsonPropertyName("points")]
     public int Points { get; set; }

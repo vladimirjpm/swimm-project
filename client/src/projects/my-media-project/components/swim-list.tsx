@@ -5,6 +5,7 @@ import { MySwimDto, SwimMediaDto } from '../use-my-swims';
 import { STATUS_COLORS, CardStatus, derivedCardStatus, visibilityLabel, hpCardCls } from './status-styles';
 import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
 import UI_SwimTime, { swimFlaggedRowProps } from '../../components/mix/swim-time/swim-time';
+import UI_PrelimLabel from '../../components/mix/prelim-label/prelim-label';
 import UI_DateIcon from '../../components/mix/date-icon/date-icon';
 import UI_SeasonBestBadge from '../../components/mix/season-best-badge/season-best-badge';
 import HelperSwimmer from '../../../utils/helpers/helper-swimmer';
@@ -117,8 +118,14 @@ function Chevron({ open }: { open: boolean }) {
   );
 }
 
-function medal(place: number | null): string | null {
-  return place === 1 ? '🥇' : place === 2 ? '🥈' : place === 3 ? '🥉' : null;
+/**
+ * Медаль рисуется НЕ из места, а из признака награды: место есть и у предварительного
+ * заплыва, и у секции «כללי», и медалей за них не дают (docs/competition-overview-cards.md,
+ * решения Р34 и Р43). Считает это сервер — `is_award` в DTO.
+ */
+function medal(swim: MySwimDto): string | null {
+  if (!swim.is_award) return null;
+  return swim.place === 1 ? '🥇' : swim.place === 2 ? '🥈' : swim.place === 3 ? '🥉' : null;
 }
 
 /** Style.Name из БД сырой (freestyle / individual_medley) — короткие лейблы дизайна. */
@@ -448,10 +455,15 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
         className={`mms-row${showDate ? ' mms-row--dated' : ''}${showCheers ? ' mms-row--cheers' : ''} hidden px-5 py-[10px] sm:grid${flagged.className ? ` ${flagged.className}` : ''}`}
         style={{ background: noVideo ? 'var(--t-input-bg)' : 'transparent' }}
       >
-        <span className="text-center text-[17px] font-black leading-none">
-          {swim.place != null ? `#${swim.place}` : '—'}
+        <span className="text-center leading-none">
+          <span className="block text-[17px] font-black">
+            {swim.place != null ? `#${swim.place}` : '—'}
+          </span>
+          {/* Место предварительного заплыва — не медальное, и молчать об этом нельзя:
+              иначе «#1» утром и «#1» вечером читаются как два золота. */}
+          <UI_PrelimLabel heatType={swim.heat_type} className="mt-0.5 block text-[8px]" />
         </span>
-        <span className="text-center text-[15px] leading-none">{medal(swim.place)}</span>
+        <span className="text-center text-[15px] leading-none">{medal(swim)}</span>
         <UI_SwimmStyleIcon
           styleName={swim.style}
           styleLen={swim.distance}
@@ -552,7 +564,7 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
           <span className="block text-[13.5px] font-black leading-none">
             {swim.place != null ? `#${swim.place}` : '—'}
           </span>
-          {medal(swim.place) && <span className="mt-[2px] block text-[13px]">{medal(swim.place)}</span>}
+          {medal(swim) && <span className="mt-[2px] block text-[13px]">{medal(swim)}</span>}
           <BestMark record={recordMark} pb={swim.is_pb} sb={swim.is_sb} stacked />
         </span>
         <UI_SwimmStyleIcon
@@ -585,6 +597,8 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
             {swim.is_relay && (
               <span className="hp-mono inline-block rounded-[5px] border border-[var(--t-accent-border)] px-1 py-[1px] text-[8.5px] font-extrabold text-[var(--t-accent)]">RELAY</span>
             )}
+            {/* На телефоне колонка места 34px — пометка стоит у времени. */}
+            <UI_PrelimLabel heatType={swim.heat_type} className="text-[8.5px]" />
             {/* Колонок на телефоне нет, поэтому 🎉 стоит у времени — рядом с заплывом,
                 к которому относится, а не у медиа. */}
             {swim.congrats_count > 0 && <CheerChip swim={swim} emphasized={swim.is_pb} />}

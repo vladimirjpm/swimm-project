@@ -339,9 +339,12 @@ public class MySwimsRepositoryTests
 
         var response = await NewRepo(db).GetMySwimsAsync(user.Id, season: 2025);
 
-        // У предварительного заплыва места нет — так же его режут таблица результатов,
-        // страница клуба и хаб-группы; My media обязана говорить то же самое.
-        Assert.Null(Assert.Single(response.Swims).Place);
+        // Место предварительного заплыва ПОКАЗЫВАЕМ (пловцу важно, что утром он был вторым),
+        // но медалью оно не является — её строка рисует по IsAward.
+        var swim = Assert.Single(response.Swims);
+        Assert.Equal(2, swim.Place);
+        Assert.False(swim.IsAward);
+        Assert.Equal("prelim", swim.HeatType);
     }
 
     [Fact]
@@ -368,8 +371,12 @@ public class MySwimsRepositoryTests
 
         var response = await NewRepo(db).GetMySwimsAsync(user.Id, season: 2025);
 
-        Assert.Null(response.Swims.Single(s => s.ResultId == dsq.Id).Place);
-        Assert.Equal(3, response.Swims.Single(s => s.ResultId == finished.Id).Place);
+        // Число у снятого в базу больше не попадает (импорт его не пишет), но если строка
+        // приехала другим путём — медалью она всё равно не станет.
+        Assert.False(response.Swims.Single(s => s.ResultId == dsq.Id).IsAward);
+        var finishedSwim = response.Swims.Single(s => s.ResultId == finished.Id);
+        Assert.Equal(3, finishedSwim.Place);
+        Assert.True(finishedSwim.IsAward);
     }
 
     [Fact]
@@ -393,7 +400,9 @@ public class MySwimsRepositoryTests
 
         var response = await NewRepo(db).GetMySwimsAsync(user.Id, season: 2025);
 
-        Assert.Null(Assert.Single(response.Swims).Place);
+        var swim = Assert.Single(response.Swims);
+        Assert.Equal(1, swim.Place);
+        Assert.False(swim.IsAward);
     }
 
     [Fact]
