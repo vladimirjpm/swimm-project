@@ -114,8 +114,6 @@ function MyMediaContent({ deep }: { deep: string }) {
   const [shareLevel, setShareLevel] = useState<'members' | 'public'>('members');
   const [shareBusy, setShareBusy] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
-  const [actionsFor, setActionsFor] = useState<MySwimDto | null>(null);
-  const [actionsMediaId, setActionsMediaId] = useState<number | null>(null);
 
   const [lightboxItems, setLightboxItems] = useState<GalleryItem[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -597,11 +595,8 @@ function MyMediaContent({ deep }: { deep: string }) {
     onDelete: handleDelete,
     onToggleLike,
     onToggleCheer,
-    onOpenActions: (s: MySwimDto) => { setActionsFor(s); setActionsMediaId(s.media[0]?.id ?? null); },
   };
 
-  const actionsSwim = actionsFor ? swims.find((s) => s.result_id === actionsFor.result_id) ?? null : null;
-  const actionsMedia = actionsSwim?.media.find((m) => m.id === actionsMediaId) ?? actionsSwim?.media[0] ?? null;
 
   return (
     <div
@@ -952,62 +947,6 @@ function MyMediaContent({ deep }: { deep: string }) {
       >
         {filterPanel}
       </MobileFiltersDrawer>
-
-      {/* Mobile actions bottom sheet */}
-      {actionsSwim && (
-        <div className="fixed inset-0 z-[100] flex items-end bg-[var(--t-scrim)] backdrop-blur-[4px] sm:hidden" onClick={() => setActionsFor(null)}>
-          <div
-            className="w-full rounded-t-[20px] border-t border-[var(--t-border)] bg-[var(--t-surface-strong)] p-5 text-[var(--t-text)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--t-accent-border)]" />
-            <p className="m-0 text-[15px] font-black">
-              {actionsSwim.distance}m {actionsSwim.style}
-              <span className="hp-mono ml-2 text-[var(--t-accent)]">{actionsSwim.time}</span>
-            </p>
-            <p dir="auto" className="m-0 mt-1 text-[12px] text-[var(--t-text-2)]">{actionsSwim.competition_name} · {actionsSwim.competition_date}</p>
-
-            {actionsSwim.media.length > 1 && (
-              <div className="mt-3 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-                {actionsSwim.media.map((m, i) => {
-                  const mediaPubs = publicationsByMedia.get(m.id) ?? [];
-                  const st = derivedCardStatus(mediaPubs);
-                  const seenByAll = mediaPubs.some((p) => p.status === 'approved' && p.level === 'public');
-                  return (
-                    <button key={m.id} type="button" onClick={() => setActionsMediaId(m.id)} className={chipClass(actionsMedia?.id === m.id)}>
-                      {m.media_type === 'image' ? '🖼' : '▶'} {i + 1} · {m.media_type === 'image' ? 'PHOTO' : m.source_type.toUpperCase()} · {visibilityLabel(st, seenByAll)} · ❤ {m.likes_count}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {actionsMedia && (
-              <div className="mt-4 flex flex-col gap-2">
-                <button type="button" onClick={() => { onPlay(actionsMedia); setActionsFor(null); }} className="hp-mono min-h-[44px] w-full rounded-[10px] border-none bg-[var(--t-accent)] text-[13px] font-extrabold text-[var(--t-accent-ink)]">
-                  {actionsMedia.media_type === 'image' ? '🖼 View photo' : '▶ Play'}
-                </button>
-                <button type="button" onClick={() => onToggleLike(actionsMedia)} className="hp-mono min-h-[44px] w-full rounded-[10px] border border-[var(--t-like-border)] bg-transparent text-[13px] font-extrabold" style={{ color: actionsMedia.my_like ? 'var(--t-like)' : 'var(--t-like)' }}>
-                  ❤ {actionsMedia.likes_count}{actionsMedia.my_like ? ' · liked' : ''}
-                </button>
-                <button type="button" onClick={() => { openShare(actionsMedia); setActionsFor(null); }} className="hp-mono min-h-[44px] w-full rounded-[10px] border border-[var(--t-accent-border)] bg-transparent text-[13px] font-extrabold text-[var(--t-accent)]">
-                  Share with a group
-                </button>
-                {(publicationsByMedia.get(actionsMedia.id) ?? [])
-                  .filter((p) => p.status === 'pending' || p.status === 'approved')
-                  .map((p) => (
-                    <button key={p.hub_group_id} type="button" onClick={() => withdrawPublication(actionsMedia.id, p.hub_group_id)} className="hp-mono min-h-[44px] w-full rounded-[10px] border border-[var(--t-warn-border)] bg-transparent text-[13px] font-extrabold text-[var(--t-warn)]">
-                      Withdraw from {p.hub_group_name}
-                    </button>
-                  ))}
-                <button type="button" onClick={() => { handleDelete(actionsMedia.id); setActionsFor(null); }} className="hp-mono min-h-[44px] w-full rounded-[10px] border border-[var(--t-danger-border)] bg-transparent text-[13px] font-extrabold text-[var(--t-danger)]">
-                  Delete {actionsMedia.media_type === 'image' ? 'photo' : 'video'}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       <UI_SwimmerGallery gallery={lightboxItems} openIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />
     </div>

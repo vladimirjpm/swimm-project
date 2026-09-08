@@ -13,10 +13,10 @@ import UI_RecordBadge, { type RecordKind } from '../../components/mix/record-bad
 import CompetitionTile from '../../results-main-project/components/competition-header/competition-tile';
 import { competitionTileData } from '../../../utils/helpers/competition-source';
 
-// Список заплывов, сгруппированный по соревнованиям — ядро My media v3
-// (README design_handoff_my_swims_v3,1 §7). Desktop: строки с фикс. колонками
-// + разворачиваемые media-панели с inline share; mobile: компактные строки,
-// действия — в bottom sheet родителя (onOpenActions).
+// Список заплывов, сгруппированный по соревнованиям — ядро My media.
+// Строка узкая на обеих ширинах, а всё управление медиа (share, withdraw, delete, ❤)
+// живёт в ОДНОЙ разворачиваемой панели под строкой — и на десктопе, и на телефоне
+// (решение Влада 08.09.2026; своей мобильной шторки действий у строки больше нет).
 
 export interface SwimListCallbacks {
   publicationsByMedia: Map<number, UserMediaPublicationDto[]>;
@@ -28,8 +28,6 @@ export interface SwimListCallbacks {
   onDelete: (mediaId: number) => void;
   onToggleLike: (media: SwimMediaDto) => void;
   onToggleCheer: (swim: MySwimDto) => void;
-  /** Mobile: тап по строке → actions bottom sheet у родителя. */
-  onOpenActions: (swim: MySwimDto) => void;
 }
 
 interface Props extends SwimListCallbacks {
@@ -520,9 +518,8 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
           там, а в строке остаётся только короткое. */}
       <div
         {...flagged}
-        className={`mms-mrow grid cursor-pointer px-4 py-[10px] sm:hidden${flagged.className ? ` ${flagged.className}` : ''}`}
+        className={`mms-mrow grid px-4 py-[10px] sm:hidden${flagged.className ? ` ${flagged.className}` : ''}`}
         style={{ background: noVideo ? 'var(--t-input-bg)' : 'transparent' }}
-        onClick={() => hasMedia && cb.onOpenActions(swim)}
       >
         {/* Место, медаль и метка — ОДНИМ столбиком: на узком экране трёх колонок под них нет. */}
         <span className="text-center leading-tight">
@@ -562,33 +559,38 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
             <span className="hp-mono mt-1 inline-block rounded-[5px] border border-[var(--t-accent-border)] px-1 py-[1px] text-[8.5px] font-extrabold text-[var(--t-accent)]">RELAY</span>
           )}
         </span>
-        {/* Одна цель нажатия высотой 44 — открыть медиа или добавить видео. */}
-        <span className="flex items-center justify-end">
+        {/* Цель нажатия 44px, поздравления — ПОД кнопкой, а не сбоку: справа их выдавливало
+            имя. Кнопка раскрывает ТУ ЖЕ панель, что на десктопе (решение Влада 08.09.2026):
+            своей мобильной шторки действий у строки больше нет. */}
+        <span className="flex flex-col items-end gap-1.5">
           {hasMedia ? (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); cb.onOpenActions(swim); }}
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={expanded}
               aria-label="Open media"
               className="hp-mono inline-flex h-[44px] items-center gap-1 rounded-[10px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-3 text-[11px] font-extrabold text-[var(--t-accent)]"
             >
               {videos.length > 0 ? `▶ ${videos.length}` : `🖼 ${photos.length}`}
-              <Chevron open={false} />
+              <Chevron open={expanded} />
             </button>
           ) : (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); cb.onAddVideo(swim); }}
+              onClick={() => cb.onAddVideo(swim)}
               className="hp-mono inline-flex h-[44px] items-center rounded-[10px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-3 text-[11px] font-extrabold text-[var(--t-accent)]"
             >
               + Video
             </button>
           )}
+          {!noVideo && <CheerChip swim={swim} emphasized={swim.is_pb} onToggle={() => cb.onToggleCheer(swim)} />}
         </span>
       </div>
 
-      {/* Expanded media panel (desktop) */}
+      {/* Раскрытая панель медиа — ОДНА на обе ширины: на узком экране она просто идёт
+          во всю ширину строки, без отступа под колонки. */}
       {expanded && hasMedia && (
-        <div className="hidden bg-[var(--t-input-bg)] px-5 py-2 pl-[116px] sm:block">
+        <div className="bg-[var(--t-input-bg)] px-4 py-2 sm:px-5 sm:pl-[116px]">
           {/* «Кому это видно» — первым: раньше бейдж стоял в строке и занимал 124px у каждой,
               хотя отвечает на вопрос, который задают, только открыв панель. */}
           <div className="mb-1">
