@@ -125,11 +125,12 @@ public class MySwimsRepository : IMySwimsRepository
                 // Само число у снятых в базе уже не хранится (инцидент И-18): импорт его
                 // не пишет, накопившееся вычищено миграцией.
                 Place = r.Position,
-                IsAward = !r.TimeFail
-                          && r.HeatType != "prelim" && r.HeatType != "extra"
-                          && r.Round != ResultRounds.FinalOpen
-                          && r.Position != null && r.Position <= 3,
+                // Признаки, из которых считается медаль. Само правило — ОДНО на продукт и
+                // живёт на клиенте (`HelperResults.isMedalPlace`): здесь только его входы,
+                // потому что эта проекция уезжает в SQL и звать C#-предикат в ней нельзя.
                 HeatType = r.HeatType,
+                Round = r.Round,
+                IsAward = r.Competition.IsAward,
                 Points = r.InternationalPoints,
                 Time = r.TimeOriginal,
                 // Пол/год рождения/возраст события — ключи ступени рекорда и SB. Пол берём у

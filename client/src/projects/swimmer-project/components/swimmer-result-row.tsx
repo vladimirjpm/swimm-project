@@ -2,6 +2,7 @@ import React from 'react';
 import SwimRow from '../../components/swim-row/swim-row';
 import type { SwimQualityDto, CompetitionRef } from '../use-swimmer-page';
 import { routes } from '../../../utils/routes';
+import HelperResults from '../../../utils/helpers/helper-results';
 
 /**
  * Строка результата страницы спортсмена — ПЕРЕХОДНИК к общему `SwimRow`
@@ -31,8 +32,12 @@ export interface ResultRowData {
   quality?: SwimQualityDto | null;
   points?: number | null;
   place?: number | null;
-  /** 'prelim' | 'final' | null — место prelim-заплыва рисуется без медали. */
+  /** Входы единого правила медали (`HelperResults.isMedalPlace`): место показываем как в
+   *  протоколе, а медаль даём только там, где её вручали. */
   heatType?: string | null;
+  round?: string | null;
+  timeFail?: boolean | null;
+  competitionIsAward?: boolean | null;
   ageInSeason?: number | null;
   splits?: string | null;
   date: string;
@@ -64,8 +69,15 @@ interface Props {
 
 function SwimmerResultRow({ row, swimmerId, gender }: Props) {
   // Prelim-место — ранжир сессии, не медаль (Р34): кружок вместо медали.
-  const isMedal =
-    row.place != null && row.place >= 1 && row.place <= 3 && row.heatType !== 'prelim';
+  // Правило медали — ОДНО на продукт: раньше эта страница знала только про `prelim`,
+  // а таблица результатов и My media считали по-своему (см. HelperResults.isMedalPlace).
+  const isMedal = HelperResults.isMedalPlace({
+    place: row.place,
+    heatType: row.heatType,
+    round: row.round,
+    timeFail: row.timeFail,
+    competitionIsAward: row.competitionIsAward,
+  });
 
   return (
     <SwimRow

@@ -158,7 +158,13 @@ public static class SwimmerPageBuilder
                     // подпись «Points» не показывали достижение, которого не было.
                     Points = quality is null ? r.InternationalPoints : null,
                     Place = r.Position,
+                    // Место показываем как в протоколе, включая предварительные; медаль по
+                    // нему НЕ выводится — её считает единое правило на клиенте
+                    // (`HelperResults.isMedalPlace`) из четырёх признаков ниже.
                     HeatType = r.HeatType,
+                    Round = r.Round,
+                    TimeFail = r.TimeFail,
+                    CompetitionIsAward = r.IsAward,
                     // Возраст в сезоне ЗАПЛЫВА, а не на его дату: осенний и весенний старты
                     // одного сезона обязаны показывать один возраст.
                     AgeInSeason = SeasonMath.AgeInSeason(SeasonAggregator.SeasonOf(r), birthYear),

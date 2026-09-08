@@ -70,8 +70,12 @@ export interface SwimmerBestTime {
   quality?: SwimQualityDto | null;
   points?: number | null;
   place?: number | null;
-  /** 'prelim' | 'final' | null — место prelim-заплыва рисуется без медали. */
+  /** Входы единого правила медали (`HelperResults.isMedalPlace`): место показывается как в
+   *  протоколе, медаль — только там, где её вручали. */
   heatType?: string | null;
+  round?: string | null;
+  timeFail?: boolean | null;
+  competitionIsAward?: boolean | null;
   ageInSeason?: number | null;
   splits?: string | null;
   date: string;
@@ -146,8 +150,12 @@ export interface SwimmerProgressPoint {
   quality?: SwimQualityDto | null;
   points?: number | null;
   place?: number | null;
-  /** 'prelim' | 'final' | null — место prelim-заплыва рисуется без медали. */
+  /** Входы единого правила медали (`HelperResults.isMedalPlace`): место показывается как в
+   *  протоколе, медаль — только там, где её вручали. */
   heatType?: string | null;
+  round?: string | null;
+  timeFail?: boolean | null;
+  competitionIsAward?: boolean | null;
   ageInSeason?: number | null;
   /** Мастерс-старт: у разряда своя таблица нормативов с возрастными полосами. */
   isMasters?: boolean;

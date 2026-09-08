@@ -125,17 +125,20 @@ public class MySwimDto
     [JsonPropertyName("place")]
     public int? Place { get; set; }
 
-    /// <summary>
-    /// Место, за которое РЕАЛЬНО дают медаль: 1–3 в зачётном заплыве. Ложно у предварительных
-    /// (Р34), у секции «כללי» без возрастной категории (`final-open`, Р43) и у снятых
-    /// (`TimeFail`) — правило медального зачёта, docs/competition-overview-cards.md.
-    /// </summary>
-    [JsonPropertyName("is_award")]
-    public bool IsAward { get; set; }
-
-    /// <summary>Тип заплыва (`prelim` / `final` / …) — для пометки `[prelim]` у места.</summary>
+    /// <summary>Тип заплыва (`prelim` / `final` / …) — пометка `[prelim]` у места и вход
+    /// правила медали (`HelperResults.isMedalPlace`).</summary>
     [JsonPropertyName("heat_type")]
     public string? HeatType { get; set; }
+
+    /// <summary>Раунд (`final-open` = секция «כללי» без возрастной категории) — вход того же
+    /// правила: за «כללי» медалей не дают (Р43).</summary>
+    [JsonPropertyName("round")]
+    public string? Round { get; set; }
+
+    /// <summary>Соревнование вообще вручает медали (`Competition.IsAward`) — вход того же
+    /// правила: на лиге мест 1–3 сколько угодно, а наград нет.</summary>
+    [JsonPropertyName("is_award")]
+    public bool IsAward { get; set; }
 
     [JsonPropertyName("points")]
     public int Points { get; set; }

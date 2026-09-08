@@ -341,9 +341,10 @@ public class MySwimsRepositoryTests
 
         // Место предварительного заплыва ПОКАЗЫВАЕМ (пловцу важно, что утром он был вторым),
         // но медалью оно не является — её строка рисует по IsAward.
+        // Место предварительного заплыва ОТДАЁМ, а признаки для правила медали клиент
+        // получает отдельно — медаль он посчитает сам (HelperResults.isMedalPlace).
         var swim = Assert.Single(response.Swims);
         Assert.Equal(2, swim.Place);
-        Assert.False(swim.IsAward);
         Assert.Equal("prelim", swim.HeatType);
     }
 
@@ -371,12 +372,12 @@ public class MySwimsRepositoryTests
 
         var response = await NewRepo(db).GetMySwimsAsync(user.Id, season: 2025);
 
-        // Число у снятого в базу больше не попадает (импорт его не пишет), но если строка
-        // приехала другим путём — медалью она всё равно не станет.
-        Assert.False(response.Swims.Single(s => s.ResultId == dsq.Id).IsAward);
+        // Число у снятого в базу больше не попадает (импорт его не пишет); признак снятия
+        // доезжает до клиента, и медали он по нему не даст.
+        Assert.True(response.Swims.Single(s => s.ResultId == dsq.Id).TimeFail);
         var finishedSwim = response.Swims.Single(s => s.ResultId == finished.Id);
         Assert.Equal(3, finishedSwim.Place);
-        Assert.True(finishedSwim.IsAward);
+        Assert.False(finishedSwim.TimeFail);
     }
 
     [Fact]
@@ -402,7 +403,7 @@ public class MySwimsRepositoryTests
 
         var swim = Assert.Single(response.Swims);
         Assert.Equal(1, swim.Place);
-        Assert.False(swim.IsAward);
+        Assert.Equal(ResultRounds.FinalOpen, swim.Round);
     }
 
     [Fact]

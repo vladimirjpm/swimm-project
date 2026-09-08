@@ -486,6 +486,7 @@ public class SwimmerPageRepository : ISwimmerPageRepository
             Position = r.Position,
             PositionAgeGroup = r.PositionAgeGroup,
             HeatType = r.HeatType,
+            Round = r.Round,
             InternationalPoints = r.InternationalPoints,
             TimeOriginal = r.TimeOriginal,
             TimeSplit = r.TimeSplit,

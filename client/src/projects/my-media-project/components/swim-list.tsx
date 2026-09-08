@@ -9,6 +9,7 @@ import UI_PrelimLabel from '../../components/mix/prelim-label/prelim-label';
 import UI_DateIcon from '../../components/mix/date-icon/date-icon';
 import UI_SeasonBestBadge from '../../components/mix/season-best-badge/season-best-badge';
 import HelperSwimmer from '../../../utils/helpers/helper-swimmer';
+import HelperResults from '../../../utils/helpers/helper-results';
 import Helper from '../../../utils/helpers/data-helper';
 import UI_RecordBadge, { type RecordKind } from '../../components/mix/record-badge/record-badge';
 import CompetitionTile from '../../results-main-project/components/competition-header/competition-tile';
@@ -119,13 +120,20 @@ function Chevron({ open }: { open: boolean }) {
 }
 
 /**
- * Медаль рисуется НЕ из места, а из признака награды: место есть и у предварительного
- * заплыва, и у секции «כללי», и медалей за них не дают (docs/competition-overview-cards.md,
- * решения Р34 и Р43). Считает это сервер — `is_award` в DTO.
+ * Медаль рисуется НЕ из места: место есть и у предварительного заплыва, и у секции «כללי»,
+ * а медалей за них не дают. Правило одно на продукт — `HelperResults.isMedalPlace`, тот же,
+ * что у таблицы результатов и страницы пловца.
  */
 function medal(swim: MySwimDto): string | null {
-  if (!swim.is_award) return null;
-  return swim.place === 1 ? '🥇' : swim.place === 2 ? '🥈' : swim.place === 3 ? '🥉' : null;
+  const isMedal = HelperResults.isMedalPlace({
+    place: swim.place,
+    heatType: swim.heat_type,
+    round: swim.round,
+    timeFail: swim.time_fail,
+    competitionIsAward: swim.is_award,
+  });
+  if (!isMedal) return null;
+  return swim.place === 1 ? '🥇' : swim.place === 2 ? '🥈' : '🥉';
 }
 
 /** Style.Name из БД сырой (freestyle / individual_medley) — короткие лейблы дизайна. */
