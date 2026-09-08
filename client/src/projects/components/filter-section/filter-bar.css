@@ -1,0 +1,221 @@
+/* Полоса выбранных фильтров — ОБЩАЯ (Ф1 плана docs/plans/my-media-filters-plan.md).
+
+   Палитра — локальные токены `--fb-*` с фоллбеком на палитру results (`--theme-*`), тот же
+   приём, что у `FilterCard` и `SwimRow`: на results ничего не меняется, а страница в другой
+   теме переопределяет токены НА СВОЁМ КОНТЕЙНЕРЕ (`.sb-bar` красит полосу в deep) вместо
+   того, чтобы держать вторую вёрстку.
+
+   Геометрий здесь ДВЕ, и это осознанно (проп `rows` в filter-bar.tsx): `card` — полоса
+   results (подложка, неактивные чипы тянутся во всю ширину, между строками пунктир) и
+   `bare` — полоса `/season-best` (без подложки, чипы по содержимому). Свести их в одну
+   картинку — отдельное решение Влада, а не побочный эффект выноса компонента. */
+
+/* ── Раскладка columns: одна полоса равных колонок, только ≥768px ──────────────── */
+
+.fb__cols { display: none; }
+
+.fb__cell {
+  flex: 1 1 0%;
+  min-width: 0;
+  display: flex;
+}
+
+.fb__cell--divided {
+  border-right: 1px solid var(--fb-divider, var(--theme-mode-border));
+}
+
+/* Выбранная колонка может быть шире прочих — но только там, где страница об этом попросит
+   (`--fb-active-grow`). Умолчание 1: на results все колонки равны, и так и должно остаться. */
+.fb__cell--active { flex-grow: var(--fb-active-grow, 1); }
+
+.fb__col {
+  flex: 1 1 0%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 6px 12px;
+}
+
+/* Подсветку в раскладке columns получает только НАЖИМАЕМЫЙ выбранный чип (на results это
+   Position): у остальных выбранное значение и так видно, а фон превратил бы полосу
+   в грядку плашек. */
+.fb__col--tone {
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.fb__col--click { cursor: pointer; }
+
+.fb__col-value--idle {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--fb-idle-text, var(--theme-mode-text-muted));
+}
+
+/* ── Раскладка rows: две строки — сверху мелко «All», снизу крупно выбранное ────── */
+
+.fb__rows { display: flex; flex-direction: column; }
+.fb__row { display: flex; }
+
+/* Строка ведущей ячейки (сезон + приписка справа). Стоит НАД строкой «All» и разделителем
+   не отбивается: разделитель отделяет невыбранное от выбранного, а сезон — ни то, ни другое. */
+.fb__row--lead { align-items: center; gap: 6px; }
+.fb__aside { margin-left: auto; }
+
+.fb__chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 10px;
+}
+
+.fb__chip--click { cursor: pointer; }
+
+.fb__chip--idle {
+  background: var(--fb-idle-bg, var(--theme-mode-surface-alt));
+  border: 1px solid var(--fb-idle-border, var(--theme-mode-border));
+}
+
+/* ── Подписи ───────────────────────────────────────────────────────────────────── */
+
+.fb__label {
+  font-weight: 800;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--fb-label, var(--theme-mode-text-muted));
+}
+
+
+/* ── Тон выбранного ────────────────────────────────────────────────────────────── */
+
+.fb__tone--accent {
+  background: var(--fb-active-bg, color-mix(in srgb, var(--theme-primary) 8%, var(--theme-mode-surface)));
+  border: 1px solid var(--fb-active-border, color-mix(in srgb, var(--theme-primary) 25%, transparent));
+}
+
+/* Золото — подиум: значение несёт свой цвет само, поэтому здесь только подложка. */
+.fb__tone--gold {
+  background: var(--fb-gold-bg, var(--theme-personal-badge-bg));
+  border: 1px solid var(--fb-gold-border, var(--theme-personal-border));
+}
+
+/* ── Геометрия `card` (results) ────────────────────────────────────────────────── */
+
+.fb--card .fb__cols {
+  background: var(--fb-bg, var(--theme-mode-surface));
+  border: 1px solid var(--fb-border, var(--theme-mode-border));
+  border-radius: 14px;
+  box-shadow: var(--fb-shadow, 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1));
+  padding: 16px 8px;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.fb--card .fb__rows {
+  gap: 8px;
+  padding: 8px;
+  background: var(--fb-bg, var(--theme-mode-surface));
+  border: 1px solid var(--fb-border, var(--theme-mode-border));
+  border-radius: 12px;
+  box-shadow: var(--fb-shadow, 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1));
+}
+
+/* Неактивные тянутся поровну и НЕ переносятся: их задача — занять узкую верхнюю строку
+   целиком, а не выстроиться лесенкой. */
+.fb--card .fb__row--idle { flex-wrap: nowrap; gap: 4px; }
+.fb--card .fb__row--active { flex-wrap: wrap; justify-content: center; gap: 8px; padding-top: 9px; }
+
+/* Пунктир между строками — только когда верхняя строка вообще есть. */
+.fb--card .fb__row--divided {
+  border-top: 1px dashed var(--fb-divider, var(--theme-mode-border));
+}
+
+.fb--card .fb__chip--idle {
+  flex: 1 1 0%;
+  min-width: 0;
+  gap: 2px;
+  padding: 5px 2px;
+  border-radius: 8px;
+}
+
+.fb--card .fb__chip--active {
+  justify-content: center;
+  gap: 4px;
+  padding: 7px 14px;
+}
+
+/* Значение выбранного чипа НЕ оформляется: кегль, цвет и направление несут сами узлы
+   (иконка стиля, плашка даты, эмблема клуба). Обрезка по ширине здесь тоже вредна —
+   она резала бы картинки.
+
+   `display: flex` — не косметика: без него обёртка добавляет СВОЙ strut (кегль 16px,
+   line-height normal), и текстовые значения («Top 10», возраст) становятся на 5px выше
+   картиночных. Во flex-контейнере высоту задаёт сам узел. */
+.fb--card .fb__chip--active .fb__chip-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fb--card .fb__chip--idle .fb__chip-value {
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--fb-idle-text, var(--theme-mode-text-muted));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* В узкой верхней строке подпись обязана ужиматься, а не выдавливать чип. Только здесь:
+   в геометрии `bare` чипы шириной по содержимому, и обрезать там нечего. */
+.fb--card .fb__label--idle { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+
+.fb--card .fb__col .fb__label { font-size: 11px; letter-spacing: 0.8px; }
+.fb--card .fb__chip--active .fb__label { font-size: 9.5px; letter-spacing: 0.6px; }
+.fb--card .fb__chip--idle .fb__label { font-size: 8.5px; letter-spacing: 0.3px; }
+
+/* ── Геометрия `bare` (/season-best) ───────────────────────────────────────────── */
+
+.fb--bare .fb__row { flex-wrap: wrap; gap: 6px; justify-content: center; }
+.fb--bare .fb__row--active { margin-top: 6px; }
+
+.fb--bare .fb__chip { gap: 2px; }
+.fb--bare .fb__chip--idle { padding: 4px 10px; }
+.fb--bare .fb__chip--active { padding: 6px 14px; }
+
+.fb--bare .fb__chip-value {
+  font-weight: 800;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.fb--bare .fb__chip--idle .fb__chip-value {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--fb-idle-text, var(--theme-mode-text-muted));
+}
+
+.fb--bare .fb__chip--active .fb__chip-value {
+  font-size: 14px;
+  color: var(--fb-active-text, var(--theme-primary));
+}
+
+.fb--bare .fb__chip--active .fb__label { font-size: 9px; letter-spacing: 0.08em; }
+.fb--bare .fb__chip--idle .fb__label { font-size: 8px; letter-spacing: 0.08em; }
+
+/* ── Брейкпоинт ────────────────────────────────────────────────────────────────── */
+
+@media (min-width: 768px) {
+  .fb--cols .fb__cols { display: flex; }
+  /* Двухстрочный вид при раскладке columns остаётся мобильным; у `/season-best` он
+     единственный (решение Влада 2026-08-26) и на десктопе не прячется. */
+  .fb--cols .fb__rows { display: none; }
+}

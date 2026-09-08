@@ -1,63 +1,84 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import '../home-project/home.css';
+import '../components/deep/deep-theme.css';
+import './my-media.css';
 import { useAuth } from '../../hooks/useAuth';
 import { useLoginModal } from '../components/login-modal/login-modal-context';
 import { useFavorites } from '../../hooks/useFavorites';
 import { useMyMediaPublications } from '../../hooks/useUserMedia';
 import { useMyHubGroups } from '../hub-groups-project/use-my-hub-groups';
+import { useDeepThemeClass } from '../components/deep/use-deep-theme-class';
 import { useAllMyMedia, AllUserMediaDto, AddMediaInput } from './use-all-my-media';
-import { useMySwims, MySwimDto, SwimMediaDto, seasonLabel, toggleLike, toggleCheer } from './use-my-swims';
+import { useMySwims, MySwimDto, SwimMediaDto, seasonLabel, toggleLike } from './use-my-swims';
 import { useMyMediaModeration } from './use-my-media-moderation';
 import AppTopbar from '../components/app-topbar/app-topbar';
 import UI_SwimmerGallery from '../components/mix/swimmer-gallery/swimmer-gallery';
 import { routes } from '../../utils/routes';
+import HelperSwimmer from '../../utils/helpers/helper-swimmer';
+import { seasonStartYear } from '../../utils/helpers/season-helper';
 import { GalleryItem } from '../../utils/interfaces/results';
 import MediaCard from './components/media-card';
 import AddLinkModal, { AddLinkSwimmerOption } from './components/add-link-modal';
+import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import ModerationPanel from './components/moderation-panel';
 import SwimList from './components/swim-list';
-import { chipClass, segmentClass, derivedCardStatus, CardStatus, hpCardCls } from './components/status-styles';
+import MyMediaFilterPanel, {
+  DEFAULT_OPEN_CARDS,
+  type Seg, type StatusFilter, type GroupFilter, type MediaCardKey,
+} from './components/my-media-filter-panel';
+import FilterBar, { type FilterBarChip } from '../components/filter-section/filter-bar';
+import FiltersFab from '../components/filter-section/filters-fab';
+import UI_SwimmStyleIcon from '../components/mix/swimm-style-icon/swimm-style-icon';
+import { useMyMediaFilterHost, type MyMediaHostState } from './my-media-filter-host';
+import MobileFiltersDrawer from '../components/filter-section/mobile-filters-drawer';
+import { chipClass, derivedCardStatus, visibilityLabel, hpCardCls } from './components/status-styles';
 
 // Страница «My media» v3 (swim-centric) — README design_handoff_my_swims_v3,1.
-// Тёмный стиль groups.html/home.html — осознанное решение, не через var(--theme-mode-*).
+// Палитра — тема deep (light + dark), как у страниц пловца, клуба и /season-best: вёрстка
+// просит роли `--t-*`, карта ролей на `--deep-*` живёт в my-media.css (Ф5).
 
 function MyMedia() {
   const auth = useAuth();
   const { openLoginModal } = useLoginModal();
+  // Класс темы deep (`.theme-deep` / `.theme-deep-light`) под текущий режим сайта: токены
+  // `--deep-*` объявлены на классе, а не на `:root`, и без него страница рисуется пустыми
+  // переменными (Ф5).
+  const deep = useDeepThemeClass();
 
   if (auth.loading) {
-    return <div className="min-h-screen bg-[#050e1c]" />;
+    return <div className="min-h-screen bg-[var(--deep-page-bg)]" />;
   }
 
   if (!auth.isAuthenticated) {
     return (
-      <div className="home-page relative flex min-h-screen items-center justify-center overflow-x-clip px-4 text-[#f3f8fd]">
-        <div className="hp-shimmer" aria-hidden="true" />
+      <div
+        className={`my-media ${deep} relative flex min-h-screen items-center justify-center overflow-x-clip px-4 text-[var(--t-text)]`}
+        style={{ background: 'var(--deep-hero-grad)' }}
+      >
         <AppTopbar />
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-full max-w-md rounded-[18px] border border-[rgba(125,211,252,0.22)] bg-[linear-gradient(180deg,rgba(56,189,248,0.08),rgba(8,25,48,0.78))] p-8 text-center shadow-[0_24px_60px_rgba(2,10,24,0.5)]">
-            <h1 className="mb-2 text-lg font-black text-[#f3f8fd]">My media</h1>
-            <p className="mb-4 text-sm text-[rgba(203,224,240,0.7)]">Sign in to manage your media</p>
+          <div className="w-full max-w-md rounded-[18px] border border-[var(--t-border)] bg-[var(--t-card)] p-8 text-center shadow-[var(--t-shadow)]">
+            <h1 className="mb-2 text-lg font-black text-[var(--t-text)]">My media</h1>
+            <p className="mb-4 text-sm text-[var(--t-text-2)]">Sign in to manage your media</p>
             <button
               type="button"
               onClick={openLoginModal}
-              className="hp-mono rounded-[11px] bg-[#38ef8f] px-4 py-2 text-sm font-extrabold text-[#04101f]"
+              className="hp-mono rounded-[11px] bg-[var(--t-accent)] px-4 py-2 text-sm font-extrabold text-[var(--t-accent-ink)]"
             >
               Sign in
             </button>
           </div>
         </div>
+        {/* И на заглушке тоже: она уже покрашена темой, и без кнопки режим отсюда не сменить. */}
+        <UI_ModeToggle />
       </div>
     );
   }
 
-  return <MyMediaContent />;
+  return <MyMediaContent deep={deep} />;
 }
 
-type Seg = 'all' | 'with' | 'without';
-type StatusFilter = CardStatus | 'all';
-
-function MyMediaContent() {
+function MyMediaContent({ deep }: { deep: string }) {
   const auth = useAuth();
   const favorites = useFavorites();
   const { media: allMedia, remove, add } = useAllMyMedia();
@@ -70,17 +91,18 @@ function MyMediaContent() {
   const [tab, setTab] = useState<'media' | 'moderation'>('media');
 
   // ── Фильтры ────────────────────────────────────────────────────────────────
-  const [season, setSeason] = useState<number | null>(null); // null → текущий (сервер)
+  // null → сервер выберет витринный сезон; 'all' → все сезоны сразу.
+  const [season, setSeason] = useState<number | 'all' | null>(null);
   const { data, loading, reload } = useMySwims(season);
   const [swimmerFilter, setSwimmerFilter] = useState<number | 'all'>('all');
   const [seg, setSeg] = useState<Seg>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [groupFilter, setGroupFilter] = useState<GroupFilter>('all');
   const [competitionFilter, setCompetitionFilter] = useState<number | 'all'>('all');
   const [styleFilter, setStyleFilter] = useState<string | 'all'>('all');
   const [distanceFilter, setDistanceFilter] = useState<string | 'all'>('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [moreOpen, setMoreOpen] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [unlinkedOpen, setUnlinkedOpen] = useState(false);
 
@@ -95,15 +117,19 @@ function MyMediaContent() {
   const [shareLevel, setShareLevel] = useState<'members' | 'public'>('members');
   const [shareBusy, setShareBusy] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
-  const [actionsFor, setActionsFor] = useState<MySwimDto | null>(null);
-  const [actionsMediaId, setActionsMediaId] = useState<number | null>(null);
 
   const [lightboxItems, setLightboxItems] = useState<GalleryItem[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
+  // Открыт ли поверх страницы хоть один слой. Нужно ровно одному потребителю —
+  // переключателю тем внизу справа (он единственный, у кого z-index выше всех оверлеев).
+  // Заводя новый оверлей, добавляй его сюда, иначе кружок повиснет поверх него.
+  const anyOverlayOpen =
+    mobileFiltersOpen || addOpen || lightboxIndex !== null ||
+    addVideoSwim !== null || addCompTarget !== null || linkSwimTarget !== null;
+
   // ── Реакции: оптимистичные оверрайды поверх ответа /api/me/swims ─────────
   const [likeOverrides, setLikeOverrides] = useState<Map<number, { count: number; mine: boolean }>>(new Map());
-  const [cheerOverrides, setCheerOverrides] = useState<Map<number, { count: number; mine: boolean }>>(new Map());
 
   const applyMediaOverride = (m: SwimMediaDto): SwimMediaDto => {
     const o = likeOverrides.get(m.id);
@@ -111,16 +137,8 @@ function MyMediaContent() {
   };
 
   const swims: MySwimDto[] = useMemo(
-    () => data.swims.map((s) => {
-      const o = cheerOverrides.get(s.result_id);
-      return {
-        ...s,
-        congrats_count: o ? o.count : s.congrats_count,
-        my_cheer: o ? o.mine : s.my_cheer,
-        media: s.media.map(applyMediaOverride),
-      };
-    }),
-    [data.swims, cheerOverrides, likeOverrides] // eslint-disable-line react-hooks/exhaustive-deps
+    () => data.swims.map((s) => ({ ...s, media: s.media.map(applyMediaOverride) })),
+    [data.swims, likeOverrides] // eslint-disable-line react-hooks/exhaustive-deps
   );
   const competitionMedia = useMemo(
     () => data.competition_media.map(applyMediaOverride),
@@ -155,9 +173,56 @@ function MyMediaContent() {
     [swims]
   );
 
+  // ── Группы: «куда я поднял медиа» ─────────────────────────────────────────
+  // Публикации приходят по ВСЕМУ моему медиа (все сезоны), а страница сезонная,
+  // поэтому список чипов берём из публикаций, а счётчики — по медиа этой страницы.
+  const pageMediaIds = useMemo(() => {
+    const ids: number[] = [];
+    for (const sw of swims) for (const m of sw.media) ids.push(m.id);
+    for (const m of competitionMedia) ids.push(m.id);
+    for (const m of unlinkedMedia) ids.push(m.id);
+    return ids;
+  }, [swims, competitionMedia, unlinkedMedia]);
+
+  const groupOptions = useMemo(() => {
+    const names = new Map<number, string>();
+    for (const p of publications) if (!names.has(p.hub_group_id)) names.set(p.hub_group_id, p.hub_group_name);
+    const counts = new Map<number, number>();
+    let notShared = 0;
+    for (const id of pageMediaIds) {
+      const pubs = publicationsByMedia.get(id) ?? [];
+      if (pubs.length === 0) { notShared += 1; continue; }
+      const seen = new Set<number>();
+      for (const p of pubs) {
+        if (seen.has(p.hub_group_id)) continue;
+        seen.add(p.hub_group_id);
+        counts.set(p.hub_group_id, (counts.get(p.hub_group_id) ?? 0) + 1);
+      }
+    }
+    const groups = Array.from(names, ([id, name]) => ({ id, name, count: counts.get(id) ?? 0 }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    return { groups, notShared, total: pageMediaIds.length };
+  }, [publications, publicationsByMedia, pageMediaIds]);
+
+  // Медиа «в группе» при любом статусе заявки (pending/approved/rejected) — статус сужает отдельный фильтр.
+  const mediaMatchesGroup = (mediaId: number) => {
+    if (groupFilter === 'all') return true;
+    const pubs = publicationsByMedia.get(mediaId) ?? [];
+    if (groupFilter === 'none') return pubs.length === 0;
+    return pubs.some((p) => p.hub_group_id === groupFilter);
+  };
+
+  const pickGroup = (v: GroupFilter) => {
+    setGroupFilter(v);
+    // Медиа без заплыва тоже фильтруется — иначе выбранная группа «пропадает» в свёрнутой секции.
+    if (v !== 'all') setUnlinkedOpen(true);
+  };
+
   // ── Фильтрация ────────────────────────────────────────────────────────────
-  // Заплыв принадлежит пловцу, если он владелец строки ИЛИ нога эстафеты (member).
-  const swimBelongsTo = (s: MySwimDto, id: number) => s.swimmer_id === id || s.member_swimmer_ids.includes(id);
+  // Принадлежность заплыва пловцу — ТОЛЬКО через канон-хелпер (docs/relays.md: «новый
+  // фильтр/счётчик по пловцу — зови это, не сравнивай swimmer_id сам»): у эстафеты
+  // swimmer_id это одна нога, остальные ноги теряются.
+  const swimBelongsTo = (s: MySwimDto, id: number) => HelperSwimmer.resultBelongsToSwimmer(s, id);
   const bySwimmer = swimmerFilter === 'all' ? swims : swims.filter((s) => swimBelongsTo(s, swimmerFilter));
 
   const segCount = (k: Seg) =>
@@ -173,6 +238,7 @@ function MyMediaContent() {
     if (competitionFilter !== 'all' && s.competition_id !== competitionFilter) return false;
     if (styleFilter !== 'all' && s.style !== styleFilter) return false;
     if (distanceFilter !== 'all' && s.distance !== distanceFilter) return false;
+    if (groupFilter !== 'all' && !s.media.some((m) => mediaMatchesGroup(m.id))) return false;
     if (dateFrom && s.date < dateFrom) return false;
     if (dateTo && s.date > dateTo) return false;
     if (seg === 'with' && statusFilter !== 'all') {
@@ -184,15 +250,26 @@ function MyMediaContent() {
     return true;
   });
 
-  const activeMoreCount =
+  const visibleCompetitionMedia =
+    groupFilter === 'all' ? competitionMedia : competitionMedia.filter((m) => mediaMatchesGroup(m.id));
+  const visibleUnlinkedMedia =
+    groupFilter === 'all' ? unlinkedMedia : unlinkedMedia.filter((m) => mediaMatchesGroup(m.id));
+
+  // Сколько фильтров ПАНЕЛИ сужают выборку: цифра на кнопке «Filters» и признак для кнопки
+  // сброса. Пловец и сезон не в счёт — они живут наверху страницы и всегда на виду.
+  const activeFilterCount =
     [competitionFilter, styleFilter, distanceFilter].filter((v) => v !== 'all').length +
     (dateFrom || dateTo ? 1 : 0) +
+    (seg !== 'all' ? 1 : 0) +
+    (groupFilter !== 'all' ? 1 : 0) +
     (seg === 'with' && statusFilter !== 'all' ? 1 : 0);
 
+  // Пловца и сезон сброс НЕ трогает (хендофф): это не сужение выборки, а ответ на вопрос
+  // «чьи заплывы и за какой сезон я смотрю» — сбросить их значит показать чужое.
   const clearAll = () => {
-    setSwimmerFilter('all');
     setSeg('all');
     setStatusFilter('all');
+    setGroupFilter('all');
     setCompetitionFilter('all');
     setStyleFilter('all');
     setDistanceFilter('all');
@@ -206,13 +283,6 @@ function MyMediaContent() {
     setLikeOverrides((prev) => new Map(prev).set(m.id, { count: m.likes_count + (next ? 1 : -1), mine: next }));
     const state = await toggleLike(m.id, next);
     if (state) setLikeOverrides((prev) => new Map(prev).set(m.id, state));
-  };
-
-  const onToggleCheer = async (s: MySwimDto) => {
-    const next = !s.my_cheer;
-    setCheerOverrides((prev) => new Map(prev).set(s.result_id, { count: s.congrats_count + (next ? 1 : -1), mine: next }));
-    const state = await toggleCheer(s.result_id, next);
-    if (state) setCheerOverrides((prev) => new Map(prev).set(s.result_id, state));
   };
 
   // ── Лайтбокс ──────────────────────────────────────────────────────────────
@@ -258,26 +328,34 @@ function MyMediaContent() {
     }
   };
 
+  // Одно место на модал и на инлайн-строку заплыва: сервер запрещает переподачу, пока
+  // публикация в этой группе pending/approved («publication already exists»), поэтому
+  // смена уровня (members ↔ everyone) идёт через withdraw + резаявку.
+  const publishTo = async (
+    mediaId: number, hubGroupId: number, level: 'members' | 'public'
+  ): Promise<{ ok: boolean; error?: string }> => {
+    const active = (publicationsByMedia.get(mediaId) ?? []).find(
+      (p) => p.hub_group_id === hubGroupId && (p.status === 'pending' || p.status === 'approved')
+    );
+    if (active) {
+      if (active.level === level) return { ok: true }; // менять нечего
+      await withdrawPublication(mediaId, hubGroupId);
+    }
+    return submitPublication(mediaId, hubGroupId, level);
+  };
+
   const handlePublish = async () => {
     if (shareTarget == null || shareGroupId === '') return;
     setShareBusy(true);
     setShareError(null);
-    // Сервер запрещает переподачу, пока публикация в этой группе pending/approved —
-    // смена уровня (members ↔ public) только через withdraw + резаявка.
-    const active = (publicationsByMedia.get(shareTarget.id) ?? []).find(
-      (p) => p.hub_group_id === shareGroupId && (p.status === 'pending' || p.status === 'approved')
-    );
-    if (active && active.level !== shareLevel) {
-      await withdrawPublication(shareTarget.id, shareGroupId);
-    }
-    const res = await submitPublication(shareTarget.id, shareGroupId, shareLevel);
+    const res = await publishTo(shareTarget.id, shareGroupId, shareLevel);
     setShareBusy(false);
     if (res.ok) setShareTarget(null);
     else setShareError(res.error ?? 'Could not submit the request');
   };
 
   const submitInlineShare = async (mediaId: number, hubGroupId: number, level: 'members' | 'public'): Promise<boolean> => {
-    const res = await submitPublication(mediaId, hubGroupId, level);
+    const res = await publishTo(mediaId, hubGroupId, level);
     return res.ok;
   };
 
@@ -300,7 +378,206 @@ function MyMediaContent() {
   const totalCount = bySwimmer.length;
   const pendingModCount = moderation.rows.filter((r) => r.status === 'pending').length;
   const effectiveSeason = data.season || new Date().getFullYear();
-  const seasonChoices = data.seasons.length > 0 ? data.seasons : [effectiveSeason];
+  // Выбранный сезон обязан быть в списке: иначе <select> показывает чужую подпись — так
+  // страница и «залипала» на пустом 2026/27, когда данные есть только за 2025/26.
+  const seasonChoices = useMemo(() => {
+    const years = new Set<number>(data.seasons);
+    years.add(effectiveSeason);
+    // Новый (календарный) сезон в списке есть всегда, даже пока стартов в нём нет — по
+    // общему правилу витрины: «новый сезон в селекторе есть, но по умолчанию не выбран»
+    // (docs/season-boundary-rule.md). Выбирает же дефолт сервер — витринным сезоном.
+    years.add(seasonStartYear());
+    return Array.from(years).sort((a, b) => b - a);
+  }, [data.seasons, effectiveSeason]);
+  // Карусель говорит числом-годом или null (∞ «все сезоны»). Состояние страницы шире:
+  // null в нём означает «сезон выбирает сервер» (витринный), поэтому наружу отдаём уже
+  // посчитанный `effectiveSeason`, а не сырой null — иначе карусель встала бы на ∞.
+  const carouselSeason = season === 'all' || data.all_seasons ? null : season ?? effectiveSeason;
+  // Выбран чип пловца — имя должно быть видно и вне чипа: в строках оно скрыто (фильтр же
+  // один на всех), и экран переставал отвечать на вопрос «чьи это заплывы».
+  const selectedSwimmerName = swimmerFilter === 'all' ? null : swimmerNames.get(swimmerFilter) ?? null;
+  const pickSeason = (v: number | null) => setSeason(v === null ? 'all' : v);
+
+  // Через общий шов идут только стиль и дистанция — единственные фильтры кабинета, для
+  // которых в общей модели есть поля (см. `my-media-filter-host.ts`).
+  const onHostChange = useCallback((patch: Partial<MyMediaHostState>) => {
+    if (patch.style !== undefined) setStyleFilter(patch.style);
+    if (patch.distance !== undefined) setDistanceFilter(patch.distance);
+  }, []);
+  const filterHost = useMyMediaFilterHost({
+    swims,
+    state: { style: styleFilter, distance: distanceFilter },
+    onChange: onHostChange,
+    onReset: clearAll,
+  });
+
+  // Панель одна, а мест у неё два — сайдбар и шторка. Элемент можно переиспользовать:
+  // React смонтирует по экземпляру на место, и раскрытые карточки у них свои.
+  // Раскрытость карточек держит страница, а не карточка: по колонке полосы нужно раскрыть
+  // именно её карточку. Открытых бывает несколько — это не аккордеон.
+  const [openCards, setOpenCards] = useState<Set<MediaCardKey>>(() => new Set(DEFAULT_OPEN_CARDS));
+  const setCardOpen = useCallback((key: MediaCardKey, open: boolean) => {
+    setOpenCards((prev) => {
+      const next = new Set(prev);
+      if (open) next.add(key); else next.delete(key);
+      return next;
+    });
+  }, []);
+  // Клик по колонке полосы: раскрыть карточку, а на узком экране ещё и открыть шторку —
+  // иначе раскрытая карточка осталась бы за кадром.
+  const revealCard = (key: MediaCardKey) => {
+    setCardOpen(key, true);
+    if (window.matchMedia('(max-width: 1023px)').matches) setMobileFiltersOpen(true);
+  };
+
+  const countLabel = `${filtered.length} ${filtered.length === 1 ? 'swim' : 'swims'}`;
+
+  /** Ячейка сезона в полосе: индикатор со стрелками ±1 сезон. Выбор — каруселью в панели. */
+  const seasonIdx = carouselSeason == null ? -1 : seasonChoices.indexOf(carouselSeason);
+  const seasonCell = (
+    <div className="mmb-season">
+      <span className="mmb-season__label">Season</span>
+      <div className="mmb-season__row">
+        {/* seasonChoices идёт от свежего к старому, поэтому «‹» — это шаг ВПЕРЁД по списку. */}
+        <button
+          type="button"
+          className="mmb-season__step"
+          aria-label="Previous season"
+          disabled={seasonIdx < 0 || seasonIdx >= seasonChoices.length - 1}
+          onClick={() => pickSeason(seasonChoices[seasonIdx + 1])}
+        >
+          ‹
+        </button>
+        <span className="mmb-season__value">
+          {carouselSeason == null ? '∞' : seasonLabel(carouselSeason).slice(2)}
+        </span>
+        <button
+          type="button"
+          className="mmb-season__step"
+          aria-label="Next season"
+          disabled={seasonIdx <= 0}
+          onClick={() => pickSeason(seasonChoices[seasonIdx - 1])}
+        >
+          ›
+        </button>
+      </div>
+    </div>
+  );
+
+  /** Чипы полосы — зеркало панели, по одному на карточку-фильтр (сезон стоит ведущей ячейкой). */
+  const barChips: FilterBarChip[] = [
+    {
+      key: 'swimmer',
+      label: 'Swimmer',
+      active: swimmerFilter !== 'all',
+      value: <span dir="auto">{selectedSwimmerName}</span>,
+      onClick: () => revealCard('swimmers'),
+    },
+    {
+      key: 'video',
+      label: 'Video',
+      active: seg !== 'all',
+      value: seg === 'with' ? 'With video' : 'No video',
+      onClick: () => revealCard('video'),
+    },
+    {
+      key: 'event',
+      label: 'Event',
+      active: styleFilter !== 'all',
+      value: (
+        <span className="mmb-event">
+          <UI_SwimmStyleIcon
+            styleName={styleFilter}
+            styleLen={distanceFilter === 'all' ? '' : distanceFilter}
+            styleType="icon-len"
+            className="src-my-media"
+          />
+        </span>
+      ),
+      onClick: () => revealCard('style'),
+    },
+    {
+      key: 'competition',
+      label: 'Competition',
+      active: competitionFilter !== 'all',
+      value: (
+        <span dir="auto">
+          {competitionOptions.find((c) => c.id === competitionFilter)?.name}
+        </span>
+      ),
+      onClick: () => revealCard('competition'),
+    },
+    {
+      key: 'date',
+      label: 'Date',
+      active: !!(dateFrom || dateTo),
+      value: dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : dateFrom || dateTo,
+      onClick: () => revealCard('date'),
+    },
+    {
+      key: 'group',
+      label: 'Shared with',
+      shortLabel: 'Shared',
+      active: groupFilter !== 'all',
+      value: (
+        <span dir="auto">
+          {groupFilter === 'none'
+            ? 'Not shared'
+            : groupOptions.groups.find((g) => g.id === groupFilter)?.name}
+        </span>
+      ),
+      onClick: () => revealCard('group'),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      active: seg === 'with' && statusFilter !== 'all',
+      value: statusFilter,
+      // Статус живёт только у видео: без него колонка врала бы, что фильтр доступен.
+      hideWhenIdle: seg !== 'with',
+      onClick: () => revealCard('status'),
+    },
+  ];
+
+  const seasonOptions = useMemo(
+    () => seasonChoices.map((y) => ({ season: y, label: seasonLabel(y) })),
+    [seasonChoices],
+  );
+
+  const filterPanel = (
+    <MyMediaFilterPanel
+      host={filterHost}
+      seasons={seasonOptions}
+      season={carouselSeason}
+      onSeason={pickSeason}
+      swimmers={data.swimmers.map((sw) => ({
+        id: sw.id,
+        name: sw.name,
+        count: swims.filter((x) => swimBelongsTo(x, sw.id)).length,
+      }))}
+      swimmerFilter={swimmerFilter}
+      onSwimmer={setSwimmerFilter}
+      totalSwims={swims.length}
+      openCards={openCards}
+      onCardOpenChange={setCardOpen}
+      seg={seg}
+      onSeg={(k) => { setSeg(k); if (k !== 'with') setStatusFilter('all'); }}
+      segCount={segCount}
+      statusFilter={statusFilter}
+      onStatus={setStatusFilter}
+      groupFilter={groupFilter}
+      onGroup={pickGroup}
+      groupOptions={groupOptions}
+      competitionFilter={competitionFilter}
+      onCompetition={setCompetitionFilter}
+      competitionOptions={competitionOptions}
+      dateFrom={dateFrom}
+      dateTo={dateTo}
+      onDateFrom={setDateFrom}
+      onDateTo={setDateTo}
+      activeCount={activeFilterCount}
+    />
+  );
 
   const swimListCallbacks = {
     publicationsByMedia,
@@ -311,280 +588,191 @@ function MyMediaContent() {
     onWithdraw: (mediaId: number, hubGroupId: number) => withdrawPublication(mediaId, hubGroupId),
     onDelete: handleDelete,
     onToggleLike,
-    onToggleCheer,
-    onOpenActions: (s: MySwimDto) => { setActionsFor(s); setActionsMediaId(s.media[0]?.id ?? null); },
   };
 
-  const actionsSwim = actionsFor ? swims.find((s) => s.result_id === actionsFor.result_id) ?? null : null;
-  const actionsMedia = actionsSwim?.media.find((m) => m.id === actionsMediaId) ?? actionsSwim?.media[0] ?? null;
 
   return (
-    <div className="home-page relative min-h-screen overflow-x-clip pb-24 text-[#f3f8fd]" style={{ background: 'linear-gradient(160deg,#0d2036 0%,#0b1b31 45%,#050e1c 100%)' }}>
-      <div className="hp-shimmer" aria-hidden="true" />
+    <div
+      className={`my-media ${deep} relative min-h-screen overflow-x-clip pb-24 text-[var(--t-text)]${
+        tab === 'moderation' ? ' my-media--moderation' : ''
+      }`}
+      style={{ background: 'var(--deep-hero-grad)' }}
+    >
       <AppTopbar />
 
-      <section className="relative px-5 pt-10 lg:px-16">
-        <p className="mb-3.5 text-[11px] font-extrabold uppercase tracking-[0.28em] text-[#7dd3fc] lg:text-[15px] lg:tracking-[0.3em]">
-          My profile · {auth.displayName || auth.email}
-        </p>
-        <div className="flex flex-wrap items-end gap-6">
-          <h1 className="m-0 text-[32px] font-black leading-[0.92] tracking-[-0.045em] text-[#f3f8fd] lg:text-[56px]">My media</h1>
-          <nav className="flex items-center gap-2 pb-1.5" aria-label="Profile sections">
-            <span className="hp-mono whitespace-nowrap rounded-[8px] border border-[#7dd3fc] bg-[rgba(125,211,252,0.14)] px-3 py-[5px] text-[12px] font-extrabold text-[#7dd3fc]">
-              Media
-            </span>
-            <a href={routes.groupsList()} className="hp-mono whitespace-nowrap rounded-[8px] border border-[rgba(125,211,252,0.3)] px-3 py-[5px] text-[12px] font-extrabold text-[rgba(125,211,252,0.6)] no-underline">
-              My groups ↗
-            </a>
-            <span
-              title="Coming later"
-              className="hp-mono whitespace-nowrap rounded-[8px] border border-dashed border-[rgba(203,224,240,0.25)] px-3 py-[5px] text-[12px] font-extrabold text-[rgba(203,224,240,0.35)]"
-            >
-              Settings · soon
-            </span>
-          </nav>
+      {/* Шапка (хендофф 2a/2c): имя · заголовок · папки-табы · «+ Add link». Чипы
+          `Media` / `My groups ↗` / `Settings · soon` сняты: первый повторял заголовок,
+          второй уехал в меню аватара топбара, третий обещал несуществующее. */}
+      <header className="mm-head">
+        <div className="mm-head__id">
+          <p className="mm-head__eyebrow">My profile · {auth.displayName || auth.email}</p>
+          <h1 className="mm-head__title">My media</h1>
         </div>
-        <p className="mt-4 max-w-[560px] text-[14.5px] leading-[1.55] text-[rgba(226,240,252,0.82)]">
-          Your swims by season — attach videos and photos, share them with groups.
-        </p>
-      </section>
 
-      <section className="relative px-5 pt-[26px] lg:px-16">
-        <div className="flex items-center gap-2.5">
-          <button type="button" onClick={() => setTab('media')} className={
-            `hp-mono inline-flex items-center gap-2 whitespace-nowrap rounded-[12px] border px-[18px] py-[10px] text-[13.5px] font-extrabold ${
-              tab === 'media' ? 'border-[#7dd3fc] bg-[rgba(125,211,252,0.14)] text-[#7dd3fc]' : 'border-[rgba(125,211,252,0.3)] bg-transparent text-[rgba(125,211,252,0.55)]'
-            }`
-          }>
-            My swims <span className="font-bold opacity-65">· {totalCount}</span>
+        <nav className="mm-tabs" aria-label="Profile sections">
+          <button
+            type="button"
+            onClick={() => setTab('media')}
+            className={`mm-tab${tab === 'media' ? ' mm-tab--on' : ''}`}
+            aria-current={tab === 'media' ? 'page' : undefined}
+          >
+            <span className="mm-tab__title">My swims</span>
+            <span className="mm-tab__sub">
+              {totalCount} swims · {data.all_seasons ? '∞' : seasonLabel(effectiveSeason).slice(2)}
+            </span>
           </button>
           {showModeration && (
-            <button type="button" onClick={() => setTab('moderation')} className={
-              `hp-mono inline-flex items-center gap-2 whitespace-nowrap rounded-[12px] border px-[18px] py-[10px] text-[13.5px] font-extrabold ${
-                tab === 'moderation' ? 'border-[#7dd3fc] bg-[rgba(125,211,252,0.14)] text-[#7dd3fc]' : 'border-[rgba(125,211,252,0.3)] bg-transparent text-[rgba(125,211,252,0.55)]'
-              }`
-            }>
-              Moderation
-              {pendingModCount > 0 && (
-                <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[9px] bg-[#ffca7a] px-[5px] text-[10.5px] font-black text-[#3a2a08]">
-                  {pendingModCount}
-                </span>
-              )}
+            <button
+              type="button"
+              onClick={() => setTab('moderation')}
+              className={`mm-tab${tab === 'moderation' ? ' mm-tab--on' : ''}`}
+              aria-current={tab === 'moderation' ? 'page' : undefined}
+            >
+              <span className="mm-tab__title">Moderation</span>
+              <span className={`mm-tab__sub${pendingModCount > 0 ? ' mm-tab__sub--warn' : ''}`}>
+                {pendingModCount > 0 && <span className="mm-tab__badge">{pendingModCount}</span>}
+                {pendingModCount > 0 ? 'waiting' : 'all clear'}
+              </span>
             </button>
           )}
-        </div>
+        </nav>
 
+        <button type="button" className="mm-add" onClick={() => setAddOpen(true)}>
+          + Add link
+        </button>
+      </header>
+
+      <section className="mm-panel">
         {tab === 'media' ? (
-          <div className="mt-[18px] flex flex-col gap-4">
+          <div className="flex flex-col gap-4">
             {showModeration && pendingModCount > 0 && (
-              <div className="flex items-center gap-3 rounded-[14px] border border-[rgba(255,202,122,0.4)] bg-[linear-gradient(180deg,rgba(255,202,122,0.1),rgba(8,25,48,0.6))] p-[12px_16px]">
-                <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-[11px] bg-[#ffca7a] px-1.5 text-[12px] font-black text-[#3a2a08]">
+              <div className="flex items-center gap-3 rounded-[14px] border border-[var(--t-warn-border)] bg-[var(--t-warn-soft)] p-[12px_16px]">
+                <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-[11px] bg-[var(--t-warn)] px-1.5 text-[12px] font-black text-[var(--t-warn-ink)]">
                   {pendingModCount}
                 </span>
-                <span className="min-w-0 text-[13.5px] font-bold text-[#ffe3b8]">requests are waiting for your approval</span>
-                <button type="button" onClick={() => setTab('moderation')} className="hp-mono ml-auto rounded-[9px] border-none bg-[#ffca7a] px-3.5 py-[7px] text-[12px] font-extrabold text-[#3a2a08]">
+                <span className="min-w-0 text-[13.5px] font-bold text-[var(--t-warn)]">requests are waiting for your approval</span>
+                <button type="button" onClick={() => setTab('moderation')} className="hp-mono ml-auto rounded-[9px] border-none bg-[var(--t-warn)] px-3.5 py-[7px] text-[12px] font-extrabold text-[var(--t-warn-ink)]">
                   Review →
                 </button>
               </div>
             )}
 
-            {/* Swimmer chips + Add link */}
-            <div className="flex items-center gap-2 overflow-x-auto sm:flex-wrap sm:overflow-visible" style={{ scrollbarWidth: 'none' }}>
-              <button type="button" onClick={() => setSwimmerFilter('all')} className={chipClass(swimmerFilter === 'all')}>
-                All · {swims.length}
-              </button>
-              {data.swimmers.map((s) => (
-                <button key={s.id} type="button" onClick={() => setSwimmerFilter(s.id)} className={chipClass(swimmerFilter === s.id)}>
-                  <span
-                    className="inline-flex h-[17px] w-[17px] items-center justify-center rounded-full text-[8px] font-black"
-                    style={{ background: swimmerFilter === s.id ? 'rgba(4,16,31,0.2)' : '#2c3d52', color: swimmerFilter === s.id ? '#04101f' : '#bfe0f5' }}
-                  >
-                    {s.name.trim().charAt(0).toUpperCase()}
-                  </span>
-                  {s.name} · {swims.filter((x) => swimBelongsTo(x, s.id)).length}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setAddOpen(true)}
-                className="hp-mono ml-auto hidden whitespace-nowrap rounded-[10px] border-none bg-[#38ef8f] px-[18px] py-[9px] text-[13px] font-extrabold text-[#04101f] sm:block"
-              >
-                + Add link
-              </button>
-            </div>
 
-            {/* Primary filter row (desktop) */}
-            <div className="hidden flex-wrap items-center gap-3 sm:flex">
-              <div className="inline-flex overflow-hidden rounded-[10px] border border-[rgba(125,211,252,0.35)]">
-                {(['all', 'with', 'without'] as Seg[]).map((k, i, arr) => (
-                  <button key={k} type="button" onClick={() => { setSeg(k); if (k !== 'with') setStatusFilter('all'); }} className={segmentClass(seg === k, i === arr.length - 1)}>
-                    {k === 'all' ? `All swims · ${segCount('all')}` : k === 'with' ? `With video · ${segCount('with')}` : `Without video · ${segCount('without')}`}
-                  </button>
-                ))}
-              </div>
-              <label className="hp-mono flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[rgba(125,211,252,0.7)]">
-                Season
-                <select
-                  value={season ?? effectiveSeason}
-                  onChange={(e) => setSeason(Number(e.target.value))}
-                  className="rounded-[8px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-2 py-[6px] text-[12px] normal-case tracking-normal text-[#f3f8fd]"
-                >
-                  {seasonChoices.map((y) => <option key={y} value={y}>{seasonLabel(y)}</option>)}
-                </select>
-              </label>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setMoreOpen((v) => !v)}
-                  className="hp-mono rounded-[10px] border border-[rgba(125,211,252,0.3)] bg-transparent px-3 py-[7px] text-[11.5px] font-extrabold text-[rgba(125,211,252,0.7)]"
-                >
-                  More filters {activeMoreCount > 0 ? `(${activeMoreCount}) ` : ''}▾
-                </button>
-                {moreOpen && (
-                  <div className="absolute left-0 top-[38px] z-30 flex w-[320px] flex-col gap-2.5 rounded-[16px] border border-[rgba(125,211,252,0.3)] bg-[linear-gradient(180deg,#0e2138,#081527)] p-3.5 shadow-[0_30px_70px_rgba(0,0,0,0.6)]">
-                    <FilterSelect
-                      label="Competition"
-                      value={competitionFilter === 'all' ? 'all' : String(competitionFilter)}
-                      onChange={(v) => setCompetitionFilter(v === 'all' ? 'all' : Number(v))}
-                      options={competitionOptions.map((c) => ({ value: String(c.id), label: c.name }))}
-                      rtl
-                    />
-                    <FilterSelect label="Style" value={styleFilter} onChange={setStyleFilter} options={styleOptions.map((s) => ({ value: s, label: s }))} />
-                    <FilterSelect label="Distance" value={distanceFilter} onChange={setDistanceFilter} options={distanceOptions.map((d) => ({ value: d, label: `${d}m` }))} />
-                    <div>
-                      <label className="hp-mono mb-1 block text-[10px] font-extrabold uppercase tracking-[0.1em] text-[rgba(125,211,252,0.7)]">Date range</label>
-                      <div className="flex items-center gap-1.5">
-                        <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full rounded-[8px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-2 py-1 text-[11px] text-[#f3f8fd]" style={{ colorScheme: 'dark' }} />
-                        <span className="text-[rgba(203,224,240,0.5)]">–</span>
-                        <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-full rounded-[8px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-2 py-1 text-[11px] text-[#f3f8fd]" style={{ colorScheme: 'dark' }} />
-                      </div>
-                    </div>
-                    {seg === 'with' && (
-                      <div>
-                        <label className="hp-mono mb-1 block text-[10px] font-extrabold uppercase tracking-[0.1em] text-[rgba(125,211,252,0.7)]">Publication status</label>
-                        <div className="flex flex-wrap gap-1.5">
-                          {(['all', 'private', 'pending', 'published', 'rejected'] as StatusFilter[]).map((k) => (
-                            <button key={k} type="button" onClick={() => setStatusFilter(k)} className={chipClass(statusFilter === k)}>
-                              {k === 'all' ? 'All' : k}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <button type="button" onClick={clearAll} className="hp-mono border-none bg-transparent text-[11px] font-extrabold text-[rgba(125,211,252,0.6)]">Reset filters</button>
-                      <button type="button" onClick={() => setMoreOpen(false)} className="hp-mono rounded-[8px] border-none bg-[#7dd3fc] px-3.5 py-[6px] text-[11px] font-extrabold text-[#04101f]">Done</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <span className="ml-auto text-[11.5px] font-bold text-[rgba(203,224,240,0.5)]">
-                {filtered.length} {filtered.length === 1 ? 'swim' : 'swims'} · sorted by date ↓
-              </span>
-            </div>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+              {/* Сайдбар фильтров (десктоп). Ширина фиксированная, как на results: строка
+                  заплыва тоже фиксированной ширины, и доля от экрана её ломала бы. */}
+              <aside className="my-media-filters hidden w-[320px] shrink-0 lg:block">
+                {filterPanel}
+              </aside>
 
-            {/* Mobile: segment + Filters button */}
-            <div className="flex flex-col gap-2 sm:hidden">
-              <div className="flex overflow-hidden rounded-[10px] border border-[rgba(125,211,252,0.35)]">
-                {(['all', 'with', 'without'] as Seg[]).map((k, i, arr) => (
-                  <button key={k} type="button" onClick={() => { setSeg(k); if (k !== 'with') setStatusFilter('all'); }} className={`flex-1 ${segmentClass(seg === k, i === arr.length - 1)}`}>
-                    {k === 'all' ? 'All' : k === 'with' ? 'With video' : 'No video'}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={() => setMobileFiltersOpen(true)}
-                className="hp-mono flex min-h-[44px] items-center justify-center gap-2 rounded-[10px] border border-[rgba(125,211,252,0.35)] bg-transparent text-[13px] font-extrabold text-[#7dd3fc]"
-              >
-                ⚙ Filters {activeMoreCount > 0 ? `(${activeMoreCount})` : ''}
-              </button>
-            </div>
-
-            {/* Main list / states */}
-            {loading ? (
-              <div className="flex flex-col gap-4">
-                {[0, 1].map((i) => (
-                  <div key={i} className={`${hpCardCls} h-[140px] animate-pulse`} />
-                ))}
-              </div>
-            ) : data.swimmers.length === 0 ? (
-              <div className={`${hpCardCls} p-[56px_40px] text-center`}>
-                <div className="text-[40px]">⭐</div>
-                <p className="m-0 mt-3 text-[17px] font-black text-[#f3f8fd]">No favorite swimmers yet</p>
-                <p className="mx-auto mt-2 max-w-[380px] text-[13px] leading-[1.5] text-[rgba(203,224,240,0.6)]">
-                  Add a swimmer to favorites — their swims will appear here and you can attach videos.
+              <div className="flex min-w-0 flex-1 flex-col gap-4">
+                {/* Полоса выбранного — ОБЩИЙ `FilterBar`, тот же, что на results и
+                    `/season-best`. Колонки — зеркало панели: щелчок раскрывает карточку
+                    того фильтра, по которому щёлкнули (на узком экране — открывает шторку). */}
+                <FilterBar
+                  className="my-media-bar"
+                  desktop="columns"
+                  rows="card"
+                  lead={seasonCell}
+                  aside={<span className="text-[11px] font-bold text-[var(--t-text-3)]">{countLabel}</span>}
+                  chips={barChips}
+                />
+                <p className="m-0 hidden text-[11.5px] font-bold text-[var(--t-text-3)] md:block">
+                  {selectedSwimmerName && (
+                    <span dir="auto" className="mr-1.5 text-[12.5px] font-black text-[var(--t-accent)]">{selectedSwimmerName}</span>
+                  )}
+                  {countLabel} · sorted by date ↓
                 </p>
-                <a href={routes.results()} className="hp-mono mt-[18px] inline-block rounded-[10px] border-none bg-[#38ef8f] px-5 py-[10px] text-[13px] font-extrabold text-[#04101f] no-underline">
-                  Find swimmers →
-                </a>
-              </div>
-            ) : swims.length === 0 ? (
-              <div className="rounded-[16px] border border-dashed border-[rgba(125,211,252,0.25)] p-10 text-center">
-                <p className="m-0 text-[14px] font-bold text-[rgba(203,224,240,0.6)]">No results in season {seasonLabel(effectiveSeason)}</p>
-                {data.seasons.filter((y) => y !== effectiveSeason).slice(0, 1).map((y) => (
-                  <button key={y} type="button" onClick={() => setSeason(y)} className="hp-mono mt-3 rounded-[9px] border border-[rgba(125,211,252,0.4)] bg-transparent px-3.5 py-[7px] text-[12px] font-extrabold text-[#7dd3fc]">
-                    Season {seasonLabel(y)} →
-                  </button>
-                ))}
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="rounded-[16px] border border-dashed border-[rgba(125,211,252,0.25)] p-10 text-center">
-                <p className="m-0 text-[14px] font-bold text-[rgba(203,224,240,0.6)]">Nothing matches the filters</p>
-                <button type="button" onClick={clearAll} className="hp-mono mt-3 rounded-[9px] border border-[rgba(125,211,252,0.4)] bg-transparent px-3.5 py-[7px] text-[12px] font-extrabold text-[#7dd3fc]">
-                  Clear all
-                </button>
-              </div>
-            ) : (
-              <SwimList
-                swims={filtered}
-                competitionMedia={competitionMedia}
-                showSwimmerName={swimmerFilter === 'all' && data.swimmers.length > 1}
-                swimmerNames={swimmerNames}
-                {...swimListCallbacks}
-              />
-            )}
 
-            {/* Unlinked media */}
-            {unlinkedMedia.length > 0 && (
-              <div className="mt-2">
-                <button
-                  type="button"
-                  onClick={() => setUnlinkedOpen((v) => !v)}
-                  className="hp-mono flex w-full items-center gap-2 rounded-[12px] border border-[rgba(125,211,252,0.25)] bg-transparent px-4 py-[10px] text-left text-[12px] font-extrabold text-[#7dd3fc]"
-                >
-                  Unlinked media
-                  <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[9px] bg-[rgba(125,211,252,0.18)] px-1.5 text-[10.5px]">{unlinkedMedia.length}</span>
-                  <span className="font-bold normal-case text-[rgba(203,224,240,0.45)]">· club videos and general footage not tied to any swim</span>
-                  <span className="ml-auto">{unlinkedOpen ? '▲' : '▼'}</span>
-                </button>
-                {unlinkedOpen && (
-                  <div className="mt-3 grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(250px,1fr))' }}>
-                    {unlinkedMedia.map((item) => (
-                      <MediaCard
-                        key={item.id}
-                        item={item}
-                        publications={publicationsByMedia.get(item.id) ?? []}
-                        onOpenLightbox={() => onPlay(item)}
-                        onDelete={() => handleDelete(item.id)}
-                        onWithdraw={(hubGroupId) => withdrawPublication(item.id, hubGroupId)}
-                        onLinkToSwim={() => setLinkSwimTarget(item)}
-                        onShareWithGroup={() => openShare(item)}
-                      />
+                {/* Main list / states */}
+                {loading ? (
+                  <div className="flex flex-col gap-4">
+                    {[0, 1].map((i) => (
+                      <div key={i} className={`${hpCardCls} h-[140px] animate-pulse`} />
                     ))}
                   </div>
+                ) : data.swimmers.length === 0 ? (
+                  <div className={`${hpCardCls} p-[56px_40px] text-center`}>
+                    <div className="text-[40px]">⭐</div>
+                    <p className="m-0 mt-3 text-[17px] font-black text-[var(--t-text)]">No favorite swimmers yet</p>
+                    <p className="mx-auto mt-2 max-w-[380px] text-[13px] leading-[1.5] text-[var(--t-text-2)]">
+                      Add a swimmer to favorites — their swims will appear here and you can attach videos.
+                    </p>
+                    <a href={routes.results()} className="hp-mono mt-[18px] inline-block rounded-[10px] border-none bg-[var(--t-accent)] px-5 py-[10px] text-[13px] font-extrabold text-[var(--t-accent-ink)] no-underline">
+                      Find swimmers →
+                    </a>
+                  </div>
+                ) : swims.length === 0 ? (
+                  <div className="rounded-[16px] border border-dashed border-[var(--t-border)] p-10 text-center">
+                    <p className="m-0 text-[14px] font-bold text-[var(--t-text-2)]">
+                      {data.all_seasons ? 'No results yet' : `No results in season ${seasonLabel(effectiveSeason)}`}
+                    </p>
+                    {data.seasons.filter((y) => y !== effectiveSeason).slice(0, 1).map((y) => (
+                      <button key={y} type="button" onClick={() => setSeason(y)} className="hp-mono mt-3 rounded-[9px] border border-[var(--t-accent-border)] bg-transparent px-3.5 py-[7px] text-[12px] font-extrabold text-[var(--t-accent)]">
+                        Season {seasonLabel(y)} →
+                      </button>
+                    ))}
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div className="rounded-[16px] border border-dashed border-[var(--t-border)] p-10 text-center">
+                    <p className="m-0 text-[14px] font-bold text-[var(--t-text-2)]">Nothing matches the filters</p>
+                    <button type="button" onClick={clearAll} className="hp-mono mt-3 rounded-[9px] border border-[var(--t-accent-border)] bg-transparent px-3.5 py-[7px] text-[12px] font-extrabold text-[var(--t-accent)]">
+                      Clear all
+                    </button>
+                  </div>
+                ) : (
+                  <SwimList
+                    swims={filtered}
+                    competitionMedia={visibleCompetitionMedia}
+                    showSwimmerName={swimmerFilter === 'all' && data.swimmers.length > 1}
+                    swimmerNames={swimmerNames}
+                    preferredSwimmerId={swimmerFilter === 'all' ? null : swimmerFilter}
+                    {...swimListCallbacks}
+                  />
                 )}
-                {unlinkedOpen && (
-                  <button
-                    type="button"
-                    onClick={() => setAddOpen(true)}
-                    className="hp-mono mt-3 rounded-[9px] border border-dashed border-[rgba(56,239,143,0.4)] bg-transparent px-3.5 py-[7px] text-[12px] font-extrabold text-[rgba(56,239,143,0.8)]"
-                  >
-                    + Add link without a swim
-                  </button>
+
+                {/* Unlinked media */}
+                {visibleUnlinkedMedia.length > 0 && (
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setUnlinkedOpen((v) => !v)}
+                      className="hp-mono flex w-full items-center gap-2 rounded-[12px] border border-[var(--t-border)] bg-transparent px-4 py-[10px] text-left text-[12px] font-extrabold text-[var(--t-accent)]"
+                    >
+                      Unlinked media
+                      <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[9px] bg-[var(--t-accent-soft)] px-1.5 text-[10.5px]">{visibleUnlinkedMedia.length}</span>
+                      <span className="font-bold normal-case text-[var(--t-text-3)]">· club videos and general footage not tied to any swim</span>
+                      <span className="ml-auto">{unlinkedOpen ? '▲' : '▼'}</span>
+                    </button>
+                    {unlinkedOpen && (
+                      <div className="mt-3 grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(250px,1fr))' }}>
+                        {visibleUnlinkedMedia.map((item) => (
+                          <MediaCard
+                            key={item.id}
+                            item={item}
+                            publications={publicationsByMedia.get(item.id) ?? []}
+                            onOpenLightbox={() => onPlay(item)}
+                            onDelete={() => handleDelete(item.id)}
+                            onWithdraw={(hubGroupId) => withdrawPublication(item.id, hubGroupId)}
+                            onLinkToSwim={() => setLinkSwimTarget(item)}
+                            onShareWithGroup={() => openShare(item)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {unlinkedOpen && (
+                      <button
+                        type="button"
+                        onClick={() => setAddOpen(true)}
+                        className="hp-mono mt-3 rounded-[9px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-3.5 py-[7px] text-[12px] font-extrabold text-[var(--t-accent-dim)]"
+                      >
+                        + Add link without a swim
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
+            </div>
           </div>
         ) : (
           <ModerationPanel
@@ -599,7 +787,7 @@ function MyMediaContent() {
         <button
           type="button"
           onClick={() => setAddOpen(true)}
-          className="hp-mono fixed bottom-5 left-1/2 z-40 -translate-x-1/2 rounded-full border-none bg-[#38ef8f] px-6 py-3 text-[13px] font-extrabold text-[#04101f] shadow-[0_12px_30px_rgba(0,0,0,0.45)] sm:hidden"
+          className="hp-mono fixed bottom-5 left-1/2 z-40 -translate-x-1/2 rounded-full border-none bg-[var(--t-accent)] px-6 py-3 text-[13px] font-extrabold text-[var(--t-accent-ink)] shadow-[var(--t-shadow)] sm:hidden"
         >
           + Add link
         </button>
@@ -623,8 +811,8 @@ function MyMediaContent() {
           contextLabel={
             <span>
               <b>{addVideoSwim.distance}m {addVideoSwim.style}</b>
-              <span className="hp-mono ml-2 text-[#7dd3fc]">{addVideoSwim.time}</span>
-              <span dir="auto" className="ml-2 text-[rgba(203,224,240,0.55)]">{addVideoSwim.competition_name} · {addVideoSwim.competition_date}</span>
+              <span className="hp-mono ml-2 text-[var(--t-accent)]">{addVideoSwim.time}</span>
+              <span dir="auto" className="ml-2 text-[var(--t-text-2)]">{addVideoSwim.competition_name} · {addVideoSwim.competition_date}</span>
             </span>
           }
           onClose={() => setAddVideoSwim(null)}
@@ -641,7 +829,7 @@ function MyMediaContent() {
           contextLabel={
             <span>
               <b>Competition media</b> 📎
-              <span dir="auto" className="ml-2 text-[rgba(203,224,240,0.55)]">{addCompTarget.name}</span>
+              <span dir="auto" className="ml-2 text-[var(--t-text-2)]">{addCompTarget.name}</span>
             </span>
           }
           onClose={() => setAddCompTarget(null)}
@@ -651,14 +839,14 @@ function MyMediaContent() {
 
       {/* Share with a group — модал (mobile actions sheet + Unlinked) */}
       {shareTarget && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(2,10,24,0.72)] backdrop-blur-[4px]" onClick={() => setShareTarget(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--t-scrim)] backdrop-blur-[4px]" onClick={() => setShareTarget(null)}>
           <div
-            className="w-[420px] max-w-[calc(100vw-40px)] rounded-[16px] border border-[rgba(125,211,252,0.3)] bg-[linear-gradient(180deg,#0e2138,#081527)] p-5 text-[#f3f8fd]"
+            className="w-[420px] max-w-[calc(100vw-40px)] rounded-[16px] border border-[var(--t-border)] bg-[var(--t-surface-strong)] p-5 text-[var(--t-text)]"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="m-0 mb-3 text-[15px] font-black">Share with a group</h3>
             {shareTargets != null && shareTargets.length === 0 && (
-              <p className="text-[12px] text-[rgba(203,224,240,0.6)]">
+              <p className="text-[12px] text-[var(--t-text-2)]">
                 No eligible groups — the swimmer must be in the group's roster and you must be a member.
               </p>
             )}
@@ -667,7 +855,7 @@ function MyMediaContent() {
                 <select
                   value={shareGroupId}
                   onChange={(e) => setShareGroupId(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="rounded-[8px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-2.5 py-2 text-[12px] text-[#f3f8fd]"
+                  className="rounded-[8px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-2.5 py-2 text-[12px] text-[var(--t-text)]"
                 >
                   <option value="">— group —</option>
                   {shareTargets.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -675,24 +863,24 @@ function MyMediaContent() {
                 <select
                   value={shareLevel}
                   onChange={(e) => setShareLevel(e.target.value as 'members' | 'public')}
-                  className="rounded-[8px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-2.5 py-2 text-[12px] text-[#f3f8fd]"
+                  className="rounded-[8px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-2.5 py-2 text-[12px] text-[var(--t-text)]"
                 >
                   <option value="members">Group members</option>
                   <option value="public">Public (visible to everyone)</option>
                 </select>
                 {shareLevel === 'public' && (
-                  <p className="m-0 text-[11px] text-[#ffca7a]">Public = visible to everyone on the internet after approval.</p>
+                  <p className="m-0 text-[11px] text-[var(--t-warn)]">Public = visible to everyone on the internet after approval.</p>
                 )}
-                {shareError && <div className="text-[11.5px] text-[#ef5350]">{shareError}</div>}
+                {shareError && <div className="text-[11.5px] text-[var(--t-danger)]">{shareError}</div>}
                 <div className="flex justify-end gap-2">
-                  <button type="button" onClick={() => setShareTarget(null)} className="hp-mono rounded-[8px] border border-[rgba(125,211,252,0.3)] bg-transparent px-3 py-[7px] text-[11.5px] font-extrabold text-[rgba(125,211,252,0.7)]">
+                  <button type="button" onClick={() => setShareTarget(null)} className="hp-mono rounded-[8px] border border-[var(--t-border)] bg-transparent px-3 py-[7px] text-[11.5px] font-extrabold text-[var(--t-accent-dim)]">
                     Cancel
                   </button>
                   <button
                     type="button"
                     disabled={shareBusy || shareGroupId === ''}
                     onClick={handlePublish}
-                    className="hp-mono rounded-[8px] border-none bg-[#38ef8f] px-3 py-[7px] text-[11.5px] font-extrabold text-[#04101f] disabled:opacity-50"
+                    className="hp-mono rounded-[8px] border-none bg-[var(--t-accent)] px-3 py-[7px] text-[11.5px] font-extrabold text-[var(--t-accent-ink)] disabled:opacity-50"
                   >
                     Submit for approval
                   </button>
@@ -719,145 +907,48 @@ function MyMediaContent() {
         />
       )}
 
-      {/* Mobile filters bottom sheet */}
-      {mobileFiltersOpen && (
-        <div className="fixed inset-0 z-[100] flex items-end bg-[rgba(2,10,24,0.72)] backdrop-blur-[4px]" onClick={() => setMobileFiltersOpen(false)}>
-          <div
-            className="max-h-[85vh] w-full overflow-y-auto rounded-t-[20px] border-t border-[rgba(125,211,252,0.3)] bg-[linear-gradient(180deg,#0e2138,#081527)] p-5 text-[#f3f8fd]"
-            onClick={(e) => e.stopPropagation()}
+      {/* Кнопка-пилюля — общая с results (решение Влада 07.09.2026). Прибита к низу экрана:
+          фильтруют, уже прокрутив список, и кнопка в потоке к этому моменту уезжает. */}
+      <FiltersFab
+        className={`my-media-fab ${deep}`}
+        open={mobileFiltersOpen}
+        onToggle={() => setMobileFiltersOpen((v) => !v)}
+        count={activeFilterCount}
+        controls="my-media-filters-sheet"
+        // У шторки свой подвал «Show N swims» — пилюля на открытой шторке легла бы на него.
+        hideWhenOpen
+      />
+
+      {/* Шторка фильтров (до lg) — ОБЩИЙ компонент, тот же, что на results. Внутри та же
+          панель, что в сайдбаре: расходиться им нельзя, иначе телефон и десктоп начнут
+          фильтровать по-разному. */}
+      <MobileFiltersDrawer
+        id="my-media-filters-sheet"
+        className={`my-media-filters ${deep}`}
+        variant="sheet"
+        open={mobileFiltersOpen}
+        onClose={() => setMobileFiltersOpen(false)}
+        footer={(
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen(false)}
+            className="hp-mono min-h-[44px] w-full rounded-[10px] border-none bg-[var(--t-accent)] text-[13px] font-extrabold text-[var(--t-accent-ink)]"
           >
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[rgba(125,211,252,0.35)]" />
-            <div className="flex flex-col gap-3">
-              <FilterSelect
-                label="Season"
-                value={String(season ?? effectiveSeason)}
-                onChange={(v) => setSeason(Number(v))}
-                options={seasonChoices.map((y) => ({ value: String(y), label: seasonLabel(y) }))}
-                noAll
-              />
-              <FilterSelect
-                label="Competition"
-                value={competitionFilter === 'all' ? 'all' : String(competitionFilter)}
-                onChange={(v) => setCompetitionFilter(v === 'all' ? 'all' : Number(v))}
-                options={competitionOptions.map((c) => ({ value: String(c.id), label: c.name }))}
-                rtl
-              />
-              <FilterSelect label="Style" value={styleFilter} onChange={setStyleFilter} options={styleOptions.map((s) => ({ value: s, label: s }))} />
-              <FilterSelect label="Distance" value={distanceFilter} onChange={setDistanceFilter} options={distanceOptions.map((d) => ({ value: d, label: `${d}m` }))} />
-              <div>
-                <label className="hp-mono mb-1 block text-[10px] font-extrabold uppercase tracking-[0.1em] text-[rgba(125,211,252,0.7)]">Date range</label>
-                <div className="flex items-center gap-1.5">
-                  <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="min-h-[44px] w-full rounded-[8px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-2 py-1 text-[12px] text-[#f3f8fd]" style={{ colorScheme: 'dark' }} />
-                  <span className="text-[rgba(203,224,240,0.5)]">–</span>
-                  <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="min-h-[44px] w-full rounded-[8px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-2 py-1 text-[12px] text-[#f3f8fd]" style={{ colorScheme: 'dark' }} />
-                </div>
-              </div>
-              {seg === 'with' && (
-                <div>
-                  <p className="hp-mono mb-1.5 text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#7dd3fc]">Publication status</p>
-                  <div className="flex flex-wrap gap-2">
-                    {(['all', 'private', 'pending', 'published', 'rejected'] as StatusFilter[]).map((k) => (
-                      <button key={k} type="button" onClick={() => setStatusFilter(k)} className={chipClass(statusFilter === k)}>
-                        {k === 'all' ? 'All' : k[0].toUpperCase() + k.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <button type="button" onClick={clearAll} className="hp-mono self-start border-none bg-transparent text-[12px] font-extrabold text-[#7dd3fc]">Reset</button>
-              <button
-                type="button"
-                onClick={() => setMobileFiltersOpen(false)}
-                className="hp-mono mt-2 min-h-[44px] w-full rounded-[10px] border-none bg-[#38ef8f] text-[13px] font-extrabold text-[#04101f]"
-              >
-                Show {filtered.length} {filtered.length === 1 ? 'swim' : 'swims'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Mobile actions bottom sheet */}
-      {actionsSwim && (
-        <div className="fixed inset-0 z-[100] flex items-end bg-[rgba(2,10,24,0.72)] backdrop-blur-[4px] sm:hidden" onClick={() => setActionsFor(null)}>
-          <div
-            className="w-full rounded-t-[20px] border-t border-[rgba(125,211,252,0.3)] bg-[linear-gradient(180deg,#0e2138,#081527)] p-5 text-[#f3f8fd]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[rgba(125,211,252,0.35)]" />
-            <p className="m-0 text-[15px] font-black">
-              {actionsSwim.distance}m {actionsSwim.style}
-              <span className="hp-mono ml-2 text-[#7dd3fc]">{actionsSwim.time}</span>
-            </p>
-            <p dir="auto" className="m-0 mt-1 text-[12px] text-[rgba(203,224,240,0.55)]">{actionsSwim.competition_name} · {actionsSwim.competition_date}</p>
-
-            {actionsSwim.media.length > 1 && (
-              <div className="mt-3 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-                {actionsSwim.media.map((m, i) => {
-                  const st = derivedCardStatus(publicationsByMedia.get(m.id) ?? []);
-                  return (
-                    <button key={m.id} type="button" onClick={() => setActionsMediaId(m.id)} className={chipClass(actionsMedia?.id === m.id)}>
-                      {m.media_type === 'image' ? '🖼' : '▶'} {i + 1} · {m.media_type === 'image' ? 'PHOTO' : m.source_type.toUpperCase()} · {st} · ❤ {m.likes_count}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {actionsMedia && (
-              <div className="mt-4 flex flex-col gap-2">
-                <button type="button" onClick={() => { onPlay(actionsMedia); setActionsFor(null); }} className="hp-mono min-h-[44px] w-full rounded-[10px] border-none bg-[#7dd3fc] text-[13px] font-extrabold text-[#04101f]">
-                  {actionsMedia.media_type === 'image' ? '🖼 View photo' : '▶ Play'}
-                </button>
-                <button type="button" onClick={() => onToggleLike(actionsMedia)} className="hp-mono min-h-[44px] w-full rounded-[10px] border border-[rgba(255,125,156,0.45)] bg-transparent text-[13px] font-extrabold" style={{ color: actionsMedia.my_like ? '#ff7d9c' : 'rgba(255,125,156,0.7)' }}>
-                  ❤ {actionsMedia.likes_count}{actionsMedia.my_like ? ' · liked' : ''}
-                </button>
-                <button type="button" onClick={() => { openShare(actionsMedia); setActionsFor(null); }} className="hp-mono min-h-[44px] w-full rounded-[10px] border border-[rgba(125,211,252,0.35)] bg-transparent text-[13px] font-extrabold text-[#7dd3fc]">
-                  Share with a group
-                </button>
-                {(publicationsByMedia.get(actionsMedia.id) ?? [])
-                  .filter((p) => p.status === 'pending' || p.status === 'approved')
-                  .map((p) => (
-                    <button key={p.hub_group_id} type="button" onClick={() => withdrawPublication(actionsMedia.id, p.hub_group_id)} className="hp-mono min-h-[44px] w-full rounded-[10px] border border-[rgba(255,202,122,0.45)] bg-transparent text-[13px] font-extrabold text-[#ffca7a]">
-                      Withdraw from {p.hub_group_name}
-                    </button>
-                  ))}
-                <button type="button" onClick={() => { handleDelete(actionsMedia.id); setActionsFor(null); }} className="hp-mono min-h-[44px] w-full rounded-[10px] border border-[rgba(239,83,80,0.45)] bg-transparent text-[13px] font-extrabold text-[#ef5350]">
-                  Delete {actionsMedia.media_type === 'image' ? 'photo' : 'video'}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+            Show {filtered.length} {filtered.length === 1 ? 'swim' : 'swims'}
+          </button>
+        )}
+      >
+        {filterPanel}
+      </MobileFiltersDrawer>
 
       <UI_SwimmerGallery gallery={lightboxItems} openIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />
-    </div>
-  );
-}
 
-function FilterSelect({
-  label, value, onChange, options, rtl, noAll,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-  rtl?: boolean;
-  noAll?: boolean;
-}) {
-  return (
-    <div>
-      <label className="hp-mono mb-1 block text-[10px] font-extrabold uppercase tracking-[0.1em] text-[rgba(125,211,252,0.7)]">{label}</label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        dir={rtl ? 'rtl' : undefined}
-        className="w-full rounded-[8px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-2 py-[7px] text-[12px] text-[#f3f8fd]"
-      >
-        {!noAll && <option value="all">All</option>}
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
+      {/* Переключатель тем. Прячется, когда сверху что-то открыто: у него z-index выше всех
+          оверлеев страницы (шторка 100, модалки 100, лайтбокс 50), и иначе кружок висел бы
+          поверх них — на мобильной шторке ровно на кнопке «Show N swims». Перечисляем
+          состояния явно, а не правим z-index общего компонента: он стоит ещё на пяти
+          страницах, и у продукта одной шкалы z-index пока нет. */}
+      {!anyOverlayOpen && <UI_ModeToggle />}
     </div>
   );
 }

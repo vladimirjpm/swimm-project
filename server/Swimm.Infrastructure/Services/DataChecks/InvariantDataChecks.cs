@@ -265,3 +265,60 @@ public sealed class SwimmerTwoClubsInCompetitionCheck(SwimmDbContext db) : IData
             .ToList());
     }
 }
+
+/// <summary>
+/// Инвариант: место есть только у ДОПЛЫВШЕГО. У снятых (DQ / NS / DNS) число в первой
+/// колонке протокола местом не является — в одном заплыве оно повторяется у разных снятых, —
+/// и на витрине выглядит как «#2 🥈» рядом со словом DSQ (инцидент И-18).
+///
+/// Правило стоит на ЗАПИСИ (`JsonImportService`: `Position = item.TimeFail ? null : …`), а эта
+/// проверка ловит то, что могло приехать другим путём: правка в админке, ручной SQL, импорт
+/// старой сборкой.
+/// </summary>
+public sealed class PlaceWithoutTimeCheck(SwimmDbContext db) : IDataCheck
+{
+    public string Id => "results.place-without-time";
+    public string Title => "Место у снятого пловца";
+    public string Description =>
+        "У результата стоит место, хотя заплыв не засчитан (DQ / NS / DNS). Место занимает тот, " +
+        "кто доплыл; у снятых число в протоколе местом не является. Лечится переимпортом " +
+        "протокола либо правкой строки в админке.";
+    public DataCheckSeverity Severity => DataCheckSeverity.Warning;
+
+    public async Task<DataCheckOutcome> RunAsync(CancellationToken ct = default)
+    {
+        var query = db.Results.AsNoTracking()
+            .Where(r => r.TimeFail && (r.Position != null || r.PositionAgeGroup != null));
+
+        var total = await query.CountAsync(ct);
+        if (total == 0) return DataCheckOutcome.Empty;
+
+        var rows = await query
+            .OrderBy(r => r.Id)
+            .Take(50)
+            .Select(r => new
+            {
+                r.Id,
+                r.Position,
+                r.PositionAgeGroup,
+                r.TimeFailNote,
+                r.Distance,
+                StyleName = r.Style.Name,
+                SwimmerName = r.Swimmer.FirstName + " " + r.Swimmer.LastName,
+                r.CompetitionId,
+                CompetitionName = r.Competition.Name,
+            })
+            .ToListAsync(ct);
+
+        return new DataCheckOutcome(total, rows
+            .Select(r => new DataCheckItem(
+                // Id результата в базе long, а карточка проверки работает с int — так же
+                // приводят его соседние проверки по результатам.
+                "Result", (int)r.Id,
+                $"{r.SwimmerName} · {r.Distance} {r.StyleName} · место {r.Position ?? r.PositionAgeGroup} при «{r.TimeFailNote ?? "DSQ"}»",
+                $"{r.CompetitionName} (#{r.CompetitionId})",
+                $"/Admin/Results/Edit?id={r.Id}",
+                PublicRoutes.Competition(r.CompetitionId)))
+            .ToList());
+    }
+}

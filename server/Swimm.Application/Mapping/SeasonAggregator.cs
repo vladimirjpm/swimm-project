@@ -35,6 +35,11 @@ public sealed record SeasonSwimRow(
     /// prelim-заплыва — ранжир сессии, не награда: медали считаются без него.</summary>
     public string? HeatType { get; init; }
 
+    /// <summary>Раунд: `final-open` — секция «כללי» без возрастной категории, медалей и очков
+    /// она не даёт (Р43). Вместе с `HeatType`, `TimeFail` и `IsAward` — входы единого правила
+    /// медали на клиенте (`HelperResults.isMedalPlace`).</summary>
+    public string? Round { get; init; }
+
     /// <summary>Место внутри возрастной полосы протокола (грубее заплыва).</summary>
     public int? PositionAgeGroup { get; init; }
 

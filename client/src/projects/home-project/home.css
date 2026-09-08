@@ -1,20 +1,58 @@
-/* Only complex multi-layer backgrounds & keyframe animations kept in CSS */
+/* Семья hp — `/home`, `/competitions`, `/groups`: общий фон, карточки и анимации.
+   Здесь только сложные многослойные фоны и keyframes; всё остальное — утилитами на месте.
+
+   ПАЛИТРА. Страницы живут в теме **deep** (`.theme-deep` / `.theme-deep-light`, класс ставит
+   `useDeepThemeClass()` на корне) — той же, что `/my-media`, страницы пловца, клуба и
+   `/season-best`. Цвета вёрстка просит РОЛЯМИ `--t-*`, карта ролей — в
+   `components/deep/deep-theme.css`. Своих цветов у семьи ровно три, и все — из-за
+   фотоподложки: сквозь неё обычная полупрозрачная карточка темы не читается, поэтому
+   корпус карточек здесь плотнее. Больше хексов в семье нет.
+
+   Фото остаётся в обеих темах — это лицо витрины; меняется вуаль над ним. */
+
 .home-page {
 	font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-	background:
-		linear-gradient(160deg, rgba(4, 16, 34, 0.72) 0%, rgba(6, 20, 42, 0.55) 45%, rgba(2, 10, 24, 0.92) 100%),
-		url('/images/mix/bg-2.jpg') center 30% / cover no-repeat;
+	background: var(--hp-veil), url('/images/mix/bg-2.jpg') center 30% / cover no-repeat;
+	/* Полутон подсветки обычной карточки: считается из роли, поэтому едет вместе с темой. */
+	--hp-tint-soft: color-mix(in srgb, var(--t-accent-soft) 55%, transparent);
+
+	/* Высота ленты рекордов — ОДНО число на двоих: им же лента задаёт свой рост, и от него
+	   же отталкивается кнопка режима, которая обязана стоять НАД лентой. Пока высота была
+	   производной от паддингов, отступ кнопки пришлось бы угадывать и он бы разъехался. */
+	--hp-ticker-h: 50px;
+	--mode-toggle-bottom: calc(var(--hp-ticker-h) + 12px);
 }
 
-.hp-mono {
-	font-family: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', monospace;
+@media (min-width: 1024px) {
+	.home-page { --hp-ticker-h: 54px; }
 }
+
+/* Тёмная: вуаль-ночь, как было до темы — тёмный режим семьи не менялся. */
+.home-page.theme-deep {
+	--hp-veil: linear-gradient(160deg, rgba(4, 16, 34, 0.72) 0%, rgba(6, 20, 42, 0.55) 45%, rgba(2, 10, 24, 0.92) 100%);
+	--hp-card-bg: rgba(8, 25, 48, 0.78);
+	--hp-card-bg-hover: rgba(8, 25, 48, 0.82);
+	--hp-shimmer: rgba(125, 211, 252, 0.1);
+}
+
+/* Светлая: та же фотография под плотной светлой вуалью — от неё остаётся структура
+   дорожек, а не картинка. Слабее нельзя: ночной снимок тянет фон в тёмное, и текст
+   `--deep-text` по нему перестаёт держать контраст. */
+.home-page.theme-deep-light {
+	--hp-veil: linear-gradient(160deg, rgba(244, 249, 252, 0.93) 0%, rgba(240, 248, 252, 0.9) 45%, rgba(244, 249, 252, 0.96) 100%);
+	--hp-card-bg: rgba(255, 255, 255, 0.88);
+	--hp-card-bg-hover: rgba(255, 255, 255, 0.95);
+	--hp-shimmer: rgba(255, 255, 255, 0.45);
+}
+
+/* `.hp-mono` живёт в глобальном `src/index.css`: тем же шрифтом набраны `/my-media` и
+   модалка логина, а она рисуется порталом на ЛЮБОЙ странице — не только на семье hp. */
 
 /* Caustic light sweep overlay */
 .hp-shimmer {
 	position: absolute;
 	inset: 0;
-	background: linear-gradient(105deg, transparent 40%, rgba(125, 211, 252, 0.1) 50%, transparent 60%);
+	background: linear-gradient(105deg, transparent 40%, var(--hp-shimmer) 50%, transparent 60%);
 	background-size: 300% 100%;
 	animation: hp-shimmer 9s linear infinite;
 	pointer-events: none;
@@ -24,23 +62,25 @@
 	100% { background-position: 250% 0; }
 }
 
-/* Card backgrounds (multi-layer gradients) */
+/* Корпус карточки: подсветка акцентом сверху → плотное тело. Фоллбек `--t-card` нужен
+   карточкам, которые рисуются ВНЕ семьи (модалка логина — портал в `body`).
+   Живая карточка подсвечена вдвое сильнее обычной — это её единственное отличие. */
 .hp-card-live {
-	background: linear-gradient(180deg, rgba(56, 189, 248, 0.16), rgba(8, 25, 48, 0.78));
+	background: linear-gradient(180deg, var(--t-accent-soft), var(--hp-card-bg, var(--t-card)));
 }
 .hp-card-live:hover,
 .hp-card-live:focus-visible {
-	background: linear-gradient(180deg, rgba(56, 189, 248, 0.22), rgba(8, 25, 48, 0.82));
+	background: linear-gradient(180deg, var(--t-accent-soft), var(--hp-card-bg-hover, var(--t-surface2)));
 }
 .hp-card-std {
-	background: linear-gradient(180deg, rgba(56, 189, 248, 0.08), rgba(8, 25, 48, 0.78));
+	background: linear-gradient(180deg, var(--hp-tint-soft), var(--hp-card-bg, var(--t-card)));
 }
 .hp-card-std:hover,
 .hp-card-std:focus-visible {
-	background: linear-gradient(180deg, rgba(56, 189, 248, 0.14), rgba(8, 25, 48, 0.82));
+	background: linear-gradient(180deg, var(--hp-tint-soft), var(--hp-card-bg-hover, var(--t-surface2)));
 }
 .hp-card-soon {
-	background: linear-gradient(180deg, rgba(148, 163, 184, 0.06), rgba(8, 25, 48, 0.72));
+	background: linear-gradient(180deg, var(--t-surface2), var(--hp-card-bg, var(--t-card)));
 }
 
 .hp-live-dot {
@@ -49,6 +89,13 @@
 @keyframes hp-blink {
 	0%, 100% { opacity: 1; }
 	50% { opacity: 0.25; }
+}
+
+/* Лента рекордов: рост задан переменной (см. выше), строка центрируется по вертикали. */
+.hp-ticker {
+	height: var(--hp-ticker-h);
+	display: flex;
+	align-items: center;
 }
 
 /* Record ticker marquee: content duplicated x2, track slides by -50% */

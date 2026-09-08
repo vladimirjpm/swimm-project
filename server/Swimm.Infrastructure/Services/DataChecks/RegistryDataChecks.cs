@@ -1,5 +1,6 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Infrastructure.Data;
 
@@ -265,5 +266,69 @@ public sealed class MergedClubStillUsedCheck(SwimmDbContext db) : IDataCheck
                 // Ведём на КАНОН: смотреть надо страницу, которая теряет данные.
                 PublicRoutes.Club(c.MergedIntoId!.Value)))
             .ToList());
+    }
+}
+/// <summary>
+/// Справочник стран: дубли одной страны и коды не в alpha-3 (инцидент И-14,
+/// docs/data-integrity.md §14).
+///
+/// Дубль тихий: на витрине обе записи выглядят одинаково (флаг рисуется по alpha-2),
+/// расхождение видно только там, где код участвует в ПОИСКЕ — рекорды, будущие рейтинги,
+/// сравнение стран. Пловцы, смотрящие на «вторую» запись, не падают, а показывают пусто:
+/// у «IL» их было 791, и никто не замечал два месяца.
+///
+/// Вход закрыт нормализацией в трёх find-or-create (<see cref="CountryCodes.Normalize"/>),
+/// но справочник наполняют ещё и восстановленные дампы, поэтому проверка остаётся.
+/// </summary>
+public sealed class CountryDuplicateCheck(SwimmDbContext db) : IDataCheck
+{
+    public string Id => "countries.duplicate";
+    public string Title => "Дубли и alpha-2 в справочнике стран";
+    public string Description =>
+        "Две записи одной страны (например «ISR» и «IL») или код не в alpha-3. Правило проекта — " +
+        "alpha-3 в данных, alpha-2 только флагам: рекорды и рейтинги ищут по коду, и половина " +
+        "пловцов страны молча выпадает из среза. Чинится склейкой FK (Swimmers, Clubs, Results, " +
+        "HubGroups, Competitions) на канон и удалением дубля.";
+    public DataCheckSeverity Severity => DataCheckSeverity.Error;
+
+    public async Task<DataCheckOutcome> RunAsync(CancellationToken ct = default)
+    {
+        var countries = await db.Countries.AsNoTracking()
+            .Select(c => new { c.Id, c.CountryCode, c.CountryName })
+            .ToListAsync(ct);
+
+        // Канон группы — запись с alpha-3 кодом; на неё и указывает подсказка «склеить в».
+        var groups = countries
+            .GroupBy(c => CountryCodes.Normalize(c.CountryCode))
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var items = new List<DataCheckItem>();
+        foreach (var (code, rows) in groups.OrderBy(g => g.Key, StringComparer.Ordinal))
+        {
+            var canonical = rows.FirstOrDefault(r => CountryCodes.LooksAlpha3(r.CountryCode)) ?? rows[0];
+
+            foreach (var row in rows)
+            {
+                var isDuplicate = rows.Count > 1 && row.Id != canonical.Id;
+                var isAlpha2 = !CountryCodes.LooksAlpha3(row.CountryCode);
+                if (!isDuplicate && !isAlpha2) continue;
+
+                // Счётчики ссылок — чтобы было видно масштаб до склейки, как в §14.
+                var swimmers = await db.Swimmers.CountAsync(x => x.CountryId == row.Id, ct);
+                var results = await db.Results.CountAsync(x => x.CountryId == row.Id, ct);
+                var clubs = await db.Clubs.CountAsync(x => x.CountryId == row.Id, ct);
+
+                items.Add(new DataCheckItem(
+                    "Country", row.Id,
+                    isDuplicate
+                        ? $"#{row.Id} «{row.CountryCode}» — дубль страны «{canonical.CountryCode}» (#{canonical.Id})"
+                        : $"#{row.Id} «{row.CountryCode}» — код не alpha-3",
+                    $"пловцов {swimmers}, результатов {results}, клубов {clubs}" +
+                        (isDuplicate ? $"; склеить в #{canonical.Id} ({code})" : ""),
+                    "/Admin/Db"));
+            }
+        }
+
+        return items.Count == 0 ? DataCheckOutcome.Empty : new DataCheckOutcome(items.Count, items.Take(50).ToList());
     }
 }

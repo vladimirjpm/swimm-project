@@ -269,7 +269,7 @@ function SwimRow({
               styleName={stroke}
               styleLen={distance}
               styleType="icon-len"
-              className="swim-row__plate-icon"
+              className="src-swim-row swim-row__plate-icon"
             />
           </div>
           {poolType && (

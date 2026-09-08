@@ -73,7 +73,7 @@ const swimHref = (swim: SwimmerCompareSwim | null | undefined, swimmerId: number
 /** Слот как элемент шапки: занятый — мини-карточка, пустой — пунктирный слот. */
 function Slot({ slot, align }: { slot: H2HSlot; align: 'left' | 'right' }) {
   if (slot.kind === 'empty') {
-    return <UI_H2HEmptySlot label={slot.label} onClick={slot.onPick} />;
+    return <UI_H2HEmptySlot label={slot.label} onClick={slot.onPick} active={slot.active} />;
   }
   return (
     <UI_H2HMiniCard
@@ -82,6 +82,7 @@ function Slot({ slot, align }: { slot: H2HSlot; align: 'left' | 'right' }) {
       isFavorite={slot.isFavorite ?? null}
       onToggleFavorite={slot.onToggleFavorite}
       onClear={slot.onClear ?? null}
+      active={slot.active}
     />
   );
 }

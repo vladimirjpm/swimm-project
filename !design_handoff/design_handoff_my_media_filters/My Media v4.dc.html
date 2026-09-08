@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#1b1f2c}
+a{color:#7dd3fc}a:hover{color:#bae6fd}
+[data-theme]{--t-bg:linear-gradient(160deg,#0d2036 0%,#0b1b31 45%,#050e1c 100%);--t-nav:#161a2e;--t-surface:rgba(8,25,48,0.72);--t-surface2:rgba(125,211,252,0.07);--t-card:linear-gradient(180deg,rgba(56,189,248,0.07),rgba(8,25,48,0.8));--t-border:rgba(125,211,252,0.22);--t-border-2:rgba(125,211,252,0.12);--t-accent:#7dd3fc;--t-accent-ink:#04101f;--t-accent-soft:rgba(125,211,252,0.14);--t-accent-dim:rgba(125,211,252,0.6);--t-text:#f3f8fd;--t-text-2:rgba(203,224,240,0.62);--t-text-3:rgba(203,224,240,0.4);--t-plate:#e6f2fb;--t-plate-ink:#0b1b31;--t-dist:#c1272d;--t-cta:#7dd3fc;--t-cta-ink:#04101f;--t-glow:0 0 18px rgba(125,211,252,0.35);--t-shadow:0 18px 50px rgba(2,10,24,0.5);--t-warn:#ffca7a;--t-warn-soft:rgba(255,202,122,0.1);--t-warn-ink:#3a2a08;--t-warn-border:rgba(255,202,122,0.45)}
+[data-theme="light"]{--t-bg:linear-gradient(160deg,#f2f6fb 0%,#e9eff7 50%,#dde6f1 100%);--t-nav:#10223a;--t-surface:#ffffff;--t-surface2:rgba(3,105,161,0.06);--t-card:#ffffff;--t-border:rgba(3,105,161,0.28);--t-border-2:rgba(3,105,161,0.14);--t-accent:#0369a1;--t-accent-ink:#ffffff;--t-accent-soft:rgba(3,105,161,0.1);--t-accent-dim:rgba(3,105,161,0.7);--t-text:#0b1b31;--t-text-2:rgba(11,27,49,0.66);--t-text-3:rgba(11,27,49,0.42);--t-plate:#e6f2fb;--t-plate-ink:#0b1b31;--t-dist:#c1272d;--t-cta:#0369a1;--t-cta-ink:#ffffff;--t-glow:none;--t-shadow:0 10px 30px rgba(11,27,49,0.1);--t-warn:#b45309;--t-warn-soft:rgba(180,83,9,0.08);--t-warn-ink:#ffffff;--t-warn-border:rgba(180,83,9,0.4)}
+::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+
+<section data-theme="{{ theme }}" style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start;padding:48px;font-family:'Inter',system-ui,sans-serif">
+
+<!-- ================= DESKTOP ================= -->
+<div id="3a" style="width:1440px;flex:none">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:#7dd3fc;color:#04101f">3a</span><span style="font-size:13px;color:#c8d0e0">Desktop · header 2a + filter bar 1a (columns) + sidebar; Swimming Style geometry from results (styles column, distances column right).</span></div>
+<div style="overflow:hidden;border-radius:12px;color:var(--t-text);background:var(--t-bg)">
+<header style="display:flex;height:46px;align-items:center;justify-content:space-between;padding:0 32px;background:var(--t-nav)">
+<div style="display:flex;align-items:center;gap:8px"><span style="display:flex;height:26px;width:26px;align-items:center;justify-content:center;border-radius:8px;background:#5b5fc7;font-size:13px;font-weight:900;color:#fff">S</span><span style="font-size:11px;font-weight:900;letter-spacing:0.22em;color:#eef1f6">SWIM<span style="color:#5b5fc7">HUB</span></span></div>
+<nav style="display:flex;gap:24px;font-size:13px;font-weight:700;color:rgba(238,241,246,0.55);white-space:nowrap;flex:none"><span>Home</span><span>Competitions</span><span>Groups</span><span>Head to head</span><span>Normatives</span><span>Records</span><span>About</span></nav>
+<div style="display:flex;align-items:center;gap:8px"><span style="display:flex;height:30px;width:30px;align-items:center;justify-content:center;border-radius:50%;background:#5b5fc7;font-size:13px;font-weight:900;color:#fff">V</span><span style="font-size:12px;font-weight:700;color:#eef1f6">Vladimir Barentsev</span><span style="font-size:9px;color:#5b5fc7">▾</span></div>
+</header>
+
+<div style="padding:28px 48px 0">
+<div style="display:flex;align-items:flex-end;gap:24px">
+<div style="padding-bottom:4px"><p style="margin:0 0 8px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.28em;color:var(--t-accent)">My profile · Vladimir Barentsev</p><h1 style="margin:0;font-size:40px;font-weight:900;line-height:0.95;letter-spacing:-0.04em">My media</h1></div>
+<div style="display:flex;align-items:flex-end;gap:6px;margin-left:16px">
+<div style="display:flex;flex-direction:column;gap:3px;border-radius:12px 12px 0 0;border:1px solid var(--t-accent);border-bottom:none;background:var(--t-surface);padding:12px 20px 14px;margin-bottom:-1px;position:relative;z-index:1"><span style="font-size:14px;font-weight:800;color:var(--t-accent)">My swims</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:800;color:var(--t-text-2)">70 swims · 25/26</span></div>
+<div style="display:flex;flex-direction:column;gap:3px;border-radius:12px 12px 0 0;border:1px solid var(--t-border);border-bottom:none;padding:10px 20px 12px"><span style="font-size:14px;font-weight:800;color:var(--t-text-2)">Moderation</span><span style="display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:800;color:var(--t-warn)"><span style="display:inline-flex;min-width:16px;height:16px;align-items:center;justify-content:center;border-radius:8px;background:var(--t-warn);padding:0 5px;font-size:9.5px;color:var(--t-warn-ink)">3</span>waiting</span></div>
+</div>
+<span style="margin-left:auto;margin-bottom:12px;font-family:'JetBrains Mono',monospace;border-radius:10px;background:var(--t-cta);padding:10px 18px;font-size:13px;font-weight:800;color:var(--t-cta-ink)">+ Add link</span>
+</div>
+</div>
+
+<div style="margin:0 48px 40px;border-top:1px solid var(--t-accent);background:var(--t-surface);border-radius:0 12px 12px 12px;padding:20px 20px 24px">
+<div style="display:grid;grid-template-columns:320px minmax(0,1fr);gap:20px;align-items:start">
+
+<aside style="display:flex;flex-direction:column;gap:10px">
+<div style="border-radius:14px;border:1px solid var(--t-accent);background:var(--t-surface2);padding:14px 16px">
+<div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:13px;font-weight:800">Swimmers</span><span dir="rtl" style="font-size:11.5px;font-weight:800;color:var(--t-accent)">גורבנקו אנסטסיה ▴</span></div>
+<div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+<sc-for list="{{ swimmers }}" as="s" hint-placeholder-count="6">
+<div style="{{ s.rowStyle }}"><span style="{{ s.avaStyle }}">{{ s.init }}</span><span dir="rtl" style="flex:1;text-align:left;font-size:13px;font-weight:700">{{ s.name }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:800;color:var(--t-text-2)">{{ s.count }}</span></div>
+</sc-for>
+</div>
+</div>
+
+<div style="border-radius:14px;border:1px solid var(--t-accent);background:var(--t-surface2);padding:14px 16px">
+<div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:13px;font-weight:800">Video</span><span style="font-size:11.5px;font-weight:800;color:var(--t-accent)">With video ▴</span></div>
+<div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+<div style="border-radius:9px;border:1px solid var(--t-border);padding:8px 12px;text-align:center;font-size:12.5px;font-weight:700;color:var(--t-text-2)">All swims · 70</div>
+<div style="border-radius:9px;border:1px solid var(--t-accent);background:var(--t-accent-soft);padding:8px 12px;text-align:center;font-size:12.5px;font-weight:800;color:var(--t-accent)">With video · 10</div>
+<div style="border-radius:9px;border:1px solid var(--t-border);padding:8px 12px;text-align:center;font-size:12.5px;font-weight:700;color:var(--t-text-2)">Without video · 60</div>
+</div>
+</div>
+
+<div style="border-radius:14px;border:1px solid var(--t-border);background:var(--t-surface2);padding:14px 16px">
+<div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:13px;font-weight:800">Swimming Style</span><span style="font-size:11.5px;font-weight:800;color:var(--t-accent)">Freestyle · 200m ▴</span></div>
+<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:10px">
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="border-radius:9px;border:1px solid var(--t-border);padding:7px 12px;text-align:center;font-size:12.5px;font-weight:700;color:var(--t-text-2)">All</div>
+<sc-for list="{{ styleBtns }}" as="st" hint-placeholder-count="5">
+<div style="{{ st.style }}"><sc-if value="{{ st.src }}" hint-placeholder-val="{{ false }}"><img src="{{ st.src }}" alt="{{ st.name }}" style="width:80px;height:auto;display:block"></sc-if></div>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;padding-left:12px;border-left:1px dashed var(--t-border)">
+<div style="visibility:hidden;padding:7px 12px;font-size:12.5px">All</div>
+<sc-for list="{{ dists }}" as="d" hint-placeholder-count="6"><div style="{{ d.style }}">{{ d.label }}</div></sc-for>
+</div>
+</div>
+</div>
+
+<sc-for list="{{ closedCards }}" as="k" hint-placeholder-count="4">
+<div style="border-radius:14px;border:1px solid var(--t-border);background:var(--t-surface2);padding:14px 16px;display:flex;justify-content:space-between"><span style="font-size:13px;font-weight:800">{{ k.label }}</span><span style="font-size:11.5px;font-weight:700;color:var(--t-text-3)">All ▾</span></div>
+</sc-for>
+<span style="align-self:flex-start;font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:800;color:var(--t-accent-dim);padding:6px 2px">Reset all · 3</span>
+</aside>
+
+<main style="display:flex;flex-direction:column;gap:14px;min-width:0">
+<div style="display:flex;border-radius:14px;border:1px solid var(--t-border);background:var(--t-surface2);padding:12px 8px;align-items:stretch">
+<div style="display:flex;flex-direction:column;justify-content:center;gap:4px;padding:6px 18px 6px 12px;border-right:1px solid var(--t-border-2)">
+<span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:800;letter-spacing:0.8px;color:var(--t-text-3)">SEASON</span>
+<div style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;color:var(--t-text-3)">‹</span><span style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:800;color:var(--t-accent);text-shadow:var(--t-glow)">25/26</span><span style="font-size:13px;color:var(--t-text-3)">›</span></div>
+</div>
+<sc-for list="{{ bar }}" as="c" hint-placeholder-count="7">
+<div style="{{ c.cellStyle }}">
+<div style="{{ c.colStyle }}">
+<span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:800;letter-spacing:0.8px;text-transform:uppercase;color:var(--t-text-3)">{{ c.label }}</span>
+<sc-if value="{{ c.isImg }}" hint-placeholder-val="{{ false }}"><div style="position:relative;display:flex;align-items:center;justify-content:center;height:40px;padding:0 8px;border-radius:7px;background:var(--t-plate)"><sc-if value="{{ c.src }}" hint-placeholder-val="{{ false }}"><img src="{{ c.src }}" alt="{{ c.value }}" style="width:56px;height:auto;display:block"></sc-if><span style="position:absolute;right:2px;top:-4px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:800;color:var(--t-dist);background:var(--t-plate);padding:0 3px;border-radius:4px">{{ c.dist }}</span></div></sc-if>
+<sc-if value="{{ c.isText }}" hint-placeholder-val="{{ true }}"><span dir="auto" style="{{ c.valStyle }}">{{ c.value }}</span></sc-if>
+</div>
+</div>
+</sc-for>
+</div>
+<p style="margin:0;font-size:11.5px;font-weight:700;color:var(--t-text-2)">4 swims · sorted by date ↓</p>
+
+<sc-for list="{{ comps }}" as="cp" hint-placeholder-count="2">
+<div style="border-radius:14px;border:1px solid var(--t-border);background:var(--t-card);box-shadow:var(--t-shadow);overflow:hidden">
+<div style="display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--t-border-2)">
+<span style="display:flex;height:40px;width:44px;flex:none;align-items:center;justify-content:center;border-radius:8px;background:#f0f4f8;font-size:16px;font-weight:900;color:#1c2a3a">{{ cp.badge }}</span>
+<span dir="rtl" style="font-size:14px;font-weight:800">{{ cp.name }}</span>
+<span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:800;color:var(--t-accent)">{{ cp.date }}</span>
+<span style="font-size:11px;color:var(--t-text-3)">{{ cp.pool }}</span>
+<span style="margin-left:auto;font-size:11px;color:var(--t-text-2)">{{ cp.summary }}</span>
+<span style="font-family:'JetBrains Mono',monospace;border-radius:8px;border:1px dashed var(--t-cta);padding:4px 10px;font-size:11px;font-weight:800;color:var(--t-cta)">+ Photo/Video</span>
+</div>
+<div style="display:grid;grid-template-columns:48px 28px 66px minmax(0,1fr) 72px 110px 120px;gap:0 14px;padding:6px 18px 0;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.16em;color:var(--t-text-3)"><span>PLACE</span><span></span><span>SWIM</span><span></span><span></span><span>TIME</span><span>MEDIA</span></div>
+<sc-for list="{{ cp.rows }}" as="r" hint-placeholder-count="3">
+<div style="display:grid;grid-template-columns:48px 28px 66px minmax(0,1fr) 72px 110px 120px;gap:0 14px;align-items:center;padding:8px 18px;border-top:1px solid var(--t-border-2)">
+<span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:800">{{ r.place }}</span>
+<span style="font-size:14px">{{ r.medal }}</span>
+<div style="position:relative;display:flex;align-items:center;justify-content:center;height:46px;border-radius:7px;background:var(--t-plate)"><sc-if value="{{ r.src }}" hint-placeholder-val="{{ false }}"><img src="{{ r.src }}" alt="{{ r.style }}" style="width:52px;height:auto;display:block"></sc-if><span style="position:absolute;right:3px;bottom:1px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:800;color:var(--t-dist)">{{ r.dist }}</span></div>
+<span dir="rtl" style="text-align:left;font-size:13.5px;font-weight:700">{{ r.name }}</span>
+<span style="{{ r.tagStyle }}">{{ r.tag }}</span>
+<span style="font-family:'JetBrains Mono',monospace;font-size:13.5px;font-weight:800;color:var(--t-accent)">{{ r.time }}</span>
+<span style="{{ r.mediaStyle }}">{{ r.media }}</span>
+</div>
+</sc-for>
+</div>
+</sc-for>
+</main>
+</div>
+</div>
+</div>
+</div>
+
+<!-- ================= MOBILE ================= -->
+<div id="3b" style="width:390px;flex:none">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:#7dd3fc;color:#04101f">3b</span><span style="font-size:13px;color:#c8d0e0">Mobile · header 2c + filter bar in rows geometry (All row above, selected below), sheet on ⚙</span></div>
+<div style="position:relative;height:844px;overflow:hidden;border-radius:24px;color:var(--t-text);background:var(--t-bg);display:flex;flex-direction:column">
+<header style="display:flex;height:46px;flex:none;align-items:center;justify-content:space-between;padding:0 16px;background:var(--t-nav)">
+<div style="display:flex;align-items:center;gap:8px"><span style="display:flex;height:26px;width:26px;align-items:center;justify-content:center;border-radius:8px;background:#5b5fc7;font-size:13px;font-weight:900;color:#fff">S</span><span style="font-size:11px;font-weight:900;letter-spacing:0.22em;color:#eef1f6">SWIM<span style="color:#5b5fc7">HUB</span></span></div>
+<div style="display:flex;align-items:center;gap:12px"><span style="display:flex;height:30px;width:30px;align-items:center;justify-content:center;border-radius:50%;background:#5b5fc7;font-size:13px;font-weight:900;color:#fff">V</span><span style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><span style="height:2px;width:19px;background:#eef1f6"></span><span style="height:2px;width:13px;background:#eef1f6"></span></span></div>
+</header>
+<div style="padding:14px 16px 0">
+<div style="display:flex;align-items:center;gap:10px"><h1 style="margin:0;font-size:24px;font-weight:900;letter-spacing:-0.04em">My media</h1><span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.2em;color:var(--t-accent)">Vladimir Barentsev</span><span style="margin-left:auto;font-family:'JetBrains Mono',monospace;border-radius:10px;background:var(--t-cta);padding:8px 12px;font-size:11.5px;font-weight:800;color:var(--t-cta-ink)">+ Add</span></div>
+<div style="display:flex;align-items:flex-end;gap:6px;margin-top:12px">
+<div style="flex:1;display:flex;flex-direction:column;gap:2px;border-radius:12px 12px 0 0;border:1px solid var(--t-accent);border-bottom:none;background:var(--t-surface);padding:12px 14px 13px;margin-bottom:-1px;position:relative;z-index:1"><span style="font-size:14px;font-weight:800;color:var(--t-accent)">My swims</span><span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:800;color:var(--t-text-2)">70 · 25/26</span></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:2px;border-radius:12px 12px 0 0;border:1px solid var(--t-border);border-bottom:none;padding:10px 14px 11px"><span style="font-size:14px;font-weight:800;color:var(--t-text-2)">Moderation</span><span style="display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:800;color:var(--t-warn)"><span style="display:inline-flex;min-width:16px;height:16px;align-items:center;justify-content:center;border-radius:8px;background:var(--t-warn);padding:0 5px;font-size:9.5px;color:var(--t-warn-ink)">3</span>waiting</span></div>
+</div>
+</div>
+<div style="flex:1;min-height:0;border-top:1px solid var(--t-accent);background:var(--t-surface);padding:12px 16px 20px;display:flex;flex-direction:column;gap:10px;overflow:hidden">
+<div style="display:flex;flex-direction:column;gap:8px;border-radius:12px;border:1px solid var(--t-border);background:var(--t-surface2);padding:8px">
+<div style="display:flex;gap:6px;align-items:stretch">
+<div style="display:flex;flex:none;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-height:44px;border-radius:9px;border:1px solid var(--t-border-2);padding:0 10px"><span style="font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:800;letter-spacing:0.3px;color:var(--t-text-3)">SEASON</span><span style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:var(--t-text-3)">‹</span><span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:var(--t-accent)">25/26</span><span style="font-size:11px;color:var(--t-text-3)">›</span></span></div>
+<span style="margin-left:auto;align-self:center;font-size:11px;font-weight:700;color:var(--t-text-2);white-space:nowrap">4 swims · date ↓</span>
+</div>
+<div style="display:flex;gap:4px">
+<sc-for list="{{ barIdle }}" as="c" hint-placeholder-count="4"><div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 2px;border-radius:8px;border:1px solid var(--t-border-2)"><span style="font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:800;letter-spacing:0.3px;text-transform:uppercase;color:var(--t-text-3);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.label }}</span><span style="font-size:10px;font-weight:700;color:var(--t-text-2)">All</span></div></sc-for>
+</div>
+<div style="display:flex;flex-wrap:nowrap;overflow-x:auto;gap:6px;padding-top:8px;border-top:1px dashed var(--t-border-2)">
+<sc-for list="{{ barActive }}" as="c" hint-placeholder-count="3">
+<div style="{{ c.chipStyle }}">
+<span style="font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;color:var(--t-text-3)">{{ c.label }}</span>
+<sc-if value="{{ c.isImg }}" hint-placeholder-val="{{ false }}"><div style="position:relative;display:flex;align-items:center;justify-content:center;height:26px;padding:0 4px;border-radius:5px;background:var(--t-plate)"><sc-if value="{{ c.src }}" hint-placeholder-val="{{ false }}"><img src="{{ c.src }}" alt="{{ c.value }}" style="width:36px;height:auto;display:block"></sc-if><span style="position:absolute;right:0;top:-5px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:800;color:var(--t-dist);background:var(--t-plate);padding:0 2px;border-radius:3px">{{ c.dist }}</span></div></sc-if>
+<sc-if value="{{ c.isText }}" hint-placeholder-val="{{ true }}"><span dir="auto" style="{{ c.valStyle }}">{{ c.value }}</span></sc-if>
+</div>
+</sc-for>
+</div>
+</div>
+
+<sc-for list="{{ comps }}" as="cp" hint-placeholder-count="2">
+<div style="border-radius:14px;border:1px solid var(--t-border);background:var(--t-card);overflow:hidden">
+<div style="display:flex;gap:10px;padding:12px 14px;border-bottom:1px solid var(--t-border-2)">
+<span style="display:flex;height:40px;width:44px;flex:none;align-items:center;justify-content:center;border-radius:8px;background:#f0f4f8;font-size:16px;font-weight:900;color:#1c2a3a">{{ cp.badge }}</span>
+<div style="min-width:0;display:flex;flex-direction:column;gap:4px"><span dir="rtl" style="text-align:left;font-size:13.5px;font-weight:800;line-height:1.25">{{ cp.name }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:800;color:var(--t-accent)">{{ cp.date }} <span style="color:var(--t-text-3);font-weight:700">{{ cp.pool }}</span></span></div>
+</div>
+<sc-for list="{{ cp.rows }}" as="r" hint-placeholder-count="3">
+<div style="display:grid;grid-template-columns:34px 58px minmax(0,1fr) auto;gap:0 10px;align-items:center;padding:8px 14px;border-top:1px solid var(--t-border-2)">
+<div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800">{{ r.place }}</span><span style="font-size:12px">{{ r.medal }}</span></div>
+<div style="position:relative;display:flex;align-items:center;justify-content:center;height:44px;border-radius:7px;background:var(--t-plate)"><sc-if value="{{ r.src }}" hint-placeholder-val="{{ false }}"><img src="{{ r.src }}" alt="{{ r.style }}" style="width:46px;height:auto;display:block"></sc-if><span style="position:absolute;right:3px;bottom:1px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:800;color:var(--t-dist)">{{ r.dist }}</span></div>
+<span style="font-family:'JetBrains Mono',monospace;font-size:13.5px;font-weight:800;color:var(--t-accent)">{{ r.time }}</span>
+<span style="{{ r.mediaStyleM }}">{{ r.mediaM }}</span>
+</div>
+</sc-for>
+</div>
+</sc-for>
+</div>
+<div style="position:absolute;left:50%;bottom:22px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;height:48px;padding:0 22px;border-radius:24px;background:var(--t-accent);color:var(--t-accent-ink);font-size:15px;font-weight:800;box-shadow:0 12px 30px rgba(2,10,24,0.45)">Filters<span style="display:inline-flex;min-width:20px;height:20px;align-items:center;justify-content:center;border-radius:10px;background:var(--t-accent-ink);color:var(--t-accent);font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:900;padding:0 6px">3</span><span style="font-size:10px">▲</span></div>
+</div>
+</div>
+
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'dark' | 'light'&quot;,&quot;section&quot;:&quot;Theme&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'dark';
+    const mono = "'JetBrains Mono',monospace";
+    const IMG = { FR: 'assets/styles/freestyle.png', BK: 'assets/styles/backstroke.png', BR: 'assets/styles/breaststroke.png', FL: 'assets/styles/butterfly.png', IM: 'assets/styles/medley.png' };
+
+    const sw = [['גורבנקו אנסטסיה','א',28,true],['גוסטמלסקי אניה','ג',7,false],['אברמסון ים מר','א',5,false],['פרופסיס פלג','פ',14,false],['ברנצב סבינה','ס',13,false],['ברנצב ולדימיר','ו',3,false]];
+    const swimmers = sw.map(([name,init,count,on]) => ({ name, init, count,
+      rowStyle: { display:'flex', alignItems:'center', gap:10, borderRadius:9, border:'1px solid ' + (on ? 'var(--t-accent)' : 'var(--t-border)'), background: on ? 'var(--t-accent-soft)' : 'transparent', padding:'6px 10px', color: on ? 'var(--t-accent)' : 'var(--t-text)' },
+      avaStyle: { display:'inline-flex', width:22, height:22, borderRadius:'50%', alignItems:'center', justifyContent:'center', background: on ? 'var(--t-accent)' : 'var(--t-surface2)', color: on ? 'var(--t-accent-ink)' : 'var(--t-text-2)', fontSize:10, fontWeight:900, flex:'none' } }));
+
+    const fseg = (on) => ({ borderRadius:9, border:'1px solid ' + (on ? 'var(--t-accent)' : 'var(--t-border)'), background: on ? 'var(--t-accent-soft)' : 'transparent', padding:'7px 12px', textAlign:'center', fontSize:12.5, fontWeight: on ? 800 : 700, color: on ? 'var(--t-accent)' : 'var(--t-text-2)', display:'flex', alignItems:'center', justifyContent:'center' });
+    const styleBtns = [['FR','freestyle'],['BK','backstroke'],['BR','breaststroke'],['FL','butterfly'],['IM','medley']].map(([k,name]) => ({ name, src: IMG[k],
+      style: Object.assign(fseg(k === 'FR'), { padding:'5px 10px', background:'var(--t-plate)', boxShadow: k === 'FR' ? '0 0 0 2px var(--t-accent-soft)' : 'none' }) }));
+    const dists = ['50','100','200','400','800','1500'].map((d) => ({ label: d + 'm', style: Object.assign(fseg(d === '200'), { fontFamily: mono, fontSize:12 }) }));
+    const closedCards = ['Competition','Date range','Shared with','Publication status'].map((label) => ({ label }));
+
+    const barDef = [
+      { label:'Swimmer', value:'גורבנקו אנסטסיה', on:true },
+      { label:'Video', value:'With video', on:true },
+      { label:'Event', value:'Freestyle', on:true, img:IMG.FR, dist:'200' },
+      { label:'Competition', value:'All' },
+      { label:'Date', value:'All' },
+      { label:'Shared with', value:'All' },
+      { label:'Status', value:'All' },
+    ];
+    const bar = barDef.map((c, i) => ({ label:c.label, value:c.value, isImg: !!c.img, isText: !c.img, src:c.img, dist:c.dist,
+      cellStyle: { flex: c.on ? '1.5 1 0%' : '1 1 0%', minWidth:0, display:'flex', borderRight: i < barDef.length - 1 ? '1px solid var(--t-border-2)' : 'none' },
+      colStyle: { flex:'1 1 0%', minWidth:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-start', gap:8, padding:'6px 12px', borderRadius:10, border:'1px solid ' + (c.on ? 'var(--t-accent)' : 'transparent'), background: c.on ? 'var(--t-accent-soft)' : 'transparent', margin:'0 4px' },
+      valStyle: { fontFamily: mono, fontSize: c.on ? 13 : 20, fontWeight:800, lineHeight:1.2, color: c.on ? 'var(--t-accent)' : 'var(--t-text-2)', textAlign:'center', whiteSpace:'normal', maxWidth:'100%' } }));
+    const barIdle = barDef.filter((c) => !c.on).map((c) => ({ label:c.label }));
+    const barActive = barDef.filter((c) => c.on).map((c) => ({ label:c.label, value:c.value, isImg: !!c.img, isText: !c.img, src:c.img, dist:c.dist,
+      chipStyle: { display:'flex', flex:'none', flexDirection:'column', alignItems:'center', gap:3, padding:'5px 12px', minWidth:56, borderRadius:9, border:'1px solid ' + (c.on ? 'var(--t-accent)' : 'var(--t-border-2)'), background: c.on ? 'var(--t-accent-soft)' : 'transparent' },
+      valStyle: { fontFamily: mono, fontSize:12, fontWeight:800, color: c.on ? 'var(--t-accent)' : 'var(--t-text-2)', whiteSpace:'nowrap' } }));
+
+    const tag = (t) => t ? { fontFamily: mono, fontSize:9.5, fontWeight:800, letterSpacing:'0.08em', borderRadius:6, border:'1px solid var(--t-border)', padding:'2px 7px', color:'var(--t-text-2)', justifySelf:'start' } : { display:'none' };
+    const mediaBtn = (has, m) => has
+      ? { fontFamily: mono, borderRadius:8, border:'1px solid var(--t-accent)', background:'var(--t-accent-soft)', padding: m ? '6px 10px' : '4px 10px', fontSize: m ? 11 : 11, fontWeight:800, color:'var(--t-accent)', textAlign:'center', whiteSpace:'nowrap' }
+      : { fontFamily: mono, borderRadius:8, border:'1px dashed var(--t-cta)', padding: m ? '6px 10px' : '4px 10px', fontSize:11, fontWeight:800, color:'var(--t-cta)', textAlign:'center', whiteSpace:'nowrap' };
+    const mk = (place, medal, k, dist, time, has, t) => ({ place, medal, style:k, src:IMG[k], dist, time, name:'גורבנקו אנסטסיה', tag:t || '', tagStyle: tag(t),
+      media: has ? '▶ 1 video' : '+ Add video', mediaStyle: mediaBtn(has, false), mediaM: has ? '▶ 1' : '+ Video', mediaStyleM: mediaBtn(has, true) });
+    const comps = [
+      { badge:'J', name:'אליפות ישראל arena לנוער ושליחים בוגרים קיץ 2026', date:'21/07/2026', pool:'50m', summary:'2 swims · 2 videos', rows:[mk('#1','🥇','FR','200','02:12.25',true), mk('#1','🥇','FR','200','02:14.02',true,'HEAT')] },
+      { badge:'A', name:'אליפות ישראל/ טריילז "ארנה" בוגרים קיץ 2026', date:'20/07/2026', pool:'25m', summary:'2 swims · 1 video', rows:[mk('#2','🥈','FR','200','02:11.80',true), mk('#3','🥉','FR','200','02:13.44',false)] },
+    ];
+    return { theme, swimmers, styleBtns, dists, closedCards, bar, barIdle, barActive, comps };
+  }
+}
+</script>
+</body>
+</html>

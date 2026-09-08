@@ -8,13 +8,13 @@ const DISCLAIMER =
   'The roster is maintained by the group creator and is not an official club or federation entry.';
 
 const cardCls =
-  'hp-card-std rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]';
+  'hp-card-std rounded-[18px] border border-[var(--t-border)] p-[18px] shadow-[var(--t-shadow)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]';
 const inputCls =
-  'w-full rounded-[10px] border border-[#7dd3fc]/30 bg-[rgba(6,20,36,0.6)] px-3 py-2 text-[13px] text-[#f3f8fd] outline-none placeholder:text-[#cbe0f0]/40 focus:border-[#7dd3fc]';
+  'w-full rounded-[10px] border border-[var(--t-accent-border)] bg-[var(--t-input-bg)] px-3 py-2 text-[13px] text-[var(--t-text)] outline-none placeholder:text-[var(--t-text-3)] focus:border-[var(--t-accent)]';
 const btnCls =
-  'cursor-pointer rounded-[9px] border border-[#7dd3fc]/50 bg-transparent px-3 py-[7px] text-[12px] font-extrabold text-[#7dd3fc] transition-colors hover:bg-[rgba(56,189,248,0.14)] disabled:cursor-not-allowed disabled:opacity-40';
+  'cursor-pointer rounded-[9px] border border-[var(--t-accent-border)] bg-transparent px-3 py-[7px] text-[12px] font-extrabold text-[var(--t-accent)] transition-colors hover:bg-[var(--t-accent-soft)] disabled:cursor-not-allowed disabled:opacity-40';
 const btnDangerCls =
-  'cursor-pointer rounded-[9px] border border-[#ef5350]/50 bg-transparent px-3 py-[7px] text-[12px] font-extrabold text-[#ef5350] transition-colors hover:bg-[rgba(239,83,80,0.14)] disabled:cursor-not-allowed disabled:opacity-40';
+  'cursor-pointer rounded-[9px] border border-[var(--t-danger-border)] bg-transparent px-3 py-[7px] text-[12px] font-extrabold text-[var(--t-danger)] transition-colors hover:bg-[var(--t-danger-soft)] disabled:cursor-not-allowed disabled:opacity-40';
 
 const EMPTY_INPUT: HubGroupInput = {
   name: '', nameEn: '', slug: '', description: '', iconUrl: '', coverImageUrl: '', location: '',
@@ -90,13 +90,13 @@ function GroupInputForm({
         <button type="button" className={btnCls} onClick={addLink}>+ Link</button>
       </div>
 
-      <label className="flex items-center gap-2 text-[13px] font-bold text-[#cbe0f0]/80">
+      <label className="flex items-center gap-2 text-[13px] font-bold text-[var(--t-text-2)]">
         <input type="checkbox" checked={form.isPublic}
           onChange={(e) => setField('isPublic', e.target.checked)} />
         Public group
       </label>
 
-      <label className="flex items-center gap-2 text-[13px] font-bold text-[#cbe0f0]/80">
+      <label className="flex items-center gap-2 text-[13px] font-bold text-[var(--t-text-2)]">
         Joining:
         <select className={`${inputCls} max-w-[220px]`} value={form.joinPolicy ?? 'open'}
           onChange={(e) => setField('joinPolicy', e.target.value as 'open' | 'approval')}>
@@ -105,13 +105,13 @@ function GroupInputForm({
         </select>
       </label>
       {recommendApproval && (form.joinPolicy ?? 'open') === 'open' && (
-        <p className="m-0 text-[11.5px] italic text-[#ffca7a]/80">
+        <p className="m-0 text-[11.5px] italic text-[var(--t-warn)]">
           In an official group, members-only content (reviews, training) is visible to everyone who
           joins — we recommend the “by request” mode.
         </p>
       )}
 
-      {error && <p className="text-[12.5px] font-bold text-[#ef5350]">{error}</p>}
+      {error && <p className="text-[12.5px] font-bold text-[var(--t-danger)]">{error}</p>}
 
       <div className="flex gap-2">
         <button type="button" className={btnCls} disabled={saving || !form.name.trim()} onClick={submit}>
@@ -146,7 +146,7 @@ function MembersEditor({ hubGroupId, clubId }: { hubGroupId: number; clubId?: nu
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
         {edit.data.members.map((m) => (
           <li key={m.id} className="flex items-center justify-between gap-2">
-            <span className="min-w-0 truncate text-[13px] text-[#f3f8fd]">{m.swimmerName || m.swimmerNameEn}</span>
+            <span className="min-w-0 truncate text-[13px] text-[var(--t-text)]">{m.swimmerName || m.swimmerNameEn}</span>
             <div className="flex shrink-0 items-center gap-2">
               <select className={`${inputCls} w-[110px]`} value={m.role}
                 onChange={(e) => edit.updateMember(m.id, e.target.value, m.sortOrder)}>
@@ -159,7 +159,7 @@ function MembersEditor({ hubGroupId, clubId }: { hubGroupId: number; clubId?: nu
           </li>
         ))}
         {edit.data.members.length === 0 && (
-          <p className="text-[12.5px] text-[#cbe0f0]/55">The roster is empty.</p>
+          <p className="text-[12.5px] text-[var(--t-text-2)]">The roster is empty.</p>
         )}
       </ul>
 
@@ -167,11 +167,11 @@ function MembersEditor({ hubGroupId, clubId }: { hubGroupId: number; clubId?: nu
         <input className={inputCls} placeholder="Find a swimmer by last name…" value={query}
           onChange={(e) => onSearch(e.target.value)} />
         {results.length > 0 && (
-          <ul className="absolute z-10 m-0 mt-1 flex max-h-[220px] w-full list-none flex-col gap-1 overflow-y-auto rounded-[10px] border border-[#7dd3fc]/30 bg-[#06182c] p-2">
+          <ul className="absolute z-10 m-0 mt-1 flex max-h-[220px] w-full list-none flex-col gap-1 overflow-y-auto rounded-[10px] border border-[var(--t-accent-border)] bg-[var(--t-surface-strong)] p-2">
             {results.map((s) => (
               <li key={s.id}>
                 <button type="button"
-                  className="w-full cursor-pointer rounded-[6px] border-none bg-transparent px-2 py-1 text-left text-[12.5px] text-[#f3f8fd] hover:bg-[rgba(56,189,248,0.14)]"
+                  className="w-full cursor-pointer rounded-[6px] border-none bg-transparent px-2 py-1 text-left text-[12.5px] text-[var(--t-text)] hover:bg-[var(--t-accent-soft)]"
                   onClick={async () => { await edit.addMember(s.id, 'member'); setQuery(''); setResults([]); }}>
                   {s.name || s.nameEn} {s.birthYear > 0 ? `(${s.birthYear})` : ''}
                 </button>
@@ -187,14 +187,14 @@ function MembersEditor({ hubGroupId, clubId }: { hubGroupId: number; clubId?: nu
             {clubSwimmers != null ? 'Hide club swimmers' : 'Show club swimmers'}
           </button>
           {clubSwimmers != null && (
-            <ul className="m-0 mt-2 flex max-h-[220px] list-none flex-col gap-1 overflow-y-auto rounded-[10px] border border-[#7dd3fc]/30 bg-[#06182c] p-2">
+            <ul className="m-0 mt-2 flex max-h-[220px] list-none flex-col gap-1 overflow-y-auto rounded-[10px] border border-[var(--t-accent-border)] bg-[var(--t-surface-strong)] p-2">
               {clubSwimmers.length === 0 && (
-                <p className="px-2 py-1 text-[12.5px] text-[#cbe0f0]/55">No club swimmers found.</p>
+                <p className="px-2 py-1 text-[12.5px] text-[var(--t-text-2)]">No club swimmers found.</p>
               )}
               {clubSwimmers.map((s) => (
                 <li key={s.id}>
                   <button type="button"
-                    className="w-full cursor-pointer rounded-[6px] border-none bg-transparent px-2 py-1 text-left text-[12.5px] text-[#f3f8fd] hover:bg-[rgba(56,189,248,0.14)]"
+                    className="w-full cursor-pointer rounded-[6px] border-none bg-transparent px-2 py-1 text-left text-[12.5px] text-[var(--t-text)] hover:bg-[var(--t-accent-soft)]"
                     onClick={() => edit.addMember(s.id, 'member')}>
                     {s.name || s.nameEn} {s.birthYear > 0 ? `(${s.birthYear})` : ''}
                   </button>
@@ -226,12 +226,12 @@ function AdminsEditor({ hubGroupId, isOwnerOrAdmin }: { hubGroupId: number; isOw
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
         {edit.admins.map((m) => (
           <li key={m.userId} className="flex items-center justify-between gap-2">
-            <span className="min-w-0 truncate text-[13px] text-[#f3f8fd]">{m.displayName} <span className="text-[#cbe0f0]/50">({m.email})</span></span>
+            <span className="min-w-0 truncate text-[13px] text-[var(--t-text)]">{m.displayName} <span className="text-[var(--t-text-3)]">({m.email})</span></span>
             <button type="button" className={btnDangerCls} onClick={() => edit.removeAdmin(m.userId)}>✕</button>
           </li>
         ))}
         {edit.admins.length === 0 && (
-          <p className="text-[12.5px] text-[#cbe0f0]/55">No group admins yet.</p>
+          <p className="text-[12.5px] text-[var(--t-text-2)]">No group admins yet.</p>
         )}
       </ul>
       <div className="flex gap-2">
@@ -239,7 +239,7 @@ function AdminsEditor({ hubGroupId, isOwnerOrAdmin }: { hubGroupId: number; isOw
           onChange={(e) => setEmail(e.target.value)} />
         <button type="button" className={btnCls} disabled={!email.trim()} onClick={submit}>+ Admin</button>
       </div>
-      {error && <p className="text-[12.5px] font-bold text-[#ef5350]">{error}</p>}
+      {error && <p className="text-[12.5px] font-bold text-[var(--t-danger)]">{error}</p>}
     </div>
   );
 }
@@ -265,11 +265,11 @@ function SwimmerPicker({
       <input className={inputCls} placeholder={placeholder} value={query}
         onChange={(e) => onSearch(e.target.value)} />
       {results.length > 0 && (
-        <ul className="absolute z-10 m-0 mt-1 flex max-h-[220px] w-full list-none flex-col gap-1 overflow-y-auto rounded-[10px] border border-[#7dd3fc]/30 bg-[#06182c] p-2">
+        <ul className="absolute z-10 m-0 mt-1 flex max-h-[220px] w-full list-none flex-col gap-1 overflow-y-auto rounded-[10px] border border-[var(--t-accent-border)] bg-[var(--t-surface-strong)] p-2">
           {results.map((s) => (
             <li key={s.id}>
               <button type="button"
-                className="w-full cursor-pointer rounded-[6px] border-none bg-transparent px-2 py-1 text-left text-[12.5px] text-[#f3f8fd] hover:bg-[rgba(56,189,248,0.14)]"
+                className="w-full cursor-pointer rounded-[6px] border-none bg-transparent px-2 py-1 text-left text-[12.5px] text-[var(--t-text)] hover:bg-[var(--t-accent-soft)]"
                 onClick={() => { onPick(s); setQuery(''); setResults([]); }}>
                 {s.name || s.nameEn} {s.birthYear > 0 ? `(${s.birthYear})` : ''}
               </button>
@@ -299,23 +299,23 @@ function UserMembersEditor({ hubGroupId }: { hubGroupId: number }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-[11.5px] italic text-[#cbe0f0]/45">
+      <p className="text-[11.5px] italic text-[var(--t-text-3)]">
         Private list — visible only to the group owner and admins, never on the public page.
       </p>
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
         {members.map((m) => (
           <li key={m.userId} className="flex flex-col gap-1">
             <div className="flex items-center justify-between gap-2">
-              <span className="min-w-0 truncate text-[13px] text-[#f3f8fd]">
-                {m.displayName} <span className="text-[#cbe0f0]/50">({m.email})</span>
-                {m.selfJoined && <span className="ml-1 text-[10.5px] text-[#7dd3fc]/70">joined on their own</span>}
+              <span className="min-w-0 truncate text-[13px] text-[var(--t-text)]">
+                {m.displayName} <span className="text-[var(--t-text-3)]">({m.email})</span>
+                {m.selfJoined && <span className="ml-1 text-[10.5px] text-[var(--t-accent-dim)]">joined on their own</span>}
                 {m.status === 'pending' && (
-                  <span className="ml-1 rounded-[6px] border border-[#ffca7a]/50 px-[5px] py-[1px] text-[10px] font-extrabold text-[#ffca7a]">
+                  <span className="ml-1 rounded-[6px] border border-[var(--t-warn-border)] px-[5px] py-[1px] text-[10px] font-extrabold text-[var(--t-warn)]">
                     request
                   </span>
                 )}
                 {m.swimmerId != null && (
-                  <span className="ml-1 text-[11px] text-[#cbe0f0]/70">
+                  <span className="ml-1 text-[11px] text-[var(--t-text-2)]">
                     — {m.note || 'parent'}: {m.swimmerName}
                   </span>
                 )}
@@ -339,7 +339,7 @@ function UserMembersEditor({ hubGroupId }: { hubGroupId: number }) {
           </li>
         ))}
         {members.length === 0 && (
-          <p className="text-[12.5px] text-[#cbe0f0]/55">No account members yet.</p>
+          <p className="text-[12.5px] text-[var(--t-text-2)]">No account members yet.</p>
         )}
       </ul>
       <div className="flex flex-col gap-2">
@@ -347,7 +347,7 @@ function UserMembersEditor({ hubGroupId }: { hubGroupId: number }) {
           onChange={(e) => setEmail(e.target.value)} />
         <SwimmerPicker edit={edit} placeholder="Label: swimmer (optional)" onPick={setLabelSwimmer} />
         {labelSwimmer && (
-          <div className="flex items-center gap-2 text-[12px] text-[#cbe0f0]/80">
+          <div className="flex items-center gap-2 text-[12px] text-[var(--t-text-2)]">
             <span>Swimmer: {labelSwimmer.name || labelSwimmer.nameEn}</span>
             <button type="button" className={btnDangerCls} onClick={() => setLabelSwimmer(null)}>✕</button>
           </div>
@@ -358,7 +358,7 @@ function UserMembersEditor({ hubGroupId }: { hubGroupId: number }) {
         )}
         <button type="button" className={btnCls} disabled={!email.trim()} onClick={submit}>+ Member</button>
       </div>
-      {error && <p className="text-[12.5px] font-bold text-[#ef5350]">{error}</p>}
+      {error && <p className="text-[12.5px] font-bold text-[var(--t-danger)]">{error}</p>}
     </div>
   );
 }
@@ -390,10 +390,10 @@ function UserMemberLabelEditor({
   };
 
   return (
-    <div className="ml-2 flex flex-col gap-2 border-l border-[#7dd3fc]/25 pl-3">
+    <div className="ml-2 flex flex-col gap-2 border-l border-[var(--t-border)] pl-3">
       <SwimmerPicker edit={edit} placeholder="Swimmer" onPick={setSwimmer} />
       {swimmer && (
-        <div className="flex items-center gap-2 text-[12px] text-[#cbe0f0]/80">
+        <div className="flex items-center gap-2 text-[12px] text-[var(--t-text-2)]">
           <span>{swimmer.name || swimmer.nameEn || `#${swimmer.id}`}</span>
           <button type="button" className={btnDangerCls} onClick={() => setSwimmer(null)}>✕</button>
         </div>
@@ -405,7 +405,7 @@ function UserMemberLabelEditor({
         <button type="button" className={btnCls} onClick={clear}>Clear label</button>
         <button type="button" className={btnCls} onClick={onDone}>Cancel</button>
       </div>
-      {error && <p className="text-[12.5px] font-bold text-[#ef5350]">{error}</p>}
+      {error && <p className="text-[12.5px] font-bold text-[var(--t-danger)]">{error}</p>}
     </div>
   );
 }
@@ -418,7 +418,7 @@ const EMPTY_MEDIA_INPUT: HubGroupMediaInput = {
 function MediaListRow({ item, onRemove }: { item: HubGroupMediaItem; onRemove: () => void }) {
   return (
     <li className="flex items-center justify-between gap-2">
-      <span className="min-w-0 truncate text-[13px] text-[#f3f8fd]">
+      <span className="min-w-0 truncate text-[13px] text-[var(--t-text)]">
         {item.media_type === 'album' ? '📂' : item.media_type === 'video' ? '🎬' : '🖼️'} {item.caption || item.url}
       </span>
       <button type="button" className={btnDangerCls} onClick={onRemove}>✕</button>
@@ -461,12 +461,12 @@ function MediaEditor({ hubGroupId, slug }: { hubGroupId: number; slug: string })
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-[11.5px] italic text-[#cbe0f0]/45">
+      <p className="text-[11.5px] italic text-[var(--t-text-3)]">
         No training set = public gallery (visible on the group page). Pick a training to attach media to it instead.
       </p>
 
       {media.loadError && (
-        <p className="text-[12.5px] font-bold text-[#ef5350]">{media.loadError}</p>
+        <p className="text-[12.5px] font-bold text-[var(--t-danger)]">{media.loadError}</p>
       )}
 
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
@@ -474,14 +474,14 @@ function MediaEditor({ hubGroupId, slug }: { hubGroupId: number; slug: string })
           <MediaListRow key={m.id} item={m} onRemove={() => media.removeMedia(m.id)} />
         ))}
         {media.gallery.length === 0 && !media.loadError && (
-          <p className="text-[12.5px] text-[#cbe0f0]/55">No public gallery items yet.</p>
+          <p className="text-[12.5px] text-[var(--t-text-2)]">No public gallery items yet.</p>
         )}
       </ul>
 
       {/* Медиа, привязанное к тренировкам, — иначе после добавления его негде увидеть/удалить. */}
       {media.trainings.filter((t) => t.media.length > 0).map((t) => (
         <div key={t.sessionId} className="flex flex-col gap-1">
-          <p className="m-0 text-[11.5px] font-extrabold uppercase tracking-[0.12em] text-[#7dd3fc]/70">
+          <p className="m-0 text-[11.5px] font-extrabold uppercase tracking-[0.12em] text-[var(--t-accent-dim)]">
             🔒 {t.label}
           </p>
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
@@ -556,7 +556,7 @@ function MediaEditor({ hubGroupId, slug }: { hubGroupId: number; slug: string })
       {/* Members-разборы — отдельным списком, иначе после добавления их негде увидеть/удалить. */}
       {media.membersMedia.length > 0 && (
         <div className="flex flex-col gap-1">
-          <p className="m-0 text-[11.5px] font-extrabold uppercase tracking-[0.12em] text-[#7dd3fc]/70">
+          <p className="m-0 text-[11.5px] font-extrabold uppercase tracking-[0.12em] text-[var(--t-accent-dim)]">
             🔒 Members reviews
           </p>
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
@@ -571,7 +571,7 @@ function MediaEditor({ hubGroupId, slug }: { hubGroupId: number; slug: string })
           </ul>
         </div>
       )}
-      {error && <p className="text-[12.5px] font-bold text-[#ef5350]">{error}</p>}
+      {error && <p className="text-[12.5px] font-bold text-[var(--t-danger)]">{error}</p>}
     </div>
   );
 }
@@ -587,7 +587,7 @@ function ClubRequestPanel({ hubGroupId }: { hubGroupId: number }) {
   const request = edit.clubRequest;
   if (request?.status === 'pending') {
     return (
-      <p className="text-[12.5px] text-[#cbe0f0]/70">
+      <p className="text-[12.5px] text-[var(--t-text-2)]">
         The official-status request for “{request.clubName}” is under review.
       </p>
     );
@@ -605,7 +605,7 @@ function ClubRequestPanel({ hubGroupId }: { hubGroupId: number }) {
   return (
     <div className="flex flex-col gap-2">
       {request?.status === 'rejected' && (
-        <p className="text-[12.5px] text-[#cbe0f0]/55">
+        <p className="text-[12.5px] text-[var(--t-text-2)]">
           The previous request for “{request.clubName}” was declined — you can apply again.
         </p>
       )}
@@ -623,7 +623,7 @@ function ClubRequestPanel({ hubGroupId }: { hubGroupId: number }) {
           {saving ? '…' : 'Submit request'}
         </button>
       </div>
-      {error && <p className="text-[12.5px] font-bold text-[#ef5350]">{error}</p>}
+      {error && <p className="text-[12.5px] font-bold text-[var(--t-danger)]">{error}</p>}
     </div>
   );
 }
@@ -633,8 +633,8 @@ function EditGroupCard({ row, currentUserId, isAdmin, onClose, onSaved }: {
 }) {
   const edit = useMyHubGroupEdit(row.id);
 
-  if (edit.forbidden) return <p className="text-[13px] font-bold text-[#ef5350]">You do not have rights to edit this group.</p>;
-  if (edit.loading || !edit.data) return <p className="text-[13px] text-[#cbe0f0]/60">Loading…</p>;
+  if (edit.forbidden) return <p className="text-[13px] font-bold text-[var(--t-danger)]">You do not have rights to edit this group.</p>;
+  if (edit.loading || !edit.data) return <p className="text-[13px] text-[var(--t-text-2)]">Loading…</p>;
 
   const isOwnerOrAdmin = isAdmin || edit.data.ownerUserId === currentUserId;
   const input: HubGroupInput = {
@@ -656,32 +656,32 @@ function EditGroupCard({ row, currentUserId, isAdmin, onClose, onSaved }: {
         onSubmit={async (i) => { const r = await edit.update(i); if (r.success) onSaved(); return r; }}
       />
       <div>
-        <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#7dd3fc]">Members</h3>
+        <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[var(--t-accent)]">Members</h3>
         <MembersEditor hubGroupId={row.id} clubId={edit.data.isOfficial ? edit.data.clubId : null} />
-        <p className="mt-2 text-[11.5px] italic text-[#cbe0f0]/45">{DISCLAIMER}</p>
+        <p className="mt-2 text-[11.5px] italic text-[var(--t-text-3)]">{DISCLAIMER}</p>
       </div>
       <div>
-        <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#7dd3fc]">Group admins</h3>
+        <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[var(--t-accent)]">Group admins</h3>
         <AdminsEditor hubGroupId={row.id} isOwnerOrAdmin={isOwnerOrAdmin} />
       </div>
       <div>
-        <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#7dd3fc]">Account members</h3>
+        <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[var(--t-accent)]">Account members</h3>
         <UserMembersEditor hubGroupId={row.id} />
       </div>
       <div>
-        <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#7dd3fc]">Gallery</h3>
+        <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[var(--t-accent)]">Gallery</h3>
         <MediaEditor hubGroupId={row.id} slug={row.slug} />
       </div>
       {isOwnerOrAdmin && !edit.data.isOfficial && (
         <div>
-          <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[#7dd3fc]">
+          <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[var(--t-accent)]">
             Official club status
           </h3>
           <ClubRequestPanel hubGroupId={row.id} />
         </div>
       )}
       {edit.data.isOfficial && (
-        <p className="text-[12.5px] font-bold text-[#38ef8f]">Official Group of {row.clubName}</p>
+        <p className="text-[12.5px] font-bold text-[var(--t-accent)]">Official Group of {row.clubName}</p>
       )}
     </div>
   );
@@ -700,7 +700,7 @@ export default function MyGroupsPanel() {
     <section className="px-4 pt-[26px] lg:px-16" aria-label="My groups">
       <div className={cardCls}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">My groups</h2>
+          <h2 className="text-[15px] font-black uppercase tracking-[0.2em] text-[var(--t-accent)]">My groups</h2>
           {!creating && mine.eligibility?.canCreate && (
             <button type="button" className={btnCls} onClick={() => setCreating(true)}>
               + Create group{mine.eligibility.remaining != null ? ` (${mine.eligibility.remaining} left)` : ''}
@@ -709,7 +709,7 @@ export default function MyGroupsPanel() {
         </div>
 
         {!creating && !mine.eligibility?.canCreate && mine.eligibility?.reason && mine.groups.length === 0 && (
-          <p className="text-[12.5px] text-[#cbe0f0]/55">{mine.eligibility.reason}</p>
+          <p className="text-[12.5px] text-[var(--t-text-2)]">{mine.eligibility.reason}</p>
         )}
 
         {creating && (
@@ -724,9 +724,9 @@ export default function MyGroupsPanel() {
         )}
 
         {mine.loading ? (
-          <p className="text-[13px] text-[#cbe0f0]/60">Loading…</p>
+          <p className="text-[13px] text-[var(--t-text-2)]">Loading…</p>
         ) : mine.groups.length === 0 && !creating ? (
-          <p className="text-[13px] text-[#cbe0f0]/60">You do not own or co-coach any group yet.</p>
+          <p className="text-[13px] text-[var(--t-text-2)]">You do not own or co-coach any group yet.</p>
         ) : (
           <ul className="m-0 flex list-none flex-col gap-3 p-0">
             {mine.groups.map((g) => (
@@ -734,15 +734,15 @@ export default function MyGroupsPanel() {
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <a href={routes.group(g.slug)}
-                      className="truncate text-[14px] font-extrabold text-[#f3f8fd] no-underline hover:underline">
+                      className="truncate text-[14px] font-extrabold text-[var(--t-text)] no-underline hover:underline">
                       {g.name}
                     </a>
                     {g.isOfficial && (
-                      <span className="hp-mono ml-2 rounded-[6px] border border-[#38ef8f]/40 px-[6px] py-[2px] text-[10px] font-extrabold text-[#38ef8f]">
+                      <span className="hp-mono ml-2 rounded-[6px] border border-[var(--t-border)] px-[6px] py-[2px] text-[10px] font-extrabold text-[var(--t-text-2)]">
                         Official · {g.clubName}
                       </span>
                     )}
-                    <div className="text-[11.5px] text-[#cbe0f0]/55">{g.memberCount} · swimmers</div>
+                    <div className="text-[11.5px] text-[var(--t-text-2)]">{g.memberCount} · swimmers</div>
                   </div>
                   <div className="flex shrink-0 gap-2">
                     <button type="button" className={btnCls}
@@ -756,7 +756,7 @@ export default function MyGroupsPanel() {
                   </div>
                 </div>
                 {editingId === g.id && (
-                  <div className="mt-3 border-t border-[#7dd3fc]/15 pt-3">
+                  <div className="mt-3 border-t border-[var(--t-border)] pt-3">
                     <EditGroupCard
                       row={g}
                       currentUserId={identity.userId}

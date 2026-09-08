@@ -2,15 +2,23 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { UserMediaPublicationDto } from '../../../hooks/useUserMedia';
 import { fetchPublishTargets, PublishTargetDto } from '../use-all-my-media';
 import { MySwimDto, SwimMediaDto } from '../use-my-swims';
-import { STATUS_COLORS, CardStatus, derivedCardStatus, hpCardCls } from './status-styles';
+import { STATUS_COLORS, CardStatus, derivedCardStatus, visibilityLabel, hpCardCls } from './status-styles';
 import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
 import UI_SwimTime, { swimFlaggedRowProps } from '../../components/mix/swim-time/swim-time';
+import UI_PrelimLabel from '../../components/mix/prelim-label/prelim-label';
 import UI_DateIcon from '../../components/mix/date-icon/date-icon';
+import UI_SeasonBestBadge from '../../components/mix/season-best-badge/season-best-badge';
+import HelperSwimmer from '../../../utils/helpers/helper-swimmer';
+import HelperResults from '../../../utils/helpers/helper-results';
+import Helper from '../../../utils/helpers/data-helper';
+import UI_RecordBadge, { type RecordKind } from '../../components/mix/record-badge/record-badge';
+import CompetitionTile from '../../results-main-project/components/competition-header/competition-tile';
+import { competitionTileData } from '../../../utils/helpers/competition-source';
 
-// Список заплывов, сгруппированный по соревнованиям — ядро My media v3
-// (README design_handoff_my_swims_v3,1 §7). Desktop: строки с фикс. колонками
-// + разворачиваемые media-панели с inline share; mobile: компактные строки,
-// действия — в bottom sheet родителя (onOpenActions).
+// Список заплывов, сгруппированный по соревнованиям — ядро My media.
+// Строка узкая на обеих ширинах, а всё управление медиа (share, withdraw, delete, ❤)
+// живёт в ОДНОЙ разворачиваемой панели под строкой — и на десктопе, и на телефоне
+// (решение Влада 08.09.2026; своей мобильной шторки действий у строки больше нет).
 
 export interface SwimListCallbacks {
   publicationsByMedia: Map<number, UserMediaPublicationDto[]>;
@@ -21,9 +29,6 @@ export interface SwimListCallbacks {
   onWithdraw: (mediaId: number, hubGroupId: number) => void;
   onDelete: (mediaId: number) => void;
   onToggleLike: (media: SwimMediaDto) => void;
-  onToggleCheer: (swim: MySwimDto) => void;
-  /** Mobile: тап по строке → actions bottom sheet у родителя. */
-  onOpenActions: (swim: MySwimDto) => void;
 }
 
 interface Props extends SwimListCallbacks {
@@ -31,14 +36,104 @@ interface Props extends SwimListCallbacks {
   competitionMedia: SwimMediaDto[];
   /** Показывать имя пловца в строке (фильтр = All). */
   showSwimmerName: boolean;
-  /** id → имя (из response.swimmers). */
+  /** id → имя (из response.swimmers), в порядке избранного: primary первым. */
   swimmerNames: Map<number, string>;
+  /** Выбранный чипом пловец — его имя и показываем на строках, которые ему принадлежат. */
+  preferredSwimmerId?: number | null;
 }
 
 /* ── Хелперы ─────────────────────────────────────────────────────────────── */
 
-function medal(place: number | null): string | null {
-  return place === 1 ? '🥇' : place === 2 ? '🥈' : place === 3 ? '🥉' : null;
+/**
+ * Дата соревнования приходит как dd/MM/yyyy, день заплыва — yyyy-MM-dd. Совпали → колонку
+ * DATE не рисуем: она дублирует дату в шапке группы. Не совпали (многодневка) — рисуем,
+ * иначе день заплыва потерялся бы.
+ */
+function sameDay(competitionDate: string, swimDate: string): boolean {
+  const [d, m, y] = competitionDate.split('/');
+  return y != null && `${y}-${m}-${d}` === swimDate;
+}
+
+/**
+ * Метка достижения строки. Словарь и приоритет — ОБЩИЕ для продукта, здесь ничего своего:
+ *  • `SB` — «быстрейший в стране в этом сезоне на своей ступени» (пол × возраст в сезоне ×
+ *    стиль × дистанция × бассейн, порог peers>=2). Рисует общий `UI_SeasonBestBadge`;
+ *  • `PB` — личный рекорд пловца за всё время на дистанции;
+ *  • одна строка носит ОДИН чип, SB замещает PB — тот же приоритет, что у `SwimRowBadge`
+ *    в `components/swim-row` («SB сильнее BEST и ЗАМЕЩАЕТ его»).
+ * Рекордов (WR/NR/REC·AGE/REC·M, `UI_RecordBadge`) в этом агрегате пока нет; когда появятся —
+ * они старше SB, вставлять их надо сюда же, а не рядом.
+ */
+const PB_CHIP =
+  'inline-flex items-center rounded-full border border-[var(--t-accent-dim)] '
+  + 'bg-[var(--t-accent-soft)] px-2 py-[1px] text-[10px] font-black leading-[1.4] text-[var(--t-accent)]';
+
+function BestMark({ record = null, pb, sb, stacked = false }: {
+  record?: { kind: RecordKind; scope?: string | null } | null;
+  pb: boolean;
+  sb: boolean;
+  stacked?: boolean;
+}) {
+  const chip = record
+    ? <UI_RecordBadge kind={record.kind} scope={record.scope} isNew />
+    : sb
+      ? <UI_SeasonBestBadge />
+      : pb ? <span className={PB_CHIP} title="Personal best">PB</span> : null;
+  if (chip == null) return null;
+  return stacked ? <span className="mt-[3px] block">{chip}</span> : chip;
+}
+
+/**
+ * Имя пловца в строке. У ЭСТАФЕТЫ владелец строки — одна нога, и он запросто не из
+ * избранного: тогда в строке стоял «?», хотя строка попала в выдачу как раз потому, что
+ * избранный плыл другую ногу. Кому принадлежит заплыв — решает канон-хелпер
+ * `HelperSwimmer.resultBelongsToSwimmer` (docs/relays.md: свой матчинг по `swimmer_id`
+ * заводить нельзя), поэтому имя ищем среди избранных: сперва выбранный чипом пловец,
+ * иначе первый подходящий (карта идёт в порядке избранного, primary первым).
+ */
+function rowSwimmerName(
+  swim: MySwimDto, names: Map<number, string>, preferredId: number | null,
+): string {
+  if (preferredId != null && HelperSwimmer.resultBelongsToSwimmer(swim, preferredId)) {
+    return names.get(preferredId) ?? '?';
+  }
+  for (const [id, name] of names) {
+    if (HelperSwimmer.resultBelongsToSwimmer(swim, id)) return name;
+  }
+  return '?';
+}
+
+/**
+ * Шеврон кнопки «развернуть медиа». Инлайновый SVG, а не `UI_*`: готовой иконки-стрелки в
+ * реестре нет (docs/ui-components.md §6, тот же случай, что у кнопки «наверх» в стартовом
+ * протоколе). Раньше тут стоял глиф ▾ в 11px — его было почти не видно.
+ */
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"
+      style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 120ms' }}
+    >
+      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/**
+ * Медаль рисуется НЕ из места: место есть и у предварительного заплыва, и у секции «כללי»,
+ * а медалей за них не дают. Правило одно на продукт — `HelperResults.isMedalPlace`, тот же,
+ * что у таблицы результатов и страницы пловца.
+ */
+function medal(swim: MySwimDto): string | null {
+  const isMedal = HelperResults.isMedalPlace({
+    place: swim.place,
+    heatType: swim.heat_type,
+    round: swim.round,
+    timeFail: swim.time_fail,
+    competitionIsAward: swim.is_award,
+  });
+  if (!isMedal) return null;
+  return swim.place === 1 ? '🥇' : swim.place === 2 ? '🥈' : '🥉';
 }
 
 /** Style.Name из БД сырой (freestyle / individual_medley) — короткие лейблы дизайна. */
@@ -56,69 +151,148 @@ function mediaStatus(m: SwimMediaDto, pubs: UserMediaPublicationDto[]): { status
   return { status, isPublic };
 }
 
-function StatusPill({ status, isPublic }: { status: CardStatus; isPublic: boolean }) {
+function pillTitle(pubs: UserMediaPublicationDto[]): string {
+  if (pubs.length === 0) return 'Private — only you can see this';
+  return pubs
+    .map((p) => `${p.hub_group_name}: ${p.status} · ${p.level === 'public' ? 'everyone' : 'members'}`)
+    .join('\n');
+}
+
+/**
+ * Видимость всего заплыва на свёрнутой строке: две строки вместо одной длинной —
+ * колонка MEDIA всего 330px, а «members of דולפין נתניה מסטרס» в одну строку её съедает.
+ * Считается по ВСЕМ медиа заплыва (у видео и фото публикации могут различаться),
+ * подробности по каждой группе — в title.
+ */
+function RowVisibility({ swim, publicationsByMedia }: {
+  swim: MySwimDto;
+  publicationsByMedia: Map<number, UserMediaPublicationDto[]>;
+  /** Мобильная строка: одна строка с обрезкой — там колонка узкая, а высота дороже ширины. */
+}) {
+  const pubs = swim.media.flatMap((m) => publicationsByMedia.get(m.id) ?? []);
+  const status = derivedCardStatus(pubs);
+  const isPublic = pubs.some((p) => p.status === 'approved' && p.level === 'public');
+  const groups = Array.from(new Map(pubs.map((p) => [p.hub_group_id, p.hub_group_name])).values());
   const c = STATUS_COLORS[status];
+
+  const head =
+    status === 'private' ? 'private'
+      : status === 'published' ? (isPublic ? 'everyone in' : 'members of')
+        : status === 'pending' ? 'pending in' : 'rejected in';
+  const tail = groups.length === 0 ? 'only you' : groups.length === 1 ? groups[0] : `${groups.length} groups`;
+
+
   return (
     <span
-      className="hp-mono inline-flex items-center gap-1 rounded-[6px] px-[8px] py-[2px] text-[10.5px] font-extrabold"
+      title={pillTitle(pubs)}
+      className="hp-mono inline-block max-w-[142px] overflow-hidden rounded-[6px] px-[7px] py-[2px] text-[9.5px] font-extrabold leading-[1.3]"
       style={{ color: c.text, border: `${isPublic ? '1.5px' : '1px'} solid ${c.border}`, background: c.bg }}
     >
-      {status}{isPublic ? ' 🌐' : ''}
+      <span className="block">{head}{isPublic ? ' 🌐' : ''}</span>
+      <span dir="auto" className="block truncate opacity-80">{tail}</span>
     </span>
   );
 }
 
-function SourceChip({ m, onClick }: { m: SwimMediaDto; onClick: () => void }) {
+function StatusPill({ status, isPublic, pubs }: { status: CardStatus; isPublic: boolean; pubs: UserMediaPublicationDto[] }) {
+  const c = STATUS_COLORS[status];
+  return (
+    <span
+      title={pillTitle(pubs)}
+      className="hp-mono inline-flex items-center gap-1 rounded-[6px] px-[8px] py-[2px] text-[10.5px] font-extrabold"
+      style={{ color: c.text, border: `${isPublic ? '1.5px' : '1px'} solid ${c.border}`, background: c.bg }}
+    >
+      {visibilityLabel(status, isPublic)}{isPublic ? ' 🌐' : ''}
+    </span>
+  );
+}
+
+/**
+ * Плашка источника: «▶ YOUTUBE» и ❤ ВНУТРИ неё (решение Влада 08.09.2026). Сердечко про
+ * это же медиа, отдельной плашкой оно занимало ещё одну позицию в строке и выдавливало
+ * «Delete» на второй ряд.
+ *
+ * Корпус — `span`, а не `button`: внутри ДВЕ разные кнопки (играть и лайкнуть), а кнопка
+ * в кнопке невалидна и отдаёт клик по сердечку в воспроизведение.
+ */
+function SourceChip({ m, onPlay, onToggleLike }: { m: SwimMediaDto; onPlay: () => void; onToggleLike: () => void }) {
   const label = m.media_type === 'image' ? '🖼 PHOTO' : `▶ ${m.source_type.toUpperCase()}`;
+  const like = likeVisual(m);
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="hp-mono w-[120px] shrink-0 rounded-[7px] border border-[rgba(125,211,252,0.4)] bg-[rgba(125,211,252,0.08)] px-2 py-[4px] text-left text-[10.5px] font-extrabold text-[#7dd3fc]"
-      title={m.media_type === 'image' ? 'Open photo' : 'Play'}
-    >
-      {label}
-    </button>
+    <span className="hp-mono inline-flex w-[142px] shrink-0 items-stretch overflow-hidden rounded-[7px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] text-[10.5px] font-extrabold text-[var(--t-accent)]">
+      <button
+        type="button"
+        onClick={onPlay}
+        className="min-w-0 flex-1 truncate px-2 py-[4px] text-left"
+        title={m.media_type === 'image' ? 'Open photo' : 'Play'}
+      >
+        {label}
+      </button>
+      <button
+        type="button"
+        onClick={onToggleLike}
+        className="flex shrink-0 items-center border-l border-[var(--t-accent-border)] px-[7px]"
+        style={{ color: like.color, background: like.background }}
+        title={like.liked ? 'Remove like' : 'Like'}
+      >
+        {like.label}
+      </button>
+    </span>
   );
 }
 
-function LikeChip({ m, onToggle }: { m: SwimMediaDto; onToggle: () => void }) {
+/** Вид сердечка — один на плашку источника и на чип строки, чтобы они не разошлись. */
+function likeVisual(m: SwimMediaDto) {
   const liked = m.my_like;
+  return {
+    liked,
+    label: `❤ ${m.likes_count}`,
+    color: liked ? 'var(--t-like)' : m.likes_count > 0 ? 'var(--t-text-2)' : 'var(--t-text-3)',
+    border: liked ? 'var(--t-like)' : 'var(--t-border)',
+    background: liked ? 'var(--t-like-soft)' : 'transparent',
+  };
+}
+
+/**
+ * ❤ — сколько людей отметило ЭТО медиа. В строке заплыва он только ПОКАЗЫВАЕТ, что
+ * популярно (решение Влада 08.09.2026), поэтому там идёт без `onToggle` и рисуется
+ * span'ом: нажимать нечего, и вид кнопки обещал бы обратное. Нажимаемым он остаётся в
+ * раскрытой панели, где вообще живут действия над медиа.
+ */
+function LikeChip({ m, onToggle }: { m: SwimMediaDto; onToggle?: () => void }) {
+  const v = likeVisual(m);
+  const className = 'hp-mono rounded-[7px] px-2 py-[3px] text-[10.5px] font-extrabold';
+  const style = { border: `1px solid ${v.border}`, background: v.background, color: v.color };
+
+  if (!onToggle) {
+    return <span className={className} style={style} title={`${m.likes_count} liked this`}>{v.label}</span>;
+  }
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="hp-mono rounded-[7px] px-2 py-[3px] text-[10.5px] font-extrabold"
-      style={{
-        border: `1px solid ${liked ? 'rgba(255,125,156,0.55)' : 'rgba(125,211,252,0.25)'}`,
-        background: liked ? 'rgba(255,125,156,0.1)' : 'transparent',
-        color: liked ? '#ff7d9c' : m.likes_count > 0 ? 'rgba(203,224,240,0.7)' : 'rgba(203,224,240,0.35)',
-      }}
-      title={liked ? 'Remove like' : 'Like'}
-    >
-      ❤ {m.likes_count}
+    <button type="button" onClick={onToggle} className={className} style={style} title={v.liked ? 'Remove like' : 'Like'}>
+      {v.label}
     </button>
   );
 }
 
-function CheerChip({ swim, emphasized, onToggle, stop }: {
-  swim: MySwimDto; emphasized: boolean; onToggle: () => void; stop?: boolean;
-}) {
+/**
+ * 🎉 — сколько людей поздравило с ЭТИМ заплывом. Тоже только показ: строка отвечает на
+ * вопрос «что тут популярно», а не предлагает поздравить самого себя — эта страница про
+ * своих пловцов.
+ */
+function CheerChip({ swim, emphasized }: { swim: MySwimDto; emphasized: boolean }) {
   const on = swim.my_cheer;
   return (
-    <button
-      type="button"
-      onClick={(e) => { if (stop) e.stopPropagation(); onToggle(); }}
+    <span
       className="hp-mono whitespace-nowrap rounded-[7px] px-2 py-[3px] text-[10.5px] font-extrabold"
       style={{
-        border: `1px solid ${on ? 'rgba(255,202,122,0.55)' : emphasized ? 'rgba(255,202,122,0.35)' : 'rgba(125,211,252,0.25)'}`,
-        background: on ? 'rgba(255,202,122,0.1)' : 'transparent',
-        color: on ? '#ffca7a' : emphasized ? 'rgba(255,202,122,0.8)' : swim.congrats_count > 0 ? 'rgba(203,224,240,0.7)' : 'rgba(203,224,240,0.35)',
+        border: `1px solid ${on ? 'var(--t-warn)' : emphasized ? 'var(--t-warn-border)' : 'var(--t-border)'}`,
+        background: on ? 'var(--t-warn-soft)' : 'transparent',
+        color: on ? 'var(--t-warn)' : emphasized ? 'var(--t-warn)' : swim.congrats_count > 0 ? 'var(--t-text-2)' : 'var(--t-text-3)',
       }}
-      title={on ? 'Remove congrats' : 'Congratulate'}
+      title={`${swim.congrats_count} congratulated this swim`}
     >
       🎉 {swim.congrats_count}
-    </button>
+    </span>
   );
 }
 
@@ -132,9 +306,11 @@ function MediaLine({
   cb: SwimListCallbacks;
 }) {
   const { status, isPublic } = mediaStatus(m, pubs);
+  // Действующая публикация (первая из pending/approved) — она же начальное значение селектов.
+  const active = pubs.find((p) => p.status === 'pending' || p.status === 'approved') ?? null;
   const [targets, setTargets] = useState<PublishTargetDto[] | null>(null);
-  const [group, setGroup] = useState<number | ''>('');
-  const [level, setLevel] = useState<'members' | 'public'>('members');
+  const [group, setGroup] = useState<number | ''>(active ? active.hub_group_id : '');
+  const [level, setLevel] = useState<'members' | 'public'>(active ? active.level : 'members');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -143,48 +319,73 @@ function MediaLine({
     return () => { alive = false; };
   }, [m.id]);
 
+  // Публикации приходят асинхронно и меняются после share/withdraw — возвращаем селекты
+  // к фактическому состоянию, но только когда оно реально сменилось (иначе затрём выбор юзера).
+  const activeKey = active ? `${active.hub_group_id}:${active.level}` : '';
+  useEffect(() => {
+    setGroup(active ? active.hub_group_id : '');
+    setLevel(active ? active.level : 'members');
+  }, [activeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Группа могла выпасть из publish-targets (пловца убрали из ростера), а публикация осталась —
+  // без этого селект показал бы пустоту вместо своей же группы.
+  const options = useMemo(() => {
+    const list = targets ?? [];
+    if (active && !list.some((t) => t.id === active.hub_group_id)) {
+      return [...list, { id: active.hub_group_id, name: active.hub_group_name }];
+    }
+    return list;
+  }, [targets, active]);
+
+  // Сервер отвергает повторную подачу в ту же группу («publication already exists»),
+  // смена уровня идёт через withdraw+резаявку в onSubmitShare — здесь только гасим кнопку.
+  const current = group === '' ? null : pubs.find((p) => p.hub_group_id === group && (p.status === 'pending' || p.status === 'approved')) ?? null;
+  const unchanged = current != null && current.level === level;
+
   const share = async () => {
-    if (group === '' || busy) return;
+    if (group === '' || busy || unchanged) return;
     setBusy(true);
     await cb.onSubmitShare(m.id, group, level);
     setBusy(false);
-    setGroup('');
   };
 
   const withdrawable = pubs.filter((p) => p.status === 'pending' || p.status === 'approved');
 
   return (
+    // Перенос оставлен: три контрола публикации требуют ~430px, и на узкой панели нести
+    // их в одну строку значило бы обрезать. Без них строка «источник · статус · Delete»
+    // помещается целиком — ровно этого и не хватало, пока ❤ стояло отдельной плашкой.
     <div className="flex flex-wrap items-center gap-2 py-[6px]">
-      <SourceChip m={m} onClick={() => cb.onPlay(m)} />
-      <span className="w-[120px] shrink-0"><StatusPill status={status} isPublic={isPublic} /></span>
-      <LikeChip m={m} onToggle={() => cb.onToggleLike(m)} />
+      <SourceChip m={m} onPlay={() => cb.onPlay(m)} onToggleLike={() => cb.onToggleLike(m)} />
+      <span className="min-w-0"><StatusPill status={status} isPublic={isPublic} pubs={pubs} /></span>
       <div className="ml-auto flex flex-wrap items-center gap-1.5">
-        {targets != null && targets.length > 0 && (
+        {targets != null && options.length > 0 && (
           <>
             <select
               value={group}
               onChange={(e) => setGroup(e.target.value === '' ? '' : Number(e.target.value))}
-              className="rounded-[7px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-1.5 py-[3px] text-[11px] text-[#f3f8fd]"
+              className="rounded-[7px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-1.5 py-[3px] text-[11px] text-[var(--t-text)]"
             >
               <option value="">Group…</option>
-              {targets.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              {options.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
             <select
               value={level}
               onChange={(e) => setLevel(e.target.value as 'members' | 'public')}
-              className="rounded-[7px] border border-[rgba(125,211,252,0.3)] bg-[rgba(2,10,24,0.5)] px-1.5 py-[3px] text-[11px] text-[#f3f8fd]"
+              className="rounded-[7px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-1.5 py-[3px] text-[11px] text-[var(--t-text)]"
             >
               <option value="members">Members</option>
-              <option value="public">Public 🌐</option>
+              <option value="public">Everyone 🌐</option>
             </select>
             <button
               type="button"
-              disabled={group === '' || busy}
+              disabled={group === '' || busy || unchanged}
               onClick={share}
+              title={unchanged ? 'Already shared with this group at this level' : undefined}
               className="hp-mono rounded-[7px] border-none px-2.5 py-[4px] text-[10.5px] font-extrabold disabled:opacity-40"
-              style={{ background: '#38ef8f', color: '#04101f' }}
+              style={{ background: 'var(--t-accent)', color: 'var(--t-accent-ink)' }}
             >
-              Share
+              {current ? 'Update' : 'Share'}
             </button>
           </>
         )}
@@ -193,7 +394,7 @@ function MediaLine({
             key={p.hub_group_id}
             type="button"
             onClick={() => cb.onWithdraw(m.id, p.hub_group_id)}
-            className="hp-mono rounded-[7px] border border-[rgba(255,202,122,0.45)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[#ffca7a]"
+            className="hp-mono rounded-[7px] border border-[var(--t-warn-border)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[var(--t-warn)]"
             title={`Withdraw from ${p.hub_group_name}`}
           >
             Withdraw
@@ -202,7 +403,7 @@ function MediaLine({
         <button
           type="button"
           onClick={() => cb.onDelete(m.id)}
-          className="hp-mono rounded-[7px] border border-[rgba(239,83,80,0.45)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[#ef5350]"
+          className="hp-mono rounded-[7px] border border-[var(--t-danger-border)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[var(--t-danger)]"
         >
           Delete
         </button>
@@ -217,20 +418,28 @@ function MediaLine({
  * Это НЕ общая строка заплыва `SwimRow` (`components/swim-row/`). Раньше она звалась
  * так же и читалась как шестая копия той же строки — поэтому переименована.
  *
- * Почему не сведена в общую: общая строка — двухлинейная КАРТОЧКА результата, а
- * здесь — ПЛОТНАЯ ТАБЛИЦА управления медиа: фиксированные колонки под своей шапкой
- * (PLACE / SWIM / TIME / DATE / congrats / MEDIA), зона действий на 330px и разворачиваемая
- * панель медиа под строкой. Карточка втрое выше и ломает выравнивание по колонкам, а
- * чтобы вместить медиа-кнопки, RELAY, метку PB и тап-по-строке, в общий компонент
- * пришлось бы добавить слот на каждый угол — ровно то, от чего план общей строки
- * отказался (§3.1 `docs/plans/swim-row-shared-component-plan.md`).
+ * Почему не сведена в общую: общая строка — двухлинейная КАРТОЧКА результата, а здесь —
+ * ПЛОТНАЯ ТАБЛИЦА управления медиа: сетка `48 28 66 1fr 72 110 120` под своей шапкой
+ * (PLACE / SWIM / TIME / MEDIA) и разворачиваемая панель медиа под строкой. Карточка втрое
+ * выше и ломает выравнивание по колонкам, а чтобы вместить медиа-кнопки, RELAY, метку PB и
+ * тап-по-строке, в общий компонент пришлось бы добавить слот на каждый угол — ровно то, от
+ * чего план общей строки отказался (§3.1 `docs/plans/swim-row-shared-component-plan.md`).
+ *
+ * В строке — только короткое и главное (решение Влада 07.09.2026): бейдж «кому это видно»,
+ * поздравления соседей и управление публикациями живут в раскрывающейся панели, а на
+ * мобильной — в нижней шторке действий. Сетка задана в `my-media.css` (`.mms-row`,
+ * `.mms-mrow`), и шапка колонок берёт её же — разъехаться они не могут.
  *
  * Общее берётся ячейками: `UI_SwimmStyleIcon`, `UI_SwimTime` вместе с
  * `swimFlaggedRowProps` (носитель спорного времени) и `UI_DateIcon` (формат даты один на продукт).
  */
-function MySwimRow({ swim, showSwimmerName, swimmerName, cb }: {
+function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, cb }: {
   swim: MySwimDto;
   showSwimmerName: boolean;
+  /** Колонка DATE — только у многодневок (см. `sameDay`). */
+  showDate: boolean;
+  /** Колонка 🎉 — только если в карточке кого-то уже поздравили (см. `CompetitionGroup`). */
+  showCheers: boolean;
   swimmerName: string;
   cb: SwimListCallbacks;
 }) {
@@ -239,6 +448,12 @@ function MySwimRow({ swim, showSwimmerName, swimmerName, cb }: {
   const photos = swim.media.filter((m) => m.media_type === 'image');
   const hasMedia = swim.media.length > 0;
   const noVideo = videos.length === 0;
+  // ❤ в строке — сводка: самое залайканное медиа заплыва. Ноль не показываем: пустое
+  // сердечко в каждой строке читается как «никому не понравилось», а не как «ещё нет оценок».
+  const topLiked = swim.media.reduce<SwimMediaDto | null>(
+    (best, m) => (m.likes_count > 0 && (!best || m.likes_count > best.likes_count) ? m : best),
+    null,
+  );
 
   // Спорное время (И11): чип рисует `UI_SwimTime`, а НОСИТЕЛЬ — сама строка:
   // caution-лента слева плюс полный текст в title/aria-label. До этого строка My media
@@ -246,147 +461,242 @@ function MySwimRow({ swim, showSwimmerName, swimmerName, cb }: {
   const quality = swim.suspect_reason ? { kind: 'protocol' as const, reason: swim.suspect_reason } : null;
   const flagged = swimFlaggedRowProps(quality);
 
+  // Бейдж рекорда — тем же способом, что в протоколе: справочник рекордов + ось возраста из
+  // админ-настройки (`Helper.recordStepAge`), своего поиска по справочнику тут нет.
+  // Эстафеты, DSQ и помеченные ошибки протокола рекордов не носят — как в таблице результатов.
+  const isMastersResult = Helper.isResultMasters(swim.category === 'masters', swim.event_style_age);
+  const recordMark = swim.is_relay || swim.time_fail || swim.suspect_reason || !swim.gender
+    ? null
+    : Helper.recordMarkForTime({
+      time: swim.time,
+      gender: swim.gender,
+      poolType: swim.pool_type,
+      styleName: swim.style,
+      distance: `${swim.distance}m`,
+      age: Helper.recordStepAge({
+        date: swim.competition_date,
+        birth_year: swim.birth_year,
+        event_style_age: swim.event_style_age,
+      }),
+      isMasters: isMastersResult,
+    });
+
   return (
     <>
-      {/* Desktop row */}
+      {/* Desktop row — сетка хендоффа `48 28 66 1fr 72 110 120` (Ф6). В строке только
+          короткое и главное (решение Влада 07.09.2026): место, медаль, дисциплина, кто,
+          метка, время и ОДИН чип медиа. Бейдж «кому это видно» и управление публикациями
+          уехали в раскрывающуюся панель — она и есть кнопка «открыть/закрыть». */}
       <div
         {...flagged}
-        className={`hidden items-center gap-3 px-5 py-[10px] sm:flex${flagged.className ? ` ${flagged.className}` : ''}`}
-        style={{ background: noVideo ? 'rgba(2,10,24,0.25)' : 'transparent' }}
+        className={`mms-row${showDate ? ' mms-row--dated' : ''}${showCheers ? ' mms-row--cheers' : ''} hidden px-5 py-[10px] sm:grid${flagged.className ? ` ${flagged.className}` : ''}`}
+        style={{ background: noVideo ? 'var(--t-input-bg)' : 'transparent' }}
       >
-        <span className="w-[26px] shrink-0 text-center text-[14px] leading-tight">
-          {medal(swim.place)}
-          {swim.is_pb && <span className="block text-[10px] text-[#ffca7a]" title="Personal best">⚡</span>}
+        <span className="text-center leading-none">
+          <span className="block text-[17px] font-black">
+            {swim.place != null ? `#${swim.place}` : '—'}
+          </span>
+          {/* Место предварительного заплыва — не медальное, и молчать об этом нельзя:
+              иначе «#1» утром и «#1» вечером читаются как два золота. */}
+          <UI_PrelimLabel heatType={swim.heat_type} className="mt-0.5 block text-[8px]" />
         </span>
-        <span className="w-[60px] shrink-0">
-          <span className="block text-[12.5px] font-extrabold">{swim.place != null ? `#${swim.place}` : '—'}</span>
-          <span className="block text-[10.5px] text-[rgba(203,224,240,0.45)]">{swim.points > 0 ? `${swim.points} pts` : ''}</span>
-        </span>
-        <span
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#2c3d52] text-[9px] font-black text-[#bfe0f5]"
-          style={{ opacity: noVideo ? 0.5 : 1 }}
-          title={swimmerName}
-        >
-          {swimmerName.trim().charAt(0).toUpperCase()}
-        </span>
-        <span className="flex min-w-[120px] items-center gap-2 overflow-hidden text-[13.5px] font-extrabold" style={{ color: noVideo ? 'rgba(226,240,252,0.55)' : '#f3f8fd' }}>
-          <UI_SwimmStyleIcon
-            styleName={swim.style}
-            styleLen={swim.distance}
-            styleType="icon-len"
-            className="w-[46px] shrink-0 rounded-[8px] bg-[rgba(226,240,252,0.92)] px-1 py-0.5 text-[15px]"
-          />
-          {showSwimmerName && <span className="truncate text-[11px] font-bold text-[rgba(203,224,240,0.5)]">{swimmerName}</span>}
-          {swim.is_relay && (
-            <span className="hp-mono ml-1 rounded-[5px] border border-[rgba(125,211,252,0.4)] px-1.5 py-[1px] text-[9px] font-extrabold text-[#7dd3fc]">RELAY</span>
+        <span className="text-center text-[15px] leading-none">{medal(swim)}</span>
+        <UI_SwimmStyleIcon
+          styleName={swim.style}
+          styleLen={swim.distance}
+          styleType="icon-len"
+          lenPlacement="below"
+          size={64}
+          className="src-swim-list rounded-[8px] bg-[var(--t-plate)] px-1 py-0.5"
+        />
+        {/* Средняя колонка тянется. Показан один пловец — имени в строке нет (оно в шапке
+            карточки), и колонку занимает название дисциплины: пустая тянущаяся колонка
+            разрывала бы строку пополам. */}
+        <span className="flex min-w-0 items-center gap-2 overflow-hidden">
+          {showSwimmerName ? (
+            // text-left обязателен: dir="auto" у ивритского имени тянет выравнивание вправо,
+            // и имена прыгали бы между краями колонки от пловца к пловцу.
+            <span dir="auto" className="min-w-0 flex-1 truncate text-left text-[19px] font-black text-[var(--t-text)]">
+              {swimmerName}
+            </span>
+          ) : (
+            <span className="min-w-0 flex-1 truncate text-left text-[13.5px] font-extrabold text-[var(--t-text-2)]">
+              {swim.distance}m {styleLabel(swim.style)}
+            </span>
           )}
         </span>
-        <span className="hp-mono w-[84px] shrink-0 text-[13.5px] font-extrabold text-[#7dd3fc]">
-          {swim.time_fail ? 'DSQ' : (
-            <UI_SwimTime time={swim.time} quality={quality} />
+        {/* Метка достижения — своей колонкой, а не под медалью: рекорд и PB это про ВРЕМЯ,
+            и стоять им положено рядом с ним. */}
+        <span className="flex items-center justify-end">
+          <BestMark record={recordMark} pb={swim.is_pb} sb={swim.is_sb} />
+        </span>
+        {/* RELAY стоит ПОД временем, а не у имени (решение Влада 08.09.2026): это признак
+            самого заплыва, и в тянущейся колонке он уезжал от времени тем дальше, чем
+            длиннее имя. Растёт по высоте только строка эстафеты — у остальных ячейка
+            прежняя. */}
+        <span className="hp-mono flex flex-col items-start gap-[3px] text-[15px] font-extrabold text-[var(--t-accent)]">
+          <span>
+            {swim.time_fail ? 'DSQ' : (
+              <UI_SwimTime time={swim.time} quality={quality} />
+            )}
+          </span>
+          {swim.is_relay && (
+            <span className="rounded-[5px] border border-[var(--t-accent-border)] px-1.5 py-[1px] text-[9px] font-extrabold leading-none">RELAY</span>
           )}
         </span>
         {/* Дата — общим `UI_DateIcon`, а не сырой ISO-строкой из API: формат даты живёт
-            в одном месте, а «2026-07-30» здесь спорило с «30 JUL 2026» на всех остальных экранах. */}
-        <span className="w-[92px] shrink-0">
-          <UI_DateIcon
-            styleType="row-style-1"
-            date={swim.date}
-            fontClassName="hp-mono text-[10.5px] text-[rgba(203,224,240,0.45)]"
-          />
-        </span>
-        <span className="w-[52px] shrink-0">
-          <CheerChip swim={swim} emphasized={swim.is_pb} onToggle={() => cb.onToggleCheer(swim)} />
-        </span>
-        <span className="flex w-[330px] shrink-0 items-center gap-2">
-          {videos.length > 0 && (
-            <button type="button" onClick={() => setExpanded((v) => !v)} className="hp-mono rounded-[7px] border border-[rgba(125,211,252,0.45)] bg-[rgba(125,211,252,0.1)] px-2 py-[3px] text-[10.5px] font-extrabold text-[#7dd3fc]">
-              ▶ {videos.length}
+            в одном месте, а «2026-07-30» здесь спорило с «30 JUL 2026» на всех остальных
+            экранах. Колонка есть только у многодневок (см. `sameDay`). */}
+        {showDate && (
+          <span>
+            <UI_DateIcon
+              styleType="row-style-1"
+              date={swim.date}
+              fontClassName="hp-mono text-[10.5px] text-[var(--t-text-3)]"
+            />
+          </span>
+        )}
+        {/* Поздравления — СВОЯ колонка: 🎉 про заплыв, а не про медиа, и в медиа-ячейке
+            читалось как оценка ролика. Колонка есть только там, где кого-то поздравили. */}
+        {showCheers && (
+          <span className="flex items-center justify-end">
+            {swim.congrats_count > 0 && <CheerChip swim={swim} emphasized={swim.is_pb} />}
+          </span>
+        )}
+        {/* MEDIA — один чип. У заплыва с медиа он же и раскрывает панель, поэтому отдельной
+            кнопки «Manage» больше нет: две кнопки об одном занимали треть строки. */}
+        <span className="flex flex-col items-end justify-center gap-1">
+          {hasMedia ? (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={expanded}
+              title={expanded ? 'Hide media panel' : 'Share, withdraw, delete this media'}
+              className="hp-mono inline-flex h-[26px] shrink-0 items-center gap-1 rounded-[8px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-2 text-[10.5px] font-extrabold text-[var(--t-accent)]"
+            >
+              {videos.length > 0 ? `▶ ${videos.length}` : `🖼 ${photos.length}`}
+              <Chevron open={expanded} />
             </button>
-          )}
-          {photos.length > 0 && (
-            <button type="button" onClick={() => setExpanded((v) => !v)} className="hp-mono rounded-[7px] border border-[rgba(125,211,252,0.25)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[rgba(125,211,252,0.6)]">
-              🖼 {photos.length}
-            </button>
-          )}
-          {noVideo && (
+          ) : (
             <button
               type="button"
               onClick={() => cb.onAddVideo(swim)}
-              className="hp-mono rounded-[7px] border border-dashed border-[rgba(56,239,143,0.5)] bg-transparent px-2.5 py-[4px] text-[10.5px] font-extrabold text-[#38ef8f]"
+              className="hp-mono shrink-0 rounded-[8px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-2 py-[4px] text-[10.5px] font-extrabold text-[var(--t-accent)]"
             >
               + Add video
             </button>
           )}
-          {hasMedia && (
-            <button type="button" onClick={() => setExpanded((v) => !v)} className="ml-auto border-none bg-transparent text-[11px] text-[rgba(125,211,252,0.6)]">
-              {expanded ? '▴' : '▾'}
-            </button>
-          )}
+          {/* Слот под ❤ держится всегда, даже пустой: иначе строки скачут по высоте
+              от того, есть у медиа оценки или нет. */}
+          <span className="flex h-[20px] items-center">
+            {topLiked && <LikeChip m={topLiked} />}
+          </span>
         </span>
       </div>
 
-      {/* Mobile row */}
+      {/* Mobile row — сетка хендоффа `34 58 1fr auto` (Ф6). Тап по строке открывает
+          нижнюю шторку действий: бейдж «кому видно», поздравления и управление медиа живут
+          там, а в строке остаётся только короткое. */}
       <div
         {...flagged}
-        className={`flex cursor-pointer items-center gap-2.5 px-4 py-[10px] sm:hidden${flagged.className ? ` ${flagged.className}` : ''}`}
-        style={{ background: noVideo ? 'rgba(2,10,24,0.25)' : 'transparent' }}
-        onClick={() => hasMedia && cb.onOpenActions(swim)}
+        className={`mms-mrow grid px-4 py-[10px] sm:hidden${flagged.className ? ` ${flagged.className}` : ''}`}
+        style={{ background: noVideo ? 'var(--t-input-bg)' : 'transparent' }}
       >
-        <span className="w-5 shrink-0 text-center text-[13px] leading-tight">
-          {medal(swim.place)}
-          {swim.is_pb && <span className="block text-[9px] text-[#ffca7a]">⚡</span>}
+        {/* Место, медаль и метка — ОДНИМ столбиком: на узком экране трёх колонок под них нет. */}
+        <span className="text-center leading-tight">
+          <span className="block text-[13.5px] font-black leading-none">
+            {swim.place != null ? `#${swim.place}` : '—'}
+          </span>
+          {medal(swim) && <span className="mt-[2px] block text-[13px]">{medal(swim)}</span>}
+          <BestMark record={recordMark} pb={swim.is_pb} sb={swim.is_sb} stacked />
         </span>
         <UI_SwimmStyleIcon
           styleName={swim.style}
           styleLen={swim.distance}
           styleType="icon-len"
-          className="w-[40px] shrink-0 rounded-[8px] bg-[rgba(226,240,252,0.92)] px-1 py-0.5 text-[14px]"
+          lenPlacement="below"
+          size={64}
+          className="src-swim-list rounded-[8px] bg-[var(--t-plate)] px-1 py-0.5"
         />
-        <span className="min-w-0 flex-1">
-          {swim.is_relay && (
-            <span className="block">
-              <span className="hp-mono rounded-[5px] border border-[rgba(125,211,252,0.4)] px-1 py-[1px] text-[8.5px] font-extrabold text-[#7dd3fc]">RELAY</span>
-            </span>
-          )}
-          <span className="mt-0.5 flex items-center gap-2">
-            <span className="hp-mono text-[12px] font-extrabold text-[#7dd3fc]">
-              {swim.time_fail ? 'DSQ' : (
-                <UI_SwimTime time={swim.time} quality={quality} />
-              )}
-            </span>
-            <span className="text-[10px] text-[rgba(203,224,240,0.45)]">
-              {swim.place != null ? `#${swim.place}` : ''}{swim.points > 0 ? ` · ${swim.points} pts` : ''}
-            </span>
-            <CheerChip swim={swim} emphasized={swim.is_pb} onToggle={() => cb.onToggleCheer(swim)} stop />
+        <span className="min-w-0">
+          <span className="hp-mono block text-[13.5px] font-extrabold text-[var(--t-accent)]">
+            {swim.time_fail ? 'DSQ' : (
+              <UI_SwimTime time={swim.time} quality={quality} />
+            )}
+          </span>
+          {/* Метки заплыва — сразу ПОД временем, имя уходит вниз (решение Влада 08.09.2026):
+              RELAY относится к заплыву, а не к пловцу, и от времени его отделять незачем.
+              `empty:hidden` — на строках без единой метки контейнер не должен разрывать
+              время и имя своим отступом. */}
+          <span className="mt-1 flex items-center gap-1.5 empty:hidden">
+            {swim.is_relay && (
+              <span className="hp-mono inline-block rounded-[5px] border border-[var(--t-accent-border)] px-1 py-[1px] text-[8.5px] font-extrabold text-[var(--t-accent)]">RELAY</span>
+            )}
+            {/* На телефоне колонка места 34px — пометка стоит у времени. */}
+            <UI_PrelimLabel heatType={swim.heat_type} className="text-[8.5px]" />
+            {/* Колонок на телефоне нет, поэтому 🎉 стоит у времени — рядом с заплывом,
+                к которому относится, а не у медиа. */}
+            {swim.congrats_count > 0 && <CheerChip swim={swim} emphasized={swim.is_pb} />}
+          </span>
+          {/* Имя целиком, без многоточия: ивритское имя, укороченное посередине, читается
+              как чужое. Показан один пловец — вместо имени дисциплина. */}
+          <span
+            dir={showSwimmerName ? 'auto' : undefined}
+            className={`mt-1 block break-words text-left leading-tight ${
+              showSwimmerName
+                ? 'text-[15px] font-black text-[var(--t-text)]'
+                : 'text-[12px] font-extrabold text-[var(--t-text-2)]'
+            }`}
+          >
+            {showSwimmerName ? swimmerName : `${swim.distance}m ${styleLabel(swim.style)}`}
           </span>
         </span>
-        <span className="flex shrink-0 items-center gap-1.5">
-          {photos.length > 0 && <span className="text-[11px] text-[rgba(125,211,252,0.55)]">🖼</span>}
-          {videos.length > 0 ? (
-            <span className="hp-mono rounded-[7px] border border-[rgba(125,211,252,0.45)] bg-[rgba(125,211,252,0.1)] px-1.5 py-[2px] text-[10px] font-extrabold text-[#7dd3fc]">▶ {videos.length}</span>
+        {/* Цель нажатия 44px, поздравления — ПОД кнопкой, а не сбоку: справа их выдавливало
+            имя. Кнопка раскрывает ТУ ЖЕ панель, что на десктопе (решение Влада 08.09.2026):
+            своей мобильной шторки действий у строки больше нет. */}
+        <span className="flex flex-col items-end gap-1.5">
+          {hasMedia ? (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={expanded}
+              aria-label="Open media"
+              className="hp-mono inline-flex h-[44px] items-center gap-1 rounded-[10px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-3 text-[11px] font-extrabold text-[var(--t-accent)]"
+            >
+              {videos.length > 0 ? `▶ ${videos.length}` : `🖼 ${photos.length}`}
+              <Chevron open={expanded} />
+            </button>
           ) : (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); cb.onAddVideo(swim); }}
-              className="hp-mono rounded-[7px] border border-dashed border-[rgba(56,239,143,0.5)] bg-transparent px-2 py-[3px] text-[10px] font-extrabold text-[#38ef8f]"
+              onClick={() => cb.onAddVideo(swim)}
+              className="hp-mono inline-flex h-[44px] items-center rounded-[10px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-3 text-[11px] font-extrabold text-[var(--t-accent)]"
             >
               + Video
             </button>
           )}
+          <span className="flex h-[20px] items-center">
+            {topLiked && <LikeChip m={topLiked} />}
+          </span>
         </span>
       </div>
 
-      {/* Expanded media panel (desktop) */}
+      {/* Раскрытая панель медиа — ОДНА на обе ширины: на узком экране она просто идёт
+          во всю ширину строки, без отступа под колонки. */}
       {expanded && hasMedia && (
-        <div className="hidden bg-[rgba(2,10,24,0.4)] px-5 py-2 pl-[116px] sm:block">
+        <div className="bg-[var(--t-input-bg)] px-4 py-2 sm:px-5 sm:pl-[116px]">
+          {/* «Кому это видно» — первым: раньше бейдж стоял в строке и занимал 124px у каждой,
+              хотя отвечает на вопрос, который задают, только открыв панель. */}
+          <div className="mb-1">
+            <RowVisibility swim={swim} publicationsByMedia={cb.publicationsByMedia} />
+          </div>
           {[...videos, ...photos].map((m) => (
             <MediaLine key={m.id} m={m} pubs={cb.publicationsByMedia.get(m.id) ?? []} cb={cb} />
           ))}
           <button
             type="button"
             onClick={() => cb.onAddVideo(swim)}
-            className="hp-mono my-1.5 rounded-[7px] border border-dashed border-[rgba(56,239,143,0.4)] bg-transparent px-2.5 py-[4px] text-[10.5px] font-extrabold text-[rgba(56,239,143,0.8)]"
+            className="hp-mono my-1.5 rounded-[7px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-2.5 py-[4px] text-[10.5px] font-extrabold text-[var(--t-accent-dim)]"
           >
             + Add media
           </button>
@@ -398,40 +708,85 @@ function MySwimRow({ swim, showSwimmerName, swimmerName, cb }: {
 
 /* ── Competition group ───────────────────────────────────────────────────── */
 
-function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, cb }: {
+function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, preferredSwimmerId, cb }: {
   swims: MySwimDto[];
   compMedia: SwimMediaDto[];
   showSwimmerName: boolean;
   swimmerNames: Map<number, string>;
+  preferredSwimmerId: number | null;
   cb: SwimListCallbacks;
 }) {
   const [mediaOpen, setMediaOpen] = useState(false);
   const first = swims[0];
   const videoCount = swims.reduce((n, s) => n + s.media.filter((m) => m.media_type === 'video').length, 0);
   const anyPodium = swims.some((s) => s.place != null && s.place <= 3);
-  const anyRecord = swims.some((s) => s.is_pb);
+  const anyPb = swims.some((s) => s.is_pb);
+  const anySb = swims.some((s) => s.is_sb);
+  // Дата в шапке группы одна на всех — колонку DATE держим только там, где дни разные.
+  const showDate = swims.some((s) => !sameDay(first.competition_date, s.date));
+  const selectedName = preferredSwimmerId != null ? swimmerNames.get(preferredSwimmerId) ?? null : null;
+  // Подписи колонок — ровно по сетке строки (`.mms-row`), поэтому ширины здесь больше нет:
+  // и шапка, и строка тянут её из одного grid-шаблона в `my-media.css`.
+  // Колонка 🎉 появляется, только если в этой карточке кого-то уже поздравили: пустой
+  // столбец нулей в каждой строке — шум, а не информация.
+  const showCheers = swims.some((s) => s.congrats_count > 0);
+  const columns: { label: string; align?: 'center' | 'right' }[] = [
+    { label: 'PLACE', align: 'center' },
+    { label: '' },
+    { label: 'SWIM', align: 'center' },
+    { label: '' },
+    { label: '' },
+    { label: 'TIME' },
+    ...(showDate ? [{ label: 'DATE' as const }] : []),
+    ...(showCheers ? [{ label: '🎉', align: 'right' as const }] : []),
+    { label: 'MEDIA', align: 'right' as const },
+  ];
 
   return (
     <div className={`${hpCardCls} overflow-hidden`}>
-      <div className="flex flex-wrap items-center gap-2.5 border-b border-[rgba(125,211,252,0.15)] px-4 py-3 sm:px-5">
-        <span dir="auto" className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-black text-[#f3f8fd]">
-          {first.competition_name}
-        </span>
-        <span className="hp-mono text-[11px] font-extrabold text-[#7dd3fc]">{first.competition_date}</span>
-        <span className="text-[11.5px] text-[rgba(203,224,240,0.5)]">{first.pool_type}</span>
+      <div className="flex flex-wrap items-center gap-2.5 border-b border-[var(--t-accent-soft)] bg-[var(--t-list-head)] px-4 py-3 sm:px-5">
+        {/* Плитка соревнования — общая CompetitionTile (сезон/кубок · буква категории ·
+            возрастная лента). Данные считает общий competitionTileData, своей эвристики по
+            названию тут нет: категория и флаг чемпионата приходят с сервера. */}
+        {/* Плитка, имя пловца и название — ОДНОЙ строкой: на мобильной этот блок занимает
+            всю ширину, поэтому дата, бассейн, метки и кнопки переносятся на вторую строку.
+            Ширина блока обязательна: без неё название сжималось флексом почти в ноль и
+            ломалось по одной букве в строку. */}
+        <div className="flex w-full min-w-0 items-center gap-2.5 sm:w-auto">
+          <CompetitionTile
+            {...competitionTileData({
+              name: first.competition_name,
+              date: first.competition_date,
+              category: first.category,
+              is_championship: first.is_championship,
+            })}
+            size="sm"
+          />
+          {/* Имя выбранного пловца — крупно и первым: карточка соревнования должна сама
+              отвечать «чьи это заплывы». В режиме All имени нет: в карточке лежат заплывы
+              разных избранных, и одно имя над ними было бы враньём. */}
+          {selectedName && (
+            <span dir="auto" className="shrink-0 text-[18px] font-black leading-tight text-[var(--t-accent)]">
+              {selectedName}
+            </span>
+          )}
+          <span dir="auto" className="min-w-0 flex-1 text-[15px] font-black leading-tight text-[var(--t-text)] sm:flex-none sm:overflow-hidden sm:text-ellipsis sm:whitespace-nowrap">
+            {first.competition_name}
+          </span>
+        </div>
+        <span className="hp-mono text-[11px] font-extrabold text-[var(--t-accent)]">{first.competition_date}</span>
+        <span className="text-[11.5px] text-[var(--t-text-2)]">{first.pool_type}</span>
         {anyPodium && <span title="Podium finish">🏅</span>}
-        {anyRecord && (
-          <span className="hp-mono rounded-[5px] border border-[rgba(255,202,122,0.5)] bg-[rgba(255,202,122,0.08)] px-1.5 py-[1px] text-[9.5px] font-extrabold text-[#ffca7a]">⚡ REC</span>
-        )}
+        <BestMark pb={anyPb} sb={anySb} />
         <span className="ml-auto flex items-center gap-2">
-          <span className="hidden text-[11px] font-bold text-[rgba(203,224,240,0.45)] sm:inline">
+          <span className="hidden text-[11px] font-bold text-[var(--t-text-2)] sm:inline">
             {swims.length} {swims.length === 1 ? 'swim' : 'swims'} · {videoCount} {videoCount === 1 ? 'video' : 'videos'}
           </span>
           {compMedia.length > 0 && (
             <button
               type="button"
               onClick={() => setMediaOpen((v) => !v)}
-              className="hp-mono rounded-[7px] border border-[rgba(125,211,252,0.35)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[#7dd3fc]"
+              className="hp-mono rounded-[7px] border border-[var(--t-accent-border)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[var(--t-accent)]"
             >
               📎 {compMedia.length} {mediaOpen ? '▴' : '▾'}
             </button>
@@ -439,7 +794,7 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, cb 
           <button
             type="button"
             onClick={() => cb.onAddCompMedia(first.competition_id, first.competition_name)}
-            className="hp-mono rounded-[7px] border border-dashed border-[rgba(56,239,143,0.5)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[#38ef8f]"
+            className="hp-mono rounded-[7px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[var(--t-accent)]"
           >
             + Photo/Video
           </button>
@@ -447,8 +802,8 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, cb 
       </div>
 
       {mediaOpen && compMedia.length > 0 && (
-        <div className="border-b border-[rgba(125,211,252,0.12)] bg-[rgba(2,10,24,0.35)] px-4 py-2 sm:px-5">
-          <p className="hp-mono m-0 mb-1 text-[9px] font-extrabold uppercase tracking-[0.14em] text-[rgba(125,211,252,0.45)]">
+        <div className="border-b border-[var(--t-accent-soft)] bg-[var(--t-input-bg)] px-4 py-2 sm:px-5">
+          <p className="hp-mono m-0 mb-1 text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--t-accent-border)]">
             Competition media · not tied to a swim
           </p>
           {compMedia.map((m) => (
@@ -457,26 +812,30 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, cb 
         </div>
       )}
 
-      {/* Column header (desktop) */}
-      <div className="hidden items-center gap-3 px-5 py-1.5 sm:flex">
-        {(['', 'PLACE', '', 'SWIM', 'TIME', 'DATE', '🎉', 'MEDIA'] as const).map((h, i) => (
+      {/* Column header (desktop) — та же сетка, что у строки: подписи не могут разъехаться
+          со столбцами, потому что ширины у них общие (`.mms-row` в my-media.css). */}
+      <div className={`mms-row${showDate ? ' mms-row--dated' : ''}${showCheers ? ' mms-row--cheers' : ''} hidden px-5 py-1.5 sm:grid`}>
+        {columns.map((c, i) => (
           <span
             key={i}
-            className="hp-mono text-[9px] font-extrabold uppercase tracking-[0.14em] text-[rgba(125,211,252,0.45)]"
-            style={{ width: [26, 60, 24, undefined, 84, 92, 52, 330][i], flex: i === 3 ? 1 : undefined, flexShrink: 0 }}
+            className={`hp-mono text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--t-accent-border)]${
+              c.align === 'center' ? ' text-center' : c.align === 'right' ? ' text-right' : ''
+            }`}
           >
-            {h}
+            {c.label}
           </span>
         ))}
       </div>
 
-      <div className="divide-y divide-[rgba(125,211,252,0.08)]">
+      <div className="divide-y divide-[var(--t-accent-soft)]">
         {swims.map((s) => (
           <MySwimRow
             key={s.result_id}
             swim={s}
             showSwimmerName={showSwimmerName}
-            swimmerName={swimmerNames.get(s.swimmer_id) ?? '?'}
+            showDate={showDate}
+            showCheers={showCheers}
+            swimmerName={rowSwimmerName(s, swimmerNames, preferredSwimmerId)}
             cb={cb}
           />
         ))}
@@ -487,7 +846,7 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, cb 
 
 /* ── Root ────────────────────────────────────────────────────────────────── */
 
-function SwimList({ swims, competitionMedia, showSwimmerName, swimmerNames, ...cb }: Props) {
+function SwimList({ swims, competitionMedia, showSwimmerName, swimmerNames, preferredSwimmerId = null, ...cb }: Props) {
   const groups = useMemo(() => {
     const byComp = new Map<number, MySwimDto[]>();
     for (const s of swims) {
@@ -519,6 +878,7 @@ function SwimList({ swims, competitionMedia, showSwimmerName, swimmerNames, ...c
           compMedia={compMediaByComp.get(g[0].competition_id) ?? []}
           showSwimmerName={showSwimmerName}
           swimmerNames={swimmerNames}
+          preferredSwimmerId={preferredSwimmerId}
           cb={cb}
         />
       ))}

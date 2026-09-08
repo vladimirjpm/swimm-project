@@ -23,6 +23,16 @@ export interface MySwimDto {
   /** dd/MM/yyyy */
   competition_date: string;
   pool_type: string;
+  /** Канонический таб соревнования — для плитки CompetitionTile в шапке карточки. */
+  category: 'kids8_11' | 'young11_14' | 'juniors' | 'adults' | 'masters' | null;
+  /** Чемпионат Израиля (флаг админки) — кубок в плитке. */
+  is_championship: boolean;
+  /** Пол пловца — ключ ступени рекорда. */
+  gender: string;
+  /** Год рождения — ось возраста ступени рекорда. */
+  birth_year: number | null;
+  /** Возраст события из протокола («45», «13»). */
+  event_style_age: string;
   /** yyyy-MM-dd — день заплыва (многодневные) */
   date: string;
   distance: string;
@@ -31,13 +41,22 @@ export interface MySwimDto {
   is_relay: boolean;
   /** SwimmerId всех ног эстафеты — для чип-фильтра/счётчиков (эстафета принадлежит всем). */
   member_swimmer_ids: number[];
+  /** Место, как напечатано в протоколе — включая предварительные заплывы. */
   place: number | null;
+  /** Входы единого правила медали (`HelperResults.isMedalPlace`): место показываем как в
+   *  протоколе, а медаль — только там, где её вручали. `is_award` здесь про СОРЕВНОВАНИЕ
+   *  (вручает ли оно медали вообще), а не про эту строку. */
+  heat_type: string | null;
+  round: string | null;
+  is_award: boolean;
   points: number;
   time: string;
   /** Ошибка протокола (И11). null — заплыв в порядке. */
   suspect_reason?: string | null;
   time_fail: boolean;
   is_pb: boolean;
+  /** Лучшее время сезона; сервер не ставит его там, где уже is_pb. */
+  is_sb: boolean;
   congrats_count: number;
   my_cheer: boolean;
   media: SwimMediaDto[];
@@ -47,6 +66,8 @@ export interface MySwimsResponse {
   swimmers: MySwimmerDto[];
   /** Стартовые годы сезонов (сентябрь–август), по убыванию. */
   seasons: number[];
+  /** Показаны все сезоны сразу (пункт «All» селектора). */
+  all_seasons: boolean;
   season: number;
   swims: MySwimDto[];
   competition_media: SwimMediaDto[];
@@ -54,7 +75,7 @@ export interface MySwimsResponse {
 }
 
 const EMPTY: MySwimsResponse = {
-  swimmers: [], seasons: [], season: 0, swims: [], competition_media: [], unlinked_media: [],
+  swimmers: [], seasons: [], all_seasons: false, season: 0, swims: [], competition_media: [], unlinked_media: [],
 };
 
 export { seasonLabel } from '../../utils/helpers/season-helper';
@@ -64,7 +85,7 @@ export { seasonLabel } from '../../utils/helpers/season-helper';
  * season=null → сервер берёт текущий; reload после add/remove медиа —
  * агрегат дешёвый, точечный merge не оправдан.
  */
-export function useMySwims(season: number | null) {
+export function useMySwims(season: number | 'all' | null) {
   const [data, setData] = useState<MySwimsResponse>(EMPTY);
   const [loading, setLoading] = useState(true);
 
@@ -126,4 +147,7 @@ async function toggleReaction(url: string, on: boolean): Promise<{ count: number
 }
 
 export const toggleLike = (mediaId: number, on: boolean) => toggleReaction(`/api/media/${mediaId}/like`, on);
+/** Поздравить с заплывом. UI-вызова сейчас НЕТ: на `/my-media` 🎉 только показывается —
+ *  страница про своих пловцов, и поздравлять там некого (решение Влада 08.09.2026).
+ *  Обёртка остаётся под экран, где поздравляют ЧУЖОЙ заплыв (витрина группы). */
 export const toggleCheer = (resultId: number, on: boolean) => toggleReaction(`/api/results/${resultId}/cheer`, on);

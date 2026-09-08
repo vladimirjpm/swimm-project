@@ -67,42 +67,30 @@
 
 /* ── Шапка фильтров (полоса выбранного) ────────────────────────────────────── */
 
-.sb-bar { margin-bottom: 12px; }
+/* Полоса — ОБЩИЙ `FilterBar` (Ф1). Своей вёрстки у страницы больше нет: остались только
+   токены палитры, поэтому полоса приезжает в deep. Двухстрочный вид на всех ширинах
+   (решение Влада 2026-08-26; на results он мобильный) задаётся пропами `desktop="rows"`
+   и `rows="bare"`, а не этим файлом. */
+.sb-bar {
+  margin-bottom: 12px;
 
-/* Полоса выбранного — ДВЕ строки на всех ширинах (решение Влада 2026-08-26; на results
-   двухстрочный вид только мобильный). Сверху мелко всё, что «All», снизу крупно и по
-   центру — выбранное. Пустая строка не рендерится вовсе, её рисует не CSS, а компонент. */
-.sb-bar__row { display: flex; flex-wrap: wrap; gap: 6px; }
-.sb-bar__row--idle { justify-content: center; }
-.sb-bar__row--active { margin-top: 6px; justify-content: center; }
-
-.sb-bar__chip { display: flex; flex-direction: column; align-items: center; gap: 2px; border-radius: 10px; }
-.sb-bar__label { font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--deep-text-ghost); }
-.sb-bar__value {
-  font-weight: 800; max-width: 100%;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center;
+  --fb-label: var(--deep-text-ghost);
+  --fb-idle-bg: var(--deep-card-bg-row);
+  --fb-idle-border: var(--deep-card-border-soft);
+  --fb-idle-text: var(--deep-text-faint);
+  --fb-active-bg: var(--deep-accent-chip);
+  --fb-active-border: var(--deep-accent-border);
+  --fb-active-text: var(--deep-accent);
 }
-
-/* Неактивное: мельче, приглушено, ужимается — оно не должно спорить с выбранным. */
-.sb-bar__chip--idle {
-  padding: 4px 10px;
-  background: var(--deep-card-bg-row); border: 1px solid var(--deep-card-border-soft);
-}
-.sb-bar__chip--idle .sb-bar__label { font-size: 8px; }
-.sb-bar__chip--idle .sb-bar__value { font-size: 10.5px; font-weight: 700; color: var(--deep-text-faint); }
-
-/* Выбранное: крупнее и акцентом. */
-.sb-bar__chip--active {
-  padding: 6px 14px;
-  background: var(--deep-accent-chip); border: 1px solid var(--deep-accent-border);
-}
-.sb-bar__chip--active .sb-bar__value { font-size: 14px; color: var(--deep-accent); }
 
 /* Чип Event — одна картинка без подписи и БЕЗ слова «EVENT» над ней (решение Влада
    2026-08-26): подпись только съедала место, которое нужно самой картинке. Поэтому чип
    шире и выше остальных, а бокс картинки фиксирован — по той же причине, что и в
    сайдбаре: исходники разной пропорции. */
-.sb-bar__chip--event { padding: 4px 16px; }
+/* ⚠ Два класса компонента в селекторе — не украшательство: у общей геометрии
+   (`.fb--bare .fb__chip--active`) та же специфичность, и одноклассовый оверрайд ей
+   проигрывал бы по порядку подключения файлов. */
+.sb-bar .fb__chip.fb__chip--event { padding: 4px 16px; }
 .sb-chip__event { display: flex; align-items: center; justify-content: center; min-width: 0; }
 .sb-chip__event-icon { width: 118px; flex: none; }
 .sb-chip__event-icon img { display: block; width: 100%; height: 46px; object-fit: contain; }

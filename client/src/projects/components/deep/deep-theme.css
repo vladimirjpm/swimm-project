@@ -42,6 +42,11 @@
   --deep-ow-bar-dim: rgba(167,139,250,.35);
   --deep-danger: #f87171;
   --deep-danger-soft: rgba(248,113,113,.14);
+  /* «Происходит сейчас» — ТОЛЬКО статус LIVE (соревнование идёт). Отдельный цвет,
+     потому что рядом стоят чипы акцентом (дата старта) и золотом (рекорды), и
+     сливаться с ними ему нельзя. Действия «Join»/«Approve» идут акцентом, не этим. */
+  --deep-live: #38ef8f;
+  --deep-live-border: rgba(56,239,143,.40);
   --deep-male: #60a5fa;  --deep-male-soft: rgba(59,130,246,.14);  --deep-male-border: rgba(59,130,246,.3);
   --deep-female: #f472b6; --deep-female-soft: rgba(236,72,153,.14); --deep-female-border: rgba(236,72,153,.3);
   --deep-seg-track: rgba(255,255,255,.08);         /* фон сегмент-контролов (25m/50m) */
@@ -110,6 +115,8 @@
   --deep-ow-bar-dim: rgba(124,58,237,.30);
   --deep-danger: #b23b3b;
   --deep-danger-soft: rgba(178,59,59,.08);
+  --deep-live: #0f7a52;                            /* зелёный тёмной темы на белом даёт 1.4 */
+  --deep-live-border: rgba(15,122,82,.35);
   --deep-male: #1d4ed8;  --deep-male-soft: rgba(29,78,216,.05);  --deep-male-border: rgba(29,78,216,.2);
   --deep-female: #be185d; --deep-female-soft: rgba(190,24,93,.04); --deep-female-border: rgba(190,24,93,.18);
   --deep-seg-track: #eef4f8;
@@ -142,6 +149,79 @@
   --deep-radius-tile: 14px;
   --deep-radius-row: 12px;
   --deep-radius-pill: 999px;
+}
+
+/* ── Роли `--t-*` — прослойка между вёрсткой и палитрой ──────────────────────
+   Вёрстка просит РОЛЬ («акцент», «рамка», «приглушённый текст», «опасность»), а не
+   конкретный цвет; во что роль разворачивается — решает этот файл. Появились на
+   `/my-media` (Ф5 плана my-media-filters-plan), сюда переехали, когда за ней на тему
+   пошла семья hp: карта одна на продукт, копий у страниц больше нет.
+
+   Объявлены рядом с палитрой, на тех же классах: у кого есть класс темы — у того есть
+   и роли. Это же снимает старую ловушку с ПОРТАЛАМИ (шторка, пилюля, модалка логина):
+   им класс темы всё равно передаётся отдельно, и теперь одного этого достаточно.
+
+   Заводя новый цвет, добавляй РОЛЬ здесь, а не хекс на месте. */
+.theme-deep, .theme-deep-light {
+  --t-accent: var(--deep-accent);
+  --t-accent-dim: color-mix(in srgb, var(--deep-accent) 70%, transparent);
+  --t-accent-border: var(--deep-accent-border);
+  --t-accent-soft: var(--deep-accent-chip);
+  --t-accent-ink: var(--deep-accent-ink);
+  --t-accent-grad: var(--deep-accent-grad);
+
+  --t-surface: var(--deep-card-bg);
+  --t-surface2: var(--deep-card-bg-raised);
+  /* Шторки, модалки и выпадающие списки стоят НАД страницей — им нужен непрозрачный
+     фон, а не полупрозрачная карточка: сквозь неё просвечивал бы список. */
+  --t-surface-strong: var(--deep-panel-bg);
+  --t-card: var(--deep-card-bg);
+  --t-input-bg: var(--deep-card-bg-row);
+  --t-border: var(--deep-card-border);
+  --t-border-2: var(--deep-card-border-soft);
+  --t-scrim: color-mix(in srgb, var(--deep-page-bg) 72%, transparent);
+  --t-shadow: var(--deep-card-shadow);
+
+  --t-text: var(--deep-text);
+  --t-text-2: var(--deep-text-mute);
+  --t-text-3: var(--deep-text-faint);
+
+  /* Плашка под чёрный силуэт иконки стиля. Единственная роль с фиксированным
+     значением: картинки нарисованы чёрным по светлому и нужны такими в ОБЕИХ темах
+     (ответ дизайнера на «силуэт не виден на тёмном»). */
+  --t-plate: #e6f2fb;
+
+  --t-warn: var(--deep-gold);
+  --t-warn-soft: var(--deep-gold-soft);
+  --t-warn-border: var(--deep-gold-border);
+  --t-warn-ink: var(--deep-accent-ink);
+
+  --t-danger: var(--deep-danger);
+  --t-danger-soft: var(--deep-danger-soft);
+  --t-danger-border: color-mix(in srgb, var(--deep-danger) 45%, transparent);
+
+  /* «Идёт прямо сейчас» — см. --deep-live. */
+  --t-live: var(--deep-live);
+  --t-live-border: var(--deep-live-border);
+
+  /* Подложка ШАПКИ списка (строка соревнования над таблицей заплывов). В тёмной теме
+     её нет и не нужно: карточка там сама тёмное стекло, шапка отбита рамкой и кеглем.
+     На белой карточке светлой темы этого не хватает — шапка сливалась со строками,
+     поэтому там встаёт прохладный тон, тот же, что под полосой табов. Пустое значение
+     в одном режиме — приём темы, так же сделаны свечения (`--deep-wheel-glow: none`). */
+  --t-list-head: transparent;
+
+  /* ❤ на медиа — не «опасность» и не акцент: своя роль, чтобы её не перекрасили заодно. */
+  --t-like: var(--deep-female);
+  --t-like-soft: var(--deep-female-soft);
+  --t-like-border: var(--deep-female-border);
+}
+
+/* Светлая тема — единственная, где шапке списка нужна подложка (см. --t-list-head).
+   Оверрайд стоит ПОСЛЕ блока ролей: у обоих селекторов одна специфичность, и решает
+   порядок в файле. */
+.theme-deep-light {
+  --t-list-head: var(--deep-tabs-bg);
 }
 
 /* ── Рецепты (все карточки собираются из них) ── */

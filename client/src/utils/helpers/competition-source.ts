@@ -98,7 +98,9 @@ const SUMMER_RX = /summer|קיץ/i;
  * Эвристика по названию остаётся фоллбеком для источников, где флага нет (старый кэш
  * /api/competitions, объекты, собранные из результатов) — см. [[isChampionshipName]].
  */
-export const isChampionshipSource = (src: CompetitionSource | undefined | null): boolean =>
+export const isChampionshipSource = (
+  src: Pick<CompetitionSource, 'name'> & { is_championship?: boolean } | undefined | null,
+): boolean =>
   src?.is_championship ?? isChampionshipName(src?.name);
 
 export const isChampionshipName = (name: string | null | undefined): boolean => {
@@ -110,7 +112,15 @@ export const isChampionshipName = (name: string | null | undefined): boolean => 
   );
 };
 
-export function competitionTileData(src: CompetitionSource | undefined | null): CompetitionTileData {
+/**
+ * Что плитке реально нужно от источника. Форма, а не весь `CompetitionSource`: те же данные
+ * есть у строки My media (`MySwimDto`), и городить ради плитки фальшивый объект с `kind`,
+ * `status`, `day_dates` — значит потерять смысл проверки типов.
+ */
+export type CompetitionTileSource = Pick<CompetitionSource, 'name' | 'date' | 'category'>
+  & { is_championship?: boolean };
+
+export function competitionTileData(src: CompetitionTileSource | undefined | null): CompetitionTileData {
   const name = src?.name ?? '';
   const category = src?.category ?? null;
 

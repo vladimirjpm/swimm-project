@@ -240,7 +240,7 @@ function TrainingShowFullTable({
             styleName={styleUnique}
             styleLen={lenUnique ?? fallbackLenFromFirstCell ?? ''}
             styleType="icon-len"
-            className="w-14"
+            className="src-training-show-full-table w-14"
           />
         </div>
       )}
@@ -337,7 +337,7 @@ function TrainingShowFullTable({
                                   styleName={cell.style}
                                   styleLen={cell.len}
                                   styleType="icon-notext"
-                                  className="w-12"
+                                  className="src-training-show-full-table w-12"
                                 />
                               </div>
                             )}

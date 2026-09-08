@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>UI Kit — dev only</title>
+    <!--
+      DEV-ONLY. Страницы нет в `rollupOptions.input` (client/vite.config.js) — значит
+      `vite build` её не собирает, в dist/ и в wwwroot API она не попадает. Открывается
+      только с dev-сервера: http://localhost:5173/ui-kit.html
+      Не добавляй её во входы сборки и не ставь ссылку из топбара.
+    -->
+  </head>
+  <body>
+    <div id="ui-kit-page"></div>
+    <script type="module" src="/src/pages/ui-kit-page.tsx"></script>
+  </body>
+</html>

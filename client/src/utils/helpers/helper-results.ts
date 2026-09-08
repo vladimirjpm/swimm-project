@@ -6,6 +6,13 @@ import HelperTime from './helper-time';
 import { ageInSeason } from './season-helper';
 import { recordAgeAxisNow } from './record-age-axis';
 
+/** Минимум для оси возраста: дата заплыва, год рождения, возраст события из протокола. */
+export type RecordStepSource = {
+  date?: string;
+  birth_year?: number | null;
+  event_style_age: string | number;
+};
+
 export default class HelperResults {
   /**
    * Заплывы, которые НЕ дают официального места и по умолчанию скрыты:
@@ -16,6 +23,37 @@ export default class HelperResults {
    */
   static isHiddenHeat(heatType?: string | null): boolean {
     return heatType === 'prelim' || heatType === 'extra';
+  }
+
+  /**
+   * ЕДИНСТВЕННОЕ место, где живёт правило «за это место дают медаль».
+   *
+   * До 08.09.2026 оно было написано трижды и трижды по-разному: таблица результатов знала
+   * про наградность соревнования и предварительные заплывы, страница пловца — только про
+   * `prelim`, My media — про снятых и «כללי». Строка при этом рисует медаль ИЗ МЕСТА, и
+   * каждое расхождение выходило наружу наградой, которой не вручали.
+   *
+   * ⚠ Само МЕСТО этим правилом не трогается: его показываем как напечатано в протоколе,
+   * включая предварительные (решение Влада 08.09.2026) — пловцу важно видеть, что утром он
+   * был первым. Предварительное помечается `UI_PrelimLabel`.
+   *
+   * Правила — docs/competition-overview-cards.md, «Что считается медалью»: Р34 (prelim и
+   * extra — ранжир сессии), Р43 («כללי» = `final-open`: секция без возрастной категории, ни
+   * очков, ни медалей), И-18 (снятым место не пишем вовсе), плюс наградность самого
+   * соревнования — на лиге мест 1–3 сколько угодно, а наград нет.
+   */
+  static isMedalPlace(row: {
+    place?: number | string | null;
+    heatType?: string | null;
+    round?: string | null;
+    timeFail?: boolean | null;
+    competitionIsAward?: boolean | null;
+  }): boolean {
+    if (!row.competitionIsAward || row.timeFail) return false;
+    if (HelperResults.isHiddenHeat(row.heatType)) return false;
+    if (row.round === 'final-open') return false;
+    const place = Number(row.place);
+    return place >= 1 && place <= 3;
   }
 
   /**
@@ -35,7 +73,11 @@ export default class HelperResults {
    * строки в ЧУЖОЙ таблице, и при оси 'calendar' он считается по году заплыва. Осенью
    * числа расходятся на единицу, и это законно (docs/data-integrity.md §13).
    */
-  static recordStepAge(res: Result): string | number {
+  /**
+   * Форма, а не весь `Result`: те же три поля есть у строки My media (`MySwimDto`), и
+   * ступень рекорда обязана считаться одним кодом на обоих экранах.
+   */
+  static recordStepAge(res: RecordStepSource): string | number {
     if (recordAgeAxisNow() === 'season') return HelperResults.ageLabel(res);
 
     const date = parseCompetitionDate(res.date);
@@ -45,7 +87,7 @@ export default class HelperResults {
     return age > 0 ? age : res.event_style_age;
   }
 
-  static ageLabel(res: Result): string | number {
+  static ageLabel(res: RecordStepSource): string | number {
     const date = parseCompetitionDate(res.date);
     const age = res.birth_year ? ageInSeason(res.birth_year, date ?? undefined) : null;
     return age ?? res.event_style_age;

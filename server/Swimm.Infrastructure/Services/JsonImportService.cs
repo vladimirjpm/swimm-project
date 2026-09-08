@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -330,8 +330,11 @@ public class JsonImportService : IImportService
                 }
 
                 // 2. Country
+                // Код нормализуем ДО поиска (CountryCodes.Normalize): alpha-2 «IL» из старых
+                // JSON заводил вторую запись Израиля рядом с «ISR», и рекорды 791 пловцу не
+                // находились вовсе (docs/data-integrity.md §14). Правило — alpha-3 в данных.
                 Country? country = null;
-                var countryCode = (item.Country ?? "").Trim().ToUpperInvariant();
+                var countryCode = CountryCodes.Normalize(item.Country);
                 if (!string.IsNullOrEmpty(countryCode))
                 {
                     if (!countryCache.TryGetValue(countryCode, out country))
@@ -339,6 +342,15 @@ public class JsonImportService : IImportService
                         country = await _db.Countries.FirstOrDefaultAsync(c => c.CountryCode == countryCode);
                         if (country == null)
                         {
+                            // Новую страну заводим, но не молча: незнакомый код — либо новый
+                            // синоним в CountryCodes.Aliases, либо опечатка в протоколе.
+                            // Данные не подменяем — говорим вслух (docs/data-integrity.md §9).
+                            if (!CountryCodes.LooksAlpha3(countryCode))
+                                diagnosticLog.Add(
+                                    $"⚠ Country: код '{countryCode}' не alpha-3 (из '{item.Country}') — " +
+                                    "заводится новая страна; если это второе имя уже известной, " +
+                                    "добавь синоним в CountryCodes.Aliases и склей записи");
+
                             country = new Country { CountryCode = countryCode, CountryName = countryCode };
                             _db.Countries.Add(country);
                             await _db.SaveChangesAsync();
@@ -716,8 +728,14 @@ public class JsonImportService : IImportService
                     HeatType = string.IsNullOrWhiteSpace(item.HeatType) ? null : item.HeatType,
                     Round = string.IsNullOrWhiteSpace(item.Round) ? null : item.Round,
                     OfficialClubPoints = item.OfficialClubPoints,
-                    Position = item.Position,
-                    PositionAgeGroup = item.PositionAgeGroup,
+                    // Место есть только у ДОПЛЫВШЕГО. У DQ / NS / DNS число в первой
+                    // колонке протокола местом не является — в одном заплыве оно
+                    // повторяется у разных снятых, — и, попав в базу, оно доезжает до
+                    // витрины как «#2 🥈» рядом со словом DSQ (инцидент И-18,
+                    // docs/data-integrity.md). Режем на ЗАПИСИ: иначе про это правило
+                    // обязан помнить каждый читающий репозиторий, а их полдюжины.
+                    Position = item.TimeFail ? null : item.Position,
+                    PositionAgeGroup = item.TimeFail ? null : item.PositionAgeGroup,
                     Heat = item.Heat ?? 0,
                     Lane = item.Lane ?? 0,
                     TimeMillisecond = ParseTimeToMs(item.Time),

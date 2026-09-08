@@ -1,0 +1,349 @@
+/* Страница `/my-media`: палитра и раскладка (Ф3–Ф5 плана docs/plans/my-media-filters-plan.md,
+   вид — по хендоффу `!design_handoff/design_handoff_my_media_filters`).
+
+   Панель, полоса, шторка и строка заплыва ОБЩИЕ — те же, что на results и `/season-best`.
+   Своей вёрстки у страницы нет: здесь только карта ролей на палитру и мелочи раскладки.
+
+   ПАЛИТРА (Ф5). Страница живёт в теме **deep** — той же, что страницы пловца, клуба и
+   `/season-best`, — и переключается вместе со всем сайтом (класс `.theme-deep` /
+   `.theme-deep-light` ставит `useDeepThemeClass()` на корне). Раньше цвета были вбиты
+   хексами в шести файлах (393 литерала) и светлой темы у страницы не было вовсе.
+
+   Сами роли `--t-*` живут не здесь, а в `components/deep/deep-theme.css`: когда за
+   `/my-media` на тему пошла семья hp (home / competitions / groups), карта стала общей.
+   Здесь остаётся только то, что есть у ЭТОЙ страницы и больше ни у кого. */
+
+/* Акцент РЕЖИМА: в модерации весь верх страницы становится золотым — вкладка, линия
+   под ней и рамка панели. Одно значение на контейнер вместо покраски каждой детали. */
+.my-media,
+.my-media-filters,
+.my-media-bar {
+  --mode-accent: var(--t-accent);
+  --mode-soft: var(--t-accent-soft);
+}
+
+/* Плитка соревнования (`CompetitionTile`) построена под ДРУГУЮ поверхность: её корпус и
+   буква — производные от `--theme-mode-accent-text`, то есть почти белые, потому что на
+   странице соревнования плитка лежит на насыщенном `--theme-primary`. У нас она стоит на
+   карточке темы deep, и в светлой теме белое по белому пропадало совсем.
+
+   Перекрашиваем штатным швом — теми же шестью токенами (так и написано в `index.css`:
+   «перекрасить плитку per-theme = поправить эти 6 токенов»), а не правкой компонента: на
+   странице соревнования он остаётся как был. Буква берёт `--t-text` — парный токен той
+   поверхности, на которой теперь лежит; корпус остаётся тонированным, полосы светлее его,
+   так что структура плитки (шапка · буква · возраст) сохраняется.
+
+   ⚠ ТОЛЬКО светлая тема (решение Влада 08.09.2026). В тёмной плитка и так читалась —
+   белая буква на тёмном, — и там она остаётся глобальной: селектора нет, значит токены
+   приходят из `:root[data-mode="dark"]`, как раньше. Чинили одну беду, а не «привели к
+   одному виду». */
+.my-media.theme-deep-light {
+  --theme-comp-tile-bg: var(--t-accent-soft);
+  --theme-comp-tile-border: var(--t-accent-border);
+  --theme-comp-tile-letter: var(--t-text);
+  --theme-comp-tile-strip-bg: var(--t-surface2);
+  --theme-comp-tile-age-bg: var(--t-surface2);
+  --theme-comp-tile-age-text: var(--t-accent);
+}
+
+.my-media--moderation {
+  --mode-accent: var(--t-warn);
+  --mode-soft: var(--t-warn-soft);
+}
+
+/* ── Шапка: имя · заголовок · папки-табы · действие (хендофф 2a/2c) ───────────── */
+
+.mm-head {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
+  padding: 28px 48px 0;
+}
+.mm-head__eyebrow {
+  margin: 0 0 6px;
+  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.28em;
+  color: var(--t-accent);
+}
+.mm-head__title {
+  margin: 0;
+  font-size: 40px; font-weight: 900; line-height: 0.95; letter-spacing: -0.04em;
+  color: var(--t-text);
+}
+
+/* Табы — «папки»: активная срастается с панелью под ней, поэтому у неё нет нижней грани,
+   а сама она сдвинута на пиксель вниз, накрывая линию панели. */
+.mm-tabs { display: flex; align-items: flex-end; gap: 6px; margin-left: 16px; }
+.mm-tab {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 10px 20px 12px;
+  border: 1px solid var(--t-border);
+  border-radius: 12px 12px 0 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+.mm-tab--on {
+  z-index: 1;
+  margin-bottom: -1px;
+  padding: 12px 20px 14px;
+  border-color: var(--mode-accent);
+  border-bottom-color: transparent;
+  background: var(--t-surface);
+}
+.mm-tab__title { font-size: 14px; font-weight: 800; color: var(--t-text-2); }
+.mm-tab--on .mm-tab__title { color: var(--mode-accent); }
+.mm-tab__sub {
+  display: flex; align-items: center; gap: 6px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px; font-weight: 800;
+  color: var(--t-text-2);
+}
+.mm-tab__badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 16px; height: 16px; padding: 0 5px;
+  border-radius: 8px;
+  background: var(--t-warn); color: var(--t-warn-ink);
+  font-size: 10px; font-weight: 900;
+}
+.mm-tab__sub--warn { color: var(--t-warn); }
+
+.mm-add {
+  margin: 0 0 12px auto;
+  padding: 10px 18px;
+  border: none; border-radius: 10px;
+  background: var(--t-accent); color: var(--t-accent-ink);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 13px; font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Панель контента: линия сверху продолжает активную вкладку, поэтому левый верхний угол
+   не скруглён — вкладка «влита» в панель. */
+.mm-panel {
+  margin: 0 48px 40px;
+  padding: 20px 20px 24px;
+  border-top: 1px solid var(--mode-accent);
+  border-radius: 0 12px 12px 12px;
+  background: var(--t-surface);
+}
+
+@media (max-width: 1023px) {
+  /* Мобильная шапка (2c): строка «заголовок · имя · действие», под ней две папки во всю
+     ширину. Табы не переносятся: две штуки помещаются даже на 320. */
+  .mm-head { flex-wrap: wrap; gap: 10px; padding: 18px 16px 0; }
+  .mm-head__eyebrow { font-size: 10px; letter-spacing: 0.2em; margin-bottom: 2px; }
+  .mm-head__title { font-size: 24px; }
+  .mm-head__id { display: flex; flex-direction: column-reverse; gap: 2px; }
+  .mm-tabs { order: 3; width: 100%; margin-left: 0; }
+  .mm-tab { flex: 1; padding: 10px 14px 11px; }
+  .mm-tab--on { padding: 12px 14px 13px; }
+  .mm-add { margin: 0; padding: 8px 14px; font-size: 11.5px; }
+  .mm-panel { margin: 0; padding: 12px 16px 20px; border-radius: 0; }
+}
+
+.my-media-filters {
+  --fc-bg: var(--t-surface);
+  --fc-border: var(--t-border);
+  --fc-title: var(--t-text);
+  --fc-summary: var(--t-text-2);
+  --fc-summary-active: var(--t-accent);
+  --fc-chevron: var(--t-text-3);
+  --fc-radius: var(--deep-radius-tile);
+
+  --fseg-bg: var(--t-input-bg);
+  --fseg-border: var(--t-border);
+  --fseg-text: var(--t-text-2);
+  --fseg-hover-border: var(--t-accent-border);
+  --fseg-hover-text: var(--t-text);
+  --fseg-active-bg: var(--t-accent-soft);
+  --fseg-active-border: var(--t-accent);
+  --fseg-active-text: var(--t-accent);
+
+  /* Мобильная шторка — тот же общий компонент, поэтому и её палитра здесь. Фон
+     непрозрачный: сквозь полупрозрачную карточку просвечивал бы список под шторкой. */
+  --fdrawer-bg: var(--t-surface-strong);
+  --fdrawer-text: var(--t-text);
+  --fdrawer-border: var(--t-border);
+  --fdrawer-handle: var(--t-accent-border);
+  --fdrawer-scrim: var(--t-scrim);
+}
+
+/* Полоса выбранных фильтров. Выбранная колонка шире прочих (хендофф): значение в ней —
+   имя пловца или название соревнования, и в равной колонке оно обрезалось бы. */
+.my-media-bar {
+  --fb-bg: var(--t-surface2);
+  --fb-border: var(--t-border);
+  --fb-divider: var(--t-border-2);
+  --fb-label: var(--t-text-3);
+  --fb-idle-text: var(--t-text-2);
+  --fb-active-bg: var(--t-accent-soft);
+  --fb-active-border: var(--t-accent);
+  --fb-active-text: var(--t-accent);
+  --fb-shadow: none;
+  --fb-active-grow: 1.5;
+}
+
+/* Кнопка-пилюля: инверсия акцента, как в хендоффе. */
+.my-media-fab {
+  --fpill-bg: var(--t-accent);
+  --fpill-bg-hover: var(--deep-accent-hover);
+  --fpill-ink: var(--t-accent-ink);
+  --fpill-shadow: var(--t-shadow);
+}
+
+.mmf { display: flex; flex-direction: column; gap: 8px; }
+
+/* Сброс — строкой под карточками. Не кнопка-плашка: он не выбор, а отмена всех выборов. */
+.mmf__reset {
+  align-self: flex-start;
+  padding: 4px 2px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--t-accent);
+  opacity: 0.75;
+}
+.mmf__reset:hover { opacity: 1; text-decoration: underline; }
+
+/* Список в карточке: соревнований и групп бывает по полсотни, без предела высоты карточка
+   уводит сайдбар на два экрана (та же причина, что у списка клубов на `/season-best`). */
+.mmf__list { max-height: 260px; overflow-y: auto; }
+/* Ивритские названия внутри LTR-строки: то же, что делает `dir="auto"`, но на строке —
+   иначе точки и сокращения уезжают не на ту сторону. */
+.mmf__list > button { unicode-bidi: plaintext; text-align: left; }
+
+/* Строка пловца: инициал · имя · счётчик. Имя тянется, счётчик прижат вправо. */
+.mmf__swimmer { display: flex; align-items: center; gap: 8px; }
+.mmf__initial {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; flex: none;
+  border-radius: 50%;
+  background: var(--t-accent-soft);
+  color: var(--t-accent);
+  font-size: 10px; font-weight: 900;
+}
+.mmf__swimmer-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mmf__count {
+  flex: none;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11.5px; font-weight: 800;
+  color: var(--t-text-2);
+}
+
+/* Карусель сезонов внутри карточки 320px. Своих отступов у полосы 22px по бокам — в
+   сайдбаре это лишние 44px, из-за которых соседние сезоны перестают быть видны вовсе
+   (лента режется `overflow:hidden`, а не переносится). */
+.mmf__season .deep-season-strip { padding: 8px 6px; gap: 4px; border-radius: 10px; }
+
+/* Плашка под иконкой стиля (ответ дизайнера на вопрос про тёмный фон): картинки нарисованы
+   чёрным силуэтом по светлому, и на тёмной кнопке от пловца остаётся одна вода. Плашка —
+   тот же приём, что в строках заплыва этой страницы. Одна картинка на продукт, светлого
+   варианта не заводим. */
+.my-media-filters .fseg img {
+  background: var(--t-plate);
+  border-radius: 8px;
+  padding: 3px 5px;
+}
+
+.mmf__date {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--fseg-border);
+  background: var(--fseg-bg);
+  color: var(--fseg-text);
+  font-size: 12px;
+  /* Нативный пикер даты рисуется системой — режим ему надо назвать явно, иначе в тёмной
+     теме он приходит светлым по светлому. */
+  color-scheme: dark;
+}
+.theme-deep-light .mmf__date { color-scheme: light; }
+.mmf__dash { color: var(--t-text-2); }
+
+/* ── Ячейка сезона в полосе (ведущая, `lead`) ─────────────────────────────────── */
+
+/* Это индикатор со стрелками ±1 сезон, а не выбор: выбирают каруселью в панели. */
+.mmb-season { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px 12px; }
+.mmb-season__label {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase;
+  color: var(--t-text-3);
+}
+.mmb-season__row { display: flex; align-items: center; gap: 8px; }
+.mmb-season__step {
+  border: none; background: none; cursor: pointer;
+  padding: 0 2px;
+  font-size: 15px; line-height: 1;
+  color: var(--t-text-2);
+}
+.mmb-season__step:hover:not(:disabled) { color: var(--t-accent); }
+.mmb-season__step:disabled { opacity: 0.3; cursor: default; }
+.mmb-season__value {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 20px; font-weight: 800;
+  color: var(--t-accent);
+  text-shadow: var(--deep-accent-glow);
+}
+
+/* Чип Event в полосе: иконка стиля на плашке, как в панели и в строках заплыва.
+   Бокс фиксирован по высоте — исходники разной пропорции, при `height:auto` колонка скачет. */
+.mmb-event { display: inline-flex; align-items: center; justify-content: center; }
+.mmb-event img {
+  display: block;
+  height: 40px;
+  width: auto;
+  max-width: 120px;
+  object-fit: contain;
+  background: var(--t-plate);
+  border-radius: 8px;
+  padding: 2px 6px;
+}
+
+/* ── Строка заплыва (Ф6, сетка хендоффа) ──────────────────────────────────────── */
+
+/* Одна сетка на шапку колонок и на строку: разъехаться они не могут по построению.
+   Порядок: место · медаль · плитка стиля · кто/что (тянется) · метка · время · медиа. */
+.mms-row {
+  grid-template-columns: 48px 28px 66px minmax(0, 1fr) 72px 110px 120px;
+  gap: 14px;
+  align-items: center;
+}
+/* Две колонки необязательные: дата (только у многодневок) и 🎉 (только там, где кого-то
+   поздравили). Комбинации перечислены явно — нулевая колонка не годится, у неё всё равно
+   остаётся зазор, и строка расходится с шапкой. */
+.mms-row--dated {
+  grid-template-columns: 48px 28px 66px minmax(0, 1fr) 72px 110px 72px 120px;
+}
+.mms-row--cheers {
+  grid-template-columns: 48px 28px 66px minmax(0, 1fr) 72px 110px 56px 120px;
+}
+.mms-row--dated.mms-row--cheers {
+  grid-template-columns: 48px 28px 66px minmax(0, 1fr) 72px 110px 72px 56px 120px;
+}
+
+/* Плотный вариант: на 1280 рядом с сайдбаром 320 полной сетке уже тесно. Ужимается
+   ровно то, что просил дизайнер, и в его порядке: медиа, метка, плитка. */
+@media (max-width: 1400px) {
+  .mms-row { grid-template-columns: 40px 24px 60px minmax(0, 1fr) 64px 96px 110px; gap: 10px; }
+  .mms-row--dated { grid-template-columns: 40px 24px 60px minmax(0, 1fr) 64px 96px 64px 110px; }
+  .mms-row--cheers { grid-template-columns: 40px 24px 60px minmax(0, 1fr) 64px 96px 52px 110px; }
+  .mms-row--dated.mms-row--cheers { grid-template-columns: 40px 24px 60px minmax(0, 1fr) 64px 96px 64px 52px 110px; }
+}
+
+/* Плитка стиля тянется по своей колонке: ширину задаёт сетка, а не размер картинки. */
+.mms-row .src-swim-list { width: 100%; }
+.mms-row .src-swim-list img { width: 100%; height: auto; }
+
+/* Мобильная строка: место+медаль · плитка · время и кто/что · одна кнопка медиа. */
+/* `display` НЕ задаём: строка прячется утилитой `sm:hidden`, а правило той же
+   специфичности из этого файла подключается позже и перебило бы её. */
+.mms-mrow {
+  grid-template-columns: 34px 58px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+.mms-mrow .src-swim-list { width: 100%; }
+.mms-mrow .src-swim-list img { width: 100%; height: auto; }

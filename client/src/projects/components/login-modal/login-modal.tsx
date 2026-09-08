@@ -1,8 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import '../deep/deep-theme.css';
+import { useDeepThemeClass } from '../deep/use-deep-theme-class';
 
 // Модал логина (фаза 4.2-4.3). Общий компонент — используется из шапки на home/competitions/groups.
 // Режимы: login (Google + email/пароль) / register / forgot — переключаются внутри одного модала.
+//
+// Палитра — роли `--t-*` темы deep. ⚠ Модал уходит ПОРТАЛОМ в `body`, снаружи корня
+// страницы, поэтому класс темы он ставит себе сам: иначе `--t-*` за пределами корня пустые
+// и модал приезжает бесцветным. По той же причине здесь нет `hp-card-std` — эта карточка
+// живёт в `home.css`, которого на половине страниц нет.
 
 type Mode = 'login' | 'register' | 'forgot';
 
@@ -14,7 +21,7 @@ interface LoginModalProps {
 }
 
 const inputClass =
-  'w-full rounded-[11px] border border-[#7dd3fc]/25 bg-[rgba(4,16,32,0.7)] px-4 py-[11px] text-[14px] font-semibold text-[#f3f8fd] outline-none placeholder:text-[#c9dcee]/40 focus:border-[#7dd3fc]/60';
+  'w-full rounded-[11px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-4 py-[11px] text-[14px] font-semibold text-[var(--t-text)] outline-none placeholder:text-[var(--t-text-3)] focus:border-[var(--t-accent)]';
 
 function GoogleIcon() {
   return (
@@ -35,6 +42,7 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const deep = useDeepThemeClass();
 
   // Esc закрывает модал; сбрасываем состояние формы при каждом открытии.
   useEffect(() => {
@@ -156,21 +164,21 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(2,10,24,0.72)] p-4 backdrop-blur-[6px]"
+      className={`${deep} fixed inset-0 z-[100] flex items-center justify-center bg-[var(--t-scrim)] p-4 backdrop-blur-[6px]`}
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="hp-card-std w-full max-w-[400px] rounded-[20px] border border-[#7dd3fc]/35 p-6 shadow-[0_28px_60px_rgba(2,10,24,0.7)]"
+        className="w-full max-w-[400px] rounded-[20px] border border-[var(--t-accent-border)] bg-[var(--t-surface-strong)] p-6 shadow-[var(--t-shadow)]"
       >
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-[18px] font-black tracking-[0.06em] text-[#f3f8fd]">{title}</h2>
+          <h2 className="text-[18px] font-black tracking-[0.06em] text-[var(--t-text)]">{title}</h2>
           <button
             type="button"
             aria-label="Close"
-            className="text-[18px] font-bold leading-none text-[#cfe6f6] hover:text-[#7dd3fc]"
+            className="text-[18px] font-bold leading-none text-[var(--t-text-2)] hover:text-[var(--t-accent)]"
             onClick={onClose}
           >
             ✕
@@ -181,16 +189,16 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
           <>
             <a
               href={googleHref}
-              className="flex items-center justify-center gap-[10px] rounded-[13px] border border-[#7dd3fc]/35 bg-[rgba(56,189,248,0.1)] px-4 py-[12px] text-[14px] font-extrabold text-[#f3f8fd] no-underline transition-colors hover:bg-[rgba(56,189,248,0.18)]"
+              className="flex items-center justify-center gap-[10px] rounded-[13px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-4 py-[12px] text-[14px] font-extrabold text-[var(--t-text)] no-underline transition-colors hover:border-[var(--t-accent)]"
             >
               <GoogleIcon />
               Sign in with Google
             </a>
 
             <div className="my-5 flex items-center gap-3">
-              <span className="h-px flex-1 bg-[#7dd3fc]/20" />
-              <span className="hp-mono text-[10px] font-extrabold tracking-[0.2em] text-[#c9dcee]/50">OR</span>
-              <span className="h-px flex-1 bg-[#7dd3fc]/20" />
+              <span className="h-px flex-1 bg-[var(--t-border)]" />
+              <span className="hp-mono text-[10px] font-extrabold tracking-[0.2em] text-[var(--t-text-3)]">OR</span>
+              <span className="h-px flex-1 bg-[var(--t-border)]" />
             </div>
           </>
         )}
@@ -216,14 +224,14 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
               onChange={(e) => setPassword(e.target.value)}
             />
             {error && (
-              <p className="rounded-[11px] border border-[#f87171]/35 bg-[rgba(248,113,113,0.08)] px-4 py-[9px] text-[12px] font-bold text-[#fca5a5]">
+              <p className="rounded-[11px] border border-[var(--t-danger-border)] bg-[var(--t-danger-soft)] px-4 py-[9px] text-[12px] font-bold text-[var(--t-danger)]">
                 {error}
               </p>
             )}
             <button
               type="submit"
               disabled={submitting}
-              className="mt-1 rounded-[13px] bg-[linear-gradient(140deg,#38bdf8,#0369a1)] px-4 py-[12px] text-[14px] font-black text-[#06263f] transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="mt-1 rounded-[13px] bg-[image:var(--t-accent-grad)] px-4 py-[12px] text-[14px] font-black text-[var(--t-accent-ink)] transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {submitting ? 'Signing in…' : 'Sign in'}
             </button>
@@ -231,14 +239,14 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
             <div className="mt-1 flex items-center justify-between text-[12px] font-bold">
               <button
                 type="button"
-                className="text-[#7dd3fc] hover:underline"
+                className="text-[var(--t-accent)] hover:underline"
                 onClick={() => switchMode('register')}
               >
                 Create account
               </button>
               <button
                 type="button"
-                className="text-[#7dd3fc] hover:underline"
+                className="text-[var(--t-accent)] hover:underline"
                 onClick={() => switchMode('forgot')}
               >
                 Forgot password?
@@ -250,12 +258,12 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
         {mode === 'register' && (
           status ? (
             <div className="flex flex-col gap-3">
-              <p className="rounded-[11px] border border-[#7dd3fc]/35 bg-[rgba(56,189,248,0.1)] px-4 py-[9px] text-[12px] font-bold text-[#e0f2fe]">
+              <p className="rounded-[11px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-4 py-[9px] text-[12px] font-bold text-[var(--t-text)]">
                 {status}
               </p>
               <button
                 type="button"
-                className="self-start text-[12px] font-bold text-[#7dd3fc] hover:underline"
+                className="self-start text-[12px] font-bold text-[var(--t-accent)] hover:underline"
                 onClick={() => switchMode('login')}
               >
                 ← Back to sign in
@@ -291,21 +299,21 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
                 onChange={(e) => setPassword(e.target.value)}
               />
               {error && (
-                <p className="rounded-[11px] border border-[#f87171]/35 bg-[rgba(248,113,113,0.08)] px-4 py-[9px] text-[12px] font-bold text-[#fca5a5]">
+                <p className="rounded-[11px] border border-[var(--t-danger-border)] bg-[var(--t-danger-soft)] px-4 py-[9px] text-[12px] font-bold text-[var(--t-danger)]">
                   {error}
                 </p>
               )}
               <button
                 type="submit"
                 disabled={submitting}
-                className="mt-1 rounded-[13px] bg-[linear-gradient(140deg,#38bdf8,#0369a1)] px-4 py-[12px] text-[14px] font-black text-[#06263f] transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="mt-1 rounded-[13px] bg-[image:var(--t-accent-grad)] px-4 py-[12px] text-[14px] font-black text-[var(--t-accent-ink)] transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 {submitting ? 'Creating…' : 'Create account'}
               </button>
 
               <button
                 type="button"
-                className="mt-1 self-start text-[12px] font-bold text-[#7dd3fc] hover:underline"
+                className="mt-1 self-start text-[12px] font-bold text-[var(--t-accent)] hover:underline"
                 onClick={() => switchMode('login')}
               >
                 ← Back to sign in
@@ -317,12 +325,12 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
         {mode === 'forgot' && (
           status ? (
             <div className="flex flex-col gap-3">
-              <p className="rounded-[11px] border border-[#7dd3fc]/35 bg-[rgba(56,189,248,0.1)] px-4 py-[9px] text-[12px] font-bold text-[#e0f2fe]">
+              <p className="rounded-[11px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-4 py-[9px] text-[12px] font-bold text-[var(--t-text)]">
                 {status}
               </p>
               <button
                 type="button"
-                className="self-start text-[12px] font-bold text-[#7dd3fc] hover:underline"
+                className="self-start text-[12px] font-bold text-[var(--t-accent)] hover:underline"
                 onClick={() => switchMode('login')}
               >
                 ← Back to sign in
@@ -340,21 +348,21 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
                 onChange={(e) => setEmail(e.target.value)}
               />
               {error && (
-                <p className="rounded-[11px] border border-[#f87171]/35 bg-[rgba(248,113,113,0.08)] px-4 py-[9px] text-[12px] font-bold text-[#fca5a5]">
+                <p className="rounded-[11px] border border-[var(--t-danger-border)] bg-[var(--t-danger-soft)] px-4 py-[9px] text-[12px] font-bold text-[var(--t-danger)]">
                   {error}
                 </p>
               )}
               <button
                 type="submit"
                 disabled={submitting}
-                className="mt-1 rounded-[13px] bg-[linear-gradient(140deg,#38bdf8,#0369a1)] px-4 py-[12px] text-[14px] font-black text-[#06263f] transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="mt-1 rounded-[13px] bg-[image:var(--t-accent-grad)] px-4 py-[12px] text-[14px] font-black text-[var(--t-accent-ink)] transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 {submitting ? 'Sending…' : 'Send reset link'}
               </button>
 
               <button
                 type="button"
-                className="mt-1 self-start text-[12px] font-bold text-[#7dd3fc] hover:underline"
+                className="mt-1 self-start text-[12px] font-bold text-[var(--t-accent)] hover:underline"
                 onClick={() => switchMode('login')}
               >
                 ← Back to sign in

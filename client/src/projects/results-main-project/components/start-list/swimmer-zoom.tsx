@@ -69,7 +69,7 @@ export default function SwimmerZoom({ orgCompIds, swimmerId, onBack, onOpenHeat 
                   А вот СТРОКУ здесь строим свою: `SwimRow` собран под результат (место,
                   медаль, очки, крупное время справа) и в стартовом протоколе показывал бы
                   то, чего ещё не было. Главное число тут — ВРЕМЯ СТАРТА. */}
-              <UI_SwimmStyleIcon styleName={s.style_name} className="h-10 w-10 shrink-0" />
+              <UI_SwimmStyleIcon styleName={s.style_name} className="src-swimmer-zoom h-10 w-10 shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="text-base font-black">{formatApproxTime(s.heat_start_at)}</div>
                 <div className="text-xs opacity-70">

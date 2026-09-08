@@ -50,7 +50,7 @@ const PopupContentSwimmerRecords: React.FC = () => {
                     styleName={rec.style}
                     styleLen={rec.distance}
                     styleType="icon-len"
-                    className="text-sm w-24"
+                    className="src-popup-content-swimmer-records text-sm w-24"
                   />
                 </td>
                 <td className="px-3 py-1.5 border">{rec.distance}</td>

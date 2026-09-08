@@ -16,6 +16,10 @@ public class MySwimsResponseDto
     [JsonPropertyName("seasons")]
     public List<int> Seasons { get; set; } = new();
 
+    /// <summary>Показаны все сезоны сразу (пункт «All» селектора), а не один.</summary>
+    [JsonPropertyName("all_seasons")]
+    public bool AllSeasons { get; set; }
+
     /// <summary>Выбранный сезон (стартовый год, сентябрь–август).</summary>
     [JsonPropertyName("season")]
     public int Season { get; set; }
@@ -65,6 +69,26 @@ public class MySwimDto
     [JsonPropertyName("pool_type")]
     public string PoolType { get; set; } = string.Empty;
 
+    /// <summary>Канонический таб соревнования (CompetitionCategories.Canonical) — для плитки в шапке карточки.</summary>
+    [JsonPropertyName("category")]
+    public string? Category { get; set; }
+
+    /// <summary>Чемпионат Израиля (ручной флаг Competition.IsChampionship) — кубок в плитке.</summary>
+    [JsonPropertyName("is_championship")]
+    public bool IsChampionship { get; set; }
+
+    /// <summary>Пол ПЛОВЦА (Results.Gender — фоллбек): ключ ступени рекорда и season best.</summary>
+    [JsonPropertyName("gender")]
+    public string Gender { get; set; } = string.Empty;
+
+    /// <summary>Год рождения — ось возраста для ступени рекорда (RecordAgeAxis).</summary>
+    [JsonPropertyName("birth_year")]
+    public int? BirthYear { get; set; }
+
+    /// <summary>Возраст события из протокола («45», «13») — та же роль, что у ResultDto.event_style_age.</summary>
+    [JsonPropertyName("event_style_age")]
+    public string EventStyleAge { get; set; } = string.Empty;
+
     /// <summary>ISO-дата заплыва (день многодневного может отличаться от даты соревнования).</summary>
     [JsonPropertyName("date")]
     public string Date { get; set; } = string.Empty;
@@ -93,8 +117,28 @@ public class MySwimDto
     [JsonPropertyName("member_swimmer_ids")]
     public List<int> MemberSwimmerIds { get; set; } = new();
 
+    /// <summary>
+    /// Место, КАК НАПЕЧАТАНО в протоколе — включая предварительные заплывы: пловцу важно
+    /// видеть, что утром он был первым. Медаль из этого числа выводить нельзя, для неё есть
+    /// <see cref="IsAward"/>.
+    /// </summary>
     [JsonPropertyName("place")]
     public int? Place { get; set; }
+
+    /// <summary>Тип заплыва (`prelim` / `final` / …) — пометка `[prelim]` у места и вход
+    /// правила медали (`HelperResults.isMedalPlace`).</summary>
+    [JsonPropertyName("heat_type")]
+    public string? HeatType { get; set; }
+
+    /// <summary>Раунд (`final-open` = секция «כללי» без возрастной категории) — вход того же
+    /// правила: за «כללי» медалей не дают (Р43).</summary>
+    [JsonPropertyName("round")]
+    public string? Round { get; set; }
+
+    /// <summary>Соревнование вообще вручает медали (`Competition.IsAward`) — вход того же
+    /// правила: на лиге мест 1–3 сколько угодно, а наград нет.</summary>
+    [JsonPropertyName("is_award")]
+    public bool IsAward { get; set; }
 
     [JsonPropertyName("points")]
     public int Points { get; set; }
@@ -112,6 +156,10 @@ public class MySwimDto
     /// <summary>Личный рекорд: лучшее время пловца за всё время на (стиль, дистанция), индивидуальные заплывы.</summary>
     [JsonPropertyName("is_pb")]
     public bool IsPb { get; set; }
+
+    /// <summary>Лучшее время СЕЗОНА на (стиль, дистанция). Не ставится там, где уже IsPb — личный рекорд и так лучший в сезоне.</summary>
+    [JsonPropertyName("is_sb")]
+    public bool IsSb { get; set; }
 
     [JsonPropertyName("congrats_count")]
     public int CongratsCount { get; set; }

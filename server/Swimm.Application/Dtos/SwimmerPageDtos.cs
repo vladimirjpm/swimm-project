@@ -172,6 +172,20 @@ public sealed class SwimmerBestTimeDto
     [JsonPropertyName("heatType")]
     public string? HeatType { get; set; }
 
+    /// <summary>Раунд (`final-open` = секция «כללי» без возрастной категории). Вместе с
+    /// `heatType`, `timeFail` и `competitionIsAward` — входы единого правила медали
+    /// (`HelperResults.isMedalPlace`), см. docs/competition-overview-cards.md.</summary>
+    [JsonPropertyName("round")]
+    public string? Round { get; set; }
+
+    /// <summary>Снят (DQ / NS / DNS) — медали не даёт даже с местом.</summary>
+    [JsonPropertyName("timeFail")]
+    public bool TimeFail { get; set; }
+
+    /// <summary>Соревнование вообще вручает медали (`Competition.IsAward`).</summary>
+    [JsonPropertyName("competitionIsAward")]
+    public bool CompetitionIsAward { get; set; }
+
     /// <summary>Возраст в сезоне заплыва — один на все старты сезона (SeasonMath.AgeInSeason).</summary>
     [JsonPropertyName("ageInSeason")]
     public int? AgeInSeason { get; set; }

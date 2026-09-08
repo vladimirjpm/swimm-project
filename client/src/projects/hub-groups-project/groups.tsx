@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import '../home-project/home.css';
+import '../components/deep/deep-theme.css';
 import AppTopbar from '../components/app-topbar/app-topbar';
 import RecordTicker from '../home-project/components/record-ticker';
+import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import MyGroupsPanel from './my-groups-panel';
 import UI_ClubIcon from '../components/mix/club-icon/club-icon';
 import UI_FlagEmoji from '../components/mix/flag-icon/flag-icon';
@@ -15,6 +17,7 @@ import type {
   HubGroupMember, HubGroupMemberMediaItem, HubGroupStanding,
 } from './types';
 import UI_SwimTime from '../components/mix/swim-time/swim-time';
+import { useDeepThemeClass } from '../components/deep/use-deep-theme-class';
 
 const GROUP_DISCLAIMER =
   'The roster is maintained by the group creator and is not an official club or federation entry.';
@@ -81,7 +84,7 @@ function GroupIcon({ iconUrl, name, size }: { iconUrl?: string | null; name: str
   }
   return (
     <span
-      className={`${cls} flex shrink-0 items-center justify-center bg-[linear-gradient(140deg,#38bdf8,#0369a1)] font-black text-[#06263f]`}
+      className={`${cls} flex shrink-0 items-center justify-center bg-[image:var(--t-accent-grad)] font-black text-[var(--t-accent-ink)]`}
     >
       {groupInitial(name)}
     </span>
@@ -98,7 +101,7 @@ function LinkChips({ links }: { links: HubGroupLink[] }) {
           href={l.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="hp-mono rounded-[8px] border border-[#7dd3fc]/40 px-3 py-[5px] text-[12px] font-extrabold text-[#7dd3fc] no-underline transition-colors hover:border-[#7dd3fc] hover:bg-[rgba(56,189,248,0.12)]"
+          className="hp-mono rounded-[8px] border border-[var(--t-accent-border)] px-3 py-[5px] text-[12px] font-extrabold text-[var(--t-accent)] no-underline transition-colors hover:border-[var(--t-accent)] hover:bg-[var(--t-accent-soft)]"
         >
           {LINK_LABEL[l.kind] ?? l.kind} ↗
         </a>
@@ -113,7 +116,7 @@ function GroupCard({ group, href }: { group: HubGroupListItem; href: string }) {
   return (
     <a
       href={href}
-      className="hp-card-std flex min-h-[130px] flex-col justify-between gap-4 rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] text-inherit no-underline shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] transition-[transform,border-color,box-shadow] duration-[180ms] ease-out hover:-translate-y-2 hover:border-[#7dd3fc]/80 lg:rounded-[24px] lg:p-[26px]"
+      className="hp-card-std flex min-h-[130px] flex-col justify-between gap-4 rounded-[18px] border border-[var(--t-border)] p-[18px] text-inherit no-underline shadow-[var(--t-shadow)] backdrop-blur-[14px] transition-[transform,border-color,box-shadow] duration-[180ms] ease-out hover:-translate-y-2 hover:border-[var(--t-accent)] lg:rounded-[24px] lg:p-[26px]"
     >
       <div className="flex items-start gap-4">
         <GroupIcon iconUrl={group.icon_url} name={group.name_en || group.name} size="sm" />
@@ -127,18 +130,18 @@ function GroupCard({ group, href }: { group: HubGroupListItem; href: string }) {
             )}
           </div>
           {group.name_en && group.name_en !== group.name && (
-            <div className="truncate text-[12px] font-bold text-[#cbe0f0]/60">{group.name_en}</div>
+            <div className="truncate text-[12px] font-bold text-[var(--t-text-2)]">{group.name_en}</div>
           )}
         </div>
       </div>
       {group.description && (
-        <p className="line-clamp-2 text-[13px] leading-snug text-[#cbe0f0]/75">{group.description}</p>
+        <p className="line-clamp-2 text-[13px] leading-snug text-[var(--t-text-2)]">{group.description}</p>
       )}
       <div className="flex items-center justify-between">
-        <span className="hp-mono rounded-[7px] border border-[#7dd3fc]/40 px-2 py-[3px] text-[11px] font-extrabold text-[#7dd3fc]">
+        <span className="hp-mono rounded-[7px] border border-[var(--t-accent-border)] px-2 py-[3px] text-[11px] font-extrabold text-[var(--t-accent)]">
           {group.member_count} · swimmers
         </span>
-        <span className="inline-flex min-w-0 items-center gap-1.5 truncate pl-3 text-[12px] font-bold text-[#cbe0f0]/60">
+        <span className="inline-flex min-w-0 items-center gap-1.5 truncate pl-3 text-[12px] font-bold text-[var(--t-text-2)]">
           {group.country && <UI_FlagEmoji countryCode={group.country} size="16x12" />}
           {group.location ?? group.club_name ?? ''}
         </span>
@@ -151,13 +154,13 @@ function GroupsList({ groups, favorites }: { groups: HubGroupListItem[]; favorit
   return (
     <>
       <section className="relative px-5 pt-[26px] lg:px-16 lg:pt-[46px]">
-        <p className="mb-[18px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[#7dd3fc] lg:text-[15px] lg:tracking-[0.3em]">
+        <p className="mb-[18px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[var(--t-accent)] lg:text-[15px] lg:tracking-[0.3em]">
           Train together · Follow together
         </p>
-        <h1 className="text-[44px] font-black leading-[0.92] tracking-[-0.045em] text-[#f3f8fd] lg:text-[88px] lg:leading-[0.9]">
+        <h1 className="text-[44px] font-black leading-[0.92] tracking-[-0.045em] text-[var(--t-text)] lg:text-[88px] lg:leading-[0.9]">
           Groups
         </h1>
-        <p className="mt-5 max-w-[560px] text-[14.5px] leading-[1.55] text-[#e2f0fc]/[0.82] lg:text-[18px] lg:leading-[1.6]">
+        <p className="mt-5 max-w-[560px] text-[14.5px] leading-[1.55] text-[var(--t-text-2)] lg:text-[18px] lg:leading-[1.6]">
           Training groups: rosters, group records and recent swims.
         </p>
       </section>
@@ -186,7 +189,7 @@ function GroupsList({ groups, favorites }: { groups: HubGroupListItem[]; favorit
           <GroupCard key={g.slug} group={g} href={routes.group(g.slug)} />
         ))}
         {groups.length === 0 && !favorites && (
-          <p className="col-span-full py-10 text-center text-[14px] text-[#cbe0f0]/60">
+          <p className="col-span-full py-10 text-center text-[14px] text-[var(--t-text-2)]">
             No groups yet.
           </p>
         )}
@@ -237,9 +240,9 @@ function JoinButton({ group }: { group: HubGroupDetails }) {
       className={
         membership
           ? isPending
-            ? 'hp-mono ml-auto shrink-0 rounded-[10px] border border-[#ffca7a]/50 px-4 py-2 text-[13px] font-extrabold text-[#ffca7a] hover:bg-[#ffca7a]/10 disabled:opacity-50'
-            : 'hp-mono ml-auto shrink-0 rounded-[10px] border border-[#7dd3fc]/40 px-4 py-2 text-[13px] font-extrabold text-[#7dd3fc] hover:bg-[#7dd3fc]/10 disabled:opacity-50'
-          : 'hp-mono ml-auto shrink-0 rounded-[10px] bg-[#38ef8f] px-4 py-2 text-[13px] font-extrabold text-[#04101f] hover:brightness-110 disabled:opacity-50'
+            ? 'hp-mono ml-auto shrink-0 rounded-[10px] border border-[var(--t-warn-border)] px-4 py-2 text-[13px] font-extrabold text-[var(--t-warn)] hover:bg-[var(--t-warn-soft)] disabled:opacity-50'
+            : 'hp-mono ml-auto shrink-0 rounded-[10px] border border-[var(--t-accent-border)] px-4 py-2 text-[13px] font-extrabold text-[var(--t-accent)] hover:bg-[var(--t-accent-soft)] disabled:opacity-50'
+          : 'hp-mono ml-auto shrink-0 rounded-[10px] bg-[var(--t-accent)] px-4 py-2 text-[13px] font-extrabold text-[var(--t-accent-ink)] hover:brightness-110 disabled:opacity-50'
       }
     >
       {label}
@@ -262,7 +265,7 @@ function TrainingsLink({ group }: { group: HubGroupDetails }) {
   return (
     <a
       href={`${routes.groupResults(group.slug)}?tab=trainings`}
-      className="hp-mono shrink-0 rounded-[10px] border border-[#38bdf8]/50 bg-[rgba(56,189,248,0.1)] px-4 py-2 text-[13px] font-extrabold text-[#7dd3fc] no-underline hover:bg-[rgba(56,189,248,0.18)]"
+      className="hp-mono shrink-0 rounded-[10px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-4 py-2 text-[13px] font-extrabold text-[var(--t-accent)] no-underline hover:border-[var(--t-accent)]"
       title="Private — visible to the group owner and admins only"
     >
       🔒 Trainings →
@@ -274,7 +277,7 @@ function TrainingsLink({ group }: { group: HubGroupDetails }) {
 
 function GalleryTile({ item, onClick }: { item: HubGroupMediaItem; onClick?: () => void }) {
   const captionOverlay = item.caption && (
-    <div className="absolute inset-x-0 bottom-0 truncate bg-[linear-gradient(0deg,rgba(2,10,24,0.85),transparent)] px-2 py-1 text-[11px] font-bold text-[#f3f8fd]">
+    <div className="absolute inset-x-0 bottom-0 truncate bg-[linear-gradient(0deg,var(--t-scrim),transparent)] px-2 py-1 text-[11px] font-bold text-[var(--t-text)]">
       {item.caption}
     </div>
   );
@@ -285,7 +288,7 @@ function GalleryTile({ item, onClick }: { item: HubGroupMediaItem; onClick?: () 
         href={item.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="hp-mono flex aspect-square flex-col items-center justify-center gap-1 rounded-[12px] border border-[#7dd3fc]/30 bg-[rgba(6,20,36,0.6)] p-2 text-center text-[12px] font-extrabold text-[#7dd3fc] no-underline hover:border-[#7dd3fc]/70 hover:bg-[rgba(56,189,248,0.12)]"
+        className="hp-mono flex aspect-square flex-col items-center justify-center gap-1 rounded-[12px] border border-[var(--t-accent-border)] bg-[var(--t-input-bg)] p-2 text-center text-[12px] font-extrabold text-[var(--t-accent)] no-underline hover:border-[var(--t-accent)] hover:bg-[var(--t-accent-soft)]"
       >
         <span className="text-[24px]">📂</span>
         <span className="line-clamp-2">{item.caption || 'Album'} ↗</span>
@@ -297,7 +300,7 @@ function GalleryTile({ item, onClick }: { item: HubGroupMediaItem; onClick?: () 
 
   return (
     <div
-      className="relative aspect-square cursor-pointer overflow-hidden rounded-[12px] border border-[#7dd3fc]/20 bg-[rgba(6,20,36,0.6)]"
+      className="relative aspect-square cursor-pointer overflow-hidden rounded-[12px] border border-[var(--t-border)] bg-[var(--t-input-bg)]"
       onClick={onClick}
     >
       {thumbUrl ? (
@@ -306,7 +309,7 @@ function GalleryTile({ item, onClick }: { item: HubGroupMediaItem; onClick?: () 
         <div className="flex h-full w-full items-center justify-center text-[28px]">🎬</div>
       )}
       {item.media_type === 'video' && (
-        <span className="absolute right-1.5 top-1.5 rounded-full bg-[rgba(2,10,24,0.7)] px-1.5 py-1 text-[13px] leading-none">
+        <span className="absolute right-1.5 top-1.5 rounded-full bg-[var(--t-scrim)] px-1.5 py-1 text-[13px] leading-none">
           ▶
         </span>
       )}
@@ -335,8 +338,8 @@ function GroupGallery({ gallery }: { gallery: HubGroupMediaItem[] }) {
   if (gallery.length === 0) return null;
 
   return (
-    <div id="gallery" className="hp-card-std rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]" aria-label="Gallery">
-      <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">Gallery</h2>
+    <div id="gallery" className="hp-card-std rounded-[18px] border border-[var(--t-border)] p-[18px] shadow-[var(--t-shadow)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]" aria-label="Gallery">
+      <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[var(--t-accent)]">Gallery</h2>
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
         {gallery.map((item) => (
           <GalleryTile
@@ -390,9 +393,9 @@ function MembersReviews({ group }: { group: HubGroupDetails }) {
   if (items.length === 0) return null;
 
   return (
-    <div id="members-reviews" className="hp-card-std rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]" aria-label="Members reviews">
-      <h2 className="mb-1 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">🔒 Reviews</h2>
-      <p className="mb-4 text-[11.5px] italic text-[#cbe0f0]/45">Visible to group members only.</p>
+    <div id="members-reviews" className="hp-card-std rounded-[18px] border border-[var(--t-border)] p-[18px] shadow-[var(--t-shadow)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]" aria-label="Members reviews">
+      <h2 className="mb-1 text-[15px] font-black uppercase tracking-[0.2em] text-[var(--t-accent)]">🔒 Reviews</h2>
+      <p className="mb-4 text-[11.5px] italic text-[var(--t-text-3)]">Visible to group members only.</p>
       <div className="flex flex-col gap-2">
         {items.map((item) => (
           <div key={item.id} className="flex items-center gap-3">
@@ -404,13 +407,13 @@ function MembersReviews({ group }: { group: HubGroupDetails }) {
             </div>
             <div className="min-w-0">
               {item.swimmer_name && (
-                <p className="m-0 truncate text-[13.5px] font-extrabold text-[#f3f8fd]">{item.swimmer_name}</p>
+                <p className="m-0 truncate text-[13.5px] font-extrabold text-[var(--t-text)]">{item.swimmer_name}</p>
               )}
               {item.result_label && (
-                <p className="m-0 truncate text-[12px] text-[#7dd3fc]/80">{item.result_label}</p>
+                <p className="m-0 truncate text-[12px] text-[var(--t-accent-dim)]">{item.result_label}</p>
               )}
               {item.caption && (
-                <p className="m-0 truncate text-[12px] text-[#cbe0f0]/70">{item.caption}</p>
+                <p className="m-0 truncate text-[12px] text-[var(--t-text-2)]">{item.caption}</p>
               )}
             </div>
           </div>
@@ -466,8 +469,12 @@ function FromMembersGallery({ group }: { group: HubGroupDetails }) {
   if (items.length === 0) return null;
 
   return (
-    <div id="from-members" className="hp-card-std rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]" aria-label="From members">
-      <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">From members</h2>
+    <div id="from-members" className="hp-card-std rounded-[18px] border border-[var(--t-border)] p-[18px] shadow-[var(--t-shadow)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]" aria-label="From members (everyone)">
+      {/* Обе секции «From members» подписаны уровнем — иначе по экрану не отличить, кто
+          увидит поданное видео. Слова и глобус те же, что у уровней публикации в My media
+          (`members` / `everyone 🌐`): один словарь на продукт, а не свой на каждой странице. */}
+      <h2 className="mb-1 text-[15px] font-black uppercase tracking-[0.2em] text-[var(--t-accent)]">🌐 From members</h2>
+      <p className="mb-4 text-[11.5px] italic text-[var(--t-text-3)]">Visible to everyone.</p>
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
         {items.map((item) => (
           <GalleryTile
@@ -514,8 +521,12 @@ function MembersPublications({ group }: { group: HubGroupDetails }) {
   if (items.length === 0) return null;
 
   return (
-    <div id="members-publications" className="hp-card-std rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]" aria-label="Members publications">
-      <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">From members</h2>
+    <div id="members-publications" className="hp-card-std rounded-[18px] border border-[var(--t-border)] p-[18px] shadow-[var(--t-shadow)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]" aria-label="From members (members only)">
+      {/* Замок и подпись обязательны: рядом на странице живёт публичная секция с ТЕМ ЖЕ
+          заголовком, и без пометки по экрану не понять, кто увидит поданное видео.
+          Форма пометки — как у соседней «🔒 Reviews», второго диалекта тут заводить нельзя. */}
+      <h2 className="mb-1 text-[15px] font-black uppercase tracking-[0.2em] text-[var(--t-accent)]">🔒 From members</h2>
+      <p className="mb-4 text-[11.5px] italic text-[var(--t-text-3)]">Visible to group members only.</p>
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
         {items.map((item) => (
           <GalleryTile
@@ -585,38 +596,38 @@ function PublicationsInbox({ group, onDecided }: { group: HubGroupDetails; onDec
     }
   };
 
-  const badgeCls = 'hp-mono rounded-[6px] border border-[#7dd3fc]/40 px-[6px] py-[2px] text-[10px] font-extrabold text-[#7dd3fc]';
+  const badgeCls = 'hp-mono rounded-[6px] border border-[var(--t-accent-border)] px-[6px] py-[2px] text-[10px] font-extrabold text-[var(--t-accent)]';
   const statusCls: Record<GroupPublicationItem['status'], string> = {
-    pending: 'text-[#ffca7a]',
-    approved: 'text-[#38ef8f]',
-    rejected: 'text-[#ef5350]',
+    pending: 'text-[var(--t-warn)]',
+    approved: 'text-[var(--t-accent)]',
+    rejected: 'text-[var(--t-danger)]',
   };
 
   return (
-    <div id="publications-inbox" className="hp-card-std rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]" aria-label="Publications inbox">
-      <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">Publication requests</h2>
+    <div id="publications-inbox" className="hp-card-std rounded-[18px] border border-[var(--t-border)] p-[18px] shadow-[var(--t-shadow)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]" aria-label="Publications inbox">
+      <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[var(--t-accent)]">Publication requests</h2>
       <div className="flex flex-col gap-2">
         {items.map((item) => {
           let domain = item.url;
           try { domain = new URL(item.url).hostname; } catch { /* оставляем как есть */ }
           return (
-            <div key={item.id} className="flex flex-wrap items-center gap-3 rounded-[10px] border border-[#7dd3fc]/15 p-2">
+            <div key={item.id} className="flex flex-wrap items-center gap-3 rounded-[10px] border border-[var(--t-border)] p-2">
               <a
                 href={item.url}
                 target="_blank"
                 rel="noopener noreferrer nofollow"
-                className="hp-mono shrink-0 text-[12px] font-extrabold text-[#7dd3fc] no-underline hover:underline"
+                className="hp-mono shrink-0 text-[12px] font-extrabold text-[var(--t-accent)] no-underline hover:underline"
               >
                 {domain} ↗
               </a>
               <div className="min-w-0 flex-1">
                 {item.swimmer_name && (
-                  <p className="m-0 truncate text-[13px] font-extrabold text-[#f3f8fd]">{item.swimmer_name}</p>
+                  <p className="m-0 truncate text-[13px] font-extrabold text-[var(--t-text)]">{item.swimmer_name}</p>
                 )}
                 {item.result_label && (
-                  <p className="m-0 truncate text-[11.5px] text-[#cbe0f0]/70">{item.result_label}</p>
+                  <p className="m-0 truncate text-[11.5px] text-[var(--t-text-2)]">{item.result_label}</p>
                 )}
-                <p className="m-0 truncate text-[11px] text-[#cbe0f0]/50">{item.owner_email}</p>
+                <p className="m-0 truncate text-[11px] text-[var(--t-text-3)]">{item.owner_email}</p>
               </div>
               <span className={badgeCls}>{PUBLICATION_LEVEL_LABEL[item.level]}</span>
               <span className={`hp-mono text-[10.5px] font-extrabold uppercase ${statusCls[item.status]}`}>
@@ -629,7 +640,7 @@ function PublicationsInbox({ group, onDecided }: { group: HubGroupDetails; onDec
                       type="button"
                       disabled={busyId === item.id}
                       onClick={() => decide(item.id, true)}
-                      className="hp-mono rounded-[8px] bg-[#38ef8f] px-3 py-[6px] text-[11.5px] font-extrabold text-[#04101f] hover:brightness-110 disabled:opacity-50"
+                      className="hp-mono rounded-[8px] bg-[var(--t-accent)] px-3 py-[6px] text-[11.5px] font-extrabold text-[var(--t-accent-ink)] hover:brightness-110 disabled:opacity-50"
                     >
                       Publish
                     </button>
@@ -637,7 +648,7 @@ function PublicationsInbox({ group, onDecided }: { group: HubGroupDetails; onDec
                       type="button"
                       disabled={busyId === item.id}
                       onClick={() => decide(item.id, false)}
-                      className="hp-mono rounded-[8px] border border-[#ef5350]/50 px-3 py-[6px] text-[11.5px] font-extrabold text-[#ef5350] hover:bg-[#ef5350]/10 disabled:opacity-50"
+                      className="hp-mono rounded-[8px] border border-[var(--t-danger-border)] px-3 py-[6px] text-[11.5px] font-extrabold text-[var(--t-danger)] hover:bg-[var(--t-danger-soft)] disabled:opacity-50"
                     >
                       Decline
                     </button>
@@ -648,7 +659,7 @@ function PublicationsInbox({ group, onDecided }: { group: HubGroupDetails; onDec
                     type="button"
                     disabled={busyId === item.id}
                     onClick={() => decide(item.id, false)}
-                    className="hp-mono rounded-[8px] border border-[#ffca7a]/50 px-3 py-[6px] text-[11.5px] font-extrabold text-[#ffca7a] hover:bg-[#ffca7a]/10 disabled:opacity-50"
+                    className="hp-mono rounded-[8px] border border-[var(--t-warn-border)] px-3 py-[6px] text-[11.5px] font-extrabold text-[var(--t-warn)] hover:bg-[var(--t-warn-soft)] disabled:opacity-50"
                   >
                     Unpublish
                   </button>
@@ -668,32 +679,32 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
   const [publicationsReloadKey, setPublicationsReloadKey] = useState(0);
   const bests = showAllBests ? group.bests : group.bests.slice(0, BESTS_PREVIEW_COUNT);
 
-  const cellCls = 'px-3 py-2 text-left text-[13px] text-[#e2f0fc]/[0.85]';
+  const cellCls = 'px-3 py-2 text-left text-[13px] text-[var(--t-text-2)]';
   const headCls =
-    'px-3 py-2 text-left text-[10.5px] font-extrabold uppercase tracking-[0.18em] text-[#7dd3fc]';
+    'px-3 py-2 text-left text-[10.5px] font-extrabold uppercase tracking-[0.18em] text-[var(--t-accent)]';
   const cardCls =
-    'hp-card-std rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]';
+    'hp-card-std rounded-[18px] border border-[var(--t-border)] p-[18px] shadow-[var(--t-shadow)] backdrop-blur-[14px] lg:rounded-[24px] lg:p-[26px]';
 
   return (
     <>
       <section className="relative px-5 pt-[26px] lg:px-16 lg:pt-[46px]">
-        <a href={routes.groupsList()} className="text-[13px] font-extrabold text-[#7dd3fc] no-underline hover:underline">
+        <a href={routes.groupsList()} className="text-[13px] font-extrabold text-[var(--t-accent)] no-underline hover:underline">
           ← All groups
         </a>
 
         <div className="mt-5 flex flex-wrap items-center gap-5">
           <GroupIcon iconUrl={group.icon_url} name={group.name_en || group.name} size="lg" />
           <div className="min-w-0">
-            <h1 className="text-[34px] font-black leading-[0.95] tracking-[-0.04em] text-[#f3f8fd] lg:text-[56px]">
+            <h1 className="text-[34px] font-black leading-[0.95] tracking-[-0.04em] text-[var(--t-text)] lg:text-[56px]">
               {group.name}
             </h1>
             {group.name_en && group.name_en !== group.name && (
-              <p className="mt-1 text-[14px] font-bold text-[#cbe0f0]/60">{group.name_en}</p>
+              <p className="mt-1 text-[14px] font-bold text-[var(--t-text-2)]">{group.name_en}</p>
             )}
             {group.is_official && group.club_name && (
               <div className="mt-2 flex items-center gap-2">
                 <UI_ClubIcon clubName={group.club_name} iconWidth="6" styleType="icon-notext" />
-                <span className="hp-mono rounded-[8px] border border-[#38ef8f]/40 bg-[rgba(56,239,143,0.1)] px-3 py-[5px] text-[12px] font-extrabold text-[#38ef8f]">
+                <span className="hp-mono rounded-[8px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-3 py-[5px] text-[12px] font-extrabold text-[var(--t-accent)]">
                   Official Group of {group.club_name}
                 </span>
               </div>
@@ -703,7 +714,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
             {!group.is_virtual && group.id > 0 && (
               <a
                 href={routes.groupResults(group.slug)}
-                className="hp-mono shrink-0 rounded-[10px] border border-[#7dd3fc]/40 bg-[rgba(125,211,252,0.08)] px-4 py-2 text-[13px] font-extrabold text-[#7dd3fc] no-underline hover:bg-[rgba(125,211,252,0.16)]"
+                className="hp-mono shrink-0 rounded-[10px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-4 py-2 text-[13px] font-extrabold text-[var(--t-accent)] no-underline hover:border-[var(--t-accent)]"
               >
                 Competitions →
               </a>
@@ -714,12 +725,12 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
         </div>
 
         {group.description && (
-          <p className="mt-4 max-w-[640px] text-[14.5px] leading-[1.55] text-[#e2f0fc]/[0.82] lg:text-[16px]">
+          <p className="mt-4 max-w-[640px] text-[14.5px] leading-[1.55] text-[var(--t-text-2)] lg:text-[16px]">
             {group.description}
           </p>
         )}
 
-        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] font-bold text-[#cbe0f0]/70">
+        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] font-bold text-[var(--t-text-2)]">
           {(group.country || group.location) && (
             <span className="inline-flex items-center gap-1.5">
               {group.country
@@ -742,9 +753,9 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
       <section className="grid grid-cols-1 gap-4 px-4 pt-[26px] lg:grid-cols-[320px_1fr] lg:gap-[18px] lg:px-16 lg:pt-10">
         {/* Участники */}
         <div id="members" className={cardCls} aria-label="Members">
-          <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">Members</h2>
+          <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[var(--t-accent)]">Members</h2>
           {group.members.length === 0 ? (
-            <p className="text-[13px] text-[#cbe0f0]/60">
+            <p className="text-[13px] text-[var(--t-text-2)]">
               {group.is_virtual ? 'No swimmers in favorites yet — tap the hearts on results.' : 'The roster is empty for now.'}
             </p>
           ) : (
@@ -752,15 +763,15 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
               {group.members.map((m) => (
                 <li key={m.swimmer_id} className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="truncate text-[14px] font-extrabold text-[#f3f8fd]">
+                    <div className="truncate text-[14px] font-extrabold text-[var(--t-text)]">
                       {m.name || m.name_en}
                     </div>
-                    <div className="truncate text-[11.5px] text-[#cbe0f0]/55">
+                    <div className="truncate text-[11.5px] text-[var(--t-text-2)]">
                       {[m.birth_year > 0 ? m.birth_year : null, m.club_name].filter(Boolean).join(' · ')}
                     </div>
                   </div>
                   {ROLE_LABEL[m.role] && (
-                    <span className="hp-mono shrink-0 rounded-[7px] border border-[#38ef8f]/40 px-2 py-[3px] text-[10.5px] font-extrabold text-[#38ef8f]">
+                    <span className="hp-mono shrink-0 rounded-[7px] border border-[var(--t-border)] px-2 py-[3px] text-[10.5px] font-extrabold text-[var(--t-text-2)]">
                       {ROLE_LABEL[m.role]}
                     </span>
                   )}
@@ -769,7 +780,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
             </ul>
           )}
           {!group.is_virtual && (
-            <p className="mt-3 text-[11px] italic leading-snug text-[#cbe0f0]/40">{GROUP_DISCLAIMER}</p>
+            <p className="mt-3 text-[11px] italic leading-snug text-[var(--t-text-3)]">{GROUP_DISCLAIMER}</p>
           )}
         </div>
 
@@ -777,22 +788,22 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
           {/* Сезонный зачёт */}
           <div className={cardCls} aria-label="Season standings">
             <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">
+              <h2 className="text-[15px] font-black uppercase tracking-[0.2em] text-[var(--t-accent)]">
                 Season standings
               </h2>
               {group.season_label && (
-                <span className="hp-mono text-[11.5px] font-bold text-[#cbe0f0]/55">
+                <span className="hp-mono text-[11.5px] font-bold text-[var(--t-text-2)]">
                   {group.season_label}
                 </span>
               )}
             </div>
             {group.standings.length === 0 || group.standings.every((s) => s.swims === 0) ? (
-              <p className="text-[13px] text-[#cbe0f0]/60">No swims this season.</p>
+              <p className="text-[13px] text-[var(--t-text-2)]">No swims this season.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="border-b border-[#7dd3fc]/20">
+                    <tr className="border-b border-[var(--t-border)]">
                       <th className={`${headCls} text-right`}>#</th>
                       <th className={headCls}>Swimmer</th>
                       <th className={`${headCls} text-right`}>Swims</th>
@@ -803,14 +814,14 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
                   </thead>
                   <tbody>
                     {group.standings.map((s: HubGroupStanding, i) => (
-                      <tr key={s.swimmer_id} className="border-b border-[#7dd3fc]/10">
-                        <td className={`${cellCls} hp-mono text-right font-extrabold text-[#cbe0f0]/70`}>
+                      <tr key={s.swimmer_id} className="border-b border-[var(--t-border)]">
+                        <td className={`${cellCls} hp-mono text-right font-extrabold text-[var(--t-text-2)]`}>
                           {i + 1}
                         </td>
-                        <td className={`${cellCls} font-extrabold text-[#f3f8fd]`}>
+                        <td className={`${cellCls} font-extrabold text-[var(--t-text)]`}>
                           <span>{s.name || s.name_en}</span>
                           {ROLE_LABEL[s.role] && (
-                            <span className="hp-mono ml-2 rounded-[6px] border border-[#38ef8f]/40 px-[6px] py-[2px] text-[10px] font-extrabold text-[#38ef8f]">
+                            <span className="hp-mono ml-2 rounded-[6px] border border-[var(--t-border)] px-[6px] py-[2px] text-[10px] font-extrabold text-[var(--t-text-2)]">
                               {ROLE_LABEL[s.role]}
                             </span>
                           )}
@@ -818,7 +829,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
                         <td className={`${cellCls} hp-mono text-right`}>{s.swims || '—'}</td>
                         <td className={`${cellCls} whitespace-nowrap`}>
                           {s.golds + s.silvers + s.bronzes === 0 ? (
-                            <span className="text-[#cbe0f0]/40">—</span>
+                            <span className="text-[var(--t-text-3)]">—</span>
                           ) : (
                             <span className="hp-mono">
                               {s.golds > 0 && <span className="mr-2">🥇{s.golds}</span>}
@@ -827,7 +838,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
                             </span>
                           )}
                         </td>
-                        <td className={`${cellCls} hp-mono text-right font-extrabold text-[#7dd3fc]`}>
+                        <td className={`${cellCls} hp-mono text-right font-extrabold text-[var(--t-accent)]`}>
                           {s.club_points || '—'}
                         </td>
                         <td className={`${cellCls} hp-mono text-right`}>{s.best_fina || '—'}</td>
@@ -841,17 +852,17 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
 
           {/* Рекорды группы */}
           <div id="records" className={cardCls} aria-label="Group records">
-            <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">
+            <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[var(--t-accent)]">
               Group records
             </h2>
             {group.bests.length === 0 ? (
-              <p className="text-[13px] text-[#cbe0f0]/60">No counted results yet.</p>
+              <p className="text-[13px] text-[var(--t-text-2)]">No counted results yet.</p>
             ) : (
               <>
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
-                      <tr className="border-b border-[#7dd3fc]/20">
+                      <tr className="border-b border-[var(--t-border)]">
                         <th className={headCls}>Event</th>
                         <th className={headCls}>Pool</th>
                         <th className={headCls}>Time</th>
@@ -864,16 +875,16 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
                       {bests.map((b) => (
                         <tr
                           key={`${b.style_name}-${b.distance}-${b.pool_type}-${b.gender}`}
-                          className="border-b border-[#7dd3fc]/10"
+                          className="border-b border-[var(--t-border)]"
                         >
-                          <td className={`${cellCls} whitespace-nowrap font-extrabold text-[#f3f8fd]`}>
+                          <td className={`${cellCls} whitespace-nowrap font-extrabold text-[var(--t-text)]`}>
                             {b.distance} {b.style_name}
-                            <span className="pl-2 text-[11px] font-bold text-[#cbe0f0]/50">
+                            <span className="pl-2 text-[11px] font-bold text-[var(--t-text-3)]">
                               {b.gender === 'female' ? 'W' : b.gender === 'male' ? 'M' : b.gender}
                             </span>
                           </td>
                           <td className={cellCls}>{b.pool_type ?? '—'}</td>
-                          <td className={`${cellCls} hp-mono whitespace-nowrap font-extrabold text-[#7dd3fc]`}>
+                          <td className={`${cellCls} hp-mono whitespace-nowrap font-extrabold text-[var(--t-accent)]`}>
                             <UI_SwimTime
                               time={b.time_original}
                               quality={b.suspect_reason ? { kind: 'protocol', reason: b.suspect_reason } : null}
@@ -882,7 +893,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
                           <td className={cellCls}>{b.swimmer_name || b.swimmer_name_en}</td>
                           <td className={`${cellCls} max-w-[220px]`}>
                             <span className="block truncate">{b.competition_name}</span>
-                            <span className="text-[11px] text-[#cbe0f0]/50">{b.date}</span>
+                            <span className="text-[11px] text-[var(--t-text-3)]">{b.date}</span>
                           </td>
                           <td className={`${cellCls} hp-mono text-right`}>{b.points || '—'}</td>
                         </tr>
@@ -894,7 +905,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
                   <button
                     type="button"
                     onClick={() => setShowAllBests((v) => !v)}
-                    className="mt-3 cursor-pointer rounded-[8px] border border-[#7dd3fc]/40 bg-transparent px-3 py-[6px] text-[12px] font-extrabold text-[#7dd3fc] transition-colors hover:bg-[rgba(56,189,248,0.12)]"
+                    className="mt-3 cursor-pointer rounded-[8px] border border-[var(--t-accent-border)] bg-transparent px-3 py-[6px] text-[12px] font-extrabold text-[var(--t-accent)] transition-colors hover:bg-[var(--t-accent-soft)]"
                   >
                     {showAllBests ? 'Show less' : `Show all ${group.bests.length}`}
                   </button>
@@ -920,16 +931,16 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
 
           {/* Последние заплывы */}
           <div className={cardCls} aria-label="Recent swims">
-            <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[#7dd3fc]">
+            <h2 className="mb-4 text-[15px] font-black uppercase tracking-[0.2em] text-[var(--t-accent)]">
               Recent swims
             </h2>
             {group.recent_results.length === 0 ? (
-              <p className="text-[13px] text-[#cbe0f0]/60">No swims yet.</p>
+              <p className="text-[13px] text-[var(--t-text-2)]">No swims yet.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="border-b border-[#7dd3fc]/20">
+                    <tr className="border-b border-[var(--t-border)]">
                       <th className={headCls}>Date</th>
                       <th className={headCls}>Swimmer</th>
                       <th className={headCls}>Event</th>
@@ -940,16 +951,16 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
                   </thead>
                   <tbody>
                     {group.recent_results.map((r) => (
-                      <tr key={r.id} className="border-b border-[#7dd3fc]/10">
+                      <tr key={r.id} className="border-b border-[var(--t-border)]">
                         <td className={`${cellCls} hp-mono whitespace-nowrap`}>{r.date}</td>
-                        <td className={`${cellCls} font-extrabold text-[#f3f8fd]`}>
+                        <td className={`${cellCls} font-extrabold text-[var(--t-text)]`}>
                           {swimmerDisplayName(r.last_name, r.first_name, r.last_name_en, r.first_name_en)}
                         </td>
                         <td className={`${cellCls} whitespace-nowrap`}>
                           {r.event_style_len} {r.event_style_name}
-                          {r.is_relay && <span className="pl-1 text-[11px] text-[#cbe0f0]/50">relay</span>}
+                          {r.is_relay && <span className="pl-1 text-[11px] text-[var(--t-text-3)]">relay</span>}
                         </td>
-                        <td className={`${cellCls} hp-mono whitespace-nowrap font-extrabold ${r.time_fail ? 'text-[#ef5350]' : 'text-[#7dd3fc]'}`}>
+                        <td className={`${cellCls} hp-mono whitespace-nowrap font-extrabold ${r.time_fail ? 'text-[var(--t-danger)]' : 'text-[var(--t-accent)]'}`}>
                           {r.time_fail ? 'DSQ' : r.time}
                         </td>
                         <td className={`${cellCls} hp-mono`}>{r.position ?? '—'}</td>
@@ -974,6 +985,7 @@ function GroupDetails({ group }: { group: HubGroupDetails }) {
 function Groups() {
   // Страница группы: /groups/{slug}; ?group= — легаси-фоллбек.
   const slug = useMemo(() => parseRoute().groupSlug ?? new URLSearchParams(window.location.search).get('group'), []);
+  const deep = useDeepThemeClass();
 
   const [groups, setGroups] = useState<HubGroupListItem[]>([]);
   const [favorites, setFavorites] = useState<HubGroupDetails | null>(null);
@@ -1021,18 +1033,18 @@ function Groups() {
   }, [slug]);
 
   return (
-    <div className="home-page relative min-h-screen overflow-x-clip pb-[96px] text-[#f3f8fd]">
+    <div className={`home-page ${deep} relative min-h-screen overflow-x-clip pb-[96px] text-[var(--t-text)]`}>
       <div className="hp-shimmer" aria-hidden="true" />
 
       <AppTopbar active="groups" />
 
       {loading && (
-        <p className="px-5 pt-10 text-[14px] font-bold text-[#cbe0f0]/60 lg:px-16">Loading…</p>
+        <p className="px-5 pt-10 text-[14px] font-bold text-[var(--t-text-2)] lg:px-16">Loading…</p>
       )}
       {!loading && error && (
         <div className="px-5 pt-10 lg:px-16">
-          <p className="text-[15px] font-bold text-[#ef5350]">{error}</p>
-          <a href={routes.groupsList()} className="mt-2 inline-block text-[13px] font-extrabold text-[#7dd3fc] no-underline hover:underline">
+          <p className="text-[15px] font-bold text-[var(--t-danger)]">{error}</p>
+          <a href={routes.groupsList()} className="mt-2 inline-block text-[13px] font-extrabold text-[var(--t-accent)] no-underline hover:underline">
             ← All groups
           </a>
         </div>
@@ -1047,6 +1059,10 @@ function Groups() {
       ))}
 
       <RecordTicker />
+      {/* Переключатель тем. На витрине он единственный способ сменить режим: топбар его
+          не носит, а внутренние экраны (results, клуб, пловец) — уже другая дверь.
+          Отступ снизу считает `home.css` от высоты ленты рекордов. */}
+      <UI_ModeToggle />
     </div>
   );
 }

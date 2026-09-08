@@ -9,6 +9,8 @@ import SportsmenDetails from '../sportsmen-details/sportsmen-details';
 import Popup from '../components/popup/popup';
 import TrainingTable from '../training-table/training-table';
 import FilterTrainigSection from '../components/filter-trainig-section/filter-trainig-section';
+import MobileFiltersDrawer from '../components/filter-section/mobile-filters-drawer';
+import FiltersFab from '../components/filter-section/filters-fab';
 import DataSourceDDL from '../components/filter-data-source-ddl/filter-data-source-ddl';
 import { useTheme } from '../../hooks/useTheme';
 import { useMode } from '../../hooks/useMode';
@@ -53,74 +55,35 @@ function checkIsTraining(selectedSource: any, filters: any) {
   return { isTraining, trainingId };
 }
 
-// Краткое описание выбранных фильтров для узкой полоски
-function summarizeFilters(filters: any, isTraining: boolean) {
-  if (!filters) return 'All results';
-  if (isTraining) {
-    const mode = filters?.training_table?.mode ?? 'default';
-    const lane = filters?.training_table?.lane ?? 'all lanes';
-    const grp = filters?.training_table?.group ?? 'all groups';
-    return `training: ${mode}, ${lane}, ${grp}`;
-  }
-  const parts: string[] = [];
-  if (filters.selected_name && filters.selected_name !== 'all') parts.push(filters.selected_name);
-  if (filters.style_name && filters.style_name !== 'all') parts.push(filters.style_name);
-  if (filters.style_len && filters.style_len !== 'all') parts.push(`${filters.style_len}m`);
-  if (filters.gender && filters.gender !== 'all') parts.push(filters.gender);
-  if (filters.pool_type && filters.pool_type !== 'all') parts.push(filters.pool_type);
-  if (filters.date_str) parts.push(filters.date_str);
-  return parts.length ? parts.join(' • ') : 'All results';
-}
-
-/** НИЖНЯЯ шторка (фильтры) — ВСЕГДА фиксирована снизу и через портал */
-function MobileFiltersDrawer({
-  summary,
-  children,
-}: {
-  summary: string;
-  children: React.ReactNode;
-}) {
+/**
+ * Плавающая кнопка «Filters / Apply» + шторка — обе ОБЩИЕ (Ф2 и Ф4.0 плана
+ * `docs/plans/my-media-filters-plan.md`). Здесь остаётся только связка их состояния:
+ * что рисовать внутри, решает страница.
+ *
+ * Счётчик активных фильтров кнопке не передаётся: на results никто такого числа не считает,
+ * а рисовать ноль хуже, чем не рисовать ничего.
+ */
+function MobileFiltersLauncher({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
 
-  const node = (
+  return (
     <>
-      {/* мобильная плавающая кнопка Filters / Apply (центрированная, всегда на месте) */}
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        className="lg:hidden fixed bottom-4 left-1/2 z-[110] transform -translate-x-1/2 bg-[var(--theme-primary)] hover:bg-[var(--theme-primary-hover)] text-white px-5 py-2 rounded-full shadow-lg flex items-center gap-3 transition-colors"
-        aria-expanded={open}
-        aria-controls="mobile-filters-sheet"
-        title={open ? 'Apply' : 'Filters'}
-      >
-        <span className="font-medium">{open ? 'Apply' : 'Filters'}</span>
-        <span className="text-sm opacity-80">{open ? '▾' : '▴'}</span>
-      </button>
-
-      {/* затемнение */}
-      
-      <div
-        id="mobile-filters-sheet"
-        className={`fixed inset-0 z-[90] bg-black/20 transition-opacity ${
-          open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={() => setOpen(false)}
+      <FiltersFab
+        open={open}
+        onToggle={() => setOpen((v) => !v)}
+        controls="mobile-filters-sheet"
       />
 
-      {/* сама панель — от самого верха до низа */}
-      <div
-        className={`fixed inset-0 z-[100] bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)] shadow-2xl transition-transform duration-300 ease-out
-        ${open ? 'translate-y-0' : 'translate-y-full'}`}
-        aria-hidden={!open}
+      <MobileFiltersDrawer
+        id="mobile-filters-sheet"
+        open={open}
+        onClose={() => setOpen(false)}
+        variant="fullscreen"
       >
-        <div className="h-full overflow-y-auto p-3 pb-24" onClick={(e) => e.stopPropagation()}>
-          {children}
-        </div>
-      </div>
+        {children}
+      </MobileFiltersDrawer>
     </>
   );
-
-  return <>{createPortal(node, document.body)}</>;
 }
 
 
@@ -463,11 +426,6 @@ function ResultsMain() {
   // фильтрами может законно вернуть 0 строк — форма фильтров всё равно должна остаться видимой.
   const hasSource = !!selectedSource?.title;
 
-  const filtersSummary = useMemo(
-    () => summarizeFilters(filters, isTraining),
-    [filters, isTraining]
-  );
-
   // /competitions/upcoming/{orgCompId} (С7б, шаг 3): соревнование ещё не проходило, своей
   // строки в Competitions нет — обычная шапка/селектор/табы тут ни к чему, только Start list.
   // Ранний возврат ПОСЛЕ всех хуков выше — правило хуков не нарушено.
@@ -682,10 +640,10 @@ function ResultsMain() {
 
           </div>
 
-          {/* Мобильная нижняя шторка с фильтрами (во весь экран при раскрытии) */}
-          <MobileFiltersDrawer summary={filtersSummary}>
+          {/* Мобильная шторка с фильтрами (во весь экран при раскрытии) */}
+          <MobileFiltersLauncher>
             {!isTraining ? <FilterSection /> : <FilterTrainigSection />}
-          </MobileFiltersDrawer>
+          </MobileFiltersLauncher>
 
           {/* Мобильный модал с деталями спортсмена (показывается вместо правой колонки на моб/планшет) */}
           <MobileSportsmenModal

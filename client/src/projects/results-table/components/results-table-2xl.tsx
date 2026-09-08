@@ -47,7 +47,16 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
   // Медаль красится только если ЭТОТ заплыв award-eligible (res.is_award — денормализовано
   // с API; для статических источников используем общий флаг источника isAwardSource).
   // Медаль только за награждаемый заплыв: prelim-место — ранжир сессии, не награда.
-  const rowIsAward = (res.is_award ?? isAwardSource ?? false) && !HelperResults.isHiddenHeat(res.heat_type);
+  // Правило медали — ОДНО на продукт (`HelperResults.isMedalPlace`): раньше каждый экран
+  // считал по-своему, и медаль появлялась там, где её не вручали. `isAwardSource` —
+  // фоллбек для статических источников, где наградность лежит на источнике, а не в строке.
+  const rowIsAward = HelperResults.isMedalPlace({
+    place: res.position,
+    heatType: res.heat_type,
+    round: (res as any).round,
+    timeFail: (res as any).time_fail,
+    competitionIsAward: res.is_award ?? isAwardSource ?? false,
+  });
 
   return (
     <>
@@ -110,7 +119,7 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
       {showEvent && (
         <div className="col-span-2">
           <div className="max-w-[100px] mx-auto">
-            <UI_SwimmStyleIcon styleName={res.event_style_name} styleLen={res.event_style_len} styleType="icon-len" className="font-bold text-2xl" />
+            <UI_SwimmStyleIcon styleName={res.event_style_name} styleLen={res.event_style_len} styleType="icon-len" className="src-results-table-2xl font-bold text-2xl" />
           </div>
           {showPoolType && <UI_PoolIcon styleType="icon-text-center" label={res.pool_type} labelClassName="text-xl" />}
         </div>

@@ -11,6 +11,7 @@ import UI_H2HCompare, { h2hScopeLabel } from '../components/mix/h2h/h2h-compare'
 import UI_H2HRivalPicker from '../components/mix/h2h/h2h-rival-picker';
 import type { H2HSlot } from '../components/mix/h2h/h2h.types';
 import { parseH2HQuery, routes, H2H_PARAM } from '../../utils/routes';
+import { PAGE_CONTAINER } from '../../utils/layout';
 import { useFavoritesContext } from '../../hooks/favorites-context';
 import {
   useSwimmerProfile, type SwimmerProfile, type SwimmerSeasonOption,
@@ -92,13 +93,22 @@ function H2HProject() {
   const [season, setSeason] = useState<number | null | undefined>(query.season);
 
   /**
-   * «ME» в левом слоте — только когда адрес молчит про `a` (H2H_DEFAULT_LEFT).
-   * В адрес это НЕ пишется: пустая страница должна оставаться `/h2h`, иначе ссылкой на неё
-   * человек передал бы своего пловца.
+   * Подстановка «ME» в левый слот — ОДНОРАЗОВАЯ и только при `H2H_DEFAULT_LEFT === 'me'`
+   * (по умолчанию её нет вовсе, решение Влада 03.09.2026).
+   *
+   * ⚠ Одноразовость — не оптимизация, а условие работоспособности крестика: пока эффект
+   * смотрел на `aId`, он возвращал пловца сразу после того, как его убрали, и левый слот
+   * было НЕ очистить. Флаг взводится и при подстановке, и при первом же действии человека
+   * (выбор/сброс), чтобы приехавший позже primary favorite не влез в слот задним числом.
+   *
+   * В адрес подстановка не пишется: пустая страница должна оставаться `/h2h`, иначе
+   * ссылкой на неё человек передал бы своего пловца.
    */
+  const autoLeftDoneRef = useRef(false);
   useEffect(() => {
-    if (H2H_DEFAULT_LEFT !== 'me') return;
+    if (H2H_DEFAULT_LEFT !== 'me' || autoLeftDoneRef.current) return;
     if (query.a != null || aId != null || primarySwimmerId == null) return;
+    autoLeftDoneRef.current = true;
     setAId(primarySwimmerId);
     setActive('b');
   }, [primarySwimmerId, query.a, aId]);
@@ -168,6 +178,7 @@ function H2HProject() {
   };
 
   const pick = (id: number) => {
+    autoLeftDoneRef.current = true;
     // Тот же пловец с другой стороны — не сравнение, а зеркало: молча меняем стороны
     // местами вместо того, чтобы поставить его дважды.
     if (active === 'a') {
@@ -183,6 +194,7 @@ function H2HProject() {
   };
 
   const clear = (side: ActiveSide) => {
+    autoLeftDoneRef.current = true;
     if (side === 'a') { setAId(null); writeQuery({ a: null }); } else { setBId(null); writeQuery({ b: null }); }
     setActive(side);
     setSearch('');
@@ -206,11 +218,15 @@ function H2HProject() {
   });
 
   const slotOf = (side: ActiveSide, profile: SwimmerProfile | null, id: number | null): H2HSlot => {
+    // Подсвечиваем сторону, которую заполнит следующий выбор: пикер тут ОДИН на два
+    // слота, и подпись «choosing the left swimmer» стоит от них отдельно — без рамки
+    // связь приходилось вычитывать из текста.
     if (id == null) {
       return {
         kind: 'empty',
         label: side === 'a' ? 'בחר שחיין · choose a swimmer' : 'בחר יריב · choose a rival',
         onPick: () => focusSlot(side),
+        active: active === side,
       };
     }
     return {
@@ -219,6 +235,7 @@ function H2HProject() {
       swimmer: profile ? slotSwimmer(profile) : { id, name: `#${id}` },
       ...favProps(id),
       onClear: () => clear(side),
+      active: active === side,
     };
   };
 
@@ -256,12 +273,17 @@ function H2HProject() {
     <div className={themeClass} style={{ background: 'var(--deep-page-bg)', minHeight: '100vh' }}>
       <AppTopbar active="h2h" />
 
-      <main className="mx-auto max-w-[1180px] px-4 py-6" style={{ color: 'var(--deep-text)' }}>
+      {/* Страничный контейнер снаружи, колонка контента внутри (`utils/layout.ts`).
+          `content-box-xs` (780px) — сравнению шире не нужно: полезное в ряду это две
+          карточки и центр, остальное на широком мониторе было пустотой. Ширина ровно
+          на пороге `@container h2h (max-width: 780px)`, то есть на десктопе экран
+          сознательно живёт в КОМПАКТНОЙ раскладке — той же, что на телефоне. */}
+      <main className={`${PAGE_CONTAINER} py-6`} style={{ color: 'var(--deep-text)' }}>
         <div className="mb-4 flex justify-end">
           <UI_ModeToggle />
         </div>
 
-        <div className="h2h-page">
+        <div className="h2h-page content-box-xs">
           <div className="h2h-page__head">
             <h1 className="h2h-page__title">Head to head</h1>
             <div className="h2h-page__hint">

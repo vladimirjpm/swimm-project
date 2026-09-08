@@ -88,7 +88,7 @@ export default function SwimRowD3({ row, showNames, onClick }: {
             // задаётся здесь, вместе с шириной. На УЗКОМ экране он вдвое крупнее (28px →
             // «100» рисуется 35px): там иконка идёт во всю ширину, и дистанция читается
             // наравне с категорией. На широком остаётся прежним.
-            className="w-[104px] shrink-0 text-[28px] sm:w-[84px] sm:text-[16px]"
+            className="src-swim-row-d3 w-[104px] shrink-0 text-[28px] sm:w-[84px] sm:text-[16px]"
           />
           {!scheduled && (
             <span className="min-w-0 truncate text-[11px] font-bold opacity-60">not scheduled</span>

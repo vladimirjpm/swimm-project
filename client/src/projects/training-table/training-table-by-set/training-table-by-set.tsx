@@ -125,7 +125,7 @@ function TrainingTableBySet({
                               styleName={res.event_style_name}
                               styleLen={res.event_style_len}
                               styleType="icon-len"
-                              className="font-bold text-2xl"
+                              className="src-training-table-by-set font-bold text-2xl"
                             />
                           </div>
                         )}

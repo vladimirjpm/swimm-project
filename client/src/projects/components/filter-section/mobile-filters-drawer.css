@@ -1,0 +1,139 @@
+/* Мобильная шторка фильтров — ОБЩАЯ (Ф2 плана docs/plans/my-media-filters-plan.md).
+
+   Палитра — токены `--fdrawer-*` с фоллбеком на палитру results (`--theme-mode-*`), как у
+   `FilterCard`, `SwimRow` и `FilterBar`: страница в другой теме переопределяет их на своём
+   контейнере, а не заводит вторую шторку.
+
+   Панель ВСЕГДА в разметке и уезжает трансформом, а не размонтируется: внутри живёт панель
+   фильтров со своим состоянием (раскрытые карточки, прокрутка списка клубов), и пересоздание
+   схлопывало бы её при каждом открытии. */
+
+.fdrawer__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: var(--fdrawer-scrim, rgb(0 0 0 / 0.2));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms;
+}
+
+.fdrawer__scrim--open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.fdrawer__panel {
+  position: fixed;
+  z-index: 100;
+  background: var(--fdrawer-bg, var(--theme-mode-surface));
+  color: var(--fdrawer-text, var(--theme-mode-text));
+  transform: translateY(100%);
+  transition: transform 300ms ease-out;
+}
+
+.fdrawer__panel--open { transform: translateY(0); }
+
+/* ── Вариант `fullscreen` (results): шторка во весь экран ─────────────────────── */
+
+.fdrawer--fullscreen .fdrawer__panel {
+  inset: 0;
+  box-shadow: var(--fdrawer-shadow, 0 25px 50px -12px rgb(0 0 0 / 0.25));
+}
+
+/* Низ с запасом: над шторкой висит плавающая кнопка «Apply», и без запаса она
+   перекрывала бы последний фильтр. */
+.fdrawer--fullscreen .fdrawer__body {
+  height: 100%;
+  overflow-y: auto;
+  padding: 12px 12px 96px;
+}
+
+/* ── Вариант `sheet` (личный кабинет): нижняя шторка по содержимому ───────────── */
+
+.fdrawer--sheet .fdrawer__panel {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  border-top: 1px solid var(--fdrawer-border, var(--theme-mode-border));
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+}
+
+.fdrawer--sheet .fdrawer__body {
+  overflow-y: auto;
+  padding: 0 20px 20px;
+}
+
+/* Полоска-ручка сверху: единственный намёк, что шторку можно закрыть свайпом вниз. */
+.fdrawer__handle {
+  flex: none;
+  width: 40px;
+  height: 4px;
+  margin: 20px auto 16px;
+  border-radius: 999px;
+  background: var(--fdrawer-handle, var(--theme-mode-border));
+}
+
+/* Подвал прилипает к низу шторки: кнопка «Show N swims» должна быть под рукой,
+   а не в конце длинного списка фильтров. */
+.fdrawer__footer {
+  flex: none;
+  padding: 12px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--fdrawer-border, var(--theme-mode-border));
+}
+
+/* ── Плавающая кнопка «Filters» (filters-fab.tsx) ─────────────────────────────── */
+
+/* Одна на две страницы (решение Влада 07.09.2026). Размеры — из хендоффа
+   `!design_handoff/design_handoff_my_media_filters`: 48px высота и радиус 24 вместо
+   прежних ~40 у results — палец попадает надёжнее, и рядом помещается счётчик. */
+.fpill {
+  position: fixed;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 22px;
+  border: none;
+  border-radius: 24px;
+  cursor: pointer;
+  background: var(--fpill-bg, var(--theme-primary));
+  color: var(--fpill-ink, #fff);
+  box-shadow: var(--fpill-shadow, 0 12px 30px rgba(2, 10, 24, 0.45));
+  transition: background-color 0.2s ease;
+}
+
+/* Кнопка мобильная: там, где панель стоит сайдбаром, ей нечего открывать. */
+@media (min-width: 1024px) {
+  .fpill { display: none; }
+}
+
+.fpill:hover { background: var(--fpill-bg-hover, var(--theme-primary-hover, var(--theme-primary))); }
+
+.fpill__label { font-size: 15px; font-weight: 800; }
+
+/* Счётчик активных фильтров: инверсия кнопки, чтобы читался на акценте. */
+.fpill__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--fpill-count-bg, var(--fpill-ink, #fff));
+  color: var(--fpill-count-text, var(--fpill-bg, var(--theme-primary)));
+  font-size: 11px;
+  font-weight: 900;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+.fpill__caret { font-size: 10px; opacity: 0.8; }

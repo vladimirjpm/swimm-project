@@ -111,6 +111,7 @@ public static class DependencyInjection
         services.AddScoped<IDataCheck, MergedSessionsCheck>();
         services.AddScoped<IDataCheck, OfficialClubPointsMismatchCheck>();
         services.AddScoped<IDataCheck, NoShowUnmatchedCheck>();
+        services.AddScoped<IDataCheck, PlaceWithoutTimeCheck>();
         services.AddScoped<ILogligEventPullService, LogligEventPullService>();
         services.AddScoped<ILogligRelayBandService, LogligRelayBandService>();
         services.AddScoped<IDataCheck, SwimmerDedupCheck>();
@@ -120,6 +121,7 @@ public static class DependencyInjection
         services.AddScoped<IDataCheck, MergedClubStillUsedCheck>();
         services.AddScoped<IDataCheck, SwimmerTwoClubsInCompetitionCheck>();
         services.AddScoped<IDataCheck, CompetitionWithoutClubPointRuleCheck>();
+        services.AddScoped<IDataCheck, CountryDuplicateCheck>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
 
         // Локальный вход (email + пароль)

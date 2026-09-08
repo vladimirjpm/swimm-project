@@ -100,7 +100,7 @@ export default function ProgrammeZoom({ orgCompId, startsLabel, notify, onPublis
               styleName={g.styleName}
               styleType="icon-len"
               styleLen={g.distance}
-              className="w-[72px] shrink-0 text-[16px] sm:w-[84px] sm:text-[18px]"
+              className="src-programme-zoom w-[72px] shrink-0 text-[16px] sm:w-[84px] sm:text-[18px]"
             />
             {/* Заголовок переносится, а не обрезается: «100m individual medley» на узком
                 экране не влезает, и «100m individual …» — худшее из двух зол. */}
