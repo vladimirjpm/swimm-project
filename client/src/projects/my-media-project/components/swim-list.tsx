@@ -705,7 +705,7 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
 
   return (
     <div className={`${hpCardCls} overflow-hidden`}>
-      <div className="flex flex-wrap items-center gap-2.5 border-b border-[var(--t-accent-soft)] px-4 py-3 sm:px-5">
+      <div className="flex flex-wrap items-center gap-2.5 border-b border-[var(--t-accent-soft)] bg-[var(--t-list-head)] px-4 py-3 sm:px-5">
         {/* Плитка соревнования — общая CompetitionTile (сезон/кубок · буква категории ·
             возрастная лента). Данные считает общий competitionTileData, своей эвристики по
             названию тут нет: категория и флаг чемпионата приходят с сервера. */}
@@ -736,11 +736,11 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
           </span>
         </div>
         <span className="hp-mono text-[11px] font-extrabold text-[var(--t-accent)]">{first.competition_date}</span>
-        <span className="text-[11.5px] text-[var(--t-text-3)]">{first.pool_type}</span>
+        <span className="text-[11.5px] text-[var(--t-text-2)]">{first.pool_type}</span>
         {anyPodium && <span title="Podium finish">🏅</span>}
         <BestMark pb={anyPb} sb={anySb} />
         <span className="ml-auto flex items-center gap-2">
-          <span className="hidden text-[11px] font-bold text-[var(--t-text-3)] sm:inline">
+          <span className="hidden text-[11px] font-bold text-[var(--t-text-2)] sm:inline">
             {swims.length} {swims.length === 1 ? 'swim' : 'swims'} · {videoCount} {videoCount === 1 ? 'video' : 'videos'}
           </span>
           {compMedia.length > 0 && (

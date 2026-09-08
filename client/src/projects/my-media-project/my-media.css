@@ -9,59 +9,41 @@
    `.theme-deep-light` ставит `useDeepThemeClass()` на корне). Раньше цвета были вбиты
    хексами в шести файлах (393 литерала) и светлой темы у страницы не было вовсе.
 
-   Роли `--t-*` — прослойка между вёрсткой и палитрой: компоненты просят «акцент», «рамку»,
-   «приглушённый текст», а не конкретный цвет. Хекса здесь ровно один — плашка под иконку
-   стиля: картинки нарисованы чёрным силуэтом по светлому и в тёмной теме требуют светлой
-   подложки в ОБОИХ режимах.
+   Сами роли `--t-*` живут не здесь, а в `components/deep/deep-theme.css`: когда за
+   `/my-media` на тему пошла семья hp (home / competitions / groups), карта стала общей.
+   Здесь остаётся только то, что есть у ЭТОЙ страницы и больше ни у кого. */
 
-   ⚠ Токены объявлены на ТРЁХ селекторах, а не на одном корне: шторка, пилюля и модалки
-   уходят порталом в `body`, снаружи корня страницы, и там `--t-*` иначе пустые. */
-
+/* Акцент РЕЖИМА: в модерации весь верх страницы становится золотым — вкладка, линия
+   под ней и рамка панели. Одно значение на контейнер вместо покраски каждой детали. */
 .my-media,
 .my-media-filters,
 .my-media-bar {
-  --t-accent: var(--deep-accent);
-  --t-accent-dim: color-mix(in srgb, var(--deep-accent) 70%, transparent);
-  --t-accent-border: var(--deep-accent-border);
-  --t-accent-soft: var(--deep-accent-chip);
-  --t-accent-ink: var(--deep-accent-ink);
-
-  --t-surface: var(--deep-card-bg);
-  --t-surface2: var(--deep-card-bg-raised);
-  /* Шторка и модалки стоят НАД страницей — им нужен непрозрачный фон, а не полупрозрачная
-     карточка: сквозь неё просвечивал бы список. */
-  --t-surface-strong: var(--deep-panel-bg);
-  --t-card: var(--deep-card-bg);
-  --t-input-bg: var(--deep-card-bg-row);
-  --t-border: var(--deep-card-border);
-  --t-border-2: var(--deep-card-border-soft);
-  --t-scrim: color-mix(in srgb, var(--deep-page-bg) 72%, transparent);
-  --t-shadow: var(--deep-card-shadow);
-
-  --t-text: var(--deep-text);
-  --t-text-2: var(--deep-text-mute);
-  --t-text-3: var(--deep-text-faint);
-
-  --t-plate: #e6f2fb;
-
-  --t-warn: var(--deep-gold);
-  --t-warn-soft: var(--deep-gold-soft);
-  --t-warn-border: var(--deep-gold-border);
-  --t-warn-ink: var(--deep-accent-ink);
-
-  --t-danger: var(--deep-danger);
-  --t-danger-soft: var(--deep-danger-soft);
-  --t-danger-border: color-mix(in srgb, var(--deep-danger) 45%, transparent);
-
-  /* ❤ на медиа — не «опасность» и не акцент: своя роль, чтобы её не перекрасили заодно. */
-  --t-like: var(--deep-female);
-  --t-like-soft: var(--deep-female-soft);
-  --t-like-border: var(--deep-female-border);
-
-  /* Акцент РЕЖИМА: в модерации весь верх страницы становится золотым — вкладка, линия
-     под ней и рамка панели. Одно значение на контейнер вместо покраски каждой детали. */
   --mode-accent: var(--t-accent);
   --mode-soft: var(--t-accent-soft);
+}
+
+/* Плитка соревнования (`CompetitionTile`) построена под ДРУГУЮ поверхность: её корпус и
+   буква — производные от `--theme-mode-accent-text`, то есть почти белые, потому что на
+   странице соревнования плитка лежит на насыщенном `--theme-primary`. У нас она стоит на
+   карточке темы deep, и в светлой теме белое по белому пропадало совсем.
+
+   Перекрашиваем штатным швом — теми же шестью токенами (так и написано в `index.css`:
+   «перекрасить плитку per-theme = поправить эти 6 токенов»), а не правкой компонента: на
+   странице соревнования он остаётся как был. Буква берёт `--t-text` — парный токен той
+   поверхности, на которой теперь лежит; корпус остаётся тонированным, полосы светлее его,
+   так что структура плитки (шапка · буква · возраст) сохраняется.
+
+   ⚠ ТОЛЬКО светлая тема (решение Влада 08.09.2026). В тёмной плитка и так читалась —
+   белая буква на тёмном, — и там она остаётся глобальной: селектора нет, значит токены
+   приходят из `:root[data-mode="dark"]`, как раньше. Чинили одну беду, а не «привели к
+   одному виду». */
+.my-media.theme-deep-light {
+  --theme-comp-tile-bg: var(--t-accent-soft);
+  --theme-comp-tile-border: var(--t-accent-border);
+  --theme-comp-tile-letter: var(--t-text);
+  --theme-comp-tile-strip-bg: var(--t-surface2);
+  --theme-comp-tile-age-bg: var(--t-surface2);
+  --theme-comp-tile-age-text: var(--t-accent);
 }
 
 .my-media--moderation {

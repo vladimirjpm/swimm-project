@@ -19,6 +19,7 @@ import { seasonStartYear } from '../../utils/helpers/season-helper';
 import { GalleryItem } from '../../utils/interfaces/results';
 import MediaCard from './components/media-card';
 import AddLinkModal, { AddLinkSwimmerOption } from './components/add-link-modal';
+import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import ModerationPanel from './components/moderation-panel';
 import SwimList from './components/swim-list';
 import MyMediaFilterPanel, {
@@ -68,6 +69,8 @@ function MyMedia() {
             </button>
           </div>
         </div>
+        {/* И на заглушке тоже: она уже покрашена темой, и без кнопки режим отсюда не сменить. */}
+        <UI_ModeToggle />
       </div>
     );
   }
@@ -117,6 +120,13 @@ function MyMediaContent({ deep }: { deep: string }) {
 
   const [lightboxItems, setLightboxItems] = useState<GalleryItem[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  // Открыт ли поверх страницы хоть один слой. Нужно ровно одному потребителю —
+  // переключателю тем внизу справа (он единственный, у кого z-index выше всех оверлеев).
+  // Заводя новый оверлей, добавляй его сюда, иначе кружок повиснет поверх него.
+  const anyOverlayOpen =
+    mobileFiltersOpen || addOpen || lightboxIndex !== null ||
+    addVideoSwim !== null || addCompTarget !== null || linkSwimTarget !== null;
 
   // ── Реакции: оптимистичные оверрайды поверх ответа /api/me/swims ─────────
   const [likeOverrides, setLikeOverrides] = useState<Map<number, { count: number; mine: boolean }>>(new Map());
@@ -932,6 +942,13 @@ function MyMediaContent({ deep }: { deep: string }) {
       </MobileFiltersDrawer>
 
       <UI_SwimmerGallery gallery={lightboxItems} openIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />
+
+      {/* Переключатель тем. Прячется, когда сверху что-то открыто: у него z-index выше всех
+          оверлеев страницы (шторка 100, модалки 100, лайтбокс 50), и иначе кружок висел бы
+          поверх них — на мобильной шторке ровно на кнопке «Show N swims». Перечисляем
+          состояния явно, а не правим z-index общего компонента: он стоит ещё на пяти
+          страницах, и у продукта одной шкалы z-index пока нет. */}
+      {!anyOverlayOpen && <UI_ModeToggle />}
     </div>
   );
 }

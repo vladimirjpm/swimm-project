@@ -1,7 +1,9 @@
 import React from 'react';
 import '../home-project/home.css';
+import '../components/deep/deep-theme.css';
 import AppTopbar from '../components/app-topbar/app-topbar';
 import RecordTicker from '../home-project/components/record-ticker';
+import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import { HOME_REGION_LABEL } from '../../utils/constants/home-region';
 import {
   CompetitionSource,
@@ -13,6 +15,7 @@ import { seasonLabel, seasonStartYear } from '../../utils/helpers/season-helper'
 import { useUpcomingCompetitions, useUpcomingStarts } from '../results-main-project/components/start-list/use-start-list';
 import { useAuth } from '../../hooks/useAuth';
 import { useFavorites } from '../../hooks/useFavorites';
+import { useDeepThemeClass } from '../components/deep/use-deep-theme-class';
 import { formatApproxTime, swimLabel } from '../results-main-project/components/start-list/start-list-helpers';
 
 type CompetitionLink = {
@@ -119,10 +122,10 @@ function MeetsSection() {
 
   return (
     <section className="relative px-4 pt-[38px] lg:px-16 lg:pt-16" aria-label="Meets">
-      <p className="mb-[14px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[#7dd3fc] lg:text-[13px] lg:tracking-[0.3em]">
+      <p className="mb-[14px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[var(--t-accent)] lg:text-[13px] lg:tracking-[0.3em]">
         {`Season ${seasonLabel(seasonStartYear(now))} · ${HOME_REGION_LABEL}`}
       </p>
-      <h2 className="mb-[18px] text-[26px] font-black tracking-[-0.02em] text-[#f3f8fd] lg:mb-6 lg:text-[36px]">
+      <h2 className="mb-[18px] text-[26px] font-black tracking-[-0.02em] text-[var(--t-text)] lg:mb-6 lg:text-[36px]">
         Meets
       </h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:gap-[18px]">
@@ -134,32 +137,32 @@ function MeetsSection() {
             <a
               key={`${src.kind}:${src.id}`}
               href={href}
-              className="hp-card-std flex min-h-[110px] flex-col justify-between gap-2 rounded-[16px] border border-[#7dd3fc]/[0.22] p-4 text-inherit no-underline shadow-[0_18px_44px_rgba(2,10,24,0.45)] backdrop-blur-[14px] transition-[transform,border-color,box-shadow] duration-[180ms] ease-out hover:-translate-y-1 hover:border-[#7dd3fc]/80 hover:shadow-[0_24px_50px_rgba(2,10,24,0.6)] focus-visible:-translate-y-1 focus-visible:border-[#7dd3fc]/80 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-[3px] focus-visible:outline-[#7dd3fc]"
+              className="hp-card-std flex min-h-[110px] flex-col justify-between gap-2 rounded-[16px] border border-[var(--t-border)] p-4 text-inherit no-underline shadow-[var(--t-shadow)] backdrop-blur-[14px] transition-[transform,border-color,box-shadow] duration-[180ms] ease-out hover:-translate-y-1 hover:border-[var(--t-accent)] hover:shadow-[var(--t-shadow)] focus-visible:-translate-y-1 focus-visible:border-[var(--t-accent)] focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-[3px] focus-visible:outline-[var(--t-accent)]"
             >
               <div className="flex items-start justify-between gap-2">
                 <span
                   dir="rtl"
-                  className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-extrabold text-[#f3f8fd]"
+                  className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-extrabold text-[var(--t-text)]"
                   style={{ textAlign: 'left' }}
                 >
                   {src.name}
                 </span>
                 {src.status === 'live' ? (
-                  <span className="hp-mono flex shrink-0 items-center gap-1 rounded-[7px] border border-[#38ef8f]/40 px-2 py-[3px] text-[11px] font-extrabold text-[#38ef8f]">
+                  <span className="hp-mono flex shrink-0 items-center gap-1 rounded-[7px] border border-[var(--t-live-border)] px-2 py-[3px] text-[11px] font-extrabold text-[var(--t-live)]">
                     ● LIVE
                   </span>
                 ) : src.status === 'upcoming' ? (
-                  <span className="hp-mono shrink-0 rounded-[7px] border border-[#7dd3fc]/40 px-2 py-[3px] text-[11px] font-extrabold text-[#7dd3fc]">
+                  <span className="hp-mono shrink-0 rounded-[7px] border border-[var(--t-accent-border)] px-2 py-[3px] text-[11px] font-extrabold text-[var(--t-accent)]">
                     {dateLabel(src)}
                   </span>
                 ) : null}
               </div>
-              <div className="flex flex-wrap items-center gap-2 text-[12px] text-[#cbe0f0]/75">
+              <div className="flex flex-wrap items-center gap-2 text-[12px] text-[var(--t-text-2)]">
                 {src.status !== 'upcoming' && <span>{dateLabel(src)}</span>}
-                <span className="text-[#7dd3fc]/60">·</span>
+                <span className="text-[var(--t-accent-dim)]">·</span>
                 <span>{src.pool_type}</span>
                 {src.day_count > 1 && (
-                  <span className="hp-mono rounded-[7px] border border-[#7dd3fc]/40 px-1.5 py-[2px] text-[10px] font-extrabold text-[#7dd3fc]">
+                  <span className="hp-mono rounded-[7px] border border-[var(--t-accent-border)] px-1.5 py-[2px] text-[10px] font-extrabold text-[var(--t-accent)]">
                     {src.day_count} days
                   </span>
                 )}
@@ -181,10 +184,10 @@ function UpcomingSection() {
 
   return (
     <section className="relative px-4 pt-[38px] lg:px-16 lg:pt-16" aria-label="Upcoming">
-      <p className="mb-[14px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[#7dd3fc] lg:text-[13px] lg:tracking-[0.3em]">
+      <p className="mb-[14px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[var(--t-accent)] lg:text-[13px] lg:tracking-[0.3em]">
         Start lists are in
       </p>
-      <h2 className="mb-[18px] text-[26px] font-black tracking-[-0.02em] text-[#f3f8fd] lg:mb-6 lg:text-[36px]">
+      <h2 className="mb-[18px] text-[26px] font-black tracking-[-0.02em] text-[var(--t-text)] lg:mb-6 lg:text-[36px]">
         Upcoming
       </h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:gap-[18px]">
@@ -192,27 +195,27 @@ function UpcomingSection() {
           <a
             key={c.org_comp_id}
             href={routes.competitionUpcoming(c.org_comp_id)}
-            className="hp-card-std flex min-h-[110px] flex-col justify-between gap-2 rounded-[16px] border border-[#7dd3fc]/[0.22] p-4 text-inherit no-underline shadow-[0_18px_44px_rgba(2,10,24,0.45)] backdrop-blur-[14px] transition-[transform,border-color,box-shadow] duration-[180ms] ease-out hover:-translate-y-1 hover:border-[#7dd3fc]/80"
+            className="hp-card-std flex min-h-[110px] flex-col justify-between gap-2 rounded-[16px] border border-[var(--t-border)] p-4 text-inherit no-underline shadow-[var(--t-shadow)] backdrop-blur-[14px] transition-[transform,border-color,box-shadow] duration-[180ms] ease-out hover:-translate-y-1 hover:border-[var(--t-accent)]"
           >
             <div className="flex items-start justify-between gap-2">
               <span
                 dir="rtl"
-                className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-extrabold text-[#f3f8fd]"
+                className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-extrabold text-[var(--t-text)]"
                 style={{ textAlign: 'left' }}
               >
                 {c.comp_name}
               </span>
-              <span className="hp-mono flex shrink-0 items-center gap-1 rounded-[7px] border border-[#7dd3fc]/40 px-2 py-[3px] text-[11px] font-extrabold text-[#7dd3fc]">
+              <span className="hp-mono flex shrink-0 items-center gap-1 rounded-[7px] border border-[var(--t-accent-border)] px-2 py-[3px] text-[11px] font-extrabold text-[var(--t-accent)]">
                 {new Date(c.date_start).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}
                 {c.date_end && c.date_end !== c.date_start
                   ? `–${new Date(c.date_end).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}`
                   : ''}
               </span>
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-[12px] text-[#cbe0f0]/75">
+            <div className="flex flex-wrap items-center gap-2 text-[12px] text-[var(--t-text-2)]">
               <span>{c.entries} entries · {c.swimmers} swimmers</span>
               {c.days > 1 && (
-                <span className="hp-mono rounded-[7px] border border-[#7dd3fc]/40 px-1.5 py-[2px] text-[10px] font-extrabold text-[#7dd3fc]">
+                <span className="hp-mono rounded-[7px] border border-[var(--t-accent-border)] px-1.5 py-[2px] text-[10px] font-extrabold text-[var(--t-accent)]">
                   {c.days} days
                 </span>
               )}
@@ -236,7 +239,7 @@ function FavoritesUpcomingSection() {
 
   return (
     <section className="relative px-4 pt-[38px] lg:px-16" aria-label="Your favorites — upcoming starts">
-      <h2 className="mb-[14px] text-[18px] font-black tracking-[-0.02em] text-[#f3f8fd]">
+      <h2 className="mb-[14px] text-[18px] font-black tracking-[-0.02em] text-[var(--t-text)]">
         Your favorites — upcoming starts
       </h2>
       <div className="flex flex-col gap-2">
@@ -244,10 +247,10 @@ function FavoritesUpcomingSection() {
           <a
             key={s.id}
             href={`${routes.competitionUpcoming(s.org_comp_id)}?tab=startlist&swimmer=${s.swimmer_id}`}
-            className="hp-card-std flex items-center justify-between gap-3 rounded-[12px] border border-[#7dd3fc]/[0.22] px-4 py-2.5 text-inherit no-underline"
+            className="hp-card-std flex items-center justify-between gap-3 rounded-[12px] border border-[var(--t-border)] px-4 py-2.5 text-inherit no-underline"
           >
             <span className="text-[13px] font-bold">{s.swimmer_name}</span>
-            <span className="text-[12px] text-[#cbe0f0]/75">
+            <span className="text-[12px] text-[var(--t-text-2)]">
               {formatApproxTime(s.heat_start_at)} · {swimLabel(s.distance, s.style_name)}
             </span>
           </a>
@@ -258,20 +261,22 @@ function FavoritesUpcomingSection() {
 }
 
 function Competitions() {
+  const deep = useDeepThemeClass();
+
   return (
-    <div className="home-page relative min-h-screen overflow-x-clip pb-[96px] text-[#f3f8fd]">
+    <div className={`home-page ${deep} relative min-h-screen overflow-x-clip pb-[96px] text-[var(--t-text)]`}>
       <div className="hp-shimmer" aria-hidden="true" />
 
       <AppTopbar active="competitions" />
 
       <section className="relative px-5 pt-[26px] lg:px-16 lg:pt-[46px]">
-        <p className="mb-[18px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[#7dd3fc] lg:text-[15px] lg:tracking-[0.3em]">
+        <p className="mb-[18px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[var(--t-accent)] lg:text-[15px] lg:tracking-[0.3em]">
           {`Season ${seasonLabel(seasonStartYear())} · ${HOME_REGION_LABEL}`}
         </p>
-        <h1 className="text-[44px] font-black leading-[0.92] tracking-[-0.045em] text-[#f3f8fd] lg:text-[88px] lg:leading-[0.9]">
+        <h1 className="text-[44px] font-black leading-[0.92] tracking-[-0.045em] text-[var(--t-text)] lg:text-[88px] lg:leading-[0.9]">
           Competitions
         </h1>
-        <p className="mt-5 max-w-[560px] text-[14.5px] leading-[1.55] text-[#e2f0fc]/[0.82] lg:text-[18px] lg:leading-[1.6]">
+        <p className="mt-5 max-w-[560px] text-[14.5px] leading-[1.55] text-[var(--t-text-2)] lg:text-[18px] lg:leading-[1.6]">
           Pick a meet — results are live from the pool.
         </p>
       </section>
@@ -284,7 +289,7 @@ function Competitions() {
           <a
             key={page.href}
             href={page.href}
-            className="hp-card-std flex min-h-[130px] flex-col justify-between rounded-[18px] border border-[#7dd3fc]/[0.22] p-[18px] text-inherit no-underline shadow-[0_24px_60px_rgba(2,10,24,0.5)] backdrop-blur-[14px] transition-[transform,border-color,box-shadow] duration-[180ms] ease-out hover:-translate-y-2 hover:border-[#7dd3fc]/80 hover:shadow-[0_28px_60px_rgba(2,10,24,0.65)] focus-visible:-translate-y-2 focus-visible:border-[#7dd3fc]/80 focus-visible:shadow-[0_28px_60px_rgba(2,10,24,0.65)] focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-[3px] focus-visible:outline-[#7dd3fc] lg:min-h-[190px] lg:rounded-[24px] lg:p-[26px]"
+            className="hp-card-std flex min-h-[130px] flex-col justify-between rounded-[18px] border border-[var(--t-border)] p-[18px] text-inherit no-underline shadow-[var(--t-shadow)] backdrop-blur-[14px] transition-[transform,border-color,box-shadow] duration-[180ms] ease-out hover:-translate-y-2 hover:border-[var(--t-accent)] hover:shadow-[var(--t-shadow)] focus-visible:-translate-y-2 focus-visible:border-[var(--t-accent)] focus-visible:shadow-[var(--t-shadow)] focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-[3px] focus-visible:outline-[var(--t-accent)] lg:min-h-[190px] lg:rounded-[24px] lg:p-[26px]"
           >
             <div className="flex items-start justify-between gap-3">
               <span className="text-[21px] font-black tracking-[-0.02em] lg:text-[26px]">
@@ -293,16 +298,16 @@ function Competitions() {
               <span
                 className={`hp-mono mt-[3px] shrink-0 rounded-[7px] border px-2 py-[3px] text-[11px] font-extrabold ${
                   page.live
-                    ? 'border-[#38ef8f]/40 text-[#38ef8f]'
-                    : 'border-[#7dd3fc]/40 text-[#7dd3fc]'
+                    ? 'border-[var(--t-live-border)] text-[var(--t-live)]'
+                    : 'border-[var(--t-accent-border)] text-[var(--t-accent)]'
                 }`}
               >
                 {page.badge}
               </span>
             </div>
             <div>
-              <p className="text-[13px] leading-snug text-[#cbe0f0]/75">{page.subtitle}</p>
-              <p className="mt-3 text-[14px] font-extrabold text-[#7dd3fc]">Open results →</p>
+              <p className="text-[13px] leading-snug text-[var(--t-text-2)]">{page.subtitle}</p>
+              <p className="mt-3 text-[14px] font-extrabold text-[var(--t-accent)]">Open results →</p>
             </div>
           </a>
         ))}
@@ -313,6 +318,10 @@ function Competitions() {
       <MeetsSection />
 
       <RecordTicker />
+      {/* Переключатель тем. На витрине он единственный способ сменить режим: топбар его
+          не носит, а внутренние экраны (results, клуб, пловец) — уже другая дверь.
+          Отступ снизу считает `home.css` от высоты ленты рекордов. */}
+      <UI_ModeToggle />
     </div>
   );
 }
