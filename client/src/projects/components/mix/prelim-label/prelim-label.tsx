@@ -9,7 +9,10 @@ import React from 'react';
  * if: `<UI_PrelimLabel heatType={res.heat_type} />` безопасен на любой строке
  * (timed-финалы и старые данные без признака ничего не показывают).
  */
-export const PRELIM_COLOR = '#f59e0b';
+/* Роль темы deep с фоллбеком на прежний хекс: страницы вне темы (таблица результатов
+   и всё, что на `--theme-*`) получают ровно тот же амбер, что и раньше, а на deep-страницах
+   в СВЕТЛОМ режиме метка перестаёт быть 2.11 (см. `--t-prelim` в deep-theme.css). */
+export const PRELIM_COLOR = 'var(--t-prelim, #f59e0b)';
 export const PRELIM_ON_COLOR = '#22c55e';
 
 interface Props {
