@@ -65,7 +65,7 @@ const UI_PoolIcon: React.FC<UI_PoolIconProps> = ({
 
   if (styleType === 'icon-text-bottom') {
     return (
-      <div className="dv-PoolIcon-icon flex flex-col items-center space-y-1 text-gray-800 text-base">
+      <div className="dv-PoolIcon-icon flex flex-col items-center space-y-1 text-[var(--theme-mode-text)] text-base">
         {svg}
         <span className={labelClassName}>{label}</span>
       </div>
@@ -74,7 +74,7 @@ const UI_PoolIcon: React.FC<UI_PoolIconProps> = ({
 
   if (styleType === 'icon-text-top') {
     return (
-      <div className="dv-PoolIcon-icon flex flex-col items-center text-gray-800 text-base">
+      <div className="dv-PoolIcon-icon flex flex-col items-center text-[var(--theme-mode-text)] text-base">
         <div className={labelClassName}>{label}</div>
         {svg}
       </div>
@@ -89,7 +89,7 @@ const UI_PoolIcon: React.FC<UI_PoolIconProps> = ({
     }
 
     return (
-      <div className="dv-PoolIcon-icon flex flex-col items-center text-gray-800 text-base">
+      <div className="dv-PoolIcon-icon flex flex-col items-center text-[var(--theme-mode-text)] text-base">
         <div className={labelClassName}>{decoratedLabel}</div>
       </div>
     );
