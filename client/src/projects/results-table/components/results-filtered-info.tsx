@@ -141,7 +141,7 @@ function ResultsFilteredInfo({
         </span>
       ),
       valueCompact: (
-        <span className="text-[16px] font-extrabold text-[var(--theme-primary)] leading-[1.2]">
+        <span className="text-[16px] font-extrabold text-[var(--theme-mode-accent-on-surface)] leading-[1.2]">
           {firstResult?.event_style_age}
         </span>
       ),
@@ -171,7 +171,7 @@ function ResultsFilteredInfo({
         position === 'podium' ? (
           podiumValue('text-[19px]', 'text-[11px]')
         ) : (
-          <span className="text-[19px] font-extrabold text-[var(--theme-primary)] leading-none whitespace-nowrap">
+          <span className="text-[19px] font-extrabold text-[var(--theme-mode-accent-on-surface)] leading-none whitespace-nowrap">
             {positionLabel}
           </span>
         ),
@@ -179,7 +179,7 @@ function ResultsFilteredInfo({
         position === 'podium' ? (
           podiumValue('text-[13px]', 'text-[11px]')
         ) : (
-          <span className="text-[16px] font-extrabold text-[var(--theme-primary)] leading-[1.2] whitespace-nowrap">
+          <span className="text-[16px] font-extrabold text-[var(--theme-mode-accent-on-surface)] leading-[1.2] whitespace-nowrap">
             {positionLabel}
           </span>
         ),

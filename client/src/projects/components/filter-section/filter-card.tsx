@@ -69,7 +69,7 @@ const FilterCard: React.FC<FilterCardProps> = ({
             <span
               className={`text-[13px] font-bold max-w-[150px] truncate ${
                 isActive
-                  ? 'text-[var(--fc-summary-active,var(--theme-primary))]'
+                  ? 'text-[var(--fc-summary-active,var(--theme-mode-accent-on-surface,var(--theme-primary)))]'
                   : 'text-[var(--fc-summary,var(--theme-mode-text-muted))]'
               }`}
             >

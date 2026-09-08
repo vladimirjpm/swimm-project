@@ -205,7 +205,7 @@
 
 .fb--bare .fb__chip--active .fb__chip-value {
   font-size: 14px;
-  color: var(--fb-active-text, var(--theme-primary));
+  color: var(--fb-active-text, var(--theme-mode-accent-on-surface, var(--theme-primary)));
 }
 
 .fb--bare .fb__chip--active .fb__label { font-size: 9px; letter-spacing: 0.08em; }

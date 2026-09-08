@@ -201,7 +201,7 @@ function CardTabs({ active, onChange, recordRows, seasonRows, seasonLabel }: {
     `flex-1 sm:flex-none sm:whitespace-nowrap cursor-pointer select-none rounded-[9px] px-3 py-[7px] text-center sm:text-left ${
       isActive
         ? 'bg-[var(--theme-agetabs-active-bg)] text-[#1a1a1a] dark:text-[#dbe8fb] shadow-[0_1px_2px_rgba(20,28,45,.10)]'
-        : 'bg-transparent text-[#8a93a3]'
+        : 'bg-transparent text-[var(--theme-mode-text-muted)]'
     }`;
 
   return (
@@ -336,7 +336,7 @@ function renderManyAges(
           <span className="text-[9px] sm:text-[10px] font-semibold text-[#aab0bd] shrink-0 whitespace-nowrap">updated {updated}</span>
         )}
         <span
-          className={`text-[#8a93a3] text-[11px] sm:text-[12px] shrink-0 transition-transform duration-150 ease-out motion-reduce:transition-none ${isOpen ? 'rotate-180' : ''}`}
+          className={`text-[var(--theme-mode-text-muted)] text-[11px] sm:text-[12px] shrink-0 transition-transform duration-150 ease-out motion-reduce:transition-none ${isOpen ? 'rotate-180' : ''}`}
         >
           ▾
         </span>
