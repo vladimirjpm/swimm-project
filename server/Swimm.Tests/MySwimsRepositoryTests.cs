@@ -93,7 +93,7 @@ public class MySwimsRepositoryTests
     private static ResultRecord NewResult(
         Swimmer swimmer, Competition comp, Style style, Club club,
         DateTime competitionDate, string distance = "50", int? timeMs = 30000,
-        int? position = 1, bool timeFail = false, int? relayId = null)
+        int? position = 1, bool timeFail = false, int? relayId = null, string? heatType = null)
     {
         return new ResultRecord
         {
@@ -109,6 +109,7 @@ public class MySwimsRepositoryTests
             TimeMillisecond = timeMs,
             TimeOriginal = timeMs != null ? "00:30.00" : "DNF",
             TimeFail = timeFail,
+            HeatType = heatType,
             RelayId = relayId,
             InternationalPoints = 500,
         };
@@ -314,6 +315,60 @@ public class MySwimsRepositoryTests
     }
 
     // ── Реакции: congrats двух юзеров → CongratsCount=2, MyCheer только у своего; лайк на медиа ──
+
+    // ── Место: только у доплывшего в зачётном заплыве (инцидент И-16) ────────────
+
+    [Fact]
+    public async Task GetMySwims_PrelimSwim_HasNoPlace()
+    {
+        await using var db = CreateDb(nameof(GetMySwims_PrelimSwim_HasNoPlace));
+        var user = NewUser("u10@example.com");
+        var swimmer = NewSwimmer("Гурбанко", "Анастасия");
+        db.AppUsers.Add(user);
+        db.Swimmers.Add(swimmer);
+        await db.SaveChangesAsync();
+        var (style, club) = await SeedRefsAsync(db);
+        var comp = await SeedCompetitionAsync(db);
+        await AddFavoriteAsync(db, user, swimmer);
+
+        db.Results.Add(NewResult(swimmer, comp, style, club, new DateTime(2025, 10, 1),
+            position: 2, heatType: "prelim"));
+        await db.SaveChangesAsync();
+
+        var response = await NewRepo(db).GetMySwimsAsync(user.Id, season: 2025);
+
+        // У предварительного заплыва места нет — так же его режут таблица результатов,
+        // страница клуба и хаб-группы; My media обязана говорить то же самое.
+        Assert.Null(Assert.Single(response.Swims).Place);
+    }
+
+    [Fact]
+    public async Task GetMySwims_DisqualifiedSwim_HasNoPlace_ButFinishedKeepsIt()
+    {
+        await using var db = CreateDb(nameof(GetMySwims_DisqualifiedSwim_HasNoPlace_ButFinishedKeepsIt));
+        var user = NewUser("u11@example.com");
+        var swimmer = NewSwimmer("Гурбанко", "Анастасия");
+        db.AppUsers.Add(user);
+        db.Swimmers.Add(swimmer);
+        await db.SaveChangesAsync();
+        var (style, club) = await SeedRefsAsync(db);
+        var comp = await SeedCompetitionAsync(db);
+        await AddFavoriteAsync(db, user, swimmer);
+
+        // Протокол печатает число в первой колонке и у снятых, и оно доезжает до нас как
+        // Position — но местом не является: заплыва не было.
+        var dsq = NewResult(swimmer, comp, style, club, new DateTime(2025, 10, 1),
+            distance: "100", timeMs: null, position: 2, timeFail: true, heatType: "final");
+        var finished = NewResult(swimmer, comp, style, club, new DateTime(2025, 10, 1),
+            distance: "50", position: 3, heatType: "final");
+        db.Results.AddRange(dsq, finished);
+        await db.SaveChangesAsync();
+
+        var response = await NewRepo(db).GetMySwimsAsync(user.Id, season: 2025);
+
+        Assert.Null(response.Swims.Single(s => s.ResultId == dsq.Id).Place);
+        Assert.Equal(3, response.Swims.Single(s => s.ResultId == finished.Id).Place);
+    }
 
     [Fact]
     public async Task GetMySwims_Reactions_CongratsCountAndMyCheer_LikesCountAndMyLike()

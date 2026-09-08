@@ -112,7 +112,14 @@ public class MySwimsRepository : IMySwimsRepository
                 Style = r.Style.Name,
                 StyleId = r.StyleId,
                 IsRelay = r.RelayId != null,
-                Place = r.Position,
+                // Место есть только у того, кто доплыл в ЗАЧЁТНОМ заплыве. Два среза:
+                // у предварительных мест нет вовсе (общее правило продукта — так же режут
+                // Position таблица результатов, страница клуба и хаб-группы), а у DQ / NS /
+                // DNS места нет по смыслу: число в первой колонке протокола у них не про
+                // место, и «#2 🥈 DSQ» в одной строке — прямое враньё (инцидент И-18).
+                Place = r.HeatType == "prelim" || r.HeatType == "extra" || r.TimeFail
+                    ? null
+                    : r.Position,
                 Points = r.InternationalPoints,
                 Time = r.TimeOriginal,
                 // Пол/год рождения/возраст события — ключи ступени рекорда и SB. Пол берём у
