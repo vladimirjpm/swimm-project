@@ -156,7 +156,7 @@ function Cell({ entries, gender, showClubIcon, showDate, stacked }: {
                 ? 'break-words text-[11.5px] leading-[1.25]'
                 : 'truncate text-[11px] sm:text-[12.5px]'
             } ${s.deep}`}
-            secondLineClassName={`text-[#8a93a3] ${
+            secondLineClassName={`text-[var(--theme-mode-text-muted)] ${
               stacked ? 'break-words text-[10px] leading-[1.25]' : 'truncate text-[10px] sm:text-[11px]'
             }`}
           />
@@ -170,7 +170,7 @@ function Cell({ entries, gender, showClubIcon, showDate, stacked }: {
           )}
           {entry.note && (
             <div
-              className={`text-[9px] sm:text-[10px] tabular-nums text-[#8a93a3] ${
+              className={`text-[9px] sm:text-[10px] tabular-nums text-[var(--theme-mode-text-muted)] ${
                 isMale ? 'text-left' : 'text-right'
               }`}
             >
