@@ -93,7 +93,8 @@ public class MySwimsRepositoryTests
     private static ResultRecord NewResult(
         Swimmer swimmer, Competition comp, Style style, Club club,
         DateTime competitionDate, string distance = "50", int? timeMs = 30000,
-        int? position = 1, bool timeFail = false, int? relayId = null, string? heatType = null)
+        int? position = 1, bool timeFail = false, int? relayId = null, string? heatType = null,
+        string? round = null)
     {
         return new ResultRecord
         {
@@ -110,6 +111,7 @@ public class MySwimsRepositoryTests
             TimeOriginal = timeMs != null ? "00:30.00" : "DNF",
             TimeFail = timeFail,
             HeatType = heatType,
+            Round = round,
             RelayId = relayId,
             InternationalPoints = 500,
         };
@@ -368,6 +370,30 @@ public class MySwimsRepositoryTests
 
         Assert.Null(response.Swims.Single(s => s.ResultId == dsq.Id).Place);
         Assert.Equal(3, response.Swims.Single(s => s.ResultId == finished.Id).Place);
+    }
+
+    [Fact]
+    public async Task GetMySwims_OpenFinalSwim_HasNoPlace()
+    {
+        await using var db = CreateDb(nameof(GetMySwims_OpenFinalSwim_HasNoPlace));
+        var user = NewUser("u12@example.com");
+        var swimmer = NewSwimmer("Гурбанко", "Анастасия");
+        db.AppUsers.Add(user);
+        db.Swimmers.Add(swimmer);
+        await db.SaveChangesAsync();
+        var (style, club) = await SeedRefsAsync(db);
+        var comp = await SeedCompetitionAsync(db);
+        await AddFavoriteAsync(db, user, swimmer);
+
+        // Секция «כללי» (final-open) не приносит ни очков, ни медалей (правило Р43): свою
+        // награду эти пловцы получают в возрастной секции того же дня.
+        db.Results.Add(NewResult(swimmer, comp, style, club, new DateTime(2025, 10, 1),
+            position: 1, heatType: "final", round: ResultRounds.FinalOpen));
+        await db.SaveChangesAsync();
+
+        var response = await NewRepo(db).GetMySwimsAsync(user.Id, season: 2025);
+
+        Assert.Null(Assert.Single(response.Swims).Place);
     }
 
     [Fact]

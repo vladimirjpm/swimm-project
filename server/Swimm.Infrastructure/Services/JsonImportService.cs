@@ -728,8 +728,14 @@ public class JsonImportService : IImportService
                     HeatType = string.IsNullOrWhiteSpace(item.HeatType) ? null : item.HeatType,
                     Round = string.IsNullOrWhiteSpace(item.Round) ? null : item.Round,
                     OfficialClubPoints = item.OfficialClubPoints,
-                    Position = item.Position,
-                    PositionAgeGroup = item.PositionAgeGroup,
+                    // Место есть только у ДОПЛЫВШЕГО. У DQ / NS / DNS число в первой
+                    // колонке протокола местом не является — в одном заплыве оно
+                    // повторяется у разных снятых, — и, попав в базу, оно доезжает до
+                    // витрины как «#2 🥈» рядом со словом DSQ (инцидент И-18,
+                    // docs/data-integrity.md). Режем на ЗАПИСИ: иначе про это правило
+                    // обязан помнить каждый читающий репозиторий, а их полдюжины.
+                    Position = item.TimeFail ? null : item.Position,
+                    PositionAgeGroup = item.TimeFail ? null : item.PositionAgeGroup,
                     Heat = item.Heat ?? 0,
                     Lane = item.Lane ?? 0,
                     TimeMillisecond = ParseTimeToMs(item.Time),

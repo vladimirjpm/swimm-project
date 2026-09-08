@@ -170,6 +170,48 @@ public class ImportUpsertIntegrationTests
         Assert.Equal(29500, updated.TimeMillisecond);
     }
 
+    // ── Место есть только у доплывшего (инцидент И-18) ──────────────────────────
+
+    [Fact]
+    public async Task DisqualifiedSwim_ImportedWithoutPlace()
+    {
+        await using var db = CreateDb(nameof(DisqualifiedSwim_ImportedWithoutPlace));
+        var svc = new JsonImportService(db, new NullCacheService());
+
+        // Протокол печатает число в первой колонке и у снятых — местом оно не является:
+        // в одном заплыве такое «место» повторяется у разных NS-строк.
+        var dsq = new
+        {
+            country = "ISR",
+            competition = "Comp",
+            date = "01/06/2026",
+            event_style_name = "Freestyle",
+            event_style_len = "50",
+            event_style_gender = "male",
+            pool_type = "25m",
+            position = 2,
+            position_age_group = 2,
+            heat = 1,
+            lane = 4,
+            last_name = "Cohen",
+            first_name = "Tal",
+            birth_year = 2005,
+            club = "Club",
+            time = (string?)null,
+            time_fail = true,
+            time_fail_note = "NS",
+        };
+
+        var result = await svc.ImportAsync(ToStream(new object[] { dsq, Item("Levi", "Dan", 2005, lane: 5) }));
+
+        Assert.Empty(result.ErrorMessages);
+        var stored = await db.Results.SingleAsync(r => r.TimeFail);
+        Assert.Null(stored.Position);
+        Assert.Null(stored.PositionAgeGroup);
+        // Доплывший место сохраняет — режем только снятых.
+        Assert.Equal(1, (await db.Results.SingleAsync(r => !r.TimeFail)).Position);
+    }
+
     [Fact]
     public async Task MediaSurvivesReimport()
     {
