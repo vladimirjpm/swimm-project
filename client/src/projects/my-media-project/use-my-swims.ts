@@ -140,4 +140,7 @@ async function toggleReaction(url: string, on: boolean): Promise<{ count: number
 }
 
 export const toggleLike = (mediaId: number, on: boolean) => toggleReaction(`/api/media/${mediaId}/like`, on);
+/** Поздравить с заплывом. UI-вызова сейчас НЕТ: на `/my-media` 🎉 только показывается —
+ *  страница про своих пловцов, и поздравлять там некого (решение Влада 08.09.2026).
+ *  Обёртка остаётся под экран, где поздравляют ЧУЖОЙ заплыв (витрина группы). */
 export const toggleCheer = (resultId: number, on: boolean) => toggleReaction(`/api/results/${resultId}/cheer`, on);

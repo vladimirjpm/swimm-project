@@ -9,7 +9,7 @@ import { useMyMediaPublications } from '../../hooks/useUserMedia';
 import { useMyHubGroups } from '../hub-groups-project/use-my-hub-groups';
 import { useDeepThemeClass } from '../components/deep/use-deep-theme-class';
 import { useAllMyMedia, AllUserMediaDto, AddMediaInput } from './use-all-my-media';
-import { useMySwims, MySwimDto, SwimMediaDto, seasonLabel, toggleLike, toggleCheer } from './use-my-swims';
+import { useMySwims, MySwimDto, SwimMediaDto, seasonLabel, toggleLike } from './use-my-swims';
 import { useMyMediaModeration } from './use-my-media-moderation';
 import AppTopbar from '../components/app-topbar/app-topbar';
 import UI_SwimmerGallery from '../components/mix/swimmer-gallery/swimmer-gallery';
@@ -120,7 +120,6 @@ function MyMediaContent({ deep }: { deep: string }) {
 
   // ── Реакции: оптимистичные оверрайды поверх ответа /api/me/swims ─────────
   const [likeOverrides, setLikeOverrides] = useState<Map<number, { count: number; mine: boolean }>>(new Map());
-  const [cheerOverrides, setCheerOverrides] = useState<Map<number, { count: number; mine: boolean }>>(new Map());
 
   const applyMediaOverride = (m: SwimMediaDto): SwimMediaDto => {
     const o = likeOverrides.get(m.id);
@@ -128,16 +127,8 @@ function MyMediaContent({ deep }: { deep: string }) {
   };
 
   const swims: MySwimDto[] = useMemo(
-    () => data.swims.map((s) => {
-      const o = cheerOverrides.get(s.result_id);
-      return {
-        ...s,
-        congrats_count: o ? o.count : s.congrats_count,
-        my_cheer: o ? o.mine : s.my_cheer,
-        media: s.media.map(applyMediaOverride),
-      };
-    }),
-    [data.swims, cheerOverrides, likeOverrides] // eslint-disable-line react-hooks/exhaustive-deps
+    () => data.swims.map((s) => ({ ...s, media: s.media.map(applyMediaOverride) })),
+    [data.swims, likeOverrides] // eslint-disable-line react-hooks/exhaustive-deps
   );
   const competitionMedia = useMemo(
     () => data.competition_media.map(applyMediaOverride),
@@ -282,13 +273,6 @@ function MyMediaContent({ deep }: { deep: string }) {
     setLikeOverrides((prev) => new Map(prev).set(m.id, { count: m.likes_count + (next ? 1 : -1), mine: next }));
     const state = await toggleLike(m.id, next);
     if (state) setLikeOverrides((prev) => new Map(prev).set(m.id, state));
-  };
-
-  const onToggleCheer = async (s: MySwimDto) => {
-    const next = !s.my_cheer;
-    setCheerOverrides((prev) => new Map(prev).set(s.result_id, { count: s.congrats_count + (next ? 1 : -1), mine: next }));
-    const state = await toggleCheer(s.result_id, next);
-    if (state) setCheerOverrides((prev) => new Map(prev).set(s.result_id, state));
   };
 
   // ── Лайтбокс ──────────────────────────────────────────────────────────────
@@ -594,7 +578,6 @@ function MyMediaContent({ deep }: { deep: string }) {
     onWithdraw: (mediaId: number, hubGroupId: number) => withdrawPublication(mediaId, hubGroupId),
     onDelete: handleDelete,
     onToggleLike,
-    onToggleCheer,
   };
 
 

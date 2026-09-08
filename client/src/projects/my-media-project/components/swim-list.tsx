@@ -27,7 +27,6 @@ export interface SwimListCallbacks {
   onWithdraw: (mediaId: number, hubGroupId: number) => void;
   onDelete: (mediaId: number) => void;
   onToggleLike: (media: SwimMediaDto) => void;
-  onToggleCheer: (swim: MySwimDto) => void;
 }
 
 interface Props extends SwimListCallbacks {
@@ -207,43 +206,51 @@ function SourceChip({ m, onClick }: { m: SwimMediaDto; onClick: () => void }) {
   );
 }
 
-function LikeChip({ m, onToggle }: { m: SwimMediaDto; onToggle: () => void }) {
+/**
+ * ❤ — сколько людей отметило ЭТО медиа. В строке заплыва он только ПОКАЗЫВАЕТ, что
+ * популярно (решение Влада 08.09.2026), поэтому там идёт без `onToggle` и рисуется
+ * span'ом: нажимать нечего, и вид кнопки обещал бы обратное. Нажимаемым он остаётся в
+ * раскрытой панели, где вообще живут действия над медиа.
+ */
+function LikeChip({ m, onToggle }: { m: SwimMediaDto; onToggle?: () => void }) {
   const liked = m.my_like;
+  const className = 'hp-mono rounded-[7px] px-2 py-[3px] text-[10.5px] font-extrabold';
+  const style = {
+    border: `1px solid ${liked ? 'var(--t-like)' : 'var(--t-border)'}`,
+    background: liked ? 'var(--t-like-soft)' : 'transparent',
+    color: liked ? 'var(--t-like)' : m.likes_count > 0 ? 'var(--t-text-2)' : 'var(--t-text-3)',
+  };
+  const label = `❤ ${m.likes_count}`;
+
+  if (!onToggle) {
+    return <span className={className} style={style} title={`${m.likes_count} liked this`}>{label}</span>;
+  }
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="hp-mono rounded-[7px] px-2 py-[3px] text-[10.5px] font-extrabold"
-      style={{
-        border: `1px solid ${liked ? 'var(--t-like)' : 'var(--t-border)'}`,
-        background: liked ? 'var(--t-like-soft)' : 'transparent',
-        color: liked ? 'var(--t-like)' : m.likes_count > 0 ? 'var(--t-text-2)' : 'var(--t-text-3)',
-      }}
-      title={liked ? 'Remove like' : 'Like'}
-    >
-      ❤ {m.likes_count}
+    <button type="button" onClick={onToggle} className={className} style={style} title={liked ? 'Remove like' : 'Like'}>
+      {label}
     </button>
   );
 }
 
-function CheerChip({ swim, emphasized, onToggle }: {
-  swim: MySwimDto; emphasized: boolean; onToggle: () => void;
-}) {
+/**
+ * 🎉 — сколько людей поздравило с ЭТИМ заплывом. Тоже только показ: строка отвечает на
+ * вопрос «что тут популярно», а не предлагает поздравить самого себя — эта страница про
+ * своих пловцов.
+ */
+function CheerChip({ swim, emphasized }: { swim: MySwimDto; emphasized: boolean }) {
   const on = swim.my_cheer;
   return (
-    <button
-      type="button"
-      onClick={onToggle}
+    <span
       className="hp-mono whitespace-nowrap rounded-[7px] px-2 py-[3px] text-[10.5px] font-extrabold"
       style={{
         border: `1px solid ${on ? 'var(--t-warn)' : emphasized ? 'var(--t-warn-border)' : 'var(--t-border)'}`,
         background: on ? 'var(--t-warn-soft)' : 'transparent',
         color: on ? 'var(--t-warn)' : emphasized ? 'var(--t-warn)' : swim.congrats_count > 0 ? 'var(--t-text-2)' : 'var(--t-text-3)',
       }}
-      title={on ? 'Remove congrats' : 'Congratulate'}
+      title={`${swim.congrats_count} congratulated this swim`}
     >
       🎉 {swim.congrats_count}
-    </button>
+    </span>
   );
 }
 
@@ -498,12 +505,12 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
             читалось как оценка ролика. Колонка есть только там, где кого-то поздравили. */}
         {showCheers && (
           <span className="flex items-center justify-end">
-            <CheerChip swim={swim} emphasized={swim.is_pb} onToggle={() => cb.onToggleCheer(swim)} />
+            {swim.congrats_count > 0 && <CheerChip swim={swim} emphasized={swim.is_pb} />}
           </span>
         )}
         {/* MEDIA — один чип. У заплыва с медиа он же и раскрывает панель, поэтому отдельной
             кнопки «Manage» больше нет: две кнопки об одном занимали треть строки. */}
-        <span className="flex items-center justify-end gap-1.5">
+        <span className="flex flex-col items-end justify-center gap-1">
           {hasMedia ? (
             <button
               type="button"
@@ -524,7 +531,11 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
               + Add video
             </button>
           )}
-          {topLiked && <LikeChip m={topLiked} onToggle={() => cb.onToggleLike(topLiked)} />}
+          {/* Слот под ❤ держится всегда, даже пустой: иначе строки скачут по высоте
+              от того, есть у медиа оценки или нет. */}
+          <span className="flex h-[20px] items-center">
+            {topLiked && <LikeChip m={topLiked} />}
+          </span>
         </span>
       </div>
 
@@ -576,9 +587,7 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
             )}
             {/* Колонок на телефоне нет, поэтому 🎉 стоит у времени — рядом с заплывом,
                 к которому относится, а не у медиа. */}
-            {swim.congrats_count > 0 && (
-              <CheerChip swim={swim} emphasized={swim.is_pb} onToggle={() => cb.onToggleCheer(swim)} />
-            )}
+            {swim.congrats_count > 0 && <CheerChip swim={swim} emphasized={swim.is_pb} />}
           </span>
         </span>
         {/* Цель нажатия 44px, поздравления — ПОД кнопкой, а не сбоку: справа их выдавливало
@@ -605,7 +614,9 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
               + Video
             </button>
           )}
-          {topLiked && <LikeChip m={topLiked} onToggle={() => cb.onToggleLike(topLiked)} />}
+          <span className="flex h-[20px] items-center">
+            {topLiked && <LikeChip m={topLiked} />}
+          </span>
         </span>
       </div>
 
