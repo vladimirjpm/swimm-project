@@ -156,8 +156,10 @@ const { values, set, options, isAvailable } = useFilterHost();
    `.sb-filters` и получает ту же панель в deep.
 3. **`window.filter_data`.** Опции results до сих пор берутся из статического файла. В
    варианте A это прячется за `options`, но техдолг остаётся. Чинить сейчас или отдельно?
-4. **Полоса чипов** (`ResultsFilteredInfo` ↔ `sb-filter-bar`) — сводить в этот же заход или
-   отдельной задачей? Правила у них одни, палитры разные — та же история, что с `FilterCard`.
+4. ~~**Полоса чипов**~~ ✅ Сведена отдельной задачей — Ф1 плана
+   [`my-media-filters-plan.md`](my-media-filters-plan.md) (07.09.2026, в master): общий
+   `FilterBar`, а `ResultsFilteredInfo` и `sb-filter-bar` стали сборщиками чипов. Последний
+   дубль этой подсистемы закрыт.
 
 ---
 
@@ -328,8 +330,9 @@ season, stroke, distance, pool, gender, age и swimmer, но НЕ читал `cl
 **Ф5 (сделан).** [`docs/ui-components.md`](../ui-components.md) больше не врёт: в §5 карточка
 фильтра описана как тем-нейтральная, `Filter*` — как ОБЩИЙ сайдбар двух страниц, и добавлена
 строка про сам шов `FilterHost`. Из §6 ушли две строки про дубли (`SbCard` и «сами фильтры»),
-осталась одна — полоса чипов `ResultsFilteredInfo` ↔ `sb-filter-bar`, последний дубль этой
-подсистемы; она сводится тем же приёмом и ждёт решения (§4 п.4).
+оставалась одна — полоса чипов `ResultsFilteredInfo` ↔ `sb-filter-bar`. Её свела Ф1 плана
+[`my-media-filters-plan.md`](my-media-filters-plan.md) (07.09.2026): дублей у подсистемы больше
+нет (§4 п.4).
 
 **Две ловушки, которые всплыли при проверке Ф1–Ф2 — держать в голове на Ф3 и Ф4:**
 
