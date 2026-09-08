@@ -141,7 +141,10 @@ function MyMediaFilterPanel({
           isActive={season == null}
           {...card('season')}
         >
-          <div className="mmf__season theme-deep">
+          {/* Класс темы карусели НЕ ставим: он уже есть выше — на корне страницы (сайдбар) и на
+              самой шторке (портал). Прибитый здесь `theme-deep` пережил Ф5 и держал карусель
+              тёмной на светлой странице: цифра сезона приезжала cyan со свечением. */}
+          <div className="mmf__season">
             <DeepSeasonCarousel seasons={seasons} season={season} onSeason={onSeason} />
           </div>
         </FilterCard>
