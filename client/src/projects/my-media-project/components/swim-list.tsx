@@ -382,11 +382,13 @@ function MediaLine({
  * Общее берётся ячейками: `UI_SwimmStyleIcon`, `UI_SwimTime` вместе с
  * `swimFlaggedRowProps` (носитель спорного времени) и `UI_DateIcon` (формат даты один на продукт).
  */
-function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
+function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, cb }: {
   swim: MySwimDto;
   showSwimmerName: boolean;
   /** Колонка DATE — только у многодневок (см. `sameDay`). */
   showDate: boolean;
+  /** Колонка 🎉 — только если в карточке кого-то уже поздравили (см. `CompetitionGroup`). */
+  showCheers: boolean;
   swimmerName: string;
   cb: SwimListCallbacks;
 }) {
@@ -395,6 +397,12 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
   const photos = swim.media.filter((m) => m.media_type === 'image');
   const hasMedia = swim.media.length > 0;
   const noVideo = videos.length === 0;
+  // ❤ в строке — сводка: самое залайканное медиа заплыва. Ноль не показываем: пустое
+  // сердечко в каждой строке читается как «никому не понравилось», а не как «ещё нет оценок».
+  const topLiked = swim.media.reduce<SwimMediaDto | null>(
+    (best, m) => (m.likes_count > 0 && (!best || m.likes_count > best.likes_count) ? m : best),
+    null,
+  );
 
   // Спорное время (И11): чип рисует `UI_SwimTime`, а НОСИТЕЛЬ — сама строка:
   // caution-лента слева плюс полный текст в title/aria-label. До этого строка My media
@@ -430,7 +438,7 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
           уехали в раскрывающуюся панель — она и есть кнопка «открыть/закрыть». */}
       <div
         {...flagged}
-        className={`mms-row${showDate ? ' mms-row--dated' : ''} hidden px-5 py-[10px] sm:grid${flagged.className ? ` ${flagged.className}` : ''}`}
+        className={`mms-row${showDate ? ' mms-row--dated' : ''}${showCheers ? ' mms-row--cheers' : ''} hidden px-5 py-[10px] sm:grid${flagged.className ? ` ${flagged.className}` : ''}`}
         style={{ background: noVideo ? 'var(--t-input-bg)' : 'transparent' }}
       >
         <span className="text-center text-[17px] font-black leading-none">
@@ -486,6 +494,13 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
             />
           </span>
         )}
+        {/* Поздравления — СВОЯ колонка: 🎉 про заплыв, а не про медиа, и в медиа-ячейке
+            читалось как оценка ролика. Колонка есть только там, где кого-то поздравили. */}
+        {showCheers && (
+          <span className="flex items-center justify-end">
+            <CheerChip swim={swim} emphasized={swim.is_pb} onToggle={() => cb.onToggleCheer(swim)} />
+          </span>
+        )}
         {/* MEDIA — один чип. У заплыва с медиа он же и раскрывает панель, поэтому отдельной
             кнопки «Manage» больше нет: две кнопки об одном занимали треть строки. */}
         <span className="flex items-center justify-end gap-1.5">
@@ -509,7 +524,7 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
               + Add video
             </button>
           )}
-          {!noVideo && <CheerChip swim={swim} emphasized={swim.is_pb} onToggle={() => cb.onToggleCheer(swim)} />}
+          {topLiked && <LikeChip m={topLiked} onToggle={() => cb.onToggleLike(topLiked)} />}
         </span>
       </div>
 
@@ -555,9 +570,16 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
           >
             {showSwimmerName ? swimmerName : `${swim.distance}m ${styleLabel(swim.style)}`}
           </span>
-          {swim.is_relay && (
-            <span className="hp-mono mt-1 inline-block rounded-[5px] border border-[var(--t-accent-border)] px-1 py-[1px] text-[8.5px] font-extrabold text-[var(--t-accent)]">RELAY</span>
-          )}
+          <span className="mt-1 flex items-center gap-1.5">
+            {swim.is_relay && (
+              <span className="hp-mono inline-block rounded-[5px] border border-[var(--t-accent-border)] px-1 py-[1px] text-[8.5px] font-extrabold text-[var(--t-accent)]">RELAY</span>
+            )}
+            {/* Колонок на телефоне нет, поэтому 🎉 стоит у времени — рядом с заплывом,
+                к которому относится, а не у медиа. */}
+            {swim.congrats_count > 0 && (
+              <CheerChip swim={swim} emphasized={swim.is_pb} onToggle={() => cb.onToggleCheer(swim)} />
+            )}
+          </span>
         </span>
         {/* Цель нажатия 44px, поздравления — ПОД кнопкой, а не сбоку: справа их выдавливало
             имя. Кнопка раскрывает ТУ ЖЕ панель, что на десктопе (решение Влада 08.09.2026):
@@ -583,7 +605,7 @@ function MySwimRow({ swim, showSwimmerName, showDate, swimmerName, cb }: {
               + Video
             </button>
           )}
-          {!noVideo && <CheerChip swim={swim} emphasized={swim.is_pb} onToggle={() => cb.onToggleCheer(swim)} />}
+          {topLiked && <LikeChip m={topLiked} onToggle={() => cb.onToggleLike(topLiked)} />}
         </span>
       </div>
 
@@ -633,6 +655,9 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
   const selectedName = preferredSwimmerId != null ? swimmerNames.get(preferredSwimmerId) ?? null : null;
   // Подписи колонок — ровно по сетке строки (`.mms-row`), поэтому ширины здесь больше нет:
   // и шапка, и строка тянут её из одного grid-шаблона в `my-media.css`.
+  // Колонка 🎉 появляется, только если в этой карточке кого-то уже поздравили: пустой
+  // столбец нулей в каждой строке — шум, а не информация.
+  const showCheers = swims.some((s) => s.congrats_count > 0);
   const columns: { label: string; align?: 'center' | 'right' }[] = [
     { label: 'PLACE', align: 'center' },
     { label: '' },
@@ -641,6 +666,7 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
     { label: '' },
     { label: 'TIME' },
     ...(showDate ? [{ label: 'DATE' as const }] : []),
+    ...(showCheers ? [{ label: '🎉', align: 'right' as const }] : []),
     { label: 'MEDIA', align: 'right' as const },
   ];
 
@@ -716,7 +742,7 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
 
       {/* Column header (desktop) — та же сетка, что у строки: подписи не могут разъехаться
           со столбцами, потому что ширины у них общие (`.mms-row` в my-media.css). */}
-      <div className={`mms-row${showDate ? ' mms-row--dated' : ''} hidden px-5 py-1.5 sm:grid`}>
+      <div className={`mms-row${showDate ? ' mms-row--dated' : ''}${showCheers ? ' mms-row--cheers' : ''} hidden px-5 py-1.5 sm:grid`}>
         {columns.map((c, i) => (
           <span
             key={i}
@@ -736,6 +762,7 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
             swim={s}
             showSwimmerName={showSwimmerName}
             showDate={showDate}
+            showCheers={showCheers}
             swimmerName={rowSwimmerName(s, swimmerNames, preferredSwimmerId)}
             cb={cb}
           />

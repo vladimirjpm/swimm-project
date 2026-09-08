@@ -329,9 +329,17 @@
   gap: 14px;
   align-items: center;
 }
-/* Колонка даты появляется только у многодневок — тогда столбцов восемь. */
+/* Две колонки необязательные: дата (только у многодневок) и 🎉 (только там, где кого-то
+   поздравили). Комбинации перечислены явно — нулевая колонка не годится, у неё всё равно
+   остаётся зазор, и строка расходится с шапкой. */
 .mms-row--dated {
   grid-template-columns: 48px 28px 66px minmax(0, 1fr) 72px 110px 72px 120px;
+}
+.mms-row--cheers {
+  grid-template-columns: 48px 28px 66px minmax(0, 1fr) 72px 110px 56px 120px;
+}
+.mms-row--dated.mms-row--cheers {
+  grid-template-columns: 48px 28px 66px minmax(0, 1fr) 72px 110px 72px 56px 120px;
 }
 
 /* Плотный вариант: на 1280 рядом с сайдбаром 320 полной сетке уже тесно. Ужимается
@@ -339,6 +347,8 @@
 @media (max-width: 1400px) {
   .mms-row { grid-template-columns: 40px 24px 60px minmax(0, 1fr) 64px 96px 110px; gap: 10px; }
   .mms-row--dated { grid-template-columns: 40px 24px 60px minmax(0, 1fr) 64px 96px 64px 110px; }
+  .mms-row--cheers { grid-template-columns: 40px 24px 60px minmax(0, 1fr) 64px 96px 52px 110px; }
+  .mms-row--dated.mms-row--cheers { grid-template-columns: 40px 24px 60px minmax(0, 1fr) 64px 96px 64px 52px 110px; }
 }
 
 /* Плитка стиля тянется по своей колонке: ширину задаёт сетка, а не размер картинки. */
