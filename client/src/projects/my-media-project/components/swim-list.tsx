@@ -495,18 +495,24 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
               {swim.distance}m {styleLabel(swim.style)}
             </span>
           )}
-          {swim.is_relay && (
-            <span className="hp-mono shrink-0 rounded-[5px] border border-[var(--t-accent-border)] px-1.5 py-[1px] text-[9px] font-extrabold text-[var(--t-accent)]">RELAY</span>
-          )}
         </span>
         {/* Метка достижения — своей колонкой, а не под медалью: рекорд и PB это про ВРЕМЯ,
             и стоять им положено рядом с ним. */}
         <span className="flex items-center justify-end">
           <BestMark record={recordMark} pb={swim.is_pb} sb={swim.is_sb} />
         </span>
-        <span className="hp-mono text-[15px] font-extrabold text-[var(--t-accent)]">
-          {swim.time_fail ? 'DSQ' : (
-            <UI_SwimTime time={swim.time} quality={quality} />
+        {/* RELAY стоит ПОД временем, а не у имени (решение Влада 08.09.2026): это признак
+            самого заплыва, и в тянущейся колонке он уезжал от времени тем дальше, чем
+            длиннее имя. Растёт по высоте только строка эстафеты — у остальных ячейка
+            прежняя. */}
+        <span className="hp-mono flex flex-col items-start gap-[3px] text-[15px] font-extrabold text-[var(--t-accent)]">
+          <span>
+            {swim.time_fail ? 'DSQ' : (
+              <UI_SwimTime time={swim.time} quality={quality} />
+            )}
+          </span>
+          {swim.is_relay && (
+            <span className="rounded-[5px] border border-[var(--t-accent-border)] px-1.5 py-[1px] text-[9px] font-extrabold leading-none">RELAY</span>
           )}
         </span>
         {/* Дата — общим `UI_DateIcon`, а не сырой ISO-строкой из API: формат даты живёт
@@ -589,19 +595,11 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
               <UI_SwimTime time={swim.time} quality={quality} />
             )}
           </span>
-          {/* Имя целиком, без многоточия: ивритское имя, укороченное посередине, читается
-              как чужое. Показан один пловец — вместо имени дисциплина. */}
-          <span
-            dir={showSwimmerName ? 'auto' : undefined}
-            className={`mt-0.5 block break-words text-left leading-tight ${
-              showSwimmerName
-                ? 'text-[15px] font-black text-[var(--t-text)]'
-                : 'text-[12px] font-extrabold text-[var(--t-text-2)]'
-            }`}
-          >
-            {showSwimmerName ? swimmerName : `${swim.distance}m ${styleLabel(swim.style)}`}
-          </span>
-          <span className="mt-1 flex items-center gap-1.5">
+          {/* Метки заплыва — сразу ПОД временем, имя уходит вниз (решение Влада 08.09.2026):
+              RELAY относится к заплыву, а не к пловцу, и от времени его отделять незачем.
+              `empty:hidden` — на строках без единой метки контейнер не должен разрывать
+              время и имя своим отступом. */}
+          <span className="mt-1 flex items-center gap-1.5 empty:hidden">
             {swim.is_relay && (
               <span className="hp-mono inline-block rounded-[5px] border border-[var(--t-accent-border)] px-1 py-[1px] text-[8.5px] font-extrabold text-[var(--t-accent)]">RELAY</span>
             )}
@@ -610,6 +608,18 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
             {/* Колонок на телефоне нет, поэтому 🎉 стоит у времени — рядом с заплывом,
                 к которому относится, а не у медиа. */}
             {swim.congrats_count > 0 && <CheerChip swim={swim} emphasized={swim.is_pb} />}
+          </span>
+          {/* Имя целиком, без многоточия: ивритское имя, укороченное посередине, читается
+              как чужое. Показан один пловец — вместо имени дисциплина. */}
+          <span
+            dir={showSwimmerName ? 'auto' : undefined}
+            className={`mt-1 block break-words text-left leading-tight ${
+              showSwimmerName
+                ? 'text-[15px] font-black text-[var(--t-text)]'
+                : 'text-[12px] font-extrabold text-[var(--t-text-2)]'
+            }`}
+          >
+            {showSwimmerName ? swimmerName : `${swim.distance}m ${styleLabel(swim.style)}`}
           </span>
         </span>
         {/* Цель нажатия 44px, поздравления — ПОД кнопкой, а не сбоку: справа их выдавливало
