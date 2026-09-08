@@ -684,7 +684,7 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
       {/* Раскрытая панель медиа — ОДНА на обе ширины: на узком экране она просто идёт
           во всю ширину строки, без отступа под колонки. */}
       {expanded && hasMedia && (
-        <div className="bg-[var(--t-input-bg)] px-4 py-2 sm:px-5 sm:pl-[116px]">
+        <div className="bg-[var(--t-nested)] px-4 py-2 sm:px-5 sm:pl-[116px]">
           {/* «Кому это видно» — первым: раньше бейдж стоял в строке и занимал 124px у каждой,
               хотя отвечает на вопрос, который задают, только открыв панель. */}
           <div className="mb-1">
@@ -802,8 +802,8 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
       </div>
 
       {mediaOpen && compMedia.length > 0 && (
-        <div className="border-b border-[var(--t-accent-soft)] bg-[var(--t-input-bg)] px-4 py-2 sm:px-5">
-          <p className="hp-mono m-0 mb-1 text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--t-accent-border)]">
+        <div className="border-b border-[var(--t-accent-soft)] bg-[var(--t-nested)] px-4 py-2 sm:px-5">
+          <p className="hp-mono m-0 mb-1 text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--t-col-label)]">
             Competition media · not tied to a swim
           </p>
           {compMedia.map((m) => (
@@ -818,7 +818,7 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
         {columns.map((c, i) => (
           <span
             key={i}
-            className={`hp-mono text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--t-accent-border)]${
+            className={`hp-mono text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--t-col-label)]${
               c.align === 'center' ? ' text-center' : c.align === 'right' ? ' text-right' : ''
             }`}
           >
