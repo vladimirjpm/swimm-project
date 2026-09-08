@@ -207,18 +207,50 @@ function StatusPill({ status, isPublic, pubs }: { status: CardStatus; isPublic: 
   );
 }
 
-function SourceChip({ m, onClick }: { m: SwimMediaDto; onClick: () => void }) {
+/**
+ * Плашка источника: «▶ YOUTUBE» и ❤ ВНУТРИ неё (решение Влада 08.09.2026). Сердечко про
+ * это же медиа, отдельной плашкой оно занимало ещё одну позицию в строке и выдавливало
+ * «Delete» на второй ряд.
+ *
+ * Корпус — `span`, а не `button`: внутри ДВЕ разные кнопки (играть и лайкнуть), а кнопка
+ * в кнопке невалидна и отдаёт клик по сердечку в воспроизведение.
+ */
+function SourceChip({ m, onPlay, onToggleLike }: { m: SwimMediaDto; onPlay: () => void; onToggleLike: () => void }) {
   const label = m.media_type === 'image' ? '🖼 PHOTO' : `▶ ${m.source_type.toUpperCase()}`;
+  const like = likeVisual(m);
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="hp-mono w-[120px] shrink-0 rounded-[7px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-2 py-[4px] text-left text-[10.5px] font-extrabold text-[var(--t-accent)]"
-      title={m.media_type === 'image' ? 'Open photo' : 'Play'}
-    >
-      {label}
-    </button>
+    <span className="hp-mono inline-flex w-[142px] shrink-0 items-stretch overflow-hidden rounded-[7px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] text-[10.5px] font-extrabold text-[var(--t-accent)]">
+      <button
+        type="button"
+        onClick={onPlay}
+        className="min-w-0 flex-1 truncate px-2 py-[4px] text-left"
+        title={m.media_type === 'image' ? 'Open photo' : 'Play'}
+      >
+        {label}
+      </button>
+      <button
+        type="button"
+        onClick={onToggleLike}
+        className="flex shrink-0 items-center border-l border-[var(--t-accent-border)] px-[7px]"
+        style={{ color: like.color, background: like.background }}
+        title={like.liked ? 'Remove like' : 'Like'}
+      >
+        {like.label}
+      </button>
+    </span>
   );
+}
+
+/** Вид сердечка — один на плашку источника и на чип строки, чтобы они не разошлись. */
+function likeVisual(m: SwimMediaDto) {
+  const liked = m.my_like;
+  return {
+    liked,
+    label: `❤ ${m.likes_count}`,
+    color: liked ? 'var(--t-like)' : m.likes_count > 0 ? 'var(--t-text-2)' : 'var(--t-text-3)',
+    border: liked ? 'var(--t-like)' : 'var(--t-border)',
+    background: liked ? 'var(--t-like-soft)' : 'transparent',
+  };
 }
 
 /**
@@ -228,21 +260,16 @@ function SourceChip({ m, onClick }: { m: SwimMediaDto; onClick: () => void }) {
  * раскрытой панели, где вообще живут действия над медиа.
  */
 function LikeChip({ m, onToggle }: { m: SwimMediaDto; onToggle?: () => void }) {
-  const liked = m.my_like;
+  const v = likeVisual(m);
   const className = 'hp-mono rounded-[7px] px-2 py-[3px] text-[10.5px] font-extrabold';
-  const style = {
-    border: `1px solid ${liked ? 'var(--t-like)' : 'var(--t-border)'}`,
-    background: liked ? 'var(--t-like-soft)' : 'transparent',
-    color: liked ? 'var(--t-like)' : m.likes_count > 0 ? 'var(--t-text-2)' : 'var(--t-text-3)',
-  };
-  const label = `❤ ${m.likes_count}`;
+  const style = { border: `1px solid ${v.border}`, background: v.background, color: v.color };
 
   if (!onToggle) {
-    return <span className={className} style={style} title={`${m.likes_count} liked this`}>{label}</span>;
+    return <span className={className} style={style} title={`${m.likes_count} liked this`}>{v.label}</span>;
   }
   return (
-    <button type="button" onClick={onToggle} className={className} style={style} title={liked ? 'Remove like' : 'Like'}>
-      {label}
+    <button type="button" onClick={onToggle} className={className} style={style} title={v.liked ? 'Remove like' : 'Like'}>
+      {v.label}
     </button>
   );
 }
@@ -325,10 +352,12 @@ function MediaLine({
   const withdrawable = pubs.filter((p) => p.status === 'pending' || p.status === 'approved');
 
   return (
+    // Перенос оставлен: три контрола публикации требуют ~430px, и на узкой панели нести
+    // их в одну строку значило бы обрезать. Без них строка «источник · статус · Delete»
+    // помещается целиком — ровно этого и не хватало, пока ❤ стояло отдельной плашкой.
     <div className="flex flex-wrap items-center gap-2 py-[6px]">
-      <SourceChip m={m} onClick={() => cb.onPlay(m)} />
-      <span className="w-[120px] shrink-0"><StatusPill status={status} isPublic={isPublic} pubs={pubs} /></span>
-      <LikeChip m={m} onToggle={() => cb.onToggleLike(m)} />
+      <SourceChip m={m} onPlay={() => cb.onPlay(m)} onToggleLike={() => cb.onToggleLike(m)} />
+      <span className="min-w-0"><StatusPill status={status} isPublic={isPublic} pubs={pubs} /></span>
       <div className="ml-auto flex flex-wrap items-center gap-1.5">
         {targets != null && options.length > 0 && (
           <>
