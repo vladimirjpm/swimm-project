@@ -1,11 +1,8 @@
 ﻿import React, { useMemo, useState } from 'react';
 import '../../index.css';
 import '../components/deep/deep-theme.css';
-import { useMode } from '../../hooks/useMode';
 import { useClubOverview, type ClubScope } from '../../hooks/useClubOverview';
-import { parseRoute } from '../../utils/routes';
-import AppTopbar from '../components/app-topbar/app-topbar';
-import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
+import { parseRoute, routes } from '../../utils/routes';
 import ClubHero from './components/club-hero';
 import ClubFilters, { SHOW_GROUP_TILES } from './components/club-filters';
 import DeepSeasonCarousel from '../components/deep/season-carousel';
@@ -17,28 +14,34 @@ import ClubSwimmers from './components/club-swimmers';
 import ClubRecords from './components/club-records';
 import ClubRecordWall from './components/club-record-wall';
 import ClubCoaches from './components/club-coaches';
-import DeepTabs, { type DeepTabItem } from '../components/deep/tabs';
 import ClubSoonCard from './components/club-soon-card';
+import DeepEntityPage from '../components/deep/entity-page';
+import DeepDigestCard from '../components/deep/digest-card';
+import ClubAvatar from './components/club-avatar';
+import type {
+  EntityPageStatus, EntityTabNav, EntityTabSpec,
+} from '../components/deep/entity-page-types';
 
 /**
- * Страница клуба (Фаза 10, план docs/plans/club-page-plan.md, этап K5).
+ * Страница клуба (Фаза 10, план docs/plans/club-page-plan.md, этап K5) — ПЕРВЫЙ потребитель
+ * общего каркаса `deep/entity-page.tsx` (план docs/plans/entity-page-shell-plan.md, этап A).
  *
  * Устройство: Hero → ОДИН глобальный блок фильтров (сезон + зачётная группа) → карточки.
  * Каждая карточка читает выбранный скоуп и своих фильтров не заводит — единственное
- * исключение будет у стены рекордов (переключатель бассейна: 25м и 50м несравнимы).
+ * исключение у стены рекордов (переключатель бассейна: 25м и 50м несравнимы).
  *
- * Тема — токены `--deep-*` из дизайн-хендоффа (club-theme.css): класс .theme-deep или
- * .theme-deep-light навешивается по глобальному режиму light/dark.
+ * Страница сама данных каркасу не «отдаёт»: каркас тупой, он знает только про слоты и
+ * порядок. Здесь остаётся то, что специфично клубу — скоуп, набор табов и состав карточек.
+ * Поменять порядок карточек = переставить элементы массива; убрать карточку = не класть её.
+ *
+ * Тема — токены `--deep-*` из дизайн-хендоффа (deep-theme.css): класс .theme-deep или
+ * .theme-deep-light навешивает каркас по глобальному режиму light/dark.
  */
-/** Табы страницы клуба (TABS.md 3a). Сам компонент плиток общий — ../components/deep/tabs. */
-type ClubTab = 'season' | 'records' | 'swimmers' | 'media' | 'history';
-const CLUB_TABS: ClubTab[] = ['season', 'records', 'swimmers', 'media', 'history'];
-const isClubTab = (value: string | null | undefined): value is ClubTab =>
-  value != null && (CLUB_TABS as string[]).includes(value);
+/** Табы страницы клуба (TABS.md 3a). Компонент плиток и корпус папки — в каркасе. */
+type ClubTab = 'overview' | 'season' | 'records' | 'swimmers' | 'media' | 'history';
 
 function ClubProject() {
   const clubId = useMemo<number | null>(() => parseRoute().clubId, []);
-  const { mode } = useMode();
 
   const [scope, setScope] = useState<ClubScope>({
     season: null,
@@ -46,179 +49,269 @@ function ClubProject() {
     standingCompetitionId: null,
   });
 
-  // Активный таб — вид, поэтому живёт в query (?tab=), а не в пути: правило
-  // routes.ts «в путь только идентичность ресурса». Диплинк на таб работает сразу.
-  const [tab, setTab] = useState<ClubTab>(() => {
-    const t = new URLSearchParams(window.location.search).get('tab');
-    return isClubTab(t) ? t : 'season';
-  });
-
-  const handleTab: (next: ClubTab) => void = (next) => {
-    setTab(next);
-    const url = new URL(window.location.href);
-    if (next === 'season') url.searchParams.delete('tab');
-    else url.searchParams.set('tab', next);
-    window.history.replaceState(null, '', url.toString());
-  };
-
   const { data, loading, error } = useClubOverview(clubId, scope);
 
-  const themeClass = mode === 'dark' ? 'theme-deep' : 'theme-deep-light';
+  // Плашку загрузки показываем ТОЛЬКО пока данных нет вовсе. При смене сезона/зачёта данные
+  // остаются на экране и обновляются на месте: иначе плашка вставлялась над контентом и вся
+  // страница прыгала вниз-вверх на каждый клик по фильтру.
+  const status: EntityPageStatus =
+    data ? 'ready'
+      : clubId == null ? 'notfound'
+        : loading ? 'loading'
+          : error === 'not-found' ? 'notfound'
+            : error ? 'error'
+              : 'loading';
+
   const scopeLabel =
     scope.season == null
       ? 'all seasons'
       : data?.seasons.find((s) => s.season === scope.season)?.label ?? String(scope.season);
 
-  return (
-    <div className={themeClass} style={{ background: 'var(--deep-page-bg)', minHeight: '100vh' }}>
-      <AppTopbar />
-
-      <main className="mx-auto max-w-[1180px] px-4 py-6" style={{ color: 'var(--deep-text)' }}>
-        <div className="mb-4 flex justify-end">
-          <UI_ModeToggle />
-        </div>
-
-        {clubId == null && <Notice>Club not found</Notice>}
-        {/* Плашка загрузки — ТОЛЬКО на первом заходе, пока данных нет вовсе.
-            При смене сезона/зачёта данные остаются на экране и обновляются на месте:
-            иначе плашка вставлялась над контентом и вся страница прыгала вниз-вверх
-            на каждый клик по фильтру. */}
-        {clubId != null && loading && !data && <Notice>Loading…</Notice>}
-        {clubId != null && !loading && error === 'not-found' && <Notice>Club not found</Notice>}
-        {clubId != null && !loading && error && error !== 'not-found' && (
-          <Notice>Could not load this club</Notice>
-        )}
-
-        {data && (
-          <>
-            <ClubHero club={data.club} kpi={data.kpi} />
-
-            {/* Полоса сезонов стоит МЕЖДУ шапкой и табами и действует на всю страницу
-                (handoff filter-season 4c). Карточки, которым сезон не положен —
-                Record wall (у рекорда сезона нет) и Season best (сознательно живёт
-                текущим сезоном) — его по-прежнему не слушают. */}
-            <DeepSeasonCarousel
-              seasons={data.seasons}
-              season={scope.season}
-              // Смена сезона сбрасывает раскрытый зачёт: он мог принадлежать другому.
-              onSeason={(season) => setScope((s) => ({ ...s, season, standingCompetitionId: null }))}
+  // Табы собираются только когда данные есть: подписи-сводки — живые числа, а не хардкод.
+  const tabs: EntityTabSpec<ClubTab>[] = data == null || clubId == null ? [] : [
+    {
+      // Дайджест: срезы соседних табов из УЖЕ загруженного `overview`-ответа. Рекордов тут
+      // нет намеренно — их строки живут в своих пагинируемых эндпоинтах внутри карточек, а
+      // выдумывать цифру ради витрины нельзя (в шапке она и так есть плиткой KPI).
+      id: 'overview',
+      icon: '▦',
+      label: 'Overview',
+      sub: 'latest meets · top swimmers',
+      cards: (nav: EntityTabNav<ClubTab>) => [
+        {
+          id: 'latest-meets',
+          span: 'half' as const,
+          render: () => (
+            <DeepDigestCard
+              title="Latest championships"
+              subtitle={`rank and medals · ${scopeLabel}`}
+              moreLabel={`All ${data.timeline.length} competitions →`}
+              onMore={() => nav.go('history')}
+              isEmpty={data.timeline.length === 0}
+              emptyText="No competitions in this scope."
+            >
+              <div className="flex flex-col gap-1.5">
+                {data.timeline.slice(0, 4).map((t) => (
+                  <div
+                    key={t.competition_id}
+                    className="flex items-center justify-between gap-3 px-3 py-2"
+                    style={{ background: 'var(--deep-card-bg-row)', borderRadius: 'var(--deep-radius-row)' }}
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-[13px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
+                        {t.name}
+                      </div>
+                      <div className="hp-mono truncate text-[11px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
+                        {t.date}{t.group_name ? ` · ${t.group_name}` : ''}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      {t.gold + t.silver + t.bronze > 0 && (
+                        <span className="hp-mono text-[11px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
+                          {t.gold > 0 && <>🥇{t.gold} </>}
+                          {t.silver > 0 && <>🥈{t.silver} </>}
+                          {t.bronze > 0 && <>🥉{t.bronze}</>}
+                        </span>
+                      )}
+                      <span
+                        className="text-[15px]"
+                        style={{
+                          fontFamily: 'var(--deep-font-display)',
+                          color: t.rank === 1 ? 'var(--deep-gold)' : 'var(--deep-text)',
+                        }}
+                      >
+                        #{t.rank}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </DeepDigestCard>
+          ),
+        },
+        {
+          id: 'top-swimmers-digest',
+          span: 'half' as const,
+          render: () => (
+            <DeepDigestCard
+              title="Top swimmers"
+              subtitle={`club points from individual swims · ${scopeLabel}`}
+              count={data.club.swimmer_count}
+              countLabel="SWIMMERS"
+              moreLabel="Full roster →"
+              onMore={() => nav.go('swimmers')}
+              isEmpty={data.top_swimmers.length === 0}
+              emptyText="No scoring swims in this scope."
+            >
+              <div className="flex flex-col gap-1.5">
+                {data.top_swimmers.slice(0, 4).map((sw) => (
+                  <a
+                    key={sw.swimmer_id}
+                    href={routes.swimmer(sw.swimmer_id)}
+                    className="flex items-center gap-3 px-3 py-2 no-underline"
+                    style={{ background: 'var(--deep-card-bg-row)', borderRadius: 'var(--deep-radius-row)' }}
+                  >
+                    <ClubAvatar
+                      firstName={sw.first_name || sw.first_name_en}
+                      lastName={sw.last_name || sw.last_name_en}
+                      gender={sw.gender}
+                      size={26}
+                    />
+                    {/* Имя на иврите по умолчанию, латиница — только фоллбеком (правило проекта). */}
+                    <span className="min-w-0 flex-1 truncate text-[12.5px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
+                      {`${sw.last_name} ${sw.first_name}`.trim() || `${sw.last_name_en} ${sw.first_name_en}`.trim()}
+                    </span>
+                    <span className="hp-mono shrink-0 text-[11.5px] font-extrabold" style={{ color: 'var(--deep-accent)' }}>
+                      {sw.points}
+                    </span>
+                  </a>
+                ))}
+              </div>
+            </DeepDigestCard>
+          ),
+        },
+      ],
+    },
+    {
+      id: 'season',
+      icon: '▦',
+      label: 'Season',
+      sub: 'grid · standings',
+      cards: () => [
+        // Плитки групп временно скрыты (SHOW_GROUP_TILES) — карточку фильтра не кладём
+        // совсем, чтобы не оставлять пустую рамку.
+        ...(SHOW_GROUP_TILES ? [{
+          id: 'filters',
+          render: () => (
+            <ClubFilters
+              groups={data.groups}
+              group={scope.group}
+              // Смена скоупа сбрасывает раскрытый зачёт: он мог принадлежать другому сезону.
+              onGroup={(group) => setScope((s) => ({ ...s, group, standingCompetitionId: null }))}
             />
-
-            {/* «Папка» (TABS.md 3a folder-tab): плитки и панель контента — один корпус,
-                активная плитка срастается с панелью. Поэтому они в общей обёртке, а не
-                двумя блоками с отступом между ними. */}
-            <div className="deep-folder mb-4">
-            <DeepTabs
-              ariaLabel="Club sections"
-              active={tab}
-              onSelect={handleTab}
-              tabs={[
-                { id: 'season', icon: '▦', label: 'Season', sub: 'grid · standings' },
-                // Число рекордов знает сама карточка (свой эндпоинт с фильтром пула),
-                // страница его не грузит — цифру не выдумываем.
-                { id: 'records', icon: '⏱', label: 'Records', sub: 'wall · best season' },
-                { id: 'swimmers', icon: '🏊', label: 'Swimmers', sub: `${data.club.swimmer_count} · coaches` },
-                { id: 'media', icon: '▶', label: 'Media', sub: 'soon' },
-                { id: 'history', icon: '🗓', label: 'History', sub: `${data.timeline.length} competitions` },
-              ]}
+          ),
+        }] : []),
+        // Грид и таблица зачёта — пара: клик по линии слева меняет таблицу справа, поэтому
+        // на десктопе они стоят рядом по половине ширины (порог 960px задаёт каркас).
+        {
+          id: 'grid',
+          span: 'half' as const,
+          render: () => (
+            <ClubGrid
+              grid={data.grid}
+              currentSeason={scope.season}
+              selectedCompetitionId={data.standings?.competition_id ?? null}
+              onPickStanding={(competitionId) =>
+                setScope((s) => ({ ...s, standingCompetitionId: competitionId }))
+              }
             />
+          ),
+        },
+        {
+          id: 'standings',
+          span: 'half' as const,
+          render: () => <ClubStandings standings={data.standings} />,
+        },
+      ],
+    },
+    {
+      // Число рекордов знает сама карточка (свой эндпоинт с фильтром пула),
+      // страница его не грузит — цифру не выдумываем.
+      id: 'records',
+      icon: '⏱',
+      label: 'Records',
+      sub: 'wall · best season',
+      // Ростер и рекорды — отдельные пагинируемые эндпоинты (K4.2), им нужен уже-резолвленный
+      // clubId (гарантирован здесь: табы собираются только при непустых data и clubId).
+      cards: () => [
+        // Времена парой: Season best — наши протоколы за ТЕКУЩИЙ сезон по возрастным ступеням
+        // (глобальный фильтр сезона не слушает — см. club-records.tsx), Record wall —
+        // официальный справочник рекордов (сезона у него нет). Данные разные, форма общая.
+        { id: 'record-wall', span: 'half' as const, render: () => <ClubRecordWall clubId={clubId} /> },
+        { id: 'season-best', span: 'half' as const, render: () => <ClubRecords clubId={clubId} /> },
+        // Best season из макета — карточки ещё нет (нужен сезонный агрегат по клубу).
+        {
+          id: 'best-season',
+          render: () => (
+            <ClubSoonCard
+              title="Best season"
+              sub="The club's strongest season by rank and medals"
+              text="Not built yet — needs a per-season aggregate on the API side."
+            />
+          ),
+        },
+      ],
+    },
+    {
+      id: 'swimmers',
+      icon: '🏊',
+      label: 'Swimmers',
+      sub: `${data.club.swimmer_count} · coaches`,
+      cards: () => [
+        // Люди клуба парой: слева выжимка «кто тащит», справа полный ростер.
+        {
+          id: 'top-swimmers',
+          span: 'half' as const,
+          render: () => <ClubTopSwimmers swimmers={data.top_swimmers} scopeLabel={scopeLabel} />,
+        },
+        {
+          id: 'roster',
+          span: 'half' as const,
+          render: () => <ClubSwimmers clubId={clubId} season={scope.season} />,
+        },
+        { id: 'coaches', render: () => <ClubCoaches /> },
+      ],
+    },
+    {
+      id: 'media',
+      icon: '▶',
+      label: 'Media',
+      sub: 'soon',
+      // Медиа у клуба пока нет вообще: ссылки живут у соревнований и в My media
+      // (docs/media-page.md), клубной выборки на API не существует. Как её завести —
+      // docs/plans/entity-page-shell-plan.md §3.10.
+      cards: () => [{
+        id: 'media-soon',
+        render: () => (
+          <ClubSoonCard
+            title="Media"
+            sub="Photos and videos from this club's meets"
+            text="Not built yet — there is no club-scoped media feed on the API side."
+          />
+        ),
+      }],
+    },
+    {
+      id: 'history',
+      icon: '🗓',
+      label: 'History',
+      sub: `${data.timeline.length} competitions`,
+      cards: () => [{ id: 'timeline', render: () => <ClubTimeline timeline={data.timeline} /> }],
+    },
+  ];
 
-            <div className="deep-tabs-panel">
-            {tab === 'season' && (
-              <>
-                {/* Плитки групп временно скрыты (SHOW_GROUP_TILES) — карточку фильтра
-                    не рендерим совсем, чтобы не оставлять пустую рамку. */}
-                {SHOW_GROUP_TILES && (
-                  <ClubFilters
-                    groups={data.groups}
-                    group={scope.group}
-                    // Смена скоупа сбрасывает раскрытый зачёт: он мог принадлежать другому сезону.
-                    onGroup={(group) => setScope((s) => ({ ...s, group, standingCompetitionId: null }))}
-                  />
-                )}
-
-                {/* Грид и таблица зачёта — пара: клик по линии слева меняет таблицу справа,
-                    поэтому на десктопе они стоят рядом по половине ширины.
-                    Порог 960px, а не стандартный lg (1024): строке грида нужно ~525px
-                    (кружок группы + название + две линии чемпионатов по 10 сегментов),
-                    таблице ~380px — вдвоём они помещаются уже с 960. Уже — одна колонка. */}
-                <div className="mb-4 grid grid-cols-1 items-start gap-4 min-[960px]:grid-cols-2">
-                  <ClubGrid
-                    grid={data.grid}
-                    currentSeason={scope.season}
-                    selectedCompetitionId={data.standings?.competition_id ?? null}
-                    onPickStanding={(competitionId) =>
-                      setScope((s) => ({ ...s, standingCompetitionId: competitionId }))
-                    }
-                  />
-
-                  <ClubStandings standings={data.standings} />
-                </div>
-              </>
-            )}
-
-            {/* Ростер и рекорды — отдельные пагинируемые эндпоинты (K4.2), им нужен
-                уже-резолвленный clubId (гарантирован здесь: data загрузился только для
-                непустого clubId). */}
-            {tab === 'records' && clubId != null && (
-              <>
-                {/* Времена парой: Season best — наши протоколы за ТЕКУЩИЙ сезон по возрастным
-                    ступеням (глобальный фильтр сезона не слушает — см. club-records.tsx),
-                    Record wall — официальный справочник рекордов (сезона у него нет).
-                    Данные разные, форма общая — club-record-card.tsx. */}
-                <div className="mb-4 grid grid-cols-1 items-start gap-4 min-[960px]:grid-cols-2">
-                  <ClubRecordWall clubId={clubId} />
-                  <ClubRecords clubId={clubId} />
-                </div>
-                {/* Best season из макета — карточки ещё нет (нужен сезонный агрегат по клубу). */}
-                <ClubSoonCard
-                  title="Best season"
-                  sub="The club's strongest season by rank and medals"
-                  text="Not built yet — needs a per-season aggregate on the API side."
-                />
-              </>
-            )}
-
-            {tab === 'swimmers' && clubId != null && (
-              <>
-                {/* Люди клуба парой: слева выжимка «кто тащит», справа полный ростер. */}
-                <div className="mb-4 grid grid-cols-1 items-start gap-4 min-[960px]:grid-cols-2">
-                  <ClubTopSwimmers swimmers={data.top_swimmers} scopeLabel={scopeLabel} />
-                  <ClubSwimmers clubId={clubId} season={scope.season} />
-                </div>
-
-                <ClubCoaches />
-              </>
-            )}
-
-            {tab === 'media' && (
-              // Медиа у клуба пока нет вообще: ссылки живут у соревнований и в My media
-              // (docs/media-page.md), клубной выборки на API не существует.
-              <ClubSoonCard
-                title="Media"
-                sub="Photos and videos from this club's meets"
-                text="Not built yet — there is no club-scoped media feed on the API side."
-              />
-            )}
-
-            {tab === 'history' && <ClubTimeline timeline={data.timeline} />}
-            </div>
-            </div>
-          </>
-        )}
-      </main>
-    </div>
-  );
-}
-
-function Notice({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className="deep-card text-center text-[14px] font-extrabold"
-      style={{ color: 'var(--deep-text-mute)' }}
-    >
-      {children}
-    </div>
+    <DeepEntityPage<ClubTab>
+      status={status}
+      messages={{ notfound: 'Club not found', error: 'Could not load this club' }}
+      hero={data ? <ClubHero club={data.club} kpi={data.kpi} /> : null}
+      beforeTabs={
+        data ? (
+          /* Полоса сезонов стоит МЕЖДУ шапкой и табами и действует на всю страницу
+             (handoff filter-season 4c). Карточки, которым сезон не положен — Record wall
+             (у рекорда сезона нет) и Season best (сознательно живёт текущим сезоном) —
+             его по-прежнему не слушают. */
+          <DeepSeasonCarousel
+            seasons={data.seasons}
+            season={scope.season}
+            // Смена сезона сбрасывает раскрытый зачёт: он мог принадлежать другому.
+            onSeason={(season) => setScope((s) => ({ ...s, season, standingCompetitionId: null }))}
+          />
+        ) : null
+      }
+      tabsAriaLabel="Club sections"
+      tabs={tabs}
+    />
   );
 }
 
