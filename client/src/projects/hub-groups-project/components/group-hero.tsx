@@ -1,0 +1,139 @@
+import React from 'react';
+import DeepHeroBand from '../../components/deep/hero-band';
+import { DeepBadge, DeepKpi } from '../../components/deep/kpi';
+import UI_ClubIcon from '../../components/mix/club-icon/club-icon';
+import UI_FlagEmoji from '../../components/mix/flag-icon/flag-icon';
+import { routes } from '../../../utils/routes';
+import { GroupIcon, JoinButton, LinkChips } from './group-bits';
+import type { HubGroupDetails } from '../types';
+
+/**
+ * Шапка группы — ВТОРОЙ вариант шапки сущности (первый — клуб, `club-hero.tsx`).
+ *
+ * Корпус полосы и кирпичи общие (`deep/hero-band.tsx`, `deep/kpi.tsx`), своё здесь — состав:
+ * аватар группы, имя, строка меты, чипы ссылок, кнопки действий и фото справа.
+ *
+ * Фото берётся из `cover_image_url` — поле УЖЕ есть на всех слоях (сущность, `/Admin/HubGroups/Edit`
+ * «Обложка (URL)», публичный DTO), просто до сих пор нигде не рисовалось. Ссылки нет —
+ * рисуем ЗАГЛУШКУ, а не схлопываем колонку (решение Влада 09.09.2026, план §3.9): так правая
+ * колонка не прыгает между сущностями, и админу видно, куда класть картинку. Выключатель
+ * показа приедет настройкой `hero.show` вместе с `DisplaySettings` (шаг C7).
+ *
+ * KPI считаются из того, что уже пришло в ответе: участники, рекорды группы, золото сезона.
+ * Ни одной цифры, которой нет в данных, тут не выдумывается.
+ */
+
+interface Props {
+  group: HubGroupDetails;
+}
+
+function GroupHero({ group }: Props) {
+  const golds = group.standings.reduce((sum, s) => sum + s.golds, 0);
+
+  return (
+    <DeepHeroBand aside={<GroupPhoto group={group} />}>
+      <div className="flex flex-wrap items-start gap-5">
+        <GroupIcon iconUrl={group.icon_url} name={group.name_en || group.name} size="lg" />
+
+        <div className="min-w-0 flex-1">
+          <h1
+            className="truncate text-[34px] leading-tight"
+            style={{ fontFamily: 'var(--deep-font-display)', color: 'var(--deep-text)' }}
+          >
+            {group.name}
+          </h1>
+          {group.name_en && group.name_en !== group.name && (
+            <div className="text-[13px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
+              {group.name_en}
+            </div>
+          )}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {(group.country || group.location) && (
+              <DeepBadge>
+                {group.country ? <UI_FlagEmoji countryCode={group.country} /> : '📍'} {group.location}
+              </DeepBadge>
+            )}
+            {group.is_official && group.club_name && (
+              <DeepBadge accent>
+                <UI_ClubIcon clubName={group.club_name} iconWidth="6" styleType="icon-notext" />{' '}
+                Official group of {group.club_name}
+              </DeepBadge>
+            )}
+            {!group.is_official && group.club_name && <DeepBadge>Club: {group.club_name}</DeepBadge>}
+          </div>
+
+          {group.description && (
+            <p
+              className="mt-3 max-w-[640px] text-[13.5px] leading-[1.55]"
+              style={{ color: 'var(--deep-text-mute)' }}
+            >
+              {group.description}
+            </p>
+          )}
+
+          {group.links.length > 0 && <div className="mt-3"><LinkChips links={group.links} /></div>}
+        </div>
+
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {/* Соревнования — ОТДЕЛЬНЫЙ экран (`/groups/{slug}/results`), а не срез этого,
+              поэтому кнопка шапки, а не таб (план §5.1). */}
+          {!group.is_virtual && group.id > 0 && (
+            <a
+              href={routes.groupResults(group.slug)}
+              className="hp-mono shrink-0 rounded-[10px] border px-4 py-2 text-[13px] font-extrabold no-underline"
+              style={{
+                borderColor: 'var(--deep-accent-border)',
+                background: 'var(--deep-accent-chip)',
+                color: 'var(--deep-accent)',
+              }}
+            >
+              Competitions →
+            </a>
+          )}
+          <JoinButton group={group} />
+        </div>
+      </div>
+
+      <div className="mt-6 flex flex-wrap gap-8">
+        <DeepKpi label="Swimmers" value={group.members.length} hint="in the roster" />
+        <DeepKpi label="Records" value={group.bests.length} hint="best in the group" />
+        <DeepKpi
+          label="Gold"
+          value={golds}
+          hint={group.season_label ? `season ${group.season_label}` : 'this season'}
+          gold={golds > 0}
+        />
+      </div>
+    </DeepHeroBand>
+  );
+}
+
+/** Фото группы либо заглушка на её месте — колонка не схлопывается (план §3.9). */
+function GroupPhoto({ group }: Props) {
+  if (group.cover_image_url) {
+    return (
+      <img
+        src={group.cover_image_url}
+        alt=""
+        className="h-full min-h-[200px] w-full rounded-2xl border object-cover"
+        style={{ borderColor: 'var(--deep-card-border)' }}
+      />
+    );
+  }
+
+  return (
+    <div
+      className="flex h-full min-h-[200px] w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed"
+      style={{ borderColor: 'var(--deep-card-border)', background: 'var(--deep-card-bg-row)' }}
+      aria-hidden="true"
+    >
+      <span className="text-[28px]">🏊</span>
+      <span className="text-[11.5px] font-extrabold" style={{ color: 'var(--deep-text-ghost)' }}>
+        No group photo yet
+      </span>
+    </div>
+  );
+}
+
+export default GroupHero;
