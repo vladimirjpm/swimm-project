@@ -5,6 +5,7 @@ using Swimm.API.Http;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
+using Swimm.Domain.Entities;
 
 namespace Swimm.API.Controllers;
 
@@ -328,7 +329,8 @@ public class HubGroupsController : ControllerBase
         if (!perms.Exists) return NotFound();
         if (!perms.CanEdit) return Forbid();
 
-        var ok = await _publications.DecideAsync(id, publicationId, request.Approve, userId.Value);
+        var ok = await _publications.DecideAsync(
+            UserMediaPublicationTarget.Group, id, publicationId, request.Approve, userId.Value);
         if (!ok) return NotFound(new { error = "Publication not found" });
 
         // Approved public-публикации входят в кэшируемый payload страницы группы (Gallery/Highlights).

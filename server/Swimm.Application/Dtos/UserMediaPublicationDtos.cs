@@ -2,7 +2,13 @@ using System.Text.Json.Serialization;
 
 namespace Swimm.Application.Dtos;
 
-/// <summary>Публикация личного медиа в группе — как её видит владелец медиа.</summary>
+/// <summary>
+/// Публикация личного медиа в КОЛЛЕКТИВЕ — как её видит владелец медиа.
+///
+/// Цель полиморфна: группа или клуб (`target_type`). Раньше полей было два — `hub_group_id`
+/// и `hub_group_name`; они переименованы в `target_*`, а не продублированы, чтобы у клиента
+/// не оказалось двух источников правды об одном и том же.
+/// </summary>
 public class UserMediaPublicationDto
 {
     [JsonPropertyName("id")]
@@ -11,13 +17,18 @@ public class UserMediaPublicationDto
     [JsonPropertyName("user_media_id")]
     public int UserMediaId { get; set; }
 
-    [JsonPropertyName("hub_group_id")]
-    public int HubGroupId { get; set; }
+    /// <summary>group | club.</summary>
+    [JsonPropertyName("target_type")]
+    public string TargetType { get; set; } = string.Empty;
 
-    [JsonPropertyName("hub_group_name")]
-    public string HubGroupName { get; set; } = string.Empty;
+    /// <summary>Id группы либо клуба — смотри <see cref="TargetType"/>.</summary>
+    [JsonPropertyName("target_id")]
+    public int TargetId { get; set; }
 
-    /// <summary>members | public.</summary>
+    [JsonPropertyName("target_name")]
+    public string TargetName { get; set; } = string.Empty;
+
+    /// <summary>members | public. У клубной цели бывает только public — членов у клуба нет.</summary>
     [JsonPropertyName("level")]
     public string Level { get; set; } = string.Empty;
 
@@ -32,11 +43,15 @@ public class UserMediaPublicationDto
     public DateTime? DecidedAt { get; set; }
 }
 
-/// <summary>Заявка владельца: опубликовать медиа в группе на уровне members|public.</summary>
+/// <summary>Заявка владельца: опубликовать медиа в коллективе на уровне members|public.</summary>
 public class SubmitPublicationRequest
 {
-    [JsonPropertyName("hub_group_id")]
-    public int HubGroupId { get; set; }
+    /// <summary>group | club.</summary>
+    [JsonPropertyName("target_type")]
+    public string TargetType { get; set; } = string.Empty;
+
+    [JsonPropertyName("target_id")]
+    public int TargetId { get; set; }
 
     /// <summary>members | public.</summary>
     [JsonPropertyName("level")]
@@ -63,9 +78,17 @@ public class VisibleResultMediaDto
     public string Url { get; set; } = string.Empty;
 }
 
-/// <summary>Группа, куда владелец может подать конкретное медиа (селектор подачи).</summary>
+/// <summary>
+/// Коллектив, куда владелец может подать конкретное медиа (селектор подачи): группа, где
+/// пловец в ростере и податель свой, либо КЛУБ пловца — там ростер бесплатный, он приходит
+/// из справочника федерации.
+/// </summary>
 public class PublishTargetDto
 {
+    /// <summary>group | club.</summary>
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = string.Empty;
+
     [JsonPropertyName("id")]
     public int Id { get; set; }
 
@@ -87,13 +110,17 @@ public class GroupPublicationInboxItemDto
     [JsonPropertyName("id")]
     public int Id { get; set; }
 
-    /* Группа — для сводного inbox-а по всем моим группам (страница My media, Moderation). */
+    /* Цель — для сводного inbox-а по всему, что я модерирую (My media → Moderation). */
 
-    [JsonPropertyName("hub_group_id")]
-    public int HubGroupId { get; set; }
+    /// <summary>group | club.</summary>
+    [JsonPropertyName("target_type")]
+    public string TargetType { get; set; } = string.Empty;
 
-    [JsonPropertyName("hub_group_name")]
-    public string HubGroupName { get; set; } = string.Empty;
+    [JsonPropertyName("target_id")]
+    public int TargetId { get; set; }
+
+    [JsonPropertyName("target_name")]
+    public string TargetName { get; set; } = string.Empty;
 
     [JsonPropertyName("level")]
     public string Level { get; set; } = string.Empty;

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Application.Validation;
+using Swimm.Domain.Entities;
 
 namespace Swimm.API.Controllers;
 
@@ -130,7 +131,7 @@ public class MediaController : ControllerBase
         var userId = CurrentUserId();
         if (userId == null) return Unauthorized();
 
-        return Ok(await _publications.GetPublishTargetsAsync(userId.Value, id));
+        return Ok(await _publications.GetPublishTargetsAsync(userId.Value, id, User.IsInRole("Admin")));
     }
 
     /// <summary>Подать медиа в группу (level: members|public). Админ группы — сразу approved.</summary>
@@ -141,13 +142,24 @@ public class MediaController : ControllerBase
         var userId = CurrentUserId();
         if (userId == null) return Unauthorized();
 
-        // Привилегия группы (владелец/админ группы/site-админ) → авто-approve своей заявки.
-        var perms = await _groupPermissions.GetPermissionsAsync(
-            request.HubGroupId, userId.Value, User.IsInRole("Admin"));
-        if (!perms.Exists) return BadRequest(new { error = "group not found" });
+        // Кто «и так решает по этой цели» — тот подаёт сразу в approved, минуя inbox.
+        // У группы это владелец/админ группы/site-админ; у клуба управляющих не существует,
+        // поэтому только админ сайта, а обычная заявка ложится pending (план §3.10).
+        bool privileged;
+        if (request.TargetType == UserMediaPublicationTarget.Club)
+        {
+            privileged = User.IsInRole("Admin");
+        }
+        else
+        {
+            var perms = await _groupPermissions.GetPermissionsAsync(
+                request.TargetId, userId.Value, User.IsInRole("Admin"));
+            if (!perms.Exists) return BadRequest(new { error = "group not found" });
+            privileged = perms.CanEdit;
+        }
 
         var (success, error, publication) = await _publications.SubmitAsync(
-            userId.Value, id, request, perms.CanEdit);
+            userId.Value, id, request, privileged);
         if (!success) return BadRequest(new { error });
 
         // Авто-approve привилегированной подачи сразу меняет публичную витрину группы
@@ -157,16 +169,49 @@ public class MediaController : ControllerBase
     }
 
     /// <summary>Отозвать публикацию своего медиа из группы (любой статус).</summary>
-    [HttpDelete("{id:int}/publications/{hubGroupId:int}")]
-    public async Task<IActionResult> WithdrawPublication(int id, int hubGroupId)
+    [HttpDelete("{id:int}/publications/{targetType}/{targetId:int}")]
+    public async Task<IActionResult> WithdrawPublication(int id, string targetType, int targetId)
     {
         var userId = CurrentUserId();
         if (userId == null) return Unauthorized();
 
-        var ok = await _publications.WithdrawAsync(userId.Value, id, hubGroupId);
+        var ok = await _publications.WithdrawAsync(userId.Value, id, targetType, targetId);
         if (!ok) return NotFound(new { error = "Publication not found" });
 
         // Отзыв approved public-публикации убирает её из витрины группы — сброс кэша страницы.
+        await _cache.InvalidateAllAsync();
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Публичная лента медиа КЛУБА — одобренные public-публикации с целью-клубом.
+    ///
+    /// Ростер клуба приходит из справочника федерации, поэтому отдельного состава вести не
+    /// нужно: сюда попадает всё, что подали и одобрили по пловцам этого клуба. Уровня
+    /// members у клуба не бывает — членства как аккаунта у него нет (план §3.10).
+    /// </summary>
+    [HttpGet("/api/clubs/{clubId:int}/media")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetClubMedia(int clubId)
+        => Ok(await _publications.GetApprovedForClubAsync(clubId));
+
+    /// <summary>
+    /// Решение по клубной заявке. Управляющих у клуба не существует, поэтому решает админ
+    /// сайта; появятся («claim your club») — сюда добавится их проверка, и больше ничего.
+    /// </summary>
+    [HttpPost("/api/clubs/{clubId:int}/media/publications/{publicationId:int}/decision")]
+    public async Task<IActionResult> DecideClubPublication(
+        int clubId, int publicationId, [FromBody] PublicationDecisionRequest request)
+    {
+        var userId = CurrentUserId();
+        if (userId == null) return Unauthorized();
+        if (!User.IsInRole("Admin")) return Forbid();
+
+        var ok = await _publications.DecideAsync(
+            UserMediaPublicationTarget.Club, clubId, publicationId, request.Approve, userId.Value);
+        if (!ok) return NotFound(new { error = "Publication not found" });
+
+        // Лента клуба входит в кэшируемую страницу клуба — без сброса решение не видно.
         await _cache.InvalidateAllAsync();
         return NoContent();
     }

@@ -14,11 +14,15 @@ public class UserMediaPublicationService : IUserMediaPublicationService
     public UserMediaPublicationService(SwimmDbContext db) => _db = db;
 
     public async Task<(bool Success, string? Error, UserMediaPublicationDto? Publication)> SubmitAsync(
-        int ownerUserId, int mediaId, SubmitPublicationRequest request, bool isGroupPrivileged)
+        int ownerUserId, int mediaId, SubmitPublicationRequest request, bool isPrivileged)
     {
         var level = request.Level?.Trim().ToLowerInvariant() ?? "";
         if (level != UserMediaPublicationLevel.Members && level != UserMediaPublicationLevel.Public)
             return (false, "level must be 'members' or 'public'", null);
+
+        var targetType = request.TargetType?.Trim().ToLowerInvariant() ?? "";
+        if (targetType != UserMediaPublicationTarget.Group && targetType != UserMediaPublicationTarget.Club)
+            return (false, "target must be 'group' or 'club'", null);
 
         // Медиа существует и принадлежит подателю — публиковать чужое нельзя.
         var media = await _db.UserMedia.AsNoTracking()
@@ -27,37 +31,72 @@ public class UserMediaPublicationService : IUserMediaPublicationService
             .FirstOrDefaultAsync();
         if (media == null) return (false, "media not found", null);
 
-        var group = await _db.HubGroups.AsNoTracking()
-            .Where(g => g.Id == request.HubGroupId)
-            .Select(g => new { g.Id, g.Name })
-            .FirstOrDefaultAsync();
-        if (group == null) return (false, "group not found", null);
+        var isClub = targetType == UserMediaPublicationTarget.Club;
 
-        // Правило подачи 1: пловец из медиа — в ростере группы. Иначе член «Дельфин мастерс»
-        // мог бы подать туда видео ребёнка, который там не плавает.
-        var swimmerInRoster = await _db.HubGroupMembers.AsNoTracking()
-            .AnyAsync(m => m.HubGroupId == group.Id && m.SwimmerId == media.SwimmerId);
-        if (!swimmerInRoster)
-            return (false, "swimmer is not in this group's roster", null);
+        // У КЛУБА нет аккаунтов-участников, поэтому у уровня members там нет аудитории —
+        // молча принять такую заявку значило бы спрятать медиа ни для кого.
+        if (isClub && level == UserMediaPublicationLevel.Members)
+            return (false, "club publications can only be public", null);
 
-        // Правило подачи 2: податель — активный user-член группы (админ/владелец группы
-        // проходит по isGroupPrivileged — контроллер проверяет через IHubGroupPermissionService).
-        if (!isGroupPrivileged)
+        string targetName;
+        if (isClub)
         {
-            var isActiveMember = await _db.HubGroupUserMembers.AsNoTracking()
-                .AnyAsync(m => m.HubGroupId == group.Id && m.UserId == ownerUserId
-                               && m.Status == HubGroupUserMemberStatus.Active);
-            if (!isActiveMember)
-                return (false, "you are not an active member of this group", null);
+            // Ростер клуба бесплатный: пловец числится за клубом в справочнике федерации.
+            // Отдельного «состава» вести не нужно — это и есть главная выгода клубной цели.
+            var club = await _db.Clubs.AsNoTracking()
+                .Where(c => c.Id == request.TargetId && c.MergedIntoId == null)
+                .Select(c => new { c.Id, c.Name })
+                .FirstOrDefaultAsync();
+            if (club == null) return (false, "club not found", null);
+
+            var swimmerInClub = await _db.Swimmers.AsNoTracking()
+                .AnyAsync(sw => sw.Id == media.SwimmerId && sw.ClubId == club.Id);
+            if (!swimmerInClub)
+                return (false, "swimmer does not belong to this club", null);
+
+            targetName = club.Name;
+        }
+        else
+        {
+            var group = await _db.HubGroups.AsNoTracking()
+                .Where(g => g.Id == request.TargetId)
+                .Select(g => new { g.Id, g.Name })
+                .FirstOrDefaultAsync();
+            if (group == null) return (false, "group not found", null);
+
+            // Правило подачи 1: пловец из медиа — в ростере группы. Иначе член «Дельфин мастерс»
+            // мог бы подать туда видео ребёнка, который там не плавает.
+            var swimmerInRoster = await _db.HubGroupMembers.AsNoTracking()
+                .AnyAsync(m => m.HubGroupId == group.Id && m.SwimmerId == media.SwimmerId);
+            if (!swimmerInRoster)
+                return (false, "swimmer is not in this group's roster", null);
+
+            // Правило подачи 2: податель — активный user-член группы (админ/владелец группы
+            // проходит по isPrivileged — контроллер проверяет через IHubGroupPermissionService).
+            // У клуба этого правила НЕТ и быть не может: членства в клубе как аккаунта не
+            // существует, поэтому там подача открыта владельцу медиа, а фильтром служит
+            // модерация.
+            if (!isPrivileged)
+            {
+                var isActiveMember = await _db.HubGroupUserMembers.AsNoTracking()
+                    .AnyAsync(m => m.HubGroupId == group.Id && m.UserId == ownerUserId
+                                   && m.Status == HubGroupUserMemberStatus.Active);
+                if (!isActiveMember)
+                    return (false, "you are not an active member of this group", null);
+            }
+
+            targetName = group.Name;
         }
 
-        // Одна публикация на пару (медиа, группа): повторная подача возвращает строку в pending
+        // Одна публикация на пару (медиа, цель): повторная подача возвращает строку в pending
         // (после reject/withdraw-approve), уровень можно поменять при переподаче.
         var existing = await _db.UserMediaPublications
-            .FirstOrDefaultAsync(p => p.UserMediaId == mediaId && p.HubGroupId == group.Id);
+            .FirstOrDefaultAsync(p => p.UserMediaId == mediaId
+                                      && (isClub ? p.ClubId == request.TargetId
+                                                 : p.HubGroupId == request.TargetId));
 
-        // Заявка от админа/владельца группы к самому себе — сразу approved (нет смысла в inbox).
-        var status = isGroupPrivileged ? UserMediaPublicationStatus.Approved : UserMediaPublicationStatus.Pending;
+        // Заявка от того, кто и так решает по этой цели, — сразу approved (нет смысла в inbox).
+        var status = isPrivileged ? UserMediaPublicationStatus.Approved : UserMediaPublicationStatus.Pending;
 
         UserMediaPublication entity;
         if (existing != null)
@@ -68,8 +107,8 @@ public class UserMediaPublicationService : IUserMediaPublicationService
 
             existing.Level = level;
             existing.Status = status;
-            existing.DecidedByUserId = isGroupPrivileged ? ownerUserId : null;
-            existing.DecidedAt = isGroupPrivileged ? DateTime.UtcNow : null;
+            existing.DecidedByUserId = isPrivileged ? ownerUserId : null;
+            existing.DecidedAt = isPrivileged ? DateTime.UtcNow : null;
             existing.CreatedAt = DateTime.UtcNow;
             entity = existing;
         }
@@ -78,11 +117,13 @@ public class UserMediaPublicationService : IUserMediaPublicationService
             entity = new UserMediaPublication
             {
                 UserMediaId = mediaId,
-                HubGroupId = group.Id,
+                TargetType = targetType,
+                HubGroupId = isClub ? null : request.TargetId,
+                ClubId = isClub ? request.TargetId : null,
                 Level = level,
                 Status = status,
-                DecidedByUserId = isGroupPrivileged ? ownerUserId : null,
-                DecidedAt = isGroupPrivileged ? DateTime.UtcNow : null,
+                DecidedByUserId = isPrivileged ? ownerUserId : null,
+                DecidedAt = isPrivileged ? DateTime.UtcNow : null,
                 CreatedAt = DateTime.UtcNow,
             };
             _db.UserMediaPublications.Add(entity);
@@ -94,8 +135,9 @@ public class UserMediaPublicationService : IUserMediaPublicationService
         {
             Id = entity.Id,
             UserMediaId = entity.UserMediaId,
-            HubGroupId = entity.HubGroupId,
-            HubGroupName = group.Name,
+            TargetType = entity.TargetType,
+            TargetId = request.TargetId,
+            TargetName = targetName,
             Level = entity.Level,
             Status = entity.Status,
             CreatedAt = entity.CreatedAt,
@@ -103,12 +145,14 @@ public class UserMediaPublicationService : IUserMediaPublicationService
         });
     }
 
-    public async Task<bool> WithdrawAsync(int ownerUserId, int mediaId, int hubGroupId)
+    public async Task<bool> WithdrawAsync(int ownerUserId, int mediaId, string targetType, int targetId)
     {
+        var isClub = targetType == UserMediaPublicationTarget.Club;
+
         // IDOR: владение проверяем через join на UserMedia.UserId.
         var entity = await _db.UserMediaPublications
-            .Where(p => p.UserMediaId == mediaId && p.HubGroupId == hubGroupId
-                        && p.Media!.UserId == ownerUserId)
+            .Where(p => p.UserMediaId == mediaId && p.Media!.UserId == ownerUserId
+                        && (isClub ? p.ClubId == targetId : p.HubGroupId == targetId))
             .FirstOrDefaultAsync();
         if (entity == null) return false;
 
@@ -125,8 +169,9 @@ public class UserMediaPublicationService : IUserMediaPublicationService
             {
                 Id = p.Id,
                 UserMediaId = p.UserMediaId,
-                HubGroupId = p.HubGroupId,
-                HubGroupName = p.HubGroup!.Name,
+                TargetType = p.TargetType,
+                TargetId = p.HubGroupId ?? p.ClubId ?? 0,
+                TargetName = p.HubGroup != null ? p.HubGroup.Name : (p.Club != null ? p.Club.Name : ""),
                 Level = p.Level,
                 Status = p.Status,
                 CreatedAt = p.CreatedAt,
@@ -134,7 +179,8 @@ public class UserMediaPublicationService : IUserMediaPublicationService
             })
             .ToListAsync();
 
-    public async Task<List<PublishTargetDto>> GetPublishTargetsAsync(int ownerUserId, int mediaId)
+    public async Task<List<PublishTargetDto>> GetPublishTargetsAsync(
+        int ownerUserId, int mediaId, bool isSiteAdmin)
     {
         var media = await _db.UserMedia.AsNoTracking()
             .Where(m => m.Id == mediaId && m.UserId == ownerUserId)
@@ -142,17 +188,44 @@ public class UserMediaPublicationService : IUserMediaPublicationService
             .FirstOrDefaultAsync();
         if (media == null) return [];
 
-        // Владелец/админ группы проходит подачу и без user-членства (isGroupPrivileged в
-        // SubmitAsync) — поэтому объединение: активный член ИЛИ владелец/админ группы.
-        return await _db.HubGroups.AsNoTracking()
+        // Группы: пловец в ростере И податель свой. Владелец/админ группы проходит подачу и
+        // без user-членства (isPrivileged в SubmitAsync) — поэтому объединение.
+        // ⚠ isSiteAdmin входит сюда наравне: раньше цели его не видели, хотя SubmitAsync
+        // пускал — админ сайта не получал ни одной цели, хотя подача от него прошла бы и сразу
+        // стала approved (диагноз в docs/media-page.md §9).
+        var groups = await _db.HubGroups.AsNoTracking()
             .Where(g => _db.HubGroupMembers.Any(m => m.HubGroupId == g.Id && m.SwimmerId == media.SwimmerId)
-                        && (g.OwnerUserId == ownerUserId
+                        && (isSiteAdmin
+                            || g.OwnerUserId == ownerUserId
                             || _db.HubGroupAdmins.Any(a => a.HubGroupId == g.Id && a.UserId == ownerUserId)
                             || _db.HubGroupUserMembers.Any(um => um.HubGroupId == g.Id
                                 && um.UserId == ownerUserId && um.Status == HubGroupUserMemberStatus.Active)))
             .OrderBy(g => g.Name)
-            .Select(g => new PublishTargetDto { Id = g.Id, Name = g.Name })
+            .Select(g => new PublishTargetDto
+            {
+                Type = UserMediaPublicationTarget.Group,
+                Id = g.Id,
+                Name = g.Name,
+            })
             .ToListAsync();
+
+        // Клуб пловца — цель без всякой ручной работы: ростер приходит из справочника
+        // федерации (Swimmer.ClubId). Членства в клубе не существует, поэтому право подать
+        // есть у владельца медиа, а фильтром служит модерация: заявка ложится pending, и
+        // решает её админ сайта (управляющих у клуба пока нет, план §3.10).
+        var club = await _db.Swimmers.AsNoTracking()
+            .Where(sw => sw.Id == media.SwimmerId && sw.Club != null && sw.Club.MergedIntoId == null
+                         && !sw.Club.IsPseudo)
+            .Select(sw => new PublishTargetDto
+            {
+                Type = UserMediaPublicationTarget.Club,
+                Id = sw.Club!.Id,
+                Name = sw.Club.Name,
+            })
+            .FirstOrDefaultAsync();
+
+        if (club != null) groups.Add(club);
+        return groups;
     }
 
     public Task<List<GroupPublicationInboxItemDto>> GetForGroupAsync(int hubGroupId)
@@ -164,9 +237,11 @@ public class UserMediaPublicationService : IUserMediaPublicationService
 
     public Task<List<GroupPublicationInboxItemDto>> GetModerationFeedAsync(int userId, bool isSiteAdmin)
         => QueryGroupItems(_db.UserMediaPublications.AsNoTracking()
+            // Клубные заявки модерирует только админ сайта — у клуба управляющих нет.
             .Where(p => isSiteAdmin
-                        || p.HubGroup!.OwnerUserId == userId
-                        || _db.HubGroupAdmins.Any(a => a.HubGroupId == p.HubGroupId && a.UserId == userId))
+                        || (p.HubGroup != null
+                            && (p.HubGroup.OwnerUserId == userId
+                                || _db.HubGroupAdmins.Any(a => a.HubGroupId == p.HubGroupId && a.UserId == userId))))
             .OrderBy(p => p.Status == UserMediaPublicationStatus.Pending ? 0 : 1)
             .ThenByDescending(p => p.Id));
 
@@ -177,13 +252,23 @@ public class UserMediaPublicationService : IUserMediaPublicationService
                         && p.Level == level)
             .OrderByDescending(p => p.Id));
 
+    public Task<List<GroupPublicationInboxItemDto>> GetApprovedForClubAsync(int clubId)
+        => QueryGroupItems(_db.UserMediaPublications.AsNoTracking()
+            .Where(p => p.ClubId == clubId
+                        && p.Status == UserMediaPublicationStatus.Approved
+                        // У клуба уровень бывает только public — но фильтр оставлен явным:
+                        // он и есть граница «что видно любому посетителю».
+                        && p.Level == UserMediaPublicationLevel.Public)
+            .OrderByDescending(p => p.Id));
+
     private static Task<List<GroupPublicationInboxItemDto>> QueryGroupItems(IQueryable<UserMediaPublication> query)
         => query
             .Select(p => new GroupPublicationInboxItemDto
             {
                 Id = p.Id,
-                HubGroupId = p.HubGroupId,
-                HubGroupName = p.HubGroup!.Name,
+                TargetType = p.TargetType,
+                TargetId = p.HubGroupId ?? p.ClubId ?? 0,
+                TargetName = p.HubGroup != null ? p.HubGroup.Name : (p.Club != null ? p.Club.Name : ""),
                 Level = p.Level,
                 Status = p.Status,
                 CreatedAt = p.CreatedAt,
@@ -308,10 +393,16 @@ public class UserMediaPublicationService : IUserMediaPublicationService
             .ToList();
     }
 
-    public async Task<bool> DecideAsync(int hubGroupId, int publicationId, bool approve, int decidedByUserId)
+    public async Task<bool> DecideAsync(
+        string targetType, int targetId, int publicationId, bool approve, int decidedByUserId)
     {
+        var isClub = targetType == UserMediaPublicationTarget.Club;
+
+        // Цель в запросе обязательна и сверяется со строкой: иначе решение по чужой заявке
+        // прошло бы через ручку своей группы.
         var entity = await _db.UserMediaPublications
-            .FirstOrDefaultAsync(p => p.Id == publicationId && p.HubGroupId == hubGroupId);
+            .FirstOrDefaultAsync(p => p.Id == publicationId
+                                      && (isClub ? p.ClubId == targetId : p.HubGroupId == targetId));
         if (entity == null) return false;
 
         entity.Status = approve ? UserMediaPublicationStatus.Approved : UserMediaPublicationStatus.Rejected;
