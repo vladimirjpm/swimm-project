@@ -106,6 +106,14 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             Members = members
         };
 
+        // Настройки отображения: показ блока фото и указатель «взять из медиа». Сам URL
+        // указателя доразрешает контроллер — там уже собрана лента `Gallery`, в которой
+        // лежат и свои медиа, и одобренные публикации. Здесь — фоллбек на обложку.
+        var display = EntityDisplaySettings.Parse(group.DisplaySettings);
+        dto.ShowHeroImage = display.Hero.Show;
+        dto.HeroMediaId = display.Hero.MediaId;
+        dto.HeroImageUrl = group.CoverImageUrl;
+
         await FillAggregatesAsync(_read, dto, members.Select(m => m.SwimmerId).ToList());
         return dto;
     }

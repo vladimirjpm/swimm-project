@@ -78,6 +78,8 @@ public class ClubOverviewRepository : IClubOverviewRepository
                 c.NameEn,
                 CountryCode = c.Country != null ? c.Country.CountryCode : null,
                 CountryName = c.Country != null ? c.Country.CountryName : null,
+                c.CoverImageUrl,
+                c.DisplaySettings,
             })
             .FirstOrDefaultAsync();
         if (club is null) return null;
@@ -98,6 +100,12 @@ public class ClubOverviewRepository : IClubOverviewRepository
                     .CountAsync(s => s.ClubId == resolvedClubId),
                 FirstSeason = rows.Count > 0 ? rows.Min(r => r.Season) : null,
                 LastSeason = rows.Count > 0 ? rows.Max(r => r.Season) : null,
+                // Указатель на картинку разрешает СЕРВЕР — наружу уходит один готовый URL.
+                // Форма hero.mediaId у клуба пока мертва: клубной медиа-ленты не существует
+                // (docs/plans/entity-page-shell-plan.md §3.10), поэтому берётся CoverImageUrl.
+                CoverImageUrl = club.CoverImageUrl,
+                HeroImageUrl = club.CoverImageUrl,
+                ShowHeroImage = EntityDisplaySettings.Parse(club.DisplaySettings).Hero.Show,
             },
             Seasons = rows
                 .Select(r => r.Season).Distinct().OrderByDescending(s => s)

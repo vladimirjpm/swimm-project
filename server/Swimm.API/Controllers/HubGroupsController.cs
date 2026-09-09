@@ -117,6 +117,22 @@ public class HubGroupsController : ControllerBase
                     Url = p.Url,
                     Caption = p.ResultLabel,
                 }));
+                // Фото шапки «из медиа»: указатель `hero.mediaId` разрешается ПО СОБРАННОЙ
+                // ленте — в ней и свои медиа (id > 0), и одобренные публикации (id < 0),
+                // поэтому помечать шапкой можно и то и другое. Медиа удалили или ссылка
+                // сменилась — молча падаем на обложку (её репозиторий уже положил), а не
+                // отдаём битую картинку.
+                if (dto.HeroMediaId is { } heroMediaId)
+                {
+                    var heroItem = dto.Gallery.FirstOrDefault(m => m.Id == heroMediaId);
+                    // ⚠ Только КАРТИНКА. Ссылка на видео (в ленте их большинство) уехала бы
+                    // прямо в <img src> и дала бы битую картинку: превью с YouTube умеет
+                    // считать клиентский HelperMedia, и второй такой реализации на сервере
+                    // быть не должно. Не картинка или медиа удалили — молча падаем на
+                    // обложку, которую положил репозиторий.
+                    if (heroItem is not null && heroItem.MediaType == "image")
+                        dto.HeroImageUrl = heroItem.Url;
+                }
                 // Лента хайлайтов шапки — строго после заполнения Gallery (video/photo берутся из неё).
                 dto.Highlights = HubGroupHighlightsBuilder.Build(dto);
                 return dto;

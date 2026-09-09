@@ -254,6 +254,23 @@ public sealed class HubGroupDetailsDto
     [JsonPropertyName("cover_image_url")]
     public string? CoverImageUrl { get; set; }
 
+    /// <summary>
+    /// Фото шапки — УЖЕ РАЗРЕШЁННОЕ сервером: hero.mediaId (взять из медиа-ленты) →
+    /// CoverImageUrl → null. Клиент про формы указателя не знает, у него одно поле.
+    /// null — картинки нет, страница рисует заглушку.
+    /// </summary>
+    [JsonPropertyName("hero_image_url")]
+    public string? HeroImageUrl { get; set; }
+
+    /// <summary>Показывать блок фото шапки (настройка hero.show). false — колонка схлопнута.</summary>
+    [JsonPropertyName("show_hero_image")]
+    public bool ShowHeroImage { get; set; } = true;
+
+    /// <summary>Id медиа, помеченного как фото шапки (hero.mediaId). Нужен табу Media,
+    /// чтобы отметить активную кнопку «Сделать фото шапки». null — фото берётся из URL.</summary>
+    [JsonPropertyName("hero_media_id")]
+    public int? HeroMediaId { get; set; }
+
     [JsonPropertyName("location")]
     public string? Location { get; set; }
 
