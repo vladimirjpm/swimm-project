@@ -258,6 +258,27 @@ public class HubGroupUserService : IHubGroupUserService
         return HubGroupMemberSaveResult.Ok();
     }
 
+    public async Task<HubGroupMemberSaveResult> SetJoinPolicyAsync(int hubGroupId, string policy)
+    {
+        if (policy != HubGroupJoinPolicy.Open && policy != HubGroupJoinPolicy.Approval)
+            return HubGroupMemberSaveResult.Fail("Политика вступления: допустимо open или approval");
+
+        var group = await _db.HubGroups.FirstOrDefaultAsync(g => g.Id == hubGroupId);
+        if (group == null) return HubGroupMemberSaveResult.Fail($"Группа #{hubGroupId} не найдена");
+        if (group.JoinPolicy == policy) return HubGroupMemberSaveResult.Ok();
+
+        // Уже вступивших переключение НЕ трогает: approval — это дверь для новых, а не
+        // ретроактивный пересмотр состава. Кого пустили, того выгоняют руками.
+        group.JoinPolicy = policy;
+        group.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        // Публичная страница группы кэшируется вместе с политикой (кнопка «Join» / «Request to
+        // join» читает её из того же payload) — без сброса тумблер минуту не виден снаружи.
+        await _core.InvalidateCacheAsync();
+        return HubGroupMemberSaveResult.Ok();
+    }
+
     public async Task<HubGroupMemberSaveResult> LeaveAsync(int hubGroupId, int userId) =>
         await RemoveUserMemberAsync(hubGroupId, userId);
 

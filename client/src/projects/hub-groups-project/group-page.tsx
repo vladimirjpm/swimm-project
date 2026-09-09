@@ -14,6 +14,7 @@ import {
   FromMembersGallery, GroupGallery, MembersPublications, MembersReviews,
 } from './components/group-media';
 import PublicationsInbox from './components/group-admin';
+import GroupJoinPolicyCard from './components/group-join-policy';
 import DeepDisplaySettingsCard from '../components/deep/display-settings-card';
 import type { HubGroupDetails } from './types';
 
@@ -201,7 +202,7 @@ function GroupPage({ slug }: { slug: string }) {
       id: 'admin' as const,
       icon: '⚙',
       label: 'Admin',
-      sub: 'display · requests',
+      sub: 'display · joining · requests',
       cards: () => [
         {
           id: 'display-settings',
@@ -220,6 +221,15 @@ function GroupPage({ slug }: { slug: string }) {
                 id: m.id, url: m.url, media_type: m.media_type,
                 source_type: m.source_type, caption: m.caption,
               }))}
+            />
+          ),
+        },
+        {
+          id: 'join-policy',
+          render: () => (
+            <GroupJoinPolicyCard
+              groupId={group.id}
+              policy={group.join_policy === 'approval' ? 'approval' : 'open'}
             />
           ),
         },

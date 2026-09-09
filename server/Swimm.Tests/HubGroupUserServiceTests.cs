@@ -647,4 +647,60 @@ public class HubGroupUserServiceTests
         Assert.Single(joined);
         Assert.Equal("g1", joined[0].Slug);
     }
+
+    // ── Политика вступления (тумблер в табе Admin страницы группы) ────────────
+
+    [Fact]
+    public async Task SetJoinPolicy_SwitchesToApproval_AndNextJoinBecomesPending()
+    {
+        await using var db = CreateDb(nameof(SetJoinPolicy_SwitchesToApproval_AndNextJoinBecomesPending));
+        var owner = await AddUserAsync(db, "owner@example.com");
+        var joiner = await AddUserAsync(db, "joiner@example.com");
+        var g = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true };
+        db.HubGroups.Add(g);
+        await db.SaveChangesAsync();
+        var svc = Service(db);
+
+        var result = await svc.SetJoinPolicyAsync(g.Id, HubGroupJoinPolicy.Approval);
+        await svc.JoinAsync(g.Id, joiner.Id);
+
+        Assert.True(result.Success);
+        var row = await db.HubGroupUserMembers.SingleAsync(m => m.UserId == joiner.Id);
+        Assert.Equal(HubGroupUserMemberStatus.Pending, row.Status);
+    }
+
+    [Fact]
+    public async Task SetJoinPolicy_DoesNotTouchAlreadyJoined()
+    {
+        await using var db = CreateDb(nameof(SetJoinPolicy_DoesNotTouchAlreadyJoined));
+        var owner = await AddUserAsync(db, "owner@example.com");
+        var joiner = await AddUserAsync(db, "joiner@example.com");
+        var g = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true };
+        db.HubGroups.Add(g);
+        await db.SaveChangesAsync();
+        var svc = Service(db);
+        await svc.JoinAsync(g.Id, joiner.Id); // при open — сразу active
+
+        await svc.SetJoinPolicyAsync(g.Id, HubGroupJoinPolicy.Approval);
+
+        // approval — дверь для НОВЫХ; уже вступивших переключение не пересматривает.
+        var row = await db.HubGroupUserMembers.SingleAsync(m => m.UserId == joiner.Id);
+        Assert.Equal(HubGroupUserMemberStatus.Active, row.Status);
+    }
+
+    [Fact]
+    public async Task SetJoinPolicy_UnknownValue_Fails()
+    {
+        await using var db = CreateDb(nameof(SetJoinPolicy_UnknownValue_Fails));
+        var owner = await AddUserAsync(db, "owner@example.com");
+        var g = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true };
+        db.HubGroups.Add(g);
+        await db.SaveChangesAsync();
+
+        var result = await Service(db).SetJoinPolicyAsync(g.Id, "everyone");
+
+        Assert.False(result.Success);
+        var stored = await db.HubGroups.SingleAsync(x => x.Id == g.Id);
+        Assert.Equal(HubGroupJoinPolicy.Open, stored.JoinPolicy);
+    }
 }
