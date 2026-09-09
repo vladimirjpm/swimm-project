@@ -15,6 +15,7 @@ import {
 } from './components/group-media';
 import PublicationsInbox from './components/group-admin';
 import GroupJoinPolicyCard from './components/group-join-policy';
+import GroupScheduleEditor from './components/group-schedule-editor';
 import DeepDisplaySettingsCard from '../components/deep/display-settings-card';
 import type { HubGroupDetails } from './types';
 
@@ -202,7 +203,7 @@ function GroupPage({ slug }: { slug: string }) {
       id: 'admin' as const,
       icon: '⚙',
       label: 'Admin',
-      sub: 'display · joining · requests',
+      sub: 'display · schedule · joining',
       cards: () => [
         {
           id: 'display-settings',
@@ -222,6 +223,12 @@ function GroupPage({ slug }: { slug: string }) {
                 source_type: m.source_type, caption: m.caption,
               }))}
             />
+          ),
+        },
+        {
+          id: 'training-schedule',
+          render: () => (
+            <GroupScheduleEditor groupId={group.id} schedule={group.training_schedule} />
           ),
         },
         {

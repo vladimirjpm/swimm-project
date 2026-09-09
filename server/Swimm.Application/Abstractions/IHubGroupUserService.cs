@@ -1,4 +1,5 @@
 using Swimm.Application.Dtos;
+using Swimm.Domain;
 
 namespace Swimm.Application.Abstractions;
 
@@ -67,6 +68,12 @@ public interface IHubGroupUserService
     /// Авторизация (CanEdit) — в контроллере.
     /// </summary>
     Task<HubGroupMemberSaveResult> SetJoinPolicyAsync(int hubGroupId, string policy);
+
+    /// <summary>
+    /// Заменить расписание тренировок (пустой список слотов = убрать расписание).
+    /// Узкая ручка по тем же причинам, что SetJoinPolicyAsync. Авторизация — в контроллере.
+    /// </summary>
+    Task<HubGroupMemberSaveResult> SetTrainingScheduleAsync(int hubGroupId, GroupTrainingScheduleDto? schedule);
 
     /// <summary>Самовыход из группы.</summary>
     Task<HubGroupMemberSaveResult> LeaveAsync(int hubGroupId, int userId);

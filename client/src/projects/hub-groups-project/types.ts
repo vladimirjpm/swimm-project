@@ -106,6 +106,31 @@ export interface HubGroupMemberMediaItem {
  * Используется и для published-списков (GET .../media/published?level=...), и для inbox
  * модерации (GET /api/hub-groups/{id}/media/publications) — форма одинаковая.
  */
+/** Одно регулярное занятие недели: день ISO (1 = Mon … 7 = Sun), часы «HH:mm». */
+export interface GroupTrainingSlot {
+  day: number;
+  start: string;
+  end?: string | null;
+}
+
+/** Регулярное расписание группы (HubGroups.TrainingSchedule). */
+export interface GroupTrainingSchedule {
+  slots: GroupTrainingSlot[];
+  place?: string | null;
+  pool_type?: string | null;
+  note?: string | null;
+}
+
+/** Ближайшее занятие — СЧИТАЕТ СЕРВЕР в поясе Израиля, клиент только рисует. */
+export interface NextTraining {
+  /** yyyy-MM-dd */
+  date: string;
+  start: string;
+  end?: string | null;
+  place?: string | null;
+  pool_type?: string | null;
+}
+
 export interface GroupPublicationItem {
   id: number;
   level: 'public' | 'members';
@@ -171,4 +196,8 @@ export interface HubGroupDetails {
   gallery: HubGroupMediaItem[];
   /** Лента хайлайтов шапки; пустая/отсутствует — модуль скрыт (старый вид шапки). */
   highlights?: HubGroupHighlight[];
+  /** Регулярное расписание; null/отсутствует — не заведено, слоты шапки скрыты. */
+  training_schedule?: GroupTrainingSchedule | null;
+  /** Ближайшее занятие по расписанию (считает сервер). */
+  next_training?: NextTraining | null;
 }

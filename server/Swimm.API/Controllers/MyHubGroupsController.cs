@@ -288,6 +288,22 @@ public class MyHubGroupsController : ControllerBase
         return result.Success ? Ok() : BadRequest(new { error = result.Error });
     }
 
+    /// <summary>
+    /// Заменить расписание тренировок (владелец/админ группы). Пустой список слотов убирает
+    /// расписание — слоты шапки тогда скрываются.
+    /// </summary>
+    [HttpPut("{id:int}/training-schedule")]
+    public async Task<IActionResult> SetTrainingSchedule(int id, [FromBody] GroupTrainingScheduleDto? request)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanEdit) return Forbid();
+
+        var result = await _mine.SetTrainingScheduleAsync(id, request);
+        return result.Success ? Ok() : BadRequest(new { error = result.Error });
+    }
+
     /// <summary>Убрать участника-аккаунт (владелец/админ группы).</summary>
     [HttpDelete("{id:int}/user-members/{userId:int}")]
     public async Task<IActionResult> RemoveUserMember(int id, int userId)

@@ -5,6 +5,7 @@ import UI_ClubIcon from '../../components/mix/club-icon/club-icon';
 import UI_FlagEmoji from '../../components/mix/flag-icon/flag-icon';
 import { routes } from '../../../utils/routes';
 import { GroupIcon, JoinButton, LinkChips } from './group-bits';
+import GroupTrainingSlots from './group-training-slots';
 import type { HubGroupDetails } from '../types';
 
 /**
@@ -94,6 +95,8 @@ function GroupHero({ group }: Props) {
           <JoinButton group={group} />
         </div>
       </div>
+
+      <GroupTrainingSlots schedule={group.training_schedule} next={group.next_training} />
 
       <div className="mt-6 flex flex-wrap gap-8">
         <DeepKpi label="Swimmers" value={group.members.length} hint="in the roster" />
