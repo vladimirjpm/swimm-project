@@ -311,12 +311,17 @@
    Карточки страницы разложены по пяти табам. Подложка и стекло — из тех же
    deep-токенов, новых цветов вариант не вводит. Glow только у активной плитки
    (правило темы: один glow на блок). */
-/* Обёртка «папки»: полоса плиток + сросшаяся с активной плиткой панель контента */
-.deep-folder { background: var(--deep-tabs-bg); border-radius: var(--deep-radius-card); }
+/* Обёртка «папки»: полоса плиток + сросшаяся с активной плиткой панель контента.
+   Подложки под полосой плиток НЕТ (решение Влада 09.09.2026, хендофф группы): корпусом
+   служит сама панель, а тёмная полоса под плитками читалась лишней рамкой. Вместе с фоном
+   сняты и внутренние отступы полосы/панели — они были нужны, только чтобы содержимое
+   сидело внутри корпуса; без корпуса панель оказывалась уже шапки на 28px.
+   ⚠ Токен --deep-tabs-bg НЕ удалять: на нём висит роль --t-list-head (шапки списков hp). */
+.deep-folder { background: transparent; }
 
 .deep-tabs {
   /* Снизу 0: активная плитка стыкуется с панелью, зазора между ними быть не должно */
-  padding: 12px 14px 0;
+  padding: 0;
   display: grid;
   /* Число табов задаёт компонент: у клуба 5, у спортсмена 6.
      minmax(0,…), а не 1fr: голый 1fr это minmax(auto,1fr), и длинное имя таба
@@ -384,7 +389,7 @@
      верхние углы отрывали её от язычка активной плитки. */
   border-radius: 0 0 13px 13px;
   box-shadow: var(--deep-panel-glow);
-  margin: 0 14px 14px;
+  margin: 0;
   padding: 14px;
 }
 
@@ -392,8 +397,8 @@
    Активная отбивается подчёркиванием, а не заливкой — заливка на 78px колонке
    съедает подпись. */
 @media (max-width: 639px) {
-  .deep-tabs { padding: 8px 8px 0; gap: 4px; }
-  .deep-tabs-panel { margin: 8px; padding: 10px; }
+  .deep-tabs { padding: 0; gap: 4px; }
+  .deep-tabs-panel { margin: 0; padding: 10px; }
   .deep-tab {
     align-items: center;
     gap: 4px;
@@ -407,18 +412,52 @@
   .deep-tab__head { flex-direction: column; gap: 2px; }
   .deep-tab__icon { width: auto; height: auto; background: none; font-size: 17px; }
   .deep-tab__name { font-size: 9.5px; font-weight: 800; letter-spacing: 0; }
-  /* В мобайле «папки» нет: плитки-колонки узкие, язычок на 70px читается как артефакт.
-     Активную отбивает подчёркивание — поэтому корпус папки здесь снимается. */
+  /* Язычок папки оставлен и в мобайле (решение Влада 09.09.2026, хендофф группы).
+     Прежде здесь корпус снимался и активную отбивало подчёркивание — считалось, что на
+     колонке ~70px язычок читается артефактом. Разворот сознательный; если на настоящем
+     390px язычок и правда мешает, возвращаем подчёркивание — подложку полосы это не
+     затрагивает, она снята отдельно. */
   .deep-tab--active {
-    background: transparent;
-    box-shadow: none;
-    border: none;
-    border-bottom: 2.5px solid var(--deep-accent);
+    background: var(--deep-panel-bg);
+    border: 1px solid var(--deep-panel-border);
+    border-bottom: none;
     border-radius: 10px 10px 0 0;
-    margin-bottom: 0;
+    margin-bottom: -1px;
+    position: relative;
+    z-index: 1;
   }
   .deep-tab--active .deep-tab__icon { background: none; color: var(--deep-accent); }
   .deep-tab--active .deep-tab__name { color: var(--deep-accent); text-shadow: var(--deep-tab-text-glow); }
+}
+
+/* ── Контейнер списка заплывов ────────────────────────────────────────────────
+   Общая строка (`components/swim-row/`) красится токенами `--sr-*` и ТОЛЬКО на контейнере
+   списка: покрасить корень страницы значило бы задеть соседнюю вёрстку. Рецепт живёт здесь,
+   а не у страницы пловца, потому что контейнер нужен каждой deep-странице со списком
+   заплывов — у группы это карточка «Recent swims». */
+.deep-list {
+  display: flex; flex-direction: column; gap: 6px;
+
+  --sr-radius: var(--deep-radius-row);
+  --sr-bg: var(--deep-card-bg-row);
+  --sr-bg-hover: var(--deep-card-bg);
+  --sr-border: var(--deep-card-border-soft);
+  --sr-border-hover: var(--deep-card-border);
+  --sr-text: var(--deep-text);
+  --sr-text-mute: var(--deep-text-mute);
+  --sr-text-faint: var(--deep-text-faint);
+  --sr-text-ghost: var(--deep-text-ghost);
+  --sr-divider: var(--deep-card-border-soft);
+  --sr-circle-bg: var(--deep-card-bg-raised);
+  --sr-circle-border: var(--deep-card-border);
+  --sr-num-font: var(--deep-font-display);
+  --sr-accent: var(--deep-accent);
+  --sr-gold: var(--deep-gold);
+  --sr-gold-chip-bg: var(--deep-gold-bar);
+  --sr-gold-chip-text: #3b2600;
+  --sr-chip-bg: var(--deep-accent-chip);
+  --sr-chip-border: var(--deep-accent-border);
+  --sr-chip-text: var(--deep-accent);
 }
 
 /* ── Полоса сезонов: кольцевая карусель (handoff filter-season, вариант 4c) ───
