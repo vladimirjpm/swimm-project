@@ -6,7 +6,7 @@ import { chipClass, segmentClass } from './status-styles';
 
 interface Props {
   rows: ModerationRowDto[];
-  onDecide: (hubGroupId: number, publicationId: number, approve: boolean) => void | Promise<void>;
+  onDecide: (targetType: 'group' | 'club', targetId: number, publicationId: number, approve: boolean) => void | Promise<void>;
 }
 
 type ModStatusFilter = 'pending' | 'published' | 'all';
@@ -20,15 +20,15 @@ function ModerationPanel({ rows, onDecide }: Props) {
 
   const groupChips = useMemo(() => {
     const byId = new Map<number, string>();
-    for (const r of rows) byId.set(r.hub_group_id, r.hub_group_name);
+    for (const r of rows) byId.set(r.target_id, r.target_name);
     return Array.from(byId.entries()).map(([id, name]) => ({
       id,
       name,
-      pendingCount: rows.filter((r) => r.hub_group_id === id && r.status === 'pending').length,
+      pendingCount: rows.filter((r) => r.target_id === id && r.status === 'pending').length,
     }));
   }, [rows]);
 
-  const byGroup = groupId === 'all' ? rows : rows.filter((r) => r.hub_group_id === groupId);
+  const byGroup = groupId === 'all' ? rows : rows.filter((r) => r.target_id === groupId);
   const visible = byGroup.filter((r) =>
     statusFilter === 'all' ? r.status !== 'rejected' : statusFilter === 'published' ? r.status === 'approved' : r.status === 'pending'
   );
@@ -40,7 +40,7 @@ function ModerationPanel({ rows, onDecide }: Props) {
   const decide = async (row: ModerationRowDto, approve: boolean) => {
     setBusyId(row.id);
     try {
-      await onDecide(row.hub_group_id, row.id, approve);
+      await onDecide(row.target_type, row.target_id, row.id, approve);
     } finally {
       setBusyId(null);
     }
@@ -74,11 +74,11 @@ function ModerationPanel({ rows, onDecide }: Props) {
         <div className="flex flex-col gap-2">
           {visible.map((r) => {
             const highlightPublic = r.level === 'public' && r.status === 'pending';
-            const embedIdx = embeddable.findIndex((e) => e.id === r.id && e.hub_group_id === r.hub_group_id);
+            const embedIdx = embeddable.findIndex((e) => e.id === r.id && e.target_id === r.target_id);
             const isEmbeddable = r.media_type === 'video' && (r.source_type === 'youtube' || r.source_type === 'vimeo');
             return (
               <div
-                key={`${r.hub_group_id}-${r.id}`}
+                key={`${r.target_id}-${r.id}`}
                 className="flex flex-wrap items-center gap-3.5 rounded-[14px] p-[10px_14px] shadow-[var(--t-shadow)]"
                 style={{
                   border: `1px solid ${highlightPublic ? 'var(--t-warn-border)' : 'var(--t-border)'}`,
@@ -96,7 +96,7 @@ function ModerationPanel({ rows, onDecide }: Props) {
                   {r.result_label && <div className="text-[11.5px] text-[var(--t-text-2)]">{r.result_label}</div>}
                 </div>
                 <div className="min-w-0 flex-1 truncate text-[11.5px] text-[var(--t-text-2)]">{r.owner_email}</div>
-                <div dir="rtl" className="min-w-0 flex-[0.8] truncate text-left text-[12px] font-bold text-[var(--t-text-2)]">{r.hub_group_name}</div>
+                <div dir="rtl" className="min-w-0 flex-[0.8] truncate text-left text-[12px] font-bold text-[var(--t-text-2)]">{r.target_name}</div>
                 <span
                   className="hp-mono shrink-0 rounded-[6px] px-2 py-[2.5px] text-[10.5px] font-extrabold"
                   style={

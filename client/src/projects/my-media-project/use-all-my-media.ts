@@ -32,6 +32,8 @@ export interface AddMediaInput {
 }
 
 export interface PublishTargetDto {
+  /** group | club — у клубной цели уровень бывает только `public` (членов у клуба нет). */
+  type: 'group' | 'club';
   id: number;
   name: string;
 }

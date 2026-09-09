@@ -5,10 +5,12 @@ import './my-media.css';
 import { useAuth } from '../../hooks/useAuth';
 import { useLoginModal } from '../components/login-modal/login-modal-context';
 import { useFavorites } from '../../hooks/useFavorites';
-import { useMyMediaPublications } from '../../hooks/useUserMedia';
+import {
+  parseTargetKey, targetKey, useMyMediaPublications, type PublishTargetRef,
+} from '../../hooks/useUserMedia';
 import { useMyHubGroups } from '../hub-groups-project/use-my-hub-groups';
 import { useDeepThemeClass } from '../components/deep/use-deep-theme-class';
-import { useAllMyMedia, AllUserMediaDto, AddMediaInput } from './use-all-my-media';
+import { useAllMyMedia, type PublishTargetDto, AllUserMediaDto, AddMediaInput } from './use-all-my-media';
 import { useMySwims, MySwimDto, SwimMediaDto, seasonLabel, toggleLike } from './use-my-swims';
 import { useMyMediaModeration } from './use-my-media-moderation';
 import AppTopbar from '../components/app-topbar/app-topbar';
@@ -112,8 +114,10 @@ function MyMediaContent({ deep }: { deep: string }) {
   const [addCompTarget, setAddCompTarget] = useState<{ id: number; name: string } | null>(null);
   const [linkSwimTarget, setLinkSwimTarget] = useState<AllUserMediaDto | null>(null);
   const [shareTarget, setShareTarget] = useState<AllUserMediaDto | null>(null);
-  const [shareTargets, setShareTargets] = useState<{ id: number; name: string }[] | null>(null);
-  const [shareGroupId, setShareGroupId] = useState<number | ''>('');
+  const [shareTargets, setShareTargets] = useState<PublishTargetDto[] | null>(null);
+  // Ключ цели строкой («group:17» / «club:438»): у `<select>` значение всегда строка, а
+  // цель теперь пара (тип, id) — числом её не выразить.
+  const [shareTargetKey, setShareTargetKey] = useState<string>('');
   const [shareLevel, setShareLevel] = useState<'members' | 'public'>('members');
   const [shareBusy, setShareBusy] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
@@ -186,7 +190,7 @@ function MyMediaContent({ deep }: { deep: string }) {
 
   const groupOptions = useMemo(() => {
     const names = new Map<number, string>();
-    for (const p of publications) if (!names.has(p.hub_group_id)) names.set(p.hub_group_id, p.hub_group_name);
+    for (const p of publications) if (!names.has(p.target_id)) names.set(p.target_id, p.target_name);
     const counts = new Map<number, number>();
     let notShared = 0;
     for (const id of pageMediaIds) {
@@ -194,9 +198,9 @@ function MyMediaContent({ deep }: { deep: string }) {
       if (pubs.length === 0) { notShared += 1; continue; }
       const seen = new Set<number>();
       for (const p of pubs) {
-        if (seen.has(p.hub_group_id)) continue;
-        seen.add(p.hub_group_id);
-        counts.set(p.hub_group_id, (counts.get(p.hub_group_id) ?? 0) + 1);
+        if (seen.has(p.target_id)) continue;
+        seen.add(p.target_id);
+        counts.set(p.target_id, (counts.get(p.target_id) ?? 0) + 1);
       }
     }
     const groups = Array.from(names, ([id, name]) => ({ id, name, count: counts.get(id) ?? 0 }))
@@ -209,7 +213,7 @@ function MyMediaContent({ deep }: { deep: string }) {
     if (groupFilter === 'all') return true;
     const pubs = publicationsByMedia.get(mediaId) ?? [];
     if (groupFilter === 'none') return pubs.length === 0;
-    return pubs.some((p) => p.hub_group_id === groupFilter);
+    return pubs.some((p) => p.target_id === groupFilter);
   };
 
   const pickGroup = (v: GroupFilter) => {
@@ -318,7 +322,7 @@ function MyMediaContent({ deep }: { deep: string }) {
     const active = (publicationsByMedia.get(item.id) ?? []).find(
       (p) => p.status === 'pending' || p.status === 'approved'
     );
-    setShareGroupId(active ? active.hub_group_id : '');
+    setShareTargetKey(active ? targetKey({ type: active.target_type, id: active.target_id }) : '');
     setShareLevel(active ? active.level : 'members');
     try {
       const r = await fetch(`/api/me/media/${item.id}/publish-targets`, { credentials: 'include' });
@@ -332,30 +336,32 @@ function MyMediaContent({ deep }: { deep: string }) {
   // публикация в этой группе pending/approved («publication already exists»), поэтому
   // смена уровня (members ↔ everyone) идёт через withdraw + резаявку.
   const publishTo = async (
-    mediaId: number, hubGroupId: number, level: 'members' | 'public'
+    mediaId: number, target: PublishTargetRef, level: 'members' | 'public'
   ): Promise<{ ok: boolean; error?: string }> => {
     const active = (publicationsByMedia.get(mediaId) ?? []).find(
-      (p) => p.hub_group_id === hubGroupId && (p.status === 'pending' || p.status === 'approved')
+      (p) => p.target_type === target.type && p.target_id === target.id
+             && (p.status === 'pending' || p.status === 'approved')
     );
     if (active) {
       if (active.level === level) return { ok: true }; // менять нечего
-      await withdrawPublication(mediaId, hubGroupId);
+      await withdrawPublication(mediaId, target);
     }
-    return submitPublication(mediaId, hubGroupId, level);
+    return submitPublication(mediaId, target, level);
   };
 
   const handlePublish = async () => {
-    if (shareTarget == null || shareGroupId === '') return;
+    const target = parseTargetKey(shareTargetKey);
+    if (shareTarget == null || target == null) return;
     setShareBusy(true);
     setShareError(null);
-    const res = await publishTo(shareTarget.id, shareGroupId, shareLevel);
+    const res = await publishTo(shareTarget.id, target, shareLevel);
     setShareBusy(false);
     if (res.ok) setShareTarget(null);
     else setShareError(res.error ?? 'Could not submit the request');
   };
 
-  const submitInlineShare = async (mediaId: number, hubGroupId: number, level: 'members' | 'public'): Promise<boolean> => {
-    const res = await publishTo(mediaId, hubGroupId, level);
+  const submitInlineShare = async (mediaId: number, target: PublishTargetRef, level: 'members' | 'public'): Promise<boolean> => {
+    const res = await publishTo(mediaId, target, level);
     return res.ok;
   };
 
@@ -585,7 +591,7 @@ function MyMediaContent({ deep }: { deep: string }) {
     onAddVideo: (s: MySwimDto) => setAddVideoSwim(s),
     onAddCompMedia: (id: number, name: string) => setAddCompTarget({ id, name }),
     onSubmitShare: submitInlineShare,
-    onWithdraw: (mediaId: number, hubGroupId: number) => withdrawPublication(mediaId, hubGroupId),
+    onWithdraw: (mediaId: number, target: PublishTargetRef) => withdrawPublication(mediaId, target),
     onDelete: handleDelete,
     onToggleLike,
   };
@@ -753,7 +759,7 @@ function MyMediaContent({ deep }: { deep: string }) {
                             publications={publicationsByMedia.get(item.id) ?? []}
                             onOpenLightbox={() => onPlay(item)}
                             onDelete={() => handleDelete(item.id)}
-                            onWithdraw={(hubGroupId) => withdrawPublication(item.id, hubGroupId)}
+                            onWithdraw={(target) => withdrawPublication(item.id, target)}
                             onLinkToSwim={() => setLinkSwimTarget(item)}
                             onShareWithGroup={() => openShare(item)}
                           />
@@ -777,7 +783,9 @@ function MyMediaContent({ deep }: { deep: string }) {
         ) : (
           <ModerationPanel
             rows={moderation.rows}
-            onDecide={async (hubGroupId, publicationId, approve) => { await moderation.decide(hubGroupId, publicationId, approve); }}
+            onDecide={async (targetType, targetId, publicationId, approve) => {
+              await moderation.decide(targetType, targetId, publicationId, approve);
+            }}
           />
         )}
       </section>
@@ -844,28 +852,43 @@ function MyMediaContent({ deep }: { deep: string }) {
             className="w-[420px] max-w-[calc(100vw-40px)] rounded-[16px] border border-[var(--t-border)] bg-[var(--t-surface-strong)] p-5 text-[var(--t-text)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="m-0 mb-3 text-[15px] font-black">Share with a group</h3>
+            <h3 className="m-0 mb-3 text-[15px] font-black">Share with a group or club</h3>
             {shareTargets != null && shareTargets.length === 0 && (
               <p className="text-[12px] text-[var(--t-text-2)]">
-                No eligible groups — the swimmer must be in the group's roster and you must be a member.
+                No eligible targets — for a group the swimmer must be in its roster and you must be
+                a member; the swimmer's club appears here on its own.
               </p>
             )}
             {shareTargets != null && shareTargets.length > 0 && (
               <div className="flex flex-col gap-2.5">
                 <select
-                  value={shareGroupId}
-                  onChange={(e) => setShareGroupId(e.target.value === '' ? '' : Number(e.target.value))}
+                  value={shareTargetKey}
+                  onChange={(e) => {
+                    setShareTargetKey(e.target.value);
+                    // У клуба нет аккаунтов-участников, значит и уровня members: сервер такую
+                    // заявку отвергнет, поэтому не даём выбрать её и в интерфейсе.
+                    if (parseTargetKey(e.target.value)?.type === 'club') setShareLevel('public');
+                  }}
                   className="rounded-[8px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-2.5 py-2 text-[12px] text-[var(--t-text)]"
                 >
-                  <option value="">— group —</option>
-                  {shareTargets.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  <option value="">— group or club —</option>
+                  {shareTargets.map((t) => (
+                    <option key={targetKey(t)} value={targetKey(t)}>
+                      {t.type === 'club' ? `${t.name} (club)` : t.name}
+                    </option>
+                  ))}
                 </select>
                 <select
                   value={shareLevel}
                   onChange={(e) => setShareLevel(e.target.value as 'members' | 'public')}
                   className="rounded-[8px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-2.5 py-2 text-[12px] text-[var(--t-text)]"
                 >
-                  <option value="members">Group members</option>
+                  <option
+                    value="members"
+                    disabled={parseTargetKey(shareTargetKey)?.type === 'club'}
+                  >
+                    Group members
+                  </option>
                   <option value="public">Public (visible to everyone)</option>
                 </select>
                 {shareLevel === 'public' && (
@@ -878,7 +901,7 @@ function MyMediaContent({ deep }: { deep: string }) {
                   </button>
                   <button
                     type="button"
-                    disabled={shareBusy || shareGroupId === ''}
+                    disabled={shareBusy || parseTargetKey(shareTargetKey) == null}
                     onClick={handlePublish}
                     className="hp-mono rounded-[8px] border-none bg-[var(--t-accent)] px-3 py-[7px] text-[11.5px] font-extrabold text-[var(--t-accent-ink)] disabled:opacity-50"
                   >

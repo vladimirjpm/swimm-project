@@ -15,6 +15,7 @@ import ClubRecords from './components/club-records';
 import ClubRecordWall from './components/club-record-wall';
 import ClubCoaches from './components/club-coaches';
 import ClubSoonCard from './components/club-soon-card';
+import ClubMedia from './components/club-media';
 import DeepEntityPage from '../components/deep/entity-page';
 import DeepDigestCard from '../components/deep/digest-card';
 import DeepDisplaySettingsCard from '../components/deep/display-settings-card';
@@ -272,20 +273,11 @@ function ClubProject() {
       id: 'media',
       icon: '▶',
       label: 'Media',
-      sub: 'soon',
-      // Медиа у клуба пока нет вообще: ссылки живут у соревнований и в My media
-      // (docs/media-page.md), клубной выборки на API не существует. Как её завести —
-      // docs/plans/entity-page-shell-plan.md §3.10.
-      cards: () => [{
-        id: 'media-soon',
-        render: () => (
-          <ClubSoonCard
-            title="Media"
-            sub="Photos and videos from this club's meets"
-            text="Not built yet — there is no club-scoped media feed on the API side."
-          />
-        ),
-      }],
+      sub: 'from swimmers',
+      // Лента клуба = одобренные public-публикации его пловцов. Ростер клуба приходит из
+      // справочника федерации, поэтому вести состав руками не нужно — этим клубная лента и
+      // отличается от групповой (docs/plans/entity-page-shell-plan.md §3.10).
+      cards: () => [{ id: 'club-media', render: () => <ClubMedia clubId={clubId} /> }],
     },
     {
       id: 'history',

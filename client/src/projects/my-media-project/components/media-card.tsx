@@ -1,3 +1,4 @@
+import type { PublishTargetRef } from '../../../hooks/useUserMedia';
 import React, { useState } from 'react';
 import { AllUserMediaDto } from '../use-all-my-media';
 import { UserMediaPublicationDto } from '../../../hooks/useUserMedia';
@@ -9,7 +10,7 @@ interface Props {
   publications: UserMediaPublicationDto[];
   onOpenLightbox: () => void;
   onDelete: () => void;
-  onWithdraw: (hubGroupId: number) => void;
+  onWithdraw: (target: PublishTargetRef) => void;
   onLinkToSwim: () => void;
   onShareWithGroup: () => void;
   /** Есть ли группы, куда можно подать (для disabled + tooltip) — считается лениво по клику. */
@@ -32,7 +33,7 @@ function MediaCard({ item, publications, onOpenLightbox, onDelete, onWithdraw, o
       : publications.map((p) => {
           const st: CardStatus = p.status === 'approved' ? 'published' : p.status === 'rejected' ? 'rejected' : 'pending';
           const seenByAll = p.status === 'approved' && p.level === 'public';
-          return { label: `${p.hub_group_name} · ${visibilityLabel(st, seenByAll)}${seenByAll ? ' 🌐' : ''}`, status: st };
+          return { label: `${p.target_name} · ${visibilityLabel(st, seenByAll)}${seenByAll ? ' 🌐' : ''}`, status: st };
         });
 
   return (
@@ -99,7 +100,7 @@ function MediaCard({ item, publications, onOpenLightbox, onDelete, onWithdraw, o
                   <button
                     type="button"
                     title="Withdraw"
-                    onClick={() => onWithdraw(pub.hub_group_id)}
+                    onClick={() => onWithdraw({ type: pub.target_type, id: pub.target_id })}
                     className="leading-none opacity-60 hover:opacity-100"
                   >
                     ×
