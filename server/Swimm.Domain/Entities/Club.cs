@@ -29,6 +29,22 @@ public class Club
     /// </summary>
     public bool IsPseudo { get; set; }
 
+    /// <summary>
+    /// Обложка страницы клуба (URL). Задаётся в /Admin/Clubs/Edit и в табе Admin страницы.
+    ///
+    /// Импорт клубы только СОЗДАЁТ (JsonImportService: `new Club{…}` при промахе поиска) и
+    /// существующие строки не переписывает — переимпорт картинку не сотрёт.
+    /// </summary>
+    [MaxLength(1000)]
+    public string? CoverImageUrl { get; set; }
+
+    /// <summary>
+    /// Настройки ОТОБРАЖЕНИЯ страницы (JSON) — разбирает <see cref="EntityDisplaySettings"/>,
+    /// руками колонку не читать. Пусто = дефолты.
+    /// </summary>
+    [Column(TypeName = "jsonb")]
+    public string? DisplaySettings { get; set; }
+
     /// <summary>Ссылка на страну (опционально)</summary>
     public int? CountryId { get; set; }
 

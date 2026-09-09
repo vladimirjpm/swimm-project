@@ -48,6 +48,14 @@ public class HubGroup
     [MaxLength(1000)]
     public string? CoverImageUrl { get; set; }
 
+    /// <summary>
+    /// Настройки ОТОБРАЖЕНИЯ страницы (JSON) — разбирает <see cref="EntityDisplaySettings"/>,
+    /// руками колонку не читать. Пусто = дефолты. Общие с клубом: группа и клуб — два вида
+    /// одного (коллектив пловцов), и настройки страницы у них одинаковые.
+    /// </summary>
+    [Column(TypeName = "jsonb")]
+    public string? DisplaySettings { get; set; }
+
     /// <summary>JSON-массив [{"kind":"whatsapp","url":"…"}]; kind: whatsapp/telegram/instagram/site</summary>
     [MaxLength(2000)]
     public string? Links { get; set; }
