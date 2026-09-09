@@ -284,6 +284,10 @@ public class UserMediaPublicationService : IUserMediaPublicationService
                     ? p.Media.ResultRecord.Style.Name + " " + p.Media.ResultRecord.Distance
                       + " · " + p.Media.ResultRecord.Competition.Date
                     : null,
+                // День заплыва, а если медиа подано на всё соревнование — оно само.
+                CompetitionId = p.Media.ResultRecord != null
+                    ? p.Media.ResultRecord.CompetitionId
+                    : p.Media.CompetitionId,
             })
             .ToListAsync();
 

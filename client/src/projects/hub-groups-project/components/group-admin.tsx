@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useCurrentIdentity, useMyHubGroups } from '../use-my-hub-groups';
-import { publicationsApiFetch } from './group-bits';
+import { publicationsApiFetch, SwimContextLine } from './group-bits';
 import type { GroupPublicationItem, HubGroupDetails } from '../types';
 
 /**
@@ -88,7 +88,13 @@ function PublicationsInbox({ group, onDecided }: { group: HubGroupDetails; onDec
                   <p className="m-0 truncate text-[13px] font-extrabold text-[var(--t-text)]">{item.swimmer_name}</p>
                 )}
                 {item.result_label && (
-                  <p className="m-0 truncate text-[11.5px] text-[var(--t-text-2)]">{item.result_label}</p>
+                  <SwimContextLine
+                    label={item.result_label}
+                    competitionId={item.competition_id}
+                    resultId={item.result_id != null ? Number(item.result_id) : null}
+                    swimmerId={item.swimmer_id}
+                    className="text-[11.5px] text-[var(--t-text-2)]"
+                  />
                 )}
                 <p className="m-0 truncate text-[11px] text-[var(--t-text-3)]">{item.owner_email}</p>
               </div>

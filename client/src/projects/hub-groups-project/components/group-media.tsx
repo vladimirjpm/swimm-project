@@ -3,6 +3,7 @@ import UI_SwimmerGallery from '../../components/mix/swimmer-gallery/swimmer-gall
 import { GalleryItem } from '../../../utils/interfaces/results';
 import { HelperMedia } from '../../../utils/helpers';
 import { useCurrentIdentity } from '../use-my-hub-groups';
+import { SwimContextLine } from './group-bits';
 import type {
   GroupPublicationItem, HubGroupDetails, HubGroupMediaItem, HubGroupMemberMediaItem,
 } from '../types';
@@ -153,7 +154,13 @@ function MembersReviews({ group }: { group: HubGroupDetails }) {
                 <p className="m-0 truncate text-[13.5px] font-extrabold text-[var(--t-text)]">{item.swimmer_name}</p>
               )}
               {item.result_label && (
-                <p className="m-0 truncate text-[12px] text-[var(--t-accent-dim)]">{item.result_label}</p>
+                <SwimContextLine
+                  label={item.result_label}
+                  competitionId={item.competition_id}
+                  resultId={item.result_id}
+                  swimmerId={item.swimmer_id}
+                  className="text-[12px] text-[var(--t-accent-dim)]"
+                />
               )}
               {item.caption && (
                 <p className="m-0 truncate text-[12px] text-[var(--t-text-2)]">{item.caption}</p>

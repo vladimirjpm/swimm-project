@@ -97,6 +97,8 @@ export interface HubGroupMemberMediaItem {
   result_id?: number | null;
   /** «freestyle 100 · 01/07/2026 · Competition» — контекст заплыва-якоря. */
   result_label?: string | null;
+  /** Соревнование заплыва-якоря — без него подпись некликабельна (routes.competitionSwims). */
+  competition_id?: number | null;
 }
 
 /**
@@ -118,6 +120,8 @@ export interface GroupPublicationItem {
   swimmer_name?: string | null;
   result_id?: number | null;
   result_label?: string | null;
+  /** Соревнование медиа: день заплыва, либо само соревнование у медиа без заплыва. */
+  competition_id?: number | null;
 }
 
 export interface HubGroupStanding {

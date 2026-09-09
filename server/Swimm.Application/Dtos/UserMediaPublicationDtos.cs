@@ -160,4 +160,11 @@ public class GroupPublicationInboxItemDto
     /// <summary>Подпись заплыва (стиль/дистанция/дата), если медиа привязано к заплыву.</summary>
     [JsonPropertyName("result_label")]
     public string? ResultLabel { get; set; }
+
+    /// <summary>
+    /// Соревнование медиа: день заплыва-якоря, а если медиа подано на всё соревнование —
+    /// оно само. Нужен, чтобы подпись вела в протокол (`routes.competitionSwims` просит id).
+    /// </summary>
+    [JsonPropertyName("competition_id")]
+    public int? CompetitionId { get; set; }
 }

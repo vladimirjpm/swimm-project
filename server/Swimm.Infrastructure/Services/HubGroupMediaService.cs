@@ -48,7 +48,8 @@ public class HubGroupMediaService : IHubGroupMediaService
                 ResultLabel = m.Result != null
                     ? m.Result.Style.Name + " " + m.Result.Distance + " · "
                       + m.Result.Competition.Date + " · " + m.Result.Competition.Name
-                    : null
+                    : null,
+                CompetitionId = m.Result != null ? m.Result.CompetitionId : null
             })
             .ToListAsync();
 

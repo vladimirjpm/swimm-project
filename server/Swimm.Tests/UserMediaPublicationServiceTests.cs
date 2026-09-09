@@ -651,4 +651,66 @@ public class UserMediaPublicationServiceTests
         Assert.False(submit.Success);
         Assert.Equal("swimmer does not belong to this club", submit.Error);
     }
+
+    // ── Контекст заплыва в ленте: подпись должна быть кликабельной ───────────
+
+    /// <summary>
+    /// Лента отдаёт id соревнования, а не только название: без него подпись заплыва в ленте
+    /// группы некликабельна (`routes.competitionSwims` адресует соревнование id). Поле легко
+    /// потерять при правке проекции — тест сторожит именно это (09.09.2026).
+    /// </summary>
+    [Fact]
+    public async Task GroupFeed_ReturnsCompetitionIdOfTheSwim()
+    {
+        await using var db = CreateDb(nameof(GroupFeed_ReturnsCompetitionIdOfTheSwim));
+        var owner = NewUser("owner@example.com");
+        db.AppUsers.Add(owner);
+        await db.SaveChangesAsync();
+
+        var swimmer = NewSwimmer("Барцев", "Владимир");
+        var competition = new Competition { Name = "Мастерс зима 2026", Date = "10/01/2026", PoolType = "25m" };
+        var style = new Style { Name = "freestyle" };
+        db.Swimmers.Add(swimmer);
+        db.Competitions.Add(competition);
+        db.Styles.Add(style);
+        await db.SaveChangesAsync();
+
+        var result = new ResultRecord
+        {
+            SwimmerId = swimmer.Id,
+            CompetitionId = competition.Id,
+            StyleId = style.Id,
+            Distance = "200",
+            Gender = "male",
+            CompetitionDate = new DateTime(2026, 1, 10),
+        };
+        db.Results.Add(result);
+
+        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id };
+        db.HubGroups.Add(group);
+        await db.SaveChangesAsync();
+
+        var media = NewMedia(owner, swimmer);
+        media.ResultId = result.Id;
+        media.Level = "result";
+        db.UserMedia.Add(media);
+        await db.SaveChangesAsync();
+
+        db.UserMediaPublications.Add(new UserMediaPublication
+        {
+            UserMediaId = media.Id,
+            TargetType = UserMediaPublicationTarget.Group,
+            HubGroupId = group.Id,
+            Level = UserMediaPublicationLevel.Members,
+            Status = UserMediaPublicationStatus.Approved,
+        });
+        await db.SaveChangesAsync();
+
+        var feed = await new UserMediaPublicationService(db)
+            .GetApprovedForGroupAsync(group.Id, UserMediaPublicationLevel.Members);
+
+        var item = Assert.Single(feed);
+        Assert.Equal(competition.Id, item.CompetitionId);
+        Assert.Equal(result.Id, item.ResultId);
+    }
 }

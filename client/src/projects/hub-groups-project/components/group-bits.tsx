@@ -173,4 +173,41 @@ function TrainingsLink({ group }: { group: HubGroupDetails }) {
 }
 
 
-export { GROUP_DISCLAIMER, ROLE_LABEL, LINK_LABEL, groupInitial, GroupIcon, LinkChips, publicationsApiFetch, swimmerDisplayName, JoinButton, TrainingsLink };
+/**
+ * Строка заплыва под карточкой медиа: «freestyle 100 · 01/07/2026 · Competition».
+ *
+ * Кликабельна, только когда сервер прислал `competitionId`: соревнование адресуется id, а не
+ * названием, и до 09.09.2026 DTO лент отдавал одно название — подпись была мёртвой. Адрес
+ * строит ОДИН генератор `routes.competitionSwims` (памятка deeplink-competition-swims):
+ * своих сборок query быть не должно, иначе ссылка снова уедет на день многодневки.
+ *
+ * `swimmerId` обязателен для ПОПАДАНИЯ в строку: одного `?swim=` мало — протокол
+ * открывается с дефолтами (freestyle · 50m · Top 10, предварительные скрыты), и заплыв
+ * другого стиля в выборку просто не попадает, подсвечивать нечего. `?swimmerId=` эти
+ * дефолты снимает и сужает срез до пловца (results-main-project, эффект диплинка).
+ */
+function SwimContextLine({
+  label, competitionId, resultId, swimmerId, className,
+}: {
+  label: string;
+  competitionId?: number | null;
+  resultId?: number | null;
+  swimmerId?: number | null;
+  className: string;
+}) {
+  if (competitionId == null) return <p className={`m-0 truncate ${className}`}>{label}</p>;
+  return (
+    <a
+      href={routes.competitionSwims(competitionId, {
+        swimmerId: swimmerId ?? null,
+        resultId: resultId ?? null,
+      })}
+      className={`m-0 block truncate underline decoration-dotted underline-offset-2 ${className}`}
+      title="Open this swim in the competition protocol"
+    >
+      {label}
+    </a>
+  );
+}
+
+export { GROUP_DISCLAIMER, ROLE_LABEL, LINK_LABEL, groupInitial, GroupIcon, LinkChips, publicationsApiFetch, swimmerDisplayName, JoinButton, TrainingsLink, SwimContextLine };
