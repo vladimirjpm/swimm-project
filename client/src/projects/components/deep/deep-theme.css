@@ -247,6 +247,20 @@
   --t-prelim: var(--deep-gold);
 }
 
+/* Нативные контролы (раскрытый список <select>, календарь <input type="date">, скроллбар)
+   рисует БРАУЗЕР, а не наш CSS: цвет текста он берёт наш, а подложку списка — системную.
+   В тёмной теме выходил наш светлый текст на системном белом фоне — читать нечего.
+   `color-scheme` — единственный надёжный способ сказать браузеру, в какой схеме рисовать
+   эту часть: стилизовать <option> напрямую разрешают не все браузеры, а Safari игнорирует
+   и фон, и цвет. Пойман 09.09.2026 на селектах публикации в строке заплыва /my-media. */
+.theme-deep select,
+.theme-deep input,
+.theme-deep textarea { color-scheme: dark; }
+
+.theme-deep-light select,
+.theme-deep-light input,
+.theme-deep-light textarea { color-scheme: light; }
+
 /* ── Рецепты (все карточки собираются из них) ── */
 .deep-card { background: var(--deep-card-bg); border: 1px solid var(--deep-card-border); border-radius: var(--deep-radius-card); padding: 20px 22px; box-shadow: var(--deep-card-shadow); }
 .deep-card-title { font-family: var(--deep-font-display); font-size: 17px; color: var(--deep-text); }

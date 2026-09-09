@@ -744,6 +744,9 @@ function MyMediaSection({
             <select
               value={pubLevel}
               onChange={(e) => setPubLevel(e.target.value as 'members' | 'public')}
+              title={parseTargetKey(pubGroupId)?.type === 'club'
+                ? 'Clubs have no member accounts — publishing to a club is always public'
+                : undefined}
               className="rounded-lg px-2 py-1.5 text-xs"
               style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
             >

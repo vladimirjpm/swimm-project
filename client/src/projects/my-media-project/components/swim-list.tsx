@@ -385,6 +385,9 @@ function MediaLine({
             <select
               value={level}
               onChange={(e) => setLevel(e.target.value as 'members' | 'public')}
+              // Почему Members гаснет на клубе — сказать вслух: у погашенного пункта нет
+              // способа объясниться, и это читается как поломка (спрошено 09.09.2026).
+              title={chosen?.type === 'club' ? 'Clubs have no member accounts — publishing to a club is always public' : undefined}
               className="rounded-[7px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-1.5 py-[3px] text-[11px] text-[var(--t-text)]"
             >
               <option value="members" disabled={chosen?.type === 'club'}>Members</option>
