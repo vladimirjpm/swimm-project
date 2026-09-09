@@ -248,8 +248,8 @@ public class HubGroupClubRequestTests
         await db.SaveChangesAsync();
         var service = new HubGroupClubRequestAdminService(db, new NoopCacheService(), new RecordingEmailSender());
 
-        // DevAdminBypass (Program.cs) отдаёт синтетический NameIdentifier="0", которого нет
-        // в Sys_AppUsers — не должно падать на FK, просто оставляем поле пустым.
+        // DevAdminBypass в фоллбеке (пустая БД) отдаёт синтетический NameIdentifier="0",
+        // которого нет в Sys_AppUsers — не должно падать на FK, просто оставляем поле пустым.
         var result = await service.ApproveAsync(request.Id, adminUserId: 0);
 
         Assert.True(result.Success);

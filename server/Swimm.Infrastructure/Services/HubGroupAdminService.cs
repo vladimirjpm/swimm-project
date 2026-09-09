@@ -230,9 +230,9 @@ public class HubGroupAdminService : IHubGroupAdminService
         _core.RemoveMemberAsync(hubGroupId, memberId);
 
     /// <summary>
-    /// DevAdminBypass (Program.cs) выдаёт неаутентифицированному запросу синтетический
-    /// NameIdentifier="0", которого нет в Sys_AppUsers, — прямая вставка такого OwnerUserId
-    /// падает на FK. В этом случае (и вообще если запрошенный id не существует) подставляем
+    /// DevAdminBypass (Security/DevAdminBypass.cs) на пустой БД падает в фоллбек —
+    /// синтетический NameIdentifier="0", которого нет в Sys_AppUsers, и прямая вставка такого
+    /// OwnerUserId падает на FK. В этом случае (и вообще если запрошенный id не существует) подставляем
     /// первого пользователя с ролью Admin. Дев-костыль, специфичный для админки — в
     /// пользовательском CRUD (8.6) не переиспользуется: там OwnerUserId — реальный вошедший.
     /// </summary>

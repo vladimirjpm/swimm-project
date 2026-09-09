@@ -1077,27 +1077,12 @@ if (app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 
-// Dev-обход логина в админку: appsettings.Development.json → "DevAdminBypass": true.
+// Dev-обход логина в админку: appsettings.Development.json → "DevAdminBypass": true
+// (кем именно входим — "DevAdminBypassEmail", по умолчанию первый активный админ).
 // Работает ТОЛЬКО в Development и только если флаг включён явно; в проде ветка мертва.
-// Неаутентифицированный запрос получает синтетического пользователя с ролью Admin,
-// чтобы можно было работать с /Admin без Google OAuth (например, при вёрстке админки).
+// Устройство и почему личность берётся из БД — в Security/DevAdminBypass.cs.
 if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("DevAdminBypass"))
-{
-    app.Use(async (context, next) =>
-    {
-        if (context.User.Identity?.IsAuthenticated != true)
-        {
-            var identity = new System.Security.Claims.ClaimsIdentity(
-            [
-                new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, "0"),
-                new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "dev-admin"),
-                new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, "Admin"),
-            ], authenticationType: "DevAdminBypass");
-            context.User = new System.Security.Claims.ClaimsPrincipal(identity);
-        }
-        await next();
-    });
-}
+    app.UseDevAdminBypass();
 
 app.UseAuthorization();
 

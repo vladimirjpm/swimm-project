@@ -139,8 +139,9 @@ public class HubGroupClubRequestAdminService : IHubGroupClubRequestAdminService
 
     /// <summary>
     /// DecidedByUserId — nullable, в отличие от OwnerUserId (см. HubGroupAdminService.ResolveOwnerIdAsync):
-    /// DevAdminBypass (Program.cs) даёт синтетический NameIdentifier="0", которого нет в Sys_AppUsers —
-    /// вместо падения на FK просто оставляем поле null (кто одобрил — не проставлен).
+    /// DevAdminBypass (Security/DevAdminBypass.cs) на пустой БД падает в фоллбек — синтетический
+    /// NameIdentifier="0", которого нет в Sys_AppUsers; вместо падения на FK просто оставляем
+    /// поле null (кто одобрил — не проставлен).
     /// </summary>
     private async Task<int?> ResolveAdminUserIdAsync(int adminUserId) =>
         adminUserId > 0 && await _db.AppUsers.AnyAsync(u => u.Id == adminUserId) ? adminUserId : null;
