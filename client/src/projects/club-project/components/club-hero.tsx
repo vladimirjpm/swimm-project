@@ -12,9 +12,11 @@ import { showcaseNoticeText } from '../../../utils/helpers/season-helper';
  * только то, что специфично клубу: логотип (или инициалы — это штатный вид, а не пустое
  * состояние), имя на иврите крупно + латиницей мелко, набор бейджей и состав KPI-ряда.
  *
- * Фото клуба из макета пока не рисуем — данных для него нет (решение Влада 2026-08-01,
- * docs/plans/club-page-model.md §6); слот под него у полосы есть (`aside`), включим шагом A7
- * вместе с настройкой показа (docs/plans/entity-page-shell-plan.md §3.9).
+ * Фото шапки есть (шаг A7): берётся из `hero_image_url`, а показывать ли блок — настройка
+ * `show_hero_image` из таба Admin. Нет ссылки — рисуем ЗАГЛУШКУ, а не схлопываем колонку:
+ * так правая колонка не прыгает между сущностями, и админу видно, куда класть картинку
+ * (решение Влада 09.09.2026, docs/plans/entity-page-shell-plan.md §3.9). Прежний отказ от
+ * фото (2026-08-01, «данных нет») этим отменён — данные появились.
  */
 
 interface Props {
@@ -26,7 +28,7 @@ interface Props {
 // больше не нужен: у неё нет ни одной цифры, которая слушала бы карусель сезонов.
 function ClubHero({ club, kpi }: Props) {
   return (
-    <DeepHeroBand>
+    <DeepHeroBand aside={club.show_hero_image ? <ClubPhoto url={club.hero_image_url} /> : undefined}>
       <div className="flex items-start gap-5">
         <UI_ClubLogo clubName={club.name} size={96} />
 
@@ -86,6 +88,33 @@ function ClubHero({ club, kpi }: Props) {
         <DeepKpi label="Swimmers" value={club.swimmer_count} hint="current roster" />
       </div>
     </DeepHeroBand>
+  );
+}
+
+/** Фото клуба либо заглушка на его месте — колонка не схлопывается (план §3.9). */
+function ClubPhoto({ url }: { url: string | null }) {
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt=""
+        className="h-full min-h-[200px] w-full rounded-2xl border object-cover"
+        style={{ borderColor: 'var(--deep-card-border)' }}
+      />
+    );
+  }
+
+  return (
+    <div
+      className="flex h-full min-h-[200px] w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed"
+      style={{ borderColor: 'var(--deep-card-border)', background: 'var(--deep-card-bg-row)' }}
+      aria-hidden="true"
+    >
+      <span className="text-[28px]">🏊</span>
+      <span className="text-[11.5px] font-extrabold" style={{ color: 'var(--deep-text-ghost)' }}>
+        No club photo yet
+      </span>
+    </div>
   );
 }
 

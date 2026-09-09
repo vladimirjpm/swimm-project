@@ -14,6 +14,7 @@ import {
   FromMembersGallery, GroupGallery, MembersPublications, MembersReviews,
 } from './components/group-media';
 import PublicationsInbox from './components/group-admin';
+import DeepDisplaySettingsCard from '../components/deep/display-settings-card';
 import type { HubGroupDetails } from './types';
 
 /**
@@ -200,16 +201,38 @@ function GroupPage({ slug }: { slug: string }) {
       id: 'admin' as const,
       icon: '⚙',
       label: 'Admin',
-      sub: 'publication requests',
-      cards: () => [{
-        id: 'publications-inbox',
-        render: () => (
-          <PublicationsInbox
-            group={group}
-            onDecided={() => setPublicationsReloadKey((k) => k + 1)}
-          />
-        ),
-      }],
+      sub: 'display · requests',
+      cards: () => [
+        {
+          id: 'display-settings',
+          render: () => (
+            <DeepDisplaySettingsCard
+              entity="group"
+              entityId={group.id}
+              coverImageUrl={group.cover_image_url}
+              showHeroImage={group.show_hero_image !== false}
+              heroMediaId={group.hero_media_id}
+              // Пикер «взять фото из медиа» стоит ЗДЕСЬ, а не кнопкой на карточках таба
+              // Media: управление сущностью живёт в одном месте (план §3.8), а лента
+              // `gallery` — единственный список, где свои медиа и одобренные публикации
+              // лежат в одном пространстве id (публикации приходят с отрицательными).
+              media={group.gallery.map((m) => ({
+                id: m.id, url: m.url, media_type: m.media_type,
+                source_type: m.source_type, caption: m.caption,
+              }))}
+            />
+          ),
+        },
+        {
+          id: 'publications-inbox',
+          render: () => (
+            <PublicationsInbox
+              group={group}
+              onDecided={() => setPublicationsReloadKey((k) => k + 1)}
+            />
+          ),
+        },
+      ],
     },
   ].filter(Boolean) as EntityTabSpec<GroupTab>[]);
 

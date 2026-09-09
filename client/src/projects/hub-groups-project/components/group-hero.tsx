@@ -13,11 +13,11 @@ import type { HubGroupDetails } from '../types';
  * Корпус полосы и кирпичи общие (`deep/hero-band.tsx`, `deep/kpi.tsx`), своё здесь — состав:
  * аватар группы, имя, строка меты, чипы ссылок, кнопки действий и фото справа.
  *
- * Фото берётся из `cover_image_url` — поле УЖЕ есть на всех слоях (сущность, `/Admin/HubGroups/Edit`
- * «Обложка (URL)», публичный DTO), просто до сих пор нигде не рисовалось. Ссылки нет —
- * рисуем ЗАГЛУШКУ, а не схлопываем колонку (решение Влада 09.09.2026, план §3.9): так правая
- * колонка не прыгает между сущностями, и админу видно, куда класть картинку. Выключатель
- * показа приедет настройкой `hero.show` вместе с `DisplaySettings` (шаг C7).
+ * Фото приходит уже разрешённым (`hero_image_url`): сервер сам решает, взять его из медиа
+ * по указателю `hero.mediaId` или из колонки-обложки. Ссылки нет — рисуем ЗАГЛУШКУ, а не
+ * схлопываем колонку (решение Влада 09.09.2026, план §3.9): так правая колонка не прыгает
+ * между сущностями, и админу видно, куда класть картинку. Выключает блок настройка
+ * `show_hero_image` из таба Admin.
  *
  * KPI считаются из того, что уже пришло в ответе: участники, рекорды группы, золото сезона.
  * Ни одной цифры, которой нет в данных, тут не выдумывается.
@@ -31,7 +31,7 @@ function GroupHero({ group }: Props) {
   const golds = group.standings.reduce((sum, s) => sum + s.golds, 0);
 
   return (
-    <DeepHeroBand aside={<GroupPhoto group={group} />}>
+    <DeepHeroBand aside={group.show_hero_image === false ? undefined : <GroupPhoto group={group} />}>
       <div className="flex flex-wrap items-start gap-5">
         <GroupIcon iconUrl={group.icon_url} name={group.name_en || group.name} size="lg" />
 
@@ -111,10 +111,11 @@ function GroupHero({ group }: Props) {
 
 /** Фото группы либо заглушка на её месте — колонка не схлопывается (план §3.9). */
 function GroupPhoto({ group }: Props) {
-  if (group.cover_image_url) {
+  // Указатель «взять из медиа» разрешает сервер — здесь одно готовое поле.
+  if (group.hero_image_url) {
     return (
       <img
-        src={group.cover_image_url}
+        src={group.hero_image_url}
         alt=""
         className="h-full min-h-[200px] w-full rounded-2xl border object-cover"
         style={{ borderColor: 'var(--deep-card-border)' }}

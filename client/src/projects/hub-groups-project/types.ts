@@ -142,6 +142,12 @@ export interface HubGroupDetails {
   description?: string | null;
   icon_url?: string | null;
   cover_image_url?: string | null;
+  /** Фото шапки, УЖЕ разрешённое сервером (указатель hero.mediaId → обложка). */
+  hero_image_url?: string | null;
+  /** Показывать блок фото (настройка hero.show). */
+  show_hero_image?: boolean;
+  /** Какое медиа помечено фото шапки; null — берётся обложка. */
+  hero_media_id?: number | null;
   location?: string | null;
   /** Alpha-3 код страны группы (ISR…), null — не задана. Флаг — через UI_FlagEmoji. */
   country?: string | null;

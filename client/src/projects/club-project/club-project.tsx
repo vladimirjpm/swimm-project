@@ -17,6 +17,8 @@ import ClubCoaches from './components/club-coaches';
 import ClubSoonCard from './components/club-soon-card';
 import DeepEntityPage from '../components/deep/entity-page';
 import DeepDigestCard from '../components/deep/digest-card';
+import DeepDisplaySettingsCard from '../components/deep/display-settings-card';
+import { useAuth } from '../../hooks/useAuth';
 import ClubAvatar from './components/club-avatar';
 import type {
   EntityPageStatus, EntityTabNav, EntityTabSpec,
@@ -38,10 +40,14 @@ import type {
  * .theme-deep-light навешивает каркас по глобальному режиму light/dark.
  */
 /** Табы страницы клуба (TABS.md 3a). Компонент плиток и корпус папки — в каркасе. */
-type ClubTab = 'overview' | 'season' | 'records' | 'swimmers' | 'media' | 'history';
+type ClubTab = 'overview' | 'season' | 'records' | 'swimmers' | 'media' | 'history' | 'admin';
 
 function ClubProject() {
   const clubId = useMemo<number | null>(() => parseRoute().clubId, []);
+  // Управление клубом — только у админа сайта: владельцев у клуба не существует
+  // (docs/plans/entity-page-shell-plan.md §3.8). Появятся («claim your club») — гейт станет
+  // таким же, как у группы, и правило таба менять не придётся.
+  const { isAdmin } = useAuth();
 
   const [scope, setScope] = useState<ClubScope>({
     season: null,
@@ -68,7 +74,7 @@ function ClubProject() {
       : data?.seasons.find((s) => s.season === scope.season)?.label ?? String(scope.season);
 
   // Табы собираются только когда данные есть: подписи-сводки — живые числа, а не хардкод.
-  const tabs: EntityTabSpec<ClubTab>[] = data == null || clubId == null ? [] : [
+  const tabs: EntityTabSpec<ClubTab>[] = data == null || clubId == null ? [] : ([
     {
       // Дайджест: срезы соседних табов из УЖЕ загруженного `overview`-ответа. Рекордов тут
       // нет намеренно — их строки живут в своих пагинируемых эндпоинтах внутри карточек, а
@@ -288,7 +294,27 @@ function ClubProject() {
       sub: `${data.timeline.length} competitions`,
       cards: () => [{ id: 'timeline', render: () => <ClubTimeline timeline={data.timeline} /> }],
     },
-  ];
+    // Управление — отдельным табом и только админу сайта; остальным его нет вовсе.
+    isAdmin && {
+      id: 'admin' as const,
+      icon: '⚙',
+      label: 'Admin',
+      sub: 'page display',
+      cards: () => [{
+        id: 'display-settings',
+        render: () => (
+          <DeepDisplaySettingsCard
+            entity="club"
+            entityId={data.club.id}
+            coverImageUrl={data.club.cover_image_url}
+            showHeroImage={data.club.show_hero_image}
+            // Пикера «взять из медиа» у клуба нет: клубной медиа-ленты не существует
+            // (план §3.10) — рисовать пустой выбор было бы враньём.
+          />
+        ),
+      }],
+    },
+  ].filter(Boolean) as EntityTabSpec<ClubTab>[]);
 
   return (
     <DeepEntityPage<ClubTab>
