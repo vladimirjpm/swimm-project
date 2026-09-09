@@ -216,6 +216,16 @@ function MyMediaContent({ deep }: { deep: string }) {
     return pubs.some((p) => p.target_id === groupFilter);
   };
 
+  /**
+   * Статус ЛЮБОГО медиа, а не только видео (09.09.2026, запрос Влада «отвяжи от with video»).
+   * Раньше фильтр жил под сегментом «With video» и внутри ещё раз резал по `media_type`, из-за
+   * чего «private» — то есть «нет ни одной публикации» — нельзя было спросить про фото, хотя
+   * для фото это ровно такой же осмысленный статус.
+   */
+  const mediaMatchesStatus = (mediaId: number) =>
+    statusFilter === 'all'
+    || derivedCardStatus(publicationsByMedia.get(mediaId) ?? []) === statusFilter;
+
   const pickGroup = (v: GroupFilter) => {
     setGroupFilter(v);
     // Медиа без заплыва тоже фильтруется — иначе выбранная группа «пропадает» в свёрнутой секции.
@@ -245,19 +255,15 @@ function MyMediaContent({ deep }: { deep: string }) {
     if (groupFilter !== 'all' && !s.media.some((m) => mediaMatchesGroup(m.id))) return false;
     if (dateFrom && s.date < dateFrom) return false;
     if (dateTo && s.date > dateTo) return false;
-    if (seg === 'with' && statusFilter !== 'all') {
-      const match = s.media.some(
-        (m) => m.media_type === 'video' && derivedCardStatus(publicationsByMedia.get(m.id) ?? []) === statusFilter
-      );
-      if (!match) return false;
-    }
+    if (statusFilter !== 'all' && !s.media.some((m) => mediaMatchesStatus(m.id))) return false;
     return true;
   });
 
-  const visibleCompetitionMedia =
-    groupFilter === 'all' ? competitionMedia : competitionMedia.filter((m) => mediaMatchesGroup(m.id));
-  const visibleUnlinkedMedia =
-    groupFilter === 'all' ? unlinkedMedia : unlinkedMedia.filter((m) => mediaMatchesGroup(m.id));
+  // Оба списка слушают ТЕ ЖЕ фильтры, что и заплывы: иначе выбранный «pending» сужал бы
+  // верхнюю часть страницы и молча оставлял нетронутыми карточки соревнований и Unlinked.
+  const mediaVisible = (id: number) => mediaMatchesGroup(id) && mediaMatchesStatus(id);
+  const visibleCompetitionMedia = competitionMedia.filter((m) => mediaVisible(m.id));
+  const visibleUnlinkedMedia = unlinkedMedia.filter((m) => mediaVisible(m.id));
 
   // Сколько фильтров ПАНЕЛИ сужают выборку: цифра на кнопке «Filters» и признак для кнопки
   // сброса. Пловец и сезон не в счёт — они живут наверху страницы и всегда на виду.
@@ -266,7 +272,7 @@ function MyMediaContent({ deep }: { deep: string }) {
     (dateFrom || dateTo ? 1 : 0) +
     (seg !== 'all' ? 1 : 0) +
     (groupFilter !== 'all' ? 1 : 0) +
-    (seg === 'with' && statusFilter !== 'all' ? 1 : 0);
+    (statusFilter !== 'all' ? 1 : 0);
 
   // Пловца и сезон сброс НЕ трогает (хендофф): это не сужение выборки, а ответ на вопрос
   // «чьи заплывы и за какой сезон я смотрю» — сбросить их значит показать чужое.
@@ -537,10 +543,8 @@ function MyMediaContent({ deep }: { deep: string }) {
     {
       key: 'status',
       label: 'Status',
-      active: seg === 'with' && statusFilter !== 'all',
+      active: statusFilter !== 'all',
       value: statusFilter,
-      // Статус живёт только у видео: без него колонка врала бы, что фильтр доступен.
-      hideWhenIdle: seg !== 'with',
       onClick: () => revealCard('status'),
     },
   ];
@@ -567,7 +571,7 @@ function MyMediaContent({ deep }: { deep: string }) {
       openCards={openCards}
       onCardOpenChange={setCardOpen}
       seg={seg}
-      onSeg={(k) => { setSeg(k); if (k !== 'with') setStatusFilter('all'); }}
+      onSeg={setSeg}
       segCount={segCount}
       statusFilter={statusFilter}
       onStatus={setStatusFilter}
