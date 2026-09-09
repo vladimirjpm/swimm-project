@@ -272,6 +272,38 @@ public class MyHubGroupsController : ControllerBase
         return result.Success ? Ok() : BadRequest(new { error = result.Error });
     }
 
+    /// <summary>
+    /// Политика вступления: open (сразу active) | approval (заявка ждёт решения).
+    /// Владелец/админ группы. Тумблер живёт в табе Admin страницы группы.
+    /// </summary>
+    [HttpPut("{id:int}/join-policy")]
+    public async Task<IActionResult> SetJoinPolicy(int id, [FromBody] SetJoinPolicyRequest request)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanEdit) return Forbid();
+
+        var result = await _mine.SetJoinPolicyAsync(id, request.JoinPolicy);
+        return result.Success ? Ok() : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Заменить расписание тренировок (владелец/админ группы). Пустой список слотов убирает
+    /// расписание — слоты шапки тогда скрываются.
+    /// </summary>
+    [HttpPut("{id:int}/training-schedule")]
+    public async Task<IActionResult> SetTrainingSchedule(int id, [FromBody] GroupTrainingScheduleDto? request)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanEdit) return Forbid();
+
+        var result = await _mine.SetTrainingScheduleAsync(id, request);
+        return result.Success ? Ok() : BadRequest(new { error = result.Error });
+    }
+
     /// <summary>Убрать участника-аккаунт (владелец/админ группы).</summary>
     [HttpDelete("{id:int}/user-members/{userId:int}")]
     public async Task<IActionResult> RemoveUserMember(int id, int userId)
@@ -345,4 +377,10 @@ public sealed class SetUserMemberLabelRequest
     /// <summary>null — снять ярлык.</summary>
     public int? SwimmerId { get; set; }
     public string? Note { get; set; }
+}
+
+public sealed class SetJoinPolicyRequest
+{
+    /// <summary>open | approval (см. HubGroupJoinPolicy); значение валидирует сервис.</summary>
+    public string JoinPolicy { get; set; } = "";
 }

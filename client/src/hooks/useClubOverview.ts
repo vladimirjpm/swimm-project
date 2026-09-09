@@ -21,6 +21,12 @@ export interface ClubProfile {
   country_name: string | null;
   official_group_slug: string | null;
   official_group_name: string | null;
+  /** Сырой url обложки — его правит форма настроек. */
+  cover_image_url: string | null;
+  /** Фото шапки, УЖЕ разрешённое сервером; null — рисуем заглушку. */
+  hero_image_url: string | null;
+  /** Показывать блок фото (настройка hero.show). */
+  show_hero_image: boolean;
   swimmer_count: number;
   first_season: number | null;
   last_season: number | null;

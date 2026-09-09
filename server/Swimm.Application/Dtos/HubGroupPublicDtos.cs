@@ -254,6 +254,23 @@ public sealed class HubGroupDetailsDto
     [JsonPropertyName("cover_image_url")]
     public string? CoverImageUrl { get; set; }
 
+    /// <summary>
+    /// Фото шапки — УЖЕ РАЗРЕШЁННОЕ сервером: hero.mediaId (взять из медиа-ленты) →
+    /// CoverImageUrl → null. Клиент про формы указателя не знает, у него одно поле.
+    /// null — картинки нет, страница рисует заглушку.
+    /// </summary>
+    [JsonPropertyName("hero_image_url")]
+    public string? HeroImageUrl { get; set; }
+
+    /// <summary>Показывать блок фото шапки (настройка hero.show). false — колонка схлопнута.</summary>
+    [JsonPropertyName("show_hero_image")]
+    public bool ShowHeroImage { get; set; } = true;
+
+    /// <summary>Id медиа, помеченного как фото шапки (hero.mediaId). Нужен табу Media,
+    /// чтобы отметить активную кнопку «Сделать фото шапки». null — фото берётся из URL.</summary>
+    [JsonPropertyName("hero_media_id")]
+    public int? HeroMediaId { get; set; }
+
     [JsonPropertyName("location")]
     public string? Location { get; set; }
 
@@ -308,4 +325,64 @@ public sealed class HubGroupDetailsDto
     /// </summary>
     [JsonPropertyName("highlights")]
     public List<HubGroupHighlightDto> Highlights { get; set; } = [];
+
+    /// <summary>Регулярное расписание группы. null — не заведено, слот шапки скрыт.</summary>
+    [JsonPropertyName("training_schedule")]
+    public GroupTrainingScheduleDto? TrainingSchedule { get; set; }
+
+    /// <summary>
+    /// Ближайшее занятие по расписанию. Считает СЕРВЕР (в поясе Израиля) — чтобы «завтра»
+    /// не зависело от часов зрителя и чтобы логику покрыли тесты. null — расписания нет.
+    /// </summary>
+    [JsonPropertyName("next_training")]
+    public NextTrainingDto? NextTraining { get; set; }
+}
+
+/// <summary>Расписание как оно есть — для показа строкой и для формы редактирования.</summary>
+public sealed class GroupTrainingScheduleDto
+{
+    [JsonPropertyName("slots")]
+    public List<GroupTrainingSlotDto> Slots { get; set; } = [];
+
+    [JsonPropertyName("place")]
+    public string? Place { get; set; }
+
+    [JsonPropertyName("pool_type")]
+    public string? PoolType { get; set; }
+
+    [JsonPropertyName("note")]
+    public string? Note { get; set; }
+}
+
+/// <summary>Занятие недели: день ISO (1 = Mon … 7 = Sun) и часы по стенным часам бассейна.</summary>
+public sealed class GroupTrainingSlotDto
+{
+    [JsonPropertyName("day")]
+    public int Day { get; set; }
+
+    [JsonPropertyName("start")]
+    public string Start { get; set; } = "";
+
+    [JsonPropertyName("end")]
+    public string? End { get; set; }
+}
+
+/// <summary>Ближайшее занятие: дата ISO + часы; место дублируется, чтобы слот был самодостаточен.</summary>
+public sealed class NextTrainingDto
+{
+    /// <summary>yyyy-MM-dd в местном времени Израиля.</summary>
+    [JsonPropertyName("date")]
+    public string Date { get; set; } = "";
+
+    [JsonPropertyName("start")]
+    public string Start { get; set; } = "";
+
+    [JsonPropertyName("end")]
+    public string? End { get; set; }
+
+    [JsonPropertyName("place")]
+    public string? Place { get; set; }
+
+    [JsonPropertyName("pool_type")]
+    public string? PoolType { get; set; }
 }

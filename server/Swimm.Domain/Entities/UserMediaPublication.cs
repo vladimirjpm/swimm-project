@@ -13,6 +13,28 @@ public static class UserMediaPublicationLevel
     public const string Public = "public";
 }
 
+/// <summary>Куда подана публикация. Клуб и группа — два вида одного: коллектив пловцов.</summary>
+public static class UserMediaPublicationTarget
+{
+    /// <summary>Группа (SwimHub) — цель по умолчанию и единственная историческая.</summary>
+    public const string Group = "group";
+
+    /// <summary>
+    /// Клуб справочника федерации. Ростер у него бесплатный (<c>Swimmer.ClubId</c>), но нет
+    /// ни аккаунтов-участников, ни управляющих — поэтому уровень у клубной публикации может
+    /// быть только <see cref="UserMediaPublicationLevel.Public"/>, а решает админ сайта.
+    ///
+    /// РЕШЕНИЕ Влада 09.09.2026 — так и остаётся, это не временная дыра:
+    /// <b>клуб — не группа, и управлять им не может никто, потому что назначить управляющего
+    /// некому.</b> Клубы приезжают импортом из справочника федерации, их никто не заводил:
+    /// у <see cref="HubGroup"/> есть <c>OwnerUserId</c>, у <see cref="Club"/> его взять неоткуда.
+    /// Нет владельца → некому одобрять подписку → нет аудитории → уровень members невозможен.
+    /// Кому нужна закрытая аудитория, тот заводит ГРУППУ: она приносит владельца с собой.
+    /// Разбор отвергнутых вариантов — docs/plans/club-subscribers-plan.md.
+    /// </summary>
+    public const string Club = "club";
+}
+
 /// <summary>Статус заявки на публикацию.</summary>
 public static class UserMediaPublicationStatus
 {
@@ -32,7 +54,6 @@ public static class UserMediaPublicationStatus
 /// members или public ПОСЛЕ одобрения админом группы. Удаление записи каскадно убирает
 /// все её публикации; снятие с публикации запись не трогает.
 /// </summary>
-[Index(nameof(UserMediaId), nameof(HubGroupId), IsUnique = true)]
 public class UserMediaPublication
 {
     [Key]
@@ -44,10 +65,21 @@ public class UserMediaPublication
     [ForeignKey(nameof(UserMediaId))]
     public UserMedia? Media { get; set; }
 
-    public int HubGroupId { get; set; }
+    /// <summary>group | club (см. <see cref="UserMediaPublicationTarget"/>).</summary>
+    [Required, MaxLength(10)]
+    public string TargetType { get; set; } = UserMediaPublicationTarget.Group;
+
+    /// <summary>Цель-группа. null у клубной публикации.</summary>
+    public int? HubGroupId { get; set; }
 
     [ForeignKey(nameof(HubGroupId))]
     public HubGroup? HubGroup { get; set; }
+
+    /// <summary>Цель-клуб. null у групповой публикации.</summary>
+    public int? ClubId { get; set; }
+
+    [ForeignKey(nameof(ClubId))]
+    public Club? Club { get; set; }
 
     /// <summary>members | public (см. <see cref="UserMediaPublicationLevel"/>).</summary>
     [Required, MaxLength(20)]

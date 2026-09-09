@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Domain;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -257,6 +258,74 @@ public class HubGroupUserService : IHubGroupUserService
         await _db.SaveChangesAsync();
         return HubGroupMemberSaveResult.Ok();
     }
+
+    public async Task<HubGroupMemberSaveResult> SetJoinPolicyAsync(int hubGroupId, string policy)
+    {
+        if (policy != HubGroupJoinPolicy.Open && policy != HubGroupJoinPolicy.Approval)
+            return HubGroupMemberSaveResult.Fail("Политика вступления: допустимо open или approval");
+
+        var group = await _db.HubGroups.FirstOrDefaultAsync(g => g.Id == hubGroupId);
+        if (group == null) return HubGroupMemberSaveResult.Fail($"Группа #{hubGroupId} не найдена");
+        if (group.JoinPolicy == policy) return HubGroupMemberSaveResult.Ok();
+
+        // Уже вступивших переключение НЕ трогает: approval — это дверь для новых, а не
+        // ретроактивный пересмотр состава. Кого пустили, того выгоняют руками.
+        group.JoinPolicy = policy;
+        group.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        // Публичная страница группы кэшируется вместе с политикой (кнопка «Join» / «Request to
+        // join» читает её из того же payload) — без сброса тумблер минуту не виден снаружи.
+        await _core.InvalidateCacheAsync();
+        return HubGroupMemberSaveResult.Ok();
+    }
+
+    public async Task<HubGroupMemberSaveResult> SetTrainingScheduleAsync(
+        int hubGroupId, GroupTrainingScheduleDto? schedule)
+    {
+        var group = await _db.HubGroups.FirstOrDefaultAsync(g => g.Id == hubGroupId);
+        if (group == null) return HubGroupMemberSaveResult.Fail($"Группа #{hubGroupId} не найдена");
+
+        var model = new GroupTrainingSchedule
+        {
+            Slots = (schedule?.Slots ?? [])
+                .Select(s => new GroupTrainingSlot
+                {
+                    Day = s.Day,
+                    Start = s.Start?.Trim() ?? "",
+                    End = string.IsNullOrWhiteSpace(s.End) ? null : s.End.Trim(),
+                })
+                .ToList(),
+            Place = Clean(schedule?.Place),
+            PoolType = Clean(schedule?.PoolType),
+            Note = Clean(schedule?.Note),
+        };
+
+        // Битые слоты не сохраняем: расписание — витрина, и «Ср :» в шапке хуже пустоты.
+        // Валидность считает сам домен (день 1..7 + разбор HH:mm), второго мнения тут нет.
+        // Текст ошибки ПО-АНГЛИЙСКИ: он показывается в карточке редактора как есть, а
+        // видимый UI у нас английский (правило проекта). Соседние сообщения этого сервиса
+        // русские — это долг, новый в него не добавляем.
+        var invalid = model.Slots.Count(s => !s.IsValid);
+        if (invalid > 0)
+            return HubGroupMemberSaveResult.Fail(invalid == 1
+                ? "One training slot has an invalid day or time (use HH:mm)"
+                : $"{invalid} training slots have an invalid day or time (use HH:mm)");
+
+        // Пустое расписание храним как NULL, а не как «{}»: пусто — это отсутствие, и
+        // читателю (в т.ч. глазами в psql) незачем гадать, чем «{} » отличается от null.
+        group.TrainingSchedule = model.Slots.Count > 0 ? model.ToJson() : null;
+        group.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        // Расписание едет в кэшируемом payload страницы группы — без сброса правка минуту
+        // не видна (та же ловушка, что у политики вступления).
+        await _core.InvalidateCacheAsync();
+        return HubGroupMemberSaveResult.Ok();
+    }
+
+    private static string? Clean(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     public async Task<HubGroupMemberSaveResult> LeaveAsync(int hubGroupId, int userId) =>
         await RemoveUserMemberAsync(hubGroupId, userId);

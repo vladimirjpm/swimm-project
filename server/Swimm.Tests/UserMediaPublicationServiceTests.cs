@@ -92,7 +92,7 @@ public class UserMediaPublicationServiceTests
         Assert.Empty(await service.GetForGroupAsync(g3.Id));
 
         // 3. Влад подаёт M_c1 в G2 (members)
-        var submitC1G2 = await service.SubmitAsync(vlad.Id, mC1.Id, new SubmitPublicationRequest { HubGroupId = g2.Id, Level = "members" }, isGroupPrivileged: false);
+        var submitC1G2 = await service.SubmitAsync(vlad.Id, mC1.Id, new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = g2.Id, Level = "members" }, isPrivileged: false);
         Assert.True(submitC1G2.Success);
         Assert.Equal(UserMediaPublicationStatus.Pending, submitC1G2.Publication!.Status);
         Assert.Empty(await service.GetApprovedForGroupAsync(g2.Id, "members"));
@@ -100,18 +100,18 @@ public class UserMediaPublicationServiceTests
         Assert.Contains(await service.GetForOwnerAsync(vlad.Id), p => p.Id == submitC1G2.Publication.Id && p.Status == UserMediaPublicationStatus.Pending);
 
         // 4. Влад подаёт M_self в G1 (members) → Coach отклоняет
-        var submitSelfG1 = await service.SubmitAsync(vlad.Id, mSelf.Id, new SubmitPublicationRequest { HubGroupId = g1.Id, Level = "members" }, isGroupPrivileged: false);
+        var submitSelfG1 = await service.SubmitAsync(vlad.Id, mSelf.Id, new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = g1.Id, Level = "members" }, isPrivileged: false);
         Assert.True(submitSelfG1.Success);
         Assert.Equal(UserMediaPublicationStatus.Pending, submitSelfG1.Publication!.Status);
 
-        var decideRejectSelf = await service.DecideAsync(g1.Id, submitSelfG1.Publication.Id, approve: false, decidedByUserId: coach.Id);
+        var decideRejectSelf = await service.DecideAsync(UserMediaPublicationTarget.Group, g1.Id, submitSelfG1.Publication.Id, approve: false, decidedByUserId: coach.Id);
         Assert.True(decideRejectSelf);
         Assert.DoesNotContain(await service.GetForGroupAsync(g1.Id), p => p.Id == submitSelfG1.Publication.Id);
         var ownerAfterReject = await service.GetForOwnerAsync(vlad.Id);
         Assert.Contains(ownerAfterReject, p => p.Id == submitSelfG1.Publication.Id && p.Status == UserMediaPublicationStatus.Rejected);
 
         // 5. Coach одобряет заявку M_c1 → G2
-        var decideApproveC1 = await service.DecideAsync(g2.Id, submitC1G2.Publication.Id, approve: true, decidedByUserId: coach.Id);
+        var decideApproveC1 = await service.DecideAsync(UserMediaPublicationTarget.Group, g2.Id, submitC1G2.Publication.Id, approve: true, decidedByUserId: coach.Id);
         Assert.True(decideApproveC1);
         var approvedG2Members = await service.GetApprovedForGroupAsync(g2.Id, "members");
         var approvedC1 = Assert.Single(approvedG2Members);
@@ -119,9 +119,9 @@ public class UserMediaPublicationServiceTests
         Assert.Contains("Реб1", approvedC1.SwimmerName);
 
         // 6. Влад подаёт M_c2 в G3 (public), Coach одобряет
-        var submitC2G3 = await service.SubmitAsync(vlad.Id, mC2.Id, new SubmitPublicationRequest { HubGroupId = g3.Id, Level = "public" }, isGroupPrivileged: false);
+        var submitC2G3 = await service.SubmitAsync(vlad.Id, mC2.Id, new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = g3.Id, Level = "public" }, isPrivileged: false);
         Assert.True(submitC2G3.Success);
-        var decideApproveC2 = await service.DecideAsync(g3.Id, submitC2G3.Publication!.Id, approve: true, decidedByUserId: coach.Id);
+        var decideApproveC2 = await service.DecideAsync(UserMediaPublicationTarget.Group, g3.Id, submitC2G3.Publication!.Id, approve: true, decidedByUserId: coach.Id);
         Assert.True(decideApproveC2);
         Assert.Single(await service.GetApprovedForGroupAsync(g3.Id, "public"));
         Assert.Empty(await service.GetApprovedForGroupAsync(g3.Id, "members"));
@@ -132,7 +132,7 @@ public class UserMediaPublicationServiceTests
         Assert.DoesNotContain(await service.GetApprovedForGroupAsync(g1.Id, "members"), p => p.SwimmerId == child2.Id);
         Assert.DoesNotContain(await service.GetApprovedForGroupAsync(g2.Id, "members"), p => p.SwimmerId == child2.Id);
 
-        var submitC1G1 = await service.SubmitAsync(vlad.Id, mC1.Id, new SubmitPublicationRequest { HubGroupId = g1.Id, Level = "members" }, isGroupPrivileged: false);
+        var submitC1G1 = await service.SubmitAsync(vlad.Id, mC1.Id, new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = g1.Id, Level = "members" }, isPrivileged: false);
         Assert.False(submitC1G1.Success);
         Assert.Equal("swimmer is not in this group's roster", submitC1G1.Error);
 
@@ -181,7 +181,7 @@ public class UserMediaPublicationServiceTests
         var (owner, _, group, media) = await SeedBasicAsync(db);
         var service = new UserMediaPublicationService(db);
 
-        var result = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { HubGroupId = group.Id, Level = level }, isGroupPrivileged: false);
+        var result = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = group.Id, Level = level }, isPrivileged: false);
 
         Assert.False(result.Success);
         Assert.Equal("level must be 'members' or 'public'", result.Error);
@@ -197,7 +197,7 @@ public class UserMediaPublicationServiceTests
         await db.SaveChangesAsync();
         var service = new UserMediaPublicationService(db);
 
-        var result = await service.SubmitAsync(stranger.Id, media.Id, new SubmitPublicationRequest { HubGroupId = group.Id, Level = "members" }, isGroupPrivileged: false);
+        var result = await service.SubmitAsync(stranger.Id, media.Id, new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = group.Id, Level = "members" }, isPrivileged: false);
 
         Assert.False(result.Success);
         Assert.Equal("media not found", result.Error);
@@ -210,7 +210,7 @@ public class UserMediaPublicationServiceTests
         var (owner, _, _, media) = await SeedBasicAsync(db);
         var service = new UserMediaPublicationService(db);
 
-        var result = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { HubGroupId = 999999, Level = "members" }, isGroupPrivileged: false);
+        var result = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = 999999, Level = "members" }, isPrivileged: false);
 
         Assert.False(result.Success);
         Assert.Equal("group not found", result.Error);
@@ -223,7 +223,7 @@ public class UserMediaPublicationServiceTests
         var (owner, _, group, media) = await SeedBasicAsync(db, ownerIsActiveMember: false);
         var service = new UserMediaPublicationService(db);
 
-        var result = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { HubGroupId = group.Id, Level = "members" }, isGroupPrivileged: false);
+        var result = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = group.Id, Level = "members" }, isPrivileged: false);
 
         Assert.False(result.Success);
         Assert.Equal("you are not an active member of this group", result.Error);
@@ -238,7 +238,7 @@ public class UserMediaPublicationServiceTests
         await db.SaveChangesAsync();
         var service = new UserMediaPublicationService(db);
 
-        var result = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { HubGroupId = group.Id, Level = "members" }, isGroupPrivileged: false);
+        var result = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = group.Id, Level = "members" }, isPrivileged: false);
 
         Assert.False(result.Success);
         Assert.Equal("you are not an active member of this group", result.Error);
@@ -251,7 +251,7 @@ public class UserMediaPublicationServiceTests
         var (owner, _, group, media) = await SeedBasicAsync(db, ownerIsActiveMember: false);
         var service = new UserMediaPublicationService(db);
 
-        var result = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { HubGroupId = group.Id, Level = "members" }, isGroupPrivileged: true);
+        var result = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = group.Id, Level = "members" }, isPrivileged: true);
 
         Assert.True(result.Success);
         Assert.Equal(UserMediaPublicationStatus.Approved, result.Publication!.Status);
@@ -266,9 +266,9 @@ public class UserMediaPublicationServiceTests
         await using var db = CreateDb(nameof(SubmitAsync_DuplicateWhilePending_AlreadyExists));
         var (owner, _, group, media) = await SeedBasicAsync(db);
         var service = new UserMediaPublicationService(db);
-        await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { HubGroupId = group.Id, Level = "members" }, isGroupPrivileged: false);
+        await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = group.Id, Level = "members" }, isPrivileged: false);
 
-        var result = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { HubGroupId = group.Id, Level = "public" }, isGroupPrivileged: false);
+        var result = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = group.Id, Level = "public" }, isPrivileged: false);
 
         Assert.False(result.Success);
         Assert.Equal("publication already exists", result.Error);
@@ -280,10 +280,10 @@ public class UserMediaPublicationServiceTests
         await using var db = CreateDb(nameof(SubmitAsync_DuplicateWhileApproved_AlreadyExists));
         var (owner, _, group, media) = await SeedBasicAsync(db);
         var service = new UserMediaPublicationService(db);
-        var first = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { HubGroupId = group.Id, Level = "members" }, isGroupPrivileged: false);
-        await service.DecideAsync(group.Id, first.Publication!.Id, approve: true, decidedByUserId: owner.Id);
+        var first = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = group.Id, Level = "members" }, isPrivileged: false);
+        await service.DecideAsync(UserMediaPublicationTarget.Group, group.Id, first.Publication!.Id, approve: true, decidedByUserId: owner.Id);
 
-        var result = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { HubGroupId = group.Id, Level = "public" }, isGroupPrivileged: false);
+        var result = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = group.Id, Level = "public" }, isPrivileged: false);
 
         Assert.False(result.Success);
         Assert.Equal("publication already exists", result.Error);
@@ -295,10 +295,10 @@ public class UserMediaPublicationServiceTests
         await using var db = CreateDb(nameof(SubmitAsync_ResubmitAfterRejected_SameRowBackToPendingWithNewLevel));
         var (owner, _, group, media) = await SeedBasicAsync(db);
         var service = new UserMediaPublicationService(db);
-        var first = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { HubGroupId = group.Id, Level = "members" }, isGroupPrivileged: false);
-        await service.DecideAsync(group.Id, first.Publication!.Id, approve: false, decidedByUserId: owner.Id);
+        var first = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = group.Id, Level = "members" }, isPrivileged: false);
+        await service.DecideAsync(UserMediaPublicationTarget.Group, group.Id, first.Publication!.Id, approve: false, decidedByUserId: owner.Id);
 
-        var resubmit = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { HubGroupId = group.Id, Level = "public" }, isGroupPrivileged: false);
+        var resubmit = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = group.Id, Level = "public" }, isPrivileged: false);
 
         Assert.True(resubmit.Success);
         Assert.Equal(first.Publication.Id, resubmit.Publication!.Id);
@@ -318,9 +318,9 @@ public class UserMediaPublicationServiceTests
         db.AppUsers.Add(stranger);
         await db.SaveChangesAsync();
         var service = new UserMediaPublicationService(db);
-        var submitted = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { HubGroupId = group.Id, Level = "members" }, isGroupPrivileged: false);
+        var submitted = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = group.Id, Level = "members" }, isPrivileged: false);
 
-        var result = await service.WithdrawAsync(stranger.Id, media.Id, group.Id);
+        var result = await service.WithdrawAsync(stranger.Id, media.Id, UserMediaPublicationTarget.Group, group.Id);
 
         Assert.False(result);
         Assert.NotNull(await db.UserMediaPublications.FindAsync(submitted.Publication!.Id));
@@ -332,9 +332,9 @@ public class UserMediaPublicationServiceTests
         await using var db = CreateDb(nameof(WithdrawAsync_Owner_RemovesRow));
         var (owner, _, group, media) = await SeedBasicAsync(db);
         var service = new UserMediaPublicationService(db);
-        var submitted = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { HubGroupId = group.Id, Level = "members" }, isGroupPrivileged: false);
+        var submitted = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = group.Id, Level = "members" }, isPrivileged: false);
 
-        var result = await service.WithdrawAsync(owner.Id, media.Id, group.Id);
+        var result = await service.WithdrawAsync(owner.Id, media.Id, UserMediaPublicationTarget.Group, group.Id);
 
         Assert.True(result);
         Assert.Null(await db.UserMediaPublications.FindAsync(submitted.Publication!.Id));
@@ -346,9 +346,11 @@ public class UserMediaPublicationServiceTests
         await using var db = CreateDb(nameof(DecideAsync_WrongGroupId_ReturnsFalse));
         var (owner, _, group, media) = await SeedBasicAsync(db);
         var service = new UserMediaPublicationService(db);
-        var submitted = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { HubGroupId = group.Id, Level = "members" }, isGroupPrivileged: false);
+        var submitted = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = group.Id, Level = "members" }, isPrivileged: false);
 
-        var result = await service.DecideAsync(group.Id + 999, submitted.Publication!.Id, approve: true, decidedByUserId: owner.Id);
+        var result = await service.DecideAsync(
+            UserMediaPublicationTarget.Group, group.Id + 999, submitted.Publication!.Id,
+            approve: true, decidedByUserId: owner.Id);
 
         Assert.False(result);
     }
@@ -359,11 +361,11 @@ public class UserMediaPublicationServiceTests
         await using var db = CreateDb(nameof(DecideAsync_ApprovedThenRejected_WithdrawsFromPublication));
         var (owner, _, group, media) = await SeedBasicAsync(db);
         var service = new UserMediaPublicationService(db);
-        var submitted = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { HubGroupId = group.Id, Level = "members" }, isGroupPrivileged: false);
-        await service.DecideAsync(group.Id, submitted.Publication!.Id, approve: true, decidedByUserId: owner.Id);
+        var submitted = await service.SubmitAsync(owner.Id, media.Id, new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = group.Id, Level = "members" }, isPrivileged: false);
+        await service.DecideAsync(UserMediaPublicationTarget.Group, group.Id, submitted.Publication!.Id, approve: true, decidedByUserId: owner.Id);
         Assert.Single(await service.GetApprovedForGroupAsync(group.Id, "members"));
 
-        var result = await service.DecideAsync(group.Id, submitted.Publication.Id, approve: false, decidedByUserId: owner.Id);
+        var result = await service.DecideAsync(UserMediaPublicationTarget.Group, group.Id, submitted.Publication.Id, approve: false, decidedByUserId: owner.Id);
 
         Assert.True(result);
         Assert.Empty(await service.GetApprovedForGroupAsync(group.Id, "members"));
@@ -378,7 +380,7 @@ public class UserMediaPublicationServiceTests
         var (owner, _, group, media) = await SeedBasicAsync(db);
         var service = new UserMediaPublicationService(db);
 
-        var targets = await service.GetPublishTargetsAsync(owner.Id, media.Id);
+        var targets = await service.GetPublishTargetsAsync(owner.Id, media.Id, isSiteAdmin: false);
 
         Assert.Equal(group.Id, Assert.Single(targets).Id);
     }
@@ -397,7 +399,7 @@ public class UserMediaPublicationServiceTests
         await db.SaveChangesAsync();
         var service = new UserMediaPublicationService(db);
 
-        var targets = await service.GetPublishTargetsAsync(owner.Id, media.Id);
+        var targets = await service.GetPublishTargetsAsync(owner.Id, media.Id, isSiteAdmin: false);
 
         Assert.DoesNotContain(targets, t => t.Id == other.Id);
     }
@@ -411,7 +413,7 @@ public class UserMediaPublicationServiceTests
         var (owner, _, group, media) = await SeedBasicAsync(db, ownerIsActiveMember: false);
         var service = new UserMediaPublicationService(db);
 
-        var targets = await service.GetPublishTargetsAsync(owner.Id, media.Id);
+        var targets = await service.GetPublishTargetsAsync(owner.Id, media.Id, isSiteAdmin: false);
 
         Assert.Equal(group.Id, Assert.Single(targets).Id);
     }
@@ -426,7 +428,7 @@ public class UserMediaPublicationServiceTests
         await db.SaveChangesAsync();
         var service = new UserMediaPublicationService(db);
 
-        Assert.Empty(await service.GetPublishTargetsAsync(stranger.Id, media.Id));
+        Assert.Empty(await service.GetPublishTargetsAsync(stranger.Id, media.Id, isSiteAdmin: false));
     }
 
     // ── Набор 3 — GetVisibleForSwimmerAsync (галерея страницы пловца) ─────────
@@ -439,12 +441,12 @@ public class UserMediaPublicationServiceTests
         var service = new UserMediaPublicationService(db);
 
         var submit = await service.SubmitAsync(owner.Id, media.Id,
-            new SubmitPublicationRequest { HubGroupId = group.Id, Level = "public" }, isGroupPrivileged: false);
+            new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = group.Id, Level = "public" }, isPrivileged: false);
         Assert.True(submit.Success);
         // Пока pending — аноним НЕ видит.
         Assert.Empty(await service.GetVisibleForSwimmerAsync(swimmer.Id, null));
 
-        await service.DecideAsync(group.Id, submit.Publication!.Id, approve: true, decidedByUserId: owner.Id);
+        await service.DecideAsync(UserMediaPublicationTarget.Group, group.Id, submit.Publication!.Id, approve: true, decidedByUserId: owner.Id);
 
         var visible = await service.GetVisibleForSwimmerAsync(swimmer.Id, null);
         Assert.Equal(media.Url, Assert.Single(visible).Url);
@@ -458,8 +460,8 @@ public class UserMediaPublicationServiceTests
         var service = new UserMediaPublicationService(db);
 
         var submit = await service.SubmitAsync(owner.Id, media.Id,
-            new SubmitPublicationRequest { HubGroupId = group.Id, Level = "members" }, isGroupPrivileged: false);
-        await service.DecideAsync(group.Id, submit.Publication!.Id, approve: true, decidedByUserId: owner.Id);
+            new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = group.Id, Level = "members" }, isPrivileged: false);
+        await service.DecideAsync(UserMediaPublicationTarget.Group, group.Id, submit.Publication!.Id, approve: true, decidedByUserId: owner.Id);
 
         // Аноним members-медиа не видит…
         Assert.Empty(await service.GetVisibleForSwimmerAsync(swimmer.Id, null));
@@ -494,5 +496,221 @@ public class UserMediaPublicationServiceTests
         var service = new UserMediaPublicationService(db);
         Assert.Empty(await service.GetVisibleForSwimmerAsync(999999, null));
         Assert.Empty(await service.GetVisibleForSwimmerAsync(0, null));
+    }
+
+    // ── Набор 4 — КЛУБ как цель публикации (план entity-page-shell §3.10) ───
+    //
+    // Сценарий Влада: родитель хочет предложить видео дочери в её клуб. Ростер клуба ведёт
+    // не человек, а справочник федерации (Swimmer.ClubId), поэтому никакой ручной работы для
+    // этого быть не должно — но и автоматом видео появиться не может: заявка ложится pending.
+
+    private static async Task<(AppUser parent, Swimmer child, Club club, UserMedia media)> SeedClubAsync(
+        SwimmDbContext db)
+    {
+        var parent = NewUser("parent@example.com");
+        db.AppUsers.Add(parent);
+        await db.SaveChangesAsync();
+
+        var club = new Club { Name = "הפועל דולפין נתניה", NameEn = "Hapoel Dolphine Netanya" };
+        db.Clubs.Add(club);
+        await db.SaveChangesAsync();
+
+        var child = NewSwimmer("Барцев", "Сабина");
+        child.ClubId = club.Id;
+        db.Swimmers.Add(child);
+        await db.SaveChangesAsync();
+
+        var media = NewMedia(parent, child);
+        db.UserMedia.Add(media);
+        await db.SaveChangesAsync();
+
+        return (parent, child, club, media);
+    }
+
+    [Fact]
+    public async Task PublishTargets_IncludeSwimmerClub_WithoutAnyRoster()
+    {
+        await using var db = CreateDb(nameof(PublishTargets_IncludeSwimmerClub_WithoutAnyRoster));
+        var (parent, _, club, media) = await SeedClubAsync(db);
+        var service = new UserMediaPublicationService(db);
+
+        var targets = await service.GetPublishTargetsAsync(parent.Id, media.Id, isSiteAdmin: false);
+
+        // Ни группы, ни ростера не заводили — клуб появляется сам, из справочника.
+        var target = Assert.Single(targets);
+        Assert.Equal(UserMediaPublicationTarget.Club, target.Type);
+        Assert.Equal(club.Id, target.Id);
+    }
+
+    [Fact]
+    public async Task SubmitToClub_ByOwner_IsPending_NotVisibleUntilApproved()
+    {
+        await using var db = CreateDb(nameof(SubmitToClub_ByOwner_IsPending_NotVisibleUntilApproved));
+        var (parent, _, club, media) = await SeedClubAsync(db);
+        var service = new UserMediaPublicationService(db);
+
+        var submit = await service.SubmitAsync(parent.Id, media.Id, new SubmitPublicationRequest
+        {
+            TargetType = UserMediaPublicationTarget.Club,
+            TargetId = club.Id,
+            Level = "public",
+        }, isPrivileged: false);
+
+        Assert.True(submit.Success);
+        Assert.Equal(UserMediaPublicationStatus.Pending, submit.Publication!.Status);
+
+        // Главное: до одобрения в ленте клуба пусто.
+        Assert.Empty(await service.GetApprovedForClubAsync(club.Id));
+    }
+
+    [Fact]
+    public async Task SubmitToClub_AfterApproval_AppearsInClubFeed()
+    {
+        await using var db = CreateDb(nameof(SubmitToClub_AfterApproval_AppearsInClubFeed));
+        var (parent, child, club, media) = await SeedClubAsync(db);
+        var admin = NewUser("admin@example.com");
+        db.AppUsers.Add(admin);
+        await db.SaveChangesAsync();
+        var service = new UserMediaPublicationService(db);
+
+        var submit = await service.SubmitAsync(parent.Id, media.Id, new SubmitPublicationRequest
+        {
+            TargetType = UserMediaPublicationTarget.Club,
+            TargetId = club.Id,
+            Level = "public",
+        }, isPrivileged: false);
+
+        var decided = await service.DecideAsync(
+            UserMediaPublicationTarget.Club, club.Id, submit.Publication!.Id,
+            approve: true, decidedByUserId: admin.Id);
+        Assert.True(decided);
+
+        var feed = await service.GetApprovedForClubAsync(club.Id);
+        var row = Assert.Single(feed);
+        Assert.Equal(UserMediaPublicationTarget.Club, row.TargetType);
+        Assert.Equal(club.Id, row.TargetId);
+        Assert.Equal(child.Id, row.SwimmerId);
+    }
+
+    [Fact]
+    public async Task SubmitToClub_ByAdmin_IsApprovedImmediately()
+    {
+        await using var db = CreateDb(nameof(SubmitToClub_ByAdmin_IsApprovedImmediately));
+        var (parent, _, club, media) = await SeedClubAsync(db);
+        var service = new UserMediaPublicationService(db);
+
+        var submit = await service.SubmitAsync(parent.Id, media.Id, new SubmitPublicationRequest
+        {
+            TargetType = UserMediaPublicationTarget.Club,
+            TargetId = club.Id,
+            Level = "public",
+        }, isPrivileged: true);
+
+        Assert.Equal(UserMediaPublicationStatus.Approved, submit.Publication!.Status);
+    }
+
+    [Fact]
+    public async Task SubmitToClub_MembersLevel_Rejected()
+    {
+        await using var db = CreateDb(nameof(SubmitToClub_MembersLevel_Rejected));
+        var (parent, _, club, media) = await SeedClubAsync(db);
+        var service = new UserMediaPublicationService(db);
+
+        // У клуба нет аккаунтов-участников, поэтому у уровня members нет аудитории:
+        // принять такую заявку значило бы спрятать медиа ни для кого.
+        var submit = await service.SubmitAsync(parent.Id, media.Id, new SubmitPublicationRequest
+        {
+            TargetType = UserMediaPublicationTarget.Club,
+            TargetId = club.Id,
+            Level = "members",
+        }, isPrivileged: false);
+
+        Assert.False(submit.Success);
+        Assert.Equal("club publications can only be public", submit.Error);
+    }
+
+    [Fact]
+    public async Task SubmitToClub_SwimmerFromAnotherClub_Rejected()
+    {
+        await using var db = CreateDb(nameof(SubmitToClub_SwimmerFromAnotherClub_Rejected));
+        var (parent, _, _, media) = await SeedClubAsync(db);
+
+        var otherClub = new Club { Name = "Другой клуб", NameEn = "Other" };
+        db.Clubs.Add(otherClub);
+        await db.SaveChangesAsync();
+
+        var service = new UserMediaPublicationService(db);
+
+        var submit = await service.SubmitAsync(parent.Id, media.Id, new SubmitPublicationRequest
+        {
+            TargetType = UserMediaPublicationTarget.Club,
+            TargetId = otherClub.Id,
+            Level = "public",
+        }, isPrivileged: false);
+
+        Assert.False(submit.Success);
+        Assert.Equal("swimmer does not belong to this club", submit.Error);
+    }
+
+    // ── Контекст заплыва в ленте: подпись должна быть кликабельной ───────────
+
+    /// <summary>
+    /// Лента отдаёт id соревнования, а не только название: без него подпись заплыва в ленте
+    /// группы некликабельна (`routes.competitionSwims` адресует соревнование id). Поле легко
+    /// потерять при правке проекции — тест сторожит именно это (09.09.2026).
+    /// </summary>
+    [Fact]
+    public async Task GroupFeed_ReturnsCompetitionIdOfTheSwim()
+    {
+        await using var db = CreateDb(nameof(GroupFeed_ReturnsCompetitionIdOfTheSwim));
+        var owner = NewUser("owner@example.com");
+        db.AppUsers.Add(owner);
+        await db.SaveChangesAsync();
+
+        var swimmer = NewSwimmer("Барцев", "Владимир");
+        var competition = new Competition { Name = "Мастерс зима 2026", Date = "10/01/2026", PoolType = "25m" };
+        var style = new Style { Name = "freestyle" };
+        db.Swimmers.Add(swimmer);
+        db.Competitions.Add(competition);
+        db.Styles.Add(style);
+        await db.SaveChangesAsync();
+
+        var result = new ResultRecord
+        {
+            SwimmerId = swimmer.Id,
+            CompetitionId = competition.Id,
+            StyleId = style.Id,
+            Distance = "200",
+            Gender = "male",
+            CompetitionDate = new DateTime(2026, 1, 10),
+        };
+        db.Results.Add(result);
+
+        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id };
+        db.HubGroups.Add(group);
+        await db.SaveChangesAsync();
+
+        var media = NewMedia(owner, swimmer);
+        media.ResultId = result.Id;
+        media.Level = "result";
+        db.UserMedia.Add(media);
+        await db.SaveChangesAsync();
+
+        db.UserMediaPublications.Add(new UserMediaPublication
+        {
+            UserMediaId = media.Id,
+            TargetType = UserMediaPublicationTarget.Group,
+            HubGroupId = group.Id,
+            Level = UserMediaPublicationLevel.Members,
+            Status = UserMediaPublicationStatus.Approved,
+        });
+        await db.SaveChangesAsync();
+
+        var feed = await new UserMediaPublicationService(db)
+            .GetApprovedForGroupAsync(group.Id, UserMediaPublicationLevel.Members);
+
+        var item = Assert.Single(feed);
+        Assert.Equal(competition.Id, item.CompetitionId);
+        Assert.Equal(result.Id, item.ResultId);
     }
 }

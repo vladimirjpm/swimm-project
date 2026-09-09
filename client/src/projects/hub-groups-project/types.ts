@@ -97,6 +97,8 @@ export interface HubGroupMemberMediaItem {
   result_id?: number | null;
   /** «freestyle 100 · 01/07/2026 · Competition» — контекст заплыва-якоря. */
   result_label?: string | null;
+  /** Соревнование заплыва-якоря — без него подпись некликабельна (routes.competitionSwims). */
+  competition_id?: number | null;
 }
 
 /**
@@ -104,6 +106,31 @@ export interface HubGroupMemberMediaItem {
  * Используется и для published-списков (GET .../media/published?level=...), и для inbox
  * модерации (GET /api/hub-groups/{id}/media/publications) — форма одинаковая.
  */
+/** Одно регулярное занятие недели: день ISO (1 = Mon … 7 = Sun), часы «HH:mm». */
+export interface GroupTrainingSlot {
+  day: number;
+  start: string;
+  end?: string | null;
+}
+
+/** Регулярное расписание группы (HubGroups.TrainingSchedule). */
+export interface GroupTrainingSchedule {
+  slots: GroupTrainingSlot[];
+  place?: string | null;
+  pool_type?: string | null;
+  note?: string | null;
+}
+
+/** Ближайшее занятие — СЧИТАЕТ СЕРВЕР в поясе Израиля, клиент только рисует. */
+export interface NextTraining {
+  /** yyyy-MM-dd */
+  date: string;
+  start: string;
+  end?: string | null;
+  place?: string | null;
+  pool_type?: string | null;
+}
+
 export interface GroupPublicationItem {
   id: number;
   level: 'public' | 'members';
@@ -118,6 +145,8 @@ export interface GroupPublicationItem {
   swimmer_name?: string | null;
   result_id?: number | null;
   result_label?: string | null;
+  /** Соревнование медиа: день заплыва, либо само соревнование у медиа без заплыва. */
+  competition_id?: number | null;
 }
 
 export interface HubGroupStanding {
@@ -142,6 +171,12 @@ export interface HubGroupDetails {
   description?: string | null;
   icon_url?: string | null;
   cover_image_url?: string | null;
+  /** Фото шапки, УЖЕ разрешённое сервером (указатель hero.mediaId → обложка). */
+  hero_image_url?: string | null;
+  /** Показывать блок фото (настройка hero.show). */
+  show_hero_image?: boolean;
+  /** Какое медиа помечено фото шапки; null — берётся обложка. */
+  hero_media_id?: number | null;
   location?: string | null;
   /** Alpha-3 код страны группы (ISR…), null — не задана. Флаг — через UI_FlagEmoji. */
   country?: string | null;
@@ -161,4 +196,8 @@ export interface HubGroupDetails {
   gallery: HubGroupMediaItem[];
   /** Лента хайлайтов шапки; пустая/отсутствует — модуль скрыт (старый вид шапки). */
   highlights?: HubGroupHighlight[];
+  /** Регулярное расписание; null/отсутствует — не заведено, слоты шапки скрыты. */
+  training_schedule?: GroupTrainingSchedule | null;
+  /** Ближайшее занятие по расписанию (считает сервер). */
+  next_training?: NextTraining | null;
 }

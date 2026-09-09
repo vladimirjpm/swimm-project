@@ -3,11 +3,14 @@ import '../../index.css';
 import '../components/deep/deep-theme.css';
 import './swimmer-page.css';
 import { useTheme } from '../../hooks/useTheme';
-import { useMode } from '../../hooks/useMode';
-import AppTopbar from '../components/app-topbar/app-topbar';
-import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import DeepSeasonCarousel from '../components/deep/season-carousel';
-import DeepTabs from '../components/deep/tabs';
+import DeepEntityPage from '../components/deep/entity-page';
+import DeepDigestCard from '../components/deep/digest-card';
+import SwimRow from '../components/swim-row/swim-row';
+import UI_DateIcon from '../components/mix/date-icon/date-icon';
+import type {
+  EntityPageStatus, EntityTabNav, EntityTabSpec,
+} from '../components/deep/entity-page-types';
 import { parseRoute, H2H_PARAM } from '../../utils/routes';
 import Helper from '../../utils/helpers/data-helper';
 import { seasonLabel } from '../../utils/helpers/season-helper';
@@ -45,8 +48,8 @@ import {
  * routes.ts — в путь только идентичность ресурса. Поэтому всё это переживает перезагрузку.
  */
 
-type SwimmerTab = 'season' | 'results' | 'media' | 'h2h';
-const TABS: SwimmerTab[] = ['season', 'results', 'media', 'h2h'];
+type SwimmerTab = 'overview' | 'season' | 'results' | 'media' | 'h2h';
+const TABS: SwimmerTab[] = ['overview', 'season', 'results', 'media', 'h2h'];
 const isTab = (v: string | null | undefined): v is SwimmerTab =>
   v != null && (TABS as string[]).includes(v);
 
@@ -66,7 +69,15 @@ const LEGACY_TAB_VIEW: Record<string, ResultsView> = { pb: 'records', progress: 
  * ровно то, что History и показывал. Ссылки на него разошлись, и молча открывать Results
  * (умолчание) значило бы тихо потерять запрошенный экран.
  */
-const LEGACY_TAB_ALIAS: Record<string, SwimmerTab> = { history: 'season', rivals: 'h2h' };
+const LEGACY_TAB_ALIAS: Record<string, SwimmerTab> = {
+  history: 'season',
+  rivals: 'h2h',
+  // `pb` и `progress` — виды ВНУТРИ Results (`LEGACY_TAB_VIEW` подставит нужный `view`).
+  // Раньше они попадали на Results умолчанием; с появлением дайджеста умолчание стало
+  // `overview`, и без явного алиаса старая ссылка открывала бы не тот экран.
+  pb: 'results',
+  progress: 'results',
+};
 
 /**
  * `?h2h_b=` — с кем сравнивать в табе H2H. Имя общее со страницей `/h2h` (`H2H_PARAM`):
@@ -91,13 +102,8 @@ function seasonFromQuery(): number | null | undefined {
   return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
-function Notice({ children }: { children: React.ReactNode }) {
-  return <div className="deep-notice">{children}</div>;
-}
-
 function SwimmerProject() {
   useTheme();
-  const { mode } = useMode();
 
   const swimmerId = useMemo<number | null>(() => {
     const fromPath = parseRoute().swimmerId;
@@ -115,7 +121,7 @@ function SwimmerProject() {
     if (isTab(t)) return t;
     // Снятый таб с наследником (`?tab=history` → Season за карьеру); `?tab=pb` и
     // `?tab=progress` приземляются на Results — вид подхватит `view` ниже.
-    return (t != null && LEGACY_TAB_ALIAS[t]) || 'results';
+    return (t != null && LEGACY_TAB_ALIAS[t]) || 'overview';
   });
 
   const [view, setView] = useState<ResultsView>(() => {
@@ -150,13 +156,9 @@ function SwimmerProject() {
   }, [profile, season]);
 
   const writeQuery = (
-    next: { tab?: SwimmerTab; season?: number | null; view?: ResultsView; rival?: number | null },
+    next: { season?: number | null; view?: ResultsView; rival?: number | null },
   ) => {
     const url = new URL(window.location.href);
-    if (next.tab !== undefined) {
-      if (next.tab === 'results') url.searchParams.delete('tab');
-      else url.searchParams.set('tab', next.tab);
-    }
     if (next.rival !== undefined) {
       // Легаси-имя вычищаем всегда: иначе адрес нёс бы обоих и читался бы по старому.
       url.searchParams.delete('rival');
@@ -174,7 +176,9 @@ function SwimmerProject() {
     window.history.replaceState(null, '', url.toString());
   };
 
-  const handleTab = (next: SwimmerTab) => { setTab(next); writeQuery({ tab: next }); };
+  // Адрес пишет каркас (управляемый режим): здесь только своё состояние — по нему страница
+  // гейтит запросы табов (`onH2H`, `onResults`).
+  const handleTab = (next: SwimmerTab) => setTab(next);
   const handleView = (next: ResultsView) => { setView(next); writeQuery({ view: next }); };
   const handleSeason = (next: number | null) => { setSeason(next); writeQuery({ season: next }); };
 
@@ -302,161 +306,267 @@ function SwimmerProject() {
     seasonBestsLabel: seasonRanks.data?.label ?? '',
   }), [activeSeason, profile, seasonRanks.data]);
 
-  const themeClass = mode === 'dark' ? 'theme-deep' : 'theme-deep-light';
   // Подпись плитки Season: тот же формат «2025/26», что у сервера и у остальных экранов —
   // голый год («2025») читался бы как календарный, а сезон идёт через границу года.
   const seasonSub = activeSeason == null ? 'career' : seasonLabel(activeSeason);
 
-  return (
-    <div className={themeClass} style={{ background: 'var(--deep-page-bg)', minHeight: '100vh' }}>
-      <AppTopbar />
+  const status: EntityPageStatus =
+    profile ? 'ready'
+      : profileState.status === 'notfound' ? 'notfound'
+        : profileState.status === 'error' ? 'error'
+          : 'loading';
 
-      <main className="mx-auto max-w-[1180px] px-4 py-6" style={{ color: 'var(--deep-text)' }}>
-        <div className="mb-4 flex justify-end">
-          <UI_ModeToggle />
-        </div>
-
-        {profileState.status === 'loading' && <Notice>Loading…</Notice>}
-        {profileState.status === 'notfound' && (
-          <Notice>{swimmerId == null ? 'No swimmer specified.' : 'Swimmer not found.'}</Notice>
-        )}
-        {profileState.status === 'error' && <Notice>Could not load this swimmer.</Notice>}
-
-        {profile && (
-          <>
-            <SwimmerHero
-              profile={profile}
-              summary={summary.data}
-              level={level}
-              achievements={achievements}
-            />
-
-            <SwimmerUpcomingStarts swimmerId={profile.id} />
-
-            {/* Одна карусель на всю страницу: сезон выбирается раз и читается всеми табами. */}
-            <DeepSeasonCarousel
-              seasons={profile.seasons ?? []}
-              season={activeSeason}
-              onSeason={handleSeason}
-            />
-
-            {/* «Папка» (TABS.md 3a): активная плитка срастается с панелью, поэтому общая обёртка. */}
-            <div className="deep-folder mb-4">
-              <DeepTabs
-                ariaLabel="Athlete sections"
-                active={tab}
-                onSelect={handleTab}
-                tabs={[
-                  {
-                    id: 'season',
-                    icon: '▦',
-                    label: 'Season',
-                    sub: summary.data
-                      ? `${summary.data.competitionCount} meets · ${summary.data.points} pts`
-                      : seasonSub,
-                  },
-                  {
-                    id: 'results',
-                    icon: '⏱',
-                    label: 'Results',
-                    sub: bestTimes.data ? `${bestTimes.data.length} best times` : 'best per distance',
-                  },
-                  { id: 'media', icon: '▶', label: 'Media', sub: 'photos and video' },
-                  {
-                    id: 'h2h',
-                    icon: '⚔',
-                    label: 'H2H',
-                    sub: compare.data
-                      ? `vs ${compare.data.rival.name}`
-                      : 'compare with a swimmer',
-                  },
-                ]}
-              />
-
-              <div className="deep-tabs-panel">
-                {!seasonReady && <PanelEmpty>Loading…</PanelEmpty>}
-
-                {seasonReady && tab === 'season' && (
-                  <SeasonPanel summary={summary.data} swimmerId={profile.id} state={summary} />
-                )}
-                {seasonReady && onResults && (
-                  <>
-                    <ResultsFilters
-                      view={view}
-                      onView={handleView}
-                      recordsHeld={profile.recordsHeld}
+  // Табы собираются только когда профиль есть: подписи-сводки — живые числа, не хардкод.
+  // У пловца тело таба одно на таб, поэтому карточка в каждом одна: сетка панели тут не
+  // раскладывает пары, а только даёт общий корпус. Полоса фильтров Results и выбранный вид
+  // живут в ОДНОЙ карточке — между ними свой отступ 12px (`.deep-filters`), а отдельными
+  // карточками сетка поставила бы 16px и раздвинула их.
+  const tabs: EntityTabSpec<SwimmerTab>[] = profile == null ? [] : [
+    {
+      // Дайджест: срезы соседних табов из уже загруженных данных, второго запроса нет.
+      // Предстоящих стартов тут намеренно нет — они стоят НАД табами и видны с любого.
+      id: 'overview',
+      icon: '▦',
+      label: 'Overview',
+      sub: 'last meet · best times',
+      cards: (nav: EntityTabNav<SwimmerTab>) => [
+        {
+          id: 'last-meet',
+          span: 'half' as const,
+          render: () => {
+            const meets = summary.data?.competitions ?? [];
+            const last = meets[0];
+            return (
+              <DeepDigestCard
+                title="Recent meets"
+                subtitle={last ? `latest — ${last.name}` : 'meets of the selected scope'}
+                count={meets.length}
+                countLabel="MEETS"
+                moreLabel={`All ${meets.length} meets →`}
+                onMore={() => nav.go('season')}
+                isEmpty={!seasonReady || meets.length === 0}
+                emptyText={seasonReady ? 'No meets in this season.' : 'Loading…'}
+              >
+                <div className="flex flex-col gap-1.5">
+                  {meets.slice(0, 4).map((m) => (
+                    <div
+                      key={`${m.competitionId}-${m.date}`}
+                      className="flex items-center justify-between gap-3 px-3 py-2"
+                      style={{ background: 'var(--deep-card-bg-row)', borderRadius: 'var(--deep-radius-row)' }}
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-[13px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
+                          {m.name}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
+                          <UI_DateIcon styleType="row-style-1" date={m.date} paddingClass="" fontClassName="text-[11px] font-bold" />
+                          <span>· {m.swims} swims</span>
+                        </div>
+                      </div>
+                      <span className="hp-mono shrink-0 text-[11.5px] font-extrabold" style={{ color: 'var(--deep-accent)' }}>
+                        {m.points} pts
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </DeepDigestCard>
+            );
+          },
+        },
+        {
+          id: 'best-times-digest',
+          span: 'half' as const,
+          render: () => {
+            const rows = [...(bestTimes.data ?? [])]
+              .sort((a, b) => (b.points ?? 0) - (a.points ?? 0))
+              .slice(0, 3);
+            return (
+              <DeepDigestCard
+                title="Best times"
+                subtitle="strongest results by FINA points"
+                count={bestTimes.data?.length ?? null}
+                countLabel="DISTANCES"
+                moreLabel="All best times →"
+                onMore={() => nav.go('results')}
+                isEmpty={!seasonReady || rows.length === 0}
+                emptyText={seasonReady ? 'No results in this scope.' : 'Loading…'}
+              >
+                <div className="deep-list">
+                  {rows.map((r) => (
+                    <SwimRow
+                      key={r.disciplineKey}
+                      stroke={r.stroke ?? ''}
+                      distance={r.distance}
+                      poolType={r.poolType}
+                      time={r.time}
+                      quality={r.quality}
+                      timeFail={!!r.timeFail}
+                      badge={sbKeys.has(r.disciplineKey) ? 'sb' : null}
+                      place={{ kind: 'none' }}
+                      competition={{ name: r.competition.name }}
+                      date={r.date}
+                      points={r.points}
                     />
+                  ))}
+                </div>
+              </DeepDigestCard>
+            );
+          },
+        },
+      ],
+    },
+    {
+      id: 'season',
+      icon: '▦',
+      label: 'Season',
+      sub: summary.data
+        ? `${summary.data.competitionCount} meets · ${summary.data.points} pts`
+        : seasonSub,
+      cards: () => [{
+        id: 'season-panel',
+        render: () => (!seasonReady
+          ? <PanelEmpty>Loading…</PanelEmpty>
+          : <SeasonPanel summary={summary.data} swimmerId={profile.id} state={summary} />),
+      }],
+    },
+    {
+      id: 'results',
+      icon: '⏱',
+      label: 'Results',
+      sub: bestTimes.data ? `${bestTimes.data.length} best times` : 'best per distance',
+      cards: () => [{
+        id: 'results-panel',
+        render: () => (!seasonReady ? <PanelEmpty>Loading…</PanelEmpty> : (
+          <>
+            <ResultsFilters view={view} onView={handleView} recordsHeld={profile.recordsHeld} />
 
-                    {view === 'best' && (
-                      <ResultsPanel
-                        rows={bestTimes.data}
-                        swimmerId={profile.id}
-                        gender={gender}
-                        sbKeys={sbKeys}
-                        state={bestTimes}
-                      />
-                    )}
-                    {view === 'season-best' && (
-                      <SeasonBestPanel
-                        rows={seasonBestRows.data}
-                        ranks={seasonRanks.data}
-                        swimmerId={profile.id}
-                        season={ranksSeason}
-                        isFallbackSeason={seasonBestFallback}
-                        state={{
-                          loading: seasonBestRows.loading || seasonRanks.loading,
-                          error: seasonBestRows.error || seasonRanks.error,
-                        }}
-                      />
-                    )}
-                    {view === 'records' && (
-                      <PersonalBestsPanel
-                        rows={personalBests.data}
-                        poolType={poolType}
-                        onPoolType={setPoolType}
-                        records={profile.records}
-                        gender={gender}
-                        age={profile.ageInSeason}
-                        state={personalBests}
-                      />
-                    )}
-                    {view === 'progress' && (
-                      <ProgressPanel
-                        distances={allBest.data}
-                        selected={discipline}
-                        onSelect={setDiscipline}
-                        progress={progress.data}
-                        swimmerId={profile.id}
-                        gender={gender}
-                        state={allBest}
-                        progressState={progress}
-                      />
-                    )}
-                  </>
-                )}
-                {seasonReady && tab === 'media' && <SwimmerMediaPanel swimmerId={profile.id} />}
-                {seasonReady && tab === 'h2h' && (
-                  <H2HPanel
-                    compare={compare.data}
-                    query={rivalQuery}
-                    onQuery={setRivalQuery}
-                    hits={rivalHits.data}
-                    hitsState={rivalHits}
-                    onPick={handleRival}
-                    onClear={() => handleRival(null)}
-                    rivalId={rivalId}
-                    swimmerId={profile.id}
-                    profileName={profile.fullName}
-                    season={activeSeason}
-                    state={compare}
-                  />
-                )}
-              </div>
-            </div>
+            {view === 'best' && (
+              <ResultsPanel
+                rows={bestTimes.data}
+                swimmerId={profile.id}
+                gender={gender}
+                sbKeys={sbKeys}
+                state={bestTimes}
+              />
+            )}
+            {view === 'season-best' && (
+              <SeasonBestPanel
+                rows={seasonBestRows.data}
+                ranks={seasonRanks.data}
+                swimmerId={profile.id}
+                season={ranksSeason}
+                isFallbackSeason={seasonBestFallback}
+                state={{
+                  loading: seasonBestRows.loading || seasonRanks.loading,
+                  error: seasonBestRows.error || seasonRanks.error,
+                }}
+              />
+            )}
+            {view === 'records' && (
+              <PersonalBestsPanel
+                rows={personalBests.data}
+                poolType={poolType}
+                onPoolType={setPoolType}
+                records={profile.records}
+                gender={gender}
+                age={profile.ageInSeason}
+                state={personalBests}
+              />
+            )}
+            {view === 'progress' && (
+              <ProgressPanel
+                distances={allBest.data}
+                selected={discipline}
+                onSelect={setDiscipline}
+                progress={progress.data}
+                swimmerId={profile.id}
+                gender={gender}
+                state={allBest}
+                progressState={progress}
+              />
+            )}
           </>
-        )}
-      </main>
-    </div>
+        )),
+      }],
+    },
+    {
+      id: 'media',
+      icon: '▶',
+      label: 'Media',
+      sub: 'photos and video',
+      cards: () => [{
+        id: 'media-panel',
+        render: () => (!seasonReady
+          ? <PanelEmpty>Loading…</PanelEmpty>
+          : <SwimmerMediaPanel swimmerId={profile.id} />),
+      }],
+    },
+    {
+      id: 'h2h',
+      icon: '⚔',
+      label: 'H2H',
+      sub: compare.data ? `vs ${compare.data.rival.name}` : 'compare with a swimmer',
+      cards: () => [{
+        id: 'h2h-panel',
+        render: () => (!seasonReady ? <PanelEmpty>Loading…</PanelEmpty> : (
+          <H2HPanel
+            compare={compare.data}
+            query={rivalQuery}
+            onQuery={setRivalQuery}
+            hits={rivalHits.data}
+            hitsState={rivalHits}
+            onPick={handleRival}
+            onClear={() => handleRival(null)}
+            rivalId={rivalId}
+            swimmerId={profile.id}
+            profileName={profile.fullName}
+            season={activeSeason}
+            state={compare}
+          />
+        )),
+      }],
+    },
+  ];
+
+  return (
+    <DeepEntityPage<SwimmerTab>
+      status={status}
+      messages={{
+        notfound: swimmerId == null ? 'No swimmer specified.' : 'Swimmer not found.',
+        error: 'Could not load this swimmer.',
+      }}
+      noticeClassName="deep-notice"
+      hero={profile ? (
+        <SwimmerHero
+          profile={profile}
+          summary={summary.data}
+          level={level}
+          achievements={achievements}
+        />
+      ) : null}
+      beforeTabs={profile ? (
+        <>
+          <SwimmerUpcomingStarts swimmerId={profile.id} />
+
+          {/* Одна карусель на всю страницу: сезон выбирается раз и читается всеми табами. */}
+          <DeepSeasonCarousel
+            seasons={profile.seasons ?? []}
+            season={activeSeason}
+            onSeason={handleSeason}
+          />
+        </>
+      ) : null}
+      tabsAriaLabel="Athlete sections"
+      tabs={tabs}
+      // Умолчание — дайджест, и он же живёт БЕЗ `?tab=` в адресе. До появления Overview
+      // умолчанием был Results; старые ссылки на него по-прежнему открывают Results, просто
+      // теперь через явный `?tab=results`.
+      defaultTabId="overview"
+      // Управляемый режим: по активному табу страница гейтит запросы (H2H и Results не
+      // грузятся, пока таб не открыт) и разбирает легаси-алиасы `?tab=history|pb|progress`.
+      activeTabId={tab}
+      onTabChange={handleTab}
+    />
   );
 }
 

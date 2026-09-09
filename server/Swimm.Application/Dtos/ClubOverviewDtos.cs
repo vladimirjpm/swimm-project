@@ -70,6 +70,25 @@ public sealed class ClubProfileDto
     [JsonPropertyName("official_group_name")]
     public string? OfficialGroupName { get; set; }
 
+    /// <summary>
+    /// СЫРОЙ URL обложки — то, что лежит в колонке. Нужен форме настроек: она правит
+    /// именно его, а не разрешённый <see cref="HeroImageUrl"/> (у группы это разные вещи).
+    /// </summary>
+    [JsonPropertyName("cover_image_url")]
+    public string? CoverImageUrl { get; set; }
+
+    /// <summary>
+    /// Фото шапки — УЖЕ РАЗРЕШЁННОЕ сервером: настройка hero.mediaId (если появится медиа
+    /// клуба) → CoverImageUrl → null. Клиент про формы указателя не знает, у него одно поле.
+    /// null — картинки нет, страница рисует заглушку.
+    /// </summary>
+    [JsonPropertyName("hero_image_url")]
+    public string? HeroImageUrl { get; set; }
+
+    /// <summary>Показывать блок фото шапки (настройка hero.show). false — колонка схлопнута.</summary>
+    [JsonPropertyName("show_hero_image")]
+    public bool ShowHeroImage { get; set; } = true;
+
     /// <summary>Пловцов в справочнике клуба (Swimmer.ClubId).</summary>
     [JsonPropertyName("swimmer_count")]
     public int SwimmerCount { get; set; }

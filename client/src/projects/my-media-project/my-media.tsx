@@ -5,10 +5,12 @@ import './my-media.css';
 import { useAuth } from '../../hooks/useAuth';
 import { useLoginModal } from '../components/login-modal/login-modal-context';
 import { useFavorites } from '../../hooks/useFavorites';
-import { useMyMediaPublications } from '../../hooks/useUserMedia';
+import {
+  parseTargetKey, targetKey, useMyMediaPublications, type PublishTargetRef,
+} from '../../hooks/useUserMedia';
 import { useMyHubGroups } from '../hub-groups-project/use-my-hub-groups';
 import { useDeepThemeClass } from '../components/deep/use-deep-theme-class';
-import { useAllMyMedia, AllUserMediaDto, AddMediaInput } from './use-all-my-media';
+import { useAllMyMedia, type PublishTargetDto, AllUserMediaDto, AddMediaInput } from './use-all-my-media';
 import { useMySwims, MySwimDto, SwimMediaDto, seasonLabel, toggleLike } from './use-my-swims';
 import { useMyMediaModeration } from './use-my-media-moderation';
 import AppTopbar from '../components/app-topbar/app-topbar';
@@ -31,7 +33,9 @@ import FiltersFab from '../components/filter-section/filters-fab';
 import UI_SwimmStyleIcon from '../components/mix/swimm-style-icon/swimm-style-icon';
 import { useMyMediaFilterHost, type MyMediaHostState } from './my-media-filter-host';
 import MobileFiltersDrawer from '../components/filter-section/mobile-filters-drawer';
-import { chipClass, derivedCardStatus, visibilityLabel, hpCardCls } from './components/status-styles';
+import {
+  chipClass, derivedCardStatus, visibilityLabel, hpCardCls, STATUS_COLORS, type CardStatus,
+} from './components/status-styles';
 
 // Страница «My media» v3 (swim-centric) — README design_handoff_my_swims_v3,1.
 // Палитра — тема deep (light + dark), как у страниц пловца, клуба и /season-best: вёрстка
@@ -112,8 +116,10 @@ function MyMediaContent({ deep }: { deep: string }) {
   const [addCompTarget, setAddCompTarget] = useState<{ id: number; name: string } | null>(null);
   const [linkSwimTarget, setLinkSwimTarget] = useState<AllUserMediaDto | null>(null);
   const [shareTarget, setShareTarget] = useState<AllUserMediaDto | null>(null);
-  const [shareTargets, setShareTargets] = useState<{ id: number; name: string }[] | null>(null);
-  const [shareGroupId, setShareGroupId] = useState<number | ''>('');
+  const [shareTargets, setShareTargets] = useState<PublishTargetDto[] | null>(null);
+  // Ключ цели строкой («group:17» / «club:438»): у `<select>` значение всегда строка, а
+  // цель теперь пара (тип, id) — числом её не выразить.
+  const [shareTargetKey, setShareTargetKey] = useState<string>('');
   const [shareLevel, setShareLevel] = useState<'members' | 'public'>('members');
   const [shareBusy, setShareBusy] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
@@ -184,9 +190,29 @@ function MyMediaContent({ deep }: { deep: string }) {
     return ids;
   }, [swims, competitionMedia, unlinkedMedia]);
 
+  /**
+   * Сводка «что у меня есть» — карточка-инфо в шапке панели, слева от баннера модерации.
+   * Считается по ВСЕМУ медиа страницы, а не по видимому: списки сужают фильтры, а сводка
+   * должна стоять на месте — иначе выбранный «pending» покажет сам себя и нули во всём
+   * остальном. Дедуп по id: одно медиа висит на нескольких заплывах эстафеты (docs/relays.md).
+   */
+  const mediaStats = useMemo(() => {
+    const byId = new Map<number, SwimMediaDto>();
+    for (const s of swims) for (const m of s.media) byId.set(m.id, m);
+    for (const m of competitionMedia) byId.set(m.id, m);
+    for (const m of unlinkedMedia) byId.set(m.id, m);
+    const status: Record<CardStatus, number> = { private: 0, pending: 0, published: 0, rejected: 0 };
+    let videos = 0;
+    for (const m of byId.values()) {
+      if (m.media_type === 'video') videos += 1;
+      status[derivedCardStatus(publicationsByMedia.get(m.id) ?? [])] += 1;
+    }
+    return { total: byId.size, videos, photos: byId.size - videos, status };
+  }, [swims, competitionMedia, unlinkedMedia, publicationsByMedia]);
+
   const groupOptions = useMemo(() => {
     const names = new Map<number, string>();
-    for (const p of publications) if (!names.has(p.hub_group_id)) names.set(p.hub_group_id, p.hub_group_name);
+    for (const p of publications) if (!names.has(p.target_id)) names.set(p.target_id, p.target_name);
     const counts = new Map<number, number>();
     let notShared = 0;
     for (const id of pageMediaIds) {
@@ -194,9 +220,9 @@ function MyMediaContent({ deep }: { deep: string }) {
       if (pubs.length === 0) { notShared += 1; continue; }
       const seen = new Set<number>();
       for (const p of pubs) {
-        if (seen.has(p.hub_group_id)) continue;
-        seen.add(p.hub_group_id);
-        counts.set(p.hub_group_id, (counts.get(p.hub_group_id) ?? 0) + 1);
+        if (seen.has(p.target_id)) continue;
+        seen.add(p.target_id);
+        counts.set(p.target_id, (counts.get(p.target_id) ?? 0) + 1);
       }
     }
     const groups = Array.from(names, ([id, name]) => ({ id, name, count: counts.get(id) ?? 0 }))
@@ -209,8 +235,18 @@ function MyMediaContent({ deep }: { deep: string }) {
     if (groupFilter === 'all') return true;
     const pubs = publicationsByMedia.get(mediaId) ?? [];
     if (groupFilter === 'none') return pubs.length === 0;
-    return pubs.some((p) => p.hub_group_id === groupFilter);
+    return pubs.some((p) => p.target_id === groupFilter);
   };
+
+  /**
+   * Статус ЛЮБОГО медиа, а не только видео (09.09.2026, запрос Влада «отвяжи от with video»).
+   * Раньше фильтр жил под сегментом «With video» и внутри ещё раз резал по `media_type`, из-за
+   * чего «private» — то есть «нет ни одной публикации» — нельзя было спросить про фото, хотя
+   * для фото это ровно такой же осмысленный статус.
+   */
+  const mediaMatchesStatus = (mediaId: number) =>
+    statusFilter === 'all'
+    || derivedCardStatus(publicationsByMedia.get(mediaId) ?? []) === statusFilter;
 
   const pickGroup = (v: GroupFilter) => {
     setGroupFilter(v);
@@ -241,19 +277,15 @@ function MyMediaContent({ deep }: { deep: string }) {
     if (groupFilter !== 'all' && !s.media.some((m) => mediaMatchesGroup(m.id))) return false;
     if (dateFrom && s.date < dateFrom) return false;
     if (dateTo && s.date > dateTo) return false;
-    if (seg === 'with' && statusFilter !== 'all') {
-      const match = s.media.some(
-        (m) => m.media_type === 'video' && derivedCardStatus(publicationsByMedia.get(m.id) ?? []) === statusFilter
-      );
-      if (!match) return false;
-    }
+    if (statusFilter !== 'all' && !s.media.some((m) => mediaMatchesStatus(m.id))) return false;
     return true;
   });
 
-  const visibleCompetitionMedia =
-    groupFilter === 'all' ? competitionMedia : competitionMedia.filter((m) => mediaMatchesGroup(m.id));
-  const visibleUnlinkedMedia =
-    groupFilter === 'all' ? unlinkedMedia : unlinkedMedia.filter((m) => mediaMatchesGroup(m.id));
+  // Оба списка слушают ТЕ ЖЕ фильтры, что и заплывы: иначе выбранный «pending» сужал бы
+  // верхнюю часть страницы и молча оставлял нетронутыми карточки соревнований и Unlinked.
+  const mediaVisible = (id: number) => mediaMatchesGroup(id) && mediaMatchesStatus(id);
+  const visibleCompetitionMedia = competitionMedia.filter((m) => mediaVisible(m.id));
+  const visibleUnlinkedMedia = unlinkedMedia.filter((m) => mediaVisible(m.id));
 
   // Сколько фильтров ПАНЕЛИ сужают выборку: цифра на кнопке «Filters» и признак для кнопки
   // сброса. Пловец и сезон не в счёт — они живут наверху страницы и всегда на виду.
@@ -262,7 +294,7 @@ function MyMediaContent({ deep }: { deep: string }) {
     (dateFrom || dateTo ? 1 : 0) +
     (seg !== 'all' ? 1 : 0) +
     (groupFilter !== 'all' ? 1 : 0) +
-    (seg === 'with' && statusFilter !== 'all' ? 1 : 0);
+    (statusFilter !== 'all' ? 1 : 0);
 
   // Пловца и сезон сброс НЕ трогает (хендофф): это не сужение выборки, а ответ на вопрос
   // «чьи заплывы и за какой сезон я смотрю» — сбросить их значит показать чужое.
@@ -318,7 +350,7 @@ function MyMediaContent({ deep }: { deep: string }) {
     const active = (publicationsByMedia.get(item.id) ?? []).find(
       (p) => p.status === 'pending' || p.status === 'approved'
     );
-    setShareGroupId(active ? active.hub_group_id : '');
+    setShareTargetKey(active ? targetKey({ type: active.target_type, id: active.target_id }) : '');
     setShareLevel(active ? active.level : 'members');
     try {
       const r = await fetch(`/api/me/media/${item.id}/publish-targets`, { credentials: 'include' });
@@ -332,30 +364,32 @@ function MyMediaContent({ deep }: { deep: string }) {
   // публикация в этой группе pending/approved («publication already exists»), поэтому
   // смена уровня (members ↔ everyone) идёт через withdraw + резаявку.
   const publishTo = async (
-    mediaId: number, hubGroupId: number, level: 'members' | 'public'
+    mediaId: number, target: PublishTargetRef, level: 'members' | 'public'
   ): Promise<{ ok: boolean; error?: string }> => {
     const active = (publicationsByMedia.get(mediaId) ?? []).find(
-      (p) => p.hub_group_id === hubGroupId && (p.status === 'pending' || p.status === 'approved')
+      (p) => p.target_type === target.type && p.target_id === target.id
+             && (p.status === 'pending' || p.status === 'approved')
     );
     if (active) {
       if (active.level === level) return { ok: true }; // менять нечего
-      await withdrawPublication(mediaId, hubGroupId);
+      await withdrawPublication(mediaId, target);
     }
-    return submitPublication(mediaId, hubGroupId, level);
+    return submitPublication(mediaId, target, level);
   };
 
   const handlePublish = async () => {
-    if (shareTarget == null || shareGroupId === '') return;
+    const target = parseTargetKey(shareTargetKey);
+    if (shareTarget == null || target == null) return;
     setShareBusy(true);
     setShareError(null);
-    const res = await publishTo(shareTarget.id, shareGroupId, shareLevel);
+    const res = await publishTo(shareTarget.id, target, shareLevel);
     setShareBusy(false);
     if (res.ok) setShareTarget(null);
     else setShareError(res.error ?? 'Could not submit the request');
   };
 
-  const submitInlineShare = async (mediaId: number, hubGroupId: number, level: 'members' | 'public'): Promise<boolean> => {
-    const res = await publishTo(mediaId, hubGroupId, level);
+  const submitInlineShare = async (mediaId: number, target: PublishTargetRef, level: 'members' | 'public'): Promise<boolean> => {
+    const res = await publishTo(mediaId, target, level);
     return res.ok;
   };
 
@@ -531,10 +565,8 @@ function MyMediaContent({ deep }: { deep: string }) {
     {
       key: 'status',
       label: 'Status',
-      active: seg === 'with' && statusFilter !== 'all',
+      active: statusFilter !== 'all',
       value: statusFilter,
-      // Статус живёт только у видео: без него колонка врала бы, что фильтр доступен.
-      hideWhenIdle: seg !== 'with',
       onClick: () => revealCard('status'),
     },
   ];
@@ -561,7 +593,7 @@ function MyMediaContent({ deep }: { deep: string }) {
       openCards={openCards}
       onCardOpenChange={setCardOpen}
       seg={seg}
-      onSeg={(k) => { setSeg(k); if (k !== 'with') setStatusFilter('all'); }}
+      onSeg={setSeg}
       segCount={segCount}
       statusFilter={statusFilter}
       onStatus={setStatusFilter}
@@ -585,7 +617,7 @@ function MyMediaContent({ deep }: { deep: string }) {
     onAddVideo: (s: MySwimDto) => setAddVideoSwim(s),
     onAddCompMedia: (id: number, name: string) => setAddCompTarget({ id, name }),
     onSubmitShare: submitInlineShare,
-    onWithdraw: (mediaId: number, hubGroupId: number) => withdrawPublication(mediaId, hubGroupId),
+    onWithdraw: (mediaId: number, target: PublishTargetRef) => withdrawPublication(mediaId, target),
     onDelete: handleDelete,
     onToggleLike,
   };
@@ -645,17 +677,72 @@ function MyMediaContent({ deep }: { deep: string }) {
       <section className="mm-panel">
         {tab === 'media' ? (
           <div className="flex flex-col gap-4">
-            {showModeration && pendingModCount > 0 && (
-              <div className="flex items-center gap-3 rounded-[14px] border border-[var(--t-warn-border)] bg-[var(--t-warn-soft)] p-[12px_16px]">
-                <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-[11px] bg-[var(--t-warn)] px-1.5 text-[12px] font-black text-[var(--t-warn-ink)]">
-                  {pendingModCount}
-                </span>
-                <span className="min-w-0 text-[13.5px] font-bold text-[var(--t-warn)]">requests are waiting for your approval</span>
-                <button type="button" onClick={() => setTab('moderation')} className="hp-mono ml-auto rounded-[9px] border-none bg-[var(--t-warn)] px-3.5 py-[7px] text-[12px] font-extrabold text-[var(--t-warn-ink)]">
-                  Review →
-                </button>
+            {/* Шапка панели: слева сводка «что у меня есть» (видна всегда), справа баннер
+                модерации (только когда есть что решать). Раньше баннер занимал всю ширину
+                один — теперь он прижат вправо и делит ряд со сводкой. */}
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
+              <div className={`${hpCardCls} flex flex-wrap items-center gap-x-5 gap-y-2.5 p-[12px_16px]`}>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-[22px] font-black leading-none text-[var(--t-text)]">{mediaStats.videos}</span>
+                  <span className="hp-mono text-[11px] font-extrabold text-[var(--t-text-3)]">
+                    {mediaStats.videos === 1 ? 'video' : 'videos'}
+                  </span>
+                  {mediaStats.photos > 0 && (
+                    <span className="text-[11.5px] font-bold text-[var(--t-text-3)]">
+                      + {mediaStats.photos} {mediaStats.photos === 1 ? 'photo' : 'photos'}
+                    </span>
+                  )}
+                </div>
+                {/* Статусы — цвет И слово, как в чипах карточек: цветом одним статус не
+                    называют. Нулевые не прячем, иначе строка прыгает при каждом решении.
+                    Каждый чип — тот же фильтр, что карточка «Publication status» в панели
+                    (одно состояние `statusFilter` на оба места, второго списка нет).
+                    Повторный клик по выбранному снимает фильтр; пустой статус не кликается —
+                    он увёл бы страницу в «Nothing matches the filters» без причины. */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {(['private', 'pending', 'published', 'rejected'] as CardStatus[]).map((k) => {
+                    const count = mediaStats.status[k];
+                    const on = statusFilter === k;
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        disabled={count === 0}
+                        aria-pressed={on}
+                        title={count === 0 ? `No ${k} media` : on ? 'Clear this filter' : `Show only ${k}`}
+                        onClick={() => setStatusFilter(on ? 'all' : k)}
+                        className={`hp-mono inline-flex items-center gap-1.5 whitespace-nowrap rounded-[8px] border px-2.5 py-[5px] text-[11px] font-extrabold${
+                          count === 0 ? ' cursor-default opacity-45' : ' cursor-pointer'
+                        }`}
+                        style={{
+                          color: STATUS_COLORS[k].text,
+                          borderColor: on ? STATUS_COLORS[k].text : STATUS_COLORS[k].border,
+                          background: STATUS_COLORS[k].bg,
+                          // Выбранный — кольцом цвета статуса: заливка у чипов уже занята
+                          // самим статусом, и «активным» её сделать нечем.
+                          boxShadow: on ? `0 0 0 2px ${STATUS_COLORS[k].bg}, 0 0 0 3px ${STATUS_COLORS[k].text}` : undefined,
+                        }}
+                      >
+                        <span className="text-[12.5px] font-black">{count}</span>
+                        {k}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            )}
+
+              {showModeration && pendingModCount > 0 && (
+                <div className="flex items-center gap-3 rounded-[14px] border border-[var(--t-warn-border)] bg-[var(--t-warn-soft)] p-[12px_16px] lg:ml-auto">
+                  <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-[11px] bg-[var(--t-warn)] px-1.5 text-[12px] font-black text-[var(--t-warn-ink)]">
+                    {pendingModCount}
+                  </span>
+                  <span className="min-w-0 text-[13.5px] font-bold text-[var(--t-warn)]">requests are waiting for your approval</span>
+                  <button type="button" onClick={() => setTab('moderation')} className="hp-mono ml-auto rounded-[9px] border-none bg-[var(--t-warn)] px-3.5 py-[7px] text-[12px] font-extrabold text-[var(--t-warn-ink)] lg:ml-3">
+                    Review →
+                  </button>
+                </div>
+              )}
+            </div>
 
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
@@ -753,7 +840,7 @@ function MyMediaContent({ deep }: { deep: string }) {
                             publications={publicationsByMedia.get(item.id) ?? []}
                             onOpenLightbox={() => onPlay(item)}
                             onDelete={() => handleDelete(item.id)}
-                            onWithdraw={(hubGroupId) => withdrawPublication(item.id, hubGroupId)}
+                            onWithdraw={(target) => withdrawPublication(item.id, target)}
                             onLinkToSwim={() => setLinkSwimTarget(item)}
                             onShareWithGroup={() => openShare(item)}
                           />
@@ -777,7 +864,9 @@ function MyMediaContent({ deep }: { deep: string }) {
         ) : (
           <ModerationPanel
             rows={moderation.rows}
-            onDecide={async (hubGroupId, publicationId, approve) => { await moderation.decide(hubGroupId, publicationId, approve); }}
+            onDecide={async (targetType, targetId, publicationId, approve) => {
+              await moderation.decide(targetType, targetId, publicationId, approve);
+            }}
           />
         )}
       </section>
@@ -844,28 +933,44 @@ function MyMediaContent({ deep }: { deep: string }) {
             className="w-[420px] max-w-[calc(100vw-40px)] rounded-[16px] border border-[var(--t-border)] bg-[var(--t-surface-strong)] p-5 text-[var(--t-text)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="m-0 mb-3 text-[15px] font-black">Share with a group</h3>
+            <h3 className="m-0 mb-3 text-[15px] font-black">Share with a group or club</h3>
             {shareTargets != null && shareTargets.length === 0 && (
               <p className="text-[12px] text-[var(--t-text-2)]">
-                No eligible groups — the swimmer must be in the group's roster and you must be a member.
+                No eligible targets — for a group the swimmer must be in its roster and you must be
+                a member; the swimmer's club appears here on its own.
               </p>
             )}
             {shareTargets != null && shareTargets.length > 0 && (
               <div className="flex flex-col gap-2.5">
                 <select
-                  value={shareGroupId}
-                  onChange={(e) => setShareGroupId(e.target.value === '' ? '' : Number(e.target.value))}
+                  value={shareTargetKey}
+                  onChange={(e) => {
+                    setShareTargetKey(e.target.value);
+                    // У клуба нет аккаунтов-участников, значит и уровня members: сервер такую
+                    // заявку отвергнет, поэтому не даём выбрать её и в интерфейсе.
+                    if (parseTargetKey(e.target.value)?.type === 'club') setShareLevel('public');
+                  }}
                   className="rounded-[8px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-2.5 py-2 text-[12px] text-[var(--t-text)]"
                 >
-                  <option value="">— group —</option>
-                  {shareTargets.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  <option value="">— group or club —</option>
+                  {shareTargets.map((t) => (
+                    <option key={targetKey(t)} value={targetKey(t)}>
+                      {t.type === 'club' ? `${t.name} (club)` : t.name}
+                    </option>
+                  ))}
                 </select>
                 <select
                   value={shareLevel}
                   onChange={(e) => setShareLevel(e.target.value as 'members' | 'public')}
+                  title={parseTargetKey(shareTargetKey)?.type === 'club' ? 'Clubs have no member accounts — publishing to a club is always public' : undefined}
                   className="rounded-[8px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-2.5 py-2 text-[12px] text-[var(--t-text)]"
                 >
-                  <option value="members">Group members</option>
+                  <option
+                    value="members"
+                    disabled={parseTargetKey(shareTargetKey)?.type === 'club'}
+                  >
+                    Group members
+                  </option>
                   <option value="public">Public (visible to everyone)</option>
                 </select>
                 {shareLevel === 'public' && (
@@ -878,7 +983,7 @@ function MyMediaContent({ deep }: { deep: string }) {
                   </button>
                   <button
                     type="button"
-                    disabled={shareBusy || shareGroupId === ''}
+                    disabled={shareBusy || parseTargetKey(shareTargetKey) == null}
                     onClick={handlePublish}
                     className="hp-mono rounded-[8px] border-none bg-[var(--t-accent)] px-3 py-[7px] text-[11.5px] font-extrabold text-[var(--t-accent-ink)] disabled:opacity-50"
                   >

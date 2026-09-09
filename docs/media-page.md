@@ -96,10 +96,12 @@ client/media.html → client/src/pages/media-page.tsx → MyMedia (my-media.tsx)
 | POST | `/api/me/media` | добавить медиа | `[EnableRateLimiting("media")]`; 400 если `swimmer_id<=0`; 400 при достижении `MaxMediaPerUser=500`; валидация `MediaUrlValidator.TryValidate` (media_type/source_type/https/regex youtube-vimeo) |
 | DELETE | `/api/me/media/{id}` | удалить своё медиа | IDOR-проверка по `userId` в репозитории |
 | GET | `/api/me/media/publications` | статусы заявок на публикацию всех моих медиа | |
-| GET | `/api/me/moderation/media` | сводный inbox модерации по группам, где я владелец/админ (site admin — все) | `IUserMediaPublicationService.GetModerationFeedAsync` |
-| GET | `/api/me/media/{id}/publish-targets` | в какие группы можно подать это медиа | пловец должен быть в ростере группы + я член |
-| POST | `/api/me/media/{id}/publications` | подать заявку (`{hub_group_id, level}`) | `[EnableRateLimiting("media")]`; привилегия (владелец/админ группы/site-admin) → авто-`approved`; при авто-approve — `ICacheService.InvalidateAllAsync()` |
-| DELETE | `/api/me/media/{id}/publications/{hubGroupId}` | отозвать заявку (любой статус) | сбрасывает кэш (публичная витрина группы могла показывать это медиа) |
+| GET | `/api/me/moderation/media` | сводный inbox модерации: группы, где я владелец/админ + все клубные заявки, если я site admin | `IUserMediaPublicationService.GetModerationFeedAsync`; строка несёт `target_type`, от него зависит ручка решения |
+| GET | `/api/me/media/{id}/publish-targets` | в какие КОЛЛЕКТИВЫ можно подать это медиа | группа: пловец в ростере + я член/владелец/админ (site admin тоже — чинилось 09.09); клуб пловца добавляется сам, ростер там из справочника федерации |
+| POST | `/api/me/media/{id}/publications` | подать заявку (`{target_type, target_id, level}`) | `[EnableRateLimiting("media")]`; привилегия по цели → авто-`approved` (у группы владелец/админ/site-admin, у клуба только site-admin); у клуба `level` может быть только `public`; при авто-approve — `ICacheService.InvalidateAllAsync()` |
+| DELETE | `/api/me/media/{id}/publications/{targetType}/{targetId}` | отозвать заявку (любой статус) | сбрасывает кэш (витрина коллектива могла показывать это медиа) |
+| GET | `/api/clubs/{id}/media` | публичная лента клуба: одобренные `public`-публикации его пловцов | анонимно; ростер клуба — из справочника федерации |
+| POST | `/api/clubs/{id}/media/publications/{pubId}/decision` | решение по клубной заявке | только site admin: управляющих у клуба нет до «claim your club» |
 
 Смежные, но не в `MediaController`:
 - `GET /api/swimmers/{id}/competitions-brief`, `GET /api/swimmers/{id}/results-brief?competitionId=` —
@@ -372,10 +374,23 @@ Publications через кэшируемый payload). Смена уровня �
 относится к медиа другого сезона — такой чип приглушён (opacity), но кликабелен. Счётчик —
 число моих медиа этой страницы (заплывы сезона + competition + unlinked), заявка любого
 статуса считается попаданием в группу (`pending/approved/rejected`); сузить до статуса —
-отдельный фильтр «Publication status» в More filters. Фильтр применяется ко всем трём
+отдельный фильтр «Publication status». Фильтр применяется ко всем трём
 спискам сразу (`filtered` по заплывам, `visibleCompetitionMedia`, `visibleUnlinkedMedia`),
 и выбор группы раскрывает свёрнутую секцию Unlinked media (`pickGroup`) — иначе часть
 попаданий не видна.
+
+**Фильтр «Publication status»** (`statusFilter`) — `all · private · pending · published ·
+rejected`; статус карточки выводит `derivedCardStatus` (`status-styles.ts`): нет публикаций →
+`private`, есть pending → `pending`, есть approved → `published`, иначе `rejected`.
+
+⚠ До 09.09.2026 он был ПРИВЯЗАН к сегменту «With video»: карточка рендерилась только при
+`seg === 'with'`, применялся фильтр тоже только там, а при уходе с сегмента сбрасывался в
+`all`. Из-за этого фильтр считали несуществующим — его не видно, пока не переключишь сегмент
+и не откроешь шторку. Привязка снята: статус есть у ЛЮБОГО медиа, «private» (нет ни одной
+публикации) для фото значит ровно то же, что для видео. Вместе с привязкой убрана и внутренняя
+резка по `media_type === 'video'`, а сам фильтр, как и «Shared with», теперь действует на все
+три списка (`mediaVisible` в `my-media.tsx`) — иначе выбранный статус сужал бы только верх
+страницы, молча оставляя карточки соревнований и Unlinked нетронутыми.
 
 ## 8. Здоровье ссылок
 
@@ -425,6 +440,38 @@ Publications через кэшируемый payload). Смена уровня �
   для страницы My media) читают/пишут одну и ту же таблицу через разные эндпоинты-обёртки
   над одним контроллером, но не шарят состояние — обновление в одном месте не отразится
   в другом без ручного `reload()`.
+- **Цель публикации — КОЛЛЕКТИВ, а не группа** (09.09.2026). `Sys_UserMediaPublications`
+  адресует цель парой: `TargetType` (`group` | `club`) + ровно один из `HubGroupId` / `ClubId`
+  (CHECK держит форму, уникальность — два ЧАСТИЧНЫХ индекса: в Postgres NULL'ы в уникальном
+  индексе различны, и общий индекс уникальность не удержал бы). У клуба две особенности,
+  которые нельзя «унифицировать»: ростер бесплатный (пловец числится за клубом в справочнике
+  федерации — ручного состава нет), а вот уровень бывает ТОЛЬКО `public` — аккаунтов-участников
+  у клуба не существует, и у `members` там нет аудитории. Решает по клубной заявке админ сайта:
+  управляющих у клуба нет до «claim your club» (docs/plans/entity-page-shell-plan.md §3.10).
+  Ручки: подача `POST /api/me/media/{id}/publications` (`target_type` + `target_id`), отзыв
+  `DELETE …/publications/{targetType}/{targetId}`, решение — своё у каждой цели
+  (`/api/hub-groups/{id}/…` и `/api/clubs/{id}/…`), лента клуба `GET /api/clubs/{id}/media`.
+  ⚠ На клиенте цель ходит ключом-строкой `«group:17»` / `«club:438»` (`targetKey`,
+  `parseTargetKey` в `hooks/useUserMedia.ts`): у `<select>` значение всегда строка, а цель —
+  пара, числом её не выразить.
+- **`DevAdminBypass` ломает модерацию из curl.** Синтетический админ имеет
+  `NameIdentifier = "0"`, а `DecidedByUserId` ссылается на `Sys_AppUsers` — решение по заявке
+  падает 500 на FK. Это свойство обхода, а не ручки: под реальным логином id настоящий.
+  Касается обеих целей, групповой и клубной.
+- **Селектов публикации нет ⇒ пловца нет в ростере группы** (диагноз 09.09.2026, повторяется).
+  Управление видимостью на `/my-media` — это НЕ один выпадающий список «private / group /
+  everyone», а пара селектов (группа + уровень `Members` / `Everyone 🌐`) плюс кнопка
+  `Share`; «private» = отсутствие публикации, снимается кнопкой `Withdraw`. Вся тройка
+  контролов рендерится под условием `targets != null && options.length > 0` (`MediaLine`
+  в `swim-list.tsx`) — если целей нет, на строке **не остаётся ничего** и причина никак не
+  подписана. Цели считает `GetPublishTargetsAsync`, и условий там ДВА, оба обязательны:
+  (1) пловец медиа состоит в **ростере пловцов** группы (`HubGroupMembers`), (2) ты
+  владелец / админ группы / активный user-член. Практически всегда виновато первое: свои
+  видео человек снимает и про своего ребёнка, а в ростер группы внесены не все.
+  ⚠ Там же **несимметричность прав**: `GetPublishTargetsAsync` не смотрит на site-admin, а
+  `SubmitAsync` — смотрит (через `GetPermissionsAsync(…, isSiteAdmin)`). Админ сайта, не
+  состоящий в группе, целей не увидит, хотя подача от него прошла бы и сразу стала
+  `approved`. Чинить — добавлением `isSiteAdmin` в целевой запрос, а не в UI.
 - **`useMySwims` перезагружает весь агрегат** после любого add/remove (`reload()` в
   `my-media.tsx`) — точечный merge сознательно не сделан (комментарий в коде: «агрегат
   дешёвый»), при росте объёма данных это может стать узким местом.

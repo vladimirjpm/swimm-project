@@ -64,6 +64,13 @@ public sealed class HubGroupMemberMediaDto
     /// <summary>Контекст заплыва для карточки: «freestyle 100 · 01/07/2026 · Competition».</summary>
     [JsonPropertyName("result_label")]
     public string? ResultLabel { get; set; }
+
+    /// <summary>
+    /// Соревнование заплыва-якоря — БЕЗ него подпись некликабельна: `routes.competitionSwims`
+    /// просит id, а названием соревнование не адресуется. null — медиа не привязано к заплыву.
+    /// </summary>
+    [JsonPropertyName("competition_id")]
+    public int? CompetitionId { get; set; }
 }
 
 /// <summary>Вход для POST /api/hub-groups/{id}/media.</summary>

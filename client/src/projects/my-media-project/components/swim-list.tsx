@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { UserMediaPublicationDto } from '../../../hooks/useUserMedia';
 import { fetchPublishTargets, PublishTargetDto } from '../use-all-my-media';
+import { parseTargetKey, targetKey, type PublishTargetRef } from '../../../hooks/useUserMedia';
 import { MySwimDto, SwimMediaDto } from '../use-my-swims';
 import { STATUS_COLORS, CardStatus, derivedCardStatus, visibilityLabel, hpCardCls } from './status-styles';
 import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
@@ -25,8 +26,8 @@ export interface SwimListCallbacks {
   onPlay: (media: SwimMediaDto) => void;
   onAddVideo: (swim: MySwimDto) => void;
   onAddCompMedia: (competitionId: number, competitionName: string) => void;
-  onSubmitShare: (mediaId: number, hubGroupId: number, level: 'members' | 'public') => Promise<boolean>;
-  onWithdraw: (mediaId: number, hubGroupId: number) => void;
+  onSubmitShare: (mediaId: number, target: PublishTargetRef, level: 'members' | 'public') => Promise<boolean>;
+  onWithdraw: (mediaId: number, target: PublishTargetRef) => void;
   onDelete: (mediaId: number) => void;
   onToggleLike: (media: SwimMediaDto) => void;
 }
@@ -154,7 +155,7 @@ function mediaStatus(m: SwimMediaDto, pubs: UserMediaPublicationDto[]): { status
 function pillTitle(pubs: UserMediaPublicationDto[]): string {
   if (pubs.length === 0) return 'Private — only you can see this';
   return pubs
-    .map((p) => `${p.hub_group_name}: ${p.status} · ${p.level === 'public' ? 'everyone' : 'members'}`)
+    .map((p) => `${p.target_name}: ${p.status} · ${p.level === 'public' ? 'everyone' : 'members'}`)
     .join('\n');
 }
 
@@ -172,7 +173,7 @@ function RowVisibility({ swim, publicationsByMedia }: {
   const pubs = swim.media.flatMap((m) => publicationsByMedia.get(m.id) ?? []);
   const status = derivedCardStatus(pubs);
   const isPublic = pubs.some((p) => p.status === 'approved' && p.level === 'public');
-  const groups = Array.from(new Map(pubs.map((p) => [p.hub_group_id, p.hub_group_name])).values());
+  const groups = Array.from(new Map(pubs.map((p) => [p.target_id, p.target_name])).values());
   const c = STATUS_COLORS[status];
 
   const head =
@@ -309,7 +310,8 @@ function MediaLine({
   // Действующая публикация (первая из pending/approved) — она же начальное значение селектов.
   const active = pubs.find((p) => p.status === 'pending' || p.status === 'approved') ?? null;
   const [targets, setTargets] = useState<PublishTargetDto[] | null>(null);
-  const [group, setGroup] = useState<number | ''>(active ? active.hub_group_id : '');
+  // Ключ цели строкой («group:17» / «club:438»): цель это пара (тип, id), числом её не выразить.
+  const [group, setGroup] = useState<string>(active ? targetKey({ type: active.target_type, id: active.target_id }) : '');
   const [level, setLevel] = useState<'members' | 'public'>(active ? active.level : 'members');
   const [busy, setBusy] = useState(false);
 
@@ -321,9 +323,9 @@ function MediaLine({
 
   // Публикации приходят асинхронно и меняются после share/withdraw — возвращаем селекты
   // к фактическому состоянию, но только когда оно реально сменилось (иначе затрём выбор юзера).
-  const activeKey = active ? `${active.hub_group_id}:${active.level}` : '';
+  const activeKey = active ? `${active.target_type}:${active.target_id}:${active.level}` : '';
   useEffect(() => {
-    setGroup(active ? active.hub_group_id : '');
+    setGroup(active ? targetKey({ type: active.target_type, id: active.target_id }) : '');
     setLevel(active ? active.level : 'members');
   }, [activeKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -331,21 +333,24 @@ function MediaLine({
   // без этого селект показал бы пустоту вместо своей же группы.
   const options = useMemo(() => {
     const list = targets ?? [];
-    if (active && !list.some((t) => t.id === active.hub_group_id)) {
-      return [...list, { id: active.hub_group_id, name: active.hub_group_name }];
+    if (active && !list.some((t) => t.type === active.target_type && t.id === active.target_id)) {
+      return [...list, { type: active.target_type, id: active.target_id, name: active.target_name }];
     }
     return list;
   }, [targets, active]);
 
   // Сервер отвергает повторную подачу в ту же группу («publication already exists»),
   // смена уровня идёт через withdraw+резаявку в onSubmitShare — здесь только гасим кнопку.
-  const current = group === '' ? null : pubs.find((p) => p.hub_group_id === group && (p.status === 'pending' || p.status === 'approved')) ?? null;
+  const chosen = parseTargetKey(group);
+  const current = chosen == null ? null : pubs.find(
+    (p) => p.target_type === chosen.type && p.target_id === chosen.id
+           && (p.status === 'pending' || p.status === 'approved')) ?? null;
   const unchanged = current != null && current.level === level;
 
   const share = async () => {
-    if (group === '' || busy || unchanged) return;
+    if (chosen == null || busy || unchanged) return;
     setBusy(true);
-    await cb.onSubmitShare(m.id, group, level);
+    await cb.onSubmitShare(m.id, chosen, level);
     setBusy(false);
   };
 
@@ -363,23 +368,34 @@ function MediaLine({
           <>
             <select
               value={group}
-              onChange={(e) => setGroup(e.target.value === '' ? '' : Number(e.target.value))}
+              onChange={(e) => {
+                setGroup(e.target.value);
+                // У клуба нет аккаунтов-участников, значит и уровня members.
+                if (parseTargetKey(e.target.value)?.type === 'club') setLevel('public');
+              }}
               className="rounded-[7px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-1.5 py-[3px] text-[11px] text-[var(--t-text)]"
             >
-              <option value="">Group…</option>
-              {options.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              <option value="">Group or club…</option>
+              {options.map((t) => (
+                <option key={targetKey(t)} value={targetKey(t)}>
+                  {t.type === 'club' ? `${t.name} (club)` : t.name}
+                </option>
+              ))}
             </select>
             <select
               value={level}
               onChange={(e) => setLevel(e.target.value as 'members' | 'public')}
+              // Почему Members гаснет на клубе — сказать вслух: у погашенного пункта нет
+              // способа объясниться, и это читается как поломка (спрошено 09.09.2026).
+              title={chosen?.type === 'club' ? 'Clubs have no member accounts — publishing to a club is always public' : undefined}
               className="rounded-[7px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-1.5 py-[3px] text-[11px] text-[var(--t-text)]"
             >
-              <option value="members">Members</option>
+              <option value="members" disabled={chosen?.type === 'club'}>Members</option>
               <option value="public">Everyone 🌐</option>
             </select>
             <button
               type="button"
-              disabled={group === '' || busy || unchanged}
+              disabled={chosen == null || busy || unchanged}
               onClick={share}
               title={unchanged ? 'Already shared with this group at this level' : undefined}
               className="hp-mono rounded-[7px] border-none px-2.5 py-[4px] text-[10.5px] font-extrabold disabled:opacity-40"
@@ -391,11 +407,11 @@ function MediaLine({
         )}
         {withdrawable.map((p) => (
           <button
-            key={p.hub_group_id}
+            key={p.target_id}
             type="button"
-            onClick={() => cb.onWithdraw(m.id, p.hub_group_id)}
+            onClick={() => cb.onWithdraw(m.id, { type: p.target_type, id: p.target_id })}
             className="hp-mono rounded-[7px] border border-[var(--t-warn-border)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[var(--t-warn)]"
-            title={`Withdraw from ${p.hub_group_name}`}
+            title={`Withdraw from ${p.target_name}`}
           >
             Withdraw
           </button>

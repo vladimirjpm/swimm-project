@@ -16,10 +16,10 @@ public interface IUserMediaPublicationService
     /// возвращает ту же строку в pending. (Success=false, Error) — при нарушении правил.
     /// </summary>
     Task<(bool Success, string? Error, UserMediaPublicationDto? Publication)> SubmitAsync(
-        int ownerUserId, int mediaId, SubmitPublicationRequest request, bool isGroupPrivileged);
+        int ownerUserId, int mediaId, SubmitPublicationRequest request, bool isPrivileged);
 
     /// <summary>Отозвать публикацию своего медиа из группы (любой статус). false — нет такой.</summary>
-    Task<bool> WithdrawAsync(int ownerUserId, int mediaId, int hubGroupId);
+    Task<bool> WithdrawAsync(int ownerUserId, int mediaId, string targetType, int targetId);
 
     /// <summary>Публикации всех медиа владельца (для списка «Мои ссылки»/страницы медиа).</summary>
     Task<List<UserMediaPublicationDto>> GetForOwnerAsync(int ownerUserId);
@@ -29,7 +29,7 @@ public interface IUserMediaPublicationService
     /// медиа в ростере. Для честного селектора в UI (не предлагать группы, где сервер
     /// всё равно откажет). Чужое/несуществующее медиа → пустой список.
     /// </summary>
-    Task<List<PublishTargetDto>> GetPublishTargetsAsync(int ownerUserId, int mediaId);
+    Task<List<PublishTargetDto>> GetPublishTargetsAsync(int ownerUserId, int mediaId, bool isSiteAdmin);
 
     /// <summary>Inbox модерации группы: pending + approved (для снятия). Авторизацию решает контроллер.</summary>
     Task<List<GroupPublicationInboxItemDto>> GetForGroupAsync(int hubGroupId);
@@ -47,11 +47,14 @@ public interface IUserMediaPublicationService
     /// </summary>
     Task<List<GroupPublicationInboxItemDto>> GetApprovedForGroupAsync(int hubGroupId, string level);
 
+    /// <summary>Публичная лента клуба: одобренные public-публикации с целью-клубом.</summary>
+    Task<List<GroupPublicationInboxItemDto>> GetApprovedForClubAsync(int clubId);
+
     /// <summary>
     /// Решение админа группы: approve=true → approved, approve=false → rejected
     /// (для approved это «снять с публикации»). false — заявка не найдена/не этой группы.
     /// </summary>
-    Task<bool> DecideAsync(int hubGroupId, int publicationId, bool approve, int decidedByUserId);
+    Task<bool> DecideAsync(string targetType, int targetId, int publicationId, bool approve, int decidedByUserId);
 
     /// <summary>
     /// Медиа с привязкой к заплыву, видимое зрителю userId (null = аноним) в рамках

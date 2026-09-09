@@ -1,4 +1,5 @@
 using Swimm.Application.Dtos;
+using Swimm.Domain;
 
 namespace Swimm.Application.Abstractions;
 
@@ -59,6 +60,20 @@ public interface IHubGroupUserService
 
     /// <summary>Одобрить заявку участника-аккаунта: pending → active. Авторизация (CanEdit) — в контроллере.</summary>
     Task<HubGroupMemberSaveResult> ApproveUserMemberAsync(int hubGroupId, int userId);
+
+    /// <summary>
+    /// Переключить политику вступления (open | approval). Узкая ручка вместо полного Update:
+    /// `HubGroupCrudCore.Apply` перезаписывает ВСЕ поля из DTO, и «поменять один тумблер»
+    /// через него значит слать форму целиком — карточка в табе Admin её не знает.
+    /// Авторизация (CanEdit) — в контроллере.
+    /// </summary>
+    Task<HubGroupMemberSaveResult> SetJoinPolicyAsync(int hubGroupId, string policy);
+
+    /// <summary>
+    /// Заменить расписание тренировок (пустой список слотов = убрать расписание).
+    /// Узкая ручка по тем же причинам, что SetJoinPolicyAsync. Авторизация — в контроллере.
+    /// </summary>
+    Task<HubGroupMemberSaveResult> SetTrainingScheduleAsync(int hubGroupId, GroupTrainingScheduleDto? schedule);
 
     /// <summary>Самовыход из группы.</summary>
     Task<HubGroupMemberSaveResult> LeaveAsync(int hubGroupId, int userId);

@@ -4,7 +4,13 @@ import { useAppSelector } from '../../store/store';
 import { useFavoritesContext } from '../../hooks/favorites-context';
 import { useLoginModal } from '../components/login-modal/login-modal-context';
 import { useAthleteCareer, AthleteCareer } from '../../hooks/useAthleteCareer';
-import { useUserMedia, useMyMediaPublications, UserMediaDto } from '../../hooks/useUserMedia';
+import {
+  useUserMedia, useMyMediaPublications, UserMediaDto, parseTargetKey, targetKey,
+  type PublishTargetType,
+} from '../../hooks/useUserMedia';
+
+/** Цель подачи из /publish-targets: группа или клуб пловца. */
+interface PublishTarget { type: PublishTargetType; id: number; name: string }
 import { useLogligStatus } from '../../hooks/useLogligStatus';
 import Helper from '../../utils/helpers/data-helper'
 import { HelperMedia } from '../../utils/helpers';
@@ -506,29 +512,31 @@ function MyMediaSection({
   // Публикации в группы (этап 3): статусы заявок + панель «поделиться» для одного медиа.
   const { publications, submit: submitPublication, withdraw: withdrawPublication } = useMyMediaPublications();
   const [publishMediaId, setPublishMediaId] = useState<number | null>(null);
-  const [pubGroupId, setPubGroupId] = useState<number | ''>('');
+  // Ключ цели строкой («group:17» / «club:438») — цель это пара (тип, id).
+  const [pubGroupId, setPubGroupId] = useState<string>('');
   const [pubLevel, setPubLevel] = useState<'members' | 'public'>('members');
   const [pubSubmitting, setPubSubmitting] = useState(false);
   const [pubError, setPubError] = useState<string | null>(null);
   // Куда МОЖНО подать выбранное медиа — сервер отдаёт только группы, где я член/админ
   // и пловец медиа в ростере (не предлагаем группы, где подача всё равно откажет).
-  const [publishTargets, setPublishTargets] = useState<{ id: number; name: string }[] | null>(null);
+  const [publishTargets, setPublishTargets] = useState<PublishTarget[] | null>(null);
   useEffect(() => {
     if (publishMediaId == null) { setPublishTargets(null); return; }
     let alive = true;
     setPublishTargets(null);
     fetch(`/api/me/media/${publishMediaId}/publish-targets`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : []))
-      .then((list: { id: number; name: string }[]) => { if (alive) setPublishTargets(list); })
+      .then((list: PublishTarget[]) => { if (alive) setPublishTargets(list); })
       .catch(() => { if (alive) setPublishTargets([]); });
     return () => { alive = false; };
   }, [publishMediaId]);
 
   const handlePublish = async () => {
-    if (publishMediaId == null || pubGroupId === '') return;
+    const target = parseTargetKey(pubGroupId);
+    if (publishMediaId == null || target == null) return;
     setPubError(null);
     setPubSubmitting(true);
-    const res = await submitPublication(publishMediaId, pubGroupId, pubLevel);
+    const res = await submitPublication(publishMediaId, target, pubLevel);
     setPubSubmitting(false);
     if (res.ok) {
       setPublishMediaId(null);
@@ -711,32 +719,44 @@ function MyMediaSection({
           </div>
           {publishTargets != null && publishTargets.length === 0 && (
             <div className="text-[10px]" style={{ color: 'var(--theme-mode-text-muted)' }}>
-              No eligible groups — the swimmer must be in the group's roster and you must be a member.
+              No eligible targets — for a group the swimmer must be in its roster and you must be a
+              member; the swimmer's club appears here on its own.
             </div>
           )}
           <div className="flex flex-wrap gap-2">
             <select
               value={pubGroupId}
-              onChange={(e) => setPubGroupId(e.target.value === '' ? '' : Number(e.target.value))}
+              onChange={(e) => {
+                setPubGroupId(e.target.value);
+                // У клуба нет аккаунтов-участников, значит и уровня members.
+                if (parseTargetKey(e.target.value)?.type === 'club') setPubLevel('public');
+              }}
               className="rounded-lg px-2 py-1.5 text-xs"
               style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
             >
-              <option value="">— group —</option>
-              {(publishTargets ?? []).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              <option value="">— group or club —</option>
+              {(publishTargets ?? []).map((t) => (
+                <option key={targetKey(t)} value={targetKey(t)}>
+                  {t.type === 'club' ? `${t.name} (club)` : t.name}
+                </option>
+              ))}
             </select>
             <select
               value={pubLevel}
               onChange={(e) => setPubLevel(e.target.value as 'members' | 'public')}
+              title={parseTargetKey(pubGroupId)?.type === 'club'
+                ? 'Clubs have no member accounts — publishing to a club is always public'
+                : undefined}
               className="rounded-lg px-2 py-1.5 text-xs"
               style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
             >
-              <option value="members">group members</option>
+              <option value="members" disabled={parseTargetKey(pubGroupId)?.type === 'club'}>group members</option>
               <option value="public">public (visible to everyone)</option>
             </select>
             <button
               type="button"
               onClick={handlePublish}
-              disabled={pubSubmitting || pubGroupId === ''}
+              disabled={pubSubmitting || parseTargetKey(pubGroupId) == null}
               className="rounded-lg px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-50"
               style={{ background: 'var(--theme-primary)' }}
             >
@@ -759,11 +779,11 @@ function MyMediaSection({
                     border: '1px solid var(--theme-mode-border)',
                   }}
                 >
-                  {p.hub_group_name} · {pubStatusLabel[p.status] ?? p.status}{p.status === 'approved' && p.level === 'public' ? ' (everyone)' : ''}
+                  {p.target_name} · {pubStatusLabel[p.status] ?? p.status}{p.status === 'approved' && p.level === 'public' ? ' (everyone)' : ''}
                   <button
                     type="button"
                     title="Withdraw"
-                    onClick={() => withdrawPublication(p.user_media_id, p.hub_group_id)}
+                    onClick={() => withdrawPublication(p.user_media_id, { type: p.target_type, id: p.target_id })}
                     className="leading-none opacity-60 hover:opacity-100"
                   >
                     ×

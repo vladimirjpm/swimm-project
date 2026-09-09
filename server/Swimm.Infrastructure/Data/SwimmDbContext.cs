@@ -898,6 +898,23 @@ public class SwimmDbContext : DbContext
                 .HasForeignKey(e => e.HubGroupId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            entity.HasOne(e => e.Club)
+                .WithMany()
+                .HasForeignKey(e => e.ClubId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // «Одна публикация на пару (медиа, цель)» — ДВА частичных индекса, а не один общий
+            // по (UserMediaId, TargetType, …): в Postgres NULL'ы в уникальном индексе считаются
+            // различными, и общий индекс не удержал бы уникальность там, где вторая колонка
+            // цели пуста.
+            entity.HasIndex(e => new { e.UserMediaId, e.HubGroupId })
+                .IsUnique()
+                .HasFilter("\"HubGroupId\" IS NOT NULL");
+
+            entity.HasIndex(e => new { e.UserMediaId, e.ClubId })
+                .IsUnique()
+                .HasFilter("\"ClubId\" IS NOT NULL");
+
             entity.HasOne(e => e.DecidedBy)
                 .WithMany()
                 .HasForeignKey(e => e.DecidedByUserId)
@@ -910,6 +927,18 @@ public class SwimmDbContext : DbContext
             entity.HasCheckConstraint(
                 "CK_UserMediaPublications_Status",
                 @"""Status"" IN ('pending', 'approved', 'rejected')");
+
+            entity.HasCheckConstraint(
+                "CK_UserMediaPublications_Target",
+                @"""TargetType"" IN ('group', 'club')");
+
+            // Цель ровно одна и совпадает с типом. Без этого «полиморфная цель» держалась бы
+            // на честном слове кода: строка с двумя заполненными FK (или с нулём) прошла бы в
+            // БД и разъехалась бы с выборками, которые фильтруют по одной из колонок.
+            entity.HasCheckConstraint(
+                "CK_UserMediaPublications_TargetShape",
+                @"(""TargetType"" = 'group' AND ""HubGroupId"" IS NOT NULL AND ""ClubId"" IS NULL)
+                  OR (""TargetType"" = 'club' AND ""ClubId"" IS NOT NULL AND ""HubGroupId"" IS NULL)");
         });
 
         // Реакции пользователей (❤ на медиа / 🎉 на заплыв) — Sys_-таблица БЕЗ grant swimm_ro:

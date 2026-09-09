@@ -100,30 +100,9 @@
    Personal bests и официальные рекорды. Своей вёрстки строки у страницы больше нет —
    deep-палитра приезжает в компонент ТОЛЬКО токенами `--sr-*` и только на контейнере
    списка: покрасить корень страницы значило бы задеть соседнюю вёрстку. */
-.deep-list {
-  display: flex; flex-direction: column; gap: 6px;
-
-  --sr-radius: var(--deep-radius-row);
-  --sr-bg: var(--deep-card-bg-row);
-  --sr-bg-hover: var(--deep-card-bg);
-  --sr-border: var(--deep-card-border-soft);
-  --sr-border-hover: var(--deep-card-border);
-  --sr-text: var(--deep-text);
-  --sr-text-mute: var(--deep-text-mute);
-  --sr-text-faint: var(--deep-text-faint);
-  --sr-text-ghost: var(--deep-text-ghost);
-  --sr-divider: var(--deep-card-border-soft);
-  --sr-circle-bg: var(--deep-card-bg-raised);
-  --sr-circle-border: var(--deep-card-border);
-  --sr-num-font: var(--deep-font-display);
-  --sr-accent: var(--deep-accent);
-  --sr-gold: var(--deep-gold);
-  --sr-gold-chip-bg: var(--deep-gold-bar);
-  --sr-gold-chip-text: #3b2600;
-  --sr-chip-bg: var(--deep-accent-chip);
-  --sr-chip-border: var(--deep-accent-border);
-  --sr-chip-text: var(--deep-accent);
-}
+/* `.deep-list` (токены `--sr-*` для общей строки заплыва) переехал в
+   `components/deep/deep-theme.css`: контейнер списка нужен и странице группы, а рецепт
+   должен быть один. Ниже — только то, что специфично странице пловца. */
 
 /* Ширина строки — половина панели, прижата ВЛЕВО (решение Влада 2026-08-27).
    После того как соревнование уехало во вторую линию, в первой между плиткой и временем

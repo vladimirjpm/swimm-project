@@ -306,28 +306,28 @@ function MyMediaFilterPanel({
           </FilterCard>
         )}
 
-        {/* Статус заявки есть только у видео — карточка появляется вместе с сегментом. */}
-        {segValue === 'with' && (
-          <FilterCard
-            title="Publication status"
-            summary={statusFilter === 'all' ? 'All' : statusFilter}
-            isActive={statusFilter !== 'all'}
-            {...card('status')}
-          >
-            <div className="flex flex-wrap gap-2">
-              {STATUSES.map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  className={seg(statusFilter === k)}
-                  onClick={() => onStatus(k)}
-                >
-                  {k === 'all' ? 'All' : k[0].toUpperCase() + k.slice(1)}
-                </button>
-              ))}
-            </div>
-          </FilterCard>
-        )}
+        {/* Статус есть у ЛЮБОГО медиа: «private» это «нет ни одной публикации», и для фото
+            он значит ровно то же, что для видео. Раньше карточка показывалась только вместе
+            с сегментом «With video» — из-за этого фильтр считали несуществующим. */}
+        <FilterCard
+          title="Publication status"
+          summary={statusFilter === 'all' ? 'All' : statusFilter}
+          isActive={statusFilter !== 'all'}
+          {...card('status')}
+        >
+          <div className="flex flex-wrap gap-2">
+            {STATUSES.map((k) => (
+              <button
+                key={k}
+                type="button"
+                className={seg(statusFilter === k)}
+                onClick={() => onStatus(k)}
+              >
+                {k === 'all' ? 'All' : k[0].toUpperCase() + k.slice(1)}
+              </button>
+            ))}
+          </div>
+        </FilterCard>
 
         {/* Сброс — под карточками, а не в шапке панели: он про всё сразу, и место ему
             там, где список фильтров кончился. Сезон и пловца НЕ трогает (хендофф). */}

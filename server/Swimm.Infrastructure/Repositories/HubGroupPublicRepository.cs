@@ -1,4 +1,6 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
+using Swimm.Application.Constants;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
@@ -106,8 +108,53 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             Members = members
         };
 
+        // Настройки отображения: показ блока фото и указатель «взять из медиа». Сам URL
+        // указателя доразрешает контроллер — там уже собрана лента `Gallery`, в которой
+        // лежат и свои медиа, и одобренные публикации. Здесь — фоллбек на обложку.
+        var display = EntityDisplaySettings.Parse(group.DisplaySettings);
+        dto.ShowHeroImage = display.Hero.Show;
+        dto.HeroMediaId = display.Hero.MediaId;
+        dto.HeroImageUrl = group.CoverImageUrl;
+
+        FillTrainingSchedule(dto, group.TrainingSchedule);
+
         await FillAggregatesAsync(_read, dto, members.Select(m => m.SwimmerId).ToList());
         return dto;
+    }
+
+    /// <summary>
+    /// Расписание и ближайшее занятие. Считаем ЗДЕСЬ, а не на клиенте: «сегодня» должно быть
+    /// израильским независимо от часов зрителя, и логику так покрывают тесты
+    /// (GroupTrainingScheduleTests). Пустое расписание → оба поля null, слоты шапки скрыты.
+    /// </summary>
+    private static void FillTrainingSchedule(HubGroupDetailsDto dto, string? json)
+    {
+        var schedule = GroupTrainingSchedule.Parse(json);
+        if (!schedule.HasSlots) return;
+
+        dto.TrainingSchedule = new GroupTrainingScheduleDto
+        {
+            Slots = schedule.Slots
+                .Where(s => s.IsValid)
+                .OrderBy(s => s.Day).ThenBy(s => s.StartTime!.Value)
+                .Select(s => new GroupTrainingSlotDto { Day = s.Day, Start = s.Start, End = s.End })
+                .ToList(),
+            Place = schedule.Place,
+            PoolType = schedule.PoolType,
+            Note = schedule.Note,
+        };
+
+        var next = schedule.NextOccurrence(IsraelTime.ToLocal(DateTime.UtcNow));
+        if (next == null) return;
+
+        dto.NextTraining = new NextTrainingDto
+        {
+            Date = next.Value.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            Start = next.Value.Slot.Start,
+            End = next.Value.Slot.End,
+            Place = schedule.Place,
+            PoolType = schedule.PoolType,
+        };
     }
 
     public async Task<HubGroupDetailsDto> GetFavoritesGroupAsync(int userId)

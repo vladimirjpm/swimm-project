@@ -318,6 +318,13 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int?>("CountryId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("CoverImageUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("DisplaySettings")
+                        .HasColumnType("jsonb");
+
                     b.Property<bool>("IsPseudo")
                         .HasColumnType("boolean");
 
@@ -1197,6 +1204,9 @@ namespace Swimm.Infrastructure.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
+                    b.Property<string>("DisplaySettings")
+                        .HasColumnType("jsonb");
+
                     b.Property<string>("IconUrl")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -1236,6 +1246,9 @@ namespace Swimm.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
+
+                    b.Property<string>("TrainingSchedule")
+                        .HasColumnType("jsonb");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -3067,6 +3080,9 @@ namespace Swimm.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("ClubId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -3076,7 +3092,7 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int?>("DecidedByUserId")
                         .HasColumnType("integer");
 
-                    b.Property<int>("HubGroupId")
+                    b.Property<int?>("HubGroupId")
                         .HasColumnType("integer");
 
                     b.Property<string>("Level")
@@ -3089,23 +3105,39 @@ namespace Swimm.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<string>("TargetType")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
                     b.Property<int>("UserMediaId")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ClubId");
+
                     b.HasIndex("DecidedByUserId");
 
                     b.HasIndex("HubGroupId");
 
+                    b.HasIndex("UserMediaId", "ClubId")
+                        .IsUnique()
+                        .HasFilter("\"ClubId\" IS NOT NULL");
+
                     b.HasIndex("UserMediaId", "HubGroupId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"HubGroupId\" IS NOT NULL");
 
                     b.ToTable("Sys_UserMediaPublications", null, t =>
                         {
                             t.HasCheckConstraint("CK_UserMediaPublications_Level", "\"Level\" IN ('members', 'public')");
 
                             t.HasCheckConstraint("CK_UserMediaPublications_Status", "\"Status\" IN ('pending', 'approved', 'rejected')");
+
+                            t.HasCheckConstraint("CK_UserMediaPublications_Target", "\"TargetType\" IN ('group', 'club')");
+
+                            t.HasCheckConstraint("CK_UserMediaPublications_TargetShape", "(\"TargetType\" = 'group' AND \"HubGroupId\" IS NOT NULL AND \"ClubId\" IS NULL)\n                  OR (\"TargetType\" = 'club' AND \"ClubId\" IS NOT NULL AND \"HubGroupId\" IS NULL)");
                         });
                 });
 
@@ -3891,6 +3923,11 @@ namespace Swimm.Infrastructure.Migrations
 
             modelBuilder.Entity("Swimm.Domain.Entities.UserMediaPublication", b =>
                 {
+                    b.HasOne("Swimm.Domain.Entities.Club", "Club")
+                        .WithMany()
+                        .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("Swimm.Domain.Entities.AppUser", "DecidedBy")
                         .WithMany()
                         .HasForeignKey("DecidedByUserId")
@@ -3899,14 +3936,15 @@ namespace Swimm.Infrastructure.Migrations
                     b.HasOne("Swimm.Domain.Entities.HubGroup", "HubGroup")
                         .WithMany()
                         .HasForeignKey("HubGroupId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("Swimm.Domain.Entities.UserMedia", "Media")
                         .WithMany()
                         .HasForeignKey("UserMediaId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Club");
 
                     b.Navigation("DecidedBy");
 

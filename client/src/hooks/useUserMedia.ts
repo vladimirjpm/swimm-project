@@ -23,12 +23,36 @@ export interface AddUserMediaInput {
   competition_id?: number | null;
 }
 
-/** Публикация медиа в группе — статус заявки владельца (этап 2/3 media-visibility-model). */
+/**
+ * Куда подана публикация. Клуб и группа — два вида одного (коллектив пловцов), поэтому у
+ * цели есть ТИП, а не отдельные поля под каждую сущность.
+ */
+export type PublishTargetType = 'group' | 'club';
+
+/** Ключ цели: тип + id. Ходит парой везде — в подаче, отзыве и ключах селектов. */
+export interface PublishTargetRef {
+  type: PublishTargetType;
+  id: number;
+}
+
+/** Ключ строкой — для `value` у `<select>` и для сравнения целей. */
+export const targetKey = (t: { type: PublishTargetType; id: number }): string => `${t.type}:${t.id}`;
+
+/** Разбор ключа обратно; мусор → null. */
+export function parseTargetKey(raw: string): PublishTargetRef | null {
+  const [type, id] = raw.split(':');
+  const n = Number(id);
+  return (type === 'group' || type === 'club') && Number.isFinite(n) && n > 0
+    ? { type, id: n }
+    : null;
+}
+
 export interface UserMediaPublicationDto {
   id: number;
   user_media_id: number;
-  hub_group_id: number;
-  hub_group_name: string;
+  target_type: PublishTargetType;
+  target_id: number;
+  target_name: string;
   level: 'members' | 'public';
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
@@ -171,7 +195,7 @@ export function useMyMediaPublications() {
   useEffect(() => { load(); }, [load]);
 
   const submit = useCallback(async (
-    mediaId: number, hubGroupId: number, level: 'members' | 'public'
+    mediaId: number, target: PublishTargetRef, level: 'members' | 'public'
   ): Promise<{ ok: boolean; error?: string }> => {
     const token = await fetchAntiforgeryToken();
     if (!token) return { ok: false, error: 'no token' };
@@ -180,7 +204,7 @@ export function useMyMediaPublications() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
-        body: JSON.stringify({ hub_group_id: hubGroupId, level }),
+        body: JSON.stringify({ target_type: target.type, target_id: target.id, level }),
       });
       if (!r.ok) {
         invalidateTokenCache();
@@ -195,18 +219,19 @@ export function useMyMediaPublications() {
     }
   }, [load]);
 
-  const withdraw = useCallback(async (mediaId: number, hubGroupId: number): Promise<boolean> => {
+  const withdraw = useCallback(async (mediaId: number, target: PublishTargetRef): Promise<boolean> => {
     const token = await fetchAntiforgeryToken();
     if (!token) return false;
     try {
-      const r = await fetch(`/api/me/media/${mediaId}/publications/${hubGroupId}`, {
+      const r = await fetch(`/api/me/media/${mediaId}/publications/${target.type}/${target.id}`, {
         method: 'DELETE',
         credentials: 'include',
         headers: { 'X-XSRF-TOKEN': token },
       });
       if (!r.ok) { invalidateTokenCache(); return false; }
       if (mountedRef.current) {
-        setPublications(prev => prev.filter(p => !(p.user_media_id === mediaId && p.hub_group_id === hubGroupId)));
+        setPublications(prev => prev.filter(
+          p => !(p.user_media_id === mediaId && p.target_type === target.type && p.target_id === target.id)));
       }
       return true;
     } catch {

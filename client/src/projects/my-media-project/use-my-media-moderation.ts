@@ -5,8 +5,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 /** Строка сводного inbox'а модерации — GET /api/me/moderation/media (все статусы, pending первыми). */
 export interface ModerationRowDto {
   id: number;
-  hub_group_id: number;
-  hub_group_name: string;
+  /** group | club — от типа зависит и ручка решения, и кто вправе решать. */
+  target_type: 'group' | 'club';
+  target_id: number;
+  target_name: string;
   owner_email: string;
   swimmer_name: string;
   result_label?: string | null;
@@ -40,8 +42,12 @@ function invalidateTokenCache() {
 }
 
 /**
- * Сводный inbox модерации по всем моим группам (owner/admin) — таб «Moderation».
- * Решение — POST /api/hub-groups/{hub_group_id}/media/publications/{id}/decision.
+ * Сводный inbox модерации по всему, что я модерирую, — таб «Moderation».
+ *
+ * Цель бывает двух видов, и ручка решения у них своя: у группы
+ * POST /api/hub-groups/{id}/media/publications/{pubId}/decision (решает владелец/админ
+ * группы), у клуба POST /api/clubs/{id}/media/publications/{pubId}/decision (управляющих у
+ * клуба нет, решает админ сайта — план §3.10).
  */
 export function useMyMediaModeration(enabled: boolean) {
   const [rows, setRows] = useState<ModerationRowDto[]>([]);
@@ -69,11 +75,14 @@ export function useMyMediaModeration(enabled: boolean) {
   useEffect(() => { load(); }, [load]);
 
   /** Publish/Reject/Unpublish — оптимистично убираем строку из текущего представления вызывающей стороны. */
-  const decide = useCallback(async (hubGroupId: number, publicationId: number, approve: boolean): Promise<boolean> => {
+  const decide = useCallback(async (
+    targetType: 'group' | 'club', targetId: number, publicationId: number, approve: boolean,
+  ): Promise<boolean> => {
     const token = await fetchAntiforgeryToken();
     if (!token) return false;
+    const base = targetType === 'club' ? `/api/clubs/${targetId}` : `/api/hub-groups/${targetId}`;
     try {
-      const r = await fetch(`/api/hub-groups/${hubGroupId}/media/publications/${publicationId}/decision`, {
+      const r = await fetch(`${base}/media/publications/${publicationId}/decision`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
