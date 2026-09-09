@@ -33,7 +33,9 @@ import FiltersFab from '../components/filter-section/filters-fab';
 import UI_SwimmStyleIcon from '../components/mix/swimm-style-icon/swimm-style-icon';
 import { useMyMediaFilterHost, type MyMediaHostState } from './my-media-filter-host';
 import MobileFiltersDrawer from '../components/filter-section/mobile-filters-drawer';
-import { chipClass, derivedCardStatus, visibilityLabel, hpCardCls } from './components/status-styles';
+import {
+  chipClass, derivedCardStatus, visibilityLabel, hpCardCls, STATUS_COLORS, type CardStatus,
+} from './components/status-styles';
 
 // Страница «My media» v3 (swim-centric) — README design_handoff_my_swims_v3,1.
 // Палитра — тема deep (light + dark), как у страниц пловца, клуба и /season-best: вёрстка
@@ -187,6 +189,26 @@ function MyMediaContent({ deep }: { deep: string }) {
     for (const m of unlinkedMedia) ids.push(m.id);
     return ids;
   }, [swims, competitionMedia, unlinkedMedia]);
+
+  /**
+   * Сводка «что у меня есть» — карточка-инфо в шапке панели, слева от баннера модерации.
+   * Считается по ВСЕМУ медиа страницы, а не по видимому: списки сужают фильтры, а сводка
+   * должна стоять на месте — иначе выбранный «pending» покажет сам себя и нули во всём
+   * остальном. Дедуп по id: одно медиа висит на нескольких заплывах эстафеты (docs/relays.md).
+   */
+  const mediaStats = useMemo(() => {
+    const byId = new Map<number, SwimMediaDto>();
+    for (const s of swims) for (const m of s.media) byId.set(m.id, m);
+    for (const m of competitionMedia) byId.set(m.id, m);
+    for (const m of unlinkedMedia) byId.set(m.id, m);
+    const status: Record<CardStatus, number> = { private: 0, pending: 0, published: 0, rejected: 0 };
+    let videos = 0;
+    for (const m of byId.values()) {
+      if (m.media_type === 'video') videos += 1;
+      status[derivedCardStatus(publicationsByMedia.get(m.id) ?? [])] += 1;
+    }
+    return { total: byId.size, videos, photos: byId.size - videos, status };
+  }, [swims, competitionMedia, unlinkedMedia, publicationsByMedia]);
 
   const groupOptions = useMemo(() => {
     const names = new Map<number, string>();
@@ -655,17 +677,72 @@ function MyMediaContent({ deep }: { deep: string }) {
       <section className="mm-panel">
         {tab === 'media' ? (
           <div className="flex flex-col gap-4">
-            {showModeration && pendingModCount > 0 && (
-              <div className="flex items-center gap-3 rounded-[14px] border border-[var(--t-warn-border)] bg-[var(--t-warn-soft)] p-[12px_16px]">
-                <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-[11px] bg-[var(--t-warn)] px-1.5 text-[12px] font-black text-[var(--t-warn-ink)]">
-                  {pendingModCount}
-                </span>
-                <span className="min-w-0 text-[13.5px] font-bold text-[var(--t-warn)]">requests are waiting for your approval</span>
-                <button type="button" onClick={() => setTab('moderation')} className="hp-mono ml-auto rounded-[9px] border-none bg-[var(--t-warn)] px-3.5 py-[7px] text-[12px] font-extrabold text-[var(--t-warn-ink)]">
-                  Review →
-                </button>
+            {/* Шапка панели: слева сводка «что у меня есть» (видна всегда), справа баннер
+                модерации (только когда есть что решать). Раньше баннер занимал всю ширину
+                один — теперь он прижат вправо и делит ряд со сводкой. */}
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
+              <div className={`${hpCardCls} flex flex-wrap items-center gap-x-5 gap-y-2.5 p-[12px_16px]`}>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-[22px] font-black leading-none text-[var(--t-text)]">{mediaStats.videos}</span>
+                  <span className="hp-mono text-[11px] font-extrabold text-[var(--t-text-3)]">
+                    {mediaStats.videos === 1 ? 'video' : 'videos'}
+                  </span>
+                  {mediaStats.photos > 0 && (
+                    <span className="text-[11.5px] font-bold text-[var(--t-text-3)]">
+                      + {mediaStats.photos} {mediaStats.photos === 1 ? 'photo' : 'photos'}
+                    </span>
+                  )}
+                </div>
+                {/* Статусы — цвет И слово, как в чипах карточек: цветом одним статус не
+                    называют. Нулевые не прячем, иначе строка прыгает при каждом решении.
+                    Каждый чип — тот же фильтр, что карточка «Publication status» в панели
+                    (одно состояние `statusFilter` на оба места, второго списка нет).
+                    Повторный клик по выбранному снимает фильтр; пустой статус не кликается —
+                    он увёл бы страницу в «Nothing matches the filters» без причины. */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {(['private', 'pending', 'published', 'rejected'] as CardStatus[]).map((k) => {
+                    const count = mediaStats.status[k];
+                    const on = statusFilter === k;
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        disabled={count === 0}
+                        aria-pressed={on}
+                        title={count === 0 ? `No ${k} media` : on ? 'Clear this filter' : `Show only ${k}`}
+                        onClick={() => setStatusFilter(on ? 'all' : k)}
+                        className={`hp-mono inline-flex items-center gap-1.5 whitespace-nowrap rounded-[8px] border px-2.5 py-[5px] text-[11px] font-extrabold${
+                          count === 0 ? ' cursor-default opacity-45' : ' cursor-pointer'
+                        }`}
+                        style={{
+                          color: STATUS_COLORS[k].text,
+                          borderColor: on ? STATUS_COLORS[k].text : STATUS_COLORS[k].border,
+                          background: STATUS_COLORS[k].bg,
+                          // Выбранный — кольцом цвета статуса: заливка у чипов уже занята
+                          // самим статусом, и «активным» её сделать нечем.
+                          boxShadow: on ? `0 0 0 2px ${STATUS_COLORS[k].bg}, 0 0 0 3px ${STATUS_COLORS[k].text}` : undefined,
+                        }}
+                      >
+                        <span className="text-[12.5px] font-black">{count}</span>
+                        {k}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            )}
+
+              {showModeration && pendingModCount > 0 && (
+                <div className="flex items-center gap-3 rounded-[14px] border border-[var(--t-warn-border)] bg-[var(--t-warn-soft)] p-[12px_16px] lg:ml-auto">
+                  <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-[11px] bg-[var(--t-warn)] px-1.5 text-[12px] font-black text-[var(--t-warn-ink)]">
+                    {pendingModCount}
+                  </span>
+                  <span className="min-w-0 text-[13.5px] font-bold text-[var(--t-warn)]">requests are waiting for your approval</span>
+                  <button type="button" onClick={() => setTab('moderation')} className="hp-mono ml-auto rounded-[9px] border-none bg-[var(--t-warn)] px-3.5 py-[7px] text-[12px] font-extrabold text-[var(--t-warn-ink)] lg:ml-3">
+                    Review →
+                  </button>
+                </div>
+              )}
+            </div>
 
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
@@ -885,6 +962,7 @@ function MyMediaContent({ deep }: { deep: string }) {
                 <select
                   value={shareLevel}
                   onChange={(e) => setShareLevel(e.target.value as 'members' | 'public')}
+                  title={parseTargetKey(shareTargetKey)?.type === 'club' ? 'Clubs have no member accounts — publishing to a club is always public' : undefined}
                   className="rounded-[8px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-2.5 py-2 text-[12px] text-[var(--t-text)]"
                 >
                   <option
