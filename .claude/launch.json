@@ -74,6 +74,34 @@
       "port": 5079
     },
     {
+      "name": "swimm-api-5079-preview-user",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "server/Swimm.API",
+        "--no-build",
+        "--configuration",
+        "Release",
+        "--",
+        "--urls",
+        "http://localhost:5079",
+        "--DevAdminBypassEmail",
+        "claude.preview@example.com"
+      ],
+      "port": 5079
+    },
+    {
+      "name": "client-5181-api5079",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set SWIMM_API_TARGET=http://localhost:5079&& npm --prefix client run dev -- --port 5181 --strictPort"
+      ],
+      "port": 5181,
+      "autoPort": false
+    },
+    {
       "name": "client-5079",
       "runtimeExecutable": "cmd",
       "runtimeArgs": [

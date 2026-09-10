@@ -15,6 +15,12 @@ public interface IHubGroupClubSubscriptionService
     Task<HubGroupClubSubscriptionDto?> GetAsync(int hubGroupId);
 
     /// <summary>
+    /// Предпросмотр подписки на клуб: сколько пловцов придёт, предупреждение про официальную
+    /// группу и подсказка «вступить в существующую». Ничего не пишет. null — клуба нет.
+    /// </summary>
+    Task<HubGroupClubSubscriptionPreviewDto?> PreviewAsync(int hubGroupId, int clubId);
+
+    /// <summary>
     /// Подписать группу на клуб и сразу пересобрать состав. Подписка на другой клуб
     /// ЗАМЕНЯЕТ прежнюю (одна на группу): пловцы прежнего клуба уходят, ручные остаются.
     /// Склеенный клуб подменяется каноническим.

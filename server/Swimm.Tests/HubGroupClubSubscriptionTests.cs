@@ -323,6 +323,106 @@ public class HubGroupClubSubscriptionTests
         Assert.Empty(await RowsAsync(db, other.Id)); // импорт клуба A чужой состав не трогает
     }
 
+    // ── Предпросмотр подписки (П3: блок «Roster from club» в «My groups») ─────
+
+    private static async Task<HubGroup> AddGroupAsync(SwimmDbContext db, string slug, bool official = false, Club? club = null)
+    {
+        var g = new HubGroup { Name = slug, Slug = slug, IsOfficial = official, ClubId = club?.Id };
+        db.HubGroups.Add(g);
+        await db.SaveChangesAsync();
+        return g;
+    }
+
+    [Fact]
+    public async Task Preview_NoOfficialNoFollowers_WarnsAboutFuture_NoHint()
+    {
+        await using var db = CreateDb(nameof(Preview_NoOfficialNoFollowers_WarnsAboutFuture_NoHint));
+        var w = await SeedWorldAsync(db);
+        await SwimmerAsync(db, w, "S1", w.A, CurrentSeason);
+        await SwimmerAsync(db, w, "S2", w.A, PreviousSeason);
+
+        var preview = await Service(db).PreviewAsync(w.Group.Id, w.A.Id);
+
+        Assert.Equal(2, preview!.SwimmerCount);
+        Assert.StartsWith("This club has no official group yet.", preview.Warning);
+        Assert.Null(preview.Hint);
+        Assert.Empty(preview.FollowingGroups);
+        Assert.Empty(await db.HubGroupClubSubscriptions.ToListAsync()); // предпросмотр ничего не пишет
+    }
+
+    [Fact]
+    public async Task Preview_AnotherGroupFollows_HintsToJoinTheBiggest()
+    {
+        await using var db = CreateDb(nameof(Preview_AnotherGroupFollows_HintsToJoinTheBiggest));
+        var w = await SeedWorldAsync(db);
+        await SwimmerAsync(db, w, "S1", w.A, CurrentSeason);
+        var small = await AddGroupAsync(db, "small-fans");
+        var big = await AddGroupAsync(db, "big-fans");
+        var svc = Service(db);
+        await svc.SubscribeAsync(big.Id, w.A.Id, null);
+        await svc.SubscribeAsync(small.Id, w.A.Id, null);
+        // «small» — меньше: одного пловца владелец скрыл.
+        await svc.SetExcludedAsync(small.Id, (await db.HubGroupMembers.FirstAsync(m => m.HubGroupId == small.Id)).Id, true);
+
+        var preview = await svc.PreviewAsync(w.Group.Id, w.A.Id);
+
+        Assert.Equal(2, preview!.FollowingGroups.Count);
+        Assert.Equal(big.Id, preview.HintGroup!.Id);
+        Assert.Contains("A group already follows this club", preview.Hint);
+        Assert.Contains("big-fans", preview.Hint);
+    }
+
+    [Fact]
+    public async Task Preview_ClubHasOfficialGroup_WarnsLinkOnly_PointsToOfficial()
+    {
+        await using var db = CreateDb(nameof(Preview_ClubHasOfficialGroup_WarnsLinkOnly_PointsToOfficial));
+        var w = await SeedWorldAsync(db);
+        var official = await AddGroupAsync(db, "dolphin-official", official: true, club: w.A);
+        var follower = await AddGroupAsync(db, "dolphin-fans");
+        await Service(db).SubscribeAsync(follower.Id, w.A.Id, null);
+
+        var preview = await Service(db).PreviewAsync(w.Group.Id, w.A.Id);
+
+        Assert.Equal(official.Id, preview!.OfficialGroup!.Id);
+        Assert.Contains("already has an official group", preview.Warning);
+        Assert.Contains("dolphin-official", preview.Warning);
+        Assert.Equal(official.Id, preview.HintGroup!.Id); // звать — в официальную, не в подписанную
+        Assert.StartsWith("Join the official group", preview.Hint);
+    }
+
+    [Fact]
+    public async Task Preview_OwnOfficialClub_NothingToWarnAbout()
+    {
+        await using var db = CreateDb(nameof(Preview_OwnOfficialClub_NothingToWarnAbout));
+        var w = await SeedWorldAsync(db);
+        w.Group.IsOfficial = true;
+        w.Group.ClubId = w.A.Id;
+        await db.SaveChangesAsync();
+
+        var preview = await Service(db).PreviewAsync(w.Group.Id, w.A.Id);
+
+        Assert.True(preview!.IsOwnOfficialClub);
+        Assert.Null(preview.Warning);
+        Assert.Null(preview.Hint);
+        Assert.Null(preview.OfficialGroup);
+    }
+
+    [Fact]
+    public async Task Preview_MergedClub_ShowsCanonical_UnknownClub_Null()
+    {
+        await using var db = CreateDb(nameof(Preview_MergedClub_ShowsCanonical_UnknownClub_Null));
+        var w = await SeedWorldAsync(db);
+        var dup = new Club { Name = "Hapoel Dolphin", MergedIntoId = w.A.Id };
+        db.Clubs.Add(dup);
+        await db.SaveChangesAsync();
+
+        var preview = await Service(db).PreviewAsync(w.Group.Id, dup.Id);
+
+        Assert.Equal(w.A.Id, preview!.ClubId);
+        Assert.Equal(w.A.Name, preview.ClubName);
+        Assert.Null(await Service(db).PreviewAsync(w.Group.Id, 12345));
+    }
+
     // ── Скрытые владельцем клубные пловцы ────────────────────────────────────
 
     [Fact]

@@ -57,6 +57,64 @@ public class HubGroupClubSubscriptionService : IHubGroupClubSubscriptionService
             .FirstOrDefaultAsync();
     }
 
+    public async Task<HubGroupClubSubscriptionPreviewDto?> PreviewAsync(int hubGroupId, int clubId)
+    {
+        var requested = await _db.Clubs.AsNoTracking()
+            .Where(c => c.Id == clubId)
+            .Select(c => new { c.Id, c.MergedIntoId })
+            .FirstOrDefaultAsync();
+        if (requested == null) return null;
+
+        // Тот же канон, что при подписке: предпросмотр обязан показать ровно то, что случится.
+        var targetClubId = requested.MergedIntoId ?? requested.Id;
+        var club = await _db.Clubs.AsNoTracking()
+            .Where(c => c.Id == targetClubId)
+            .Select(c => new { c.Name, c.NameEn })
+            .FirstAsync();
+
+        var swimmerCount = await HubGroupClubRoster
+            .SwimmerIds(_db, targetClubId, HubGroupClubRules.ActivitySince(DateTime.UtcNow))
+            .CountAsync();
+
+        var official = await _db.HubGroups.AsNoTracking()
+            .Where(g => g.IsOfficial && g.ClubId == targetClubId)
+            .Select(g => new HubGroupRefDto
+            {
+                Id = g.Id, Slug = g.Slug, Name = g.Name, MemberCount = g.Members.Count(m => !m.IsExcluded)
+            })
+            .FirstOrDefaultAsync();
+
+        var following = await _db.HubGroups.AsNoTracking()
+            .Where(g => g.Id != hubGroupId && g.ClubSubscriptions.Any(s => s.ClubId == targetClubId))
+            .OrderByDescending(g => g.Members.Count(m => !m.IsExcluded))
+            .Select(g => new HubGroupRefDto
+            {
+                Id = g.Id, Slug = g.Slug, Name = g.Name, MemberCount = g.Members.Count(m => !m.IsExcluded)
+            })
+            .ToListAsync();
+
+        var isOwnOfficial = official?.Id == hubGroupId;
+        var otherOfficial = isOwnOfficial ? null : official;
+
+        // Звать — в официальную, если она есть (это «лицо клуба»), иначе в самую населённую из
+        // подписанных. Самой официальной группе звать некуда.
+        var hintGroup = isOwnOfficial ? null : otherOfficial ?? following.FirstOrDefault();
+
+        return new HubGroupClubSubscriptionPreviewDto
+        {
+            ClubId = targetClubId,
+            ClubName = club.Name.Length > 0 ? club.Name : club.NameEn,
+            ClubNameEn = club.NameEn.Length > 0 ? club.NameEn : null,
+            SwimmerCount = swimmerCount,
+            IsOwnOfficialClub = isOwnOfficial,
+            OfficialGroup = otherOfficial,
+            FollowingGroups = following,
+            Warning = isOwnOfficial ? null : HubGroupClubRules.SubscribeWarning(otherOfficial?.Name),
+            Hint = hintGroup == null ? null : HubGroupClubRules.JoinInsteadHint(hintGroup.Name, hintGroup == otherOfficial),
+            HintGroup = hintGroup
+        };
+    }
+
     public async Task<HubGroupClubSubscribeResult> SubscribeAsync(int hubGroupId, int clubId, int? userId)
     {
         if (!await _db.HubGroups.AnyAsync(g => g.Id == hubGroupId))

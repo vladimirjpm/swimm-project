@@ -46,6 +46,46 @@ export interface HubGroupMemberRow {
   clubName?: string | null;
   role: 'member' | 'captain' | 'coach';
   sortOrder: number;
+  /** manual — добавлен руками; club — из подписки на клуб, пересобирается сам. */
+  source: 'manual' | 'club';
+  /**
+   * Владелец скрыл клубного пловца: его не видно нигде на сайте, и пересборка его не
+   * возвращает. Приходит только в панель управления — отсюда его возвращают.
+   */
+  isExcluded: boolean;
+}
+
+/** Подписка группы на клуб: состав собирается из пловцов клуба (docs/hubgroups-architecture.md §4а). */
+export interface HubGroupClubSubscription {
+  clubId: number;
+  clubName: string;
+  clubNameEn?: string | null;
+  createdAt: string;
+}
+
+export interface HubGroupRef {
+  id: number;
+  slug: string;
+  name: string;
+  memberCount: number;
+}
+
+/**
+ * Что будет при подписке на клуб (`GET …/club-subscription-preview?clubId=`). Тексты
+ * предупреждения и подсказки уже по-английски — их считает сервер (HubGroupClubRules).
+ */
+export interface ClubSubscriptionPreview {
+  /** Канонический клуб: склеенный дубль сервер подменяет сам. */
+  clubId: number;
+  clubName: string;
+  clubNameEn?: string | null;
+  swimmerCount: number;
+  isOwnOfficialClub: boolean;
+  officialGroup?: HubGroupRef | null;
+  followingGroups: HubGroupRef[];
+  warning?: string | null;
+  hint?: string | null;
+  hintGroup?: HubGroupRef | null;
 }
 
 /** Участник-аккаунт группы (приватный список, не пловец). */
@@ -91,8 +131,11 @@ export interface HubGroupEditData {
   /** open | approval — политика самозаписи. */
   joinPolicy: 'open' | 'approval';
   links: HubGroupLinkInput[];
+  /** Весь состав, включая скрытых клубных (`isExcluded`). */
   members: HubGroupMemberRow[];
   userMembers: HubGroupUserMember[];
+  /** Подписка на клуб; null — состав ведётся только руками. */
+  clubSubscription?: HubGroupClubSubscription | null;
 }
 
 export interface SwimmerSearchResult {

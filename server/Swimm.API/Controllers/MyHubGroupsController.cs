@@ -206,6 +206,22 @@ public class MyHubGroupsController : ControllerBase
     }
 
     /// <summary>
+    /// Предпросмотр подписки до кнопки Follow: сколько пловцов придёт, предупреждение про
+    /// официальную группу клуба и подсказка «вступить в существующую». Ничего не пишет.
+    /// </summary>
+    [HttpGet("{id:int}/club-subscription-preview")]
+    public async Task<IActionResult> PreviewClubSubscription(int id, [FromQuery] int clubId)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanEdit) return Forbid();
+
+        var preview = await _clubSubscriptions.PreviewAsync(id, clubId);
+        return preview == null ? NotFound(new { error = "Club not found." }) : Ok(preview);
+    }
+
+    /// <summary>
     /// Подписать группу на клуб (другой клуб заменяет прежний — подписка одна) и сразу
     /// пересобрать состав. В ответе — подписка и сколько пловцов пришло/ушло.
     /// </summary>

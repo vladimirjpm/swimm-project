@@ -3,6 +3,7 @@ import { useAuth } from '../../hooks/useAuth';
 import type {
   ClubOption,
   ClubRequest,
+  ClubSubscriptionPreview,
   CreateEligibility,
   GroupCreationPolicy,
   HubGroupClubRequestInput,
@@ -255,6 +256,46 @@ export function useMyHubGroupEdit(id: number | null) {
     return result;
   }, [id, reload]);
 
+  // ── Подписка на клуб (docs/plans/hubgroup-club-subscription-plan.md П3) ──────
+
+  /** Что будет при подписке — ничего не пишет; null — клуб не найден или нет прав. */
+  const previewClubSubscription = useCallback(async (clubId: number): Promise<ClubSubscriptionPreview | null> => {
+    if (id == null) return null;
+    const r = await fetch(`/api/me/hub-groups/${id}/club-subscription-preview?clubId=${clubId}`, { credentials: 'include' });
+    return r.ok ? r.json() : null;
+  }, [id]);
+
+  /** Подписать и сразу пересобрать состав (другой клуб заменяет прежний — подписка одна). */
+  const subscribeToClub = useCallback(async (clubId: number): Promise<SaveResult> => {
+    if (id == null) return { success: false, error: 'No group' };
+    const r = await apiFetch(`/api/me/hub-groups/${id}/club-subscription`, {
+      method: 'PUT', body: JSON.stringify({ clubId }),
+    });
+    const result = await saveResultFrom(r);
+    if (result.success) await reload();
+    return result;
+  }, [id, reload]);
+
+  /** Снять подписку: клубные пловцы уходят (скрытые тоже), добавленные руками остаются. */
+  const unsubscribeFromClub = useCallback(async (): Promise<SaveResult> => {
+    if (id == null) return { success: false, error: 'No group' };
+    const r = await apiFetch(`/api/me/hub-groups/${id}/club-subscription`, { method: 'DELETE' });
+    const result = await saveResultFrom(r);
+    if (result.success) await reload();
+    return result;
+  }, [id, reload]);
+
+  /** Скрыть / вернуть клубного пловца (ручного так не прячут — его удаляют). */
+  const setMemberExcluded = useCallback(async (memberId: number, excluded: boolean): Promise<SaveResult> => {
+    if (id == null) return { success: false, error: 'No group' };
+    const r = await apiFetch(`/api/me/hub-groups/${id}/members/${memberId}/excluded`, {
+      method: 'PUT', body: JSON.stringify({ excluded }),
+    });
+    const result = await saveResultFrom(r);
+    if (result.success) await reload();
+    return result;
+  }, [id, reload]);
+
   const addAdmin = useCallback(async (email: string): Promise<SaveResult> => {
     if (id == null) return { success: false, error: 'No group' };
     const r = await apiFetch(`/api/me/hub-groups/${id}/admins`, { method: 'POST', body: JSON.stringify({ email }) });
@@ -320,6 +361,7 @@ export function useMyHubGroupEdit(id: number | null) {
   return {
     data, admins, clubRequest, loading, forbidden,
     update, searchSwimmers, getClubSwimmers, addMember, updateMember, removeMember,
+    previewClubSubscription, subscribeToClub, unsubscribeFromClub, setMemberExcluded,
     addAdmin, removeAdmin, submitClubRequest, addUserMember, approveUserMember, removeUserMember, setUserMemberLabel,
   };
 }
