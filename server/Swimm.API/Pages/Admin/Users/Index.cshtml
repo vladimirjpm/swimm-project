@@ -43,6 +43,7 @@
                 <th>Вход</th>
                 <th>Последняя активность</th>
                 <th class="text-right">Логины 7д / 30д</th>
+                <th class="text-right" title="Сколько групп владеет / действующий лимит">Группы</th>
                 <th>Статус</th>
                 <th></th>
             </tr>
@@ -51,6 +52,7 @@
             @foreach (var u in Model.Users)
             {
                 var online = Swimm.API.Pages.Admin.Users.IndexModel.IsOnline(u.LastSeenAt);
+                var groupLimit = Model.EffectiveHubGroupLimit(u.Roles, u.HubGroupLimit);
                 <tr class="@(u.Id == Model.UserId ? "bg-admin-surface-hover" : null)">
                     <td>
                         <a href="@Url.Page("Index", new { userId = u.Id })" class="text-admin-accent hover:underline font-medium">@u.DisplayName</a>
@@ -88,6 +90,13 @@
                         }
                     </td>
                     <td class="text-right tabular-nums">@u.Logins7d / @u.Logins30d</td>
+                    <td class="text-right tabular-nums whitespace-nowrap">
+                        @u.HubGroupsOwned / @(groupLimit?.ToString() ?? "∞")
+                        @if (u.HubGroupLimit != null && !u.Roles.Contains("Admin"))
+                        {
+                            <span class="admin-badge border-admin-accent/30 bg-admin-accent/15 text-admin-accent ml-1" title="Персональный лимит — исключение из лимита по роли">перс.</span>
+                        }
+                    </td>
                     <td>
                         @if (u.IsActive)
                         {
@@ -149,6 +158,36 @@
             {
                 <span class="text-admin-danger">· Lockout до @lockout.ToString("dd.MM HH:mm") UTC</span>
             }
+        </div>
+        @* ── Лимит групп: владение и персональное исключение (правило — HubGroupCreationRules) ── *@
+        @{ var detailLimit = Model.EffectiveHubGroupLimit(d.Roles, d.HubGroupLimit); }
+        <div class="mb-4 rounded-md border border-admin-border p-3">
+            <div class="mb-2 text-sm text-admin-text">
+                Группы: владеет <span class="font-semibold tabular-nums">@d.HubGroupsOwned</span>
+                из <span class="font-semibold tabular-nums">@(detailLimit?.ToString() ?? "∞")</span>
+                <span class="text-xs text-admin-text-muted">· @Swimm.API.Pages.Admin.Users.IndexModel.HubGroupLimitSource(d.Roles, d.HubGroupLimit)</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <form method="post" asp-page-handler="SetHubGroupLimit" class="flex flex-wrap items-center gap-2">
+                    <input type="hidden" name="userId" value="@d.Id" />
+                    <label for="hubGroupLimit" class="text-xs text-admin-text-muted">Персональный лимит</label>
+                    <input id="hubGroupLimit" name="hubGroupLimit" type="number" step="1" min="0"
+                           max="@Swimm.Application.Mapping.HubGroupCreationRules.MaxLimit"
+                           value="@d.HubGroupLimit" placeholder="по роли" class="admin-input w-28" />
+                    <button type="submit" class="admin-btn admin-btn-primary py-1 px-2.5">Сохранить</button>
+                </form>
+                @if (d.HubGroupLimit != null)
+                {
+                    <form method="post" asp-page-handler="SetHubGroupLimit" class="inline">
+                        <input type="hidden" name="userId" value="@d.Id" />
+                        <button type="submit" class="admin-btn admin-btn-ghost py-1 px-2.5" title="Снять исключение — будет действовать лимит по роли">Снять</button>
+                    </form>
+                }
+            </div>
+            <p class="mt-2 text-xs text-admin-text-muted">
+                Пусто — лимит по роли, 0 — запретить создавать группы. Считаются группы, которыми
+                пользователь владеет (официальные тоже); уже созданные при снижении лимита остаются.
+            </p>
         </div>
         @if (d.LoginHistory.Count == 0)
         {

@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.Caching.Memory;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 
 namespace Swimm.Infrastructure.Services;
 
@@ -39,10 +40,17 @@ public class AdminSettingsService : ISettingsService
                 "paged — постранично с фильтрами на сервере (включится в фазе 3); " +
                 "client — клиент выбирает сам через ?loadMode= (по умолчанию full). " +
                 "full/paged принудительны — URL-параметр клиента игнорируется"),
-            new("HubGroupCreationPolicy", "admin", "string", "livesite",
-                "Кто создаёт группы (SwimHub): admin — только админ; coach — админ и тренеры; any — любой пользователь"),
+            // Дефолты групп = рабочий режим (решение 10.09.2026): значения живут в памяти и после
+            // рестарта возвращаются сюда. Исключения по конкретным людям — в /Admin/Users (в БД).
+            new("HubGroupCreationPolicy", "any", "string", "livesite",
+                "Кто создаёт группы (SwimHub): admin — только админ; coach — админ и тренеры; " +
+                "any — любой вошедший пользователь (в пределах лимита)"),
             new("HubGroupMaxPerUser", "3", "int", "livesite",
-                "Лимит групп на пользователя (на админа не действует)"),
+                "Сколько групп может ВЛАДЕТЬ обычный пользователь (официальные тоже в счёт). " +
+                "Персональный лимит в /Admin/Users важнее; на админа не действует"),
+            new("HubGroupMaxPerCoach", "3", "int", "livesite",
+                "Сколько групп может ВЛАДЕТЬ пользователь с ролью Coach. Персональный лимит в " +
+                "/Admin/Users важнее; на админа не действует"),
             new("HubGroupVisibility", "public", "string", "livesite",
                 "Видимость групп: public — все видны всем; private — все скрыты; " +
                 "perGroup — решает флаг IsPublic у конкретной группы"),
@@ -114,6 +122,9 @@ public class AdminSettingsService : ISettingsService
         if (key == "HubGroupVisibility" && newValue is not ("public" or "private" or "perGroup"))
             return false;
         if (key == "RecordAgeAxis" && newValue is not ("calendar" or "season"))
+            return false;
+        if (key is "HubGroupMaxPerUser" or "HubGroupMaxPerCoach"
+            && int.Parse(newValue) is < 0 or > HubGroupCreationRules.MaxLimit)
             return false;
 
         _settings[key] = existing with { Value = newValue };

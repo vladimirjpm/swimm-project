@@ -11,6 +11,8 @@ export interface MyHubGroupRow {
   isPublic: boolean;
   isOfficial: boolean;
   updatedAt: string;
+  /** Владелец. В списке лежат и группы, где ты только админ, — Delete только владельцу. */
+  ownerUserId: number;
 }
 
 export interface HubGroupLinkInput {
@@ -110,7 +112,12 @@ export interface HubGroupAdmin {
 
 export interface CreateEligibility {
   canCreate: boolean;
+  /** Причина отказа, уже по-английски (текст считает сервер). */
   reason?: string | null;
+  /** Сколько групп пользователь владеет (официальные тоже). */
+  owned: number;
+  /** Действующий лимит (персональный или по роли); null — без лимита (админ). */
+  limit?: number | null;
   remaining?: number | null;
 }
 

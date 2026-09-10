@@ -25,8 +25,9 @@ public class AdminSettingsServiceTests
         // + RecordAgeAxis (ось возраста для сверки с рекордами) + DebugDetails (общий
         // тумблер отладочных подробностей) — оба 2026-08-22
         // + LogligStampOnImport (штамповка loglig-id пловцам после импорта, 2026-08-23)
-        // + StartListEnabled/StartListDaysAhead (автозабор стартового протокола, С10).
-        Assert.Equal(16, all.Count);
+        // + StartListEnabled/StartListDaysAhead (автозабор стартового протокола, С10)
+        // + HubGroupMaxPerCoach (лимит групп для роли Coach, 2026-09-10).
+        Assert.Equal(17, all.Count);
     }
 
     [Fact]
@@ -56,6 +57,7 @@ public class AdminSettingsServiceTests
     [InlineData("ResultsLoadMode")]
     [InlineData("HubGroupCreationPolicy")]
     [InlineData("HubGroupMaxPerUser")]
+    [InlineData("HubGroupMaxPerCoach")]
     [InlineData("HubGroupVisibility")]
     [InlineData("DiscoveryEnabled")]
     [InlineData("DiscoveryIntervalHours")]

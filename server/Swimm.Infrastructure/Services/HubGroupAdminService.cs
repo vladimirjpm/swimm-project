@@ -38,7 +38,8 @@ public class HubGroupAdminService : IHubGroupAdminService
                 MemberCount = g.Members.Count,
                 IsPublic = g.IsPublic,
                 IsOfficial = g.IsOfficial,
-                UpdatedAt = g.UpdatedAt
+                UpdatedAt = g.UpdatedAt,
+                OwnerUserId = g.OwnerUserId
             })
             .ToListAsync();
     }

@@ -12,6 +12,12 @@ public sealed class HubGroupAdminRowDto
     public bool IsPublic { get; set; }
     public bool IsOfficial { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>
+    /// Владелец группы. В панели «My groups» по нему решается, показывать ли Delete: в том же
+    /// списке лежат и группы, где пользователь всего лишь админ, а удалять может только владелец.
+    /// </summary>
+    public int OwnerUserId { get; set; }
 }
 
 /// <summary>Ссылка группы (WhatsApp/Telegram/Instagram/Site) — хранится JSON-массивом в <see cref="Swimm.Domain.Entities.HubGroup.Links"/>.</summary>

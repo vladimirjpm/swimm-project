@@ -122,22 +122,34 @@ public partial class HubGroupCrudCore
 
     public async Task<HubGroupSaveResult> SaveAsync(HubGroup group)
     {
+        var error = await TrySaveChangesAsync(group);
+        if (error != null) return HubGroupSaveResult.Fail(error);
+        await _cache.InvalidateAllAsync();
+        return HubGroupSaveResult.Ok(group.Id);
+    }
+
+    /// <summary>
+    /// SaveChanges с разбором ошибок записи, БЕЗ сброса кэша: null — сохранено, иначе текст
+    /// ошибки. Для записи внутри транзакции — кэш сбрасывают после коммита, иначе параллельный
+    /// публичный запрос успеет закэшировать состояние до коммита.
+    /// </summary>
+    public async Task<string?> TrySaveChangesAsync(HubGroup group)
+    {
         try
         {
             await _db.SaveChangesAsync();
+            return null;
         }
         catch (DbUpdateException ex)
         {
             // 23505 = unique_violation (slug), 23503 = foreign_key_violation (владелец/клуб) —
             // ловить их одинаково как «slug занят» было бы враньём, вводящим в заблуждение.
             if (ex.InnerException is PostgresException { SqlState: "23505" })
-                return HubGroupSaveResult.Fail($"Не удалось сохранить: slug «{group.Slug}» уже занят другой группой.");
+                return $"Не удалось сохранить: slug «{group.Slug}» уже занят другой группой.";
             if (ex.InnerException is PostgresException { SqlState: "23503" })
-                return HubGroupSaveResult.Fail("Не удалось сохранить: владелец или клуб не найден.");
-            return HubGroupSaveResult.Fail("Не удалось сохранить группу.");
+                return "Не удалось сохранить: владелец или клуб не найден.";
+            return "Не удалось сохранить группу.";
         }
-        await _cache.InvalidateAllAsync();
-        return HubGroupSaveResult.Ok(group.Id);
     }
 
     public async Task<HubGroupMemberSaveResult> AddMemberAsync(int hubGroupId, int swimmerId, string role)

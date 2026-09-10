@@ -13,6 +13,13 @@ public interface IAdminRepository
     /// <summary>Принудительный выход со всех устройств (бамп SecurityStamp), аккаунт остаётся активным.</summary>
     Task<bool> ForceSignOutAsync(int userId);
 
+    /// <summary>
+    /// Персональный лимит групп (исключение из лимита по роли): null — снять, 0 — запретить
+    /// создавать. Вне 0..HubGroupCreationRules.MaxLimit — ArgumentOutOfRangeException.
+    /// false — пользователь не найден. Сессии не трогает: лимит читается из БД при каждой проверке.
+    /// </summary>
+    Task<bool> SetHubGroupLimitAsync(int userId, int? limit);
+
     /// <summary>Сводка по логинам (онлайн сейчас, логины 7/30д, фейлы 7д) для панели Admin/Users.</summary>
     Task<LoginStatsDto> GetLoginStatsAsync();
 

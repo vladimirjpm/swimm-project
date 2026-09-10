@@ -693,23 +693,47 @@ export default function MyGroupsPanel() {
   const mine = useMyHubGroups(identity.isAuthenticated);
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
 
   if (identity.loading || !identity.isAuthenticated) return null;
+
+  const eligibility = mine.eligibility;
+  // Удалять может только владелец (или site-админ): в списке лежат и группы, где ты админ.
+  const canDelete = (g: MyHubGroupRow) => identity.isAdmin || g.ownerUserId === identity.userId;
+
+  const removeGroup = async (g: MyHubGroupRow) => {
+    if (!window.confirm(`Delete the group “${g.name}”? Its trainings, gallery and member list will be deleted too. This cannot be undone.`)) return;
+    setListError(null);
+    const result = await mine.deleteGroup(g.id);
+    if (!result.success) setListError(result.error ?? 'Could not delete the group');
+  };
 
   return (
     <section className="px-4 pt-[26px] lg:px-16" aria-label="My groups">
       <div className={cardCls}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-[15px] font-black uppercase tracking-[0.2em] text-[var(--t-accent)]">My groups</h2>
-          {!creating && mine.eligibility?.canCreate && (
-            <button type="button" className={btnCls} onClick={() => setCreating(true)}>
-              + Create group{mine.eligibility.remaining != null ? ` (${mine.eligibility.remaining} left)` : ''}
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {eligibility?.limit != null && (
+              <span className="hp-mono text-[11.5px] font-bold text-[var(--t-text-2)]"
+                title="Groups you own out of your limit (official groups count too)">
+                {eligibility.owned} / {eligibility.limit} groups
+              </span>
+            )}
+            {!creating && eligibility?.canCreate && (
+              <button type="button" className={btnCls} onClick={() => setCreating(true)}>
+                + Create group
+              </button>
+            )}
+          </div>
         </div>
 
-        {!creating && !mine.eligibility?.canCreate && mine.eligibility?.reason && mine.groups.length === 0 && (
-          <p className="text-[12.5px] text-[var(--t-text-2)]">{mine.eligibility.reason}</p>
+        {!creating && !eligibility?.canCreate && eligibility?.reason && (
+          <p className="mb-3 text-[12.5px] text-[var(--t-text-2)]">{eligibility.reason}</p>
+        )}
+
+        {listError && (
+          <p className="mb-3 text-[12.5px] font-bold text-[var(--t-danger)]" role="alert">{listError}</p>
         )}
 
         {creating && (
@@ -749,10 +773,11 @@ export default function MyGroupsPanel() {
                       onClick={() => setEditingId(editingId === g.id ? null : g.id)}>
                       {editingId === g.id ? 'Close' : 'Edit'}
                     </button>
-                    <button type="button" className={btnDangerCls}
-                      onClick={async () => { if (window.confirm(`Delete the group “${g.name}”?`)) await mine.deleteGroup(g.id); }}>
-                      Delete
-                    </button>
+                    {canDelete(g) && (
+                      <button type="button" className={btnDangerCls} onClick={() => removeGroup(g)}>
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
                 {editingId === g.id && (
