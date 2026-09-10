@@ -1,7 +1,12 @@
 import React, { useCallback, useState } from 'react';
-import { useClubOptions, useCurrentIdentity, useHubGroupMedia, useMyHubGroupEdit, useMyHubGroups } from './use-my-hub-groups';
+import {
+  useClubOptions, useCurrentIdentity, useGroupCreationPolicy, useHubGroupMedia, useMyHubGroupEdit, useMyHubGroups,
+} from './use-my-hub-groups';
 import DeleteGroupDialog from './components/delete-group-dialog';
-import type { HubGroupInput, HubGroupLinkInput, HubGroupMediaInput, MyHubGroupRow } from './my-groups-types';
+import { useLoginModal } from '../components/login-modal/login-modal-context';
+import type {
+  GroupCreationPolicy, HubGroupInput, HubGroupLinkInput, HubGroupMediaInput, MyHubGroupRow,
+} from './my-groups-types';
 import type { HubGroupMediaItem } from '../../utils/interfaces/results';
 import { routes } from '../../utils/routes';
 
@@ -688,16 +693,56 @@ function EditGroupCard({ row, currentUserId, isAdmin, onClose, onSaved }: {
   );
 }
 
-/** Панель самообслуживания групп (8.6) — на странице списка групп, только для авторизованных. */
+/**
+ * Гостю панели «My groups» нет — вместо неё подсказка, что группу можно создать, и вход.
+ * Без неё создание было не найти: кнопка живёт только в панели, а панель видят только
+ * вошедшие. Обещать можно только то, что открыто: при политике `admin` молчим, при `coach`
+ * так и пишем. Пока политика грузится — тоже молчим, чтобы текст не мигал.
+ */
+function GuestCreateHint({ policy }: { policy: GroupCreationPolicy | null }) {
+  const { openLoginModal } = useLoginModal();
+  if (policy == null || policy === 'admin') return null;
+
+  return (
+    <section className="px-4 pt-[26px] lg:px-16" aria-label="Create a group">
+      <div className={`${cardCls} flex flex-wrap items-center justify-between gap-4`}>
+        <div className="min-w-0 max-w-[640px]">
+          <h2 className="mb-1.5 text-[15px] font-black uppercase tracking-[0.2em] text-[var(--t-accent)]">
+            Create your own group
+          </h2>
+          <p className="m-0 text-[13px] text-[var(--t-text-2)]">
+            {policy === 'coach'
+              ? 'Creating groups is open to coaches right now. Sign in with your coach account to start one.'
+              : 'Coach a squad or train with friends from different clubs? Sign in to create a group and follow everyone’s swims, records and season standings in one place.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={openLoginModal}
+          className="hp-mono shrink-0 cursor-pointer rounded-[11px] bg-[var(--t-accent)] px-4 py-2 text-[13px] font-extrabold text-[var(--t-accent-ink)]"
+        >
+          Sign in to create a group
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Панель самообслуживания групп (8.6) — на странице списка групп. Вошедшим — список, лимит и
+ * создание; гостю — подсказка со входом (`GuestCreateHint`).
+ */
 export default function MyGroupsPanel() {
   const identity = useCurrentIdentity();
   const mine = useMyHubGroups(identity.isAuthenticated);
+  const guestPolicy = useGroupCreationPolicy(!identity.loading && !identity.isAuthenticated);
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deletingGroup, setDeletingGroup] = useState<MyHubGroupRow | null>(null);
   const closeDeleteDialog = useCallback(() => setDeletingGroup(null), []);
 
-  if (identity.loading || !identity.isAuthenticated) return null;
+  if (identity.loading) return null;
+  if (!identity.isAuthenticated) return <GuestCreateHint policy={guestPolicy} />;
 
   const eligibility = mine.eligibility;
   // Удалять может только владелец (или site-админ): в списке лежат и группы, где ты админ.

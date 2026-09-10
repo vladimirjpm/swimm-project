@@ -135,6 +135,9 @@ export interface HubGroupDeleteImpact {
   hasContent: boolean;
 }
 
+/** Кто может создавать группы — настройка HubGroupCreationPolicy (`/api/client-config`). */
+export type GroupCreationPolicy = 'admin' | 'coach' | 'any';
+
 export interface CreateEligibility {
   canCreate: boolean;
   /** Причина отказа, уже по-английски (текст считает сервер). */

@@ -1291,6 +1291,10 @@ app.Map("/error", (HttpContext ctx) =>
 // recordAgeAxis: по какой оси сверять заплывы со справочником рекордов (calendar/season,
 // docs/data-integrity.md §13). Клиенту она нужна затем же, зачем серверу: бейдж рекорда в
 // строке результата обязан совпадать с карточкой «New records», а её считает сервер.
+//
+// hubGroupCreationPolicy (admin/coach/any): кто может создавать группы. Нужна ГОСТЮ на
+// /groups — подсказка «войдите и создайте группу» не должна обещать невозможного, когда
+// создание закрыто. Вошедшему сервер и так отдаёт create-eligibility с причиной отказа.
 app.MapGet("/api/client-config",
     async (ISettingsService settings, IDebugOptionsService debug) => Results.Ok(new
     {
@@ -1298,6 +1302,7 @@ app.MapGet("/api/client-config",
         recordAgeAxis = RecordAgeAxisSetting.From(settings) == RecordAgeAxis.Season
             ? "season"
             : "calendar",
+        hubGroupCreationPolicy = settings.GetValue(HubGroupCreationRules.PolicyKey, HubGroupCreationRules.DefaultPolicy),
         // Отладочные подробности витрин: только ДЕЙСТВУЮЩИЕ (общий тумблер × галочка опции),
         // клиенту знать про два уровня незачем. См. DebugOption.
         debug = new

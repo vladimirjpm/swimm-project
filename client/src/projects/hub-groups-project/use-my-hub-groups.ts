@@ -4,6 +4,7 @@ import type {
   ClubOption,
   ClubRequest,
   CreateEligibility,
+  GroupCreationPolicy,
   HubGroupClubRequestInput,
   HubGroupDeleteImpact,
   HubGroupEditData,
@@ -113,6 +114,29 @@ export function useMyHubGroups(enabled: boolean) {
   }, [reload]);
 
   return { groups, eligibility, loading, reload, createGroup, deleteGroup };
+}
+
+/**
+ * Политика создания групп для ГОСТЯ (`hubGroupCreationPolicy` из публичного
+ * `/api/client-config`). Вошедшему она не нужна — ему сервер отдаёт create-eligibility с
+ * причиной. Гостю нужна, чтобы подсказка «войдите и создайте группу» не обещала невозможного,
+ * когда создание закрыто. Сбой запроса = дефолт `any`: подсказка покажется лишний раз, а после
+ * входа панель честно назовёт причину отказа. null — ещё не загружено.
+ */
+export function useGroupCreationPolicy(enabled: boolean): GroupCreationPolicy | null {
+  const [policy, setPolicy] = useState<GroupCreationPolicy | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    fetch('/api/client-config')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((cfg) => { if (!cancelled) setPolicy(cfg?.hubGroupCreationPolicy ?? 'any'); })
+      .catch(() => { if (!cancelled) setPolicy('any'); });
+    return () => { cancelled = true; };
+  }, [enabled]);
+
+  return policy;
 }
 
 /**
