@@ -167,7 +167,10 @@ GroupAdmin** (создатель, его нельзя снять). Бейдж `c
 Официальна только **связь группы с клубом**, не состав. `HubGroup.IsOfficial` (одна официальная
 группа на клуб — partial unique по `ClubId`; check `NOT IsOfficial OR ClubId IS NOT NULL`).
 Заявка владельца (`Sys_HubGroupClubRequests`) → одобрение site-админом одной транзакцией:
-`IsOfficial`+`ClubId`+site-роль `Coach` заявителю+bump `SecurityStamp`+email.
+`IsOfficial`+`ClubId`+site-роль `Coach` заявителю+bump `SecurityStamp`+email. После коммита
+группа **сама подписывается на свой клуб** (§4а), если подписки ещё нет — иначе только что
+одобренная официальная группа стояла бы пустой (решение 10.09.2026). Сбой подписки одобрение
+не откатывает.
 
 ---
 

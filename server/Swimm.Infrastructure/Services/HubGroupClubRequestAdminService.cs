@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
@@ -12,12 +13,22 @@ public class HubGroupClubRequestAdminService : IHubGroupClubRequestAdminService
     private readonly SwimmDbContext _db;
     private readonly ICacheService _cache;
     private readonly IEmailSender _email;
+    private readonly IHubGroupClubSubscriptionService? _clubSubscriptions;
+    private readonly ILogger<HubGroupClubRequestAdminService>? _logger;
 
-    public HubGroupClubRequestAdminService(SwimmDbContext db, ICacheService cache, IEmailSender email)
+    /// <param name="clubSubscriptions">
+    /// Автоподписка официальной группы на её клуб при одобрении. Необязательна: тестам
+    /// одобрения, которым она не нужна, конструктор не меняли; в приложении её подставляет DI.
+    /// </param>
+    public HubGroupClubRequestAdminService(SwimmDbContext db, ICacheService cache, IEmailSender email,
+        IHubGroupClubSubscriptionService? clubSubscriptions = null,
+        ILogger<HubGroupClubRequestAdminService>? logger = null)
     {
         _db = db;
         _cache = cache;
         _email = email;
+        _clubSubscriptions = clubSubscriptions;
+        _logger = logger;
     }
 
     public async Task<IReadOnlyList<HubGroupClubRequestAdminRowDto>> GetAllAsync()
@@ -109,6 +120,8 @@ public class HubGroupClubRequestAdminService : IHubGroupClubRequestAdminService
         }
         await _cache.InvalidateAllAsync();
 
+        await SubscribeOfficialGroupAsync(group.Id, request.ClubId, request.DecidedByUserId);
+
         await _email.SendAsync(request.User.Email, "Swimm — club request approved",
             $"Your group \"{group.Name}\" is now the official group of {request.Club!.Name}. " +
             "You've been granted the Coach role for managing groups.");
@@ -135,6 +148,35 @@ public class HubGroupClubRequestAdminService : IHubGroupClubRequestAdminService
             $"Your official-status request for group \"{request.HubGroup!.Name}\" was not approved.");
 
         return HubGroupMemberSaveResult.Ok();
+    }
+
+    /// <summary>
+    /// Официальная группа — «лицо клуба» и весь клуб одной страницей, поэтому при одобрении она
+    /// сама подписывается на свой клуб, если подписки у неё ещё нет (решение Влада 10.09.2026,
+    /// §6-1 плана docs/plans/hubgroup-club-subscription-plan.md). Без этого только что
+    /// одобренная группа стояла пустой: официальный статус — это связь с клубом, не состав.
+    /// Уже подписанную не трогаем — подписку выбирал владелец; отписаться он может сам.
+    ///
+    /// После коммита одобрения и best-effort: сбой подписки одобрение не откатывает, подписать
+    /// можно руками (API владельца …/club-subscription).
+    /// </summary>
+    private async Task SubscribeOfficialGroupAsync(int hubGroupId, int clubId, int? decidedByUserId)
+    {
+        if (_clubSubscriptions == null) return;
+        if (await _db.HubGroupClubSubscriptions.AnyAsync(s => s.HubGroupId == hubGroupId)) return;
+
+        try
+        {
+            var result = await _clubSubscriptions.SubscribeAsync(hubGroupId, clubId, decidedByUserId);
+            if (!result.Success)
+                _logger?.LogWarning("Официальная группа {GroupId} не подписана на клуб {ClubId}: {Error}",
+                    hubGroupId, clubId, result.Error);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Официальная группа {GroupId} не подписана на клуб {ClubId} — подписать руками",
+                hubGroupId, clubId);
+        }
     }
 
     /// <summary>
