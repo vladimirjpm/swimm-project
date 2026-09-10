@@ -110,6 +110,31 @@ export interface HubGroupAdmin {
   createdAt: string;
 }
 
+/**
+ * Что уйдёт вместе с группой (`GET /api/me/hub-groups/{id}/delete-impact`). Удаление жёсткое,
+ * всё перечисленное — каскадом.
+ */
+export interface HubGroupDeleteImpact {
+  id: number;
+  name: string;
+  nameEn?: string | null;
+  isOfficial: boolean;
+  clubName?: string | null;
+  /** Пловцы в составе — сами пловцы остаются на сайте. */
+  swimmers: number;
+  accountMembers: number;
+  admins: number;
+  trainingSessions: number;
+  trainingResults: number;
+  /** Галерея, фото тренировок, разборы. */
+  media: number;
+  /** Публикации личных медиа участников — сами медиа остаются у авторов. */
+  mediaPublications: number;
+  hasPendingClubRequest: boolean;
+  /** Есть что терять — тогда подтверждение просит ввести имя группы. */
+  hasContent: boolean;
+}
+
 export interface CreateEligibility {
   canCreate: boolean;
   /** Причина отказа, уже по-английски (текст считает сервер). */

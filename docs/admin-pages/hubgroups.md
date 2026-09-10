@@ -14,3 +14,14 @@ deep-link с дашборда): `HubGroupUserMembers.Status == "pending"`, че�
 `IDataQualityService.GetPendingJoinRequestsAsync` (топ-200 + total). Read-only —
 группа/email/дата подачи, без approve/reject (это Sys_-таблица, решения принимают
 владельцы/админы конкретной группы вне этой страницы).
+
+## Удаление (2026-09-10)
+
+И в списке, и в форме Edit подтверждение показывает **перечень потерь**: пловцы в составе,
+аккаунты, админы группы, тренировки с результатами, медиа, публикации участников,
+официальный статус, заявка — только ненулевое. Скрипт один на обе страницы —
+`_DeleteConfirm.cshtml` (`hubGroupDeleteConfirm(id)` поверх `adminConfirm`), данные — из
+`GET /api/me/hub-groups/{id}/delete-impact` (у админа сайта `CanDelete` на любую группу).
+Ивритские имена в тексте диалога изолированы символами FSI/PDI — иначе «ёлочки» вокруг них
+встают задом наперёд. Удаление пишется в аудит `hubgroup.delete` самим `DeleteAsync`.
+Правило целиком — `docs/hubgroups-architecture.md` §3.

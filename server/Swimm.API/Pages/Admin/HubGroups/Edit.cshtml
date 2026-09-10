@@ -291,7 +291,8 @@
         <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5">
             <h2 class="text-sm font-semibold text-admin-danger mb-1">Опасная зона — удаление</h2>
             <p class="text-xs text-admin-text-muted leading-relaxed mb-4">
-                Удалит группу вместе со всеми участниками (пловцы в справочнике останутся).
+                Удалит группу вместе с составом, тренировками, медиа и публикациями участников
+                (пловцы в справочнике останутся). Перед удалением покажем, что именно пропадёт.
                 <strong class="text-admin-danger">Действие необратимо.</strong>
             </p>
             <form method="post" asp-page-handler="Delete" id="hg-delete-form">
@@ -310,6 +311,7 @@
 }
 
 @section Scripts {
+    <partial name="/Pages/Admin/HubGroups/_DeleteConfirm.cshtml" />
     <script>
         // Автогенерация slug из английского названия, пока пользователь не тронул поле Slug вручную.
         (function () {
@@ -336,13 +338,7 @@
         if (hgDeleteForm) {
             hgDeleteForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const ok = await adminConfirm({
-                    title: 'Удалить группу?',
-                    message: 'Все участники группы будут удалены вместе с ней. Пловцы в справочнике останутся.',
-                    confirmText: 'Удалить',
-                    danger: true,
-                });
-                if (ok) hgDeleteForm.submit();
+                if (await hubGroupDeleteConfirm(@Model.Id)) hgDeleteForm.submit();
             });
         }
     </script>

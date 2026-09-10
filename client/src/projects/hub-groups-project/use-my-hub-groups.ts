@@ -5,6 +5,7 @@ import type {
   ClubRequest,
   CreateEligibility,
   HubGroupClubRequestInput,
+  HubGroupDeleteImpact,
   HubGroupEditData,
   HubGroupInput,
   HubGroupAdmin,
@@ -112,6 +113,31 @@ export function useMyHubGroups(enabled: boolean) {
   }, [reload]);
 
   return { groups, eligibility, loading, reload, createGroup, deleteGroup };
+}
+
+/**
+ * Перечень того, что уйдёт вместе с группой, — для подтверждения удаления. Грузится при
+ * открытии диалога, а не заранее: нужен только тому, кто уже нажал Delete.
+ */
+export function useGroupDeleteImpact(id: number) {
+  const [impact, setImpact] = useState<HubGroupDeleteImpact | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setImpact(null);
+    setError(null);
+    fetch(`/api/me/hub-groups/${id}/delete-impact`, { credentials: 'include' })
+      .then(async (r) => {
+        if (cancelled) return;
+        if (r.ok) { setImpact(await r.json()); return; }
+        setError(r.status === 403 ? 'Only the group owner can delete it.' : `Could not load the group (${r.status})`);
+      })
+      .catch(() => { if (!cancelled) setError('Could not load the group'); });
+    return () => { cancelled = true; };
+  }, [id]);
+
+  return { impact, error };
 }
 
 /** Справочник клубов — для select в форме заявки на официальный статус. */

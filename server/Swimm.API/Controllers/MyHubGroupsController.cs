@@ -110,8 +110,26 @@ public class MyHubGroupsController : ControllerBase
         if (!perms.Exists) return NotFound();
         if (!perms.CanDelete) return Forbid();
 
+        // Аудит hubgroup.delete пишет сам DeleteAsync — он общий для всех путей удаления.
         var result = await _admin.DeleteAsync(id);
         return result.Success ? NoContent() : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Что уйдёт вместе с группой — для подтверждения удаления. Права те же, что у DELETE:
+    /// перечень нужен только тому, кто может удалить. Этим же пользуются страницы
+    /// /Admin/HubGroups — у админа сайта CanDelete на любую группу.
+    /// </summary>
+    [HttpGet("{id:int}/delete-impact")]
+    public async Task<IActionResult> GetDeleteImpact(int id)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanDelete) return Forbid();
+
+        var impact = await _admin.GetDeleteImpactAsync(id);
+        return impact == null ? NotFound() : Ok(impact);
     }
 
     /// <summary>Поиск пловцов для добавления участника — та же выборка, что в админке.</summary>

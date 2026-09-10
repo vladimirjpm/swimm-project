@@ -20,6 +20,47 @@ public sealed class HubGroupAdminRowDto
     public int OwnerUserId { get; set; }
 }
 
+/// <summary>
+/// Что уйдёт вместе с группой при удалении: удаление жёсткое, всё ниже — каскадом. Показывается
+/// в подтверждении (панель «My groups», /Admin/HubGroups) и уходит в аудит `hubgroup.delete`.
+/// </summary>
+public sealed class HubGroupDeleteImpactDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public string? NameEn { get; set; }
+    public bool IsOfficial { get; set; }
+    public string? ClubName { get; set; }
+
+    /// <summary>Пловцы в составе. Сами пловцы остаются в справочнике.</summary>
+    public int Swimmers { get; set; }
+
+    /// <summary>Участники-аккаунты (active и pending).</summary>
+    public int AccountMembers { get; set; }
+
+    /// <summary>Назначенные админы группы (владелец не в счёт).</summary>
+    public int Admins { get; set; }
+
+    public int TrainingSessions { get; set; }
+    public int TrainingResults { get; set; }
+
+    /// <summary>Медиа группы (Sys_HubGroupMedia): галерея, фото тренировок, разборы.</summary>
+    public int Media { get; set; }
+
+    /// <summary>Публикации личных медиа участников в группу. Сами медиа остаются у авторов.</summary>
+    public int MediaPublications { get; set; }
+
+    public bool HasPendingClubRequest { get; set; }
+
+    /// <summary>
+    /// Есть ли что терять, кроме пустой оболочки. Пустую группу удаляют одной кнопкой, для
+    /// остальных подтверждение просит ввести имя группы.
+    /// </summary>
+    public bool HasContent =>
+        Swimmers + AccountMembers + Admins + TrainingSessions + Media + MediaPublications > 0
+        || IsOfficial || HasPendingClubRequest;
+}
+
 /// <summary>Ссылка группы (WhatsApp/Telegram/Instagram/Site) — хранится JSON-массивом в <see cref="Swimm.Domain.Entities.HubGroup.Links"/>.</summary>
 public sealed class HubGroupLinkDto
 {

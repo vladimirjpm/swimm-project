@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useClubOptions, useCurrentIdentity, useHubGroupMedia, useMyHubGroupEdit, useMyHubGroups } from './use-my-hub-groups';
+import DeleteGroupDialog from './components/delete-group-dialog';
 import type { HubGroupInput, HubGroupLinkInput, HubGroupMediaInput, MyHubGroupRow } from './my-groups-types';
 import type { HubGroupMediaItem } from '../../utils/interfaces/results';
 import { routes } from '../../utils/routes';
@@ -693,7 +694,8 @@ export default function MyGroupsPanel() {
   const mine = useMyHubGroups(identity.isAuthenticated);
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [listError, setListError] = useState<string | null>(null);
+  const [deletingGroup, setDeletingGroup] = useState<MyHubGroupRow | null>(null);
+  const closeDeleteDialog = useCallback(() => setDeletingGroup(null), []);
 
   if (identity.loading || !identity.isAuthenticated) return null;
 
@@ -701,11 +703,13 @@ export default function MyGroupsPanel() {
   // Удалять может только владелец (или site-админ): в списке лежат и группы, где ты админ.
   const canDelete = (g: MyHubGroupRow) => identity.isAdmin || g.ownerUserId === identity.userId;
 
-  const removeGroup = async (g: MyHubGroupRow) => {
-    if (!window.confirm(`Delete the group “${g.name}”? Its trainings, gallery and member list will be deleted too. This cannot be undone.`)) return;
-    setListError(null);
+  const confirmDelete = async (g: MyHubGroupRow) => {
     const result = await mine.deleteGroup(g.id);
-    if (!result.success) setListError(result.error ?? 'Could not delete the group');
+    if (result.success) {
+      setDeletingGroup(null);
+      if (editingId === g.id) setEditingId(null);
+    }
+    return result;
   };
 
   return (
@@ -732,8 +736,13 @@ export default function MyGroupsPanel() {
           <p className="mb-3 text-[12.5px] text-[var(--t-text-2)]">{eligibility.reason}</p>
         )}
 
-        {listError && (
-          <p className="mb-3 text-[12.5px] font-bold text-[var(--t-danger)]" role="alert">{listError}</p>
+        {deletingGroup && (
+          <DeleteGroupDialog
+            groupId={deletingGroup.id}
+            groupName={deletingGroup.name}
+            onConfirm={() => confirmDelete(deletingGroup)}
+            onClose={closeDeleteDialog}
+          />
         )}
 
         {creating && (
@@ -774,7 +783,7 @@ export default function MyGroupsPanel() {
                       {editingId === g.id ? 'Close' : 'Edit'}
                     </button>
                     {canDelete(g) && (
-                      <button type="button" className={btnDangerCls} onClick={() => removeGroup(g)}>
+                      <button type="button" className={btnDangerCls} onClick={() => setDeletingGroup(g)}>
                         Delete
                       </button>
                     )}
