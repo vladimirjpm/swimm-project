@@ -5,6 +5,7 @@ using Npgsql;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -160,10 +161,25 @@ public partial class HubGroupCrudCore
         var swimmerExists = await _db.Swimmers.AnyAsync(s => s.Id == swimmerId);
         if (!swimmerExists) return HubGroupMemberSaveResult.Fail($"Пловец #{swimmerId} не найден");
 
-        var dup = await _db.HubGroupMembers.AnyAsync(m => m.HubGroupId == hubGroupId && m.SwimmerId == swimmerId);
-        if (dup) return HubGroupMemberSaveResult.Fail("Этот пловец уже состоит в группе");
-
         if (!HubGroupMember.Roles.Contains(role)) role = "member";
+
+        var existing = await _db.HubGroupMembers
+            .FirstOrDefaultAsync(m => m.HubGroupId == hubGroupId && m.SwimmerId == swimmerId);
+        if (existing != null)
+        {
+            if (existing.Source == HubGroupMemberSource.Manual)
+                return HubGroupMemberSaveResult.Fail("Этот пловец уже состоит в группе");
+
+            // Клубного (в т.ч. скрытого) владелец добавил руками — строка становится ручной:
+            // ручной побеждает клубного (план §2), и ни уход из клуба, ни отписка его больше не
+            // уберут. Скрытие снимается — человека только что выбрали явно.
+            existing.Source = HubGroupMemberSource.Manual;
+            existing.IsExcluded = false;
+            existing.Role = role;
+            await _db.SaveChangesAsync();
+            await TouchGroupAsync(hubGroupId);
+            return HubGroupMemberSaveResult.Ok();
+        }
 
         var maxOrder = await _db.HubGroupMembers.Where(m => m.HubGroupId == hubGroupId)
             .Select(m => (int?)m.SortOrder).MaxAsync() ?? 0;
@@ -203,13 +219,34 @@ public partial class HubGroupCrudCore
         return HubGroupMemberSaveResult.Ok();
     }
 
+    /// <summary>
+    /// Убрать пловца из состава так, чтобы пересборка по подписке на клуб его НЕ вернула:
+    /// <list type="bullet">
+    ///   <item>клубного — не удаляем, а скрываем: удалённого следующая пересборка вставила бы снова;</item>
+    ///   <item>ручного, который ещё и в клубе подписки, — туда же, в скрытые клубные;</item>
+    ///   <item>остального ручного — удаляем, как всегда.</item>
+    /// </list>
+    /// </summary>
     public async Task<HubGroupMemberSaveResult> RemoveMemberAsync(int hubGroupId, int memberId)
     {
         var member = await _db.HubGroupMembers.FindAsync(memberId);
         if (member == null || member.HubGroupId != hubGroupId)
             return HubGroupMemberSaveResult.Fail($"Участник #{memberId} не найден");
 
-        _db.HubGroupMembers.Remove(member);
+        var hideAsClub = member.Source == HubGroupMemberSource.Club
+            || await HubGroupClubRoster.IsInSubscribedClubAsync(
+                _db, hubGroupId, member.SwimmerId, HubGroupClubRules.ActivitySince(DateTime.UtcNow));
+
+        if (hideAsClub)
+        {
+            member.Source = HubGroupMemberSource.Club;
+            member.IsExcluded = true;
+        }
+        else
+        {
+            _db.HubGroupMembers.Remove(member);
+        }
+
         await _db.SaveChangesAsync();
         await TouchGroupAsync(hubGroupId);
         return HubGroupMemberSaveResult.Ok();

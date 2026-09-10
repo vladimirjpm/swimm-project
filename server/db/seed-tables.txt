@@ -61,6 +61,7 @@ Sys_StartListPulls           # журнал заборов стартового 
 #   Локально это одна тестовая группа на 19 участников — в проде создаётся заново
 #   за минуту. Вместе с ними не едут и привязанные к пользователям:
 #   Sys_HubGroupAdmins, Sys_HubGroupUserMembers, Sys_HubGroupClubRequests, Sys_HubGroupMedia
+#   И подписки групп на клуб — HubGroupClubSubscriptions висит на HubGroups.
 #
 # Приватные тренировки групп (привязаны к HubGroups и к пользователям):
 #   Sys_TrainingSessions, Sys_TrainingResults

@@ -79,6 +79,15 @@ public sealed class HubGroupMemberRowDto
     public string? ClubName { get; set; }
     public string Role { get; set; } = "member";
     public int SortOrder { get; set; }
+
+    /// <summary>manual | club (HubGroupMemberSource) — у клубного вместо ✕ «скрыть/вернуть».</summary>
+    public string Source { get; set; } = "manual";
+
+    /// <summary>
+    /// Владелец скрыл клубного пловца. Приходит ТОЛЬКО в панель управления (там его можно
+    /// вернуть); публичные ответы скрытых не содержат вовсе.
+    /// </summary>
+    public bool IsExcluded { get; set; }
 }
 
 /// <summary>Полные данные группы для формы Admin/HubGroups/Edit.</summary>
@@ -103,9 +112,12 @@ public sealed class HubGroupEditDto
     /// <summary>open | approval — политика самозаписи (см. HubGroupJoinPolicy).</summary>
     public string JoinPolicy { get; set; } = "open";
     public List<HubGroupLinkDto> Links { get; set; } = [];
+    /// <summary>Весь состав, включая скрытых клубных (<see cref="HubGroupMemberRowDto.IsExcluded"/>).</summary>
     public List<HubGroupMemberRowDto> Members { get; set; } = [];
     /// <summary>Участники-аккаунты (приватный список, не пловцы) — только в панели управления.</summary>
     public List<HubGroupUserMemberRowDto> UserMembers { get; set; } = [];
+    /// <summary>Подписка на клуб; null — состав ведётся только руками.</summary>
+    public HubGroupClubSubscriptionDto? ClubSubscription { get; set; }
 }
 
 /// <summary>Входные данные создания/обновления группы.</summary>

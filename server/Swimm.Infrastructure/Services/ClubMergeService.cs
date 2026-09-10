@@ -20,7 +20,13 @@ namespace Swimm.Infrastructure.Services;
 /// После реального merge кэш сбрасывается целиком (club-summary и публичные выдачи
 /// денормализуют клуб).
 /// </summary>
-public class ClubMergeService(SwimmDbContext db, ICacheService cache, IClubStandingService standings)
+/// <param name="clubSync">
+/// Пересборка составов групп, подписанных на канонические клубы, после склейки. Необязательна:
+/// тестам склейки она не нужна; в приложении её подставляет DI.
+/// </param>
+public class ClubMergeService(
+    SwimmDbContext db, ICacheService cache, IClubStandingService standings,
+    IHubGroupClubSubscriptionService? clubSync = null)
     : IClubMergeService
 {
     public async Task<ClubMergeReport> MergeAsync(
@@ -145,6 +151,13 @@ public class ClubMergeService(SwimmDbContext db, ICacheService cache, IClubStand
             foreach (var r in requests) r.ClubId = canonical.Id;
             Note(res, "Sys_HubGroupClubRequests", requests.Count);
 
+            // Подписки групп на клуб: подписка на дубль следит за пустым клубом. Уникальность —
+            // по группе, не по клубу, поэтому перевесить можно всегда; состав пересоберётся
+            // после SaveChanges (канон теперь несёт и пловцов дубля).
+            var subscriptions = await db.HubGroupClubSubscriptions.Where(s => s.ClubId == duplicate.Id).ToListAsync(ct);
+            foreach (var s in subscriptions) s.ClubId = canonical.Id;
+            Note(res, "HubGroupClubSubscriptions", subscriptions.Count);
+
             // Guard 2: клуб может оказаться в избранном юзера дважды — строку дубля удаляем.
             var favs = await db.UserFavorites.Where(f => f.ClubId == duplicate.Id).ToListAsync(ct);
             var favUsersOfCanonical = await db.UserFavorites
@@ -206,6 +219,27 @@ public class ClubMergeService(SwimmDbContext db, ICacheService cache, IClubStand
 
             foreach (var id in report.Pairs.Where(p => p.Status == "merged").Select(p => p.CanonicalId).Distinct())
                 await standings.RebuildForClubAsync(id, ct);
+
+            // Группы, подписанные на канон (в т.ч. перевешенные с дубля), получают пловцов
+            // обоих. Склейка уже закоммичена — сбой пересборки её не откатывает, он только
+            // пишется в отчёт; догнать можно `dotnet run -- --hubgroup-club-sync`.
+            if (clubSync is not null)
+            {
+                var mergedPairs = report.Pairs.Where(p => p.Status == "merged").ToList();
+                try
+                {
+                    db.ChangeTracker.Clear();
+                    var sync = await clubSync.SyncClubsAsync(mergedPairs.Select(p => p.CanonicalId).Distinct().ToList());
+                    if (sync.Groups > 0)
+                        mergedPairs[0].Actions.Add(
+                            $"HubGroupClubSubscriptions: пересобрано групп {sync.Groups}, пловцов +{sync.Added} / −{sync.Removed}");
+                }
+                catch (Exception ex)
+                {
+                    mergedPairs[0].Actions.Add(
+                        $"HubGroupClubSubscriptions: пересборка не выполнена ({ex.GetType().Name}: {ex.Message}) — запустить --hubgroup-club-sync");
+                }
+            }
         }
 
         // club-summary (фаза 3.4) и прочие публичные выдачи денормализуют клуб.

@@ -23,13 +23,16 @@ public class MyHubGroupsController : ControllerBase
     private readonly IHubGroupAdminService _admin;
     private readonly IHubGroupUserService _mine;
     private readonly IHubGroupPermissionService _permissions;
+    private readonly IHubGroupClubSubscriptionService _clubSubscriptions;
 
     public MyHubGroupsController(
-        IHubGroupAdminService admin, IHubGroupUserService mine, IHubGroupPermissionService permissions)
+        IHubGroupAdminService admin, IHubGroupUserService mine, IHubGroupPermissionService permissions,
+        IHubGroupClubSubscriptionService clubSubscriptions)
     {
         _admin = admin;
         _mine = mine;
         _permissions = permissions;
+        _clubSubscriptions = clubSubscriptions;
     }
 
     private int? CurrentUserId()
@@ -181,8 +184,72 @@ public class MyHubGroupsController : ControllerBase
         if (!perms.Exists) return NotFound();
         if (!perms.CanEdit) return Forbid();
 
+        // Клубного пловца (и ручного, который есть в клубе подписки) это не удаляет, а
+        // скрывает — иначе следующая пересборка вернула бы его. См. HubGroupCrudCore.RemoveMemberAsync.
         var result = await _admin.RemoveMemberAsync(id, memberId);
         return result.Success ? NoContent() : BadRequest(new { error = result.Error });
+    }
+
+    // ── Подписка на клуб (docs/plans/hubgroup-club-subscription-plan.md П2) ──────
+
+    /// <summary>Подписка группы на клуб; 204 — группа ни на кого не подписана.</summary>
+    [HttpGet("{id:int}/club-subscription")]
+    public async Task<IActionResult> GetClubSubscription(int id)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanEdit) return Forbid();
+
+        var subscription = await _clubSubscriptions.GetAsync(id);
+        return subscription == null ? NoContent() : Ok(subscription);
+    }
+
+    /// <summary>
+    /// Подписать группу на клуб (другой клуб заменяет прежний — подписка одна) и сразу
+    /// пересобрать состав. В ответе — подписка и сколько пловцов пришло/ушло.
+    /// </summary>
+    [HttpPut("{id:int}/club-subscription")]
+    public async Task<IActionResult> SubscribeToClub(int id, [FromBody] ClubSubscriptionRequest request)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanEdit) return Forbid();
+
+        var result = await _clubSubscriptions.SubscribeAsync(id, request.ClubId, CurrentUserId());
+        return result.Success
+            ? Ok(new { subscription = result.Subscription, added = result.Sync.Added, removed = result.Sync.Removed })
+            : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>Снять подписку: клубные пловцы уходят (скрытые тоже), ручные остаются.</summary>
+    [HttpDelete("{id:int}/club-subscription")]
+    public async Task<IActionResult> UnsubscribeFromClub(int id)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanEdit) return Forbid();
+
+        var result = await _clubSubscriptions.UnsubscribeAsync(id);
+        return result == null ? NotFound(new { error = "The group does not follow a club." }) : Ok(new { removed = result.Removed });
+    }
+
+    /// <summary>
+    /// Скрыть / вернуть клубного пловца (владелец/админ группы). Скрытый не возвращается
+    /// пересборкой и не виден ни на одной витрине; ручного так не прячут — его удаляют.
+    /// </summary>
+    [HttpPut("{id:int}/members/{memberId:int}/excluded")]
+    public async Task<IActionResult> SetMemberExcluded(int id, int memberId, [FromBody] SetMemberExcludedRequest request)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanEdit) return Forbid();
+
+        var result = await _clubSubscriptions.SetExcludedAsync(id, memberId, request.Excluded);
+        return result.Success ? Ok() : BadRequest(new { error = result.Error });
     }
 
     [HttpGet("{id:int}/admins")]
@@ -375,6 +442,16 @@ public sealed class UpdateMemberRequest
 {
     public string Role { get; set; } = "member";
     public int SortOrder { get; set; }
+}
+
+public sealed class ClubSubscriptionRequest
+{
+    public int ClubId { get; set; }
+}
+
+public sealed class SetMemberExcludedRequest
+{
+    public bool Excluded { get; set; }
 }
 
 public sealed class AddAdminRequest

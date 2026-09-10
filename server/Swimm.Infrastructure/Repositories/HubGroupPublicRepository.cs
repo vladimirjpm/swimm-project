@@ -58,7 +58,9 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                 Country = g.Country != null ? g.Country.CountryCode : null,
                 ClubName = g.Club != null ? g.Club.Name : null,
                 IsOfficial = g.IsOfficial,
-                MemberCount = g.Members.Count
+                // Скрытых владельцем клубных пловцов (IsExcluded) не видит НИ ОДИН читатель
+                // состава — ни счётчик, ни страница, ни ростер соревнований.
+                MemberCount = g.Members.Count(m => !m.IsExcluded)
             })
             .ToListAsync();
     }
@@ -76,7 +78,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
         if (visibility == "perGroup" && !group.IsPublic) return null;
 
         var members = await _read.HubGroupMembers.AsNoTracking()
-            .Where(m => m.HubGroupId == group.Id)
+            .Where(m => m.HubGroupId == group.Id && !m.IsExcluded)
             .OrderBy(m => m.SortOrder)
             .Select(m => new HubGroupPublicMemberDto
             {
@@ -201,7 +203,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
         if (visibility == "perGroup" && !group.IsPublic) return null;
 
         return await _read.HubGroupMembers.AsNoTracking()
-            .Where(m => m.HubGroupId == group.Id)
+            .Where(m => m.HubGroupId == group.Id && !m.IsExcluded)
             .Select(m => m.SwimmerId)
             .ToListAsync();
     }

@@ -300,6 +300,20 @@ if (args.Contains("--rebuild-club-standings"))
     return;
 }
 
+// Пересобрать составы ВСЕХ групп, подписанных на клуб (docs/plans/hubgroup-club-subscription-plan.md П2):
+//   dotnet run -- --hubgroup-club-sync
+// Штатно состав пересобирается сам — при подписке, после импорта (по клубам импорта) и после
+// склейки клубов. Этот прогон — догнать, если пересборка после импорта упала, и раз в сезон:
+// окно «пловцы клуба» (текущий + прошлый сезон) сдвигается 1 сентября без всякого импорта.
+if (args.Contains("--hubgroup-club-sync"))
+{
+    using var scope = app.Services.CreateScope();
+    var svc = scope.ServiceProvider.GetRequiredService<IHubGroupClubSubscriptionService>();
+    var sync = await svc.SyncAllAsync();
+    Console.WriteLine($"Группы с подпиской на клуб: пересобрано {sync.Groups}, пловцов добавлено {sync.Added}, убрано {sync.Removed}");
+    return;
+}
+
 // Проставить «есть ли ОФИЦИАЛЬНЫЙ клубный зачёт (דירוג מועדונים)» уже импортированным:
 //   dotnet run -- --probe-club-standings [--force]
 // Затягивание новых соревнований проставляет флаг само; этот прогон — для тех, кто попал в

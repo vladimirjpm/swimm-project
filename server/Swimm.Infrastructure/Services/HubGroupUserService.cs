@@ -41,7 +41,7 @@ public class HubGroupUserService : IHubGroupUserService
                 Slug = g.Slug,
                 IconUrl = g.IconUrl,
                 ClubName = g.Club != null ? g.Club.Name : null,
-                MemberCount = g.Members.Count,
+                MemberCount = g.Members.Count(m => !m.IsExcluded),
                 IsPublic = g.IsPublic,
                 IsOfficial = g.IsOfficial,
                 UpdatedAt = g.UpdatedAt,

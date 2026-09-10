@@ -66,8 +66,9 @@ public class UserMediaPublicationService : IUserMediaPublicationService
 
             // Правило подачи 1: пловец из медиа — в ростере группы. Иначе член «Дельфин мастерс»
             // мог бы подать туда видео ребёнка, который там не плавает.
+            // Скрытый владельцем клубный пловец в ростер не входит (IsExcluded).
             var swimmerInRoster = await _db.HubGroupMembers.AsNoTracking()
-                .AnyAsync(m => m.HubGroupId == group.Id && m.SwimmerId == media.SwimmerId);
+                .AnyAsync(m => m.HubGroupId == group.Id && m.SwimmerId == media.SwimmerId && !m.IsExcluded);
             if (!swimmerInRoster)
                 return (false, "swimmer is not in this group's roster", null);
 
@@ -194,7 +195,7 @@ public class UserMediaPublicationService : IUserMediaPublicationService
         // пускал — админ сайта не получал ни одной цели, хотя подача от него прошла бы и сразу
         // стала approved (диагноз в docs/media-page.md §9).
         var groups = await _db.HubGroups.AsNoTracking()
-            .Where(g => _db.HubGroupMembers.Any(m => m.HubGroupId == g.Id && m.SwimmerId == media.SwimmerId)
+            .Where(g => _db.HubGroupMembers.Any(m => m.HubGroupId == g.Id && m.SwimmerId == media.SwimmerId && !m.IsExcluded)
                         && (isSiteAdmin
                             || g.OwnerUserId == ownerUserId
                             || _db.HubGroupAdmins.Any(a => a.HubGroupId == g.Id && a.UserId == ownerUserId)
@@ -308,7 +309,7 @@ public class UserMediaPublicationService : IUserMediaPublicationService
             : competitionId != null
                 ? mediaInScope.Where(m => m.CompetitionId == competitionId)
                 : mediaInScope.Where(m => m.ResultId != null && _db.HubGroupMembers.Any(gm =>
-                    gm.SwimmerId == m.SwimmerId && gm.HubGroup!.Slug == groupSlug));
+                    gm.SwimmerId == m.SwimmerId && gm.HubGroup!.Slug == groupSlug && !gm.IsExcluded));
 
         // 1. Своё медиа — видно владельцу целиком (private в том числе).
         var mine = userId == null
@@ -332,7 +333,7 @@ public class UserMediaPublicationService : IUserMediaPublicationService
                             : competitionId != null
                                 ? p.Media!.CompetitionId == competitionId
                                 : p.Media!.ResultId != null && _db.HubGroupMembers.Any(gm =>
-                                    gm.SwimmerId == p.Media.SwimmerId && gm.HubGroup!.Slug == groupSlug))
+                                    gm.SwimmerId == p.Media.SwimmerId && gm.HubGroup!.Slug == groupSlug && !gm.IsExcluded))
                         && (p.Level == UserMediaPublicationLevel.Public
                             || (userId != null && _db.HubGroupUserMembers.Any(um =>
                                 um.HubGroupId == p.HubGroupId && um.UserId == userId

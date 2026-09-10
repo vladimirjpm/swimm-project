@@ -12,8 +12,17 @@
         <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">← К списку</a>
         @if (!Model.IsNew && Model.Existing != null)
         {
+            var hiddenCount = Model.Existing.Members.Count(m => m.IsExcluded);
             <span class="text-xs text-admin-text-muted">
-                Участников: <strong class="text-admin-text">@Model.Existing.Members.Count</strong>
+                Участников: <strong class="text-admin-text">@(Model.Existing.Members.Count - hiddenCount)</strong>
+                @if (hiddenCount > 0)
+                {
+                    <text> · скрыто владельцем: @hiddenCount</text>
+                }
+                @if (Model.Existing.ClubSubscription != null)
+                {
+                    <text> · подписка на клуб «@Model.Existing.ClubSubscription.ClubName»</text>
+                }
             </span>
         }
     </div>
@@ -182,6 +191,14 @@
                                     {
                                         <div class="text-[11px] text-admin-text-muted">@m.SwimmerNameEn</div>
                                     }
+                                    @* Клубный — пришёл из подписки на клуб; скрытый не виден ни на одной витрине,
+                                       пересборка его не возвращает. Вернуть — добавить руками (станет ручным). *@
+                                    @if (m.Source == "club")
+                                    {
+                                        <div class="text-[11px] text-admin-text-muted italic">
+                                            из подписки на клуб@(m.IsExcluded ? " · скрыт владельцем" : "")
+                                        </div>
+                                    }
                                 </td>
                                 <td>@(m.BirthYear > 0 ? m.BirthYear.ToString() : "—")</td>
                                 <td>@(m.ClubName ?? "—")</td>
@@ -200,11 +217,15 @@
                                 </td>
                                 <td class="text-right">@m.SortOrder</td>
                                 <td class="text-right">
-                                    <form method="post" asp-page-handler="RemoveMember" class="inline">
-                                        <input type="hidden" asp-for="Id" />
-                                        <input type="hidden" name="memberId" value="@m.Id" />
-                                        <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
-                                    </form>
+                                    @* У клубного «удалить» = скрыть: удалённого вставила бы следующая пересборка. *@
+                                    @if (!m.IsExcluded)
+                                    {
+                                        <form method="post" asp-page-handler="RemoveMember" class="inline">
+                                            <input type="hidden" asp-for="Id" />
+                                            <input type="hidden" name="memberId" value="@m.Id" />
+                                            <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">@(m.Source == "club" ? "Скрыть" : "Удалить")</button>
+                                        </form>
+                                    }
                                 </td>
                             </tr>
                         }

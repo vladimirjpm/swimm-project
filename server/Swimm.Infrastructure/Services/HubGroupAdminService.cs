@@ -37,7 +37,8 @@ public class HubGroupAdminService : IHubGroupAdminService
                 Slug = g.Slug,
                 IconUrl = g.IconUrl,
                 ClubName = g.Club != null ? g.Club.Name : null,
-                MemberCount = g.Members.Count,
+                // Видимый состав: скрытые клубные пловцы — служебные строки пересборки.
+                MemberCount = g.Members.Count(m => !m.IsExcluded),
                 IsPublic = g.IsPublic,
                 IsOfficial = g.IsOfficial,
                 UpdatedAt = g.UpdatedAt,
@@ -67,9 +68,17 @@ public class HubGroupAdminService : IHubGroupAdminService
                 BirthYear = m.Swimmer.BirthYear,
                 ClubName = m.Swimmer.Club != null ? m.Swimmer.Club.Name : null,
                 Role = m.Role,
-                SortOrder = m.SortOrder
+                SortOrder = m.SortOrder,
+                // Панель управления получает и скрытых — там их возвращают.
+                Source = m.Source,
+                IsExcluded = m.IsExcluded
             })
             .ToListAsync();
+
+        var clubSubscription = await _db.HubGroupClubSubscriptions.AsNoTracking()
+            .Where(s => s.HubGroupId == id)
+            .Select(HubGroupClubSubscriptionService.ToDto)
+            .FirstOrDefaultAsync();
 
         var userMembers = await _db.HubGroupUserMembers.AsNoTracking()
             .Where(m => m.HubGroupId == id)
@@ -109,7 +118,8 @@ public class HubGroupAdminService : IHubGroupAdminService
             JoinPolicy = g.JoinPolicy,
             Links = HubGroupCrudCore.ParseLinks(g.Links),
             Members = members,
-            UserMembers = userMembers
+            UserMembers = userMembers,
+            ClubSubscription = clubSubscription
         };
     }
 
@@ -182,7 +192,7 @@ public class HubGroupAdminService : IHubGroupAdminService
                 NameEn = g.NameEn,
                 IsOfficial = g.IsOfficial,
                 ClubName = g.Club != null ? g.Club.Name : null,
-                Swimmers = g.Members.Count,
+                Swimmers = g.Members.Count(m => !m.IsExcluded),
                 AccountMembers = g.UserMembers.Count,
                 Admins = g.Admins.Count,
                 TrainingSessions = _db.TrainingSessions.Count(s => s.HubGroupId == g.Id),

@@ -24,6 +24,7 @@ public class JsonImportService : IImportService
     private readonly ICacheService _cache;
     private readonly IDataCheckRunner? _checks;
     private readonly IStartListStitchService? _stitch;
+    private readonly IHubGroupClubSubscriptionService? _clubSync;
 
     private static readonly string[] ClearableTables =
         ["Results", "GalleryItems", "Galleries", "Relays", "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "CompetitionEvents", "Countries"];
@@ -38,16 +39,22 @@ public class JsonImportService : IImportService
     /// приходилось догадываться открыть /Admin/Health. Необязателен по той же причине, что и
     /// <paramref name="recalc"/> — тестам импорта он не нужен.
     /// </param>
+    /// <param name="clubSync">
+    /// Пересборка составов групп, подписанных на клубы этого импорта. Необязательна по той же
+    /// причине, что и <paramref name="recalc"/>.
+    /// </param>
     public JsonImportService(SwimmDbContext db, ICacheService cache,
         ICompetitionRecalculationService? recalc = null,
         IDataCheckRunner? checks = null,
-        IStartListStitchService? stitch = null)
+        IStartListStitchService? stitch = null,
+        IHubGroupClubSubscriptionService? clubSync = null)
     {
         _db    = db;
         _cache = cache;
         _recalc = recalc;
         _checks = checks;
         _stitch = stitch;
+        _clubSync = clubSync;
     }
 
     public string[] GetClearableTables() => ClearableTables;
@@ -1131,6 +1138,36 @@ public class JsonImportService : IImportService
             {
                 diagnosticLog.Add(
                     $"Сшивка стартового протокола не выполнена ({ex.GetType().Name}: {ex.Message}). Импорт сохранён.");
+            }
+        }
+
+        // Пересборка составов групп, подписанных на клубы этого импорта (docs/plans/
+        // hubgroup-club-subscription-plan.md П2): пловец, впервые выступивший за клуб, попадает в
+        // состав, выпавший из окна активности — уходит. Только клубы этого импорта: чужие составы
+        // от него не меняются. Как и соседи — после коммита и в try/catch.
+        if (_clubSync is not null && touchedCompetitionKeys.Count > 0)
+        {
+            try
+            {
+                _db.ChangeTracker.Clear();
+                var touchedIds = touchedCompetitionKeys
+                    .Select(k => competitionCache[k].Id).Distinct().ToList();
+                var clubIds = await _db.Results.AsNoTracking()
+                    .Where(r => touchedIds.Contains(r.CompetitionId))
+                    .Select(r => r.ClubId)
+                    .Distinct()
+                    .ToListAsync();
+
+                var sync = await _clubSync.SyncClubsAsync(clubIds);
+                if (sync.Groups > 0)
+                    diagnosticLog.Add(
+                        $"Группы с подпиской на клуб: пересобрано {sync.Groups}, пловцов добавлено {sync.Added}, убрано {sync.Removed}");
+            }
+            catch (Exception ex)
+            {
+                diagnosticLog.Add(
+                    $"Пересборка групп по подписке на клуб не выполнена ({ex.GetType().Name}: {ex.Message}). " +
+                    "Импорт сохранён; догнать — `dotnet run -- --hubgroup-club-sync`.");
             }
         }
 
