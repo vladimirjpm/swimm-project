@@ -26,8 +26,29 @@ public class AdminSettingsServiceTests
         // тумблер отладочных подробностей) — оба 2026-08-22
         // + LogligStampOnImport (штамповка loglig-id пловцам после импорта, 2026-08-23)
         // + StartListEnabled/StartListDaysAhead (автозабор стартового протокола, С10)
-        // + HubGroupMaxPerCoach (лимит групп для роли Coach, 2026-09-10).
-        Assert.Equal(17, all.Count);
+        // + HubGroupMaxPerCoach (лимит групп для роли Coach, 2026-09-10)
+        // + FavoritesMaxSwimmers/FavoritesMaxClubs (лимиты избранного, 2026-09-10).
+        Assert.Equal(19, all.Count);
+    }
+
+    [Fact]
+    public void FavoritesLimits_Default30And3_Range1To200()
+    {
+        var svc = Build();
+
+        Assert.Equal("30", svc.Get("FavoritesMaxSwimmers")!.Value);
+        Assert.Equal("3", svc.Get("FavoritesMaxClubs")!.Value);
+
+        foreach (var key in new[] { "FavoritesMaxSwimmers", "FavoritesMaxClubs" })
+        {
+            // Ноль — это не лимит, а «избранное выключено», другая фича; 201 — опечатка.
+            Assert.False(svc.Update(key, "0"));
+            Assert.False(svc.Update(key, "201"));
+            Assert.False(svc.Update(key, "many"));
+            Assert.True(svc.Update(key, "1"));
+            Assert.True(svc.Update(key, "200"));
+            Assert.Equal("200", svc.Get(key)!.Value);
+        }
     }
 
     [Fact]

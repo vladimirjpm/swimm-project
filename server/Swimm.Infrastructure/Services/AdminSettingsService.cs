@@ -51,6 +51,14 @@ public class AdminSettingsService : ISettingsService
             new("HubGroupMaxPerCoach", "3", "int", "livesite",
                 "Сколько групп может ВЛАДЕТЬ пользователь с ролью Coach. Персональный лимит в " +
                 "/Admin/Users важнее; на админа не действует"),
+            // Лимиты избранного (решение 10.09.2026): сердечко должно что-то выделять, а список
+            // «весь клуб» — это группа. Правило и тексты — FavoritesRules.
+            new(FavoritesRules.MaxSwimmersKey, FavoritesRules.DefaultMaxSwimmers.ToString(), "int", "livesite",
+                "Сколько ПЛОВЦОВ можно держать в избранном (звезда «это я» тоже в счёт), 1..200. " +
+                "Кто уже выше лимита, ничего не теряет — только не может добавить"),
+            new(FavoritesRules.MaxClubsKey, FavoritesRules.DefaultMaxClubs.ToString(), "int", "livesite",
+                "Сколько КЛУБОВ можно держать в избранном, 1..200. Избранный клуб в пловцов не " +
+                "разворачивается и в лимит пловцов не идёт"),
             new("HubGroupVisibility", "public", "string", "livesite",
                 "Видимость групп: public — все видны всем; private — все скрыты; " +
                 "perGroup — решает флаг IsPublic у конкретной группы"),
@@ -125,6 +133,9 @@ public class AdminSettingsService : ISettingsService
             return false;
         if (key is "HubGroupMaxPerUser" or "HubGroupMaxPerCoach"
             && int.Parse(newValue) is < 0 or > HubGroupCreationRules.MaxLimit)
+            return false;
+        if (key is FavoritesRules.MaxSwimmersKey or FavoritesRules.MaxClubsKey
+            && !FavoritesRules.IsValidLimit(int.Parse(newValue)))
             return false;
 
         _settings[key] = existing with { Value = newValue };

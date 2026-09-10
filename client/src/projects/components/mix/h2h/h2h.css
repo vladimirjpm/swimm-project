@@ -127,6 +127,8 @@
 .h2h-mini--left .h2h-mini__fav { left: 10px; }
 .h2h-mini--right .h2h-mini__fav { right: 10px; }
 .h2h-mini__fav--on { color: var(--deep-danger); text-shadow: 0 0 8px var(--deep-danger-soft); }
+/* Лимит избранного выбран: сердечко погашено, причина — в title. */
+.h2h-mini__fav[aria-disabled='true'] { opacity: 0.4; cursor: not-allowed; }
 /* «Сменить пловца» — во ВНУТРЕННЕМ углу (со стороны центра), чтобы не спорить с сердечком
    во внешнем. Появляется только у сменяемой стороны: в табе её нет вовсе. */
 /* Размер — це́ль клика, а не украшение: символ ✕ 12px без подложки давал зону ~10×12,

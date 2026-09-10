@@ -42,6 +42,8 @@ export interface ResultsTableRowProps {
   /** Колбэк для переключения избранного/primary */
   onToggleFavorite?: (swimmerId: number) => void;
   onTogglePrimary?: (swimmerId: number) => void;
+  /** Лимит избранного выбран: пустое сердечко погашено, это подсказка к нему (см. `UI_FavoriteControls`). */
+  favoriteBlockedHint?: string | null;
   /** Мобильный вид: развёрнута ли нижняя строка (level/pts/date) */
   isExpanded?: boolean;
   /** Мобильный вид: переключить развёрнутость нижней строки */

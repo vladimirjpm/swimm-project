@@ -49,7 +49,10 @@ function ResultsTable() {
     primarySwimmerId,
     toggleFavoriteSwimmer,
     togglePrimarySwimmer,
+    fullHint,
   } = useFavoritesContext();
+  // Лимит избранного выбран — пустые сердечки в строках погашены с этой подсказкой.
+  const swimmerFullHint = fullHint('swimmer');
   const { openLoginModal } = useLoginModal();
 
   // Медиа заплывов, видимое зрителю (своё + одобренные публикации) — иконки видео на строках.
@@ -588,6 +591,7 @@ function ResultsTable() {
                     onTogglePrimary: isFav && swimmerId != null && !res.is_relay
                       ? () => togglePrimarySwimmer(swimmerId)
                       : undefined,
+                    favoriteBlockedHint: isFav ? null : swimmerFullHint,
                   }
                 : {
                     isFavorite: false,

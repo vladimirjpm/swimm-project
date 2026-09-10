@@ -8,6 +8,12 @@ interface UI_FavoriteControlsProps {
   onTogglePrimary?: (swimmerId: number) => void;
   /** Показывать звезду "это я" (в таблице — только сердечко; звезда живёт в попапе). */
   showPrimary?: boolean;
+  /**
+   * Лимит избранного выбран: пустое сердечко погашено, текст — подсказка в title
+   * (`useFavorites().fullHint('swimmer')`). Горящее сердечко не гаснет никогда — убрать
+   * из избранного можно всегда.
+   */
+  addBlockedHint?: string | null;
   className?: string;
 }
 
@@ -23,11 +29,13 @@ const UI_FavoriteControls: React.FC<UI_FavoriteControlsProps> = ({
   onToggleFavorite,
   onTogglePrimary,
   showPrimary = true,
+  addBlockedHint = null,
   className = '',
 }) => {
   if (!onToggleFavorite || swimmerId == null) return null;
 
   const stop = (e: React.MouseEvent) => e.stopPropagation();
+  const blocked = !isFavorite && addBlockedHint != null;
 
   // "Звезда отменяет сердечко": у primary (me) вместо сердечка — золотая звезда
   if (isPrimaryFavorite) {
@@ -49,11 +57,14 @@ const UI_FavoriteControls: React.FC<UI_FavoriteControlsProps> = ({
 
   return (
     <div className={`flex flex-col items-center gap-1 shrink-0 ${className}`}>
+      {/* На пределе — `aria-disabled`, а не `disabled`: у выключенной кнопки title не всплывает,
+          а клик всё равно гасим сами (stop — чтобы строка под сердечком не раскрылась). */}
       <button
         type="button"
-        title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-        onClick={(e) => { stop(e); onToggleFavorite(swimmerId); }}
-        className="leading-none hover:scale-110 transition-transform"
+        title={blocked ? addBlockedHint! : isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+        aria-disabled={blocked || undefined}
+        onClick={(e) => { stop(e); if (!blocked) onToggleFavorite(swimmerId); }}
+        className={blocked ? 'leading-none opacity-40 cursor-not-allowed' : 'leading-none hover:scale-110 transition-transform'}
       >
         <svg width="17" height="17" viewBox="0 0 24 24" fill={isFavorite ? '#e23b5a' : 'none'} stroke={isFavorite ? '#e23b5a' : '#c2c8d2'} strokeWidth="2">
           <path d="M12 21s-7.5-4.6-10-9.3C.4 8.3 2 5 5.2 5c2 0 3.3 1.1 4.1 2.3C10.1 6.1 11.4 5 13.4 5 16.6 5 18.2 8.3 16.6 11.7 14.1 16.4 12 21 12 21z" />

@@ -821,7 +821,7 @@ export function H2HPanel({
   season: number | null;
   state: PanelLoad;
 }) {
-  const { isAuthenticated, favorites, favoriteSwimmerIds, toggleFavoriteSwimmer } =
+  const { isAuthenticated, favorites, favoriteSwimmerIds, toggleFavoriteSwimmer, fullHint } =
     useFavoritesContext();
   // Пустой слот — кнопка «выбрать»: попапа у него нет (выбор и так стоит под ним), поэтому
   // клик просто уводит курсор в поиск. Иначе слот выглядел бы нажимаемым и не делал ничего.
@@ -859,6 +859,8 @@ export function H2HPanel({
   const favProps = (id: number) => ({
     isFavorite: isAuthenticated ? favoriteSwimmerIds.has(id) : null,
     onToggleFavorite: () => toggleFavoriteSwimmer(id),
+    // Лимит избранного выбран — у ещё-не-избранного сердечко погашено с подсказкой.
+    favoriteBlockedHint: favoriteSwimmerIds.has(id) ? null : fullHint('swimmer'),
   });
 
   // Левый слот — хозяин страницы: имя берём из compare, когда оно уже приехало (там же клуб

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 
 namespace Swimm.API.Controllers;
 
@@ -49,11 +50,20 @@ public class FavoritesController : ControllerBase
         if (request.TargetType == "club" && request.ClubId == null)
             return BadRequest(new { error = "club_id is required for target_type 'club'" });
 
-        var fav = await _favorites.AddAsync(userId.Value, request);
-        if (fav == null)
-            return Conflict(new { error = "Already in favorites" });
-
-        return CreatedAtAction(nameof(GetFavorites), fav);
+        var result = await _favorites.AddAsync(userId.Value, request);
+        return result.Status switch
+        {
+            AddFavoriteStatus.Added => CreatedAtAction(nameof(GetFavorites), result.Favorite),
+            // 422, а не 409: запрос верный, но выполнить его нельзя, пока не освободится место.
+            // Клиент по `code` узнаёт лимит и гасит сердечко с подсказкой из `error`.
+            AddFavoriteStatus.LimitReached => UnprocessableEntity(new
+            {
+                error = result.Message,
+                code = FavoritesRules.LimitErrorCode,
+                limit = result.Limit
+            }),
+            _ => Conflict(new { error = "Already in favorites" }),
+        };
     }
 
     [HttpDelete("{id:int}")]

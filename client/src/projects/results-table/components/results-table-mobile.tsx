@@ -40,6 +40,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
   isFavorite,
   onToggleFavorite,
   onTogglePrimary,
+  favoriteBlockedHint,
   isExpanded,
   onToggleExpand,
   onAddVideo,
@@ -89,6 +90,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
             isFavorite={isFavorite}
             isPrimaryFavorite={isPrimaryFavorite}
             onToggleFavorite={onToggleFavorite}
+            addBlockedHint={favoriteBlockedHint}
             showPrimary={false}
           />
           {onAddVideo && (

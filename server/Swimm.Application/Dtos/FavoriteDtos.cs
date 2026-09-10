@@ -44,6 +44,32 @@ public class AddFavoriteRequest
     public int? ClubId { get; set; }
 }
 
+public enum AddFavoriteStatus
+{
+    Added,
+    /// <summary>Уже в избранном (409, как было до лимита).</summary>
+    Duplicate,
+    /// <summary>Лимит типа выбран (422 с кодом <c>FavoritesRules.LimitErrorCode</c>).</summary>
+    LimitReached,
+}
+
+/// <summary>
+/// Исход добавления в избранное. Раньше «не добавилось» было одним null и значило только
+/// «дубль»; с лимитом у отказа две причины, и клиенту нужно их различать: на дубль молчат, на
+/// лимит гасят сердечко с подсказкой.
+/// </summary>
+public sealed record AddFavoriteResult(
+    AddFavoriteStatus Status,
+    FavoriteDto? Favorite = null,
+    int? Limit = null,
+    string? Message = null)
+{
+    public static AddFavoriteResult Added(FavoriteDto favorite) => new(AddFavoriteStatus.Added, favorite);
+    public static AddFavoriteResult Duplicate() => new(AddFavoriteStatus.Duplicate);
+    public static AddFavoriteResult LimitReached(int limit, string message) =>
+        new(AddFavoriteStatus.LimitReached, Limit: limit, Message: message);
+}
+
 public class ReorderItem
 {
     [JsonPropertyName("id")]

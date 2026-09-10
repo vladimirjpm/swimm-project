@@ -78,7 +78,7 @@ function H2HProject() {
   const themeClass = mode === 'dark' ? 'theme-deep' : 'theme-deep-light';
 
   const {
-    isAuthenticated, favorites, primarySwimmerId, favoriteSwimmerIds, toggleFavoriteSwimmer,
+    isAuthenticated, favorites, primarySwimmerId, favoriteSwimmerIds, toggleFavoriteSwimmer, fullHint,
   } = useFavoritesContext();
 
   // Адрес читается ОДИН раз: дальше состояние ведёт страница, а в query пишется обратно.
@@ -215,6 +215,8 @@ function H2HProject() {
   const favProps = (id: number) => ({
     isFavorite: isAuthenticated ? favoriteSwimmerIds.has(id) : null,
     onToggleFavorite: () => toggleFavoriteSwimmer(id),
+    // Лимит избранного выбран — у ещё-не-избранного сердечко погашено с подсказкой.
+    favoriteBlockedHint: favoriteSwimmerIds.has(id) ? null : fullHint('swimmer'),
   });
 
   const slotOf = (side: ActiveSide, profile: SwimmerProfile | null, id: number | null): H2HSlot => {

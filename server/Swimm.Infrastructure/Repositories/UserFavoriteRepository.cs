@@ -1,6 +1,8 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -9,11 +11,47 @@ namespace Swimm.Infrastructure.Repositories;
 public class UserFavoriteRepository : IUserFavoriteRepository
 {
     private readonly SwimmDbContext _db;
+    private readonly ISettingsService _settings;
 
-    public UserFavoriteRepository(SwimmDbContext db)
+    public UserFavoriteRepository(SwimmDbContext db, ISettingsService settings)
     {
         _db = db;
+        _settings = settings;
     }
+
+    /// <summary>
+    /// Первый ключ транзакционной advisory-блокировки «добавление в избранное» (второй —
+    /// userId). Произвольная константа, лишь бы не совпала с другими блокировками в БД.
+    /// </summary>
+    private const int AddLockClass = 0x46415653; // "FAVS"
+
+    /// <summary>
+    /// Проекция строки избранного в DTO — одна на чтение списка и ответ на добавление: в ней
+    /// правило имён, и двум копиям разъехаться нельзя.
+    /// </summary>
+    private static readonly Expression<Func<UserFavorite, FavoriteDto>> ToDto = f => new FavoriteDto
+    {
+        Id = f.Id,
+        TargetType = f.TargetType,
+        SwimmerId = f.SwimmerId,
+        // Имя пловца — ИВРИТСКОЕ по умолчанию (правило Влада от 28.08.2026):
+        // имена показываются так, как напечатаны в протоколе федерации. Английское —
+        // фоллбек, когда ивритского нет. Правило «UI только English» этому не
+        // противоречит: оно про строки интерфейса, а имя человека — данные.
+        SwimmerName = f.Swimmer == null
+            ? null
+            : (f.Swimmer.LastName.Length > 0 || f.Swimmer.FirstName.Length > 0)
+                ? (f.Swimmer.LastName + " " + f.Swimmer.FirstName).Trim()
+                : (f.Swimmer.LastNameEn + " " + f.Swimmer.FirstNameEn).Trim(),
+        ClubId = f.ClubId,
+        // Клуб — по тому же правилу, что имя: иврит по умолчанию, EN фоллбеком.
+        ClubName = f.Club == null
+            ? null
+            : (f.Club.Name.Length > 0 ? f.Club.Name : f.Club.NameEn),
+        IsPrimary = f.IsPrimary,
+        SortOrder = f.SortOrder,
+        CreatedAt = f.CreatedAt
+    };
 
     public async Task<List<FavoriteDto>> GetForUserAsync(int userId)
     {
@@ -22,84 +60,85 @@ public class UserFavoriteRepository : IUserFavoriteRepository
             .Where(f => f.UserId == userId)
             .OrderBy(f => f.SortOrder)
             .ThenBy(f => f.Id)
-            .Select(f => new FavoriteDto
-            {
-                Id = f.Id,
-                TargetType = f.TargetType,
-                SwimmerId = f.SwimmerId,
-                // Имя пловца — ИВРИТСКОЕ по умолчанию (правило Влада от 28.08.2026):
-                // имена показываются так, как напечатаны в протоколе федерации. Английское —
-                // фоллбек, когда ивритского нет. Правило «UI только English» этому не
-                // противоречит: оно про строки интерфейса, а имя человека — данные.
-                SwimmerName = f.Swimmer == null
-                    ? null
-                    : (f.Swimmer.LastName.Length > 0 || f.Swimmer.FirstName.Length > 0)
-                        ? (f.Swimmer.LastName + " " + f.Swimmer.FirstName).Trim()
-                        : (f.Swimmer.LastNameEn + " " + f.Swimmer.FirstNameEn).Trim(),
-                ClubId = f.ClubId,
-                // Клуб — по тому же правилу, что имя: иврит по умолчанию, EN фоллбеком.
-                ClubName = f.Club == null
-                    ? null
-                    : (f.Club.Name.Length > 0 ? f.Club.Name : f.Club.NameEn),
-                IsPrimary = f.IsPrimary,
-                SortOrder = f.SortOrder,
-                CreatedAt = f.CreatedAt
-            })
+            .Select(ToDto)
             .ToListAsync();
     }
 
-    public async Task<FavoriteDto?> AddAsync(int userId, AddFavoriteRequest request)
+    public async Task<AddFavoriteResult> AddAsync(int userId, AddFavoriteRequest request)
     {
-        var fav = new UserFavorite
+        // «Посчитать → вставить» — одна транзакция под блокировкой пользователя (как у лимита
+        // групп в HubGroupUserService): без неё две вкладки на 29-м пловце обе видят «есть
+        // место» и обе вставляют. Execution strategy обязательна: ручная транзакция при
+        // retry-стратегии иначе бросает исключение.
+        var strategy = _db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            UserId = userId,
-            TargetType = request.TargetType,
-            SwimmerId = request.SwimmerId,
-            ClubId = request.ClubId,
-            IsPrimary = false,
-            SortOrder = 0,
-            CreatedAt = DateTime.UtcNow
-        };
+            await using var tx = await _db.Database.BeginTransactionAsync();
+            await LockUserAsync(userId);
 
-        _db.UserFavorites.Add(fav);
-        try
-        {
-            await _db.SaveChangesAsync();
-        }
-        catch (DbUpdateException)
-        {
-            // Нарушение unique-constraint → дубль, возвращаем null (409 Conflict на уровне контроллера).
-            _db.Entry(fav).State = EntityState.Detached;
-            return null;
-        }
+            // Дубль — раньше лимита: «уже в избранном» остаётся 409 и на пределе, иначе
+            // повторный клик по уже горящему сердечку объявил бы, что места нет.
+            var sameTarget = request.TargetType == FavoritesRules.TargetClub
+                ? _db.UserFavorites.Where(f => f.UserId == userId
+                    && f.TargetType == FavoritesRules.TargetClub && f.ClubId == request.ClubId)
+                : _db.UserFavorites.Where(f => f.UserId == userId
+                    && f.TargetType == FavoritesRules.TargetSwimmer && f.SwimmerId == request.SwimmerId);
+            if (await sameTarget.AnyAsync())
+                return AddFavoriteResult.Duplicate();
 
-        return await _db.UserFavorites
-            .AsNoTracking()
-            .Where(f => f.Id == fav.Id)
-            .Select(f => new FavoriteDto
+            // Счёт по типу: primary («это я») — такой же пловец и идёт в счёт пловцов. Кто
+            // уже выше лимита (лимит снизили), ничего не теряет — только не добавляет.
+            var limit = FavoritesRules.LimitFor(_settings, request.TargetType);
+            var count = await _db.UserFavorites
+                .CountAsync(f => f.UserId == userId && f.TargetType == request.TargetType);
+            if (count >= limit)
+                return AddFavoriteResult.LimitReached(limit, FavoritesRules.FullHint(request.TargetType, limit));
+
+            var fav = new UserFavorite
             {
-                Id = f.Id,
-                TargetType = f.TargetType,
-                SwimmerId = f.SwimmerId,
-                // Имя пловца — ИВРИТСКОЕ по умолчанию (правило Влада от 28.08.2026):
-                // имена показываются так, как напечатаны в протоколе федерации. Английское —
-                // фоллбек, когда ивритского нет. Правило «UI только English» этому не
-                // противоречит: оно про строки интерфейса, а имя человека — данные.
-                SwimmerName = f.Swimmer == null
-                    ? null
-                    : (f.Swimmer.LastName.Length > 0 || f.Swimmer.FirstName.Length > 0)
-                        ? (f.Swimmer.LastName + " " + f.Swimmer.FirstName).Trim()
-                        : (f.Swimmer.LastNameEn + " " + f.Swimmer.FirstNameEn).Trim(),
-                ClubId = f.ClubId,
-                // Клуб — по тому же правилу, что имя: иврит по умолчанию, EN фоллбеком.
-                ClubName = f.Club == null
-                    ? null
-                    : (f.Club.Name.Length > 0 ? f.Club.Name : f.Club.NameEn),
-                IsPrimary = f.IsPrimary,
-                SortOrder = f.SortOrder,
-                CreatedAt = f.CreatedAt
-            })
-            .FirstOrDefaultAsync();
+                UserId = userId,
+                TargetType = request.TargetType,
+                SwimmerId = request.SwimmerId,
+                ClubId = request.ClubId,
+                IsPrimary = false,
+                SortOrder = 0,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _db.UserFavorites.Add(fav);
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                // Нарушение unique-constraint (гонка мимо проверки выше или несуществующий
+                // пловец/клуб) → как и раньше, 409 на уровне контроллера. Транзакция
+                // откатится при выходе из using.
+                _db.Entry(fav).State = EntityState.Detached;
+                return AddFavoriteResult.Duplicate();
+            }
+
+            // Читаем до коммита: своя вставка в своей транзакции видна наверняка.
+            var dto = await _db.UserFavorites
+                .AsNoTracking()
+                .Where(f => f.Id == fav.Id)
+                .Select(ToDto)
+                .FirstAsync();
+
+            await tx.CommitAsync();
+            return AddFavoriteResult.Added(dto);
+        });
+    }
+
+    /// <summary>
+    /// Транзакционная advisory-блокировка по пользователю: снимается сама на commit/rollback,
+    /// чужих пользователей не задерживает. На InMemory (тесты) блокировок нет — там один поток.
+    /// </summary>
+    private async Task LockUserAsync(int userId)
+    {
+        if (!_db.Database.IsNpgsql()) return;
+        await _db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({AddLockClass}, {userId})");
     }
 
     public async Task<bool> RemoveAsync(int userId, int favoriteId)

@@ -63,6 +63,8 @@
   cursor: pointer;
 }
 .deep-hero-action--fav { color: var(--deep-danger); border-color: var(--deep-danger-soft); }
+/* Лимит избранного выбран: кнопка видна, но погашена, причина — в title. */
+.deep-hero-action[aria-disabled='true'] { opacity: 0.4; cursor: not-allowed; }
 .deep-hero-action--me {
   color: var(--deep-gold);
   background: var(--deep-gold-chip);

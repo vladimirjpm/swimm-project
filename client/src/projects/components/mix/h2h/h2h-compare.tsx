@@ -81,6 +81,7 @@ function Slot({ slot, align }: { slot: H2HSlot; align: 'left' | 'right' }) {
       align={align}
       isFavorite={slot.isFavorite ?? null}
       onToggleFavorite={slot.onToggleFavorite}
+      favoriteBlockedHint={slot.favoriteBlockedHint ?? null}
       onClear={slot.onClear ?? null}
       active={slot.active}
     />
@@ -176,6 +177,7 @@ const UI_H2HCompare: React.FC<Props> = ({
           records: compare.mine.records,
           isFavorite: left.isFavorite ?? null,
           onToggleFavorite: left.onToggleFavorite,
+          favoriteBlockedHint: left.favoriteBlockedHint ?? null,
           onClear: left.onClear ?? null,
         }}
         right={{
@@ -186,6 +188,7 @@ const UI_H2HCompare: React.FC<Props> = ({
           records: compare.rival.records,
           isFavorite: right.isFavorite ?? null,
           onToggleFavorite: right.onToggleFavorite,
+          favoriteBlockedHint: right.favoriteBlockedHint ?? null,
           onClear: right.onClear ?? null,
         }}
         leftFaster={compare.mineFaster}
