@@ -60,16 +60,17 @@ public interface IUserMediaPublicationService
     /// Медиа с привязкой к заплыву, видимое зрителю userId (null = аноним) в рамках
     /// соревнования competitionId, всех дней события eventId или group-режима groupSlug
     /// (заплывы пловцов из ростера группы): своё (любое) + approved public (всем) +
-    /// approved members (только активным членам той группы). Для иконок видео в таблице.
+    /// approved members (участникам-аккаунтам и управляющим той группы, админу сайта —
+    /// та же аудитория, что у ленты members на странице группы). Для иконок видео в таблице.
     /// </summary>
     Task<List<VisibleResultMediaDto>> GetVisibleForResultsAsync(
-        int? competitionId, int? eventId, string? groupSlug, int? userId);
+        int? competitionId, int? eventId, string? groupSlug, int? userId, bool isSiteAdmin);
 
     /// <summary>
     /// Всё видимое зрителю userId (null = аноним) медиа КОНКРЕТНОГО пловца — для галереи на
-    /// странице пловца (swimmer.html): своё (любое, вкл. private) + approved public (всем) +
-    /// approved members (только активным членам группы публикации). Скоуп — по SwimmerId
-    /// (любой уровень привязки: заплыв/соревнование/swimmer-level).
+    /// странице пловца (swimmer.html): своё (любое, вкл. private) + одобренные публикации по
+    /// тому же правилу аудитории, что и <see cref="GetVisibleForResultsAsync"/>. Скоуп — по
+    /// SwimmerId (любой уровень привязки: заплыв/соревнование/swimmer-level).
     /// </summary>
-    Task<List<VisibleResultMediaDto>> GetVisibleForSwimmerAsync(int swimmerId, int? userId);
+    Task<List<VisibleResultMediaDto>> GetVisibleForSwimmerAsync(int swimmerId, int? userId, bool isSiteAdmin);
 }

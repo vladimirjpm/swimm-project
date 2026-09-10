@@ -3,13 +3,16 @@ using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
+using Swimm.Infrastructure.Services;
 
 namespace Swimm.Infrastructure.Repositories;
 
 /// <summary>
 /// Реакции (Sys_UserReactions). Лайк доступен только на видимое пользователю медиа:
-/// своё, либо с approved-публикацией (public — всем, members — членам/админам/владельцу
-/// группы). Поздравление — на любой существующий заплыв (результаты публичны).
+/// своё, либо с approved-публикацией по общему правилу аудитории
+/// (<see cref="MediaPublicationAudience"/>: public — всем, members — активным участникам,
+/// владельцу, админам группы и админу сайта). Поздравление — на любой существующий заплыв
+/// (результаты публичны).
 /// Гонка двойного POST гасится partial unique индексом (UX_UserReactions_*).
 /// </summary>
 public class ReactionRepository : IReactionRepository
@@ -21,18 +24,16 @@ public class ReactionRepository : IReactionRepository
         _db = db;
     }
 
-    public async Task<ReactionStateDto?> SetLikeAsync(int userId, int mediaId, bool on)
+    public async Task<ReactionStateDto?> SetLikeAsync(int userId, int mediaId, bool on, bool isSiteAdmin)
     {
-        var visible = await _db.UserMedia
-            .AsNoTracking()
-            .AnyAsync(m => m.Id == mediaId && (
-                m.UserId == userId ||
-                _db.UserMediaPublications.Any(p =>
-                    p.UserMediaId == m.Id && p.Status == UserMediaPublicationStatus.Approved && (
-                        p.Level == UserMediaPublicationLevel.Public ||
-                        _db.HubGroupUserMembers.Any(gm => gm.HubGroupId == p.HubGroupId && gm.UserId == userId) ||
-                        _db.HubGroupAdmins.Any(ga => ga.HubGroupId == p.HubGroupId && ga.UserId == userId) ||
-                        _db.HubGroups.Any(g => g.Id == p.HubGroupId && g.OwnerUserId == userId)))));
+        // Своё — всегда; чужое — только если хоть одна одобренная публикация видна этому
+        // пользователю. Раньше здесь была своя копия правила, и она пускала участника с
+        // висящей заявкой (pending) лайкнуть members-видео, которого он не видит.
+        var visible = await _db.UserMedia.AsNoTracking().AnyAsync(m => m.Id == mediaId && m.UserId == userId)
+            || await _db.UserMediaPublications.AsNoTracking()
+                .Where(p => p.UserMediaId == mediaId && p.Status == UserMediaPublicationStatus.Approved)
+                .Where(MediaPublicationAudience.CanSee(_db, userId, isSiteAdmin))
+                .AnyAsync();
         if (!visible) return null;
 
         await ToggleAsync(userId, on,

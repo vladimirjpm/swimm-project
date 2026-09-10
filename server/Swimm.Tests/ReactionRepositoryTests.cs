@@ -150,7 +150,7 @@ public class ReactionRepositoryTests
         await db.SaveChangesAsync();
         var repo = new ReactionRepository(db);
 
-        var state = await repo.SetLikeAsync(owner.Id, media.Id, on: true);
+        var state = await repo.SetLikeAsync(owner.Id, media.Id, on: true, isSiteAdmin: false);
 
         Assert.NotNull(state);
         Assert.Equal(1, state!.Count);
@@ -172,7 +172,7 @@ public class ReactionRepositoryTests
         await db.SaveChangesAsync();
         var repo = new ReactionRepository(db);
 
-        var state = await repo.SetLikeAsync(stranger.Id, media.Id, on: true);
+        var state = await repo.SetLikeAsync(stranger.Id, media.Id, on: true, isSiteAdmin: false);
 
         Assert.Null(state);
     }
@@ -205,7 +205,7 @@ public class ReactionRepositoryTests
         await db.SaveChangesAsync();
         var repo = new ReactionRepository(db);
 
-        var state = await repo.SetLikeAsync(stranger.Id, media.Id, on: true);
+        var state = await repo.SetLikeAsync(stranger.Id, media.Id, on: true, isSiteAdmin: false);
 
         Assert.NotNull(state);
         Assert.True(state!.Mine);
@@ -239,7 +239,7 @@ public class ReactionRepositoryTests
         await db.SaveChangesAsync();
         var repo = new ReactionRepository(db);
 
-        var state = await repo.SetLikeAsync(member.Id, media.Id, on: true);
+        var state = await repo.SetLikeAsync(member.Id, media.Id, on: true, isSiteAdmin: false);
 
         Assert.NotNull(state);
         Assert.True(state!.Mine);
@@ -270,7 +270,7 @@ public class ReactionRepositoryTests
         await db.SaveChangesAsync();
         var repo = new ReactionRepository(db);
 
-        var state = await repo.SetLikeAsync(stranger.Id, media.Id, on: true);
+        var state = await repo.SetLikeAsync(stranger.Id, media.Id, on: true, isSiteAdmin: false);
 
         Assert.Null(state);
     }

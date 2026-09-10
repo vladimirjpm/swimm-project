@@ -7,7 +7,8 @@ namespace Swimm.API.Controllers;
 /// <summary>
 /// Публичная точка видимости медиа заплывов (этап 4 media-visibility-model): иконки видео
 /// в таблице результатов. Аноним видит только approved public публикации; залогиненный —
-/// плюс своё медиа и members-публикации своих групп. Per-viewer → без общего кэша.
+/// плюс своё медиа и members-публикации групп, где он участник или управляющий (правило
+/// аудитории — MediaPublicationAudience). Per-viewer → без общего кэша.
 /// </summary>
 [ApiController]
 [Route("api/media")]
@@ -51,7 +52,8 @@ public class PublicMediaController : ControllerBase
         var raw = User.FindFirstValue(ClaimTypes.NameIdentifier);
         int? userId = int.TryParse(raw, out var id) ? id : null;
 
-        return Ok(await _publications.GetVisibleForResultsAsync(competitionId, eventId, group, userId));
+        return Ok(await _publications.GetVisibleForResultsAsync(
+            competitionId, eventId, group, userId, User.IsInRole("Admin")));
     }
 
     /// <summary>
@@ -63,6 +65,6 @@ public class PublicMediaController : ControllerBase
     {
         var raw = User.FindFirstValue(ClaimTypes.NameIdentifier);
         int? userId = int.TryParse(raw, out var uid) ? uid : null;
-        return Ok(await _publications.GetVisibleForSwimmerAsync(id, userId));
+        return Ok(await _publications.GetVisibleForSwimmerAsync(id, userId, User.IsInRole("Admin")));
     }
 }
