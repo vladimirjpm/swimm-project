@@ -11,7 +11,9 @@ process.stdin.on('end', () => {
   } catch {
     return; // не разобрали вход — молчим, push не наше дело останавливать
   }
-  if (!/\bgit\s+push\b/.test(command)) return;
+  // `git push` именно как команда — в начале строки или после &&, ||, ;, |, (. Слова «git push»
+  // внутри текста (сообщение коммита, echo) напоминание не вызывают: ложный сигнал учит его игнорировать.
+  if (!/(^|[;&|(\n])\s*git\s+push\b/.test(command)) return;
 
   process.stdout.write(JSON.stringify({
     hookSpecificOutput: {
