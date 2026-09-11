@@ -23,6 +23,9 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
     /// <summary>Сколько последних заплывов отдаём на страницу группы.</summary>
     private const int RecentResultsLimit = 25;
 
+    /// <summary>Сколько лучших заплывов последнего старта показывает карточка Overview.</summary>
+    private const int LastStartRowsLimit = 5;
+
     private readonly SwimmReadDbContext _read;
     private readonly SwimmDbContext _rw;
     private readonly ISettingsService _settings;
@@ -309,6 +312,9 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             .Select(ResultMapping.ToDto)
             .ToListAsync();
 
+        if (recentIds.Count > 0)
+            dto.LastStart = await BuildLastStartAsync(db, swimmerIds, recentIds[0]);
+
         // «Рекорды группы»: лучшее время по каждой оси стиль+дистанция+бассейн+пол.
         // Эстафеты и незачтённые времена (DSQ/DNS) не участвуют.
         dto.Bests = await db.Results.AsNoTracking()
@@ -347,6 +353,106 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             .ToList();
 
         await FillStandingsAsync(db, dto, swimmerIds, seasonStart);
+    }
+
+    /// <summary>
+    /// «Последний старт» ростера целиком: турнир самого свежего заплыва ленты.
+    ///
+    /// Многодневка — несколько <c>Competitions</c> под одним <c>EventId</c>, и старт здесь весь
+    /// турнир, а не день: иначе карточка показала бы треть чемпионата. Эстафеты входят по
+    /// членству в <c>RelayMembers</c> — строка эстафеты принадлежит одной ноге, а плыла вся
+    /// команда (docs/relays.md, «Золотое правило»).
+    /// </summary>
+    private static async Task<HubGroupLastStartDto?> BuildLastStartAsync(
+        SwimmDbContext db, List<int> swimmerIds, long latestResultId)
+    {
+        var anchor = await db.Results.AsNoTracking()
+            .Where(r => r.Id == latestResultId)
+            .Select(r => new
+            {
+                r.CompetitionId,
+                r.Competition.EventId,
+                Name = r.Competition.Event != null ? r.Competition.Event.Name : r.Competition.Name,
+            })
+            .FirstOrDefaultAsync();
+        if (anchor == null) return null;
+
+        var dayIds = anchor.EventId is int eventId
+            ? await db.Competitions.AsNoTracking().Where(c => c.EventId == eventId).Select(c => c.Id).ToListAsync()
+            : [anchor.CompetitionId];
+
+        var rows = await db.Results.AsNoTracking()
+            .Where(r => dayIds.Contains(r.CompetitionId)
+                        && (swimmerIds.Contains(r.SwimmerId)
+                            || (r.RelayId != null && db.RelayMembers.Any(m =>
+                                    m.RelayId == r.RelayId && swimmerIds.Contains(m.SwimmerId)))))
+            .Select(r => new LastStartRow
+            {
+                Id = r.Id,
+                CompetitionDate = r.CompetitionDate,
+                Position = r.Position,
+                TimeFail = r.TimeFail,
+                HeatType = r.HeatType,
+                Round = r.Round,
+                IsAward = r.Competition.IsAward,
+            })
+            .ToListAsync();
+        if (rows.Count == 0) return null;
+
+        // Строки карточки: медали, затем остальные места по возрастанию, без места и снятые —
+        // в конце. Одно место — свежий день выше. Раньше карточка брала пять последних по id,
+        // и на чемпионате с шестью золотами показывала 12-е, 11-е и 10-е места.
+        var topIds = rows
+            .OrderBy(r => r.IsMedal ? 0 : r.Position is > 0 && !r.TimeFail ? 1 : 2)
+            .ThenBy(r => r.Position ?? int.MaxValue)
+            .ThenByDescending(r => r.CompetitionDate)
+            .ThenByDescending(r => r.Id)
+            .Take(LastStartRowsLimit)
+            .Select(r => r.Id)
+            .ToList();
+
+        var dtos = await db.Results.AsNoTracking()
+            .Where(r => topIds.Contains(r.Id))
+            .Select(ResultMapping.ToDto)
+            .ToListAsync();
+        var order = topIds.Select((id, i) => (id, i)).ToDictionary(x => x.id, x => x.i);
+
+        var medals = rows.Where(r => r.IsMedal).Select(r => r.Position).ToList();
+        return new HubGroupLastStartDto
+        {
+            CompetitionId = anchor.CompetitionId,
+            EventId = anchor.EventId,
+            Name = anchor.Name,
+            DateFrom = rows.Min(r => r.CompetitionDate).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
+            DateTo = rows.Max(r => r.CompetitionDate).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
+            Swims = rows.Count,
+            Golds = medals.Count(p => p == 1),
+            Silvers = medals.Count(p => p == 2),
+            Bronzes = medals.Count(p => p == 3),
+            Rows = dtos.OrderBy(d => order[d.Id]).ToList(),
+        };
+    }
+
+    /// <summary>Проекция заплыва последнего старта (in-memory).</summary>
+    private sealed class LastStartRow
+    {
+        public long Id { get; init; }
+        public DateTime CompetitionDate { get; init; }
+        public int? Position { get; init; }
+        public bool TimeFail { get; init; }
+        public string? HeatType { get; init; }
+        public string? Round { get; init; }
+        public bool IsAward { get; init; }
+
+        /// <summary>
+        /// Медаль — по единому правилу продукта, зеркало клиентского
+        /// <c>HelperResults.isMedalPlace</c>: соревнование награждаемое, время зачтено, место
+        /// не из предварительного или дополнительного заплыва (Р34) и не из общей секции
+        /// «כללי» (Р43). Само место правило не трогает — его показываем как в протоколе.
+        /// </summary>
+        public bool IsMedal =>
+            IsAward && !TimeFail && HeatTypes.GivesOfficialPlace(HeatType)
+            && Round != ResultRounds.FinalOpen && Position is >= 1 and <= 3;
     }
 
     /// <summary>Сезонный зачёт: очки за место по правилам PointRuleClubs + медали за сезон.</summary>

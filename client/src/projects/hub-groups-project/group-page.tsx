@@ -96,8 +96,9 @@ function GroupPage({ slug }: { slug: string }) {
 
   const tabs: EntityTabSpec<GroupTab>[] = group == null || membersOnly ? [] : ([
     {
-      // Дайджест — витрина соседних табов, а не шестой набор данных: те же `bests`,
-      // `recent_results` и `members`, что у полных карточек, второго запроса нет.
+      // Дайджест — витрина соседних табов, а не шестой набор данных: те же `bests` и
+      // `members`, что у полных карточек, плюс `last_start` из того же ответа — второго
+      // запроса нет.
       id: 'overview' as const,
       icon: '▦',
       label: 'Overview',
