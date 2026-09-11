@@ -45,7 +45,7 @@ function MediaStripTile({ item, onClick }: { item: TrainingMediaItem; onClick?: 
 
   return (
     <div className="tbs-media-tile" onClick={onClick}>
-      {thumbUrl ? <img loading="lazy" src={thumbUrl} alt="" /> : <span className="tbs-media-fallback">🎬</span>}
+      {thumbUrl ? <img loading="lazy" src={thumbUrl} referrerPolicy="no-referrer" alt="" /> : <span className="tbs-media-fallback">🎬</span>}
       {item.media_type === 'video' && <span className="tbs-media-play">▶</span>}
       {item.caption && <span className="tbs-media-caption">{item.caption}</span>}
     </div>

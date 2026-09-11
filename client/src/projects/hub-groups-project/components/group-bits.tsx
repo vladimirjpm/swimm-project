@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { routes } from '../../../utils/routes';
+import { HelperMedia } from '../../../utils/helpers';
 import { useCurrentIdentity, useHubGroupMembership, useMyHubGroups } from '../use-my-hub-groups';
 import type { HubGroupDetails, HubGroupLink, HubGroupMember } from '../types';
 
@@ -71,7 +72,7 @@ function GroupIcon({ iconUrl, name, size }: { iconUrl?: string | null; name: str
       ? 'h-16 w-16 rounded-[18px] text-[26px] lg:h-20 lg:w-20 lg:text-[32px]'
       : 'h-11 w-11 rounded-[13px] text-[18px]';
   if (iconUrl) {
-    return <img src={iconUrl} alt="" className={`${cls} shrink-0 object-cover`} />;
+    return <img src={HelperMedia.directImageUrl(iconUrl)} referrerPolicy="no-referrer" alt="" className={`${cls} shrink-0 object-cover`} />;
   }
   return (
     <span

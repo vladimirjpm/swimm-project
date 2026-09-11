@@ -103,7 +103,7 @@ function ClubMedia({ clubId }: { clubId: number }) {
                 style={{ borderColor: 'var(--deep-card-border)', background: 'var(--deep-card-bg-row)' }}
               >
                 {thumb
-                  ? <img loading="lazy" src={thumb} alt="" className="h-full w-full object-cover" />
+                  ? <img loading="lazy" src={thumb} referrerPolicy="no-referrer" alt="" className="h-full w-full object-cover" />
                   : <span className="text-[28px]">🎬</span>}
                 {m.media_type === 'video' && (
                   <span

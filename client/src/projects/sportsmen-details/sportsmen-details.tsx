@@ -653,7 +653,7 @@ function MyMediaSection({
                 {isEmbeddable ? (
                   <div className="cursor-pointer aspect-video flex items-center justify-center" onClick={() => openLightboxFor(item)}>
                     {thumb ? (
-                      <img src={thumb} alt="" className="w-full h-full object-cover" />
+                      <img src={thumb} referrerPolicy="no-referrer" alt="" className="w-full h-full object-cover" />
                     ) : (
                       <span className="text-xs" style={{ color: 'var(--theme-mode-text-muted)' }}>video</span>
                     )}
@@ -666,7 +666,7 @@ function MyMediaSection({
                     className="aspect-video flex items-center justify-center"
                   >
                     {thumb ? (
-                      <img src={thumb} alt="" className="w-full h-full object-cover" />
+                      <img src={thumb} referrerPolicy="no-referrer" alt="" className="w-full h-full object-cover" />
                     ) : (
                       <span className="text-xs underline" style={{ color: 'var(--theme-mode-text-muted)' }}>link</span>
                     )}

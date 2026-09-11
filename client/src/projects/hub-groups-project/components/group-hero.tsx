@@ -4,6 +4,7 @@ import { DeepBadge, DeepKpi } from '../../components/deep/kpi';
 import UI_ClubIcon from '../../components/mix/club-icon/club-icon';
 import UI_FlagEmoji from '../../components/mix/flag-icon/flag-icon';
 import { routes } from '../../../utils/routes';
+import { HelperMedia } from '../../../utils/helpers';
 import { GroupIcon, JoinButton, LinkChips } from './group-bits';
 import GroupTrainingSlots from './group-training-slots';
 import type { HubGroupDetails } from '../types';
@@ -131,10 +132,12 @@ function GroupHero({ group }: Props) {
 /** Фото группы либо заглушка на её месте — колонка не схлопывается (план §3.9). */
 function GroupPhoto({ group }: Props) {
   // Указатель «взять из медиа» разрешает сервер — здесь одно готовое поле.
+  // Ссылку Google Drive (страница просмотрщика) переводит в картинку HelperMedia.
   if (group.hero_image_url) {
     return (
       <img
-        src={group.hero_image_url}
+        src={HelperMedia.directImageUrl(group.hero_image_url)}
+        referrerPolicy="no-referrer"
         alt=""
         className="h-full min-h-[200px] w-full rounded-2xl border object-cover"
         style={{ borderColor: 'var(--deep-card-border)' }}
