@@ -24,14 +24,15 @@ public static class CachedJsonExtensions
         TimeSpan payloadTtl,
         string cacheControl)
     {
-        var entry = await cache.GetAsync<CachedPayload>(cacheKey);
-        if (entry is null)
+        // GetOrCreate, а не Get + Set: параллельные промахи одного ключа ждут ОДНУ сборку.
+        // После общего сброса витрину открывают сразу многие, и каждый строил тяжёлый ответ
+        // заново (docs/plans/cache-tags-plan.md, К1).
+        var entry = await cache.GetOrCreateAsync(cacheKey, async () =>
         {
             var json = JsonSerializer.Serialize(await load());
             var etag = $"\"{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json)))[..32]}\"";
-            entry = new CachedPayload(json, etag);
-            await cache.SetAsync(cacheKey, entry, payloadTtl);
-        }
+            return new CachedPayload(json, etag);
+        }, payloadTtl);
 
         controller.Response.Headers[HeaderNames.CacheControl] = cacheControl;
         controller.Response.Headers[HeaderNames.ETag] = entry.ETag;

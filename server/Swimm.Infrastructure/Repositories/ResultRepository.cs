@@ -37,9 +37,9 @@ public class ResultRepository : IResultRepository
         pageSize = Math.Min(pageSize, 500);
         var key = ResultsCacheKey(filter, page, pageSize);
 
-        var cached = await _cache.GetAsync<(List<ResultDto>, bool, int)>(key);
-        if (cached != default)
-            return cached;
+        var cached = await _cache.GetAsync<CachedResultsPage>(key);
+        if (cached is not null)
+            return (cached.Items, cached.HasMore, cached.Total);
 
         var query = await BuildFilteredQueryAsync(filter);
         if (query is null)
@@ -72,10 +72,16 @@ public class ResultRepository : IResultRepository
         // hasMore — из total; расхождение возможно только в пределах TTL кэша (2 мин), как и раньше.
         var hasMore = (page - 1) * pageSize + items.Count < total;
 
-        var result = (items, hasMore, total);
-        await _cache.SetAsync(key, result, ResultsTtl);
-        return result;
+        await _cache.SetAsync(key, new CachedResultsPage(items, hasMore, total), ResultsTtl);
+        return (items, hasMore, total);
     }
+
+    /// <summary>
+    /// Страница результатов в кэше. Record, а не кортеж: у <c>ValueTuple</c> только поля, и
+    /// System.Text.Json пишет его как <c>{}</c> — в Redis страница молча стала бы пустой
+    /// (docs/plans/cache-tags-plan.md §4-2).
+    /// </summary>
+    private sealed record CachedResultsPage(List<ResultDto> Items, bool HasMore, int Total);
 
     /// <summary>
     /// Применяет весь фильтр к запросу результатов (включая разрешение <c>Latest</c> —
@@ -902,20 +908,44 @@ public class ResultRepository : IResultRepository
         return overview;
     }
 
-    /// <summary>Рекорды Израиля (country/ISR, все категории) для детекции — кэш 10 мин.</summary>
+    /// <summary>
+    /// Рекорды Израиля (country/ISR, все категории) для детекции — кэш 10 мин.
+    ///
+    /// В кэше — не сущности <c>Record</c>, а их оси (<see cref="CachedRecordAxis"/>): сущность EF
+    /// не контракт и в Redis не переносима (docs/plans/cache-tags-plan.md §4-2). Детектор
+    /// принимает <c>Record</c>, поэтому на выходе собираем их обратно — он читает только оси.
+    /// </summary>
     private async Task<IReadOnlyList<Domain.Entities.Record>> GetIsraelRecordsAsync()
     {
         const string key = "records:country:ISR:all";
-        var cached = await _cache.GetAsync<IReadOnlyList<Domain.Entities.Record>>(key);
-        if (cached is not null)
-            return cached;
+        var axes = await _cache.GetAsync<List<CachedRecordAxis>>(key);
+        if (axes is null)
+        {
+            axes = await _db.Records.AsNoTracking()
+                .Where(r => r.RegionType == "country" && r.RegionCode == "ISR")
+                .Select(r => new CachedRecordAxis(
+                    r.Category, r.AgeKey, r.Gender, r.PoolType, r.Style, r.Distance, r.Time))
+                .ToListAsync();
+            await _cache.SetAsync(key, axes, StaticHintsTtl);
+        }
 
-        var records = await _db.Records.AsNoTracking()
-            .Where(r => r.RegionType == "country" && r.RegionCode == "ISR")
-            .ToListAsync();
-        await _cache.SetAsync<IReadOnlyList<Domain.Entities.Record>>(key, records, StaticHintsTtl);
-        return records;
+        return axes.Select(a => new Domain.Entities.Record
+        {
+            RegionType = "country",
+            RegionCode = "ISR",
+            Category = a.Category,
+            AgeKey = a.AgeKey,
+            Gender = a.Gender,
+            PoolType = a.PoolType,
+            Style = a.Style,
+            Distance = a.Distance,
+            Time = a.Time,
+        }).ToList();
     }
+
+    /// <summary>Оси рекорда, которые читают детектор новых рекордов и бонус High Point.</summary>
+    private sealed record CachedRecordAxis(
+        string Category, string AgeKey, string Gender, string PoolType, string Style, string Distance, string Time);
 
     /// <summary>
     /// Место, по которому идёт зачёт. Объединённое место дисциплины по всему событию берётся,

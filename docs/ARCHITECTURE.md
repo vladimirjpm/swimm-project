@@ -107,7 +107,7 @@ Application → реализация в Infrastructure → регистраци�
 
 | Интерфейс | Сейчас | Потом |
 |---|---|---|
-| `ICacheService` | `MemoryCacheService` (токен-инвалидация всего кэша при импорте) | `RedisCacheService` при горизонтальном масштабировании — только замена регистрации |
+| `ICacheService` | `MemoryCacheService` (токен-инвалидация всего кэша при импорте); цель — токен на МЕТКУ, сброс по меткам ([cache-tags-plan.md](plans/cache-tags-plan.md)) | `RedisCacheService` при горизонтальном масштабировании (версии меток в Redis) — только замена регистрации, если соблюдены правила §5 |
 | `IResultSourceProvider` *(новый)* | `PdfResultSourceProvider` (обёртка над парсерами IsrOrg) | `IsrOrgWebSourceProvider` — скрейпинг isr.org.il; другие федерации |
 | `ICompetitionDiscoveryProvider` *(новый)* | — | обнаружение новых соревнований на isr.org.il/competitions.asp → «входящие» в админке |
 | `IRecordSourceProvider` *(новый)* | импорт из существующих JS/JSON + парсеры `IsrOrgAgeRecords`/`IsrOrgMastersRecords`/`WorldRecords` | автообновление рекордов из веба |
@@ -124,10 +124,23 @@ Application → реализация в Infrastructure → регистраци�
 1. **HTTP-уровень** — `OutputCache`/ETag на публичных GET (`/api/results`, `/api/records`,
    `/api/competitions`, `/api/categories`, `/api/club-points`). Результаты завершённого
    соревнования **иммутабельны** — им длинный TTL + ETag; список соревнований — короткий TTL.
+   ⚠ Страницы, которые правят из их же таба Admin (группа, клуб), — `no-cache` + ETag, а не
+   `max-age`: серверный сброс до кэша браузера не дотягивается, и с `max-age=60` правка минуту
+   не была видна (11.09.2026).
 2. **Приложение** — `ICacheService` для собранных ответов репозиториев. Ключ =
-   нормализованный фильтр. Инвалидация — `InvalidateAllAsync()` после любого импорта/CRUD
-   (уже реализовано токеном).
+   нормализованный фильтр. Инвалидация сейчас — `InvalidateAllAsync()` после любого импорта/CRUD
+   (токеном, вручную в каждом месте записи). **Цель — сброс по меткам:** ответ объявляет, из
+   каких данных собран (`results`, `hub-group:24`…), запись сбрасывает свои метки автоматически
+   через перехватчик сохранения EF — план [cache-tags-plan.md](plans/cache-tags-plan.md).
 3. **БД** — индексы + `SwimmReadDbContext` NoTracking. Только этот уровень платит за промах.
+
+**Правила, готовые к Redis (соблюдать уже сейчас, до переезда):** всё — только через
+`ICacheService` (никаких `static`-словарей и прямого `IMemoryCache`: второй экземпляр о них не
+узнает); в кэш — только DTO/record, переживающие JSON-круг (не сущности EF, не кортежи — System.Text.Json
+пишет `ValueTuple` как `{}`); значение из кэша не мутировать (в памяти правка видна всем, в
+Redis — нет); сброс — по метке, не перебором ключей. Правило «что можно в кэш» — код (`CacheValueRules`):
+проверяется при каждой записи и тестом по всем вызовам кэша. Подробности —
+[cache-tags-plan.md §4](plans/cache-tags-plan.md).
 
 Правило: авторизованные и персональные данные (`/auth/*`, favorites, user media) —
 **никогда** не кэшируются на уровнях 1–2.
