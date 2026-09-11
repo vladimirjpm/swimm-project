@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Swimm.Application.Abstractions;
 
 namespace Swimm.API.Pages.Admin;
 
@@ -18,9 +19,37 @@ namespace Swimm.API.Pages.Admin;
 [Authorize(Roles = "Admin")]
 public class CacheModel : PageModel
 {
+    private readonly ICacheDiagnostics _diagnostics;
+
+    public CacheModel(ICacheDiagnostics diagnostics) => _diagnostics = diagnostics;
+
     public IReadOnlyList<CachePolicyRow> Policies { get; private set; } = [];
 
-    public void OnGet() => Policies = CachePolicyCatalog.Build(typeof(CacheModel).Assembly);
+    /// <summary>Живые записи серверного кэша с их метками (К3: метки таблиц ставятся сами).</summary>
+    public IReadOnlyList<CacheEntryInfo> Entries { get; private set; } = [];
+
+    /// <summary>Метка → сколько записей она сбросит. По убыванию.</summary>
+    public IReadOnlyList<(string Tag, int Count)> TagCounts { get; private set; } = [];
+
+    /// <summary>
+    /// Записи без меток таблиц — их сбрасывает только общий сброс. Пока запись зовёт общий
+    /// сброс, это не баг; когда перестанет (К4), такая запись будет врать до конца TTL.
+    /// </summary>
+    public IReadOnlyList<CacheEntryInfo> Untagged { get; private set; } = [];
+
+    public void OnGet()
+    {
+        Policies = CachePolicyCatalog.Build(typeof(CacheModel).Assembly);
+        Entries = _diagnostics.Snapshot();
+        TagCounts = Entries
+            .SelectMany(e => e.Tags)
+            .GroupBy(t => t)
+            .Select(g => (g.Key, g.Count()))
+            .OrderByDescending(x => x.Item2)
+            .ThenBy(x => x.Key, StringComparer.Ordinal)
+            .ToList();
+        Untagged = Entries.Where(e => !e.Tags.Any(t => t.StartsWith("table:", StringComparison.Ordinal))).ToList();
+    }
 }
 
 /// <summary>Политика кэша одного контроллера: что видит браузер и сколько живёт ответ на сервере.</summary>

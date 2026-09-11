@@ -35,24 +35,23 @@ public class ResultRepository : IResultRepository
     public async Task<(List<ResultDto> Items, bool HasMore, int Total)> GetPagedAsync(ResultFilter filter, int page, int pageSize)
     {
         pageSize = Math.Min(pageSize, 500);
-        var key = ResultsCacheKey(filter, page, pageSize);
+        // GetOrCreate: страницу зовут и ВНЕ сборки CachedJson (/api/results), и только своя
+        // сборка даёт ей метки её таблиц (К3, docs/plans/cache-tags-plan.md).
+        var cached = await _cache.GetOrCreateAsync(ResultsCacheKey(filter, page, pageSize),
+            () => LoadPageAsync(filter, page, pageSize), ResultsTtl);
+        return (cached.Items, cached.HasMore, cached.Total);
+    }
 
-        var cached = await _cache.GetAsync<CachedResultsPage>(key);
-        if (cached is not null)
-            return (cached.Items, cached.HasMore, cached.Total);
-
+    private async Task<CachedResultsPage> LoadPageAsync(ResultFilter filter, int page, int pageSize)
+    {
         var query = await BuildFilteredQueryAsync(filter);
         if (query is null)
-            return ([], false, 0);
+            return new CachedResultsPage([], false, 0);
 
         // Total — отдельный кэш-ключ БЕЗ page/pageSize: листание страниц не пересчитывает COUNT.
-        var totalKey = $"results-total:{FilterCacheKey(filter)}";
-        var total = await _cache.GetAsync<int?>(totalKey) ?? -1;
-        if (total < 0)
-        {
-            total = await query.CountAsync();
-            await _cache.SetAsync<int?>(totalKey, total, ResultsTtl);
-        }
+        // Вложенная запись: её метки наследует и страница.
+        var total = (await _cache.GetOrCreateAsync($"results-total:{FilterCacheKey(filter)}",
+            async () => new CachedCount(await query.CountAsync()), ResultsTtl)).Value;
 
         var items = await query
             .OrderByDescending(r => r.CompetitionDate)
@@ -72,8 +71,7 @@ public class ResultRepository : IResultRepository
         // hasMore — из total; расхождение возможно только в пределах TTL кэша (2 мин), как и раньше.
         var hasMore = (page - 1) * pageSize + items.Count < total;
 
-        await _cache.SetAsync(key, new CachedResultsPage(items, hasMore, total), ResultsTtl);
-        return (items, hasMore, total);
+        return new CachedResultsPage(items, hasMore, total);
     }
 
     /// <summary>
@@ -82,6 +80,9 @@ public class ResultRepository : IResultRepository
     /// (docs/plans/cache-tags-plan.md §4-2).
     /// </summary>
     private sealed record CachedResultsPage(List<ResultDto> Items, bool HasMore, int Total);
+
+    /// <summary>COUNT фильтра в кэше. Record, а не <c>int?</c>: GetOrCreate работает со ссылочными значениями.</summary>
+    private sealed record CachedCount(int Value);
 
     /// <summary>
     /// Применяет весь фильтр к запросу результатов (включая разрешение <c>Latest</c> —
@@ -206,15 +207,11 @@ public class ResultRepository : IResultRepository
     /// список на случай неуникальных имён (в проде Name уникален — обычно 1 элемент).</summary>
     private async Task<int[]> ResolveStyleIdsAsync(string styleName)
     {
-        const string key = "styles:name-to-ids";
-        var map = await _cache.GetAsync<Dictionary<string, int[]>>(key);
-        if (map is null)
-        {
-            map = (await _db.Styles.AsNoTracking().Select(s => new { s.Name, s.Id }).ToListAsync())
+        var map = await _cache.GetOrCreateAsync("styles:name-to-ids", async () =>
+            (await _db.Styles.AsNoTracking().Select(s => new { s.Name, s.Id }).ToListAsync())
                 .GroupBy(s => s.Name)
-                .ToDictionary(g => g.Key, g => g.Select(s => s.Id).ToArray());
-            await _cache.SetAsync(key, map, TimeSpan.FromMinutes(10));
-        }
+                .ToDictionary(g => g.Key, g => g.Select(s => s.Id).ToArray()),
+            TimeSpan.FromMinutes(10));
         return map.TryGetValue(styleName, out var ids) ? ids : [];
     }
 
@@ -224,26 +221,22 @@ public class ResultRepository : IResultRepository
     /// последнее на большом объёме заставляет планировщик сканировать всю таблицу.</summary>
     private async Task<int[]> ResolveEventCompetitionIdsAsync(int eventId)
     {
-        var key = $"event-competitions:{eventId}";
-        var ids = await _cache.GetAsync<int[]>(key);
-        if (ids is null)
-        {
-            ids = await _db.Competitions.AsNoTracking()
+        return await _cache.GetOrCreateAsync($"event-competitions:{eventId}", () =>
+            _db.Competitions.AsNoTracking()
                 .Where(c => c.EventId == eventId)
                 .Select(c => c.Id)
-                .ToArrayAsync();
-            await _cache.SetAsync(key, ids, TimeSpan.FromMinutes(10));
-        }
-        return ids;
+                .ToArrayAsync(),
+            TimeSpan.FromMinutes(10));
     }
 
-    public async Task<IReadOnlyList<ClubSummaryDto>> GetClubSummaryAsync(ResultFilter filter)
-    {
-        var key = $"club-summary:{FilterCacheKey(filter)}";
-        var cached = await _cache.GetAsync<IReadOnlyList<ClubSummaryDto>>(key);
-        if (cached is not null)
-            return cached;
+    // GetOrCreate: запись собирается в своём контексте и получает метки своих таблиц сама
+    // (К3, docs/plans/cache-tags-plan.md). Обзор соревнования зовёт её же — метки наследует.
+    public Task<IReadOnlyList<ClubSummaryDto>> GetClubSummaryAsync(ResultFilter filter) =>
+        _cache.GetOrCreateAsync($"club-summary:{FilterCacheKey(filter)}",
+            () => LoadClubSummaryAsync(filter), ResultsTtl);
 
+    private async Task<IReadOnlyList<ClubSummaryDto>> LoadClubSummaryAsync(ResultFilter filter)
+    {
         var query = await BuildFilteredQueryAsync(filter);
         if (query is null)
             return [];
@@ -325,17 +318,15 @@ public class ResultRepository : IResultRepository
             })
             .ToList();
 
-        await _cache.SetAsync(key, (IReadOnlyList<ClubSummaryDto>)summary, ResultsTtl);
         return summary;
     }
 
-    public async Task<CompetitionOverviewDto> GetCompetitionOverviewAsync(ResultFilter filter)
-    {
-        var key = $"competition-overview:{FilterCacheKey(filter)}";
-        var cached = await _cache.GetAsync<CompetitionOverviewDto>(key);
-        if (cached is not null)
-            return cached;
+    public Task<CompetitionOverviewDto> GetCompetitionOverviewAsync(ResultFilter filter) =>
+        _cache.GetOrCreateAsync($"competition-overview:{FilterCacheKey(filter)}",
+            () => LoadCompetitionOverviewAsync(filter), ResultsTtl);
 
+    private async Task<CompetitionOverviewDto> LoadCompetitionOverviewAsync(ResultFilter filter)
+    {
         var query = await BuildFilteredQueryAsync(filter);
         if (query is null)
             return new CompetitionOverviewDto();
@@ -904,7 +895,6 @@ public class ResultRepository : IResultRepository
             Records = newRecords
         };
 
-        await _cache.SetAsync(key, overview, ResultsTtl);
         return overview;
     }
 
@@ -917,17 +907,13 @@ public class ResultRepository : IResultRepository
     /// </summary>
     private async Task<IReadOnlyList<Domain.Entities.Record>> GetIsraelRecordsAsync()
     {
-        const string key = "records:country:ISR:all";
-        var axes = await _cache.GetAsync<List<CachedRecordAxis>>(key);
-        if (axes is null)
-        {
-            axes = await _db.Records.AsNoTracking()
+        var axes = await _cache.GetOrCreateAsync("records:country:ISR:all", () =>
+            _db.Records.AsNoTracking()
                 .Where(r => r.RegionType == "country" && r.RegionCode == "ISR")
                 .Select(r => new CachedRecordAxis(
                     r.Category, r.AgeKey, r.Gender, r.PoolType, r.Style, r.Distance, r.Time))
-                .ToListAsync();
-            await _cache.SetAsync(key, axes, StaticHintsTtl);
-        }
+                .ToListAsync(),
+            StaticHintsTtl);
 
         return axes.Select(a => new Domain.Entities.Record
         {
@@ -1090,61 +1076,61 @@ public class ResultRepository : IResultRepository
         var prefix = (q ?? "").Trim();
         var key = $"hints:{field}:{prefix}";
 
-        var cached = await _cache.GetAsync<string[]>(key);
-        if (cached is not null)
-            return cached;
-
         var ttl = field is "style" or "distance" ? StaticHintsTtl : DynamicHintsTtl;
 
-        var hints = field switch
+        // GetOrCreate: метки своих таблиц запись получает сама (К3). Пустую выдачу не кэшируем,
+        // как и раньше, — фабрика отдаёт null, и в кэш он не ложится.
+        return await _cache.GetOrCreateAsync<string[]?>(key, LoadAsync, ttl) ?? [];
+
+        async Task<string[]?> LoadAsync()
         {
-            "style" => await _db.Styles
-                .OrderBy(s => s.Name)
-                .Select(s => s.Name)
-                .ToArrayAsync(),
+            var hints = field switch
+            {
+                "style" => await _db.Styles
+                    .OrderBy(s => s.Name)
+                    .Select(s => s.Name)
+                    .ToArrayAsync(),
 
-            "distance" => await _db.Results
-                .Select(r => r.Distance)
-                .Distinct()
-                .OrderBy(d => d.Length)
-                .ThenBy(d => d)
-                .ToArrayAsync(),
+                "distance" => await _db.Results
+                    .Select(r => r.Distance)
+                    .Distinct()
+                    .OrderBy(d => d.Length)
+                    .ThenBy(d => d)
+                    .ToArrayAsync(),
 
-            "club" => await _db.Clubs
-                .Where(c => c.MergedIntoId == null)   // склеенные в подсказки фильтра не идут
-                .Where(c => prefix.Length == 0 || c.Name.StartsWith(prefix) || c.NameEn.StartsWith(prefix))
-                .Select(c => c.Name)
-                .Where(n => n.Length > 0)
-                .Distinct()
-                .OrderBy(n => n)
-                .Take(limit)
-                .ToArrayAsync(),
+                "club" => await _db.Clubs
+                    .Where(c => c.MergedIntoId == null)   // склеенные в подсказки фильтра не идут
+                    .Where(c => prefix.Length == 0 || c.Name.StartsWith(prefix) || c.NameEn.StartsWith(prefix))
+                    .Select(c => c.Name)
+                    .Where(n => n.Length > 0)
+                    .Distinct()
+                    .OrderBy(n => n)
+                    .Take(limit)
+                    .ToArrayAsync(),
 
-            "competition" => await _db.Competitions
-                .Where(c => prefix.Length == 0 || c.Name.StartsWith(prefix))
-                .Select(c => c.Name)
-                .Where(n => n.Length > 0)
-                .Distinct()
-                .OrderBy(n => n)
-                .Take(limit)
-                .ToArrayAsync(),
+                "competition" => await _db.Competitions
+                    .Where(c => prefix.Length == 0 || c.Name.StartsWith(prefix))
+                    .Select(c => c.Name)
+                    .Where(n => n.Length > 0)
+                    .Distinct()
+                    .OrderBy(n => n)
+                    .Take(limit)
+                    .ToArrayAsync(),
 
-            "name" when prefix.Length > 0 => await _db.Swimmers
-                .Where(s => s.LastName.StartsWith(prefix))
-                .Select(s => s.LastName)
-                .Union(_db.Swimmers.Where(s => s.FirstName.StartsWith(prefix)).Select(s => s.FirstName))
-                .Where(n => n.Length > 0)
-                .OrderBy(n => n)
-                .Take(limit)
-                .ToArrayAsync(),
+                "name" when prefix.Length > 0 => await _db.Swimmers
+                    .Where(s => s.LastName.StartsWith(prefix))
+                    .Select(s => s.LastName)
+                    .Union(_db.Swimmers.Where(s => s.FirstName.StartsWith(prefix)).Select(s => s.FirstName))
+                    .Where(n => n.Length > 0)
+                    .OrderBy(n => n)
+                    .Take(limit)
+                    .ToArrayAsync(),
 
-            _ => []
-        };
+                _ => []
+            };
 
-        if (hints.Length > 0)
-            await _cache.SetAsync(key, hints, ttl);
-
-        return hints;
+            return hints.Length > 0 ? hints : null;
+        }
     }
 
     private static string FilterCacheKey(ResultFilter f) =>
@@ -1159,15 +1145,17 @@ public class ResultRepository : IResultRepository
     private static string ResultsCacheKey(ResultFilter f, int page, int pageSize) =>
         $"results:{FilterCacheKey(f)}:{page}:{pageSize}";
 
-    public async Task<IReadOnlyList<CompetitionSourceDto>> GetSourcesAsync(string? country = null)
+    public Task<IReadOnlyList<CompetitionSourceDto>> GetSourcesAsync(string? country = null)
     {
         // Нормализация как в GetStandardsAsync (RecordRepository): trim + upper, пусто — без фильтра.
         var countryKey = string.IsNullOrWhiteSpace(country) ? null : country.Trim().ToUpperInvariant();
-        var key = $"competition-sources:{countryKey ?? "all"}";
-        var cached = await _cache.GetAsync<IReadOnlyList<CompetitionSourceDto>>(key);
-        if (cached is not null)
-            return cached;
+        // GetOrCreate: метки своих таблиц запись получает сама (К3).
+        return _cache.GetOrCreateAsync($"competition-sources:{countryKey ?? "all"}",
+            () => LoadSourcesAsync(countryKey), TimeSpan.FromMinutes(5));
+    }
 
+    private async Task<IReadOnlyList<CompetitionSourceDto>> LoadSourcesAsync(string? countryKey)
+    {
         // Многодневные события — сворачиваем в одну запись, агрегируя по дням.
         // Флаги по дням: masters/award — у ЛЮБОГО дня; show_combine — у ВСЕХ дней
         // (как !Any(!combine), чтобы EF надёжно транслировал в SQL). Пустые события пропускаем.
@@ -1337,7 +1325,6 @@ public class ResultRepository : IResultRepository
             .Select(x => x.Dto)
             .ToList();
 
-        await _cache.SetAsync(key, (IReadOnlyList<CompetitionSourceDto>)ordered, TimeSpan.FromMinutes(5));
         return ordered;
     }
 
@@ -1347,65 +1334,68 @@ public class ResultRepository : IResultRepository
         if (name.Length == 0) return null;
 
         var key = $"athlete-career:{name.ToLowerInvariant()}";
-        var cached = await _cache.GetAsync<AthleteCareerDto>(key);
-        if (cached is not null)
-            return cached;
+        // GetOrCreate: запись собирается в своём контексте и получает метки своих таблиц
+        // сама (К3). «Не найдено» (null) в кэш не ложится — как и раньше.
+        return await _cache.GetOrCreateAsync<AthleteCareerDto?>(key, LoadAsync, TimeSpan.FromMinutes(5));
 
-        // Клиент передаёт полное имя ("First Last"); матчим оба порядка + EN-вариант.
-        var rows = await ProjectCareerRows(_db.Results.AsNoTracking()
-            .Where(r => r.RelayId == null && (
-                r.Swimmer.FirstName + " " + r.Swimmer.LastName == name ||
-                r.Swimmer.LastName + " " + r.Swimmer.FirstName == name ||
-                r.Swimmer.FirstNameEn + " " + r.Swimmer.LastNameEn == name ||
-                r.Swimmer.LastNameEn + " " + r.Swimmer.FirstNameEn == name)));
+        async Task<AthleteCareerDto?> LoadAsync()
+        {
+            // Клиент передаёт полное имя ("First Last"); матчим оба порядка + EN-вариант.
+            var rows = await ProjectCareerRows(_db.Results.AsNoTracking()
+                .Where(r => r.RelayId == null && (
+                    r.Swimmer.FirstName + " " + r.Swimmer.LastName == name ||
+                    r.Swimmer.LastName + " " + r.Swimmer.FirstName == name ||
+                    r.Swimmer.FirstNameEn + " " + r.Swimmer.LastNameEn == name ||
+                    r.Swimmer.LastNameEn + " " + r.Swimmer.FirstNameEn == name)));
 
-        // Эстафеты: в БД одна строка Result на команду, привязана к ОДНОМУ "первому" пловцу
-        // (SwimmerId), остальные участники — только строкой Relay.SwimmersName ("Имя Фамилия, …").
-        // Поэтому медаль за эстафету не находится обычным матчем по Swimmer — ищем спортсмена
-        // в SwimmersName у ЛЮБОЙ эстафеты (не только "своей" по SwimmerId).
-        // Грубая SQL-фильтрация по вхождению имени, точная проверка — посегментно в C#.
-        var nameTokens = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var relayCandidates = nameTokens.Length == 0
-            ? []
-            : (await _db.Results.AsNoTracking()
-                .Where(r => r.RelayId != null)
-                .Select(r => new
-                {
-                    r.CompetitionId,
-                    EventId = (int?)r.Competition.EventId,
-                    Position = r.HeatType == "prelim" || r.HeatType == "extra" ? null : r.Position,
-                    r.Relay!.SwimmersName,
-                    StyleName = r.Style.Name,
-                    r.Distance,
-                    CompetitionName = r.Competition.Name,
-                    DateRaw = r.Competition.Date,
-                    IsAward = r.Competition.IsAward
-                })
-                .ToListAsync())
-                // Грубый фильтр по вхождению имени — на клиенте (EF InMemory-провайдер в тестах
-                // не транслирует Any() с захваченным массивом внутри Where; на Postgres было бы
-                // эффективнее фильтровать в SQL, но датасет эстафет некрупный — не критично).
-                .Where(r => nameTokens.Any(t => r.SwimmersName != null && r.SwimmersName.Contains(t)))
+            // Эстафеты: в БД одна строка Result на команду, привязана к ОДНОМУ "первому" пловцу
+            // (SwimmerId), остальные участники — только строкой Relay.SwimmersName ("Имя Фамилия, …").
+            // Поэтому медаль за эстафету не находится обычным матчем по Swimmer — ищем спортсмена
+            // в SwimmersName у ЛЮБОЙ эстафеты (не только "своей" по SwimmerId).
+            // Грубая SQL-фильтрация по вхождению имени, точная проверка — посегментно в C#.
+            var nameTokens = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var relayCandidates = nameTokens.Length == 0
+                ? []
+                : (await _db.Results.AsNoTracking()
+                    .Where(r => r.RelayId != null)
+                    .Select(r => new
+                    {
+                        r.CompetitionId,
+                        EventId = (int?)r.Competition.EventId,
+                        Position = r.HeatType == "prelim" || r.HeatType == "extra" ? null : r.Position,
+                        r.Relay!.SwimmersName,
+                        StyleName = r.Style.Name,
+                        r.Distance,
+                        CompetitionName = r.Competition.Name,
+                        DateRaw = r.Competition.Date,
+                        IsAward = r.Competition.IsAward
+                    })
+                    .ToListAsync())
+                    // Грубый фильтр по вхождению имени — на клиенте (EF InMemory-провайдер в тестах
+                    // не транслирует Any() с захваченным массивом внутри Where; на Postgres было бы
+                    // эффективнее фильтровать в SQL, но датасет эстафет некрупный — не критично).
+                    .Where(r => nameTokens.Any(t => r.SwimmersName != null && r.SwimmersName.Contains(t)))
+                    .ToList();
+
+            static bool SegmentMatchesName(string segment, string name)
+            {
+                segment = segment.Trim();
+                if (segment == name) return true;
+                var parts = segment.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                return parts.Length == 2 && $"{parts[1]} {parts[0]}" == name;
+            }
+
+            var relayMedals = relayCandidates
+                .Where(r => (r.SwimmersName ?? "").Split(',').Any(seg => SegmentMatchesName(seg, name)))
+                .Select(r => new CareerRelayRow(
+                    r.CompetitionId, r.EventId, r.Position, r.StyleName, r.Distance,
+                    r.CompetitionName, r.DateRaw, r.IsAward))
                 .ToList();
 
-        static bool SegmentMatchesName(string segment, string name)
-        {
-            segment = segment.Trim();
-            if (segment == name) return true;
-            var parts = segment.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            return parts.Length == 2 && $"{parts[1]} {parts[0]}" == name;
+            if (rows.Count == 0 && relayMedals.Count == 0) return null;
+
+            return await BuildCareerAsync(rows, relayMedals);
         }
-
-        var relayMedals = relayCandidates
-            .Where(r => (r.SwimmersName ?? "").Split(',').Any(seg => SegmentMatchesName(seg, name)))
-            .Select(r => new CareerRelayRow(
-                r.CompetitionId, r.EventId, r.Position, r.StyleName, r.Distance,
-                r.CompetitionName, r.DateRaw, r.IsAward))
-            .ToList();
-
-        if (rows.Count == 0 && relayMedals.Count == 0) return null;
-
-        return await BuildCareerAsync(key, rows, relayMedals);
     }
 
     /// <summary>
@@ -1422,46 +1412,50 @@ public class ResultRepository : IResultRepository
         if (swimmerId <= 0) return null;
 
         var key = $"athlete-career-id:{swimmerId}";
-        var cached = await _cache.GetAsync<AthleteCareerDto>(key);
-        if (cached is not null) return cached;
+        // GetOrCreate: запись собирается в своём контексте и получает метки своих таблиц
+        // сама (К3). «Не найдено» (null) в кэш не ложится — как и раньше.
+        return await _cache.GetOrCreateAsync<AthleteCareerDto?>(key, LoadAsync, TimeSpan.FromMinutes(5));
 
-        var rows = await ProjectCareerRows(_db.Results.AsNoTracking()
-            .Where(r => r.SwimmerId == swimmerId && r.RelayId == null));
+        async Task<AthleteCareerDto?> LoadAsync()
+        {
+            var rows = await ProjectCareerRows(_db.Results.AsNoTracking()
+                .Where(r => r.SwimmerId == swimmerId && r.RelayId == null));
 
-        var relayIds = await _db.RelayMembers.AsNoTracking()
-            .Where(m => m.SwimmerId == swimmerId)
-            .Select(m => m.RelayId)
-            .Distinct()
-            .ToListAsync();
+            var relayIds = await _db.RelayMembers.AsNoTracking()
+                .Where(m => m.SwimmerId == swimmerId)
+                .Select(m => m.RelayId)
+                .Distinct()
+                .ToListAsync();
 
-        // Строка эстафеты, привязанная к самому пловцу как к «первой ноге», может не иметь
-        // записи в RelayMembers у старых импортов — берём и её, дальше дедуп по CompetitionId.
-        var relayMedals = (await _db.Results.AsNoTracking()
-            .Where(r => r.RelayId != null
-                        && (relayIds.Contains(r.RelayId!.Value) || r.SwimmerId == swimmerId))
-            .Select(r => new
-            {
-                r.Id,
-                r.CompetitionId,
-                EventId = (int?)r.Competition.EventId,
-                Position = r.HeatType == "prelim" || r.HeatType == "extra" ? null : r.Position,
-                StyleName = r.Style.Name,
-                r.Distance,
-                CompetitionName = r.Competition.Name,
-                DateRaw = r.Competition.Date,
-                IsAward = r.Competition.IsAward
-            })
-            .ToListAsync())
-            .GroupBy(r => r.Id)
-            .Select(g => g.First())
-            .Select(r => new CareerRelayRow(
-                r.CompetitionId, r.EventId, r.Position, r.StyleName, r.Distance,
-                r.CompetitionName, r.DateRaw, r.IsAward))
-            .ToList();
+            // Строка эстафеты, привязанная к самому пловцу как к «первой ноге», может не иметь
+            // записи в RelayMembers у старых импортов — берём и её, дальше дедуп по CompetitionId.
+            var relayMedals = (await _db.Results.AsNoTracking()
+                .Where(r => r.RelayId != null
+                            && (relayIds.Contains(r.RelayId!.Value) || r.SwimmerId == swimmerId))
+                .Select(r => new
+                {
+                    r.Id,
+                    r.CompetitionId,
+                    EventId = (int?)r.Competition.EventId,
+                    Position = r.HeatType == "prelim" || r.HeatType == "extra" ? null : r.Position,
+                    StyleName = r.Style.Name,
+                    r.Distance,
+                    CompetitionName = r.Competition.Name,
+                    DateRaw = r.Competition.Date,
+                    IsAward = r.Competition.IsAward
+                })
+                .ToListAsync())
+                .GroupBy(r => r.Id)
+                .Select(g => g.First())
+                .Select(r => new CareerRelayRow(
+                    r.CompetitionId, r.EventId, r.Position, r.StyleName, r.Distance,
+                    r.CompetitionName, r.DateRaw, r.IsAward))
+                .ToList();
 
-        if (rows.Count == 0 && relayMedals.Count == 0) return null;
+            if (rows.Count == 0 && relayMedals.Count == 0) return null;
 
-        return await BuildCareerAsync(key, rows, relayMedals);
+            return await BuildCareerAsync(rows, relayMedals);
+        }
     }
 
     /// <summary>Личный заплыв карьеры — общая форма для именного и id-пути.</summary>
@@ -1508,7 +1502,7 @@ public class ResultRepository : IResultRepository
     /// карточка-попап и страница показывали бы разные цифры про одного человека.
     /// </summary>
     private async Task<AthleteCareerDto> BuildCareerAsync(
-        string cacheKey, List<CareerSwimRow> rows, List<CareerRelayRow> relayMedals)
+        List<CareerSwimRow> rows, List<CareerRelayRow> relayMedals)
     {
         // Лучшее время на (стиль × дистанция) — только валидные времена.
         var bestByStyle = rows
@@ -1592,7 +1586,6 @@ public class ResultRepository : IResultRepository
             Medals = medals
         };
 
-        await _cache.SetAsync(cacheKey, dto, TimeSpan.FromMinutes(5));
         return dto;
     }
 
@@ -1601,50 +1594,53 @@ public class ResultRepository : IResultRepository
         if (id <= 0) return null;
 
         var key = $"swimmer-profile:{id}";
-        var cached = await _cache.GetAsync<SwimmerProfileDto>(key);
-        if (cached is not null) return cached;
+        // GetOrCreate: запись собирается в своём контексте и получает метки своих таблиц
+        // сама (К3, docs/plans/cache-tags-plan.md) — от кого бы её ни позвали.
+        return await _cache.GetOrCreateAsync(key, LoadAsync, TimeSpan.FromMinutes(5));
 
-        var s = await _db.Swimmers.AsNoTracking()
-            .Where(x => x.Id == id)
-            .Select(x => new
-            {
-                x.Id,
-                x.FirstName, x.LastName,
-                x.FirstNameEn, x.LastNameEn,
-                x.BirthYear, x.Gender, x.Origin, x.AvatarUrl,
-                x.ClubId,
-                ClubName = x.Club != null ? x.Club.Name : null,
-                CountryCode = x.Country != null ? x.Country.CountryCode : null,
-                CountryName = x.Country != null ? x.Country.CountryName : null,
-            })
-            .FirstOrDefaultAsync();
-        if (s is null) return null;
-
-        // FullName для карьерного запроса и заголовка: приоритет RU, иначе EN.
-        var ru = $"{s.FirstName} {s.LastName}".Trim();
-        var en = $"{s.FirstNameEn} {s.LastNameEn}".Trim();
-        var fullName = ru.Length > 0 ? ru : en;
-
-        var dto = new SwimmerProfileDto
+        async Task<SwimmerProfileDto?> LoadAsync()
         {
-            Id = s.Id,
-            FullName = fullName,
-            FirstName = s.FirstName,
-            LastName = s.LastName,
-            FirstNameEn = s.FirstNameEn,
-            LastNameEn = s.LastNameEn,
-            BirthYear = s.BirthYear,
-            Gender = s.Gender,
-            ClubId = s.ClubId,
-            ClubName = s.ClubName,
-            CountryCode = s.CountryCode,
-            CountryName = s.CountryName,
-            AvatarUrl = s.AvatarUrl,
-            Origin = s.Origin,
-        };
+            var s = await _db.Swimmers.AsNoTracking()
+                .Where(x => x.Id == id)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.FirstName, x.LastName,
+                    x.FirstNameEn, x.LastNameEn,
+                    x.BirthYear, x.Gender, x.Origin, x.AvatarUrl,
+                    x.ClubId,
+                    ClubName = x.Club != null ? x.Club.Name : null,
+                    CountryCode = x.Country != null ? x.Country.CountryCode : null,
+                    CountryName = x.Country != null ? x.Country.CountryName : null,
+                })
+                .FirstOrDefaultAsync();
+            if (s is null) return null;
 
-        await _cache.SetAsync(key, dto, TimeSpan.FromMinutes(5));
-        return dto;
+            // FullName для карьерного запроса и заголовка: приоритет RU, иначе EN.
+            var ru = $"{s.FirstName} {s.LastName}".Trim();
+            var en = $"{s.FirstNameEn} {s.LastNameEn}".Trim();
+            var fullName = ru.Length > 0 ? ru : en;
+
+            var dto = new SwimmerProfileDto
+            {
+                Id = s.Id,
+                FullName = fullName,
+                FirstName = s.FirstName,
+                LastName = s.LastName,
+                FirstNameEn = s.FirstNameEn,
+                LastNameEn = s.LastNameEn,
+                BirthYear = s.BirthYear,
+                Gender = s.Gender,
+                ClubId = s.ClubId,
+                ClubName = s.ClubName,
+                CountryCode = s.CountryCode,
+                CountryName = s.CountryName,
+                AvatarUrl = s.AvatarUrl,
+                Origin = s.Origin,
+            };
+
+            return dto;
+        }
     }
 
     /// <summary>

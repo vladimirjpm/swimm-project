@@ -77,11 +77,13 @@ public class ShowcaseSeasonProvider : IShowcaseSeasonProvider
     /// <see cref="StandingKinds.Resolve"/>, что и на странице клуба: короткая вода +
     /// признак чемпионата, ручное исключение — <c>StandingKindOverride</c>.
     /// </summary>
-    private async Task<IReadOnlyList<DateTime>> WinterDatesAsync(CancellationToken ct)
-    {
-        var cached = await _cache.GetAsync<List<DateTime>>(CacheKey);
-        if (cached is not null) return cached;
+    // GetOrCreate: запись получает метку Competitions сама (К3), и витрины, собранные поверх
+    // витринного сезона, наследуют её при попадании в этот кэш.
+    private async Task<IReadOnlyList<DateTime>> WinterDatesAsync(CancellationToken ct) =>
+        await _cache.GetOrCreateAsync(CacheKey, () => LoadWinterDatesAsync(ct), Ttl);
 
+    private async Task<List<DateTime>> LoadWinterDatesAsync(CancellationToken ct)
+    {
         var raw = await _read.Competitions.AsNoTracking()
             .Where(c => c.IsChampionship)
             .Select(c => new { c.Date, c.PoolType, c.StandingKindOverride })
@@ -93,7 +95,6 @@ public class ShowcaseSeasonProvider : IShowcaseSeasonProvider
             .Where(d => d != DateTime.MinValue)
             .ToList();
 
-        await _cache.SetAsync(CacheKey, dates, Ttl);
         return dates;
     }
 

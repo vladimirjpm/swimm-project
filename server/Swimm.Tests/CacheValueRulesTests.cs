@@ -5,6 +5,7 @@ using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Application.Validation;
 using Swimm.Infrastructure.Repositories;
+using Swimm.Infrastructure.Services;
 using Xunit;
 
 namespace Swimm.Tests;
@@ -61,12 +62,10 @@ public class CacheValueRulesTests
     [Fact]
     public void EveryCachedValueType_SurvivesRedis()
     {
-        var cached = new HashSet<Type>();
-        foreach (var assembly in new[] { typeof(ResultRepository).Assembly, typeof(ResultDto).Assembly })
-            foreach (var type in assembly.GetTypes())
-                foreach (var method in type.GetMethods(AllDeclared).Cast<MethodBase>()
-                             .Concat(type.GetConstructors(AllDeclared)))
-                    CollectCacheTypeArguments(method, cached);
+        var cached = CacheCalls()
+            .Select(c => c.Called.GetGenericArguments()[0])
+            .Where(t => !t.ContainsGenericParameters)
+            .ToHashSet();
 
         // Сторож самого теста: сканер, который тихо перестал находить вызовы, зеленеет вечно.
         // Проверено и в обратную сторону: на коде до К2 (кортеж и сущности Record в кэше) тест падает.
@@ -74,13 +73,52 @@ public class CacheValueRulesTests
             $"Найдено всего {cached.Count} типов в вызовах кэша — сканер IL сломался?");
         Assert.Contains(typeof(IReadOnlyList<CategoryDto>), cached); // CategoryRepository, асинхронный метод
 
-
         var offenders = cached
             .Select(t => CacheValueRules.Violation(t))
             .Where(v => v is not null)
             .ToList();
         Assert.True(offenders.Count == 0,
             "В кэш кладутся типы, которые не переживут Redis: " + string.Join("; ", offenders));
+    }
+
+    /// <summary>
+    /// Запись в кэш — только через <c>GetOrCreateAsync</c> (К3, docs/plans/cache-tags-plan.md §4-7):
+    /// у такой записи своя сборка, и метки своих таблиц она получает сама. Ручной <c>SetAsync</c>
+    /// вне чужой сборки кладёт запись без меток таблиц — её снимет только общий сброс, а когда
+    /// записи перестанут звать общий сброс (К4), она будет врать до конца TTL.
+    /// </summary>
+    [Fact]
+    public void NoManualSetAsync_OutsideTheCacheItself()
+    {
+        var offenders = CacheCalls()
+            .Where(c => c.Called.Name == "SetAsync")
+            .Select(c => OuterType(c.Caller.DeclaringType!))
+            .Where(t => t != typeof(MemoryCacheService) && t != typeof(ICacheService))
+            .Select(t => t.Name)
+            .Distinct()
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            "SetAsync вызывают напрямую (нужен GetOrCreateAsync): " + string.Join(", ", offenders));
+    }
+
+    /// <summary>Внешний тип для сгенерированных компилятором (асинхронные методы, лямбды).</summary>
+    private static Type OuterType(Type type)
+    {
+        while (type.DeclaringType is not null) type = type.DeclaringType;
+        return type;
+    }
+
+    /// <summary>Все вызовы обобщённых методов <see cref="ICacheService"/> в Infrastructure и Application.</summary>
+    private static List<(MethodBase Caller, MethodInfo Called)> CacheCalls()
+    {
+        var calls = new List<(MethodBase, MethodInfo)>();
+        foreach (var assembly in new[] { typeof(ResultRepository).Assembly, typeof(ResultDto).Assembly })
+            foreach (var type in assembly.GetTypes())
+                foreach (var method in type.GetMethods(AllDeclared).Cast<MethodBase>()
+                             .Concat(type.GetConstructors(AllDeclared)))
+                    CollectCacheCalls(method, calls);
+        return calls;
     }
 
     private const BindingFlags AllDeclared =
@@ -94,7 +132,7 @@ public class CacheValueRulesTests
         .Select(f => (OpCode)f.GetValue(null)!)
         .ToDictionary(o => o.Value);
 
-    private static void CollectCacheTypeArguments(MethodBase method, HashSet<Type> into)
+    private static void CollectCacheCalls(MethodBase method, List<(MethodBase, MethodInfo)> into)
     {
         byte[]? il;
         try { il = method.GetMethodBody()?.GetILAsByteArray(); }
@@ -123,8 +161,7 @@ public class CacheValueRulesTests
                         && called.DeclaringType == typeof(ICacheService)
                         && CacheMethods.Contains(called.Name))
                     {
-                        var arg = called.GetGenericArguments()[0];
-                        if (!arg.ContainsGenericParameters) into.Add(arg);
+                        into.Add((method, called));
                     }
                 }
                 catch (ArgumentException) { /* токен из чужого контекста — пропускаем */ }

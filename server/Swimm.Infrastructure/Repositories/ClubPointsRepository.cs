@@ -20,12 +20,12 @@ public class ClubPointsRepository : IClubPointsRepository
         _cache = cache;
     }
 
-    public async Task<IReadOnlyList<ClubPointsRuleDto>> GetRulesAsync()
-    {
-        var cached = await _cache.GetAsync<IReadOnlyList<ClubPointsRuleDto>>(CacheKey);
-        if (cached is not null)
-            return cached;
+    // GetOrCreate: метки таблиц правил запись получает сама (К3).
+    public Task<IReadOnlyList<ClubPointsRuleDto>> GetRulesAsync() =>
+        _cache.GetOrCreateAsync(CacheKey, LoadRulesAsync, CacheTtl);
 
+    private async Task<IReadOnlyList<ClubPointsRuleDto>> LoadRulesAsync()
+    {
         // ManualOnly-правила НЕ отдаём: они существуют только для явной привязки к
         // соревнованию и в автоподборе не участвуют (CompetitionRuleResolver). Клиент
         // подбирает правило сам — по дате и scope, привязки он не знает, — и, увидев
@@ -51,8 +51,6 @@ public class ClubPointsRepository : IClubPointsRepository
                 .OrderBy(e => e.Place)
                 .ToDictionary(e => e.Place.ToString(), e => e.Points)
         }).ToList();
-
-        await _cache.SetAsync(CacheKey, (IReadOnlyList<ClubPointsRuleDto>)dtos, CacheTtl);
 
         return dtos;
     }

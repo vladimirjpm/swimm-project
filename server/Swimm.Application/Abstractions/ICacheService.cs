@@ -38,14 +38,17 @@ public interface ICacheService
     /// ответ (season-best, обзор соревнования). Метки снимаются ДО сборки: если данные сбросили,
     /// пока ответ строился, собранное уже устарело и в кэш не попадает — иначе оно пролежало бы
     /// до конца TTL.
+    ///
+    /// «Не найдено» — фабрика вернула null (T объявлен nullable) — в кэш не кладётся: следующий
+    /// запрос спросит базу снова, как было до перевода мест кэша на этот метод.
     /// </summary>
     async Task<T> GetOrCreateAsync<T>(string key, Func<Task<T>> factory, TimeSpan ttl, params string[] tags)
-        where T : class
+        where T : class?
     {
         var hit = await GetAsync<T>(key);
         if (hit is not null) return hit;
         var value = await factory();
-        await SetAsync(key, value, ttl, tags);
+        if (value is not null) await SetAsync(key, value, ttl, tags);
         return value;
     }
 

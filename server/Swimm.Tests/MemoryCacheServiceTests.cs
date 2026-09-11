@@ -11,6 +11,10 @@ namespace Swimm.Tests;
 /// собранное во время сброса в кэш не ложится.
 ///
 /// Эти же тесты обязан пройти будущий RedisCacheService — поведение потребителям не меняется.
+///
+/// К3: метки ставятся сами — касание таблицы в сборке (так делает перехватчик SQL, здесь его
+/// роль играет прямой <see cref="CacheBuildScope.Touch"/>) и наследование от вложенных записей.
+/// Настоящий SQL — в <c>CacheDependencyInterceptorPgTests</c>.
 /// </summary>
 public class MemoryCacheServiceTests
 {
@@ -158,6 +162,186 @@ public class MemoryCacheServiceTests
             () => Task.FromResult(new Payload("rebuilt")), Ttl);
 
         Assert.Equal("cached", value.Value);
+    }
+
+    // ── К3: метки ставятся сами — из сборки и вложенных записей ─────────────────
+
+    [Fact]
+    public async Task Touch_DuringBuild_TagsTheEntry()
+    {
+        // Так метку ставит перехватчик SQL: касание таблицы внутри сборки.
+        var cache = NewCache();
+        await cache.GetOrCreateAsync("season-best", () =>
+        {
+            CacheBuildScope.Current!.Touch(CacheTags.Table("Results"));
+            return Task.FromResult(new Payload("sb"));
+        }, Ttl);
+
+        await cache.InvalidateTagsAsync(CacheTags.Table("HubGroups"));
+        Assert.NotNull(await cache.GetAsync<Payload>("season-best"));
+
+        await cache.InvalidateTagsAsync(CacheTags.Table("Results"));
+        Assert.Null(await cache.GetAsync<Payload>("season-best"));
+    }
+
+    [Fact]
+    public async Task Touch_ThenTableInvalidatedBeforeBuildEnds_NotCached()
+    {
+        // Таблицу прочитали, а до конца сборки её поменяли: собранное устарело.
+        var cache = NewCache();
+        var tag = CacheTags.Table("Records");
+
+        await cache.GetOrCreateAsync("club-page", async () =>
+        {
+            CacheBuildScope.Current!.Touch(tag);
+            await cache.InvalidateTagsAsync(tag);
+            return new Payload("stale");
+        }, Ttl);
+
+        Assert.Null(await cache.GetAsync<Payload>("club-page"));
+    }
+
+    [Fact]
+    public async Task Nested_InnerMiss_OuterInheritsInnerTags()
+    {
+        var cache = NewCache();
+        var competitions = CacheTags.Table("Competitions");
+
+        await cache.GetOrCreateAsync("season-best", async () =>
+        {
+            // Витринный сезон — своя запись кэша, собранная внутри season-best.
+            var season = await cache.GetOrCreateAsync("showcase-season", () =>
+            {
+                CacheBuildScope.Current!.Touch(competitions);
+                return Task.FromResult(new Payload("2025/26"));
+            }, Ttl);
+            return new Payload("sb for " + season.Value);
+        }, Ttl);
+
+        await cache.InvalidateTagsAsync(competitions);
+
+        Assert.Null(await cache.GetAsync<Payload>("showcase-season"));
+        Assert.Null(await cache.GetAsync<Payload>("season-best"));
+    }
+
+    [Fact]
+    public async Task Nested_InnerHit_OuterStillInheritsInnerTags()
+    {
+        // Попадание во вложенный кэш: SQL не выполнялся, и без наследования внешний ответ не
+        // узнал бы, из чего собран внутренний.
+        var cache = NewCache();
+        var records = CacheTags.Table("Records");
+        await cache.SetAsync("israel-records", new Payload("axes"), Ttl, records);
+
+        await cache.GetOrCreateAsync("overview", async () =>
+        {
+            var axes = await cache.GetAsync<Payload>("israel-records");
+            return new Payload("overview with " + axes!.Value);
+        }, Ttl);
+
+        await cache.InvalidateTagsAsync(records);
+
+        Assert.Null(await cache.GetAsync<Payload>("overview"));
+    }
+
+    [Fact]
+    public async Task Waiters_OnSharedInnerBuild_AllInheritItsTags()
+    {
+        // Два внешних ответа ждут одну вложенную сборку — наследовать должны оба, а не только
+        // тот, чей запрос её запустил.
+        var cache = NewCache();
+        var tag = CacheTags.Table("Competitions");
+        var gate = new TaskCompletionSource();
+
+        async Task<Payload> Inner()
+        {
+            CacheBuildScope.Current!.Touch(tag);
+            await gate.Task;
+            return new Payload("inner");
+        }
+
+        var first = cache.GetOrCreateAsync("outer-1", async () =>
+            new Payload((await cache.GetOrCreateAsync("inner", Inner, Ttl)).Value), Ttl);
+        var second = cache.GetOrCreateAsync("outer-2", async () =>
+            new Payload((await cache.GetOrCreateAsync("inner", Inner, Ttl)).Value), Ttl);
+        gate.SetResult();
+        await Task.WhenAll(first, second);
+
+        await cache.InvalidateTagsAsync(tag);
+
+        Assert.Null(await cache.GetAsync<Payload>("outer-1"));
+        Assert.Null(await cache.GetAsync<Payload>("outer-2"));
+    }
+
+    [Fact]
+    public async Task ManualSet_InsideBuild_TakesTagsGatheredSoFar()
+    {
+        var cache = NewCache();
+        var tag = CacheTags.Table("Styles");
+
+        await cache.GetOrCreateAsync("page", async () =>
+        {
+            CacheBuildScope.Current!.Touch(tag);
+            await cache.SetAsync("manual", new Payload("m"), Ttl);
+            return new Payload("p");
+        }, Ttl);
+
+        await cache.InvalidateTagsAsync(tag);
+
+        Assert.Null(await cache.GetAsync<Payload>("manual"));
+    }
+
+    [Fact]
+    public async Task OwnersCancelledBuild_DoesNotFailWaiters()
+    {
+        // Фабрики получают токен запроса. Оборвали запрос того, кто строит, — ждавший не должен
+        // упасть вместе с ним, а строит сам.
+        var cache = NewCache();
+        var gate = new TaskCompletionSource();
+
+        var owner = cache.GetOrCreateAsync<Payload>("sb", async () =>
+        {
+            await gate.Task;
+            throw new OperationCanceledException("request aborted");
+        }, Ttl);
+        var waiter = cache.GetOrCreateAsync("sb", () => Task.FromResult(new Payload("mine")), Ttl);
+        gate.SetResult();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => owner);
+        Assert.Equal("mine", (await waiter).Value);
+    }
+
+    [Fact]
+    public async Task NullFromFactory_IsNotCached()
+    {
+        var cache = NewCache();
+        var calls = 0;
+
+        Task<Payload?> NotFound() { calls++; return Task.FromResult<Payload?>(null); }
+
+        Assert.Null(await cache.GetOrCreateAsync("category:nope", NotFound, Ttl));
+        Assert.Null(await cache.GetOrCreateAsync("category:nope", NotFound, Ttl));
+        Assert.Equal(2, calls);
+        Assert.DoesNotContain(cache.Snapshot(), e => e.Key == "category:nope");
+    }
+
+    [Fact]
+    public async Task Snapshot_ListsLiveEntriesWithTheirTags()
+    {
+        var cache = NewCache();
+        await cache.GetOrCreateAsync("club-page", () =>
+        {
+            CacheBuildScope.Current!.Touch(CacheTags.Table("Records"));
+            CacheBuildScope.Current!.Touch(CacheTags.Table("Clubs"));
+            return Task.FromResult(new Payload("c"));
+        }, Ttl);
+
+        var entry = Assert.Single(cache.Snapshot());
+        Assert.Equal("club-page", entry.Key);
+        Assert.Equal(["table:Clubs", "table:Records"], entry.Tags); // без неявной all, по алфавиту
+
+        await cache.InvalidateTagsAsync(CacheTags.Table("Clubs"));
+        Assert.Empty(cache.Snapshot());
     }
 
     [Fact]

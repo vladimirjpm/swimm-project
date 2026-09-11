@@ -37,43 +37,46 @@ public class SwimmerPageRepository : ISwimmerPageRepository
         if (swimmerId <= 0) return [];
 
         var key = $"swimmer-swims:{swimmerId}";
-        var cached = await _cache.GetAsync<List<SeasonSwimRow>>(key);
-        if (cached is not null) return cached;
+        // GetOrCreate: запись собирается в своём контексте и получает метки своих таблиц
+        // сама (К3, docs/plans/cache-tags-plan.md) — от кого бы её ни позвали.
+        return await _cache.GetOrCreateAsync(key, LoadAsync, Ttl);
 
-        var personal = await Project(
-            _read.Results.AsNoTracking().Where(r => r.SwimmerId == swimmerId && r.RelayId == null));
+        async Task<List<SeasonSwimRow>> LoadAsync()
+        {
+            var personal = await Project(
+                _read.Results.AsNoTracking().Where(r => r.SwimmerId == swimmerId && r.RelayId == null));
 
-        // Эстафеты, где пловец значится ногой (docs/relays.md): строка результата привязана
-        // к первой ноге, поэтому «свои» эстафеты обычным матчем по SwimmerId не находятся.
-        var relayIds = await _read.RelayMembers.AsNoTracking()
-            .Where(m => m.SwimmerId == swimmerId)
-            .Select(m => m.RelayId)
-            .Distinct()
-            .ToListAsync();
+            // Эстафеты, где пловец значится ногой (docs/relays.md): строка результата привязана
+            // к первой ноге, поэтому «свои» эстафеты обычным матчем по SwimmerId не находятся.
+            var relayIds = await _read.RelayMembers.AsNoTracking()
+                .Where(m => m.SwimmerId == swimmerId)
+                .Select(m => m.RelayId)
+                .Distinct()
+                .ToListAsync();
 
-        // Плюс строка, где он же владелец: у старых импортов RelayMembers может быть пуст.
-        var relay = relayIds.Count > 0
-            ? await Project(_read.Results.AsNoTracking()
-                .Where(r => r.RelayId != null && relayIds.Contains(r.RelayId.Value)))
-            : [];
+            // Плюс строка, где он же владелец: у старых импортов RelayMembers может быть пуст.
+            var relay = relayIds.Count > 0
+                ? await Project(_read.Results.AsNoTracking()
+                    .Where(r => r.RelayId != null && relayIds.Contains(r.RelayId.Value)))
+                : [];
 
-        var ownRelay = await Project(
-            _read.Results.AsNoTracking().Where(r => r.SwimmerId == swimmerId && r.RelayId != null));
+            var ownRelay = await Project(
+                _read.Results.AsNoTracking().Where(r => r.SwimmerId == swimmerId && r.RelayId != null));
 
-        var rows = personal
-            .Concat(relay)
-            .Concat(ownRelay)
-            .GroupBy(r => r.ResultId)
-            .Select(g => g.First())
-            .OrderBy(r => r.CompetitionDate)
-            .ThenBy(r => r.ResultId)
-            // SwimmerId у эстафеты в базе — первая нога; для страницы это ВСЕГДА запрошенный
-            // пловец, иначе PB-детекция ключевалась бы по чужому id.
-            .Select(r => r.SwimmerId == swimmerId ? r : r with { SwimmerId = swimmerId })
-            .ToList();
+            var rows = personal
+                .Concat(relay)
+                .Concat(ownRelay)
+                .GroupBy(r => r.ResultId)
+                .Select(g => g.First())
+                .OrderBy(r => r.CompetitionDate)
+                .ThenBy(r => r.ResultId)
+                // SwimmerId у эстафеты в базе — первая нога; для страницы это ВСЕГДА запрошенный
+                // пловец, иначе PB-детекция ключевалась бы по чужому id.
+                .Select(r => r.SwimmerId == swimmerId ? r : r with { SwimmerId = swimmerId })
+                .ToList();
 
-        await _cache.SetAsync(key, rows, Ttl);
-        return rows;
+            return rows;
+        }
     }
 
     public async Task<IReadOnlyDictionary<int, string?>> GetStandingKindsAsync(
@@ -191,46 +194,49 @@ public class SwimmerPageRepository : ISwimmerPageRepository
         // Возраст В КЛЮЧЕ кэша: выборка разная для каждой ступени, и общий ключ отдавал бы
         // девятилетке минимум семнадцатилетних.
         var key = $"club-best-ms:{clubId}:age{age}";
-        var cached = await _cache.GetAsync<Dictionary<string, int>>(key);
-        if (cached is not null) return cached;
+        // GetOrCreate: запись собирается в своём контексте и получает метки своих таблиц
+        // сама (К3, docs/plans/cache-tags-plan.md) — от кого бы её ни позвали.
+        return await _cache.GetOrCreateAsync(key, LoadAsync, Ttl);
 
-        // Группировка в SQL: у крупного клуба полторы тысячи строк, тянуть их ради минимума
-        // незачем. Отбор строк — те же правила, что у SeasonAggregator.IsCountable, плюс возраст.
-        //
-        // Возраст считается ПО СЕЗОНУ ЗАПЛЫВА, а не по календарному году — то же правило,
-        // что в SeasonMath.AgeInSeason, развёрнутое выражением: хелпер — обычный C#-метод,
-        // и EF его в SQL не переведёт. Формула обязана остаться тождественной хелперу: разойдутся —
-        // дельта клуба и дельта страны начнут мерять разные ступени (сторож — в Swimm.Tests).
-        var grouped = await _read.Results.AsNoTracking()
-            .Where(r => r.ClubId == clubId
-                        && r.RelayId == null
-                        && !r.TimeFail
-                        && r.SuspectReason == null
-                        && r.TimeMillisecond > 0
-                        && r.Swimmer.BirthYear > 0
-                        && (r.CompetitionDate.Month >= SeasonMath.SeasonStartMonth
-                                ? r.CompetitionDate.Year
-                                : r.CompetitionDate.Year - 1)
-                            + 1 - r.Swimmer.BirthYear == age)
-            .GroupBy(r => new { r.StyleId, r.Distance, r.Competition.PoolType, r.Gender })
-            .Select(g => new
-            {
-                g.Key.StyleId,
-                g.Key.Distance,
-                g.Key.PoolType,
-                g.Key.Gender,
-                Ms = g.Min(x => x.TimeMillisecond),
-            })
-            .ToListAsync();
+        async Task<Dictionary<string, int>> LoadAsync()
+        {
+            // Группировка в SQL: у крупного клуба полторы тысячи строк, тянуть их ради минимума
+            // незачем. Отбор строк — те же правила, что у SeasonAggregator.IsCountable, плюс возраст.
+            //
+            // Возраст считается ПО СЕЗОНУ ЗАПЛЫВА, а не по календарному году — то же правило,
+            // что в SeasonMath.AgeInSeason, развёрнутое выражением: хелпер — обычный C#-метод,
+            // и EF его в SQL не переведёт. Формула обязана остаться тождественной хелперу: разойдутся —
+            // дельта клуба и дельта страны начнут мерять разные ступени (сторож — в Swimm.Tests).
+            var grouped = await _read.Results.AsNoTracking()
+                .Where(r => r.ClubId == clubId
+                            && r.RelayId == null
+                            && !r.TimeFail
+                            && r.SuspectReason == null
+                            && r.TimeMillisecond > 0
+                            && r.Swimmer.BirthYear > 0
+                            && (r.CompetitionDate.Month >= SeasonMath.SeasonStartMonth
+                                    ? r.CompetitionDate.Year
+                                    : r.CompetitionDate.Year - 1)
+                                + 1 - r.Swimmer.BirthYear == age)
+                .GroupBy(r => new { r.StyleId, r.Distance, r.Competition.PoolType, r.Gender })
+                .Select(g => new
+                {
+                    g.Key.StyleId,
+                    g.Key.Distance,
+                    g.Key.PoolType,
+                    g.Key.Gender,
+                    Ms = g.Min(x => x.TimeMillisecond),
+                })
+                .ToListAsync();
 
-        var best = grouped
-            .Where(g => g.Ms is > 0)
-            .ToDictionary(
-                g => SeasonAggregator.DisciplineKey(g.StyleId, g.Distance, g.PoolType, g.Gender),
-                g => g.Ms!.Value);
+            var best = grouped
+                .Where(g => g.Ms is > 0)
+                .ToDictionary(
+                    g => SeasonAggregator.DisciplineKey(g.StyleId, g.Distance, g.PoolType, g.Gender),
+                    g => g.Ms!.Value);
 
-        await _cache.SetAsync(key, best, Ttl);
-        return best;
+            return best;
+        }
     }
 
     public async Task<IReadOnlyList<SwimmerSearchHitDto>> SearchSwimmersAsync(string query, int limit)
@@ -246,57 +252,60 @@ public class SwimmerPageRepository : ISwimmerPageRepository
 
         var take = Math.Clamp(limit, 1, 30);
         var key = $"swimmer-search:{take}:{string.Join('', words).ToLowerInvariant()}";
-        var cached = await _cache.GetAsync<List<SwimmerSearchHitDto>>(key);
-        if (cached is not null) return cached;
+        // GetOrCreate: запись собирается в своём контексте и получает метки своих таблиц
+        // сама (К3, docs/plans/cache-tags-plan.md) — от кого бы её ни позвали.
+        return await _cache.GetOrCreateAsync(key, LoadAsync, Ttl);
 
-        var swimmers = _read.Swimmers.AsNoTracking();
-        foreach (var word in words)
+        async Task<List<SwimmerSearchHitDto>> LoadAsync()
         {
-            var pattern = $"%{word}%";
-            swimmers = swimmers.Where(s =>
-                EF.Functions.ILike(s.LastName, pattern)
-                || EF.Functions.ILike(s.FirstName, pattern)
-                || EF.Functions.ILike(s.LastNameEn, pattern)
-                || EF.Functions.ILike(s.FirstNameEn, pattern));
+            var swimmers = _read.Swimmers.AsNoTracking();
+            foreach (var word in words)
+            {
+                var pattern = $"%{word}%";
+                swimmers = swimmers.Where(s =>
+                    EF.Functions.ILike(s.LastName, pattern)
+                    || EF.Functions.ILike(s.FirstName, pattern)
+                    || EF.Functions.ILike(s.LastNameEn, pattern)
+                    || EF.Functions.ILike(s.FirstNameEn, pattern));
+            }
+
+            var rows = await swimmers
+                // Составные «пловцы» из ног эстафет (имя списком через запятую) — не люди:
+                // страницы у них нет, и сравнивать с ними нечего. Тот же отсев, что в поиске
+                // участников группы (HubGroupAdminService.SearchSwimmersAsync).
+                .Where(s => !EF.Functions.ILike(s.LastName, "%,%") && !EF.Functions.ILike(s.FirstName, "%,%"))
+                .OrderBy(s => s.LastName).ThenBy(s => s.FirstName)
+                .Take(take)
+                .Select(s => new
+                {
+                    s.Id,
+                    s.FirstName,
+                    s.LastName,
+                    s.FirstNameEn,
+                    s.LastNameEn,
+                    s.BirthYear,
+                    s.Gender,
+                    ClubName = s.Club != null ? s.Club.Name : null,
+                })
+                .ToListAsync();
+
+            var hits = rows.Select(s =>
+            {
+                // Имя на витрине ивритское, английское — только фоллбеком (правило проекта).
+                var he = $"{s.FirstName} {s.LastName}".Trim();
+                var en = $"{s.FirstNameEn} {s.LastNameEn}".Trim();
+                return new SwimmerSearchHitDto
+                {
+                    Id = s.Id,
+                    Name = he.Length > 0 ? he : en,
+                    BirthYear = s.BirthYear,
+                    Gender = s.Gender,
+                    ClubName = s.ClubName,
+                };
+            }).ToList();
+
+            return hits;
         }
-
-        var rows = await swimmers
-            // Составные «пловцы» из ног эстафет (имя списком через запятую) — не люди:
-            // страницы у них нет, и сравнивать с ними нечего. Тот же отсев, что в поиске
-            // участников группы (HubGroupAdminService.SearchSwimmersAsync).
-            .Where(s => !EF.Functions.ILike(s.LastName, "%,%") && !EF.Functions.ILike(s.FirstName, "%,%"))
-            .OrderBy(s => s.LastName).ThenBy(s => s.FirstName)
-            .Take(take)
-            .Select(s => new
-            {
-                s.Id,
-                s.FirstName,
-                s.LastName,
-                s.FirstNameEn,
-                s.LastNameEn,
-                s.BirthYear,
-                s.Gender,
-                ClubName = s.Club != null ? s.Club.Name : null,
-            })
-            .ToListAsync();
-
-        var hits = rows.Select(s =>
-        {
-            // Имя на витрине ивритское, английское — только фоллбеком (правило проекта).
-            var he = $"{s.FirstName} {s.LastName}".Trim();
-            var en = $"{s.FirstNameEn} {s.LastNameEn}".Trim();
-            return new SwimmerSearchHitDto
-            {
-                Id = s.Id,
-                Name = he.Length > 0 ? he : en,
-                BirthYear = s.BirthYear,
-                Gender = s.Gender,
-                ClubName = s.ClubName,
-            };
-        }).ToList();
-
-        await _cache.SetAsync(key, hits, Ttl);
-        return hits;
     }
 
     public async Task<IReadOnlyList<PeerSeasonBest>> GetAgeCohortSeasonBestsAsync(
@@ -307,44 +316,47 @@ public class SwimmerPageRepository : ISwimmerPageRepository
         // Ключ КОГОРТЫ, а не пловца: у 326 сверстников 2017 года одна и та же выборка,
         // и считать её 326 раз незачем.
         var key = $"age-cohort-season-bests:{seasonStartYear}:{birthYear}";
-        var cached = await _cache.GetAsync<List<PeerSeasonBest>>(key);
-        if (cached is not null) return cached;
+        // GetOrCreate: запись собирается в своём контексте и получает метки своих таблиц
+        // сама (К3, docs/plans/cache-tags-plan.md) — от кого бы её ни позвали.
+        return await _cache.GetOrCreateAsync(key, LoadAsync, Ttl);
 
-        var (start, endExclusive) = SeasonMath.RangeOf(seasonStartYear);
+        async Task<List<PeerSeasonBest>> LoadAsync()
+        {
+            var (start, endExclusive) = SeasonMath.RangeOf(seasonStartYear);
 
-        // Группировка в SQL: наружу выходит «лучшее сверстника в дисциплине», а не все его
-        // заплывы (замер на живой базе: 81k строк → 2.3k групп, 16 мс). Отбор строк — те же
-        // правила, что у SeasonAggregator.IsCountable.
-        var grouped = await _read.Results.AsNoTracking()
-            .Where(r => r.CompetitionDate >= start
-                        && r.CompetitionDate < endExclusive
-                        && r.Swimmer.BirthYear == birthYear
-                        && r.RelayId == null
-                        && !r.TimeFail
-                        && r.SuspectReason == null
-                        && r.TimeMillisecond > 0)
-            .GroupBy(r => new { r.SwimmerId, r.StyleId, r.Distance, r.Competition.PoolType, r.Gender })
-            .Select(g => new
-            {
-                g.Key.SwimmerId,
-                g.Key.StyleId,
-                g.Key.Distance,
-                g.Key.PoolType,
-                g.Key.Gender,
-                Ms = g.Min(x => x.TimeMillisecond),
-            })
-            .ToListAsync();
+            // Группировка в SQL: наружу выходит «лучшее сверстника в дисциплине», а не все его
+            // заплывы (замер на живой базе: 81k строк → 2.3k групп, 16 мс). Отбор строк — те же
+            // правила, что у SeasonAggregator.IsCountable.
+            var grouped = await _read.Results.AsNoTracking()
+                .Where(r => r.CompetitionDate >= start
+                            && r.CompetitionDate < endExclusive
+                            && r.Swimmer.BirthYear == birthYear
+                            && r.RelayId == null
+                            && !r.TimeFail
+                            && r.SuspectReason == null
+                            && r.TimeMillisecond > 0)
+                .GroupBy(r => new { r.SwimmerId, r.StyleId, r.Distance, r.Competition.PoolType, r.Gender })
+                .Select(g => new
+                {
+                    g.Key.SwimmerId,
+                    g.Key.StyleId,
+                    g.Key.Distance,
+                    g.Key.PoolType,
+                    g.Key.Gender,
+                    Ms = g.Min(x => x.TimeMillisecond),
+                })
+                .ToListAsync();
 
-        var rows = grouped
-            .Where(g => g.Ms is > 0)
-            .Select(g => new PeerSeasonBest(
-                g.SwimmerId,
-                SeasonAggregator.DisciplineKey(g.StyleId, g.Distance, g.PoolType, g.Gender),
-                g.Ms!.Value))
-            .ToList();
+            var rows = grouped
+                .Where(g => g.Ms is > 0)
+                .Select(g => new PeerSeasonBest(
+                    g.SwimmerId,
+                    SeasonAggregator.DisciplineKey(g.StyleId, g.Distance, g.PoolType, g.Gender),
+                    g.Ms!.Value))
+                .ToList();
 
-        await _cache.SetAsync(key, rows, Ttl);
-        return rows;
+            return rows;
+        }
     }
 
     public Task<IReadOnlyDictionary<string, NationalAgeRecordRow>> GetNationalAgeRecordsAsync(
@@ -365,62 +377,65 @@ public class SwimmerPageRepository : ISwimmerPageRepository
 
         ageKey ??= string.Empty;
         var key = $"national-records:{region}:{sex}:{category}:{ageKey}";
-        var cached = await _cache.GetAsync<Dictionary<string, NationalAgeRecordRow>>(key);
-        if (cached is not null) return cached;
+        // GetOrCreate: запись собирается в своём контексте и получает метки своих таблиц
+        // сама (К3, docs/plans/cache-tags-plan.md) — от кого бы её ни позвали.
+        return await _cache.GetOrCreateAsync(key, LoadAsync, Ttl);
 
-        var records = await _read.Records.AsNoTracking()
-            .Where(r => r.RegionType == "country"
-                        && r.RegionCode == region
-                        && r.Category == category
-                        && r.AgeKey == ageKey
-                        && r.Gender == sex)
-            .Select(r => new { r.Style, r.Distance, r.PoolType, r.Time, r.HolderName })
-            .ToListAsync();
-
-        // Справочник хранит стиль СТРОКОЙ, а ключ дисциплины — по StyleId: без карты
-        // «имя → id» сравнение молча не нашло бы ни одной пары.
-        var styleIds = await _read.Styles.AsNoTracking()
-            .Select(s => new { s.Id, s.Name })
-            .ToListAsync();
-        var byName = styleIds
-            .GroupBy(s => s.Name.Trim().ToLowerInvariant())
-            .ToDictionary(g => g.Key, g => g.First().Id);
-
-        // Метка «запись оспаривается» — тот же реестр, что у публичного API рекордов и стены
-        // клуба, иначе значок был бы на одной странице и пропадал на другой (инвариант И11).
-        // Ступень в ключе НЕ учитываем: лестница федерации кумулятивная, одно достижение
-        // растянуто на 2–4 возраста, а претензия заводится на одну ступень (баг RQ-1).
-        var issues = (await _read.RecordIssues.AsNoTracking()
-                .Where(i => i.RegionType == "country"
-                            && i.RegionCode == region
-                            && i.Category == category
-                            && i.Gender == sex
-                            && (i.Status == RecordIssueStatuses.Open
-                                || i.Status == RecordIssueStatuses.Reported
-                                || i.Status == RecordIssueStatuses.Accepted))
-                .Select(i => new { i.PoolType, i.Style, i.Distance, i.FlaggedTime, i.Reason })
-                .ToListAsync())
-            .GroupBy(i => IssueKey(i.PoolType, i.Style, i.Distance, i.FlaggedTime))
-            .ToDictionary(g => g.Key, g => g.First().Reason);
-
-        var map = new Dictionary<string, NationalAgeRecordRow>();
-        foreach (var r in records)
+        async Task<Dictionary<string, NationalAgeRecordRow>> LoadAsync()
         {
-            if (!byName.TryGetValue((r.Style ?? "").Trim().ToLowerInvariant(), out var styleId)) continue;
+            var records = await _read.Records.AsNoTracking()
+                .Where(r => r.RegionType == "country"
+                            && r.RegionCode == region
+                            && r.Category == category
+                            && r.AgeKey == ageKey
+                            && r.Gender == sex)
+                .Select(r => new { r.Style, r.Distance, r.PoolType, r.Time, r.HolderName })
+                .ToListAsync();
 
-            var discipline = SeasonAggregator.DisciplineKey(styleId, r.Distance, r.PoolType, sex);
-            issues.TryGetValue(IssueKey(r.PoolType, r.Style, r.Distance, r.Time), out var issue);
-            var row = new NationalAgeRecordRow(
-                r.Time, SwimTime.ParseToMs(r.Time), r.HolderName, ageKey, issue);
+            // Справочник хранит стиль СТРОКОЙ, а ключ дисциплины — по StyleId: без карты
+            // «имя → id» сравнение молча не нашло бы ни одной пары.
+            var styleIds = await _read.Styles.AsNoTracking()
+                .Select(s => new { s.Id, s.Name })
+                .ToListAsync();
+            var byName = styleIds
+                .GroupBy(s => s.Name.Trim().ToLowerInvariant())
+                .ToDictionary(g => g.Key, g => g.First().Id);
 
-            // Дубли в справочнике возможны — держим самый быстрый.
-            if (!map.TryGetValue(discipline, out var cur)
-                || (row.TimeMs is int ms && (cur.TimeMs is null || ms < cur.TimeMs)))
-                map[discipline] = row;
+            // Метка «запись оспаривается» — тот же реестр, что у публичного API рекордов и стены
+            // клуба, иначе значок был бы на одной странице и пропадал на другой (инвариант И11).
+            // Ступень в ключе НЕ учитываем: лестница федерации кумулятивная, одно достижение
+            // растянуто на 2–4 возраста, а претензия заводится на одну ступень (баг RQ-1).
+            var issues = (await _read.RecordIssues.AsNoTracking()
+                    .Where(i => i.RegionType == "country"
+                                && i.RegionCode == region
+                                && i.Category == category
+                                && i.Gender == sex
+                                && (i.Status == RecordIssueStatuses.Open
+                                    || i.Status == RecordIssueStatuses.Reported
+                                    || i.Status == RecordIssueStatuses.Accepted))
+                    .Select(i => new { i.PoolType, i.Style, i.Distance, i.FlaggedTime, i.Reason })
+                    .ToListAsync())
+                .GroupBy(i => IssueKey(i.PoolType, i.Style, i.Distance, i.FlaggedTime))
+                .ToDictionary(g => g.Key, g => g.First().Reason);
+
+            var map = new Dictionary<string, NationalAgeRecordRow>();
+            foreach (var r in records)
+            {
+                if (!byName.TryGetValue((r.Style ?? "").Trim().ToLowerInvariant(), out var styleId)) continue;
+
+                var discipline = SeasonAggregator.DisciplineKey(styleId, r.Distance, r.PoolType, sex);
+                issues.TryGetValue(IssueKey(r.PoolType, r.Style, r.Distance, r.Time), out var issue);
+                var row = new NationalAgeRecordRow(
+                    r.Time, SwimTime.ParseToMs(r.Time), r.HolderName, ageKey, issue);
+
+                // Дубли в справочнике возможны — держим самый быстрый.
+                if (!map.TryGetValue(discipline, out var cur)
+                    || (row.TimeMs is int ms && (cur.TimeMs is null || ms < cur.TimeMs)))
+                    map[discipline] = row;
+            }
+
+            return map;
         }
-
-        await _cache.SetAsync(key, map, Ttl);
-        return map;
     }
 
     /// <summary>Ключ претензии без возрастной ступени — одно достижение живёт на нескольких.</summary>

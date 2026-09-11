@@ -96,11 +96,17 @@
         (<code>GetOrCreateAsync</code>), а ответ, собранный во время сброса, в кэш не ложится.
     </p>
     <p>
-        <strong class="text-admin-text">Цель — сброс по меткам:</strong> ответ помнит, из каких
-        данных собран (<code>Records</code>, <code>HubGroups:24</code>…), и запись сбрасывает только
-        свои метки. Правка расписания одной группы — одна страница, импорт результатов — всё, что
-        собрано из результатов. Метки уже есть в <code>ICacheService</code>; их расстановка и
-        автоматический сброс — следующие этапы (<code>docs/plans/cache-tags-plan.md</code>, К3–К4).
+        <strong class="text-admin-text">Метки ставятся сами:</strong> пока ответ собирается, каждый
+        SQL-запрос отмечает таблицы, которых коснулся (<code>table:Results</code>,
+        <code>table:Records</code>…), а ответ, собранный из другой записи кэша, наследует её метки.
+        Руками их никто не пишет — поэтому и забыть нельзя. Список ниже показывает, что лежит в кэше
+        сейчас и с какими метками.
+    </p>
+    <p>
+        <strong class="text-admin-text">Следующий шаг — сброс по меткам</strong> (К4,
+        <code>docs/plans/cache-tags-plan.md</code>): запись сбросит только метки своих таблиц. Правка
+        расписания группы — страницы групп, импорт результатов — всё, что собрано из результатов.
+        Пока же любая запись сбрасывает всё, и метки ничего не меняют в поведении.
     </p>
     <div class="flex flex-wrap items-center gap-3 mt-4">
         <button id="btn-invalidate-cache" class="admin-btn admin-btn-primary cursor-pointer">Сбросить весь серверный кэш</button>
@@ -108,9 +114,63 @@
     </div>
 </div>
 
+<h2 class="text-lg text-admin-accent m-0 mb-2">Сейчас в кэше: @Model.Entries.Count</h2>
+<div class="admin-card mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
+    @if (Model.Entries.Count == 0)
+    {
+        <p class="m-0">Пусто — ответы соберутся при первых запросах к сайту.</p>
+    }
+    else
+    {
+        <p class="mt-0 mb-2">Метка → сколько записей её сброс выкинет:</p>
+        <div class="flex flex-wrap gap-1.5 mb-4">
+            @foreach (var (tag, count) in Model.TagCounts)
+            {
+                <span class="text-[0.7rem] py-0.5 px-1.5 rounded-sm font-semibold whitespace-nowrap bg-admin-accent/15 text-admin-accent">@tag · @count</span>
+            }
+        </div>
+
+        @if (Model.Untagged.Count > 0)
+        {
+            <div class="border-l-[3px] border-l-admin-warning pl-3 mb-4">
+                <strong class="text-admin-text">Без меток таблиц: @Model.Untagged.Count.</strong>
+                Их сбрасывает только общий сброс — перед К4 каждую надо понять.
+                <div class="text-xs mt-1">
+                    @foreach (var e in Model.Untagged)
+                    {
+                        <div><code>@e.Key</code></div>
+                    }
+                </div>
+            </div>
+        }
+
+        <details>
+            <summary class="cursor-pointer text-admin-text">Все записи</summary>
+            <div class="overflow-x-auto mt-2">
+                <table class="admin-table">
+                    <thead>
+                        <tr><th>Ключ</th><th>Метки</th><th>Тип</th><th>Живёт ещё</th></tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var e in Model.Entries)
+                    {
+                        <tr>
+                            <td class="align-top"><code class="text-xs">@e.Key</code></td>
+                            <td class="align-top text-xs">@string.Join(", ", e.Tags)</td>
+                            <td class="align-top text-xs">@e.ValueType</td>
+                            <td class="align-top text-xs whitespace-nowrap">@CachePolicyCatalog.Human(TimeSpan.FromSeconds(Math.Max(0, Math.Round((e.ExpiresAt - DateTimeOffset.UtcNow).TotalSeconds))))</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </details>
+    }
+</div>
+
 <h2 class="text-lg text-admin-accent m-0 mb-2">Правила (чтобы переезд на Redis был заменой одной строки)</h2>
 <div class="admin-card mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
-    <ol class="m-0 pl-5">
+    <ol class="m-0 pl-5 list-decimal">
         <li><strong class="text-admin-text">Только через <code>ICacheService</code>.</strong>
             Свой словарь или прямой <code>IMemoryCache</code> второй сервер не увидит и не сбросит.</li>
         <li><strong class="text-admin-text">В кэш — только DTO/record со свойствами.</strong>
@@ -119,6 +179,9 @@
         <li><strong class="text-admin-text">Взятое из кэша не менять.</strong>
             В памяти правка видна всем следующим читателям, в Redis — нет.</li>
         <li><strong class="text-admin-text">Сбрасывать по метке</strong>, а не перебором ключей.</li>
+        <li><strong class="text-admin-text">Записывать в кэш — только через <code>GetOrCreateAsync</code>.</strong>
+            Тогда запись собирается в своём контексте и получает метки своих таблиц сама. Ручной
+            <code>SetAsync</code> ловит тест.</li>
     </ol>
 </div>
 
