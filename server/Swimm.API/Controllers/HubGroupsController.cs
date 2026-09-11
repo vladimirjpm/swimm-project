@@ -28,7 +28,15 @@ public class HubGroupsController : ControllerBase
     private readonly IHubGroupMediaService _media;
     private readonly IUserMediaPublicationService _publications;
 
-    private const string CacheControlValue = "public, max-age=60";
+    /// <summary>
+    /// <c>no-cache</c>, а не <c>max-age</c>: браузер хранит ответ, но перед КАЖДЫМ использованием
+    /// сверяет ETag (без изменений — 304 без тела, payload берётся из серверного кэша). Страницу
+    /// правят из её же таба Admin, и при max-age=60 правка минуту не была видна: перезагрузка
+    /// ревалидирует только документ, а данные приходили с диска (11.09.2026, «расписание не
+    /// сохраняется», хотя в базе оно было). Серверный кэш запись сбрасывает — браузерный до
+    /// этого не дотягивался.
+    /// </summary>
+    private const string CacheControlValue = "public, no-cache";
     private static readonly TimeSpan PayloadTtl = TimeSpan.FromMinutes(5);
 
     public HubGroupsController(

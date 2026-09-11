@@ -52,6 +52,10 @@ plus repo-specific footguns.
   inward, controllers inject only `Swimm.Application` interfaces — never `Swimm.Infrastructure`
   types directly.
 - **Don't commit or push unless asked.** Default branch is `master`; branch first if asked to commit.
+- **Перед каждым push — пройди [`docs/pre-push-rules.md`](docs/pre-push-rules.md) по диффу.**
+  Там собраны правила «поменял X → обнови Y» (кэш → страница `/Admin/Cache`, новая админ-страница
+  → её MD, Tailwind → бандл, маршрут → три зеркала…). Новое правило такого вида — строкой туда,
+  а не россыпью по докам (решение Влада, 11.09.2026).
 - **Comments/identifiers in this codebase are bilingual (RU prose, EN identifiers).** Mirror the
   local style of the file you edit.
 - **Имена пловцов и названия клубов на витрине — ИВРИТСКИЕ по умолчанию, всегда** (решение

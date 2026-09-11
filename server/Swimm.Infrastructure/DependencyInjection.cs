@@ -27,19 +27,30 @@ public static class DependencyInjection
         var adminCs = configuration.GetConnectionString("AdminConnection") ?? defaultCs;
         var readCs = configuration.GetConnectionString("ReadConnection") ?? defaultCs;
 
-        services.AddDbContext<SwimmDbContext>(options =>
-            options.UseNpgsql(adminCs, npgsql =>
-                npgsql.EnableRetryOnFailure(maxRetryCount: 3)));
+        // Перехватчик ставит метки кэша сам: SQL, выполненный во время сборки записи кэша,
+        // отмечает в ней таблицы, которых коснулся (К3, docs/plans/cache-tags-plan.md). Он
+        // stateless — один экземпляр на оба контекста. Контекст, собранный в обход DI, меток
+        // не ставит: такие есть только у миграций и dotnet ef, кэш там не строится.
+        var cacheDependencies = new CacheDependencyInterceptor();
+
+        services.AddDbContext<SwimmDbContext>(options => options
+            .UseNpgsql(adminCs, npgsql =>
+                npgsql.EnableRetryOnFailure(maxRetryCount: 3))
+            .AddInterceptors(cacheDependencies));
 
         services.AddDbContext<SwimmReadDbContext>(options => options
             .UseNpgsql(readCs, npgsql =>
                 npgsql.EnableRetryOnFailure(maxRetryCount: 3))
-            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking));
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
+            .AddInterceptors(cacheDependencies));
 
         // Кэш — IMemoryCache для одного инстанса; для Redis заменить MemoryCacheService
         // на RedisCacheService (IDistributedCache + JSON) без изменений в потребителях.
+        // Один экземпляр под двумя интерфейсами: диагностика (/Admin/Cache) смотрит в тот же кэш.
         services.AddMemoryCache();
-        services.AddSingleton<ICacheService, MemoryCacheService>();
+        services.AddSingleton<MemoryCacheService>();
+        services.AddSingleton<ICacheService>(sp => sp.GetRequiredService<MemoryCacheService>());
+        services.AddSingleton<ICacheDiagnostics>(sp => sp.GetRequiredService<MemoryCacheService>());
 
         // Settings (singleton — in-memory store)
         services.AddSingleton<ISettingsService, AdminSettingsService>();

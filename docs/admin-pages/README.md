@@ -32,7 +32,9 @@
 | /Admin/Audit | [audit.md](audit.md) | Журнал ручных мутаций (аудит «кто/что/когда») |
 | /Admin/Db | [db.md](db.md) | Схема БД |
 | /Admin/Api | [api.md](api.md) | Каталог эндпоинтов + браузер данных |
+| /Admin/Cache | [cache.md](cache.md) | Как устроен кэш: кто сколько держит в браузере и на сервере (таблица из кода), как сбрасывается, правила под Redis, кнопка сброса |
 | /Admin/Settings | [settings.md](settings.md) | Параметры приложения (in-memory settings) |
+| /Admin/Docs/{section} | [docs.md](docs.md) | **Документация** репозитория в админке: Important / Rules / Decisions, MD читается с диска |
 | /Admin/UiPreview | [uipreview.md](uipreview.md) | Витрина компонентов админки |
 
 Общее для всех страниц: Razor Pages в `server/Swimm.API/Pages/Admin/**`,

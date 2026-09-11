@@ -1,0 +1,47 @@
+@page "{section?}"
+@model Swimm.API.Pages.Admin.DocsModel
+@{
+    ViewData["Title"] = "Docs · " + Model.Section.Title;
+    ViewData["PageSubtitle"] = Model.Section.Subtitle;
+}
+
+@* Документы читаются из репозитория при открытии — копий нет. Что где показывать —
+   Shared/DocsCatalog.cs; справка по странице — docs/admin-pages/docs.md. *@
+
+<div class="flex flex-col gap-5 lg:flex-row">
+    <nav class="lg:w-64 shrink-0" aria-label="Документы раздела">
+        <div class="admin-card p-2">
+            @foreach (var doc in Model.Section.Docs)
+            {
+                var active = doc.Path == Model.FilePath;
+                <a href="/Admin/Docs/@Model.Section.Key?file=@Uri.EscapeDataString(doc.Path)"
+                   class="block rounded-md px-3 py-2 no-underline @(active ? "bg-admin-accent/15" : "hover:bg-admin-surface-hover")">
+                    <div class="text-sm font-semibold @(active ? "text-admin-accent" : "text-admin-text")">@doc.Title</div>
+                    <div class="text-xs text-admin-text-muted leading-snug">@doc.About</div>
+                </a>
+            }
+        </div>
+    </nav>
+
+    <article class="admin-card min-w-0 flex-1">
+        @if (Model.FilePath is not null)
+        {
+            <div class="mb-4 flex flex-wrap items-baseline justify-between gap-2 border-b border-admin-border pb-2 text-xs text-admin-text-muted">
+                <code>@Model.FilePath</code>
+                @if (Model.LastWriteTime is { } changed)
+                {
+                    <span>изменён @changed.ToString("dd.MM.yyyy HH:mm")</span>
+                }
+            </div>
+        }
+
+        @if (Model.Error is not null)
+        {
+            <div class="text-sm text-admin-warning">@Model.Error</div>
+        }
+        else if (Model.Html is not null)
+        {
+            <div class="admin-md">@Html.Raw(Model.Html)</div>
+        }
+    </article>
+</div>

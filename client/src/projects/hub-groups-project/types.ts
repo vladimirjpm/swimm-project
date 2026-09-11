@@ -62,8 +62,38 @@ export interface HubGroupRecentResult {
   time: string;
   time_ms?: number | null;
   time_fail: boolean;
+  /** Причина снятия («DQ / SW 4.4», «NS») — без неё у времени остаётся одна красная «*». */
+  time_fail_note?: string | null;
+  /** Ошибка протокола (И11): время, показанное без этого признака, выдаёт себя за чистое. */
+  suspect_reason?: string | null;
   international_points: number;
+  /** Входы единого правила медали (`HelperResults.isMedalPlace`). */
+  is_award: boolean;
+  heat_type?: string | null;
+  round?: string | null;
   is_relay: boolean;
+  relay_team_name?: string | null;
+  /** Состав эстафеты текстом: строка принадлежит одной ноге, а плыла команда (docs/relays.md). */
+  relay_swimmers_name?: string | null;
+}
+
+/**
+ * Последний старт ростера ЦЕЛИКОМ — считает сервер (`HubGroupLastStartDto`). Резать его из
+ * `recent_results` нельзя: лента обрезана до 25 строк, и на чемпионате её не хватает даже на
+ * два дня из трёх.
+ */
+export interface HubGroupLastStart {
+  competition_id: number;
+  event_id?: number | null;
+  name: string;
+  date_from: string; // dd/MM/yyyy
+  date_to: string;
+  swims: number;
+  golds: number;
+  silvers: number;
+  bronzes: number;
+  /** Лучшие заплывы старта, уже отсортированы сервером: медали, места, снятые в конце. */
+  rows: HubGroupRecentResult[];
 }
 
 /**
@@ -205,6 +235,8 @@ export interface HubGroupDetails {
   is_virtual: boolean;
   members: HubGroupMember[];
   recent_results: HubGroupRecentResult[];
+  /** Последний старт целиком; null — ростер ещё не плыл. */
+  last_start?: HubGroupLastStart | null;
   bests: HubGroupBest[];
   season_label: string;
   standings: HubGroupStanding[];

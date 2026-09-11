@@ -20,12 +20,16 @@ public class CategoryRepository : ICategoryRepository
         _cache = cache;
     }
 
-    public async Task<IReadOnlyList<CategoryDto>> GetCategoriesAsync()
-    {
-        var cached = await _cache.GetAsync<IReadOnlyList<CategoryDto>>(AllCacheKey);
-        if (cached is not null)
-            return cached;
+    // GetOrCreate, а не Get + Set: запись собирается в своём контексте и получает метки своих
+    // таблиц сама (К3, docs/plans/cache-tags-plan.md) — от кого бы её ни позвали.
+    public Task<IReadOnlyList<CategoryDto>> GetCategoriesAsync() =>
+        _cache.GetOrCreateAsync(AllCacheKey, LoadCategoriesAsync, CacheTtl);
 
+    public Task<CategoryDetailDto?> GetByKeyAsync(string key) =>
+        _cache.GetOrCreateAsync($"categories:{key}", () => LoadByKeyAsync(key), CacheTtl);
+
+    private async Task<IReadOnlyList<CategoryDto>> LoadCategoriesAsync()
+    {
         var categories = await _db.Categories
             .AsNoTracking()
             .OrderBy(c => c.DisplayOrder)
@@ -41,19 +45,11 @@ public class CategoryRepository : ICategoryRepository
             })
             .ToListAsync();
 
-        await _cache.SetAsync(AllCacheKey, (IReadOnlyList<CategoryDto>)categories, CacheTtl);
-
         return categories;
     }
 
-    public async Task<CategoryDetailDto?> GetByKeyAsync(string key)
+    private async Task<CategoryDetailDto?> LoadByKeyAsync(string key)
     {
-        var cacheKey = $"categories:{key}";
-
-        var cached = await _cache.GetAsync<CategoryDetailDto>(cacheKey);
-        if (cached is not null)
-            return cached;
-
         var category = await _db.Categories
             .AsNoTracking()
             .Where(c => c.Key == key)
@@ -92,8 +88,6 @@ public class CategoryRepository : ICategoryRepository
             DisplayOrder = category.DisplayOrder,
             Competitions = competitions
         };
-
-        await _cache.SetAsync(cacheKey, dto, CacheTtl);
 
         return dto;
     }

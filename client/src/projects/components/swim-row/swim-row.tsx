@@ -119,6 +119,14 @@ export interface SwimRowProps {
     /** Id клуба — эмблема становится ссылкой на /clubs/{id}. Нет id — просто картинка. */
     clubId?: number | null;
     showClubIcon?: boolean;
+    /**
+     * Эстафета: строка принадлежит ОДНОЙ ноге, а плыла команда (docs/relays.md). Имя ноги
+     * в первой линии читается как «он один проплыл 4X50» — вместо него встаёт команда
+     * (`club`), под ней состав. Раскладку держит `UI_SwimmerNameCell`, как в протоколе.
+     */
+    isRelay?: boolean;
+    /** Состав текстом, через запятую (`relay_swimmers_name`). */
+    relaySwimmersName?: string | null;
   } | null;
 
   competition?: { name: string; isChampionship?: boolean } | null;
@@ -292,6 +300,8 @@ function SwimRow({
               firstName={swimmer.name}
               club={swimmer.club ?? undefined}
               clubId={swimmer.clubId}
+              isRelay={swimmer.isRelay}
+              relaySwimmersName={swimmer.relaySwimmersName ?? undefined}
               showClubIcon={swimmer.showClubIcon}
               clubIconSide="left"
               clubIconWidth="10"

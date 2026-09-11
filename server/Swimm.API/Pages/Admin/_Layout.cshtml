@@ -11,7 +11,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Swimm — @pageTitle</title>
-    <link rel="stylesheet" href="/css/admin.min.css" />
+    @* asp-append-version: к адресу добавляется хэш файла. Без него браузер после пересборки
+       бандла держал старый CSS (заголовков кэша у статики нет — свежесть он угадывает сам),
+       и новые классы «не применялись» (поймано 11.09.2026 на /Admin/Docs). *@
+    <link rel="stylesheet" href="~/css/admin.min.css" asp-append-version="true" />
     @await RenderSectionAsync("Styles", required: false)
 </head>
 <body class="min-h-screen bg-admin-bg font-sans text-sm text-admin-text antialiased">

@@ -161,6 +161,53 @@ public sealed class HubGroupStandingDto
 }
 
 /// <summary>
+/// «Последний старт» ростера — карточка таба Overview.
+///
+/// Считается сервером по ВСЕМУ турниру, а не срезом ленты <c>recent_results</c>: лента
+/// обрезана до 25 строк, и на чемпионате её хватает на полтора дня из трёх. Срез врал
+/// сразу в трёх местах — «25 swims» было лимитом ленты, медали считались по обрезку
+/// (1 золото вместо 6), а пять строк карточки были последними по id, а не лучшими.
+/// </summary>
+public sealed class HubGroupLastStartDto
+{
+    /// <summary>Последний день старта (<c>Competitions.Id</c>) — адрес дня.</summary>
+    [JsonPropertyName("competition_id")]
+    public int CompetitionId { get; set; }
+
+    /// <summary>Турнир многодневки (<c>CompetitionEvent</c>); null — старт однодневный.</summary>
+    [JsonPropertyName("event_id")]
+    public int? EventId { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = "";
+
+    /// <summary>Первый и последний день, в которые плыл ростер (dd/MM/yyyy).</summary>
+    [JsonPropertyName("date_from")]
+    public string DateFrom { get; set; } = "";
+
+    [JsonPropertyName("date_to")]
+    public string DateTo { get; set; } = "";
+
+    /// <summary>Все заплывы ростера на старте, эстафеты — по членству (docs/relays.md).</summary>
+    [JsonPropertyName("swims")]
+    public int Swims { get; set; }
+
+    /// <summary>Медали — по единому правилу продукта (клиентский <c>HelperResults.isMedalPlace</c>).</summary>
+    [JsonPropertyName("golds")]
+    public int Golds { get; set; }
+
+    [JsonPropertyName("silvers")]
+    public int Silvers { get; set; }
+
+    [JsonPropertyName("bronzes")]
+    public int Bronzes { get; set; }
+
+    /// <summary>Лучшие заплывы старта: медали, потом места по возрастанию, снятые — в конце.</summary>
+    [JsonPropertyName("rows")]
+    public List<ResultDto> Rows { get; set; } = [];
+}
+
+/// <summary>
 /// Карточка ленты хайлайтов шапки группы (design_handoff_group_header).
 /// Дискриминированный union по <see cref="Type"/>: record | medals | video | photo —
 /// у каждого варианта заполнен свой поднабор полей, остальные null и не сериализуются.
@@ -336,6 +383,10 @@ public sealed class HubGroupDetailsDto
     /// <summary>Последние заплывы участников (свежие сверху).</summary>
     [JsonPropertyName("recent_results")]
     public List<ResultDto> RecentResults { get; set; } = [];
+
+    /// <summary>Последний старт ростера целиком (карточка Overview); null — заплывов нет.</summary>
+    [JsonPropertyName("last_start")]
+    public HubGroupLastStartDto? LastStart { get; set; }
 
     /// <summary>Рекорды группы: лучшее время по каждой оси стиль+дистанция+бассейн.</summary>
     [JsonPropertyName("bests")]

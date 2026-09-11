@@ -384,7 +384,10 @@ public class ResultRepositoryTests
         // DB пустая — если кеш сработает, результат придёт из кеша, а не из DB
         var expected = new[] { "freestyle", "backstroke" };
         var cacheMock = new Mock<ICacheService>();
-        cacheMock.Setup(c => c.GetAsync<string[]>(It.IsAny<string>()))
+        // Репозиторий берёт подсказки через GetOrCreateAsync (К3): попадание в кэш — это
+        // готовое значение без вызова фабрики, то есть без запроса к базе.
+        cacheMock.Setup(c => c.GetOrCreateAsync(It.IsAny<string>(), It.IsAny<Func<Task<string[]?>>>(),
+                     It.IsAny<TimeSpan>(), It.IsAny<string[]>()))
                  .ReturnsAsync(expected);
         var repo = new ResultRepository(db, cacheMock.Object);
 
