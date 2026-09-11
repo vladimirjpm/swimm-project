@@ -16,11 +16,14 @@ public class PublicMediaController : ControllerBase
 {
     private readonly IUserMediaPublicationService _publications;
     private readonly IUserMediaRepository _media;
+    private readonly IHubGroupPublicRepository _groups;
 
-    public PublicMediaController(IUserMediaPublicationService publications, IUserMediaRepository media)
+    public PublicMediaController(
+        IUserMediaPublicationService publications, IUserMediaRepository media, IHubGroupPublicRepository groups)
     {
         _publications = publications;
         _media = media;
+        _groups = groups;
     }
 
     /* Пикер привязки к заплыву (Add link, дизайн-бриф §6.3) — публичные данные результатов. */
@@ -51,9 +54,17 @@ public class PublicMediaController : ControllerBase
 
         var raw = User.FindFirstValue(ClaimTypes.NameIdentifier);
         int? userId = int.TryParse(raw, out var id) ? id : null;
+        var isSiteAdmin = User.IsInRole("Admin");
+
+        // Group-режим приватной группы: медиа её ростера — данные группы, не-участнику пусто (§6-6).
+        if (competitionId == null && eventId == null && group != null)
+        {
+            var access = await _groups.GetAccessAsync(group, userId, isSiteAdmin);
+            if (access is { CanView: false }) return Ok(Array.Empty<object>());
+        }
 
         return Ok(await _publications.GetVisibleForResultsAsync(
-            competitionId, eventId, group, userId, User.IsInRole("Admin")));
+            competitionId, eventId, group, userId, isSiteAdmin));
     }
 
     /// <summary>

@@ -260,20 +260,14 @@ public class HubGroupUserService : IHubGroupUserService
             .FirstOrDefaultAsync();
         if (group == null) return HubGroupMemberSaveResult.Fail($"Группа #{hubGroupId} не найдена");
 
-        // Вступить можно только в публично видимую группу — тот же критерий, что у публичного
-        // списка (HubGroupVisibility: private → никуда, perGroup → только IsPublic, public → любые).
-        var visibility = _settings.GetValue("HubGroupVisibility", "public");
-        var joinable = visibility switch
-        {
-            "private" => false,
-            "perGroup" => group.IsPublic,
-            _ => true,
-        };
-        if (!joinable) return HubGroupMemberSaveResult.Fail("В эту группу нельзя вступить");
+        // В приватную группу вступают — иначе её страница «только для участников» вела бы в
+        // тупик (§6-6, 11.09.2026). Но ТОЛЬКО заявкой, какой бы ни была политика: открытая
+        // самозапись сняла бы приватность одним кликом любого вошедшего.
+        var isPrivate = HubGroupVisibilityRules.IsPrivate(HubGroupVisibilityRules.Current(_settings), group.IsPublic);
 
         // Гейт members-контента: при approval самозапись создаёт заявку (pending),
         // активирует владелец/админ группы через ApproveUserMemberAsync.
-        var status = group.JoinPolicy == HubGroupJoinPolicy.Approval
+        var status = isPrivate || group.JoinPolicy == HubGroupJoinPolicy.Approval
             ? HubGroupUserMemberStatus.Pending
             : HubGroupUserMemberStatus.Active;
         return await InsertUserMemberAsync(hubGroupId, userId, addedByUserId: null, status);

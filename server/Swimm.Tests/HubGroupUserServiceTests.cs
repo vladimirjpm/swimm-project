@@ -484,38 +484,50 @@ public class HubGroupUserServiceTests
         Assert.Null(row.AddedByUserId); // самозапись
     }
 
+    // Приватная группа (§6-6, 11.09.2026): вступить МОЖНО — иначе её страница «только для
+    // участников» вела бы в тупик, — но только заявкой, даже при открытой политике: открытая
+    // самозапись снимала бы приватность одним кликом. Раньше вступление было запрещено вовсе.
+
     [Fact]
-    public async Task Join_PrivateVisibility_Blocked()
+    public async Task Join_PrivateVisibility_CreatesRequestEvenWhenOpen()
     {
-        await using var db = CreateDb(nameof(Join_PrivateVisibility_Blocked));
+        await using var db = CreateDb(nameof(Join_PrivateVisibility_CreatesRequestEvenWhenOpen));
         var settings = new SettingsStub(new() { ["HubGroupVisibility"] = "private" });
         var owner = await AddUserAsync(db, "owner@example.com");
         var joiner = await AddUserAsync(db, "joiner@example.com");
-        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true };
+        var group = new HubGroup
+        {
+            Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true, JoinPolicy = HubGroupJoinPolicy.Open
+        };
         db.HubGroups.Add(group);
         await db.SaveChangesAsync();
 
         var result = await Service(db, settings).JoinAsync(group.Id, joiner.Id);
 
-        Assert.False(result.Success);
-        Assert.Empty(db.HubGroupUserMembers);
+        Assert.True(result.Success);
+        Assert.Equal(HubGroupUserMemberStatus.Pending, (await db.HubGroupUserMembers.SingleAsync()).Status);
     }
 
     [Fact]
-    public async Task Join_PerGroupVisibility_OnlyPublicGroups()
+    public async Task Join_PerGroupVisibility_PrivateGroupByRequest_PublicGroupInstant()
     {
-        await using var db = CreateDb(nameof(Join_PerGroupVisibility_OnlyPublicGroups));
+        await using var db = CreateDb(nameof(Join_PerGroupVisibility_PrivateGroupByRequest_PublicGroupInstant));
         var settings = new SettingsStub(new() { ["HubGroupVisibility"] = "perGroup" });
         var owner = await AddUserAsync(db, "owner@example.com");
         var joiner = await AddUserAsync(db, "joiner@example.com");
         var hidden = new HubGroup { Name = "H", Slug = "h", OwnerUserId = owner.Id, IsPublic = false };
-        db.HubGroups.Add(hidden);
+        var open = new HubGroup { Name = "O", Slug = "o", OwnerUserId = owner.Id, IsPublic = true };
+        db.HubGroups.AddRange(hidden, open);
         await db.SaveChangesAsync();
+        var svc = Service(db, settings);
 
-        var result = await Service(db, settings).JoinAsync(hidden.Id, joiner.Id);
+        Assert.True((await svc.JoinAsync(hidden.Id, joiner.Id)).Success);
+        Assert.True((await svc.JoinAsync(open.Id, joiner.Id)).Success);
 
-        Assert.False(result.Success);
-        Assert.Empty(db.HubGroupUserMembers);
+        Assert.Equal(HubGroupUserMemberStatus.Pending,
+            (await db.HubGroupUserMembers.SingleAsync(m => m.HubGroupId == hidden.Id)).Status);
+        Assert.Equal(HubGroupUserMemberStatus.Active,
+            (await db.HubGroupUserMembers.SingleAsync(m => m.HubGroupId == open.Id)).Status);
     }
 
     [Fact]

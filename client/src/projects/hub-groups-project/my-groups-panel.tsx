@@ -102,6 +102,14 @@ function GroupInputForm({
           onChange={(e) => setField('isPublic', e.target.checked)} />
         Public group
       </label>
+      {/* Приватная (§6-6): закрыта не-участникам, но не спрятана от них насовсем — по ссылке
+          они видят «members only» и могут подать заявку. */}
+      {!form.isPublic && (
+        <p className="m-0 text-[11.5px] italic text-[var(--t-text-3)]">
+          Private: only members see the roster, results and media. Everyone else gets a “members only”
+          page and can only request to join; the group is not listed in the catalog.
+        </p>
+      )}
 
       <label className="flex items-center gap-2 text-[13px] font-bold text-[var(--t-text-2)]">
         Joining:

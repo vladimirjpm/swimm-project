@@ -6,6 +6,7 @@ import type {
 import { routes } from '../../utils/routes';
 import { useCurrentIdentity, useHubGroupMembership, useMyHubGroups } from './use-my-hub-groups';
 import GroupHero from './components/group-hero';
+import GroupMembersOnly from './components/group-members-only';
 import {
   GroupLastStartCard, GroupMembersCard, GroupMembersDigest, GroupRecentSwimsCard,
   GroupRecordsCard, GroupRecordsDigest, GroupStandingsCard,
@@ -90,7 +91,10 @@ function GroupPage({ slug }: { slug: string }) {
   // сервер ей считает тем же агрегатом, что и обычной группе, — эти табы работают.
   const real = group != null && !group.is_virtual && group.id > 0;
 
-  const tabs: EntityTabSpec<GroupTab>[] = group == null ? [] : ([
+  // Приватная группа, зритель не участник (§6-6): сервер прислал заглушку без данных — табов нет.
+  const membersOnly = group?.members_only === true;
+
+  const tabs: EntityTabSpec<GroupTab>[] = group == null || membersOnly ? [] : ([
     {
       // Дайджест — витрина соседних табов, а не шестой набор данных: те же `bests`,
       // `recent_results` и `members`, что у полных карточек, второго запроса нет.
@@ -258,7 +262,14 @@ function GroupPage({ slug }: { slug: string }) {
       topbarActive="groups"
       status={status}
       messages={{ notfound: 'Group not found', error: 'Could not load this group' }}
-      hero={group ? <GroupHero group={group} /> : null}
+      hero={group ? (membersOnly ? <GroupMembersOnly group={group} /> : <GroupHero group={group} />) : null}
+      beforeTabs={group?.is_private && !membersOnly ? (
+        // Участник видит приватную группу целиком — пусть знает, что остальным она закрыта.
+        <p className="mb-4 text-[12px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
+          🔒 Private group — only members see this page. Everyone else sees a “members only” notice
+          and can only request to join.
+        </p>
+      ) : null}
       tabsAriaLabel="Group sections"
       tabs={tabs}
     />

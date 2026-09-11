@@ -59,9 +59,12 @@ public class AdminSettingsService : ISettingsService
             new(FavoritesRules.MaxClubsKey, FavoritesRules.DefaultMaxClubs.ToString(), "int", "livesite",
                 "Сколько КЛУБОВ можно держать в избранном, 1..200. Избранный клуб в пловцов не " +
                 "разворачивается и в лимит пловцов не идёт"),
-            new("HubGroupVisibility", "public", "string", "livesite",
-                "Видимость групп: public — все видны всем; private — все скрыты; " +
-                "perGroup — решает флаг IsPublic у конкретной группы"),
+            // Дефолт perGroup (решение 11.09.2026, §6-6): иначе галочка «Public group» у группы
+            // ни на что не влияла. Приватная = только для участников, остальным — заглушка.
+            new(HubGroupVisibilityRules.SettingKey, HubGroupVisibilityRules.Default, "string", "livesite",
+                "Видимость групп: perGroup — решает галочка «Public group» у группы (снята — группу " +
+                "видят только участники, остальным страница «только для участников», в каталоге её нет); " +
+                "public — все группы открыты всем, галочка не действует; private — все группы только для участников"),
             new("DiscoveryEnabled", "false", "bool", "admin",
                 "Автозабор isr.org.il: true — фоновая проверка списка соревнований по расписанию"),
             new("DiscoveryIntervalHours", "12", "int", "admin",

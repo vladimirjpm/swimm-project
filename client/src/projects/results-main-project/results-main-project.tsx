@@ -86,6 +86,9 @@ function MobileFiltersLauncher({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Приватная группа глазами не-участника (§6-6): результаты и тренировки — только участникам. */
+const PRIVATE_GROUP_NOTICE =
+  'This group is private — only its members can see its results. Open the group page to request to join.';
 
 function ResultsMain() {
   const dispatch = useAppDispatch();
@@ -156,6 +159,7 @@ function ResultsMain() {
         );
         if (cancelled) return;
         if (r.status === 404) { setGroupError('Group not found.'); return; }
+        if (r.status === 403) { setGroupError(PRIVATE_GROUP_NOTICE); return; }
         if (!r.ok) { setGroupError(`Failed to load results (${r.status}).`); return; }
         const json = await r.json();
         all.push(...(json.data ?? []));
@@ -184,6 +188,9 @@ function ResultsMain() {
           const dto: HubGroupDetails = await info.json();
           setGroupInfo(dto);
           title = dto.name_en || dto.name || groupSlug;
+          // Приватная группа, зритель не участник (§6-6): её результаты и тренировки закрыты —
+          // говорим это прямо, а не «не удалось загрузить».
+          if (dto.members_only) { setGroupError(PRIVATE_GROUP_NOTICE); return; }
         }
         await (groupTab === 'trainings' ? loadTrainings() : loadCompetitions(title));
       } catch {
