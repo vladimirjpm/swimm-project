@@ -1,0 +1,156 @@
+@page
+@model Swimm.API.Pages.Admin.CacheModel
+@using Swimm.API.Pages.Admin
+@{
+    ViewData["Title"] = "Cache";
+    ViewData["PageSubtitle"] = "Как устроен кэш и кто сколько кэширует";
+}
+
+@* ⚠ Эту страницу держат в синхроне с кодом (docs/pre-push-rules.md): поменял кэш — поправь
+   тексты здесь и docs/admin-pages/cache.md. Таблица политик собирается из кода сама. *@
+
+<div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
+    Кэш живёт в <strong class="text-admin-text">двух местах</strong>:
+    у посетителя в браузере (заголовок <code>Cache-Control</code> ответа) и на сервере
+    (<code>ICacheService</code>, сейчас — в памяти процесса). Оба нужны, чтобы не ходить в базу
+    за одним и тем же. Промах кэша = запрос в базу, и только он стоит денег.<br>
+    Серверный кэш сбрасывается записью в админке, а браузерный сервер сбросить
+    <strong class="text-admin-text">не может</strong> — поэтому то, что правят руками, отдаётся
+    браузеру с <code>no-cache</code>.
+</div>
+
+<h2 class="text-lg text-admin-accent m-0 mb-2">Браузер: кто сколько держит</h2>
+<p class="text-xs text-admin-text-muted mt-0 mb-3 leading-relaxed">
+    <span class="text-[0.7rem] py-0.5 px-1.5 rounded-sm font-semibold uppercase whitespace-nowrap bg-admin-accent/15 text-admin-accent">max-age=N</span>
+    — N секунд браузер не спрашивает сервер вообще: правка в админке видна посетителю
+    <strong class="text-admin-text">не сразу</strong>, а через N секунд.
+    <span class="text-[0.7rem] py-0.5 px-1.5 rounded-sm font-semibold uppercase whitespace-nowrap bg-admin-success/15 text-admin-success">no-cache</span>
+    — браузер хранит ответ, но перед каждым показом сверяет ETag (не менялось — короткий ответ 304
+    без тела): правка видна <strong class="text-admin-text">сразу</strong>.
+    <code>private, no-store</code> — не хранить вовсе (приватная группа).
+    Таблица собрана из кода при открытии страницы — цифры не устаревают.
+</p>
+
+<div class="overflow-x-auto mb-6">
+<table class="admin-table">
+    <thead>
+        <tr>
+            <th>Где на сайте</th>
+            <th>Браузер (Cache-Control)</th>
+            <th>Сервер (TTL ответа)</th>
+            <th>Эндпоинты контроллера</th>
+        </tr>
+    </thead>
+    <tbody>
+    @foreach (var row in Model.Policies)
+    {
+        <tr>
+            <td class="align-top">
+                @if (row.WhereOnSite is null)
+                {
+                    <span class="text-admin-warning font-semibold">не описан — добавь в карту WhereOnSite (Cache.cshtml.cs)</span>
+                }
+                else
+                {
+                    <span class="text-admin-text">@row.WhereOnSite</span>
+                }
+                <div class="text-xs text-admin-text-muted">@row.Controller</div>
+            </td>
+            <td class="align-top whitespace-nowrap">
+                @foreach (var policy in row.BrowserPolicies)
+                {
+                    var immediate = policy.Contains("no-cache") || policy.Contains("no-store");
+                    <div class="mb-1">
+                        <span class="text-[0.7rem] py-0.5 px-1.5 rounded-sm font-semibold whitespace-nowrap @(immediate ? "bg-admin-success/15 text-admin-success" : "bg-admin-accent/15 text-admin-accent")">@policy</span>
+                    </div>
+                }
+                @if (row.MaxAgeSeconds > 0)
+                {
+                    <div class="text-xs text-admin-text-muted">правка видна через @CachePolicyCatalog.Human(TimeSpan.FromSeconds(row.MaxAgeSeconds))</div>
+                }
+            </td>
+            <td class="align-top whitespace-nowrap">
+                @(row.ServerTtls.Count == 0 ? "—" : string.Join(" / ", row.ServerTtls.Select(CachePolicyCatalog.Human)))
+            </td>
+            <td class="align-top">
+                <div class="text-xs text-admin-text-muted leading-relaxed">
+                    @foreach (var route in row.Routes)
+                    {
+                        <div><code>@route</code></div>
+                    }
+                </div>
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>
+</div>
+
+<h2 class="text-lg text-admin-accent m-0 mb-2">Сервер: как сбрасывается</h2>
+<div class="admin-card mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
+    <p class="mt-0">
+        <strong class="text-admin-text">Сейчас:</strong> любая запись из админки, импорт или пересчёт
+        сбрасывает <strong class="text-admin-text">весь</strong> серверный кэш
+        (<code>InvalidateAllAsync</code>); вызов сброса ручной в каждом месте записи. Параллельные
+        запросы одного ответа после сброса строят его <strong class="text-admin-text">один раз</strong>
+        (<code>GetOrCreateAsync</code>), а ответ, собранный во время сброса, в кэш не ложится.
+    </p>
+    <p>
+        <strong class="text-admin-text">Цель — сброс по меткам:</strong> ответ помнит, из каких
+        данных собран (<code>Records</code>, <code>HubGroups:24</code>…), и запись сбрасывает только
+        свои метки. Правка расписания одной группы — одна страница, импорт результатов — всё, что
+        собрано из результатов. Метки уже есть в <code>ICacheService</code>; их расстановка и
+        автоматический сброс — следующие этапы (<code>docs/plans/cache-tags-plan.md</code>, К3–К4).
+    </p>
+    <div class="flex flex-wrap items-center gap-3 mt-4">
+        <button id="btn-invalidate-cache" class="admin-btn admin-btn-primary cursor-pointer">Сбросить весь серверный кэш</button>
+        <span class="text-xs">Свежие ответы соберутся при следующих запросах. Браузеры посетителей это не трогает.</span>
+    </div>
+</div>
+
+<h2 class="text-lg text-admin-accent m-0 mb-2">Правила (чтобы переезд на Redis был заменой одной строки)</h2>
+<div class="admin-card mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
+    <ol class="m-0 pl-5">
+        <li><strong class="text-admin-text">Только через <code>ICacheService</code>.</strong>
+            Свой словарь или прямой <code>IMemoryCache</code> второй сервер не увидит и не сбросит.</li>
+        <li><strong class="text-admin-text">В кэш — только DTO/record со свойствами.</strong>
+            Не сущности базы, не кортежи (Redis запишет кортеж как <code>{}</code>). Проверяется при
+            каждой записи в кэш и тестом по всем местам вызова кэша.</li>
+        <li><strong class="text-admin-text">Взятое из кэша не менять.</strong>
+            В памяти правка видна всем следующим читателям, в Redis — нет.</li>
+        <li><strong class="text-admin-text">Сбрасывать по метке</strong>, а не перебором ключей.</li>
+    </ol>
+</div>
+
+<h2 class="text-lg text-admin-accent m-0 mb-2">Чего кэш не решает</h2>
+<div class="admin-card mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
+    Данные, <strong class="text-admin-text">посчитанные и сохранённые в базе</strong>, — не кэш:
+    их надо не сбросить, а пересчитать. Сменился мировой рекорд — пометки «время под вопросом»
+    (<code>SuspectReason</code>) сами не обновятся, их пересчитывает проверка качества; поменялась
+    шкала очков — пересчитывается клубный зачёт. Сброс кэша здесь не поможет.
+</div>
+
+<div class="admin-card border-l-[3px] border-l-admin-warning py-3 px-4 text-xs text-admin-text-muted leading-relaxed">
+    <strong class="text-admin-text">Как поддерживать эту страницу.</strong>
+    Таблица выше обновляется сама. Руками — тексты этой страницы, карта «где на сайте»
+    (<code>Cache.cshtml.cs</code>) и <code>docs/admin-pages/cache.md</code>: их правят в том же
+    изменении, что трогает кэш (Cache-Control, TTL, сброс, метки, <code>ICacheService</code>).
+    Перед push это сверяется по <code>docs/pre-push-rules.md</code>.
+</div>
+
+@section Scripts {
+<script>
+    document.getElementById('btn-invalidate-cache').addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        try {
+            await api('/api/admin/cache/invalidate', { method: 'POST' });
+            toast('Серверный кэш сброшен — ответы соберутся при следующих запросах', 3500);
+        } catch (err) {
+            toast('Ошибка: ' + err.message, 5000);
+        } finally {
+            btn.disabled = false;
+        }
+    });
+</script>
+}
