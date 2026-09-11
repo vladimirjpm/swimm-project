@@ -178,7 +178,7 @@ export default function CompetitionPersonalStrip({ overview, onOpenSwims, onOpen
                   className="relative block h-[38px] w-[64px] overflow-hidden rounded-[7px]"
                   style={{ background: 'color-mix(in srgb, var(--theme-mode-text) 10%, transparent)' }}
                 >
-                  {thumb && <img src={thumb} alt="" loading="lazy" className="h-full w-full object-cover" />}
+                  {thumb && <img src={thumb} referrerPolicy="no-referrer" alt="" loading="lazy" className="h-full w-full object-cover" />}
                   {m.media_type === 'video' && (
                     <span className="absolute inset-0 flex items-center justify-center text-[13px] text-white drop-shadow">▶</span>
                   )}

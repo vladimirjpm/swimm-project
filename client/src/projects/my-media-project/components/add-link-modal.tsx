@@ -7,6 +7,7 @@ import {
   SwimmerResultBrief,
 } from '../use-all-my-media';
 import { chipClass, segmentClass } from './status-styles';
+import { HelperMedia } from '../../../utils/helpers';
 
 export interface AddLinkSwimmerOption {
   id: number;
@@ -155,7 +156,7 @@ function AddLinkModal({
                 </div>
                 <div className="flex aspect-video items-center justify-center rounded-[12px] border border-[var(--t-border)] bg-[var(--t-surface2)]">
                   {kind === 'photo' && /^https?:\/\//i.test(url) ? (
-                    <img src={url} alt="" className="h-full w-full rounded-[12px] object-cover" />
+                    <img src={HelperMedia.directImageUrl(url)} referrerPolicy="no-referrer" alt="" className="h-full w-full rounded-[12px] object-cover" />
                   ) : (
                     <span className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--t-accent-border)] bg-[var(--t-scrim)] text-[16px] text-[var(--t-accent)]">
                       {kind === 'photo' ? '🖼' : '▶'}

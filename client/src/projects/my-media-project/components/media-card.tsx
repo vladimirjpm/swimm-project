@@ -45,7 +45,7 @@ function MediaCard({ item, publications, onOpenLightbox, onDelete, onWithdraw, o
         onClick={() => { if (isEmbeddable) onOpenLightbox(); else window.open(item.url, '_blank', 'noopener,noreferrer'); }}
       >
         {thumb ? (
-          <img src={thumb} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <img src={thumb} referrerPolicy="no-referrer" alt="" className="absolute inset-0 h-full w-full object-cover" />
         ) : null}
         <span className="relative z-10 flex h-11 w-11 items-center justify-center rounded-full border border-[var(--t-accent-border)] bg-[var(--t-scrim)] text-[15px] text-[var(--t-accent)]">
           {playGlyph}

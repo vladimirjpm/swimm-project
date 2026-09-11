@@ -7,6 +7,7 @@ import UI_FlagEmoji from '../../components/mix/flag-icon/flag-icon';
 import DeepHeroBand from '../../components/deep/hero-band';
 import { DeepBadge, DeepKpi } from '../../components/deep/kpi';
 import { showcaseNoticeText } from '../../../utils/helpers/season-helper';
+import { HelperMedia } from '../../../utils/helpers';
 
 /**
  * Hero страницы клуба — ОДИН ИЗ вариантов шапки сущности (второй — группа). Корпус полосы и
@@ -173,7 +174,8 @@ function ClubPhoto({ url }: { url: string | null }) {
   if (url) {
     return (
       <img
-        src={url}
+        src={HelperMedia.directImageUrl(url)}
+        referrerPolicy="no-referrer"
         alt=""
         className="h-full min-h-[200px] w-full rounded-2xl border object-cover"
         style={{ borderColor: 'var(--deep-card-border)' }}

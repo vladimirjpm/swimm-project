@@ -28,7 +28,7 @@ function MediaTile({ item, onClick }: { item: CompetitionMediaItem; onClick: () 
       style={{ borderColor: 'var(--theme-mode-border)', background: 'var(--theme-mode-surface)' }}
     >
       {thumb ? (
-        <img src={thumb} alt="" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+        <img src={thumb} referrerPolicy="no-referrer" alt="" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
       ) : (
         <div
           className="flex h-full w-full items-center justify-center text-[28px]"

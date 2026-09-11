@@ -48,7 +48,7 @@ function GalleryTile({ item, onClick }: { item: HubGroupMediaItem; onClick?: () 
       onClick={onClick}
     >
       {thumbUrl ? (
-        <img loading="lazy" src={thumbUrl} alt="" className="h-full w-full object-cover" />
+        <img loading="lazy" src={thumbUrl} referrerPolicy="no-referrer" alt="" className="h-full w-full object-cover" />
       ) : (
         <div className="flex h-full w-full items-center justify-center text-[28px]">🎬</div>
       )}

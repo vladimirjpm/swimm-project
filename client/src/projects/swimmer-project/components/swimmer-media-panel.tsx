@@ -18,7 +18,7 @@ function MediaTile({ item, onClick }: { item: GalleryItem; onClick: () => void }
   return (
     <button type="button" onClick={onClick} className="deep-media-tile">
       {thumb ? (
-        <img src={thumb} alt="" className="h-full w-full object-cover" />
+        <img src={thumb} referrerPolicy="no-referrer" alt="" className="h-full w-full object-cover" />
       ) : (
         <span className="deep-media-tile__glyph">{item.type === 'image' ? '🖼' : '▶'}</span>
       )}

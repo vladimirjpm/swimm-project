@@ -31,7 +31,8 @@ const GalleryItemView: React.FC<{ item: GalleryItem }> = ({ item }) => {
   if (item.type === 'image') {
     return (
       <img
-        src={item.url}
+        src={item.url ? HelperMedia.directImageUrl(item.url) : undefined}
+        referrerPolicy="no-referrer"
         alt=""
         className="max-w-full max-h-[80vh] object-contain"
       />

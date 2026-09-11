@@ -12,6 +12,8 @@ import { HelperMedia } from '../../../utils/helpers';
  * Семантика запроса — полная замена: форма маленькая и всегда предзаполнена текущим
  * состоянием, поэтому шлём её целиком, а не патч.
  *
+ * Под полем URL — проверка ссылки глазами посетителя (`PhotoUrlCheck` внизу файла).
+ *
  * ⚠ После сохранения страница ПЕРЕЗАГРУЖАЕТСЯ. Это не лень: настройки меняют корпус страницы
  * (правая колонка шапки появляется или исчезает), а серверный ответ кэшируется — сервер
  * сбрасывает кэш при записи, и честный способ увидеть результат целиком это перечитать
@@ -135,6 +137,8 @@ function DeepDisplaySettingsCard({
         />
       </label>
 
+      {mediaId == null && url.trim() !== '' && <PhotoUrlCheck url={url} />}
+
       {photos.length > 0 && (
         <div className="mt-4">
           <div className="text-[11.5px] font-extrabold uppercase tracking-wide" style={{ color: 'var(--deep-text-mute)' }}>
@@ -158,7 +162,7 @@ function DeepDisplaySettingsCard({
                   }}
                 >
                   {thumb
-                    ? <img loading="lazy" src={thumb} alt="" className="h-full w-full object-cover" />
+                    ? <img loading="lazy" src={thumb} referrerPolicy="no-referrer" alt="" className="h-full w-full object-cover" />
                     : <span className="text-[20px]">🎬</span>}
                 </button>
               );
@@ -185,6 +189,119 @@ function DeepDisplaySettingsCard({
         {busy ? 'Saving…' : 'Save'}
       </button>
     </section>
+  );
+}
+
+/**
+ * Проверка ссылки на фото — глазами ПОСЕТИТЕЛЯ, а не админа. Повод: ссылка «Поделиться» из
+ * Google Drive отдаёт код 200, но это страница просмотрщика, и фото на витрине битое
+ * (11.09.2026). Сам перевод такой ссылки в картинку делает `HelperMedia.directImageUrl`.
+ *
+ * Картинку грузит браузер. Серверной проверки нет сознательно: сервер, скачивающий любой
+ * адрес по просьбе админа группы, — это SSRF. Хосты Google грузим анонимно
+ * (`crossOrigin="anonymous"` = без кук): админ залогинен в Google, и ЗАКРЫТЫЙ файл Drive у
+ * него показался бы целым, а у посетителя — нет. Google отдаёт `Access-Control-Allow-Origin: *`,
+ * поэтому открытый файл в этом режиме грузится. Остальным хостам анонимный режим не включаем:
+ * без CORS-заголовка он уронил бы и рабочую картинку.
+ *
+ * Это предупреждение, а не запрет: сохранить можно и битую ссылку — хост мог прилечь на
+ * минуту, а доступ в Drive человек откроет потом (для того и «Check again»).
+ */
+function PhotoUrlCheck({ url }: { url: string }) {
+  const [attempt, setAttempt] = useState(0);
+  // Результат помнит, К ЧЕМУ он относится: сменилась ссылка или нажали «Check again» — старый
+  // ответ не подходит, и состояние само становится «checking», без эффекта-сброса (эффект
+  // гонялся бы с onLoad закэшированной картинки).
+  const [checked, setChecked] = useState<{ key: string; ok: boolean } | null>(null);
+
+  const trimmed = url.trim();
+  if (!/^https?:\/\//i.test(trimmed)) {
+    return (
+      <p className="mt-2 text-[12px] font-extrabold" style={{ color: 'var(--deep-danger)' }}>
+        The link must start with https://
+      </p>
+    );
+  }
+
+  const src = HelperMedia.directImageUrl(trimmed);
+  const isDrive = HelperMedia.isGoogleDriveUrl(trimmed);
+  const anonymous = isDrive || /^https?:\/\/[^/]*\.googleusercontent\.com\//i.test(src);
+  const key = `${attempt}|${src}`;
+  const state: 'checking' | 'ok' | 'broken' =
+    checked?.key !== key ? 'checking' : checked.ok ? 'ok' : 'broken';
+
+  const shareSteps = <b>Share → General access → Anyone with the link</b>;
+  let hint: React.ReactNode = null;
+  if (isDrive && HelperMedia.extractGoogleDriveFileId(trimmed) == null) {
+    hint = 'This is a Google Drive folder or document, not an image. Open the image itself in Drive and copy its link.';
+  } else if (isDrive && state === 'broken') {
+    hint = <>Google Drive: open the file → {shareSteps}. Then press Check again.</>;
+  } else if (isDrive) {
+    hint = <>Google Drive: keep the file shared — {shareSteps}. Otherwise only you will see it.</>;
+  } else if (state === 'broken') {
+    hint = 'Paste a direct link to the image file (it usually ends in .jpg or .png), not a link to a page that shows it.';
+  }
+
+  const statusColor =
+    state === 'ok' ? 'var(--deep-accent)' : state === 'broken' ? 'var(--deep-danger)' : 'var(--deep-text-mute)';
+
+  return (
+    <div className="mt-3 flex items-start gap-3" aria-live="polite">
+      <div
+        className="relative h-[72px] w-[128px] shrink-0 overflow-hidden rounded-[10px] border"
+        style={{ borderColor: 'var(--deep-card-border)', background: 'var(--deep-card-bg-row)' }}
+      >
+        <img
+          key={key}
+          src={src}
+          crossOrigin={anonymous ? 'anonymous' : undefined}
+          referrerPolicy="no-referrer"
+          alt=""
+          onLoad={() => setChecked({ key, ok: true })}
+          onError={() => setChecked({ key, ok: false })}
+          className={`h-full w-full object-cover ${state === 'ok' ? '' : 'invisible'}`}
+        />
+        {state !== 'ok' && (
+          <span
+            className="absolute inset-0 flex items-center justify-center text-[18px] font-black"
+            style={{ color: state === 'broken' ? 'var(--deep-danger)' : 'var(--deep-text-ghost)' }}
+            aria-hidden="true"
+          >
+            {state === 'broken' ? '✕' : '…'}
+          </span>
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="text-[12.5px] font-extrabold" style={{ color: statusColor }}>
+          {state === 'checking' && 'Checking the link…'}
+          {state === 'ok' && '✓ Visitors will see this photo'}
+          {state === 'broken' && "✕ Visitors won't see this photo — the link doesn't open as an image"}
+        </div>
+        {hint && (
+          <p
+            className="mt-1 text-[11.5px] font-bold"
+            style={{ color: state === 'broken' ? 'var(--deep-text)' : 'var(--deep-text-mute)' }}
+          >
+            {hint}
+          </p>
+        )}
+        {state === 'broken' && (
+          <button
+            type="button"
+            onClick={() => setAttempt((n) => n + 1)}
+            className="mt-2 cursor-pointer rounded-[9px] border px-3 py-1.5 text-[12px] font-extrabold hover:brightness-110"
+            style={{
+              background: 'var(--deep-accent-chip)',
+              borderColor: 'var(--deep-accent-border)',
+              color: 'var(--deep-accent)',
+            }}
+          >
+            Check again
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
