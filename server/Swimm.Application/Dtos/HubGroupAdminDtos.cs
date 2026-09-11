@@ -18,6 +18,21 @@ public sealed class HubGroupAdminRowDto
     /// списке лежат и группы, где пользователь всего лишь админ, а удалять может только владелец.
     /// </summary>
     public int OwnerUserId { get; set; }
+
+    /// <summary>Клуб, на который подписана группа (состав из клуба); null — подписки нет.</summary>
+    public string? FollowedClubName { get; set; }
+
+    /// <summary>
+    /// Группу убрала из каталога официальная группа клуба подписки (П4). По ссылке работает.
+    /// Считается на лету: снимут официальный статус — вернётся.
+    /// </summary>
+    public bool HiddenByOfficialGroup { get; set; }
+
+    /// <summary>Плашка «Not in the catalog: …» — текст считает сервер (HubGroupClubRules).</summary>
+    public string? CatalogNotice { get; set; }
+
+    /// <summary>Slug официальной группы клуба — ссылка из плашки.</summary>
+    public string? OfficialGroupSlug { get; set; }
 }
 
 /// <summary>

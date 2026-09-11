@@ -72,6 +72,26 @@ else
                                     <input type="hidden" name="id" value="@r.Id" />
                                     <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Отклонить</button>
                                 </form>
+                                @* Последствия одобрения для ДРУГИХ групп — видны до кнопки (план подписки, П4). *@
+                                @if (r.ApproveImpact is { IsEmpty: false } impact)
+                                {
+                                    <div class="mt-1 text-xs text-admin-text-muted whitespace-normal text-left">
+                                        @if (impact.LeaveCatalog.Count > 0)
+                                        {
+                                            <div title="@string.Join(", ", impact.LeaveCatalog)">
+                                                Уйдут из каталога: <strong class="text-admin-text">@impact.LeaveCatalog.Count</strong>
+                                                (подписаны на клуб; по ссылке работают)
+                                            </div>
+                                        }
+                                        @if (impact.Renamed.Count > 0)
+                                        {
+                                            <div title="@string.Join("\n", impact.Renamed)">
+                                                Будут переименованы: <strong class="text-admin-text">@impact.Renamed.Count</strong>
+                                                (имя совпало с клубом → « · community»)
+                                            </div>
+                                        }
+                                    </div>
+                                }
                             }
                             else if (r.DecidedByDisplayName != null)
                             {

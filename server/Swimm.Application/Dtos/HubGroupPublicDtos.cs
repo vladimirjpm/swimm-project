@@ -289,6 +289,23 @@ public sealed class HubGroupDetailsDto
     [JsonPropertyName("join_policy")]
     public string JoinPolicy { get; set; } = "open";
 
+    /// <summary>Клуб, на который подписана группа (состав из клуба); null — подписки нет.</summary>
+    [JsonPropertyName("followed_club_id")]
+    public int? FollowedClubId { get; set; }
+
+    [JsonPropertyName("followed_club_name")]
+    public string? FollowedClubName { get; set; }
+
+    /// <summary>
+    /// Официальная группа клуба подписки, если это не эта группа (П4): копию клуба открыли по
+    /// ссылке — шапка показывает, где «лицо клуба». null — официальной нет или это она сама.
+    /// </summary>
+    [JsonPropertyName("official_group_slug")]
+    public string? OfficialGroupSlug { get; set; }
+
+    [JsonPropertyName("official_group_name")]
+    public string? OfficialGroupName { get; set; }
+
     [JsonPropertyName("links")]
     public List<HubGroupPublicLinkDto> Links { get; set; } = [];
 

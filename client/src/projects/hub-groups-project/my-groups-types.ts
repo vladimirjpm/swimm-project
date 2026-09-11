@@ -13,6 +13,17 @@ export interface MyHubGroupRow {
   updatedAt: string;
   /** Владелец. В списке лежат и группы, где ты только админ, — Delete только владельцу. */
   ownerUserId: number;
+  /** Клуб, на который подписана группа (состав из клуба); null — подписки нет. */
+  followedClubName?: string | null;
+  /**
+   * Группу убрала из каталога официальная группа клуба подписки (П4). По ссылке она работает;
+   * снимут официальный статус — вернётся сама.
+   */
+  hiddenByOfficialGroup?: boolean;
+  /** Текст плашки «Not in the catalog: …» — уже по-английски, считает сервер. */
+  catalogNotice?: string | null;
+  /** Официальная группа клуба — ссылка из плашки. */
+  officialGroupSlug?: string | null;
 }
 
 export interface HubGroupLinkInput {

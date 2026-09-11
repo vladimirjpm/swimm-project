@@ -31,7 +31,7 @@ public class HubGroupUserService : IHubGroupUserService
 
     public async Task<IReadOnlyList<HubGroupAdminRowDto>> GetMineAsync(int userId)
     {
-        return await _db.HubGroups.AsNoTracking()
+        var rows = await _db.HubGroups.AsNoTracking()
             .Where(g => g.OwnerUserId == userId || g.Admins.Any(m => m.UserId == userId))
             .OrderByDescending(g => g.UpdatedAt)
             .Select(g => new HubGroupAdminRowDto
@@ -48,6 +48,10 @@ public class HubGroupUserService : IHubGroupUserService
                 OwnerUserId = g.OwnerUserId
             })
             .ToListAsync();
+
+        // Клуб подписки и плашка «не в каталоге из-за официальной X» (П4).
+        await HubGroupCatalog.FillCatalogStatusAsync(_db, rows);
+        return rows;
     }
 
     public async Task<HubGroupCreateEligibilityDto> GetCreateEligibilityAsync(int userId, bool isAdmin, bool isCoach)

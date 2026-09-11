@@ -95,6 +95,50 @@ public partial class HubGroupCrudCore
             input.JoinPolicy != HubGroupJoinPolicy.Approval)
             return "Политика вступления: допустимо open или approval";
 
+        return await ValidateNameAgainstOfficialGroupsAsync(input, excludeId);
+    }
+
+    /// <summary>
+    /// Имя клуба с официальной группой занято (§2 плана подписки): неофициальной группе его не
+    /// сохранить — ни имя клуба (иврит/латиница), ни имя самой официальной группы. До появления
+    /// официальной имя клуба разрешено; совпавшие к моменту одобрения переименовываются там же.
+    ///
+    /// Проверяется только то, что МЕНЯЕТСЯ: у группы, получившей имя до одобрения официальной,
+    /// правка описания не должна упираться в имя, которого она не трогает.
+    /// </summary>
+    private async Task<string?> ValidateNameAgainstOfficialGroupsAsync(HubGroupInputDto input, int? excludeId)
+    {
+        var checkName = true;
+        var checkNameEn = true;
+        if (excludeId is int id)
+        {
+            var current = await _db.HubGroups.AsNoTracking()
+                .Where(g => g.Id == id)
+                .Select(g => new { g.IsOfficial, g.Name, g.NameEn })
+                .FirstOrDefaultAsync();
+            if (current == null || current.IsOfficial) return null; // официальной её имя можно
+
+            checkName = HubGroupClubRules.NormalizeName(current.Name) != HubGroupClubRules.NormalizeName(input.Name);
+            checkNameEn = HubGroupClubRules.NormalizeName(current.NameEn) != HubGroupClubRules.NormalizeName(input.NameEn);
+            if (!checkName && !checkNameEn) return null;
+        }
+
+        var officials = await _db.HubGroups.AsNoTracking()
+            .Where(o => o.IsOfficial && o.Club != null)
+            .Select(o => new { o.Name, o.NameEn, ClubName = o.Club!.Name, ClubNameEn = o.Club.NameEn })
+            .ToListAsync();
+
+        foreach (var o in officials)
+        {
+            string?[] reserved = [o.ClubName, o.ClubNameEn, o.Name, o.NameEn];
+            var clubName = o.ClubName.Length > 0 ? o.ClubName : o.ClubNameEn;
+
+            if (checkName && HubGroupClubRules.ConflictsWith(input.Name, reserved))
+                return HubGroupClubRules.NameTakenError(clubName, input.Name);
+            if (checkNameEn && HubGroupClubRules.ConflictsWith(input.NameEn, reserved))
+                return HubGroupClubRules.NameTakenError(clubName, input.NameEn!);
+        }
+
         return null;
     }
 

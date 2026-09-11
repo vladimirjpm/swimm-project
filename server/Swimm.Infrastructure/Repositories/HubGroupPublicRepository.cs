@@ -41,7 +41,9 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
         var visibility = Visibility;
         if (visibility == "private") return [];
 
-        var query = _read.HubGroups.AsNoTracking();
+        // Официальная группа — главная (П4): копии, подписанные на клуб с официальной группой,
+        // в каталоге не показываем — по ссылке они работают (GetBySlugAsync их не фильтрует).
+        var query = _read.HubGroups.AsNoTracking().Where(HubGroupCatalog.ListedInCatalog(_read));
         if (visibility == "perGroup")
             query = query.Where(g => g.IsPublic);
 
@@ -109,6 +111,28 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             IsVirtual = false,
             Members = members
         };
+
+        // Подписка на клуб и официальная группа этого клуба (если это не мы) — для шапки: копию
+        // клуба открыли по ссылке мимо каталога, и она должна показать, где «лицо клуба» (П4).
+        var followed = await _read.HubGroupClubSubscriptions.AsNoTracking()
+            .Where(s => s.HubGroupId == group.Id)
+            .Select(s => new
+            {
+                s.ClubId,
+                ClubName = s.Club!.Name.Length > 0 ? s.Club.Name : s.Club.NameEn,
+                Official = _read.HubGroups
+                    .Where(o => o.IsOfficial && o.ClubId == s.ClubId && o.Id != group.Id)
+                    .Select(o => new { o.Slug, o.Name })
+                    .FirstOrDefault()
+            })
+            .FirstOrDefaultAsync();
+        if (followed != null)
+        {
+            dto.FollowedClubId = followed.ClubId;
+            dto.FollowedClubName = followed.ClubName;
+            dto.OfficialGroupSlug = followed.Official?.Slug;
+            dto.OfficialGroupName = followed.Official?.Name;
+        }
 
         // Настройки отображения: показ блока фото и указатель «взять из медиа». Сам URL
         // указателя доразрешает контроллер — там уже собрана лента `Gallery`, в которой

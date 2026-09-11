@@ -62,6 +62,22 @@ function GroupHero({ group }: Props) {
               </DeepBadge>
             )}
             {!group.is_official && group.club_name && <DeepBadge>Club: {group.club_name}</DeepBadge>}
+            {/* Состав из клуба (подписка). У официальной своего бейджа хватает — «Official group of». */}
+            {!group.is_official && group.followed_club_name && (
+              group.followed_club_id ? (
+                <a href={routes.club(group.followed_club_id)} className="no-underline">
+                  <DeepBadge>Follows <bdi>{group.followed_club_name}</bdi></DeepBadge>
+                </a>
+              ) : (
+                <DeepBadge>Follows <bdi>{group.followed_club_name}</bdi></DeepBadge>
+              )
+            )}
+            {/* Копию клуба открыли по ссылке мимо каталога — показываем, где «лицо клуба» (П4). */}
+            {group.official_group_slug && (
+              <a href={routes.group(group.official_group_slug)} className="no-underline">
+                <DeepBadge accent>Official group: <bdi>{group.official_group_name}</bdi> →</DeepBadge>
+              </a>
+            )}
           </div>
 
           {group.description && (

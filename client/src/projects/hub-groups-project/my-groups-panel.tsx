@@ -1060,7 +1060,25 @@ export default function MyGroupsPanel() {
                         Official · {g.clubName}
                       </span>
                     )}
-                    <div className="text-[11.5px] text-[var(--t-text-2)]">{g.memberCount} · swimmers</div>
+                    <div className="text-[11.5px] text-[var(--t-text-2)]">
+                      {g.memberCount} · swimmers
+                      {!g.isOfficial && g.followedClubName && (
+                        <> · from club <bdi>{g.followedClubName}</bdi></>
+                      )}
+                    </div>
+                    {/* Официальная группа клуба убрала копию из каталога (П4). Писем не шлём —
+                        владелец узнаёт отсюда; текст считает сервер. */}
+                    {g.hiddenByOfficialGroup && g.catalogNotice && (
+                      <p className="m-0 mt-1 text-[11.5px] font-bold text-[var(--t-warn)]">
+                        {g.catalogNotice}{' '}
+                        {g.officialGroupSlug && (
+                          <a href={routes.group(g.officialGroupSlug)}
+                            className="text-[var(--t-accent)] no-underline hover:underline">
+                            Open the official group →
+                          </a>
+                        )}
+                      </p>
+                    )}
                   </div>
                   <div className="flex shrink-0 gap-2">
                     <button type="button" className={btnCls}

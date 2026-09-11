@@ -28,7 +28,7 @@ public class HubGroupAdminService : IHubGroupAdminService
 
     public async Task<IReadOnlyList<HubGroupAdminRowDto>> GetAllAsync()
     {
-        return await _db.HubGroups.AsNoTracking()
+        var rows = await _db.HubGroups.AsNoTracking()
             .OrderByDescending(g => g.UpdatedAt)
             .Select(g => new HubGroupAdminRowDto
             {
@@ -45,6 +45,9 @@ public class HubGroupAdminService : IHubGroupAdminService
                 OwnerUserId = g.OwnerUserId
             })
             .ToListAsync();
+
+        await HubGroupCatalog.FillCatalogStatusAsync(_db, rows);
+        return rows;
     }
 
     public async Task<HubGroupEditDto?> GetByIdAsync(int id)
