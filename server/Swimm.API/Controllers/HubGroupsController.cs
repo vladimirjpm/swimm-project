@@ -47,13 +47,27 @@ public class HubGroupsController : ControllerBase
         _media = media;
     }
 
-    private string Visibility => _settings.GetValue("HubGroupVisibility", "public");
+    private string Visibility => HubGroupVisibilityRules.Current(_settings);
+
+    /// <summary>
+    /// Ответ приватной группы — только участнику и только в его браузере: общий HTTP-кэш
+    /// (браузерный/прокси) не должен унести состав приватной группы следующему зрителю.
+    /// </summary>
+    private const string PrivateCacheControlValue = "private, no-store";
 
     private int? CurrentUserId()
     {
         var raw = User.FindFirstValue(ClaimTypes.NameIdentifier);
         return int.TryParse(raw, out var id) ? id : null;
     }
+
+    /// <summary>Доступ зрителя к группе (§6-6): null — группы нет.</summary>
+    private Task<HubGroupAccessDto?> AccessAsync(string slug) =>
+        _groups.GetAccessAsync(slug, CurrentUserId(), User.IsInRole("Admin"));
+
+    /// <summary>Отказ не-участнику приватной группы — машиночитаемый код для клиента.</summary>
+    private ObjectResult MembersOnly() =>
+        StatusCode(StatusCodes.Status403Forbidden, new { error = "members_only" });
 
     /// <summary>Список видимых групп.</summary>
     [HttpGet("/api/hub-groups")]
@@ -87,13 +101,25 @@ public class HubGroupsController : ControllerBase
         if (string.IsNullOrWhiteSpace(slug) || slug.Length > 120)
             return BadRequest("slug is required");
 
-        // 404/скрытость проверяем ДЁШЕВО (slug-lookup + ids), не строя payload: агрегаты
+        // 404 и доступ проверяем ДЁШЕВО (slug-lookup + членство), не строя payload: агрегаты
         // страницы (последние заплывы, рекорды группы, сезонный зачёт) ходят по Results
         // и на большой таблице стоят сотни мс — им место ТОЛЬКО внутри load-лямбды
         // CachedJson (выполняется на cache miss). 404 при этом не кэшируется.
-        var roster = await _groups.GetRosterSwimmerIdsAsync(slug);
-        if (roster == null) return NotFound();
+        var access = await AccessAsync(slug);
+        if (access == null) return NotFound();
 
+        // Приватная группа, зритель не участник (§6-6): вместо 404 — заглушка «вступите, чтобы
+        // увидеть». Персональный ответ — мимо общего кэша и без хранения в браузере.
+        if (!access.CanView)
+        {
+            var stub = await _groups.GetMembersOnlyStubAsync(slug);
+            if (stub == null) return NotFound();
+            Response.Headers.CacheControl = PrivateCacheControlValue;
+            return Ok(stub);
+        }
+
+        // Полный payload в серверном кэше один на всех, кому можно смотреть; у приватной группы
+        // его отдаём с private, no-store — браузер не держит, прокси не делят.
         return await this.CachedJson(_cache,
             $"http:hub-groups:group:{slug.ToLowerInvariant()}:{Visibility}",
             async () =>
@@ -137,7 +163,7 @@ public class HubGroupsController : ControllerBase
                 // Лента хайлайтов шапки — строго после заполнения Gallery (video/photo берутся из неё).
                 dto.Highlights = HubGroupHighlightsBuilder.Build(dto);
                 return dto;
-            }, PayloadTtl, CacheControlValue);
+            }, PayloadTtl, access.IsPrivate ? PrivateCacheControlValue : CacheControlValue);
     }
 
     /// <summary>
@@ -166,6 +192,12 @@ public class HubGroupsController : ControllerBase
         if (pageSize > 500) pageSize = 500;
         if (pageSize < 1) pageSize = 1;
         if (page < 1) page = 1;
+
+        // Результаты ростера приватной группы — тоже её данные (§6-6).
+        var access = await AccessAsync(slug);
+        if (access == null) return NotFound();
+        if (!access.CanView) return MembersOnly();
+        if (access.IsPrivate) Response.Headers.CacheControl = PrivateCacheControlValue;
 
         var rosterIds = await _groups.GetRosterSwimmerIdsAsync(slug);
         if (rosterIds is null) return NotFound();
@@ -354,6 +386,13 @@ public class HubGroupsController : ControllerBase
 
         var groupId = await _trainings.ResolveGroupIdBySlugAsync(slug);
         if (groupId is null) return NotFound();
+
+        // У приватной группы и public-публикации — её данные: не-участнику не отдаём (§6-6).
+        if (level == "public")
+        {
+            var access = await AccessAsync(slug);
+            if (access is { CanView: false }) return MembersOnly();
+        }
 
         if (level == "members")
         {

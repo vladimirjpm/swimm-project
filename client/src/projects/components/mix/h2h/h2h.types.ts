@@ -54,6 +54,8 @@ export type H2HSlot =
       /** null — избранное недоступно (гость): сердечко не рисуется. */
       isFavorite?: boolean | null;
       onToggleFavorite?: () => void;
+      /** Лимит избранного выбран: пустое сердечко погашено, это подсказка к нему. */
+      favoriteBlockedHint?: string | null;
       /** null — слот несменяемый; иначе кнопка сброса стороны. */
       onClear?: (() => void) | null;
       /** Эту сторону сейчас заполняет пикер — см. `active` у пустого слота. */

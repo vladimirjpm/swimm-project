@@ -51,6 +51,14 @@ public class AppUser
     /// </summary>
     public DateTime? LastSeenAt { get; set; }
 
+    /// <summary>
+    /// Персональный лимит групп, которыми пользователь может владеть, — исключение, которое
+    /// выставляет админ в /Admin/Users. null — действует лимит по роли (настройки
+    /// HubGroupMaxPerUser / HubGroupMaxPerCoach), 0 — создавать группы нельзя. Как это
+    /// складывается с политикой и ролью — только в <c>HubGroupCreationRules</c>.
+    /// </summary>
+    public int? HubGroupLimit { get; set; }
+
     // --- Навигация ---
     public ICollection<AppUserRole> UserRoles { get; set; } = new List<AppUserRole>();
     public ICollection<UserExternalLogin> ExternalLogins { get; set; } = new List<UserExternalLogin>();

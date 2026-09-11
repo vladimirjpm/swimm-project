@@ -27,7 +27,7 @@ interface Props {
 
 /** ♡ избранное + ★ «это я». Гостю — приглашение войти вместо кнопок. */
 function Actions({ swimmerId }: { swimmerId: number }) {
-  const { isAuthenticated, isFavorite, isMe, toggleFavorite, markAsMe, openLoginModal } =
+  const { isAuthenticated, isFavorite, isMe, addBlockedHint, toggleFavorite, markAsMe, openLoginModal } =
     useIdentityFavorites(swimmerId);
 
   if (!isAuthenticated) {
@@ -38,13 +38,18 @@ function Actions({ swimmerId }: { swimmerId: number }) {
     );
   }
 
+  // Лимит избранного выбран — обе кнопки погашены у ещё-не-избранного (звезда тоже добавляет).
+  // `aria-disabled`, а не `disabled`: у выключенной кнопки подсказка в title не всплывает.
+  const blocked = addBlockedHint != null;
+
   return (
     <div className="flex items-center gap-2">
       <button
         type="button"
-        onClick={toggleFavorite}
-        title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+        onClick={blocked ? undefined : toggleFavorite}
+        title={addBlockedHint ?? (isFavorite ? 'Remove from favorites' : 'Add to favorites')}
         aria-pressed={isFavorite}
+        aria-disabled={blocked || undefined}
         className={`deep-hero-action${isFavorite ? ' deep-hero-action--fav' : ''}`}
       >
         <svg width="17" height="17" viewBox="0 0 24 24" fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
@@ -53,9 +58,10 @@ function Actions({ swimmerId }: { swimmerId: number }) {
       </button>
       <button
         type="button"
-        onClick={markAsMe}
-        title={isMe ? 'This is me — unmark' : 'Mark: this is me'}
+        onClick={blocked ? undefined : markAsMe}
+        title={addBlockedHint ?? (isMe ? 'This is me — unmark' : 'Mark: this is me')}
         aria-pressed={isMe}
+        aria-disabled={blocked || undefined}
         className={`deep-hero-action${isMe ? ' deep-hero-action--me' : ''}`}
       >
         <svg width="17" height="17" viewBox="0 0 24 24" fill={isMe ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">

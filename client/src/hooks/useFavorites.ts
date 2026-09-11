@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchAntiforgeryToken, invalidateTokenCache } from '../utils/antiforgery';
+import { loadClientConfig, type FavoriteTarget, type FavoritesLimit } from '../utils/helpers/client-config';
 import { useAuth } from './useAuth';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface FavoriteDto {
   id: number;
-  target_type: 'swimmer' | 'club';
+  target_type: FavoriteTarget;
   swimmer_id?: number;
   swimmer_name?: string;
   club_id?: number;
@@ -23,8 +24,13 @@ interface FavoritesState {
   primarySwimmerId: number | null;
   /** Множество ID пловцов в избранном */
   favoriteSwimmerIds: Set<number>;
+  /** Множество ID клубов в избранном (кнопка «Follow club» в шапке клуба) */
+  favoriteClubIds: Set<number>;
   loading: boolean;
 }
+
+/** Код отказа 422 «лимит избранного выбран» — `FavoritesRules.LimitErrorCode` на сервере. */
+const LIMIT_ERROR_CODE = 'favorites_limit';
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -38,8 +44,17 @@ export function useFavorites() {
     favorites: [],
     primarySwimmerId: null,
     favoriteSwimmerIds: new Set(),
+    favoriteClubIds: new Set(),
     loading: true,
   });
+
+  /**
+   * Лимиты избранного по типу (решение 10.09.2026: 30 пловцов, 3 клуба — настройками в
+   * /Admin/Settings). Приезжают из `/api/client-config`; пока не приехали — сердечко не
+   * гасим, решает сервер. Отказ 422 обновляет лимит из ответа: так клиент догоняет лимит,
+   * снижённый в админке, пока страница была открыта.
+   */
+  const [limits, setLimits] = useState<Partial<Record<FavoriteTarget, FavoritesLimit>>>({});
 
   // Флаг, чтобы не делать запросы после размонтирования компонента
   const mountedRef = useRef(true);
@@ -54,10 +69,24 @@ export function useFavorites() {
     const favoriteSwimmerIds = new Set(
       swimmerFavs.map(f => f.swimmer_id).filter((id): id is number => id != null)
     );
+    const favoriteClubIds = new Set(
+      favorites
+        .filter(f => f.target_type === 'club')
+        .map(f => f.club_id)
+        .filter((id): id is number => id != null)
+    );
     if (mountedRef.current) {
-      setState({ isAuthenticated, favorites, primarySwimmerId, favoriteSwimmerIds, loading: false });
+      setState({ isAuthenticated, favorites, primarySwimmerId, favoriteSwimmerIds, favoriteClubIds, loading: false });
     }
   }, []);
+
+  // Лимиты нужны только вошедшему: гостю сердечко и так открывает вход.
+  useEffect(() => {
+    if (!authIsAuthenticated) return;
+    loadClientConfig().then((cfg) => {
+      if (mountedRef.current && cfg?.favoritesLimits) setLimits(cfg.favoritesLimits);
+    });
+  }, [authIsAuthenticated]);
 
   // Загрузка, реактивная к auth: пока /auth/me не готов — ждём (тот же один запрос,
   // что и раньше на первом рендере); гость → пустое состояние; залогинен → грузим
@@ -86,9 +115,35 @@ export function useFavorites() {
     return () => { cancelled = true; };
   }, [authIsAuthenticated, authLoading, applyFavorites]);
 
+  /** Перечитать список с сервера: после отказа 422 локальный счёт мог устареть (другая вкладка). */
+  const reloadFavorites = useCallback(async (): Promise<void> => {
+    try {
+      const r = await fetch('/api/me/favorites', { credentials: 'include' });
+      if (r.ok) applyFavorites(await r.json(), true);
+    } catch {
+      // Список остаётся прежним — за лимит сервер всё равно не пустит.
+    }
+  }, [applyFavorites]);
+
+  // ── Limits ──────────────────────────────────────────────────────────────────
+
+  /** Лимит типа выбран: добавить нельзя, пока не убрать кого-то. Пока лимит не приехал — false. */
+  const isFull = useCallback((target: FavoriteTarget): boolean => {
+    const max = limits[target]?.max;
+    if (max == null) return false;
+    return state.favorites.filter(f => f.target_type === target).length >= max;
+  }, [limits, state.favorites]);
+
+  /**
+   * Подсказка к погашенному сердечку / кнопке («Up to 30 swimmers — use a group…»); null —
+   * добавлять можно. Текст приходит с сервера (тот же, что в отказе 422), своей копии нет.
+   */
+  const fullHint = useCallback((target: FavoriteTarget): string | null =>
+    (isFull(target) ? limits[target]?.fullHint ?? null : null), [isFull, limits]);
+
   // ── Mutations ───────────────────────────────────────────────────────────────
 
-  const addFavoriteSwimmer = useCallback(async (swimmerId: number): Promise<FavoriteDto | null> => {
+  const addFavorite = useCallback(async (target: FavoriteTarget, targetId: number): Promise<FavoriteDto | null> => {
     const token = await fetchAntiforgeryToken();
     if (!token) return null;
 
@@ -97,19 +152,37 @@ export function useFavorites() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
-        body: JSON.stringify({ target_type: 'swimmer', swimmer_id: swimmerId }),
+        body: JSON.stringify(target === 'club'
+          ? { target_type: 'club', club_id: targetId }
+          : { target_type: 'swimmer', swimmer_id: targetId }),
       });
 
       if (r.status === 409) return null; // уже в избранном
+      if (r.status === 422) {
+        // Лимит выбран, а клиент этого не знал (добавляли в другой вкладке, лимит снизили в
+        // админке). Раньше любой отказ молча превращался в null, и клик выглядел поломкой:
+        // теперь берём лимит из ответа и перечитываем список — сердечко гаснет с подсказкой.
+        const body = await r.json().catch(() => null);
+        if (body?.code === LIMIT_ERROR_CODE && typeof body.limit === 'number' && mountedRef.current) {
+          setLimits(prev => ({
+            ...prev,
+            [target]: { max: body.limit, fullHint: body.error ?? prev[target]?.fullHint ?? '' },
+          }));
+        }
+        await reloadFavorites();
+        return null;
+      }
       if (!r.ok) { invalidateTokenCache(); return null; }
 
       const fav: FavoriteDto = await r.json();
       if (mountedRef.current) {
         setState(prev => {
           const next = [...prev.favorites, fav];
-          const ids = new Set(prev.favoriteSwimmerIds);
-          if (fav.swimmer_id) ids.add(fav.swimmer_id);
-          return { ...prev, favorites: next, favoriteSwimmerIds: ids };
+          const swimmerIds = new Set(prev.favoriteSwimmerIds);
+          const clubIds = new Set(prev.favoriteClubIds);
+          if (fav.swimmer_id) swimmerIds.add(fav.swimmer_id);
+          if (fav.club_id) clubIds.add(fav.club_id);
+          return { ...prev, favorites: next, favoriteSwimmerIds: swimmerIds, favoriteClubIds: clubIds };
         });
       }
       return fav;
@@ -117,7 +190,10 @@ export function useFavorites() {
       invalidateTokenCache();
       return null;
     }
-  }, []);
+  }, [reloadFavorites]);
+
+  const addFavoriteSwimmer = useCallback(
+    (swimmerId: number) => addFavorite('swimmer', swimmerId), [addFavorite]);
 
   const removeFavorite = useCallback(async (favoriteId: number): Promise<boolean> => {
     const token = await fetchAntiforgeryToken();
@@ -136,10 +212,12 @@ export function useFavorites() {
         setState(prev => {
           const removed = prev.favorites.find(f => f.id === favoriteId);
           const next = prev.favorites.filter(f => f.id !== favoriteId);
-          const ids = new Set(prev.favoriteSwimmerIds);
-          if (removed?.swimmer_id) ids.delete(removed.swimmer_id);
+          const swimmerIds = new Set(prev.favoriteSwimmerIds);
+          const clubIds = new Set(prev.favoriteClubIds);
+          if (removed?.swimmer_id) swimmerIds.delete(removed.swimmer_id);
+          if (removed?.club_id) clubIds.delete(removed.club_id);
           const primarySwimmerId = next.find(f => f.is_primary && f.target_type === 'swimmer')?.swimmer_id ?? null;
-          return { ...prev, favorites: next, favoriteSwimmerIds: ids, primarySwimmerId };
+          return { ...prev, favorites: next, favoriteSwimmerIds: swimmerIds, favoriteClubIds: clubIds, primarySwimmerId };
         });
       }
       return true;
@@ -206,7 +284,11 @@ export function useFavorites() {
     }
   }, []);
 
-  /** Переключение: добавить → избранное / убрать из избранного */
+  /**
+   * Переключение: добавить → избранное / убрать из избранного. На пределе добавление не
+   * шлётся вовсе: сердечко там погашено с подсказкой, а клик мимо подсказки (экран, где её
+   * забыли показать) не должен оборачиваться отказом сервера.
+   */
   const toggleFavoriteSwimmer = useCallback(async (swimmerId: number): Promise<void> => {
     if (!state.isAuthenticated) return;
 
@@ -215,10 +297,28 @@ export function useFavorites() {
     );
     if (existing) {
       await removeFavorite(existing.id);
-    } else {
+    } else if (!isFull('swimmer')) {
       await addFavoriteSwimmer(swimmerId);
     }
-  }, [state.isAuthenticated, state.favorites, addFavoriteSwimmer, removeFavorite]);
+  }, [state.isAuthenticated, state.favorites, isFull, addFavoriteSwimmer, removeFavorite]);
+
+  /**
+   * «Follow club» из шапки клуба: клуб в избранное / из избранного. Клуб в пловцов НЕ
+   * разворачивается (решение 10.09.2026): это отдельный сигнал «мы», как голубой клуб в
+   * стартовом протоколе, и в лимит пловцов он не идёт.
+   */
+  const toggleFavoriteClub = useCallback(async (clubId: number): Promise<void> => {
+    if (!state.isAuthenticated) return;
+
+    const existing = state.favorites.find(
+      f => f.target_type === 'club' && f.club_id === clubId
+    );
+    if (existing) {
+      await removeFavorite(existing.id);
+    } else if (!isFull('club')) {
+      await addFavorite('club', clubId);
+    }
+  }, [state.isAuthenticated, state.favorites, isFull, addFavorite, removeFavorite]);
 
   /** Переключение primary для пловца: не primary → primary → снять primary */
   const togglePrimarySwimmer = useCallback(async (swimmerId: number): Promise<void> => {
@@ -240,6 +340,7 @@ export function useFavorites() {
    * Звезда "это я" (из попапа деталей): toggle primary для пловца.
    * Если пловца ещё нет в избранном — сначала добавляем, потом делаем primary
    * (backend требует, чтобы primary был среди избранного). Уже primary → снять.
+   * «Это я» идёт в счёт пловцов: на пределе звезда у НЕ-избранного погашена так же, как сердечко.
    */
   const setMeBySwimmer = useCallback(async (swimmerId: number): Promise<void> => {
     if (!state.isAuthenticated) return;
@@ -255,13 +356,17 @@ export function useFavorites() {
       }
       return;
     }
+    if (isFull('swimmer')) return;
     const fav = await addFavoriteSwimmer(swimmerId);
     if (fav) await setPrimary(fav.id);
-  }, [state.isAuthenticated, state.favorites, addFavoriteSwimmer, setPrimary, unsetPrimary]);
+  }, [state.isAuthenticated, state.favorites, isFull, addFavoriteSwimmer, setPrimary, unsetPrimary]);
 
   return {
     ...state,
+    isFull,
+    fullHint,
     toggleFavoriteSwimmer,
+    toggleFavoriteClub,
     togglePrimarySwimmer,
     setMeBySwimmer,
     setPrimary,

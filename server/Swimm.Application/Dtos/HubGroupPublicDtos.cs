@@ -2,6 +2,12 @@ using System.Text.Json.Serialization;
 
 namespace Swimm.Application.Dtos;
 
+/// <summary>
+/// Доступ зрителя к группе: приватна ли она и может ли он её смотреть (участник/управляющий).
+/// Не отдаётся наружу — по нему контроллеры выбирают страницу или заглушку.
+/// </summary>
+public sealed record HubGroupAccessDto(int Id, bool IsPrivate, bool CanView);
+
 /// <summary>Карточка группы в публичном списке /api/hub-groups.</summary>
 public sealed class HubGroupListItemDto
 {
@@ -288,6 +294,34 @@ public sealed class HubGroupDetailsDto
     /// <summary>open | approval — чтобы кнопка вступления показывала «Подать заявку».</summary>
     [JsonPropertyName("join_policy")]
     public string JoinPolicy { get; set; } = "open";
+
+    /// <summary>Группа только для участников (HubGroupVisibilityRules). Участник видит её целиком.</summary>
+    [JsonPropertyName("is_private")]
+    public bool IsPrivate { get; set; }
+
+    /// <summary>
+    /// Заглушка для НЕ-участника приватной группы: только имя, иконка и как вступить — ни
+    /// состава, ни результатов, ни медиа. Вступление в приватную — всегда заявкой.
+    /// </summary>
+    [JsonPropertyName("members_only")]
+    public bool MembersOnly { get; set; }
+
+    /// <summary>Клуб, на который подписана группа (состав из клуба); null — подписки нет.</summary>
+    [JsonPropertyName("followed_club_id")]
+    public int? FollowedClubId { get; set; }
+
+    [JsonPropertyName("followed_club_name")]
+    public string? FollowedClubName { get; set; }
+
+    /// <summary>
+    /// Официальная группа клуба подписки, если это не эта группа (П4): копию клуба открыли по
+    /// ссылке — шапка показывает, где «лицо клуба». null — официальной нет или это она сама.
+    /// </summary>
+    [JsonPropertyName("official_group_slug")]
+    public string? OfficialGroupSlug { get; set; }
+
+    [JsonPropertyName("official_group_name")]
+    public string? OfficialGroupName { get; set; }
 
     [JsonPropertyName("links")]
     public List<HubGroupPublicLinkDto> Links { get; set; } = [];

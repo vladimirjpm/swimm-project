@@ -66,8 +66,9 @@ public class UserMediaPublicationService : IUserMediaPublicationService
 
             // Правило подачи 1: пловец из медиа — в ростере группы. Иначе член «Дельфин мастерс»
             // мог бы подать туда видео ребёнка, который там не плавает.
+            // Скрытый владельцем клубный пловец в ростер не входит (IsExcluded).
             var swimmerInRoster = await _db.HubGroupMembers.AsNoTracking()
-                .AnyAsync(m => m.HubGroupId == group.Id && m.SwimmerId == media.SwimmerId);
+                .AnyAsync(m => m.HubGroupId == group.Id && m.SwimmerId == media.SwimmerId && !m.IsExcluded);
             if (!swimmerInRoster)
                 return (false, "swimmer is not in this group's roster", null);
 
@@ -194,7 +195,7 @@ public class UserMediaPublicationService : IUserMediaPublicationService
         // пускал — админ сайта не получал ни одной цели, хотя подача от него прошла бы и сразу
         // стала approved (диагноз в docs/media-page.md §9).
         var groups = await _db.HubGroups.AsNoTracking()
-            .Where(g => _db.HubGroupMembers.Any(m => m.HubGroupId == g.Id && m.SwimmerId == media.SwimmerId)
+            .Where(g => _db.HubGroupMembers.Any(m => m.HubGroupId == g.Id && m.SwimmerId == media.SwimmerId && !m.IsExcluded)
                         && (isSiteAdmin
                             || g.OwnerUserId == ownerUserId
                             || _db.HubGroupAdmins.Any(a => a.HubGroupId == g.Id && a.UserId == ownerUserId)
@@ -292,7 +293,7 @@ public class UserMediaPublicationService : IUserMediaPublicationService
             .ToListAsync();
 
     public async Task<List<VisibleResultMediaDto>> GetVisibleForResultsAsync(
-        int? competitionId, int? eventId, string? groupSlug, int? userId)
+        int? competitionId, int? eventId, string? groupSlug, int? userId, bool isSiteAdmin)
     {
         if (competitionId == null && eventId == null && string.IsNullOrWhiteSpace(groupSlug)) return [];
 
@@ -308,7 +309,7 @@ public class UserMediaPublicationService : IUserMediaPublicationService
             : competitionId != null
                 ? mediaInScope.Where(m => m.CompetitionId == competitionId)
                 : mediaInScope.Where(m => m.ResultId != null && _db.HubGroupMembers.Any(gm =>
-                    gm.SwimmerId == m.SwimmerId && gm.HubGroup!.Slug == groupSlug));
+                    gm.SwimmerId == m.SwimmerId && gm.HubGroup!.Slug == groupSlug && !gm.IsExcluded));
 
         // 1. Своё медиа — видно владельцу целиком (private в том числе).
         var mine = userId == null
@@ -324,7 +325,8 @@ public class UserMediaPublicationService : IUserMediaPublicationService
                 })
                 .ToListAsync();
 
-        // 2. Одобренные публикации: public — всем; members — активным членам группы публикации.
+        // 2. Одобренные публикации, которые зрителю положено видеть (MediaPublicationAudience):
+        // public — всем; members — участникам и управляющим группы публикации.
         var published = await _db.UserMediaPublications.AsNoTracking()
             .Where(p => p.Status == UserMediaPublicationStatus.Approved
                         && (eventId != null
@@ -332,11 +334,8 @@ public class UserMediaPublicationService : IUserMediaPublicationService
                             : competitionId != null
                                 ? p.Media!.CompetitionId == competitionId
                                 : p.Media!.ResultId != null && _db.HubGroupMembers.Any(gm =>
-                                    gm.SwimmerId == p.Media.SwimmerId && gm.HubGroup!.Slug == groupSlug))
-                        && (p.Level == UserMediaPublicationLevel.Public
-                            || (userId != null && _db.HubGroupUserMembers.Any(um =>
-                                um.HubGroupId == p.HubGroupId && um.UserId == userId
-                                && um.Status == HubGroupUserMemberStatus.Active))))
+                                    gm.SwimmerId == p.Media.SwimmerId && gm.HubGroup!.Slug == groupSlug && !gm.IsExcluded)))
+            .Where(MediaPublicationAudience.CanSee(_db, userId, isSiteAdmin))
             .Select(p => new VisibleResultMediaDto
             {
                 ResultId = p.Media!.ResultId,
@@ -354,14 +353,14 @@ public class UserMediaPublicationService : IUserMediaPublicationService
             .ToList();
     }
 
-    public async Task<List<VisibleResultMediaDto>> GetVisibleForSwimmerAsync(int swimmerId, int? userId)
+    public async Task<List<VisibleResultMediaDto>> GetVisibleForSwimmerAsync(int swimmerId, int? userId, bool isSiteAdmin)
     {
         if (swimmerId <= 0) return [];
 
         // Скоуп — всё медиа пловца (любой уровень привязки). Правила видимости те же, что и в
-        // GetVisibleForResultsAsync: своё (любое) + approved public (всем) + approved members
-        // (активным членам группы публикации). Отличие только в скоупе (по SwimmerId, не по
-        // соревнованию), поэтому логику намеренно дублируем минимально, не размывая контракт.
+        // GetVisibleForResultsAsync: своё (любое) + одобренные публикации по общему правилу
+        // аудитории (MediaPublicationAudience). Отличие только в скоупе (по SwimmerId, не по
+        // соревнованию).
         var mine = userId == null
             ? []
             : await _db.UserMedia.AsNoTracking()
@@ -376,12 +375,8 @@ public class UserMediaPublicationService : IUserMediaPublicationService
                 .ToListAsync();
 
         var published = await _db.UserMediaPublications.AsNoTracking()
-            .Where(p => p.Status == UserMediaPublicationStatus.Approved
-                        && p.Media!.SwimmerId == swimmerId
-                        && (p.Level == UserMediaPublicationLevel.Public
-                            || (userId != null && _db.HubGroupUserMembers.Any(um =>
-                                um.HubGroupId == p.HubGroupId && um.UserId == userId
-                                && um.Status == HubGroupUserMemberStatus.Active))))
+            .Where(p => p.Status == UserMediaPublicationStatus.Approved && p.Media!.SwimmerId == swimmerId)
+            .Where(MediaPublicationAudience.CanSee(_db, userId, isSiteAdmin))
             .Select(p => new VisibleResultMediaDto
             {
                 ResultId = p.Media!.ResultId,

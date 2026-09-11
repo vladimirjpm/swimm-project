@@ -39,4 +39,26 @@ public sealed class HubGroupClubRequestAdminRowDto
     public DateTime CreatedAt { get; set; }
     public DateTime? DecidedAt { get; set; }
     public string? DecidedByDisplayName { get; set; }
+
+    /// <summary>
+    /// Что случится с другими группами при одобрении (только у pending): уйдут из каталога и
+    /// будут переименованы. Админ видит это ДО кнопки — план П4.
+    /// </summary>
+    public HubGroupClubApproveImpactDto? ApproveImpact { get; set; }
+}
+
+/// <summary>
+/// Последствия одобрения официальной группы клуба для ОСТАЛЬНЫХ групп (П4 плана подписки):
+/// подписанные на клуб уйдут из каталога (по ссылке работают), совпавшие с клубом имена получат
+/// « · community». Писем владельцам не шлём — они видят плашку в «My groups».
+/// </summary>
+public sealed class HubGroupClubApproveImpactDto
+{
+    /// <summary>Имена групп, подписанных на клуб, — после одобрения их не будет в каталоге.</summary>
+    public List<string> LeaveCatalog { get; set; } = [];
+
+    /// <summary>«Старое имя → новое» у групп, чьё имя совпало с клубом или официальной группой.</summary>
+    public List<string> Renamed { get; set; } = [];
+
+    public bool IsEmpty => LeaveCatalog.Count == 0 && Renamed.Count == 0;
 }

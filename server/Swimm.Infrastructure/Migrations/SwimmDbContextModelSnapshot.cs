@@ -141,6 +141,9 @@ namespace Swimm.Infrastructure.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<int?>("HubGroupLimit")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -1358,6 +1361,36 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("Sys_HubGroupClubRequests", (string)null);
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.HubGroupClubSubscription", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ClubId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("HubGroupId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClubId");
+
+                    b.HasIndex("HubGroupId")
+                        .IsUnique();
+
+                    b.ToTable("HubGroupClubSubscriptions", (string)null);
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.HubGroupMedia", b =>
                 {
                     b.Property<int>("Id")
@@ -1445,6 +1478,9 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int>("HubGroupId")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("IsExcluded")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime>("JoinedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1456,6 +1492,13 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("manual");
+
                     b.Property<int>("SwimmerId")
                         .HasColumnType("integer");
 
@@ -1466,7 +1509,12 @@ namespace Swimm.Infrastructure.Migrations
                     b.HasIndex("HubGroupId", "SwimmerId")
                         .IsUnique();
 
-                    b.ToTable("HubGroupMembers", (string)null);
+                    b.ToTable("HubGroupMembers", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_HubGroupMembers_ExcludedOnlyClub", "NOT \"IsExcluded\" OR \"Source\" = 'club'");
+
+                            t.HasCheckConstraint("CK_HubGroupMembers_Source", "\"Source\" IN ('manual', 'club')");
+                        });
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.HubGroupUserMember", b =>
@@ -3137,7 +3185,7 @@ namespace Swimm.Infrastructure.Migrations
 
                             t.HasCheckConstraint("CK_UserMediaPublications_Target", "\"TargetType\" IN ('group', 'club')");
 
-                            t.HasCheckConstraint("CK_UserMediaPublications_TargetShape", "(\"TargetType\" = 'group' AND \"HubGroupId\" IS NOT NULL AND \"ClubId\" IS NULL)\n                  OR (\"TargetType\" = 'club' AND \"ClubId\" IS NOT NULL AND \"HubGroupId\" IS NULL)");
+                            t.HasCheckConstraint("CK_UserMediaPublications_TargetShape", "(\"TargetType\" = 'group' AND \"HubGroupId\" IS NOT NULL AND \"ClubId\" IS NULL)\r\n                  OR (\"TargetType\" = 'club' AND \"ClubId\" IS NOT NULL AND \"HubGroupId\" IS NULL)");
                         });
                 });
 
@@ -3551,6 +3599,25 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("HubGroup");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.HubGroupClubSubscription", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.Club", "Club")
+                        .WithMany()
+                        .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Swimm.Domain.Entities.HubGroup", "HubGroup")
+                        .WithMany("ClubSubscriptions")
+                        .HasForeignKey("HubGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Club");
+
+                    b.Navigation("HubGroup");
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.HubGroupMedia", b =>
@@ -4037,6 +4104,8 @@ namespace Swimm.Infrastructure.Migrations
             modelBuilder.Entity("Swimm.Domain.Entities.HubGroup", b =>
                 {
                     b.Navigation("Admins");
+
+                    b.Navigation("ClubSubscriptions");
 
                     b.Navigation("Members");
 

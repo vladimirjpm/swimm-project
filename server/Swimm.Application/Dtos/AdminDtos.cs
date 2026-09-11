@@ -17,6 +17,10 @@ public class UserDto
     /// <summary>Успешных логинов за 7/30 дней (для панели логинов).</summary>
     public int Logins7d { get; set; }
     public int Logins30d { get; set; }
+    /// <summary>Сколько групп пользователь ВЛАДЕЕТ — числитель колонки «Группы».</summary>
+    public int HubGroupsOwned { get; set; }
+    /// <summary>Персональный лимит групп; null — действует лимит по роли.</summary>
+    public int? HubGroupLimit { get; set; }
 }
 
 /// <summary>Сводка по логинам для шапки Admin/Users.</summary>
@@ -107,6 +111,9 @@ public class UserDetailDto
     public bool LocalEmailConfirmed { get; set; }
     public int LocalFailedLoginCount { get; set; }
     public DateTime? LocalLockoutEnd { get; set; }
+    public int HubGroupsOwned { get; set; }
+    /// <summary>Персональный лимит групп; null — действует лимит по роли.</summary>
+    public int? HubGroupLimit { get; set; }
     public List<ExternalLoginDto> ExternalLogins { get; set; } = [];
     public List<LoginHistoryItemDto> LoginHistory { get; set; } = [];
 }

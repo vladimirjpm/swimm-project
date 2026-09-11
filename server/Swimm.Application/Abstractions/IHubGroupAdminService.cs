@@ -22,8 +22,15 @@ public interface IHubGroupAdminService
     /// <summary>Обновить. Ошибка — при пустом/занятом Slug или пустом Name.</summary>
     Task<HubGroupSaveResult> UpdateAsync(int id, HubGroupInputDto input);
 
-    /// <summary>Удалить группу (участники удаляются каскадно на уровне БД).</summary>
+    /// <summary>
+    /// Удалить группу. Жёстко: состав, тренировки, медиа, публикации и заявки уходят каскадом
+    /// на уровне БД. Пишет аудит `hubgroup.delete` с перечнем потерь — здесь, а не в вызывающих:
+    /// путей удаления три (панель «My groups», список и форма /Admin/HubGroups).
+    /// </summary>
     Task<HubGroupSaveResult> DeleteAsync(int id);
+
+    /// <summary>Что уйдёт вместе с группой — для подтверждения удаления. null — группы нет.</summary>
+    Task<HubGroupDeleteImpactDto?> GetDeleteImpactAsync(int id);
 
     /// <summary>Поиск пловцов по подстроке в фамилии/имени (RU/EN), top-20 — для добавления участника.</summary>
     Task<IReadOnlyList<SwimmerSearchResultDto>> SearchSwimmersAsync(string query);

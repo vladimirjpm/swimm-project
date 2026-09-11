@@ -12,6 +12,68 @@ public sealed class HubGroupAdminRowDto
     public bool IsPublic { get; set; }
     public bool IsOfficial { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>
+    /// Владелец группы. В панели «My groups» по нему решается, показывать ли Delete: в том же
+    /// списке лежат и группы, где пользователь всего лишь админ, а удалять может только владелец.
+    /// </summary>
+    public int OwnerUserId { get; set; }
+
+    /// <summary>Клуб, на который подписана группа (состав из клуба); null — подписки нет.</summary>
+    public string? FollowedClubName { get; set; }
+
+    /// <summary>
+    /// Группу убрала из каталога официальная группа клуба подписки (П4). По ссылке работает.
+    /// Считается на лету: снимут официальный статус — вернётся.
+    /// </summary>
+    public bool HiddenByOfficialGroup { get; set; }
+
+    /// <summary>Плашка «Not in the catalog: …» — текст считает сервер (HubGroupClubRules).</summary>
+    public string? CatalogNotice { get; set; }
+
+    /// <summary>Slug официальной группы клуба — ссылка из плашки.</summary>
+    public string? OfficialGroupSlug { get; set; }
+}
+
+/// <summary>
+/// Что уйдёт вместе с группой при удалении: удаление жёсткое, всё ниже — каскадом. Показывается
+/// в подтверждении (панель «My groups», /Admin/HubGroups) и уходит в аудит `hubgroup.delete`.
+/// </summary>
+public sealed class HubGroupDeleteImpactDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public string? NameEn { get; set; }
+    public bool IsOfficial { get; set; }
+    public string? ClubName { get; set; }
+
+    /// <summary>Пловцы в составе. Сами пловцы остаются в справочнике.</summary>
+    public int Swimmers { get; set; }
+
+    /// <summary>Участники-аккаунты (active и pending).</summary>
+    public int AccountMembers { get; set; }
+
+    /// <summary>Назначенные админы группы (владелец не в счёт).</summary>
+    public int Admins { get; set; }
+
+    public int TrainingSessions { get; set; }
+    public int TrainingResults { get; set; }
+
+    /// <summary>Медиа группы (Sys_HubGroupMedia): галерея, фото тренировок, разборы.</summary>
+    public int Media { get; set; }
+
+    /// <summary>Публикации личных медиа участников в группу. Сами медиа остаются у авторов.</summary>
+    public int MediaPublications { get; set; }
+
+    public bool HasPendingClubRequest { get; set; }
+
+    /// <summary>
+    /// Есть ли что терять, кроме пустой оболочки. Пустую группу удаляют одной кнопкой, для
+    /// остальных подтверждение просит ввести имя группы.
+    /// </summary>
+    public bool HasContent =>
+        Swimmers + AccountMembers + Admins + TrainingSessions + Media + MediaPublications > 0
+        || IsOfficial || HasPendingClubRequest;
 }
 
 /// <summary>Ссылка группы (WhatsApp/Telegram/Instagram/Site) — хранится JSON-массивом в <see cref="Swimm.Domain.Entities.HubGroup.Links"/>.</summary>
@@ -32,6 +94,15 @@ public sealed class HubGroupMemberRowDto
     public string? ClubName { get; set; }
     public string Role { get; set; } = "member";
     public int SortOrder { get; set; }
+
+    /// <summary>manual | club (HubGroupMemberSource) — у клубного вместо ✕ «скрыть/вернуть».</summary>
+    public string Source { get; set; } = "manual";
+
+    /// <summary>
+    /// Владелец скрыл клубного пловца. Приходит ТОЛЬКО в панель управления (там его можно
+    /// вернуть); публичные ответы скрытых не содержат вовсе.
+    /// </summary>
+    public bool IsExcluded { get; set; }
 }
 
 /// <summary>Полные данные группы для формы Admin/HubGroups/Edit.</summary>
@@ -56,9 +127,12 @@ public sealed class HubGroupEditDto
     /// <summary>open | approval — политика самозаписи (см. HubGroupJoinPolicy).</summary>
     public string JoinPolicy { get; set; } = "open";
     public List<HubGroupLinkDto> Links { get; set; } = [];
+    /// <summary>Весь состав, включая скрытых клубных (<see cref="HubGroupMemberRowDto.IsExcluded"/>).</summary>
     public List<HubGroupMemberRowDto> Members { get; set; } = [];
     /// <summary>Участники-аккаунты (приватный список, не пловцы) — только в панели управления.</summary>
     public List<HubGroupUserMemberRowDto> UserMembers { get; set; } = [];
+    /// <summary>Подписка на клуб; null — состав ведётся только руками.</summary>
+    public HubGroupClubSubscriptionDto? ClubSubscription { get; set; }
 }
 
 /// <summary>Входные данные создания/обновления группы.</summary>

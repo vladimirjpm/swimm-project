@@ -17,16 +17,18 @@ public class HubGroupAdminService : IHubGroupAdminService
 {
     private readonly SwimmDbContext _db;
     private readonly HubGroupCrudCore _core;
+    private readonly IAdminAuditService _audit;
 
-    public HubGroupAdminService(SwimmDbContext db, HubGroupCrudCore core)
+    public HubGroupAdminService(SwimmDbContext db, HubGroupCrudCore core, IAdminAuditService audit)
     {
         _db = db;
         _core = core;
+        _audit = audit;
     }
 
     public async Task<IReadOnlyList<HubGroupAdminRowDto>> GetAllAsync()
     {
-        return await _db.HubGroups.AsNoTracking()
+        var rows = await _db.HubGroups.AsNoTracking()
             .OrderByDescending(g => g.UpdatedAt)
             .Select(g => new HubGroupAdminRowDto
             {
@@ -35,12 +37,17 @@ public class HubGroupAdminService : IHubGroupAdminService
                 Slug = g.Slug,
                 IconUrl = g.IconUrl,
                 ClubName = g.Club != null ? g.Club.Name : null,
-                MemberCount = g.Members.Count,
+                // Видимый состав: скрытые клубные пловцы — служебные строки пересборки.
+                MemberCount = g.Members.Count(m => !m.IsExcluded),
                 IsPublic = g.IsPublic,
                 IsOfficial = g.IsOfficial,
-                UpdatedAt = g.UpdatedAt
+                UpdatedAt = g.UpdatedAt,
+                OwnerUserId = g.OwnerUserId
             })
             .ToListAsync();
+
+        await HubGroupCatalog.FillCatalogStatusAsync(_db, rows);
+        return rows;
     }
 
     public async Task<HubGroupEditDto?> GetByIdAsync(int id)
@@ -64,9 +71,17 @@ public class HubGroupAdminService : IHubGroupAdminService
                 BirthYear = m.Swimmer.BirthYear,
                 ClubName = m.Swimmer.Club != null ? m.Swimmer.Club.Name : null,
                 Role = m.Role,
-                SortOrder = m.SortOrder
+                SortOrder = m.SortOrder,
+                // Панель управления получает и скрытых — там их возвращают.
+                Source = m.Source,
+                IsExcluded = m.IsExcluded
             })
             .ToListAsync();
+
+        var clubSubscription = await _db.HubGroupClubSubscriptions.AsNoTracking()
+            .Where(s => s.HubGroupId == id)
+            .Select(HubGroupClubSubscriptionService.ToDto)
+            .FirstOrDefaultAsync();
 
         var userMembers = await _db.HubGroupUserMembers.AsNoTracking()
             .Where(m => m.HubGroupId == id)
@@ -106,7 +121,8 @@ public class HubGroupAdminService : IHubGroupAdminService
             JoinPolicy = g.JoinPolicy,
             Links = HubGroupCrudCore.ParseLinks(g.Links),
             Members = members,
-            UserMembers = userMembers
+            UserMembers = userMembers,
+            ClubSubscription = clubSubscription
         };
     }
 
@@ -152,13 +168,61 @@ public class HubGroupAdminService : IHubGroupAdminService
 
     public async Task<HubGroupSaveResult> DeleteAsync(int id)
     {
+        // Перечень потерь снимаем ДО удаления: после каскада считать уже нечего.
+        var impact = await GetDeleteImpactAsync(id);
         var group = await _db.HubGroups.FindAsync(id);
-        if (group == null) return HubGroupSaveResult.Fail($"Группа #{id} не найдена");
+        if (group == null || impact == null) return HubGroupSaveResult.Fail($"Группа #{id} не найдена");
 
         _db.HubGroups.Remove(group);
         await _db.SaveChangesAsync();
         await _core.InvalidateCacheAsync();
+
+        // Аудит здесь, а не в вызывающих: путей удаления три, и группа уходит необратимо —
+        // «кто и когда удалил, что пропало» должно остаться при любом из них. Актор — из
+        // HTTP-контекста: владелец из панели «My groups» или админ сайта.
+        await _audit.LogAsync("hubgroup.delete", "HubGroup", id.ToString(), DeleteAuditSummary(impact), impact);
         return HubGroupSaveResult.Ok(id);
+    }
+
+    public async Task<HubGroupDeleteImpactDto?> GetDeleteImpactAsync(int id)
+    {
+        return await _db.HubGroups.AsNoTracking()
+            .Where(g => g.Id == id)
+            .Select(g => new HubGroupDeleteImpactDto
+            {
+                Id = g.Id,
+                Name = g.Name,
+                NameEn = g.NameEn,
+                IsOfficial = g.IsOfficial,
+                ClubName = g.Club != null ? g.Club.Name : null,
+                Swimmers = g.Members.Count(m => !m.IsExcluded),
+                AccountMembers = g.UserMembers.Count,
+                Admins = g.Admins.Count,
+                TrainingSessions = _db.TrainingSessions.Count(s => s.HubGroupId == g.Id),
+                TrainingResults = _db.TrainingResults.Count(r => r.Session!.HubGroupId == g.Id),
+                Media = _db.HubGroupMedia.Count(m => m.HubGroupId == g.Id),
+                MediaPublications = _db.UserMediaPublications.Count(p => p.HubGroupId == g.Id),
+                HasPendingClubRequest = _db.HubGroupClubRequests.Any(r =>
+                    r.HubGroupId == g.Id && r.Status == HubGroupClubRequestStatus.Pending)
+            })
+            .FirstOrDefaultAsync();
+    }
+
+    /// <summary>Строка аудита: имя и только ненулевые потери — читать глазами в /Admin/Audit.</summary>
+    private static string DeleteAuditSummary(HubGroupDeleteImpactDto i)
+    {
+        var parts = new List<string>();
+        if (i.Swimmers > 0) parts.Add($"пловцов в составе {i.Swimmers}");
+        if (i.AccountMembers > 0) parts.Add($"аккаунтов {i.AccountMembers}");
+        if (i.Admins > 0) parts.Add($"админов группы {i.Admins}");
+        if (i.TrainingSessions > 0) parts.Add($"тренировок {i.TrainingSessions} (результатов {i.TrainingResults})");
+        if (i.Media > 0) parts.Add($"медиа {i.Media}");
+        if (i.MediaPublications > 0) parts.Add($"публикаций медиа {i.MediaPublications}");
+        if (i.IsOfficial) parts.Add($"официальная группа клуба «{i.ClubName}»");
+        if (i.HasPendingClubRequest) parts.Add("заявка на официальный статус");
+
+        var lost = parts.Count > 0 ? string.Join(", ", parts) : "пустая";
+        return $"Удалена группа «{i.Name}» (#{i.Id}): {lost}";
     }
 
     public async Task<IReadOnlyList<SwimmerSearchResultDto>> SearchSwimmersAsync(string query)

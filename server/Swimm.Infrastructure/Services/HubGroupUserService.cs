@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Domain;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
@@ -22,12 +23,15 @@ public class HubGroupUserService : IHubGroupUserService
         _settings = settings;
     }
 
-    private string Policy => _settings.GetValue("HubGroupCreationPolicy", "admin");
-    private int MaxPerUser => _settings.GetValue("HubGroupMaxPerUser", 3);
+    /// <summary>
+    /// Первый ключ транзакционной advisory-блокировки «создание группы владельцем» (второй —
+    /// userId). Произвольная константа, лишь бы не совпала с другими блокировками в БД.
+    /// </summary>
+    private const int CreateLockClass = 0x48474C4D; // "HGLM" — hub group limit
 
     public async Task<IReadOnlyList<HubGroupAdminRowDto>> GetMineAsync(int userId)
     {
-        return await _db.HubGroups.AsNoTracking()
+        var rows = await _db.HubGroups.AsNoTracking()
             .Where(g => g.OwnerUserId == userId || g.Admins.Any(m => m.UserId == userId))
             .OrderByDescending(g => g.UpdatedAt)
             .Select(g => new HubGroupAdminRowDto
@@ -37,49 +41,78 @@ public class HubGroupUserService : IHubGroupUserService
                 Slug = g.Slug,
                 IconUrl = g.IconUrl,
                 ClubName = g.Club != null ? g.Club.Name : null,
-                MemberCount = g.Members.Count,
+                MemberCount = g.Members.Count(m => !m.IsExcluded),
                 IsPublic = g.IsPublic,
                 IsOfficial = g.IsOfficial,
-                UpdatedAt = g.UpdatedAt
+                UpdatedAt = g.UpdatedAt,
+                OwnerUserId = g.OwnerUserId
             })
             .ToListAsync();
+
+        // Клуб подписки и плашка «не в каталоге из-за официальной X» (П4).
+        await HubGroupCatalog.FillCatalogStatusAsync(_db, rows);
+        return rows;
     }
 
     public async Task<HubGroupCreateEligibilityDto> GetCreateEligibilityAsync(int userId, bool isAdmin, bool isCoach)
     {
-        if (isAdmin) return new HubGroupCreateEligibilityDto { CanCreate = true, Remaining = null };
-
-        var policy = Policy;
-        if (policy == "admin")
-            return new HubGroupCreateEligibilityDto { CanCreate = false, Reason = "Создание групп сейчас разрешено только администратору." };
-        if (policy == "coach" && !isCoach)
-            return new HubGroupCreateEligibilityDto { CanCreate = false, Reason = "Создание групп сейчас разрешено только тренерам." };
-
+        // Считаем владение, а не админство: официальные группы тоже в счёт (решение 10.09.2026).
         var owned = await _db.HubGroups.CountAsync(g => g.OwnerUserId == userId);
-        var remaining = MaxPerUser - owned;
-        if (remaining <= 0)
-            return new HubGroupCreateEligibilityDto { CanCreate = false, Reason = $"Достигнут лимит групп на пользователя ({MaxPerUser}).", Remaining = 0 };
+        var personalLimit = await _db.AppUsers
+            .Where(u => u.Id == userId)
+            .Select(u => u.HubGroupLimit)
+            .FirstOrDefaultAsync();
 
-        return new HubGroupCreateEligibilityDto { CanCreate = true, Remaining = remaining };
+        return HubGroupCreationRules.Evaluate(_settings, isAdmin, isCoach, personalLimit, owned);
     }
 
     public async Task<HubGroupSaveResult> CreateAsync(HubGroupInputDto input, int ownerUserId, bool isAdmin, bool isCoach)
     {
-        var eligibility = await GetCreateEligibilityAsync(ownerUserId, isAdmin, isCoach);
-        if (!eligibility.CanCreate)
-            return HubGroupSaveResult.Fail(eligibility.Reason ?? "Создание группы недоступно.");
+        // «Посчитать → вставить» — одна транзакция под блокировкой владельца. Без неё два
+        // параллельных запроса оба видят owned < limit и оба вставляют: лимит превышен на
+        // единицу. Execution strategy обязательна: ручная транзакция при retry-стратегии
+        // AdminConnection иначе бросает исключение (см. JsonImportService).
+        var strategy = _db.Database.CreateExecutionStrategy();
+        var result = await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await _db.Database.BeginTransactionAsync();
+            await LockOwnerAsync(ownerUserId);
 
-        var slug = await _core.ResolveSlugAsync(input, excludeId: null);
-        var error = await _core.ValidateAsync(input, slug, excludeId: null);
-        if (error != null) return HubGroupSaveResult.Fail(error);
+            var eligibility = await GetCreateEligibilityAsync(ownerUserId, isAdmin, isCoach);
+            if (!eligibility.CanCreate)
+                return HubGroupSaveResult.Fail(eligibility.Reason ?? "Creating a group is not available.");
 
-        // allowClubChange:false — пользователь создаёт только свободную группу (как favorites);
-        // привязка к клубу — через заявку и одобрение админа (8.7), не через ввод.
-        var group = new HubGroup { OwnerUserId = ownerUserId };
-        HubGroupCrudCore.Apply(group, input, slug, allowClubChange: false);
-        await _core.ApplyCountryAsync(group, input.Country);
-        _db.HubGroups.Add(group);
-        return await _core.SaveAsync(group);
+            var slug = await _core.ResolveSlugAsync(input, excludeId: null);
+            var error = await _core.ValidateAsync(input, slug, excludeId: null);
+            if (error != null) return HubGroupSaveResult.Fail(error);
+
+            // allowClubChange:false — пользователь создаёт только свободную группу (как favorites);
+            // привязка к клубу — через заявку и одобрение админа (8.7), не через ввод.
+            var group = new HubGroup { OwnerUserId = ownerUserId };
+            HubGroupCrudCore.Apply(group, input, slug, allowClubChange: false);
+            await _core.ApplyCountryAsync(group, input.Country);
+            _db.HubGroups.Add(group);
+
+            var saveError = await _core.TrySaveChangesAsync(group);
+            if (saveError != null) return HubGroupSaveResult.Fail(saveError);
+
+            await tx.CommitAsync();
+            return HubGroupSaveResult.Ok(group.Id);
+        });
+
+        // Кэш — после коммита: до него параллельный публичный запрос закэшировал бы список без группы.
+        if (result.Success) await _core.InvalidateCacheAsync();
+        return result;
+    }
+
+    /// <summary>
+    /// Транзакционная advisory-блокировка по владельцу: снимается сама на commit/rollback,
+    /// чужих пользователей не задерживает. На InMemory (тесты) блокировок нет — там один поток.
+    /// </summary>
+    private async Task LockOwnerAsync(int userId)
+    {
+        if (!_db.Database.IsNpgsql()) return;
+        await _db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({CreateLockClass}, {userId})");
     }
 
     public async Task<HubGroupSaveResult> UpdateAsync(int id, HubGroupInputDto input)
@@ -227,20 +260,14 @@ public class HubGroupUserService : IHubGroupUserService
             .FirstOrDefaultAsync();
         if (group == null) return HubGroupMemberSaveResult.Fail($"Группа #{hubGroupId} не найдена");
 
-        // Вступить можно только в публично видимую группу — тот же критерий, что у публичного
-        // списка (HubGroupVisibility: private → никуда, perGroup → только IsPublic, public → любые).
-        var visibility = _settings.GetValue("HubGroupVisibility", "public");
-        var joinable = visibility switch
-        {
-            "private" => false,
-            "perGroup" => group.IsPublic,
-            _ => true,
-        };
-        if (!joinable) return HubGroupMemberSaveResult.Fail("В эту группу нельзя вступить");
+        // В приватную группу вступают — иначе её страница «только для участников» вела бы в
+        // тупик (§6-6, 11.09.2026). Но ТОЛЬКО заявкой, какой бы ни была политика: открытая
+        // самозапись сняла бы приватность одним кликом любого вошедшего.
+        var isPrivate = HubGroupVisibilityRules.IsPrivate(HubGroupVisibilityRules.Current(_settings), group.IsPublic);
 
         // Гейт members-контента: при approval самозапись создаёт заявку (pending),
         // активирует владелец/админ группы через ApproveUserMemberAsync.
-        var status = group.JoinPolicy == HubGroupJoinPolicy.Approval
+        var status = isPrivate || group.JoinPolicy == HubGroupJoinPolicy.Approval
             ? HubGroupUserMemberStatus.Pending
             : HubGroupUserMemberStatus.Active;
         return await InsertUserMemberAsync(hubGroupId, userId, addedByUserId: null, status);

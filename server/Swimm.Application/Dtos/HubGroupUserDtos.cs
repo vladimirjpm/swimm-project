@@ -1,12 +1,23 @@
 namespace Swimm.Application.Dtos;
 
-/// <summary>Может ли текущий пользователь создать группу — для показа/скрытия кнопки в UI.</summary>
+/// <summary>
+/// Может ли текущий пользователь создать группу — для кнопки и счётчика «2 / 3» в UI.
+/// Считает <see cref="Swimm.Application.Mapping.HubGroupCreationRules"/>.
+/// </summary>
 public sealed class HubGroupCreateEligibilityDto
 {
     public bool CanCreate { get; set; }
+
+    /// <summary>Причина отказа — текст для витрины, по-английски. null — отказа нет.</summary>
     public string? Reason { get; set; }
 
-    /// <summary>Сколько ещё групп можно создать (по HubGroupMaxPerUser); null — без лимита (админ).</summary>
+    /// <summary>Сколько групп пользователь уже ВЛАДЕЕТ (официальные тоже).</summary>
+    public int Owned { get; set; }
+
+    /// <summary>Действующий лимит: персональный или по роли; null — без лимита (админ).</summary>
+    public int? Limit { get; set; }
+
+    /// <summary>Сколько ещё групп можно создать; null — без лимита (админ).</summary>
     public int? Remaining { get; set; }
 }
 

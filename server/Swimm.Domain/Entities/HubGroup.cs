@@ -115,6 +115,12 @@ public class HubGroup
 
     public ICollection<HubGroupMember> Members { get; set; } = new List<HubGroupMember>();
 
+    /// <summary>
+    /// Подписка на клуб — коллекция, хотя сейчас она одна (уникальный индекс по HubGroupId):
+    /// разрешить несколько клубов = снять уникальность, модель не менять.
+    /// </summary>
+    public ICollection<HubGroupClubSubscription> ClubSubscriptions { get; set; } = new List<HubGroupClubSubscription>();
+
     /// <summary>Админы группы (право правки, не владение). Владелец — primary GroupAdmin.</summary>
     public ICollection<HubGroupAdmin> Admins { get; set; } = new List<HubGroupAdmin>();
 

@@ -34,15 +34,19 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
         _settings = settings;
     }
 
-    private string Visibility => _settings.GetValue("HubGroupVisibility", "public");
+    private string Visibility => HubGroupVisibilityRules.Current(_settings);
 
     public async Task<IReadOnlyList<HubGroupListItemDto>> GetGroupsAsync()
     {
         var visibility = Visibility;
-        if (visibility == "private") return [];
+        // Приватные в каталоге не показываем НИКОМУ: список общий и кэшируется, а участники
+        // приходят к своей группе по ссылке или из «My groups».
+        if (visibility == HubGroupVisibilityRules.Private) return [];
 
-        var query = _read.HubGroups.AsNoTracking();
-        if (visibility == "perGroup")
+        // Официальная группа — главная (П4): копии, подписанные на клуб с официальной группой,
+        // в каталоге не показываем — по ссылке они работают (GetBySlugAsync их не фильтрует).
+        var query = _read.HubGroups.AsNoTracking().Where(HubGroupCatalog.ListedInCatalog(_read));
+        if (visibility == HubGroupVisibilityRules.PerGroup)
             query = query.Where(g => g.IsPublic);
 
         return await query
@@ -58,25 +62,25 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                 Country = g.Country != null ? g.Country.CountryCode : null,
                 ClubName = g.Club != null ? g.Club.Name : null,
                 IsOfficial = g.IsOfficial,
-                MemberCount = g.Members.Count
+                // Скрытых владельцем клубных пловцов (IsExcluded) не видит НИ ОДИН читатель
+                // состава — ни счётчик, ни страница, ни ростер соревнований.
+                MemberCount = g.Members.Count(m => !m.IsExcluded)
             })
             .ToListAsync();
     }
 
     public async Task<HubGroupDetailsDto?> GetBySlugAsync(string slug)
     {
-        var visibility = Visibility;
-        if (visibility == "private") return null;
-
+        // Приватную тоже отдаём целиком: смотреть ли её этому зрителю, решает контроллер по
+        // GetAccessAsync — участнику страница, остальным заглушка (решение §6-6, 11.09.2026).
         var group = await _read.HubGroups.AsNoTracking()
             .Include(g => g.Club)
             .Include(g => g.Country)
             .FirstOrDefaultAsync(g => g.Slug == slug);
         if (group == null) return null;
-        if (visibility == "perGroup" && !group.IsPublic) return null;
 
         var members = await _read.HubGroupMembers.AsNoTracking()
-            .Where(m => m.HubGroupId == group.Id)
+            .Where(m => m.HubGroupId == group.Id && !m.IsExcluded)
             .OrderBy(m => m.SortOrder)
             .Select(m => new HubGroupPublicMemberDto
             {
@@ -103,10 +107,33 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             ClubName = group.Club?.Name,
             IsOfficial = group.IsOfficial,
             JoinPolicy = group.JoinPolicy,
+            IsPrivate = HubGroupVisibilityRules.IsPrivate(Visibility, group.IsPublic),
             Links = ParseLinks(group.Links),
             IsVirtual = false,
             Members = members
         };
+
+        // Подписка на клуб и официальная группа этого клуба (если это не мы) — для шапки: копию
+        // клуба открыли по ссылке мимо каталога, и она должна показать, где «лицо клуба» (П4).
+        var followed = await _read.HubGroupClubSubscriptions.AsNoTracking()
+            .Where(s => s.HubGroupId == group.Id)
+            .Select(s => new
+            {
+                s.ClubId,
+                ClubName = s.Club!.Name.Length > 0 ? s.Club.Name : s.Club.NameEn,
+                Official = _read.HubGroups
+                    .Where(o => o.IsOfficial && o.ClubId == s.ClubId && o.Id != group.Id)
+                    .Select(o => new { o.Slug, o.Name })
+                    .FirstOrDefault()
+            })
+            .FirstOrDefaultAsync();
+        if (followed != null)
+        {
+            dto.FollowedClubId = followed.ClubId;
+            dto.FollowedClubName = followed.ClubName;
+            dto.OfficialGroupSlug = followed.Official?.Slug;
+            dto.OfficialGroupName = followed.Official?.Name;
+        }
 
         // Настройки отображения: показ блока фото и указатель «взять из медиа». Сам URL
         // указателя доразрешает контроллер — там уже собрана лента `Gallery`, в которой
@@ -190,20 +217,65 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
 
     public async Task<List<int>?> GetRosterSwimmerIdsAsync(string slug)
     {
-        var visibility = Visibility;
-        if (visibility == "private") return null;
-
-        var group = await _read.HubGroups.AsNoTracking()
+        var groupId = await _read.HubGroups.AsNoTracking()
             .Where(g => g.Slug == slug)
-            .Select(g => new { g.Id, g.IsPublic })
+            .Select(g => (int?)g.Id)
             .FirstOrDefaultAsync();
-        if (group == null) return null;
-        if (visibility == "perGroup" && !group.IsPublic) return null;
+        if (groupId == null) return null;
 
         return await _read.HubGroupMembers.AsNoTracking()
-            .Where(m => m.HubGroupId == group.Id)
+            .Where(m => m.HubGroupId == groupId && !m.IsExcluded)
             .Select(m => m.SwimmerId)
             .ToListAsync();
+    }
+
+    public async Task<HubGroupAccessDto?> GetAccessAsync(string slug, int? userId, bool isSiteAdmin)
+    {
+        // Через rw-контекст: членство и админы групп — Sys_-таблицы, роли swimm_ro их не видно.
+        var group = await _rw.HubGroups.AsNoTracking()
+            .Where(g => g.Slug == slug)
+            .Select(g => new { g.Id, g.IsPublic, g.OwnerUserId })
+            .FirstOrDefaultAsync();
+        if (group == null) return null;
+
+        var isPrivate = HubGroupVisibilityRules.IsPrivate(Visibility, group.IsPublic);
+        if (!isPrivate || isSiteAdmin) return new HubGroupAccessDto(group.Id, isPrivate, CanView: true);
+        if (userId is not int uid) return new HubGroupAccessDto(group.Id, isPrivate, CanView: false);
+
+        // Та же аудитория, что у тренировок и members-медиа: управляющий ИЛИ активный участник.
+        // Заявка (pending) доступа не даёт — иначе «вступление по заявке» пускало бы до решения.
+        var canView = group.OwnerUserId == uid
+            || await _rw.HubGroupAdmins.AnyAsync(a => a.HubGroupId == group.Id && a.UserId == uid)
+            || await _rw.HubGroupUserMembers.AnyAsync(m => m.HubGroupId == group.Id && m.UserId == uid
+                && m.Status == HubGroupUserMemberStatus.Active);
+
+        return new HubGroupAccessDto(group.Id, isPrivate, canView);
+    }
+
+    public async Task<HubGroupDetailsDto?> GetMembersOnlyStubAsync(string slug)
+    {
+        // Только то, что нужно странице «вступите, чтобы увидеть»: кто это и как вступить.
+        // Состав, результаты, медиа, расписание и описание — данные группы, их тут нет.
+        return await _read.HubGroups.AsNoTracking()
+            .Where(g => g.Slug == slug)
+            .Select(g => new HubGroupDetailsDto
+            {
+                Id = g.Id,
+                Slug = g.Slug,
+                Name = g.Name,
+                NameEn = g.NameEn,
+                IconUrl = g.IconUrl,
+                Country = g.Country != null ? g.Country.CountryCode : null,
+                IsOfficial = g.IsOfficial,
+                ClubName = g.Club != null ? g.Club.Name : null,
+                // В приватную вступают только заявкой — кнопка должна говорить «Request to join».
+                JoinPolicy = HubGroupJoinPolicy.Approval,
+                IsPrivate = true,
+                MembersOnly = true,
+                ShowHeroImage = false,
+                IsVirtual = false
+            })
+            .FirstOrDefaultAsync();
     }
 
     /// <summary>Общие агрегаты страницы: последние заплывы, рекорды группы и сезонный зачёт.</summary>

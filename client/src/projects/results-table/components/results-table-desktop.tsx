@@ -41,6 +41,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
   isFavorite,
   onToggleFavorite,
   onTogglePrimary,
+  favoriteBlockedHint,
   onAddVideo,
 }) => {
   const handleNameClick = () => {
@@ -75,6 +76,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
           isFavorite={isFavorite}
           isPrimaryFavorite={isPrimaryFavorite}
           onToggleFavorite={onToggleFavorite}
+          addBlockedHint={favoriteBlockedHint}
           showPrimary={false}
         />
         {onAddVideo && (

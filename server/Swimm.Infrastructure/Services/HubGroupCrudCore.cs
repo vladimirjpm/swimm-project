@@ -5,6 +5,7 @@ using Npgsql;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -94,6 +95,50 @@ public partial class HubGroupCrudCore
             input.JoinPolicy != HubGroupJoinPolicy.Approval)
             return "Политика вступления: допустимо open или approval";
 
+        return await ValidateNameAgainstOfficialGroupsAsync(input, excludeId);
+    }
+
+    /// <summary>
+    /// Имя клуба с официальной группой занято (§2 плана подписки): неофициальной группе его не
+    /// сохранить — ни имя клуба (иврит/латиница), ни имя самой официальной группы. До появления
+    /// официальной имя клуба разрешено; совпавшие к моменту одобрения переименовываются там же.
+    ///
+    /// Проверяется только то, что МЕНЯЕТСЯ: у группы, получившей имя до одобрения официальной,
+    /// правка описания не должна упираться в имя, которого она не трогает.
+    /// </summary>
+    private async Task<string?> ValidateNameAgainstOfficialGroupsAsync(HubGroupInputDto input, int? excludeId)
+    {
+        var checkName = true;
+        var checkNameEn = true;
+        if (excludeId is int id)
+        {
+            var current = await _db.HubGroups.AsNoTracking()
+                .Where(g => g.Id == id)
+                .Select(g => new { g.IsOfficial, g.Name, g.NameEn })
+                .FirstOrDefaultAsync();
+            if (current == null || current.IsOfficial) return null; // официальной её имя можно
+
+            checkName = HubGroupClubRules.NormalizeName(current.Name) != HubGroupClubRules.NormalizeName(input.Name);
+            checkNameEn = HubGroupClubRules.NormalizeName(current.NameEn) != HubGroupClubRules.NormalizeName(input.NameEn);
+            if (!checkName && !checkNameEn) return null;
+        }
+
+        var officials = await _db.HubGroups.AsNoTracking()
+            .Where(o => o.IsOfficial && o.Club != null)
+            .Select(o => new { o.Name, o.NameEn, ClubName = o.Club!.Name, ClubNameEn = o.Club.NameEn })
+            .ToListAsync();
+
+        foreach (var o in officials)
+        {
+            string?[] reserved = [o.ClubName, o.ClubNameEn, o.Name, o.NameEn];
+            var clubName = o.ClubName.Length > 0 ? o.ClubName : o.ClubNameEn;
+
+            if (checkName && HubGroupClubRules.ConflictsWith(input.Name, reserved))
+                return HubGroupClubRules.NameTakenError(clubName, input.Name);
+            if (checkNameEn && HubGroupClubRules.ConflictsWith(input.NameEn, reserved))
+                return HubGroupClubRules.NameTakenError(clubName, input.NameEn!);
+        }
+
         return null;
     }
 
@@ -122,22 +167,34 @@ public partial class HubGroupCrudCore
 
     public async Task<HubGroupSaveResult> SaveAsync(HubGroup group)
     {
+        var error = await TrySaveChangesAsync(group);
+        if (error != null) return HubGroupSaveResult.Fail(error);
+        await _cache.InvalidateAllAsync();
+        return HubGroupSaveResult.Ok(group.Id);
+    }
+
+    /// <summary>
+    /// SaveChanges с разбором ошибок записи, БЕЗ сброса кэша: null — сохранено, иначе текст
+    /// ошибки. Для записи внутри транзакции — кэш сбрасывают после коммита, иначе параллельный
+    /// публичный запрос успеет закэшировать состояние до коммита.
+    /// </summary>
+    public async Task<string?> TrySaveChangesAsync(HubGroup group)
+    {
         try
         {
             await _db.SaveChangesAsync();
+            return null;
         }
         catch (DbUpdateException ex)
         {
             // 23505 = unique_violation (slug), 23503 = foreign_key_violation (владелец/клуб) —
             // ловить их одинаково как «slug занят» было бы враньём, вводящим в заблуждение.
             if (ex.InnerException is PostgresException { SqlState: "23505" })
-                return HubGroupSaveResult.Fail($"Не удалось сохранить: slug «{group.Slug}» уже занят другой группой.");
+                return $"Не удалось сохранить: slug «{group.Slug}» уже занят другой группой.";
             if (ex.InnerException is PostgresException { SqlState: "23503" })
-                return HubGroupSaveResult.Fail("Не удалось сохранить: владелец или клуб не найден.");
-            return HubGroupSaveResult.Fail("Не удалось сохранить группу.");
+                return "Не удалось сохранить: владелец или клуб не найден.";
+            return "Не удалось сохранить группу.";
         }
-        await _cache.InvalidateAllAsync();
-        return HubGroupSaveResult.Ok(group.Id);
     }
 
     public async Task<HubGroupMemberSaveResult> AddMemberAsync(int hubGroupId, int swimmerId, string role)
@@ -148,10 +205,25 @@ public partial class HubGroupCrudCore
         var swimmerExists = await _db.Swimmers.AnyAsync(s => s.Id == swimmerId);
         if (!swimmerExists) return HubGroupMemberSaveResult.Fail($"Пловец #{swimmerId} не найден");
 
-        var dup = await _db.HubGroupMembers.AnyAsync(m => m.HubGroupId == hubGroupId && m.SwimmerId == swimmerId);
-        if (dup) return HubGroupMemberSaveResult.Fail("Этот пловец уже состоит в группе");
-
         if (!HubGroupMember.Roles.Contains(role)) role = "member";
+
+        var existing = await _db.HubGroupMembers
+            .FirstOrDefaultAsync(m => m.HubGroupId == hubGroupId && m.SwimmerId == swimmerId);
+        if (existing != null)
+        {
+            if (existing.Source == HubGroupMemberSource.Manual)
+                return HubGroupMemberSaveResult.Fail("Этот пловец уже состоит в группе");
+
+            // Клубного (в т.ч. скрытого) владелец добавил руками — строка становится ручной:
+            // ручной побеждает клубного (план §2), и ни уход из клуба, ни отписка его больше не
+            // уберут. Скрытие снимается — человека только что выбрали явно.
+            existing.Source = HubGroupMemberSource.Manual;
+            existing.IsExcluded = false;
+            existing.Role = role;
+            await _db.SaveChangesAsync();
+            await TouchGroupAsync(hubGroupId);
+            return HubGroupMemberSaveResult.Ok();
+        }
 
         var maxOrder = await _db.HubGroupMembers.Where(m => m.HubGroupId == hubGroupId)
             .Select(m => (int?)m.SortOrder).MaxAsync() ?? 0;
@@ -191,13 +263,34 @@ public partial class HubGroupCrudCore
         return HubGroupMemberSaveResult.Ok();
     }
 
+    /// <summary>
+    /// Убрать пловца из состава так, чтобы пересборка по подписке на клуб его НЕ вернула:
+    /// <list type="bullet">
+    ///   <item>клубного — не удаляем, а скрываем: удалённого следующая пересборка вставила бы снова;</item>
+    ///   <item>ручного, который ещё и в клубе подписки, — туда же, в скрытые клубные;</item>
+    ///   <item>остального ручного — удаляем, как всегда.</item>
+    /// </list>
+    /// </summary>
     public async Task<HubGroupMemberSaveResult> RemoveMemberAsync(int hubGroupId, int memberId)
     {
         var member = await _db.HubGroupMembers.FindAsync(memberId);
         if (member == null || member.HubGroupId != hubGroupId)
             return HubGroupMemberSaveResult.Fail($"Участник #{memberId} не найден");
 
-        _db.HubGroupMembers.Remove(member);
+        var hideAsClub = member.Source == HubGroupMemberSource.Club
+            || await HubGroupClubRoster.IsInSubscribedClubAsync(
+                _db, hubGroupId, member.SwimmerId, HubGroupClubRules.ActivitySince(DateTime.UtcNow));
+
+        if (hideAsClub)
+        {
+            member.Source = HubGroupMemberSource.Club;
+            member.IsExcluded = true;
+        }
+        else
+        {
+            _db.HubGroupMembers.Remove(member);
+        }
+
         await _db.SaveChangesAsync();
         await TouchGroupAsync(hubGroupId);
         return HubGroupMemberSaveResult.Ok();

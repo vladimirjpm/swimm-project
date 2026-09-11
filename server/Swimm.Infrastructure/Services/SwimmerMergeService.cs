@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
+using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
 namespace Swimm.Infrastructure.Services;
@@ -121,14 +123,24 @@ public class SwimmerMergeService(SwimmDbContext db) : ISwimmerMergeService
             }
             Note(res, "Sys_UserFavorites", favs.Count);
 
-            // Членства в группах: уникальный (HubGroupId, SwimmerId) — дубль-строку удаляем.
+            // Членства в группах: уникальный (HubGroupId, SwimmerId) — дубль-строку удаляем, а
+            // каноническая берёт итог обеих по правилу HubGroupClubRules.MergeRows: ручная
+            // побеждает клубную (и тогда видима), две клубные — скрыта, если скрыта хоть одна.
             var members = await db.HubGroupMembers.Where(m => m.SwimmerId == duplicate.Id).ToListAsync(ct);
-            var canonGroups = await db.HubGroupMembers
-                .Where(m => m.SwimmerId == canonical.Id).Select(m => m.HubGroupId).ToListAsync(ct);
+            var canonRows = await db.HubGroupMembers
+                .Where(m => m.SwimmerId == canonical.Id).ToDictionaryAsync(m => m.HubGroupId, ct);
             foreach (var m in members)
             {
-                if (canonGroups.Contains(m.HubGroupId))
+                if (canonRows.TryGetValue(m.HubGroupId, out var canonRow))
                 {
+                    var (source, excluded) = HubGroupClubRules.MergeRows(
+                        (canonRow.Source, canonRow.IsExcluded), (m.Source, m.IsExcluded));
+                    // Роль — от строки, которую владелец завёл руками: у клубной она всегда member.
+                    if (m.Source == HubGroupMemberSource.Manual && canonRow.Source != HubGroupMemberSource.Manual)
+                        canonRow.Role = m.Role;
+                    canonRow.Source = source;
+                    canonRow.IsExcluded = excluded;
+
                     db.HubGroupMembers.Remove(m);
                     res.Actions.Add($"HubGroupMembers: строка группы {m.HubGroupId} удалена (canonical уже в группе)");
                 }

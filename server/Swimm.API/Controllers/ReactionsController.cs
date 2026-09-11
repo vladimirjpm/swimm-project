@@ -47,7 +47,7 @@ public class ReactionsController : ControllerBase
         var userId = CurrentUserId();
         if (userId == null) return Unauthorized();
 
-        var state = await _reactions.SetLikeAsync(userId.Value, mediaId, on);
+        var state = await _reactions.SetLikeAsync(userId.Value, mediaId, on, User.IsInRole("Admin"));
         // 404 и для невидимого медиа — не раскрываем существование чужих приватных записей.
         return state == null ? NotFound(new { error = "Media not found" }) : Ok(state);
     }

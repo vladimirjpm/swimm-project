@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.Caching.Memory;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 
 namespace Swimm.Infrastructure.Services;
 
@@ -39,13 +40,31 @@ public class AdminSettingsService : ISettingsService
                 "paged — постранично с фильтрами на сервере (включится в фазе 3); " +
                 "client — клиент выбирает сам через ?loadMode= (по умолчанию full). " +
                 "full/paged принудительны — URL-параметр клиента игнорируется"),
-            new("HubGroupCreationPolicy", "admin", "string", "livesite",
-                "Кто создаёт группы (SwimHub): admin — только админ; coach — админ и тренеры; any — любой пользователь"),
+            // Дефолты групп = рабочий режим (решение 10.09.2026): значения живут в памяти и после
+            // рестарта возвращаются сюда. Исключения по конкретным людям — в /Admin/Users (в БД).
+            new("HubGroupCreationPolicy", "any", "string", "livesite",
+                "Кто создаёт группы (SwimHub): admin — только админ; coach — админ и тренеры; " +
+                "any — любой вошедший пользователь (в пределах лимита)"),
             new("HubGroupMaxPerUser", "3", "int", "livesite",
-                "Лимит групп на пользователя (на админа не действует)"),
-            new("HubGroupVisibility", "public", "string", "livesite",
-                "Видимость групп: public — все видны всем; private — все скрыты; " +
-                "perGroup — решает флаг IsPublic у конкретной группы"),
+                "Сколько групп может ВЛАДЕТЬ обычный пользователь (официальные тоже в счёт). " +
+                "Персональный лимит в /Admin/Users важнее; на админа не действует"),
+            new("HubGroupMaxPerCoach", "3", "int", "livesite",
+                "Сколько групп может ВЛАДЕТЬ пользователь с ролью Coach. Персональный лимит в " +
+                "/Admin/Users важнее; на админа не действует"),
+            // Лимиты избранного (решение 10.09.2026): сердечко должно что-то выделять, а список
+            // «весь клуб» — это группа. Правило и тексты — FavoritesRules.
+            new(FavoritesRules.MaxSwimmersKey, FavoritesRules.DefaultMaxSwimmers.ToString(), "int", "livesite",
+                "Сколько ПЛОВЦОВ можно держать в избранном (звезда «это я» тоже в счёт), 1..200. " +
+                "Кто уже выше лимита, ничего не теряет — только не может добавить"),
+            new(FavoritesRules.MaxClubsKey, FavoritesRules.DefaultMaxClubs.ToString(), "int", "livesite",
+                "Сколько КЛУБОВ можно держать в избранном, 1..200. Избранный клуб в пловцов не " +
+                "разворачивается и в лимит пловцов не идёт"),
+            // Дефолт perGroup (решение 11.09.2026, §6-6): иначе галочка «Public group» у группы
+            // ни на что не влияла. Приватная = только для участников, остальным — заглушка.
+            new(HubGroupVisibilityRules.SettingKey, HubGroupVisibilityRules.Default, "string", "livesite",
+                "Видимость групп: perGroup — решает галочка «Public group» у группы (снята — группу " +
+                "видят только участники, остальным страница «только для участников», в каталоге её нет); " +
+                "public — все группы открыты всем, галочка не действует; private — все группы только для участников"),
             new("DiscoveryEnabled", "false", "bool", "admin",
                 "Автозабор isr.org.il: true — фоновая проверка списка соревнований по расписанию"),
             new("DiscoveryIntervalHours", "12", "int", "admin",
@@ -114,6 +133,12 @@ public class AdminSettingsService : ISettingsService
         if (key == "HubGroupVisibility" && newValue is not ("public" or "private" or "perGroup"))
             return false;
         if (key == "RecordAgeAxis" && newValue is not ("calendar" or "season"))
+            return false;
+        if (key is "HubGroupMaxPerUser" or "HubGroupMaxPerCoach"
+            && int.Parse(newValue) is < 0 or > HubGroupCreationRules.MaxLimit)
+            return false;
+        if (key is FavoritesRules.MaxSwimmersKey or FavoritesRules.MaxClubsKey
+            && !FavoritesRules.IsValidLimit(int.Parse(newValue)))
             return false;
 
         _settings[key] = existing with { Value = newValue };

@@ -139,6 +139,7 @@ else
 }
 
 @section Scripts {
+    <partial name="/Pages/Admin/HubGroups/_DeleteConfirm.cshtml" />
     <script>
         // Deep-link с дашборда (?tab=requests) — прокрутить к секции заявок.
         document.addEventListener('DOMContentLoaded', () => {
@@ -149,13 +150,8 @@ else
         document.querySelectorAll('.hubgroup-delete-form').forEach(form => {
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const ok = await adminConfirm({
-                    title: 'Удалить группу?',
-                    message: 'Все участники группы будут удалены вместе с ней. Пловцы в справочнике останутся.',
-                    confirmText: 'Удалить',
-                    danger: true,
-                });
-                if (ok) form.submit();
+                const id = form.querySelector('input[name="id"]').value;
+                if (await hubGroupDeleteConfirm(id)) form.submit();
             });
         });
     </script>

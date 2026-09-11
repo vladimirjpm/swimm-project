@@ -1,6 +1,13 @@
-import React, { useState } from 'react';
-import { useClubOptions, useCurrentIdentity, useHubGroupMedia, useMyHubGroupEdit, useMyHubGroups } from './use-my-hub-groups';
-import type { HubGroupInput, HubGroupLinkInput, HubGroupMediaInput, MyHubGroupRow } from './my-groups-types';
+import React, { useCallback, useRef, useState } from 'react';
+import {
+  useClubOptions, useCurrentIdentity, useGroupCreationPolicy, useHubGroupMedia, useMyHubGroupEdit, useMyHubGroups,
+} from './use-my-hub-groups';
+import DeleteGroupDialog from './components/delete-group-dialog';
+import { useLoginModal } from '../components/login-modal/login-modal-context';
+import type {
+  ClubSubscriptionPreview, GroupCreationPolicy, HubGroupInput, HubGroupLinkInput, HubGroupMediaInput,
+  HubGroupMemberRow, MyHubGroupRow,
+} from './my-groups-types';
 import type { HubGroupMediaItem } from '../../utils/interfaces/results';
 import { routes } from '../../utils/routes';
 
@@ -95,6 +102,14 @@ function GroupInputForm({
           onChange={(e) => setField('isPublic', e.target.checked)} />
         Public group
       </label>
+      {/* Приватная (§6-6): закрыта не-участникам, но не спрятана от них насовсем — по ссылке
+          они видят «members only» и могут подать заявку. */}
+      {!form.isPublic && (
+        <p className="m-0 text-[11.5px] italic text-[var(--t-text-3)]">
+          Private: only members see the roster, results and media. Everyone else gets a “members only”
+          page and can only request to join; the group is not listed in the catalog.
+        </p>
+      )}
 
       <label className="flex items-center gap-2 text-[13px] font-bold text-[var(--t-text-2)]">
         Joining:
@@ -123,11 +138,190 @@ function GroupInputForm({
   );
 }
 
-function MembersEditor({ hubGroupId, clubId }: { hubGroupId: number; clubId?: number | null }) {
+type GroupEdit = ReturnType<typeof useMyHubGroupEdit>;
+
+const subHeaderCls =
+  'm-0 flex w-full cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-left text-[11.5px] font-extrabold uppercase tracking-[0.12em] text-[var(--t-accent-dim)]';
+
+/**
+ * Состав из клуба (П3 плана подписки): группа подписывается на клуб, и её пловцы — все, кто
+ * выступал за клуб в этом или прошлом сезоне, — приходят и уходят сами. Живёт внутри редактора
+ * состава на ТОМ ЖЕ экземпляре `useMyHubGroupEdit`: иначе после подписки список пловцов ниже
+ * остался бы старым до перезагрузки.
+ *
+ * Предупреждение и подсказку «вступить в существующую» пишет сервер (предпросмотр) — здесь
+ * только показ. Подсказка — не запрет (решение Влада): подписаться можно всё равно.
+ */
+function ClubSubscriptionBlock({ edit, clubRows, onChanged }: {
+  edit: GroupEdit;
+  /** Сколько клубных строк уйдёт при отписке (видимые + скрытые). */
+  clubRows: number;
+  onChanged?: () => void;
+}) {
+  const clubs = useClubOptions();
+  const [clubId, setClubId] = useState<number | ''>('');
+  const [preview, setPreview] = useState<ClubSubscriptionPreview | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmUnfollow, setConfirmUnfollow] = useState(false);
+  // Предпросмотр грузится на каждый выбор — ответ на прежний выбор не должен перетереть свежий.
+  const pickSeq = useRef(0);
+
+  const subscription = edit.data?.clubSubscription ?? null;
+
+  const pick = async (value: number | '') => {
+    const seq = ++pickSeq.current;
+    setClubId(value);
+    setPreview(null);
+    setError(null);
+    if (value === '') return;
+    const p = await edit.previewClubSubscription(value);
+    if (seq !== pickSeq.current) return;
+    if (p) setPreview(p); else setError('Could not load this club.');
+  };
+
+  const follow = async () => {
+    if (clubId === '') return;
+    setBusy(true);
+    setError(null);
+    const r = await edit.subscribeToClub(clubId);
+    setBusy(false);
+    if (!r.success) { setError(r.error ?? 'Could not follow the club.'); return; }
+    setClubId('');
+    setPreview(null);
+    onChanged?.();
+  };
+
+  const unfollow = async () => {
+    setBusy(true);
+    setError(null);
+    const r = await edit.unsubscribeFromClub();
+    setBusy(false);
+    setConfirmUnfollow(false);
+    if (r.success) onChanged?.(); else setError(r.error ?? 'Could not unfollow the club.');
+  };
+
+  if (subscription) {
+    return (
+      <div className="flex flex-col gap-2 rounded-[12px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] p-3">
+        <p className="m-0 text-[13px] text-[var(--t-text)]">
+          Roster from club: <bdi className="font-extrabold">{subscription.clubName}</bdi>
+        </p>
+        <p className="m-0 text-[11.5px] text-[var(--t-text-2)]">
+          Everyone who competed for the club this season or last is in the roster. New swimmers join
+          after each competition import; those who stop competing for the club leave on their own.
+        </p>
+        {confirmUnfollow ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[12px] font-bold text-[var(--t-warn)]">
+              {clubRows} club swimmers will leave the roster, hidden ones too. Swimmers you added yourself stay.
+            </span>
+            <button type="button" className={btnDangerCls} disabled={busy} onClick={unfollow}>
+              {busy ? '…' : 'Unfollow'}
+            </button>
+            <button type="button" className={btnCls} onClick={() => setConfirmUnfollow(false)}>Cancel</button>
+          </div>
+        ) : (
+          <div>
+            <button type="button" className={btnCls} onClick={() => setConfirmUnfollow(true)}>Unfollow club</button>
+          </div>
+        )}
+        {error && <p className="m-0 text-[12.5px] font-bold text-[var(--t-danger)]">{error}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-[12px] border border-[var(--t-border)] p-3">
+      <p className="m-0 text-[12px] text-[var(--t-text-2)]">
+        Roster from a club: everyone who competed for it this season or last joins, and the roster keeps
+        itself up to date. Swimmers you add yourself stay either way.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <select className={`${inputCls} max-w-[260px]`} value={clubId}
+          onChange={(e) => pick(e.target.value ? Number(e.target.value) : '')}>
+          <option value="">Select a club…</option>
+          {clubs.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+        <button type="button" className={btnCls} disabled={!preview || busy} onClick={follow}>
+          {busy ? '…' : 'Follow club'}
+        </button>
+      </div>
+      {preview && (
+        <div className="flex flex-col gap-1">
+          <p className="m-0 text-[12.5px] text-[var(--t-text)]">
+            {preview.swimmerCount} swimmers compete for <bdi className="font-extrabold">{preview.clubName}</bdi> —
+            all of them will be in the roster.
+          </p>
+          {preview.warning && (
+            <p className="m-0 text-[11.5px] font-bold text-[var(--t-warn)]">{preview.warning}</p>
+          )}
+          {preview.hint && preview.hintGroup && (
+            <p className="m-0 text-[11.5px] text-[var(--t-text-2)]">
+              {preview.hint}{' '}
+              <a href={routes.group(preview.hintGroup.slug)}
+                className="font-extrabold text-[var(--t-accent)] no-underline hover:underline">
+                Open the group →
+              </a>
+            </p>
+          )}
+        </div>
+      )}
+      {error && <p className="m-0 text-[12.5px] font-bold text-[var(--t-danger)]">{error}</p>}
+    </div>
+  );
+}
+
+/** Строка пловца в редакторе состава: имя (иврит по умолчанию), год, роль и действие справа. */
+function MemberLine({ m, edit, action, showRole = true }: {
+  m: HubGroupMemberRow;
+  edit: GroupEdit;
+  action: React.ReactNode;
+  showRole?: boolean;
+}) {
+  return (
+    <li className="flex items-center justify-between gap-2">
+      <span className="min-w-0 truncate text-[13px] text-[var(--t-text)]">
+        <bdi>{m.swimmerName || m.swimmerNameEn}</bdi>
+        {m.birthYear > 0 && <span className="ml-1.5 text-[11px] text-[var(--t-text-3)]">{m.birthYear}</span>}
+      </span>
+      <div className="flex shrink-0 items-center gap-2">
+        {showRole && (
+          <select className={`${inputCls} w-[110px]`} value={m.role}
+            onChange={(e) => edit.updateMember(m.id, e.target.value, m.sortOrder)}>
+            <option value="member">member</option>
+            <option value="captain">captain</option>
+            <option value="coach">coach</option>
+          </select>
+        )}
+        {action}
+      </div>
+    </li>
+  );
+}
+
+/**
+ * Состав пловцов группы. Три вида строк (docs/hubgroups-architecture.md §4а):
+ *   · добавленные руками — как всегда, с ✕;
+ *   · пришедшие из подписки на клуб — свёрнутым списком с поиском (их бывает 150+) и «Hide»
+ *     вместо ✕: удалённого клубного вернула бы следующая пересборка;
+ *   · скрытые владельцем — отдельно, с «Restore».
+ */
+function MembersEditor({ hubGroupId, clubId, onRosterChanged }: {
+  hubGroupId: number;
+  clubId?: number | null;
+  /** Состав сдвинулся (подписка/отписка) — обновить счётчик в списке «My groups». */
+  onRosterChanged?: () => void;
+}) {
   const edit = useMyHubGroupEdit(hubGroupId);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Awaited<ReturnType<typeof edit.searchSwimmers>>>([]);
   const [clubSwimmers, setClubSwimmers] = useState<Awaited<ReturnType<typeof edit.getClubSwimmers>> | null>(null);
+  const [showFromClub, setShowFromClub] = useState(false);
+  const [clubFilter, setClubFilter] = useState('');
+  const [showHidden, setShowHidden] = useState(false);
 
   if (!edit.data) return null;
 
@@ -141,27 +335,85 @@ function MembersEditor({ hubGroupId, clubId }: { hubGroupId: number; clubId?: nu
     if (clubId) setClubSwimmers(await edit.getClubSwimmers(clubId));
   };
 
+  const subscription = edit.data.clubSubscription ?? null;
+  const manual = edit.data.members.filter((m) => m.source !== 'club');
+  const fromClub = edit.data.members.filter((m) => m.source === 'club' && !m.isExcluded);
+  const hidden = edit.data.members.filter((m) => m.isExcluded);
+
+  const filter = clubFilter.trim().toLowerCase();
+  const fromClubShown = filter.length === 0
+    ? fromClub
+    : fromClub.filter((m) => `${m.swimmerName} ${m.swimmerNameEn}`.toLowerCase().includes(filter));
+
   return (
     <div className="flex flex-col gap-2">
+      <ClubSubscriptionBlock edit={edit} clubRows={fromClub.length + hidden.length} onChanged={onRosterChanged} />
+
+      {subscription && (
+        <p className="m-0 mt-1 text-[11.5px] font-extrabold uppercase tracking-[0.12em] text-[var(--t-accent-dim)]">
+          Added by you · {manual.length}
+        </p>
+      )}
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
-        {edit.data.members.map((m) => (
-          <li key={m.id} className="flex items-center justify-between gap-2">
-            <span className="min-w-0 truncate text-[13px] text-[var(--t-text)]">{m.swimmerName || m.swimmerNameEn}</span>
-            <div className="flex shrink-0 items-center gap-2">
-              <select className={`${inputCls} w-[110px]`} value={m.role}
-                onChange={(e) => edit.updateMember(m.id, e.target.value, m.sortOrder)}>
-                <option value="member">member</option>
-                <option value="captain">captain</option>
-                <option value="coach">coach</option>
-              </select>
-              <button type="button" className={btnDangerCls} onClick={() => edit.removeMember(m.id)}>✕</button>
-            </div>
-          </li>
+        {manual.map((m) => (
+          <MemberLine key={m.id} m={m} edit={edit}
+            action={<button type="button" className={btnDangerCls} onClick={() => edit.removeMember(m.id)}>✕</button>} />
         ))}
         {edit.data.members.length === 0 && (
           <p className="text-[12.5px] text-[var(--t-text-2)]">The roster is empty.</p>
         )}
       </ul>
+
+      {fromClub.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <button type="button" className={subHeaderCls} aria-expanded={showFromClub}
+            onClick={() => setShowFromClub((v) => !v)}>
+            {showFromClub ? '▾' : '▸'} From the club · {fromClub.length}
+          </button>
+          {showFromClub && (
+            <>
+              <input className={inputCls} placeholder="Filter by name…" value={clubFilter}
+                onChange={(e) => setClubFilter(e.target.value)} />
+              <ul className="m-0 flex max-h-[360px] list-none flex-col gap-2 overflow-y-auto p-0 pr-1">
+                {fromClubShown.map((m) => (
+                  <MemberLine key={m.id} m={m} edit={edit}
+                    action={(
+                      <button type="button" className={btnCls}
+                        title="Hide from the group everywhere — the next club update won't bring the swimmer back"
+                        onClick={() => edit.setMemberExcluded(m.id, true)}>
+                        Hide
+                      </button>
+                    )} />
+                ))}
+                {fromClubShown.length === 0 && (
+                  <p className="text-[12.5px] text-[var(--t-text-2)]">No swimmers match the filter.</p>
+                )}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
+
+      {hidden.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <button type="button" className={subHeaderCls} aria-expanded={showHidden}
+            onClick={() => setShowHidden((v) => !v)}>
+            {showHidden ? '▾' : '▸'} Hidden · {hidden.length}
+          </button>
+          {showHidden && (
+            <ul className="m-0 flex list-none flex-col gap-2 p-0">
+              {hidden.map((m) => (
+                <MemberLine key={m.id} m={m} edit={edit} showRole={false}
+                  action={(
+                    <button type="button" className={btnCls} onClick={() => edit.setMemberExcluded(m.id, false)}>
+                      Restore
+                    </button>
+                  )} />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <div className="relative">
         <input className={inputCls} placeholder="Find a swimmer by last name…" value={query}
@@ -181,7 +433,8 @@ function MembersEditor({ hubGroupId, clubId }: { hubGroupId: number; clubId?: nu
         )}
       </div>
 
-      {clubId && (
+      {/* Ручной подбор из справочника клуба — только пока нет подписки: с ней клуб и так весь в составе. */}
+      {clubId && !subscription && (
         <div>
           <button type="button" className={btnCls} onClick={toggleClubSwimmers}>
             {clubSwimmers != null ? 'Hide club swimmers' : 'Show club swimmers'}
@@ -657,7 +910,8 @@ function EditGroupCard({ row, currentUserId, isAdmin, onClose, onSaved }: {
       />
       <div>
         <h3 className="mb-2 text-[12px] font-black uppercase tracking-[0.18em] text-[var(--t-accent)]">Members</h3>
-        <MembersEditor hubGroupId={row.id} clubId={edit.data.isOfficial ? edit.data.clubId : null} />
+        <MembersEditor hubGroupId={row.id} clubId={edit.data.isOfficial ? edit.data.clubId : null}
+          onRosterChanged={onSaved} />
         <p className="mt-2 text-[11.5px] italic text-[var(--t-text-3)]">{DISCLAIMER}</p>
       </div>
       <div>
@@ -687,29 +941,101 @@ function EditGroupCard({ row, currentUserId, isAdmin, onClose, onSaved }: {
   );
 }
 
-/** Панель самообслуживания групп (8.6) — на странице списка групп, только для авторизованных. */
+/**
+ * Гостю панели «My groups» нет — вместо неё подсказка, что группу можно создать, и вход.
+ * Без неё создание было не найти: кнопка живёт только в панели, а панель видят только
+ * вошедшие. Обещать можно только то, что открыто: при политике `admin` молчим, при `coach`
+ * так и пишем. Пока политика грузится — тоже молчим, чтобы текст не мигал.
+ */
+function GuestCreateHint({ policy }: { policy: GroupCreationPolicy | null }) {
+  const { openLoginModal } = useLoginModal();
+  if (policy == null || policy === 'admin') return null;
+
+  return (
+    <section className="px-4 pt-[26px] lg:px-16" aria-label="Create a group">
+      <div className={`${cardCls} flex flex-wrap items-center justify-between gap-4`}>
+        <div className="min-w-0 max-w-[640px]">
+          <h2 className="mb-1.5 text-[15px] font-black uppercase tracking-[0.2em] text-[var(--t-accent)]">
+            Create your own group
+          </h2>
+          <p className="m-0 text-[13px] text-[var(--t-text-2)]">
+            {policy === 'coach'
+              ? 'Creating groups is open to coaches right now. Sign in with your coach account to start one.'
+              : 'Coach a squad or train with friends from different clubs? Sign in to create a group and follow everyone’s swims, records and season standings in one place.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={openLoginModal}
+          className="hp-mono shrink-0 cursor-pointer rounded-[11px] bg-[var(--t-accent)] px-4 py-2 text-[13px] font-extrabold text-[var(--t-accent-ink)]"
+        >
+          Sign in to create a group
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Панель самообслуживания групп (8.6) — на странице списка групп. Вошедшим — список, лимит и
+ * создание; гостю — подсказка со входом (`GuestCreateHint`).
+ */
 export default function MyGroupsPanel() {
   const identity = useCurrentIdentity();
   const mine = useMyHubGroups(identity.isAuthenticated);
+  const guestPolicy = useGroupCreationPolicy(!identity.loading && !identity.isAuthenticated);
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [deletingGroup, setDeletingGroup] = useState<MyHubGroupRow | null>(null);
+  const closeDeleteDialog = useCallback(() => setDeletingGroup(null), []);
 
-  if (identity.loading || !identity.isAuthenticated) return null;
+  if (identity.loading) return null;
+  if (!identity.isAuthenticated) return <GuestCreateHint policy={guestPolicy} />;
+
+  const eligibility = mine.eligibility;
+  // Удалять может только владелец (или site-админ): в списке лежат и группы, где ты админ.
+  const canDelete = (g: MyHubGroupRow) => identity.isAdmin || g.ownerUserId === identity.userId;
+
+  const confirmDelete = async (g: MyHubGroupRow) => {
+    const result = await mine.deleteGroup(g.id);
+    if (result.success) {
+      setDeletingGroup(null);
+      if (editingId === g.id) setEditingId(null);
+    }
+    return result;
+  };
 
   return (
     <section className="px-4 pt-[26px] lg:px-16" aria-label="My groups">
       <div className={cardCls}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-[15px] font-black uppercase tracking-[0.2em] text-[var(--t-accent)]">My groups</h2>
-          {!creating && mine.eligibility?.canCreate && (
-            <button type="button" className={btnCls} onClick={() => setCreating(true)}>
-              + Create group{mine.eligibility.remaining != null ? ` (${mine.eligibility.remaining} left)` : ''}
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {eligibility?.limit != null && (
+              <span className="hp-mono text-[11.5px] font-bold text-[var(--t-text-2)]"
+                title="Groups you own out of your limit (official groups count too)">
+                {eligibility.owned} / {eligibility.limit} groups
+              </span>
+            )}
+            {!creating && eligibility?.canCreate && (
+              <button type="button" className={btnCls} onClick={() => setCreating(true)}>
+                + Create group
+              </button>
+            )}
+          </div>
         </div>
 
-        {!creating && !mine.eligibility?.canCreate && mine.eligibility?.reason && mine.groups.length === 0 && (
-          <p className="text-[12.5px] text-[var(--t-text-2)]">{mine.eligibility.reason}</p>
+        {!creating && !eligibility?.canCreate && eligibility?.reason && (
+          <p className="mb-3 text-[12.5px] text-[var(--t-text-2)]">{eligibility.reason}</p>
+        )}
+
+        {deletingGroup && (
+          <DeleteGroupDialog
+            groupId={deletingGroup.id}
+            groupName={deletingGroup.name}
+            onConfirm={() => confirmDelete(deletingGroup)}
+            onClose={closeDeleteDialog}
+          />
         )}
 
         {creating && (
@@ -742,17 +1068,36 @@ export default function MyGroupsPanel() {
                         Official · {g.clubName}
                       </span>
                     )}
-                    <div className="text-[11.5px] text-[var(--t-text-2)]">{g.memberCount} · swimmers</div>
+                    <div className="text-[11.5px] text-[var(--t-text-2)]">
+                      {g.memberCount} · swimmers
+                      {!g.isOfficial && g.followedClubName && (
+                        <> · from club <bdi>{g.followedClubName}</bdi></>
+                      )}
+                    </div>
+                    {/* Официальная группа клуба убрала копию из каталога (П4). Писем не шлём —
+                        владелец узнаёт отсюда; текст считает сервер. */}
+                    {g.hiddenByOfficialGroup && g.catalogNotice && (
+                      <p className="m-0 mt-1 text-[11.5px] font-bold text-[var(--t-warn)]">
+                        {g.catalogNotice}{' '}
+                        {g.officialGroupSlug && (
+                          <a href={routes.group(g.officialGroupSlug)}
+                            className="text-[var(--t-accent)] no-underline hover:underline">
+                            Open the official group →
+                          </a>
+                        )}
+                      </p>
+                    )}
                   </div>
                   <div className="flex shrink-0 gap-2">
                     <button type="button" className={btnCls}
                       onClick={() => setEditingId(editingId === g.id ? null : g.id)}>
                       {editingId === g.id ? 'Close' : 'Edit'}
                     </button>
-                    <button type="button" className={btnDangerCls}
-                      onClick={async () => { if (window.confirm(`Delete the group “${g.name}”?`)) await mine.deleteGroup(g.id); }}>
-                      Delete
-                    </button>
+                    {canDelete(g) && (
+                      <button type="button" className={btnDangerCls} onClick={() => setDeletingGroup(g)}>
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
                 {editingId === g.id && (

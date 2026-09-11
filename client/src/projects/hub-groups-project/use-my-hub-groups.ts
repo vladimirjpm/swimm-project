@@ -3,8 +3,11 @@ import { useAuth } from '../../hooks/useAuth';
 import type {
   ClubOption,
   ClubRequest,
+  ClubSubscriptionPreview,
   CreateEligibility,
+  GroupCreationPolicy,
   HubGroupClubRequestInput,
+  HubGroupDeleteImpact,
   HubGroupEditData,
   HubGroupInput,
   HubGroupAdmin,
@@ -114,6 +117,54 @@ export function useMyHubGroups(enabled: boolean) {
   return { groups, eligibility, loading, reload, createGroup, deleteGroup };
 }
 
+/**
+ * Политика создания групп для ГОСТЯ (`hubGroupCreationPolicy` из публичного
+ * `/api/client-config`). Вошедшему она не нужна — ему сервер отдаёт create-eligibility с
+ * причиной. Гостю нужна, чтобы подсказка «войдите и создайте группу» не обещала невозможного,
+ * когда создание закрыто. Сбой запроса = дефолт `any`: подсказка покажется лишний раз, а после
+ * входа панель честно назовёт причину отказа. null — ещё не загружено.
+ */
+export function useGroupCreationPolicy(enabled: boolean): GroupCreationPolicy | null {
+  const [policy, setPolicy] = useState<GroupCreationPolicy | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    fetch('/api/client-config')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((cfg) => { if (!cancelled) setPolicy(cfg?.hubGroupCreationPolicy ?? 'any'); })
+      .catch(() => { if (!cancelled) setPolicy('any'); });
+    return () => { cancelled = true; };
+  }, [enabled]);
+
+  return policy;
+}
+
+/**
+ * Перечень того, что уйдёт вместе с группой, — для подтверждения удаления. Грузится при
+ * открытии диалога, а не заранее: нужен только тому, кто уже нажал Delete.
+ */
+export function useGroupDeleteImpact(id: number) {
+  const [impact, setImpact] = useState<HubGroupDeleteImpact | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setImpact(null);
+    setError(null);
+    fetch(`/api/me/hub-groups/${id}/delete-impact`, { credentials: 'include' })
+      .then(async (r) => {
+        if (cancelled) return;
+        if (r.ok) { setImpact(await r.json()); return; }
+        setError(r.status === 403 ? 'Only the group owner can delete it.' : `Could not load the group (${r.status})`);
+      })
+      .catch(() => { if (!cancelled) setError('Could not load the group'); });
+    return () => { cancelled = true; };
+  }, [id]);
+
+  return { impact, error };
+}
+
 /** Справочник клубов — для select в форме заявки на официальный статус. */
 export function useClubOptions() {
   const [clubs, setClubs] = useState<ClubOption[]>([]);
@@ -205,6 +256,46 @@ export function useMyHubGroupEdit(id: number | null) {
     return result;
   }, [id, reload]);
 
+  // ── Подписка на клуб (docs/plans/hubgroup-club-subscription-plan.md П3) ──────
+
+  /** Что будет при подписке — ничего не пишет; null — клуб не найден или нет прав. */
+  const previewClubSubscription = useCallback(async (clubId: number): Promise<ClubSubscriptionPreview | null> => {
+    if (id == null) return null;
+    const r = await fetch(`/api/me/hub-groups/${id}/club-subscription-preview?clubId=${clubId}`, { credentials: 'include' });
+    return r.ok ? r.json() : null;
+  }, [id]);
+
+  /** Подписать и сразу пересобрать состав (другой клуб заменяет прежний — подписка одна). */
+  const subscribeToClub = useCallback(async (clubId: number): Promise<SaveResult> => {
+    if (id == null) return { success: false, error: 'No group' };
+    const r = await apiFetch(`/api/me/hub-groups/${id}/club-subscription`, {
+      method: 'PUT', body: JSON.stringify({ clubId }),
+    });
+    const result = await saveResultFrom(r);
+    if (result.success) await reload();
+    return result;
+  }, [id, reload]);
+
+  /** Снять подписку: клубные пловцы уходят (скрытые тоже), добавленные руками остаются. */
+  const unsubscribeFromClub = useCallback(async (): Promise<SaveResult> => {
+    if (id == null) return { success: false, error: 'No group' };
+    const r = await apiFetch(`/api/me/hub-groups/${id}/club-subscription`, { method: 'DELETE' });
+    const result = await saveResultFrom(r);
+    if (result.success) await reload();
+    return result;
+  }, [id, reload]);
+
+  /** Скрыть / вернуть клубного пловца (ручного так не прячут — его удаляют). */
+  const setMemberExcluded = useCallback(async (memberId: number, excluded: boolean): Promise<SaveResult> => {
+    if (id == null) return { success: false, error: 'No group' };
+    const r = await apiFetch(`/api/me/hub-groups/${id}/members/${memberId}/excluded`, {
+      method: 'PUT', body: JSON.stringify({ excluded }),
+    });
+    const result = await saveResultFrom(r);
+    if (result.success) await reload();
+    return result;
+  }, [id, reload]);
+
   const addAdmin = useCallback(async (email: string): Promise<SaveResult> => {
     if (id == null) return { success: false, error: 'No group' };
     const r = await apiFetch(`/api/me/hub-groups/${id}/admins`, { method: 'POST', body: JSON.stringify({ email }) });
@@ -270,6 +361,7 @@ export function useMyHubGroupEdit(id: number | null) {
   return {
     data, admins, clubRequest, loading, forbidden,
     update, searchSwimmers, getClubSwimmers, addMember, updateMember, removeMember,
+    previewClubSubscription, subscribeToClub, unsubscribeFromClub, setMemberExcluded,
     addAdmin, removeAdmin, submitClubRequest, addUserMember, approveUserMember, removeUserMember, setUserMemberLabel,
   };
 }

@@ -1,0 +1,47 @@
+@*
+    Подтверждение удаления группы для /Admin/HubGroups — и списка, и формы Edit (одна копия
+    текста на обе страницы). Перечень потерь берёт из GET /api/me/hub-groups/{id}/delete-impact —
+    того же ответа, что видит владелец в панели «My groups»: у админа сайта CanDelete на любую
+    группу. Удаление жёсткое, поэтому показываем перечень, а не общую фразу «участники будут
+    удалены» (так было раньше, и про тренировки с медиа она молчала).
+
+    Использование: const ok = await hubGroupDeleteConfirm(id);
+*@
+<script>
+    async function hubGroupDeleteConfirm(id) {
+        // Ивритское имя внутри русской фразы утаскивает соседние «ёлочки» в свой RTL-прогон,
+        // и они встают задом наперёд. adminConfirm пишет textContent — <bdi> не вставить,
+        // поэтому изолируем символами FSI…PDI.
+        const iso = (s) => '\u2068' + s + '\u2069';
+        let impact = null;
+        try {
+            const r = await fetch(`/api/me/hub-groups/${id}/delete-impact`, { credentials: 'include' });
+            if (r.ok) impact = await r.json();
+        } catch { /* перечень не получили — спросим без него, но предупредим */ }
+
+        const lines = [];
+        if (impact) {
+            if (impact.swimmers) lines.push(`• пловцов в составе: ${impact.swimmers} (в справочнике они останутся)`);
+            if (impact.accountMembers) lines.push(`• участников-аккаунтов: ${impact.accountMembers}`);
+            if (impact.admins) lines.push(`• админов группы: ${impact.admins}`);
+            if (impact.trainingSessions) lines.push(`• тренировок: ${impact.trainingSessions}, результатов в них: ${impact.trainingResults}`);
+            if (impact.media) lines.push(`• медиа группы: ${impact.media}`);
+            if (impact.mediaPublications) lines.push(`• публикаций медиа участников: ${impact.mediaPublications} (сами медиа останутся у авторов)`);
+            if (impact.isOfficial) lines.push(`• официальный статус группы клуба «${iso(impact.clubName)}»`);
+            if (impact.hasPendingClubRequest) lines.push('• заявка на официальный статус');
+        }
+
+        const message = !impact
+            ? 'Не удалось получить перечень того, что удалится. Группа уйдёт вместе с составом, тренировками и медиа. Действие необратимо.'
+            : lines.length
+                ? `Вместе с группой удалится:\n${lines.join('\n')}\n\nДействие необратимо.`
+                : 'Группа пустая — кроме неё ничего не удалится.';
+
+        return adminConfirm({
+            title: impact ? `Удалить группу «${iso(impact.name)}»?` : 'Удалить группу?',
+            message,
+            confirmText: 'Удалить',
+            danger: true,
+        });
+    }
+</script>

@@ -11,6 +11,19 @@ export interface MyHubGroupRow {
   isPublic: boolean;
   isOfficial: boolean;
   updatedAt: string;
+  /** Владелец. В списке лежат и группы, где ты только админ, — Delete только владельцу. */
+  ownerUserId: number;
+  /** Клуб, на который подписана группа (состав из клуба); null — подписки нет. */
+  followedClubName?: string | null;
+  /**
+   * Группу убрала из каталога официальная группа клуба подписки (П4). По ссылке она работает;
+   * снимут официальный статус — вернётся сама.
+   */
+  hiddenByOfficialGroup?: boolean;
+  /** Текст плашки «Not in the catalog: …» — уже по-английски, считает сервер. */
+  catalogNotice?: string | null;
+  /** Официальная группа клуба — ссылка из плашки. */
+  officialGroupSlug?: string | null;
 }
 
 export interface HubGroupLinkInput {
@@ -44,6 +57,46 @@ export interface HubGroupMemberRow {
   clubName?: string | null;
   role: 'member' | 'captain' | 'coach';
   sortOrder: number;
+  /** manual — добавлен руками; club — из подписки на клуб, пересобирается сам. */
+  source: 'manual' | 'club';
+  /**
+   * Владелец скрыл клубного пловца: его не видно нигде на сайте, и пересборка его не
+   * возвращает. Приходит только в панель управления — отсюда его возвращают.
+   */
+  isExcluded: boolean;
+}
+
+/** Подписка группы на клуб: состав собирается из пловцов клуба (docs/hubgroups-architecture.md §4а). */
+export interface HubGroupClubSubscription {
+  clubId: number;
+  clubName: string;
+  clubNameEn?: string | null;
+  createdAt: string;
+}
+
+export interface HubGroupRef {
+  id: number;
+  slug: string;
+  name: string;
+  memberCount: number;
+}
+
+/**
+ * Что будет при подписке на клуб (`GET …/club-subscription-preview?clubId=`). Тексты
+ * предупреждения и подсказки уже по-английски — их считает сервер (HubGroupClubRules).
+ */
+export interface ClubSubscriptionPreview {
+  /** Канонический клуб: склеенный дубль сервер подменяет сам. */
+  clubId: number;
+  clubName: string;
+  clubNameEn?: string | null;
+  swimmerCount: number;
+  isOwnOfficialClub: boolean;
+  officialGroup?: HubGroupRef | null;
+  followingGroups: HubGroupRef[];
+  warning?: string | null;
+  hint?: string | null;
+  hintGroup?: HubGroupRef | null;
 }
 
 /** Участник-аккаунт группы (приватный список, не пловец). */
@@ -89,8 +142,11 @@ export interface HubGroupEditData {
   /** open | approval — политика самозаписи. */
   joinPolicy: 'open' | 'approval';
   links: HubGroupLinkInput[];
+  /** Весь состав, включая скрытых клубных (`isExcluded`). */
   members: HubGroupMemberRow[];
   userMembers: HubGroupUserMember[];
+  /** Подписка на клуб; null — состав ведётся только руками. */
+  clubSubscription?: HubGroupClubSubscription | null;
 }
 
 export interface SwimmerSearchResult {
@@ -108,9 +164,42 @@ export interface HubGroupAdmin {
   createdAt: string;
 }
 
+/**
+ * Что уйдёт вместе с группой (`GET /api/me/hub-groups/{id}/delete-impact`). Удаление жёсткое,
+ * всё перечисленное — каскадом.
+ */
+export interface HubGroupDeleteImpact {
+  id: number;
+  name: string;
+  nameEn?: string | null;
+  isOfficial: boolean;
+  clubName?: string | null;
+  /** Пловцы в составе — сами пловцы остаются на сайте. */
+  swimmers: number;
+  accountMembers: number;
+  admins: number;
+  trainingSessions: number;
+  trainingResults: number;
+  /** Галерея, фото тренировок, разборы. */
+  media: number;
+  /** Публикации личных медиа участников — сами медиа остаются у авторов. */
+  mediaPublications: number;
+  hasPendingClubRequest: boolean;
+  /** Есть что терять — тогда подтверждение просит ввести имя группы. */
+  hasContent: boolean;
+}
+
+/** Кто может создавать группы — настройка HubGroupCreationPolicy (`/api/client-config`). */
+export type GroupCreationPolicy = 'admin' | 'coach' | 'any';
+
 export interface CreateEligibility {
   canCreate: boolean;
+  /** Причина отказа, уже по-английски (текст считает сервер). */
   reason?: string | null;
+  /** Сколько групп пользователь владеет (официальные тоже). */
+  owned: number;
+  /** Действующий лимит (персональный или по роли); null — без лимита (админ). */
+  limit?: number | null;
   remaining?: number | null;
 }
 

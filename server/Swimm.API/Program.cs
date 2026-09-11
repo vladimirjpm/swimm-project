@@ -300,6 +300,20 @@ if (args.Contains("--rebuild-club-standings"))
     return;
 }
 
+// Пересобрать составы ВСЕХ групп, подписанных на клуб (docs/plans/hubgroup-club-subscription-plan.md П2):
+//   dotnet run -- --hubgroup-club-sync
+// Штатно состав пересобирается сам — при подписке, после импорта (по клубам импорта) и после
+// склейки клубов. Этот прогон — догнать, если пересборка после импорта упала, и раз в сезон:
+// окно «пловцы клуба» (текущий + прошлый сезон) сдвигается 1 сентября без всякого импорта.
+if (args.Contains("--hubgroup-club-sync"))
+{
+    using var scope = app.Services.CreateScope();
+    var svc = scope.ServiceProvider.GetRequiredService<IHubGroupClubSubscriptionService>();
+    var sync = await svc.SyncAllAsync();
+    Console.WriteLine($"Группы с подпиской на клуб: пересобрано {sync.Groups}, пловцов добавлено {sync.Added}, убрано {sync.Removed}");
+    return;
+}
+
 // Проставить «есть ли ОФИЦИАЛЬНЫЙ клубный зачёт (דירוג מועדונים)» уже импортированным:
 //   dotnet run -- --probe-club-standings [--force]
 // Затягивание новых соревнований проставляет флаг само; этот прогон — для тех, кто попал в
@@ -1291,6 +1305,15 @@ app.Map("/error", (HttpContext ctx) =>
 // recordAgeAxis: по какой оси сверять заплывы со справочником рекордов (calendar/season,
 // docs/data-integrity.md §13). Клиенту она нужна затем же, зачем серверу: бейдж рекорда в
 // строке результата обязан совпадать с карточкой «New records», а её считает сервер.
+//
+// hubGroupCreationPolicy (admin/coach/any): кто может создавать группы. Нужна ГОСТЮ на
+// /groups — подсказка «войдите и создайте группу» не должна обещать невозможного, когда
+// создание закрыто. Вошедшему сервер и так отдаёт create-eligibility с причиной отказа.
+//
+// favoritesLimits: сколько пловцов и клубов можно держать в избранном, по типу избранного
+// (ключи — те же target_type, что в /api/me/favorites). Клиенту — чтобы сердечко на пределе
+// гасло с подсказкой ДО клика, а не отказом после; подсказка та же, что в тексте отказа 422
+// (FavoritesRules.FullHint), второй копии текста на клиенте нет.
 app.MapGet("/api/client-config",
     async (ISettingsService settings, IDebugOptionsService debug) => Results.Ok(new
     {
@@ -1298,6 +1321,13 @@ app.MapGet("/api/client-config",
         recordAgeAxis = RecordAgeAxisSetting.From(settings) == RecordAgeAxis.Season
             ? "season"
             : "calendar",
+        hubGroupCreationPolicy = settings.GetValue(HubGroupCreationRules.PolicyKey, HubGroupCreationRules.DefaultPolicy),
+        favoritesLimits = new[] { FavoritesRules.TargetSwimmer, FavoritesRules.TargetClub }
+            .ToDictionary(t => t, t =>
+            {
+                var max = FavoritesRules.LimitFor(settings, t);
+                return new { max, fullHint = FavoritesRules.FullHint(t, max) };
+            }),
         // Отладочные подробности витрин: только ДЕЙСТВУЮЩИЕ (общий тумблер × галочка опции),
         // клиенту знать про два уровня незачем. См. DebugOption.
         debug = new

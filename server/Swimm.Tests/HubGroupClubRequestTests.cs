@@ -222,6 +222,68 @@ public class HubGroupClubRequestTests
         Assert.Contains("approved", email.Sent[0].Subject);
     }
 
+    // ── Автоподписка официальной группы на её клуб (§6-1, 10.09.2026) ────────
+
+    /// <summary>Пловец, выступивший за клуб в текущем сезоне, — попадает в окно подписки.</summary>
+    private static async Task<Swimmer> AddClubSwimmerAsync(SwimmDbContext db, Club club)
+    {
+        var swimmer = new Swimmer { LastName = "Swimmer", FirstName = "Club", BirthYear = 2013 };
+        var comp = new Competition { Name = "Meet", Date = "01/10/2026", PoolType = "25m" };
+        var style = new Style { Name = "Freestyle" };
+        db.AddRange(swimmer, comp, style);
+        await db.SaveChangesAsync();
+        db.Results.Add(new ResultRecord
+        {
+            SwimmerId = swimmer.Id, ClubId = club.Id, CompetitionId = comp.Id, StyleId = style.Id,
+            Distance = "50", Gender = "male",
+            CompetitionDate = Swimm.Domain.SeasonMath.StartOf(Swimm.Domain.SeasonMath.StartYearOf(DateTime.UtcNow)).AddDays(10)
+        });
+        await db.SaveChangesAsync();
+        return swimmer;
+    }
+
+    [Fact]
+    public async Task Approve_SubscribesOfficialGroupToItsClub_RosterFillsUp()
+    {
+        await using var db = CreateDb(nameof(Approve_SubscribesOfficialGroupToItsClub_RosterFillsUp));
+        var (owner, club, group) = await SeedAsync(db, ownerIsCoach: true);
+        var swimmer = await AddClubSwimmerAsync(db, club);
+        var request = new HubGroupClubRequest { HubGroupId = group.Id, UserId = owner.Id, ClubId = club.Id };
+        db.HubGroupClubRequests.Add(request);
+        await db.SaveChangesAsync();
+        var subscriptions = new HubGroupClubSubscriptionService(db, new HubGroupCrudCore(db, new NoopCacheService()));
+        var service = new HubGroupClubRequestAdminService(db, new NoopCacheService(), new RecordingEmailSender(), subscriptions);
+
+        var result = await service.ApproveAsync(request.Id, 0);
+
+        // Раньше одобренная группа стояла пустой: официальный статус — связь, не состав.
+        Assert.True(result.Success);
+        Assert.Equal(club.Id, (await db.HubGroupClubSubscriptions.SingleAsync()).ClubId);
+        var row = await db.HubGroupMembers.SingleAsync(m => m.HubGroupId == group.Id);
+        Assert.Equal(swimmer.Id, row.SwimmerId);
+        Assert.Equal(HubGroupMemberSource.Club, row.Source);
+    }
+
+    [Fact]
+    public async Task Approve_GroupAlreadyFollowsAClub_SubscriptionUntouched()
+    {
+        await using var db = CreateDb(nameof(Approve_GroupAlreadyFollowsAClub_SubscriptionUntouched));
+        var (owner, club, group) = await SeedAsync(db, ownerIsCoach: true);
+        var otherClub = new Club { Name = "Other Club" };
+        db.Clubs.Add(otherClub);
+        await db.SaveChangesAsync();
+        var subscriptions = new HubGroupClubSubscriptionService(db, new HubGroupCrudCore(db, new NoopCacheService()));
+        await subscriptions.SubscribeAsync(group.Id, otherClub.Id, owner.Id); // выбор владельца
+        var request = new HubGroupClubRequest { HubGroupId = group.Id, UserId = owner.Id, ClubId = club.Id };
+        db.HubGroupClubRequests.Add(request);
+        await db.SaveChangesAsync();
+        var service = new HubGroupClubRequestAdminService(db, new NoopCacheService(), new RecordingEmailSender(), subscriptions);
+
+        Assert.True((await service.ApproveAsync(request.Id, 0)).Success);
+
+        Assert.Equal(otherClub.Id, (await db.HubGroupClubSubscriptions.SingleAsync()).ClubId);
+    }
+
     [Fact]
     public async Task Approve_OwnerAlreadyCoach_DoesNotDuplicateRole()
     {

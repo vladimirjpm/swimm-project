@@ -21,6 +21,11 @@ interface Props {
   isFavorite?: boolean | null;
   onToggleFavorite?: () => void;
   /**
+   * Лимит избранного выбран: пустое сердечко погашено, текст — подсказка в title. Горящее
+   * не гаснет: убрать из избранного можно всегда.
+   */
+  favoriteBlockedHint?: string | null;
+  /**
    * Сброс стороны. Не задан — карточку сменить нельзя (в табе левый это хозяин профиля),
    * и кнопки нет вовсе: в макете её тоже нет, она появилась вместе со страницей `/h2h`,
    * где сменяемы обе стороны.
@@ -34,8 +39,10 @@ interface Props {
 }
 
 const UI_H2HMiniCard: React.FC<Props> = ({
-  swimmer, align, isFavorite = null, onToggleFavorite, onClear = null, active = false,
+  swimmer, align, isFavorite = null, onToggleFavorite, favoriteBlockedHint = null, onClear = null, active = false,
 }) => {
+  const favBlocked = !isFavorite && favoriteBlockedHint != null;
+
   // Портрет — общий `UI_SwimmerAvatar` (он же в шапке страницы пловца и в карточке-попапе):
   // раньше здесь была буква без флага, и один и тот же человек выглядел на двух экранах
   // по-разному.
@@ -67,9 +74,12 @@ const UI_H2HMiniCard: React.FC<Props> = ({
         <button
           type="button"
           className={`h2h-mini__fav${isFavorite ? ' h2h-mini__fav--on' : ''}`}
-          title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+          title={favBlocked ? favoriteBlockedHint! : isFavorite ? 'Remove from favorites' : 'Add to favorites'}
           aria-pressed={isFavorite}
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite?.(); }}
+          // `aria-disabled`, а не `disabled`: у выключенной кнопки title не всплывает, а клик
+          // всё равно надо перехватить — иначе он уйдёт в ссылку карточки.
+          aria-disabled={favBlocked || undefined}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (!favBlocked) onToggleFavorite?.(); }}
         >
           {isFavorite ? '♥' : '♡'}
         </button>

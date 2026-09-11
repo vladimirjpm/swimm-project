@@ -444,11 +444,11 @@ public class UserMediaPublicationServiceTests
             new SubmitPublicationRequest { TargetType = UserMediaPublicationTarget.Group, TargetId = group.Id, Level = "public" }, isPrivileged: false);
         Assert.True(submit.Success);
         // Пока pending — аноним НЕ видит.
-        Assert.Empty(await service.GetVisibleForSwimmerAsync(swimmer.Id, null));
+        Assert.Empty(await service.GetVisibleForSwimmerAsync(swimmer.Id, null, isSiteAdmin: false));
 
         await service.DecideAsync(UserMediaPublicationTarget.Group, group.Id, submit.Publication!.Id, approve: true, decidedByUserId: owner.Id);
 
-        var visible = await service.GetVisibleForSwimmerAsync(swimmer.Id, null);
+        var visible = await service.GetVisibleForSwimmerAsync(swimmer.Id, null, isSiteAdmin: false);
         Assert.Equal(media.Url, Assert.Single(visible).Url);
     }
 
@@ -464,16 +464,16 @@ public class UserMediaPublicationServiceTests
         await service.DecideAsync(UserMediaPublicationTarget.Group, group.Id, submit.Publication!.Id, approve: true, decidedByUserId: owner.Id);
 
         // Аноним members-медиа не видит…
-        Assert.Empty(await service.GetVisibleForSwimmerAsync(swimmer.Id, null));
+        Assert.Empty(await service.GetVisibleForSwimmerAsync(swimmer.Id, null, isSiteAdmin: false));
         // …а активный член группы (owner) — видит (как своё И как members-публикацию).
-        var forMember = await service.GetVisibleForSwimmerAsync(swimmer.Id, owner.Id);
+        var forMember = await service.GetVisibleForSwimmerAsync(swimmer.Id, owner.Id, isSiteAdmin: false);
         Assert.Equal(media.Url, Assert.Single(forMember).Url);
 
         // Посторонний залогиненный (не член группы) — не видит.
         var stranger = NewUser("outsider@example.com");
         db.AppUsers.Add(stranger);
         await db.SaveChangesAsync();
-        Assert.Empty(await service.GetVisibleForSwimmerAsync(swimmer.Id, stranger.Id));
+        Assert.Empty(await service.GetVisibleForSwimmerAsync(swimmer.Id, stranger.Id, isSiteAdmin: false));
     }
 
     [Fact]
@@ -484,9 +484,9 @@ public class UserMediaPublicationServiceTests
         var service = new UserMediaPublicationService(db);
 
         // Никаких публикаций — владелец всё равно видит своё приватное медиа.
-        Assert.Equal(media.Url, Assert.Single(await service.GetVisibleForSwimmerAsync(swimmer.Id, owner.Id)).Url);
+        Assert.Equal(media.Url, Assert.Single(await service.GetVisibleForSwimmerAsync(swimmer.Id, owner.Id, isSiteAdmin: false)).Url);
         // Аноним — ничего.
-        Assert.Empty(await service.GetVisibleForSwimmerAsync(swimmer.Id, null));
+        Assert.Empty(await service.GetVisibleForSwimmerAsync(swimmer.Id, null, isSiteAdmin: false));
     }
 
     [Fact]
@@ -494,8 +494,8 @@ public class UserMediaPublicationServiceTests
     {
         await using var db = CreateDb(nameof(GetVisibleForSwimmer_UnknownSwimmer_Empty));
         var service = new UserMediaPublicationService(db);
-        Assert.Empty(await service.GetVisibleForSwimmerAsync(999999, null));
-        Assert.Empty(await service.GetVisibleForSwimmerAsync(0, null));
+        Assert.Empty(await service.GetVisibleForSwimmerAsync(999999, null, isSiteAdmin: false));
+        Assert.Empty(await service.GetVisibleForSwimmerAsync(0, null, isSiteAdmin: false));
     }
 
     // ── Набор 4 — КЛУБ как цель публикации (план entity-page-shell §3.10) ───

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -41,7 +42,9 @@ public class AdminRepository : IAdminRepository
                 HasGoogle = u.ExternalLogins.Any(e => e.Provider == "Google"),
                 LastSeenAt = u.LastSeenAt,
                 Logins7d = _db.UserLoginHistory.Count(h => h.UserId == u.Id && h.Success && h.LoginAt >= since7d),
-                Logins30d = _db.UserLoginHistory.Count(h => h.UserId == u.Id && h.Success && h.LoginAt >= since30d)
+                Logins30d = _db.UserLoginHistory.Count(h => h.UserId == u.Id && h.Success && h.LoginAt >= since30d),
+                HubGroupsOwned = _db.HubGroups.Count(g => g.OwnerUserId == u.Id),
+                HubGroupLimit = u.HubGroupLimit
             })
             .ToListAsync();
     }
@@ -118,6 +121,22 @@ public class AdminRepository : IAdminRepository
         if (user == null) return false;
 
         BumpSecurityStamp(user);
+        await _db.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> SetHubGroupLimitAsync(int userId, int? limit)
+    {
+        if (limit is < 0 or > HubGroupCreationRules.MaxLimit)
+            throw new ArgumentOutOfRangeException(nameof(limit), limit,
+                $"Лимит групп — от 0 до {HubGroupCreationRules.MaxLimit} (null — по роли)");
+
+        var user = await _db.AppUsers.FindAsync(userId);
+        if (user == null) return false;
+
+        // Штамп НЕ бампаем: лимит не в claims, проверка читает его из БД каждый раз.
+        user.HubGroupLimit = limit;
+        user.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
         return true;
     }
@@ -227,6 +246,8 @@ public class AdminRepository : IAdminRepository
             LocalEmailConfirmed = user.LocalCredential?.EmailConfirmed ?? false,
             LocalFailedLoginCount = user.LocalCredential?.FailedLoginCount ?? 0,
             LocalLockoutEnd = user.LocalCredential?.LockoutEnd,
+            HubGroupsOwned = await _db.HubGroups.CountAsync(g => g.OwnerUserId == userId),
+            HubGroupLimit = user.HubGroupLimit,
             ExternalLogins = user.ExternalLogins
                 .OrderBy(e => e.Provider)
                 .Select(e => new ExternalLoginDto

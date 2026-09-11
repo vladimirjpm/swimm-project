@@ -91,6 +91,8 @@ public class SwimmDbContext : DbContext
     /* === Группы (SwimHub) === */
     public DbSet<HubGroup> HubGroups => Set<HubGroup>();
     public DbSet<HubGroupMember> HubGroupMembers => Set<HubGroupMember>();
+    /// <summary>Подписка группы на клуб: состав пересобирается из пловцов клуба. Публичная.</summary>
+    public DbSet<HubGroupClubSubscription> HubGroupClubSubscriptions => Set<HubGroupClubSubscription>();
     public DbSet<HubGroupAdmin> HubGroupAdmins => Set<HubGroupAdmin>();
     public DbSet<HubGroupUserMember> HubGroupUserMembers => Set<HubGroupUserMember>();
     public DbSet<HubGroupClubRequest> HubGroupClubRequests => Set<HubGroupClubRequest>();
@@ -1018,6 +1020,49 @@ public class SwimmDbContext : DbContext
             entity.HasOne(e => e.Swimmer)
                 .WithMany()
                 .HasForeignKey(e => e.SwimmerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Дефолт на уровне БД — им же миграция размечает существующий состав: всё, что было
+            // до подписки на клуб, добавлено руками. IsExcluded дефолта в модели не держит: для
+            // bool EF не отличил бы «явно false» от «не задано», а существующим строкам false
+            // и так проставляет AddColumn.
+            entity.Property(e => e.Source).HasDefaultValue(HubGroupMemberSource.Manual);
+
+            entity.HasCheckConstraint(
+                "CK_HubGroupMembers_Source",
+                @"""Source"" IN ('manual', 'club')");
+
+            // Скрыть можно только клубного: ручного владелец убирает удалением, а «ручной и
+            // скрытый» — противоречие, которое читатели состава трактовали бы по-разному.
+            entity.HasCheckConstraint(
+                "CK_HubGroupMembers_ExcludedOnlyClub",
+                @"NOT ""IsExcluded"" OR ""Source"" = 'club'");
+        });
+
+        // Подписка группы на клуб (docs/plans/hubgroup-club-subscription-plan.md) — бизнес-
+        // таблица, ПУБЛИЧНАЯ: её читает анонимный путь (каталог, строка «Follows club») →
+        // грант swimm_ro в миграции и в server/db/02-grants.sql.
+        modelBuilder.Entity<HubGroupClubSubscription>(entity =>
+        {
+            entity.ToTable("HubGroupClubSubscriptions");
+
+            // Одна подписка на группу (решение 10.09.2026). Разрешить несколько = снять
+            // уникальность здесь, модель и сервис менять не придётся.
+            entity.HasIndex(e => e.HubGroupId).IsUnique();
+
+            // Пересборка после импорта ищет подписки по клубам импорта.
+            entity.HasIndex(e => e.ClubId);
+
+            entity.HasOne(e => e.HubGroup)
+                .WithMany(g => g.ClubSubscriptions)
+                .HasForeignKey(e => e.HubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Клубы склеиваются мягко (MergedIntoId), строку не удаляют; удаляется только
+            // пустой клуб (--delete-empty-clubs), а у пустого и подписка пуста.
+            entity.HasOne(e => e.Club)
+                .WithMany()
+                .HasForeignKey(e => e.ClubId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

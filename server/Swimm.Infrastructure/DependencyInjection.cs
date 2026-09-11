@@ -89,6 +89,9 @@ public static class DependencyInjection
         services.AddScoped<IEntityDisplayRepository, EntityDisplayRepository>();
         services.AddScoped<IHubGroupUserService, HubGroupUserService>();
         services.AddScoped<IHubGroupClubRequestAdminService, HubGroupClubRequestAdminService>();
+        // Подписка группы на клуб: зовут контроллер «My groups», импорт (после коммита) и
+        // склейка клубов — оба последних через необязательный параметр конструктора.
+        services.AddScoped<IHubGroupClubSubscriptionService, HubGroupClubSubscriptionService>();
         services.AddScoped<IClubPointsRepository, ClubPointsRepository>();
         services.AddScoped<IClubStandingService, ClubStandingService>();
         services.AddScoped<ICompetitionRecalculationService, CompetitionRecalculationService>();

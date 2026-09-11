@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
@@ -17,8 +18,13 @@ namespace Swimm.Tests;
 /// </summary>
 public class HubGroupUserServiceTests
 {
+    // CreateAsync идёт в явной транзакции (блокировка лимита) — InMemory её не умеет и без
+    // этого глушителя бросает TransactionIgnoredWarning.
     private static SwimmDbContext CreateDb(string name) =>
-        new(new DbContextOptionsBuilder<SwimmDbContext>().UseInMemoryDatabase(name).Options);
+        new(new DbContextOptionsBuilder<SwimmDbContext>()
+            .UseInMemoryDatabase(name)
+            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
+            .Options);
 
     private sealed class NoopCacheService : ICacheService
     {
@@ -107,6 +113,194 @@ public class HubGroupUserServiceTests
         var atLimit = await svc.GetCreateEligibilityAsync(owner.Id, isAdmin: false, isCoach: false);
         Assert.False(atLimit.CanCreate);
         Assert.Equal(0, atLimit.Remaining);
+    }
+
+    // ── Лимит: персональное исключение, роль, официальные, дефолты (10.09.2026) ─
+
+    private static async Task<AppUser> AddOwnerWithGroupsAsync(SwimmDbContext db, int groups, int? personalLimit = null)
+    {
+        var owner = await AddUserAsync(db, "owner@example.com");
+        owner.HubGroupLimit = personalLimit;
+        for (var i = 0; i < groups; i++)
+            db.HubGroups.Add(new HubGroup { Name = $"G{i}", Slug = $"g{i}", OwnerUserId = owner.Id });
+        await db.SaveChangesAsync();
+        return owner;
+    }
+
+    [Fact]
+    public async Task Eligibility_NoSettings_DefaultIsAnyWithLimit3()
+    {
+        // Настройки живут в памяти: после рестарта действуют дефолты, и они = рабочий режим.
+        await using var db = CreateDb(nameof(Eligibility_NoSettings_DefaultIsAnyWithLimit3));
+        var owner = await AddOwnerWithGroupsAsync(db, groups: 2);
+
+        var e = await Service(db).GetCreateEligibilityAsync(owner.Id, isAdmin: false, isCoach: false);
+
+        Assert.True(e.CanCreate);
+        Assert.Equal(2, e.Owned);
+        Assert.Equal(3, e.Limit);
+        Assert.Equal(1, e.Remaining);
+    }
+
+    [Fact]
+    public async Task Eligibility_PersonalLimit_RaisesAboveRoleLimit()
+    {
+        await using var db = CreateDb(nameof(Eligibility_PersonalLimit_RaisesAboveRoleLimit));
+        var settings = new SettingsStub(new() { ["HubGroupMaxPerUser"] = "3" });
+        var owner = await AddOwnerWithGroupsAsync(db, groups: 3, personalLimit: 5);
+
+        var e = await Service(db, settings).GetCreateEligibilityAsync(owner.Id, isAdmin: false, isCoach: false);
+
+        Assert.True(e.CanCreate);
+        Assert.Equal(5, e.Limit);
+        Assert.Equal(2, e.Remaining);
+    }
+
+    [Fact]
+    public async Task Eligibility_PersonalLimitZero_BlocksEvenUnderRoleLimit()
+    {
+        await using var db = CreateDb(nameof(Eligibility_PersonalLimitZero_BlocksEvenUnderRoleLimit));
+        var owner = await AddOwnerWithGroupsAsync(db, groups: 0, personalLimit: 0);
+
+        var e = await Service(db).GetCreateEligibilityAsync(owner.Id, isAdmin: false, isCoach: false);
+
+        Assert.False(e.CanCreate);
+        Assert.Equal(0, e.Limit);
+        Assert.Equal("Creating groups is not available for your account.", e.Reason);
+    }
+
+    [Fact]
+    public async Task Eligibility_Coach_UsesCoachLimit_UserUsesUserLimit()
+    {
+        await using var db = CreateDb(nameof(Eligibility_Coach_UsesCoachLimit_UserUsesUserLimit));
+        var settings = new SettingsStub(new() { ["HubGroupMaxPerUser"] = "1", ["HubGroupMaxPerCoach"] = "4" });
+        var owner = await AddOwnerWithGroupsAsync(db, groups: 1);
+        var svc = Service(db, settings);
+
+        var asUser = await svc.GetCreateEligibilityAsync(owner.Id, isAdmin: false, isCoach: false);
+        var asCoach = await svc.GetCreateEligibilityAsync(owner.Id, isAdmin: false, isCoach: true);
+
+        Assert.False(asUser.CanCreate);
+        Assert.Equal(1, asUser.Limit);
+        Assert.True(asCoach.CanCreate);
+        Assert.Equal(4, asCoach.Limit);
+    }
+
+    [Fact]
+    public async Task Eligibility_OfficialGroupCountsTowardLimit_AdminOfOtherGroupDoesNot()
+    {
+        await using var db = CreateDb(nameof(Eligibility_OfficialGroupCountsTowardLimit_AdminOfOtherGroupDoesNot));
+        var settings = new SettingsStub(new() { ["HubGroupMaxPerUser"] = "2" });
+        var owner = await AddUserAsync(db, "owner@example.com");
+        var stranger = await AddUserAsync(db, "stranger@example.com");
+        var club = new Club { Name = "Club" };
+        db.Clubs.Add(club);
+        await db.SaveChangesAsync();
+        db.HubGroups.Add(new HubGroup { Name = "Free", Slug = "free", OwnerUserId = owner.Id });
+        db.HubGroups.Add(new HubGroup { Name = "Official", Slug = "off", OwnerUserId = owner.Id, IsOfficial = true, ClubId = club.Id });
+        var foreign = new HubGroup { Name = "Foreign", Slug = "foreign", OwnerUserId = stranger.Id };
+        db.HubGroups.Add(foreign);
+        await db.SaveChangesAsync();
+        db.HubGroupAdmins.Add(new HubGroupAdmin { HubGroupId = foreign.Id, UserId = owner.Id, GrantedByUserId = stranger.Id });
+        await db.SaveChangesAsync();
+
+        var e = await Service(db, settings).GetCreateEligibilityAsync(owner.Id, isAdmin: false, isCoach: false);
+
+        Assert.Equal(2, e.Owned);   // свободная + официальная; админство в чужой не в счёт
+        Assert.False(e.CanCreate);
+    }
+
+    [Fact]
+    public async Task Eligibility_LimitLoweredBelowOwned_DeniedWithZeroRemaining()
+    {
+        await using var db = CreateDb(nameof(Eligibility_LimitLoweredBelowOwned_DeniedWithZeroRemaining));
+        var settings = new SettingsStub(new() { ["HubGroupMaxPerUser"] = "2" });
+        var owner = await AddOwnerWithGroupsAsync(db, groups: 3);
+
+        var e = await Service(db, settings).GetCreateEligibilityAsync(owner.Id, isAdmin: false, isCoach: false);
+
+        Assert.False(e.CanCreate);
+        Assert.Equal(3, e.Owned);      // уже созданные остаются
+        Assert.Equal(0, e.Remaining);  // не -1
+        Assert.Contains("limit of 2 groups", e.Reason);
+    }
+
+    [Fact]
+    public async Task Eligibility_PolicyCoach_PersonalLimitDoesNotBypassPolicy()
+    {
+        // Политика — общий рубильник: исключение по человеку его не пробивает.
+        await using var db = CreateDb(nameof(Eligibility_PolicyCoach_PersonalLimitDoesNotBypassPolicy));
+        var settings = new SettingsStub(new() { ["HubGroupCreationPolicy"] = "coach" });
+        var owner = await AddOwnerWithGroupsAsync(db, groups: 0, personalLimit: 10);
+
+        var e = await Service(db, settings).GetCreateEligibilityAsync(owner.Id, isAdmin: false, isCoach: false);
+
+        Assert.False(e.CanCreate);
+        Assert.Equal("Creating groups is currently limited to coaches.", e.Reason);
+    }
+
+    [Fact]
+    public async Task Eligibility_Admin_IgnoresPersonalLimitAndPolicy()
+    {
+        await using var db = CreateDb(nameof(Eligibility_Admin_IgnoresPersonalLimitAndPolicy));
+        var settings = new SettingsStub(new() { ["HubGroupCreationPolicy"] = "admin" });
+        var owner = await AddOwnerWithGroupsAsync(db, groups: 5, personalLimit: 0);
+
+        var e = await Service(db, settings).GetCreateEligibilityAsync(owner.Id, isAdmin: true, isCoach: false);
+
+        Assert.True(e.CanCreate);
+        Assert.Null(e.Limit);
+        Assert.Equal(5, e.Owned);
+    }
+
+    [Fact]
+    public async Task CreateAsync_AtLimit_FailsAndInsertsNothing()
+    {
+        await using var db = CreateDb(nameof(CreateAsync_AtLimit_FailsAndInsertsNothing));
+        var settings = new SettingsStub(new() { ["HubGroupMaxPerUser"] = "1" });
+        var owner = await AddOwnerWithGroupsAsync(db, groups: 1);
+
+        var result = await Service(db, settings).CreateAsync(
+            new HubGroupInputDto { Name = "One too many", IsPublic = true },
+            owner.Id, isAdmin: false, isCoach: false);
+
+        Assert.False(result.Success);
+        Assert.Contains("limit of 1 group.", result.Error);
+        Assert.Equal(1, await db.HubGroups.CountAsync(g => g.OwnerUserId == owner.Id));
+    }
+
+    [Fact]
+    public async Task CreateAsync_UnderLimit_CreatesOwnedGroup()
+    {
+        await using var db = CreateDb(nameof(CreateAsync_UnderLimit_CreatesOwnedGroup));
+        var owner = await AddOwnerWithGroupsAsync(db, groups: 2);
+
+        var result = await Service(db).CreateAsync(
+            new HubGroupInputDto { Name = "Third", IsPublic = true },
+            owner.Id, isAdmin: false, isCoach: false);
+
+        Assert.True(result.Success);
+        Assert.Equal(owner.Id, (await db.HubGroups.SingleAsync(g => g.Id == result.Id)).OwnerUserId);
+    }
+
+    [Fact]
+    public async Task GetMine_ReturnsOwnerUserId_ForOwnedAndAdminedGroups()
+    {
+        // По OwnerUserId клиент решает, показывать ли Delete: админ группы удалять не может.
+        await using var db = CreateDb(nameof(GetMine_ReturnsOwnerUserId_ForOwnedAndAdminedGroups));
+        var me = await AddUserAsync(db, "me@example.com");
+        var other = await AddUserAsync(db, "other@example.com");
+        var mine = new HubGroup { Name = "Mine", Slug = "mine", OwnerUserId = me.Id };
+        var admined = new HubGroup { Name = "Admined", Slug = "admined", OwnerUserId = other.Id };
+        db.HubGroups.AddRange(mine, admined);
+        await db.SaveChangesAsync();
+        db.HubGroupAdmins.Add(new HubGroupAdmin { HubGroupId = admined.Id, UserId = me.Id, GrantedByUserId = other.Id });
+        await db.SaveChangesAsync();
+
+        var rows = await Service(db).GetMineAsync(me.Id);
+
+        Assert.Equal(me.Id, rows.Single(r => r.Slug == "mine").OwnerUserId);
+        Assert.Equal(other.Id, rows.Single(r => r.Slug == "admined").OwnerUserId);
     }
 
     // ── ClubId gating (S1) ──────────────────────────────────────────────────
@@ -290,38 +484,50 @@ public class HubGroupUserServiceTests
         Assert.Null(row.AddedByUserId); // самозапись
     }
 
+    // Приватная группа (§6-6, 11.09.2026): вступить МОЖНО — иначе её страница «только для
+    // участников» вела бы в тупик, — но только заявкой, даже при открытой политике: открытая
+    // самозапись снимала бы приватность одним кликом. Раньше вступление было запрещено вовсе.
+
     [Fact]
-    public async Task Join_PrivateVisibility_Blocked()
+    public async Task Join_PrivateVisibility_CreatesRequestEvenWhenOpen()
     {
-        await using var db = CreateDb(nameof(Join_PrivateVisibility_Blocked));
+        await using var db = CreateDb(nameof(Join_PrivateVisibility_CreatesRequestEvenWhenOpen));
         var settings = new SettingsStub(new() { ["HubGroupVisibility"] = "private" });
         var owner = await AddUserAsync(db, "owner@example.com");
         var joiner = await AddUserAsync(db, "joiner@example.com");
-        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true };
+        var group = new HubGroup
+        {
+            Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true, JoinPolicy = HubGroupJoinPolicy.Open
+        };
         db.HubGroups.Add(group);
         await db.SaveChangesAsync();
 
         var result = await Service(db, settings).JoinAsync(group.Id, joiner.Id);
 
-        Assert.False(result.Success);
-        Assert.Empty(db.HubGroupUserMembers);
+        Assert.True(result.Success);
+        Assert.Equal(HubGroupUserMemberStatus.Pending, (await db.HubGroupUserMembers.SingleAsync()).Status);
     }
 
     [Fact]
-    public async Task Join_PerGroupVisibility_OnlyPublicGroups()
+    public async Task Join_PerGroupVisibility_PrivateGroupByRequest_PublicGroupInstant()
     {
-        await using var db = CreateDb(nameof(Join_PerGroupVisibility_OnlyPublicGroups));
+        await using var db = CreateDb(nameof(Join_PerGroupVisibility_PrivateGroupByRequest_PublicGroupInstant));
         var settings = new SettingsStub(new() { ["HubGroupVisibility"] = "perGroup" });
         var owner = await AddUserAsync(db, "owner@example.com");
         var joiner = await AddUserAsync(db, "joiner@example.com");
         var hidden = new HubGroup { Name = "H", Slug = "h", OwnerUserId = owner.Id, IsPublic = false };
-        db.HubGroups.Add(hidden);
+        var open = new HubGroup { Name = "O", Slug = "o", OwnerUserId = owner.Id, IsPublic = true };
+        db.HubGroups.AddRange(hidden, open);
         await db.SaveChangesAsync();
+        var svc = Service(db, settings);
 
-        var result = await Service(db, settings).JoinAsync(hidden.Id, joiner.Id);
+        Assert.True((await svc.JoinAsync(hidden.Id, joiner.Id)).Success);
+        Assert.True((await svc.JoinAsync(open.Id, joiner.Id)).Success);
 
-        Assert.False(result.Success);
-        Assert.Empty(db.HubGroupUserMembers);
+        Assert.Equal(HubGroupUserMemberStatus.Pending,
+            (await db.HubGroupUserMembers.SingleAsync(m => m.HubGroupId == hidden.Id)).Status);
+        Assert.Equal(HubGroupUserMemberStatus.Active,
+            (await db.HubGroupUserMembers.SingleAsync(m => m.HubGroupId == open.Id)).Status);
     }
 
     [Fact]

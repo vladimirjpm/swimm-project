@@ -30,7 +30,7 @@ interface Props {
 
 /** ♡/★ карточки: белые круглые кнопки на градиенте шапки попапа. */
 function CardActions({ swimmerId }: { swimmerId: number }) {
-  const { canMark, isFavorite, isMe, showGuestCta, toggleFavorite, markAsMe, openLoginModal } =
+  const { canMark, isFavorite, isMe, addBlockedHint, showGuestCta, toggleFavorite, markAsMe, openLoginModal } =
     useIdentityFavorites(swimmerId);
 
   if (showGuestCta) {
@@ -51,14 +51,22 @@ function CardActions({ swimmerId }: { swimmerId: number }) {
 
   if (!canMark) return null;
 
+  // Лимит избранного выбран — у ещё-не-избранного погашены обе кнопки (звезда тоже добавляет).
+  // `aria-disabled`, а не `disabled`: у выключенной кнопки подсказка в title не всплывает.
+  const blocked = addBlockedHint != null;
+  const buttonClass = blocked
+    ? 'w-8 h-8 rounded-full inline-flex items-center justify-center leading-none opacity-40 cursor-not-allowed'
+    : 'w-8 h-8 rounded-full inline-flex items-center justify-center leading-none hover:scale-110 transition-transform';
+
   return (
     <div className="flex items-center gap-1.5">
       <button
         type="button"
-        onClick={toggleFavorite}
-        title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+        onClick={blocked ? undefined : toggleFavorite}
+        title={addBlockedHint ?? (isFavorite ? 'Remove from favorites' : 'Add to favorites')}
         aria-pressed={isFavorite}
-        className="w-8 h-8 rounded-full inline-flex items-center justify-center leading-none hover:scale-110 transition-transform"
+        aria-disabled={blocked || undefined}
+        className={buttonClass}
         style={{ background: 'rgba(255,255,255,0.9)', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}
       >
         <svg width="17" height="17" viewBox="0 0 24 24" fill={isFavorite ? '#e23b5a' : 'none'} stroke={isFavorite ? '#e23b5a' : '#9aa3af'} strokeWidth="2">
@@ -67,10 +75,11 @@ function CardActions({ swimmerId }: { swimmerId: number }) {
       </button>
       <button
         type="button"
-        onClick={markAsMe}
-        title={isMe ? 'This is me — unmark' : 'Mark: this is me'}
+        onClick={blocked ? undefined : markAsMe}
+        title={addBlockedHint ?? (isMe ? 'This is me — unmark' : 'Mark: this is me')}
         aria-pressed={isMe}
-        className="w-8 h-8 rounded-full inline-flex items-center justify-center leading-none hover:scale-110 transition-transform"
+        aria-disabled={blocked || undefined}
+        className={buttonClass}
         style={{ background: isMe ? '#fff6da' : 'rgba(255,255,255,0.75)', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}
       >
         <svg width="17" height="17" viewBox="0 0 24 24" fill={isMe ? '#f5b800' : 'none'} stroke={isMe ? '#d99a00' : '#9aa3af'} strokeWidth="1.8" strokeLinejoin="round">

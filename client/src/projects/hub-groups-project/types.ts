@@ -185,6 +185,22 @@ export interface HubGroupDetails {
   is_official: boolean;
   /** open | approval — политика самозаписи (кнопка «Вступить» vs «Подать заявку»). */
   join_policy?: 'open' | 'approval';
+  /** Группа только для участников (§6-6). Участник видит её целиком, с пометкой. */
+  is_private?: boolean;
+  /**
+   * Заглушка для НЕ-участника приватной группы: только имя, иконка и как вступить (заявкой) —
+   * ни состава, ни результатов, ни медиа. Массивы в ней пустые.
+   */
+  members_only?: boolean;
+  /** Клуб, на который подписана группа (состав из клуба); null — подписки нет. */
+  followed_club_id?: number | null;
+  followed_club_name?: string | null;
+  /**
+   * Официальная группа клуба подписки, если это не эта группа: копию клуба открыли по ссылке
+   * мимо каталога — шапка показывает, где «лицо клуба» (П4 плана подписки).
+   */
+  official_group_slug?: string | null;
+  official_group_name?: string | null;
   links: HubGroupLink[];
   is_virtual: boolean;
   members: HubGroupMember[];

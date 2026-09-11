@@ -12,8 +12,17 @@
         <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">← К списку</a>
         @if (!Model.IsNew && Model.Existing != null)
         {
+            var hiddenCount = Model.Existing.Members.Count(m => m.IsExcluded);
             <span class="text-xs text-admin-text-muted">
-                Участников: <strong class="text-admin-text">@Model.Existing.Members.Count</strong>
+                Участников: <strong class="text-admin-text">@(Model.Existing.Members.Count - hiddenCount)</strong>
+                @if (hiddenCount > 0)
+                {
+                    <text> · скрыто владельцем: @hiddenCount</text>
+                }
+                @if (Model.Existing.ClubSubscription != null)
+                {
+                    <text> · подписка на клуб «@Model.Existing.ClubSubscription.ClubName»</text>
+                }
             </span>
         }
     </div>
@@ -128,7 +137,9 @@
                 <span class="text-admin-text">Публичная группа</span>
             </label>
             <div class="text-[11px] text-admin-text-muted mt-1">
-                Действует только при настройке <code class="text-admin-accent">HubGroupVisibility = perGroup</code> (Admin/Settings).
+                Снята — группу видят только участники и управляющие, остальным страница «только для
+                участников», в каталоге её нет, вступление — заявкой. Действует при
+                <code class="text-admin-accent">HubGroupVisibility = perGroup</code> (дефолт, Admin/Settings).
             </div>
         </div>
 
@@ -182,6 +193,14 @@
                                     {
                                         <div class="text-[11px] text-admin-text-muted">@m.SwimmerNameEn</div>
                                     }
+                                    @* Клубный — пришёл из подписки на клуб; скрытый не виден ни на одной витрине,
+                                       пересборка его не возвращает. Вернуть — добавить руками (станет ручным). *@
+                                    @if (m.Source == "club")
+                                    {
+                                        <div class="text-[11px] text-admin-text-muted italic">
+                                            из подписки на клуб@(m.IsExcluded ? " · скрыт владельцем" : "")
+                                        </div>
+                                    }
                                 </td>
                                 <td>@(m.BirthYear > 0 ? m.BirthYear.ToString() : "—")</td>
                                 <td>@(m.ClubName ?? "—")</td>
@@ -200,11 +219,15 @@
                                 </td>
                                 <td class="text-right">@m.SortOrder</td>
                                 <td class="text-right">
-                                    <form method="post" asp-page-handler="RemoveMember" class="inline">
-                                        <input type="hidden" asp-for="Id" />
-                                        <input type="hidden" name="memberId" value="@m.Id" />
-                                        <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
-                                    </form>
+                                    @* У клубного «удалить» = скрыть: удалённого вставила бы следующая пересборка. *@
+                                    @if (!m.IsExcluded)
+                                    {
+                                        <form method="post" asp-page-handler="RemoveMember" class="inline">
+                                            <input type="hidden" asp-for="Id" />
+                                            <input type="hidden" name="memberId" value="@m.Id" />
+                                            <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">@(m.Source == "club" ? "Скрыть" : "Удалить")</button>
+                                        </form>
+                                    }
                                 </td>
                             </tr>
                         }
@@ -291,7 +314,8 @@
         <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5">
             <h2 class="text-sm font-semibold text-admin-danger mb-1">Опасная зона — удаление</h2>
             <p class="text-xs text-admin-text-muted leading-relaxed mb-4">
-                Удалит группу вместе со всеми участниками (пловцы в справочнике останутся).
+                Удалит группу вместе с составом, тренировками, медиа и публикациями участников
+                (пловцы в справочнике останутся). Перед удалением покажем, что именно пропадёт.
                 <strong class="text-admin-danger">Действие необратимо.</strong>
             </p>
             <form method="post" asp-page-handler="Delete" id="hg-delete-form">
@@ -310,6 +334,7 @@
 }
 
 @section Scripts {
+    <partial name="/Pages/Admin/HubGroups/_DeleteConfirm.cshtml" />
     <script>
         // Автогенерация slug из английского названия, пока пользователь не тронул поле Slug вручную.
         (function () {
@@ -336,13 +361,7 @@
         if (hgDeleteForm) {
             hgDeleteForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const ok = await adminConfirm({
-                    title: 'Удалить группу?',
-                    message: 'Все участники группы будут удалены вместе с ней. Пловцы в справочнике останутся.',
-                    confirmText: 'Удалить',
-                    danger: true,
-                });
-                if (ok) hgDeleteForm.submit();
+                if (await hubGroupDeleteConfirm(@Model.Id)) hgDeleteForm.submit();
             });
         }
     </script>
