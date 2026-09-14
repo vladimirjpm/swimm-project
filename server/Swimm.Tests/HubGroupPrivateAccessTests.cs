@@ -163,7 +163,7 @@ public class HubGroupPrivateAccessTests
         var w = await SeedAsync(db);
 
         // Раньше репозиторий возвращал null (→ 404 и владельцу). Теперь отдаёт, а гейт — в контроллере.
-        var page = await Repo(db).GetBySlugAsync(w.Private.Slug);
+        var page = await Repo(db).GetPageAsync(w.Private.Id, w.Private.Slug);
 
         Assert.NotNull(page);
         Assert.True(page!.IsPrivate);

@@ -17,8 +17,13 @@ public interface IHubGroupPublicRepository
     /// <summary>Группы для каталога: без приватных и без копий клуба с официальной группой.</summary>
     Task<IReadOnlyList<HubGroupListItemDto>> GetGroupsAsync();
 
-    /// <summary>Страница группы по slug (и приватной тоже — см. <see cref="GetAccessAsync"/>). null — нет.</summary>
-    Task<HubGroupDetailsDto?> GetBySlugAsync(string slug);
+    /// <summary>
+    /// Страница группы (и приватной тоже — см. <see cref="GetAccessAsync"/>). Id — из
+    /// <see cref="GetAccessAsync"/>, slug — сверка: группу переименовали между проверкой и
+    /// загрузкой — null, как и «группы нет». По id, а не по slug, потому что так её строки
+    /// сужает кэш (docs/plans/cache-row-precision-plan.md §2.3): поиск по slug не сузить.
+    /// </summary>
+    Task<HubGroupDetailsDto?> GetPageAsync(int groupId, string slug);
 
     /// <summary>
     /// Может ли зритель смотреть группу: публичную — любой; приватную — активный участник-аккаунт,

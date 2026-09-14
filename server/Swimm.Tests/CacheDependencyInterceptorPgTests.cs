@@ -88,8 +88,9 @@ public class CacheDependencyInterceptorPgTests
     {
         await using var read = TryRead();
         if (read == null) return;
-        var slug = await read.HubGroups.OrderBy(g => g.Id).Select(g => g.Slug).FirstOrDefaultAsync();
-        if (slug == null) return; // групп нет — нечего проверять
+        var group = await read.HubGroups.OrderBy(g => g.Id).Select(g => new { g.Id, g.Slug }).FirstOrDefaultAsync();
+        if (group == null) return; // групп нет — нечего проверять
+        var slug = group.Slug;
         await using var rw = Rw();
         var cache = NewCache();
 
@@ -99,7 +100,7 @@ public class CacheDependencyInterceptorPgTests
         await cache.GetOrCreateAsync("http:season-best:table:cur",
             () => seasonBest.GetSeasonBestTableAsync(null), TimeSpan.FromMinutes(5));
         await cache.GetOrCreateAsync<HubGroupDetailsDto?>($"http:hub-groups:group:{slug}",
-            () => groups.GetBySlugAsync(slug), TimeSpan.FromMinutes(5));
+            () => groups.GetPageAsync(group.Id, slug), TimeSpan.FromMinutes(5));
 
         var sbTags = TagsOf(cache, "http:season-best:table:cur");
         Assert.Contains(CacheTags.Table("Results"), sbTags);
@@ -138,7 +139,7 @@ public class CacheDependencyInterceptorPgTests
         // Те же три шага, что фабрика страницы группы в HubGroupsController.GetGroup.
         await cache.GetOrCreateAsync<HubGroupDetailsDto?>("group-page", async () =>
         {
-            var dto = await groups.GetBySlugAsync(group.Slug);
+            var dto = await groups.GetPageAsync(group.Id, group.Slug);
             await media.GetGalleryAsync(group.Id);
             await publications.GetApprovedForGroupAsync(group.Id, "public");
             return dto;

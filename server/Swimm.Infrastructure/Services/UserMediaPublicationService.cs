@@ -246,15 +246,21 @@ public class UserMediaPublicationService : IUserMediaPublicationService
             .OrderBy(p => p.Status == UserMediaPublicationStatus.Pending ? 0 : 1)
             .ThenByDescending(p => p.Id));
 
-    public Task<List<PublishedMediaItemDto>> GetApprovedForGroupAsync(int hubGroupId, string level)
-        => QueryPublishedItems(_db.UserMediaPublications.AsNoTracking()
-            .Where(p => p.HubGroupId == hubGroupId
-                        && p.Status == UserMediaPublicationStatus.Approved
-                        && p.Level == level)
-            .OrderByDescending(p => p.Id));
+    public async Task<List<PublishedMediaItemDto>> GetApprovedForGroupAsync(int hubGroupId, string level)
+    {
+        // Публикации ЭТОЙ группы (фильтр по HubGroupId): страница группы зависит от своей строки,
+        // а не от таблицы — публикация в чужую группу её не роняет (docs/plans/
+        // cache-row-precision-plan.md §3.1, Q14). Вне сборки кэша блок пустой.
+        using (_db.CacheRows<HubGroup>(hubGroupId, typeof(UserMediaPublication)))
+            return await PublishedItemsAsync(_db.UserMediaPublications.AsNoTracking()
+                .Where(p => p.HubGroupId == hubGroupId
+                            && p.Status == UserMediaPublicationStatus.Approved
+                            && p.Level == level)
+                .OrderByDescending(p => p.Id));
+    }
 
     public Task<List<PublishedMediaItemDto>> GetApprovedForClubAsync(int clubId)
-        => QueryPublishedItems(_db.UserMediaPublications.AsNoTracking()
+        => PublishedItemsAsync(_db.UserMediaPublications.AsNoTracking()
             .Where(p => p.ClubId == clubId
                         && p.Status == UserMediaPublicationStatus.Approved
                         // У клуба уровень бывает только public — но фильтр оставлен явным:
@@ -266,27 +272,77 @@ public class UserMediaPublicationService : IUserMediaPublicationService
     /// Лента зрителя: без владельца медиа и без названия цели. Не строка inbox-а
     /// (<see cref="QueryGroupItems"/>): та тянет email владельца из <c>Sys_AppUsers</c>, и
     /// отдавать её посетителю нельзя. Меньше JOIN — ещё и меньше меток кэша у страницы группы.
+    ///
+    /// Двумя запросами, а не одним JOIN (К4б.4): публикации — строки цели (сужает вызывающий,
+    /// блоком группы), медиа — строки своего корня <c>Sys_UserMedia</c>, по списку id. Одним SQL
+    /// строки двух корней не сузить. Запись в My media без публикации страницу группы не роняет:
+    /// у нового медиа нет публикации, и его строки страница не читала. Пловец и подпись заплыва —
+    /// в запросе медиа, таблицей.
     /// </summary>
-    private static Task<List<PublishedMediaItemDto>> QueryPublishedItems(IQueryable<UserMediaPublication> query)
-        => query
-            .Select(p => new PublishedMediaItemDto
+    private async Task<List<PublishedMediaItemDto>> PublishedItemsAsync(IQueryable<UserMediaPublication> publications)
+    {
+        var rows = await publications.Select(p => new { p.Id, p.UserMediaId }).ToListAsync();
+        if (rows.Count == 0) return [];
+
+        var mediaIds = rows.Select(p => p.UserMediaId).Distinct().ToList();
+        Dictionary<int, PublishedMediaRow> media;
+        using (_db.CacheRows<UserMedia>(mediaIds))
+            media = await _db.UserMedia.AsNoTracking()
+                .Where(m => mediaIds.Contains(m.Id))
+                .Select(m => new PublishedMediaRow
+                {
+                    Id = m.Id,
+                    MediaType = m.MediaType,
+                    SourceType = m.SourceType,
+                    Url = m.Url,
+                    SwimmerId = m.SwimmerId,
+                    SwimmerName = (m.Swimmer.LastName + " " + m.Swimmer.FirstName).Trim(),
+                    ResultId = m.ResultId,
+                    ResultLabel = m.ResultRecord != null
+                        ? m.ResultRecord.Style.Name + " " + m.ResultRecord.Distance
+                          + " · " + m.ResultRecord.Competition.Date
+                        : null,
+                    // День заплыва, а если медиа подано на всё соревнование — оно само.
+                    CompetitionId = m.ResultRecord != null ? m.ResultRecord.CompetitionId : m.CompetitionId,
+                })
+                .ToDictionaryAsync(m => m.Id);
+
+        // Порядок — публикаций (его задал вызывающий). Медиа удалили между запросами — его
+        // публикации ушли каскадом, строки пропускаем.
+        return rows
+            .Where(p => media.ContainsKey(p.UserMediaId))
+            .Select(p =>
             {
-                Id = p.Id,
-                MediaType = p.Media!.MediaType,
-                SourceType = p.Media.SourceType,
-                Url = p.Media.Url,
-                SwimmerId = p.Media.SwimmerId,
-                SwimmerName = (p.Media.Swimmer!.LastName + " " + p.Media.Swimmer.FirstName).Trim(),
-                ResultId = p.Media.ResultId,
-                ResultLabel = p.Media.ResultRecord != null
-                    ? p.Media.ResultRecord.Style.Name + " " + p.Media.ResultRecord.Distance
-                      + " · " + p.Media.ResultRecord.Competition.Date
-                    : null,
-                CompetitionId = p.Media.ResultRecord != null
-                    ? p.Media.ResultRecord.CompetitionId
-                    : p.Media.CompetitionId,
+                var m = media[p.UserMediaId];
+                return new PublishedMediaItemDto
+                {
+                    Id = p.Id,
+                    MediaType = m.MediaType,
+                    SourceType = m.SourceType,
+                    Url = m.Url,
+                    SwimmerId = m.SwimmerId,
+                    SwimmerName = m.SwimmerName,
+                    ResultId = m.ResultId,
+                    ResultLabel = m.ResultLabel,
+                    CompetitionId = m.CompetitionId,
+                };
             })
-            .ToListAsync();
+            .ToList();
+    }
+
+    /// <summary>Медиа одобренной публикации — второй запрос ленты зрителя.</summary>
+    private sealed class PublishedMediaRow
+    {
+        public int Id { get; init; }
+        public string MediaType { get; init; } = "";
+        public string SourceType { get; init; } = "";
+        public string Url { get; init; } = "";
+        public int SwimmerId { get; init; }
+        public string SwimmerName { get; init; } = "";
+        public long? ResultId { get; init; }
+        public string? ResultLabel { get; init; }
+        public int? CompetitionId { get; init; }
+    }
 
     private static Task<List<GroupPublicationInboxItemDto>> QueryGroupItems(IQueryable<UserMediaPublication> query)
         => query

@@ -17,10 +17,16 @@ namespace Swimm.Tests;
 public class CacheRowsSitesTests
 {
     /// <summary>
-    /// Места сужения, у которых есть сценарные тесты: «Тип.Метод». Пусто до К4б.4 — первой сюда
-    /// встанет страница группы вместе со своими сценариями.
+    /// Места сужения, у которых есть сценарные тесты: «Тип.Метод».
     /// </summary>
-    private static readonly string[] Covered = [];
+    private static readonly string[] Covered =
+    [
+        // Страница группы (К4б.4) — сценарии в CacheGroupPageNarrowingTests.
+        "HubGroupPublicRepository.GetPageAsync",
+        "HubGroupMediaService.GetGalleryAsync",
+        "UserMediaPublicationService.GetApprovedForGroupAsync",
+        "UserMediaPublicationService.PublishedItemsAsync",
+    ];
 
     [Fact]
     public void EveryNarrowingSite_HasScenarioTests()

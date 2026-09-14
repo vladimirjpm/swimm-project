@@ -47,7 +47,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
         if (visibility == HubGroupVisibilityRules.Private) return [];
 
         // Официальная группа — главная (П4): копии, подписанные на клуб с официальной группой,
-        // в каталоге не показываем — по ссылке они работают (GetBySlugAsync их не фильтрует).
+        // в каталоге не показываем — по ссылке они работают (GetPageAsync их не фильтрует).
         var query = _read.HubGroups.AsNoTracking().Where(HubGroupCatalog.ListedInCatalog(_read));
         if (visibility == HubGroupVisibilityRules.PerGroup)
             query = query.Where(g => g.IsPublic);
@@ -72,29 +72,53 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             .ToListAsync();
     }
 
-    public async Task<HubGroupDetailsDto?> GetBySlugAsync(string slug)
+    public async Task<HubGroupDetailsDto?> GetPageAsync(int groupId, string slug)
     {
-        // Приватную тоже отдаём целиком: смотреть ли её этому зрителю, решает контроллер по
-        // GetAccessAsync — участнику страница, остальным заглушка (решение §6-6, 11.09.2026).
-        var group = await _read.HubGroups.AsNoTracking()
-            .Include(g => g.Club)
-            .Include(g => g.Country)
-            .FirstOrDefaultAsync(g => g.Slug == slug);
-        if (group == null) return null;
+        HubGroup? group;
+        List<HubGroupPublicMemberDto> members;
+        FollowedClubRow? followed;
+        // Сужение кэша (docs/plans/cache-row-precision-plan.md §3.1, К4б.4): строка группы, её
+        // участники и подписка — строки ЭТОЙ группы, и страница зависит от row:HubGroups:{id}, а
+        // не от таблиц: правка чужой группы её не роняет. Клуб, страна и пловцы в тех же SQL —
+        // таблицей. ⚠ Правило блока: каждый запрос в нём фильтрует эти таблицы по id группы.
+        // Поэтому и загрузка по id — поиск по slug не сузить: id нужен ДО запроса.
+        using (_read.CacheRows<HubGroup>(groupId, typeof(HubGroupMember), typeof(HubGroupClubSubscription)))
+        {
+            // Приватную тоже отдаём целиком: смотреть ли её этому зрителю, решает контроллер по
+            // GetAccessAsync — участнику страница, остальным заглушка (решение §6-6, 11.09.2026).
+            // Slug — сверка: id пришёл из проверки доступа, и группу могли переименовать между
+            // ними — тогда под этим slug собралась бы страница другой группы.
+            group = await _read.HubGroups.AsNoTracking()
+                .Include(g => g.Club)
+                .Include(g => g.Country)
+                .FirstOrDefaultAsync(g => g.Id == groupId && g.Slug == slug);
+            if (group == null) return null;
 
-        var members = await _read.HubGroupMembers.AsNoTracking()
-            .Where(m => m.HubGroupId == group.Id && !m.IsExcluded)
-            .OrderBy(m => m.SortOrder)
-            .Select(m => new HubGroupPublicMemberDto
-            {
-                SwimmerId = m.SwimmerId,
-                Name = (m.Swimmer!.LastName + " " + m.Swimmer.FirstName).Trim(),
-                NameEn = (m.Swimmer.LastNameEn + " " + m.Swimmer.FirstNameEn).Trim(),
-                BirthYear = m.Swimmer.BirthYear,
-                ClubName = m.Swimmer.Club != null ? m.Swimmer.Club.Name : null,
-                Role = m.Role
-            })
-            .ToListAsync();
+            members = await _read.HubGroupMembers.AsNoTracking()
+                .Where(m => m.HubGroupId == groupId && !m.IsExcluded)
+                .OrderBy(m => m.SortOrder)
+                .Select(m => new HubGroupPublicMemberDto
+                {
+                    SwimmerId = m.SwimmerId,
+                    Name = (m.Swimmer!.LastName + " " + m.Swimmer.FirstName).Trim(),
+                    NameEn = (m.Swimmer.LastNameEn + " " + m.Swimmer.FirstNameEn).Trim(),
+                    BirthYear = m.Swimmer.BirthYear,
+                    ClubName = m.Swimmer.Club != null ? m.Swimmer.Club.Name : null,
+                    Role = m.Role
+                })
+                .ToListAsync();
+
+            // Подписка на клуб — для шапки: копию клуба открыли по ссылке мимо каталога, и она
+            // должна показать, где «лицо клуба» (П4).
+            followed = await _read.HubGroupClubSubscriptions.AsNoTracking()
+                .Where(s => s.HubGroupId == groupId)
+                .Select(s => new FollowedClubRow
+                {
+                    ClubId = s.ClubId,
+                    ClubName = s.Club!.Name.Length > 0 ? s.Club.Name : s.Club.NameEn,
+                })
+                .FirstOrDefaultAsync();
+        }
 
         var dto = new HubGroupDetailsDto
         {
@@ -116,26 +140,26 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             Members = members
         };
 
-        // Подписка на клуб и официальная группа этого клуба (если это не мы) — для шапки: копию
-        // клуба открыли по ссылке мимо каталога, и она должна показать, где «лицо клуба» (П4).
-        var followed = await _read.HubGroupClubSubscriptions.AsNoTracking()
-            .Where(s => s.HubGroupId == group.Id)
-            .Select(s => new
-            {
-                s.ClubId,
-                ClubName = s.Club!.Name.Length > 0 ? s.Club.Name : s.Club.NameEn,
-                Official = _read.HubGroups
-                    .Where(o => o.IsOfficial && o.ClubId == s.ClubId && o.Id != group.Id)
-                    .Select(o => new { o.Slug, o.Name })
-                    .FirstOrDefault()
-            })
-            .FirstOrDefaultAsync();
         if (followed != null)
         {
             dto.FollowedClubId = followed.ClubId;
             dto.FollowedClubName = followed.ClubName;
-            dto.OfficialGroupSlug = followed.Official?.Slug;
-            dto.OfficialGroupName = followed.Official?.Name;
+
+            // Официальная группа клуба подписки (если это не мы) — строки HubGroups ДРУГИХ групп:
+            // блок нашей группы их не сужает. Сужено по клубу: row:Clubs:{c} сбрасывает любая
+            // запись группы с этим ClubId — правка, удаление, одобрение официальной, перенос
+            // ClubId (старое и новое значение FK). Отдельным запросом, а не подзапросом подписки:
+            // JOIN строк двух корней одним SQL не сузить.
+            var clubId = followed.ClubId;
+            using (_read.CacheRows<Club>(clubId, typeof(HubGroup)))
+            {
+                var official = await _read.HubGroups.AsNoTracking()
+                    .Where(o => o.IsOfficial && o.ClubId == clubId && o.Id != groupId)
+                    .Select(o => new { o.Slug, o.Name })
+                    .FirstOrDefaultAsync();
+                dto.OfficialGroupSlug = official?.Slug;
+                dto.OfficialGroupName = official?.Name;
+            }
         }
 
         // Настройки отображения: показ блока фото и указатель «взять из медиа». Сам URL
@@ -530,6 +554,13 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
         public bool IsMasters { get; init; }
         /// <summary>Правило клубных очков, привязанное к соревнованию; null — подбор по дате.</summary>
         public int? RuleId { get; init; }
+    }
+
+    /// <summary>Подписка группы на клуб — из блока сужения группы наружу.</summary>
+    private sealed class FollowedClubRow
+    {
+        public int ClubId { get; init; }
+        public string ClubName { get; init; } = "";
     }
 
     private static List<HubGroupPublicLinkDto> ParseLinks(string? json)

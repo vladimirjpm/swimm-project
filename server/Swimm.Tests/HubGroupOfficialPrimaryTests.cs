@@ -149,7 +149,7 @@ public class HubGroupOfficialPrimaryTests
 
         Assert.Equal(new HashSet<string> { "Official", "Haifa fans", "Masters" }, catalog);
         // По ссылке копия работает.
-        Assert.NotNull(await PublicRepo(db).GetBySlugAsync(copy.Slug));
+        Assert.NotNull(await PublicRepo(db).GetPageAsync(copy.Id, copy.Slug));
     }
 
     [Fact]
@@ -325,8 +325,8 @@ public class HubGroupOfficialPrimaryTests
         var official = await GroupAsync(db, w, "Dolphin official", official: true, followsClub: w.Club);
         var copy = await GroupAsync(db, w, "Dolphin fans", followsClub: w.Club);
 
-        var copyPage = await PublicRepo(db).GetBySlugAsync(copy.Slug);
-        var officialPage = await PublicRepo(db).GetBySlugAsync(official.Slug);
+        var copyPage = await PublicRepo(db).GetPageAsync(copy.Id, copy.Slug);
+        var officialPage = await PublicRepo(db).GetPageAsync(official.Id, official.Slug);
 
         Assert.Equal(w.Club.Id, copyPage!.FollowedClubId);
         Assert.Equal(ClubHe, copyPage.FollowedClubName);

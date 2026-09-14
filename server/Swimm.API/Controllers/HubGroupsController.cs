@@ -132,8 +132,11 @@ public class HubGroupsController : ControllerBase
             $"http:hub-groups:group:{slug.ToLowerInvariant()}:{Visibility}",
             async () =>
             {
-                var dto = await _groups.GetBySlugAsync(slug)
-                    // Группа исчезла между проверкой и загрузкой — гонка с удалением, не кэшируем мусор.
+                // По id из проверки доступа: так кэш сужает строки группы (К4б.4) — страница
+                // зависит от своей группы, а не от таблицы групп.
+                var dto = await _groups.GetPageAsync(access.Id, slug)
+                    // Группа исчезла или сменила slug между проверкой и загрузкой — гонка с
+                    // удалением или переименованием, не кэшируем мусор.
                     ?? throw new InvalidOperationException($"hub group '{slug}' vanished during load");
 
                 // Публичная галерея (TrainingId == null) — через SwimmDbContext (не read-реплику):
