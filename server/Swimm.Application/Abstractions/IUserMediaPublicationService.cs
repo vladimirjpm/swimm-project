@@ -44,11 +44,12 @@ public interface IUserMediaPublicationService
     /// Одобренные публикации группы уровня level (members|public) — для отображения на
     /// странице группы. Авторизацию members-уровня решает контроллер; не подмешивается
     /// в HubGroupMedia-галереи (другая природа id, снятие — через DecideAsync, не Delete).
+    /// Лента зрителя — без владельца медиа (<see cref="PublishedMediaItemDto"/>).
     /// </summary>
-    Task<List<GroupPublicationInboxItemDto>> GetApprovedForGroupAsync(int hubGroupId, string level);
+    Task<List<PublishedMediaItemDto>> GetApprovedForGroupAsync(int hubGroupId, string level);
 
     /// <summary>Публичная лента клуба: одобренные public-публикации с целью-клубом.</summary>
-    Task<List<GroupPublicationInboxItemDto>> GetApprovedForClubAsync(int clubId);
+    Task<List<PublishedMediaItemDto>> GetApprovedForClubAsync(int clubId);
 
     /// <summary>
     /// Решение админа группы: approve=true → approved, approve=false → rejected

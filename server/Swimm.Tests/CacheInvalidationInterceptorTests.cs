@@ -204,7 +204,51 @@ public class CacheInvalidationInterceptorTests
         Assert.True(await Cached(cache, "season-best"));
     }
 
+    // ── Подпись для журнала сбросов (К4б.1) ───────────────────────────────────────
+
+    [Fact]
+    public async Task Journal_SignsTheSave_WithTableAndChangedColumns()
+    {
+        var cache = NewCache();
+        await using var db = InMemory(cache, nameof(Journal_SignsTheSave_WithTableAndChangedColumns));
+        var row = new ProbeA { Id = 1, V = "x" };
+        db.A.Add(row);
+        await db.SaveChangesAsync(); // кэш пуст — сброс ничего не выкинул, в журнал не попал
+        await SeedPages(cache);
+
+        row.V = "y";
+        await db.SaveChangesAsync();
+
+        // По подписи видно, какая запись выкинула страницы и какую колонку она правила —
+        // по ней выбирают служебные колонки (К4б.6).
+        var e = Assert.Single(cache.Journal().Events);
+        Assert.Equal("SaveChanges: cache_k4_probe_a ~1 (V)", e.Reason);
+        Assert.Equal(["page-a"], e.DroppedKeys);
+    }
+
     // ── Транзакции (живой Postgres, временные таблицы) ─────────────────────────────
+
+    [Fact]
+    public async Task InTransaction_JournalsOneLine_WithEverySaveOfTheTransaction()
+    {
+        var cache = NewCache();
+        await using var db = TryPg(cache);
+        if (db == null) return;
+        await SeedPages(cache);
+
+        await using (var tx = await db.Database.BeginTransactionAsync())
+        {
+            db.A.Add(new ProbeA { Id = 1, V = "x" });
+            await db.SaveChangesAsync();
+            db.B.Add(new ProbeB { Id = 1, V = "x" });
+            await db.SaveChangesAsync();
+            await tx.CommitAsync();
+        }
+
+        var e = Assert.Single(cache.Journal().Events);
+        Assert.Equal("транзакция: SaveChanges: cache_k4_probe_a +1 | SaveChanges: cache_k4_probe_b +1", e.Reason);
+        Assert.Equal(2, e.DroppedCount);
+    }
 
     [Fact]
     public async Task InTransaction_DropsOnlyAfterCommit()

@@ -5,7 +5,7 @@ import { HelperMedia } from '../../../utils/helpers';
 import { useCurrentIdentity } from '../use-my-hub-groups';
 import { SwimContextLine } from './group-bits';
 import type {
-  GroupPublicationItem, HubGroupDetails, HubGroupMediaItem, HubGroupMemberMediaItem,
+  HubGroupDetails, HubGroupMediaItem, HubGroupMemberMediaItem, PublishedMediaItem,
 } from '../types';
 
 /**
@@ -179,12 +179,12 @@ function MembersReviews({ group }: { group: HubGroupDetails }) {
 }
 
 /** Подпись тайла публикации — swimmer_name (+ result_label, если есть). */
-function publicationCaption(item: GroupPublicationItem): string | null {
+function publicationCaption(item: PublishedMediaItem): string | null {
   const parts = [item.swimmer_name, item.result_label].filter(Boolean) as string[];
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
-function publicationsLightbox(items: GroupPublicationItem[]) {
+function publicationsLightbox(items: PublishedMediaItem[]) {
   const lightboxItems = items.filter((g) => g.media_type !== 'album');
   return {
     lightboxGalleryItems: lightboxItems.map((g): GalleryItem => ({
@@ -201,14 +201,14 @@ function publicationsLightbox(items: GroupPublicationItem[]) {
  * доступно всем (включая анонимов) — под Gallery. Пустой список → секция не рендерится.
  */
 function FromMembersGallery({ group }: { group: HubGroupDetails }) {
-  const [items, setItems] = useState<GroupPublicationItem[]>([]);
+  const [items, setItems] = useState<PublishedMediaItem[]>([]);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (group.is_virtual || !group.slug) { setItems([]); return; }
     let alive = true;
     fetch(`/api/hub-groups/${encodeURIComponent(group.slug)}/media/published?level=public`)
-      .then((r) => (r.ok ? (r.json() as Promise<GroupPublicationItem[]>) : []))
+      .then((r) => (r.ok ? (r.json() as Promise<PublishedMediaItem[]>) : []))
       .then((data) => { if (alive) setItems(data); })
       .catch(() => { if (alive) setItems([]); });
     return () => { alive = false; };
@@ -253,14 +253,14 @@ function FromMembersGallery({ group }: { group: HubGroupDetails }) {
  */
 function MembersPublications({ group }: { group: HubGroupDetails }) {
   const { isAuthenticated } = useCurrentIdentity();
-  const [items, setItems] = useState<GroupPublicationItem[]>([]);
+  const [items, setItems] = useState<PublishedMediaItem[]>([]);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated || group.is_virtual || group.id <= 0) { setItems([]); return; }
     let alive = true;
     fetch(`/api/hub-groups/${encodeURIComponent(group.slug)}/media/published?level=members`, { credentials: 'include' })
-      .then((r) => (r.ok ? (r.json() as Promise<GroupPublicationItem[]>) : []))
+      .then((r) => (r.ok ? (r.json() as Promise<PublishedMediaItem[]>) : []))
       .then((data) => { if (alive) setItems(data); })
       .catch(() => { if (alive) setItems([]); });
     return () => { alive = false; };

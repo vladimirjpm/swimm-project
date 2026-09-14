@@ -98,9 +98,18 @@ client/media.html → client/src/pages/media-page.tsx → MyMedia (my-media.tsx)
 | GET | `/api/me/media/publications` | статусы заявок на публикацию всех моих медиа | |
 | GET | `/api/me/moderation/media` | сводный inbox модерации: группы, где я владелец/админ + все клубные заявки, если я site admin | `IUserMediaPublicationService.GetModerationFeedAsync`; строка несёт `target_type`, от него зависит ручка решения |
 | GET | `/api/me/media/{id}/publish-targets` | в какие КОЛЛЕКТИВЫ можно подать это медиа | группа: пловец в ростере + я член/владелец/админ (site admin тоже — чинилось 09.09); клуб пловца добавляется сам, ростер там из справочника федерации |
-| POST | `/api/me/media/{id}/publications` | подать заявку (`{target_type, target_id, level}`) | `[EnableRateLimiting("media")]`; привилегия по цели → авто-`approved` (у группы владелец/админ/site-admin, у клуба только site-admin); у клуба `level` может быть только `public`; при авто-approve — `ICacheService.InvalidateAllAsync()` |
-| DELETE | `/api/me/media/{id}/publications/{targetType}/{targetId}` | отозвать заявку (любой статус) | сбрасывает кэш (витрина коллектива могла показывать это медиа) |
-| GET | `/api/clubs/{id}/media` | публичная лента клуба: одобренные `public`-публикации его пловцов | анонимно; ростер клуба — из справочника федерации |
+| POST | `/api/me/media/{id}/publications` | подать заявку (`{target_type, target_id, level}`) | `[EnableRateLimiting("media")]`; привилегия по цели → авто-`approved` (у группы владелец/админ/site-admin, у клуба только site-admin); у клуба `level` может быть только `public`; кэш витрины сбрасывает само сохранение (перехватчик К4) |
+| DELETE | `/api/me/media/{id}/publications/{targetType}/{targetId}` | отозвать заявку (любой статус) | кэш витрины коллектива сбрасывает само сохранение (К4) |
+| GET | `/api/clubs/{id}/media` | публичная лента клуба: одобренные `public`-публикации его пловцов | анонимно; ростер клуба — из справочника федерации; строка — `PublishedMediaItemDto` (см. ниже) |
+
+**Лента зрителя — без владельца медиа.** Кто подал медиа, знают только модераторы: email и id
+владельца есть лишь в строке inbox-а модерации (`GroupPublicationInboxItemDto` —
+`/api/me/moderation/media`, `/api/hub-groups/{id}/media/publications`). Ленты, которые видит
+посетитель, — клуба (`/api/clubs/{id}/media`), группы (`/api/hub-groups/{slug}/media/published`,
+оба уровня) и публикации в галерее страницы группы — отдают `PublishedMediaItemDto`: id, тип,
+источник, url, пловец, подпись заплыва, соревнование. Сторож — тест
+`PublicFeeds_DoNotCarryTheMediaOwner`. Узкая проекция держит и кэш: страница группы не читает
+`Sys_AppUsers` и не выпадает из кэша на каждом входе через Google (cache-row-precision-plan К4б.0).
 | POST | `/api/clubs/{id}/media/publications/{pubId}/decision` | решение по клубной заявке | только site admin: управляющих у клуба нет до «claim your club» |
 
 Смежные, но не в `MediaController`:

@@ -246,21 +246,47 @@ public class UserMediaPublicationService : IUserMediaPublicationService
             .OrderBy(p => p.Status == UserMediaPublicationStatus.Pending ? 0 : 1)
             .ThenByDescending(p => p.Id));
 
-    public Task<List<GroupPublicationInboxItemDto>> GetApprovedForGroupAsync(int hubGroupId, string level)
-        => QueryGroupItems(_db.UserMediaPublications.AsNoTracking()
+    public Task<List<PublishedMediaItemDto>> GetApprovedForGroupAsync(int hubGroupId, string level)
+        => QueryPublishedItems(_db.UserMediaPublications.AsNoTracking()
             .Where(p => p.HubGroupId == hubGroupId
                         && p.Status == UserMediaPublicationStatus.Approved
                         && p.Level == level)
             .OrderByDescending(p => p.Id));
 
-    public Task<List<GroupPublicationInboxItemDto>> GetApprovedForClubAsync(int clubId)
-        => QueryGroupItems(_db.UserMediaPublications.AsNoTracking()
+    public Task<List<PublishedMediaItemDto>> GetApprovedForClubAsync(int clubId)
+        => QueryPublishedItems(_db.UserMediaPublications.AsNoTracking()
             .Where(p => p.ClubId == clubId
                         && p.Status == UserMediaPublicationStatus.Approved
                         // У клуба уровень бывает только public — но фильтр оставлен явным:
                         // он и есть граница «что видно любому посетителю».
                         && p.Level == UserMediaPublicationLevel.Public)
             .OrderByDescending(p => p.Id));
+
+    /// <summary>
+    /// Лента зрителя: без владельца медиа и без названия цели. Не строка inbox-а
+    /// (<see cref="QueryGroupItems"/>): та тянет email владельца из <c>Sys_AppUsers</c>, и
+    /// отдавать её посетителю нельзя. Меньше JOIN — ещё и меньше меток кэша у страницы группы.
+    /// </summary>
+    private static Task<List<PublishedMediaItemDto>> QueryPublishedItems(IQueryable<UserMediaPublication> query)
+        => query
+            .Select(p => new PublishedMediaItemDto
+            {
+                Id = p.Id,
+                MediaType = p.Media!.MediaType,
+                SourceType = p.Media.SourceType,
+                Url = p.Media.Url,
+                SwimmerId = p.Media.SwimmerId,
+                SwimmerName = (p.Media.Swimmer!.LastName + " " + p.Media.Swimmer.FirstName).Trim(),
+                ResultId = p.Media.ResultId,
+                ResultLabel = p.Media.ResultRecord != null
+                    ? p.Media.ResultRecord.Style.Name + " " + p.Media.ResultRecord.Distance
+                      + " · " + p.Media.ResultRecord.Competition.Date
+                    : null,
+                CompetitionId = p.Media.ResultRecord != null
+                    ? p.Media.ResultRecord.CompetitionId
+                    : p.Media.CompetitionId,
+            })
+            .ToListAsync();
 
     private static Task<List<GroupPublicationInboxItemDto>> QueryGroupItems(IQueryable<UserMediaPublication> query)
         => query

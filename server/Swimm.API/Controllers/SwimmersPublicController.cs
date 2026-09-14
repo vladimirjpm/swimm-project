@@ -74,7 +74,8 @@ public class SwimmersPublicController : ControllerBase
 
     private async Task<SwimmerProfileDto> BuildProfileAsync(int id)
     {
-        var dto = (await _results.GetSwimmerProfileAsync(id))!;
+        // Копия: профиль приходит из кэша, а поля шапки дописываются ниже (§4-3 cache-tags-plan).
+        var dto = (await _results.GetSwimmerProfileAsync(id))!.CopyForPage();
         var rows = await _swims.GetSwimsAsync(id);
 
         var showcase = await _showcase.CurrentStartYearAsync();
@@ -295,8 +296,8 @@ public class SwimmersPublicController : ControllerBase
         var rivalSwimmerId = h2hB ?? rivalId ?? 0;
         if (rivalSwimmerId <= 0 || rivalSwimmerId == id) return BadRequest(new { error = "h2h_b" });
 
-        var rivalProfile = await _results.GetSwimmerProfileAsync(rivalSwimmerId);
-        if (rivalProfile is null) return NotFound();
+        // Резолв ДО кэшируемой загрузки: 404 не должен плодить кэш-записи.
+        if (await _results.GetSwimmerProfileAsync(rivalSwimmerId) is null) return NotFound();
 
         return await this.CachedJson(_cache,
             $"http:swimmer:{id}:compare:{rivalSwimmerId}:{season ?? "default"}",
@@ -307,6 +308,9 @@ public class SwimmersPublicController : ControllerBase
                 var mineRows = await _swims.GetSwimsAsync(id);
                 var rivalRows = await _swims.GetSwimsAsync(rivalSwimmerId);
                 var mineProfile = await _results.GetSwimmerProfileAsync(id);
+                // Профиль соперника — ВНУТРИ сборки: так ответ наследует метки его записи кэша.
+                // Прочитанный до сборки, он в ответ попадал, а его метки — нет.
+                var rivalProfile = await _results.GetSwimmerProfileAsync(rivalSwimmerId);
 
                 // Сезон приземляется на заплывы ХОЗЯИНА страницы: карусель сверху — его,
                 // и таб обязан показывать тот же период, что остальные табы страницы.
