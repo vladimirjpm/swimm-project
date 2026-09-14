@@ -57,8 +57,11 @@ public static class DependencyInjection
         services.AddSingleton<ICacheService>(sp => sp.GetRequiredService<MemoryCacheService>());
         services.AddSingleton<ICacheDiagnostics>(sp => sp.GetRequiredService<MemoryCacheService>());
 
-        // Settings (singleton — in-memory store)
-        services.AddSingleton<ISettingsService, AdminSettingsService>();
+        // Settings (singleton — in-memory store). Среда нужна дефолтам отладочного толка (доля
+        // сверки кэша); вне хоста (тесты) IHostEnvironment нет — тогда дефолты как на проде.
+        services.AddSingleton<ISettingsService>(sp => new AdminSettingsService(
+            sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(),
+            development: sp.GetService<IHostEnvironment>()?.IsDevelopment() ?? false));
         services.AddScoped<IDebugOptionsService, DebugOptionsService>();
 
         // Scoped services

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Primitives;
 using Swimm.Application.Abstractions;
@@ -20,10 +21,18 @@ namespace Swimm.Infrastructure.Services;
 /// Откуда метки (К3): явные — от вызывающего; метки таблиц — САМИ, из SQL, выполненного во
 /// время сборки (<see cref="CacheBuildScope"/> + перехватчик команд EF); метки вложенных
 /// записей — наследуются при попадании в них. Запись хранит свои метки рядом со значением.
+///
+/// Сужение до строк (К4б.3, docs/plans/cache-row-precision-plan.md): сборка знает, включён ли
+/// выключатель <see cref="CacheSettings.RowPrecision"/>; попадание в суженную запись с долей
+/// <see cref="CacheSettings.HitVerifyPercent"/> сверяется с ответом, собранным заново.
 /// </summary>
 public class MemoryCacheService : ICacheService, ICacheDiagnostics
 {
     private readonly IMemoryCache _cache;
+
+    // Выключатели кэша (/Admin/Settings). Нет — сужение выключено и сверки нет: так кэш живёт в
+    // тестах, которые собирают его без настроек.
+    private readonly ISettingsService? _settings;
 
     // Общий токен (метка all) и токены меток. Старые токены только ОТМЕНЯЕМ, но не Dispose:
     // соседний поток мог уже взять ссылку на источник и вот-вот спросит у него Token —
@@ -56,7 +65,29 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
         public long ByAll;
     }
 
-    public MemoryCacheService(IMemoryCache cache) => _cache = cache;
+    // Сверка на попадании (К4б.3, §4-6): счётчики с запуска процесса и последние расхождения.
+    private const int MismatchesKept = 50;
+    private const int MismatchSnippet = 60;
+    private readonly ConcurrentQueue<CacheHitMismatch> _mismatches = new();
+    private long _hitChecks;
+    private long _hitMismatches;
+
+    // Подметание источников меток (§7): метки строк копятся в _tags до общего сброса. Раз в 1024
+    // касания смотрим размер; больше порога — выбрасываем источники, которых не носит ни одна запись.
+    private int _captures;
+    private int _sweeping;
+
+    /// <summary>Сколько источников меток держать до подметания; тесты ставят маленький порог.</summary>
+    internal int TagSweepThreshold { get; init; } = 20_000;
+
+    /// <summary>Сколько источников меток сейчас в словаре — для тестов подметания.</summary>
+    internal int TagSourceCount => _tags.Count;
+
+    public MemoryCacheService(IMemoryCache cache, ISettingsService? settings = null)
+    {
+        _cache = cache;
+        _settings = settings;
+    }
 
     /// <summary>
     /// Запись в IMemoryCache: значение и его метки с токенами, с которыми оно валидно.
@@ -67,7 +98,11 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
         IReadOnlyDictionary<string, CancellationToken> Tokens,
         string ValueType,
         DateTimeOffset StoredAt,
-        DateTimeOffset ExpiresAt);
+        DateTimeOffset ExpiresAt)
+    {
+        /// <summary>Запись сужена до строк (носит <c>row:</c>/<c>anyrow:</c>) — её сверяет попадание.</summary>
+        public bool RowLevel { get; } = Tokens.Keys.Any(CacheTags.IsRowLevel);
+    }
 
     public Task<T?> GetAsync<T>(string key)
     {
@@ -96,12 +131,20 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
     public async Task<T> GetOrCreateAsync<T>(string key, Func<Task<T>> factory, TimeSpan ttl, params string[] tags)
         where T : class?
     {
+        // Внутри сверки — мимо кэша целиком: вложенная запись тоже строится заново, иначе
+        // устаревшая вложенная совпала бы сама с собой (§4-6). Ничего не читаем и не кладём.
+        if (CacheBuildScope.Current is { IsVerification: true }) return await factory();
+
         for (var attempt = 0; ; attempt++)
         {
             if (_cache.TryGetValue(key, out Entry? hit) && hit?.Value is T cached)
             {
-                CacheBuildScope.Current?.Inherit(hit.Tokens);
-                return cached;
+                if (!ShouldVerify(hit) || await MatchesFreshAsync(key, hit, cached, factory))
+                {
+                    CacheBuildScope.Current?.Inherit(hit.Tokens);
+                    return cached;
+                }
+                // Не совпало: запись врала и выкинута — ответ строится обычным путём, ниже.
             }
 
             var mine = new Lazy<Task<Entry>>(() => BuildAsync(key, factory, ttl, tags));
@@ -134,7 +177,7 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
         // Сбросили данные, пока ответ строился, — снятый токен уже отменён, и собранное из
         // старых данных в кэш не ляжет. Со снятием ПОСЛЕ сборки оно пролежало бы до конца TTL.
         var tokens = CaptureTokens(tags);
-        using var scope = CacheBuildScope.Begin(CaptureTagToken);
+        using var scope = CacheBuildScope.Begin(CaptureTagToken, rowPrecision: RowPrecisionOn);
 
         var value = await factory();
 
@@ -143,6 +186,75 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
         return value is null
             ? new Entry(null, tokens, typeof(T).Name, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)
             : Store(key, value, typeof(T), ttl, tokens);
+    }
+
+    private bool RowPrecisionOn => _settings?.GetValue(CacheSettings.RowPrecision, false) ?? false;
+
+    /// <summary>Сверять ли это попадание: запись сужена до строк и выпала доля сверки.</summary>
+    private bool ShouldVerify(Entry hit)
+    {
+        if (!hit.RowLevel || _settings is null) return false;
+        var percent = _settings.GetValue(CacheSettings.HitVerifyPercent, 0);
+        return percent > 0 && Random.Shared.Next(100) < percent;
+    }
+
+    /// <summary>
+    /// Сверка на попадании (§4-6): ответ строится заново целиком мимо кэша (вложенные записи
+    /// тоже) в изолированной сборке, и его JSON сравнивается с тем, что лежит в кэше. Не совпало —
+    /// «подозрение на недосброс» в журнал и запись вон. Ловит нарушение правила сужения, которого
+    /// не предусмотрели тесты, при обычном прокликивании. Табличные записи не сверяются: их
+    /// доказал К4, а шум «от времени» в них не нужен.
+    /// </summary>
+    private async Task<bool> MatchesFreshAsync<T>(string key, Entry hit, T cached, Func<Task<T>> factory)
+    {
+        T fresh;
+        using (CacheBuildScope.BeginVerification())
+        {
+            try { fresh = await factory(); }
+            // Сверка — диагностика: упавшая сборка страницу не роняет, её просто нечем сверить.
+            catch (Exception e) when (e is not OperationCanceledException) { return true; }
+        }
+
+        Interlocked.Increment(ref _hitChecks);
+        // Запись сбросили, пока сверяли: данные поменялись, и сброс до неё дошёл — это не недосброс.
+        if (hit.Tokens.Values.Any(t => t.IsCancellationRequested)) return true;
+
+        var was = JsonSerializer.Serialize(cached, typeof(T));
+        var now = JsonSerializer.Serialize(fresh, typeof(T));
+        if (was == now) return true;
+
+        Interlocked.Increment(ref _hitMismatches);
+        _mismatches.Enqueue(new CacheHitMismatch(
+            DateTimeOffset.UtcNow,
+            key,
+            hit.Tokens.Keys
+                .Where(t => t != CacheTags.All)
+                .OrderBy(t => !CacheTags.IsRowLevel(t))
+                .ThenBy(t => t, StringComparer.Ordinal)
+                .Take(JournalTagsPerEvent)
+                .ToList(),
+            Difference(was, now)));
+        while (_mismatches.Count > MismatchesKept && _mismatches.TryDequeue(out _)) { }
+
+        // Выкидываем ровно ЭТУ запись: пока сверяли, её могли уже пересобрать.
+        if (_cache.TryGetValue(key, out Entry? current) && ReferenceEquals(current, hit)) _cache.Remove(key);
+        return false;
+    }
+
+    /// <summary>Где JSON из кэша разошёлся с собранным заново: позиция и кусок с каждой стороны.</summary>
+    internal static string Difference(string was, string now)
+    {
+        var at = 0;
+        var common = Math.Min(was.Length, now.Length);
+        while (at < common && was[at] == now[at]) at++;
+        return $"с символа {at}: в кэше «{Snippet(was, at)}», заново «{Snippet(now, at)}»";
+
+        static string Snippet(string json, int at)
+        {
+            var from = Math.Max(0, at - 20);
+            var length = Math.Min(MismatchSnippet, json.Length - from);
+            return (from > 0 ? "…" : "") + json.Substring(from, length) + (from + length < json.Length ? "…" : "");
+        }
     }
 
     public Task RemoveAsync(string key)
@@ -186,7 +298,11 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
             .Select(d => new CacheDropStats(d.Key, Interlocked.Read(ref d.Value.ByTags), Interlocked.Read(ref d.Value.ByAll)))
             .OrderByDescending(d => d.ByTags + d.ByAll)
             .ThenBy(d => d.Kind, StringComparer.Ordinal)
-            .ToList());
+            .ToList(),
+        new CacheHitChecks(
+            Interlocked.Read(ref _hitChecks),
+            Interlocked.Read(ref _hitMismatches),
+            _mismatches.Reverse().ToList()));
 
     /// <summary>
     /// Вид записи для счётчиков журнала: у HTTP-ответов — два первых сегмента ключа
@@ -268,8 +384,36 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
             if (_tags.TryRemove(tag, out var source)) source.Cancel();
     }
 
-    private CancellationToken CaptureTagToken(string tag) =>
-        _tags.GetOrAdd(tag, _ => new CancellationTokenSource()).Token;
+    private CancellationToken CaptureTagToken(string tag)
+    {
+        // Размер словаря — не на каждое касание: Count у ConcurrentDictionary берёт все блокировки.
+        if ((Interlocked.Increment(ref _captures) & 1023) == 0 && _tags.Count > TagSweepThreshold) SweepTags();
+        return _tags.GetOrAdd(tag, _ => new CancellationTokenSource()).Token;
+    }
+
+    /// <summary>
+    /// Подметание (§7): выбросить источники меток, которых не носит ни одна запись в индексе.
+    /// ОТМЕНИТЬ, а не просто выбросить: сборка в полёте могла уже снять токен такой метки — отмена
+    /// даст ей лишний сброс (её ответ не ляжет в кэш), а выброс без отмены — недосброс: сброс
+    /// метки такую сборку уже не нашёл бы.
+    /// </summary>
+    internal void SweepTags()
+    {
+        if (Interlocked.Exchange(ref _sweeping, 1) == 1) return;
+        try
+        {
+            // Протухшие, но ещё не вытесненные записи тоже в счёт: их метки лишний раз
+            // остаются — это безопасно.
+            var worn = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var entry in _index.Values) worn.UnionWith(entry.Tokens.Keys);
+            foreach (var tag in _tags.Keys)
+                if (!worn.Contains(tag) && _tags.TryRemove(tag, out var source)) source.Cancel();
+        }
+        finally
+        {
+            Volatile.Write(ref _sweeping, 0);
+        }
+    }
 
     private Dictionary<string, CancellationToken> CaptureTokens(string[] tags)
     {

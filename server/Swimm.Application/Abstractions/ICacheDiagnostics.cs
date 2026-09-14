@@ -32,13 +32,26 @@ public sealed record CacheEntryInfo(
 /// Журнал сбросов. <paramref name="Events"/> — последние сбросы, выкинувшие хоть одну запись,
 /// свежие первыми; пустые (метку никто не носил) не пишутся, их только считают
 /// (<paramref name="EmptyCount"/>). <paramref name="Drops"/> — сколько записей каждого вида
-/// выкинуто с <paramref name="Since"/>, по убыванию.
+/// выкинуто с <paramref name="Since"/>, по убыванию. <paramref name="HitChecks"/> — сверка на
+/// попадании.
 /// </summary>
 public sealed record CacheJournal(
     DateTimeOffset Since,
     IReadOnlyList<CacheInvalidationEvent> Events,
     long EmptyCount,
-    IReadOnlyList<CacheDropStats> Drops);
+    IReadOnlyList<CacheDropStats> Drops,
+    CacheHitChecks HitChecks);
+
+/// <summary>
+/// Сверка на попадании (docs/plans/cache-row-precision-plan.md §4-6): сколько попаданий в записи,
+/// суженные до строк, построено заново мимо кэша (<paramref name="Checked"/>) и сколько из них не
+/// совпало с кэшем (<paramref name="Mismatched"/>). Расхождение — «подозрение на недосброс»:
+/// запись врала, её выкинули. <paramref name="Mismatches"/> — последние, свежие первыми.
+/// </summary>
+public sealed record CacheHitChecks(long Checked, long Mismatched, IReadOnlyList<CacheHitMismatch> Mismatches);
+
+/// <summary>Одно расхождение: ключ, метки записи (строки первыми) и где JSON из кэша разошёлся с собранным заново.</summary>
+public sealed record CacheHitMismatch(DateTimeOffset At, string Key, IReadOnlyList<string> Tags, string Difference);
 
 /// <summary>
 /// Один сброс: когда, кто и почему (<paramref name="Reason"/>), какие метки, сколько живых

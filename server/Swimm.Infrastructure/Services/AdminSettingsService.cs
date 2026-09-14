@@ -15,13 +15,17 @@ public class AdminSettingsService : ISettingsService
     private readonly ConcurrentDictionary<string, AdminSetting> _settings = new();
     private readonly IMemoryCache _cache;
 
-    public AdminSettingsService(IMemoryCache cache)
+    /// <param name="development">
+    /// Среда Development: от неё зависят дефолты отладочного толка (доля сверки кэша на
+    /// попадании — там ощутимая, на проде 0).
+    /// </param>
+    public AdminSettingsService(IMemoryCache cache, bool development = false)
     {
         _cache = cache;
-        SeedDefaults();
+        SeedDefaults(development);
     }
 
-    private void SeedDefaults()
+    private void SeedDefaults(bool development)
     {
         var defaults = new AdminSetting[]
         {
@@ -90,6 +94,15 @@ public class AdminSettingsService : ISettingsService
                 "окончания сезона, как считаем возраст у себя. Оси расходятся только с " +
                 "сентября по декабрь. Возраст на страницах (ростер, зачёт, категории) " +
                 "настройка НЕ трогает — он всегда сезонный (docs/data-integrity.md §13)"),
+            // Точность сброса кэша (docs/plans/cache-row-precision-plan.md §2.5, §4-6).
+            new(CacheSettings.RowPrecision, "false", "bool", "livesite",
+                "Кэш: сужение до строк. true — страница одной группы или клуба зависит от своих " +
+                "строк и падает только от их правки; false — от всей таблицы, как раньше. " +
+                "Аварийный рычаг: всплыл недосброс (подозрения сверки на /Admin/Cache) — выключить"),
+            new(CacheSettings.HitVerifyPercent, CacheSettings.DefaultHitVerifyPercent(development).ToString(), "int", "livesite",
+                "Кэш: сверка на попадании, % (0–100). Попадание в запись, суженную до строк, с этой " +
+                "вероятностью строится заново мимо кэша и сравнивается; расхождение — «подозрение " +
+                "на недосброс» в журнале /Admin/Cache и сброс записи. В Development 20, на проде 0"),
         };
 
         foreach (var s in defaults)
@@ -139,6 +152,8 @@ public class AdminSettingsService : ISettingsService
             return false;
         if (key is FavoritesRules.MaxSwimmersKey or FavoritesRules.MaxClubsKey
             && !FavoritesRules.IsValidLimit(int.Parse(newValue)))
+            return false;
+        if (key == CacheSettings.HitVerifyPercent && int.Parse(newValue) is < 0 or > 100)
             return false;
 
         _settings[key] = existing with { Value = newValue };

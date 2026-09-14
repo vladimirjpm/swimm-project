@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Reflection.Emit;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
@@ -92,7 +91,7 @@ public class CacheValueRulesTests
     {
         var offenders = CacheCalls()
             .Where(c => c.Called.Name == "SetAsync")
-            .Select(c => OuterType(c.Caller.DeclaringType!))
+            .Select(c => IlCalls.OuterType(c.Caller.DeclaringType!))
             .Where(t => t != typeof(MemoryCacheService) && t != typeof(ICacheService))
             .Select(t => t.Name)
             .Distinct()
@@ -102,82 +101,12 @@ public class CacheValueRulesTests
             "SetAsync вызывают напрямую (нужен GetOrCreateAsync): " + string.Join(", ", offenders));
     }
 
-    /// <summary>Внешний тип для сгенерированных компилятором (асинхронные методы, лямбды).</summary>
-    private static Type OuterType(Type type)
-    {
-        while (type.DeclaringType is not null) type = type.DeclaringType;
-        return type;
-    }
-
-    /// <summary>Все вызовы обобщённых методов <see cref="ICacheService"/> в Infrastructure и Application.</summary>
-    private static List<(MethodBase Caller, MethodInfo Called)> CacheCalls()
-    {
-        var calls = new List<(MethodBase, MethodInfo)>();
-        foreach (var assembly in new[] { typeof(ResultRepository).Assembly, typeof(ResultDto).Assembly })
-            foreach (var type in assembly.GetTypes())
-                foreach (var method in type.GetMethods(AllDeclared).Cast<MethodBase>()
-                             .Concat(type.GetConstructors(AllDeclared)))
-                    CollectCacheCalls(method, calls);
-        return calls;
-    }
-
-    private const BindingFlags AllDeclared =
-        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static
-        | BindingFlags.DeclaredOnly;
-
     private static readonly string[] CacheMethods = ["GetAsync", "SetAsync", "GetOrCreateAsync"];
 
-    private static readonly Dictionary<short, OpCode> OpCodesByValue = typeof(OpCodes)
-        .GetFields(BindingFlags.Public | BindingFlags.Static)
-        .Select(f => (OpCode)f.GetValue(null)!)
-        .ToDictionary(o => o.Value);
-
-    private static void CollectCacheCalls(MethodBase method, List<(MethodBase, MethodInfo)> into)
-    {
-        byte[]? il;
-        try { il = method.GetMethodBody()?.GetILAsByteArray(); }
-        catch { return; }
-        if (il is null) return;
-
-        var typeArgs = method.DeclaringType is { IsGenericType: true } dt ? dt.GetGenericArguments() : null;
-        var methodArgs = method.IsGenericMethod ? method.GetGenericArguments() : null;
-
-        var pos = 0;
-        while (pos < il.Length)
-        {
-            short value = il[pos++];
-            if (value == 0xFE && pos < il.Length) value = (short)(0xFE00 | il[pos++]);
-            if (!OpCodesByValue.TryGetValue(value, out var op)) return; // не разобрали — не гадаем
-
-            if (op.OperandType == OperandType.InlineMethod)
-            {
-                var token = BitConverter.ToInt32(il, pos);
-                try
-                {
-                    if (method.Module.ResolveMethod(token, typeArgs, methodArgs) is MethodInfo
-                        {
-                            IsGenericMethod: true,
-                        } called
-                        && called.DeclaringType == typeof(ICacheService)
-                        && CacheMethods.Contains(called.Name))
-                    {
-                        into.Add((method, called));
-                    }
-                }
-                catch (ArgumentException) { /* токен из чужого контекста — пропускаем */ }
-            }
-
-            pos += OperandSize(op.OperandType, il, pos);
-        }
-    }
-
-    private static int OperandSize(OperandType type, byte[] il, int pos) => type switch
-    {
-        OperandType.InlineNone => 0,
-        OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
-        OperandType.InlineVar => 2,
-        OperandType.InlineI8 or OperandType.InlineR => 8,
-        OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il, pos),
-        _ => 4,
-    };
+    /// <summary>Все вызовы обобщённых методов <see cref="ICacheService"/> в Infrastructure и Application.</summary>
+    private static List<(MethodBase Caller, MethodInfo Called)> CacheCalls() => IlCalls.Find(
+        [typeof(ResultRepository).Assembly, typeof(ResultDto).Assembly],
+        called => called.IsGenericMethod
+                  && called.DeclaringType == typeof(ICacheService)
+                  && CacheMethods.Contains(called.Name));
 }

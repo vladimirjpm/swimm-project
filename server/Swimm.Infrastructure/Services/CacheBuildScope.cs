@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Swimm.Application.Constants;
 
 namespace Swimm.Infrastructure.Services;
 
@@ -16,10 +17,25 @@ namespace Swimm.Infrastructure.Services;
 ///
 /// Живёт в <see cref="AsyncLocal{T}"/>: контекст течёт в await-цепочку сборки и не вытекает
 /// наружу — асинхронный метод возвращает вызывающему его прежний контекст.
+///
+/// Сужение (docs/plans/cache-row-precision-plan.md §2.3, К4б.3): внутри блока
+/// <see cref="Narrow"/> чтение перечисленных таблиц даёт не <c>table:T</c>, а метки строк
+/// корня и <c>anyrow:T</c> — страница одной группы зависит от своих строк, а не от всей таблицы.
 /// </summary>
 public sealed class CacheBuildScope : IDisposable
 {
+    /// <summary>
+    /// Потолок сужения (§2.3): больше id в одном блоке — блок работает как таблица. Сотня меток
+    /// у страницы группы нормальна; тысяча — уже не выгода, а нагрузка (в Redis — MGET на каждое
+    /// попадание).
+    /// </summary>
+    public const int MaxNarrowedIds = 200;
+
     private static readonly AsyncLocal<CacheBuildScope?> CurrentScope = new();
+
+    // Открытый блок сужения. Своя AsyncLocal, а не поле сборки: блок течёт только в ту
+    // await-цепочку, которая его открыла, и не задевает параллельную ветку той же сборки.
+    private static readonly AsyncLocal<RowNarrowing?> CurrentNarrowing = new();
 
     /// <summary>Сборка, внутри которой идёт выполнение; null — вне сборки записи кэша.</summary>
     public static CacheBuildScope? Current => CurrentScope.Value;
@@ -28,22 +44,87 @@ public sealed class CacheBuildScope : IDisposable
     private readonly Func<string, CancellationToken> _captureToken;
     private readonly ConcurrentDictionary<string, CancellationToken> _tokens = new();
 
-    private CacheBuildScope(CacheBuildScope? parent, Func<string, CancellationToken> captureToken)
+    private CacheBuildScope(CacheBuildScope? parent, Func<string, CancellationToken> captureToken,
+        bool rowPrecision, bool isVerification)
     {
         _parent = parent;
         _captureToken = captureToken;
+        RowPrecision = rowPrecision;
+        IsVerification = isVerification;
     }
 
+    /// <summary>
+    /// Сужение до строк включено (выключатель <c>CacheRowPrecision</c> на момент начала сборки).
+    /// Выключено — блоки <see cref="Narrow"/> ничего не делают, запись зависит от таблиц.
+    /// </summary>
+    public bool RowPrecision { get; }
+
+    /// <summary>
+    /// Сборка-сверка (§4-6): ответ строится заново мимо кэша, вложенные записи тоже, а метки
+    /// никуда не идут — сверке нужен только сам ответ.
+    /// </summary>
+    public bool IsVerification { get; }
+
     /// <summary>Открыть сборку внутри текущего контекста. Закрывается <see cref="Dispose"/>.</summary>
-    public static CacheBuildScope Begin(Func<string, CancellationToken> captureToken)
+    public static CacheBuildScope Begin(Func<string, CancellationToken> captureToken, bool rowPrecision = false)
     {
-        var scope = new CacheBuildScope(CurrentScope.Value, captureToken);
+        var scope = new CacheBuildScope(CurrentScope.Value, captureToken, rowPrecision, isVerification: false);
+        CurrentScope.Value = scope;
+        return scope;
+    }
+
+    /// <summary>Открыть сборку-сверку: её касания токенов не снимают, её метки выбрасываются.</summary>
+    public static CacheBuildScope BeginVerification()
+    {
+        var scope = new CacheBuildScope(CurrentScope.Value, static _ => CancellationToken.None,
+            rowPrecision: false, isVerification: true);
         CurrentScope.Value = scope;
         return scope;
     }
 
     /// <summary>Отметить зависимость. Повторное касание сохраняет ПЕРВЫЙ снятый токен — самый ранний.</summary>
     public void Touch(string tag) => _tokens.GetOrAdd(tag, _captureToken);
+
+    /// <summary>
+    /// Запрос прочёл таблицу: <c>table:T</c>, а если таблица сужена открытым в ЭТОЙ сборке
+    /// блоком — метки строк корня и <c>anyrow:T</c>.
+    ///
+    /// ⚠ Блок чужой сборки не действует: вложенная запись (скажем, «все стили»), собранная внутри
+    /// блока группы 24, легла бы в кэш с меткой группы 24 и потом врала бы всем. Поэтому
+    /// вложенная сборка начинает с чистого сужения, а её метки наружу наследуются как раньше.
+    /// </summary>
+    public void TouchTable(string table)
+    {
+        if (CurrentNarrowing.Value is { } narrowing
+            && ReferenceEquals(narrowing.Scope, this)
+            && narrowing.Tables.Contains(table))
+        {
+            Touch(CacheTags.AnyRow(table));
+            narrowing.TouchRows();
+            return;
+        }
+        Touch(CacheTags.Table(table));
+    }
+
+    /// <summary>
+    /// Блок сужения: пока открыт, чтение таблиц <paramref name="tables"/> в этой сборке зависит
+    /// от строк <paramref name="ids"/> корня <paramref name="rootTable"/>, а не от таблиц. Зовёт
+    /// только <c>CacheRows</c> (<see cref="Data.CacheRowsExtensions"/>) — он проверил по модели,
+    /// что у таблиц есть FK на корень.
+    ///
+    /// Выключатель выключен или id больше <see cref="MaxNarrowedIds"/> — блок пустой, запись
+    /// зависит от таблиц. Вложенный блок на своё время заменяет внешний, на выходе внешний
+    /// возвращается: чтение, которое внутренний не сужает, зависит от таблицы — это лишний сброс,
+    /// не недосброс.
+    /// </summary>
+    public IDisposable Narrow(string rootTable, IReadOnlyCollection<long> ids, IReadOnlySet<string> tables)
+    {
+        if (!RowPrecision || ids.Count > MaxNarrowedIds) return NoBlock.Instance;
+
+        var outer = CurrentNarrowing.Value;
+        CurrentNarrowing.Value = new RowNarrowing(this, rootTable, ids, tables);
+        return new Block(outer);
+    }
 
     /// <summary>
     /// Унаследовать зависимости записи, из которой собирается этот ответ (попадание во вложенный
@@ -59,4 +140,35 @@ public sealed class CacheBuildScope : IDisposable
     public IReadOnlyDictionary<string, CancellationToken> Tokens => _tokens;
 
     public void Dispose() => CurrentScope.Value = _parent;
+
+    /// <summary>Открытый блок сужения: чья сборка, какой корень, какие строки и таблицы.</summary>
+    private sealed class RowNarrowing(
+        CacheBuildScope scope, string rootTable, IReadOnlyCollection<long> ids, IReadOnlySet<string> tables)
+    {
+        private int _rowsTouched;
+
+        public CacheBuildScope Scope => scope;
+        public IReadOnlySet<string> Tables => tables;
+
+        /// <summary>
+        /// Метки строк корня — один раз на блок: токен снимается при первом касании, до чтения
+        /// данных, как у таблиц; повторные касания его всё равно не меняют.
+        /// </summary>
+        public void TouchRows()
+        {
+            if (Interlocked.Exchange(ref _rowsTouched, 1) == 1) return;
+            foreach (var id in ids) scope.Touch(CacheTags.Row(rootTable, id));
+        }
+    }
+
+    private sealed class Block(RowNarrowing? outer) : IDisposable
+    {
+        public void Dispose() => CurrentNarrowing.Value = outer;
+    }
+
+    private sealed class NoBlock : IDisposable
+    {
+        public static readonly NoBlock Instance = new();
+        public void Dispose() { }
+    }
 }
