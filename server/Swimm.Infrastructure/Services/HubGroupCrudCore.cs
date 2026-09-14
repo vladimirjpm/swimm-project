@@ -20,13 +20,8 @@ namespace Swimm.Infrastructure.Services;
 public partial class HubGroupCrudCore
 {
     private readonly SwimmDbContext _db;
-    private readonly ICacheService _cache;
 
-    public HubGroupCrudCore(SwimmDbContext db, ICacheService cache)
-    {
-        _db = db;
-        _cache = cache;
-    }
+    public HubGroupCrudCore(SwimmDbContext db) => _db = db;
 
     public async Task<string> ResolveSlugAsync(HubGroupInputDto input, int? excludeId)
     {
@@ -169,14 +164,13 @@ public partial class HubGroupCrudCore
     {
         var error = await TrySaveChangesAsync(group);
         if (error != null) return HubGroupSaveResult.Fail(error);
-        await _cache.InvalidateAllAsync();
         return HubGroupSaveResult.Ok(group.Id);
     }
 
     /// <summary>
-    /// SaveChanges с разбором ошибок записи, БЕЗ сброса кэша: null — сохранено, иначе текст
-    /// ошибки. Для записи внутри транзакции — кэш сбрасывают после коммита, иначе параллельный
-    /// публичный запрос успеет закэшировать состояние до коммита.
+    /// SaveChanges с разбором ошибок записи: null — сохранено, иначе текст ошибки. Кэш
+    /// сбрасывает перехватчик сохранения (К4); внутри транзакции — после её коммита, иначе
+    /// параллельный публичный запрос успел бы закэшировать состояние до коммита.
     /// </summary>
     public async Task<string?> TrySaveChangesAsync(HubGroup group)
     {
@@ -296,8 +290,6 @@ public partial class HubGroupCrudCore
         return HubGroupMemberSaveResult.Ok();
     }
 
-    public Task InvalidateCacheAsync() => _cache.InvalidateAllAsync();
-
     public async Task TouchGroupAsync(int groupId)
     {
         var group = await _db.HubGroups.FindAsync(groupId);
@@ -306,8 +298,6 @@ public partial class HubGroupCrudCore
             group.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
         }
-        // Мутации участников идут только через этот метод — инвалидация кэша здесь.
-        await _cache.InvalidateAllAsync();
     }
 
     private const int SlugMaxLength = 120; // HubGroup.Slug — MaxLength(120)

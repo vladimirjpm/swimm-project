@@ -33,10 +33,15 @@ public static class DependencyInjection
         // не ставит: такие есть только у миграций и dotnet ef, кэш там не строится.
         var cacheDependencies = new CacheDependencyInterceptor();
 
-        services.AddDbContext<SwimmDbContext>(options => options
+        // Сброс — тоже сам (К4): сохранение через EF сбрасывает метки изменённых таблиц, после
+        // коммита. Только у контекста записи — контекст чтения ничего не сохраняет. Синглтон:
+        // держит ICacheService, а состояние сохранения — по экземпляру контекста.
+        services.AddSingleton<CacheInvalidationInterceptor>();
+
+        services.AddDbContext<SwimmDbContext>((sp, options) => options
             .UseNpgsql(adminCs, npgsql =>
                 npgsql.EnableRetryOnFailure(maxRetryCount: 3))
-            .AddInterceptors(cacheDependencies));
+            .AddInterceptors(cacheDependencies, sp.GetRequiredService<CacheInvalidationInterceptor>()));
 
         services.AddDbContext<SwimmReadDbContext>(options => options
             .UseNpgsql(readCs, npgsql =>

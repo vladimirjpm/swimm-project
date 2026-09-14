@@ -25,14 +25,6 @@ public class HubGroupOfficialPrimaryTests
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options);
 
-    private sealed class NullCache : ICacheService
-    {
-        public Task<T?> GetAsync<T>(string key) => Task.FromResult<T?>(default);
-        public Task SetAsync<T>(string key, T value, TimeSpan ttl) => Task.CompletedTask;
-        public Task RemoveAsync(string key) => Task.CompletedTask;
-        public Task InvalidateAllAsync() => Task.CompletedTask;
-    }
-
     private sealed class NullEmail : IEmailSender
     {
         public Task SendAsync(string toEmail, string subject, string htmlBody, CancellationToken ct = default) => Task.CompletedTask;
@@ -187,7 +179,7 @@ public class HubGroupOfficialPrimaryTests
     }
 
     private static HubGroupClubRequestAdminService Approver(SwimmDbContext db, RecordingAudit? audit = null) =>
-        new(db, new NullCache(), new NullEmail(), audit: audit);
+        new(db, new NullEmail(), audit: audit);
 
     [Fact]
     public async Task Approve_RenamesAnyGroupNamedLikeTheClubOrOfficial_NotOthers()
@@ -267,7 +259,7 @@ public class HubGroupOfficialPrimaryTests
     {
         await using var db = CreateDb(nameof(Validate_ClubNameTakenOnceOfficialExists_SuffixAllowed));
         var w = await SeedAsync(db);
-        var core = new HubGroupCrudCore(db, new NullCache());
+        var core = new HubGroupCrudCore(db);
 
         // До официальной имя клуба разрешено.
         Assert.Null(await core.ValidateAsync(Input(ClubHe), "slug-1", excludeId: null));
@@ -291,7 +283,7 @@ public class HubGroupOfficialPrimaryTests
         var official = await GroupAsync(db, w, ClubHe, ClubEn, official: true);
         // Имя получено ДО одобрения официальной и не переименовано (было до П4).
         var legacy = await GroupAsync(db, w, "Dolphins", ClubEn);
-        var core = new HubGroupCrudCore(db, new NullCache());
+        var core = new HubGroupCrudCore(db);
 
         // Правка без смены имени — проходит; смена имени на имя клуба — нет.
         Assert.Null(await core.ValidateAsync(Input("Dolphins", ClubEn), legacy.Slug, legacy.Id));
@@ -310,7 +302,7 @@ public class HubGroupOfficialPrimaryTests
         var official = await GroupAsync(db, w, "Dolphin official", official: true, followsClub: w.Club);
         var copy = await GroupAsync(db, w, "Dolphin fans", followsClub: w.Club);
         var haifa = await GroupAsync(db, w, "Haifa fans", followsClub: w.OtherClub);
-        var svc = new HubGroupUserService(db, new HubGroupCrudCore(db, new NullCache()), new SettingsStub());
+        var svc = new HubGroupUserService(db, new HubGroupCrudCore(db), new SettingsStub());
 
         var rows = (await svc.GetMineAsync(w.Owner.Id)).ToDictionary(r => r.Id);
 

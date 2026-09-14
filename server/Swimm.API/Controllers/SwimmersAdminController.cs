@@ -19,7 +19,6 @@ public class SwimmersAdminController : ControllerBase
     private readonly ISwimmerDedupService _dedup;
     private readonly ISwimmerMergeService _merge;
     private readonly IDedupIgnoreService _ignore;
-    private readonly ICacheService _cache;
     private readonly IAdminAuditService _audit;
     private readonly IDataQualityService _quality;
     private readonly IDataCheckRunner _checks;
@@ -29,7 +28,6 @@ public class SwimmersAdminController : ControllerBase
         ISwimmerDedupService dedup,
         ISwimmerMergeService merge,
         IDedupIgnoreService ignore,
-        ICacheService cache,
         IAdminAuditService audit,
         IDataQualityService quality,
         IDataCheckRunner checks,
@@ -38,7 +36,6 @@ public class SwimmersAdminController : ControllerBase
         _dedup = dedup;
         _merge = merge;
         _ignore = ignore;
-        _cache = cache;
         _audit = audit;
         _quality = quality;
         _checks = checks;
@@ -111,8 +108,6 @@ public class SwimmersAdminController : ControllerBase
             await _audit.LogAsync("swimmer.merge", "Swimmer", null,
                 $"Склейка пловцов ({report.Pairs.Count} пар): {pairsText}",
                 new { report.Pairs }, ct);
-            // Имена пловцов денормализованы в публичных выдачах — сбрасываем кэш целиком.
-            await _cache.InvalidateAllAsync();
         }
 
         return Ok(report);
@@ -136,8 +131,6 @@ public class SwimmersAdminController : ControllerBase
         await _audit.LogAsync("swimmer.set-gender", "Swimmer", id.ToString(),
             $"Пол '{request.Gender}' проставлен пловцу; строк результата поправлено — {rows}",
             new { swimmerId = id, request.Gender, rows }, ct);
-
-        await _cache.InvalidateAllAsync();
         return Ok(new { rows });
     }
 
@@ -158,7 +151,6 @@ public class SwimmersAdminController : ControllerBase
             await _audit.LogAsync("swimmer.orphans-delete", "Swimmer", null,
                 $"Удалено пловцов-сирот: {report.Deleted}",
                 new { report.Deleted, report.DeletedIds }, ct);
-            await _cache.InvalidateAllAsync();
         }
 
         return Ok(report);

@@ -107,7 +107,7 @@ Application → реализация в Infrastructure → регистраци�
 
 | Интерфейс | Сейчас | Потом |
 |---|---|---|
-| `ICacheService` | `MemoryCacheService` (токен-инвалидация всего кэша при импорте); цель — токен на МЕТКУ, сброс по меткам ([cache-tags-plan.md](plans/cache-tags-plan.md)) | `RedisCacheService` при горизонтальном масштабировании (версии меток в Redis) — только замена регистрации, если соблюдены правила §5 |
+| `ICacheService` | `MemoryCacheService`: токен на МЕТКУ; метки таблиц запись получает сама (К3), сохранение через EF сбрасывает их само после коммита (К4); общий сброс — импорт и настройки ([cache-tags-plan.md](plans/cache-tags-plan.md)) | `RedisCacheService` при горизонтальном масштабировании (версии меток в Redis) — только замена регистрации, если соблюдены правила §5 |
 | `IResultSourceProvider` *(новый)* | `PdfResultSourceProvider` (обёртка над парсерами IsrOrg) | `IsrOrgWebSourceProvider` — скрейпинг isr.org.il; другие федерации |
 | `ICompetitionDiscoveryProvider` *(новый)* | — | обнаружение новых соревнований на isr.org.il/competitions.asp → «входящие» в админке |
 | `IRecordSourceProvider` *(новый)* | импорт из существующих JS/JSON + парсеры `IsrOrgAgeRecords`/`IsrOrgMastersRecords`/`WorldRecords` | автообновление рекордов из веба |
@@ -130,8 +130,10 @@ Application → реализация в Infrastructure → регистраци�
 2. **Приложение** — `ICacheService` для собранных ответов репозиториев. Ключ =
    нормализованный фильтр. Метки таблиц запись получает САМА (К3): SQL, выполненный при её
    сборке, отмечает таблицы (`CacheDependencyInterceptor`), вложенные записи передают свои.
-   Инвалидация пока — `InvalidateAllAsync()` после любого импорта/CRUD (вручную в каждом месте
-   записи); **цель — сброс по меткам** через перехватчик сохранения EF (К4) — план
+   Сброс — тоже сам, по меткам (К4): `CacheInvalidationInterceptor` после `SaveChanges`
+   сбрасывает метки изменённых таблиц (и таблиц каскада удаления), в транзакции — на коммите.
+   Массовая запись мимо EF сбрасывает свою метку явно (`db.InvalidateCacheTagsAsync`); весь кэш
+   сбрасывают только импорт, смена настроек (они в памяти) и кнопка на `/Admin/Cache` — план
    [cache-tags-plan.md](plans/cache-tags-plan.md). Записывать в кэш — только `GetOrCreateAsync`.
 3. **БД** — индексы + `SwimmReadDbContext` NoTracking. Только этот уровень платит за промах.
 

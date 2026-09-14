@@ -37,7 +37,7 @@ public class HubGroupLimitTests
         public bool Update(string key, string newValue) { _values[key] = newValue; return true; }
     }
 
-    private static AdminRepository BuildRepo(SwimmDbContext db) => new(db, Mock.Of<ICacheService>());
+    private static AdminRepository BuildRepo(SwimmDbContext db) => new(db);
 
     private static async Task<AppUser> AddUserAsync(SwimmDbContext db, string email, int? limit = null)
     {

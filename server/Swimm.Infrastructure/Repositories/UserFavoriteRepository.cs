@@ -212,6 +212,8 @@ public class UserFavoriteRepository : IUserFavoriteRepository
                 .Where(f => f.Id == item.Id && f.UserId == userId)
                 .ExecuteUpdateAsync(s => s.SetProperty(f => f.SortOrder, item.SortOrder));
         }
+        // Массовая запись мимо трекера — метку своей таблицы сбрасываем явно (К4).
+        if (items.Count > 0) await _db.InvalidateCacheTagsAsync(_db.TableTag<UserFavorite>());
         return true;
     }
 }

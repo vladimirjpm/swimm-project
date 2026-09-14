@@ -10,12 +10,10 @@ namespace Swimm.Infrastructure.Repositories;
 public class AdminRepository : IAdminRepository
 {
     private readonly SwimmDbContext _db;
-    private readonly ICacheService _cache;
 
-    public AdminRepository(SwimmDbContext db, ICacheService cache)
+    public AdminRepository(SwimmDbContext db)
     {
         _db = db;
-        _cache = cache;
     }
 
     public async Task<List<UserDto>> GetUsersAsync()
@@ -163,9 +161,12 @@ public class AdminRepository : IAdminRepository
     public async Task<int> CleanupLoginHistoryAsync()
     {
         var cutoff = DateTime.UtcNow.AddDays(-90);
-        return await _db.UserLoginHistory
+        var deleted = await _db.UserLoginHistory
             .Where(h => h.LoginAt < cutoff)
             .ExecuteDeleteAsync();
+        // Массовая запись мимо трекера — метку своей таблицы сбрасываем явно (К4).
+        if (deleted > 0) await _db.InvalidateCacheTagsAsync(_db.TableTag<UserLoginHistory>());
+        return deleted;
     }
 
     public async Task<AdminStatsDto> GetStatsAsync()
@@ -356,9 +357,6 @@ public class AdminRepository : IAdminRepository
         }
 
         await _db.SaveChangesAsync();
-        // Публичный read-путь кэширует /api/results, /api/competitions, /api/categories —
-        // сбрасываем, иначе клиент видит старые флаги/категории до истечения TTL.
-        await _cache.InvalidateAllAsync();
         return true;
     }
 

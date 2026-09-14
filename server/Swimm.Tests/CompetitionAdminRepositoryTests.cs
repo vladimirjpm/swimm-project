@@ -22,17 +22,6 @@ public class CompetitionAdminRepositoryTests
     private static SwimmDbContext CreateDb(string name) =>
         new SwimmDbContext(BuildOptions(name));
 
-    /// <summary>ICacheService, который всегда возвращает miss — репозиторий идёт в БД.</summary>
-    private sealed class NullCacheService : ICacheService
-    {
-        public Task<T?> GetAsync<T>(string key) => Task.FromResult<T?>(default);
-        public Task SetAsync<T>(string key, T value, TimeSpan ttl) => Task.CompletedTask;
-        public Task RemoveAsync(string key) => Task.CompletedTask;
-        public Task InvalidateAllAsync() => Task.CompletedTask;
-    }
-
-    private static ICacheService NoCache() => new NullCacheService();
-
     private static CompetitionInputDto ValidInput(string poolType) => new()
     {
         Name = "TestComp",
@@ -48,7 +37,7 @@ public class CompetitionAdminRepositoryTests
     public async Task Create_RejectsInvalidPoolType()
     {
         await using var db = CreateDb(nameof(Create_RejectsInvalidPoolType));
-        var repo = new CompetitionAdminRepository(db, NoCache());
+        var repo = new CompetitionAdminRepository(db);
 
         var result = await repo.CreateAsync(ValidInput("50 m"));
 
@@ -61,7 +50,7 @@ public class CompetitionAdminRepositoryTests
     public async Task Create_RejectsEmptyPoolType()
     {
         await using var db = CreateDb(nameof(Create_RejectsEmptyPoolType));
-        var repo = new CompetitionAdminRepository(db, NoCache());
+        var repo = new CompetitionAdminRepository(db);
 
         var result = await repo.CreateAsync(ValidInput(""));
 
@@ -74,7 +63,7 @@ public class CompetitionAdminRepositoryTests
     public async Task Create_AcceptsCanonicalPoolType()
     {
         await using var db = CreateDb(nameof(Create_AcceptsCanonicalPoolType));
-        var repo = new CompetitionAdminRepository(db, NoCache());
+        var repo = new CompetitionAdminRepository(db);
 
         var result = await repo.CreateAsync(ValidInput("50m"));
 
@@ -115,7 +104,7 @@ public class CompetitionAdminRepositoryTests
             });
         await db.SaveChangesAsync();
 
-        var repo = new CompetitionAdminRepository(db, NoCache());
+        var repo = new CompetitionAdminRepository(db);
         var all = await repo.GetUnifiedAsync(null, null, null, null, showSynthetic: false, month: null, 1, 20);
 
         // SYNTH скрыта по умолчанию → 4 (imported/dbOnly/onSite/ignored), без синтетики.
@@ -208,7 +197,7 @@ public class CompetitionAdminRepositoryTests
         });
         await db.SaveChangesAsync();
 
-        var repo = new CompetitionAdminRepository(db, NoCache());
+        var repo = new CompetitionAdminRepository(db);
         var result = await repo.GetUnifiedAsync(null, null, null, null, showSynthetic: false, month: null, 1, 20, qualityFilter: "discovery-error");
 
         Assert.Equal(1, result.Page.TotalCount);
@@ -241,7 +230,7 @@ public class CompetitionAdminRepositoryTests
             });
         await db.SaveChangesAsync();
 
-        var repo = new CompetitionAdminRepository(db, NoCache());
+        var repo = new CompetitionAdminRepository(db);
         var all = await repo.GetUnifiedAsync(null, null, null, null, showSynthetic: false, month: null, 1, 20);
         Assert.Equal(6, all.Page.TotalCount);
 
@@ -268,7 +257,7 @@ public class CompetitionAdminRepositoryTests
             new Competition { Id = 3, Name = "Другое", Date = "03/07/2026", PoolType = "25m" });
         await db.SaveChangesAsync();
 
-        var repo = new CompetitionAdminRepository(db, NoCache());
+        var repo = new CompetitionAdminRepository(db);
         var result = await repo.QuickUpdateAsync(new CompetitionQuickEditDto
         {
             CompetitionId = 2, // открыли панель у второго дня — применяется всё равно ко всем

@@ -16,8 +16,7 @@ namespace Swimm.API.Controllers;
 /// Профиль по id (<c>GET /api/swimmers/{id}</c>) остаётся в ResultsController: он старше
 /// страницы и его использует попап-карточка.
 ///
-/// Кэш — как у страницы клуба: ETag + Cache-Control, инвалидация общая
-/// (ICacheService.InvalidateAllAsync после импорта и админ-мутаций).
+/// Кэш — как у страницы клуба: ETag + Cache-Control, сброс по меткам таблиц — сам, при записи (К4).
 /// </summary>
 [ApiController]
 public class SwimmersPublicController : ControllerBase

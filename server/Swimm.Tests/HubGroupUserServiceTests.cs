@@ -26,14 +26,6 @@ public class HubGroupUserServiceTests
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options);
 
-    private sealed class NoopCacheService : ICacheService
-    {
-        public Task<T?> GetAsync<T>(string key) => Task.FromResult(default(T));
-        public Task SetAsync<T>(string key, T value, TimeSpan ttl) => Task.CompletedTask;
-        public Task RemoveAsync(string key) => Task.CompletedTask;
-        public Task InvalidateAllAsync() => Task.CompletedTask;
-    }
-
     /// <summary>Настройки с настраиваемыми значениями (policy/лимит).</summary>
     private sealed class SettingsStub : ISettingsService
     {
@@ -47,7 +39,7 @@ public class HubGroupUserServiceTests
     }
 
     private static HubGroupUserService Service(SwimmDbContext db, ISettingsService? settings = null) =>
-        new(db, new HubGroupCrudCore(db, new NoopCacheService()), settings ?? new SettingsStub());
+        new(db, new HubGroupCrudCore(db), settings ?? new SettingsStub());
 
     private static async Task<AppUser> AddUserAsync(SwimmDbContext db, string email)
     {

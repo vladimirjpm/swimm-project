@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
@@ -19,21 +20,26 @@ public class HubGroupClubRequestTests
 {
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static DbContextOptions<SwimmDbContext> BuildOptions(string name) =>
-        new DbContextOptionsBuilder<SwimmDbContext>()
-            .UseInMemoryDatabase(name)
-            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
-            .Options;
-
-    private static SwimmDbContext CreateDb(string name) => new(BuildOptions(name));
-
-    private sealed class NoopCacheService : ICacheService
+    private static DbContextOptions<SwimmDbContext> BuildOptions(string name, ICacheService? cache = null)
     {
+        var options = new DbContextOptionsBuilder<SwimmDbContext>()
+            .UseInMemoryDatabase(name)
+            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
+        // Сброс кэша делает перехватчик сохранения (К4) — подключается к контексту.
+        if (cache != null) options.AddInterceptors(new CacheInvalidationInterceptor(cache));
+        return options.Options;
+    }
+
+    private static SwimmDbContext CreateDb(string name, ICacheService? cache = null) => new(BuildOptions(name, cache));
+
+    private sealed class RecordingCache : ICacheService
+    {
+        public List<string> Invalidated { get; } = [];
         public Task<T?> GetAsync<T>(string key) => Task.FromResult(default(T));
         public Task SetAsync<T>(string key, T value, TimeSpan ttl) => Task.CompletedTask;
         public Task RemoveAsync(string key) => Task.CompletedTask;
-        public int InvalidateCount { get; private set; }
-        public Task InvalidateAllAsync() { InvalidateCount++; return Task.CompletedTask; }
+        public Task InvalidateTagsAsync(params string[] tags) { Invalidated.AddRange(tags); return Task.CompletedTask; }
+        public Task InvalidateAllAsync() { Invalidated.Add(CacheTags.All); return Task.CompletedTask; }
     }
 
     private sealed class RecordingEmailSender : IEmailSender
@@ -88,7 +94,7 @@ public class HubGroupClubRequestTests
     {
         await using var db = CreateDb(nameof(SubmitClubRequest_HappyPath_CreatesPendingRequest));
         var (owner, club, group) = await SeedAsync(db);
-        var core = new HubGroupCrudCore(db, new NoopCacheService());
+        var core = new HubGroupCrudCore(db);
         var service = new HubGroupUserService(db, core, new StubSettingsService());
 
         var result = await service.SubmitClubRequestAsync(group.Id, owner.Id,
@@ -109,7 +115,7 @@ public class HubGroupClubRequestTests
         group.IsOfficial = true;
         group.ClubId = club.Id;
         await db.SaveChangesAsync();
-        var core = new HubGroupCrudCore(db, new NoopCacheService());
+        var core = new HubGroupCrudCore(db);
         var service = new HubGroupUserService(db, core, new StubSettingsService());
 
         var result = await service.SubmitClubRequestAsync(group.Id, owner.Id,
@@ -126,7 +132,7 @@ public class HubGroupClubRequestTests
         var (owner, club, group) = await SeedAsync(db);
         db.HubGroupClubRequests.Add(new HubGroupClubRequest { HubGroupId = group.Id, UserId = owner.Id, ClubId = club.Id });
         await db.SaveChangesAsync();
-        var core = new HubGroupCrudCore(db, new NoopCacheService());
+        var core = new HubGroupCrudCore(db);
         var service = new HubGroupUserService(db, core, new StubSettingsService());
 
         var result = await service.SubmitClubRequestAsync(group.Id, owner.Id,
@@ -147,7 +153,7 @@ public class HubGroupClubRequestTests
             IsPublic = true, IsOfficial = true, ClubId = club.Id
         });
         await db.SaveChangesAsync();
-        var core = new HubGroupCrudCore(db, new NoopCacheService());
+        var core = new HubGroupCrudCore(db);
         var service = new HubGroupUserService(db, core, new StubSettingsService());
 
         var result = await service.SubmitClubRequestAsync(group.Id, owner.Id,
@@ -172,7 +178,7 @@ public class HubGroupClubRequestTests
             Status = HubGroupClubRequestStatus.Pending, CreatedAt = DateTime.UtcNow
         });
         await db.SaveChangesAsync();
-        var core = new HubGroupCrudCore(db, new NoopCacheService());
+        var core = new HubGroupCrudCore(db);
         var service = new HubGroupUserService(db, core, new StubSettingsService());
 
         var latest = await service.GetClubRequestAsync(group.Id);
@@ -186,7 +192,8 @@ public class HubGroupClubRequestTests
     [Fact]
     public async Task Approve_HappyPath_MakesGroupOfficialGrantsCoachAndBumpsStamp()
     {
-        await using var db = CreateDb(nameof(Approve_HappyPath_MakesGroupOfficialGrantsCoachAndBumpsStamp));
+        var cache = new RecordingCache();
+        await using var db = CreateDb(nameof(Approve_HappyPath_MakesGroupOfficialGrantsCoachAndBumpsStamp), cache);
         var (owner, club, group) = await SeedAsync(db);
         db.AppRoles.Add(new AppRole { Name = "Coach" });
         var admin = new AppUser { Email = "admin@example.com", DisplayName = "Admin", SecurityStamp = "admin-stamp" };
@@ -195,10 +202,10 @@ public class HubGroupClubRequestTests
         var request = new HubGroupClubRequest { HubGroupId = group.Id, UserId = owner.Id, ClubId = club.Id };
         db.HubGroupClubRequests.Add(request);
         await db.SaveChangesAsync();
+        cache.Invalidated.Clear();
 
-        var cache = new NoopCacheService();
         var email = new RecordingEmailSender();
-        var service = new HubGroupClubRequestAdminService(db, cache, email);
+        var service = new HubGroupClubRequestAdminService(db, email);
         var stampBefore = owner.SecurityStamp;
 
         var result = await service.ApproveAsync(request.Id, admin.Id);
@@ -217,7 +224,8 @@ public class HubGroupClubRequestTests
         Assert.NotEqual(stampBefore, updatedOwner.SecurityStamp);
         Assert.True(await db.AppUserRoles.AnyAsync(ur => ur.UserId == owner.Id));
 
-        Assert.Equal(1, cache.InvalidateCount);
+        // Группа стала официальной — страницы групп сбрасываются сами (перехватчик сохранения).
+        Assert.Contains(CacheTags.Table("HubGroups"), cache.Invalidated);
         Assert.Single(email.Sent);
         Assert.Contains("approved", email.Sent[0].Subject);
     }
@@ -251,8 +259,8 @@ public class HubGroupClubRequestTests
         var request = new HubGroupClubRequest { HubGroupId = group.Id, UserId = owner.Id, ClubId = club.Id };
         db.HubGroupClubRequests.Add(request);
         await db.SaveChangesAsync();
-        var subscriptions = new HubGroupClubSubscriptionService(db, new HubGroupCrudCore(db, new NoopCacheService()));
-        var service = new HubGroupClubRequestAdminService(db, new NoopCacheService(), new RecordingEmailSender(), subscriptions);
+        var subscriptions = new HubGroupClubSubscriptionService(db, new HubGroupCrudCore(db));
+        var service = new HubGroupClubRequestAdminService(db, new RecordingEmailSender(), subscriptions);
 
         var result = await service.ApproveAsync(request.Id, 0);
 
@@ -272,12 +280,12 @@ public class HubGroupClubRequestTests
         var otherClub = new Club { Name = "Other Club" };
         db.Clubs.Add(otherClub);
         await db.SaveChangesAsync();
-        var subscriptions = new HubGroupClubSubscriptionService(db, new HubGroupCrudCore(db, new NoopCacheService()));
+        var subscriptions = new HubGroupClubSubscriptionService(db, new HubGroupCrudCore(db));
         await subscriptions.SubscribeAsync(group.Id, otherClub.Id, owner.Id); // выбор владельца
         var request = new HubGroupClubRequest { HubGroupId = group.Id, UserId = owner.Id, ClubId = club.Id };
         db.HubGroupClubRequests.Add(request);
         await db.SaveChangesAsync();
-        var service = new HubGroupClubRequestAdminService(db, new NoopCacheService(), new RecordingEmailSender(), subscriptions);
+        var service = new HubGroupClubRequestAdminService(db, new RecordingEmailSender(), subscriptions);
 
         Assert.True((await service.ApproveAsync(request.Id, 0)).Success);
 
@@ -292,7 +300,7 @@ public class HubGroupClubRequestTests
         var request = new HubGroupClubRequest { HubGroupId = group.Id, UserId = owner.Id, ClubId = club.Id };
         db.HubGroupClubRequests.Add(request);
         await db.SaveChangesAsync();
-        var service = new HubGroupClubRequestAdminService(db, new NoopCacheService(), new RecordingEmailSender());
+        var service = new HubGroupClubRequestAdminService(db, new RecordingEmailSender());
 
         var result = await service.ApproveAsync(request.Id, 0);
 
@@ -308,7 +316,7 @@ public class HubGroupClubRequestTests
         var request = new HubGroupClubRequest { HubGroupId = group.Id, UserId = owner.Id, ClubId = club.Id };
         db.HubGroupClubRequests.Add(request);
         await db.SaveChangesAsync();
-        var service = new HubGroupClubRequestAdminService(db, new NoopCacheService(), new RecordingEmailSender());
+        var service = new HubGroupClubRequestAdminService(db, new RecordingEmailSender());
 
         // DevAdminBypass в фоллбеке (пустая БД) отдаёт синтетический NameIdentifier="0",
         // которого нет в Sys_AppUsers — не должно падать на FK, просто оставляем поле пустым.
@@ -332,7 +340,7 @@ public class HubGroupClubRequestTests
         var request = new HubGroupClubRequest { HubGroupId = group.Id, UserId = owner.Id, ClubId = club.Id };
         db.HubGroupClubRequests.Add(request);
         await db.SaveChangesAsync();
-        var service = new HubGroupClubRequestAdminService(db, new NoopCacheService(), new RecordingEmailSender());
+        var service = new HubGroupClubRequestAdminService(db, new RecordingEmailSender());
 
         var result = await service.ApproveAsync(request.Id, 0);
 
@@ -355,7 +363,7 @@ public class HubGroupClubRequestTests
         };
         db.HubGroupClubRequests.Add(request);
         await db.SaveChangesAsync();
-        var service = new HubGroupClubRequestAdminService(db, new NoopCacheService(), new RecordingEmailSender());
+        var service = new HubGroupClubRequestAdminService(db, new RecordingEmailSender());
 
         var result = await service.ApproveAsync(request.Id, 0);
 
@@ -371,7 +379,7 @@ public class HubGroupClubRequestTests
         db.HubGroupClubRequests.Add(request);
         await db.SaveChangesAsync();
         var email = new RecordingEmailSender();
-        var service = new HubGroupClubRequestAdminService(db, new NoopCacheService(), email);
+        var service = new HubGroupClubRequestAdminService(db, email);
 
         var result = await service.RejectAsync(request.Id, 0);
 
@@ -397,7 +405,7 @@ public class HubGroupClubRequestTests
         };
         db.HubGroupClubRequests.Add(request);
         await db.SaveChangesAsync();
-        var service = new HubGroupClubRequestAdminService(db, new NoopCacheService(), new RecordingEmailSender());
+        var service = new HubGroupClubRequestAdminService(db, new RecordingEmailSender());
 
         var result = await service.RejectAsync(request.Id, 0);
 

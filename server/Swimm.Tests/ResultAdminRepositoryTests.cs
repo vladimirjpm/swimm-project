@@ -18,15 +18,7 @@ public class ResultAdminRepositoryTests
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options);
 
-    private sealed class NullCache : ICacheService
-    {
-        public Task<T?> GetAsync<T>(string key) => Task.FromResult<T?>(default);
-        public Task SetAsync<T>(string key, T value, TimeSpan ttl) => Task.CompletedTask;
-        public Task RemoveAsync(string key) => Task.CompletedTask;
-        public Task InvalidateAllAsync() => Task.CompletedTask;
-    }
-
-    private static ResultAdminRepository Repo(SwimmDbContext db) => new(db, new NullCache());
+    private static ResultAdminRepository Repo(SwimmDbContext db) => new(db);
 
     /// <summary>Шпион пересчёта: сам расчёт использует ExecuteUpdate и на InMemory не работает,
     /// поэтому проверяем факт вызова.</summary>
@@ -212,7 +204,7 @@ public class ResultAdminRepositoryTests
         await using var db = CreateDb(nameof(Update_TriggersCombinedRecalculation));
         var (id, _, _) = await SeedResult(db);
         var spy = new RecalcSpy();
-        var repo = new ResultAdminRepository(db, new NullCache(), spy);
+        var repo = new ResultAdminRepository(db, spy);
 
         var dto = (await repo.GetByIdAsync(id))!;
         var input = BaseInput(dto);
@@ -229,7 +221,7 @@ public class ResultAdminRepositoryTests
     {
         await using var db = CreateDb(nameof(Update_SurvivesRecalculationFailure));
         var (id, _, _) = await SeedResult(db);
-        var repo = new ResultAdminRepository(db, new NullCache(), new RecalcSpy { Throw = true });
+        var repo = new ResultAdminRepository(db, new RecalcSpy { Throw = true });
 
         var dto = (await repo.GetByIdAsync(id))!;
         var input = BaseInput(dto);

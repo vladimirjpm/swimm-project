@@ -11,13 +11,15 @@
   открытии страницы**: строковые константы контроллера с `max-age`/`no-cache`/`no-store` —
   политики браузера, `static readonly TimeSpan` — TTL на сервере, `[HttpGet]` — эндпоинты.
   Поэтому цифры не устаревают сами.
-- **Сервер: как сбрасывается** — сейчас весь кэш целиком (`InvalidateAllAsync`), склейка
-  параллельных промахов (`GetOrCreateAsync`); метки таблиц ставятся сами (К3), сброс по меткам —
-  К4 ([cache-tags-plan.md](../plans/cache-tags-plan.md)).
+- **Сервер: как сбрасывается** — метки таблиц ставятся сами (К3) и сами же сбрасываются (К4):
+  `CacheInvalidationInterceptor` после `SaveChanges` сбрасывает метки изменённых таблиц и таблиц
+  каскада удаления, в транзакции — на коммите. Весь кэш сбрасывают только импорт, смена настроек
+  и кнопка; склейка параллельных промахов (`GetOrCreateAsync`)
+  ([cache-tags-plan.md](../plans/cache-tags-plan.md)).
 - **Сейчас в кэше** — живые записи серверного кэша (`ICacheDiagnostics.Snapshot()`, реализует
   `MemoryCacheService`): метка → сколько записей её сброс выкинет; отдельно — записи БЕЗ меток
-  таблиц (их снимает только общий сброс; перед К4 таких быть не должно); полный список в
-  свёрнутом блоке. В кэше отдельного экземпляра API — свой список.
+  таблиц (их снимает только общий сброс, запись в базу — нет; таких быть не должно); полный
+  список в свёрнутом блоке. В кэше отдельного экземпляра API — свой список.
 - **Правила под Redis** и **чего кэш не решает** (производные данные в базе пересчитываются,
   а не сбрасываются).
 
@@ -29,7 +31,8 @@
   `Cache.cshtml.cs` и этот MD;
 - их правят в том же изменении, что трогает кэш: `Cache-Control`/`CacheControlValue`,
   `PayloadTtl` и прочие TTL, `ICacheService`/`MemoryCacheService`, `CachedJsonExtensions`,
-  сброс (`InvalidateAllAsync`/`InvalidateTagsAsync`), `CacheTags`;
+  сброс (`InvalidateAllAsync`/`InvalidateTagsAsync`, `CacheInvalidationInterceptor`,
+  `InvalidateCacheTagsAsync`), `CacheTags`;
 - перед push это сверяется по [pre-push-rules.md](../pre-push-rules.md).
 
 ## Грабли

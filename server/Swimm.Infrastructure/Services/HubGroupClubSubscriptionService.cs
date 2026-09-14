@@ -157,7 +157,6 @@ public class HubGroupClubSubscriptionService : IHubGroupClubSubscriptionService
             return await SyncLockedAsync(hubGroupId, targetClubId);
         });
 
-        await _core.InvalidateCacheAsync();
         return HubGroupClubSubscribeResult.Ok((await GetAsync(hubGroupId))!, sync);
     }
 
@@ -177,14 +176,12 @@ public class HubGroupClubSubscriptionService : IHubGroupClubSubscriptionService
             return await SyncLockedAsync(hubGroupId, clubId: null);
         });
 
-        if (result != null) await _core.InvalidateCacheAsync();
         return result;
     }
 
     public async Task<HubGroupClubSyncResult> SyncGroupAsync(int hubGroupId)
     {
         var result = await SyncOneAsync(hubGroupId);
-        if (result.Added + result.Removed > 0) await _core.InvalidateCacheAsync();
         return result;
     }
 
@@ -226,7 +223,7 @@ public class HubGroupClubSubscriptionService : IHubGroupClubSubscriptionService
 
         member.IsExcluded = excluded;
         await _db.SaveChangesAsync();
-        await _core.TouchGroupAsync(hubGroupId); // UpdatedAt + сброс кэша
+        await _core.TouchGroupAsync(hubGroupId); // UpdatedAt группы (кэш сбрасывают сами сохранения, К4)
         return HubGroupMemberSaveResult.Ok();
     }
 
@@ -238,8 +235,6 @@ public class HubGroupClubSubscriptionService : IHubGroupClubSubscriptionService
         foreach (var groupId in groupIds)
             total = total.Plus(await SyncOneAsync(groupId));
 
-        // Кэш — один раз на весь проход, и только если состав где-то сдвинулся.
-        if (total.Added + total.Removed > 0) await _core.InvalidateCacheAsync();
         return total;
     }
 

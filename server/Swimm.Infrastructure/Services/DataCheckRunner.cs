@@ -26,9 +26,6 @@ public class DataCheckRunner(
     // Пересчёт зачёта после привязки правила. Необязателен: без него правило проставится,
     // но цифры Top Clubs останутся старыми до следующего пересчёта — в тестах это не нужно.
     IClubStandingService? standings = null,
-    // Сброс кэша после правок, меняющих витрину (пол участвует в рекордах и season best).
-    // Необязателен по той же причине, что и standings: в тестах кэша нет.
-    ICacheService? cache = null,
     // «Не дубли» для пар дедупа при «Принять». Необязателен, как и остальные: в тестах,
     // где проверяют только реестр, развязывать нечего.
     IDedupIgnoreService? dedupIgnore = null) : IDataCheckRunner
@@ -345,8 +342,6 @@ public class DataCheckRunner(
         foreach (var r in rows) r.Gender = gender;
 
         await db.SaveChangesAsync(ct);
-        // Пол участвует в выборках витрин (рекорды, season best) — кэш обязан протухнуть.
-        if (cache != null) await cache.InvalidateAllAsync();
         return rows.Count;
     }
 

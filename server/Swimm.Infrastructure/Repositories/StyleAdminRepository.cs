@@ -8,10 +8,10 @@ namespace Swimm.Infrastructure.Repositories;
 
 /// <summary>
 /// Админский CRUD стилей (см. <see cref="IStyleAdminRepository"/>). Пишет через owner-контекст;
-/// имена стилей денормализованы в публичных выдачах результатов, поэтому после мутаций
-/// сбрасывает кэш целиком. Зарезервированные стили (посевные 7) защищены от rename/delete.
+/// имена стилей денормализованы в публичных выдачах результатов — сохранение само сбрасывает
+/// метку <c>table:Styles</c> (перехватчик К4). Зарезервированные стили (посевные 7) защищены от rename/delete.
 /// </summary>
-public class StyleAdminRepository(SwimmDbContext db, ICacheService cache) : IStyleAdminRepository
+public class StyleAdminRepository(SwimmDbContext db) : IStyleAdminRepository
 {
     public async Task<IReadOnlyList<StyleAdminRowDto>> GetAllAsync()
     {
@@ -89,7 +89,6 @@ public class StyleAdminRepository(SwimmDbContext db, ICacheService cache) : ISty
 
         db.Styles.Remove(style);
         await db.SaveChangesAsync();
-        await cache.InvalidateAllAsync();
         return StyleSaveResult.Ok(id);
     }
 
@@ -105,7 +104,6 @@ public class StyleAdminRepository(SwimmDbContext db, ICacheService cache) : ISty
         {
             return StyleSaveResult.Fail("Не удалось сохранить: имя уже занято другим стилем.");
         }
-        await cache.InvalidateAllAsync();
         return StyleSaveResult.Ok(style.Id);
     }
 

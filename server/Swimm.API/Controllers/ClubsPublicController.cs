@@ -14,8 +14,8 @@ namespace Swimm.API.Controllers;
 /// Резолв {id} — дёшево, ДО кэшируемой загрузки (как 404-проверка у /api/hub-groups/{slug}),
 /// чтобы 404 и разные исходные id одного приёмника не плодили отдельные кэш-записи.
 ///
-/// Кэш — как у RecordsController/HubGroupsController: ETag + Cache-Control, инвалидация —
-/// общий ICacheService.InvalidateAllAsync после админ-мутаций/импорта/пересчёта зачёта.
+/// Кэш — как у RecordsController/HubGroupsController: ETag + Cache-Control; сброс — по меткам
+/// таблиц, сам, при записи (К4, docs/plans/cache-tags-plan.md), импорт сбрасывает всё.
 /// </summary>
 [ApiController]
 public class ClubsPublicController : ControllerBase

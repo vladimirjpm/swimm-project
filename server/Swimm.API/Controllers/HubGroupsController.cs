@@ -310,10 +310,6 @@ public class HubGroupsController : ControllerBase
 
         var result = await _media.AddAsync(id, input, userId.Value);
         if (!result.Success) return BadRequest(new { error = result.Error });
-
-        // Галерея встроена в кэшируемый GET /api/hub-groups/{slug} — без инвалидации
-        // владелец (и публика) до 5 минут видели бы старый список (идиома всех админ-мутаций).
-        await _cache.InvalidateAllAsync();
         return Ok(new { id = result.Id });
     }
 
@@ -332,8 +328,6 @@ public class HubGroupsController : ControllerBase
 
         var removed = await _media.DeleteAsync(id, mediaId);
         if (!removed) return NotFound();
-
-        await _cache.InvalidateAllAsync();
         return NoContent();
     }
 
@@ -372,9 +366,6 @@ public class HubGroupsController : ControllerBase
         var ok = await _publications.DecideAsync(
             UserMediaPublicationTarget.Group, id, publicationId, request.Approve, userId.Value);
         if (!ok) return NotFound(new { error = "Publication not found" });
-
-        // Approved public-публикации входят в кэшируемый payload страницы группы (Gallery/Highlights).
-        await _cache.InvalidateAllAsync();
         return NoContent();
     }
 

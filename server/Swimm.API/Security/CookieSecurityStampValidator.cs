@@ -91,6 +91,9 @@ public static class CookieSecurityStampValidator
 
             // Метка активности для админки («онлайн сейчас»). Дёшево: мы уже на
             // троттленном пути (≤ раза в ValidateInterval на сессию), один UPDATE без чтения.
+            // Кэш СОЗНАТЕЛЬНО не сбрасываем (К4): LastSeenAt видит только админка, в кэшируемых
+            // ответах его нет, а метка Sys_AppUsers есть у страниц групп — сброс на каждом
+            // запросе пользователя выбивал бы их постоянно.
             await db.AppUsers
                 .Where(u => u.Id == userId)
                 .ExecuteUpdateAsync(s => s.SetProperty(u => u.LastSeenAt, now.UtcDateTime));

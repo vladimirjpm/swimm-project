@@ -17,15 +17,15 @@ namespace Swimm.Infrastructure.Services;
 /// Sys_UserFavorites (клуб дважды в избранном одного юзера) схлопываются в одну.
 /// Все изменения — одним SaveChanges; dry-run не пишет ничего. Tracked-сущности
 /// (InMemory-совместимо): одноразовая админ-операция, худший случай — тысячи строк.
-/// После реального merge кэш сбрасывается целиком (club-summary и публичные выдачи
-/// денормализуют клуб).
+/// После реального merge кэш сбрасывает само сохранение — метки всех таблиц, которые оно
+/// тронуло (перехватчик К4): club-summary и публичные выдачи денормализуют клуб.
 /// </summary>
 /// <param name="clubSync">
 /// Пересборка составов групп, подписанных на канонические клубы, после склейки. Необязательна:
 /// тестам склейки она не нужна; в приложении её подставляет DI.
 /// </param>
 public class ClubMergeService(
-    SwimmDbContext db, ICacheService cache, IClubStandingService standings,
+    SwimmDbContext db, IClubStandingService standings,
     IHubGroupClubSubscriptionService? clubSync = null)
     : IClubMergeService
 {
@@ -241,9 +241,6 @@ public class ClubMergeService(
                 }
             }
         }
-
-        // club-summary (фаза 3.4) и прочие публичные выдачи денормализуют клуб.
-        if (anyMerged) await cache.InvalidateAllAsync();
 
         return report;
     }

@@ -36,14 +36,6 @@ public class HubGroupClubSubscriptionPgTests
         catch { db.Dispose(); return null; }
     }
 
-    private sealed class NullCache : ICacheService
-    {
-        public Task<T?> GetAsync<T>(string key) => Task.FromResult<T?>(default);
-        public Task SetAsync<T>(string key, T value, TimeSpan ttl) => Task.CompletedTask;
-        public Task RemoveAsync(string key) => Task.CompletedTask;
-        public Task InvalidateAllAsync() => Task.CompletedTask;
-    }
-
     /// <summary>Клуб с пловцами в окне активности и любой владелец для группы; null — база пуста.</summary>
     private static async Task<(int ClubId, int OwnerId)?> PickAsync(SwimmDbContext db)
     {
@@ -74,7 +66,7 @@ public class HubGroupClubSubscriptionPgTests
         try
         {
             await using var db = NewContext();
-            var svc = new HubGroupClubSubscriptionService(db, new HubGroupCrudCore(db, new NullCache()));
+            var svc = new HubGroupClubSubscriptionService(db, new HubGroupCrudCore(db));
 
             var subscribed = await svc.SubscribeAsync(group.Id, clubId, ownerId);
             Assert.True(subscribed.Success, subscribed.Error);

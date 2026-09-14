@@ -17,7 +17,6 @@ namespace Swimm.Infrastructure.Repositories;
 public class CompetitionAdminRepository : ICompetitionAdminRepository
 {
     private readonly SwimmDbContext _db;
-    private readonly ICacheService _cache;
     private readonly ICompetitionRecalculationService? _recalc;
 
     /// <param name="recalc">
@@ -25,11 +24,10 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
     /// <c>ShowCombineAllResults</c> или привязки <c>PointRuleClubsId</c>.
     /// Необязателен: null — пересчёт пропускается (тесты).
     /// </param>
-    public CompetitionAdminRepository(SwimmDbContext db, ICacheService cache,
+    public CompetitionAdminRepository(SwimmDbContext db,
         ICompetitionRecalculationService? recalc = null)
     {
         _db = db;
-        _cache = cache;
         _recalc = recalc;
     }
 
@@ -674,7 +672,6 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             // `dotnet run -- --rebuild-club-standings` (клубный зачёт).
             try { await _recalc.RecalculateCompetitionAsync(comp.Id); }
             catch (Exception) { /* лог не нужен: аварийный прогон закрывает случай */ }
-            await _cache.InvalidateAllAsync();
         }
 
         return save;
@@ -694,7 +691,6 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 "Не удалось сохранить: нарушено ограничение уникальности " +
                 "(название+дата+бассейн или OrgCompId уже заняты).");
         }
-        await _cache.InvalidateAllAsync();
         return CompetitionSaveResult.Ok(comp.Id);
     }
 
@@ -728,7 +724,6 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             // Гонка с параллельным добавлением того же (OrgCompId, Culture) — есть UNIQUE-индекс.
             return CompetitionSaveResult.Fail($"URL для culture «{culture}» уже есть");
         }
-        await _cache.InvalidateAllAsync();
         return CompetitionSaveResult.Ok(orgCompId);
     }
 
@@ -742,7 +737,6 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
 
         _db.CompetitionResultUrls.Remove(entity);
         await _db.SaveChangesAsync();
-        await _cache.InvalidateAllAsync();
         return true;
     }
 
@@ -830,7 +824,6 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         }
 
         await _db.SaveChangesAsync();
-        await _cache.InvalidateAllAsync();
     }
 
     /// <summary>Проверка уникальности до записи (дружелюбный текст вместо DbUpdateException).</summary>
@@ -947,7 +940,6 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         }
 
         await _db.SaveChangesAsync();
-        await _cache.InvalidateAllAsync();
 
         // Клубный зачёт материализован — смена привязки без пересчёта оставила бы очки
         // старого правила. Зачётная единица — событие целиком, поэтому пересчёт по разу

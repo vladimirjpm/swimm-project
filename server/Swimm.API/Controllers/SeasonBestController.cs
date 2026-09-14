@@ -11,8 +11,9 @@ namespace Swimm.API.Controllers;
 ///
 /// Кэшируется ровно как рекорды (<see cref="RecordsController"/>): сериализованный JSON и его
 /// ETag лежат в ICacheService сутки, браузеру — Cache-Control max-age=300 + ETag (повтор с
-/// If-None-Match → 304 без тела). Инвалидация глобальная (ICacheService.InvalidateAllAsync
-/// после импорта и админ-мутаций), поэтому после нового протокола витрина обновится сама.
+/// If-None-Match → 304 без тела). Сброс — по меткам таблиц, из которых таблица собрана
+/// (Results, Competitions…), поэтому после нового протокола витрина обновится сама, а правка
+/// группы или расписания её не трогает (К4).
 /// </summary>
 [ApiController]
 public class SeasonBestController : ControllerBase

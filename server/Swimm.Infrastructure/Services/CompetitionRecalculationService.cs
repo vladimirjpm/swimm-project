@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
+using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
 namespace Swimm.Infrastructure.Services;
@@ -118,10 +119,18 @@ public class CompetitionRecalculationService : ICompetitionRecalculationService
 
     /// <summary>Флаг сняли — стираем материализованные значения, чтобы не показывать устаревшее.</summary>
     private async Task<int> ClearCombinedAsync(IReadOnlyCollection<int> competitionIds, CancellationToken ct)
-        => await _db.Results
+    {
+        var cleared = await _db.Results
             .Where(r => competitionIds.Contains(r.CompetitionId) && r.CombinedPlace != null)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(r => r.CombinedPlace, (int?)null)
                 .SetProperty(r => r.IsBestResult, (bool?)null)
                 .SetProperty(r => r.BestTimeMs, (int?)null), ct);
+
+        // Массовая запись мимо трекера — перехватчик сохранения её не видит, сбрасываем явно (К4).
+        // Стирать было нечего — нечего и сбрасывать: пересчёт зовут на каждую правку правила очков,
+        // и пустой сброс Results ронял бы все витрины из результатов.
+        if (cleared > 0) await _db.InvalidateCacheTagsAsync(_db.TableTag<ResultRecord>());
+        return cleared;
+    }
 }

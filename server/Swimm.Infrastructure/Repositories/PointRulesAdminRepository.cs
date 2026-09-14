@@ -16,9 +16,9 @@ namespace Swimm.Infrastructure.Repositories;
 /// Два вида правил (клубные / пловца) — разные сущности с общей частью полей, поэтому
 /// маппинг разведён по <c>kind</c>, а всё остальное (валидация, шкала, кэш, гарды) общее.
 ///
-/// Правки правил меняют очки в публичных выдачах результатов и клубного зачёта, поэтому
-/// после каждой мутации сбрасывается весь кэш: точечных ключей мало не будет —
-/// очки денормализованы и в <c>club-points:rules</c>, и в HTTP-ответах.
+/// Правки правил меняют очки в публичных выдачах результатов и клубного зачёта: каждое
+/// сохранение само сбрасывает метки таблиц, которые тронуло (перехватчик К4), — и
+/// <c>club-points:rules</c>, и HTTP-ответы с очками собраны из этих таблиц.
 ///
 /// Одного кэша мало: клубный зачёт МАТЕРИАЛИЗОВАН в <c>ClubCompetitionStandings</c>, поэтому
 /// правка шкалы и перепривязка соревнований запускают его пересчёт
@@ -29,7 +29,6 @@ namespace Swimm.Infrastructure.Repositories;
 /// </param>
 public class PointRulesAdminRepository(
     SwimmDbContext db,
-    ICacheService cache,
     ICompetitionRecalculationService? recalc = null) : IPointRulesAdminRepository
 {
     private static readonly string[] Scopes = ["all", "masters", "non-masters"];
@@ -280,7 +279,6 @@ public class PointRulesAdminRepository(
         if (changed == 0) return PointRuleSaveResult.Ok(0);
 
         await db.SaveChangesAsync();
-        await cache.InvalidateAllAsync();
 
         // Перепривязка отсюда — тот же случай, что и в /Admin/Competitions: клубный зачёт
         // материализован, без пересчёта соревнование осталось бы на очках прежнего правила.
@@ -388,7 +386,6 @@ public class PointRulesAdminRepository(
             // Пустой ввод стирает примечание целиком — переводы уедут каскадом.
             db.CompetitionNotes.RemoveRange(existing);
             await db.SaveChangesAsync();
-            await cache.InvalidateAllAsync();
             return PointRuleSaveResult.Ok(0);
         }
 
@@ -427,8 +424,6 @@ public class PointRulesAdminRepository(
         }
 
         await db.SaveChangesAsync();
-        // Текст едет в публичный overview — кэш обязан протухнуть.
-        await cache.InvalidateAllAsync();
         return PointRuleSaveResult.Ok(1);
     }
 
@@ -555,7 +550,6 @@ public class PointRulesAdminRepository(
             id = rule.Id;
         }
 
-        await cache.InvalidateAllAsync();
 
         // Привязок у нового правила ещё нет, но НЕ-ManualOnly правило сразу входит в
         // автоподбор и может перехватить соревнования без FK — их зачёт станет неверным.
@@ -610,7 +604,6 @@ public class PointRulesAdminRepository(
             if (await SaveAsync() is { } fail2) return fail2;
         }
 
-        await cache.InvalidateAllAsync();
 
         // Клубный зачёт материализован — правка шкалы обязана его пересчитать. Очки пловцов
         // (High Point) считаются на лету (Э6), им хватает сброса кэша.
@@ -648,7 +641,6 @@ public class PointRulesAdminRepository(
         }
 
         if (await SaveAsync() is { } fail) return fail;
-        await cache.InvalidateAllAsync();
         await RebuildStandingsAsync(unitsBefore);
         return PointRuleSaveResult.Ok(id);
     }

@@ -12,7 +12,6 @@ namespace Swimm.Infrastructure.Services;
 public class HubGroupClubRequestAdminService : IHubGroupClubRequestAdminService
 {
     private readonly SwimmDbContext _db;
-    private readonly ICacheService _cache;
     private readonly IEmailSender _email;
     private readonly IHubGroupClubSubscriptionService? _clubSubscriptions;
     private readonly ILogger<HubGroupClubRequestAdminService>? _logger;
@@ -23,13 +22,12 @@ public class HubGroupClubRequestAdminService : IHubGroupClubRequestAdminService
     /// одобрения, которым она не нужна, конструктор не меняли; в приложении её подставляет DI.
     /// </param>
     /// <param name="audit">Аудит одобрения (кого убрали из каталога, кого переименовали). Необязателен так же.</param>
-    public HubGroupClubRequestAdminService(SwimmDbContext db, ICacheService cache, IEmailSender email,
+    public HubGroupClubRequestAdminService(SwimmDbContext db, IEmailSender email,
         IHubGroupClubSubscriptionService? clubSubscriptions = null,
         ILogger<HubGroupClubRequestAdminService>? logger = null,
         IAdminAuditService? audit = null)
     {
         _db = db;
-        _cache = cache;
         _email = email;
         _clubSubscriptions = clubSubscriptions;
         _logger = logger;
@@ -196,7 +194,6 @@ public class HubGroupClubRequestAdminService : IHubGroupClubRequestAdminService
             // вместо 500. Изменения этой транзакции откатываются целиком.
             return HubGroupMemberSaveResult.Fail("У этого клуба уже есть официальная группа");
         }
-        await _cache.InvalidateAllAsync();
 
         await SubscribeOfficialGroupAsync(group.Id, request.ClubId, request.DecidedByUserId);
 

@@ -25,14 +25,6 @@ public class CompetitionRecalcOnFlagTests
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options);
 
-    private sealed class NullCache : ICacheService
-    {
-        public Task<T?> GetAsync<T>(string key) => Task.FromResult<T?>(default);
-        public Task SetAsync<T>(string key, T value, TimeSpan ttl) => Task.CompletedTask;
-        public Task RemoveAsync(string key) => Task.CompletedTask;
-        public Task InvalidateAllAsync() => Task.CompletedTask;
-    }
-
     private sealed class RecalcSpy : ICompetitionRecalculationService
     {
         public List<int> Calls { get; } = [];
@@ -80,7 +72,7 @@ public class CompetitionRecalcOnFlagTests
         var comp = await SeedAsync(db, showCombine: false);
         var spy = new RecalcSpy();
 
-        var res = await new CompetitionAdminRepository(db, new NullCache(), spy)
+        var res = await new CompetitionAdminRepository(db, spy)
             .UpdateAsync(comp.Id, Input(comp, showCombine: true));
 
         Assert.True(res.Success);
@@ -94,7 +86,7 @@ public class CompetitionRecalcOnFlagTests
         var comp = await SeedAsync(db, showCombine: true);
         var spy = new RecalcSpy();
 
-        await new CompetitionAdminRepository(db, new NullCache(), spy)
+        await new CompetitionAdminRepository(db, spy)
             .UpdateAsync(comp.Id, Input(comp, showCombine: false));
 
         Assert.Equal([comp.Id], spy.Calls);
@@ -109,7 +101,7 @@ public class CompetitionRecalcOnFlagTests
 
         var input = Input(comp, showCombine: true);
         input.Name = "Meet renamed";
-        await new CompetitionAdminRepository(db, new NullCache(), spy).UpdateAsync(comp.Id, input);
+        await new CompetitionAdminRepository(db, spy).UpdateAsync(comp.Id, input);
 
         Assert.Empty(spy.Calls); // пересчёт по всему событию — не для каждой правки формы
     }
@@ -120,7 +112,7 @@ public class CompetitionRecalcOnFlagTests
         await using var db = CreateDb(nameof(RecalculationFailure_DoesNotFailTheEdit));
         var comp = await SeedAsync(db, showCombine: false);
 
-        var res = await new CompetitionAdminRepository(db, new NullCache(), new RecalcSpy { Throw = true })
+        var res = await new CompetitionAdminRepository(db, new RecalcSpy { Throw = true })
             .UpdateAsync(comp.Id, Input(comp, showCombine: true));
 
         Assert.True(res.Success);
@@ -148,7 +140,7 @@ public class CompetitionRecalcOnFlagTests
 
         var input = Input(comp, showCombine: false);
         input.PointRuleClubsId = 4; // было null (авто) → привязали вручную
-        var res = await new CompetitionAdminRepository(db, new NullCache(), spy)
+        var res = await new CompetitionAdminRepository(db, spy)
             .UpdateAsync(comp.Id, input);
 
         Assert.True(res.Success);
@@ -174,7 +166,7 @@ public class CompetitionRecalcOnFlagTests
 
         var input = Input(comp, showCombine: false);
         input.PointRuleSwimmersId = 7;
-        await new CompetitionAdminRepository(db, new NullCache(), spy).UpdateAsync(comp.Id, input);
+        await new CompetitionAdminRepository(db, spy).UpdateAsync(comp.Id, input);
 
         Assert.Empty(spy.Calls);
     }
@@ -194,7 +186,7 @@ public class CompetitionRecalcOnFlagTests
         await db.SaveChangesAsync();
         var spy = new RecalcSpy();
 
-        var res = await new CompetitionAdminRepository(db, new NullCache(), spy)
+        var res = await new CompetitionAdminRepository(db, spy)
             .AssignRulesAsync(new CompetitionRuleAssignmentDto
             {
                 CompetitionIds = [day1.Id, day2.Id, single.Id],
@@ -219,7 +211,7 @@ public class CompetitionRecalcOnFlagTests
         await db.SaveChangesAsync();
         var spy = new RecalcSpy();
 
-        var res = await new CompetitionAdminRepository(db, new NullCache(), spy)
+        var res = await new CompetitionAdminRepository(db, spy)
             .AssignRulesAsync(new CompetitionRuleAssignmentDto
             {
                 CompetitionIds = [comp.Id],

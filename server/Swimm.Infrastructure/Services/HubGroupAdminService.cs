@@ -175,7 +175,6 @@ public class HubGroupAdminService : IHubGroupAdminService
 
         _db.HubGroups.Remove(group);
         await _db.SaveChangesAsync();
-        await _core.InvalidateCacheAsync();
 
         // Аудит здесь, а не в вызывающих: путей удаления три, и группа уходит необратимо —
         // «кто и когда удалил, что пропало» должно остаться при любом из них. Актор — из

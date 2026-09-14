@@ -16,7 +16,7 @@ namespace Swimm.Infrastructure.Services;
 /// и переимпорте, а решение человека «эта строка врёт» — факт о данных, его нельзя
 /// молча терять (иначе после каждого импорта пришлось бы перепроверять руками).
 /// </summary>
-public class SuspectResultService(SwimmDbContext db, ICacheService cache) : ISuspectResultService
+public class SuspectResultService(SwimmDbContext db) : ISuspectResultService
 {
     public async Task<SuspectScanResultDto> ScanAsync(
         int? eventId, int? competitionId, CancellationToken ct = default)
@@ -75,8 +75,6 @@ public class SuspectResultService(SwimmDbContext db, ICacheService cache) : ISus
         foreach (var c in scannedCompetitions) c.QualityScannedAt = scanStamp;
 
         await db.SaveChangesAsync(ct);
-        // Рекорды в шапке соревнования считаются с учётом пометок — сбрасываем кэш.
-        await cache.InvalidateAllAsync();
 
         var result = await GetFlaggedAsync(eventId, competitionId, ct);
         return new SuspectScanResultDto(rows.Count, flagged, cleared, manualKept, result);
@@ -198,7 +196,6 @@ public class SuspectResultService(SwimmDbContext db, ICacheService cache) : ISus
         }
 
         await db.SaveChangesAsync(ct);
-        await cache.InvalidateAllAsync();
         return true;
     }
 

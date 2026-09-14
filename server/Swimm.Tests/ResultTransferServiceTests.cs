@@ -17,15 +17,7 @@ public class ResultTransferServiceTests
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options);
 
-    private sealed class NullCache : ICacheService
-    {
-        public Task<T?> GetAsync<T>(string key) => Task.FromResult<T?>(default);
-        public Task SetAsync<T>(string key, T value, TimeSpan ttl) => Task.CompletedTask;
-        public Task RemoveAsync(string key) => Task.CompletedTask;
-        public Task InvalidateAllAsync() => Task.CompletedTask;
-    }
-
-    private static ResultTransferService Svc(SwimmDbContext db) => new(db, new NullCache());
+    private static ResultTransferService Svc(SwimmDbContext db) => new(db);
 
     private static async Task<(Competition src, Competition dst, Swimmer sw, Style st, Club club)> Seed(SwimmDbContext db)
     {

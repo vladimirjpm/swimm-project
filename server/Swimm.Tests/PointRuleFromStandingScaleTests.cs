@@ -27,14 +27,6 @@ public class PointRuleFromStandingScaleTests
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options);
 
-    private sealed class NullCache : ICacheService
-    {
-        public Task<T?> GetAsync<T>(string key) => Task.FromResult<T?>(default);
-        public Task SetAsync<T>(string key, T value, TimeSpan ttl) => Task.CompletedTask;
-        public Task RemoveAsync(string key) => Task.CompletedTask;
-        public Task InvalidateAllAsync() => Task.CompletedTask;
-    }
-
     /// <summary>Ровно то, что собирает эндпоинт из снятой шкалы.</summary>
     private static PointRuleInputDto InputFromScale(IReadOnlyList<(int Place, int Points)> scale, string version) => new()
     {
@@ -57,7 +49,7 @@ public class PointRuleFromStandingScaleTests
         // Не-ManualOnly правило со свежей датой перехватывает ВСЕ соревнования без явной
         // привязки — этот баг мы уже ловили, поэтому кнопка обязана ставить флаг.
         await using var db = CreateDb(nameof(CreatedRule_IsManualOnly_SoItDoesNotHijackAutoPick));
-        var repo = new PointRulesAdminRepository(db, new NullCache());
+        var repo = new PointRulesAdminRepository(db);
 
         var res = await repo.CreateAsync(PointRuleKind.Clubs, InputFromScale(SpringCupScale, "9pt.8pl.2026"));
 
@@ -76,7 +68,7 @@ public class PointRuleFromStandingScaleTests
         // Смысл всей кнопки: после заведения та же шкала должна опознаваться этим правилом,
         // иначе превью продолжит предлагать завести ещё одно.
         await using var db = CreateDb(nameof(CreatedRule_MatchesTheStandingItWasBuiltFrom));
-        var repo = new PointRulesAdminRepository(db, new NullCache());
+        var repo = new PointRulesAdminRepository(db);
         await repo.CreateAsync(PointRuleKind.Clubs, InputFromScale(SpringCupScale, "9pt.8pl.2026"));
 
         var rules = await db.PointRulesClubs.Include(r => r.Entries).ToListAsync();
@@ -89,7 +81,7 @@ public class PointRuleFromStandingScaleTests
     public async Task DuplicateVersion_IsRejected_NotSilentlyDoubled()
     {
         await using var db = CreateDb(nameof(DuplicateVersion_IsRejected_NotSilentlyDoubled));
-        var repo = new PointRulesAdminRepository(db, new NullCache());
+        var repo = new PointRulesAdminRepository(db);
         await repo.CreateAsync(PointRuleKind.Clubs, InputFromScale(SpringCupScale, "9pt.8pl.2026"));
 
         var second = await repo.CreateAsync(PointRuleKind.Clubs, InputFromScale(SpringCupScale, "9pt.8pl.2026"));
@@ -104,7 +96,7 @@ public class PointRuleFromStandingScaleTests
         // Проверка «по делу»: заведённое правило должно давать те же очки, что стоят в
         // протоколе loglig — 1-е место 9, 8-е 1, вне восьмёрки ноль, эстафета вдвое.
         await using var db = CreateDb(nameof(CreatedRule_ScoresLikeTheOfficialTable));
-        var repo = new PointRulesAdminRepository(db, new NullCache());
+        var repo = new PointRulesAdminRepository(db);
         await repo.CreateAsync(PointRuleKind.Clubs, InputFromScale(SpringCupScale, "9pt.8pl.2026"));
         var rule = await db.PointRulesClubs.Include(r => r.Entries).SingleAsync();
 

@@ -61,8 +61,10 @@ public interface ICacheService
     Task InvalidateTagsAsync(params string[] tags) => InvalidateAllAsync();
 
     /// <summary>
-    /// Сбрасывает весь кэш (= метка <see cref="Constants.CacheTags.All"/>). Вызывать после импорта,
-    /// удаления или очистки данных.
+    /// Сбрасывает весь кэш (= метка <see cref="Constants.CacheTags.All"/>). После записи в базу
+    /// звать НЕ нужно: сохранение через EF сбрасывает метки своих таблиц само (К4), массовая
+    /// запись — явными метками. Общий сброс — для импорта, настроек (они в памяти, не в базе)
+    /// и кнопки на /Admin/Cache.
     /// IMemoryCache: отменяет общий CancellationToken — все записи вылетают разом.
     /// Redis: INCR версии метки all — записи со старой версией становятся промахом.
     /// </summary>

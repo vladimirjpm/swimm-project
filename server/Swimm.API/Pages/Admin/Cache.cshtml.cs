@@ -32,8 +32,8 @@ public class CacheModel : PageModel
     public IReadOnlyList<(string Tag, int Count)> TagCounts { get; private set; } = [];
 
     /// <summary>
-    /// Записи без меток таблиц — их сбрасывает только общий сброс. Пока запись зовёт общий
-    /// сброс, это не баг; когда перестанет (К4), такая запись будет врать до конца TTL.
+    /// Записи без меток таблиц — их сбрасывает только общий сброс, а запись в базу с К4 сбрасывает
+    /// лишь метки своих таблиц: такая запись врала бы до конца TTL.
     /// </summary>
     public IReadOnlyList<CacheEntryInfo> Untagged { get; private set; } = [];
 

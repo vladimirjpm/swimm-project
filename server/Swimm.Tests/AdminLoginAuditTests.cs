@@ -50,7 +50,7 @@ public class AdminLoginAuditTests
     }
 
     private static AdminRepository BuildRepo(SwimmDbContext db) =>
-        new(db, Mock.Of<ICacheService>());
+        new(db);
 
     // ── запись событий ────────────────────────────────────────────────────────
 

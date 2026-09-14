@@ -29,16 +29,14 @@ public class EntityDisplayController : ControllerBase
     private readonly IEntityDisplayRepository _display;
     private readonly IHubGroupPermissionService _permissions;
     private readonly IAdminAuditService _audit;
-    private readonly ICacheService _cache;
 
     public EntityDisplayController(
         IEntityDisplayRepository display, IHubGroupPermissionService permissions,
-        IAdminAuditService audit, ICacheService cache)
+        IAdminAuditService audit)
     {
         _display = display;
         _permissions = permissions;
         _audit = audit;
-        _cache = cache;
     }
 
     private int? CurrentUserId()
@@ -57,8 +55,6 @@ public class EntityDisplayController : ControllerBase
 
         await _audit.LogAsync("club.display-settings", "Club", id.ToString(),
             $"hero: show={input.ShowHeroImage}, mediaId={input.HeroMediaId?.ToString() ?? "—"}", input);
-        // Страница клуба кэшируется целиком — без сброса правка не видна до истечения TTL.
-        await _cache.InvalidateAllAsync();
         return NoContent();
     }
 
@@ -77,7 +73,6 @@ public class EntityDisplayController : ControllerBase
 
         await _audit.LogAsync("hub-group.display-settings", "HubGroup", id.ToString(),
             $"hero: show={input.ShowHeroImage}, mediaId={input.HeroMediaId?.ToString() ?? "—"}", input);
-        await _cache.InvalidateAllAsync();
         return NoContent();
     }
 }

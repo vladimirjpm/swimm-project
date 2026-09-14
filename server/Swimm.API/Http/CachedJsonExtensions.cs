@@ -10,9 +10,8 @@ namespace Swimm.API.Http;
 /// <summary>
 /// Общий хелпер HTTP-кэша для публичных GET (этап 3.1, вынесен из RecordsController).
 /// Сериализованный JSON и его ETag (SHA-256) кэшируются в ICacheService; клиенту — Cache-Control
-/// + ETag, повтор с If-None-Match на совпавший ETag → 304 без тела. Инвалидация глобальная
-/// (ICacheService.InvalidateAllAsync после админ-мутаций/импорта) — отдельно инвалидировать
-/// конкретные ключи не нужно.
+/// + ETag, повтор с If-None-Match на совпавший ETag → 304 без тела. Сбрасывать конкретные ключи
+/// не нужно: запись получает метки таблиц сама (К3), а сохранение через EF сбрасывает их само (К4).
 /// </summary>
 public static class CachedJsonExtensions
 {

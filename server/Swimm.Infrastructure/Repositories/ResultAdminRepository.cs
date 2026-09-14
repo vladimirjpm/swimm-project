@@ -8,8 +8,8 @@ namespace Swimm.Infrastructure.Repositories;
 
 /// <summary>
 /// Ручная правка одного результата (см. <see cref="IResultAdminRepository"/>). Пишет через
-/// owner-контекст; данные результата денормализованы в публичных выдачах → после правки
-/// сбрасывает кэш целиком. Эстафетные строки (RelayId != null) не редактируются: их состав
+/// owner-контекст; данные результата денормализованы в публичных выдачах → сохранение само
+/// сбрасывает метки своих таблиц (перехватчик К4). Эстафетные строки (RelayId != null) не редактируются: их состав
 /// живёт в RelayMembers, а переназначение пловца тут разорвало бы связь.
 /// </summary>
 /// <param name="recalc">
@@ -18,7 +18,6 @@ namespace Swimm.Infrastructure.Repositories;
 /// </param>
 public class ResultAdminRepository(
     SwimmDbContext db,
-    ICacheService cache,
     ICompetitionRecalculationService? recalc = null) : IResultAdminRepository
 {
     public async Task<ResultEditDto?> GetByIdAsync(long id, CancellationToken ct = default)
@@ -127,7 +126,6 @@ public class ResultAdminRepository(
             catch (Exception) { /* починка — прогоном CLI */ }
         }
 
-        await cache.InvalidateAllAsync();
         return ResultSaveResult.Ok();
     }
 }

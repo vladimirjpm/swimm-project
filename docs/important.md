@@ -78,6 +78,10 @@
   тогда получает сама). Так переезд на Redis будет заменой одной строки.
   → [ARCHITECTURE.md](ARCHITECTURE.md) §5, [plans/cache-tags-plan.md](plans/cache-tags-plan.md),
   страница `/Admin/Cache`.
+- **Сброс после записи в базу — сам, ручной не нужен** (К4, 14.09.2026): `SaveChanges` сбрасывает
+  метки изменённых таблиц после коммита. Исключения: запись мимо EF (`ExecuteUpdate`/`Delete`,
+  сырой SQL) — явно `db.InvalidateCacheTagsAsync(db.TableTag<T>())`; то, что живёт не в базе
+  (настройки), — общий сброс. → [plans/cache-tags-plan.md](plans/cache-tags-plan.md) §3.2.
 
 ## Как работаем
 

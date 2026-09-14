@@ -11,13 +11,8 @@ namespace Swimm.Infrastructure.Services;
 public class CompetitionSourceAdminService : ICompetitionSourceAdminService
 {
     private readonly SwimmDbContext _db;
-    private readonly ICacheService _cache;
 
-    public CompetitionSourceAdminService(SwimmDbContext db, ICacheService cache)
-    {
-        _db = db;
-        _cache = cache;
-    }
+    public CompetitionSourceAdminService(SwimmDbContext db) => _db = db;
 
     public Task<CompetitionSourcesViewDto> GetAsync(int competitionId, CancellationToken ct = default)
         => BuildAsync(competitionId, ct);
@@ -50,7 +45,6 @@ public class CompetitionSourceAdminService : ICompetitionSourceAdminService
                 SortOrder = 0
             });
             await _db.SaveChangesAsync(ct);
-            await InvalidateOverviewAsync();
         }
 
         return await BuildAsync(competitionId, ct);
@@ -67,7 +61,6 @@ public class CompetitionSourceAdminService : ICompetitionSourceAdminService
             // Ошибочную привязку так можно снять и переставить, ничего не перезабирая.
             _db.CompetitionSources.Remove(link);
             await _db.SaveChangesAsync(ct);
-            await InvalidateOverviewAsync();
         }
 
         return await BuildAsync(competitionId, ct);
@@ -156,15 +149,6 @@ public class CompetitionSourceAdminService : ICompetitionSourceAdminService
 
         return new CompetitionSourcesViewDto(comp.Id, comp.Name, orderedDays, linked, candidates);
     }
-
-    /// <summary>
-    /// Овервью соревнования кэшируется (competition-overview:*), а список источников — его
-    /// часть: без сброса подтаб появился бы только через TTL, и правка выглядела бы не
-    /// сработавшей. Точечного сброса по префиксу в ICacheService нет — ключ включает весь
-    /// фильтр выборки, так что попасть в него мы всё равно не смогли бы; привязка источника
-    /// делается редко и вручную, сбросить весь кэш тут дешевле, чем заводить новый шов.
-    /// </summary>
-    private Task InvalidateOverviewAsync() => _cache.InvalidateAllAsync();
 
     /// <summary>dd/MM/yyyy → дата (Unspecified, колонка календарная); непарсимая → null.</summary>
     private static DateTime? ParseDay(string? date)

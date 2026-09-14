@@ -22,18 +22,10 @@ public class HubGroupDeleteTests
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options);
 
-    private sealed class NoopCacheService : ICacheService
-    {
-        public Task<T?> GetAsync<T>(string key) => Task.FromResult(default(T));
-        public Task SetAsync<T>(string key, T value, TimeSpan ttl) => Task.CompletedTask;
-        public Task RemoveAsync(string key) => Task.CompletedTask;
-        public Task InvalidateAllAsync() => Task.CompletedTask;
-    }
-
     private sealed record FakeActor(int? UserId, string Name, string? IpAddress) : ICurrentActor;
 
     private static HubGroupAdminService Service(SwimmDbContext db, ICurrentActor? actor = null) =>
-        new(db, new HubGroupCrudCore(db, new NoopCacheService()),
+        new(db, new HubGroupCrudCore(db),
             new AdminAuditService(db, actor ?? new FakeActor(7, "owner@example.com", null),
                 NullLogger<AdminAuditService>.Instance));
 

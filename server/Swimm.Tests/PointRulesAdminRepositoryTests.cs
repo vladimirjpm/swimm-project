@@ -22,15 +22,7 @@ public class PointRulesAdminRepositoryTests
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options);
 
-    private sealed class NullCache : ICacheService
-    {
-        public Task<T?> GetAsync<T>(string key) => Task.FromResult<T?>(default);
-        public Task SetAsync<T>(string key, T value, TimeSpan ttl) => Task.CompletedTask;
-        public Task RemoveAsync(string key) => Task.CompletedTask;
-        public Task InvalidateAllAsync() => Task.CompletedTask;
-    }
-
-    private static PointRulesAdminRepository Repo(SwimmDbContext db) => new(db, new NullCache());
+    private static PointRulesAdminRepository Repo(SwimmDbContext db) => new(db);
 
     private static PointRuleInputDto Input(string version, params int[] points) => new()
     {
