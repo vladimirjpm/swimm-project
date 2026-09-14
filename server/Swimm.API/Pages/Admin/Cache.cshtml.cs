@@ -38,7 +38,7 @@ public class CacheModel : PageModel
     public IReadOnlyList<CacheEntryInfo> Untagged { get; private set; } = [];
 
     /// <summary>Журнал сбросов (К4б.1): кто что сбросил и кого это выкинуло.</summary>
-    public CacheJournal Journal { get; private set; } = new(DateTimeOffset.UtcNow, [], 0, []);
+    public CacheJournal Journal { get; private set; } = new(DateTimeOffset.UtcNow, [], 0, [], new CacheHitChecks(0, 0, []));
 
     public void OnGet()
     {

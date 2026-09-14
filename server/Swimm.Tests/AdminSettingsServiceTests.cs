@@ -27,8 +27,26 @@ public class AdminSettingsServiceTests
         // + LogligStampOnImport (штамповка loglig-id пловцам после импорта, 2026-08-23)
         // + StartListEnabled/StartListDaysAhead (автозабор стартового протокола, С10)
         // + HubGroupMaxPerCoach (лимит групп для роли Coach, 2026-09-10)
-        // + FavoritesMaxSwimmers/FavoritesMaxClubs (лимиты избранного, 2026-09-10).
-        Assert.Equal(19, all.Count);
+        // + FavoritesMaxSwimmers/FavoritesMaxClubs (лимиты избранного, 2026-09-10)
+        // + CacheRowPrecision/CacheHitVerifyPercent (точность сброса кэша, К4б.3, 2026-09-14).
+        Assert.Equal(21, all.Count);
+    }
+
+    [Fact]
+    public void CacheSettings_RowPrecisionOff_VerifyPercentByEnvironment_Range0To100()
+    {
+        var prod = Build();
+        var dev = new AdminSettingsService(new MemoryCache(Options.Create(new MemoryCacheOptions())), development: true);
+
+        // Сужение включают после приёмки К4б.4; сверка в Development ощутимая, на проде выключена.
+        Assert.Equal("false", prod.Get(CacheSettings.RowPrecision)!.Value);
+        Assert.Equal("0", prod.Get(CacheSettings.HitVerifyPercent)!.Value);
+        Assert.Equal("20", dev.Get(CacheSettings.HitVerifyPercent)!.Value);
+
+        Assert.False(prod.Update(CacheSettings.HitVerifyPercent, "-1"));
+        Assert.False(prod.Update(CacheSettings.HitVerifyPercent, "101"));
+        Assert.True(prod.Update(CacheSettings.HitVerifyPercent, "100"));
+        Assert.True(prod.Update(CacheSettings.RowPrecision, "true"));
     }
 
     [Fact]

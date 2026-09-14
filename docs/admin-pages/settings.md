@@ -6,7 +6,8 @@
 Ключевые ключи: DiscoveryEnabled/DiscoveryIntervalHours,
 LogligVerifyEnabled/LogligVerifyIntervalHours (дефолт вкл/24ч),
 LogligBatchEnabled/LogligBatchPerRun/LogligBatchIntervalHours (дефолт ВЫКЛ/50/24ч),
-**RecordAgeAxis** (дефолт `calendar`, значения `calendar`/`season`).
+**RecordAgeAxis** (дефолт `calendar`, значения `calendar`/`season`),
+**CacheRowPrecision** / **CacheHitVerifyPercent** (кэш, раздел ниже).
 Scope: admin / livesite / both.
 
 ## Группы: кто создаёт и сколько (2026-09-10)
@@ -37,6 +38,24 @@ Scope: admin / livesite / both.
 `422 {error, code: "favorites_limit", limit}`, а лимиты с подсказками уезжают на сайт через
 `GET /api/client-config` → `favoritesLimits`, и сердечко на пределе гаснет ДО клика. Новое
 значение действует сразу, без рестарта. Зачем лимит — `docs/plans/hubgroup-club-subscription-plan.md` §1.
+
+## Кэш: сужение до строк и сверка на попадании (2026-09-14)
+
+Две настройки точности сброса кэша ([cache-row-precision-plan.md](../plans/cache-row-precision-plan.md)
+§2.5, §4-6; константы — `CacheSettings`):
+
+- **`CacheRowPrecision`** (bool, дефолт **`false`**) — сужение до строк. `true`: страница одной
+  группы или клуба, читающая свои строки в блоке `CacheRows`, зависит от них, а не от всей
+  таблицы, и падает только от их правки. `false`: блоки ничего не делают, всё как до К4б.
+  Аварийный рычаг: всплыл недосброс (подозрения сверки на `/Admin/Cache`) — выключить за секунду
+  и чинить без отката релиза. По плану включается по умолчанию после приёмки К4б.4.
+- **`CacheHitVerifyPercent`** (int 0–100, дефолт **20 в Development, 0 на проде**) — доля
+  попаданий в суженные записи, которые строятся заново мимо кэша и сверяются с кэшем.
+  Расхождение — «подозрение на недосброс» в журнале `/Admin/Cache`. Дефолт зависит от среды
+  (`IHostEnvironment`); вне хоста (тесты) — как на проде.
+
+Смена любой из них, как и всякой настройки, сбрасывает весь кэш — записи, собранные при старом
+положении, не смешиваются с новыми. Живут в памяти: после рестарта — дефолты.
 
 ## RecordAgeAxis — ось возраста для сверки с рекордами (2026-08-22)
 

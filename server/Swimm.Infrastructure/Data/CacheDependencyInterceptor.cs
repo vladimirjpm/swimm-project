@@ -4,7 +4,6 @@ using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Swimm.Application.Constants;
 using Swimm.Infrastructure.Services;
 
 namespace Swimm.Infrastructure.Data;
@@ -68,7 +67,8 @@ public sealed class CacheDependencyInterceptor : DbCommandInterceptor
         foreach (Match match in QuotedIdentifier.Matches(command.CommandText))
         {
             var name = match.Groups[1].Value;
-            if (tables.Contains(name)) scope.Touch(CacheTags.Table(name));
+            // table:T — или, в блоке сужения этой сборки, метки строк корня + anyrow:T (К4б.3).
+            if (tables.Contains(name)) scope.TouchTable(name);
         }
     }
 

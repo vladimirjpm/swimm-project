@@ -111,9 +111,15 @@
         которая на них ссылается, — метки её группы, клуба, пловца: и прежние, и новые.
         Где задетые строки неизвестны — <code>anyrow:HubGroupMembers</code>: каскад в базе, массовая
         запись, больше 500 строк одной таблицы за раз, строка, подключённая к сохранению не запросом
-        из базы. Пока от меток строк не зависит ни одна запись — они для страниц одной сущности,
-        которые будут зависеть от своей строки, а не от всей таблицы
-        (<code>docs/plans/cache-row-precision-plan.md</code>, К4б.2); видны в журнале.
+        из базы (<code>docs/plans/cache-row-precision-plan.md</code>, К4б.2); видны в журнале.
+    </p>
+    <p>
+        <strong class="text-admin-text">Сужение при чтении:</strong> страница одной сущности может
+        прочесть свои строки в блоке <code>CacheRows</code> — тогда её запись носит не
+        <code>table:HubGroupMembers</code>, а <code>row:HubGroups:24</code> и
+        <code>anyrow:HubGroupMembers</code> и падает только от правки своих строк (К4б.3). Работает,
+        пока включена настройка <code>CacheRowPrecision</code> на /Admin/Settings — это и аварийный
+        рычаг. Мест сужения пока нет: первым станет страница группы (К4б.4).
     </p>
     <p>
         <strong class="text-admin-text">Весь кэш сбрасывают</strong> только импорт протоколов, смена
@@ -199,6 +205,38 @@
             {
                 <span class="text-[0.7rem] py-0.5 px-1.5 rounded-sm font-semibold whitespace-nowrap bg-admin-accent/15 text-admin-accent">@d.Kind · @d.ByTags / @d.ByAll</span>
             }
+        </div>
+    }
+    @{ var checks = journal.HitChecks; }
+    <p class="mb-2">
+        <strong class="text-admin-text">Сверка на попадании:</strong> сверено @checks.Checked,
+        расхождений @checks.Mismatched. Попадание в запись, суженную до строк, с долей из настройки
+        <code>CacheHitVerifyPercent</code> строится заново мимо кэша и сравнивается с тем, что в кэше.
+    </p>
+    @if (checks.Mismatches.Count > 0)
+    {
+        <div class="border-l-[3px] border-l-admin-warning pl-3 mb-4">
+            <strong class="text-admin-text">Подозрения на недосброс: @checks.Mismatched.</strong>
+            Запись врала и выкинута. Причина — нарушено правило сужения, или данные поменял тот, чей
+            сброс сюда не доходит: другой экземпляр API, правка в psql, команда <code>dotnet run -- --флаг</code>.
+            <div class="overflow-x-auto mt-2">
+                <table class="admin-table">
+                    <thead>
+                        <tr><th>Когда</th><th>Запись</th><th>Где разошлось</th><th>Метки</th></tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var m in checks.Mismatches)
+                    {
+                        <tr>
+                            <td class="align-top text-xs whitespace-nowrap">@m.At.ToLocalTime().ToString("dd.MM HH:mm:ss")</td>
+                            <td class="align-top"><code class="text-xs">@m.Key</code></td>
+                            <td class="align-top text-xs">@m.Difference</td>
+                            <td class="align-top text-xs">@string.Join(", ", m.Tags.Take(6))@(m.Tags.Count > 6 ? $" +{m.Tags.Count - 6}" : "")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
         </div>
     }
     @if (journal.Events.Count == 0)
