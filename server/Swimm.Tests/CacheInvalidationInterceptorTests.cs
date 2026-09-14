@@ -383,9 +383,9 @@ public class CacheInvalidationInterceptorTests
 
         await using (var tx = await db.Database.BeginTransactionAsync())
         {
-            // Массовая запись мимо трекера — перехватчик её не видит, метку сбрасывают явно.
+            // Массовая запись мимо трекера — перехватчик её не видит, таблицу сбрасывают явно.
             await db.A.ExecuteDeleteAsync();
-            await db.InvalidateCacheTagsAsync(db.TableTag<ProbeA>());
+            await db.InvalidateTableCacheAsync<ProbeA>();
 
             Assert.True(await Cached(cache, "page-a")); // до коммита — рано, как и у SaveChanges
             await tx.CommitAsync();
@@ -393,7 +393,7 @@ public class CacheInvalidationInterceptorTests
         Assert.False(await Cached(cache, "page-a"));
 
         await SeedPages(cache);
-        await db.InvalidateCacheTagsAsync(db.TableTag<ProbeB>()); // вне транзакции — сразу
+        await db.InvalidateTableCacheAsync<ProbeB>(); // вне транзакции — сразу
         Assert.False(await Cached(cache, "page-b"));
         Assert.True(await Cached(cache, "page-a"));
     }

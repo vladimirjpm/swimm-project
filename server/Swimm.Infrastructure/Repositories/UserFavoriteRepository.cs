@@ -213,7 +213,7 @@ public class UserFavoriteRepository : IUserFavoriteRepository
                 .ExecuteUpdateAsync(s => s.SetProperty(f => f.SortOrder, item.SortOrder));
         }
         // Массовая запись мимо трекера — метку своей таблицы сбрасываем явно (К4).
-        if (items.Count > 0) await _db.InvalidateCacheTagsAsync(_db.TableTag<UserFavorite>());
+        if (items.Count > 0) await _db.InvalidateTableCacheAsync<UserFavorite>();
         return true;
     }
 }

@@ -132,7 +132,7 @@ Application → реализация в Infrastructure → регистраци�
    сборке, отмечает таблицы (`CacheDependencyInterceptor`), вложенные записи передают свои.
    Сброс — тоже сам, по меткам (К4): `CacheInvalidationInterceptor` после `SaveChanges`
    сбрасывает метки изменённых таблиц (и таблиц каскада удаления), в транзакции — на коммите.
-   Массовая запись мимо EF сбрасывает свою метку явно (`db.InvalidateCacheTagsAsync`); весь кэш
+   Массовая запись мимо EF сбрасывает свою таблицу явно (`db.InvalidateTableCacheAsync<T>()`); весь кэш
    сбрасывают только импорт, смена настроек (они в памяти) и кнопка на `/Admin/Cache` — план
    [cache-tags-plan.md](plans/cache-tags-plan.md). Записывать в кэш — только `GetOrCreateAsync`.
 3. **БД** — индексы + `SwimmReadDbContext` NoTracking. Только этот уровень платит за промах.
