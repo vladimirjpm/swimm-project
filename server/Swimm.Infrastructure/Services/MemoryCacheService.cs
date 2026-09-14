@@ -188,7 +188,9 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
             : Store(key, value, typeof(T), ttl, tokens);
     }
 
-    private bool RowPrecisionOn => _settings?.GetValue(CacheSettings.RowPrecision, false) ?? false;
+    // Без настроек (кэш из тестов, собранный без них) сужения нет — такие тесты живут как до К4б.
+    private bool RowPrecisionOn =>
+        _settings?.GetValue(CacheSettings.RowPrecision, CacheSettings.DefaultRowPrecision) ?? false;
 
     /// <summary>Сверять ли это попадание: запись сужена до строк и выпала доля сверки.</summary>
     private bool ShouldVerify(Entry hit)

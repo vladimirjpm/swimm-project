@@ -21,11 +21,15 @@ public class CacheRowsSitesTests
     /// </summary>
     private static readonly string[] Covered =
     [
-        // Страница группы (К4б.4) — сценарии в CacheGroupPageNarrowingTests.
+        // Сценарии — в CacheNarrowedPagesTests.
+        // Страница группы (К4б.4).
         "HubGroupPublicRepository.GetPageAsync",
         "HubGroupMediaService.GetGalleryAsync",
         "UserMediaPublicationService.GetApprovedForGroupAsync",
         "UserMediaPublicationService.PublishedItemsAsync",
+        // Клуб (К4б.5): официальная группа в обзоре, состав целиком.
+        "ClubOverviewRepository.GetOverviewAsync",
+        "ClubPublicRepository.GetRosterAsync",
     ];
 
     [Fact]

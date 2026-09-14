@@ -135,6 +135,10 @@ Application → реализация в Infrastructure → регистраци�
    Массовая запись мимо EF сбрасывает свою таблицу явно (`db.InvalidateTableCacheAsync<T>()`); весь кэш
    сбрасывают только импорт, смена настроек (они в памяти) и кнопка на `/Admin/Cache` — план
    [cache-tags-plan.md](plans/cache-tags-plan.md). Записывать в кэш — только `GetOrCreateAsync`.
+   Точность до строки (К4б): сохранение сбрасывает и метки строк корней (`row:HubGroups:24`), а
+   страница одной группы или клуба читает свои строки в блоке `db.CacheRows<TRoot>(id, …)` и
+   падает только от их правки; выключатель `CacheRowPrecision` (по умолчанию вкл.) —
+   [cache-row-precision-plan.md](plans/cache-row-precision-plan.md).
 3. **БД** — индексы + `SwimmReadDbContext` NoTracking. Только этот уровень платит за промах.
 
 **Правила, готовые к Redis (соблюдать уже сейчас, до переезда):** всё — только через

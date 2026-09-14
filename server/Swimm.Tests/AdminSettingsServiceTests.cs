@@ -33,20 +33,24 @@ public class AdminSettingsServiceTests
     }
 
     [Fact]
-    public void CacheSettings_RowPrecisionOff_VerifyPercentByEnvironment_Range0To100()
+    public void CacheSettings_RowPrecisionOn_VerifyPercentByEnvironment_Range0To100()
     {
         var prod = Build();
         var dev = new AdminSettingsService(new MemoryCache(Options.Create(new MemoryCacheOptions())), development: true);
 
-        // Сужение включают после приёмки К4б.4; сверка в Development ощутимая, на проде выключена.
-        Assert.Equal("false", prod.Get(CacheSettings.RowPrecision)!.Value);
+        // Сужение включено по умолчанию с приёмки К4б.5 (§8-5) — и на проде, и в Development;
+        // сверка в Development ощутимая, на проде выключена.
+        Assert.Equal("true", prod.Get(CacheSettings.RowPrecision)!.Value);
+        Assert.Equal("true", dev.Get(CacheSettings.RowPrecision)!.Value);
         Assert.Equal("0", prod.Get(CacheSettings.HitVerifyPercent)!.Value);
         Assert.Equal("20", dev.Get(CacheSettings.HitVerifyPercent)!.Value);
 
         Assert.False(prod.Update(CacheSettings.HitVerifyPercent, "-1"));
         Assert.False(prod.Update(CacheSettings.HitVerifyPercent, "101"));
         Assert.True(prod.Update(CacheSettings.HitVerifyPercent, "100"));
-        Assert.True(prod.Update(CacheSettings.RowPrecision, "true"));
+        // Аварийный рычаг работает: выключается.
+        Assert.True(prod.Update(CacheSettings.RowPrecision, "false"));
+        Assert.Equal("false", prod.Get(CacheSettings.RowPrecision)!.Value);
     }
 
     [Fact]

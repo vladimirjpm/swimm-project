@@ -113,14 +113,23 @@ public class ClubOverviewRepository : IClubOverviewRepository
                 .ToList(),
         };
 
-        var official = await _read.HubGroups.AsNoTracking()
-            .Where(g => g.ClubId == resolvedClubId && g.IsOfficial)
-            .Select(g => new { g.Slug, g.Name })
-            .FirstOrDefaultAsync();
-        if (official is not null)
+        // Официальная группа — единственная таблица обзора с частыми записями (владельцы групп).
+        // Сужено по клубу (docs/plans/cache-row-precision-plan.md §3.2, К4б.5): обзор зависит от
+        // row:Clubs:{id}, а её сбрасывает запись группы с этим ClubId — правка, одобрение
+        // официальной, перенос ClubId (старое и новое значение FK). Правка группы без клуба или
+        // чужого клуба обзор не роняет. Остальное в обзоре — таблицей: рейтинг всех клубов,
+        // season-best страны, стена рекордов по именам.
+        using (_read.CacheRows<Club>(resolvedClubId, typeof(HubGroup)))
         {
-            dto.Club.OfficialGroupSlug = official.Slug;
-            dto.Club.OfficialGroupName = official.Name;
+            var official = await _read.HubGroups.AsNoTracking()
+                .Where(g => g.ClubId == resolvedClubId && g.IsOfficial)
+                .Select(g => new { g.Slug, g.Name })
+                .FirstOrDefaultAsync();
+            if (official is not null)
+            {
+                dto.Club.OfficialGroupSlug = official.Slug;
+                dto.Club.OfficialGroupName = official.Name;
+            }
         }
 
         // Скоуп страницы: сезон и/или зачётная группа. Дальше все карточки читают его.
