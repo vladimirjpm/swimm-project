@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Swimm.Application.Dtos;
@@ -504,6 +505,44 @@ public class UserMediaPublicationServiceTests
     // не человек, а справочник федерации (Swimmer.ClubId), поэтому никакой ручной работы для
     // этого быть не должно — но и автоматом видео появиться не может: заявка ложится pending.
 
+    // ── Ленты зрителя — без владельца медиа (cache-row-precision-plan, К4б.0) ────────
+
+    /// <summary>
+    /// Кто подал медиа, знают только модераторы. Ленты клуба и группы открыты анонимам — в них
+    /// не должно быть ни email, ни id владельца. Сверяем сериализованный JSON: новое поле
+    /// «owner_*» в DTO ленты уронит тест, даже если в сиде оно было бы пустым.
+    /// </summary>
+    [Fact]
+    public async Task PublicFeeds_DoNotCarryTheMediaOwner()
+    {
+        await using var db = CreateDb(nameof(PublicFeeds_DoNotCarryTheMediaOwner));
+        var (owner, _, group, groupMedia) = await SeedBasicAsync(db);
+        var (parent, _, club, clubMedia) = await SeedClubAsync(db);
+        db.UserMediaPublications.AddRange(
+            new UserMediaPublication
+            {
+                UserMediaId = groupMedia.Id, TargetType = UserMediaPublicationTarget.Group, HubGroupId = group.Id,
+                Level = UserMediaPublicationLevel.Public, Status = UserMediaPublicationStatus.Approved,
+            },
+            new UserMediaPublication
+            {
+                UserMediaId = clubMedia.Id, TargetType = UserMediaPublicationTarget.Club, ClubId = club.Id,
+                Level = UserMediaPublicationLevel.Public, Status = UserMediaPublicationStatus.Approved,
+            });
+        await db.SaveChangesAsync();
+        var service = new UserMediaPublicationService(db);
+
+        var groupFeed = await service.GetApprovedForGroupAsync(group.Id, UserMediaPublicationLevel.Public);
+        var clubFeed = await service.GetApprovedForClubAsync(club.Id);
+        Assert.Single(groupFeed); // ленты не пустые — иначе проверка ниже прошла бы даром
+        Assert.Single(clubFeed);
+
+        var json = JsonSerializer.Serialize(groupFeed) + JsonSerializer.Serialize(clubFeed);
+        Assert.DoesNotContain(owner.Email, json);
+        Assert.DoesNotContain(parent.Email, json);
+        Assert.DoesNotContain("owner", json);
+    }
+
     private static async Task<(AppUser parent, Swimmer child, Club club, UserMedia media)> SeedClubAsync(
         SwimmDbContext db)
     {
@@ -587,8 +626,8 @@ public class UserMediaPublicationServiceTests
 
         var feed = await service.GetApprovedForClubAsync(club.Id);
         var row = Assert.Single(feed);
-        Assert.Equal(UserMediaPublicationTarget.Club, row.TargetType);
-        Assert.Equal(club.Id, row.TargetId);
+        // Лента выбрана по клубу — цель в строке зрителю не нужна (её и нет, PublishedMediaItemDto).
+        Assert.Equal(submit.Publication.Id, row.Id);
         Assert.Equal(child.Id, row.SwimmerId);
     }
 

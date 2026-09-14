@@ -131,11 +131,6 @@ export interface HubGroupMemberMediaItem {
   competition_id?: number | null;
 }
 
-/**
- * Публикация личного медиа участника в группу (GroupPublicationInboxItemDto, snake_case).
- * Используется и для published-списков (GET .../media/published?level=...), и для inbox
- * модерации (GET /api/hub-groups/{id}/media/publications) — форма одинаковая.
- */
 /** Одно регулярное занятие недели: день ISO (1 = Mon … 7 = Sun), часы «HH:mm». */
 export interface GroupTrainingSlot {
   day: number;
@@ -161,6 +156,11 @@ export interface NextTraining {
   pool_type?: string | null;
 }
 
+/**
+ * Строка inbox-а модерации (GroupPublicationInboxItemDto, snake_case):
+ * GET /api/hub-groups/{id}/media/publications. ⚠ Только модераторам — в ней владелец медиа.
+ * Ленты зрителя (GET .../media/published?level=...) отдают {@link PublishedMediaItem}.
+ */
 export interface GroupPublicationItem {
   id: number;
   level: 'public' | 'members';
@@ -171,6 +171,23 @@ export interface GroupPublicationItem {
   url: string;
   owner_user_id: number;
   owner_email: string;
+  swimmer_id?: number | null;
+  swimmer_name?: string | null;
+  result_id?: number | null;
+  result_label?: string | null;
+  /** Соревнование медиа: день заплыва, либо само соревнование у медиа без заплыва. */
+  competition_id?: number | null;
+}
+
+/**
+ * Одобренная публикация в ленте зрителя (PublishedMediaItemDto): GET .../media/published
+ * (public и members). Без владельца медиа — кто подал, знают только модераторы.
+ */
+export interface PublishedMediaItem {
+  id: number;
+  media_type: HubGroupMediaItem['media_type'];
+  source_type: HubGroupMediaItem['source_type'];
+  url: string;
   swimmer_id?: number | null;
   swimmer_name?: string | null;
   result_id?: number | null;

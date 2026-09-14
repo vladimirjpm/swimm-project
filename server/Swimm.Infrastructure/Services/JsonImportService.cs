@@ -1203,7 +1203,7 @@ public class JsonImportService : IImportService
             }
         }
 
-        await _cache.InvalidateAllAsync();
+        await _cache.InvalidateAllAsync(fileName is null ? "импорт протокола" : $"импорт протокола {fileName}");
 
         // insertedCount — реально вставленные строки resultBatch (после того как сматченные
         // upsert-строки были из него удалены выше); created включает и их (полный успешный проход).
@@ -1721,7 +1721,7 @@ public class JsonImportService : IImportService
             await _db.Database.ExecuteSqlRawAsync(
                 $"ALTER TABLE \"{table}\" ALTER COLUMN \"Id\" RESTART WITH 1;");
 
-        await _cache.InvalidateAllAsync();
+        await _cache.InvalidateAllAsync("очистка всех данных");
         return result;
     }
 
@@ -1763,7 +1763,7 @@ public class JsonImportService : IImportService
             return r;
         });
 
-        await _cache.InvalidateAllAsync();
+        await _cache.InvalidateAllAsync($"удаление соревнования #{competitionId}");
         return result;
     }
 
@@ -1811,7 +1811,7 @@ public class JsonImportService : IImportService
             return agg;
         });
 
-        await _cache.InvalidateAllAsync();
+        await _cache.InvalidateAllAsync($"удаление события #{eventId}");
         return result;
     }
 

@@ -38,6 +38,24 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
     // Живые записи — для диагностики (/Admin/Cache). Убираются колбэком вытеснения.
     private readonly ConcurrentDictionary<string, Entry> _index = new();
 
+    // Журнал сбросов (К4б.1, docs/plans/cache-row-precision-plan.md): последние сбросы, выкинувшие
+    // хоть одну запись, и счётчики «кого выкидывают» по видам записей — с запуска процесса.
+    private const int JournalSize = 200;
+    private const int JournalKeysPerEvent = 20;
+    private const int JournalTagsPerEvent = 100;
+    private const int JournalReasonLength = 500;
+    private const string NoReason = "без подписи";
+    private readonly ConcurrentQueue<CacheInvalidationEvent> _journal = new();
+    private readonly ConcurrentDictionary<string, DropCounter> _drops = new(StringComparer.Ordinal);
+    private readonly DateTimeOffset _since = DateTimeOffset.UtcNow;
+    private long _emptyInvalidations;
+
+    private sealed class DropCounter
+    {
+        public long ByTags;
+        public long ByAll;
+    }
+
     public MemoryCacheService(IMemoryCache cache) => _cache = cache;
 
     /// <summary>
@@ -133,24 +151,95 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
         return Task.CompletedTask;
     }
 
-    public Task InvalidateTagsAsync(params string[] tags)
+    public Task InvalidateTagsAsync(params string[] tags) => InvalidateTagsAsync(tags, NoReason);
+
+    public Task InvalidateTagsAsync(IReadOnlyCollection<string> tags, string reason)
     {
+        // Среди меток общая — это общий сброс: он отменяет и все остальные.
+        if (tags.Contains(CacheTags.All)) return InvalidateAllAsync(reason);
+
+        // Жертв считаем ДО отмены: после неё выкинутую запись уже не отличить от протухшей.
+        var victims = LiveKeys(tags);
         foreach (var tag in tags)
-        {
-            if (tag == CacheTags.All)
-            {
-                InvalidateAll();
-                continue;
-            }
             if (_tags.TryRemove(tag, out var source)) source.Cancel();
-        }
+
+        Record(reason, tags, all: false, victims);
         return Task.CompletedTask;
     }
 
-    public Task InvalidateAllAsync()
+    public Task InvalidateAllAsync() => InvalidateAllAsync(NoReason);
+
+    public Task InvalidateAllAsync(string reason)
     {
+        var victims = LiveKeys(tags: null);
         InvalidateAll();
+        Record(reason, [CacheTags.All], all: true, victims);
         return Task.CompletedTask;
+    }
+
+    public CacheJournal Journal() => new(
+        _since,
+        // Очередь перечисляется от старых к новым — журнал показывают свежими первыми.
+        _journal.Reverse().ToList(),
+        Interlocked.Read(ref _emptyInvalidations),
+        _drops
+            .Select(d => new CacheDropStats(d.Key, Interlocked.Read(ref d.Value.ByTags), Interlocked.Read(ref d.Value.ByAll)))
+            .OrderByDescending(d => d.ByTags + d.ByAll)
+            .ThenBy(d => d.Kind, StringComparer.Ordinal)
+            .ToList());
+
+    /// <summary>
+    /// Вид записи для счётчиков журнала: у HTTP-ответов — два первых сегмента ключа
+    /// (<c>http:swimmer</c>, <c>http:hub-groups</c>), у записей данных — первый
+    /// (<c>swimmer-profile</c>, <c>results</c>). Id в вид не входит: считаем «страницы пловца»,
+    /// а не пловца 5825.
+    /// </summary>
+    internal static string KindOf(string key)
+    {
+        var parts = key.Split(':', 3);
+        return parts is ["http", var second, ..] ? $"http:{second}" : parts[0];
+    }
+
+    /// <summary>Живые записи, которые носят любую из меток; null — все живые (общий сброс).</summary>
+    private List<string> LiveKeys(IReadOnlyCollection<string>? tags)
+    {
+        var set = tags is null ? null : new HashSet<string>(tags, StringComparer.Ordinal);
+        var now = DateTimeOffset.UtcNow;
+        var keys = new List<string>();
+        foreach (var (key, entry) in _index)
+        {
+            if (entry.ExpiresAt <= now || entry.Tokens.Values.Any(t => t.IsCancellationRequested)) continue;
+            if (set is null || entry.Tokens.Keys.Any(set.Contains)) keys.Add(key);
+        }
+        return keys;
+    }
+
+    private void Record(string reason, IReadOnlyCollection<string> tags, bool all, List<string> victims)
+    {
+        // Пустой сброс (метку никто не носил) не пишем — только считаем: иначе он вытеснил бы
+        // из журнала то, ради чего журнал заведён. Общий сброс пишем всегда: импорт в 12:00 —
+        // событие, даже если кэш был пуст.
+        if (victims.Count == 0 && !all)
+        {
+            Interlocked.Increment(ref _emptyInvalidations);
+            return;
+        }
+
+        foreach (var key in victims)
+        {
+            var counter = _drops.GetOrAdd(KindOf(key), static _ => new DropCounter());
+            if (all) Interlocked.Increment(ref counter.ByAll);
+            else Interlocked.Increment(ref counter.ByTags);
+        }
+
+        _journal.Enqueue(new CacheInvalidationEvent(
+            DateTimeOffset.UtcNow,
+            reason.Length > JournalReasonLength ? reason[..JournalReasonLength] + "…" : reason,
+            tags.Take(JournalTagsPerEvent).ToList(),
+            all,
+            victims.Count,
+            victims.Order(StringComparer.Ordinal).Take(JournalKeysPerEvent).ToList()));
+        while (_journal.Count > JournalSize && _journal.TryDequeue(out _)) { }
     }
 
     public IReadOnlyList<CacheEntryInfo> Snapshot() => _index

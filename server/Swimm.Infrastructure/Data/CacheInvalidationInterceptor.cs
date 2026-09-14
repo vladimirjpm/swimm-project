@@ -1,6 +1,7 @@
 using System.Data.Common;
 using System.Runtime.CompilerServices;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -40,8 +41,14 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
         /// <summary>Метки идущего SaveChanges — ждут его успеха.</summary>
         public string[]? Saving;
 
+        /// <summary>Подпись идущего SaveChanges для журнала сбросов: что именно поменялось.</summary>
+        public string SavingReason = "";
+
         /// <summary>Метки сохранений внутри открытой транзакции — ждут её коммита.</summary>
         public readonly HashSet<string> Pending = new(StringComparer.Ordinal);
+
+        /// <summary>Подписи тех же сохранений — уходят в журнал одной строкой на коммите.</summary>
+        public readonly List<string> PendingReasons = [];
     }
 
     // ── SaveChanges ────────────────────────────────────────────────────────────────
@@ -110,11 +117,11 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
     }
 
     public void TransactionCommitted(DbTransaction transaction, TransactionEndEventData eventData) =>
-        FlushPendingAsync(eventData.Context).GetAwaiter().GetResult();
+        FlushPendingAsync(eventData.Context, failed: false).GetAwaiter().GetResult();
 
     public Task TransactionCommittedAsync(
         DbTransaction transaction, TransactionEndEventData eventData, CancellationToken cancellationToken = default) =>
-        FlushPendingAsync(eventData.Context);
+        FlushPendingAsync(eventData.Context, failed: false);
 
     public void TransactionRolledBack(DbTransaction transaction, TransactionEndEventData eventData) =>
         ForgetPending(eventData.Context);
@@ -127,11 +134,11 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
     }
 
     public void TransactionFailed(DbTransaction transaction, TransactionErrorEventData eventData) =>
-        FlushPendingAsync(eventData.Context).GetAwaiter().GetResult();
+        FlushPendingAsync(eventData.Context, failed: true).GetAwaiter().GetResult();
 
     public Task TransactionFailedAsync(
         DbTransaction transaction, TransactionErrorEventData eventData, CancellationToken cancellationToken = default) =>
-        FlushPendingAsync(eventData.Context);
+        FlushPendingAsync(eventData.Context, failed: true);
 
     // ── Устройство ─────────────────────────────────────────────────────────────────
 
@@ -139,7 +146,7 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
     /// Явный сброс для записи мимо трекера (<see cref="DbContextCacheExtensions.InvalidateCacheTagsAsync"/>):
     /// в открытой транзакции — после её коммита, иначе сразу. Правило то же, что у SaveChanges.
     /// </summary>
-    internal Task InvalidateAfterCommitAsync(DbContext context, string[] tags)
+    internal Task InvalidateAfterCommitAsync(DbContext context, string[] tags, string reason)
     {
         if (tags.Length == 0) return Task.CompletedTask;
 
@@ -147,10 +154,12 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
         // транзакций не ведёт и событий о них не шлёт — сбрасываем сразу.
         if (context.Database.IsRelational() && context.Database.CurrentTransaction is not null)
         {
-            _states.GetOrCreateValue(context).Pending.UnionWith(tags);
+            var state = _states.GetOrCreateValue(context);
+            state.Pending.UnionWith(tags);
+            state.PendingReasons.Add(reason);
             return Task.CompletedTask;
         }
-        return cache.InvalidateTagsAsync(tags);
+        return cache.InvalidateTagsAsync(tags, reason);
     }
 
     private void Collect(DbContext? context)
@@ -158,12 +167,20 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
         if (context is null) return;
 
         var tables = new HashSet<string>(StringComparer.Ordinal);
+        // Что поменялось по таблицам — подпись для журнала сбросов (/Admin/Cache): по ней
+        // видно, какая именно запись выкинула страницы, и какие колонки пишут чаще всего.
+        var changes = new SortedDictionary<string, TableChange>(StringComparer.Ordinal);
         // Entries() сама делает DetectChanges (если он не выключен — тогда не сделал бы и
         // SaveChanges), так что правка отслеживаемого объекта без Update() тоже видна.
         foreach (var entry in context.ChangeTracker.Entries())
         {
             if (entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted)) continue;
-            if (entry.Metadata.GetTableName() is { } table) tables.Add(table);
+            if (entry.Metadata.GetTableName() is { } table)
+            {
+                tables.Add(table);
+                if (!changes.TryGetValue(table, out var change)) changes[table] = change = new TableChange();
+                change.Note(entry);
+            }
 
             // Удаление каскадит в БАЗЕ на зависимые строки, которых трекер не видел (их не
             // загружали): удалили группу — ушли её состав, медиа, тренировки. Их таблицы берём
@@ -171,7 +188,51 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
             if (entry.State == EntityState.Deleted) AddCascadeTables(entry.Metadata, tables, []);
         }
 
-        _states.GetOrCreateValue(context).Saving = tables.Select(CacheTags.Table).ToArray();
+        var state = _states.GetOrCreateValue(context);
+        state.Saving = tables.Select(CacheTags.Table).ToArray();
+        state.SavingReason = Describe(changes, tables);
+    }
+
+    /// <summary>Сколько строк таблицы добавлено, изменено, удалено и какие колонки правились.</summary>
+    private sealed class TableChange
+    {
+        private int _added, _modified, _deleted;
+        private readonly SortedSet<string> _columns = new(StringComparer.Ordinal);
+
+        public void Note(EntityEntry entry)
+        {
+            switch (entry.State)
+            {
+                case EntityState.Added: _added++; break;
+                case EntityState.Deleted: _deleted++; break;
+                case EntityState.Modified:
+                    _modified++;
+                    foreach (var p in entry.Properties)
+                        if (p.IsModified) _columns.Add(p.Metadata.Name);
+                    break;
+            }
+        }
+
+        /// <summary>«~2 (Name, UpdatedAt) +1 −3» — что увидит админ в журнале.</summary>
+        public override string ToString()
+        {
+            var parts = new List<string>(3);
+            if (_modified > 0) parts.Add(_columns.Count > 0 ? $"~{_modified} ({string.Join(", ", _columns)})" : $"~{_modified}");
+            if (_added > 0) parts.Add($"+{_added}");
+            if (_deleted > 0) parts.Add($"−{_deleted}");
+            return string.Join(" ", parts);
+        }
+    }
+
+    /// <summary>
+    /// Подпись сохранения: «SaveChanges: HubGroups ~1 (TrainingSchedule, UpdatedAt); каскад: …».
+    /// Каскад — таблицы, которые сбрасываются только потому, что удаление уходит в них в базе.
+    /// </summary>
+    private static string Describe(SortedDictionary<string, TableChange> changes, HashSet<string> tables)
+    {
+        var text = "SaveChanges: " + string.Join("; ", changes.Select(c => $"{c.Key} {c.Value}"));
+        var cascade = tables.Where(t => !changes.ContainsKey(t)).Order(StringComparer.Ordinal).ToList();
+        return cascade.Count > 0 ? $"{text}; каскад: {string.Join(", ", cascade)}" : text;
     }
 
     private static void AddCascadeTables(IEntityType principal, HashSet<string> tables, HashSet<IEntityType> seen)
@@ -193,16 +254,21 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
         if (context is null || !_states.TryGetValue(context, out var state) || state.Saving is not { } tags)
             return Task.CompletedTask;
         state.Saving = null;
-        return InvalidateAfterCommitAsync(context, tags);
+        return InvalidateAfterCommitAsync(context, tags, state.SavingReason);
     }
 
-    private Task FlushPendingAsync(DbContext? context)
+    private Task FlushPendingAsync(DbContext? context, bool failed)
     {
         if (context is null || !_states.TryGetValue(context, out var state) || state.Pending.Count == 0)
             return Task.CompletedTask;
         var tags = state.Pending.ToArray();
+        var reason = state.PendingReasons.Count == 1
+            ? state.PendingReasons[0]
+            : "транзакция: " + string.Join(" | ", state.PendingReasons);
+        if (failed) reason = "сбой коммита, сброшено на всякий случай — " + reason;
         state.Pending.Clear();
-        return cache.InvalidateTagsAsync(tags);
+        state.PendingReasons.Clear();
+        return cache.InvalidateTagsAsync(tags, reason);
     }
 
     private void ForgetSaving(DbContext? context)
@@ -212,7 +278,9 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
 
     private void ForgetPending(DbContext? context)
     {
-        if (context is not null && _states.TryGetValue(context, out var state)) state.Pending.Clear();
+        if (context is null || !_states.TryGetValue(context, out var state)) return;
+        state.Pending.Clear();
+        state.PendingReasons.Clear();
     }
 }
 
@@ -239,6 +307,6 @@ public static class DbContextCacheExtensions
     public static Task InvalidateCacheTagsAsync(this DbContext db, params string[] tags) =>
         db.GetService<IDbContextOptions>().FindExtension<CoreOptionsExtension>()?.Interceptors?
             .OfType<CacheInvalidationInterceptor>().FirstOrDefault()?
-            .InvalidateAfterCommitAsync(db, tags)
+            .InvalidateAfterCommitAsync(db, tags, "массовая запись мимо EF (ExecuteUpdate/ExecuteDelete)")
         ?? Task.CompletedTask;
 }

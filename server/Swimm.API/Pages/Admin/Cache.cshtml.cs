@@ -37,10 +37,14 @@ public class CacheModel : PageModel
     /// </summary>
     public IReadOnlyList<CacheEntryInfo> Untagged { get; private set; } = [];
 
+    /// <summary>Журнал сбросов (К4б.1): кто что сбросил и кого это выкинуло.</summary>
+    public CacheJournal Journal { get; private set; } = new(DateTimeOffset.UtcNow, [], 0, []);
+
     public void OnGet()
     {
         Policies = CachePolicyCatalog.Build(typeof(CacheModel).Assembly);
         Entries = _diagnostics.Snapshot();
+        Journal = _diagnostics.Journal();
         TagCounts = Entries
             .SelectMany(e => e.Tags)
             .GroupBy(t => t)

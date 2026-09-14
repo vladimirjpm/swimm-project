@@ -99,9 +99,10 @@
         <strong class="text-admin-text">И сбрасываются сами:</strong> сохранение в базу сбрасывает
         метки таблиц, которые оно изменило, — и только <strong class="text-admin-text">после коммита</strong>
         транзакции, иначе соседний запрос успел бы положить в кэш старые данные. Правка расписания
-        группы роняет страницы групп, а season-best, рекорды и клубы остаются. Удаление заодно
-        сбрасывает таблицы, куда оно каскадит в базе. Ручного сброса в местах записи нет — забыть
-        его нельзя (<code>docs/plans/cache-tags-plan.md</code>, К4).
+        группы роняет страницы групп и обзоры клубов (обзор показывает официальную группу клуба),
+        а season-best и рекорды остаются. Удаление заодно сбрасывает таблицы, куда оно каскадит в
+        базе. Ручного сброса в местах записи нет — забыть его нельзя
+        (<code>docs/plans/cache-tags-plan.md</code>, К4). Кто что сбросил — в журнале ниже.
     </p>
     <p>
         <strong class="text-admin-text">Весь кэш сбрасывают</strong> только импорт протоколов, смена
@@ -167,6 +168,80 @@
                 </table>
             </div>
         </details>
+    }
+</div>
+
+@{ var journal = Model.Journal; }
+<h2 class="text-lg text-admin-accent m-0 mb-2">Журнал сбросов</h2>
+<div class="admin-card mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
+    <p class="mt-0">
+        Кто что сбросил и какие записи это выкинуло — с запуска сервера
+        (@journal.Since.ToLocalTime().ToString("dd.MM.yyyy HH:mm")). В таблице — последние сбросы,
+        выкинувшие хоть одну запись; пустых (метку никто не носил) было @journal.EmptyCount.
+        Журнал живёт в памяти процесса: перезапуск его обнуляет, у каждого экземпляра сервера он свой.
+    </p>
+    @if (journal.Drops.Count > 0)
+    {
+        <p class="mb-2">Кого выкидывают — вид записи · сбросом по меткам / общим сбросом:</p>
+        <div class="flex flex-wrap gap-1.5 mb-4">
+            @foreach (var d in journal.Drops)
+            {
+                <span class="text-[0.7rem] py-0.5 px-1.5 rounded-sm font-semibold whitespace-nowrap bg-admin-accent/15 text-admin-accent">@d.Kind · @d.ByTags / @d.ByAll</span>
+            }
+        </div>
+    }
+    @if (journal.Events.Count == 0)
+    {
+        <p class="m-0">Сбросов пока не было.</p>
+    }
+    else
+    {
+        <div class="overflow-x-auto">
+            <table class="admin-table">
+                <thead>
+                    <tr><th>Когда</th><th>Кто и почему</th><th>Метки</th><th>Выкинуто</th></tr>
+                </thead>
+                <tbody>
+                @foreach (var e in journal.Events)
+                {
+                    <tr>
+                        <td class="align-top text-xs whitespace-nowrap">@e.At.ToLocalTime().ToString("dd.MM HH:mm:ss")</td>
+                        <td class="align-top text-xs">@e.Reason</td>
+                        <td class="align-top text-xs">
+                            @if (e.All)
+                            {
+                                <strong class="text-admin-text">весь кэш</strong>
+                            }
+                            else
+                            {
+                                <span>@string.Join(", ", e.Tags.Take(6))@(e.Tags.Count > 6 ? $" +{e.Tags.Count - 6}" : "")</span>
+                            }
+                        </td>
+                        <td class="align-top text-xs">
+                            @if (e.DroppedCount == 0)
+                            {
+                                <span>0</span>
+                            }
+                            else
+                            {
+                                <details>
+                                    <summary class="cursor-pointer text-admin-text">@e.DroppedCount</summary>
+                                    @foreach (var key in e.DroppedKeys)
+                                    {
+                                        <div><code>@key</code></div>
+                                    }
+                                    @if (e.DroppedCount > e.DroppedKeys.Count)
+                                    {
+                                        <div>… и ещё @(e.DroppedCount - e.DroppedKeys.Count)</div>
+                                    }
+                                </details>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
     }
 </div>
 

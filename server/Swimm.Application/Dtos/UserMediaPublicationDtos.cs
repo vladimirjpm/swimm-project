@@ -104,7 +104,10 @@ public class PublicationDecisionRequest
     public bool Approve { get; set; }
 }
 
-/// <summary>Строка inbox-а модерации для админа группы.</summary>
+/// <summary>
+/// Строка inbox-а модерации для админа группы. ⚠ Только модераторам: в ней владелец медиа
+/// (email и id). Публичные ленты отдают <see cref="PublishedMediaItemDto"/>.
+/// </summary>
 public class GroupPublicationInboxItemDto
 {
     [JsonPropertyName("id")]
@@ -165,6 +168,46 @@ public class GroupPublicationInboxItemDto
     /// Соревнование медиа: день заплыва-якоря, а если медиа подано на всё соревнование —
     /// оно само. Нужен, чтобы подпись вела в протокол (`routes.competitionSwims` просит id).
     /// </summary>
+    [JsonPropertyName("competition_id")]
+    public int? CompetitionId { get; set; }
+}
+
+/// <summary>
+/// Одобренная публикация в ленте, которую видит посетитель, — клуба или группы (уровни
+/// public и members). Сознательно БЕЗ владельца медиа и без названия цели: кто подал медиа,
+/// знают только модераторы (<see cref="GroupPublicationInboxItemDto"/>), а цель ленты зритель
+/// и так видит. Узкая проекция держит и кэш: страница группы, собранная из неё, не читает
+/// <c>Sys_AppUsers</c> и не выпадает из кэша на каждом входе через Google
+/// (docs/plans/cache-row-precision-plan.md, К4б.0).
+/// </summary>
+public class PublishedMediaItemDto
+{
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+
+    [JsonPropertyName("media_type")]
+    public string MediaType { get; set; } = string.Empty;
+
+    [JsonPropertyName("source_type")]
+    public string SourceType { get; set; } = string.Empty;
+
+    [JsonPropertyName("url")]
+    public string Url { get; set; } = string.Empty;
+
+    [JsonPropertyName("swimmer_id")]
+    public int SwimmerId { get; set; }
+
+    [JsonPropertyName("swimmer_name")]
+    public string? SwimmerName { get; set; }
+
+    [JsonPropertyName("result_id")]
+    public long? ResultId { get; set; }
+
+    /// <summary>Подпись заплыва (стиль/дистанция/дата), если медиа привязано к заплыву.</summary>
+    [JsonPropertyName("result_label")]
+    public string? ResultLabel { get; set; }
+
+    /// <summary>Соревнование медиа: день заплыва-якоря, либо само соревнование у медиа без заплыва.</summary>
     [JsonPropertyName("competition_id")]
     public int? CompetitionId { get; set; }
 }

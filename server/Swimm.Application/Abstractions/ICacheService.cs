@@ -61,6 +61,18 @@ public interface ICacheService
     Task InvalidateTagsAsync(params string[] tags) => InvalidateAllAsync();
 
     /// <summary>
+    /// То же, с подписью «кто и почему» — для журнала сбросов на /Admin/Cache
+    /// (<see cref="ICacheDiagnostics.Journal"/>). Подпись — только диагностика: что сбросится,
+    /// решают метки. Метки — коллекцией: одиночную метку строкой сюда не передать, иначе
+    /// подпись ушла бы в метки через перегрузку с <c>params</c>. Реализация без журнала
+    /// подпись теряет.
+    /// </summary>
+    Task InvalidateTagsAsync(IReadOnlyCollection<string> tags, string reason) => InvalidateTagsAsync([.. tags]);
+
+    /// <summary>Общий сброс с подписью для журнала (импорт, кнопка, настройки).</summary>
+    Task InvalidateAllAsync(string reason) => InvalidateAllAsync();
+
+    /// <summary>
     /// Сбрасывает весь кэш (= метка <see cref="Constants.CacheTags.All"/>). После записи в базу
     /// звать НЕ нужно: сохранение через EF сбрасывает метки своих таблиц само (К4), массовая
     /// запись — явными метками. Общий сброс — для импорта, настроек (они в памяти, не в базе)

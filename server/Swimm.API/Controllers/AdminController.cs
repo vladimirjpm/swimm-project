@@ -153,7 +153,7 @@ public class AdminController : ControllerBase
         // Настройки живут в памяти, не в базе, — сброс по меткам таблиц их не видит. А кэшированные
         // ответы от них зависят: ось возраста рекордов (RecordAgeAxis) в ключ кэша не входит, и без
         // сброса обзор соревнования и страница пловца до 5 минут считали бы по старой оси.
-        await _cacheService.InvalidateAllAsync();
+        await _cacheService.InvalidateAllAsync($"настройка «{key}» изменена");
         await _audit.LogAsync("setting.update", "Setting", key,
             $"Настройка «{key}» изменена на «{request.Value}»", new { key, request.Value });
         return Ok(_settings.Get(key));
@@ -214,7 +214,7 @@ public class AdminController : ControllerBase
     [HttpPost("cache/invalidate")]
     public async Task<IActionResult> InvalidateCache()
     {
-        await _cacheService.InvalidateAllAsync();
+        await _cacheService.InvalidateAllAsync("кнопка «Сбросить весь серверный кэш»");
         await _audit.LogAsync("cache.invalidate", "Cache", null,
             "Сброшен кэш агрегатов (пересчёт при следующем запросе)");
         return Ok(new { message = "Cache invalidated" });

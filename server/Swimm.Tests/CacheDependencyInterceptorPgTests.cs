@@ -113,4 +113,40 @@ public class CacheDependencyInterceptorPgTests
         Assert.DoesNotContain(cache.Snapshot(), e => e.Key == $"http:hub-groups:group:{slug}");
         Assert.Contains(cache.Snapshot(), e => e.Key == "http:season-best:table:cur");
     }
+
+    /// <summary>
+    /// К4б.0 (cache-row-precision-plan): страница группы не собрана из <c>Sys_AppUsers</c> — иначе
+    /// каждый вход через Google (он всегда пишет строку пользователя) выкидывал бы страницы всех
+    /// групп. Раньше метку приносила лента публикаций: общая с inbox-ом модерации проекция тянула
+    /// email владельца медиа, который страница тут же выбрасывала. Inbox метку сохраняет — это и
+    /// проверка, что тест вообще видит <c>Sys_AppUsers</c> в SQL.
+    /// </summary>
+    [Fact]
+    public async Task GroupPage_DoesNotDependOnAppUsers_ModerationInboxDoes()
+    {
+        await using var read = TryRead();
+        if (read == null) return;
+        var group = await read.HubGroups.OrderBy(g => g.Id).Select(g => new { g.Id, g.Slug }).FirstOrDefaultAsync();
+        if (group == null) return; // групп нет — нечего проверять
+        await using var rw = Rw();
+        var cache = NewCache();
+
+        var groups = new HubGroupPublicRepository(read, rw, new SettingsStub());
+        var media = new HubGroupMediaService(rw);
+        var publications = new UserMediaPublicationService(rw);
+
+        // Те же три шага, что фабрика страницы группы в HubGroupsController.GetGroup.
+        await cache.GetOrCreateAsync<HubGroupDetailsDto?>("group-page", async () =>
+        {
+            var dto = await groups.GetBySlugAsync(group.Slug);
+            await media.GetGalleryAsync(group.Id);
+            await publications.GetApprovedForGroupAsync(group.Id, "public");
+            return dto;
+        }, TimeSpan.FromMinutes(5));
+        await cache.GetOrCreateAsync("moderation-inbox",
+            () => publications.GetForGroupAsync(group.Id), TimeSpan.FromMinutes(5));
+
+        Assert.DoesNotContain(CacheTags.Table("Sys_AppUsers"), TagsOf(cache, "group-page"));
+        Assert.Contains(CacheTags.Table("Sys_AppUsers"), TagsOf(cache, "moderation-inbox"));
+    }
 }

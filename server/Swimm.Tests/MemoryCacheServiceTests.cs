@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Caching.Memory;
+using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
 using Swimm.Infrastructure.Services;
 using Xunit;
@@ -354,4 +355,114 @@ public class MemoryCacheServiceTests
             cache.SetAsync("page", (new List<int> { 1 }, true, 3), Ttl));
         Assert.Contains("кортеж", ex.Message);
     }
+
+    // ── Журнал сбросов (К4б.1, docs/plans/cache-row-precision-plan.md) ────────────────
+
+    [Fact]
+    public async Task Journal_RecordsWhoDroppedWhat()
+    {
+        var cache = NewCache();
+        var groups = CacheTags.Table("HubGroups");
+        await cache.SetAsync("http:hub-groups:group:b", new Payload("b"), Ttl, groups);
+        await cache.SetAsync("http:hub-groups:group:a", new Payload("a"), Ttl, groups);
+        await cache.SetAsync("http:season-best:table", new Payload("s"), Ttl, CacheTags.Table("Results"));
+
+        await cache.InvalidateTagsAsync([groups], "правка расписания");
+
+        var journal = cache.Journal();
+        var e = Assert.Single(journal.Events);
+        Assert.Equal("правка расписания", e.Reason);
+        Assert.Equal([groups], e.Tags);
+        Assert.False(e.All);
+        Assert.Equal(2, e.DroppedCount);
+        Assert.Equal(["http:hub-groups:group:a", "http:hub-groups:group:b"], e.DroppedKeys); // по алфавиту
+        Assert.Equal(new CacheDropStats("http:hub-groups", 2, 0), Assert.Single(journal.Drops));
+    }
+
+    [Fact]
+    public async Task Journal_EmptyInvalidation_IsCountedButNotListed()
+    {
+        // Сброс метки, которую никто не носит, — самый частый: он не должен вытеснять из журнала
+        // то, ради чего журнал заведён.
+        var cache = NewCache();
+        await cache.SetAsync("page", new Payload("p"), Ttl, CacheTags.Table("Records"));
+
+        await cache.InvalidateTagsAsync([CacheTags.Table("Sys_UserLoginHistory")], "чистка истории входов");
+
+        var journal = cache.Journal();
+        Assert.Empty(journal.Events);
+        Assert.Equal(1, journal.EmptyCount);
+    }
+
+    [Fact]
+    public async Task Journal_DoesNotCountAnEntryTwice()
+    {
+        // Выкинутая запись может ещё лежать в индексе (IMemoryCache вытесняет лениво) — второй
+        // сброс той же метки не должен выдать её за новую жертву.
+        var cache = NewCache();
+        var tag = CacheTags.Table("Records");
+        await cache.SetAsync("page", new Payload("p"), Ttl, tag);
+
+        await cache.InvalidateTagsAsync([tag], "первый");
+        await cache.InvalidateTagsAsync([tag], "второй");
+
+        var journal = cache.Journal();
+        Assert.Equal("первый", Assert.Single(journal.Events).Reason);
+        Assert.Equal(1, journal.EmptyCount);
+    }
+
+    [Fact]
+    public async Task Journal_InvalidateAll_ListsEveryLiveEntry_CountedAsAll()
+    {
+        var cache = NewCache();
+        await cache.SetAsync("http:swimmer:1:profile", new Payload("a"), Ttl, CacheTags.Table("Swimmers"));
+        await cache.SetAsync("swimmer-profile:1", new Payload("b"), Ttl);
+
+        await cache.InvalidateAllAsync("импорт протокола");
+
+        var journal = cache.Journal();
+        var e = Assert.Single(journal.Events);
+        Assert.True(e.All);
+        Assert.Equal("импорт протокола", e.Reason);
+        Assert.Equal(2, e.DroppedCount);
+        Assert.Equal(
+            [new CacheDropStats("http:swimmer", 0, 1), new CacheDropStats("swimmer-profile", 0, 1)],
+            journal.Drops);
+    }
+
+    [Fact]
+    public async Task Journal_InvalidateAll_IsListedEvenWhenTheCacheIsEmpty()
+    {
+        // Импорт в 12:00 — событие, даже если выкидывать было нечего.
+        var cache = NewCache();
+
+        await cache.InvalidateAllAsync("кнопка");
+
+        Assert.Equal(0, Assert.Single(cache.Journal().Events).DroppedCount);
+    }
+
+    [Fact]
+    public async Task Journal_KeepsTheLatest200_NewestFirst()
+    {
+        var cache = NewCache();
+        for (var i = 0; i < 250; i++)
+        {
+            var tag = CacheTags.Table($"T{i}");
+            await cache.SetAsync($"page-{i}", new Payload("p"), Ttl, tag);
+            await cache.InvalidateTagsAsync([tag], $"r{i}");
+        }
+
+        var events = cache.Journal().Events;
+        Assert.Equal(200, events.Count);
+        Assert.Equal("r249", events[0].Reason);
+        Assert.Equal("r50", events[^1].Reason);
+    }
+
+    [Theory]
+    [InlineData("http:swimmer:5825:profile", "http:swimmer")]
+    [InlineData("http:hub-groups:group:masters:perGroup", "http:hub-groups")]
+    [InlineData("swimmer-profile:5825", "swimmer-profile")]
+    [InlineData("winter-championship-dates", "winter-championship-dates")]
+    public void Journal_KindOfEntry_IsThePage_NotTheId(string key, string kind) =>
+        Assert.Equal(kind, MemoryCacheService.KindOf(key));
 }

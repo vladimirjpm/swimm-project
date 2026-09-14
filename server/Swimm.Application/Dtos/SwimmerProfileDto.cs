@@ -93,4 +93,20 @@ public class SwimmerProfileDto
     /// <summary>Сезоны с заплывами, от свежих к старым; ровно один — isDisplayDefault.</summary>
     [JsonPropertyName("seasons")]
     public List<SwimmerSeasonOptionDto> Seasons { get; set; } = [];
+
+    /// <summary>
+    /// Копия, в которую страница пловца дописывает поля шапки (сезоны, рекорды, программы).
+    /// Базовый профиль лежит в кэше (<c>swimmer-profile:{id}</c>), и дописывать в САМ объект из
+    /// кэша нельзя: в памяти правка видна всем следующим читателям, в Redis — нет, там копия
+    /// (docs/plans/cache-tags-plan.md §4-3). Поля копируются все — новое поле пловца забыть нельзя;
+    /// списки новые — общий с кэшем список правился бы и там.
+    /// </summary>
+    public SwimmerProfileDto CopyForPage()
+    {
+        var copy = (SwimmerProfileDto)MemberwiseClone();
+        copy.Programs = [.. Programs];
+        copy.Records = [.. Records];
+        copy.Seasons = [.. Seasons];
+        return copy;
+    }
 }
