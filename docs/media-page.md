@@ -110,6 +110,10 @@ client/media.html → client/src/pages/media-page.tsx → MyMedia (my-media.tsx)
 источник, url, пловец, подпись заплыва, соревнование. Сторож — тест
 `PublicFeeds_DoNotCarryTheMediaOwner`. Узкая проекция держит и кэш: страница группы не читает
 `Sys_AppUsers` и не выпадает из кэша на каждом входе через Google (cache-row-precision-plan К4б.0).
+Лента собирается ДВУМЯ запросами (`UserMediaPublicationService.PublishedItemsAsync`, К4б.4):
+публикации цели, потом медиа по списку их id. Не склеивать обратно в один JOIN: так кэш сужает
+страницу группы до её публикаций и её медиа, и запись в My media без публикации (или правка
+чужого медиа) её не роняет.
 | POST | `/api/clubs/{id}/media/publications/{pubId}/decision` | решение по клубной заявке | только site admin: управляющих у клуба нет до «claim your club» |
 
 Смежные, но не в `MediaController`:

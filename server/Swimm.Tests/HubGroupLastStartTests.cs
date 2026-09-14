@@ -114,7 +114,7 @@ public class HubGroupLastStartTests
             Swim(w, w.A, day2, 12));                             // свежая, но 12-я
         await db.SaveChangesAsync();
 
-        var last = (await Repo(db).GetBySlugAsync(w.Group.Slug))!.LastStart;
+        var last = (await Repo(db).GetPageAsync(w.Group.Id, w.Group.Slug))!.LastStart;
 
         Assert.NotNull(last);
         Assert.Equal(ev.Id, last!.EventId);
@@ -144,7 +144,7 @@ public class HubGroupLastStartTests
         db.Results.AddRange(Swim(w, w.A, league, 1), Swim(w, w.B, league, 2));
         await db.SaveChangesAsync();
 
-        var last = (await Repo(db).GetBySlugAsync(w.Group.Slug))!.LastStart;
+        var last = (await Repo(db).GetPageAsync(w.Group.Id, w.Group.Slug))!.LastStart;
 
         Assert.NotNull(last);
         Assert.Null(last!.EventId);
@@ -162,7 +162,7 @@ public class HubGroupLastStartTests
         await using var db = CreateDb(nameof(LastStart_NullWhenRosterNeverSwam));
         var w = await SeedAsync(db);
 
-        var page = await Repo(db).GetBySlugAsync(w.Group.Slug);
+        var page = await Repo(db).GetPageAsync(w.Group.Id, w.Group.Slug);
 
         Assert.Null(page!.LastStart);
     }

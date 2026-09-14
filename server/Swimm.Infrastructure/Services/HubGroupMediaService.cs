@@ -17,12 +17,18 @@ public class HubGroupMediaService : IHubGroupMediaService
     public HubGroupMediaService(SwimmDbContext db) => _db = db;
 
     public async Task<List<HubGroupMediaDto>> GetGalleryAsync(int hubGroupId)
-        => await _db.HubGroupMedia.AsNoTracking()
-            .Where(m => m.HubGroupId == hubGroupId && m.TrainingId == null
-                        && m.Visibility == HubGroupMediaVisibility.Public)
-            .OrderBy(m => m.Id)
-            .Select(ToDto)
-            .ToListAsync();
+    {
+        // Медиа ЭТОЙ группы (фильтр по HubGroupId): страница группы зависит от своей строки, а
+        // не от таблицы — медиа чужой группы её не роняет (docs/plans/cache-row-precision-plan.md
+        // §3.1, Q13). Вне сборки кэша блок пустой.
+        using (_db.CacheRows<HubGroup>(hubGroupId, typeof(HubGroupMedia)))
+            return await _db.HubGroupMedia.AsNoTracking()
+                .Where(m => m.HubGroupId == hubGroupId && m.TrainingId == null
+                            && m.Visibility == HubGroupMediaVisibility.Public)
+                .OrderBy(m => m.Id)
+                .Select(ToDto)
+                .ToListAsync();
+    }
 
     public async Task<List<HubGroupMemberMediaDto>> GetMembersMediaAsync(int hubGroupId)
         => await _db.HubGroupMedia.AsNoTracking()
