@@ -24,7 +24,12 @@ public class ClubsPublicController : ControllerBase
     private readonly IClubOverviewRepository _overview;
     private readonly ICacheService _cache;
 
-    private const string CacheControlValue = "public, max-age=60";
+    /// <summary>
+    /// <c>no-cache</c> (ревалидация по ETag перед каждым использованием), а не <c>max-age</c>:
+    /// страницу правят из её таба Admin, и с max-age=60 правка минуту не была видна — та же
+    /// причина, что у страницы группы (см. <see cref="HubGroupsController"/>).
+    /// </summary>
+    private const string CacheControlValue = "public, no-cache";
     private const int DefaultGridSeasons = 3;
     private const int MaxGridSeasons = 20;
     private static readonly TimeSpan PayloadTtl = TimeSpan.FromMinutes(5);

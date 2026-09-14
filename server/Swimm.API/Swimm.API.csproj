@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <!-- EF Design/Tools нужны в startup-проекте для команд dotnet ef migrations -->
+    <PackageReference Include="Markdig" Version="1.3.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.2">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
@@ -73,18 +74,14 @@
     <ItemGroup>
       <!-- data/json и data/excel — наследие Фазы 2 (15 МБ), их не читает ни один модуль
            клиента; в артефакт деплоя не берём. -->
-      <ClientDistFile Include="$(ClientDir)/dist/**/*"
-                      Exclude="$(ClientDir)/dist/data/json/**/*;$(ClientDir)/dist/data/excel/**/*" />
+      <ClientDistFile Include="$(ClientDir)/dist/**/*" Exclude="$(ClientDir)/dist/data/json/**/*;$(ClientDir)/dist/data/excel/**/*" />
     </ItemGroup>
 
-    <Error Condition="'@(ClientDistFile)' == ''"
-           Text="Сборка клиента пуста: $(ClientDir)/dist не существует или не содержит файлов." />
+    <Error Condition="'@(ClientDistFile)' == ''" Text="Сборка клиента пуста: $(ClientDir)/dist не существует или не содержит файлов." />
 
-    <Copy SourceFiles="@(ClientDistFile)"
-          DestinationFiles="@(ClientDistFile->'$(PublishDir)wwwroot/%(RecursiveDir)%(Filename)%(Extension)')"
-          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(ClientDistFile)" DestinationFiles="@(ClientDistFile->'$(PublishDir)wwwroot/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
 
-    <Message Importance="high" Text="Клиент опубликован в $(PublishDir)wwwroot: @(ClientDistFile->Count()) файлов." />
+    <Message Importance="high" Text="Клиент опубликован в $(PublishDir)wwwroot: @(ClientDistFile-&gt;Count()) файлов." />
   </Target>
 
 </Project>

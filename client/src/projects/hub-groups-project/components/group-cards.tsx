@@ -3,8 +3,9 @@ import { ClubRecordCard, ClubRecordTile, type PoolFilter } from '../../club-proj
 import DeepDigestCard from '../../components/deep/digest-card';
 import SwimRow from '../../components/swim-row/swim-row';
 import { routes } from '../../../utils/routes';
+import HelperResults from '../../../utils/helpers/helper-results';
 import { GROUP_DISCLAIMER, ROLE_LABEL, swimmerDisplayName } from './group-bits';
-import type { HubGroupDetails, HubGroupStanding } from '../types';
+import type { HubGroupDetails, HubGroupRecentResult, HubGroupStanding } from '../types';
 
 /**
  * Карточки страницы группы — на ОБЩИХ примитивах, а не на своей вёрстке (этап C плана
@@ -212,6 +213,52 @@ function GroupRecordsCard({ group }: { group: HubGroupDetails }) {
   );
 }
 
+/**
+ * Строка заплыва группы — ОДНА на обе карточки (Recent swims и Last start).
+ *
+ * Раньше каждая карточка раскладывала `SwimRow` сама, и обе теряли одно и то же: медаль
+ * рисовалась серой всегда (правила медали строка не спрашивала — хотя `is_award` в ленте
+ * есть), признак спорного времени не передавался (И11), у снятого вместо «DQ / SW 4.4»
+ * стояла одна красная «*», а эстафета подписывалась именем одной ноги.
+ */
+function GroupSwimRow({ r, showCompetition = false }: { r: HubGroupRecentResult; showCompetition?: boolean }) {
+  // Место показываем как в протоколе, медаль — только где её вручали (одно правило на продукт).
+  const isMedal = HelperResults.isMedalPlace({
+    place: r.position,
+    heatType: r.heat_type,
+    round: r.round,
+    timeFail: r.time_fail,
+    competitionIsAward: r.is_award,
+  });
+
+  return (
+    <SwimRow
+      stroke={r.event_style_name}
+      distance={r.event_style_len}
+      poolType={r.pool_type}
+      time={r.time}
+      quality={r.suspect_reason ? { kind: 'protocol', reason: r.suspect_reason } : null}
+      timeFail={r.time_fail}
+      timeFailNote={r.time_fail_note}
+      heatType={r.heat_type}
+      place={r.position != null ? { kind: 'medal', value: r.position, isAward: isMedal } : { kind: 'none' }}
+      swimmer={{
+        name: swimmerDisplayName(r.last_name, r.first_name, r.last_name_en, r.first_name_en),
+        club: r.is_relay ? r.relay_team_name : null,
+        isRelay: r.is_relay,
+        relaySwimmersName: r.relay_swimmers_name,
+        showClubIcon: false,
+      }}
+      competition={showCompetition ? { name: r.competition } : null}
+      date={r.date}
+      points={r.international_points}
+      // Ссылки на старт у строки нет: лента отдаёт НАЗВАНИЕ соревнования, но не его
+      // id (`HubGroupRecentResult`), а `routes.competitionSwims` просит именно id.
+      // Кликабельной строку сделает добавление id в DTO, а не догадка на клиенте.
+    />
+  );
+}
+
 /** Последние заплывы — ОБЩЕЙ строкой заплыва, а не своей таблицей. */
 function GroupRecentSwimsCard({ group }: { group: HubGroupDetails }) {
   return (
@@ -225,30 +272,7 @@ function GroupRecentSwimsCard({ group }: { group: HubGroupDetails }) {
         </div>
       ) : (
         <div className="deep-list mt-4">
-          {group.recent_results.map((r) => (
-            <SwimRow
-              key={r.id}
-              stroke={r.event_style_name}
-              distance={r.event_style_len}
-              poolType={r.pool_type}
-              time={r.time}
-              timeFail={r.time_fail}
-              // Место протокольное; награждаемость строка ленты не знает, поэтому диск серый —
-              // выдавать его за медаль нельзя (правило четырёх видов места, см. SwimRow).
-              place={r.position != null ? { kind: 'medal', value: r.position, isAward: false } : { kind: 'none' }}
-              swimmer={{
-                name: swimmerDisplayName(r.last_name, r.first_name, r.last_name_en, r.first_name_en),
-                showClubIcon: false,
-              }}
-              competition={{ name: r.competition }}
-              date={r.date}
-              points={r.international_points}
-              extras={r.is_relay ? <span>relay</span> : undefined}
-              // Ссылки на старт у строки нет: лента отдаёт НАЗВАНИЕ соревнования, но не его
-              // id (`HubGroupRecentResult`), а `routes.competitionSwims` просит именно id.
-              // Кликабельной строку сделает добавление id в DTO, а не догадка на клиенте.
-            />
-          ))}
+          {group.recent_results.map((r) => <GroupSwimRow key={r.id} r={r} showCompetition />)}
         </div>
       )}
     </section>
@@ -262,7 +286,6 @@ function GroupRecentSwimsCard({ group }: { group: HubGroupDetails }) {
 
 const DIGEST_RECORDS = 4;
 const DIGEST_MEMBERS = 4;
-const DIGEST_SWIMS = 5;
 
 /** Рекорды группы: четыре плитки той же формы, что на своём табе. */
 function GroupRecordsDigest({ group, onMore }: { group: HubGroupDetails; onMore: () => void }) {
@@ -296,47 +319,45 @@ function GroupRecordsDigest({ group, onMore }: { group: HubGroupDetails; onMore:
   );
 }
 
+/** «28–30/07/2026» у дней одного месяца, иначе обе даты целиком; однодневный — одна дата. */
+function dateRangeLabel(from: string, to: string): string {
+  if (from === to) return from;
+  const [d1, m1, y1] = from.split('/');
+  const [, m2, y2] = to.split('/');
+  return m1 === m2 && y1 === y2 ? `${d1}–${to}` : `${from} – ${to}`;
+}
+
 /**
- * Последний старт: заплывы САМОГО СВЕЖЕГО соревнования ленты.
+ * Последний старт — ВЕСЬ турнир самого свежего заплыва ростера (`last_start`, считает сервер).
  *
- * Лента приходит отсортированной по дате вниз, поэтому «последний старт» — это соревнование
- * первой строки, а его заплывы — все строки с тем же названием. По названию, а не по дате:
- * многодневка это несколько дней одного турнира, и срез по дате показал бы один день.
+ * До 11.09.2026 карточка резала его из ленты `recent_results`, обрезанной до 25 строк, и
+ * врала трижды: «25 swims» было лимитом ленты (на чемпионате 28–30.07 у ростера 113
+ * заплывов), золото считалось по обрезку (1 вместо 6) и мимо правила медали, а пятью
+ * строками шли последние по id — 12-е, 11-е и 10-е места при шести золотах.
  */
 function GroupLastStartCard({ group, onMore }: { group: HubGroupDetails; onMore: () => void }) {
-  const first = group.recent_results[0];
-  const rows = first ? group.recent_results.filter((r) => r.competition === first.competition) : [];
-  const golds = rows.filter((r) => r.position === 1).length;
+  const last = group.last_start;
+  const medals = last
+    ? [
+        last.golds > 0 ? `🥇${last.golds}` : '',
+        last.silvers > 0 ? `🥈${last.silvers}` : '',
+        last.bronzes > 0 ? `🥉${last.bronzes}` : '',
+      ].filter(Boolean).join(' ')
+    : '';
 
   return (
     <DeepDigestCard
-      title={first ? first.competition : 'Last start'}
-      subtitle={first
-        ? `${first.date} · ${rows.length} swims${golds > 0 ? ` · ${golds} gold` : ''}`
+      title={last ? last.name : 'Last start'}
+      subtitle={last
+        ? [dateRangeLabel(last.date_from, last.date_to), `${last.swims} swims`, medals].filter(Boolean).join(' · ')
         : undefined}
       moreLabel="All recent swims →"
       onMore={onMore}
-      isEmpty={rows.length === 0}
+      isEmpty={!last || last.rows.length === 0}
       emptyText="No swims yet."
     >
       <div className="deep-list">
-        {rows.slice(0, DIGEST_SWIMS).map((r) => (
-          <SwimRow
-            key={r.id}
-            stroke={r.event_style_name}
-            distance={r.event_style_len}
-            poolType={r.pool_type}
-            time={r.time}
-            timeFail={r.time_fail}
-            place={r.position != null ? { kind: 'medal', value: r.position, isAward: false } : { kind: 'none' }}
-            swimmer={{
-              name: swimmerDisplayName(r.last_name, r.first_name, r.last_name_en, r.first_name_en),
-              showClubIcon: false,
-            }}
-            date={r.date}
-            points={r.international_points}
-          />
-        ))}
+        {last?.rows.map((r) => <GroupSwimRow key={r.id} r={r} />)}
       </div>
     </DeepDigestCard>
   );

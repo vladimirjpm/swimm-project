@@ -23,7 +23,7 @@ public class RecordRepository : IRecordRepository
         _cache = cache;
     }
 
-    public async Task<IReadOnlyList<RecordDto>> GetRecordsAsync(
+    public Task<IReadOnlyList<RecordDto>> GetRecordsAsync(
         string region, string? category = null, bool withHolderDetails = false)
     {
         // Регион нормализуем к ключу кэша: records:{region}:{category|all}[:details]
@@ -31,10 +31,14 @@ public class RecordRepository : IRecordRepository
         var cacheKey = $"records:{regionKey}:{category ?? "all"}"
                      + (withHolderDetails ? ":details" : "");
 
-        var cached = await _cache.GetAsync<IReadOnlyList<RecordDto>>(cacheKey);
-        if (cached is not null)
-            return cached;
+        // GetOrCreate: метки Records/RecordIssues/Swimmers запись получает сама (К3).
+        return _cache.GetOrCreateAsync(cacheKey,
+            () => LoadRecordsAsync(regionKey, category, withHolderDetails), CacheTtl);
+    }
 
+    private async Task<IReadOnlyList<RecordDto>> LoadRecordsAsync(
+        string regionKey, string? category, bool withHolderDetails)
+    {
         var query = _db.Records.AsNoTracking();
 
         // "world" — тип региона; всё остальное — код континента или страны.
@@ -80,8 +84,6 @@ public class RecordRepository : IRecordRepository
             records[index].IssueReason = reason;
 
         if (withHolderDetails) await FillHolderDetailsAsync(records);
-
-        await _cache.SetAsync(cacheKey, (IReadOnlyList<RecordDto>)records, CacheTtl);
 
         return records;
     }
@@ -198,16 +200,17 @@ public class RecordRepository : IRecordRepository
         return map;
     }
 
-    public async Task<IReadOnlyList<NormativeStandardDto>> GetStandardsAsync(string? kind = null, string? country = null)
+    public Task<IReadOnlyList<NormativeStandardDto>> GetStandardsAsync(string? kind = null, string? country = null)
     {
         // Страну нормализуем как регион выше: trim + upper.
         var countryKey = string.IsNullOrWhiteSpace(country) ? null : country.Trim().ToUpperInvariant();
         var cacheKey = $"normative-standards:{kind ?? "all"}:{countryKey ?? "all"}";
 
-        var cached = await _cache.GetAsync<IReadOnlyList<NormativeStandardDto>>(cacheKey);
-        if (cached is not null)
-            return cached;
+        return _cache.GetOrCreateAsync(cacheKey, () => LoadStandardsAsync(kind, countryKey), CacheTtl);
+    }
 
+    private async Task<IReadOnlyList<NormativeStandardDto>> LoadStandardsAsync(string? kind, string? countryKey)
+    {
         var query = _db.NormativeStandards.AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(kind))
@@ -234,8 +237,6 @@ public class RecordRepository : IRecordRepository
                 Time     = s.Time
             })
             .ToListAsync();
-
-        await _cache.SetAsync(cacheKey, (IReadOnlyList<NormativeStandardDto>)standards, CacheTtl);
 
         return standards;
     }

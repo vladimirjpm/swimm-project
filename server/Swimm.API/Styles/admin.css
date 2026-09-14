@@ -127,6 +127,74 @@
   #quality-modal::backdrop {
     background: rgb(0 0 0 / 0.65);
   }
+
+  /* Документ из репозитория, отрендеренный из Markdown (/Admin/Docs). HTML приходит от
+     Markdig, классов на элементах нет — поэтому стили по тегам внутри контейнера. Preflight
+     Tailwind обнуляет списки и заголовки, здесь они возвращаются. */
+  .admin-md {
+    @apply text-sm leading-relaxed text-admin-text;
+  }
+  .admin-md h1 {
+    @apply mt-0 mb-4 text-2xl font-bold text-admin-accent;
+  }
+  .admin-md h2 {
+    @apply mt-7 mb-3 border-b border-admin-border pb-1.5 text-lg font-semibold text-admin-accent;
+  }
+  .admin-md h3 {
+    @apply mt-5 mb-2 text-base font-semibold text-admin-text;
+  }
+  .admin-md h4 {
+    @apply mt-4 mb-2 text-sm font-semibold text-admin-text;
+  }
+  .admin-md p,
+  .admin-md ul,
+  .admin-md ol,
+  .admin-md pre,
+  .admin-md blockquote {
+    @apply mb-3;
+  }
+  .admin-md ul {
+    @apply list-disc pl-6;
+  }
+  .admin-md ol {
+    @apply list-decimal pl-6;
+  }
+  .admin-md li {
+    @apply mb-1;
+  }
+  /* Длинные неразрывные токены (имена тестов, пути, URL) переносятся внутри слова — иначе
+     одна строка распирает страницу по ширине на узком экране. */
+  .admin-md a {
+    @apply text-admin-accent underline underline-offset-2 wrap-anywhere;
+  }
+  .admin-md strong {
+    @apply font-semibold text-admin-text;
+  }
+  .admin-md code {
+    @apply rounded bg-admin-surface-hover px-1 py-0.5 font-mono text-[0.85em] wrap-anywhere;
+  }
+  .admin-md pre {
+    @apply overflow-x-auto rounded-md border border-admin-border bg-admin-bg p-3;
+  }
+  .admin-md pre code {
+    @apply bg-transparent p-0 wrap-normal;
+  }
+  .admin-md blockquote {
+    @apply border-l-[3px] border-admin-accent pl-3 text-admin-text-muted;
+  }
+  .admin-md hr {
+    @apply my-5 border-admin-border;
+  }
+  .admin-md table {
+    @apply mb-4 block max-w-full overflow-x-auto border-collapse text-[0.85em];
+  }
+  .admin-md th,
+  .admin-md td {
+    @apply border border-admin-border px-2.5 py-1.5 text-left align-top;
+  }
+  .admin-md th {
+    @apply bg-admin-surface-hover font-semibold;
+  }
 }
 
 /* ── Legacy-классы страниц (JS-рендер) ──────────────────────────────────────

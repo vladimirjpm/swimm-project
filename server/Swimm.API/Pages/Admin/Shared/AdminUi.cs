@@ -37,7 +37,14 @@ public static class AdminNav
         new("Audit log", "history", "/Admin/Audit", "System"),
         new("DB Schema", "database", "/Admin/Db", "System"),
         new("API Reference", "radio", "/Admin/Api", "System"),
+        // Как устроен кэш и кто сколько кэширует; держится в синхроне по docs/pre-push-rules.md.
+        new("Cache", "database", "/Admin/Cache", "System"),
         new("Settings", "settings", "/Admin/Settings", "System"),
+
+        // Документация репозитория (MD, читается с диска): что в каком разделе — DocsCatalog.cs.
+        new("Important", "award", "/Admin/Docs/important", "Docs"),
+        new("Rules", "shield", "/Admin/Docs/rules", "Docs"),
+        new("Decisions", "tag", "/Admin/Docs/decisions", "Docs"),
     ];
 
     /// <summary>Человекочитаемые заголовки секций сайдбара (пустая секция — без заголовка).</summary>
@@ -46,6 +53,7 @@ public static class AdminNav
         [""] = "",
         ["Data"] = "Данные",
         ["System"] = "Система",
+        ["Docs"] = "Документация",
     };
 }
 
