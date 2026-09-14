@@ -1,4 +1,5 @@
 using System.Data.Common;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -24,6 +25,14 @@ namespace Swimm.Infrastructure.Data;
 ///
 /// Удаление добавляет таблицы, куда оно каскадит в базе (зависимые строки трекер не видит).
 ///
+/// Метки строк (docs/plans/cache-row-precision-plan.md §2.2, К4б.2): кроме <c>table:T</c>
+/// сохранение сбрасывает <c>row:R:id</c> — строка корня (<see cref="CacheRowRoots"/>) свою, строка
+/// с FK на корень — метку корня по старому И новому значению FK (участник ушёл из группы 24 в
+/// 17 → обе). Временный ключ пропускается: строки ещё нет в базе, от неё не зависит ни одна
+/// запись кэша. Где задетые строки неизвестны — <c>anyrow:T</c>: таблицы каскада, больше
+/// <see cref="MaxRowsPerTable"/> строк одной таблицы, строка с FK на корень, подключённая не
+/// запросом (<see cref="Watch"/>).
+///
 /// Видит ТОЛЬКО SaveChanges. Массовые операции мимо трекера (<c>ExecuteUpdate/Delete</c>, сырой
 /// SQL) сбрасывают метки явно (<see cref="DbContextCacheExtensions"/>). Это сознательно: общий перехват
 /// записей по тексту SQL выбивал бы страницы групп на каждом запросе — отметка «был онлайн»
@@ -32,23 +41,65 @@ namespace Swimm.Infrastructure.Data;
 public sealed class CacheInvalidationInterceptor(ICacheService cache)
     : ISaveChangesInterceptor, IDbTransactionInterceptor
 {
+    /// <summary>
+    /// Сжатие (§2.2 п. 4): сохранение — или транзакция — меняет больше строк одной таблицы, и
+    /// вместо их меток строк идёт одна <c>anyrow:T</c>. Слиянию клубов, пересчёту объединённых
+    /// мест, переносу результатов метки на тысячи строк ни к чему, а в Redis каждая метка — INCR.
+    /// </summary>
+    internal const int MaxRowsPerTable = 500;
+
     // Перехватчик один на все контексты (синглтон), а сохранение и транзакция — у каждого
     // экземпляра контекста свои. Слабая таблица не держит контекст после его Dispose.
     private readonly ConditionalWeakTable<DbContext, State> _states = new();
 
+    private static readonly object AttachedMark = new();
+
     private sealed class State
     {
         /// <summary>Метки идущего SaveChanges — ждут его успеха.</summary>
-        public string[]? Saving;
+        public ChangeTags? Saving;
 
         /// <summary>Подпись идущего SaveChanges для журнала сбросов: что именно поменялось.</summary>
         public string SavingReason = "";
 
         /// <summary>Метки сохранений внутри открытой транзакции — ждут её коммита.</summary>
-        public readonly HashSet<string> Pending = new(StringComparer.Ordinal);
+        public readonly ChangeTags Pending = new();
 
         /// <summary>Подписи тех же сохранений — уходят в журнал одной строкой на коммите.</summary>
         public readonly List<string> PendingReasons = [];
+
+        /// <summary>
+        /// Строки, которые контекст подключил НЕ запросом (<see cref="Watch"/>). <c>null</c> —
+        /// контекст за этим не следит, и не запросом могла прийти любая строка.
+        /// </summary>
+        public ConditionalWeakTable<object, object>? Attached;
+    }
+
+    /// <summary>
+    /// Следить, какие строки контекст подключил НЕ запросом (§2.2 п. 7). У строки из запроса
+    /// исходные значения — из базы. У подключённой (<c>Attach</c>, <c>Update</c>, <c>Remove</c>
+    /// заглушки <c>new X { Id = … }</c>, повторное подключение после <c>ChangeTracker.Clear</c>) —
+    /// те, что дал код: у заглушки FK пуст, и метку старого родителя (группы, откуда ушёл
+    /// участник) не построить. Такая строка вместо меток строк даёт <c>anyrow:T</c>. Новая строка
+    /// (Added) не в счёт: её значения и пишутся.
+    ///
+    /// Зовёт конструктор контекста: следить надо с первого подключения, иначе ранняя заглушка
+    /// сошла бы за строку из базы. Контекст, который не следит, не верит ни одной изменённой или
+    /// удалённой строке с FK на корень.
+    /// </summary>
+    public static void Watch(DbContext context, DbContextOptions options)
+    {
+        var interceptor = options.FindExtension<CoreOptionsExtension>()?.Interceptors?
+            .OfType<CacheInvalidationInterceptor>().FirstOrDefault();
+        if (interceptor is null) return; // контекст без сброса кэша (чтение, миграции) — следить незачем
+
+        var attached = new ConditionalWeakTable<object, object>();
+        interceptor._states.GetOrCreateValue(context).Attached = attached;
+        context.ChangeTracker.Tracked += (_, e) =>
+        {
+            if (e.FromQuery || e.Entry.State == EntityState.Added) return;
+            attached.AddOrUpdate(e.Entry.Entity, AttachedMark);
+        };
     }
 
     // ── SaveChanges ────────────────────────────────────────────────────────────────
@@ -143,30 +194,54 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
     // ── Устройство ─────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Явный сброс для записи мимо трекера (<see cref="DbContextCacheExtensions.InvalidateCacheTagsAsync"/>):
-    /// в открытой транзакции — после её коммита, иначе сразу. Правило то же, что у SaveChanges.
+    /// Явный сброс таблицы после записи мимо трекера (<see cref="DbContextCacheExtensions.InvalidateTableCacheAsync"/>):
+    /// какие строки задеты, неизвестно — <c>table:T</c> и <c>anyrow:T</c>.
     /// </summary>
-    internal Task InvalidateAfterCommitAsync(DbContext context, string[] tags, string reason)
+    internal Task InvalidateTableAfterCommitAsync(DbContext context, string table)
     {
-        if (tags.Length == 0) return Task.CompletedTask;
+        var tags = new ChangeTags();
+        tags.AddUnknown(table);
+        return InvalidateAfterCommitAsync(context, tags, $"массовая запись мимо EF (ExecuteUpdate/ExecuteDelete): {table}");
+    }
+
+    /// <summary>
+    /// Сброс после записи: в открытой транзакции — после её коммита, иначе сразу. Правило одно
+    /// для SaveChanges и для явного сброса массовой записи.
+    /// </summary>
+    private Task InvalidateAfterCommitAsync(DbContext context, ChangeTags tags, string reason)
+    {
+        if (tags.IsEmpty) return Task.CompletedTask;
 
         // Внутри транзакции — ждём коммита. Нереляционный провайдер (InMemory в тестах)
         // транзакций не ведёт и событий о них не шлёт — сбрасываем сразу.
         if (context.Database.IsRelational() && context.Database.CurrentTransaction is not null)
         {
             var state = _states.GetOrCreateValue(context);
-            state.Pending.UnionWith(tags);
+            tags.MergeInto(state.Pending);
             state.PendingReasons.Add(reason);
             return Task.CompletedTask;
         }
-        return cache.InvalidateTagsAsync(tags, reason);
+        return cache.InvalidateTagsAsync(tags.ToTags(), reason);
     }
 
     private void Collect(DbContext? context)
     {
         if (context is null) return;
+        var state = _states.GetOrCreateValue(context);
+        (state.Saving, state.SavingReason) = Gather(context, state);
+    }
 
-        var tables = new HashSet<string>(StringComparer.Ordinal);
+    /// <summary>
+    /// Метки, которые сбросило бы сохранение прямо сейчас, — для тестов: временный ключ виден
+    /// только до сохранения, и только у провайдера, который его выдаёт (Npgsql, не InMemory).
+    /// </summary>
+    internal string[] PreviewTags(DbContext context) => Gather(context, _states.GetOrCreateValue(context)).Tags.ToTags();
+
+    private static (ChangeTags Tags, string Reason) Gather(DbContext context, State state)
+    {
+        var tags = new ChangeTags();
+        var cascade = new HashSet<string>(StringComparer.Ordinal);
+        var rows = new List<string>();
         // Что поменялось по таблицам — подпись для журнала сбросов (/Admin/Cache): по ней
         // видно, какая именно запись выкинула страницы, и какие колонки пишут чаще всего.
         var changes = new SortedDictionary<string, TableChange>(StringComparer.Ordinal);
@@ -177,20 +252,199 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
             if (entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted)) continue;
             if (entry.Metadata.GetTableName() is { } table)
             {
-                tables.Add(table);
                 if (!changes.TryGetValue(table, out var change)) changes[table] = change = new TableChange();
                 change.Note(entry);
+
+                rows.Clear();
+                var known = tags.CollectsRowsOf(table) && CollectRowTags(entry, state, rows);
+                tags.AddRow(table, known ? rows : null);
             }
 
             // Удаление каскадит в БАЗЕ на зависимые строки, которых трекер не видел (их не
             // загружали): удалили группу — ушли её состав, медиа, тренировки. Их таблицы берём
             // из модели; есть ли там строки на самом деле, неважно — лишний сброс безопасен.
-            if (entry.State == EntityState.Deleted) AddCascadeTables(entry.Metadata, tables, []);
+            // Какие строки задеты и чьи они, трекер не знает — anyrow (§2.2 п. 5): удалили
+            // медиа — ушли его публикации, а страница группы сужена по группе, не по медиа.
+            if (entry.State == EntityState.Deleted) AddCascadeTables(entry.Metadata, cascade, []);
+        }
+        foreach (var table in cascade) tags.AddUnknown(table);
+
+        return (tags, Describe(changes, cascade));
+    }
+
+    /// <summary>
+    /// Метки строк одной изменённой строки (§2.2 п. 1–3) — в <paramref name="into"/>. false —
+    /// какие строки корней она задела, неизвестно: исходные значения её FK взяты не из базы.
+    /// </summary>
+    private static bool CollectRowTags(EntityEntry entry, State state, List<string> into)
+    {
+        var links = RowLinks.Of(entry.Metadata);
+        if (!links.Supported) return false;
+
+        // п. 1: своя строка корня. Ключ не меняется — старое значение равно новому. Временный
+        // (новая строка, id выдаст база) пропускается: от строки, которой нет, никто не зависит.
+        if (links.OwnKey is { } key)
+        {
+            var k = entry.Property(key);
+            if (!k.IsTemporary) AddRowTag(into, links.OwnTable, k.CurrentValue);
+        }
+        if (links.Parents.Length == 0) return true;
+
+        // п. 2: FK на корни. У изменённой и удалённой строки — и старое значение: участник ушёл
+        // из группы 24 в 17, меняются обе. Старое верно, только если строку загрузил запрос.
+        var added = entry.State == EntityState.Added;
+        if (!added && !OriginalsFromDatabase(state, entry)) return false;
+        foreach (var (fk, root) in links.Parents)
+        {
+            var p = entry.Property(fk);
+            if (!p.IsTemporary) AddRowTag(into, root, p.CurrentValue);
+            if (!added) AddRowTag(into, root, p.OriginalValue);
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Исходные значения строки — из базы: её загрузил запрос, а не подключил код (<see cref="Watch"/>).
+    /// Контекст, который не следит, не знает этого ни про одну строку.
+    /// </summary>
+    private static bool OriginalsFromDatabase(State state, EntityEntry entry) =>
+        state.Attached is { } attached && !attached.TryGetValue(entry.Entity, out _);
+
+    private static void AddRowTag(List<string> into, string table, object? id)
+    {
+        if (id is null) return; // связи нет — и метки нет
+        // Тип ключа — целое: другие RowLinks отбраковал (Supported = false).
+        into.Add(CacheTags.Row(table, Convert.ToInt64(id, CultureInfo.InvariantCulture)));
+    }
+
+    /// <summary>
+    /// Что у сущности даёт метки строк: свой ключ, если она корень, и FK на корни. Считается по
+    /// модели один раз на тип сущности.
+    /// </summary>
+    private sealed class RowLinks
+    {
+        private static readonly ConditionalWeakTable<IEntityType, RowLinks> Cache = new();
+
+        /// <summary>Ключ строки — если сущность сама корень.</summary>
+        public IProperty? OwnKey { get; private init; }
+        public string OwnTable { get; private init; } = "";
+
+        /// <summary>FK на корни и таблица корня.</summary>
+        public (IProperty Fk, string Root)[] Parents { get; private init; } = [];
+
+        /// <summary>
+        /// false — ключ корня или FK на корень не одна целая колонка на первичный ключ: метку
+        /// строки не построить, изменённые строки таблицы всегда «неизвестны» (anyrow). В модели
+        /// таких нет; появятся — сброс станет грубее, но не пропустит строку.
+        /// </summary>
+        public bool Supported { get; private init; } = true;
+
+        public static RowLinks Of(IEntityType type) => Cache.GetValue(type, Build);
+
+        private static RowLinks Build(IEntityType type)
+        {
+            var supported = true;
+            IProperty? ownKey = null;
+            if (CacheRowRoots.IsRoot(type))
+            {
+                if (type.FindPrimaryKey() is { Properties: [var k] } && IsWholeNumber(k)) ownKey = k;
+                else supported = false;
+            }
+
+            var parents = new List<(IProperty, string)>();
+            foreach (var fk in type.GetForeignKeys())
+            {
+                if (!CacheRowRoots.IsRoot(fk.PrincipalEntityType)) continue;
+                if (fk.Properties is [var p] && fk.PrincipalKey.IsPrimaryKey() && IsWholeNumber(p)
+                    && fk.PrincipalEntityType.GetTableName() is { } root)
+                    parents.Add((p, root));
+                else supported = false;
+            }
+
+            return new RowLinks
+            {
+                OwnKey = ownKey,
+                OwnTable = type.GetTableName() ?? "",
+                Parents = [.. parents],
+                Supported = supported,
+            };
         }
 
-        var state = _states.GetOrCreateValue(context);
-        state.Saving = tables.Select(CacheTags.Table).ToArray();
-        state.SavingReason = Describe(changes, tables);
+        private static bool IsWholeNumber(IProperty p) =>
+            (Nullable.GetUnderlyingType(p.ClrType) ?? p.ClrType) is var t && (t == typeof(int) || t == typeof(long));
+    }
+
+    /// <summary>
+    /// Метки одного сохранения — или всей транзакции (сохранения в неё сливаются): изменённые
+    /// таблицы, а по каждой — метки её строк либо «какие строки — неизвестно».
+    /// </summary>
+    internal sealed class ChangeTags
+    {
+        private sealed class TableRows
+        {
+            public int Count;
+
+            /// <summary>Метки строк; <c>null</c> — строки неизвестны, вместо них <c>anyrow:T</c>.</summary>
+            public HashSet<string>? Rows = new(StringComparer.Ordinal);
+        }
+
+        private readonly Dictionary<string, TableRows> _tables = new(StringComparer.Ordinal);
+
+        public bool IsEmpty => _tables.Count == 0;
+
+        /// <summary>Нужны ли ещё метки строк таблицы — или она уже сжата до anyrow.</summary>
+        public bool CollectsRowsOf(string table) =>
+            !_tables.TryGetValue(table, out var t) || (t.Rows is not null && t.Count < MaxRowsPerTable);
+
+        /// <summary>Одна изменённая строка таблицы; <paramref name="rows"/> null — чьи строки задеты, неизвестно.</summary>
+        public void AddRow(string table, List<string>? rows)
+        {
+            var t = Of(table);
+            t.Count++;
+            if (rows is null || t.Count > MaxRowsPerTable) t.Rows = null;
+            else t.Rows?.UnionWith(rows);
+        }
+
+        /// <summary>Строки таблицы изменены, но какие — неизвестно (каскад, массовая запись).</summary>
+        public void AddUnknown(string table) => Of(table).Rows = null;
+
+        public void MergeInto(ChangeTags target)
+        {
+            foreach (var (table, src) in _tables)
+            {
+                var t = target.Of(table);
+                t.Count += src.Count;
+                if (src.Rows is null || t.Count > MaxRowsPerTable) t.Rows = null;
+                else t.Rows?.UnionWith(src.Rows);
+            }
+        }
+
+        /// <summary>Метки для сброса: по каждой таблице <c>table:T</c>, затем её строки или <c>anyrow:T</c>.</summary>
+        public string[] ToTags()
+        {
+            var tags = new List<string>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var (table, t) in _tables)
+            {
+                Add(CacheTags.Table(table));
+                if (t.Rows is null) Add(CacheTags.AnyRow(table));
+                else foreach (var row in t.Rows) Add(row);
+            }
+            return [.. tags];
+
+            void Add(string tag)
+            {
+                if (seen.Add(tag)) tags.Add(tag);
+            }
+        }
+
+        public void Clear() => _tables.Clear();
+
+        private TableRows Of(string table)
+        {
+            if (!_tables.TryGetValue(table, out var t)) _tables[table] = t = new TableRows();
+            return t;
+        }
     }
 
     /// <summary>Сколько строк таблицы добавлено, изменено, удалено и какие колонки правились.</summary>
@@ -228,10 +482,10 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
     /// Подпись сохранения: «SaveChanges: HubGroups ~1 (TrainingSchedule, UpdatedAt); каскад: …».
     /// Каскад — таблицы, которые сбрасываются только потому, что удаление уходит в них в базе.
     /// </summary>
-    private static string Describe(SortedDictionary<string, TableChange> changes, HashSet<string> tables)
+    private static string Describe(SortedDictionary<string, TableChange> changes, HashSet<string> cascadeTables)
     {
         var text = "SaveChanges: " + string.Join("; ", changes.Select(c => $"{c.Key} {c.Value}"));
-        var cascade = tables.Where(t => !changes.ContainsKey(t)).Order(StringComparer.Ordinal).ToList();
+        var cascade = cascadeTables.Where(t => !changes.ContainsKey(t)).Order(StringComparer.Ordinal).ToList();
         return cascade.Count > 0 ? $"{text}; каскад: {string.Join(", ", cascade)}" : text;
     }
 
@@ -259,9 +513,9 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
 
     private Task FlushPendingAsync(DbContext? context, bool failed)
     {
-        if (context is null || !_states.TryGetValue(context, out var state) || state.Pending.Count == 0)
+        if (context is null || !_states.TryGetValue(context, out var state) || state.Pending.IsEmpty)
             return Task.CompletedTask;
-        var tags = state.Pending.ToArray();
+        var tags = state.Pending.ToTags();
         var reason = state.PendingReasons.Count == 1
             ? state.PendingReasons[0]
             : "транзакция: " + string.Join(" | ", state.PendingReasons);
@@ -287,26 +541,28 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
 /// <summary>
 /// ЯВНЫЙ сброс — там, где запись идёт мимо трекера EF (<c>ExecuteUpdate</c>, <c>ExecuteDelete</c>,
 /// сырой SQL) и <see cref="CacheInvalidationInterceptor"/> её не видит:
-/// <code>await _db.InvalidateCacheTagsAsync(_db.TableTag&lt;ResultRecord&gt;());</code>
+/// <code>await _db.InvalidateTableCacheAsync&lt;ResultRecord&gt;();</code>
 /// </summary>
 public static class DbContextCacheExtensions
 {
     /// <summary>
-    /// Метка таблицы сущности. Имя — из модели EF, а не литералом: иначе метка сброса разойдётся
-    /// с меткой, которую запись кэша получила из SQL, и сброс молча промахнётся.
+    /// Сбросить таблицу после записи мимо трекера: <c>table:T</c> и <c>anyrow:T</c>. Какие строки
+    /// задела массовая запись, неизвестно, поэтому падают и записи, сузившие чтение таблицы до
+    /// своих строк: одна <c>table:T</c> прошла бы мимо них — недосброс (§2.2 п. 6).
+    ///
+    /// По тем же правилам, что SaveChanges: в открытой транзакции после её коммита, иначе сразу.
+    /// Контекст без перехватчика (собран в обход DI — миграции, тесты) ничего не сбрасывает: кэша
+    /// у него нет.
     /// </summary>
-    public static string TableTag<TEntity>(this DbContext db) where TEntity : class =>
-        CacheTags.Table(db.Model.FindEntityType(typeof(TEntity))?.GetTableName()
-            ?? throw new InvalidOperationException($"{typeof(TEntity).Name} не отображён на таблицу в модели {db.GetType().Name}"));
-
-    /// <summary>
-    /// Сбросить метки после записи мимо трекера — по тем же правилам, что SaveChanges: в открытой
-    /// транзакции после её коммита, иначе сразу. Контекст без перехватчика (собран в обход DI —
-    /// миграции, тесты) ничего не сбрасывает: кэша у него нет.
-    /// </summary>
-    public static Task InvalidateCacheTagsAsync(this DbContext db, params string[] tags) =>
-        db.GetService<IDbContextOptions>().FindExtension<CoreOptionsExtension>()?.Interceptors?
-            .OfType<CacheInvalidationInterceptor>().FirstOrDefault()?
-            .InvalidateAfterCommitAsync(db, tags, "массовая запись мимо EF (ExecuteUpdate/ExecuteDelete)")
-        ?? Task.CompletedTask;
+    public static Task InvalidateTableCacheAsync<TEntity>(this DbContext db) where TEntity : class
+    {
+        // Имя — из модели EF, а не литералом: иначе метка сброса разойдётся с меткой, которую
+        // запись кэша получила из SQL, и сброс молча промахнётся.
+        var table = db.Model.FindEntityType(typeof(TEntity))?.GetTableName()
+            ?? throw new InvalidOperationException($"{typeof(TEntity).Name} не отображён на таблицу в модели {db.GetType().Name}");
+        return db.GetService<IDbContextOptions>().FindExtension<CoreOptionsExtension>()?.Interceptors?
+                .OfType<CacheInvalidationInterceptor>().FirstOrDefault()?
+                .InvalidateTableAfterCommitAsync(db, table)
+            ?? Task.CompletedTask;
+    }
 }

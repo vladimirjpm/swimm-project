@@ -130,7 +130,7 @@ public class CompetitionRecalculationService : ICompetitionRecalculationService
         // Массовая запись мимо трекера — перехватчик сохранения её не видит, сбрасываем явно (К4).
         // Стирать было нечего — нечего и сбрасывать: пересчёт зовут на каждую правку правила очков,
         // и пустой сброс Results ронял бы все витрины из результатов.
-        if (cleared > 0) await _db.InvalidateCacheTagsAsync(_db.TableTag<ResultRecord>());
+        if (cleared > 0) await _db.InvalidateTableCacheAsync<ResultRecord>();
         return cleared;
     }
 }

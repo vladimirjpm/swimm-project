@@ -7,6 +7,9 @@ public class SwimmDbContext : DbContext
 {
     public SwimmDbContext(DbContextOptions<SwimmDbContext> options) : base(options)
     {
+        // Сброс кэша по строкам верит старым значениям FK только у строк из запроса — следить
+        // за подключёнными заглушками надо с рождения контекста (К4б.2).
+        CacheInvalidationInterceptor.Watch(this, options);
     }
 
     /// <summary>
@@ -15,6 +18,7 @@ public class SwimmDbContext : DbContext
     /// </summary>
     protected SwimmDbContext(DbContextOptions options) : base(options)
     {
+        CacheInvalidationInterceptor.Watch(this, options);
     }
 
     /* === Справочники === */

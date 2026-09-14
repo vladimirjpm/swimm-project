@@ -15,7 +15,12 @@
   `CacheInvalidationInterceptor` после `SaveChanges` сбрасывает метки изменённых таблиц и таблиц
   каскада удаления, в транзакции — на коммите. Весь кэш сбрасывают только импорт, смена настроек
   и кнопка; склейка параллельных промахов (`GetOrCreateAsync`)
-  ([cache-tags-plan.md](../plans/cache-tags-plan.md)).
+  ([cache-tags-plan.md](../plans/cache-tags-plan.md)). С К4б.2 — и **метки строк**
+  ([cache-row-precision-plan.md](../plans/cache-row-precision-plan.md) §2.2): `row:HubGroups:24`
+  у строки корня (реестр `CacheRowRoots`: группы, клубы, пловцы, медиа, эстафеты) и у строки с
+  FK на корень — по старому и новому значению FK; `anyrow:T`, где задетые строки неизвестны
+  (каскад, массовая запись, больше 500 строк одной таблицы, строка не из запроса). Пока от них
+  никто не зависит — сужение чтения придёт в К4б.3+.
 - **Сейчас в кэше** — живые записи серверного кэша (`ICacheDiagnostics.Snapshot()`, реализует
   `MemoryCacheService`): метка → сколько записей её сброс выкинет; отдельно — записи БЕЗ меток
   таблиц (их снимает только общий сброс, запись в базу — нет; таких быть не должно); полный
@@ -29,7 +34,8 @@
   - перехватчик сохранения — «SaveChanges: HubGroups ~1 (TrainingSchedule, UpdatedAt); каскад: …»
     (`~` правка с перечнем колонок, `+` добавление, `−` удаление); в транзакции — одной строкой
     «транзакция: … | …» на коммите;
-  - явный сброс массовой записи — «массовая запись мимо EF»;
+  - явный сброс массовой записи — «массовая запись мимо EF (ExecuteUpdate/ExecuteDelete): Results»,
+    метки `table:T` + `anyrow:T`;
   - общий сброс — «импорт протокола …», «удаление соревнования #…», «настройка «…» изменена»,
     «кнопка …».
   Журнал в памяти процесса: перезапуск обнуляет, у каждого экземпляра сервера свой. Им меряют
@@ -47,7 +53,7 @@
 - их правят в том же изменении, что трогает кэш: `Cache-Control`/`CacheControlValue`,
   `PayloadTtl` и прочие TTL, `ICacheService`/`MemoryCacheService`, `CachedJsonExtensions`,
   сброс (`InvalidateAllAsync`/`InvalidateTagsAsync`, `CacheInvalidationInterceptor`,
-  `InvalidateCacheTagsAsync`), `CacheTags`;
+  `InvalidateTableCacheAsync`), `CacheTags`, `CacheRowRoots`;
 - перед push это сверяется по [pre-push-rules.md](../pre-push-rules.md).
 
 ## Грабли

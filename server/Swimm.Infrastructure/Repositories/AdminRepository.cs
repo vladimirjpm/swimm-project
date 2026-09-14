@@ -165,7 +165,7 @@ public class AdminRepository : IAdminRepository
             .Where(h => h.LoginAt < cutoff)
             .ExecuteDeleteAsync();
         // Массовая запись мимо трекера — метку своей таблицы сбрасываем явно (К4).
-        if (deleted > 0) await _db.InvalidateCacheTagsAsync(_db.TableTag<UserLoginHistory>());
+        if (deleted > 0) await _db.InvalidateTableCacheAsync<UserLoginHistory>();
         return deleted;
     }
 
