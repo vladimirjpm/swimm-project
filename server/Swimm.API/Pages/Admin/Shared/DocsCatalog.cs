@@ -42,6 +42,7 @@ public static class DocsCatalog
             new("docs/relays.md", "Эстафеты", "модель RelayMembers, журнал фиксов"),
             new("docs/media-page.md", "Медиа", "My media, публикации, видимость"),
             new("docs/plans/cache-tags-plan.md", "Кэш", "сброс по меткам, готовность к Redis"),
+            new("docs/plans/cache-row-precision-plan.md", "Кэш: точность до строки", "метки строк и служебных колонок, правило сужения"),
             new("docs/plans/club-subscribers-plan.md", "Клуб — не группа", "почему у клуба нет подписчиков"),
         ]),
     ];
