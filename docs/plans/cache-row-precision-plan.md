@@ -556,7 +556,7 @@ using (_read.CacheRows<HubGroup>(groupId, typeof(HubGroupMember), typeof(HubGrou
 | `cache-k4b-03` (от `cache-k4b-02`) | [#31](https://github.com/vladimirjpm/swimm-project/pull/31) → `cache-k4b-02` | `8825ab6` К4б.3 (сужение при чтении, сверка, страж, подметание) | ✓ 3/3 |
 | `cache-k4b-04` (от `cache-k4b-03`) | [#32](https://github.com/vladimirjpm/swimm-project/pull/32) → `cache-k4b-03` | `d45069b` К4б.4 (страница группы на блоках сужения) | ✓ 3/3 |
 | `cache-k4b-05` (от `cache-k4b-04`) | [#33](https://github.com/vladimirjpm/swimm-project/pull/33) → `cache-k4b-04` | `ade5051` К4б.5 (клуб; дефолт выключателя `true`) + передача §10 после К4б.5 | ✓ 3/3 |
-| `cache-k4b-06` (от `cache-k4b-05`) | [#34](https://github.com/vladimirjpm/swimm-project/pull/34) → `cache-k4b-05` | К4б.6 (служебные колонки; дефолт `CacheColumnPrecision` `true`) + эта передача | см. PR |
+| `cache-k4b-06` (от `cache-k4b-05`) | [#34](https://github.com/vladimirjpm/swimm-project/pull/34) → `cache-k4b-05` | `32f369f` К4б.6 (служебные колонки; дефолт `CacheColumnPrecision` `true`) + эта передача | ✓ 3/3 |
 
 - **Вливать по порядку: #28 → #29 → … → #33 → #34.** После слияния #28 GitHub сам перенацелит
   #29 на `master` (и так далее по цепочке). Миграций нет — на проде применять нечего.
