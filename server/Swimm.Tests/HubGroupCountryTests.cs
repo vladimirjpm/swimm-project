@@ -18,15 +18,7 @@ public class HubGroupCountryTests
     private static SwimmDbContext CreateDb(string name) =>
         new(new DbContextOptionsBuilder<SwimmDbContext>().UseInMemoryDatabase(name).Options);
 
-    private sealed class NoopCacheService : ICacheService
-    {
-        public Task<T?> GetAsync<T>(string key) => Task.FromResult(default(T));
-        public Task SetAsync<T>(string key, T value, TimeSpan ttl) => Task.CompletedTask;
-        public Task RemoveAsync(string key) => Task.CompletedTask;
-        public Task InvalidateAllAsync() => Task.CompletedTask;
-    }
-
-    private static HubGroupCrudCore Core(SwimmDbContext db) => new(db, new NoopCacheService());
+    private static HubGroupCrudCore Core(SwimmDbContext db) => new(db);
 
     [Fact]
     public async Task ExistingCountry_ResolvedToItsId_NoDuplicateCreated()

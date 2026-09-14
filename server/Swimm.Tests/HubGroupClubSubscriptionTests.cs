@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Moq;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Domain;
@@ -28,19 +29,24 @@ public class HubGroupClubSubscriptionTests
 {
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static SwimmReadDbContext CreateDb(string name) =>
-        new(new DbContextOptionsBuilder<SwimmReadDbContext>()
+    private static SwimmReadDbContext CreateDb(string name, ICacheService? cache = null)
+    {
+        var options = new DbContextOptionsBuilder<SwimmReadDbContext>()
             .UseInMemoryDatabase(name)
-            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
-            .Options);
+            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
+        // Сброс кэша делает перехватчик сохранения (К4) — подключается к контексту.
+        if (cache != null) options.AddInterceptors(new CacheInvalidationInterceptor(cache));
+        return new(options.Options);
+    }
 
     private sealed class FakeCache : ICacheService
     {
-        public int Invalidations { get; private set; }
+        public List<string> Invalidated { get; } = [];
         public Task<T?> GetAsync<T>(string key) => Task.FromResult<T?>(default);
         public Task SetAsync<T>(string key, T value, TimeSpan ttl) => Task.CompletedTask;
         public Task RemoveAsync(string key) => Task.CompletedTask;
-        public Task InvalidateAllAsync() { Invalidations++; return Task.CompletedTask; }
+        public Task InvalidateTagsAsync(params string[] tags) { Invalidated.AddRange(tags); return Task.CompletedTask; }
+        public Task InvalidateAllAsync() { Invalidated.Add(CacheTags.All); return Task.CompletedTask; }
     }
 
     private sealed class SettingsStub : ISettingsService
@@ -51,10 +57,10 @@ public class HubGroupClubSubscriptionTests
         public bool Update(string key, string newValue) => true;
     }
 
-    private static HubGroupClubSubscriptionService Service(SwimmDbContext db, FakeCache? cache = null) =>
-        new(db, new HubGroupCrudCore(db, cache ?? new FakeCache()));
+    private static HubGroupClubSubscriptionService Service(SwimmDbContext db) =>
+        new(db, new HubGroupCrudCore(db));
 
-    private static HubGroupCrudCore Core(SwimmDbContext db) => new(db, new FakeCache());
+    private static HubGroupCrudCore Core(SwimmDbContext db) => new(db);
 
     /// <summary>Дата внутри ТЕКУЩЕГО сезона.</summary>
     private static DateTime CurrentSeason => SeasonMath.StartOf(SeasonMath.StartYearOf(DateTime.UtcNow)).AddDays(10);
@@ -181,16 +187,17 @@ public class HubGroupClubSubscriptionTests
     [Fact]
     public async Task Subscribe_AddsClubSwimmers_FromCurrentAndPreviousSeason_IndividualOnly()
     {
-        await using var db = CreateDb(nameof(Subscribe_AddsClubSwimmers_FromCurrentAndPreviousSeason_IndividualOnly));
+        var cache = new FakeCache();
+        await using var db = CreateDb(nameof(Subscribe_AddsClubSwimmers_FromCurrentAndPreviousSeason_IndividualOnly), cache);
         var w = await SeedWorldAsync(db);
         var current = await SwimmerAsync(db, w, "Current", w.A, CurrentSeason);
         var previous = await SwimmerAsync(db, w, "Previous", w.A, PreviousSeason);
         await SwimmerAsync(db, w, "Old", w.A, TooOld);                     // ушёл давно
         await SwimmerAsync(db, w, "OtherClub", w.B, CurrentSeason);        // чужой клуб
         await SwimmerAsync(db, w, "RelayShadow", w.A, CurrentSeason, 777); // пловец-тень эстафеты
-        var cache = new FakeCache();
+        cache.Invalidated.Clear();
 
-        var result = await Service(db, cache).SubscribeAsync(w.Group.Id, w.A.Id, userId: 5);
+        var result = await Service(db).SubscribeAsync(w.Group.Id, w.A.Id, userId: 5);
 
         Assert.True(result.Success);
         Assert.Equal(w.A.Id, result.Subscription!.ClubId);
@@ -199,7 +206,9 @@ public class HubGroupClubSubscriptionTests
         Assert.Equal(new[] { current.Id, previous.Id }.Order(), rows.Select(r => r.SwimmerId).Order());
         Assert.All(rows, r => Assert.Equal(HubGroupMemberSource.Club, r.Source));
         Assert.Equal(5, (await db.HubGroupClubSubscriptions.SingleAsync()).CreatedByUserId);
-        Assert.True(cache.Invalidations > 0); // публичный кэш групп обязан сброситься
+        // Публичный кэш групп обязан сброситься: состав и подписка — части страницы группы.
+        Assert.Contains(CacheTags.Table("HubGroupMembers"), cache.Invalidated);
+        Assert.Contains(CacheTags.Table("HubGroupClubSubscriptions"), cache.Invalidated);
     }
 
     [Fact]
@@ -657,7 +666,7 @@ public class HubGroupClubSubscriptionTests
         await svc.SubscribeAsync(w.Group.Id, dupClub.Id, null);
         Assert.Equal(fromDup.Id, Assert.Single(await RowsAsync(db, w.Group.Id)).SwimmerId);
 
-        var report = await new ClubMergeService(db, new FakeCache(), new NoStandings(), svc)
+        var report = await new ClubMergeService(db, new NoStandings(), svc)
             .MergeAsync([new ClubMergePair(w.A.Id, dupClub.Id)], dryRun: false);
 
         Assert.Equal("merged", report.Pairs.Single().Status);

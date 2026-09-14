@@ -100,8 +100,6 @@ public class HubGroupUserService : IHubGroupUserService
             return HubGroupSaveResult.Ok(group.Id);
         });
 
-        // Кэш — после коммита: до него параллельный публичный запрос закэшировал бы список без группы.
-        if (result.Success) await _core.InvalidateCacheAsync();
         return result;
     }
 
@@ -184,7 +182,6 @@ public class HubGroupUserService : IHubGroupUserService
             return HubGroupMemberSaveResult.Fail("Не удалось назначить админа группы");
         }
 
-        await _core.InvalidateCacheAsync();
         return HubGroupMemberSaveResult.Ok();
     }
 
@@ -196,7 +193,6 @@ public class HubGroupUserService : IHubGroupUserService
 
         _db.HubGroupAdmins.Remove(admin);
         await _db.SaveChangesAsync();
-        await _core.InvalidateCacheAsync();
         return HubGroupMemberSaveResult.Ok();
     }
 
@@ -301,9 +297,6 @@ public class HubGroupUserService : IHubGroupUserService
         group.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
-        // Публичная страница группы кэшируется вместе с политикой (кнопка «Join» / «Request to
-        // join» читает её из того же payload) — без сброса тумблер минуту не виден снаружи.
-        await _core.InvalidateCacheAsync();
         return HubGroupMemberSaveResult.Ok();
     }
 
@@ -344,10 +337,6 @@ public class HubGroupUserService : IHubGroupUserService
         group.TrainingSchedule = model.Slots.Count > 0 ? model.ToJson() : null;
         group.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
-
-        // Расписание едет в кэшируемом payload страницы группы — без сброса правка минуту
-        // не видна (та же ловушка, что у политики вступления).
-        await _core.InvalidateCacheAsync();
         return HubGroupMemberSaveResult.Ok();
     }
 

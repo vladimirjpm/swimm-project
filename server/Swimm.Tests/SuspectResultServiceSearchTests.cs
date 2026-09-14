@@ -21,14 +21,6 @@ public class SuspectResultServiceSearchTests
     private static SwimmDbContext CreateDb(string name) =>
         new(new DbContextOptionsBuilder<SwimmDbContext>().UseInMemoryDatabase(name).Options);
 
-    private sealed class NullCache : ICacheService
-    {
-        public Task<T?> GetAsync<T>(string key) => Task.FromResult<T?>(default);
-        public Task SetAsync<T>(string key, T value, TimeSpan ttl) => Task.CompletedTask;
-        public Task RemoveAsync(string key) => Task.CompletedTask;
-        public Task InvalidateAllAsync() => Task.CompletedTask;
-    }
-
     /// <summary>Соревнование с двумя заплывами одного пловца — как в исходном случае.</summary>
     private static async Task<SwimmDbContext> SeedAsync(string name)
     {
@@ -59,7 +51,7 @@ public class SuspectResultServiceSearchTests
     public async Task Search_FindsUnflaggedRow_ByTime()
     {
         await using var db = await SeedAsync(nameof(Search_FindsUnflaggedRow_ByTime));
-        var service = new SuspectResultService(db, new NullCache());
+        var service = new SuspectResultService(db);
 
         var rows = await service.SearchAsync(null, 1527, "1:53.09");
 
@@ -73,7 +65,7 @@ public class SuspectResultServiceSearchTests
     public async Task Search_BySwimmerName_IsCaseInsensitive()
     {
         await using var db = await SeedAsync(nameof(Search_BySwimmerName_IsCaseInsensitive));
-        var service = new SuspectResultService(db, new NullCache());
+        var service = new SuspectResultService(db);
 
         Assert.Equal(2, (await service.SearchAsync(null, 1527, "ורדי")).Count);
         Assert.Equal(2, (await service.SearchAsync(null, 1527, "HAPOEL")).Count);
@@ -84,7 +76,7 @@ public class SuspectResultServiceSearchTests
     {
         // Иначе один символ вывалил бы всё соревнование — список, в котором ничего не найти.
         await using var db = await SeedAsync(nameof(Search_TooShortQuery_ReturnsNothing));
-        var service = new SuspectResultService(db, new NullCache());
+        var service = new SuspectResultService(db);
 
         Assert.Empty(await service.SearchAsync(null, 1527, "1"));
     }
@@ -97,7 +89,7 @@ public class SuspectResultServiceSearchTests
         await using var db = await SeedAsync(nameof(Scan_StampsCompetition_SoEmptyListIsNotConfusedWithNeverChecked));
         Assert.Null((await db.Competitions.SingleAsync()).QualityScannedAt);
 
-        await new SuspectResultService(db, new NullCache()).ScanAsync(null, 1527);
+        await new SuspectResultService(db).ScanAsync(null, 1527);
 
         Assert.NotNull((await db.Competitions.SingleAsync()).QualityScannedAt);
     }
@@ -106,7 +98,7 @@ public class SuspectResultServiceSearchTests
     public async Task ManualFlag_ThenSearch_ShowsRowAsAlreadyFlagged()
     {
         await using var db = await SeedAsync(nameof(ManualFlag_ThenSearch_ShowsRowAsAlreadyFlagged));
-        var service = new SuspectResultService(db, new NullCache());
+        var service = new SuspectResultService(db);
 
         Assert.True(await service.SetManualAsync(6056530, true, "200 за 1:53 при стольнике 1:05"));
 

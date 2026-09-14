@@ -12,7 +12,6 @@ public sealed class LogligRelayBandService(
     SwimmDbContext db,
     ICompetitionDiscoveryProvider provider,
     ICompetitionRecalculationService recalc,
-    ICacheService cache,
     ILogger<LogligRelayBandService> logger) : ILogligRelayBandService
 {
     public async Task<LogligRelayBandReport> RepairAsync(
@@ -126,7 +125,6 @@ public sealed class LogligRelayBandService(
         // и ручной правки результата. Без него правка мест не доедет до витрины.
         foreach (var competitionId in competitionIds)
             await recalc.RecalculateCompetitionAsync(competitionId, ct);
-        await cache.InvalidateAllAsync();
 
         logger.LogInformation("Полосы эстафет: обновлено строк {Count}", changed.Count);
         return changed.Count;

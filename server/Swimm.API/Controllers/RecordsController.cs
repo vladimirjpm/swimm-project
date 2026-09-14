@@ -11,8 +11,8 @@ namespace Swimm.API.Controllers;
 ///
 /// HTTP-кэширование (часть этапа 3.1, вытащена вперёд): ответ отдаётся с ETag +
 /// Cache-Control. Сериализованный JSON и его хэш кэшируются рядом с данными в
-/// ICacheService — та же токен-инвалидация из админ-CRUD (InvalidateAllAsync), поэтому
-/// после правки рекорда браузеры получают свежие данные первой же ревалидацией.
+/// ICacheService; правка рекорда сбрасывает метку Records сама (К4), поэтому браузеры получают
+/// свежие данные первой же ревалидацией.
 /// </summary>
 [ApiController]
 public class RecordsController : ControllerBase

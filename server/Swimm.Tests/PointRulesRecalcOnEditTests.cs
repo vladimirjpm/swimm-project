@@ -28,14 +28,6 @@ public class PointRulesRecalcOnEditTests
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options);
 
-    private sealed class NullCache : ICacheService
-    {
-        public Task<T?> GetAsync<T>(string key) => Task.FromResult<T?>(default);
-        public Task SetAsync<T>(string key, T value, TimeSpan ttl) => Task.CompletedTask;
-        public Task RemoveAsync(string key) => Task.CompletedTask;
-        public Task InvalidateAllAsync() => Task.CompletedTask;
-    }
-
     private sealed class RecalcSpy : ICompetitionRecalculationService
     {
         public List<int> Calls { get; } = [];
@@ -98,7 +90,7 @@ public class PointRulesRecalcOnEditTests
         await db.SaveChangesAsync();
         var spy = new RecalcSpy();
 
-        var res = await new PointRulesAdminRepository(db, new NullCache(), spy)
+        var res = await new PointRulesAdminRepository(db, spy)
             .UpdateAsync(PointRuleKind.Clubs, 1, Input(rule, 30, 28, 25)); // хвост шкалы поправлен
 
         Assert.True(res.Success);
@@ -118,7 +110,7 @@ public class PointRulesRecalcOnEditTests
         await db.SaveChangesAsync();
         var spy = new RecalcSpy();
 
-        await new PointRulesAdminRepository(db, new NullCache(), spy)
+        await new PointRulesAdminRepository(db, spy)
             .UpdateAsync(PointRuleKind.Clubs, 1, Input(rule, 30, 26));
 
         Assert.Equal([10], spy.Calls);
@@ -139,7 +131,7 @@ public class PointRulesRecalcOnEditTests
 
         var input = Input(rule, 30, 28);
         input.EffectiveFrom = new DateOnly(2027, 1, 1);
-        await new PointRulesAdminRepository(db, new NullCache(), spy)
+        await new PointRulesAdminRepository(db, spy)
             .UpdateAsync(PointRuleKind.Clubs, 1, input);
 
         Assert.Equal([10], spy.Calls);
@@ -159,7 +151,7 @@ public class PointRulesRecalcOnEditTests
         var input = Input(rule, 30, 28);
         input.Version = "v1-renamed";
         input.Description = "поправили описание";
-        await new PointRulesAdminRepository(db, new NullCache(), spy)
+        await new PointRulesAdminRepository(db, spy)
             .UpdateAsync(PointRuleKind.Clubs, 1, input);
 
         Assert.Empty(spy.Calls);
@@ -177,7 +169,7 @@ public class PointRulesRecalcOnEditTests
         await db.SaveChangesAsync();
         var spy = new RecalcSpy();
 
-        await new PointRulesAdminRepository(db, new NullCache(), spy)
+        await new PointRulesAdminRepository(db, spy)
             .UpdateAsync(PointRuleKind.Clubs, 1, Input(rule, 30, 26));
 
         Assert.Empty(spy.Calls);
@@ -199,7 +191,7 @@ public class PointRulesRecalcOnEditTests
         await db.SaveChangesAsync();
         var spy = new RecalcSpy();
 
-        await new PointRulesAdminRepository(db, new NullCache(), spy)
+        await new PointRulesAdminRepository(db, spy)
             .UpdateAsync(PointRuleKind.Clubs, 1, Input(rule, 30, 26));
 
         Assert.Equal(2, spy.Calls.Count);
@@ -224,7 +216,7 @@ public class PointRulesRecalcOnEditTests
         await db.SaveChangesAsync();
         var spy = new RecalcSpy();
 
-        await new PointRulesAdminRepository(db, new NullCache(), spy).UpdateAsync(
+        await new PointRulesAdminRepository(db, spy).UpdateAsync(
             PointRuleKind.Swimmers, 3,
             new PointRuleInputDto
             {
@@ -245,7 +237,7 @@ public class PointRulesRecalcOnEditTests
         db.Add(Standing(10));
         await db.SaveChangesAsync();
 
-        var res = await new PointRulesAdminRepository(db, new NullCache(), new RecalcSpy { Throw = true })
+        var res = await new PointRulesAdminRepository(db, new RecalcSpy { Throw = true })
             .UpdateAsync(PointRuleKind.Clubs, 1, Input(rule, 30, 26));
 
         Assert.True(res.Success);
@@ -267,7 +259,7 @@ public class PointRulesRecalcOnEditTests
         await db.SaveChangesAsync();
         var spy = new RecalcSpy();
 
-        var res = await new PointRulesAdminRepository(db, new NullCache(), spy).CreateAsync(
+        var res = await new PointRulesAdminRepository(db, spy).CreateAsync(
             PointRuleKind.Clubs,
             new PointRuleInputDto
             {
@@ -290,7 +282,7 @@ public class PointRulesRecalcOnEditTests
         await db.SaveChangesAsync();
         var spy = new RecalcSpy();
 
-        await new PointRulesAdminRepository(db, new NullCache(), spy).CreateAsync(
+        await new PointRulesAdminRepository(db, spy).CreateAsync(
             PointRuleKind.Clubs,
             new PointRuleInputDto
             {
@@ -312,7 +304,7 @@ public class PointRulesRecalcOnEditTests
         await db.SaveChangesAsync();
         var spy = new RecalcSpy();
 
-        var res = await new PointRulesAdminRepository(db, new NullCache(), spy)
+        var res = await new PointRulesAdminRepository(db, spy)
             .DeleteAsync(PointRuleKind.Clubs, 1);
 
         Assert.True(res.Success);
@@ -332,7 +324,7 @@ public class PointRulesRecalcOnEditTests
         await db.SaveChangesAsync();
         var spy = new RecalcSpy();
 
-        var res = await new PointRulesAdminRepository(db, new NullCache(), spy)
+        var res = await new PointRulesAdminRepository(db, spy)
             .ReassignCompetitionsAsync(PointRuleKind.Clubs, [new PointRuleReassignItem(10, 9)]);
 
         Assert.True(res.Success);
@@ -349,7 +341,7 @@ public class PointRulesRecalcOnEditTests
         await db.SaveChangesAsync();
         var spy = new RecalcSpy();
 
-        await new PointRulesAdminRepository(db, new NullCache(), spy)
+        await new PointRulesAdminRepository(db, spy)
             .ReassignCompetitionsAsync(PointRuleKind.Clubs, [new PointRuleReassignItem(10, 1)]);
 
         Assert.Empty(spy.Calls);

@@ -14,12 +14,10 @@ namespace Swimm.Infrastructure.Repositories;
 public class RecordAdminRepository : IRecordAdminRepository
 {
     private readonly SwimmDbContext _db;
-    private readonly ICacheService _cache;
 
-    public RecordAdminRepository(SwimmDbContext db, ICacheService cache)
+    public RecordAdminRepository(SwimmDbContext db)
     {
         _db = db;
-        _cache = cache;
     }
 
     // ── Records ──────────────────────────────────────────────────────────────
@@ -84,7 +82,6 @@ public class RecordAdminRepository : IRecordAdminRepository
 
         _db.Records.Remove(record);
         await _db.SaveChangesAsync();
-        await _cache.InvalidateAllAsync();
         return RecordSaveResult.Ok(id);
     }
 
@@ -142,7 +139,6 @@ public class RecordAdminRepository : IRecordAdminRepository
 
         _db.NormativeStandards.Remove(standard);
         await _db.SaveChangesAsync();
-        await _cache.InvalidateAllAsync();
         return RecordSaveResult.Ok(id);
     }
 
@@ -218,7 +214,6 @@ public class RecordAdminRepository : IRecordAdminRepository
         {
             return RecordSaveResult.Fail("Такой рекорд уже есть (совпадает территория/категория/дисциплина).");
         }
-        await _cache.InvalidateAllAsync();
         return RecordSaveResult.Ok(record.Id);
     }
 
@@ -232,7 +227,6 @@ public class RecordAdminRepository : IRecordAdminRepository
         {
             return RecordSaveResult.Fail("Такой норматив уже есть (совпадает система/дисциплина/уровень).");
         }
-        await _cache.InvalidateAllAsync();
         return RecordSaveResult.Ok(standard.Id);
     }
 

@@ -28,14 +28,6 @@ public class CompetitionPullCountersTests
     private static SwimmDbContext CreateDb(string name) =>
         new(new DbContextOptionsBuilder<SwimmDbContext>().UseInMemoryDatabase(name).Options);
 
-    private sealed class NoCache : ICacheService
-    {
-        public Task<T?> GetAsync<T>(string key) => Task.FromResult<T?>(default);
-        public Task SetAsync<T>(string key, T value, TimeSpan ttl) => Task.CompletedTask;
-        public Task RemoveAsync(string key) => Task.CompletedTask;
-        public Task InvalidateAllAsync() => Task.CompletedTask;
-    }
-
     private static DiscoveredCompetition Site(int id, int orgCompId, string name,
         int? logligId, DateTime? emptySourceAt = null, string? lastError = null) => new()
     {
@@ -61,7 +53,7 @@ public class CompetitionPullCountersTests
             Site(12, 300, "Тоже пустой", logligId: 14120, emptySourceAt: noProtocol));
         await db.SaveChangesAsync();
 
-        var list = await new CompetitionAdminRepository(db, new NoCache())
+        var list = await new CompetitionAdminRepository(db)
             .GetUnifiedAsync(null, null, 2026, null, showSynthetic: false, month: null, 1, 20);
 
         var season = Assert.Single(list.SeasonCounts!);
@@ -89,7 +81,7 @@ public class CompetitionPullCountersTests
             Site(12, 300, "Апрель 3", logligId: null));
         await db.SaveChangesAsync();
 
-        var list = await new CompetitionAdminRepository(db, new NoCache())
+        var list = await new CompetitionAdminRepository(db)
             .GetUnifiedAsync(null, null, 2026, null, showSynthetic: false, month: null, 1, 20);
 
         var season = Assert.Single(list.SeasonCounts!);
@@ -106,7 +98,7 @@ public class CompetitionPullCountersTests
         db.DiscoveredCompetitions.Add(Site(10, 100, "Сорвался забор", logligId: 14042, lastError: "502"));
         await db.SaveChangesAsync();
 
-        var list = await new CompetitionAdminRepository(db, new NoCache())
+        var list = await new CompetitionAdminRepository(db)
             .GetUnifiedAsync(null, null, 2026, null, showSynthetic: false, month: null, 1, 20);
 
         var season = Assert.Single(list.SeasonCounts!);
@@ -125,7 +117,7 @@ public class CompetitionPullCountersTests
         db.DiscoveredCompetitions.Add(ignored);
         await db.SaveChangesAsync();
 
-        var list = await new CompetitionAdminRepository(db, new NoCache())
+        var list = await new CompetitionAdminRepository(db)
             .GetUnifiedAsync(null, null, 2026, null, showSynthetic: false, month: null, 1, 20);
 
         var season = Assert.Single(list.SeasonCounts!);

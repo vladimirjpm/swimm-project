@@ -14,7 +14,7 @@ public class RecordRepository : IRecordRepository
     private readonly ICacheService _cache;
 
     // Данные меняются редко (правки в админке, будущее автообновление) — длинный TTL;
-    // админ-CRUD инвалидирует всё через ICacheService.InvalidateAllAsync().
+    // правка рекорда сбрасывает метку Records сама (К4).
     private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(24);
 
     public RecordRepository(SwimmReadDbContext db, ICacheService cache)

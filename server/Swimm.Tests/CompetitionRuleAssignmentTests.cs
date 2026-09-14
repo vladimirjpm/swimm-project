@@ -21,15 +21,7 @@ public class CompetitionRuleAssignmentTests
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options);
 
-    private sealed class NullCache : ICacheService
-    {
-        public Task<T?> GetAsync<T>(string key) => Task.FromResult<T?>(default);
-        public Task SetAsync<T>(string key, T value, TimeSpan ttl) => Task.CompletedTask;
-        public Task RemoveAsync(string key) => Task.CompletedTask;
-        public Task InvalidateAllAsync() => Task.CompletedTask;
-    }
-
-    private static CompetitionAdminRepository Repo(SwimmDbContext db) => new(db, new NullCache());
+    private static CompetitionAdminRepository Repo(SwimmDbContext db) => new(db);
 
     /// <summary>Два правила (клубное #1, пловца #1) + соревнования по вкусу теста.</summary>
     private static async Task SeedRulesAsync(SwimmDbContext db)

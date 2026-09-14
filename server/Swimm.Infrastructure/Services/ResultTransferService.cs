@@ -9,9 +9,10 @@ namespace Swimm.Infrastructure.Services;
 /// <summary>
 /// Перенос всех результатов source-соревнования в target (см. <see cref="IResultTransferService"/>).
 /// Один SaveChanges = одна транзакция; dry-run не пишет ничего. Данные результатов
-/// денормализованы в публичных выдачах → после применения сбрасываем кэш целиком.
+/// денормализованы в публичных выдачах → сохранение само сбрасывает метки своих таблиц
+/// (перехватчик К4).
 /// </summary>
-public class ResultTransferService(SwimmDbContext db, ICacheService cache) : IResultTransferService
+public class ResultTransferService(SwimmDbContext db) : IResultTransferService
 {
     public async Task<ResultTransferReport> MoveResultsAsync(
         int sourceCompetitionId, int targetCompetitionId, bool apply, CancellationToken ct = default)
@@ -56,7 +57,6 @@ public class ResultTransferService(SwimmDbContext db, ICacheService cache) : IRe
         }
 
         await db.SaveChangesAsync(ct);   // одна транзакция
-        await cache.InvalidateAllAsync();
 
         report.Applied = true;
         return report;

@@ -14,12 +14,10 @@ namespace Swimm.Infrastructure.Repositories;
 public class CategoryAdminRepository : ICategoryAdminRepository
 {
     private readonly SwimmDbContext _db;
-    private readonly ICacheService _cache;
 
-    public CategoryAdminRepository(SwimmDbContext db, ICacheService cache)
+    public CategoryAdminRepository(SwimmDbContext db)
     {
         _db = db;
-        _cache = cache;
     }
 
     public async Task<IReadOnlyList<CategoryAdminRowDto>> GetAllAsync()
@@ -125,7 +123,6 @@ public class CategoryAdminRepository : ICategoryAdminRepository
 
         _db.Categories.Remove(cat);
         await _db.SaveChangesAsync();
-        await _cache.InvalidateAllAsync();
         return CategorySaveResult.Ok(id);
     }
 
@@ -154,7 +151,6 @@ public class CategoryAdminRepository : ICategoryAdminRepository
         {
             return CategorySaveResult.Fail("Не удалось сохранить: Key уже занят другой категорией.");
         }
-        await _cache.InvalidateAllAsync();
         return CategorySaveResult.Ok(cat.Id);
     }
 

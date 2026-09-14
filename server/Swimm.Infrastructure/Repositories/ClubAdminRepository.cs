@@ -8,10 +8,11 @@ namespace Swimm.Infrastructure.Repositories;
 
 /// <summary>
 /// Правка клубов (см. <see cref="IClubAdminRepository"/>). Имя клуба денормализованных копий
-/// не имеет — публичные выдачи джойнят Clubs по ClubId, но кэшируются, поэтому после
-/// переименования сбрасываем кэш целиком (иначе club-summary/результаты покажут старое имя).
+/// не имеет — публичные выдачи джойнят Clubs по ClubId, но кэшируются: после переименования
+/// сохранение само сбрасывает метку <c>table:Clubs</c> (перехватчик К4), иначе
+/// club-summary/результаты показали бы старое имя.
 /// </summary>
-public class ClubAdminRepository(SwimmDbContext db, ICacheService cache) : IClubAdminRepository
+public class ClubAdminRepository(SwimmDbContext db) : IClubAdminRepository
 {
     public async Task<ClubEditDto?> GetByIdAsync(int id, CancellationToken ct = default)
     {
@@ -48,7 +49,6 @@ public class ClubAdminRepository(SwimmDbContext db, ICacheService cache) : IClub
         club.IsPseudo = input.IsPseudo;
 
         await db.SaveChangesAsync(ct);
-        await cache.InvalidateAllAsync();
         return ClubSaveResult.Ok();
     }
 
@@ -63,7 +63,6 @@ public class ClubAdminRepository(SwimmDbContext db, ICacheService cache) : IClub
         var name = club.Name;
         db.Clubs.Remove(club);
         await db.SaveChangesAsync(ct);
-        await cache.InvalidateAllAsync();
         return ClubDeleteResult.Ok(name);
     }
 
@@ -98,7 +97,6 @@ public class ClubAdminRepository(SwimmDbContext db, ICacheService cache) : IClub
         if (deleted.Count > 0)
         {
             await db.SaveChangesAsync(ct);
-            await cache.InvalidateAllAsync();
         }
 
         return new ClubBulkDeleteResult(deleted, skipped);

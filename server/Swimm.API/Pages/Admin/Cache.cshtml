@@ -89,13 +89,6 @@
 <h2 class="text-lg text-admin-accent m-0 mb-2">Сервер: как сбрасывается</h2>
 <div class="admin-card mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
     <p class="mt-0">
-        <strong class="text-admin-text">Сейчас:</strong> любая запись из админки, импорт или пересчёт
-        сбрасывает <strong class="text-admin-text">весь</strong> серверный кэш
-        (<code>InvalidateAllAsync</code>); вызов сброса ручной в каждом месте записи. Параллельные
-        запросы одного ответа после сброса строят его <strong class="text-admin-text">один раз</strong>
-        (<code>GetOrCreateAsync</code>), а ответ, собранный во время сброса, в кэш не ложится.
-    </p>
-    <p>
         <strong class="text-admin-text">Метки ставятся сами:</strong> пока ответ собирается, каждый
         SQL-запрос отмечает таблицы, которых коснулся (<code>table:Results</code>,
         <code>table:Records</code>…), а ответ, собранный из другой записи кэша, наследует её метки.
@@ -103,10 +96,18 @@
         сейчас и с какими метками.
     </p>
     <p>
-        <strong class="text-admin-text">Следующий шаг — сброс по меткам</strong> (К4,
-        <code>docs/plans/cache-tags-plan.md</code>): запись сбросит только метки своих таблиц. Правка
-        расписания группы — страницы групп, импорт результатов — всё, что собрано из результатов.
-        Пока же любая запись сбрасывает всё, и метки ничего не меняют в поведении.
+        <strong class="text-admin-text">И сбрасываются сами:</strong> сохранение в базу сбрасывает
+        метки таблиц, которые оно изменило, — и только <strong class="text-admin-text">после коммита</strong>
+        транзакции, иначе соседний запрос успел бы положить в кэш старые данные. Правка расписания
+        группы роняет страницы групп, а season-best, рекорды и клубы остаются. Удаление заодно
+        сбрасывает таблицы, куда оно каскадит в базе. Ручного сброса в местах записи нет — забыть
+        его нельзя (<code>docs/plans/cache-tags-plan.md</code>, К4).
+    </p>
+    <p>
+        <strong class="text-admin-text">Весь кэш сбрасывают</strong> только импорт протоколов, смена
+        настроек (они живут в памяти, не в базе) и кнопка ниже. Параллельные запросы одного ответа
+        после сброса строят его <strong class="text-admin-text">один раз</strong>
+        (<code>GetOrCreateAsync</code>), а ответ, собранный во время сброса, в кэш не ложится.
     </p>
     <div class="flex flex-wrap items-center gap-3 mt-4">
         <button id="btn-invalidate-cache" class="admin-btn admin-btn-primary cursor-pointer">Сбросить весь серверный кэш</button>
@@ -134,7 +135,8 @@
         {
             <div class="border-l-[3px] border-l-admin-warning pl-3 mb-4">
                 <strong class="text-admin-text">Без меток таблиц: @Model.Untagged.Count.</strong>
-                Их сбрасывает только общий сброс — перед К4 каждую надо понять.
+                Их сбрасывает только общий сброс, а запись в базу — нет: такая запись врёт до конца
+                срока жизни. Каждую надо понять.
                 <div class="text-xs mt-1">
                     @foreach (var e in Model.Untagged)
                     {
@@ -182,6 +184,10 @@
         <li><strong class="text-admin-text">Записывать в кэш — только через <code>GetOrCreateAsync</code>.</strong>
             Тогда запись собирается в своём контексте и получает метки своих таблиц сама. Ручной
             <code>SetAsync</code> ловит тест.</li>
+        <li><strong class="text-admin-text">Запись в базу мимо EF сбрасывает свою метку явно.</strong>
+            <code>ExecuteUpdate</code>, <code>ExecuteDelete</code> и сырой SQL перехватчик сохранения не
+            видит: после такой записи — <code>db.InvalidateCacheTagsAsync(db.TableTag&lt;T&gt;())</code>
+            (тоже ждёт коммита).</li>
     </ol>
 </div>
 

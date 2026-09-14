@@ -23,20 +23,17 @@ public class MediaController : ControllerBase
     private readonly IMySwimsRepository _mySwims;
     private readonly IUserMediaPublicationService _publications;
     private readonly IHubGroupPermissionService _groupPermissions;
-    private readonly ICacheService _cache;
 
     public MediaController(
         IUserMediaRepository media,
         IMySwimsRepository mySwims,
         IUserMediaPublicationService publications,
-        IHubGroupPermissionService groupPermissions,
-        ICacheService cache)
+        IHubGroupPermissionService groupPermissions)
     {
         _media = media;
         _mySwims = mySwims;
         _publications = publications;
         _groupPermissions = groupPermissions;
-        _cache = cache;
     }
 
     private int? CurrentUserId()
@@ -161,10 +158,6 @@ public class MediaController : ControllerBase
         var (success, error, publication) = await _publications.SubmitAsync(
             userId.Value, id, request, privileged);
         if (!success) return BadRequest(new { error });
-
-        // Авто-approve привилегированной подачи сразу меняет публичную витрину группы
-        // (Gallery/Highlights в кэшируемом payload страницы группы).
-        if (publication!.Status == "approved") await _cache.InvalidateAllAsync();
         return Ok(publication);
     }
 
@@ -177,9 +170,6 @@ public class MediaController : ControllerBase
 
         var ok = await _publications.WithdrawAsync(userId.Value, id, targetType, targetId);
         if (!ok) return NotFound(new { error = "Publication not found" });
-
-        // Отзыв approved public-публикации убирает её из витрины группы — сброс кэша страницы.
-        await _cache.InvalidateAllAsync();
         return NoContent();
     }
 
@@ -210,9 +200,6 @@ public class MediaController : ControllerBase
         var ok = await _publications.DecideAsync(
             UserMediaPublicationTarget.Club, clubId, publicationId, request.Approve, userId.Value);
         if (!ok) return NotFound(new { error = "Publication not found" });
-
-        // Лента клуба входит в кэшируемую страницу клуба — без сброса решение не видно.
-        await _cache.InvalidateAllAsync();
         return NoContent();
     }
 

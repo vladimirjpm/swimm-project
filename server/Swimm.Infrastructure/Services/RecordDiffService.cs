@@ -10,8 +10,8 @@ namespace Swimm.Infrastructure.Services;
 /// <summary>
 /// Дифф спарсенных рекордов (<see cref="IRecordSourceProvider"/>) с текущими Records +
 /// применение выбранных групп. Диффы держим в <see cref="IMemoryCache"/> 10 минут (сессия
-/// превью в UI — Fetch → показать дифф → Apply); отдельно от публичного HTTP-кэша
-/// (<see cref="ICacheService"/>), который тут только инвалидируется после Apply.
+/// превью в UI — Fetch → показать дифф → Apply); это не публичный HTTP-кэш
+/// (<see cref="ICacheService"/>) — тот Apply сбрасывает сам, сохранением через EF (К4).
 /// </summary>
 public class RecordDiffService : IRecordDiffService
 {
@@ -25,13 +25,11 @@ public class RecordDiffService : IRecordDiffService
     };
 
     private readonly SwimmDbContext _db;
-    private readonly ICacheService _cache;
     private readonly IMemoryCache _memoryCache;
 
-    public RecordDiffService(SwimmDbContext db, ICacheService cache, IMemoryCache memoryCache)
+    public RecordDiffService(SwimmDbContext db, IMemoryCache memoryCache)
     {
         _db = db;
-        _cache = cache;
         _memoryCache = memoryCache;
     }
 
@@ -154,7 +152,6 @@ public class RecordDiffService : IRecordDiffService
 
         await _db.SaveChangesAsync(ct);
         _memoryCache.Remove(DiffCacheKey(request.DiffId));
-        await _cache.InvalidateAllAsync();
 
         return new RecordDiffApplyResult(true, null, toApply.Count);
     }
