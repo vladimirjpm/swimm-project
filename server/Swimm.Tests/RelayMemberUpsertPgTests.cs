@@ -18,6 +18,7 @@ namespace Swimm.Tests;
 /// «правильной» сама по себе и потому не заметила, что в сервисе проверки RelayMembers нет
 /// (2026-08-02: 102 живых эстафетчика в списке сирот). Копию предиката не возвращать.
 /// </summary>
+[Collection(LiveDbCollection.Name)]
 public class RelayMemberUpsertPgTests
 {
     private const string Conn =

@@ -95,10 +95,10 @@ public class AdminSettingsService : ISettingsService
                 "сентября по декабрь. Возраст на страницах (ростер, зачёт, категории) " +
                 "настройка НЕ трогает — он всегда сезонный (docs/data-integrity.md §13)"),
             // Точность сброса кэша (docs/plans/cache-row-precision-plan.md §2.5, §4-6).
-            new(CacheSettings.RowPrecision, "false", "bool", "livesite",
-                "Кэш: сужение до строк. true — страница одной группы или клуба зависит от своих " +
-                "строк и падает только от их правки; false — от всей таблицы, как раньше. " +
-                "Аварийный рычаг: всплыл недосброс (подозрения сверки на /Admin/Cache) — выключить"),
+            new(CacheSettings.RowPrecision, CacheSettings.DefaultRowPrecision ? "true" : "false", "bool", "livesite",
+                "Кэш: сужение до строк (по умолчанию вкл.). true — страница одной группы или клуба " +
+                "зависит от своих строк и падает только от их правки; false — от всей таблицы, как " +
+                "раньше. Аварийный рычаг: всплыл недосброс (подозрения сверки на /Admin/Cache) — выключить"),
             new(CacheSettings.HitVerifyPercent, CacheSettings.DefaultHitVerifyPercent(development).ToString(), "int", "livesite",
                 "Кэш: сверка на попадании, % (0–100). Попадание в запись, суженную до строк, с этой " +
                 "вероятностью строится заново мимо кэша и сравнивается; расхождение — «подозрение " +

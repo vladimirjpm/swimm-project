@@ -17,6 +17,7 @@ namespace Swimm.Tests;
 /// Тест ходит в рабочую локальную базу, поэтому заводит свою группу и в finally удаляет её —
 /// каскад уносит и состав, и подписку.
 /// </summary>
+[Collection(LiveDbCollection.Name)]
 public class HubGroupClubSubscriptionPgTests
 {
     private const string Conn =

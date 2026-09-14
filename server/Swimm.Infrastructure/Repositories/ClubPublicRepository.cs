@@ -85,6 +85,13 @@ public class ClubPublicRepository : IClubPublicRepository
         if (ageFrom.HasValue) query = query.Where(s => s.BirthYear <= ageYear - ageFrom.Value);
         if (ageTo.HasValue) query = query.Where(s => s.BirthYear >= ageYear - ageTo.Value);
 
+        // Сужение кэша (docs/plans/cache-row-precision-plan.md §3.2, К4б.5): до конца метода —
+        // пловцы и результаты ЭТОГО клуба, запись зависит от row:Clubs:{id}, а не от таблиц:
+        // правка пловца или результата чужого клуба её не роняет, переход пловца между клубами
+        // роняет оба состава (старое и новое значение FK). ⚠ Правило блока: каждый запрос ниже
+        // фильтрует Swimmers и Results по ClubId — новый запрос без такого фильтра ставить ДО.
+        using var narrowed = _read.CacheRows<Club>(resolvedClubId, typeof(Swimmer), typeof(ResultRecord));
+
         var total = await query.CountAsync();
 
         var pageRows = await query
@@ -128,13 +135,16 @@ public class ClubPublicRepository : IClubPublicRepository
                 .Select(g => new
                 {
                     SwimmerId = g.Key,
-                    Competitions = g.Select(r => r.CompetitionId).Distinct().Count(),
+                    // ⚠ Не «Competitions»: имя свойства уходит в SQL псевдонимом колонки
+                    // (AS "Competitions"), а метки кэша ищутся в тексте SQL по именам таблиц в
+                    // кавычках — состав получил бы лишнюю метку table:Competitions.
+                    CompetitionCount = g.Select(r => r.CompetitionId).Distinct().Count(),
                     Swims = g.Count()
                 })
                 .ToListAsync();
 
             foreach (var c in counts)
-                countsById[c.SwimmerId] = (c.Competitions, c.Swims);
+                countsById[c.SwimmerId] = (c.CompetitionCount, c.Swims);
         }
 
         var data = pageRows.Select(s =>

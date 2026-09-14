@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 
 namespace Swimm.API.Pages.Admin;
 
@@ -32,8 +33,10 @@ public class CacheModel : PageModel
     public IReadOnlyList<(string Tag, int Count)> TagCounts { get; private set; } = [];
 
     /// <summary>
-    /// Записи без меток таблиц — их сбрасывает только общий сброс, а запись в базу с К4 сбрасывает
-    /// лишь метки своих таблиц: такая запись врала бы до конца TTL.
+    /// Записи без меток данных — их сбрасывает только общий сброс, а запись в базу с К4 сбрасывает
+    /// лишь метки своих таблиц и строк: такая запись врала бы до конца TTL. Метка данных — это
+    /// <c>table:</c> или, у записи, суженной до строк (К4б), <c>row:</c>/<c>anyrow:</c>: состав
+    /// клуба целиком сужен и таблиц не носит вовсе.
     /// </summary>
     public IReadOnlyList<CacheEntryInfo> Untagged { get; private set; } = [];
 
@@ -52,7 +55,9 @@ public class CacheModel : PageModel
             .OrderByDescending(x => x.Item2)
             .ThenBy(x => x.Key, StringComparer.Ordinal)
             .ToList();
-        Untagged = Entries.Where(e => !e.Tags.Any(t => t.StartsWith("table:", StringComparison.Ordinal))).ToList();
+        Untagged = Entries
+            .Where(e => !e.Tags.Any(t => t.StartsWith("table:", StringComparison.Ordinal) || CacheTags.IsRowLevel(t)))
+            .ToList();
     }
 }
 
