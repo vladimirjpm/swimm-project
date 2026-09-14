@@ -20,13 +20,29 @@ namespace Swimm.Infrastructure.Data;
 /// Таблицы ищутся в тексте SQL по закавыченным именам из модели EF (Npgsql кавычит PascalCase
 /// всегда). Лишнее совпадение — колонка, названная как таблица, — даёт лишний сброс, а не
 /// недосброс, и это безопасно.
+///
+/// Служебные колонки (docs/plans/cache-row-precision-plan.md §2.6, К4б.6) — так же: в SQL есть и
+/// таблица <c>"T"</c>, и её служебная колонка <c>"C"</c> → <c>col:T.C</c>. EF называет каждую
+/// колонку, которую читает, поэтому не названная — не прочитана. Та же колонка у другой таблицы
+/// запроса (<c>"UpdatedAt"</c> клуба рядом с группами) даёт лишний сброс, а не ошибку;
+/// <c>SELECT *</c> и <c>"x".*</c> считаются чтением всех служебных колонок упомянутых таблиц.
+/// Метки <c>col:</c> ставятся при любом положении выключателя <c>CacheColumnPrecision</c> —
+/// он действует на запись.
 /// </summary>
 public sealed class CacheDependencyInterceptor : DbCommandInterceptor
 {
     private static readonly Regex QuotedIdentifier = new("\"([^\"]+)\"", RegexOptions.Compiled);
 
-    // Имена таблиц модели — один раз на модель (у SwimmDbContext и SwimmReadDbContext свои).
-    private static readonly ConcurrentDictionary<IModel, HashSet<string>> TablesByModel = new();
+    // Чтение всех колонок: SELECT *, SELECT DISTINCT *, ", *", "x".*. COUNT(*) колонок не читает и
+    // сюда не попадает; лишнее совпадение (звёздочка в строковой константе) — лишний сброс.
+    private static readonly Regex Star = new(
+        @"(?:\bSELECT\s+(?:DISTINCT\s+)?|,\s*|\.)\*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>Имена таблиц модели и её служебные колонки по таблицам.</summary>
+    private sealed record ModelNames(HashSet<string> Tables, IReadOnlyDictionary<string, string[]> ServiceColumns);
+
+    // Один раз на модель (у SwimmDbContext и SwimmReadDbContext свои).
+    private static readonly ConcurrentDictionary<IModel, ModelNames> NamesByModel = new();
 
     public override InterceptionResult<DbDataReader> ReaderExecuting(
         DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result)
@@ -63,17 +79,28 @@ public sealed class CacheDependencyInterceptor : DbCommandInterceptor
         var scope = CacheBuildScope.Current;
         if (scope is null || eventData.Context is null) return;
 
-        var tables = TablesByModel.GetOrAdd(eventData.Context.Model, TableNames);
-        foreach (Match match in QuotedIdentifier.Matches(command.CommandText))
+        var names = NamesByModel.GetOrAdd(eventData.Context.Model, Names);
+        var sql = command.CommandText;
+        var identifiers = new HashSet<string>(StringComparer.Ordinal);
+        foreach (Match match in QuotedIdentifier.Matches(sql)) identifiers.Add(match.Groups[1].Value);
+
+        bool? star = null;
+        foreach (var name in identifiers)
         {
-            var name = match.Groups[1].Value;
-            // table:T — или, в блоке сужения этой сборки, метки строк корня + anyrow:T (К4б.3).
-            if (tables.Contains(name)) scope.TouchTable(name);
+            if (!names.Tables.Contains(name)) continue;
+            // table:T — или, в блоке сужения этой сборки, метки строк корня + anyrow:T (К4б.3);
+            // плюс col:T.C на служебные колонки таблицы, названные в том же SQL (К4б.6).
+            string[]? columns = null;
+            if (names.ServiceColumns.TryGetValue(name, out var service))
+                columns = (star ??= Star.IsMatch(sql)) ? service : service.Where(identifiers.Contains).ToArray();
+            scope.TouchTable(name, columns);
         }
     }
 
-    private static HashSet<string> TableNames(IModel model) => model.GetEntityTypes()
-        .SelectMany(e => new[] { e.GetTableName(), e.GetViewName() })
-        .OfType<string>()
-        .ToHashSet(StringComparer.Ordinal);
+    private static ModelNames Names(IModel model) => new(
+        model.GetEntityTypes()
+            .SelectMany(e => new[] { e.GetTableName(), e.GetViewName() })
+            .OfType<string>()
+            .ToHashSet(StringComparer.Ordinal),
+        CacheServiceColumns.Of(model).ByTable);
 }

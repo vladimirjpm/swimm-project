@@ -129,6 +129,22 @@
         роняет и его состав. Список групп читает группы таблицей и падает от любой их правки.
     </p>
     <p>
+        <strong class="text-admin-text">Служебные колонки:</strong> правка, задевшая только колонки из
+        короткого реестра — loglig-привязка пловца (<code>Swimmers.LogligId…</code>), штамп проверки
+        качества (<code>Competitions.QualityScannedAt</code>), объединённые места
+        (<code>Results.CombinedPlace</code>, <code>IsBestResult</code>, <code>BestTimeMs</code>), отметки
+        «обновлено» (<code>HubGroups.UpdatedAt</code>, <code>Sys_AppUsers.UpdatedAt</code>), —
+        сбрасывает не <code>table:T</code>, а <code>col:Swimmers.LogligId</code> (у группы, клуба,
+        пловца — ещё метку своей строки). Падают только записи, в SQL которых эта колонка названа, —
+        они носят <code>col:</code>. Loglig-задания и проверка качества не роняют season-best, обзоры и
+        составы клубов, страницы групп; отметка «обновлено» группы роняет только её страницу
+        (К4б.6). Работает, пока включена настройка <code>CacheColumnPrecision</code> (по умолчанию
+        включена) — выключить её и есть аварийный рычаг; метки <code>col:</code> записи носят при
+        любом положении. Реестр —
+        <code>CacheServiceColumns</code>; колонка идёт туда по журналу ниже: её правка часто
+        выкидывает записи, которые её не читают.
+    </p>
+    <p>
         <strong class="text-admin-text">Весь кэш сбрасывают</strong> только импорт протоколов, смена
         настроек (они живут в памяти, не в базе) и кнопка ниже. Параллельные запросы одного ответа
         после сброса строят его <strong class="text-admin-text">один раз</strong>
@@ -217,7 +233,8 @@
     @{ var checks = journal.HitChecks; }
     <p class="mb-2">
         <strong class="text-admin-text">Сверка на попадании:</strong> сверено @checks.Checked,
-        расхождений @checks.Mismatched. Попадание в запись, суженную до строк, с долей из настройки
+        расхождений @checks.Mismatched. Попадание в запись, суженную до строк (или читавшую служебные
+        колонки, пока включена точность по ним), с долей из настройки
         <code>CacheHitVerifyPercent</code> строится заново мимо кэша и сравнивается с тем, что в кэше.
     </p>
     @if (checks.Mismatches.Count > 0)
@@ -319,7 +336,9 @@
             <code>ExecuteUpdate</code>, <code>ExecuteDelete</code> и сырой SQL перехватчик сохранения не
             видит: после такой записи — <code>db.InvalidateTableCacheAsync&lt;T&gt;()</code>, метки
             <code>table:T</code> и <code>anyrow:T</code> (тоже ждёт коммита). Одна метка таблицы прошла
-            бы мимо страниц, зависящих от своих строк.</li>
+            бы мимо страниц, зависящих от своих строк. Запись только служебных колонок —
+            <code>db.InvalidateColumnsCacheAsync&lt;T&gt;(колонки)</code>: метки <code>col:</code> (у
+            корня ещё <code>anyrow:T</code>); колонка не из реестра — исключение.</li>
     </ol>
 </div>
 

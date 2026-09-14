@@ -10,13 +10,21 @@ using Xunit;
 
 namespace Swimm.Tests;
 
-/// <summary>Настройки кэша для тестов: выключатель сужения и доля сверки — как на /Admin/Settings.</summary>
-internal sealed class CacheSettingsStub(bool rowPrecision = true, int hitVerifyPercent = 0) : ISettingsService
+/// <summary>
+/// Настройки кэша для тестов: выключатели сужения до строк и точности по колонкам, доля сверки —
+/// как на /Admin/Settings. Выключатели по умолчанию — как дефолты на сайте.
+/// </summary>
+internal sealed class CacheSettingsStub(
+    bool rowPrecision = CacheSettings.DefaultRowPrecision,
+    int hitVerifyPercent = 0,
+    bool columnPrecision = CacheSettings.DefaultColumnPrecision)
+    : ISettingsService
 {
     private readonly Dictionary<string, string> _values = new()
     {
         [CacheSettings.RowPrecision] = rowPrecision ? "true" : "false",
         [CacheSettings.HitVerifyPercent] = hitVerifyPercent.ToString(),
+        [CacheSettings.ColumnPrecision] = columnPrecision ? "true" : "false",
     };
 
     public IReadOnlyList<AdminSetting> GetAll() => [];

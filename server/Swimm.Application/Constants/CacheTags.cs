@@ -8,7 +8,8 @@ namespace Swimm.Application.Constants;
 ///
 /// Точность — «таблица» или «строка корня» (docs/plans/cache-row-precision-plan.md §2.1); по
 /// колонкам не дробим (решение плана §3.3): лишний сброс дешевле, чем схема, в которой легко
-/// забыть зависимость.
+/// забыть зависимость. Единственное исключение — короткий реестр служебных колонок
+/// (<see cref="Column"/>, §2.6 того же плана): их пишут часто, а читают единицы.
 /// </summary>
 public static class CacheTags
 {
@@ -20,6 +21,7 @@ public static class CacheTags
 
     private const string RowPrefix = "row:";
     private const string AnyRowPrefix = "anyrow:";
+    private const string ColumnPrefix = "col:";
 
     /// <summary>
     /// Строка корня или её прямой потомок: <c>row:HubGroups:24</c> — изменилась группа 24, её
@@ -41,4 +43,15 @@ public static class CacheTags
     /// </summary>
     public static bool IsRowLevel(string tag) =>
         tag.StartsWith(RowPrefix, StringComparison.Ordinal) || tag.StartsWith(AnyRowPrefix, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Служебная колонка таблицы: <c>col:Swimmers.LogligId</c> — изменилась только она (loglig-
+    /// привязка пловца), остальные данные строки те же. Её носят записи, в SQL которых эта колонка
+    /// названа; правка одной служебной колонки <see cref="Table"/> не сбрасывает
+    /// (docs/plans/cache-row-precision-plan.md §2.6). Имена — как в БД.
+    /// </summary>
+    public static string Column(string table, string column) => $"{ColumnPrefix}{table}.{column}";
+
+    /// <summary>Метка служебной колонки (<see cref="Column"/>).</summary>
+    public static bool IsColumn(string tag) => tag.StartsWith(ColumnPrefix, StringComparison.Ordinal);
 }

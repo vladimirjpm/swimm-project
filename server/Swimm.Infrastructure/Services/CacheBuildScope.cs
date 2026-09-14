@@ -87,13 +87,21 @@ public sealed class CacheBuildScope : IDisposable
 
     /// <summary>
     /// Запрос прочёл таблицу: <c>table:T</c>, а если таблица сужена открытым в ЭТОЙ сборке
-    /// блоком — метки строк корня и <c>anyrow:T</c>.
+    /// блоком — метки строк корня и <c>anyrow:T</c>. Плюс <c>col:T.C</c> на каждую служебную
+    /// колонку <paramref name="serviceColumns"/>, которую запрос назвал (К4б.6, §2.6).
     ///
     /// ⚠ Блок чужой сборки не действует: вложенная запись (скажем, «все стили»), собранная внутри
     /// блока группы 24, легла бы в кэш с меткой группы 24 и потом врала бы всем. Поэтому
     /// вложенная сборка начинает с чистого сужения, а её метки наружу наследуются как раньше.
+    ///
+    /// Служебная правка не сбрасывает ни <c>table:T</c>, ни метки корней по FK — только <c>col:</c>
+    /// и, если таблица — корень, метку своей строки. Поэтому <c>col:</c> носит всякий читатель
+    /// колонки, и суженный потомок тоже (участников группы правка их пловца по <c>row:</c> группы
+    /// не найдёт), — кроме корня в его же блоке: его строки читаются по id, и служебную правку
+    /// такой строки закрывает её <c>row:</c>. С <c>col:</c> страница группы, которая читает свою
+    /// строку целиком (с <c>UpdatedAt</c>), падала бы от отметки «обновлено» ЛЮБОЙ группы.
     /// </summary>
-    public void TouchTable(string table)
+    public void TouchTable(string table, IReadOnlyCollection<string>? serviceColumns = null)
     {
         if (CurrentNarrowing.Value is { } narrowing
             && ReferenceEquals(narrowing.Scope, this)
@@ -101,9 +109,15 @@ public sealed class CacheBuildScope : IDisposable
         {
             Touch(CacheTags.AnyRow(table));
             narrowing.TouchRows();
-            return;
+            if (table == narrowing.RootTable) return;
         }
-        Touch(CacheTags.Table(table));
+        else
+        {
+            Touch(CacheTags.Table(table));
+        }
+
+        if (serviceColumns is null) return;
+        foreach (var column in serviceColumns) Touch(CacheTags.Column(table, column));
     }
 
     /// <summary>
@@ -148,6 +162,7 @@ public sealed class CacheBuildScope : IDisposable
         private int _rowsTouched;
 
         public CacheBuildScope Scope => scope;
+        public string RootTable => rootTable;
         public IReadOnlySet<string> Tables => tables;
 
         /// <summary>

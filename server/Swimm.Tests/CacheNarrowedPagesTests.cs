@@ -58,21 +58,26 @@ public class CacheNarrowedPagesTests
     private sealed class World : IAsyncDisposable
     {
         private const string ListKey = "http:hub-groups:list";
+        private const string SeasonBestKey = "http:season-best:table:cur";
         private static readonly CacheDependencyInterceptor Reads = new();
 
         private readonly SwimmReadDbContext _read;
         private readonly SwimmDbContext _rw;
+        private readonly CacheSettingsStub _settings;
         private readonly HubGroupPublicRepository _groups;
         private readonly HubGroupMediaService _media;
         private readonly UserMediaPublicationService _publications;
         private readonly ClubPublicRepository _clubRepo;
         private readonly ClubOverviewRepository _overview;
+        private readonly SeasonBestRepository _seasonBest;
         private Dictionary<int, int> _mediaSwimmers = [];
+        private bool _withSeasonBest;
 
         private World(SwimmReadDbContext read, SwimmDbContext rw, CacheSettingsStub settings)
         {
             _read = read;
             _rw = rw;
+            _settings = settings;
             _groups = new HubGroupPublicRepository(read, rw, settings);
             _media = new HubGroupMediaService(rw);
             _publications = new UserMediaPublicationService(rw);
@@ -80,6 +85,7 @@ public class CacheNarrowedPagesTests
             var showcase = new ShowcaseSeasonProvider(read, Cache);
             _clubRepo = new ClubPublicRepository(read, showcase);
             _overview = new ClubOverviewRepository(read, _clubRepo, showcase);
+            _seasonBest = new SeasonBestRepository(read, showcase);
         }
 
         public MemoryCacheService Cache { get; }
@@ -94,7 +100,10 @@ public class CacheNarrowedPagesTests
         /// <summary>Медиа без одобренной публикации ни в одной группе — ни одна страница его не читала.</summary>
         public int SpareMediaId { get; private set; }
 
-        public static async Task<World?> OpenAsync(bool rowPrecision = true, int hitVerifyPercent = 0, bool clubs = false)
+        /// <param name="columnPrecision">Выключатель точности по служебным колонкам (К4б.6) — и для записей зеркала.</param>
+        /// <param name="seasonBest">Добавить season-best страны (<c>/api/season-best/table</c>) — витрину «по всей стране».</param>
+        public static async Task<World?> OpenAsync(bool rowPrecision = true, int hitVerifyPercent = 0, bool clubs = false,
+            bool columnPrecision = CacheSettings.DefaultColumnPrecision, bool seasonBest = false)
         {
             var read = new SwimmReadDbContext(new DbContextOptionsBuilder<SwimmReadDbContext>()
                 .UseNpgsql(PgConn)
@@ -109,7 +118,10 @@ public class CacheNarrowedPagesTests
 
             var rw = new SwimmDbContext(new DbContextOptionsBuilder<SwimmDbContext>()
                 .UseNpgsql(PgConn).AddInterceptors(Reads).Options);
-            var world = new World(read, rw, new CacheSettingsStub(rowPrecision, hitVerifyPercent));
+            var world = new World(read, rw, new CacheSettingsStub(rowPrecision, hitVerifyPercent, columnPrecision))
+            {
+                _withSeasonBest = seasonBest,
+            };
             await world.LoadAsync(clubs);
             return world;
         }
@@ -172,6 +184,34 @@ public class CacheNarrowedPagesTests
                 await Cache.GetOrCreateAsync(c.RosterKey,
                     () => _clubRepo.GetRosterAsync(c.Id, 1, 50, null, null, null, null), Ttl);
             }
+            // Как SeasonBestController: вся сезонная таблица страны (бейдж SB, /season-best).
+            if (_withSeasonBest)
+                await Cache.GetOrCreateAsync(SeasonBestKey, () => _seasonBest.GetSeasonBestTableAsync(null), Ttl);
+        }
+
+        public async Task<bool> SeasonBestCached() =>
+            await Cache.GetAsync<SeasonBestTableDto>(SeasonBestKey) is not null;
+
+        /// <summary>Ключи всех страниц мира: группы, список, клубы, season-best.</summary>
+        public IReadOnlyList<string> PageKeys =>
+        [
+            .. Groups.Select(g => g.Key), ListKey,
+            .. Clubs.SelectMany(c => new[] { c.OverviewKey, c.RosterKey }),
+            .. (_withSeasonBest ? new[] { SeasonBestKey } : Array.Empty<string>()),
+        ];
+
+        /// <summary>Страницы мира, которые носят метку <paramref name="tag"/>, — до правки, пока они в кэше.</summary>
+        public List<string> PagesWith(Func<string, bool> tag) =>
+            PageKeys.Where(k => TagsOf(k).Any(tag)).Order(StringComparer.Ordinal).ToList();
+
+        /// <summary>
+        /// Какие страницы мира выкинуты — одним списком: сценарий «ничего не упало» проверяет все
+        /// сразу, а упавшую называет в сообщении.
+        /// </summary>
+        public string[] Dropped()
+        {
+            var live = Cache.Snapshot().Select(e => e.Key).ToHashSet(StringComparer.Ordinal);
+            return [.. PageKeys.Where(k => !live.Contains(k)).Order(StringComparer.Ordinal)];
         }
 
         public async Task<bool> OverviewCached(LiveClub c) =>
@@ -246,7 +286,7 @@ public class CacheNarrowedPagesTests
             }
             return new SwimmDbContext(new DbContextOptionsBuilder<SwimmDbContext>()
                 .UseInMemoryDatabase(name)
-                .AddInterceptors(new CacheInvalidationInterceptor(Cache))
+                .AddInterceptors(new CacheInvalidationInterceptor(Cache, _settings))
                 .Options);
 
             static UserMedia Media(int id, int swimmerId) => new()
@@ -343,15 +383,19 @@ public class CacheNarrowedPagesTests
     /// лежащей — сужение не спрятало от страницы ни одного её чтения, а сама страница
     /// детерминирована (иначе сверка сыпала бы ложными подозрениями при прокликивании).
     /// </summary>
-    [Fact]
-    public async Task HitVerification_OnRealPages_FindsNoMismatch()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task HitVerification_OnRealPages_FindsNoMismatch(bool columnPrecision)
     {
-        await using var world = await World.OpenAsync(hitVerifyPercent: 100, clubs: true);
+        await using var world = await World.OpenAsync(hitVerifyPercent: 100, clubs: true, seasonBest: true,
+            columnPrecision: columnPrecision);
         if (world == null || world.Groups.Count == 0) return;
 
         await world.BuildAsync(); // всё уже в кэше: попадание → сверка
 
-        // Сверяются суженные записи: страницы групп, обзоры и составы клубов (список — таблицей).
+        // Сверяются суженные записи: страницы групп, обзоры и составы клубов. Список и season-best —
+        // таблицей; служебных колонок они не читают, и с точностью по колонкам сверять их нечего.
         var checks = world.Cache.Journal().HitChecks;
         Assert.Equal(world.Groups.Count + 2 * world.Clubs.Count, checks.Checked);
         Assert.True(checks.Mismatched == 0, string.Join(" | ", checks.Mismatches.Select(m => $"{m.Key}: {m.Difference}")));
@@ -675,9 +719,137 @@ public class CacheNarrowedPagesTests
         if (world == null || world.Clubs.Count == 0) return;
         await using var db = world.Mirror();
 
-        // Как стирание объединённых мест в пересчёте (ExecuteUpdate по Results).
+        // ExecuteUpdate/ExecuteDelete по обычным колонкам Results: какие строки задеты — неизвестно.
         await db.InvalidateTableCacheAsync<ResultRecord>();
 
         foreach (var c in world.Clubs) Assert.False(await world.RosterCached(c));
+    }
+
+    // ── Служебные колонки (§2.6, К4б.6) ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Приёмка К4б.6: loglig-привязку пловца (подсказка пользователя, суточные задания, штамп
+    /// после импорта) не читает ни одна из этих витрин — ни season-best страны, ни обзор и состав
+    /// ЕГО клуба, ни страницы групп. Падает только то, что её называет в SQL (страница пловца).
+    /// </summary>
+    [Fact]
+    public async Task LogligEdit_KeepsSeasonBest_ClubPages_AndGroupPages()
+    {
+        await using var world = await World.OpenAsync(clubs: true, seasonBest: true, columnPrecision: true);
+        if (world == null || world.Clubs.Count == 0) return;
+        await using var db = world.Mirror();
+
+        var swimmer = await db.Swimmers.SingleAsync(s => s.Id == world.Clubs[0].SwimmerId);
+        swimmer.LogligId = 900_000_077;
+        swimmer.LogligIdStatus = "Suggested";
+        swimmer.LogligIdSource = "user-claim";
+        swimmer.LogligIdSuggestedByUserId = 1;
+        swimmer.LogligIdSuggestedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        Assert.Empty(world.Dropped());
+    }
+
+    /// <summary>Выключатель — аварийный рычаг: выключен — та же правка обычная, как до К4б.6.</summary>
+    [Fact]
+    public async Task LogligEdit_SwitchOff_DropsWhatReadsSwimmers()
+    {
+        await using var world = await World.OpenAsync(clubs: true, seasonBest: true, columnPrecision: false);
+        if (world == null || world.Clubs.Count == 0) return;
+        var (own, other) = (world.Clubs[0], world.Clubs[1]);
+        await using var db = world.Mirror();
+
+        (await db.Swimmers.SingleAsync(s => s.Id == own.SwimmerId)).LogligId = 900_000_077;
+        await db.SaveChangesAsync();
+
+        Assert.False(await world.SeasonBestCached());   // table:Swimmers
+        Assert.False(await world.RosterCached(own));    // row:Clubs своего клуба
+        Assert.True(await world.RosterCached(other));   // состав сужен по клубу — чужой жив и так
+    }
+
+    /// <summary>Прогон проверки качества: штамп «проверка была» не читает ни одна витрина.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task QualityScanStamp_KeepsEveryPage_WhileColumnPrecisionIsOn(bool columnPrecision)
+    {
+        await using var world = await World.OpenAsync(clubs: true, seasonBest: true, columnPrecision: columnPrecision);
+        if (world == null || world.Groups.Count == 0) return;
+        const int competitionId = 900_000_009;
+        await using var db = world.Mirror(seed => seed.Competitions.Add(new Competition { Id = competitionId, Name = "c" }),
+            $"{nameof(QualityScanStamp_KeepsEveryPage_WhileColumnPrecisionIsOn)}-{columnPrecision}"); // своя база на случай
+
+        (await db.Competitions.SingleAsync(c => c.Id == competitionId)).QualityScannedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        if (columnPrecision) Assert.Empty(world.Dropped());
+        else Assert.False(await world.SeasonBestCached()); // table:Competitions — season-best из соревнований
+    }
+
+    /// <summary>
+    /// Пересчёт объединённых мест (правка правила очков, флаг Combine All Results): падают только
+    /// те, кто показывает места, — страницы групп читают результаты состава целиком. Season-best,
+    /// обзоры и составы клубов живы (до К4б.6 пересчёт ронял все витрины из результатов).
+    /// </summary>
+    [Fact]
+    public async Task CombinedPlaces_DropOnlyThePagesThatShowThem()
+    {
+        await using var world = await World.OpenAsync(clubs: true, seasonBest: true, columnPrecision: true);
+        if (world == null || world.Clubs.Count == 0) return;
+        const int resultId = 900_000_007;
+        var club = world.Clubs[0];
+        var readers = world.PagesWith(IsCombinedPlaceColumn);
+        Assert.NotEmpty(readers); // иначе сценарий не отличит «колонкой» от «ничего»
+        await using var db = world.Mirror(seed => seed.Results.Add(new ResultRecord
+        {
+            Id = resultId, CompetitionId = 1, StyleId = 1, SwimmerId = club.SwimmerId, ClubId = club.Id,
+        }));
+
+        var result = await db.Results.SingleAsync(r => r.Id == resultId);
+        result.CombinedPlace = 1;
+        result.IsBestResult = true;
+        result.BestTimeMs = 30_000;
+        await db.SaveChangesAsync();
+
+        Assert.Equal(readers, world.Dropped());
+    }
+
+    private static bool IsCombinedPlaceColumn(string tag) =>
+        tag.StartsWith(CacheTags.Column("Results", ""), StringComparison.Ordinal);
+
+    /// <summary>Стирание объединённых мест мимо трекера (флаг сняли) — колонками, не таблицей.</summary>
+    [Fact]
+    public async Task BulkClearOfCombinedPlaces_KeepsRostersAndSeasonBest()
+    {
+        await using var world = await World.OpenAsync(clubs: true, seasonBest: true, columnPrecision: true);
+        if (world == null || world.Clubs.Count == 0) return;
+        var readers = world.PagesWith(IsCombinedPlaceColumn);
+        await using var db = world.Mirror();
+
+        await db.InvalidateColumnsCacheAsync<ResultRecord>(
+            nameof(ResultRecord.CombinedPlace), nameof(ResultRecord.IsBestResult), nameof(ResultRecord.BestTimeMs));
+
+        // Составы сужены по клубу и носят anyrow:Results: сброс таблицей их бы выкинул (сценарий выше).
+        Assert.Equal(readers, world.Dropped());
+        foreach (var c in world.Clubs) Assert.True(await world.RosterCached(c));
+    }
+
+    /// <summary>
+    /// Отметка «обновлено» группы после правки состава (TouchGroupAsync): падает страница самой
+    /// группы (она читает свою строку целиком) — и только она. Обзор и состав её клуба живы: до
+    /// К4б.6 отметка давала row:Clubs по FK группы и роняла их.
+    /// </summary>
+    [Fact]
+    public async Task GroupTouched_DropsOnlyItsOwnPage_NotItsClub()
+    {
+        await using var world = await World.OpenAsync(clubs: true, columnPrecision: true);
+        if (world == null || world.Groups.Count == 0) return;
+        var touched = world.Groups.FirstOrDefault(g => world.Clubs.Any(c => c.Id == g.ClubId)) ?? world.Groups[0];
+        await using var db = world.Mirror();
+
+        (await db.HubGroups.SingleAsync(g => g.Id == touched.Id)).UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        Assert.Equal([touched.Key], world.Dropped());
     }
 }

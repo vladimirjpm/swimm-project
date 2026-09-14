@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
+using Swimm.Infrastructure.Services;
 
 namespace Swimm.Infrastructure.Data;
 
@@ -33,12 +34,21 @@ namespace Swimm.Infrastructure.Data;
 /// <see cref="MaxRowsPerTable"/> строк одной таблицы, строка с FK на корень, подключённая не
 /// запросом (<see cref="Watch"/>).
 ///
+/// Служебные колонки (§2.6, К4б.6; выключатель <see cref="CacheSettings.ColumnPrecision"/>):
+/// изменённая строка, у которой ВСЕ изменённые колонки из реестра <see cref="CacheServiceColumns"/>,
+/// даёт <c>col:T.C</c> на каждую из них и, если таблица — корень, метку своей строки, — без
+/// <c>table:T</c> и без меток корней по FK. Колонку читают только те, кто её назвал в SQL, и
+/// они носят <c>col:</c>; не носит его лишь корень, прочитанный в своём блоке, — его строку
+/// закрывает её <c>row:</c> (<see cref="CacheBuildScope.TouchTable"/>). Поэтому правка loglig-
+/// привязки пловца не роняет ни состав, ни обзор его клуба. Добавление, удаление и правка хоть
+/// одной обычной колонки — как всегда.
+///
 /// Видит ТОЛЬКО SaveChanges. Массовые операции мимо трекера (<c>ExecuteUpdate/Delete</c>, сырой
 /// SQL) сбрасывают метки явно (<see cref="DbContextCacheExtensions"/>). Это сознательно: общий перехват
 /// записей по тексту SQL выбивал бы страницы групп на каждом запросе — отметка «был онлайн»
 /// пишется массовым UPDATE в <c>Sys_AppUsers</c>, а страница группы собрана и из этой таблицы.
 /// </summary>
-public sealed class CacheInvalidationInterceptor(ICacheService cache)
+public sealed class CacheInvalidationInterceptor(ICacheService cache, ISettingsService? settings = null)
     : ISaveChangesInterceptor, IDbTransactionInterceptor
 {
     /// <summary>
@@ -53,6 +63,11 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
     private readonly ConditionalWeakTable<DbContext, State> _states = new();
 
     private static readonly object AttachedMark = new();
+
+    // Без настроек (перехватчик из тестов, собранный без них) точности по колонкам нет: служебная
+    // правка сбрасывает таблицу, как до К4б.6.
+    private bool ColumnPrecisionOn =>
+        settings?.GetValue(CacheSettings.ColumnPrecision, CacheSettings.DefaultColumnPrecision) ?? false;
 
     private sealed class State
     {
@@ -205,6 +220,27 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
     }
 
     /// <summary>
+    /// Явный сброс после массовой записи ТОЛЬКО служебных колонок мимо трекера
+    /// (<see cref="DbContextCacheExtensions.InvalidateColumnsCacheAsync"/>, §2.6): <c>col:T.C</c>
+    /// на каждую, а если таблица — корень, ещё <c>anyrow:T</c> (какие строки задеты, неизвестно, а
+    /// корень в своём блоке <c>col:</c> не носит). Выключатель выключен — как обычная массовая
+    /// запись. Колонки уже проверены по реестру (колонка не из него — исключение: её <c>col:</c>
+    /// никто не носит, и сброс прошёл бы мимо всех — недосброс).
+    /// </summary>
+    internal Task InvalidateColumnsAfterCommitAsync(DbContext context, IEntityType type, string table, IReadOnlyList<string> columns)
+    {
+        var tags = new ChangeTags();
+        if (!ColumnPrecisionOn) tags.AddUnknown(table);
+        else
+        {
+            tags.AddColumns(table, columns);
+            if (CacheRowRoots.IsRoot(type)) tags.AddUnknown(table, whole: false);
+        }
+        return InvalidateAfterCommitAsync(context, tags,
+            $"массовая запись служебных колонок мимо EF (ExecuteUpdate): {table} ({string.Join(", ", columns)})");
+    }
+
+    /// <summary>
     /// Сброс после записи: в открытой транзакции — после её коммита, иначе сразу. Правило одно
     /// для SaveChanges и для явного сброса массовой записи.
     /// </summary>
@@ -228,20 +264,22 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
     {
         if (context is null) return;
         var state = _states.GetOrCreateValue(context);
-        (state.Saving, state.SavingReason) = Gather(context, state);
+        (state.Saving, state.SavingReason) = Gather(context, state, ColumnPrecisionOn);
     }
 
     /// <summary>
     /// Метки, которые сбросило бы сохранение прямо сейчас, — для тестов: временный ключ виден
     /// только до сохранения, и только у провайдера, который его выдаёт (Npgsql, не InMemory).
     /// </summary>
-    internal string[] PreviewTags(DbContext context) => Gather(context, _states.GetOrCreateValue(context)).Tags.ToTags();
+    internal string[] PreviewTags(DbContext context) =>
+        Gather(context, _states.GetOrCreateValue(context), ColumnPrecisionOn).Tags.ToTags();
 
-    private static (ChangeTags Tags, string Reason) Gather(DbContext context, State state)
+    private static (ChangeTags Tags, string Reason) Gather(DbContext context, State state, bool columnPrecision)
     {
         var tags = new ChangeTags();
         var cascade = new HashSet<string>(StringComparer.Ordinal);
         var rows = new List<string>();
+        var service = columnPrecision ? CacheServiceColumns.Of(context.Model) : null;
         // Что поменялось по таблицам — подпись для журнала сбросов (/Admin/Cache): по ней
         // видно, какая именно запись выкинула страницы, и какие колонки пишут чаще всего.
         var changes = new SortedDictionary<string, TableChange>(StringComparer.Ordinal);
@@ -256,6 +294,19 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
                 change.Note(entry);
 
                 rows.Clear();
+                if (service is not null && ServiceOnly(entry, service) is { } columns)
+                {
+                    // Служебная правка (§2.6): col: на колонки и, у корня, метка своей строки.
+                    // table:T и метки корней по FK не нужны — см. описание класса.
+                    tags.AddColumns(table, columns);
+                    if (CacheRowRoots.IsRoot(entry.Metadata))
+                    {
+                        var ownKnown = tags.CollectsRowsOf(table) && CollectOwnRowTag(entry, rows);
+                        tags.AddRow(table, ownKnown ? rows : null, whole: false);
+                    }
+                    continue; // правка, не удаление: каскада нет
+                }
+
                 var known = tags.CollectsRowsOf(table) && CollectRowTags(entry, state, rows);
                 tags.AddRow(table, known ? rows : null);
             }
@@ -300,6 +351,38 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
             if (!p.IsTemporary) AddRowTag(into, root, p.CurrentValue);
             if (!added) AddRowTag(into, root, p.OriginalValue);
         }
+        return true;
+    }
+
+    /// <summary>
+    /// Изменённые служебные колонки строки (§2.6) — если правка задела ТОЛЬКО их; иначе null:
+    /// добавление, удаление, хоть одна обычная колонка (<c>Update()</c> помечает все), сложное
+    /// свойство (его правка в <c>Properties</c> не видна) или ни одной помеченной колонки.
+    /// </summary>
+    private static List<string>? ServiceOnly(EntityEntry entry, CacheServiceColumns.Resolved service)
+    {
+        if (entry.State != EntityState.Modified) return null;
+        List<string>? columns = null;
+        foreach (var p in entry.Properties)
+        {
+            if (!p.IsModified) continue;
+            if (!service.Columns.TryGetValue(p.Metadata, out var column)) return null;
+            (columns ??= []).Add(column);
+        }
+        return columns is not null && !entry.ComplexProperties.Any(c => c.IsModified) ? columns : null;
+    }
+
+    /// <summary>
+    /// Метка строки служебной правки корня (§2.6) — только своя: её носит корень, прочитанный в
+    /// своём блоке по id, а <c>col:</c> он не носит. Ключ настоящий и у строки не из запроса.
+    /// Корня, которого читают ещё и по FK на себя, реестр служебных колонок не допускает
+    /// (<see cref="CacheServiceColumns"/>). false — ключ не целый (в модели таких корней нет).
+    /// </summary>
+    private static bool CollectOwnRowTag(EntityEntry entry, List<string> into)
+    {
+        var links = RowLinks.Of(entry.Metadata);
+        if (links.OwnKey is not { } key) return false;
+        AddRowTag(into, links.OwnTable, entry.Property(key).CurrentValue);
         return true;
     }
 
@@ -376,7 +459,8 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
 
     /// <summary>
     /// Метки одного сохранения — или всей транзакции (сохранения в неё сливаются): изменённые
-    /// таблицы, а по каждой — метки её строк либо «какие строки — неизвестно».
+    /// таблицы, а по каждой — метки её строк либо «какие строки — неизвестно», и нужна ли таблица
+    /// целиком или только служебные колонки (§2.6).
     /// </summary>
     internal sealed class ChangeTags
     {
@@ -386,6 +470,12 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
 
             /// <summary>Метки строк; <c>null</c> — строки неизвестны, вместо них <c>anyrow:T</c>.</summary>
             public HashSet<string>? Rows = new(StringComparer.Ordinal);
+
+            /// <summary>Есть правка не только служебных колонок (или неизвестно какая) — нужна <c>table:T</c>.</summary>
+            public bool Whole;
+
+            /// <summary>Служебные колонки служебных правок — по <c>col:T.C</c> на каждую.</summary>
+            public SortedSet<string>? Columns;
         }
 
         private readonly Dictionary<string, TableRows> _tables = new(StringComparer.Ordinal);
@@ -396,17 +486,36 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
         public bool CollectsRowsOf(string table) =>
             !_tables.TryGetValue(table, out var t) || (t.Rows is not null && t.Count < MaxRowsPerTable);
 
-        /// <summary>Одна изменённая строка таблицы; <paramref name="rows"/> null — чьи строки задеты, неизвестно.</summary>
-        public void AddRow(string table, List<string>? rows)
+        /// <summary>
+        /// Одна изменённая строка таблицы; <paramref name="rows"/> null — чьи строки задеты, неизвестно.
+        /// <paramref name="whole"/> false — служебная правка корня: метки её строк без <c>table:T</c>.
+        /// </summary>
+        public void AddRow(string table, List<string>? rows, bool whole = true)
         {
             var t = Of(table);
             t.Count++;
+            t.Whole |= whole;
             if (rows is null || t.Count > MaxRowsPerTable) t.Rows = null;
             else t.Rows?.UnionWith(rows);
         }
 
-        /// <summary>Строки таблицы изменены, но какие — неизвестно (каскад, массовая запись).</summary>
-        public void AddUnknown(string table) => Of(table).Rows = null;
+        /// <summary>Служебные колонки таблицы, изменённые служебной правкой (§2.6).</summary>
+        public void AddColumns(string table, IEnumerable<string> columns)
+        {
+            var t = Of(table);
+            (t.Columns ??= new SortedSet<string>(StringComparer.Ordinal)).UnionWith(columns);
+        }
+
+        /// <summary>
+        /// Строки таблицы изменены, но какие — неизвестно (каскад, массовая запись). <paramref name="whole"/>
+        /// false — массовая запись только служебных колонок корня: <c>anyrow:T</c> без <c>table:T</c>.
+        /// </summary>
+        public void AddUnknown(string table, bool whole = true)
+        {
+            var t = Of(table);
+            t.Rows = null;
+            t.Whole |= whole;
+        }
 
         public void MergeInto(ChangeTags target)
         {
@@ -414,21 +523,29 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache)
             {
                 var t = target.Of(table);
                 t.Count += src.Count;
+                t.Whole |= src.Whole;
                 if (src.Rows is null || t.Count > MaxRowsPerTable) t.Rows = null;
                 else t.Rows?.UnionWith(src.Rows);
+                if (src.Columns is not null) target.AddColumns(table, src.Columns);
             }
         }
 
-        /// <summary>Метки для сброса: по каждой таблице <c>table:T</c>, затем её строки или <c>anyrow:T</c>.</summary>
+        /// <summary>
+        /// Метки для сброса: по каждой таблице <c>table:T</c> (если правка не только служебная), её
+        /// строки или <c>anyrow:T</c>, и <c>col:T.C</c> служебных правок. <c>col:</c> нужен и рядом с
+        /// <c>table:T</c>: суженные читатели таблицы <c>table:T</c> не носят, а метки чужих корней
+        /// служебная правка не дала.
+        /// </summary>
         public string[] ToTags()
         {
             var tags = new List<string>();
             var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (var (table, t) in _tables)
             {
-                Add(CacheTags.Table(table));
+                if (t.Whole) Add(CacheTags.Table(table));
                 if (t.Rows is null) Add(CacheTags.AnyRow(table));
                 else foreach (var row in t.Rows) Add(row);
+                if (t.Columns is not null) foreach (var column in t.Columns) Add(CacheTags.Column(table, column));
             }
             return [.. tags];
 
@@ -560,9 +677,39 @@ public static class DbContextCacheExtensions
         // запись кэша получила из SQL, и сброс молча промахнётся.
         var table = db.Model.FindEntityType(typeof(TEntity))?.GetTableName()
             ?? throw new InvalidOperationException($"{typeof(TEntity).Name} не отображён на таблицу в модели {db.GetType().Name}");
-        return db.GetService<IDbContextOptions>().FindExtension<CoreOptionsExtension>()?.Interceptors?
-                .OfType<CacheInvalidationInterceptor>().FirstOrDefault()?
-                .InvalidateTableAfterCommitAsync(db, table)
-            ?? Task.CompletedTask;
+        return Interceptor(db)?.InvalidateTableAfterCommitAsync(db, table) ?? Task.CompletedTask;
     }
+
+    /// <summary>
+    /// Сбросить служебные колонки после массовой записи ТОЛЬКО их мимо трекера (стирание
+    /// объединённых мест в пересчёте) — <c>col:T.C</c> вместо всей таблицы, пока включена точность
+    /// по колонкам (docs/plans/cache-row-precision-plan.md §2.6):
+    /// <code>await _db.InvalidateColumnsCacheAsync&lt;ResultRecord&gt;(nameof(ResultRecord.CombinedPlace));</code>
+    /// Свойство не из реестра <see cref="CacheServiceColumns"/> — исключение: его <c>col:</c> никто
+    /// не носит. Запись задела и обычные колонки — это <see cref="InvalidateTableCacheAsync"/>.
+    /// </summary>
+    public static Task InvalidateColumnsCacheAsync<TEntity>(this DbContext db, params string[] properties)
+        where TEntity : class
+    {
+        var type = db.Model.FindEntityType(typeof(TEntity));
+        var table = type?.GetTableName()
+            ?? throw new InvalidOperationException($"{typeof(TEntity).Name} не отображён на таблицу в модели {db.GetType().Name}");
+        if (properties.Length == 0) throw new ArgumentException("Не названа ни одна колонка", nameof(properties));
+
+        // Проверка — всегда, и без перехватчика: ошибка в списке должна всплыть в любом тесте пути.
+        var service = CacheServiceColumns.Of(db.Model);
+        var columns = properties.Select(name =>
+                type!.FindProperty(name) is { } p && service.Columns.TryGetValue(p, out var column)
+                    ? column
+                    : throw new InvalidOperationException(
+                        $"{typeof(TEntity).Name}.{name} не служебная колонка (CacheServiceColumns): " +
+                        "массовую запись обычных колонок сбрасывают InvalidateTableCacheAsync"))
+            .ToList();
+
+        return Interceptor(db)?.InvalidateColumnsAfterCommitAsync(db, type!, table, columns) ?? Task.CompletedTask;
+    }
+
+    private static CacheInvalidationInterceptor? Interceptor(DbContext db) =>
+        db.GetService<IDbContextOptions>().FindExtension<CoreOptionsExtension>()?.Interceptors?
+            .OfType<CacheInvalidationInterceptor>().FirstOrDefault();
 }
