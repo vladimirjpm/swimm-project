@@ -7,7 +7,7 @@
 LogligVerifyEnabled/LogligVerifyIntervalHours (дефолт вкл/24ч),
 LogligBatchEnabled/LogligBatchPerRun/LogligBatchIntervalHours (дефолт ВЫКЛ/50/24ч),
 **RecordAgeAxis** (дефолт `calendar`, значения `calendar`/`season`),
-**CacheRowPrecision** / **CacheHitVerifyPercent** (кэш, раздел ниже).
+**CacheRowPrecision** / **CacheColumnPrecision** / **CacheHitVerifyPercent** (кэш, раздел ниже).
 Scope: admin / livesite / both.
 
 ## Группы: кто создаёт и сколько (2026-09-10)
@@ -39,9 +39,9 @@ Scope: admin / livesite / both.
 `GET /api/client-config` → `favoritesLimits`, и сердечко на пределе гаснет ДО клика. Новое
 значение действует сразу, без рестарта. Зачем лимит — `docs/plans/hubgroup-club-subscription-plan.md` §1.
 
-## Кэш: сужение до строк и сверка на попадании (2026-09-14)
+## Кэш: сужение до строк, служебные колонки и сверка на попадании (2026-09-14)
 
-Две настройки точности сброса кэша ([cache-row-precision-plan.md](../plans/cache-row-precision-plan.md)
+Три настройки точности сброса кэша ([cache-row-precision-plan.md](../plans/cache-row-precision-plan.md)
 §2.5, §4-6; константы — `CacheSettings`):
 
 - **`CacheRowPrecision`** (bool, дефолт **`true`** с К4б.5 — решение Влада 14.09.2026, константа
@@ -51,8 +51,17 @@ Scope: admin / livesite / both.
   недосброс (подозрения сверки на `/Admin/Cache` или жалоба «правка не видна») — выключить за
   секунду и чинить без отката релиза; рестарт вернёт `true`. Что сужено — страница группы
   (К4б.4), обзор и состав клуба (К4б.5); список в [cache.md](cache.md).
+- **`CacheColumnPrecision`** (bool, дефолт **`true`** с К4б.6 — решение Влада 14.09.2026, константа
+  `CacheSettings.DefaultColumnPrecision`) — точность по служебным колонкам. `true`: правка, задевшая
+  только колонки реестра `CacheServiceColumns` (loglig-привязка пловца, штамп проверки качества,
+  объединённые места, отметки «обновлено»), роняет лишь записи, в SQL которых эти колонки названы:
+  loglig-задания и проверка качества не роняют season-best, клубы и группы. `false`: такая правка
+  сбрасывает всю таблицу, как обычная. Действует на запись в базу — метки `col:` записи кэша носят
+  при любом положении, поэтому переключение безопасно в обе стороны. Аварийный рычаг, как и
+  `CacheRowPrecision`: выключаешь по одному и видишь, чей недосброс; рестарт вернёт `true`.
 - **`CacheHitVerifyPercent`** (int 0–100, дефолт **20 в Development, 0 на проде**) — доля
-  попаданий в суженные записи, которые строятся заново мимо кэша и сверяются с кэшем.
+  попаданий в суженные записи (и в читавшие служебные колонки, пока включена
+  `CacheColumnPrecision`), которые строятся заново мимо кэша и сверяются с кэшем.
   Расхождение — «подозрение на недосброс» в журнале `/Admin/Cache`. Дефолт зависит от среды
   (`IHostEnvironment`); вне хоста (тесты) — как на проде.
 

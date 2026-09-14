@@ -108,6 +108,32 @@ public class CacheHitVerificationTests
         Assert.Equal(0, cache.Journal().HitChecks.Checked);
     }
 
+    /// <summary>
+    /// Записи, читавшие служебные колонки (К4б.6): пока точность по колонкам включена, служебная
+    /// правка сбрасывает их колонкой, а не таблицей, — их сверяет попадание. Выключена — они
+    /// табличные, как в <see cref="TableLevelEntries_AreNotVerified"/>.
+    /// </summary>
+    [Theory]
+    [InlineData(true, 1)]
+    [InlineData(false, 0)]
+    public async Task ColumnLevelEntries_AreVerified_WhileColumnPrecisionIsOn(bool columnPrecision, int checkedCount)
+    {
+        var cache = new MemoryCacheService(new MemoryCache(new MemoryCacheOptions()),
+            new CacheSettingsStub(hitVerifyPercent: 100, columnPrecision: columnPrecision));
+        Task<Page> Card() => cache.GetOrCreateAsync("swimmer-card", () =>
+        {
+            _builds++;
+            CacheBuildScope.Current!.TouchTable("Swimmers", ["LogligId"]); // карточка показывает привязку
+            return Task.FromResult(new Page("card"));
+        }, Ttl);
+
+        await Card();
+        await Card();
+
+        Assert.Equal(checkedCount, cache.Journal().HitChecks.Checked);
+        Assert.Equal(0, cache.Journal().HitChecks.Mismatched);
+    }
+
     [Fact]
     public async Task ZeroPercent_NeverVerifies()
     {

@@ -24,7 +24,8 @@ namespace Swimm.Infrastructure.Services;
 ///
 /// Сужение до строк (К4б.3, docs/plans/cache-row-precision-plan.md): сборка знает, включён ли
 /// выключатель <see cref="CacheSettings.RowPrecision"/>; попадание в суженную запись с долей
-/// <see cref="CacheSettings.HitVerifyPercent"/> сверяется с ответом, собранным заново.
+/// <see cref="CacheSettings.HitVerifyPercent"/> сверяется с ответом, собранным заново. С К4б.6 —
+/// и в запись, читавшую служебные колонки, пока включён <see cref="CacheSettings.ColumnPrecision"/>.
 /// </summary>
 public class MemoryCacheService : ICacheService, ICacheDiagnostics
 {
@@ -102,6 +103,12 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
     {
         /// <summary>Запись сужена до строк (носит <c>row:</c>/<c>anyrow:</c>) — её сверяет попадание.</summary>
         public bool RowLevel { get; } = Tokens.Keys.Any(CacheTags.IsRowLevel);
+
+        /// <summary>
+        /// Запись читала служебные колонки (носит <c>col:</c>) — её сверяет попадание, пока включена
+        /// точность по колонкам: тогда служебная правка сбрасывает её не таблицей, а колонкой (К4б.6).
+        /// </summary>
+        public bool ColumnLevel { get; } = Tokens.Keys.Any(CacheTags.IsColumn);
     }
 
     public Task<T?> GetAsync<T>(string key)
@@ -192,10 +199,18 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
     private bool RowPrecisionOn =>
         _settings?.GetValue(CacheSettings.RowPrecision, CacheSettings.DefaultRowPrecision) ?? false;
 
-    /// <summary>Сверять ли это попадание: запись сужена до строк и выпала доля сверки.</summary>
+    // Точность по служебным колонкам (К4б.6) действует на запись в базу; здесь от неё зависит только
+    // сверка: с выключенной служебная правка сбрасывает таблицу, и записи с col: доказаны К4.
+    private bool ColumnPrecisionOn =>
+        _settings?.GetValue(CacheSettings.ColumnPrecision, CacheSettings.DefaultColumnPrecision) ?? false;
+
+    /// <summary>
+    /// Сверять ли это попадание: запись сужена до строк (или читала служебные колонки, пока точность
+    /// по ним включена) и выпала доля сверки.
+    /// </summary>
     private bool ShouldVerify(Entry hit)
     {
-        if (!hit.RowLevel || _settings is null) return false;
+        if (_settings is null || !(hit.RowLevel || (hit.ColumnLevel && ColumnPrecisionOn))) return false;
         var percent = _settings.GetValue(CacheSettings.HitVerifyPercent, 0);
         return percent > 0 && Random.Shared.Next(100) < percent;
     }
@@ -231,7 +246,7 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
             key,
             hit.Tokens.Keys
                 .Where(t => t != CacheTags.All)
-                .OrderBy(t => !CacheTags.IsRowLevel(t))
+                .OrderBy(t => !(CacheTags.IsRowLevel(t) || CacheTags.IsColumn(t)))
                 .ThenBy(t => t, StringComparer.Ordinal)
                 .Take(JournalTagsPerEvent)
                 .ToList(),

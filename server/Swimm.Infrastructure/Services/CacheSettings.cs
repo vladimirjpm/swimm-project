@@ -20,8 +20,24 @@ public static class CacheSettings
     public const bool DefaultRowPrecision = true;
 
     /// <summary>
-    /// Сверка на попадании, % (int 0–100): попадание в запись, суженную до строк, с этой
-    /// вероятностью строится заново мимо кэша и сравнивается. В Development 20, на проде 0.
+    /// Выключатель точности по служебным колонкам (bool, дефолт — <see cref="DefaultColumnPrecision"/>),
+    /// К4б.6: включён — правка только служебных колонок (<c>CacheServiceColumns</c>) сбрасывает
+    /// <c>col:T.C</c> вместо <c>table:T</c>; выключен — таблицу, как обычная правка. Действует на
+    /// запись: читатели метки <c>col:</c> носят при любом положении, так что смена положения не
+    /// оставит в кэше записи без нужной метки. Аварийный рычаг, как и <see cref="RowPrecision"/>.
+    /// </summary>
+    public const string ColumnPrecision = "CacheColumnPrecision";
+
+    /// <summary>
+    /// Включена по умолчанию — с приёмки К4б.6 (служебные колонки), решение Влада 14.09.2026, как
+    /// у <see cref="DefaultRowPrecision"/> после К4б.5.
+    /// </summary>
+    public const bool DefaultColumnPrecision = true;
+
+    /// <summary>
+    /// Сверка на попадании, % (int 0–100): попадание в запись, суженную до строк (или читавшую
+    /// служебные колонки, пока включён <see cref="ColumnPrecision"/>), с этой вероятностью строится
+    /// заново мимо кэша и сравнивается. В Development 20, на проде 0.
     /// </summary>
     public const string HitVerifyPercent = "CacheHitVerifyPercent";
 

@@ -28,8 +28,25 @@ public class AdminSettingsServiceTests
         // + StartListEnabled/StartListDaysAhead (автозабор стартового протокола, С10)
         // + HubGroupMaxPerCoach (лимит групп для роли Coach, 2026-09-10)
         // + FavoritesMaxSwimmers/FavoritesMaxClubs (лимиты избранного, 2026-09-10)
-        // + CacheRowPrecision/CacheHitVerifyPercent (точность сброса кэша, К4б.3, 2026-09-14).
-        Assert.Equal(21, all.Count);
+        // + CacheRowPrecision/CacheHitVerifyPercent (точность сброса кэша, К4б.3, 2026-09-14)
+        // + CacheColumnPrecision (служебные колонки, К4б.6, 2026-09-14).
+        Assert.Equal(22, all.Count);
+    }
+
+    [Fact]
+    public void CacheSettings_ColumnPrecisionOnByDefault_AndSwitchesOff()
+    {
+        var prod = Build();
+        var dev = new AdminSettingsService(new MemoryCache(Options.Create(new MemoryCacheOptions())), development: true);
+
+        // Включена с приёмки К4б.6 (решение Влада 14.09.2026) — в любой среде.
+        Assert.Equal("true", prod.Get(CacheSettings.ColumnPrecision)!.Value);
+        Assert.Equal("true", dev.Get(CacheSettings.ColumnPrecision)!.Value);
+
+        // Аварийный рычаг работает: выключается.
+        Assert.True(prod.Update(CacheSettings.ColumnPrecision, "false"));
+        Assert.False(prod.GetValue(CacheSettings.ColumnPrecision, true));
+        Assert.False(prod.Update(CacheSettings.ColumnPrecision, "maybe"));
     }
 
     [Fact]
