@@ -37,11 +37,13 @@ public class CategoriesController : ControllerBase
     [HttpGet("{key}")]
     public async Task<IActionResult> GetByKey(string key)
     {
-        var result = await _repo.GetByKeyAsync(key);
-        if (result is null)
+        if (await _repo.GetByKeyAsync(key) is null)
             return NotFound();
 
+        // Внутри сборки — снова через репозиторий (попадание во вложенную запись categories:{key}):
+        // так ответ получает её метки. Готовый ответ из замыкания меток не нёс, и правка категории
+        // не сбрасывала этот ответ до часа (нашёл сторож К5).
         return await this.CachedJson(_cache, $"http:categories:{key}",
-            () => Task.FromResult(result), PayloadTtl, CacheControlValue);
+            () => _repo.GetByKeyAsync(key), PayloadTtl, CacheControlValue);
     }
 }

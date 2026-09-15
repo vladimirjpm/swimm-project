@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
@@ -26,6 +27,9 @@ namespace Swimm.Infrastructure.Services;
 /// выключатель <see cref="CacheSettings.RowPrecision"/>; попадание в суженную запись с долей
 /// <see cref="CacheSettings.HitVerifyPercent"/> сверяется с ответом, собранным заново. С К4б.6 —
 /// и в запись, читавшую служебные колонки, пока включён <see cref="CacheSettings.ColumnPrecision"/>.
+///
+/// Сторож меток (К5): собранная запись без меток данных и без объявления
+/// <see cref="CacheTags.NotFromDb"/> — ошибка, режим — <see cref="UntaggedEntryPolicy"/>.
 /// </summary>
 public class MemoryCacheService : ICacheService, ICacheDiagnostics
 {
@@ -34,6 +38,13 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
     // Выключатели кэша (/Admin/Settings). Нет — сужение выключено и сверки нет: так кэш живёт в
     // тестах, которые собирают его без настроек.
     private readonly ISettingsService? _settings;
+
+    // Сторож меток (К5). Предупреждение — одно на вид записи за жизнь процесса: запись
+    // пересобирается каждый срок жизни, и лог иначе зарос бы одинаковыми строками. Живой список
+    // таких записей — на /Admin/Cache.
+    private readonly ILogger<MemoryCacheService>? _logger;
+    private readonly UntaggedEntryPolicy _untagged;
+    private readonly ConcurrentDictionary<string, byte> _untaggedWarned = new(StringComparer.Ordinal);
 
     // Общий токен (метка all) и токены меток. Старые токены только ОТМЕНЯЕМ, но не Dispose:
     // соседний поток мог уже взять ссылку на источник и вот-вот спросит у него Token —
@@ -84,10 +95,16 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
     /// <summary>Сколько источников меток сейчас в словаре — для тестов подметания.</summary>
     internal int TagSourceCount => _tags.Count;
 
-    public MemoryCacheService(IMemoryCache cache, ISettingsService? settings = null)
+    public MemoryCacheService(
+        IMemoryCache cache,
+        ISettingsService? settings = null,
+        ILogger<MemoryCacheService>? logger = null,
+        UntaggedEntryPolicy untagged = UntaggedEntryPolicy.Allow)
     {
         _cache = cache;
         _settings = settings;
+        _logger = logger;
+        _untagged = untagged;
     }
 
     /// <summary>
@@ -190,9 +207,33 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
 
         foreach (var (tag, token) in scope.Tokens) tokens.TryAdd(tag, token);
         // «Не найдено» (null) не кэшируем — как и до К3: следующий запрос спросит базу снова.
-        return value is null
-            ? new Entry(null, tokens, typeof(T).Name, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)
-            : Store(key, value, typeof(T), ttl, tokens);
+        if (value is null)
+            return new Entry(null, tokens, typeof(T).Name, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+
+        EnsureDataTags(key, tokens.Keys);
+        return Store(key, value, typeof(T), ttl, tokens);
+    }
+
+    /// <summary>
+    /// Сторож меток (К5): запись, в сборке которой не было ни одного запроса к базе и ни одной
+    /// вложенной записи с метками данных, почти наверняка собрана из данных, прочитанных ДО
+    /// <c>GetOrCreateAsync</c> (попали в замыкание). Сохранение в базу такую запись не сбросит — она
+    /// врёт до конца срока жизни. Запись, которая правда собрана не из базы, объявляет это
+    /// <see cref="CacheTags.NotFromDb"/>.
+    /// </summary>
+    private void EnsureDataTags(string key, IEnumerable<string> tags)
+    {
+        if (_untagged == UntaggedEntryPolicy.Allow
+            || tags.Any(t => CacheTags.IsData(t) || t == CacheTags.NotFromDb)) return;
+
+        var message =
+            $"Запись кэша «{key}» собрана без меток данных: внутри сборки не было ни одного запроса к базе. " +
+            "Если данные прочитаны ДО GetOrCreateAsync/CachedJson — перенесите чтение внутрь фабрики, иначе " +
+            "запись в базу эту запись не сбросит. Если запись правда собрана не из базы — объявите это меткой " +
+            "CacheTags.NotFromDb (docs/plans/cache-tags-plan.md, К5).";
+
+        if (_untagged == UntaggedEntryPolicy.Throw) throw new InvalidOperationException(message);
+        if (_untaggedWarned.TryAdd(KindOf(key), 0)) _logger?.LogWarning("{Message}", message);
     }
 
     // Без настроек (кэш из тестов, собранный без них) сужения нет — такие тесты живут как до К4б.
@@ -469,4 +510,19 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
         _cache.Set(key, entry, options);
         return entry;
     }
+}
+
+/// <summary>
+/// Что делать с собранной записью без меток данных и без <see cref="CacheTags.NotFromDb"/> (К5).
+/// </summary>
+public enum UntaggedEntryPolicy
+{
+    /// <summary>Класть молча — как до К5. Кэш из тестов: там фабрики сплошь без базы.</summary>
+    Allow,
+
+    /// <summary>Класть и написать предупреждение в лог (одно на вид записи) — прод.</summary>
+    Warn,
+
+    /// <summary>Не класть, бросить исключение — Development: ошибку видит тот, кто завёл эндпоинт.</summary>
+    Throw,
 }

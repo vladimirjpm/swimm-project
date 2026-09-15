@@ -81,6 +81,14 @@
   тогда получает сама). Так переезд на Redis будет заменой одной строки.
   → [ARCHITECTURE.md](ARCHITECTURE.md) §5, [plans/cache-tags-plan.md](plans/cache-tags-plan.md),
   страница `/Admin/Cache`.
+- **Запись кэша без меток данных — ошибка** (К5, 15.09.2026): данные читаются ВНУТРИ фабрики
+  `GetOrCreateAsync`/`CachedJson`, не до неё. Собранное правда не из базы объявляет
+  `CacheTags.NotFromDb`, константный ответ в кэш не кладут. В Development нарушение — исключение.
+  → [plans/cache-tags-plan.md](plans/cache-tags-plan.md) §4-8.
+- **Redis (К6) — только вместе с масштабированием** (решение Влада, 15.09.2026): до второго
+  экземпляра API он пользы не даёт, а второй экземпляр требует ещё выбора лидера для фоновых
+  сервисов, настроек не в памяти и состояния превью не в `IMemoryCache`.
+  → [plans/cache-tags-plan.md](plans/cache-tags-plan.md) §5.
 - **Сброс после записи в базу — сам, ручной не нужен** (К4, 14.09.2026): `SaveChanges` сбрасывает
   метки изменённых таблиц после коммита. Исключения: запись мимо EF (`ExecuteUpdate`/`Delete`,
   сырой SQL) — явно `db.InvalidateTableCacheAsync<T>()` (`table:T` + `anyrow:T`); то, что живёт не в базе

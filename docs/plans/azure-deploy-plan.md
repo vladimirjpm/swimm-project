@@ -783,7 +783,9 @@ Communication Services — все дают SMTP-endpoint, под который 
 - Кастомный домен + TLS + www-редирект (Р1), SPF/DKIM/DMARC.
 - Staging-слот и обкатка миграций на копии (компромисс: поднять временный B1ms того же
   региона на сутки, прогнать §6 целиком, удалить — стоит центы).
-- Redis вместо `MemoryCacheService`, лидер-выбор для фоновых сервисов, autoscale.
+- Redis вместо `MemoryCacheService`, лидер-выбор для фоновых сервисов, autoscale — одной фазой
+  (решение Влада 15.09.2026): туда же настройки не в памяти и состояние превью импорта не в
+  `IMemoryCache` — [cache-tags-plan.md](cache-tags-plan.md) §5.
 - Перенос `client/public/images` в Blob Storage + CDN.
 - Ретеншен IP-адресов фоновым сервисом (сейчас чистка срабатывает, только когда админ
   откроет страницу) и чистка `Sys_AdminAudit`.

@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Caching.Memory;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
@@ -25,7 +24,6 @@ public class DiscoveryAdminController : ControllerBase
     private readonly ISwimmerNameSyncService _nameSync;
     private readonly IImportJobQueue _jobs;
     private readonly IImportService _import;
-    private readonly IMemoryCache _cache;
     private readonly IImportRecordPreviewService _recordPreview;
     private readonly IOfficialClubStandingService _clubStandings;
     private readonly IPointRulesAdminRepository _rules;
@@ -45,7 +43,6 @@ public class DiscoveryAdminController : ControllerBase
         ISwimmerNameSyncService nameSync,
         IImportJobQueue jobs,
         IImportService import,
-        IMemoryCache cache,
         IImportRecordPreviewService recordPreview,
         IOfficialClubStandingService clubStandings,
         IPointRulesAdminRepository rules,
@@ -64,7 +61,6 @@ public class DiscoveryAdminController : ControllerBase
         _nameSync = nameSync;
         _jobs = jobs;
         _import = import;
-        _cache = cache;
         _recordPreview = recordPreview;
         _clubStandings = clubStandings;
         _rules = rules;

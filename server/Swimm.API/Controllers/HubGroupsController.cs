@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swimm.API.Http;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
@@ -77,11 +78,20 @@ public class HubGroupsController : ControllerBase
     private ObjectResult MembersOnly() =>
         StatusCode(StatusCodes.Status403Forbidden, new { error = "members_only" });
 
-    /// <summary>Список видимых групп.</summary>
+    /// <summary>
+    /// Список видимых групп. При видимости «private» каталог пуст для всех (правило —
+    /// <c>HubGroupPublicRepository.GetGroupsAsync</c>) и собирается из настройки, без базы: такая
+    /// запись объявляет это (<see cref="CacheTags.NotFromDb"/>, сторож К5). Смену настройки кэш
+    /// видит сам — она в ключе, и она же сбрасывает весь кэш.
+    /// </summary>
     [HttpGet("/api/hub-groups")]
     public async Task<IActionResult> GetGroups()
-        => await this.CachedJson(_cache, $"http:hub-groups:list:{Visibility}",
-            () => _groups.GetGroupsAsync(), PayloadTtl, CacheControlValue);
+    {
+        var visibility = Visibility;
+        return await this.CachedJson(_cache, $"http:hub-groups:list:{visibility}",
+            () => _groups.GetGroupsAsync(), PayloadTtl, CacheControlValue,
+            visibility == HubGroupVisibilityRules.Private ? [CacheTags.NotFromDb] : []);
+    }
 
     /// <summary>
     /// Виртуальная группа «Моё избранное» текущего пользователя — тот же контракт,

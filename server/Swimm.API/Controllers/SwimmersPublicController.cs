@@ -17,6 +17,8 @@ namespace Swimm.API.Controllers;
 /// страницы и его использует попап-карточка.
 ///
 /// Кэш — как у страницы клуба: ETag + Cache-Control, сброс по меткам таблиц — сам, при записи (К4).
+/// Id в маршрутах — <c>min(1)</c>: при id ≤ 0 сборка отдавала пустой ответ, не спросив базу, и такая
+/// запись без меток данных — ошибка сторожа К5; пловца с таким id нет, это 404.
 /// </summary>
 [ApiController]
 public class SwimmersPublicController : ControllerBase
@@ -62,7 +64,7 @@ public class SwimmersPublicController : ControllerBase
     /// сверху — возраст в сезоне, зачётная группа, программы, рекорды и сезоны.
     /// 404 — пловца нет.
     /// </summary>
-    [HttpGet("/api/swimmers/{id:int}")]
+    [HttpGet("/api/swimmers/{id:int:min(1)}")]
     public async Task<IActionResult> GetProfile(int id)
     {
         // Резолв ДО кэшируемой загрузки: 404 не должен плодить кэш-записи.
@@ -123,7 +125,7 @@ public class SwimmersPublicController : ControllerBase
     /// KPI-плитки, шапка панели и список стартов сезона. <c>?season=all</c> — за карьеру
     /// (этим же ответом живёт таб History).
     /// </summary>
-    [HttpGet("/api/swimmers/{id:int}/summary")]
+    [HttpGet("/api/swimmers/{id:int:min(1)}/summary")]
     public async Task<IActionResult> GetSummary(int id, [FromQuery] string? season = null)
         => await this.CachedJson(_cache,
             $"http:swimmer:{id}:summary:{season ?? "default"}",
@@ -143,7 +145,7 @@ public class SwimmersPublicController : ControllerBase
     /// Таб Results: одна дистанция — одна строка, лучшее время за сезон.
     /// <c>?season=all</c> — лучшее за карьеру.
     /// </summary>
-    [HttpGet("/api/swimmers/{id:int}/best-times")]
+    [HttpGet("/api/swimmers/{id:int:min(1)}/best-times")]
     public async Task<IActionResult> GetBestTimes(int id, [FromQuery] string? season = null)
         => await this.CachedJson(_cache,
             $"http:swimmer:{id}:best-times:{season ?? "default"}",
@@ -161,7 +163,7 @@ public class SwimmersPublicController : ControllerBase
     /// лучшего времени клуба и до рекорда страны своего возраста.
     /// <paramref name="poolType"/> — «25m»/«50m»; без него оба бассейна.
     /// </summary>
-    [HttpGet("/api/swimmers/{id:int}/personal-bests")]
+    [HttpGet("/api/swimmers/{id:int:min(1)}/personal-bests")]
     public async Task<IActionResult> GetPersonalBests(int id, [FromQuery] string? poolType = null)
         => await this.CachedJson(_cache,
             $"http:swimmer:{id}:personal-bests:{poolType ?? "any"}",
@@ -202,7 +204,7 @@ public class SwimmersPublicController : ControllerBase
     /// клиент склеивает ответ с <c>/best-times</c> того же сезона по <c>disciplineKey</c>.
     /// <c>?season=all</c> — мест нет: сравнение живёт внутри одного сезона.
     /// </summary>
-    [HttpGet("/api/swimmers/{id:int}/season-ranks")]
+    [HttpGet("/api/swimmers/{id:int:min(1)}/season-ranks")]
     public async Task<IActionResult> GetSeasonRanks(int id, [FromQuery] string? season = null)
         => await this.CachedJson(_cache,
             $"http:swimmer:{id}:season-ranks:{season ?? "default"}",
@@ -235,7 +237,7 @@ public class SwimmersPublicController : ControllerBase
     /// <paramref name="disciplineKey"/> — ключ из <c>/best-times</c>: связка
     /// стиль × дистанция × бассейн × пол, а не «eventId» — событий-дисциплин в модели нет.
     /// </summary>
-    [HttpGet("/api/swimmers/{id:int}/progress")]
+    [HttpGet("/api/swimmers/{id:int:min(1)}/progress")]
     public async Task<IActionResult> GetProgress(int id, [FromQuery] string? disciplineKey = null)
     {
         if (string.IsNullOrWhiteSpace(disciplineKey))
@@ -286,7 +288,7 @@ public class SwimmersPublicController : ControllerBase
     /// 404 — соперника нет; соперник = <paramref name="id"/> отклоняем: сравнение с самим
     /// собой не значит ничего.
     /// </summary>
-    [HttpGet("/api/swimmers/{id:int}/compare")]
+    [HttpGet("/api/swimmers/{id:int:min(1)}/compare")]
     public async Task<IActionResult> GetCompare(
         int id,
         [FromQuery(Name = "h2h_b")] int? h2hB = null,

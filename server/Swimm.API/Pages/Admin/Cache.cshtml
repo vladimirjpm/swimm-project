@@ -183,9 +183,10 @@
         @if (Model.Untagged.Count > 0)
         {
             <div class="border-l-[3px] border-l-admin-warning pl-3 mb-4">
-                <strong class="text-admin-text">Без меток таблиц и строк: @Model.Untagged.Count.</strong>
+                <strong class="text-admin-text">Без меток данных: @Model.Untagged.Count.</strong>
                 Их сбрасывает только общий сброс, а запись в базу — нет: такая запись врёт до конца
-                срока жизни. Каждую надо понять.
+                срока жизни. На проде кэш пишет о каждой предупреждение в лог; если запись правда
+                собрана не из базы — пусть объявит это меткой <code>not-from-db</code>.
                 <div class="text-xs mt-1">
                     @foreach (var e in Model.Untagged)
                     {
@@ -330,7 +331,9 @@
 <div class="admin-card mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
     <ol class="m-0 pl-5 list-decimal">
         <li><strong class="text-admin-text">Только через <code>ICacheService</code>.</strong>
-            Свой словарь или прямой <code>IMemoryCache</code> второй сервер не увидит и не сбросит.</li>
+            Свой словарь или прямой <code>IMemoryCache</code> второй сервер не увидит и не сбросит.
+            Места, где <code>IMemoryCache</code> законен (состояние превью, внешний источник, сводки
+            админки), — закрытый список с причинами в тесте <code>DirectMemoryCacheTests</code>.</li>
         <li><strong class="text-admin-text">В кэш — только DTO/record со свойствами.</strong>
             Не сущности базы, не кортежи (Redis запишет кортеж как <code>{}</code>). Проверяется при
             каждой записи в кэш и тестом по всем местам вызова кэша.</li>
@@ -340,6 +343,11 @@
         <li><strong class="text-admin-text">Записывать в кэш — только через <code>GetOrCreateAsync</code>.</strong>
             Тогда запись собирается в своём контексте и получает метки своих таблиц сама. Ручной
             <code>SetAsync</code> ловит тест.</li>
+        <li><strong class="text-admin-text">Данные читать внутри сборки.</strong>
+            Прочитанное до <code>GetOrCreateAsync</code> меток не даёт, и запись в базу такой ответ
+            не сбросит. Кэш это ловит: запись без меток данных в Development — исключение, на проде —
+            предупреждение в лог. Собранное правда не из базы объявляет метку
+            <code>not-from-db</code>; ответ-константу в кэш не кладут.</li>
         <li><strong class="text-admin-text">Запись в базу мимо EF сбрасывает свою таблицу явно.</strong>
             <code>ExecuteUpdate</code>, <code>ExecuteDelete</code> и сырой SQL перехватчик сохранения не
             видит: после такой записи — <code>db.InvalidateTableCacheAsync&lt;T&gt;()</code>, метки
