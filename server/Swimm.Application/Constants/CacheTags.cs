@@ -54,4 +54,21 @@ public static class CacheTags
 
     /// <summary>Метка служебной колонки (<see cref="Column"/>).</summary>
     public static bool IsColumn(string tag) => tag.StartsWith(ColumnPrefix, StringComparison.Ordinal);
+
+    // ── Метки страниц — для ручного сброса из админки ────────────────────────────────────
+    // Данные они не описывают: запись в базу через сайт сбрасывает кэш сама метками таблиц,
+    // строк и колонок. Эти нужны, когда данные поменяли мимо этого процесса API (правка в базе
+    // руками, `dotnet run -- --флаг`, другой экземпляр) — сброс нужен точечный, а не весь кэш.
+
+    /// <summary>Все страницы клубов (обзор, состав, season-best клуба, стена рекордов) — кнопка «все клубы».</summary>
+    public const string ClubPages = "page:clubs";
+
+    /// <summary>Страницы одного клуба: <c>page:club:438</c> — кнопка «этот клуб» в табе Admin клуба.</summary>
+    public static string ClubPage(int clubId) => $"page:club:{clubId}";
+
+    /// <summary>
+    /// Метки, которые несёт КАЖДАЯ запись страницы клуба (<c>ClubsPublicController</c>): все клубы и
+    /// этот, по id клуба-приёмника (склеенный клуб отдаёт страницы приёмника).
+    /// </summary>
+    public static string[] ClubPageTags(int clubId) => [ClubPages, ClubPage(clubId)];
 }

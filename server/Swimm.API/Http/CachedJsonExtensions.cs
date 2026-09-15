@@ -15,13 +15,18 @@ namespace Swimm.API.Http;
 /// </summary>
 public static class CachedJsonExtensions
 {
+    /// <param name="tags">
+    /// Явные метки сверх тех, что запись получит сама из SQL, — метки страниц для ручного сброса
+    /// из админки (<c>CacheTags.ClubPages</c>, <c>CacheTags.ClubPage(id)</c>).
+    /// </param>
     public static async Task<IActionResult> CachedJson<T>(
         this ControllerBase controller,
         ICacheService cache,
         string cacheKey,
         Func<Task<T>> load,
         TimeSpan payloadTtl,
-        string cacheControl)
+        string cacheControl,
+        params string[] tags)
     {
         // GetOrCreate, а не Get + Set: параллельные промахи одного ключа ждут ОДНУ сборку.
         // После общего сброса витрину открывают сразу многие, и каждый строил тяжёлый ответ
@@ -31,7 +36,7 @@ public static class CachedJsonExtensions
             var json = JsonSerializer.Serialize(await load());
             var etag = $"\"{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json)))[..32]}\"";
             return new CachedPayload(json, etag);
-        }, payloadTtl);
+        }, payloadTtl, tags);
 
         controller.Response.Headers[HeaderNames.CacheControl] = cacheControl;
         controller.Response.Headers[HeaderNames.ETag] = entry.ETag;

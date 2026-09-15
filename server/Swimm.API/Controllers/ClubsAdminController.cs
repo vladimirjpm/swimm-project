@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 
 namespace Swimm.API.Controllers;
@@ -9,6 +10,7 @@ namespace Swimm.API.Controllers;
 /// Админ-API склейки клубов-дублей (docs/tasks/club-merge-plan.md, фаза B): кандидаты
 /// по трём эвристикам, dry-run и применение merge. Merge необратим — применение только
 /// явным флагом apply (страница /Admin/Clubs покажет dry-run-план перед этим, фаза C).
+/// Здесь же — ручной сброс серверного кэша страниц клуба: одного и всех.
 /// </summary>
 [ApiController]
 [Route("api/admin/clubs")]
@@ -22,6 +24,8 @@ public class ClubsAdminController : ControllerBase
     private readonly IAdminAuditService _audit;
     private readonly IDataQualityService _quality;
     private readonly IClubAdminRepository _clubs;
+    private readonly IClubPublicRepository _publicClubs;
+    private readonly ICacheService _cache;
     private readonly ILogger<ClubsAdminController> _logger;
 
     public ClubsAdminController(
@@ -31,9 +35,13 @@ public class ClubsAdminController : ControllerBase
         IAdminAuditService audit,
         IDataQualityService quality,
         IClubAdminRepository clubs,
+        IClubPublicRepository publicClubs,
+        ICacheService cache,
         ILogger<ClubsAdminController> logger)
     {
         _clubs = clubs;
+        _publicClubs = publicClubs;
+        _cache = cache;
         _dedup = dedup;
         _merge = merge;
         _ignore = ignore;
@@ -149,5 +157,35 @@ public class ClubsAdminController : ControllerBase
         }
 
         return Ok(report);
+    }
+
+    // ── Кэш страниц клуба ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Сбросить серверный кэш страниц одного клуба — кнопка в табе Admin страницы клуба: обзор,
+    /// состав, season-best клуба, стена рекордов (метка <c>page:club:{id}</c>). Нужна, только когда
+    /// данные поменяли мимо этого процесса API — правка в базе руками, <c>dotnet run -- --флаг</c>,
+    /// другой экземпляр; правка через сайт и админку сбрасывает кэш сама.
+    /// Склеенный клуб — по приёмнику: его страницы лежат под id приёмника.
+    /// </summary>
+    [HttpPost("{id:int}/cache/invalidate")]
+    public async Task<IActionResult> InvalidateClubCache(int id)
+    {
+        var clubId = await _publicClubs.ResolveClubIdAsync(id) ?? id;
+        await _cache.InvalidateTagsAsync([CacheTags.ClubPage(clubId)], $"кнопка «Сбросить кэш клуба» #{clubId}");
+        await _audit.LogAsync("cache.invalidate", "Club", clubId.ToString(), $"Сброшен кэш страниц клуба #{clubId}");
+        return Ok(new { club_id = clubId });
+    }
+
+    /// <summary>
+    /// Сбросить серверный кэш страниц ВСЕХ клубов (метка <c>page:clubs</c>) — кнопка на /Admin/Cache.
+    /// Остальной кэш (группы, результаты, season-best страны) не трогает, в отличие от общего сброса.
+    /// </summary>
+    [HttpPost("cache/invalidate")]
+    public async Task<IActionResult> InvalidateAllClubsCache()
+    {
+        await _cache.InvalidateTagsAsync([CacheTags.ClubPages], "кнопка «Сбросить кэш всех клубов»");
+        await _audit.LogAsync("cache.invalidate", "Club", null, "Сброшен кэш страниц всех клубов");
+        return Ok(new { message = "Club pages cache invalidated" });
     }
 }

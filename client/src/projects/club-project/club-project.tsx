@@ -21,6 +21,7 @@ import DeepDigestCard from '../components/deep/digest-card';
 import DeepDisplaySettingsCard from '../components/deep/display-settings-card';
 import { useAuth } from '../../hooks/useAuth';
 import ClubAvatar from './components/club-avatar';
+import ClubCacheCard from './components/club-cache-card';
 import type {
   EntityPageStatus, EntityTabNav, EntityTabSpec,
 } from '../components/deep/entity-page-types';
@@ -291,7 +292,7 @@ function ClubProject() {
       id: 'admin' as const,
       icon: '⚙',
       label: 'Admin',
-      sub: 'page display',
+      sub: 'page display, cache',
       cards: () => [{
         id: 'display-settings',
         render: () => (
@@ -304,6 +305,10 @@ function ClubProject() {
             // (план §3.10) — рисовать пустой выбор было бы враньём.
           />
         ),
+      }, {
+        // Ручной сброс серверного кэша страниц клуба — после правки мимо API (в базе руками).
+        id: 'cache',
+        render: () => <ClubCacheCard clubId={data.club.id} />,
       }],
     },
   ].filter(Boolean) as EntityTabSpec<ClubTab>[]);
