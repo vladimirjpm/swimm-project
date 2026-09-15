@@ -1,0 +1,34 @@
+@*
+    Кнопки сброса серверного кэша — одни на /Admin/Cache и блок «Кэш» дашборда. JS-API:
+
+      const done = await adminCacheReset('all');    // или 'clubs'; true — сброшено, false — отмена/ошибка
+
+    Полный сброс — с подтверждением (решение Влада 15.09.2026): сайт становится «холодным», первые
+    посетители пересобирают все ответы, база ловит всплеск тяжёлых запросов (season-best). Сброс
+    «все клубы» узкий — без диалога. Подключать в @section Scripts: нужны api, toast, adminConfirm
+    из layout.
+*@
+<script>
+async function adminCacheReset(kind) {
+    if (kind === 'all') {
+        const ok = await adminConfirm({
+            title: 'Сбросить весь серверный кэш?',
+            message: 'Все ответы сайта соберутся заново при следующих запросах: первые посетители подождут, база получит всплеск запросов.\n' +
+                     'Нужно, только если данные поменяли мимо этого API — руками в базе, командой, другим экземпляром. Браузеры посетителей это не трогает.',
+            confirmText: 'Сбросить весь кэш',
+            danger: true,
+        });
+        if (!ok) return false;
+    }
+    try {
+        await api(kind === 'all' ? '/api/admin/cache/invalidate' : '/api/admin/clubs/cache/invalidate', { method: 'POST' });
+        toast(kind === 'all'
+            ? 'Серверный кэш сброшен — ответы соберутся при следующих запросах'
+            : 'Кэш страниц всех клубов сброшен — остальной кэш цел', 3500);
+        return true;
+    } catch (err) {
+        toast('Ошибка: ' + err.message, 5000);
+        return false;
+    }
+}
+</script>

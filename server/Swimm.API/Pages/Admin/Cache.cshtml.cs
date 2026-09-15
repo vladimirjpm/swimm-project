@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Swimm.Application.Abstractions;
-using Swimm.Application.Constants;
+using Swimm.Application.Dtos;
 
 namespace Swimm.API.Pages.Admin;
 
@@ -33,8 +33,8 @@ public class CacheModel : PageModel
     public IReadOnlyList<(string Tag, int Count)> TagCounts { get; private set; } = [];
 
     /// <summary>
-    /// Записи без меток данных (<see cref="CacheTags.IsData"/>) и без объявления «не из базы»
-    /// (<see cref="CacheTags.NotFromDb"/>) — их сбрасывает только общий сброс, а запись в базу с К4
+    /// Записи без меток данных и без объявления «не из базы» (<see cref="CacheOverview.IsUntagged"/>)
+    /// — их сбрасывает только общий сброс, а запись в базу с К4
     /// сбрасывает лишь метки своих таблиц и строк: такая запись врала бы до конца TTL. С К5 кэш
     /// такую запись не кладёт (Development) или пишет предупреждение в лог (прод), так что здесь
     /// должно быть пусто.
@@ -42,13 +42,17 @@ public class CacheModel : PageModel
     public IReadOnlyList<CacheEntryInfo> Untagged { get; private set; } = [];
 
     /// <summary>Журнал сбросов (К4б.1): кто что сбросил и кого это выкинуло.</summary>
-    public CacheJournal Journal { get; private set; } = new(DateTimeOffset.UtcNow, [], 0, [], new CacheHitChecks(0, 0, []));
+    public CacheJournal Journal { get; private set; } = new(DateTimeOffset.UtcNow, [], 0, [], new CacheHitChecks(0, 0, []), null);
+
+    /// <summary>Сводка для верха страницы — та же, что у блока «Кэш» дашборда (<see cref="CacheOverview"/>).</summary>
+    public CacheOverview Overview { get; private set; } = null!;
 
     public void OnGet()
     {
         Policies = CachePolicyCatalog.Build(typeof(CacheModel).Assembly);
         Entries = _diagnostics.Snapshot();
         Journal = _diagnostics.Journal();
+        Overview = CacheOverview.From(Entries, Journal, Environment.WorkingSet, GC.GetGCMemoryInfo().HeapSizeBytes);
         TagCounts = Entries
             .SelectMany(e => e.Tags)
             .GroupBy(t => t)
@@ -56,9 +60,7 @@ public class CacheModel : PageModel
             .OrderByDescending(x => x.Item2)
             .ThenBy(x => x.Key, StringComparer.Ordinal)
             .ToList();
-        Untagged = Entries
-            .Where(e => !e.Tags.Any(t => CacheTags.IsData(t) || t == CacheTags.NotFromDb))
-            .ToList();
+        Untagged = Entries.Where(CacheOverview.IsUntagged).ToList();
     }
 }
 

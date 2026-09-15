@@ -1,6 +1,7 @@
 @page
 @model Swimm.API.Pages.Admin.CacheModel
 @using Swimm.API.Pages.Admin
+@using Swimm.Application.Dtos
 @{
     ViewData["Title"] = "Cache";
     ViewData["PageSubtitle"] = "Как устроен кэш и кто сколько кэширует";
@@ -8,6 +9,33 @@
 
 @* ⚠ Эту страницу держат в синхроне с кодом (docs/pre-push-rules.md): поменял кэш — поправь
    тексты здесь и docs/admin-pages/cache.md. Таблица политик собирается из кода сама. *@
+
+@* Верх страницы — кнопки и сводка; та же сводка (CacheOverview) — в блоке «Кэш» дашборда. *@
+@{ var o = Model.Overview; }
+<div class="admin-card flex flex-wrap items-center gap-3 py-3 px-4 mb-6">
+    <button id="btn-invalidate-cache" class="admin-btn admin-btn-primary cursor-pointer">Сбросить весь серверный кэш</button>
+    <button id="btn-invalidate-clubs" class="admin-btn admin-btn-ghost cursor-pointer">Сбросить кэш всех клубов</button>
+    <div class="text-xs text-admin-text-muted leading-relaxed">
+        <div>
+            Записей в кэше: <strong class="text-admin-text">@o.Entries</strong> ·
+            <strong class="text-admin-text">@CacheOverview.Human(o.Bytes)</strong> JSON
+            (ответы API: @o.ApiEntries · @CacheOverview.Human(o.ApiBytes), данные: @o.DataEntries · @CacheOverview.Human(o.DataBytes))
+            · процесс @CacheOverview.Human(o.ProcessBytes)
+        </div>
+        <div>
+            Последний общий сброс:
+            @if (o.LastFullReset is { } reset)
+            {
+                <strong class="text-admin-text">@reset.At.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</strong>
+                <span>— @reset.Reason</span>
+            }
+            else
+            {
+                <span>не было с запуска процесса (@o.Since.ToLocalTime().ToString("dd.MM.yyyy HH:mm"))</span>
+            }
+        </div>
+    </div>
+</div>
 
 <div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
     Кэш живёт в <strong class="text-admin-text">двух местах</strong>:
@@ -153,18 +181,15 @@
     <p>
         <strong class="text-admin-text">Ручной сброс нужен</strong>, только когда данные поменяли
         мимо этого процесса API: руками в базе, командой <code>dotnet run -- --флаг</code>, другим
-        экземпляром сервера. Точечно: <strong class="text-admin-text">страницы всех клубов</strong> —
-        кнопка ниже (метка <code>page:clubs</code>), одного клуба — «Refresh this club» в табе Admin
-        страницы клуба (<code>page:club:{id}</code>).
+        экземпляром сервера. Кнопки — вверху страницы и в блоке «Кэш» дашборда; весь кэш — с
+        подтверждением. Точечно: <strong class="text-admin-text">страницы всех клубов</strong>
+        (метка <code>page:clubs</code>), одного клуба — «Refresh this club» в табе Admin страницы
+        клуба (<code>page:club:{id}</code>). Свежие ответы соберутся при следующих запросах;
+        браузеры посетителей это не трогает.
     </p>
-    <div class="flex flex-wrap items-center gap-3 mt-4">
-        <button id="btn-invalidate-cache" class="admin-btn admin-btn-primary cursor-pointer">Сбросить весь серверный кэш</button>
-        <button id="btn-invalidate-clubs" class="admin-btn admin-btn-ghost cursor-pointer">Сбросить кэш всех клубов</button>
-        <span class="text-xs">Свежие ответы соберутся при следующих запросах. Браузеры посетителей это не трогает.</span>
-    </div>
 </div>
 
-<h2 class="text-lg text-admin-accent m-0 mb-2">Сейчас в кэше: @Model.Entries.Count</h2>
+<h2 class="text-lg text-admin-accent m-0 mb-2">Сейчас в кэше: @Model.Entries.Count · @CacheOverview.Human(o.Bytes)</h2>
 <div class="admin-card mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
     @if (Model.Entries.Count == 0)
     {
@@ -201,7 +226,7 @@
             <div class="overflow-x-auto mt-2">
                 <table class="admin-table">
                     <thead>
-                        <tr><th>Ключ</th><th>Метки</th><th>Тип</th><th>Живёт ещё</th></tr>
+                        <tr><th>Ключ</th><th>Метки</th><th>Тип</th><th>Размер</th><th>Живёт ещё</th></tr>
                     </thead>
                     <tbody>
                     @foreach (var e in Model.Entries)
@@ -210,6 +235,7 @@
                             <td class="align-top"><code class="text-xs">@e.Key</code></td>
                             <td class="align-top text-xs">@string.Join(", ", e.Tags)</td>
                             <td class="align-top text-xs">@e.ValueType</td>
+                            <td class="align-top text-xs whitespace-nowrap">@(e.SizeBytes is { } size ? CacheOverview.Human(size) : "—")</td>
                             <td class="align-top text-xs whitespace-nowrap">@CachePolicyCatalog.Human(TimeSpan.FromSeconds(Math.Max(0, Math.Round((e.ExpiresAt - DateTimeOffset.UtcNow).TotalSeconds))))</td>
                         </tr>
                     }
@@ -375,30 +401,16 @@
 </div>
 
 @section Scripts {
+<partial name="/Pages/Admin/Shared/_CacheReset.cshtml" />
 <script>
-    document.getElementById('btn-invalidate-cache').addEventListener('click', async (e) => {
-        const btn = e.currentTarget;
-        btn.disabled = true;
-        try {
-            await api('/api/admin/cache/invalidate', { method: 'POST' });
-            toast('Серверный кэш сброшен — ответы соберутся при следующих запросах', 3500);
-        } catch (err) {
-            toast('Ошибка: ' + err.message, 5000);
-        } finally {
-            btn.disabled = false;
-        }
-    });
-    document.getElementById('btn-invalidate-clubs').addEventListener('click', async (e) => {
-        const btn = e.currentTarget;
-        btn.disabled = true;
-        try {
-            await api('/api/admin/clubs/cache/invalidate', { method: 'POST' });
-            toast('Кэш страниц всех клубов сброшен — остальной кэш цел', 3500);
-        } catch (err) {
-            toast('Ошибка: ' + err.message, 5000);
-        } finally {
-            btn.disabled = false;
-        }
-    });
+    // Сброс удался — страница перечитывается: наверху новый «последний общий сброс», в журнале — событие.
+    for (const [id, kind] of [['btn-invalidate-cache', 'all'], ['btn-invalidate-clubs', 'clubs']]) {
+        document.getElementById(id).addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            btn.disabled = true;
+            if (await adminCacheReset(kind)) setTimeout(() => location.reload(), 900);
+            else btn.disabled = false;
+        });
+    }
 </script>
 }
