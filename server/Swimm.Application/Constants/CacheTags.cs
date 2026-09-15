@@ -17,8 +17,9 @@ public static class CacheTags
     public const string All = "all";
 
     /// <summary>Любые данные таблицы: <c>table:Records</c>. Имя — как в БД (имя таблицы EF).</summary>
-    public static string Table(string table) => $"table:{table}";
+    public static string Table(string table) => $"{TablePrefix}{table}";
 
+    private const string TablePrefix = "table:";
     private const string RowPrefix = "row:";
     private const string AnyRowPrefix = "anyrow:";
     private const string ColumnPrefix = "col:";
@@ -54,6 +55,22 @@ public static class CacheTags
 
     /// <summary>Метка служебной колонки (<see cref="Column"/>).</summary>
     public static bool IsColumn(string tag) => tag.StartsWith(ColumnPrefix, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Метка данных — из какой таблицы, строки или колонки собрана запись (<see cref="Table"/>,
+    /// <see cref="Row"/>, <see cref="AnyRow"/>, <see cref="Column"/>). Её сбросит запись в базу; у
+    /// записи без меток данных остаётся только общий сброс (К5).
+    /// </summary>
+    public static bool IsData(string tag) =>
+        tag.StartsWith(TablePrefix, StringComparison.Ordinal) || IsRowLevel(tag) || IsColumn(tag);
+
+    /// <summary>
+    /// Объявление «собрано НЕ из базы»: настройки, внешний сайт, чистая функция аргументов. Без
+    /// него запись без меток данных — ошибка (К5): почти наверняка данные прочитаны ДО
+    /// <c>GetOrCreateAsync</c> и попали в замыкание, запись в базу такую запись не сбросит, и она
+    /// врёт до конца срока жизни. С ним — сбрасывает только общий сброс, и больше ей не нужно.
+    /// </summary>
+    public const string NotFromDb = "not-from-db";
 
     // ── Метки страниц — для ручного сброса из админки ────────────────────────────────────
     // Данные они не описывают: запись в базу через сайт сбрасывает кэш сама метками таблиц,

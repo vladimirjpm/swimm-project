@@ -33,10 +33,11 @@ public class CacheModel : PageModel
     public IReadOnlyList<(string Tag, int Count)> TagCounts { get; private set; } = [];
 
     /// <summary>
-    /// Записи без меток данных — их сбрасывает только общий сброс, а запись в базу с К4 сбрасывает
-    /// лишь метки своих таблиц и строк: такая запись врала бы до конца TTL. Метка данных — это
-    /// <c>table:</c> или, у записи, суженной до строк (К4б), <c>row:</c>/<c>anyrow:</c>: состав
-    /// клуба целиком сужен и таблиц не носит вовсе.
+    /// Записи без меток данных (<see cref="CacheTags.IsData"/>) и без объявления «не из базы»
+    /// (<see cref="CacheTags.NotFromDb"/>) — их сбрасывает только общий сброс, а запись в базу с К4
+    /// сбрасывает лишь метки своих таблиц и строк: такая запись врала бы до конца TTL. С К5 кэш
+    /// такую запись не кладёт (Development) или пишет предупреждение в лог (прод), так что здесь
+    /// должно быть пусто.
     /// </summary>
     public IReadOnlyList<CacheEntryInfo> Untagged { get; private set; } = [];
 
@@ -56,7 +57,7 @@ public class CacheModel : PageModel
             .ThenBy(x => x.Key, StringComparer.Ordinal)
             .ToList();
         Untagged = Entries
-            .Where(e => !e.Tags.Any(t => t.StartsWith("table:", StringComparison.Ordinal) || CacheTags.IsRowLevel(t)))
+            .Where(e => !e.Tags.Any(t => CacheTags.IsData(t) || t == CacheTags.NotFromDb))
             .ToList();
     }
 }

@@ -135,6 +135,11 @@ public class ResultsController : ControllerBase
         if (string.IsNullOrWhiteSpace(field) || !AllowedHintFields.Contains(field))
             return BadRequest("field must be one of: style, distance, club, competition, name");
 
+        // Имена без префикса не подсказываем (правило репозитория) — ответ пустой и собирается без
+        // базы: кэшировать нечего, а запись без меток данных — ошибка сторожа К5.
+        if (field == "name" && string.IsNullOrWhiteSpace(q))
+            return Ok(Array.Empty<string>());
+
         return await this.CachedJson(_cache, $"http:filter-hints:{field}:{q}:{limit}",
             () => _results.GetFilterHintsAsync(field, q, limit), PayloadTtl, CacheControlValue);
     }

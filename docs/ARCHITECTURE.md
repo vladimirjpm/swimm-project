@@ -149,8 +149,10 @@ Application → реализация в Infrastructure → регистраци�
 узнает); в кэш — только DTO/record, переживающие JSON-круг (не сущности EF, не кортежи — System.Text.Json
 пишет `ValueTuple` как `{}`); значение из кэша не мутировать (в памяти правка видна всем, в
 Redis — нет); сброс — по метке, не перебором ключей. Правило «что можно в кэш» — код (`CacheValueRules`):
-проверяется при каждой записи и тестом по всем вызовам кэша. Подробности —
-[cache-tags-plan.md §4](plans/cache-tags-plan.md).
+проверяется при каждой записи и тестом по всем вызовам кэша. У записи — метки данных
+(`table:`/`row:`/`anyrow:`/`col:`) или объявление `CacheTags.NotFromDb`: запись без них — ошибка
+(сторож К5 в `MemoryCacheService`, в Development — исключение); прямой `IMemoryCache` — только из
+закрытого списка `DirectMemoryCacheTests`. Подробности — [cache-tags-plan.md §4](plans/cache-tags-plan.md).
 
 Правило: авторизованные и персональные данные (`/auth/*`, favorites, user media) —
 **никогда** не кэшируются на уровнях 1–2.

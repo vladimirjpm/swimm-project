@@ -19,7 +19,8 @@ namespace Swimm.API.Controllers;
 /// таблиц, сам, при записи (К4, docs/plans/cache-tags-plan.md), импорт сбрасывает всё.
 /// Каждая запись несёт ещё метки страницы (<see cref="CacheTags.ClubPageTags"/>) — для ручного
 /// сброса «этот клуб» / «все клубы» из админки (<c>ClubsAdminController</c>), когда данные поменяли
-/// мимо API. ⚠ Новый эндпоинт клуба — с ними же, иначе кнопки его не сбросят.
+/// мимо API. ⚠ Новый эндпоинт клуба — через <see cref="ClubJson{T}"/>: ключ и метки там вместе
+/// (К5); прямой <c>CachedJson</c> без меток кнопки не сбросят.
 /// </summary>
 [ApiController]
 public class ClubsPublicController : ControllerBase
@@ -47,6 +48,14 @@ public class ClubsPublicController : ControllerBase
     }
 
     /// <summary>
+    /// Ответ страницы клуба из кэша: ключ <c>http:clubs:{id}:{что}</c> и метки страницы
+    /// (<see cref="CacheTags.ClubPageTags"/>) — в одном месте, по id клуба-приёмника.
+    /// </summary>
+    private Task<IActionResult> ClubJson<T>(int clubId, string what, Func<Task<T>> load) =>
+        this.CachedJson(_cache, $"http:clubs:{clubId}:{what}", load,
+            PayloadTtl, CacheControlValue, CacheTags.ClubPageTags(clubId));
+
+    /// <summary>
     /// Сборный ответ страницы клуба: Hero, фильтры, грид «сезон × группа», таблица зачёта,
     /// история и топ пловцов. Ростер и рекорды — отдельными эндпоинтами ниже.
     /// </summary>
@@ -66,11 +75,10 @@ public class ClubsPublicController : ControllerBase
         var resolvedId = await _clubs.ResolveClubIdAsync(id);
         if (resolvedId == null) return NotFound();
 
-        return await this.CachedJson(_cache,
-            $"http:clubs:{resolvedId}:overview:{season?.ToString() ?? "all"}:{group ?? "all"}:{gridSeasons}:{standingCompetitionId?.ToString() ?? "auto"}",
+        return await ClubJson(resolvedId.Value,
+            $"overview:{season?.ToString() ?? "all"}:{group ?? "all"}:{gridSeasons}:{standingCompetitionId?.ToString() ?? "auto"}",
             () => _overview.GetOverviewAsync(
-                resolvedId.Value, id, season, group, gridSeasons, standingCompetitionId),
-            PayloadTtl, CacheControlValue, CacheTags.ClubPageTags(resolvedId.Value));
+                resolvedId.Value, id, season, group, gridSeasons, standingCompetitionId));
     }
 
     /// <summary>Ростер клуба: пагинация + фильтры пол/возраст/сезон.</summary>
@@ -94,10 +102,9 @@ public class ClubsPublicController : ControllerBase
         var resolvedId = await _clubs.ResolveClubIdAsync(id);
         if (resolvedId == null) return NotFound();
 
-        return await this.CachedJson(_cache,
-            $"http:clubs:{resolvedId}:roster:{page}:{pageSize}:{gender ?? "all"}:{ageFrom?.ToString() ?? "-"}:{ageTo?.ToString() ?? "-"}:{season?.ToString() ?? "cur"}",
-            () => _clubs.GetRosterAsync(resolvedId.Value, page, pageSize, gender, ageFrom, ageTo, season),
-            PayloadTtl, CacheControlValue, CacheTags.ClubPageTags(resolvedId.Value));
+        return await ClubJson(resolvedId.Value,
+            $"roster:{page}:{pageSize}:{gender ?? "all"}:{ageFrom?.ToString() ?? "-"}:{ageTo?.ToString() ?? "-"}:{season?.ToString() ?? "cur"}",
+            () => _clubs.GetRosterAsync(resolvedId.Value, page, pageSize, gender, ageFrom, ageTo, season));
     }
 
     /// <summary>
@@ -115,10 +122,9 @@ public class ClubsPublicController : ControllerBase
         var resolvedId = await _clubs.ResolveClubIdAsync(id);
         if (resolvedId == null) return NotFound();
 
-        return await this.CachedJson(_cache,
-            $"http:clubs:{resolvedId}:season-best:{pool ?? "all"}:{season?.ToString() ?? "cur"}",
-            () => _clubs.GetSeasonBestAsync(resolvedId.Value, pool, season),
-            PayloadTtl, CacheControlValue, CacheTags.ClubPageTags(resolvedId.Value));
+        return await ClubJson(resolvedId.Value,
+            $"season-best:{pool ?? "all"}:{season?.ToString() ?? "cur"}",
+            () => _clubs.GetSeasonBestAsync(resolvedId.Value, pool, season));
     }
 
     /// <summary>
@@ -134,9 +140,8 @@ public class ClubsPublicController : ControllerBase
         var resolvedId = await _clubs.ResolveClubIdAsync(id);
         if (resolvedId == null) return NotFound();
 
-        return await this.CachedJson(_cache,
-            $"http:clubs:{resolvedId}:record-wall:{pool ?? "all"}",
-            () => _clubs.GetRecordWallAsync(resolvedId.Value, pool),
-            PayloadTtl, CacheControlValue, CacheTags.ClubPageTags(resolvedId.Value));
+        return await ClubJson(resolvedId.Value,
+            $"record-wall:{pool ?? "all"}",
+            () => _clubs.GetRecordWallAsync(resolvedId.Value, pool));
     }
 }

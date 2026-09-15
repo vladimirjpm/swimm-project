@@ -53,7 +53,15 @@ public static class DependencyInjection
         // на RedisCacheService (IDistributedCache + JSON) без изменений в потребителях.
         // Один экземпляр под двумя интерфейсами: диагностика (/Admin/Cache) смотрит в тот же кэш.
         services.AddMemoryCache();
-        services.AddSingleton<MemoryCacheService>();
+        services.AddSingleton(sp => new MemoryCacheService(
+            sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(),
+            sp.GetRequiredService<ISettingsService>(),
+            sp.GetService<ILogger<MemoryCacheService>>(),
+            // Сторож меток (К5): запись без меток данных в Development роняет запрос — ошибку
+            // видит тот, кто завёл эндпоинт; на проде и вне хоста — предупреждение в лог.
+            untagged: sp.GetService<IHostEnvironment>()?.IsDevelopment() == true
+                ? UntaggedEntryPolicy.Throw
+                : UntaggedEntryPolicy.Warn));
         services.AddSingleton<ICacheService>(sp => sp.GetRequiredService<MemoryCacheService>());
         services.AddSingleton<ICacheDiagnostics>(sp => sp.GetRequiredService<MemoryCacheService>());
 
