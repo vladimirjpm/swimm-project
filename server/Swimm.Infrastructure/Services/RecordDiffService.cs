@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -88,10 +89,35 @@ public class RecordDiffService : IRecordDiffService
 
         var missingInSource = existingByKey.Keys.Count(k => !parsedKeys.Contains(k));
 
-        var diffId = Guid.NewGuid().ToString("N");
-        _memoryCache.Set(DiffCacheKey(diffId), new CachedRecordDiff(source, added, changed), TimeSpan.FromMinutes(10));
+        // Сторож правдоподобия (И-20): источник сам отдаёт невозможные времена. Ничего не
+        // отбрасываем — Apply запишет строки как есть и заведёт их в реестр кандидатами.
+        var suspicious = RecordPlausibility.Check(
+            addedEntries.Concat(changedEntries), await WorldReferenceAsync(parsed, ct));
 
-        return new RecordDiffResult(diffId, source, added.Count, changed.Count, unchanged, missingInSource, addedEntries, changedEntries);
+        var diffId = Guid.NewGuid().ToString("N");
+        _memoryCache.Set(DiffCacheKey(diffId), new CachedRecordDiff(source, added, changed, suspicious), TimeSpan.FromMinutes(10));
+
+        return new RecordDiffResult(diffId, source, added.Count, changed.Count, unchanged, missingInSource,
+            addedEntries, changedEntries, suspicious);
+    }
+
+    /// <summary>
+    /// Мировые рекорды из базы и из этого диффа — эталон правила «быстрее мирового».
+    /// Источник возрастных рекордов мировых строк не приносит, поэтому база нужна всегда.
+    /// </summary>
+    private async Task<Dictionary<string, (int Ms, string Time)>> WorldReferenceAsync(
+        IReadOnlyList<ParsedRecordDto> parsed, CancellationToken ct)
+    {
+        var fromDb = await _db.Records.AsNoTracking()
+            .Where(r => r.RegionType == "world" && r.Category == "open")
+            .Select(r => new { r.Gender, r.PoolType, r.Style, r.Distance, r.Time })
+            .ToListAsync(ct);
+
+        return RecordPlausibility.WorldReference(
+            fromDb.Select(r => (r.Gender, r.PoolType, r.Style, r.Distance, r.Time))
+                .Concat(parsed
+                    .Where(p => p.RegionType == "world" && p.Category == "open")
+                    .Select(p => (p.Gender, p.PoolType, p.Style, p.Distance, p.Time))));
     }
 
     public async Task<RecordDiffApplyResult> ApplyAsync(RecordDiffApplyRequest request, CancellationToken ct = default)
@@ -150,11 +176,79 @@ public class RecordDiffService : IRecordDiffService
             }
         }
 
+        var candidates = await AddIssueCandidatesAsync(cached.Suspicious, toApply, now, ct);
+
         await _db.SaveChangesAsync(ct);
         _memoryCache.Remove(DiffCacheKey(request.DiffId));
 
-        return new RecordDiffApplyResult(true, null, toApply.Count);
+        return new RecordDiffApplyResult(true, null, toApply.Count, candidates);
     }
+
+    /// <summary>
+    /// Подозрительные значения, которые этот Apply реально записал, — в реестр спорных
+    /// рекордов кандидатами (<see cref="RecordIssueStatuses.Candidate"/>). Пишутся тем же
+    /// SaveChanges, что и рекорды: рекорд без претензии или претензия без рекорда — оба хуже.
+    ///
+    /// Претензию на то же значение (8 осей + время), которая уже есть в реестре, не трогаем ни
+    /// в каком статусе: если человек её отклонил, повторный импорт того же файла не должен её
+    /// воскрешать.
+    /// </summary>
+    private async Task<int> AddIssueCandidatesAsync(
+        IReadOnlyList<RecordSuspiciousEntry> suspicious, IReadOnlyList<ParsedRecordDto> applied,
+        DateTime now, CancellationToken ct)
+    {
+        if (suspicious.Count == 0) return 0;
+
+        // Кандидат — только то, что реально легло: галки «новые / изменившиеся» в UI могут
+        // отсечь часть диффа.
+        var appliedKeys = applied.Select(p => IssueKey(p.RegionType, p.RegionCode, p.Category, p.AgeKey,
+            p.Gender, p.PoolType, p.Style, p.Distance, p.Time)).ToHashSet();
+        var toFlag = suspicious.Where(s => appliedKeys.Contains(IssueKey(s))).ToList();
+        if (toFlag.Count == 0) return 0;
+
+        var times = toFlag.Select(s => s.Time).Distinct().ToList();
+        var inRegistry = (await _db.RecordIssues.AsNoTracking()
+                .Where(i => times.Contains(i.FlaggedTime))
+                .Select(i => new { i.RegionType, i.RegionCode, i.Category, i.AgeKey, i.Gender, i.PoolType, i.Style, i.Distance, i.FlaggedTime })
+                .ToListAsync(ct))
+            .Select(i => IssueKey(i.RegionType, i.RegionCode, i.Category, i.AgeKey, i.Gender, i.PoolType, i.Style, i.Distance, i.FlaggedTime))
+            .ToHashSet();
+
+        var created = 0;
+        foreach (var s in toFlag)
+        {
+            if (!inRegistry.Add(IssueKey(s))) continue;
+            _db.RecordIssues.Add(new RecordIssue
+            {
+                RegionType = s.RegionType,
+                RegionCode = s.RegionCode,
+                Category = s.Category,
+                AgeKey = s.AgeKey,
+                Gender = s.Gender,
+                PoolType = s.PoolType,
+                Style = s.Style,
+                Distance = s.Distance,
+                FlaggedTime = s.Time,
+                Reason = s.Reason,
+                Status = RecordIssueStatuses.Candidate,
+                Note = s.Note,
+                CreatedBy = "auto",
+                CreatedAt = now,
+                UpdatedAt = now,
+            });
+            created++;
+        }
+        return created;
+    }
+
+    private static string IssueKey(RecordSuspiciousEntry s) =>
+        IssueKey(s.RegionType, s.RegionCode, s.Category, s.AgeKey, s.Gender, s.PoolType, s.Style, s.Distance, s.Time);
+
+    // Ключ реестра нормализует регистр и суффикс дистанции: претензию, заведённую руками как
+    // «100», импорт обязан узнать в «100m».
+    private static string IssueKey(string regionType, string regionCode, string category, string ageKey,
+        string gender, string poolType, string style, string distance, string time) =>
+        RecordIssueKey.Of(regionType, regionCode, category, ageKey, gender, poolType, style, distance, time);
 
     public async Task<IReadOnlyList<RecordSourceStatusDto>> GetSourceStatusAsync(CancellationToken ct = default)
     {
@@ -226,5 +320,7 @@ public class RecordDiffService : IRecordDiffService
     private static string Key(ParsedRecordDto p) =>
         string.Join(KeySeparator, p.RegionType, p.RegionCode, p.Category, p.AgeKey, p.Gender, p.PoolType, p.Style, p.Distance);
 
-    private sealed record CachedRecordDiff(string Source, IReadOnlyList<ParsedRecordDto> Added, IReadOnlyList<ParsedRecordDto> Changed);
+    private sealed record CachedRecordDiff(
+        string Source, IReadOnlyList<ParsedRecordDto> Added, IReadOnlyList<ParsedRecordDto> Changed,
+        IReadOnlyList<RecordSuspiciousEntry> Suspicious);
 }

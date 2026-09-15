@@ -88,8 +88,20 @@ public static class RecordIssueReasons
     /// <summary>Рекорд ступени быстрее рекорда старшей ступени — лестница кумулятивна.</summary>
     public const string NonMonotonicLadder = "non-monotonic-ladder";
 
+    /// <summary>
+    /// Национальный / возрастной / мастерс-рекорд быстрее мирового той же дисциплины —
+    /// абсолютный рекорд потому и абсолютный. Находка сторожа импорта (И-20).
+    /// </summary>
+    public const string FasterThanWorldRecord = "faster-than-world-record";
+
+    /// <summary>
+    /// Мировой рекорд улучшен за раз больше порога (<c>RecordPlausibility.WorldMaxImprovement</c>).
+    /// Живой случай — «40.11» на 100 в/с ж 50 м против 51.68 (И-20).
+    /// </summary>
+    public const string ImplausibleImprovement = "implausible-improvement";
+
     public static readonly string[] All =
-        [Manual, LongCourseFasterThanShort, NonMonotonicLadder];
+        [Manual, LongCourseFasterThanShort, NonMonotonicLadder, FasterThanWorldRecord, ImplausibleImprovement];
 }
 
 /// <summary>
@@ -98,6 +110,14 @@ public static class RecordIssueReasons
 /// </summary>
 public static class RecordIssueStatuses
 {
+    /// <summary>
+    /// Предложено автопроверкой при импорте, человек ещё не смотрел. ⚠ На сайте НЕ
+    /// показывается: публичные выборки берут только open / reported / accepted. Правило плана
+    /// (records-quality-plan.md §3): автомат ничего не помечает сам, иначе метка «спорно»
+    /// обесценится — он только предлагает, статус ставит человек.
+    /// </summary>
+    public const string Candidate = "candidate";
+
     /// <summary>Заведено, в федерацию не сообщено.</summary>
     public const string Open = "open";
 
@@ -113,5 +133,5 @@ public static class RecordIssueStatuses
     /// <summary>В источнике уже исправлено.</summary>
     public const string FixedBySource = "fixed-by-source";
 
-    public static readonly string[] All = [Open, Reported, Accepted, Rejected, FixedBySource];
+    public static readonly string[] All = [Candidate, Open, Reported, Accepted, Rejected, FixedBySource];
 }
