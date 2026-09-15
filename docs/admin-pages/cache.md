@@ -1,12 +1,21 @@
 # /Admin/Cache — как устроен кэш
 
 Файлы: `Pages/Admin/Cache.cshtml` (тексты), `Pages/Admin/Cache.cshtml.cs` (`CacheModel`,
-`CachePolicyCatalog` — сборка таблицы из кода и карта «где на сайте»). Кнопки сброса:
+`CachePolicyCatalog` — сборка таблицы из кода и карта «где на сайте»), `Pages/Admin/Shared/_CacheReset.cshtml`
+(общий `adminCacheReset` для кнопок здесь и на дашборде), сводка — `CacheOverview`
+(`Swimm.Application/Dtos/CacheOverviewDtos.cs`).
+
+**Верх страницы** (15.09.2026) — кнопки сброса и сводка: сколько записей и сколько весят (ответы
+API и записи данных порознь), память процесса, последний общий сброс (когда и почему) или «не было
+с запуска процесса». Та же сводка — в блоке «Кэш» дашборда ([index.md](index.md)), живым запросом
+`GET /api/admin/cache/summary`. Кнопки сброса:
 - «Сбросить весь серверный кэш» — `POST /api/admin/cache/invalidate`
-  (`AdminController.InvalidateCache`, та же, что на Settings);
+  (`AdminController.InvalidateCache`, та же, что на Settings); **с подтверждением** (решение Влада
+  15.09.2026): сайт после него «холодный», первые посетители пересобирают все ответы, база ловит
+  всплеск тяжёлых запросов (season-best). После сброса страница перечитывается;
 - «Сбросить кэш всех клубов» — `POST /api/admin/clubs/cache/invalidate`
   (`ClubsAdminController.InvalidateAllClubsCache`, метка `page:clubs`): страницы всех клубов, а
-  группы, результаты, season-best страны остаются. Одного клуба — кнопка «Refresh this club» в
+  группы, результаты, season-best страны остаются. Узкий — без подтверждения. Одного клуба — кнопка «Refresh this club» в
   табе Admin страницы клуба (`client/src/projects/club-project/components/club-cache-card.tsx` →
   `POST /api/admin/clubs/{id}/cache/invalidate`, метка `page:club:{id}`; склеенный клуб — по
   приёмнику).
@@ -74,7 +83,14 @@
   Development не кладёт (исключение), на проде пишет предупреждение в лог (одно на вид записи) —
   блок нужен проду. Суженная запись вроде состава клуба носит только `row:`/`anyrow:` — это метки
   данных, в список она не попадает; метки страниц `page:*` меткой данных не считаются. Полный
-  список — в свёрнутом блоке. В кэше отдельного экземпляра API — свой список.
+  список — в свёрнутом блоке, с колонкой «Размер». В кэше отдельного экземпляра API — свой список.
+- **Размер** (15.09.2026) — байты JSON записи, то есть сколько она заняла бы в Redis. Объекты в
+  памяти процесса занимают больше, поэтому рядом — память процесса и куча .NET. Главное правило
+  (решение Влада 15.09.2026): **путь посетителя за размер не платит**. Ответ API
+  (`CachedJson`) знает размер сам — длина готовой строки (`ICacheSizedValue`, реализован явно, чтобы
+  не попасть в JSON); запись данных репозитория сериализуется в счётчик при первом взгляде админки
+  (`ICacheDiagnostics.Snapshot`) и запоминается — один замер на запись, без буфера на весь JSON. Цена
+  — время запроса админки на новых записях. Redis отдаст размер значения даром.
 - **Журнал сбросов** (К4б.1, [cache-row-precision-plan.md](../plans/cache-row-precision-plan.md);
   `ICacheDiagnostics.Journal()`) — последние 200 сбросов, выкинувших хоть одну запись: когда,
   кто и почему, какие метки, сколько записей выкинуто (ключи — в раскрывашке). Пустые сбросы
@@ -119,7 +135,8 @@
   сброс (`InvalidateAllAsync`/`InvalidateTagsAsync`, `CacheInvalidationInterceptor`,
   `InvalidateTableCacheAsync`, `InvalidateColumnsCacheAsync`), `CacheTags`, `CacheRowRoots`,
   реестр служебных колонок (`CacheServiceColumns` — список колонок есть и в тексте страницы),
-  сужение (`CacheRowsExtensions`, `CacheBuildScope`), настройки кэша (`CacheSettings`);
+  сужение (`CacheRowsExtensions`, `CacheBuildScope`), настройки кэша (`CacheSettings`), сводка и
+  кнопки (`CacheOverview`, `_CacheReset.cshtml` — они же в блоке «Кэш» дашборда);
 - перед push это сверяется по [pre-push-rules.md](../pre-push-rules.md).
 
 ## Грабли

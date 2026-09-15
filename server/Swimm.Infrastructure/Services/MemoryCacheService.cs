@@ -71,6 +71,10 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
     private readonly DateTimeOffset _since = DateTimeOffset.UtcNow;
     private long _emptyInvalidations;
 
+    // Последний общий сброс — отдельно от очереди: её окно вытесняют сбросы по меткам, а «когда
+    // сбрасывали всё» админка показывает всегда (верх /Admin/Cache, блок «Кэш» дашборда).
+    private CacheInvalidationEvent? _lastFullReset;
+
     private sealed class DropCounter
     {
         public long ByTags;
@@ -126,6 +130,61 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
         /// точность по колонкам: тогда служебная правка сбрасывает её не таблицей, а колонкой (К4б.6).
         /// </summary>
         public bool ColumnLevel { get; } = Tokens.Keys.Any(CacheTags.IsColumn);
+
+        // Размер JSON в байтах (/Admin/Cache): меряется при первом взгляде админки, а не при записи —
+        // путь посетителя за это не платит. Одна запись — один замер; гонка двух админов безвредна.
+        private long _size = NotMeasured;
+
+        /// <summary>Байты JSON значения; null — сериализовать не удалось.</summary>
+        public long? SizeBytes()
+        {
+            var size = Volatile.Read(ref _size);
+            if (size == NotMeasured) Volatile.Write(ref _size, size = MeasureJson(Value));
+            return size >= 0 ? size : null;
+        }
+    }
+
+    private const long NotMeasured = -1;
+    private const long Unmeasurable = -2;
+
+    /// <summary>
+    /// Байты JSON значения — сколько оно заняло бы в Redis. Ответ API знает их сам
+    /// (<see cref="ICacheSizedValue"/>); остальное сериализуется в счётчик: <c>Serialize</c> в поток
+    /// пишет кусками из пула, буфера на весь JSON нет. Значение из кэша не меняют (§4-3), поэтому
+    /// мерить его рядом с читателями безопасно.
+    /// </summary>
+    private static long MeasureJson(object? value)
+    {
+        if (value is ICacheSizedValue sized) return sized.SizeBytes;
+        if (value is null) return 0;
+        try
+        {
+            using var counter = new CountingStream();
+            JsonSerializer.Serialize(counter, value, value.GetType());
+            return counter.Length;
+        }
+        // Замер — диагностика: не сложилось — размер неизвестен, а страница админки работает.
+        catch (Exception e) when (e is not OperationCanceledException) { return Unmeasurable; }
+    }
+
+    /// <summary>Поток, который только считает записанные байты.</summary>
+    private sealed class CountingStream : Stream
+    {
+        private long _length;
+
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => _length;
+        public override long Position { get => _length; set => throw new NotSupportedException(); }
+
+        public override void Write(byte[] buffer, int offset, int count) => _length += count;
+        public override void Write(ReadOnlySpan<byte> buffer) => _length += buffer.Length;
+        public override void Flush() { }
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
     }
 
     public Task<T?> GetAsync<T>(string key)
@@ -343,7 +402,7 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
     {
         var victims = LiveKeys(tags: null);
         InvalidateAll();
-        Record(reason, [CacheTags.All], all: true, victims);
+        Volatile.Write(ref _lastFullReset, Record(reason, [CacheTags.All], all: true, victims));
         return Task.CompletedTask;
     }
 
@@ -360,7 +419,8 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
         new CacheHitChecks(
             Interlocked.Read(ref _hitChecks),
             Interlocked.Read(ref _hitMismatches),
-            _mismatches.Reverse().ToList()));
+            _mismatches.Reverse().ToList()),
+        Volatile.Read(ref _lastFullReset));
 
     /// <summary>
     /// Вид записи для счётчиков журнала: у HTTP-ответов — два первых сегмента ключа
@@ -388,7 +448,8 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
         return keys;
     }
 
-    private void Record(string reason, IReadOnlyCollection<string> tags, bool all, List<string> victims)
+    /// <summary>Записать сброс в журнал; null — пустой сброс по меткам, его только посчитали.</summary>
+    private CacheInvalidationEvent? Record(string reason, IReadOnlyCollection<string> tags, bool all, List<string> victims)
     {
         // Пустой сброс (метку никто не носил) не пишем — только считаем: иначе он вытеснил бы
         // из журнала то, ради чего журнал заведён. Общий сброс пишем всегда: импорт в 12:00 —
@@ -396,7 +457,7 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
         if (victims.Count == 0 && !all)
         {
             Interlocked.Increment(ref _emptyInvalidations);
-            return;
+            return null;
         }
 
         foreach (var key in victims)
@@ -406,14 +467,16 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
             else Interlocked.Increment(ref counter.ByTags);
         }
 
-        _journal.Enqueue(new CacheInvalidationEvent(
+        var recorded = new CacheInvalidationEvent(
             DateTimeOffset.UtcNow,
             reason.Length > JournalReasonLength ? reason[..JournalReasonLength] + "…" : reason,
             tags.Take(JournalTagsPerEvent).ToList(),
             all,
             victims.Count,
-            victims.Order(StringComparer.Ordinal).Take(JournalKeysPerEvent).ToList()));
+            victims.Order(StringComparer.Ordinal).Take(JournalKeysPerEvent).ToList());
+        _journal.Enqueue(recorded);
         while (_journal.Count > JournalSize && _journal.TryDequeue(out _)) { }
+        return recorded;
     }
 
     public IReadOnlyList<CacheEntryInfo> Snapshot() => _index
@@ -425,7 +488,8 @@ public class MemoryCacheService : ICacheService, ICacheDiagnostics
             e.Value.Tokens.Keys.Where(t => t != CacheTags.All).OrderBy(t => t, StringComparer.Ordinal).ToList(),
             e.Value.ValueType,
             e.Value.StoredAt,
-            e.Value.ExpiresAt))
+            e.Value.ExpiresAt,
+            e.Value.SizeBytes()))
         .OrderBy(e => e.Key, StringComparer.Ordinal)
         .ToList();
 

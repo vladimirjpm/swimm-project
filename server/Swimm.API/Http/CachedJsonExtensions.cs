@@ -47,5 +47,12 @@ public static class CachedJsonExtensions
         return controller.Content(entry.Json, "application/json; charset=utf-8");
     }
 
-    private sealed record CachedPayload(string Json, string ETag);
+    /// <summary>
+    /// Готовый ответ. Свой размер знает без сериализации (/Admin/Cache): System.Text.Json по
+    /// умолчанию экранирует всё не-ASCII (иврит — <c>י</c>), так что символы = байты.
+    /// </summary>
+    private sealed record CachedPayload(string Json, string ETag) : ICacheSizedValue
+    {
+        long ICacheSizedValue.SizeBytes => Json.Length + ETag.Length;
+    }
 }

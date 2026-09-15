@@ -23,6 +23,7 @@ public class AdminController : ControllerBase
     private readonly IMemoryCache _cache;
     private readonly IAdminAuditService _audit;
     private readonly ICacheService _cacheService;
+    private readonly ICacheDiagnostics _cacheDiagnostics;
     private readonly IUserMediaLinkChecker _linkChecker;
     private readonly IDebugOptionsService _debugOptions;
     private readonly IRegulationAnalyzer _regulation;
@@ -38,6 +39,7 @@ public class AdminController : ControllerBase
         IMemoryCache cache,
         IAdminAuditService audit,
         ICacheService cacheService,
+        ICacheDiagnostics cacheDiagnostics,
         IUserMediaLinkChecker linkChecker,
         IDebugOptionsService debugOptions,
         IRegulationAnalyzer regulation)
@@ -52,6 +54,7 @@ public class AdminController : ControllerBase
         _cache = cache;
         _audit = audit;
         _cacheService = cacheService;
+        _cacheDiagnostics = cacheDiagnostics;
         _linkChecker = linkChecker;
         _debugOptions = debugOptions;
         _regulation = regulation;
@@ -219,6 +222,17 @@ public class AdminController : ControllerBase
             "Сброшен кэш агрегатов (пересчёт при следующем запросе)");
         return Ok(new { message = "Cache invalidated" });
     }
+
+    /// <summary>
+    /// Сводка кэша для блока «Кэш» дашборда (docs/admin-pages/index.md): записи и их размер,
+    /// последний общий сброс, последние сбросы. Живая — не в двухминутной сводке дашборда, иначе
+    /// после кнопки сброса число ещё две минуты было бы старым. Списки кэша читаются без
+    /// блокировок — запросы посетителей её не ждут.
+    /// </summary>
+    [HttpGet("cache/summary")]
+    public IActionResult GetCacheSummary() => Ok(CacheOverview.From(
+        _cacheDiagnostics.Snapshot(), _cacheDiagnostics.Journal(),
+        Environment.WorkingSet, GC.GetGCMemoryInfo().HeapSizeBytes));
 
     // ── Media (здоровье ссылок, фаза 7.5) ───────────────────────────────────────
 
