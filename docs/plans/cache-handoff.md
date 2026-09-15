@@ -7,13 +7,13 @@
 
 ## Где мы
 
-- В `master`: К1–К3 (PR #25), К4 (#28), К4б.0–К4б.6 (#29–#34), §10 плана К4б (#35), кнопки
-  ручного сброса клубов (#36, `06e5795`).
-- **К5 — ветка `cache-k5-guards`** (15.09.2026, решение Влада: переосмыслить, все три пункта):
-  сторож записей без меток данных (`UntaggedEntryPolicy`, `CacheTags.NotFromDb`), закрытый список
-  прямого `IMemoryCache` (`DirectMemoryCacheTests`), обёртка `ClubJson`. Попутно починен
-  `/api/categories/{key}` — жил без меток. Что и почему — строка К5 в §6
-  [cache-tags-plan.md](cache-tags-plan.md).
+- **Всё сделанное — в `master`, открытых PR по кэшу нет, CI зелёный.** К1–К3 (PR #25), К4 (#28),
+  К4б.0–К4б.6 (#29–#34), §10 плана К4б (#35), кнопки ручного сброса клубов (#36), К5 (#37,
+  `fb10e0f`).
+- **К5** (15.09.2026, решение Влада: переосмыслить, все три пункта): сторож записей без меток
+  данных (`UntaggedEntryPolicy`, `CacheTags.NotFromDb`), закрытый список прямого `IMemoryCache`
+  (`DirectMemoryCacheTests`), обёртка `ClubJson`. Попутно починен `/api/categories/{key}` — жил без
+  меток. Что и почему — строка К5 в §6 [cache-tags-plan.md](cache-tags-plan.md).
 - Тесты 1973/1973.
 - Настройки кэша (`/Admin/Settings`, живут в памяти, рестарт возвращает дефолт):
   `CacheRowPrecision` = `true`, `CacheColumnPrecision` = `true`, `CacheHitVerifyPercent` = 20 в
