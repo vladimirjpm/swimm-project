@@ -393,6 +393,14 @@
                     : 'ошибки источника не чиним, а помечаем',
                 tone: 'warn', href: '/Admin/Records?filter=issues',
             });
+            // Кандидаты сторожа импорта (docs/data-integrity.md И-20): неправдоподобное время
+            // из источника. На сайте их нет, пока человек не переведёт в open, — поэтому
+            // метрика появляется только когда есть что разбирать.
+            if (quality.issuesCandidates > 0) metrics.push({
+                v: quality.issuesCandidates, label: 'Кандидаты в спорные',
+                sub: 'нашёл сторож импорта — на сайте не видны до перевода в open',
+                tone: 'warn', href: '/Admin/Records?tab=issues&status=candidate',
+            });
             metrics.push({
                 v: quality.found - quality.foundWrongDate, label: 'Подтверждены протоколом',
                 sub: 'нашёлся заплыв с этим временем и в этот день',
@@ -463,16 +471,19 @@
 
     function renderRecordQuality(q) {
         if (!q) return '';
-        const issues = (q.issues || []).map(i => `
+        const issueRow = i => `
             <div class="py-1 border-t border-admin-border/60">
                 <div class="text-[12px] text-admin-text">
                     <span class="font-semibold">${esc(i.style)} ${esc(i.distance)}</span>
                     · ${esc(i.poolType)} · ${esc(i.gender === 'female' ? '♀' : '♂')}
+                    · ${esc(i.regionType === 'world' ? 'WR' : i.regionCode)}
                     · ${esc(i.category)}${i.ageKey ? ' ' + esc(i.ageKey) : ''}
                     <span class="text-admin-warning font-semibold ml-1">${esc(i.flaggedTime)}</span>
                 </div>
                 <div class="text-[11px] text-admin-text-muted line-clamp-2">${esc(i.note)}</div>
-            </div>`).join('');
+            </div>`;
+        const issues = (q.issues || []).map(issueRow).join('');
+        const candidates = (q.candidates || []).map(issueRow).join('');
         const running = recVerify.status === 'running';
         return `<div class="mt-4 pt-3 border-t border-admin-border">
             <div class="text-[12px] font-semibold text-admin-text mb-1">Сверка с протоколами</div>
@@ -484,6 +495,7 @@
                 class="admin-btn text-sm ${running ? 'opacity-50 cursor-not-allowed' : ''}">${running ? 'Сверяю…' : 'Сверить с протоколами'}</button>
             ${recVerify.text ? `<div class="mt-1.5 text-[12px] text-admin-text-muted">${esc(recVerify.text)}</div>` : ''}
             ${renderAgeAxis(q)}
+            ${candidates ? `<div class="mt-3"><div class="text-[12px] font-semibold text-admin-text mb-1">Кандидаты сторожа импорта (candidate) — разобрать в <a href="/Admin/Records?tab=issues&status=candidate" class="text-admin-warning no-underline hover:underline">реестре</a></div>${candidates}</div>` : ''}
             ${issues ? `<div class="mt-3"><div class="text-[12px] font-semibold text-admin-text mb-1">Спорные записи (open)</div>${issues}</div>` : ''}
         </div>`;
     }

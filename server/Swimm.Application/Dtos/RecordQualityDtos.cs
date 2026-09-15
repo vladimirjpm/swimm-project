@@ -26,6 +26,11 @@ namespace Swimm.Application.Dtos;
 /// Сколько проверенных ступеней НЕ сходится с текущей осью (<paramref name="AgeAxis"/>) —
 /// то есть на скольких записях наша сверка попадёт не в ту строку справочника.
 /// </param>
+/// <param name="IssuesCandidates">
+/// Претензий в статусе candidate — предложены сторожем импорта, человек ещё не смотрел.
+/// На сайте их нет, пока не переведены в open.
+/// </param>
+/// <param name="Candidates">Последние кандидаты для панели деталей.</param>
 public sealed record RecordQualitySummary(
     int Total,
     int Found,
@@ -42,7 +47,9 @@ public sealed record RecordQualitySummary(
     int AgeAxisCalendarOnly = 0,
     int AgeAxisSeasonOnly = 0,
     int AgeAxisNone = 0,
-    int AgeAxisMismatch = 0);
+    int AgeAxisMismatch = 0,
+    int IssuesCandidates = 0,
+    IReadOnlyList<RecordIssueDto>? Candidates = null);
 
 /// <summary>Строка реестра спорных рекордов.</summary>
 /// <param name="RecordStillCurrent">
