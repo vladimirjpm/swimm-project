@@ -111,8 +111,13 @@ public class RecordsImportController : ControllerBase
     public async Task<IActionResult> Apply([FromBody] RecordDiffApplyRequest request)
     {
         var result = await _diffService.ApplyAsync(request, HttpContext.RequestAborted);
-        return result.Success
-            ? Ok(new { message = $"Применено: {result.AppliedCount}", applied = result.AppliedCount })
-            : BadRequest(new { error = result.Error });
+        if (!result.Success) return BadRequest(new { error = result.Error });
+
+        // Подозрительные значения записаны как в источнике, но заведены в реестр кандидатами —
+        // админ должен узнать об этом сразу, а не при следующем заходе на дашборд.
+        var message = result.CandidatesCreated > 0
+            ? $"Применено: {result.AppliedCount}. В реестр спорных — кандидатов: {result.CandidatesCreated} (/Admin/Records?tab=issues)"
+            : $"Применено: {result.AppliedCount}";
+        return Ok(new { message, applied = result.AppliedCount, candidates = result.CandidatesCreated });
     }
 }

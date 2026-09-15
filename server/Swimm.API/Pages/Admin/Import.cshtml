@@ -1203,15 +1203,24 @@
         return `${esc(region)} · ${esc(e.gender)} ${esc(e.poolType)} ${esc(e.style)} ${esc(e.distance)}${esc(age)}`;
     }
 
+    // Ключ строки диффа — 8 осей + время; им же сторож импорта помечает подозрительные.
+    const diffKey = (e, time) => [e.regionType, e.regionCode, e.category, e.ageKey, e.gender,
+        e.poolType, e.style, e.distance, time].join('|');
+
     function showRecordsDiff(source, data) {
         currentDiffId = data.diffId;
         recordsDiffSource.textContent = SOURCE_LABELS[source] || source;
+
+        // Сторож правдоподобия (docs/data-integrity.md И-20): Apply такие строки НЕ отбрасывает —
+        // копия обязана совпадать с источником, — а заводит в реестр спорных кандидатами.
+        const suspicious = new Map((data.suspicious || []).map(s => [diffKey(s, s.time), s]));
 
         recordsDiffStats.innerHTML = [
             statCard('Новых', data.addedCount, '#66bb6a'),
             statCard('Изменилось', data.changedCount, '#ffa726'),
             statCard('Без изменений', data.unchangedCount, '#546e7a'),
-            statCard('Нет в источнике', data.missingInSourceCount, '#4fc3f7')
+            statCard('Нет в источнике', data.missingInSourceCount, '#4fc3f7'),
+            ...(suspicious.size > 0 ? [statCard('Неправдоподобно → в реестр', suspicious.size, '#ef5350')] : [])
         ].join('');
 
         recordsAddedCount.textContent = data.addedCount;
@@ -1223,17 +1232,20 @@
         const rows = [
             ...(data.added || []).map(e => ({ e, kind: 'added' })),
             ...(data.changed || []).map(e => ({ e, kind: 'changed' }))
-        ];
+        ].map(r => ({ ...r, flag: suspicious.get(diffKey(r.e, r.e.newTime)) }));
+        // Подозрительные — наверх: иначе при большом диффе они уйдут за MAX_ROWS.
+        rows.sort((a, b) => (b.flag ? 1 : 0) - (a.flag ? 1 : 0));
         const shown = rows.slice(0, MAX_ROWS);
 
-        recordsDiffRows.innerHTML = shown.map(({ e, kind }) => {
+        recordsDiffRows.innerHTML = shown.map(({ e, kind, flag }) => {
             const was = kind === 'added' ? '<span class="text-admin-text-muted">— новый —</span>' : `${esc(e.oldTime)} · ${esc(e.oldHolderName || '')}`;
             const will = `${esc(e.newTime)} · ${esc(e.newHolderName || '')}`;
             const rowClass = kind === 'added' ? 'text-[#66bb6a]' : 'text-[#ffa726]';
+            const note = flag ? `<div class="text-[11px] text-admin-warning">⚠ ${esc(flag.note)}</div>` : '';
             return `<tr class="border-b border-admin-border/30">
                 <td class="py-1 pr-2">${discipline(e)}</td>
                 <td class="py-1 pr-2 text-admin-text-muted">${was}</td>
-                <td class="py-1 pr-2 ${rowClass}">${will}</td>
+                <td class="py-1 pr-2 ${rowClass}">${will}${note}</td>
             </tr>`;
         }).join('') || '<tr><td class="py-2 text-admin-text-muted" colspan="3">нет новых/изменившихся строк</td></tr>';
 

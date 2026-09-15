@@ -189,6 +189,19 @@ public class RecordQualityService(SwimmDbContext db, ISettingsService? settings 
         foreach (var i in issues)
             issueDtos.Add(await ToDtoAsync(i, ct));
 
+        // Кандидаты сторожа импорта (И-20): на сайте их нет, пока человек не переведёт в open,
+        // поэтому дашборд — единственное место, где они видны без захода в реестр.
+        var candidatesCount = await db.RecordIssues.AsNoTracking()
+            .CountAsync(i => i.Status == RecordIssueStatuses.Candidate, ct);
+        var candidates = await db.RecordIssues.AsNoTracking()
+            .Where(i => i.Status == RecordIssueStatuses.Candidate)
+            .OrderByDescending(i => i.CreatedAt)
+            .Take(issuesLimit)
+            .ToListAsync(ct);
+        var candidateDtos = new List<RecordIssueDto>(candidates.Count);
+        foreach (var i in candidates)
+            candidateDtos.Add(await ToDtoAsync(i, ct));
+
         return new RecordQualitySummary(
             Total: total,
             Found: found,
@@ -205,7 +218,9 @@ public class RecordQualityService(SwimmDbContext db, ISettingsService? settings 
             AgeAxisCalendarOnly: axisCalendar,
             AgeAxisSeasonOnly: axisSeason,
             AgeAxisNone: axisNone,
-            AgeAxisMismatch: axisMismatch);
+            AgeAxisMismatch: axisMismatch,
+            IssuesCandidates: candidatesCount,
+            Candidates: candidateDtos);
     }
 
     /* ──────────────────────── реестр претензий ──────────────────────── */
@@ -218,8 +233,10 @@ public class RecordQualityService(SwimmDbContext db, ISettingsService? settings 
             query = query.Where(i => i.Status == status);
 
         var total = await query.CountAsync(ct);
+        // Сверху то, что ждёт человека: кандидаты автопроверки, потом открытые.
         var rows = await query
-            .OrderBy(i => i.Status == RecordIssueStatuses.Open ? 0 : 1)
+            .OrderBy(i => i.Status == RecordIssueStatuses.Candidate ? 0
+                        : i.Status == RecordIssueStatuses.Open ? 1 : 2)
             .ThenByDescending(i => i.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)

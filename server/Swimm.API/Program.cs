@@ -717,6 +717,16 @@ if (args.Contains("--records-refresh"))
         foreach (var e in diff.Added.Take(15))
             Console.WriteLine($"    + {e.RegionType,-7} {e.RegionCode,-3} {e.Gender,-6} {e.PoolType,-4} "
                 + $"{e.Style,-18} {e.Distance,-7} {e.NewTime,9}");
+        // Сторож правдоподобия (И-20): такие значения всё равно применяются (копия обязана
+        // совпадать с источником), но уходят в реестр спорных кандидатами — их надо разобрать.
+        var suspicious = diff.Suspicious ?? [];
+        if (suspicious.Count > 0)
+        {
+            Console.WriteLine($"  ⚠ неправдоподобно: {suspicious.Count} — после Apply кандидатами в реестр (/Admin/Records?tab=issues)");
+            foreach (var s in suspicious)
+                Console.WriteLine($"    ⚠ {s.RegionType,-7} {s.RegionCode,-3} {s.Gender,-6} {s.PoolType,-4} "
+                    + $"{s.Style,-18} {s.Distance,-7} {s.Time,9}  {s.Reason}");
+        }
 
         if (dryRun) { Console.WriteLine("  --dry-run: не применяю"); continue; }
 
@@ -724,6 +734,7 @@ if (args.Contains("--records-refresh"))
             new Swimm.Application.Dtos.RecordDiffApplyRequest(diff.DiffId, ApplyAdded: true, ApplyChanged: true));
         Console.WriteLine(applied.Success
             ? $"  применено: {applied.AppliedCount}"
+                + (applied.CandidatesCreated > 0 ? $"; в реестр кандидатами: {applied.CandidatesCreated}" : "")
             : $"  ОШИБКА: {applied.Error}");
     }
 
