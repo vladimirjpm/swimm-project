@@ -155,7 +155,8 @@ public class WorldRecordsParser : IFormatParser
             // Страна (NF Code или Country)
             string country = !string.IsNullOrWhiteSpace(nfCodeVal) ? nfCodeVal.Trim().ToUpperInvariant() : countryVal.Trim();
 
-            // Тип рекорда: WR остаётся, NR/CR и другие национальные → код страны (ISR, SWE, ...)
+            // Тип рекорда: WR (и повторённый «=WR») остаётся, NR/CR и другие национальные → код
+            // страны (ISR, SWE, ...). Составные значения («NR, WR») — см. NormalizeRecordType.
             string recordType = NormalizeRecordType(recordVal.Trim().ToUpperInvariant(), country);
             if (string.IsNullOrEmpty(recordType)) recordType = "WR";
 
@@ -407,13 +408,25 @@ public class WorldRecordsParser : IFormatParser
     }
 
     /// <summary>
-    /// Нормализация типа рекорда: "WR" остаётся "WR",
-    /// национальные рекорды ("NR", "CR" и пр.) заменяются на код страны спортсмена.
+    /// Нормализация типа рекорда: мировой → "WR", национальные ("NR", "CR" и пр.) заменяются на
+    /// код страны спортсмена.
+    ///
+    /// Колонка Record у World Aquatics — не всегда одно слово:
+    /// <list type="bullet">
+    /// <item>«=WR» — повторённый (equalled) мировой рекорд. Пока здесь сравнивали строго с "WR",
+    /// такая строка уезжала в национальные: из world пропадал соавтор рекорда (100 брасс ж 25 м —
+    /// Atkinson рядом с Meilutyte), а в Records оседали одиночки country/USA/open и
+    /// country/JAM/open (docs/data-integrity.md, И-19).</item>
+    /// <item>«NR, WR», «NR, AM», «NR, CR» — в отчёте NR: национальный рекорд, который заодно
+    /// мировой / континентальный / рекорд чемпионата. Главный тип — ПЕРВЫЙ: отчёт запрошен по
+    /// нему (recordCode=NR), остальное — попутные титулы. «NR, WR» — национальный.</item>
+    /// </list>
     /// </summary>
     private static string NormalizeRecordType(string recordType, string country)
     {
         if (string.IsNullOrEmpty(recordType)) return "";
-        if (recordType == "WR") return "WR";
+        var primary = recordType.Split(',')[0].Trim().TrimStart('=').Trim();
+        if (primary == "WR") return "WR";
         // NR (National Record), CR (Championship Record) и другие → код страны
         if (!string.IsNullOrEmpty(country))
             return country;
