@@ -1,8 +1,22 @@
 # /Admin/Cache — как устроен кэш
 
 Файлы: `Pages/Admin/Cache.cshtml` (тексты), `Pages/Admin/Cache.cshtml.cs` (`CacheModel`,
-`CachePolicyCatalog` — сборка таблицы из кода и карта «где на сайте»). Кнопка сброса —
-`POST /api/admin/cache/invalidate` (`AdminController.InvalidateCache`, та же, что на Settings).
+`CachePolicyCatalog` — сборка таблицы из кода и карта «где на сайте»). Кнопки сброса:
+- «Сбросить весь серверный кэш» — `POST /api/admin/cache/invalidate`
+  (`AdminController.InvalidateCache`, та же, что на Settings);
+- «Сбросить кэш всех клубов» — `POST /api/admin/clubs/cache/invalidate`
+  (`ClubsAdminController.InvalidateAllClubsCache`, метка `page:clubs`): страницы всех клубов, а
+  группы, результаты, season-best страны остаются. Одного клуба — кнопка «Refresh this club» в
+  табе Admin страницы клуба (`client/src/projects/club-project/components/club-cache-card.tsx` →
+  `POST /api/admin/clubs/{id}/cache/invalidate`, метка `page:club:{id}`; склеенный клуб — по
+  приёмнику).
+
+Метки `page:*` — явные, их ставит `ClubsPublicController` (`CacheTags.ClubPageTags(id)` на всех
+четырёх ответах клуба: обзор, состав, season-best клуба, стена рекордов). Данные они не описывают:
+правка через сайт сбрасывает кэш сама. Ручной сброс нужен, только когда данные поменяли мимо этого
+процесса API — руками в базе, `dotnet run -- --флаг`, другим экземпляром. ⚠ Новый эндпоинт клуба
+— с теми же метками, иначе кнопки его не сбросят. Вложенная запись «витринный сезон»
+(`ShowcaseSeasonProvider`) не клубная — кнопки её не трогают.
 
 ## Что показывает
 

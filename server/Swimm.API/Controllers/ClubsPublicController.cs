@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Swimm.API.Http;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 
 namespace Swimm.API.Controllers;
 
@@ -16,6 +17,9 @@ namespace Swimm.API.Controllers;
 ///
 /// Кэш — как у RecordsController/HubGroupsController: ETag + Cache-Control; сброс — по меткам
 /// таблиц, сам, при записи (К4, docs/plans/cache-tags-plan.md), импорт сбрасывает всё.
+/// Каждая запись несёт ещё метки страницы (<see cref="CacheTags.ClubPageTags"/>) — для ручного
+/// сброса «этот клуб» / «все клубы» из админки (<c>ClubsAdminController</c>), когда данные поменяли
+/// мимо API. ⚠ Новый эндпоинт клуба — с ними же, иначе кнопки его не сбросят.
 /// </summary>
 [ApiController]
 public class ClubsPublicController : ControllerBase
@@ -66,7 +70,7 @@ public class ClubsPublicController : ControllerBase
             $"http:clubs:{resolvedId}:overview:{season?.ToString() ?? "all"}:{group ?? "all"}:{gridSeasons}:{standingCompetitionId?.ToString() ?? "auto"}",
             () => _overview.GetOverviewAsync(
                 resolvedId.Value, id, season, group, gridSeasons, standingCompetitionId),
-            PayloadTtl, CacheControlValue);
+            PayloadTtl, CacheControlValue, CacheTags.ClubPageTags(resolvedId.Value));
     }
 
     /// <summary>Ростер клуба: пагинация + фильтры пол/возраст/сезон.</summary>
@@ -93,7 +97,7 @@ public class ClubsPublicController : ControllerBase
         return await this.CachedJson(_cache,
             $"http:clubs:{resolvedId}:roster:{page}:{pageSize}:{gender ?? "all"}:{ageFrom?.ToString() ?? "-"}:{ageTo?.ToString() ?? "-"}:{season?.ToString() ?? "cur"}",
             () => _clubs.GetRosterAsync(resolvedId.Value, page, pageSize, gender, ageFrom, ageTo, season),
-            PayloadTtl, CacheControlValue);
+            PayloadTtl, CacheControlValue, CacheTags.ClubPageTags(resolvedId.Value));
     }
 
     /// <summary>
@@ -114,7 +118,7 @@ public class ClubsPublicController : ControllerBase
         return await this.CachedJson(_cache,
             $"http:clubs:{resolvedId}:season-best:{pool ?? "all"}:{season?.ToString() ?? "cur"}",
             () => _clubs.GetSeasonBestAsync(resolvedId.Value, pool, season),
-            PayloadTtl, CacheControlValue);
+            PayloadTtl, CacheControlValue, CacheTags.ClubPageTags(resolvedId.Value));
     }
 
     /// <summary>
@@ -133,6 +137,6 @@ public class ClubsPublicController : ControllerBase
         return await this.CachedJson(_cache,
             $"http:clubs:{resolvedId}:record-wall:{pool ?? "all"}",
             () => _clubs.GetRecordWallAsync(resolvedId.Value, pool),
-            PayloadTtl, CacheControlValue);
+            PayloadTtl, CacheControlValue, CacheTags.ClubPageTags(resolvedId.Value));
     }
 }

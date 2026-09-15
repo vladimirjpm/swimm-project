@@ -150,8 +150,16 @@
         после сброса строят его <strong class="text-admin-text">один раз</strong>
         (<code>GetOrCreateAsync</code>), а ответ, собранный во время сброса, в кэш не ложится.
     </p>
+    <p>
+        <strong class="text-admin-text">Ручной сброс нужен</strong>, только когда данные поменяли
+        мимо этого процесса API: руками в базе, командой <code>dotnet run -- --флаг</code>, другим
+        экземпляром сервера. Точечно: <strong class="text-admin-text">страницы всех клубов</strong> —
+        кнопка ниже (метка <code>page:clubs</code>), одного клуба — «Refresh this club» в табе Admin
+        страницы клуба (<code>page:club:{id}</code>).
+    </p>
     <div class="flex flex-wrap items-center gap-3 mt-4">
         <button id="btn-invalidate-cache" class="admin-btn admin-btn-primary cursor-pointer">Сбросить весь серверный кэш</button>
+        <button id="btn-invalidate-clubs" class="admin-btn admin-btn-ghost cursor-pointer">Сбросить кэш всех клубов</button>
         <span class="text-xs">Свежие ответы соберутся при следующих запросах. Браузеры посетителей это не трогает.</span>
     </div>
 </div>
@@ -366,6 +374,18 @@
         try {
             await api('/api/admin/cache/invalidate', { method: 'POST' });
             toast('Серверный кэш сброшен — ответы соберутся при следующих запросах', 3500);
+        } catch (err) {
+            toast('Ошибка: ' + err.message, 5000);
+        } finally {
+            btn.disabled = false;
+        }
+    });
+    document.getElementById('btn-invalidate-clubs').addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        try {
+            await api('/api/admin/clubs/cache/invalidate', { method: 'POST' });
+            toast('Кэш страниц всех клубов сброшен — остальной кэш цел', 3500);
         } catch (err) {
             toast('Ошибка: ' + err.message, 5000);
         } finally {
