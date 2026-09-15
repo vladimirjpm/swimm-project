@@ -77,6 +77,25 @@ public class WorldRecordsSourceProviderTests
         }
     }
 
+    [Fact]
+    public async Task Fetch_RealReports_CountryRowsOnlyFromNationalReports()
+    {
+        var dir = Environment.GetEnvironmentVariable("SWIMM_WR_REPORTS_DIR");
+        if (string.IsNullOrEmpty(dir) || !File.Exists(Path.Combine(dir, "WR_SCM.xlsx")))
+            return; // нет сохранённых отчётов — скип (локальная диагностика, не CI)
+
+        var provider = new WorldRecordsSourceProvider(
+            new StubHttpClientFactory(new FileBackedHandler(dir)), new WorldRecordsParser());
+
+        var raw = await provider.FetchAsync(new RecordSourceRequest("worldrecords", null, null, null, null, null));
+
+        // Национальные строки приходят только из пары NR-файлов — это ОДНА страна. Лишний регион
+        // здесь — строка отчёта WR, принятая за национальную: так повторённый мировой рекорд
+        // «=WR» заводил одиночки country/USA и country/JAM (docs/data-integrity.md, И-19).
+        var regions = raw.Where(p => p.RegionType == "country").Select(p => p.RegionCode).Distinct().ToList();
+        Assert.True(regions.Count <= 1, $"Лишние регионы из отчёта WR: {string.Join(", ", regions)}");
+    }
+
     private static string AxisKey(ParsedRecordDto p) =>
         string.Join("|", p.RegionType, p.RegionCode, p.Category, p.AgeKey, p.Gender, p.PoolType, p.Style, p.Distance);
 
