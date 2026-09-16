@@ -152,15 +152,12 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @{ var issueRow = 0; }
                     @foreach (var i in Model.Issues.Items)
                     {
-                        @* Подсветка через одну ЗАПИСЬ, а не через строку: у претензии их две. *@
-                        var altClass = issueRow++ % 2 == 1 ? " issue-alt" : "";
                         @* Претензия занимает ДВЕ строки: оси и статусы сверху, обоснование
                            широким полем под ними. Одной строкой textarea растягивала таблицу
                            так, что кнопки уезжали за правый край. *@
-                        <tr id="iss-row-@i.Id" class="issue-head@(altClass)">
+                        <tr id="iss-row-@i.Id" class="issue-head">
                             <td class="text-admin-text-muted">@i.Id</td>
                             <td class="whitespace-nowrap text-admin-text-muted">
                                 @i.RegionType@(string.IsNullOrEmpty(i.RegionCode) ? "" : $" · {i.RegionCode}")
@@ -201,7 +198,7 @@
                                 <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5" onclick="deleteIssue(@i.Id)">Del</button>
                             </td>
                         </tr>
-                        <tr id="iss-note-@i.Id" class="issue-note@(altClass)">
+                        <tr id="iss-note-@i.Id" class="issue-note">
                             <td colspan="7">
                                 <label class="block text-[11px] text-admin-text-muted mb-0.5">Обоснование</label>
                                 <textarea class="admin-input w-full h-16" data-field="note">@i.Note</textarea>
