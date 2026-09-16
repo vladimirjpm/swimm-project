@@ -52,6 +52,14 @@ public class RecordDto
     [JsonPropertyName("holder_name")]
     public string? HolderName { get; set; }
 
+    /// <summary>
+    /// Держатель латиницей (`Records.HolderNameEn`). Нужен админской таблице рекордов и
+    /// международным экранам. ⚠ Остальная витрина берёт <see cref="HolderName"/>: имена на
+    /// иврите по умолчанию — правило, а не забывчивость (docs/important.md).
+    /// </summary>
+    [JsonPropertyName("holder_name_en")]
+    public string? HolderNameEn { get; set; }
+
     [JsonPropertyName("club")]
     public string? Club { get; set; }
 

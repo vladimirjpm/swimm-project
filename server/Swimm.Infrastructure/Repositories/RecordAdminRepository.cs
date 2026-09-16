@@ -66,10 +66,14 @@ public class RecordAdminRepository : IRecordAdminRepository
 
         if (string.IsNullOrWhiteSpace(input.Time)) return RecordSaveResult.Fail("Time обязателен");
 
-        // ПЕРЕД перезаписью Time: правило смотрит, тот же это рекорд или уже другой.
-        // Иначе правка времени оставила бы английское имя ПРЕЖНЕГО держателя.
-        record.HolderNameEn = HolderLatinName.CarryOver(
-            input.HolderName, input.Time.Trim(), record.Time, record.HolderNameEn);
+        // Человек сильнее автомата: вписанное руками английское имя побеждает правило.
+        // Пустое поле НЕ стирает сохранённое — форма отправляется целиком, и пустая клетка
+        // означала бы «стереть» при каждой правке времени.
+        record.HolderNameEn = string.IsNullOrWhiteSpace(input.HolderNameEn)
+            // ПЕРЕД перезаписью Time: правило смотрит, тот же это рекорд или уже другой.
+            // Иначе правка времени оставила бы английское имя ПРЕЖНЕГО держателя.
+            ? HolderLatinName.CarryOver(input.HolderName, input.Time.Trim(), record.Time, record.HolderNameEn)
+            : input.HolderNameEn.Trim();
         record.Time = input.Time.Trim();
         record.HolderName = Norm(input.HolderName);
         record.Club = Norm(input.Club);
@@ -189,10 +193,11 @@ public class RecordAdminRepository : IRecordAdminRepository
         record.PoolType = input.PoolType.Trim();
         record.Style = input.Style.Trim();
         record.Distance = input.Distance.Trim();
-        // То же правило, что у импорта и быстрой правки: английское имя живёт, только пока
-        // это ТОТ ЖЕ рекорд (HolderLatinName.CarryOver). Считаем до перезаписи Time.
-        record.HolderNameEn = HolderLatinName.CarryOver(
-            input.HolderName, input.Time.Trim(), record.Time, record.HolderNameEn);
+        // То же, что в быстрой правке: вписанное руками побеждает, пустое не стирает,
+        // иначе работает общее правило HolderLatinName.CarryOver (до перезаписи Time).
+        record.HolderNameEn = string.IsNullOrWhiteSpace(input.HolderNameEn)
+            ? HolderLatinName.CarryOver(input.HolderName, input.Time.Trim(), record.Time, record.HolderNameEn)
+            : input.HolderNameEn.Trim();
         record.Time = input.Time.Trim();
         record.HolderName = Norm(input.HolderName);
         record.Club = Norm(input.Club);
@@ -252,6 +257,7 @@ public class RecordAdminRepository : IRecordAdminRepository
         Distance = r.Distance,
         Time = r.Time,
         HolderName = r.HolderName,
+        HolderNameEn = r.HolderNameEn,
         Club = r.Club,
         HolderCountry = r.HolderCountry,
         RecordDate = r.RecordDate,

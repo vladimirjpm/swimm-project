@@ -318,6 +318,12 @@ else if (Model.Tab == "records")
             <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Holder name
                 <input id="nr-holderName" class="admin-input" />
             </label>
+            @* Латиница для /records и /records/compare: там ивритская строка посреди рейтинга
+               двух сотен стран читается как сбой кодировки (important.md). Пусто — подставится
+               из источника или из карточки пловца, если найдётся. *@
+            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Holder (latin)
+                <input id="nr-holderNameEn" class="admin-input" placeholder="для /records" />
+            </label>
             <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Club
                 <input id="nr-club" class="admin-input" />
             </label>
@@ -347,7 +353,7 @@ else if (Model.Tab == "records")
                 <thead>
                     <tr>
                         <th>ID</th><th>Region</th><th>Category</th><th>Age</th><th>Gender</th><th>Pool</th>
-                        <th>Style</th><th>Dist</th><th>Time</th><th>Holder</th><th>Club</th><th>Country</th><th>Date</th><th></th>
+                        <th>Style</th><th>Dist</th><th>Time</th><th>Holder</th><th>Holder (latin)</th><th>Club</th><th>Country</th><th>Date</th><th></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -364,6 +370,8 @@ else if (Model.Tab == "records")
                             <td>@r.Distance</td>
                             <td><input class="admin-input w-24" data-field="time" value="@r.Time" /></td>
                             <td><input class="admin-input w-40" data-field="holderName" value="@r.HolderName" /></td>
+                            <td><input class="admin-input w-40" data-field="holderNameEn" value="@r.HolderNameEn"
+                                       title="Латиница для /records; пусто — не стирает сохранённое" /></td>
                             <td><input class="admin-input w-32" data-field="club" value="@r.Club" /></td>
                             <td><input class="admin-input w-16" data-field="holderCountry" value="@r.HolderCountry" /></td>
                             <td><input class="admin-input w-24" data-field="recordDate" value="@r.RecordDate" /></td>
@@ -551,6 +559,7 @@ else
                     body: JSON.stringify({
                         time: rowField(row, 'time').value,
                         holderName: rowField(row, 'holderName').value,
+                        holderNameEn: rowField(row, 'holderNameEn').value,
                         club: rowField(row, 'club').value,
                         holderCountry: rowField(row, 'holderCountry').value,
                         recordDate: rowField(row, 'recordDate').value,
@@ -584,6 +593,7 @@ else
                         regionType: val('regionType'), regionCode: val('regionCode'), category: val('category'),
                         ageKey: val('ageKey'), gender: val('gender'), poolType: val('poolType'), style: val('style'),
                         distance: val('distance'), time: val('time'), holderName: val('holderName'),
+                        holderNameEn: val('holderNameEn'),
                         club: val('club'), holderCountry: val('holderCountry'), recordDate: val('recordDate'),
                     }),
                 });

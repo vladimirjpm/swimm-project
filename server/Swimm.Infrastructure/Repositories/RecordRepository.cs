@@ -65,6 +65,7 @@ public class RecordRepository : IRecordRepository
                 Distance      = r.Distance,
                 Time          = r.Time,
                 HolderName    = r.HolderName,
+                HolderNameEn  = r.HolderNameEn,
                 Club          = r.Club,
                 HolderCountry = r.HolderCountry,
                 RecordDate    = r.RecordDate,

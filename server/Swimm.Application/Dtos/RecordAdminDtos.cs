@@ -30,6 +30,15 @@ public sealed class RecordInputDto
     public string Distance { get; set; } = "";
     public string Time { get; set; } = "";
     public string? HolderName { get; set; }
+
+    /// <summary>
+    /// Держатель латиницей для международных экранов (`Records.HolderNameEn`). Руками
+    /// заполняют там, где источник латиницу не дал: у части израильских рекордов держателя
+    /// нет ни в одном нашем протоколе, и взять имя неоткуда, кроме как вписать.
+    /// ⚠ Пустое поле формы сохранённое имя НЕ стирает (см. `RecordAdminRepository`): форма
+    /// отправляется целиком, и пустая клетка означала бы «стереть» при каждой правке времени.
+    /// </summary>
+    public string? HolderNameEn { get; set; }
     public string? Club { get; set; }
     public string? HolderCountry { get; set; }
     public string? RecordDate { get; set; }
@@ -40,6 +49,9 @@ public sealed class RecordQuickEditDto
 {
     public string Time { get; set; } = "";
     public string? HolderName { get; set; }
+
+    /// <summary>Держатель латиницей; пустое поле сохранённое имя НЕ стирает.</summary>
+    public string? HolderNameEn { get; set; }
     public string? Club { get; set; }
     public string? HolderCountry { get; set; }
     public string? RecordDate { get; set; }
