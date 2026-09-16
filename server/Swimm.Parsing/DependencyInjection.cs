@@ -53,6 +53,9 @@ public static class DependencyInjection
         // Разбор регламента соревнования (תקנון) для галочек в панели затягивания.
         services.AddSingleton<IRegulationAnalyzer, Parsers.Regulation.RegulationAnalyzer>();
 
+        // Список стран источника (11.1.1) — из него батч Фазы 11 берёт, чьи NR качать.
+        services.AddSingleton<IRecordCountriesProvider, WorldAquaticsCountriesProvider>();
+
         services.AddSingleton<IRecordSourceProvider, WorldRecordsSourceProvider>();
         services.AddSingleton<IRecordSourceProvider, IsrOrgAgeRecordsSourceProvider>();
         services.AddSingleton<IRecordSourceProvider, IsrOrgMastersRecordsSourceProvider>();

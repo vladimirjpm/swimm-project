@@ -112,3 +112,16 @@ public sealed record RecordSourceLinkDto(
     bool IsMasters,
     DateOnly? UpdatedOn,
     bool Trusted = true);
+
+/// <summary>
+/// Страна источника рекордов (11.1.1): чем её обозначает наша модель (<paramref name="Code"/>,
+/// alpha-3 — он же <c>Record.RegionCode</c>) и чем — сам источник
+/// (<paramref name="SourceId"/>, внутренний GUID, которым запрашиваются национальные рекорды).
+///
+/// Список тянется живым в начале прогона и в БД не хранится: GUID нужен только импорту,
+/// а таблицу <c>Countries</c> (названия для витрины) он не трогает.
+/// </summary>
+/// <param name="Region">Континент источника. Пустой он ровно у псевдо-сборных
+/// (AIN, EOR, FINA…), поэтому и служит признаком «это не страна» — в DTO попадают только
+/// настоящие.</param>
+public sealed record RecordCountryDto(string Code, string SourceId, string Name, string Region);
