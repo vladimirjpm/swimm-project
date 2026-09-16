@@ -19,11 +19,19 @@ public class RecordDiffService : IRecordDiffService
 {
     private const char KeySeparator = '';
 
-    private static readonly (string Source, string Category)[] SourceScopes =
+    /// <summary>
+    /// Чем владеет каждый источник — этим и меряется его «обновлено» в карточке админки.
+    /// <c>RegionType</c> пустой значит «любой»: отчёт World Aquatics приносит и мировые
+    /// рекорды, и национальные, обе территории одной категорией <c>open</c>. А вот мастерс
+    /// теперь пишут ДВА источника, и различает их именно территория — без неё обе карточки
+    /// показывали бы одну и ту же дату.
+    /// </summary>
+    private static readonly (string Source, string Category, string RegionType)[] SourceScopes =
     {
-        ("worldrecords", "open"),
-        ("isrorg-age", "age"),
-        ("isrorg-masters", "masters"),
+        ("worldrecords", "open", ""),
+        ("isrorg-age", "age", ""),
+        ("isrorg-masters", "masters", "country"),
+        ("wa-masters", "masters", "world"),
     };
 
     /// <summary>Сколько живёт дифф превью в админке, если вызывающий не попросил другого.</summary>
@@ -267,10 +275,11 @@ public class RecordDiffService : IRecordDiffService
     public async Task<IReadOnlyList<RecordSourceStatusDto>> GetSourceStatusAsync(CancellationToken ct = default)
     {
         var result = new List<RecordSourceStatusDto>();
-        foreach (var (source, category) in SourceScopes)
+        foreach (var (source, category, regionType) in SourceScopes)
         {
             var max = await _db.Records.AsNoTracking()
-                .Where(r => r.Category == category)
+                .Where(r => r.Category == category
+                            && (regionType == "" || r.RegionType == regionType))
                 .Select(r => (DateTime?)r.UpdatedAt)
                 .MaxAsync(ct);
             result.Add(new RecordSourceStatusDto(source, max));

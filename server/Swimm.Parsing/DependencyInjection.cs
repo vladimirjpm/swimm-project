@@ -50,6 +50,12 @@ public static class DependencyInjection
         services.AddSingleton<IRecordSourceLinksProvider>(
             sp => sp.GetRequiredService<RecordSources.IsrOrgRecordsPageResolver>());
 
+        // Страница-оглавление мастерских МИРОВЫХ рекордов (worldaquatics.com/masters/records):
+        // адреса PDF там тоже с датой и GUID, прямую ссылку в конфиг прибивать нечем.
+        services.AddSingleton<RecordSources.WaMastersRecordsPageResolver>();
+        services.AddSingleton<IRecordSourceLinksProvider>(
+            sp => sp.GetRequiredService<RecordSources.WaMastersRecordsPageResolver>());
+
         // Разбор регламента соревнования (תקנון) для галочек в панели затягивания.
         services.AddSingleton<IRegulationAnalyzer, Parsers.Regulation.RegulationAnalyzer>();
 
@@ -60,9 +66,12 @@ public static class DependencyInjection
         services.AddSingleton<IRecordCountryFetcher>(sp => new WorldAquaticsCountryFetcher(
             sp.GetRequiredService<IHttpClientFactory>(), sp.GetRequiredService<WorldRecordsParser>()));
 
+        services.AddSingleton<Parsers.WaMastersRecords.WaMastersRecordsParser>();
+
         services.AddSingleton<IRecordSourceProvider, WorldRecordsSourceProvider>();
         services.AddSingleton<IRecordSourceProvider, IsrOrgAgeRecordsSourceProvider>();
         services.AddSingleton<IRecordSourceProvider, IsrOrgMastersRecordsSourceProvider>();
+        services.AddSingleton<IRecordSourceProvider, WaMastersRecordsSourceProvider>();
 
         return services;
     }

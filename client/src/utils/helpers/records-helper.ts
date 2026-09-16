@@ -154,7 +154,9 @@ export default class RecordsHelper {
   private static async loadOpenRecords(): Promise<void> {
     try {
       const [world, national] = await Promise.all([
-        fetchRecords('region=world'),
+        // Категорию спрашиваем явно: с сентября 2026 в world лежат ещё и мастерские мировые
+        // рекорды (источник wa-masters, ~1100 строк), а этому дереву нужны только абсолютные.
+        fetchRecords('region=world&category=open'),
         fetchRecords(`region=${HOME_REGION}&category=open`),
       ]);
       const tree: OpenRecordsTree = { normatives: {} as OpenRecordsTree['normatives'] };

@@ -70,6 +70,9 @@ public class IsrOrgRecordsPageResolver : IRecordSourceLinksProvider
         _configuration = configuration;
     }
 
+    /// <summary>Страница «שיאי ישראל» — одна на оба израильских источника рекордов.</summary>
+    public IReadOnlyCollection<string> Sources { get; } = ["isrorg-age", "isrorg-masters"];
+
     /// <summary>
     /// Страница-оглавление: из настроек (RecordsImport:IsrOrgRecordsPageUrl) или дефолт.
     /// Читается в одном месте — иначе оба провайдера завели бы по своей копии.

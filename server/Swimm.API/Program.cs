@@ -688,7 +688,10 @@ if (args.Contains("--records-refresh"))
         .ToDictionary(p => p.Source, StringComparer.OrdinalIgnoreCase);
     var diffService = scope.ServiceProvider.GetRequiredService<IRecordDiffService>();
 
-    string[] order = ["worldrecords", "isrorg-age"];
+    // wa-masters стоит рядом с worldrecords: это тоже World Aquatics, и он единственный
+    // владелец world/masters — ни с кем ключами упсерта не спорит, поэтому его место в списке
+    // определяется только здравым смыслом «сначала мир, потом федерация».
+    string[] order = ["worldrecords", "wa-masters", "isrorg-age"];
     foreach (var sourceKey in order)
     {
         if (!providers.TryGetValue(sourceKey, out var provider))

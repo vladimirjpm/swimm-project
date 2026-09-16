@@ -203,9 +203,13 @@ public class IsrOrgRecordsPageResolverTests(Xunit.Abstractions.ITestOutputHelper
     }
 
     /// <summary>
-    /// DI-граф: карточки Age/Masters в /Admin/Import зовут провайдера через шов
-    /// IRecordSourceLinksProvider, и оба источника рекордов ждут резолвер в конструкторе.
+    /// DI-граф: карточки источников в /Admin/Import зовут провайдера через шов
+    /// IRecordSourceLinksProvider, и источники рекордов ждут резолвер в конструкторе.
     /// Тест ловит забытую регистрацию раньше, чем это сделает 500 в админке.
+    ///
+    /// Резолверов теперь несколько (страница федерации и страница World Aquatics), поэтому
+    /// ищем нужный ПО КЛЮЧУ ИСТОЧНИКА — ровно как контроллер: <c>GetRequiredService</c> отдал
+    /// бы последний зарегистрированный, и карточка получила бы чужую страницу.
     /// </summary>
     [Fact]
     public void Di_ResolvesLinksProviderAndBothRecordSources()
@@ -217,13 +221,21 @@ public class IsrOrgRecordsPageResolverTests(Xunit.Abstractions.ITestOutputHelper
 
         using var sp = services.BuildServiceProvider(validateScopes: true);
 
-        Assert.NotNull(sp.GetRequiredService<IRecordSourceLinksProvider>());
+        var links = sp.GetServices<IRecordSourceLinksProvider>().ToList();
         Assert.Equal(IsrOrgRecordsSource.RecordsPageUrlDefault,
-            sp.GetRequiredService<IRecordSourceLinksProvider>().PageUrl);
+            PageUrlOf(links, "isrorg-age"));
+        Assert.Equal(IsrOrgRecordsSource.RecordsPageUrlDefault,
+            PageUrlOf(links, "isrorg-masters"));
+        Assert.Equal(WorldAquaticsSource.MastersRecordsPageUrl,
+            PageUrlOf(links, "wa-masters"));
 
         var sources = sp.GetServices<IRecordSourceProvider>().Select(p => p.Source).ToList();
         Assert.Contains("isrorg-age", sources);
         Assert.Contains("isrorg-masters", sources);
+        Assert.Contains("wa-masters", sources);
+
+        static string PageUrlOf(IEnumerable<IRecordSourceLinksProvider> providers, string source) =>
+            providers.Single(p => p.Sources.Contains(source)).PageUrl;
     }
 
     private sealed class SingleClientFactory : IHttpClientFactory
