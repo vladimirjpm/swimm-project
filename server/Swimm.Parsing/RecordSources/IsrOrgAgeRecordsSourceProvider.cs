@@ -54,13 +54,16 @@ public class IsrOrgAgeRecordsSourceProvider : IRecordSourceProvider
                 var url25 = _configuration["RecordsImport:IsrOrgAgeRecordsUrl25m"];
                 var url50 = _configuration["RecordsImport:IsrOrgAgeRecordsUrl50m"];
 
-                // Ничего не задано руками — идём на страницу-оглавление за актуальными файлами.
-                if (string.IsNullOrWhiteSpace(url25) && string.IsNullOrWhiteSpace(url50))
+                // Перехват ПОФАЙЛОВЫЙ — см. близнеца в IsrOrgMastersRecordsSourceProvider:
+                // условие «пусты ОБА» превращало один заданный адрес в отмену второго файла.
+                if (string.IsNullOrWhiteSpace(url25) || string.IsNullOrWhiteSpace(url50))
                 {
                     var pageUrl = _pageResolver.PageUrl;
                     var links = await _pageResolver.ResolveAsync(pageUrl, ct);
-                    url25 = IsrOrgRecordsPageResolver.Pick(links, isMasters: false, "25m")?.Url;
-                    url50 = IsrOrgRecordsPageResolver.Pick(links, isMasters: false, "50m")?.Url;
+                    if (string.IsNullOrWhiteSpace(url25))
+                        url25 = IsrOrgRecordsPageResolver.Pick(links, isMasters: false, "25m")?.Url;
+                    if (string.IsNullOrWhiteSpace(url50))
+                        url50 = IsrOrgRecordsPageResolver.Pick(links, isMasters: false, "50m")?.Url;
 
                     if (string.IsNullOrWhiteSpace(url25) && string.IsNullOrWhiteSpace(url50))
                         throw new InvalidOperationException(

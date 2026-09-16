@@ -50,13 +50,18 @@ public class IsrOrgMastersRecordsSourceProvider : IRecordSourceProvider
                 var url50 = _configuration["RecordsImport:IsrOrgMastersRecordsUrl50m"];
                 var url25 = _configuration["RecordsImport:IsrOrgMastersRecordsUrl25m"];
 
-                // Ничего не задано руками — идём на страницу-оглавление за актуальными файлами.
-                if (string.IsNullOrWhiteSpace(url50) && string.IsNullOrWhiteSpace(url25))
+                // Перехват ПОФАЙЛОВЫЙ: страница опрашивается, если руками задан не каждый
+                // адрес, и заполняет только пустые. Раньше условие было «пусты ОБА», и один
+                // заданный адрес молча отменял второй файл — подставив 25 м вместо битой
+                // ссылки федерации (И-15), можно было потерять длинную воду целиком.
+                if (string.IsNullOrWhiteSpace(url50) || string.IsNullOrWhiteSpace(url25))
                 {
                     var pageUrl = _pageResolver.PageUrl;
                     var links = await _pageResolver.ResolveAsync(pageUrl, ct);
-                    url50 = IsrOrgRecordsPageResolver.Pick(links, isMasters: true, "50m")?.Url;
-                    url25 = IsrOrgRecordsPageResolver.Pick(links, isMasters: true, "25m")?.Url;
+                    if (string.IsNullOrWhiteSpace(url50))
+                        url50 = IsrOrgRecordsPageResolver.Pick(links, isMasters: true, "50m")?.Url;
+                    if (string.IsNullOrWhiteSpace(url25))
+                        url25 = IsrOrgRecordsPageResolver.Pick(links, isMasters: true, "25m")?.Url;
 
                     if (string.IsNullOrWhiteSpace(url50) && string.IsNullOrWhiteSpace(url25))
                         throw new InvalidOperationException(
