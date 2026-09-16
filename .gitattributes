@@ -8,3 +8,10 @@ server/Swimm.API/wwwroot/css/admin.min.css text eol=lf
 # Правило сознательно узкое: общее «*.sql eol=lf» перенормализовало бы давно лежащие
 # в репозитории файлы и дало бы дифф не по делу.
 server/db/*.sh text eol=lf
+
+# Архив источников рекордов (!records-sources/): CSV коммитятся и сверяются контрольной
+# суммой из SHA256SUMS.txt. При core.autocrlf=true рабочая копия на Windows была бы с CRLF,
+# на Linux — с LF, и сумма не совпала бы ни с чем. PDF гит и так не трогает.
+# ⚠ Слэш перед «!» обязателен: ведущий восклицательный знак гит читает как отрицание,
+# а отрицания в .gitattributes игнорируются молча ("Negative patterns are ignored").
+\!records-sources/*.csv text eol=lf
