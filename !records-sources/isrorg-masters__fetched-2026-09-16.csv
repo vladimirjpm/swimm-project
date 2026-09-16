@@ -1,0 +1,847 @@
+RegionType,RegionCode,Category,AgeKey,Gender,PoolType,Style,Distance,Time,HolderName,Club,HolderCountry,RecordDate
+country,ISR,masters,25-29,female,25m,backstroke,100m,01:08.15,שפייזר טל,הפועל ירושלים ניו-יורק,ISR,12/08/2009
+country,ISR,masters,25-29,female,25m,backstroke,200m,02:25.75,שפייזר טל,הפועל ירושלים ניו-יורק,ISR,12/08/2009
+country,ISR,masters,25-29,female,25m,backstroke,50m,31.87,שפייזר טל,"הפועל ירושלים ארה""ב",ISR,
+country,ISR,masters,25-29,female,25m,breaststroke,100m,01:19.46,שץ מיקה,הפועל גליל-עליון עין גדי,ISR,3/18/2011
+country,ISR,masters,25-29,female,25m,breaststroke,200m,02:50.41,עדן דנה,הפועל עולם המים בית-אייל,ISR,02/12/2010
+country,ISR,masters,25-29,female,25m,breaststroke,50m,36.50,שץ מיקה,הפועל גליל-עליון עין גדי,ISR,3/18/2011
+country,ISR,masters,25-29,female,25m,butterfly,100m,01:06.94,קרטין ליהי,עולם המים לאומית,ISR,
+country,ISR,masters,25-29,female,25m,butterfly,200m,02:40.42,צהרי מיכל,ירושלים,ISR,10/20/2000
+country,ISR,masters,25-29,female,25m,butterfly,50m,29.94,אלוני סהר,הפועל עמק-חפר,ISR,10/20/2000
+country,ISR,masters,25-29,female,25m,freestyle,100m,59.52,בנפשי ענת,עולם המים לאומית,ISR,3/19/2021
+country,ISR,masters,25-29,female,25m,freestyle,1500m,21:58.60,גורנשטיין קארן,בני הרצליה וינגייט,ISR,2/21/2015
+country,ISR,masters,25-29,female,25m,freestyle,200m,02:10.25,בכר עמית,מכבי פ.מ. רעות לאומית וינגייט,ISR,01/06/2017
+country,ISR,masters,25-29,female,25m,freestyle,400m,04:44.40,בנפשי ענת,עולם המים לאומית,ISR,3/19/2021
+country,ISR,masters,25-29,female,25m,freestyle,50m,27.81,בנפשי ענת,מכבי עולם המים לאומית,ISR,3/19/2021
+country,ISR,masters,25-29,female,25m,freestyle,800m,09:25.23,בכר עמית,מכבי פ.מ. רעות לאומית,ISR,01/07/2017
+country,ISR,masters,25-29,female,25m,individual_medley,100m,01:12.53,פאור עדינה,הפועל ירושלים גבעת חיים,ISR,6/15/2002
+country,ISR,masters,25-29,female,25m,individual_medley,200m,02:31.39,בכר נעם,מכבי פ.מ. רעות לאומית,ISR,01/06/2017
+country,ISR,masters,25-29,female,25m,individual_medley,400m,06:14.89,הרשקוביץ קורל,הפועל בת ים לאומית,ISR,04/05/2024
+country,ISR,masters,25-29,female,50m,backstroke,100m,01:11.22,פאור עדינה,בני-הרצליה צרפת,ISR,04/01/2003
+country,ISR,masters,25-29,female,50m,backstroke,200m,02:33.82,בכר נעם,מכבי פ.מ. רעות לאומית טוטו,ISR,6/30/2016
+country,ISR,masters,25-29,female,50m,backstroke,50m,31.71,בנפשי ענת,מכבי עולם המים לאומית,ISR,08/07/2021
+country,ISR,masters,25-29,female,50m,breaststroke,100m,01:19.78,ביכמן עדי,מכבי שוהם מכון וינגייט,ISR,7/15/2011
+country,ISR,masters,25-29,female,50m,breaststroke,200m,02:55.81,ביכמן עדי,מכבי פ.מ. רעות מכון וינגייט,ISR,02/08/2008
+country,ISR,masters,25-29,female,50m,breaststroke,50m,36.79,גת רוני,עולם המים דרום קוריאה,ISR,8/18/2019
+country,ISR,masters,25-29,female,50m,butterfly,100m,01:08.23,בנפשי ענת,מכבי עולם המים לאומית,ISR,03/11/2022
+country,ISR,masters,25-29,female,50m,butterfly,200m,02:57.47,הרשקוביץ קורל,הפועל בת ים לאומית,ISR,05/04/2025
+country,ISR,masters,25-29,female,50m,butterfly,50m,29.57,בנפשי ענת,מכבי עולם המים לאומית,ISR,6/18/2021
+country,ISR,masters,25-29,female,50m,freestyle,100m,01:03.69,בכר נעם,מכבי פ.מ. רעות לאומית טוטו,ISR,05/12/2017
+country,ISR,masters,25-29,female,50m,freestyle,1500m,23:44.20,גורנשטיין קארן,בני הרצליה לאומית טוטו,ISR,08/01/2015
+country,ISR,masters,25-29,female,50m,freestyle,200m,02:15.30,בכר עמית,מכבי פ.מ. רעות לאומית טוטו,ISR,7/31/2015
+country,ISR,masters,25-29,female,50m,freestyle,400m,04:45.62,בכר עמית,מכבי פ.מ. רעות לאומית טוטו,ISR,07/01/2016
+country,ISR,masters,25-29,female,50m,freestyle,50m,28.36,בנפשי ענת,מכבי עולם המים לאומית,ISR,08/07/2021
+country,ISR,masters,25-29,female,50m,freestyle,800m,09:31.11,בכר עמית,מכבי פ.מ. רעות לאומית טוטו,ISR,6/30/2016
+country,ISR,masters,25-29,female,50m,individual_medley,200m,02:33.35,בנפשי ענת,מכבי עולם המים לאומית,ISR,08/06/2021
+country,ISR,masters,25-29,female,50m,individual_medley,400m,05:21.87,בכר עמית,מכבי פ.מ. רעות לאומית טוטו,ISR,05/12/2017
+country,ISR,masters,25-29,male,25m,backstroke,100m,56.86,מלכה אורן,מכבי חיפה לאומית,ISR,02/03/2023
+country,ISR,masters,25-29,male,25m,backstroke,200m,02:09.55,רויחל סלבו,אסא תל-אביב לאומית,ISR,2/28/2015
+country,ISR,masters,25-29,male,25m,backstroke,50m,24.78,חירותי מירון,מכבי חיפה לאומית,ISR,04/05/2024
+country,ISR,masters,25-29,male,25m,breaststroke,100m,01:08.14,אבן דנן,רן הפועל עולם המים גבעת חיים,ISR,7/13/2007
+country,ISR,masters,25-29,male,25m,breaststroke,200m,02:32.01,דמבינסקי עומר,מכבי פ.מ. רעות בית-אייל,ISR,02/12/2010
+country,ISR,masters,25-29,male,25m,breaststroke,50m,29.21,רובינשטיין פליקס,ספורטן פתח-תקוה לאומית,ISR,2/28/2015
+country,ISR,masters,25-29,male,25m,butterfly,100m,58.69,מלכינסון שיר,בני הרצליה לאומית,ISR,2/15/2020
+country,ISR,masters,25-29,male,25m,butterfly,200m,02:12.15,קייזלר מכבי,חיפה לאומית,ISR,04/01/2025
+country,ISR,masters,25-29,male,25m,butterfly,50m,25.20,חוזמן אריאל,"מתנ""ס רמת הנגב לאומית",ISR,10/01/2026
+country,ISR,masters,25-29,male,25m,freestyle,100m,52.28,קיזלר מכבי,חיפה לאומית,ISR,02/03/2023
+country,ISR,masters,25-29,male,25m,freestyle,200m,01:56.76,קיזלר מכבי,חיפה לאומית,ISR,03/01/2025
+country,ISR,masters,25-29,male,25m,freestyle,400m,04:16.77,איילון שילו,"ממ""ג שורק אשדות יעקב",ISR,11/14/2006
+country,ISR,masters,25-29,male,25m,freestyle,50m,23.77,קלונטרוב זיו,הפועל כפר סבא ב. ב. לאומית,ISR,09/01/2026
+country,ISR,masters,25-29,male,25m,freestyle,800m,09:25.96,כהן שגיא,מכבי חיפה לאומית,ISR,12/17/2021
+country,ISR,masters,25-29,male,25m,individual_medley,100m,58.59,חוזמן אריאל,"מתנ""ס רמת הנגב לאומית",ISR,09/01/2026
+country,ISR,masters,25-29,male,25m,individual_medley,200m,02:11.74,קייזלר מכבי,חיפה לאומית,ISR,03/01/2025
+country,ISR,masters,25-29,male,25m,individual_medley,400m,05:15.19,קלמנסון לוטם,מאסטרס רחובות לאומית,ISR,2/23/2018
+country,ISR,masters,25-29,male,50m,backstroke,100m,59.83,מלכה אורן,מכבי חיפה לאומית,ISR,7/15/2023
+country,ISR,masters,25-29,male,50m,backstroke,200m,02:18.86,מלכה אורן,מכבי חיפה לאומית,ISR,7/14/2023
+country,ISR,masters,25-29,male,50m,backstroke,50m,27.70,מלכה אורן,מכבי חיפה לאומית,ISR,7/15/2023
+country,ISR,masters,25-29,male,50m,breaststroke,100m,01:06.99,חביב אמיר,הפועל בת ים לאומית,ISR,04/04/2025
+country,ISR,masters,25-29,male,50m,breaststroke,200m,02:39.04,דמבינסקי עומר,מכבי פ.מ. רעות מכון וינגייט,ISR,07/09/2010
+country,ISR,masters,25-29,male,50m,breaststroke,50m,29.63,רובינשטיין פליכס,ספורטן פתח-תקוה לאומית טוטו,ISR,09/06/2014
+country,ISR,masters,25-29,male,50m,butterfly,100m,59.08,פושקר ויטלי,הפועל ירושלים מכון וינגייט,ISR,7/15/2011
+country,ISR,masters,25-29,male,50m,butterfly,200m,02:19.55,דגש רומן,מכבי חיפה מכון וינגייט,ISR,7/21/2012
+country,ISR,masters,25-29,male,50m,butterfly,50m,25.81,פושקר ויטלי,הפועל ירושלים מכון וינגייט,ISR,07/09/2010
+country,ISR,masters,25-29,male,50m,freestyle,100m,53.74,קיזלר מכבי,חיפה לאומית,ISR,7/26/2024
+country,ISR,masters,25-29,male,50m,freestyle,1500m,19:10.58,עופר אמיר,מכבי פ.מ. רעות מכון וינגייט,ISR,07/10/2012
+country,ISR,masters,25-29,male,50m,freestyle,200m,02:05.45,מלכינסון שיר,הפועל מ.א. משגב לאומית טוטו,ISR,05/12/2017
+country,ISR,masters,25-29,male,50m,freestyle,400m,04:25.34,דגש רומן,חיפה מכון וינגייט,ISR,7/26/2013
+country,ISR,masters,25-29,male,50m,freestyle,50m,24.30,זילברמן גלעד,מכבי קרית-ביאליק מכון וינגייט,ISR,07/09/2010
+country,ISR,masters,25-29,male,50m,freestyle,800m,09:30.49,שחקלדיאן אמיל,שחייני מאסטרס לאומית טוטו,ISR,5/13/2017
+country,ISR,masters,25-29,male,50m,individual_medley,200m,02:14.37,קיזלר מכבי,חיפה לאומית,ISR,7/15/2023
+country,ISR,masters,25-29,male,50m,individual_medley,400m,05:14.38,קימל אלון,מכבי פ.מ. רעות לאומית טוטו,ISR,7/31/2015
+country,ISR,masters,30-34,female,25m,backstroke,100m,01:03.22,גוסטמלסקי אניה,הפועל דולפין נתניה אולימפית,ISR,02/07/2014
+country,ISR,masters,30-34,female,25m,backstroke,200m,02:39.73,רותם תמר,הפועל עולם המים בית-אייל,ISR,3/13/2013
+country,ISR,masters,30-34,female,25m,backstroke,50m,30.52,גוסטמלסקי אניה,הפועל דולפין נתניה אולימפית,ISR,02/07/2014
+country,ISR,masters,30-34,female,25m,breaststroke,100m,01:16.29,בנפשי ענת,מכבי עולם המים לאומית,ISR,02/04/2023
+country,ISR,masters,30-34,female,25m,breaststroke,200m,03:00.98,שץ מיקה,הפועל גליל עליון אולימפית,ISR,02/09/2014
+country,ISR,masters,30-34,female,25m,breaststroke,50m,34.42,בנפשי ענת,מכבי עולם המים לאומית,ISR,02/03/2023
+country,ISR,masters,30-34,female,25m,butterfly,100m,01:09.56,בירקאן ליאור,הפועל ירושלים,ISR,10/20/1993
+country,ISR,masters,30-34,female,25m,butterfly,200m,02:43.25,מרמור טל,הפועל עולם המים לאומית,ISR,2/28/2015
+country,ISR,masters,30-34,female,25m,butterfly,50m,28.55,גוסטמלסקי אניה,הפועל דולפין נתניה אולימפית,ISR,02/07/2014
+country,ISR,masters,30-34,female,25m,freestyle,100m,01:01.38,בנפשי ענת,מכבי עולם המים לאומית,ISR,04/01/2025
+country,ISR,masters,30-34,female,25m,freestyle,1500m,23:14.82,דאון מויאל,ימית מאסטרס כפר שמריהו וינגייט,ISR,2/21/2015
+country,ISR,masters,30-34,female,25m,freestyle,200m,02:13.34,בנפשי ענת,מכבי עולם המים לאומית,ISR,03/01/2025
+country,ISR,masters,30-34,female,25m,freestyle,400m,04:49.52,בנפשי ענת,מכבי עולם המים לאומית,ISR,03/01/2025
+country,ISR,masters,30-34,female,25m,freestyle,50m,26.28,גוסטמלסקי אניה,הפועל דולפין נתניה אולימפית,ISR,02/07/2014
+country,ISR,masters,30-34,female,25m,freestyle,800m,10:46.33,אלול שני,מאסטרס רחובות לאומית,ISR,2/24/2018
+country,ISR,masters,30-34,female,25m,individual_medley,100m,01:08.48,בנפשי ענת,מכבי עולם המים לאומית,ISR,02/03/2023
+country,ISR,masters,30-34,female,25m,individual_medley,200m,02:29.85,בנפשי ענת,מכבי עולם המים לאומית,ISR,02/04/2023
+country,ISR,masters,30-34,female,25m,individual_medley,400m,05:49.48,מרמור טל,הפועל עולם המים וינגייט,ISR,2/21/2015
+country,ISR,masters,30-34,female,50m,backstroke,100m,01:10.08,פאור עדינה,הפועל ירושלים סלובניה,ISR,08/02/2007
+country,ISR,masters,30-34,female,50m,backstroke,200m,02:35.60,פאור עדינה,הפועל ירושלים סלובניה,ISR,08/02/2007
+country,ISR,masters,30-34,female,50m,backstroke,50m,32.39,פאור עדינה,הפועל ירושלים סלובניה,ISR,08/02/2007
+country,ISR,masters,30-34,female,50m,breaststroke,100m,01:21.00,כהן ליאב,"מכבי פ.מ. רעות GBR London,",ISR,5/26/2016
+country,ISR,masters,30-34,female,50m,breaststroke,200m,02:57.60,כהן ליאב,"מכבי פ.מ. רעות GBR London,",ISR,5/29/2016
+country,ISR,masters,30-34,female,50m,breaststroke,50m,37.11,מוסקונה שני,מאסטרס רחובות לאומית,ISR,7/20/2019
+country,ISR,masters,30-34,female,50m,butterfly,100m,01:10.53,גוטמן מאירי,זיוית מכבי חיפה מכון וינגייט,ISR,7/20/2012
+country,ISR,masters,30-34,female,50m,butterfly,200m,02:39.47,גוטמן מאירי,זיוית מכבי חיפה מכון וינגייט,ISR,7/21/2012
+country,ISR,masters,30-34,female,50m,butterfly,50m,30.60,קרטין ליהי,מכבי עולם המים לאומית,ISR,7/26/2024
+country,ISR,masters,30-34,female,50m,freestyle,100m,01:04.78,גוטמן מאירי,זיוית מכבי חיפה מכון וינגייט,ISR,7/20/2012
+country,ISR,masters,30-34,female,50m,freestyle,1500m,28:27.67,נטף יונית,הפועל עמק-יזרעאל/נ.ע.ג לאומית טוטו,ISR,08/01/2015
+country,ISR,masters,30-34,female,50m,freestyle,200m,02:19.99,טרוביצין אסתר,SWIM TLV לאומית,ISR,04/04/2025
+country,ISR,masters,30-34,female,50m,freestyle,400m,04:55.76,טרוביצין אסתר,SWIM TLV לאומית,ISR,04/04/2025
+country,ISR,masters,30-34,female,50m,freestyle,50m,28.62,גוסטמלסקי אניה,הפועל דולפין נתניה לאומית טוטו,ISR,08/01/2015
+country,ISR,masters,30-34,female,50m,freestyle,800m,10:16.58,גוטמן מאירי,זיוית מכבי חיפה מכון וינגייט,ISR,07/10/2012
+country,ISR,masters,30-34,female,50m,individual_medley,200m,02:38.98,פאור עדינה,הפועל ירושלים סלובניה,ISR,8/28/2007
+country,ISR,masters,30-34,female,50m,individual_medley,400m,06:00.74,ביכמן עדי,מכבי שוהם לאומית טוטו,ISR,07/01/2016
+country,ISR,masters,30-34,male,25m,backstroke,100m,56.89,קופלב יהונתן,מכבי חיפה לאומית,ISR,12/17/2021
+country,ISR,masters,30-34,male,25m,backstroke,200m,02:13.35,רויחל סלבו,אסא תל-אביב לאומית,ISR,2/14/2020
+country,ISR,masters,30-34,male,25m,backstroke,50m,24.51,טומרקין יעקב,מכבי אשדוד לאומית,ISR,04/05/2024
+country,ISR,masters,30-34,male,25m,breaststroke,100m,01:05.87,שגלוב ירון,מכבי חיפה לאומית,ISR,02/04/2023
+country,ISR,masters,30-34,male,25m,breaststroke,200m,02:32.66,דמבינסקי עומר,מכבי פ.מ. רעות לאומית,ISR,2/27/2015
+country,ISR,masters,30-34,male,25m,breaststroke,50m,28.90,זוסמן ערן,הפועל דולפין נתניה לאומית,ISR,2/28/2015
+country,ISR,masters,30-34,male,25m,butterfly,100m,56.01,בלחסן ויקטור,מכבי חיפה לאומית,ISR,04/05/2024
+country,ISR,masters,30-34,male,25m,butterfly,200m,02:10.38,קציר דניאל,הפועל עמק-יזרעאל/נ.ע.ג לאומית,ISR,2/28/2015
+country,ISR,masters,30-34,male,25m,butterfly,50m,24.77,בלחסן ויקטור,מכבי חיפה לאומית,ISR,04/05/2024
+country,ISR,masters,30-34,male,25m,freestyle,100m,51.47,בלחסן ויקטור,מכבי חיפה לאומית,ISR,04/05/2024
+country,ISR,masters,30-34,male,25m,freestyle,1500m,17:33.68,עופר אמיר,מכבי פ.מ. רעות וינגייט,ISR,2/21/2015
+country,ISR,masters,30-34,male,25m,freestyle,200m,01:58.02,קציר דניאל,הפועל עמק-יזרעאל/נ.ע.ג לאומית,ISR,2/27/2015
+country,ISR,masters,30-34,male,25m,freestyle,400m,04:13.40,קציר דניאל,מכבי קרית ביאליק לאומית,ISR,2/24/2018
+country,ISR,masters,30-34,male,25m,freestyle,50m,22.99,בלחסן ויקטור,מכבי חיפה לאומית,ISR,04/06/2024
+country,ISR,masters,30-34,male,25m,freestyle,800m,08:50.25,קציר דניאל,מכבי קרית ביאליק לאומית,ISR,2/24/2018
+country,ISR,masters,30-34,male,25m,individual_medley,100m,54.79,טומרקין יעקב,מכבי אשדוד לאומית,ISR,04/05/2024
+country,ISR,masters,30-34,male,25m,individual_medley,200m,02:11.61,קופלב יהונתן,מכבי חיפה לאומית,ISR,12/18/2021
+country,ISR,masters,30-34,male,25m,individual_medley,400m,04:48.81,קציר דניאל,מכבי קרית ביאליק לאומית,ISR,2/23/2018
+country,ISR,masters,30-34,male,50m,backstroke,100m,59.75,קופלב יהונתן,מכבי חיפה לאומית,ISR,08/06/2021
+country,ISR,masters,30-34,male,50m,backstroke,200m,02:22.67,קרוטס גיא,מכבי עמותת השחייה שוהם לאומית טוטו,ISR,5/13/2017
+country,ISR,masters,30-34,male,50m,backstroke,50m,26.17,קופלב יהונתן,מכבי חיפה לאומית,ISR,08/06/2021
+country,ISR,masters,30-34,male,50m,breaststroke,100m,01:12.44,שחף אסף,הפועל המרכז הישראלי מכון וינגייט,ISR,07/09/2010
+country,ISR,masters,30-34,male,50m,breaststroke,200m,02:43.92,דמבינסקי עומר,מכבי פ.מ. רעות לאומית טוטו,ISR,7/31/2015
+country,ISR,masters,30-34,male,50m,breaststroke,50m,30.47,זוסמן ערן,עולם המים לאומית,ISR,7/20/2019
+country,ISR,masters,30-34,male,50m,butterfly,100m,01:02.17,קציר דניאל,מכבי קרית ביאליק לאומית טוטו,ISR,05/12/2017
+country,ISR,masters,30-34,male,50m,butterfly,200m,02:11.27,קציר דניאל,מכבי קרית ביאליק לאומית,ISR,4/16/2016
+country,ISR,masters,30-34,male,50m,butterfly,50m,26.73,קופלב יהונתן,מכבי חיפה לאומית,ISR,03/12/2022
+country,ISR,masters,30-34,male,50m,freestyle,100m,53.68,קופלב יהונתן,מכבי חיפה לאומית,ISR,08/06/2021
+country,ISR,masters,30-34,male,50m,freestyle,1500m,17:49.06,קציר דניאל,הפועל עמק-יזרעאל/נ.ע.ג לאומית טוטו,ISR,08/01/2015
+country,ISR,masters,30-34,male,50m,freestyle,200m,02:00.45,קציר דניאל,"הפועל עמק-יזרעאל/נ.ע.ג RUS Kazan,",ISR,08/12/2015
+country,ISR,masters,30-34,male,50m,freestyle,400m,04:17.96,קציר דניאל,"הפועל עמק-יזרעאל/נ.ע.ג RUS Kazan,",ISR,8/14/2015
+country,ISR,masters,30-34,male,50m,freestyle,50m,24.51,קופלב יהונתן,מכבי חיפה לאומית,ISR,08/06/2021
+country,ISR,masters,30-34,male,50m,freestyle,800m,08:51.62,קציר דניאל,"הפועל עמק-יזרעאל/נ.ע.ג RUS Kazan,",ISR,08/10/2015
+country,ISR,masters,30-34,male,50m,individual_medley,200m,02:18.94,קציר דניאל,"הפועל עמק-יזרעאל/נ.ע.ג RUS Kazan,",ISR,8/14/2015
+country,ISR,masters,30-34,male,50m,individual_medley,400m,04:53.61,קציר דניאל,מכבי קרית ביאליק לאומית,ISR,04/09/2016
+country,ISR,masters,35-39,female,25m,backstroke,100m,01:08.89,נטליה אדייקינה,מכבי חיפה לאומית,ISR,03/01/2025
+country,ISR,masters,35-39,female,25m,backstroke,200m,02:32.30,גזית מיכל,הפועל שחייני הנגב לאומית,ISR,2/14/2020
+country,ISR,masters,35-39,female,25m,backstroke,50m,30.73,נטליה אדייקינה,מכבי חיפה לאומית,ISR,04/01/2025
+country,ISR,masters,35-39,female,25m,breaststroke,100m,01:18.53,טבת אילנה,הפועל עירוני הוד השרון אולימפית,ISR,02/07/2014
+country,ISR,masters,35-39,female,25m,breaststroke,200m,02:57.84,מוסקונה שני,מכבי עולם המים לאומית,ISR,12/17/2021
+country,ISR,masters,35-39,female,25m,breaststroke,50m,36.87,מוסקונה שני,מאסטרס רחובות לאומית,ISR,2/15/2020
+country,ISR,masters,35-39,female,25m,butterfly,100m,01:07.69,בירקאן ליאור,הפועל ירושלים ירושלים,ISR,10/20/2001
+country,ISR,masters,35-39,female,25m,butterfly,200m,02:30.60,גוטמן מאירי,זיוית מכבי חיפה לאומית,ISR,2/28/2015
+country,ISR,masters,35-39,female,25m,butterfly,50m,31.15,בירקאן ליאור,הפועל ירושלים ירושלים,ISR,10/20/2001
+country,ISR,masters,35-39,female,25m,freestyle,100m,01:03.03,גוטמן מאירי,זיוית מכבי חיפה אולימפית,ISR,02/07/2014
+country,ISR,masters,35-39,female,25m,freestyle,200m,02:16.42,גוטמן מאירי,זיוית מכבי חיפה בית-אייל,ISR,2/22/2013
+country,ISR,masters,35-39,female,25m,freestyle,400m,04:41.59,גוטמן מאירי,זיוית מכבי חיפה לאומית,ISR,2/28/2015
+country,ISR,masters,35-39,female,25m,freestyle,50m,28.20,אדייקינה נטליה,מכבי חיפה לאומית,ISR,04/01/2025
+country,ISR,masters,35-39,female,25m,freestyle,800m,09:41.90,גוטמן מאירי,זיוית מכבי חיפה וינגייט,ISR,2/28/2015
+country,ISR,masters,35-39,female,25m,individual_medley,100m,01:11.81,פאור עדינה,בני הרצליה בית-אייל,ISR,2/22/2013
+country,ISR,masters,35-39,female,25m,individual_medley,200m,02:39.77,פאור עדינה,בני הרצליה בית-אייל,ISR,2/22/2013
+country,ISR,masters,35-39,female,25m,individual_medley,400m,05:49.78,גזית מיכל,הפועל שחייני הנגב לאומית,ISR,2/14/2020
+country,ISR,masters,35-39,female,50m,backstroke,100m,01:11.44,פאור עדינה,בני-הרצליה אוקראינה,ISR,09/09/2011
+country,ISR,masters,35-39,female,50m,backstroke,200m,02:34.93,פאור עדינה,בני-הרצליה אוקראינה,ISR,09/08/2011
+country,ISR,masters,35-39,female,50m,backstroke,50m,32.36,אדייקינה נטליה,מכבי חיפה לאומית,ISR,05/04/2025
+country,ISR,masters,35-39,female,50m,breaststroke,100m,01:24.72,מוסקונה שני,מכבי עולם המים לאומית,ISR,08/07/2021
+country,ISR,masters,35-39,female,50m,breaststroke,200m,03:07.51,מוסקונה שני,מכבי עולם המים לאומית,ISR,08/06/2021
+country,ISR,masters,35-39,female,50m,breaststroke,50m,37.33,מוסקונה שני,מכבי עולם המים לאומית,ISR,08/06/2021
+country,ISR,masters,35-39,female,50m,butterfly,100m,01:08.79,אלוני סהר,עולם המים מכון וינגייט,ISR,7/25/2013
+country,ISR,masters,35-39,female,50m,butterfly,200m,02:32.89,בירקאן ליאור,הפועל ירושלים פאלמה דה מאיורקה,ISR,04/01/2001
+country,ISR,masters,35-39,female,50m,butterfly,50m,30.17,אלוני סהר,עולם המים מכון וינגייט,ISR,7/26/2013
+country,ISR,masters,35-39,female,50m,freestyle,100m,01:05.08,גוטמן מאירי,זיוית חיפה בריכת טוטו מכבייה,ISR,7/13/2017
+country,ISR,masters,35-39,female,50m,freestyle,1500m,19:22.36,גוטמן מאירי,זיוית מכבי חיפה לאומית טוטו,ISR,08/01/2015
+country,ISR,masters,35-39,female,50m,freestyle,200m,02:18.19,גוטמן מאירי,זיוית מכבי חיפה לאומית טוטו,ISR,7/31/2015
+country,ISR,masters,35-39,female,50m,freestyle,400m,04:46.30,גוטמן מאירי,"זיוית מכבי חיפה RUS Kazan,",ISR,8/15/2015
+country,ISR,masters,35-39,female,50m,freestyle,50m,29.15,אלוני סהר,עולם המים מכון וינגייט,ISR,7/25/2013
+country,ISR,masters,35-39,female,50m,freestyle,800m,09:47.36,גוטמן מאירי,"זיוית מכבי חיפה RUS Kazan,",ISR,08/10/2015
+country,ISR,masters,35-39,female,50m,individual_medley,200m,02:41.97,ביכמן עדי,מכבי שוהם לאומית,ISR,7/14/2018
+country,ISR,masters,35-39,female,50m,individual_medley,400m,05:47.47,ביכמן עדי,מכבי שוהם לאומית,ISR,7/14/2018
+country,ISR,masters,35-39,male,25m,backstroke,100m,57.75,קופלב יהונתן,מכבי עולם המים לאומית,ISR,09/01/2026
+country,ISR,masters,35-39,male,25m,backstroke,200m,02:12.16,אושרי בן,SWIM TLV לאומית,ISR,2/24/2018
+country,ISR,masters,35-39,male,25m,backstroke,50m,25.88,קופלב יהונתן,מכבי עולם המים לאומית,ISR,10/01/2026
+country,ISR,masters,35-39,male,25m,breaststroke,100m,01:05.40,זוסמן ערן,מכבי עולם המים לאומית,ISR,12/18/2021
+country,ISR,masters,35-39,male,25m,breaststroke,200m,02:29.45,לוין יורי,מועדון ספורט דניה לאומית,ISR,04/05/2024
+country,ISR,masters,35-39,male,25m,breaststroke,50m,28.70,זוסמן ערן,מכבי עולם המים לאומית,ISR,12/19/2022
+country,ISR,masters,35-39,male,25m,butterfly,100m,57.46,פיינברג עידו,שחייני מאסטרס לאומית,ISR,2/16/2019
+country,ISR,masters,35-39,male,25m,butterfly,200m,02:13.27,קציר דניאל,מכבי חיפה לאומית,ISR,02/04/2023
+country,ISR,masters,35-39,male,25m,butterfly,50m,26.30,זוסמן ערן,מכבי עולם המים לאומית,ISR,04/05/2024
+country,ISR,masters,35-39,male,25m,freestyle,100m,51.99,קופלב יהונתן,מכבי עולם המים לאומית,ISR,10/01/2026
+country,ISR,masters,35-39,male,25m,freestyle,200m,01:57.61,קופלב יהונתן,מכבי עולם המים לאומית,ISR,09/01/2026
+country,ISR,masters,35-39,male,25m,freestyle,400m,04:14.10,קציר דניאל,מכבי חיפה לאומית,ISR,12/19/2022
+country,ISR,masters,35-39,male,25m,freestyle,50m,24.47,וייס זוהר,אקוותיקים גבעת-חיים ירושלים,ISR,10/19/2000
+country,ISR,masters,35-39,male,25m,freestyle,800m,08:50.13,קציר דניאל,מכבי חיפה לאומית,ISR,12/19/2022
+country,ISR,masters,35-39,male,25m,individual_medley,100m,59.23,זוסמן ערן,מכבי עולם המים לאומית,ISR,12/18/2021
+country,ISR,masters,35-39,male,25m,individual_medley,200m,02:15.54,קציר דניאל,הפועל עמק יזרעאל לאומית,ISR,2/15/2020
+country,ISR,masters,35-39,male,25m,individual_medley,400m,04:46.77,קציר דניאל,הפועל עמק יזרעאל לאומית,ISR,8/19/2020
+country,ISR,masters,35-39,male,50m,backstroke,100m,01:06.69,וייזר שי,עולם המים לאומית טוטו,ISR,07/01/2016
+country,ISR,masters,35-39,male,50m,backstroke,200m,02:18.72,אושרי בן,SWIM TLV לאומית,ISR,7/13/2018
+country,ISR,masters,35-39,male,50m,backstroke,50m,28.15,פיינברג עידו,SWIM TLV לאומית,ISR,7/19/2019
+country,ISR,masters,35-39,male,50m,breaststroke,100m,01:09.06,זוסמן ערן,מכבי עולם המים לאומית,ISR,7/14/2023
+country,ISR,masters,35-39,male,50m,breaststroke,200m,02:33.58,לוין יורי,מועדון ספורט דניה לאומית,ISR,7/21/2022
+country,ISR,masters,35-39,male,50m,breaststroke,50m,29.52,זוסמן ערן,מכבי עולם המים לאומית,ISR,08/06/2021
+country,ISR,masters,35-39,male,50m,butterfly,100m,58.29,פיינברג עידו,SWIM TLV לאומית,ISR,7/20/2019
+country,ISR,masters,35-39,male,50m,butterfly,200m,02:16.23,קציר דניאל,"מכבי חיפה רומא, איטליה",ISR,09/02/2022
+country,ISR,masters,35-39,male,50m,butterfly,50m,25.87,פיינברג עידו,SWIM TLV לאומית,ISR,7/19/2019
+country,ISR,masters,35-39,male,50m,freestyle,100m,57.40,זוסמן ערן,מכבי עולם המים לאומית,ISR,08/06/2021
+country,ISR,masters,35-39,male,50m,freestyle,100m,57.40,קציר דניאל,מכבי חיפה לאומית,ISR,7/21/2022
+country,ISR,masters,35-39,male,50m,freestyle,1500m,17:44.55,קציר דניאל,מכבי חיפה לאומית,ISR,18/07/2023
+country,ISR,masters,35-39,male,50m,freestyle,200m,02:02.12,קציר דניאל,מכבי חיפה לאומית,ISR,08/07/2021
+country,ISR,masters,35-39,male,50m,freestyle,400m,04:19.36,קציר דניאל,מכבי חיפה לאומית,ISR,7/21/2021
+country,ISR,masters,35-39,male,50m,freestyle,50m,25.16,שטרן משה,מאסטרס רחובות לאומית,ISR,7/20/2019
+country,ISR,masters,35-39,male,50m,freestyle,800m,08:58.31,קציר דניאל,מכבי חיפה לאומית,ISR,7/23/2021
+country,ISR,masters,35-39,male,50m,individual_medley,200m,02:15.61,חליקה מיכאל,ירושלים מכון וינגייט,ISR,7/25/2013
+country,ISR,masters,35-39,male,50m,individual_medley,400m,04:57.49,חליקה מיכאל,הפועל ירושלים לאומית טוטו,ISR,7/31/2015
+country,ISR,masters,40-44,female,25m,backstroke,100m,01:05.42,גוסטמלסקי אניה,מכבי עולם המים לאומית,ISR,04/06/2024
+country,ISR,masters,40-44,female,25m,backstroke,200m,02:38.03,פאור עדינה,מכבי שוהם בית-אייל,ISR,2/22/2016
+country,ISR,masters,40-44,female,25m,backstroke,50m,30.22,גוסטמלסקי אניה,מכבי עולם המים לאומית,ISR,04/05/2024
+country,ISR,masters,40-44,female,25m,breaststroke,100m,01:23.28,מוסקונה שני,מכבי עולם המים לאומית,ISR,10/01/2026
+country,ISR,masters,40-44,female,25m,breaststroke,200m,03:00.19,מרן רעות,אקוותיקים לאומית,ISR,04/05/2024
+country,ISR,masters,40-44,female,25m,breaststroke,50m,37.62,מוסקונה שני,מכבי עולם המים לאומית,ISR,09/01/2026
+country,ISR,masters,40-44,female,25m,butterfly,100m,01:10.52,סגל דורי,עדי מכבי חיפה לאומית,ISR,02/03/2023
+country,ISR,masters,40-44,female,25m,butterfly,200m,02:46.85,גוטמן מאירי,זיוית אקוותיקים גבעת-חיים לאומית,ISR,
+country,ISR,masters,40-44,female,25m,butterfly,50m,28.66,גוסטמלסקי אניה,מכבי עולם המים לאומית,ISR,
+country,ISR,masters,40-44,female,25m,freestyle,100m,01:05.12,פסמני אולגה,מאסטרס רחובות אולימפית,ISR,02/07/2014
+country,ISR,masters,40-44,female,25m,freestyle,1500m,20:44.73,טורק אבישג,הפועל עולם המים וינגייט,ISR,2/21/2015
+country,ISR,masters,40-44,female,25m,freestyle,200m,02:17.41,סגל דורי,עדי מכבי חיפה לאומית,ISR,02/04/2023
+country,ISR,masters,40-44,female,25m,freestyle,400m,05:03.98,מיטל עינת,Nemos TLV לאומית,ISR,02/04/2023
+country,ISR,masters,40-44,female,25m,freestyle,50m,27.09,גוסטמלסקי אניה,מכבי עולם המים לאומית,ISR,02/04/2023
+country,ISR,masters,40-44,female,25m,freestyle,800m,10:17.85,גוטמן מאירי,זיוית אקוותיקים גבעת-חיים לאומית,ISR,2/24/2018
+country,ISR,masters,40-44,female,25m,individual_medley,100m,01:13.91,פאור עדינה,מכבי שוהם בית-אייל,ISR,2/22/2016
+country,ISR,masters,40-44,female,25m,individual_medley,200m,02:43.31,פסמני אולגה,שירותי בריאות כללית עירונית אילת,ISR,10/23/2014
+country,ISR,masters,40-44,female,25m,individual_medley,400m,05:49.45,גוטמן מאירי,זיוית אקוותיקים גבעת-חיים לאומית,ISR,03/04/2018
+country,ISR,masters,40-44,female,50m,backstroke,100m,01:10.92,גוסטמלסקי אניה,מכבי עולם המים לאומית,ISR,04/04/2025
+country,ISR,masters,40-44,female,50m,backstroke,200m,02:41.98,פאור עדינה,מכבי שוהם סלובניה,ISR,09/06/2018
+country,ISR,masters,40-44,female,50m,backstroke,50m,31.87,גוסטמלסקי אניה,מכבי עולם המים לאומית,ISR,7/14/2023
+country,ISR,masters,40-44,female,50m,breaststroke,100m,01:25.80,מרן רעות,אקוותיקים פוקואוקה יפן,ISR,08/06/2023
+country,ISR,masters,40-44,female,50m,breaststroke,200m,03:04.29,מרן רעות,אקוותיקים לאומית,ISR,7/26/2024
+country,ISR,masters,40-44,female,50m,breaststroke,50m,38.97,רביב תמר,ירושלים מכון וינגייט,ISR,7/25/2013
+country,ISR,masters,40-44,female,50m,butterfly,100m,01:15.61,גוטמן מאירי,זיוית אקוותיקים לאומית,ISR,6/17/2022
+country,ISR,masters,40-44,female,50m,butterfly,200m,02:49.00,גוטמן מאירי,זיוית אקוותיקים ריצ׳מונד ורג׳יניה,ISR,08/03/2022
+country,ISR,masters,40-44,female,50m,butterfly,50m,28.87,גוסטמלסקי אניה,מכבי עולם המים לאומית,ISR,7/14/2023
+country,ISR,masters,40-44,female,50m,freestyle,100m,01:01.46,גוסטמלסקי אניה,מכבי עולם המים לאומית,ISR,7/26/2024
+country,ISR,masters,40-44,female,50m,freestyle,1500m,20:01.65,גוטמן מאירי,זיוית אקוותיקים ריצ׳מונד ורג׳יניה,ISR,08/03/2022
+country,ISR,masters,40-44,female,50m,freestyle,200m,02:21.69,דקל אילנה,אקוותיקים לאומית,ISR,7/27/2024
+country,ISR,masters,40-44,female,50m,freestyle,400m,05:05.86,גוטמן מאירי,זיוית אקוותיקים לאומית,ISR,7/22/2022
+country,ISR,masters,40-44,female,50m,freestyle,400m,05:05.86,מיטל עינת,Nemos TLV לאומית,ISR,7/22/2022
+country,ISR,masters,40-44,female,50m,freestyle,50m,27.97,גוסטמלסקי אניה,מכבי עולם המים לאומית,ISR,7/15/2023
+country,ISR,masters,40-44,female,50m,freestyle,800m,10:41.24,גוטמן מאירי,זיוית אקוותיקים ריצ׳מונד ורג׳יניה,ISR,08/03/2022
+country,ISR,masters,40-44,female,50m,individual_medley,200m,02:47.77,פסמני אולגה,מאסטרס רחובות לאומית טוטו,ISR,08/01/2015
+country,ISR,masters,40-44,female,50m,individual_medley,400m,06:10.20,גוטמן מאירי,זיוית אקוותיקים ריצ׳מונד ורג׳יניה,ISR,08/03/2022
+country,ISR,masters,40-44,male,25m,backstroke,100m,01:01.82,זוסמן ערן,מכבי עולם המים לאומית,ISR,09/01/2026
+country,ISR,masters,40-44,male,25m,backstroke,200m,02:18.98,קוטק אריק,עולם המים לאומית,ISR,2/15/2019
+country,ISR,masters,40-44,male,25m,backstroke,50m,29.22,קרבקוב איגור,הפועל דולפין נהריה,ISR,10/19/1998
+country,ISR,masters,40-44,male,25m,breaststroke,100m,01:06.17,זוסמן ערן,מכבי עולם המים לאומית,ISR,04/01/2025
+country,ISR,masters,40-44,male,25m,breaststroke,200m,02:31.12,הר-שי לירון,מכבי עולם המים לאומית,ISR,04/05/2024
+country,ISR,masters,40-44,male,25m,breaststroke,50m,29.24,זוסמן ערן,מכבי עולם המים לאומית,ISR,03/01/2025
+country,ISR,masters,40-44,male,25m,butterfly,100m,59.04,זוסמן ערן,מכבי עולם המים לאומית,ISR,09/01/2026
+country,ISR,masters,40-44,male,25m,butterfly,200m,02:14.48,קציר דניאל,"מכבי חיפה לובלין, פולין",ISR,13/12/2025
+country,ISR,masters,40-44,male,25m,butterfly,50m,26.44,זוסמן ערן,מכבי עולם המים לאומית,ISR,10/01/2026
+country,ISR,masters,40-44,male,25m,freestyle,100m,54.30,וייס זוהר,אקוותיקים גבעת-חיים עירונית אילת,ISR,10/27/2004
+country,ISR,masters,40-44,male,25m,freestyle,1500m,18:46.45,סלע אורי,הפועל עולם המים וינגייט,ISR,2/21/2015
+country,ISR,masters,40-44,male,25m,freestyle,200m,01:58.64,וייס זוהר,אקוותיקים גבעת-חיים גבעת חיים,ISR,10/19/2003
+country,ISR,masters,40-44,male,25m,freestyle,400m,04:14.81,קציר דניאל,"מכבי חיפה לובלין, פולין",ISR,13/12/2025
+country,ISR,masters,40-44,male,25m,freestyle,50m,24.49,שטרן משה,מכבי עולם המים לאומית,ISR,02/04/2023
+country,ISR,masters,40-44,male,25m,freestyle,800m,08:48.97,קציר דניאל,"מכבי חיפה לובלין, פולין",ISR,10/12/2025
+country,ISR,masters,40-44,male,25m,individual_medley,100m,59.31,זוסמן ערן,מכבי עולם המים לאומית,ISR,03/01/2025
+country,ISR,masters,40-44,male,25m,individual_medley,200m,02:18.98,הר-שי לירון,עולם המים לאומית,ISR,3/19/2021
+country,ISR,masters,40-44,male,25m,individual_medley,400m,04:57.17,קציר דניאל,מכבי חיפה לאומית,ISR,04/01/2025
+country,ISR,masters,40-44,male,50m,backstroke,100m,01:06.14,זוסמן ערן,עולם המים לאומית,ISR,04/04/2025
+country,ISR,masters,40-44,male,50m,backstroke,200m,02:27.29,קוטק אריק,עולם המים לאומית,ISR,7/13/2018
+country,ISR,masters,40-44,male,50m,backstroke,50m,28.61,פיינברג עידו,בני הרצליה לאומית,ISR,7/14/2023
+country,ISR,masters,40-44,male,50m,breaststroke,100m,01:13.53,הר-שי לירון,מכבי עולם המים לאומית,ISR,7/20/2022
+country,ISR,masters,40-44,male,50m,breaststroke,200m,02:40.83,הר-שי לירון,מכבי עולם המים לאומית,ISR,7/26/2024
+country,ISR,masters,40-44,male,50m,breaststroke,50m,30.16,זוסמן ערן,מכבי עולם המים לאומית,ISR,04/04/2025
+country,ISR,masters,40-44,male,50m,butterfly,100m,01:00.78,פיינברג עידו,בני הרצליה לאומית,ISR,7/15/2023
+country,ISR,masters,40-44,male,50m,butterfly,200m,02:16.51,טיטינשניידר רומן,הפועל עולם המים איטליה,ISR,6/16/2012
+country,ISR,masters,40-44,male,50m,butterfly,50m,27.57,זילברברג אהוד,מכבי פ.מ. רעות מכון וינגייט,ISR,7/20/2012
+country,ISR,masters,40-44,male,50m,freestyle,100m,57.50,שטרן משה,מכבי עולם המים לאומית,ISR,03/11/2022
+country,ISR,masters,40-44,male,50m,freestyle,1500m,19:04.15,סלע אורי,הפועל עולם המים לאומית טוטו,ISR,08/01/2015
+country,ISR,masters,40-44,male,50m,freestyle,200m,02:07.81,קציר דניאל,מכבי חיפה לאומית,ISR,04/04/2025
+country,ISR,masters,40-44,male,50m,freestyle,400m,04:28.00,קציר דניאל,מכבי חיפה לאומית,ISR,04/04/2025
+country,ISR,masters,40-44,male,50m,freestyle,50m,25.20,שטרן משה,מכבי עולם המים לאומית,ISR,03/11/2022
+country,ISR,masters,40-44,male,50m,freestyle,800m,10:00.40,סלע אורי,עולם המים לאומית טוטו,ISR,6/30/2016
+country,ISR,masters,40-44,male,50m,individual_medley,200m,02:24.91,טיטינשניידר רומן,מכבי שוהם לאומית טוטו,ISR,07/01/2016
+country,ISR,masters,40-44,male,50m,individual_medley,400m,05:12.50,ליפשיץ יוחאי,אקוותיקים גבעת-חיים וינגייט,ISR,08/06/2007
+country,ISR,masters,45-49,female,25m,backstroke,100m,01:06.36,גוסטמלסקי אניה,מכבי עולם המים לאומית,ISR,09/01/2026
+country,ISR,masters,45-49,female,25m,backstroke,200m,02:43.01,פאור עדינה,מכבי שוהם לאומית,ISR,02/04/2023
+country,ISR,masters,45-49,female,25m,backstroke,50m,30.25,גוסטמלסקי אניה,מכבי עולם המים לאומית,ISR,09/01/2026
+country,ISR,masters,45-49,female,25m,backstroke,50m,33.19,פאור עדינה,מכבי שוהם לאומית,ISR,
+country,ISR,masters,45-49,female,25m,breaststroke,100m,01:22.12,אפרתי אירית,מכבי שוהם לאומית,ISR,2/15/2019
+country,ISR,masters,45-49,female,25m,breaststroke,200m,03:01.14,אפרתי אירית,מכבי עמותת השחייה שהם לאומית,ISR,01/06/2017
+country,ISR,masters,45-49,female,25m,breaststroke,50m,38.03,אפרתי אירית,מכבי עמותת השחייה שהם לאומית,ISR,01/07/2017
+country,ISR,masters,45-49,female,25m,butterfly,100m,01:13.53,בירקאן ליאור,הפועל ירושלים בית-אייל,ISR,2/24/2012
+country,ISR,masters,45-49,female,25m,butterfly,200m,02:42.94,גוטמן מאירי,זיוית אקוותיקים לאומית,ISR,04/06/2024
+country,ISR,masters,45-49,female,25m,butterfly,50m,29.07,גוסטמלסקי אניה,מכבי עולם המים לאומית,ISR,10/01/2026
+country,ISR,masters,45-49,female,25m,freestyle,100m,01:04.26,פסמני אולגה,מאסטרס רחובות לאומית,ISR,2/15/2019
+country,ISR,masters,45-49,female,25m,freestyle,200m,02:19.41,גוטמן מאירי,זיוית אקוותיקים לאומית,ISR,02/04/2023
+country,ISR,masters,45-49,female,25m,freestyle,400m,04:56.03,נגלי איילת,WEST SWIM לאומית,ISR,2/15/2020
+country,ISR,masters,45-49,female,25m,freestyle,50m,27.23,גוסטמלסקי אניה,מכבי עולם המים לאומית,ISR,10/01/2026
+country,ISR,masters,45-49,female,25m,freestyle,800m,10:04.05,נגלי איילת,עולם המים לאומית,ISR,2/15/2019
+country,ISR,masters,45-49,female,25m,individual_medley,100m,01:13.73,פסמני אולגה,מאסטרס רחובות לאומית,ISR,2/15/2019
+country,ISR,masters,45-49,female,25m,individual_medley,200m,02:38.31,פסמני אולגה,מאסטרס רחובות לאומית,ISR,2/15/2020
+country,ISR,masters,45-49,female,25m,individual_medley,400m,05:52.45,גוטמן מאירי,זיוית אקוותיקים לאומית,ISR,02/04/2023
+country,ISR,masters,45-49,female,50m,backstroke,100m,01:14.40,פאור עדינה,מכבי שוהם לאומית,ISR,7/20/2019
+country,ISR,masters,45-49,female,50m,backstroke,200m,02:43.29,פאור עדינה,מכבי שוהם דרום קוריאה,ISR,8/13/2019
+country,ISR,masters,45-49,female,50m,backstroke,50m,33.97,פסמני אולגה,מכבי וייסגל רחובות לאומית,ISR,7/13/2018
+country,ISR,masters,45-49,female,50m,breaststroke,100m,01:23.07,אפרתי אירית,מכבי שוהם סלובניה,ISR,09/07/2018
+country,ISR,masters,45-49,female,50m,breaststroke,200m,03:02.98,אפרתי אירית,"מכבי שוהם GBR London,",ISR,5/29/2016
+country,ISR,masters,45-49,female,50m,breaststroke,50m,38.11,אפרתי אירית,מכבי שוהם סלובניה,ISR,09/03/2018
+country,ISR,masters,45-49,female,50m,butterfly,100m,01:12.13,בירקאן ליאור,הפועל ירושלים מכון וינגייט,ISR,7/22/2009
+country,ISR,masters,45-49,female,50m,butterfly,200m,02:50.88,גוטמן מאירי,זיוית אקוותיקים לאומית,ISR,7/15/2023
+country,ISR,masters,45-49,female,50m,butterfly,50m,32.13,בירקאן ליאור,הפועל ירושלים מכון וינגייט,ISR,7/20/2009
+country,ISR,masters,45-49,female,50m,freestyle,100m,01:03.83,פסמני אולגה,מכבי וייסגל רחובות לאומית,ISR,7/13/2018
+country,ISR,masters,45-49,female,50m,freestyle,200m,02:22.90,זילברברג מיכל,פ.מ. רעות בריכת טוטו מכבייה,ISR,07/12/2017
+country,ISR,masters,45-49,female,50m,freestyle,400m,04:58.11,קטן רונית,הפועל גליל עליון איטליה,ISR,6/16/2012
+country,ISR,masters,45-49,female,50m,freestyle,50m,29.73,פסמני אולגה,מאסטרס רחובות לאומית טוטו,ISR,5/13/2017
+country,ISR,masters,45-49,female,50m,freestyle,800m,10:18.63,נגלי איילת,עולם המים לאומית,ISR,7/13/2018
+country,ISR,masters,45-49,female,50m,individual_medley,200m,02:39.40,פסמני אולגה,מכבי וייסגל רחובות סלובניה,ISR,09/05/2018
+country,ISR,masters,45-49,female,50m,individual_medley,400m,05:49.07,קטן רונית,הפועל גליל עליון איטליה,ISR,06/12/2012
+country,ISR,masters,45-49,male,25m,backstroke,100m,01:03.51,קוטק אריק,WEST SWIM לאומית,ISR,2/15/2020
+country,ISR,masters,45-49,male,25m,backstroke,200m,02:17.65,קוטק אריק,WEST SWIM לאומית,ISR,2/14/2020
+country,ISR,masters,45-49,male,25m,backstroke,50m,29.36,קוטק אריק,WEST SWIM לאומית,ISR,2/15/2020
+country,ISR,masters,45-49,male,25m,breaststroke,100m,01:10.04,הר-שי לירון,"מכבי עולם המים לובלין, פולין",ISR,11/12/2025
+country,ISR,masters,45-49,male,25m,breaststroke,200m,02:32.19,הר-שי לירון,מכבי עולם המים לאומית,ISR,03/01/2025
+country,ISR,masters,45-49,male,25m,breaststroke,50m,30.05,בן חיים,"אסף SWIM TLV לובלין, פולין",ISR,10/12/2025
+country,ISR,masters,45-49,male,25m,butterfly,100m,01:02.77,זילברברג אהוד,מכבי פ.מ. רעות בית-אייל,ISR,2/22/2013
+country,ISR,masters,45-49,male,25m,butterfly,200m,02:21.01,טיטינשניידר רומן,מכבי שוהם לאומית,ISR,2/15/2019
+country,ISR,masters,45-49,male,25m,butterfly,50m,27.71,כהן אלי,עולם המים לאומית,ISR,3/19/2021
+country,ISR,masters,45-49,male,25m,freestyle,100m,55.72,שטרן משה,"מכבי עולם המים לובלין, פולין",ISR,14/12/2025
+country,ISR,masters,45-49,male,25m,freestyle,1500m,20:35.32,גרנות שגיא,אקוותיקים גבעת-חיים וינגייט,ISR,2/21/2015
+country,ISR,masters,45-49,male,25m,freestyle,200m,02:05.24,כהן אלי,עולם המים לאומית,ISR,3/20/2021
+country,ISR,masters,45-49,male,25m,freestyle,400m,04:33.63,טיטינשניידר רומן,מכבי עמותת השחייה שהם לאומית,ISR,01/07/2017
+country,ISR,masters,45-49,male,25m,freestyle,50m,25.16,שטרן משה,"מכבי עולם המים לובלין, פולין",ISR,13/12/2025
+country,ISR,masters,45-49,male,25m,freestyle,800m,09:18.22,חליקה מיכאל,הפועל עירוני מודיעין לאומית,ISR,04/05/2024
+country,ISR,masters,45-49,male,25m,individual_medley,100m,01:04.50,הר-שי לירון,"מכבי עולם המים לובלין, פולין",ISR,10/12/2025
+country,ISR,masters,45-49,male,25m,individual_medley,200m,02:20.14,הר-שי לירון,מכבי עולם המים לאומית,ISR,03/01/2025
+country,ISR,masters,45-49,male,25m,individual_medley,400m,05:02.24,הר-שי לירון,מכבי עולם המים לאומית,ISR,04/01/2025
+country,ISR,masters,45-49,male,50m,backstroke,100m,01:06.35,קוטק אריק,מכבי עולם המים לאומית,ISR,08/06/2021
+country,ISR,masters,45-49,male,50m,backstroke,200m,02:27.38,קוטק אריק,מכבי עולם המים לאומית,ISR,7/21/2022
+country,ISR,masters,45-49,male,50m,backstroke,50m,30.23,קרבקוב איגור,הפועל דולפין נהריה שוויץ,ISR,8/17/2005
+country,ISR,masters,45-49,male,50m,breaststroke,100m,01:14.75,אלדר גיא,אנשים וספורט גן שמואל לאומית,ISR,7/20/2022
+country,ISR,masters,45-49,male,50m,breaststroke,200m,02:44.60,הר-שי לירון,מכבי עולם המים לאומית,ISR,05/04/2025
+country,ISR,masters,45-49,male,50m,breaststroke,50m,30.47,בן חיים,אסף הפועל עירוני הוד השרון לאומית,ISR,7/22/2022
+country,ISR,masters,45-49,male,50m,butterfly,100m,01:03.14,טיטינשניידר רומן,עמותת השחייה שוהם בריכת טוטו מכבייה,ISR,7/13/2017
+country,ISR,masters,45-49,male,50m,butterfly,200m,02:19.99,טיטינשניידר רומן,מכבי עמותת השחייה שוהם הונגריה,ISR,8/14/2017
+country,ISR,masters,45-49,male,50m,butterfly,50m,27.68,כהן אלי,מכבי עולם המים לאומית,ISR,03/12/2022
+country,ISR,masters,45-49,male,50m,freestyle,100m,57.90,וייס זוהר,אקוותיקים גבעת-חיים וינגייט,ISR,2/16/2007
+country,ISR,masters,45-49,male,50m,freestyle,1500m,18:04.93,וייס זוהר,אקוותיקים גבעת-חיים מכון וינגייט,ISR,7/21/2010
+country,ISR,masters,45-49,male,50m,freestyle,200m,02:08.88,וייס זוהר,אקוותיקים גבעת-חיים וינגייט,ISR,04/12/2007
+country,ISR,masters,45-49,male,50m,freestyle,400m,04:33.74,וייס זוהר,אקוותיקים גבעת-חיים מכון וינגייט,ISR,7/21/2010
+country,ISR,masters,45-49,male,50m,freestyle,50m,25.98,שטרן משה,מכבי עולם המים לאומית,ISR,05/04/2025
+country,ISR,masters,45-49,male,50m,freestyle,800m,09:53.68,טיטינשניידר רומן,מכבי שוהם לאומית,ISR,7/13/2018
+country,ISR,masters,45-49,male,50m,individual_medley,200m,02:28.08,הר-שי לירון,מכבי עולם המים לאומית,ISR,05/04/2025
+country,ISR,masters,45-49,male,50m,individual_medley,400m,05:35.07,סלע אורי,עולם המים לאומית,ISR,7/14/2018
+country,ISR,masters,50-54,female,25m,backstroke,100m,01:13.71,פאור עדינה,מכבי שוהם לאומית,ISR,04/06/2024
+country,ISR,masters,50-54,female,25m,backstroke,200m,02:45.05,פאור עדינה,מכבי שוהם לאומית,ISR,04/01/2025
+country,ISR,masters,50-54,female,25m,backstroke,50m,34.43,פסמני אולגה,מאסטרס רחובות לאומית,ISR,04/05/2024
+country,ISR,masters,50-54,female,25m,backstroke,50m,34.43,פאור עדינה,מכבי שוהם לאומית,ISR,04/06/2024
+country,ISR,masters,50-54,female,25m,breaststroke,100m,01:20.23,אפרתי אירית,הפועל שחייני הנגב לאומית,ISR,2/14/2020
+country,ISR,masters,50-54,female,25m,breaststroke,200m,02:55.53,אפרתי אירית,הפועל שחייני הנגב לאומית,ISR,2/15/2020
+country,ISR,masters,50-54,female,25m,breaststroke,50m,37.42,אפרתי אירית,הפועל שחייני הנגב לאומית,ISR,2/15/2020
+country,ISR,masters,50-54,female,25m,butterfly,100m,01:12.73,בירקאן ליאור,הפועל ירושלים אולימפית,ISR,
+country,ISR,masters,50-54,female,25m,butterfly,200m,03:03.51,קוסביצקי יעל,מכבי שוהם לאומית,ISR,04/01/2025
+country,ISR,masters,50-54,female,25m,butterfly,50m,32.28,פסמני אולגה,מאסטרס רחובות לאומית,ISR,02/03/2023
+country,ISR,masters,50-54,female,25m,freestyle,100m,01:05.83,זילברברג מיכל,מכבי פ.מ. רעות לאומית,ISR,04/01/2025
+country,ISR,masters,50-54,female,25m,freestyle,200m,02:25.05,פאור עדינה,מכבי שוהם לאומית,ISR,04/06/2024
+country,ISR,masters,50-54,female,25m,freestyle,400m,05:07.36,מיכל זילברברג,מכבי פ.מ. רעות לאומית,ISR,03/01/2025
+country,ISR,masters,50-54,female,25m,freestyle,50m,29.29,פסמני אולגה,מאסטרס רחובות לאומית,ISR,02/04/2023
+country,ISR,masters,50-54,female,25m,freestyle,800m,10:47.70,בירקאן ליאור,הפועל ירושלים לאומית,ISR,2/28/2015
+country,ISR,masters,50-54,female,25m,individual_medley,100m,01:13.65,פסמני אולגה,מאסטרס רחובות לאומית,ISR,02/03/2023
+country,ISR,masters,50-54,female,25m,individual_medley,200m,02:50.13,קטן רונית,שירותי בריאות כללית עירונית אילת,ISR,10/29/2015
+country,ISR,masters,50-54,female,25m,individual_medley,400m,06:03.23,אפרתי אירית,הפועל שחייני הנגב לאומית,ISR,2/14/2020
+country,ISR,masters,50-54,female,50m,backstroke,100m,01:23.15,בירקאן ליאור,הפועל ירושלים לאומית טוטו,ISR,09/06/2014
+country,ISR,masters,50-54,female,50m,backstroke,200m,02:57.53,קטן רונית,הפועל גליל עליון לאומית טוטו,ISR,6/30/2016
+country,ISR,masters,50-54,female,50m,backstroke,50m,35.76,פסמני אולגה,מאסטרס רחובות לאומית,ISR,03/11/2022
+country,ISR,masters,50-54,female,50m,breaststroke,100m,01:30.75,קורדובר שקד,עינב הפועל שחייני הנגב לאומית,ISR,04/04/2025
+country,ISR,masters,50-54,female,50m,breaststroke,200m,03:19.66,קורדובר שקד,עינב הפועל שחייני הנגב לאומית,ISR,05/04/2025
+country,ISR,masters,50-54,female,50m,breaststroke,50m,42.22,קטן רונית,הפועל גליל עליון איטליה,ISR,06/09/2015
+country,ISR,masters,50-54,female,50m,butterfly,100m,01:12.87,בירקאן ליאור,הפועל ירושלים איינדהובן,ISR,09/03/2013
+country,ISR,masters,50-54,female,50m,butterfly,200m,02:47.50,בירקאן ליאור,הפועל ירושלים איינדהובן,ISR,09/04/2013
+country,ISR,masters,50-54,female,50m,butterfly,50m,32.68,בירקאן ליאור,הפועל ירושלים לאומית טוטו,ISR,09/05/2014
+country,ISR,masters,50-54,female,50m,freestyle,100m,01:06.36,זילברברג מיכל,מכבי פ.מ. רעות לאומית,ISR,7/26/2024
+country,ISR,masters,50-54,female,50m,freestyle,200m,02:27.27,קטן רונית,גליל עליון בריכת טוטו מכבייה,ISR,07/12/2017
+country,ISR,masters,50-54,female,50m,freestyle,400m,05:16.19,קטן רונית,גליל עליון בריכת טוטו מכבייה,ISR,7/14/2017
+country,ISR,masters,50-54,female,50m,freestyle,50m,30.46,זילברברג מיכל,מכבי פ.מ. רעות לאומית,ISR,7/26/2024
+country,ISR,masters,50-54,female,50m,freestyle,800m,11:08.50,קטן רונית,הפועל גליל עליון לאומית טוטו,ISR,6/30/2016
+country,ISR,masters,50-54,female,50m,individual_medley,200m,02:48.32,פסמני אולגה,מאסטרס רחובות לאומית,ISR,05/04/2025
+country,ISR,masters,50-54,female,50m,individual_medley,400m,06:40.01,קוסביצקי יעל,מכבי שוהם לאומית,ISR,04/04/2025
+country,ISR,masters,50-54,male,25m,backstroke,100m,01:04.88,קוטק אריק,מכבי עולם המים לאומית,ISR,03/01/2025
+country,ISR,masters,50-54,male,25m,backstroke,200m,02:21.63,קוטק אריק,מכבי עולם המים לאומית,ISR,04/01/2025
+country,ISR,masters,50-54,male,25m,backstroke,50m,29.98,קוטק אריק,מכבי עולם המים לאומית,ISR,03/01/2025
+country,ISR,masters,50-54,male,25m,breaststroke,100m,01:13.36,כרמל אופיר,מכבי חיפה לאומית,ISR,03/04/2018
+country,ISR,masters,50-54,male,25m,breaststroke,200m,02:41.83,מנשר גרשון,מכבי פ.מ. רעות לאומית,ISR,12/17/2021
+country,ISR,masters,50-54,male,25m,breaststroke,50m,32.47,כרמל אופיר,מכבי חיפה לאומית,ISR,3/20/2021
+country,ISR,masters,50-54,male,25m,butterfly,100m,01:04.79,קרבקוב איגור,הפועל דולפין נהריה ירושלים,ISR,6/25/2011
+country,ISR,masters,50-54,male,25m,butterfly,200m,02:28.61,טיטינשניידר רומן,מכבי שוהם לאומית,ISR,02/04/2023
+country,ISR,masters,50-54,male,25m,butterfly,50m,28.01,כהן אלי,מכבי עולם המים לאומית,ISR,02/03/2023
+country,ISR,masters,50-54,male,25m,freestyle,100m,56.72,כהן אלי,מכבי עולם המים לאומית,ISR,02/03/2023
+country,ISR,masters,50-54,male,25m,freestyle,1500m,20:09.01,סנונית טל,אקוותיקים גבעת-חיים וינגייט,ISR,2/21/2015
+country,ISR,masters,50-54,male,25m,freestyle,200m,02:07.53,כהן אלי,מכבי עולם המים לאומית,ISR,02/04/2023
+country,ISR,masters,50-54,male,25m,freestyle,400m,04:34.88,כהן אלי,מכבי עולם המים לאומית,ISR,04/06/2024
+country,ISR,masters,50-54,male,25m,freestyle,50m,25.24,משקיף טל,מכבי חיפה לאומית,ISR,2/24/2018
+country,ISR,masters,50-54,male,25m,freestyle,800m,09:39.94,סלע אורי,מכבי עולם המים לאומית,ISR,04/05/2024
+country,ISR,masters,50-54,male,25m,individual_medley,100m,01:05.67,קרבקוב איגור,הפועל דולפין נהריה עין גדי,ISR,3/18/2011
+country,ISR,masters,50-54,male,25m,individual_medley,200m,02:26.59,כרמל אופיר,מכבי חיפה לאומית,ISR,2/16/2019
+country,ISR,masters,50-54,male,25m,individual_medley,400m,05:16.29,טיטינשניידר רומן,מכבי שוהם לאומית,ISR,02/04/2023
+country,ISR,masters,50-54,male,50m,backstroke,100m,01:06.83,קרבקוב איגור,הפועל דולפין נהריה קאדיז,ISR,9/19/2009
+country,ISR,masters,50-54,male,50m,backstroke,200m,02:28.01,טיטינשניידר רומן,מכבי שוהם פוקואוקה יפן,ISR,08/06/2023
+country,ISR,masters,50-54,male,50m,backstroke,50m,30.32,קרבקוב איגור,הפועל דולפין נהריה קאדיז,ISR,9/19/2009
+country,ISR,masters,50-54,male,50m,breaststroke,100m,01:16.65,כרמל אופיר,חיפה בריכת טוטו מכבייה,ISR,7/13/2017
+country,ISR,masters,50-54,male,50m,breaststroke,200m,02:50.22,מנשר גרשון,מכבי פ.מ. רעות לאומית,ISR,7/21/2022
+country,ISR,masters,50-54,male,50m,breaststroke,50m,32.64,כרמל אופיר,חיפה בריכת טוטו מכבייה,ISR,7/13/2017
+country,ISR,masters,50-54,male,50m,butterfly,100m,01:04.43,קרבקוב איגור,הפועל דולפין נהריה אוקראינה,ISR,09/06/2011
+country,ISR,masters,50-54,male,50m,butterfly,200m,02:25.88,טיטינשניידר רומן,מכבי שוהם פוקואוקה יפן,ISR,08/10/2023
+country,ISR,masters,50-54,male,50m,butterfly,50m,27.43,קרבקוב איגור,הפועל דולפין נהריה קאדיז,ISR,9/18/2009
+country,ISR,masters,50-54,male,50m,freestyle,100m,58.82,כהן אלי,מכבי עולם המים לאומית,ISR,7/14/2023
+country,ISR,masters,50-54,male,50m,freestyle,1500m,20:36.24,סנונית טל,אקוותיקים גבעת-חיים לאומית טוטו,ISR,08/01/2015
+country,ISR,masters,50-54,male,50m,freestyle,200m,02:12.92,טיטינשניידר רומן,מכבי שוהם לאומית,ISR,7/14/2023
+country,ISR,masters,50-54,male,50m,freestyle,400m,04:45.05,טיטינשניידר רומן,מכבי שוהם פוקואוקה יפן,ISR,08/11/2023
+country,ISR,masters,50-54,male,50m,freestyle,50m,26.49,קרבקוב איגור,הפועל דולפין נהריה מכון וינגייט,ISR,7/16/2011
+country,ISR,masters,50-54,male,50m,freestyle,800m,09:41.25,וייס זוהר,אסא תל-אביב לאומית טוטו,ISR,6/30/2016
+country,ISR,masters,50-54,male,50m,individual_medley,200m,02:28.79,כרמל אופיר,מכבי חיפה הונגריה,ISR,8/14/2017
+country,ISR,masters,50-54,male,50m,individual_medley,400m,05:23.85,סלע אורי,מכבי עולם המים לאומית,ISR,7/14/2023
+country,ISR,masters,55-59,female,25m,backstroke,100m,01:18.39,אלרי סילבי,מכבי עולם המים לאומית,ISR,09/01/2026
+country,ISR,masters,55-59,female,25m,backstroke,200m,02:55.85,קטן רונית,אקוותיקים לאומית,ISR,12/18/2021
+country,ISR,masters,55-59,female,25m,backstroke,50m,35.48,אלרי סילבי,מכבי עולם המים לאומית,ISR,09/01/2026
+country,ISR,masters,55-59,female,25m,breaststroke,100m,01:31.87,טוביס-לאונוב איבונה,אקוותיקים גבעת-חיים אילת,ISR,10/20/2005
+country,ISR,masters,55-59,female,25m,breaststroke,200m,03:25.25,הולדשטיין אסתר,אקוותיקים גבעת-חיים ירושלים,ISR,10/19/2003
+country,ISR,masters,55-59,female,25m,breaststroke,50m,41.85,טוביס-לאונוב איבונה,אקוותיקים גבעת-חיים אשדות יעקב,ISR,11/15/2006
+country,ISR,masters,55-59,female,25m,butterfly,100m,01:20.75,קוסביצקי יעל,מכבי שוהם לאומית,ISR,09/01/2026
+country,ISR,masters,55-59,female,25m,butterfly,200m,03:05.04,קוסביצקי יעל,מכבי שוהם לאומית,ISR,10/01/2026
+country,ISR,masters,55-59,female,25m,butterfly,50m,33.85,טוביס-לאונוב איבונה,הפועל גבעתיים אילת,ISR,10/02/2003
+country,ISR,masters,55-59,female,25m,freestyle,100m,01:09.69,קטן רונית,אקוותיקים לאומית,ISR,8/15/2020
+country,ISR,masters,55-59,female,25m,freestyle,200m,02:31.08,קטן רונית,אקוותיקים לאומית,ISR,2/14/2020
+country,ISR,masters,55-59,female,25m,freestyle,400m,05:26.91,קטן רונית,אקוותיקים לאומית,ISR,2/15/2020
+country,ISR,masters,55-59,female,25m,freestyle,50m,31.90,קטן רונית,אקוותיקים לאומית,ISR,2/15/2020
+country,ISR,masters,55-59,female,25m,freestyle,800m,11:12.94,קוסביצקי יעל,מכבי שוהם לאומית,ISR,10/01/2026
+country,ISR,masters,55-59,female,25m,individual_medley,100m,01:20.00,טוביס-לאונוב איבונה,הפועל גבעתיים אילת,ISR,10/01/2003
+country,ISR,masters,55-59,female,25m,individual_medley,200m,02:55.32,קטן רונית,אקוותיקים לאומית,ISR,02/04/2023
+country,ISR,masters,55-59,female,25m,individual_medley,400m,07:43.37,גולדשטיין לריסה,מכבי נהריה בית-אייל,ISR,2/21/2016
+country,ISR,masters,55-59,female,50m,backstroke,100m,01:23.75,טוביס-לאונוב איבונה,אקוותיקים גבעת-חיים שבדיה,ISR,08/11/2005
+country,ISR,masters,55-59,female,50m,backstroke,200m,02:56.45,קטן רונית,אקוותיקים לאומית,ISR,7/21/2022
+country,ISR,masters,55-59,female,50m,backstroke,50m,37.73,טוביס-לאונוב איבונה,אקוותיקים גבעת-חיים שבדיה,ISR,08/12/2005
+country,ISR,masters,55-59,female,50m,breaststroke,100m,01:36.79,קטן רונית,אקוותיקים לאומית,ISR,08/07/2021
+country,ISR,masters,55-59,female,50m,breaststroke,200m,03:30.78,ניסמן רונדה,אקוותיקים גבעת-חיים מכון וינגייט,ISR,7/15/2011
+country,ISR,masters,55-59,female,50m,breaststroke,50m,43.52,קונסטנטיני נעמה,ירושלים מכון וינגייט,ISR,7/25/2013
+country,ISR,masters,55-59,female,50m,butterfly,100m,01:21.45,כהן חגית,אקוותיקים לאומית,ISR,03/11/2022
+country,ISR,masters,55-59,female,50m,butterfly,50m,35.13,טוביס-לאונוב איבונה,אקוותיקים גבעת-חיים סלובניה,ISR,09/02/2007
+country,ISR,masters,55-59,female,50m,freestyle,100m,01:10.92,קטן רונית,אקוותיקים לאומית,ISR,7/21/2022
+country,ISR,masters,55-59,female,50m,freestyle,200m,02:33.77,קטן רונית,אקוותיקים לאומית,ISR,7/20/2022
+country,ISR,masters,55-59,female,50m,freestyle,400m,05:31.62,קטן רונית,אקוותיקים לאומית,ISR,7/14/2023
+country,ISR,masters,55-59,female,50m,freestyle,50m,31.91,ניסמן רונדה,אקוותיקים גבעת-חיים מכון וינגייט,ISR,7/21/2012
+country,ISR,masters,55-59,female,50m,freestyle,800m,11:31.71,ניסמן רונדה,אקוותיקים גבעת-חיים אוקראינה,ISR,09/05/2011
+country,ISR,masters,55-59,female,50m,individual_medley,200m,03:05.26,ניסמן רונדה,אקוותיקים גבעת-חיים מכון וינגייט,ISR,06/05/2009
+country,ISR,masters,55-59,female,50m,individual_medley,400m,06:40.79,ניסמן רונדה,אקוותיקים גבעת-חיים מכון וינגייט,ISR,08/02/2011
+country,ISR,masters,55-59,male,25m,backstroke,100m,01:08.32,קרבקוב איגור,הפועל דולפין נהריה אולימפית,ISR,02/07/2014
+country,ISR,masters,55-59,male,25m,backstroke,200m,02:28.44,קרבקוב איגור,הפועל דולפין נהריה בית-אייל,ISR,2/22/2013
+country,ISR,masters,55-59,male,25m,backstroke,50m,30.68,קרבקוב איגור,הפועל דולפין נהריה אולימפית,ISR,02/07/2014
+country,ISR,masters,55-59,male,25m,breaststroke,100m,01:14.96,קרבקוב איגור,מכבי קרית ביאליק לאומית,ISR,2/27/2015
+country,ISR,masters,55-59,male,25m,breaststroke,200m,02:47.66,שפע גרשון,אקוותיקים גבעת-חיים אילת,ISR,10/19/2001
+country,ISR,masters,55-59,male,25m,breaststroke,50m,33.05,כרמל אופיר,מכבי חיפה לאומית,ISR,02/03/2023
+country,ISR,masters,55-59,male,25m,butterfly,100m,01:05.58,קרבקוב איגור,הפועל דולפין נהריה בית-אייל,ISR,2/22/2013
+country,ISR,masters,55-59,male,25m,butterfly,200m,02:40.14,קרבקוב איגור,מכבי קרית ביאליק בית-אייל,ISR,2/21/2016
+country,ISR,masters,55-59,male,25m,butterfly,50m,28.53,קרבקוב איגור,הפועל דולפין נהריה אולימפית,ISR,02/07/2014
+country,ISR,masters,55-59,male,25m,freestyle,100m,59.11,שנהר יזהר,מאסטרס רחובות לאומית,ISR,03/04/2018
+country,ISR,masters,55-59,male,25m,freestyle,200m,02:12.64,וייס זוהר,אסא תל-אביב לאומית,ISR,03/04/2018
+country,ISR,masters,55-59,male,25m,freestyle,400m,04:36.35,וייס זוהר,אסא תל-אביב לאומית,ISR,01/07/2017
+country,ISR,masters,55-59,male,25m,freestyle,50m,26.32,קרבקוב איגור,מכבי קרית ביאליק לאומית,ISR,2/28/2015
+country,ISR,masters,55-59,male,25m,freestyle,800m,09:40.28,וייס זוהר,אסא תל-אביב לאומית,ISR,2/24/2018
+country,ISR,masters,55-59,male,25m,individual_medley,100m,01:05.70,קרבקוב איגור,הפועל דולפין נהריה בית-אייל,ISR,2/22/2013
+country,ISR,masters,55-59,male,25m,individual_medley,200m,02:29.41,כרמל אופיר,מכבי חיפה לאומית,ISR,02/04/2023
+country,ISR,masters,55-59,male,25m,individual_medley,400m,05:23.95,ליפשיץ יוחאי,אקוותיקים לאומית,ISR,3/20/2021
+country,ISR,masters,55-59,male,50m,backstroke,100m,01:06.62,קרבקוב איגור,הפועל דולפין נהריה טורינו,ISR,08/06/2013
+country,ISR,masters,55-59,male,50m,backstroke,200m,02:36.39,קרבקוב איגור,הפועל דולפין נהריה טורינו,ISR,08/04/2013
+country,ISR,masters,55-59,male,50m,backstroke,50m,31.11,קרבקוב איגור,"מכבי קרית ביאליק RUS Kazan,",ISR,8/13/2015
+country,ISR,masters,55-59,male,50m,breaststroke,100m,01:18.37,כרמל אופיר,מכבי חיפה לאומית,ISR,03/12/2022
+country,ISR,masters,55-59,male,50m,breaststroke,200m,02:51.10,שפע גרשון,אקוותיקים גבעת-חיים פאלמה דה מאיורקה,ISR,04/01/2001
+country,ISR,masters,55-59,male,50m,breaststroke,50m,33.51,כרמל אופיר,מכבי חיפה לאומית,ISR,03/12/2022
+country,ISR,masters,55-59,male,50m,butterfly,100m,01:05.37,קרבקוב איגור,הפועל דולפין נהריה איינדהובן,ISR,09/03/2013
+country,ISR,masters,55-59,male,50m,butterfly,200m,02:48.80,יובל הרי,פלגי מכבי חיפה לאומית,ISR,7/15/2023
+country,ISR,masters,55-59,male,50m,butterfly,50m,27.98,קרבקוב איגור,הפועל דולפין נהריה איינדהובן,ISR,09/05/2013
+country,ISR,masters,55-59,male,50m,freestyle,100m,01:00.93,שנהר יזהר,מאסטרס רחובות לאומית,ISR,7/19/2019
+country,ISR,masters,55-59,male,50m,freestyle,1500m,22:01.08,מנור טומי,אקוותיקים גבעת-חיים מכון וינגייט,ISR,7/21/2010
+country,ISR,masters,55-59,male,50m,freestyle,200m,02:15.22,וייס זוהר,אסא תל-אביב בריכת טוטו מכבייה,ISR,07/12/2017
+country,ISR,masters,55-59,male,50m,freestyle,400m,04:55.77,גרטל משה,ירושלים רבתי פאלמה דה מאיורקה,ISR,04/01/2001
+country,ISR,masters,55-59,male,50m,freestyle,50m,26.91,קרבקוב איגור,"מכבי קרית ביאליק RUS Kazan,",ISR,8/13/2015
+country,ISR,masters,55-59,male,50m,freestyle,800m,09:51.04,וייס זוהר,אסא תל-אביב לאומית טוטו,ISR,5/13/2017
+country,ISR,masters,55-59,male,50m,individual_medley,200m,02:34.02,קרבקוב איגור,דולפין נהריה מכון וינגייט,ISR,7/25/2013
+country,ISR,masters,55-59,male,50m,individual_medley,400m,05:41.61,ליפשיץ יוחאי,אקוותיקים לאומית,ISR,03/11/2022
+country,ISR,masters,60-64,female,25m,backstroke,100m,01:28.51,טוביס-לאונוב איבונה,הפועל עירוני הוד-השרון עירונית אילת,ISR,9/18/2008
+country,ISR,masters,60-64,female,25m,backstroke,200m,02:57.95,קטן רונית,אקוותיקים לאומית,ISR,04/05/2024
+country,ISR,masters,60-64,female,25m,backstroke,50m,40.29,יופה רונה,אקוותיקים גבעת-חיים עין גדי,ISR,3/18/2011
+country,ISR,masters,60-64,female,25m,breaststroke,100m,01:35.86,הולדשטיין אסתר,אקוותיקים גבעת-חיים עירונית אילת,ISR,10/16/2009
+country,ISR,masters,60-64,female,25m,breaststroke,200m,03:30.36,הולדשטיין אסתר,אקוותיקים גבעת-חיים אילת,ISR,10/17/2009
+country,ISR,masters,60-64,female,25m,breaststroke,50m,43.30,הולדשטיין אסתר,אקוותיקים גבעת-חיים עירונית אילת,ISR,10/16/2009
+country,ISR,masters,60-64,female,25m,butterfly,100m,01:25.60,ניסמן רונדה,אקוותיקים גבעת-חיים אולימפית,ISR,02/07/2014
+country,ISR,masters,60-64,female,25m,butterfly,50m,37.39,ניסמן רונדה,אקוותיקים גבעת-חיים לאומית,ISR,01/07/2017
+country,ISR,masters,60-64,female,25m,freestyle,100m,01:14.06,ניסמן רונדה,אקוותיקים גבעת-חיים לאומית,ISR,01/06/2017
+country,ISR,masters,60-64,female,25m,freestyle,200m,02:33.79,קטן רונית,אקוותיקים לאומית,ISR,04/06/2024
+country,ISR,masters,60-64,female,25m,freestyle,400m,05:30.03,קטן רונית,אקוותיקים לאומית,ISR,04/06/2024
+country,ISR,masters,60-64,female,25m,freestyle,50m,31.91,ניסמן רונדה,אקוותיקים גבעת-חיים אולימפית,ISR,02/07/2014
+country,ISR,masters,60-64,female,25m,freestyle,800m,11:15.05,קטן רונית,אקוותיקים לאומית,ISR,04/05/2024
+country,ISR,masters,60-64,female,25m,individual_medley,100m,01:25.38,קטן רונית,אקוותיקים לאומית,ISR,09/01/2026
+country,ISR,masters,60-64,female,25m,individual_medley,200m,03:10.39,טוביס-לאונוב איבונה,הפועל עירוני הוד-השרון עין גדי,ISR,3/18/2011
+country,ISR,masters,60-64,female,25m,individual_medley,400m,07:43.37,גולדשטיין לריסה,מכבי נהריה בית-אייל,ISR,2/21/2016
+country,ISR,masters,60-64,female,50m,backstroke,100m,01:27.06,טוביס-לאונוב איבונה,הפועל עירוני הוד-השרון קאדיז,ISR,9/19/2009
+country,ISR,masters,60-64,female,50m,backstroke,200m,02:59.06,קטן רונית,אקוותיקים לאומית,ISR,7/27/2024
+country,ISR,masters,60-64,female,50m,backstroke,50m,38.57,טוביס-לאונוב איבונה,הפועל עירוני הוד-השרון קאדיז,ISR,9/17/2009
+country,ISR,masters,60-64,female,50m,breaststroke,100m,01:35.50,הולדשטיין אסתר,אקוותיקים גבעת-חיים אוקראינה,ISR,09/07/2011
+country,ISR,masters,60-64,female,50m,breaststroke,200m,03:34.53,טוביס-לאונוב איבונה,הפועל עירוני הוד-השרון איטליה,ISR,5/31/2009
+country,ISR,masters,60-64,female,50m,breaststroke,50m,42.98,טוביס-לאונוב איבונה,הפועל עירוני הוד-השרון קאדיז,ISR,9/16/2009
+country,ISR,masters,60-64,female,50m,butterfly,100m,01:31.90,ניסמן רונדה,אקוותיקים גבעת-חיים בריכת טוטו מכבייה,ISR,7/13/2017
+country,ISR,masters,60-64,female,50m,butterfly,200m,03:54.64,טליה אקוותיקים,לאומית,ISR,03/12/2022
+country,ISR,masters,60-64,female,50m,butterfly,50m,35.62,טוביס-לאונוב איבונה,הפועל עירוני הוד-השרון קאדיז,ISR,9/18/2009
+country,ISR,masters,60-64,female,50m,freestyle,100m,01:11.12,קטן רונית,אקוותיקים לאומית,ISR,7/26/2024
+country,ISR,masters,60-64,female,50m,freestyle,1500m,23:13.13,ניסמן רונדה,אקוותיקים גבעת-חיים לאומית טוטו,ISR,08/01/2015
+country,ISR,masters,60-64,female,50m,freestyle,200m,02:34.81,קטן רונית,"אקוותיקים בלגרד, סרביה",ISR,6/27/2024
+country,ISR,masters,60-64,female,50m,freestyle,400m,05:26.39,קטן רונית,"אקוותיקים בלגרד, סרביה",ISR,07/02/2024
+country,ISR,masters,60-64,female,50m,freestyle,50m,32.36,קטן רונית,אקוותיקים לאומית,ISR,7/27/2024
+country,ISR,masters,60-64,female,50m,freestyle,800m,11:25.28,קטן רונית,"אקוותיקים בלגרד, סרביה",ISR,6/26/2024
+country,ISR,masters,60-64,female,50m,individual_medley,200m,03:12.31,ניסמן רונדה,אקוותיקים גבעת-חיים בריכת טוטו מכבייה,ISR,7/13/2017
+country,ISR,masters,60-64,female,50m,individual_medley,400m,06:49.66,ניסמן רונדה,אקוותיקים גבעת-חיים לאומית טוטו,ISR,07/01/2016
+country,ISR,masters,60-64,male,25m,backstroke,100m,01:08.01,קרבקוב איגור,מכבי שוהם לאומית,ISR,2/16/2019
+country,ISR,masters,60-64,male,25m,backstroke,200m,02:34.84,קרבקוב איגור,מכבי שוהם לאומית,ISR,2/15/2019
+country,ISR,masters,60-64,male,25m,backstroke,50m,31.21,קרבקוב איגור,מכבי שוהם לאומית,ISR,2/15/2020
+country,ISR,masters,60-64,male,25m,breaststroke,100m,01:17.97,שפע גרשון,אקוותיקים גבעת-חיים אילת,ISR,10/02/2003
+country,ISR,masters,60-64,male,25m,breaststroke,200m,02:56.63,ליפשיץ יוחאי,אקוותיקים לאומית,ISR,04/05/2024
+country,ISR,masters,60-64,male,25m,breaststroke,50m,34.24,שפע גרשון,אקוותיקים גבעת-חיים גבעת חיים,ISR,10/19/2003
+country,ISR,masters,60-64,male,25m,butterfly,100m,01:07.21,קרבקוב איגור,מכבי שוהם לאומית,ISR,2/16/2019
+country,ISR,masters,60-64,male,25m,butterfly,200m,02:46.03,ניסמן דב,אקוותיקים גבעת-חיים לאומית,ISR,01/07/2017
+country,ISR,masters,60-64,male,25m,butterfly,50m,29.39,קרבקוב איגור,מכבי שוהם לאומית,ISR,2/15/2019
+country,ISR,masters,60-64,male,25m,freestyle,100m,01:01.88,נבון גיא,מכבי חיפה לאומית,ISR,10/01/2026
+country,ISR,masters,60-64,male,25m,freestyle,200m,02:20.98,ליפשיץ יוחאי,אקוותיקים לאומית,ISR,04/06/2024
+country,ISR,masters,60-64,male,25m,freestyle,400m,05:00.56,ניסמן דב,אקוותיקים גבעת-חיים לאומית,ISR,01/07/2017
+country,ISR,masters,60-64,male,25m,freestyle,50m,27.09,קרבקוב איגור,מכבי שוהם לאומית,ISR,2/15/2020
+country,ISR,masters,60-64,male,25m,freestyle,800m,10:15.77,ניסמן דב,ירושלים רבתי בית-אייל,ISR,2/21/2016
+country,ISR,masters,60-64,male,25m,individual_medley,100m,01:07.85,קרבקוב איגור,מכבי קרית ביאליק לאומית,ISR,2/24/2018
+country,ISR,masters,60-64,male,25m,individual_medley,200m,02:36.84,קרבקוב איגור,מכבי שוהם לאומית,ISR,2/15/2020
+country,ISR,masters,60-64,male,25m,individual_medley,400m,05:33.74,ניסמן דב,ירושלים רבתי בית-אייל,ISR,2/21/2016
+country,ISR,masters,60-64,male,50m,backstroke,100m,01:10.47,קרבקוב איגור,מכבי קרית ביאליק סלובניה,ISR,09/04/2018
+country,ISR,masters,60-64,male,50m,backstroke,200m,02:38.80,קרבקוב איגור,מכבי שוהם לאומית,ISR,7/19/2019
+country,ISR,masters,60-64,male,50m,backstroke,50m,31.59,קרבקוב איגור,מכבי שוהם לאומית,ISR,7/20/2019
+country,ISR,masters,60-64,male,50m,breaststroke,100m,01:21.69,שפע גרשון,אקוותיקים גבעת-חיים,ISR,8/13/2006
+country,ISR,masters,60-64,male,50m,breaststroke,200m,02:55.26,שפע גרשון,אקוותיקים גבעת-חיים איטליה,ISR,07/01/2004
+country,ISR,masters,60-64,male,50m,breaststroke,50m,35.80,קרבקוב איגור,מכבי שוהם לאומית,ISR,7/20/2019
+country,ISR,masters,60-64,male,50m,butterfly,100m,01:08.02,קרבקוב איגור,מכבי קרית ביאליק לאומית,ISR,7/14/2018
+country,ISR,masters,60-64,male,50m,butterfly,200m,02:50.32,ניסמן דב,"ירושלים רבתי RUS Kazan,",ISR,8/13/2015
+country,ISR,masters,60-64,male,50m,butterfly,50m,28.91,קרבקוב איגור,מכבי קרית ביאליק סלובניה,ISR,09/06/2018
+country,ISR,masters,60-64,male,50m,freestyle,100m,01:03.49,גרטל משה,ירושלים רבתי,ISR,8/13/2006
+country,ISR,masters,60-64,male,50m,freestyle,1500m,21:18.37,גרטל משה,ירושלים רבתי מכון וינגייט,ISR,7/22/2008
+country,ISR,masters,60-64,male,50m,freestyle,200m,02:21.27,גרטל משה,ירושלים רבתי,ISR,8/13/2006
+country,ISR,masters,60-64,male,50m,freestyle,400m,05:00.66,גרטל משה,ירושלים רבתי מכון וינגייט,ISR,8/13/2006
+country,ISR,masters,60-64,male,50m,freestyle,50m,27.28,קרבקוב איגור,מכבי שוהם לאומית,ISR,7/20/2019
+country,ISR,masters,60-64,male,50m,freestyle,800m,10:24.12,ניסמן דב,אקוותיקים גבעת-חיים לאומית טוטו,ISR,6/30/2016
+country,ISR,masters,60-64,male,50m,individual_medley,200m,02:39.35,קרבקוב איגור,מכבי שוהם לאומית,ISR,7/20/2019
+country,ISR,masters,60-64,male,50m,individual_medley,400m,05:45.86,ניסמן דב,ירושלים רבתי לאומית טוטו,ISR,07/01/2016
+country,ISR,masters,65-69,female,25m,backstroke,100m,01:33.08,יופה רונה,אקוותיקים גבעת-חיים לאומית,ISR,01/06/2017
+country,ISR,masters,65-69,female,25m,backstroke,200m,03:19.06,יופה רונה,אקוותיקים גבעת-חיים לאומית,ISR,2/24/2018
+country,ISR,masters,65-69,female,25m,backstroke,50m,42.65,יופה רונה,אקוותיקים גבעת-חיים לאומית,ISR,
+country,ISR,masters,65-69,female,25m,breaststroke,100m,01:39.66,הולדשטיין אסתר,אקוותיקים גבעת-חיים בית-אייל,ISR,2/22/2013
+country,ISR,masters,65-69,female,25m,breaststroke,200m,03:34.41,הולדשטיין אסתר,אקוותיקים גבעת-חיים בית-אייל,ISR,2/24/2012
+country,ISR,masters,65-69,female,25m,breaststroke,50m,45.92,טוביס-לאונוב איבונה,הפועל עירוני הוד השרון בית-אייל,ISR,2/22/2013
+country,ISR,masters,65-69,female,25m,butterfly,100m,01:46.54,זיורוב לובוב,מכבי כפר המכביה לאומית,ISR,09/01/2026
+country,ISR,masters,65-69,female,25m,butterfly,50m,38.04,ניסמן רונדה,אקוותיקים לאומית,ISR,
+country,ISR,masters,65-69,female,25m,freestyle,100m,01:15.95,ניסמן רונדה,אקוותיקים גבעת-חיים לאומית,ISR,8/15/2020
+country,ISR,masters,65-69,female,25m,freestyle,1500m,24:51.03,הולדשטיין אסתר,אקוותיקים גבעת-חיים וינגייט,ISR,2/21/2015
+country,ISR,masters,65-69,female,25m,freestyle,200m,02:53.40,הולדשטיין אסתר,אקוותיקים גבעת-חיים בית-אייל,ISR,2/22/2013
+country,ISR,masters,65-69,female,25m,freestyle,400m,06:43.50,מזור אוה,הפועל בת ים לאומית,ISR,02/04/2023
+country,ISR,masters,65-69,female,25m,freestyle,50m,32.53,הולדשטיין אסתר,אקוותיקים גבעת-חיים בית אייל,ISR,2/24/2012
+country,ISR,masters,65-69,female,25m,freestyle,800m,13:09.11,הולדשטיין סטלה,אסתר אקוותיקים גבעת-חיים וינגייט,ISR,2/28/2015
+country,ISR,masters,65-69,female,25m,individual_medley,100m,01:30.58,הולדשטיין אסתר,אקוותיקים גבעת-חיים אולימפית,ISR,02/07/2014
+country,ISR,masters,65-69,female,25m,individual_medley,200m,03:20.73,ניסמן רונדה,אקוותיקים לאומית,ISR,8/15/2020
+country,ISR,masters,65-69,female,25m,individual_medley,400m,08:16.61,גולדשטיין לריסה,מכבי שוהם לאומית,ISR,02/04/2023
+country,ISR,masters,65-69,female,50m,backstroke,100m,01:34.42,יופה רונה,"אקוותיקים גבעת-חיים GBR London,",ISR,5/28/2016
+country,ISR,masters,65-69,female,50m,backstroke,200m,03:22.51,יופה רונה,אקוותיקים גבעת-חיים לאומית טוטו,ISR,6/30/2016
+country,ISR,masters,65-69,female,50m,backstroke,50m,42.63,טוביס לאונוב,איבונה עירוני הוד השרון מכון וינגייט,ISR,7/26/2013
+country,ISR,masters,65-69,female,50m,breaststroke,100m,01:35.75,הולדשטיין אסתר,אקוותיקים גבעת-חיים איטליה,ISR,06/11/2012
+country,ISR,masters,65-69,female,50m,breaststroke,200m,03:36.00,הולדשטיין אסתר,אקוותיקים גבעת-חיים מכון וינגייט,ISR,7/20/2012
+country,ISR,masters,65-69,female,50m,breaststroke,50m,46.05,הולדשטיין אסתר,אקוותיקים גבעת-חיים מכון וינגייט,ISR,7/21/2012
+country,ISR,masters,65-69,female,50m,butterfly,100m,01:41.10,ניסמן רונדה,אקוותיקים לאומית,ISR,08/06/2021
+country,ISR,masters,65-69,female,50m,butterfly,200m,04:02.00,ניסמן רונדה,"אקוותיקים רומא, איטליה",ISR,09/02/2022
+country,ISR,masters,65-69,female,50m,butterfly,50m,39.38,ניסמן רונדה,אקוותיקים לאומית,ISR,03/12/2022
+country,ISR,masters,65-69,female,50m,freestyle,100m,01:16.29,ניסמן רונדה,אקוותיקים לאומית,ISR,08/06/2021
+country,ISR,masters,65-69,female,50m,freestyle,200m,02:50.73,ניסמן רונדה,אקוותיקים לאומית,ISR,7/20/2019
+country,ISR,masters,65-69,female,50m,freestyle,400m,05:58.07,ניסמן רונדה,אקוותיקים לאומית,ISR,7/22/2022
+country,ISR,masters,65-69,female,50m,freestyle,50m,33.81,ניסמן רונדה,אקוותיקים לאומית,ISR,03/11/2022
+country,ISR,masters,65-69,female,50m,freestyle,800m,12:13.13,ניסמן רונדה,אקוותיקים לאומית,ISR,7/19/2019
+country,ISR,masters,65-69,female,50m,individual_medley,200m,03:20.32,ניסמן רונדה,אקוותיקים לאומית,ISR,7/20/2019
+country,ISR,masters,65-69,female,50m,individual_medley,400m,07:35.27,ניסמן רונדה,אקוותיקים לאומית,ISR,03/11/2022
+country,ISR,masters,65-69,male,25m,backstroke,100m,01:09.47,קרבקוב איגור,"מכבי שוהם לובלין, פולין",ISR,12/12/2025
+country,ISR,masters,65-69,male,25m,backstroke,200m,02:39.11,קרבקוב איגור,מכבי שוהם לאומית,ISR,02/04/2023
+country,ISR,masters,65-69,male,25m,backstroke,50m,31.72,קרבקוב איגור,מכבי שוהם לאומית,ISR,04/05/2024
+country,ISR,masters,65-69,male,25m,breaststroke,100m,01:20.41,שפע גרשון,אקוותיקים גבעת-חיים גבעת חיים,ISR,6/27/2008
+country,ISR,masters,65-69,male,25m,breaststroke,200m,02:54.56,שפע גרשון,אקוותיקים גבעת-חיים גבעת חיים,ISR,6/27/2008
+country,ISR,masters,65-69,male,25m,breaststroke,50m,35.05,קרבקוב איגור,מכבי שוהם לאומית,ISR,04/06/2024
+country,ISR,masters,65-69,male,25m,butterfly,100m,01:12.62,ניסמן דב,אקוותיקים לאומית,ISR,12/17/2021
+country,ISR,masters,65-69,male,25m,butterfly,200m,02:50.56,ניסמן דב,אקוותיקים לאומית,ISR,02/04/2023
+country,ISR,masters,65-69,male,25m,butterfly,50m,30.82,קרבקוב איגור,"מכבי שוהם לובלין, פולין",ISR,11/12/2025
+country,ISR,masters,65-69,male,25m,freestyle,100m,01:05.65,גרטל משה,ירושלים רבתי עין גדי,ISR,3/18/2011
+country,ISR,masters,65-69,male,25m,freestyle,200m,02:21.12,קרמן רון,מכבי חיפה לאומית,ISR,04/06/2024
+country,ISR,masters,65-69,male,25m,freestyle,400m,05:03.89,ניסמן דב,אקוותיקים לאומית,ISR,12/18/2021
+country,ISR,masters,65-69,male,25m,freestyle,50m,27.41,קרבקוב איגור,מכבי שוהם לאומית,ISR,04/06/2024
+country,ISR,masters,65-69,male,25m,freestyle,800m,10:36.60,ניסמן דב,אקוותיקים לאומית,ISR,2/15/2019
+country,ISR,masters,65-69,male,25m,individual_medley,100m,01:10.14,קרבקוב איגור,מכבי שוהם לאומית,ISR,02/03/2023
+country,ISR,masters,65-69,male,25m,individual_medley,200m,02:39.54,קרמן רון,מכבי חיפה לאומית,ISR,04/06/2024
+country,ISR,masters,65-69,male,25m,individual_medley,400m,05:40.37,ניסמן דב,אקוותיקים לאומית,ISR,02/04/2023
+country,ISR,masters,65-69,male,50m,backstroke,100m,01:08.80,קרבקוב איגור,מכבי שוהם פוקואוקה יפן,ISR,08/10/2023
+country,ISR,masters,65-69,male,50m,backstroke,200m,02:53.49,קרמן רון,מכבי חיפה לאומית,ISR,7/27/2024
+country,ISR,masters,65-69,male,50m,backstroke,50m,31.55,קרבקוב איגור,מכבי שוהם פוקואוקה יפן,ISR,08/11/2023
+country,ISR,masters,65-69,male,50m,breaststroke,100m,01:21.75,שפע גרשון,אקוותיקים גבעת-חיים אוסטרליה,ISR,4/20/2008
+country,ISR,masters,65-69,male,50m,breaststroke,200m,02:59.99,שפע גרשון,אקוותיקים גבעת-חיים אוסטרליה,ISR,4/22/2008
+country,ISR,masters,65-69,male,50m,breaststroke,50m,37.17,שפע גרשון,אקוותיקים גבעת-חיים אוסטרליה,ISR,4/22/2008
+country,ISR,masters,65-69,male,50m,butterfly,100m,01:09.86,קרבקוב איגור,מכבי שוהם פוקואוקה יפן,ISR,08/08/2023
+country,ISR,masters,65-69,male,50m,butterfly,200m,02:54.18,ניסמן דב,אקוותיקים דרום קוריאה,ISR,8/17/2019
+country,ISR,masters,65-69,male,50m,butterfly,50m,28.92,קרבקוב איגור,מכבי שוהם פוקואוקה יפן,ISR,08/07/2023
+country,ISR,masters,65-69,male,50m,freestyle,100m,01:03.39,קרבקוב איגור,מכבי שוהם לאומית,ISR,7/14/2023
+country,ISR,masters,65-69,male,50m,freestyle,1500m,22:34.54,שפע גרשון,אקוותיקים גבעת-חיים מכון וינגייט,ISR,7/21/2010
+country,ISR,masters,65-69,male,50m,freestyle,200m,02:24.53,קרמן רון,מכבי חיפה לאומית,ISR,7/27/2024
+country,ISR,masters,65-69,male,50m,freestyle,400m,05:07.78,ניסמן דב,אקוותיקים לאומית,ISR,08/06/2021
+country,ISR,masters,65-69,male,50m,freestyle,50m,27.10,קרבקוב איגור,מכבי שוהם פוקואוקה יפן,ISR,08/09/2023
+country,ISR,masters,65-69,male,50m,freestyle,800m,10:32.88,ניסמן דב,אקוותיקים דרום קוריאה,ISR,08/12/2019
+country,ISR,masters,65-69,male,50m,individual_medley,200m,02:42.67,ניסמן דב,אקוותיקים לאומית,ISR,7/20/2022
+country,ISR,masters,65-69,male,50m,individual_medley,400m,05:51.00,ניסמן דב,אקוותיקים דרום קוריאה,ISR,8/14/2019
+country,ISR,masters,70-74,female,25m,backstroke,100m,01:38.18,יופה רונה,אקוותיקים גבעת-חיים לאומית,ISR,3/19/2021
+country,ISR,masters,70-74,female,25m,backstroke,200m,03:30.19,יופה רונה,אקוותיקים גבעת-חיים לאומית,ISR,3/19/2021
+country,ISR,masters,70-74,female,25m,backstroke,50m,42.48,טוביס לאונוב,איבונה מאסטרס רחובות לאומית,ISR,2/15/2019
+country,ISR,masters,70-74,female,25m,breaststroke,100m,01:43.14,הולדשטיין אסתר,אקוותיקים גבעת-חיים לאומית,ISR,01/06/2017
+country,ISR,masters,70-74,female,25m,breaststroke,200m,03:50.05,הולדשטיין סטלה,אסתר אקוותיקים לאומית,ISR,2/16/2019
+country,ISR,masters,70-74,female,25m,breaststroke,50m,50.15,הולדשטיין סטלה,אסתר אקוותיקים לאומית,ISR,2/14/2020
+country,ISR,masters,70-74,female,25m,butterfly,100m,01:49.14,ניסמן רונדה,אקוותיקים לאומית,ISR,03/01/2025
+country,ISR,masters,70-74,female,25m,butterfly,50m,40.79,טוביס לאונוב,איבונה מאסטרס רחובות לאומית,ISR,2/15/2019
+country,ISR,masters,70-74,female,25m,freestyle,100m,01:18.48,ניסמן רונדה,אקוותיקים לאומית,ISR,04/05/2024
+country,ISR,masters,70-74,female,25m,freestyle,200m,03:00.76,ניסמן רונדה,אקוותיקים לאומית,ISR,04/06/2024
+country,ISR,masters,70-74,female,25m,freestyle,400m,06:08.82,ניסמן רונדה,אקוותיקים לאומית,ISR,04/06/2024
+country,ISR,masters,70-74,female,25m,freestyle,50m,34.04,ניסמן רונדה,אקוותיקים לאומית,ISR,04/06/2024
+country,ISR,masters,70-74,female,25m,freestyle,800m,12:22.72,ניסמן רונדה,אקוותיקים לאומית,ISR,04/05/2024
+country,ISR,masters,70-74,female,25m,individual_medley,100m,01:31.88,טוביס לאונוב,איבונה מאסטרס רחובות לאומית,ISR,2/15/2019
+country,ISR,masters,70-74,female,25m,individual_medley,200m,03:27.72,טוביס לאונוב,איבונה מאסטרס רחובות לאומית,ISR,2/16/2019
+country,ISR,masters,70-74,female,25m,individual_medley,400m,07:27.04,ניסמן רונדה,אקוותיקים לאומית,ISR,04/01/2025
+country,ISR,masters,70-74,female,50m,backstroke,100m,01:34.68,טוביס לאונוב,איבונה מכבי וייסגל רחובות סלובניה,ISR,09/04/2018
+country,ISR,masters,70-74,female,50m,backstroke,200m,03:31.72,יופה רונה,"אקוותיקים רומא, איטליה",ISR,09/01/2022
+country,ISR,masters,70-74,female,50m,backstroke,50m,42.25,טוביס לאונוב,איבונה מאסטרס רחובות לאומית,ISR,7/19/2019
+country,ISR,masters,70-74,female,50m,breaststroke,100m,01:44.85,הולדשטיין סטלה,אסתר אקוותיקים סלובניה,ISR,09/07/2018
+country,ISR,masters,70-74,female,50m,breaststroke,200m,04:34.46,גרבר ביאטריס,אקוותיקים לאומית,ISR,7/21/2022
+country,ISR,masters,70-74,female,50m,breaststroke,50m,46.50,הולדשטיין אסתר,אקוותיקים גבעת-חיים לאומית טוטו,ISR,5/13/2017
+country,ISR,masters,70-74,female,50m,butterfly,100m,02:09.61,ברנשטיין לאה,"מכבי פ.מ. רעות GBR London,",ISR,5/26/2016
+country,ISR,masters,70-74,female,50m,butterfly,50m,40.61,טוביס לאונוב,איבונה מכבי וייסגל רחובות סלובניה,ISR,09/06/2018
+country,ISR,masters,70-74,female,50m,freestyle,100m,01:20.73,ניסמן רונדה,אקוותיקים לאומית,ISR,7/26/2024
+country,ISR,masters,70-74,female,50m,freestyle,200m,03:05.05,ניסמן רונדה,אקוותיקים לאומית,ISR,7/26/2024
+country,ISR,masters,70-74,female,50m,freestyle,400m,06:17.62,ניסמן רונדה,אקוותיקים לאומית,ISR,7/27/2024
+country,ISR,masters,70-74,female,50m,freestyle,50m,34.70,ניסמן רונדה,אקוותיקים לאומית,ISR,7/27/2024
+country,ISR,masters,70-74,female,50m,freestyle,800m,12:44.81,ניסמן רונדה,אקוותיקים לאומית,ISR,7/27/2024
+country,ISR,masters,70-74,female,50m,individual_medley,200m,03:23.37,טוביס לאונוב,איבונה מכבי וייסגל רחובות לאומית,ISR,7/14/2018
+country,ISR,masters,70-74,male,25m,backstroke,100m,01:21.63,ניסמן דב,אקוותיקים לאומית,ISR,04/06/2024
+country,ISR,masters,70-74,male,25m,backstroke,200m,02:50.28,ניסמן דב,אקוותיקים לאומית,ISR,10/01/2026
+country,ISR,masters,70-74,male,25m,backstroke,50m,39.47,טוביס אילון,מכבי חיפה לאומית,ISR,2/15/2020
+country,ISR,masters,70-74,male,25m,breaststroke,100m,01:26.54,שפע גרשון,אקוותיקים גבעת-חיים לאומית,ISR,2/27/2015
+country,ISR,masters,70-74,male,25m,breaststroke,200m,03:10.86,שפע גרשון,אקוותיקים גבעת-חיים בית-אייל,ISR,2/22/2013
+country,ISR,masters,70-74,male,25m,breaststroke,50m,39.32,שפע גרשון,אקוותיקים גבעת-חיים לאומית,ISR,2/28/2015
+country,ISR,masters,70-74,male,25m,butterfly,100m,01:15.05,ניסמן דב,"אקוותיקים פונטוודרה, ספרד",ISR,10/02/2024
+country,ISR,masters,70-74,male,25m,butterfly,200m,02:50.92,ניסמן דב,אקוותיקים לאומית,ISR,04/06/2024
+country,ISR,masters,70-74,male,25m,butterfly,50m,33.40,ניסמן דב,אקוותיקים לאומית,ISR,04/01/2025
+country,ISR,masters,70-74,male,25m,freestyle,100m,01:08.15,גרטל משה,ירושלים רבתי לאומית,ISR,01/06/2017
+country,ISR,masters,70-74,male,25m,freestyle,200m,02:31.37,גרטל משה,ירושלים רבתי לאומית,ISR,01/06/2017
+country,ISR,masters,70-74,male,25m,freestyle,400m,05:19.39,ניסמן דב,אקוותיקים לאומית,ISR,09/01/2026
+country,ISR,masters,70-74,male,25m,freestyle,50m,30.86,תדיר יונה,אקוותיקים גבעת-חיים קליפורניה,ISR,12/05/2014
+country,ISR,masters,70-74,male,25m,freestyle,800m,10:50.52,ניסמן דב,אקוותיקים לאומית,ISR,10/01/2026
+country,ISR,masters,70-74,male,25m,individual_medley,100m,01:17.31,ניסמן דב,"אקוותיקים פונטוודרה, ספרד",ISR,09/02/2024
+country,ISR,masters,70-74,male,25m,individual_medley,200m,02:43.64,ניסמן דב,"אקוותיקים פונטוודרה, ספרד",ISR,08/02/2024
+country,ISR,masters,70-74,male,25m,individual_medley,400m,05:54.02,ניסמן דב,"אקוותיקים פונטוודרה, ספרד",ISR,10/02/2024
+country,ISR,masters,70-74,male,50m,backstroke,100m,01:25.10,שפע גרשון,אקוותיקים גבעת-חיים מכון וינגייט,ISR,7/24/2013
+country,ISR,masters,70-74,male,50m,backstroke,200m,02:55.43,ניסמן דב,"אקוותיקים בלגרד, סרביה",ISR,6/29/2024
+country,ISR,masters,70-74,male,50m,backstroke,50m,38.47,שפע גרשון,אקוותיקים גבעת-חיים לאומית טוטו,ISR,7/31/2015
+country,ISR,masters,70-74,male,50m,breaststroke,100m,01:34.02,שפע גרשון,אקוותיקים סלובניה,ISR,09/07/2018
+country,ISR,masters,70-74,male,50m,breaststroke,200m,03:19.11,שפע גרשון,אקוותיקים גבעת-חיים לאומית טוטו,ISR,09/05/2014
+country,ISR,masters,70-74,male,50m,breaststroke,50m,41.55,שפע גרשון,אקוותיקים גבעת-חיים לאומית טוטו,ISR,08/01/2015
+country,ISR,masters,70-74,male,50m,butterfly,100m,01:21.46,ניסמן דב,אקוותיקים לאומית,ISR,05/04/2025
+country,ISR,masters,70-74,male,50m,butterfly,200m,04:01.41,ארבל ראובן,אקוותיקים גבעת-חיים וינגייט,ISR,2/16/2007
+country,ISR,masters,70-74,male,50m,butterfly,50m,32.19,ניסמן דב,אקוותיקים לאומית,ISR,7/26/2024
+country,ISR,masters,70-74,male,50m,freestyle,100m,01:10.57,גרטל משה,ירושלים רבתי הונגריה,ISR,8/14/2017
+country,ISR,masters,70-74,male,50m,freestyle,1500m,25:56.77,הרדי עמוס,אקוותיקים גבעת-חיים מכון וינגייט,ISR,07/10/2012
+country,ISR,masters,70-74,male,50m,freestyle,200m,02:32.32,גרטל משה,ירושלים רבתי הונגריה,ISR,8/14/2017
+country,ISR,masters,70-74,male,50m,freestyle,400m,05:26.71,גרטל משה,ירושלים רבתי הונגריה,ISR,8/14/2017
+country,ISR,masters,70-74,male,50m,freestyle,50m,30.84,תדיר יונה,אקוותיקים גבעת-חיים מכון וינגייט,ISR,7/25/2013
+country,ISR,masters,70-74,male,50m,freestyle,800m,10:50.03,ניסמן דב,"אקוותיקים בלגרד, סרביה",ISR,6/26/2024
+country,ISR,masters,70-74,male,50m,individual_medley,200m,02:49.16,ניסמן דב,"אקוותיקים בלגרד, סרביה",ISR,6/27/2024
+country,ISR,masters,70-74,male,50m,individual_medley,400m,05:59.49,ניסמן דב,"אקוותיקים בלגרד, סרביה",ISR,6/28/2024
+country,ISR,masters,75-79,female,25m,backstroke,100m,01:42.18,טוביס-לאונוב איבונה,מאסטרס רחובות לאומית,ISR,04/06/2024
+country,ISR,masters,75-79,female,25m,backstroke,200m,03:45.19,טוביס-לאונוב איבונה,מאסטרס רחובות לאומית,ISR,02/04/2023
+country,ISR,masters,75-79,female,25m,backstroke,50m,46.47,טוביס לאונוב,איבונה מאסטרס רחובות לאומית,ISR,04/05/2024
+country,ISR,masters,75-79,female,25m,breaststroke,100m,01:52.41,הולדשטיין אסתר,אקוותיקים גבעת-חיים לאומית,ISR,04/01/2025
+country,ISR,masters,75-79,female,25m,breaststroke,200m,05:08.78,שניידמן ג׳אן,אקוותיקים לאומית,ISR,2/14/2020
+country,ISR,masters,75-79,female,25m,breaststroke,50m,51.73,טוביס-לאונוב איבונה,מאסטרס רחובות לאומית,ISR,02/03/2023
+country,ISR,masters,75-79,female,25m,butterfly,100m,02:13.95,ברנשטיין לאה,מכבי פ.מ. רעות לאומית,ISR,
+country,ISR,masters,75-79,female,25m,butterfly,50m,53.67,ברנשטיין לאה,מכבי פ.מ. רעות לאומית,ISR,3/19/2021
+country,ISR,masters,75-79,female,25m,freestyle,100m,01:25.58,הולדשטיין סטלה,אסתר אקוותיקים לאומית,ISR,02/03/2023
+country,ISR,masters,75-79,female,25m,freestyle,200m,03:07.53,הולדשטיין סטלה,אסתר אקוותיקים לאומית,ISR,02/04/2023
+country,ISR,masters,75-79,female,25m,freestyle,400m,06:48.94,הולדשטיין סטלה,אסתר אקוותיקים לאומית,ISR,02/04/2023
+country,ISR,masters,75-79,female,25m,freestyle,50m,41.53,הולדשטיין סטלה,אסתר אקוותיקים לאומית,ISR,02/04/2023
+country,ISR,masters,75-79,female,25m,freestyle,800m,13:44.04,הולדשטיין סטלה,אסתר אקוותיקים לאומית,ISR,02/03/2023
+country,ISR,masters,75-79,female,25m,individual_medley,100m,01:43.89,הולדשטיין אסתר,אקוותיקים לאומית,ISR,03/01/2025
+country,ISR,masters,75-79,female,25m,individual_medley,200m,03:48.81,הולדשטיין סטלה,אסתר אקוותיקים לאומית,ISR,02/04/2023
+country,ISR,masters,75-79,female,50m,backstroke,100m,01:56.34,טיין אדית,מכבי חיפה בריטניה,ISR,6/25/1996
+country,ISR,masters,75-79,female,50m,backstroke,200m,04:01.29,טיין אדית,מכבי חיפה בריטניה,ISR,07/01/1996
+country,ISR,masters,75-79,female,50m,backstroke,50m,50.04,הולדשטיין סטלה,אסתר אקוותיקים לאומית,ISR,7/27/2024
+country,ISR,masters,75-79,female,50m,breaststroke,100m,01:44.46,הולדשטיין סטלה,"אסתר אקוותיקים רומא, איטליה",ISR,8/30/2022
+country,ISR,masters,75-79,female,50m,breaststroke,200m,03:55.88,הולדשטיין סטלה,אסתר אקוותיקים לאומית,ISR,7/21/2022
+country,ISR,masters,75-79,female,50m,breaststroke,50m,48.59,הולדשטיין סטלה,אסתר אקוותיקים לאומית,ISR,7/22/2022
+country,ISR,masters,75-79,female,50m,butterfly,100m,01:58.01,ברנע דניאלה,אקוותיקים פוקואוקה יפן,ISR,08/07/2023
+country,ISR,masters,75-79,female,50m,butterfly,200m,04:14.76,ברנע דניאלה,"אקוותיקים רומא, איטליה",ISR,09/02/2022
+country,ISR,masters,75-79,female,50m,butterfly,50m,44.54,הולדשטיין סטלה,אסתר אקוותיקים לאומית,ISR,7/20/2022
+country,ISR,masters,75-79,female,50m,freestyle,100m,01:26.01,הולדשטיין סטלה,אסתר אקוותיקים לאומית,ISR,7/26/2024
+country,ISR,masters,75-79,female,50m,freestyle,200m,03:05.65,הולדשטיין סטלה,אסתר אקוותיקים לאומית,ISR,7/20/2022
+country,ISR,masters,75-79,female,50m,freestyle,400m,06:39.23,הולדשטיין סטלה,אסתר אקוותיקים לאומית,ISR,7/22/2022
+country,ISR,masters,75-79,female,50m,freestyle,50m,36.43,הולדשטיין סטלה,אסתר אקוותיקים לאומית,ISR,7/21/2022
+country,ISR,masters,75-79,female,50m,freestyle,800m,16:52.18,ברנשטיין לאה,מכבי פ.מ. רעות לאומית,ISR,6/18/2021
+country,ISR,masters,75-79,female,50m,individual_medley,200m,03:37.26,הולדשטיין סטלה,אסתר אקוותיקים לאומית,ISR,03/12/2022
+country,ISR,masters,75-79,female,50m,individual_medley,400m,08:09.76,ברנע דניאלה,אקוותיקים פוקואוקה יפן,ISR,08/07/2023
+country,ISR,masters,75-79,male,25m,backstroke,100m,01:26.38,שפע גרשון,אקוותיקים לאומית,ISR,2/15/2020
+country,ISR,masters,75-79,male,25m,backstroke,200m,03:38.34,שפע ראובן,אקוותיקים גבעת-חיים לאומית,ISR,2/28/2015
+country,ISR,masters,75-79,male,25m,backstroke,50m,39.67,שפע גרשון,אקוותיקים לאומית,ISR,2/16/2019
+country,ISR,masters,75-79,male,25m,breaststroke,100m,01:30.97,שפע גרשון,אקוותיקים לאומית,ISR,2/24/2018
+country,ISR,masters,75-79,male,25m,breaststroke,200m,03:26.40,שפע גרשון,אקוותיקים לאומית,ISR,2/15/2019
+country,ISR,masters,75-79,male,25m,breaststroke,50m,43.15,שפע גרשון,אקוותיקים לאומית,ISR,8/15/2020
+country,ISR,masters,75-79,male,25m,butterfly,100m,02:03.00,ארבל ראובן,מכבי נהריה עין גדי,ISR,3/18/2011
+country,ISR,masters,75-79,male,25m,butterfly,50m,37.25,תדיר יונה,אקוותיקים גבעת-חיים לאומית,ISR,2/24/2018
+country,ISR,masters,75-79,male,25m,freestyle,100m,01:13.46,שפע גרשון,אקוותיקים גבעת-חיים לאומית,ISR,03/04/2018
+country,ISR,masters,75-79,male,25m,freestyle,200m,02:57.53,גרטל משה,ירושלים רבתי לאומית,ISR,04/06/2024
+country,ISR,masters,75-79,male,25m,freestyle,400m,06:00.91,גרטל משה,ירושלים רבתי לאומית,ISR,3/19/2021
+country,ISR,masters,75-79,male,25m,freestyle,50m,31.68,תדיר יונה,אקוותיקים לאומית,ISR,2/24/2018
+country,ISR,masters,75-79,male,25m,freestyle,800m,12:51.10,גרטל משה,ירושלים רבתי לאומית,ISR,04/05/2024
+country,ISR,masters,75-79,male,25m,individual_medley,100m,01:22.84,שפע גרשון,אקוותיקים גבעת-חיים לאומית,ISR,2/24/2018
+country,ISR,masters,75-79,male,25m,individual_medley,200m,03:01.83,שפע גרשון,אקוותיקים לאומית,ISR,2/16/2019
+country,ISR,masters,75-79,male,50m,backstroke,100m,01:27.01,שפע גרשון,אקוותיקים סלובניה,ISR,09/04/2018
+country,ISR,masters,75-79,male,50m,backstroke,200m,03:52.48,חן יצחק,אקוותיקים לאומית,ISR,03/11/2022
+country,ISR,masters,75-79,male,50m,backstroke,50m,40.54,שפע גרשון,אקוותיקים לאומית טוטו,ISR,7/14/2018
+country,ISR,masters,75-79,male,50m,breaststroke,100m,01:33.33,שפע גרשון,אקוותיקים לאומית,ISR,7/13/2018
+country,ISR,masters,75-79,male,50m,breaststroke,200m,03:26.50,שפע גרשון,אקוותיקים סלובניה,ISR,09/04/2018
+country,ISR,masters,75-79,male,50m,breaststroke,50m,44.48,שפע גרשון,אקוותיקים לאומית,ISR,7/13/2018
+country,ISR,masters,75-79,male,50m,butterfly,100m,01:53.51,שבתאי זאב,אקוותיקים לאומית,ISR,7/14/2018
+country,ISR,masters,75-79,male,50m,butterfly,200m,04:49.46,ארבל ראובן,הפועל דולפין נהריה אוקראינה,ISR,09/07/2011
+country,ISR,masters,75-79,male,50m,butterfly,50m,39.38,תדיר יונה,אקוותיקים לאומית,ISR,08/07/2021
+country,ISR,masters,75-79,male,50m,freestyle,100m,01:16.62,גרטל משה,ירושלים רבתי לאומית,ISR,08/06/2021
+country,ISR,masters,75-79,male,50m,freestyle,1500m,33:32.30,ארבל ראובן,הפועל דולפין נהריה מכון וינגייט,ISR,08/06/2013
+country,ISR,masters,75-79,male,50m,freestyle,200m,02:47.20,גרטל משה,ירושלים רבתי לאומית,ISR,08/07/2021
+country,ISR,masters,75-79,male,50m,freestyle,400m,05:56.32,גרטל משה,ירושלים רבתי לאומית,ISR,08/06/2021
+country,ISR,masters,75-79,male,50m,freestyle,50m,31.99,תדיר יונה,אקוותיקים לאומית,ISR,7/20/2019
+country,ISR,masters,75-79,male,50m,freestyle,800m,12:18.32,גרטל משה,ירושלים רבתי לאומית,ISR,08/07/2021
+country,ISR,masters,75-79,male,50m,individual_medley,200m,03:07.76,שפע גרשון,אקוותיקים סלובניה,ISR,09/05/2018
+country,ISR,masters,75-79,male,50m,individual_medley,400m,08:04.26,שפע ראובן,אקוותיקים גבעת-חיים לאומית טוטו,ISR,7/29/2014
+country,ISR,masters,80-84,female,25m,backstroke,100m,02:01.48,טיין אדית,מרכז ישראלי לרפואת ספורט פלמה דה מיורקה,ISR,10/19/2001
+country,ISR,masters,80-84,female,25m,backstroke,200m,04:18.22,טיין אדית,מרכז ישראלי לרפואת ספורט פלמה דה מיורקה,ISR,10/20/2001
+country,ISR,masters,80-84,female,25m,backstroke,50m,55.14,טיין אידית,מרכז ישראלי לרפואת ספורט ושיקום פלמה דה מיורקה,ISR,10/19/2001
+country,ISR,masters,80-84,female,25m,breaststroke,50m,01:34.21,בראונר חוה,שירותי בריאות כללית אילת,ISR,10/19/2001
+country,ISR,masters,80-84,female,25m,butterfly,50m,56.91,ברנשטיין לאה,מכבי פ.מ. רעות לאומית,ISR,10/01/2026
+country,ISR,masters,80-84,female,25m,freestyle,100m,02:26.08,יערי זיוה,תעשיה אווירית לאומית,ISR,3/20/2021
+country,ISR,masters,80-84,female,25m,freestyle,200m,05:08.13,יערי זיוה,תעשיה אווירית לאומית,ISR,3/20/2021
+country,ISR,masters,80-84,female,25m,freestyle,400m,09:10.42,טיין אדית,מרכז ישראלי לרפואת ספורט פלמה דה מיורקה,ISR,10/19/2001
+country,ISR,masters,80-84,female,25m,freestyle,50m,46.71,ברנשטיין לאה,מכבי פ.מ. רעות לאומית,ISR,10/01/2026
+country,ISR,masters,80-84,female,25m,individual_medley,100m,02:05.39,ברנשטיין לאה,מכבי פ.מ. רעות לאומית,ISR,09/01/2026
+country,ISR,masters,80-84,female,25m,individual_medley,200m,04:37.51,ברנשטיין לאה,מכבי פ.מ. רעות לאומית,ISR,09/01/2026
+country,ISR,masters,80-84,female,50m,backstroke,100m,02:01.49,טיין אדית,מכבי חיפה גרמניה,ISR,7/30/2000
+country,ISR,masters,80-84,female,50m,backstroke,200m,04:11.83,טיין אדית,מכבי חיפה גרמניה,ISR,08/02/2000
+country,ISR,masters,80-84,female,50m,backstroke,50m,56.54,טיין אדית,מכבי חיפה גרמניה,ISR,7/29/2000
+country,ISR,masters,80-84,female,50m,freestyle,100m,02:46.81,שיבלין ז׳אנה,מכבי נהריה לאומית,ISR,08/06/2021
+country,ISR,masters,80-84,female,50m,freestyle,200m,05:52.91,שיבלין ז׳אנה,מכבי נהריה לאומית,ISR,7/20/2022
+country,ISR,masters,80-84,female,50m,freestyle,400m,08:43.54,טיין אדית,מכבי חיפה גרמניה,ISR,7/29/2000
+country,ISR,masters,80-84,female,50m,freestyle,50m,01:00.76,יערי זיוה,תעשיה אווירית לאומית,ISR,6/18/2021
+country,ISR,masters,80-84,female,50m,freestyle,800m,18:07.12,טיין אדית,מכבי חיפה גרמניה,ISR,7/29/2000
+country,ISR,masters,80-84,male,25m,backstroke,100m,01:32.63,שפע גרשון,אקוותיקים לאומית,ISR,02/03/2023
+country,ISR,masters,80-84,male,25m,backstroke,200m,03:27.39,שפע גרשון,אקוותיקים לאומית,ISR,04/05/2024
+country,ISR,masters,80-84,male,25m,backstroke,50m,42.13,שפע גרשון,אקוותיקים לאומית,ISR,02/04/2023
+country,ISR,masters,80-84,male,25m,breaststroke,100m,01:50.64,שבתאי זאב,אקוותיקים לאומית,ISR,02/04/2023
+country,ISR,masters,80-84,male,25m,breaststroke,200m,04:25.25,כרמל דן,הפועל עולם המים,ISR,2/24/2012
+country,ISR,masters,80-84,male,25m,breaststroke,50m,48.27,שפע גרשון,אקוותיקים לאומית,ISR,09/01/2026
+country,ISR,masters,80-84,male,25m,butterfly,100m,02:35.15,ארבל ראובן,מכבי נהריה לאומית,ISR,2/24/2018
+country,ISR,masters,80-84,male,25m,butterfly,200m,05:15.89,ארבל ראובן,מכבי נהריה לאומית,ISR,2/24/2018
+country,ISR,masters,80-84,male,25m,butterfly,50m,41.62,תדיר יונה,אקוותיקים לאומית,ISR,02/03/2023
+country,ISR,masters,80-84,male,25m,freestyle,100m,01:21.94,שפע גרשון,אקוותיקים לאומית,ISR,04/01/2025
+country,ISR,masters,80-84,male,25m,freestyle,200m,03:13.81,לנדאו יאיר,אקוותיקים לאומית,ISR,04/06/2024
+country,ISR,masters,80-84,male,25m,freestyle,400m,07:15.03,שבתאי זאב,אקוותיקים לאומית,ISR,02/04/2023
+country,ISR,masters,80-84,male,25m,freestyle,50m,33.46,תדיר יונה,אקוותיקים לאומית,ISR,02/04/2023
+country,ISR,masters,80-84,male,25m,freestyle,800m,14:58.28,שבתאי זאב,אקוותיקים לאומית,ISR,12/17/2021
+country,ISR,masters,80-84,male,25m,individual_medley,100m,01:28.67,שפע גרשון,אקוותיקים לאומית,ISR,02/03/2023
+country,ISR,masters,80-84,male,25m,individual_medley,200m,03:23.52,שפע גרשון,אקוותיקים לאומית,ISR,02/04/2023
+country,ISR,masters,80-84,male,25m,individual_medley,400m,09:58.50,ארבל ראובן,מכבי נהריה בית-אייל,ISR,2/21/2016
+country,ISR,masters,80-84,male,50m,backstroke,100m,01:31.29,שפע גרשון,אקוותיקים פוקואוקה יפן,ISR,08/10/2023
+country,ISR,masters,80-84,male,50m,backstroke,200m,04:07.02,שבתאי זאב,אקוותיקים לאומית,ISR,03/11/2022
+country,ISR,masters,80-84,male,50m,backstroke,50m,42.32,שפע גרשון,אקוותיקים פוקואוקה יפן,ISR,08/09/2023
+country,ISR,masters,80-84,male,50m,breaststroke,100m,01:38.90,שפע גרשון,אקוותיקים לאומית,ISR,7/14/2023
+country,ISR,masters,80-84,male,50m,breaststroke,200m,03:42.00,שפע גרשון,אקוותיקים פוקואוקה יפן,ISR,08/10/2023
+country,ISR,masters,80-84,male,50m,breaststroke,50m,46.91,שפע גרשון,אקוותיקים לאומית,ISR,7/14/2023
+country,ISR,masters,80-84,male,50m,butterfly,100m,02:33.75,רורקה דוד,אקוותיקים לאומית,ISR,7/21/2022
+country,ISR,masters,80-84,male,50m,butterfly,200m,05:25.04,ארבל ראובן,מכבי נהריה מכון וינגייט,ISR,7/14/2018
+country,ISR,masters,80-84,male,50m,butterfly,50m,46.63,שפע גרשון,אקוותיקים לאומית,ISR,7/15/2023
+country,ISR,masters,80-84,male,50m,freestyle,100m,01:27.09,שפע גרשון,אקוותיקים לאומית,ISR,05/04/2025
+country,ISR,masters,80-84,male,50m,freestyle,200m,03:26.61,שבתאי זאב,אקוותיקים לאומית,ISR,7/20/2022
+country,ISR,masters,80-84,male,50m,freestyle,400m,07:18.85,לנדאו יאיר,אקוותיקים לאומית,ISR,7/26/2024
+country,ISR,masters,80-84,male,50m,freestyle,50m,33.59,תדיר יונה,"אקוותיקים קליפורניה, ארה""ב",ISR,8/24/2024
+country,ISR,masters,80-84,male,50m,freestyle,800m,14:41.61,קליגמן יוסף,מכבי שוהם דרום קוריאה,ISR,08/12/2019
+country,ISR,masters,80-84,male,50m,individual_medley,200m,03:20.69,שפע גרשון,אקוותיקים לאומית,ISR,7/15/2023
+country,ISR,masters,80-84,male,50m,individual_medley,400m,10:25.79,ארבל ראובן,מכבי נהריה לאומית,ISR,7/14/2018
+country,ISR,masters,85-89,female,25m,backstroke,100m,02:23.95,טיין אידית,מכבי חיפה אילת,ISR,10/27/2004
+country,ISR,masters,85-89,female,25m,backstroke,200m,04:18.50,טיין אדית,מרכז ישראלי לרפואת ספורט מטולה,ISR,10/20/2003
+country,ISR,masters,85-89,female,25m,backstroke,50m,01:06.58,טיין אידית,מכבי חיפה אילת,ISR,10/27/2004
+country,ISR,masters,85-89,female,25m,breaststroke,50m,01:18.69,טיין אדית,מכבי חיפה אילת,ISR,10/28/2004
+country,ISR,masters,85-89,female,25m,freestyle,100m,02:17.60,טיין אידית,מכבי חיפה אילת,ISR,10/27/2004
+country,ISR,masters,85-89,female,25m,freestyle,200m,04:20.18,טיין אדית,מרכז ישראלי לרפואת ספורט מטולה,ISR,10/19/2003
+country,ISR,masters,85-89,female,25m,freestyle,50m,01:03.44,טיין אידית,מכבי חיפה אילת,ISR,10/27/2004
+country,ISR,masters,85-89,female,25m,freestyle,800m,24:05.00,יערי זיוה,תעשייה אווירית לאומית,ISR,04/05/2024
+country,ISR,masters,85-89,female,25m,individual_medley,100m,03:08.86,יערי זיוה,תעשייה אווירית אגודה לאומית,ISR,02/03/2023
+country,ISR,masters,85-89,female,50m,backstroke,100m,02:10.44,טיין אדית,מכבי חיפה איטליה,ISR,07/03/2004
+country,ISR,masters,85-89,female,50m,backstroke,200m,04:52.29,טיין אדית,מכבי חיפה איטליה,ISR,07/12/2004
+country,ISR,masters,85-89,female,50m,backstroke,50m,01:04.51,טיין אדית,מכבי חיפה איטליה,ISR,07/01/2004
+country,ISR,masters,85-89,female,50m,freestyle,200m,05:47.48,יערי זיוה,תעשיה אווירית לאומית,ISR,04/04/2025
+country,ISR,masters,85-89,female,50m,freestyle,50m,01:16.04,יערי זיוה,תעשיה אווירית לאומית,ISR,6/18/2021
+country,ISR,masters,85-89,male,25m,backstroke,100m,02:15.01,זק יצחק,WEST SWIM לאומית,ISR,2/15/2020
+country,ISR,masters,85-89,male,25m,backstroke,200m,04:51.26,זק יצחק,WEST SWIM לאומית,ISR,2/14/2020
+country,ISR,masters,85-89,male,25m,backstroke,50m,01:01.57,זק יצחק,WEST SWIM לאומית,ISR,2/14/2020
+country,ISR,masters,85-89,male,25m,breaststroke,100m,01:56.09,רורקה דוד,אקוותיקים לאומית,ISR,10/01/2026
+country,ISR,masters,85-89,male,25m,breaststroke,200m,04:19.05,שבתאי זאב,אקוותיקים לאומית,ISR,09/01/2026
+country,ISR,masters,85-89,male,25m,breaststroke,50m,54.76,שבתאי זאב,אקוותיקים לאומית,ISR,09/01/2026
+country,ISR,masters,85-89,male,25m,butterfly,50m,01:06.93,רורקה דוד,אקוותיקים לאומית,ISR,04/01/2025
+country,ISR,masters,85-89,male,25m,freestyle,100m,02:09.92,יקיר ראובן,תעשיה אווירית לאומית,ISR,04/05/2024
+country,ISR,masters,85-89,male,25m,freestyle,50m,49.28,אביגד ראובן,חברת חשמל צפון גבעת חיים,ISR,04/07/2005
+country,ISR,masters,85-89,male,25m,individual_medley,100m,01:51.93,שבתאי זאב,אקוותיקים לאומית,ISR,09/01/2026
+country,ISR,masters,85-89,male,25m,individual_medley,200m,04:27.77,שבתאי זאב,אקוותיקים לאומית,ISR,10/01/2026
+country,ISR,masters,85-89,male,50m,backstroke,100m,02:16.25,זק יצחק,עולם המים לאומית,ISR,7/14/2018
+country,ISR,masters,85-89,male,50m,backstroke,200m,04:59.69,זק יצחק,עולם המים בריכת לאומית טוטו,ISR,7/13/2018
+country,ISR,masters,85-89,male,50m,backstroke,50m,01:00.77,זק יצחק,עולם המים סלובניה,ISR,09/07/2018
+country,ISR,masters,85-89,male,50m,breaststroke,100m,02:46.67,רורקה דוד,אקוותיקים לאומית,ISR,04/04/2025
+country,ISR,masters,85-89,male,50m,breaststroke,200m,06:25.01,רורקה דוד,אקוותיקים לאומית,ISR,05/04/2025
+country,ISR,masters,85-89,male,50m,breaststroke,50m,01:05.23,זק יצחק,עולם המים לאומית,ISR,7/14/2018
+country,ISR,masters,85-89,male,50m,butterfly,100m,02:59.35,רורקה דוד,אקוותיקים לאומית,ISR,05/04/2025
+country,ISR,masters,85-89,male,50m,butterfly,50m,01:11.16,רורקה דוד,אקוותיקים לאומית,ISR,04/04/2025
+country,ISR,masters,85-89,male,50m,freestyle,100m,01:37.25,קליגמן יוסף,מכבי שוהם פוקואוקה יפן,ISR,08/07/2023
+country,ISR,masters,85-89,male,50m,freestyle,200m,03:16.32,קליגמן יוסף,מכבי שוהם פוקואוקה יפן,ISR,08/07/2023
+country,ISR,masters,85-89,male,50m,freestyle,400m,07:11.40,קליגמן יוסף,מכבי שוהם פוקואוקה יפן,ISR,08/11/2023
+country,ISR,masters,85-89,male,50m,freestyle,50m,39.76,קליגמן יוסף,מכבי שוהם לאומית,ISR,7/14/2023
+country,ISR,masters,85-89,male,50m,freestyle,800m,14:57.37,קליגמן יוסף,מכבי שוהם לאומית,ISR,7/15/2023
+country,ISR,masters,90-94,male,25m,backstroke,100m,02:23.51,זק יצחק,מכבי עולם המים לאומית,ISR,02/03/2023
+country,ISR,masters,90-94,male,25m,backstroke,200m,05:08.21,זק יצחק,מכבי עולם המים לאומית,ISR,02/04/2023
+country,ISR,masters,90-94,male,25m,backstroke,50m,01:05.63,זק יצחק,מכבי עולם המים לאומית,ISR,02/04/2023
+country,ISR,masters,90-94,male,25m,breaststroke,50m,01:12.49,זק יצחק,מכבי עולם המים לאומית,ISR,02/03/2023
+country,ISR,masters,90-94,male,25m,freestyle,100m,02:32.48,רמון אמנון,ירושלים רבתי לאומית,ISR,10/01/2026
+country,ISR,masters,90-94,male,25m,freestyle,50m,50.94,זק יצחק,מכבי עולם המים לאומית,ISR,10/01/2026
+country,ISR,masters,90-94,male,50m,backstroke,100m,02:25.24,זק יצחק,מכבי עולם המים לאומית,ISR,7/26/2024
+country,ISR,masters,90-94,male,50m,backstroke,200m,05:27.70,זק יצחק,מכבי עולם המים לאומית,ISR,7/14/2023
+country,ISR,masters,90-94,male,50m,backstroke,50m,01:05.29,זק יצחק,מכבי עולם המים לאומית,ISR,7/27/2024
+country,ISR,masters,90-94,male,50m,breaststroke,50m,01:17.47,זק יצחק,אקוותיקים לאומית,ISR,7/15/2023
+country,ISR,masters,90-94,male,50m,freestyle,100m,02:46.15,רמון אמנון,ירושלים רבתי לאומית,ISR,7/26/2024
+country,ISR,masters,90-94,male,50m,freestyle,50m,01:13.08,זק יצחק,מכבי עולם המים לאומית,ISR,7/27/2024
