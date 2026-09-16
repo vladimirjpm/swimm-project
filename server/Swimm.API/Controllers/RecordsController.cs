@@ -129,6 +129,54 @@ public class RecordsController : ControllerBase
     }
 
     /// <summary>
+    /// Страны, у которых в справочнике есть рекорды — список для выбора сторон сравнения.
+    /// Что есть В БАЗЕ; живой источник и права здесь ни при чём (это не админский эндпоинт).
+    /// </summary>
+    [HttpGet("/api/records/countries")]
+    public Task<IActionResult> GetRecordCountries()
+        => this.CachedJson(_cache, "http:records:countries",
+            () => _records.GetRecordCountriesAsync(), PayloadTtl, CacheControlValue);
+
+    /// <summary>
+    /// Сравнение двух стран по рекордам (этап 11.3.1): общая ось дисциплин, время каждой
+    /// стороны, дельта и сводный счёт.
+    ///
+    /// <c>pool</c> и <c>gender</c> — необязательные разрезы, в отличие от рейтинга: смысл
+    /// экрана в обходе ВСЕХ дисциплин сразу.
+    ///
+    /// ⚠ Дисциплина, где рекорда нет у одной из сторон, остаётся строкой «нет данных» и в
+    /// счёт не идёт ни в чью пользу — иначе страна с половинным покрытием выигрывала бы
+    /// пустотами (требование 11.3.3).
+    /// </summary>
+    [HttpGet("/api/records/compare")]
+    public async Task<IActionResult> GetCompare(
+        [FromQuery] string? a,
+        [FromQuery] string? b,
+        [FromQuery] string? pool,
+        [FromQuery] string? gender)
+    {
+        if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b))
+            return BadRequest("a and b are required country codes, e.g. ?a=ISR&b=USA");
+
+        if (pool != null && pool.Trim().ToLowerInvariant() is not ("25m" or "50m" or ""))
+            return BadRequest("pool must be '25m' or '50m' when given");
+
+        if (gender != null && gender.Trim().ToLowerInvariant() is not ("male" or "female" or ""))
+            return BadRequest("gender must be 'male' or 'female' when given");
+
+        var query = RecordCompareQuery.Create(a, b, pool, gender);
+
+        if (query.A == query.B)
+            return BadRequest("a and b must be different countries");
+
+        return await this.CachedJson(_cache,
+            $"http:records:compare:{query.A}:{query.B}"
+                + $":{query.PoolType ?? "all"}:{query.Gender ?? "all"}",
+            () => _records.GetCompareAsync(query),
+            PayloadTtl, CacheControlValue);
+    }
+
+    /// <summary>
     /// Нормативы уровней. kind: regular/masters (опционально — иначе все).
     /// country: alpha-3 код системы нормативов (опционально — иначе легаси-поведение без фильтра).
     /// </summary>

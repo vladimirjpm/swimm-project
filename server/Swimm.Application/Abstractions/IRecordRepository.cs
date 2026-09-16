@@ -31,6 +31,23 @@ public interface IRecordRepository
     Task<RecordRankingDto> GetRankingAsync(RecordRankingQuery query);
 
     /// <summary>
+    /// Сравнение двух стран по рекордам (этап 11.3.1): общая ось дисциплин, время каждой
+    /// стороны, дельта и сводный счёт.
+    ///
+    /// Не выражается через <see cref="GetRankingAsync"/> с двумя кодами: тот отвечает про
+    /// ОДНУ дисциплину, а здесь смысл ровно в обходе всех сразу — и в том, что дисциплина
+    /// без данных у одной из сторон обязана остаться видимой строкой «нет данных», а не
+    /// исчезнуть (11.3.3).
+    /// </summary>
+    Task<RecordCompareDto> GetCompareAsync(RecordCompareQuery query);
+
+    /// <summary>
+    /// Страны, у которых в справочнике есть рекорды `open` — список для выбора на витрине
+    /// (`/records/compare`). Что есть В БАЗЕ, а не что отдаёт источник.
+    /// </summary>
+    Task<IReadOnlyList<RecordCountryOptionDto>> GetRecordCountriesAsync();
+
+    /// <summary>
     /// Нормативы. kind: regular/masters; null — все.
     /// country: alpha-3 код системы нормативов (RUS/ISR/…); null — без фильтра (легаси).
     /// Задан — отдаёт строки с этой страной плюс универсальные (Country == "").

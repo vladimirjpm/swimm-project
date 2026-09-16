@@ -198,6 +198,73 @@ public class RecordRepository : IRecordRepository
         };
     }
 
+    /// <summary>Страны справочника для выбора на витрине (11.3.2).</summary>
+    public Task<IReadOnlyList<RecordCountryOptionDto>> GetRecordCountriesAsync()
+        => _cache.GetOrCreateAsync("records:countries", async () =>
+        {
+            var rows = await _db.Records.AsNoTracking()
+                .Where(r => r.RegionType == "country" && r.Category == "open")
+                .GroupBy(r => r.RegionCode)
+                .Select(g => new RecordCountryOptionDto { Code = g.Key, Records = g.Count() })
+                .OrderBy(x => x.Code)
+                .ToListAsync();
+
+            return (IReadOnlyList<RecordCountryOptionDto>)rows;
+        }, CacheTtl);
+
+    /// <summary>
+    /// Сравнение двух стран (11.3.1). Кэш — по паре кодов и разрезу; пара НЕ сортируется:
+    /// «A против B» и «B против A» дают зеркальный ответ (слева своя сторона), и один ключ
+    /// на оба означал бы, что второй запрос получит чужую раскладку.
+    /// </summary>
+    public Task<RecordCompareDto> GetCompareAsync(RecordCompareQuery query)
+    {
+        var cacheKey = $"records:compare:{query.A}:{query.B}"
+                     + $":{query.PoolType ?? "all"}:{query.Gender ?? "all"}";
+
+        return _cache.GetOrCreateAsync(cacheKey, () => LoadCompareAsync(query), CacheTtl);
+    }
+
+    private async Task<RecordCompareDto> LoadCompareAsync(RecordCompareQuery query)
+    {
+        var codes = new[] { query.A, query.B };
+
+        var q = _db.Records.AsNoTracking()
+            .Where(r => r.RegionType == "country"
+                     && r.Category == "open"
+                     && r.TimeMs != null
+                     && codes.Contains(r.RegionCode));
+
+        if (query.PoolType != null) q = q.Where(r => r.PoolType == query.PoolType);
+        if (query.Gender != null) q = q.Where(r => r.Gender == query.Gender);
+
+        var rows = await q
+            .Select(r => new
+            {
+                r.RegionType, r.RegionCode, r.Category, r.AgeKey, r.Gender,
+                r.PoolType, r.Style, r.Distance,
+                r.Time, TimeMs = r.TimeMs!.Value, r.HolderName, r.RecordDate,
+            })
+            .ToListAsync();
+
+        // Претензии — тем же путём, что у /api/records и рейтинга: словарь в памяти.
+        var issues = await OpenIssuesAsync();
+        var axes = rows.Select((r, i) => new RecordAxes(
+            i, r.RegionType, r.RegionCode, r.Category, r.AgeKey,
+            r.Gender, r.PoolType, r.Style, r.Distance, r.Time, r.HolderName, r.RecordDate)).ToList();
+        var reasons = RecordIssueSpreader.Resolve(axes, issues);
+
+        var input = rows.Select((r, i) => new RecordCompareBuilder.Row(
+            r.RegionCode, r.Style, r.Distance, r.Gender, r.PoolType,
+            r.Time, r.TimeMs, r.HolderName, r.RecordDate,
+            reasons.TryGetValue(i, out var reason) ? reason : null)).ToList();
+
+        var result = RecordCompareBuilder.Build(input, query.A, query.B);
+        result.PoolType = query.PoolType;
+        result.Gender = query.Gender;
+        return result;
+    }
+
     /// <summary>
     /// Досыпает год рождения держателя и его возраст в год рекорда (отладочная опция
     /// ShowAgeRecordsDetails). В справочнике федерации года рождения нет — восстанавливаем

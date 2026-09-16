@@ -1300,6 +1300,7 @@ app.Use(async (context, next) =>
             },
             >= 2 => seg[0] switch
             {
+                "records" when seg[1] == "compare" => "/records-compare.html", // сравнение двух стран
                 "competitions" => "/results_main.html",              // /competitions/{id}
                 "swimmers" => "/swimmer.html",                       // /swimmers/{id}
                 "clubs" => "/club.html",                             // /clubs/{id}
