@@ -33,6 +33,7 @@ const cleanUrlRewrite = () => ({
           records: '/records.html' }[seg[0]] ?? null;
       }
       if (seg.length >= 2) {
+        if (seg[0] === 'records' && seg[1] === 'compare') return '/records-compare.html';
         if (seg[0] === 'competitions') return '/results_main.html';
         if (seg[0] === 'swimmers') return '/swimmer.html';
         if (seg[0] === 'clubs') return '/club.html';
@@ -93,6 +94,7 @@ export default defineConfig(({ command }) => ({
         season_best: resolve(__dirname, 'season-best.html'),
         h2h: resolve(__dirname, 'h2h.html'),
         records: resolve(__dirname, 'records.html'),
+        records_compare: resolve(__dirname, 'records-compare.html'),
       },
       output: {
         entryFileNames: '[name].js',

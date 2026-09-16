@@ -16,6 +16,7 @@
 //   /about                  → about.html
 //   /season-best            → season-best.html (списки лучших в сезоне; всё в query)
 //   /records                → records.html (рейтинг рекордов стран; дисциплина в query)
+//   /records/compare        → records-compare.html (две страны по рекордам; пара в query)
 //
 // ПРАВИЛО: в путь идёт только идентичность ресурса. Состояние вида
 // (tab, filter, club, swim, eventId, cat, loadMode, themes) остаётся в query —
@@ -126,6 +127,26 @@ export const routes = {
     if (q.highlight) params.set('country', q.highlight);
     const query = params.toString();
     return query ? `/records?${query}` : '/records';
+  },
+
+  /**
+   * Страница `/records/compare` — сравнение ДВУХ СТРАН по рекордам (этап 11.3.2).
+   *
+   * Сегмент в пути, а пара в query — и это не противоречие правилу «в путь только
+   * идентичность»: `compare` тут не идентификатор ресурса, а другой ЭКРАН тех же данных
+   * (как `/groups/{slug}/results` рядом с `/groups/{slug}`). Сама пара стран идентичностью
+   * не является по той же причине, что пара пловцов в `/h2h`: «ещё никто не выбран» —
+   * законное состояние, и в пути оно потребовало бы второго формата.
+   */
+  recordsCompare: (q: { a?: string | null; b?: string | null;
+    poolType?: string | null; gender?: string | null } = {}) => {
+    const params = new URLSearchParams();
+    if (q.a) params.set('a', q.a);
+    if (q.b) params.set('b', q.b);
+    if (q.poolType) params.set('pool', q.poolType);
+    if (q.gender) params.set('gender', q.gender);
+    const query = params.toString();
+    return query ? `/records/compare?${query}` : '/records/compare';
   },
 
   /**
@@ -316,6 +337,40 @@ export function parseRecordsQuery(search: string = window.location.search): Reco
     gender: gender === 'male' || gender === 'female' ? gender : null,
     poolType: pool === '25m' || pool === '50m' ? pool : null,
     highlight: (p.get('country') || '').trim().toUpperCase() || null,
+  };
+}
+
+/**
+ * Пара стран и разрез страницы `/records/compare`, разобранные из query. Живёт рядом с
+ * генератором по тому же правилу, что остальные разборы.
+ *
+ * `a === b` даёт null во втором слоте — сравнение страны с самой собой не значит ничего
+ * (то же решение, что у `parseH2HQuery`).
+ */
+export interface RecordsCompareQuery {
+  a: string | null;
+  b: string | null;
+  poolType: '25m' | '50m' | null;
+  gender: 'male' | 'female' | null;
+}
+
+export function parseRecordsCompareQuery(search: string = window.location.search): RecordsCompareQuery {
+  const p = new URLSearchParams(search);
+  const code = (key: string) => {
+    const raw = (p.get(key) || '').trim().toUpperCase();
+    return /^[A-Z]{3}$/.test(raw) ? raw : null;
+  };
+  const pool = (p.get('pool') ?? '').toLowerCase();
+  const gender = (p.get('gender') ?? '').toLowerCase();
+
+  const a = code('a');
+  const b = code('b');
+
+  return {
+    a,
+    b: b != null && b === a ? null : b,
+    poolType: pool === '25m' || pool === '50m' ? pool : null,
+    gender: gender === 'male' || gender === 'female' ? gender : null,
   };
 }
 
