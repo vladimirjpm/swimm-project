@@ -56,6 +56,10 @@ public static class DependencyInjection
         // Список стран источника (11.1.1) — из него батч Фазы 11 берёт, чьи NR качать.
         services.AddSingleton<IRecordCountriesProvider, WorldAquaticsCountriesProvider>();
 
+        // Национальные рекорды одной страны по её GUID (11.1.3 п. 2) — кирпич батча.
+        services.AddSingleton<IRecordCountryFetcher>(sp => new WorldAquaticsCountryFetcher(
+            sp.GetRequiredService<IHttpClientFactory>(), sp.GetRequiredService<WorldRecordsParser>()));
+
         services.AddSingleton<IRecordSourceProvider, WorldRecordsSourceProvider>();
         services.AddSingleton<IRecordSourceProvider, IsrOrgAgeRecordsSourceProvider>();
         services.AddSingleton<IRecordSourceProvider, IsrOrgMastersRecordsSourceProvider>();

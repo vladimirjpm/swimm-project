@@ -125,3 +125,32 @@ public sealed record RecordSourceLinkDto(
 /// (AIN, EOR, FINA…), поэтому и служит признаком «это не страна» — в DTO попадают только
 /// настоящие.</param>
 public sealed record RecordCountryDto(string Code, string SourceId, string Name, string Region);
+
+/// <summary>
+/// Национальные рекорды одной страны, как их отдал источник (11.1.3 п. 2): что мы готовы
+/// записать и что отбросили.
+///
+/// Отбрасываем не молча: <paramref name="Mismatches"/> — требование плана, а не отладка.
+/// В режиме «все страны» <c>RegionCode</c> берётся ИЗ ЗАПРОСА, поэтому строка, которую
+/// источник пометил чужой федерацией, не должна ни записаться под нашим кодом, ни исчезнуть
+/// без следа: она едет в отчёт прогона.
+/// </summary>
+public sealed record RecordCountryFetchResult(
+    string Code,
+    IReadOnlyList<ParsedRecordDto> Records,
+    IReadOnlyList<RecordCountryMismatchDto> Mismatches);
+
+/// <summary>
+/// Строка отчёта прогона, которую НЕ записали: код федерации в строке не равен
+/// запрошенной стране. Пустой <c>NF Code</c> выглядит так же — парсер подставляет на его
+/// место колонку <c>Country</c>, а это страна МЕСТА соревнования («Great Britain»), не
+/// спортсмена; в режиме «все страны» такой фоллбек запрещён (план §3а).
+/// </summary>
+public sealed record RecordCountryMismatchDto(
+    string RequestedCode,
+    string ReportedCountry,
+    string PoolType,
+    string Style,
+    string Distance,
+    string Gender,
+    string Time);
