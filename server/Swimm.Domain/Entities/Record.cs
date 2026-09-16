@@ -101,6 +101,22 @@ public class Record
     [MaxLength(400)]
     public string? HolderName { get; set; }
 
+    /// <summary>
+    /// Держатель ЛАТИНИЦЕЙ — для международных экранов (`/records`, `/records/compare`),
+    /// где ивритская строка посреди рейтинга двух сотен стран читается как сбой кодировки
+    /// (решение Влада 16.09.2026, исключение в docs/important.md).
+    ///
+    /// Заполняет источник, который сам отдаёт латиницу (World Aquatics); федерация пишет
+    /// иврит в <see cref="HolderName"/> и это поле не трогает.
+    ///
+    /// ⚠ **Имя привязано к КОНКРЕТНОМУ рекорду, а не к дисциплине.** Поэтому при смене
+    /// <see cref="Time"/> оно сбрасывается: иначе следующий рекорд той же дисциплины оказался
+    /// бы подписан именем предыдущего держателя. Правило целиком — в
+    /// <c>RecordDiffService.ResolveHolderNameEn</c>.
+    /// </summary>
+    [MaxLength(400)]
+    public string? HolderNameEn { get; set; }
+
     /// <summary>Клуб держателя (age/masters-рекорды).</summary>
     [MaxLength(200)]
     public string? Club { get; set; }

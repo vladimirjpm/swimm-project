@@ -68,6 +68,37 @@ public class HolderLatinNameTests
         Assert.Equal("", HolderLatinName.Resolve("", Latin));
     }
 
+    /// <summary>
+    /// Правило переноса английского имени (`CarryOver`) — одно на импорт и обе админские
+    /// формы. Главное в нём — пункт 3: сменилось время, значит рекорд ДРУГОЙ, и старое имя
+    /// к нему не относится.
+    /// </summary>
+    [Fact]
+    public void CarryOver_LatinIncoming_WinsAlways()
+        => Assert.Equal("Denis Loktev",
+            HolderLatinName.CarryOver("Denis Loktev", "47.90", "48.18", "Tomer Frankel"));
+
+    [Fact]
+    public void CarryOver_HebrewOverSameTime_KeepsPreviousLatin()
+        => Assert.Equal("Tomer Frankel",
+            HolderLatinName.CarryOver("תומר פרנקל", "48.18", "48.18", "Tomer Frankel"));
+
+    [Fact]
+    public void CarryOver_HebrewOverNewTime_Clears()
+        => Assert.Null(HolderLatinName.CarryOver("שם אחר", "47.90", "48.18", "Tomer Frankel"));
+
+    [Fact]
+    public void CarryOver_NewRowWithHebrew_HasNoLatin()
+        => Assert.Null(HolderLatinName.CarryOver("תומר פרנקל", "48.18", existingTime: null, existingHolderNameEn: null));
+
+    /// <summary>Пустое имя не считается латиницей: пустая строка ничего не подписывает.</summary>
+    [Fact]
+    public void CarryOver_EmptyIncoming_FallsBackToTheTimeRule()
+    {
+        Assert.Equal("Tomer Frankel", HolderLatinName.CarryOver("  ", "48.18", "48.18", "Tomer Frankel"));
+        Assert.Null(HolderLatinName.CarryOver("  ", "47.90", "48.18", "Tomer Frankel"));
+    }
+
     [Theory]
     [InlineData("תומר פרנקל", true)]
     [InlineData("Cameron Mcevoy", false)]

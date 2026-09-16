@@ -137,7 +137,7 @@ public class RecordRepository : IRecordRepository
             {
                 r.RegionType, r.RegionCode, r.Category, r.AgeKey, r.Gender,
                 r.PoolType, r.Style, r.Distance,
-                r.Time, TimeMs = r.TimeMs!.Value, r.HolderName, r.RecordDate,
+                r.Time, TimeMs = r.TimeMs!.Value, r.HolderName, r.HolderNameEn, r.RecordDate,
             })
             .ToListAsync();
 
@@ -149,7 +149,7 @@ public class RecordRepository : IRecordRepository
             {
                 r.RegionType, r.RegionCode, r.Category, r.AgeKey, r.Gender,
                 r.PoolType, r.Style, r.Distance,
-                r.Time, TimeMs = r.TimeMs!.Value, r.HolderName, r.RecordDate,
+                r.Time, TimeMs = r.TimeMs!.Value, r.HolderName, r.HolderNameEn, r.RecordDate,
             })
             .FirstOrDefaultAsync();
 
@@ -178,13 +178,13 @@ public class RecordRepository : IRecordRepository
         {
             Time = worldRow.Time,
             TimeMs = worldRow.TimeMs,
-            HolderName = HolderLatinName.Resolve(worldRow.HolderName, latin),
+            HolderName = LatinFirst(worldRow.HolderNameEn, worldRow.HolderName, latin),
             RecordDate = worldRow.RecordDate,
             IssueReason = reasons.TryGetValue(rows.Count, out var worldReason) ? worldReason : null,
         };
 
         var input = rows.Select((r, i) => new RecordRankingBuilder.Row(
-            r.RegionCode, r.Time, r.TimeMs, HolderLatinName.Resolve(r.HolderName, latin), r.RecordDate,
+            r.RegionCode, r.Time, r.TimeMs, LatinFirst(r.HolderNameEn, r.HolderName, latin), r.RecordDate,
             reasons.TryGetValue(i, out var reason) ? reason : null)).ToList();
 
         var ranked = RecordRankingBuilder.Build(input, world);
@@ -247,7 +247,7 @@ public class RecordRepository : IRecordRepository
             {
                 r.RegionType, r.RegionCode, r.Category, r.AgeKey, r.Gender,
                 r.PoolType, r.Style, r.Distance,
-                r.Time, TimeMs = r.TimeMs!.Value, r.HolderName, r.RecordDate,
+                r.Time, TimeMs = r.TimeMs!.Value, r.HolderName, r.HolderNameEn, r.RecordDate,
             })
             .ToListAsync();
 
@@ -263,7 +263,7 @@ public class RecordRepository : IRecordRepository
 
         var input = rows.Select((r, i) => new RecordCompareBuilder.Row(
             r.RegionCode, r.Style, r.Distance, r.Gender, r.PoolType,
-            r.Time, r.TimeMs, HolderLatinName.Resolve(r.HolderName, latin), r.RecordDate,
+            r.Time, r.TimeMs, LatinFirst(r.HolderNameEn, r.HolderName, latin), r.RecordDate,
             reasons.TryGetValue(i, out var reason) ? reason : null)).ToList();
 
         var result = RecordCompareBuilder.Build(input, query.A, query.B);
@@ -307,6 +307,21 @@ public class RecordRepository : IRecordRepository
                 r.HolderAge = y - birthYear;
         }
     }
+
+    /// <summary>
+    /// Имя держателя для международного экрана. Два источника латиницы, и порядок между
+    /// ними не произвольный:
+    /// 1. <c>HolderNameEn</c> — пришло вместе С ЭТОЙ строкой от источника (World Aquatics) и
+    ///    привязано к её времени, поэтому доверия больше;
+    /// 2. словарь по карточкам наших пловцов — совпадение по ИМЕНИ, а значит теоретически
+    ///    возможен тёзка (однозначные пары мы и так отбираем, но данные меняются);
+    /// 3. не вышло ничего — оставляем как в справочнике.
+    /// </summary>
+    private static string? LatinFirst(
+        string? holderNameEn, string? holderName, IReadOnlyDictionary<string, string> latin)
+        => string.IsNullOrWhiteSpace(holderNameEn)
+            ? HolderLatinName.Resolve(holderName, latin)
+            : holderNameEn;
 
     /// <summary>
     /// Словарь «ивритское имя → латинское» из карточек наших пловцов. Сама подстановка и

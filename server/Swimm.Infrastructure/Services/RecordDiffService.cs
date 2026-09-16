@@ -169,6 +169,9 @@ public class RecordDiffService : IRecordDiffService
         {
             if (existingByKey.TryGetValue(Key(p), out var rec))
             {
+                // ПЕРЕД перезаписью Time: правило опирается на то, тот же это рекорд или уже
+                // другой, а после присваивания прежнее время было бы потеряно.
+                rec.HolderNameEn = HolderLatinName.CarryOver(p.HolderName, p.Time, rec.Time, rec.HolderNameEn);
                 rec.Time = p.Time;
                 rec.HolderName = p.HolderName;
                 rec.Club = p.Club;
@@ -190,6 +193,7 @@ public class RecordDiffService : IRecordDiffService
                     Distance = p.Distance,
                     Time = p.Time,
                     HolderName = p.HolderName,
+                    HolderNameEn = HolderLatinName.CarryOver(p.HolderName, p.Time, existingTime: null, existingHolderNameEn: null),
                     Club = p.Club,
                     HolderCountry = p.HolderCountry,
                     RecordDate = p.RecordDate,

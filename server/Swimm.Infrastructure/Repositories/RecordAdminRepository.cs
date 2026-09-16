@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -65,6 +66,10 @@ public class RecordAdminRepository : IRecordAdminRepository
 
         if (string.IsNullOrWhiteSpace(input.Time)) return RecordSaveResult.Fail("Time обязателен");
 
+        // ПЕРЕД перезаписью Time: правило смотрит, тот же это рекорд или уже другой.
+        // Иначе правка времени оставила бы английское имя ПРЕЖНЕГО держателя.
+        record.HolderNameEn = HolderLatinName.CarryOver(
+            input.HolderName, input.Time.Trim(), record.Time, record.HolderNameEn);
         record.Time = input.Time.Trim();
         record.HolderName = Norm(input.HolderName);
         record.Club = Norm(input.Club);
@@ -184,6 +189,10 @@ public class RecordAdminRepository : IRecordAdminRepository
         record.PoolType = input.PoolType.Trim();
         record.Style = input.Style.Trim();
         record.Distance = input.Distance.Trim();
+        // То же правило, что у импорта и быстрой правки: английское имя живёт, только пока
+        // это ТОТ ЖЕ рекорд (HolderLatinName.CarryOver). Считаем до перезаписи Time.
+        record.HolderNameEn = HolderLatinName.CarryOver(
+            input.HolderName, input.Time.Trim(), record.Time, record.HolderNameEn);
         record.Time = input.Time.Trim();
         record.HolderName = Norm(input.HolderName);
         record.Club = Norm(input.Club);
