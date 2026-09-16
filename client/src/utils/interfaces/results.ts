@@ -157,6 +157,7 @@ export type TrainingMediaItem = HubGroupMediaItem;
   trainingId: number;            // уникальный ID тренировки
   sessionId?: number;             // настоящий PK Sys_TrainingSessions.Id (для медиа тренировки)
   trainingName: string;
+  note?: string | null;          // заметка к тренировке (одна на сессию), напр. кто плыл в ластах
   set: number;                   // номер сета
   order: number;                 // порядок в сете
   interval?: number;             // интервал (секунд)

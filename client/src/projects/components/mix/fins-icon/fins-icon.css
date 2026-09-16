@@ -1,0 +1,8 @@
+.dv-fins-icon{color:goldenrod}
+
+.dv-fins-icon svg {
+  transition: transform 0.2s ease;
+}
+.dv-fins-icon:hover svg {
+  transform: scale(1.05);
+}

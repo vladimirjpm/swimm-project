@@ -69,6 +69,10 @@ public sealed class TrainingInfoDto
     /// разобрано из ExternalTrainingId), нужен как training_id при добавлении медиа тренировки.</summary>
     [JsonPropertyName("sessionId")] public int SessionId { get; set; }
     [JsonPropertyName("trainingName")] public string TrainingName { get; set; } = string.Empty;
+
+    /// <summary>Заметка к тренировке (Sys_TrainingSessions.Note) — одинакова у всех строк сессии,
+    /// клиент читает из первой строки. Напр. кто плыл в ластах: отдельного признака у повтора в БД нет.</summary>
+    [JsonPropertyName("note")] public string? Note { get; set; }
     [JsonPropertyName("set")] public int Set { get; set; }
     [JsonPropertyName("order")] public int Order { get; set; }
     [JsonPropertyName("interval")] public int? Interval { get; set; }
@@ -77,8 +81,8 @@ public sealed class TrainingInfoDto
 
     [JsonPropertyName("isPaddles")] public bool IsPaddles { get; set; }
     [JsonPropertyName("isBuoy")] public bool IsBuoy { get; set; }
-    // Остальной инвентарь в данных Дельфина отсутствует — отдаём false для полноты формы TrainingInfo.
     [JsonPropertyName("isFins")] public bool IsFins { get; set; }
+    // Остальной инвентарь в данных Дельфина отсутствует — отдаём false для полноты формы TrainingInfo.
     [JsonPropertyName("isSnorkel")] public bool IsSnorkel { get; set; }
     [JsonPropertyName("isBoard")] public bool IsBoard { get; set; }
 

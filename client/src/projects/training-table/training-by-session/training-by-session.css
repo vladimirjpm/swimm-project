@@ -94,6 +94,21 @@
 }
 .tbs-stat .v small { font-size: 11px; font-weight: 600; color: var(--theme-mode-text-secondary); }
 
+/* Заметка тренировки — та же плашка, что у .tbs-stat, но во всю ширину и строкой */
+.tbs-note {
+  display: flex; align-items: baseline; gap: 10px;
+  margin: 0 18px 14px;
+  background: var(--theme-mode-input-bg);
+  border: 1px solid var(--theme-mode-border);
+  border-radius: 12px; padding: 9px 12px;
+}
+.tbs-note .k {
+  flex: none;
+  font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--theme-mode-text-muted);
+}
+.tbs-note .v { font-size: 14px; font-weight: 600; color: var(--theme-mode-text); }
+
 /* Блок сета */
 .tbs-set { border-top: 1px solid var(--theme-mode-border); }
 .tbs-set-head {
@@ -112,7 +127,9 @@
   border: 1px solid var(--theme-mode-border-input);
   border-radius: 8px; padding: 2px 8px;
 }
-.tbs-recipe .chip.strong { color: var(--theme-mode-text); font-weight: 700; }
+.tbs-recipe .chip.strong { color: var(--theme-mode-text); font-weight: 700; gap: 6px; padding: 3px 8px; }
+/* Значок стиля в «рецепте» сета — на светлой подложке, как в строке (силуэт чёрный) */
+.tbs-recipe .dv-swimm-icon { background: #fff; border-radius: 6px; padding: 2px 3px; }
 .tbs-recipe .chip.v { padding: 1px 4px; }
 .tbs-setmeta {
   margin-left: auto; font-size: 11px; color: var(--theme-mode-text-muted);
@@ -129,6 +146,12 @@
   border-top: 1px solid var(--theme-mode-border-row);
 }
 .tbs-row:first-child { border-top: none; }
+/* Сет со смешанными стилями: узкая колонка под значок стиля сразу после номера повтора.
+   Отдельная колонка, а не .tbs-gear — та на мобиле скрыта, а стиль нужен везде. */
+.tbs-row--styled { grid-template-columns: 42px 120px minmax(96px, 1.4fr) 40px minmax(84px, 1fr) 44px auto; }
+.tbs-style { display: flex; align-items: center; justify-content: center; }
+/* Светлая подложка в ОБЕИХ темах: силуэты стилей нарисованы чёрным (как .swim-row__plate) */
+.tbs-style .dv-swimm-icon { background: #fff; border-radius: 7px; padding: 3px 2px; }
 .tbs-row.m { background: var(--theme-mode-row-male); }
 .tbs-row.f { background: var(--theme-mode-row-female); }
 
@@ -153,5 +176,8 @@
   .tbs-summary { grid-template-columns: repeat(2, 1fr); }
   .tbs-stat-pool { display: none; }
   .tbs-row { grid-template-columns: 36px minmax(80px, 1fr) 70px 40px; }
+  /* На телефоне значок вдвое меньше десктопного: иначе колонка имён схлопывается */
+  .tbs-row--styled { grid-template-columns: 36px 60px minmax(80px, 1fr) 70px 40px; }
+  .tbs-style .dv-swimm-icon { width: 56px; }
   .tbs-gear, .tbs-lvl { display: none; }
 }

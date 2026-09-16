@@ -271,6 +271,7 @@ function SportsmenDetails() {
                 sortedBestResults={allSwimmerResults}
                 isMastersSource={isMastersSource}
                 isAwardSource={isAwardSource}
+                career={career}
                 mediaResultIds={mediaResultIds}
                 onOpenMedia={setOpenMediaResultId}
               />
@@ -441,9 +442,10 @@ function GuestFavoritesCta({ onSignIn }: { onSignIn: () => void }) {
   );
 }
 
-// All-time: лучшие времена по стилям — те же карточки-строки, что и в табе «это соревнование»
-function AllTimeBests({ career }: { career: AthleteCareer }) {
-  const rows = useMemo(() => career.bestByStyle.map((b) => {
+// Карьерные лучшие → строки карточки. Нужны в ДВУХ местах: раздел All-time и таб
+// «Competition», когда в источнике соревнований нет вовсе (источник-тренировки).
+function careerBestsToRows(career: AthleteCareer) {
+  return career.bestByStyle.map((b) => {
     const isMaster = Helper.isResultMasters(b.isMasters, b.eventStyleAge);
     const resolvedGender = Helper.resolveGender(b.gender);
 
@@ -471,7 +473,12 @@ function AllTimeBests({ career }: { career: AthleteCareer }) {
       levelIsMaster: isMaster,
       levelAgeGroup: b.ageGroup,
     };
-  }), [career.bestByStyle]);
+  });
+}
+
+// All-time: лучшие времена по стилям — те же карточки-строки, что и в табе «это соревнование»
+function AllTimeBests({ career }: { career: AthleteCareer }) {
+  const rows = useMemo(() => careerBestsToRows(career), [career]);
 
   const isMastersOverall = career.bestByStyle.some((b) => b.isMasters);
 
@@ -821,12 +828,14 @@ function TopResultsTabs({
   sortedBestResults,
   isMastersSource,
   isAwardSource,
+  career,
   mediaResultIds,
   onOpenMedia,
 }: {
   sortedBestResults: any[];
   isMastersSource: boolean;
   isAwardSource: boolean;
+  career: AthleteCareer;
   mediaResultIds?: Set<number>;
   onOpenMedia?: (resultId: number) => void;
 }) {
@@ -839,8 +848,16 @@ function TopResultsTabs({
     return sortedBestResults.filter(r => !r.training?.trainingId);
   }, [sortedBestResults]);
 
+  // В источнике-тренировках соревнований нет ВООБЩЕ, и таб «Competition» всегда стоял
+  // пустым (Влад, 16.09.2026). Тогда показываем карьерные лучшие с сервера — те же строки,
+  // что и в разделе All-time.
+  const careerRows = useMemo(() => careerBestsToRows(career), [career]);
+  const competitionFromCareer = competitionResults.length === 0 && careerRows.length > 0;
+  const competitionRows = competitionFromCareer ? careerRows : competitionResults;
+  const careerIsMasters = career.bestByStyle.some((b) => b.isMasters);
+
   // Определяем начальный таб: competition, если training пустой
-  const initialTab = trainingResults.length === 0 && competitionResults.length > 0 ? 'competition' : 'training';
+  const initialTab = trainingResults.length === 0 && competitionRows.length > 0 ? 'competition' : 'training';
   const [activeTab, setActiveTab] = useState<'training' | 'competition'>(initialTab);
 
   // Проверяем, есть ли хотя бы один результат с is_masters
@@ -859,7 +876,8 @@ function TopResultsTabs({
     );
   }
 
-  const currentResults = activeTab === 'training' ? trainingResults : competitionResults;
+  const currentResults = activeTab === 'training' ? trainingResults : competitionRows;
+  const showCareerNote = competitionFromCareer && activeTab === 'competition';
 
   return (
     <div>
@@ -867,7 +885,7 @@ function TopResultsTabs({
       <div className="flex gap-1 w-fit rounded-[10px] p-[3px] mb-3" style={{ background: 'var(--theme-mode-surface-alt)' }}>
         {(['training', 'competition'] as const).map((tab) => {
           const active = activeTab === tab;
-          const count = tab === 'training' ? trainingResults.length : competitionResults.length;
+          const count = tab === 'training' ? trainingResults.length : competitionRows.length;
           return (
             <button
               key={tab}
@@ -883,14 +901,22 @@ function TopResultsTabs({
         })}
       </div>
 
+      {/* Подпись: строки не из этого источника, а карьерные (иначе непонятно, откуда они) */}
+      {showCareerNote && (
+        <div className="text-[11px] italic mb-2 text-[var(--theme-mode-text-muted)]">
+          Career best times — this view has trainings only
+        </div>
+      )}
+
       {/* Карточки результатов */}
       {currentResults.length > 0 ? (
         <ResultsTable
           results={currentResults}
-          isMastersSource={isMastersSource}
+          isMastersSource={showCareerNote ? careerIsMasters : isMastersSource}
           isAwardSource={isAwardSource}
           mediaResultIds={mediaResultIds}
           onOpenMedia={onOpenMedia}
+          showCompetition={showCareerNote}
         />
       ) : (
         <div className="text-[var(--theme-mode-text-muted)] italic p-4">No {activeTab} results</div>

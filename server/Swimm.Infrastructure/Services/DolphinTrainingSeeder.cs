@@ -85,6 +85,15 @@ public class DolphinTrainingSeeder : IDolphinTrainingSeeder
         }
         log.Add($"local-пловцы: создано {created}, переиспользовано {reused}, existing {byPerson.Values.Count(e => e.Kind == "existing")}");
 
+        // Пол строки = пол КАРТОЧКИ (И14, data-integrity.md): исходник пишет event_style_gender
+        // построчно и местами путает (у רוני 4 строки «male» при женской карточке).
+        var cardIds = swimmerIdByPerson.Values.Distinct().ToList();
+        var cardGenderById = (await _db.Swimmers
+                .Where(s => cardIds.Contains(s.Id))
+                .Select(s => new { s.Id, s.Gender })
+                .ToListAsync())
+            .ToDictionary(s => s.Id, s => NormalizeGender(s.Gender));
+
         // ── ростер группы (HubGroupMembers) — иначе вкладка Competitions пуста ─────
         var existingMemberIds = new HashSet<int>(await _db.HubGroupMembers
             .Where(m => m.HubGroupId == hubGroupId).Select(m => m.SwimmerId).ToListAsync());
@@ -165,15 +174,23 @@ public class DolphinTrainingSeeder : IDolphinTrainingSeeder
                     Name = StrOrNull(t, "trainingName"),
                     Date = ParseDate(Str(r, "date")),
                     PoolType = NormalizePool(Str(r, "pool_type")),
+                    // Заметка к тренировке (training.note) — напр. кто плыл в ластах: признака у повтора нет.
+                    Note = StrOrNull(t, "note"),
                 };
                 _db.TrainingSessions.Add(session);
                 await _db.SaveChangesAsync();
                 sessionCache[extId] = session;
             }
-            else if (session.Name is null)
+            else if (session.Name is null || session.Note is null)
             {
-                var nm = StrOrNull(t, "trainingName");
-                if (nm is not null) { session.Name = nm; await _db.SaveChangesAsync(); }
+                var nm = session.Name is null ? StrOrNull(t, "trainingName") : null;
+                var note = session.Note is null ? StrOrNull(t, "note") : null;
+                if (nm is not null || note is not null)
+                {
+                    session.Name ??= nm;
+                    session.Note ??= note;
+                    await _db.SaveChangesAsync();
+                }
             }
 
             var styleName = Str(r, "event_style_name");
@@ -197,7 +214,7 @@ public class DolphinTrainingSeeder : IDolphinTrainingSeeder
                 SwimmerId = swimmerId,
                 StyleId = styleId,
                 Distance = distance,
-                Gender = Str(r, "event_style_gender"),
+                Gender = cardGenderById.GetValueOrDefault(swimmerId) ?? Str(r, "event_style_gender"),
                 TimeMillisecond = ParseTimeMs(Str(r, "time")),
                 TimeOriginal = Str(r, "time"),
                 SetNo = setNo,
@@ -206,6 +223,7 @@ public class DolphinTrainingSeeder : IDolphinTrainingSeeder
                 Intensity = StrOrNull(t, "intensity"),
                 IsPaddles = Bool(t, "isPaddles"),
                 IsBuoy = Bool(t, "isBuoy"),
+                IsFins = Bool(t, "isFins"),
                 ExpectedTimeMs = ParseTimeMs(Str(t, "expected_time")),
             });
             inserted++;
@@ -273,6 +291,14 @@ public class DolphinTrainingSeeder : IDolphinTrainingSeeder
         var m = System.Text.RegularExpressions.Regex.Match(v, @"\d{4}");
         return m.Success ? m.Value : "";
     }
+
+    /// <summary>Пол карточки → male/female: у локальных пловцов в карточке «M»/«F», у isr — полные слова.</summary>
+    private static string? NormalizeGender(string? gender) => gender?.Trim().ToLowerInvariant() switch
+    {
+        "male" or "m" => "male",
+        "female" or "f" => "female",
+        _ => null,
+    };
 
     /// <summary>«3:42» / «1:15.6» / «16.6» / «» → мс (null если пусто/битое).</summary>
     private static int? ParseTimeMs(string? s)

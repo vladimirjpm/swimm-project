@@ -4,7 +4,8 @@ import { useAppDispatch } from '../../../../store/store';
 import { createPortal } from 'react-dom';
 
 interface UI_IntensityIconProps {
-  intensity?: string;
+  // null приходит с API, когда интенсивность у повтора не записана (тренировка 15.09.2026)
+  intensity?: string | null;
   className?: string;
   iconWidth?: string;
   styleType?: 'icon-nocolor';
@@ -12,7 +13,7 @@ interface UI_IntensityIconProps {
 }
 
 const UI_IntensityIcon: React.FC<UI_IntensityIconProps> = ({
-  intensity = 'v0',
+  intensity: rawIntensity,
   className = '',
   iconWidth = '8',
   styleType = '',
@@ -21,6 +22,8 @@ const UI_IntensityIcon: React.FC<UI_IntensityIconProps> = ({
   const dispatch = useAppDispatch();
   const [showPopup, setShowPopup] = useState(false);
 
+  // Дефолт параметра ловит только undefined; null и '' тоже сводим к «V0», а не падаем.
+  const intensity = rawIntensity || 'v0';
   const normalized = intensity.toLowerCase();
 
   const handleClick = () => setShowPopup(true);

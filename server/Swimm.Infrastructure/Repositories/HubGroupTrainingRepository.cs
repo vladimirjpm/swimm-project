@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Infrastructure.Data;
@@ -42,8 +42,8 @@ public class HubGroupTrainingRepository : IHubGroupTrainingRepository
             .Include(r => r.Session)
             .Include(r => r.Swimmer!).ThenInclude(s => s.Club)
             .Include(r => r.Style)
-            // Порядок как в источнике: тренировка → сет → повтор.
-            .OrderBy(r => r.Session!.Date)
+            // Последняя тренировка сверху; внутри тренировки порядок источника: сет → повтор.
+            .OrderByDescending(r => r.Session!.Date)
             .ThenBy(r => r.SetNo).ThenBy(r => r.OrderNo).ThenBy(r => r.Id)
             .ToListAsync();
 
@@ -90,7 +90,9 @@ public class HubGroupTrainingRepository : IHubGroupTrainingRepository
             Event = $"{styleName} {r.Distance}m",
             EventStyleName = styleName,
             EventStyleLen = r.Distance,
-            EventStyleGender = r.Gender,
+            // Пол — из карточки пловца (И14, data-integrity.md): строка несёт пол, скопированный из
+            // исходника построчно, и у רוני он местами «male». Пол строки — только запасной.
+            EventStyleGender = NormalizeGender(sw.Gender) ?? r.Gender,
             EventStyleAge = eventAge > 0 ? eventAge.ToString() : string.Empty,
             PoolType = session.PoolType,
 
@@ -113,6 +115,7 @@ public class HubGroupTrainingRepository : IHubGroupTrainingRepository
                 TrainingId = long.TryParse(session.ExternalTrainingId, out var tid) ? tid : 0,
                 SessionId = session.Id,
                 TrainingName = session.Name ?? string.Empty,
+                Note = session.Note,
                 Set = r.SetNo,
                 Order = r.OrderNo,
                 Interval = r.IntervalSec,
@@ -120,10 +123,19 @@ public class HubGroupTrainingRepository : IHubGroupTrainingRepository
                 ExpectedTime = FormatMs(r.ExpectedTimeMs),
                 IsPaddles = r.IsPaddles,
                 IsBuoy = r.IsBuoy,
+                IsFins = r.IsFins,
                 Media = mediaLookup.TryGetValue(session.Id, out var media) ? media : [],
             },
         };
     }
+
+    /// <summary>Пол карточки → male/female: у локальных пловцов в карточке «M»/«F», у isr — полные слова.</summary>
+    private static string? NormalizeGender(string? gender) => gender?.Trim().ToLowerInvariant() switch
+    {
+        "male" or "m" => "male",
+        "female" or "f" => "female",
+        _ => null,
+    };
 
     /// <summary>Мс → строка «M:SS» / «M:SS.ff» (обратно к формату источника). null/0 → пусто.</summary>
     private static string? FormatMs(int? ms)
