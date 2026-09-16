@@ -175,7 +175,7 @@
 
                         <label class="text-[11px] text-admin-text-muted flex flex-col gap-0.5">
                             Причина
-                            <select class="admin-input w-48" data-field="reason">
+                            <select class="admin-input w-full" data-field="reason">
                                 @foreach (var r in Model.IssueReasons)
                                 {
                                     <option value="@r" selected="@(r == i.Reason)">@r</option>
@@ -185,7 +185,7 @@
 
                         <label class="text-[11px] text-admin-text-muted flex flex-col gap-0.5">
                             Статус
-                            <select class="admin-input w-40" data-field="status">
+                            <select class="admin-input w-full" data-field="status">
                                 @foreach (var st in Model.IssueStatuses)
                                 {
                                     <option value="@st" selected="@(st == i.Status)">@st</option>
@@ -193,7 +193,7 @@
                             </select>
                         </label>
 
-                        <div class="text-[11px] text-admin-text-muted whitespace-nowrap ml-auto text-right">
+                        <div class="text-[11px] text-admin-text-muted whitespace-nowrap">
                             @i.CreatedAt.ToString("dd/MM/yyyy")<br />@i.CreatedBy
                         </div>
 
