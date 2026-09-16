@@ -37,6 +37,34 @@ public class WorldAquaticsCountriesProviderTests(Xunit.Abstractions.ITestOutputH
         Assert.All(countries, c => Assert.False(string.IsNullOrWhiteSpace(c.Region)));
     }
 
+    /// <summary>
+    /// Расформированные государства и нейтральные сборные отсеиваются, хотя по форме они
+    /// неотличимы от стран (И-24): регион заполнен, код alpha-3, GUID настоящий. Фикстура —
+    /// настоящие записи ответа на 2026-09-16.
+    ///
+    /// ⚠ Тест держит и обратную сторону: GER, у которой источник помечает часть рекордов
+    /// кодом GDR, из списка НЕ пропадает — убираем историческую федерацию, а не страну.
+    /// </summary>
+    [Fact]
+    public void ParseCountries_DropsDefunctAndNeutralTeams()
+    {
+        const string json = """
+            [
+              {"Id":"a6ff6db1-9fd2-4c54-9b5a-2e2b0a1a1a01","Name":"German Democratic Republic","Code":"GDR","RegionId":"e3fa24ba-2945-479b-a20e-b21b93aafa1f","RegionName":"Europe"},
+              {"Id":"a6ff6db1-9fd2-4c54-9b5a-2e2b0a1a1a02","Name":"Soviet Union","Code":"URS","RegionId":"e3fa24ba-2945-479b-a20e-b21b93aafa1f","RegionName":"Europe"},
+              {"Id":"a6ff6db1-9fd2-4c54-9b5a-2e2b0a1a1a03","Name":"Saar","Code":"SAA","RegionId":"e3fa24ba-2945-479b-a20e-b21b93aafa1f","RegionName":"Europe"},
+              {"Id":"a6ff6db1-9fd2-4c54-9b5a-2e2b0a1a1a04","Name":"World Aquatics Refugee Team","Code":"ART","RegionId":"e3fa24ba-2945-479b-a20e-b21b93aafa1f","RegionName":"Europe"},
+              {"Id":"a6ff6db1-9fd2-4c54-9b5a-2e2b0a1a1a05","Name":"Neutral Independent Athletes","Code":"NIA","RegionId":"e3fa24ba-2945-479b-a20e-b21b93aafa1f","RegionName":"Europe"},
+              {"Id":"a8f83373-fc6a-44ed-8ca2-11deb9c06654","Name":"Hungary","Code":"HUN","RegionId":"e3fa24ba-2945-479b-a20e-b21b93aafa1f","RegionName":"Europe"},
+              {"Id":"a6ff6db1-9fd2-4c54-9b5a-2e2b0a1a1a06","Name":"Germany","Code":"GER","RegionId":"e3fa24ba-2945-479b-a20e-b21b93aafa1f","RegionName":"Europe"}
+            ]
+            """;
+
+        var countries = WorldAquaticsCountriesProvider.ParseCountries(json);
+
+        Assert.Equal(new[] { "GER", "HUN" }, countries.Select(c => c.Code).ToArray());
+    }
+
     [Fact]
     public void ParseCountries_MapsCodeToSourceGuid()
     {
@@ -49,7 +77,7 @@ public class WorldAquaticsCountriesProviderTests(Xunit.Abstractions.ITestOutputH
     }
 
     /// <summary>
-    /// Битые записи пропускаются молча, а не роняют прогон по 235 странам: одна кривая
+    /// Битые записи пропускаются молча, а не роняют прогон по 215 странам: одна кривая
     /// строка в ответе источника не повод не качать остальные.
     /// </summary>
     [Fact]
@@ -100,12 +128,13 @@ public class WorldAquaticsCountriesProviderTests(Xunit.Abstractions.ITestOutputH
     }
 
     /// <summary>
-    /// Живая проверка: источник по-прежнему отдаёт 235 реальных стран, а GUID Израиля —
-    /// тот же, что зашит константой (на нём стоит дефолт NR-отчётов). В обычном прогоне
-    /// пропускается (сеть), включается переменной SWIMM_NET_TESTS=1.
+    /// Живая проверка: источник по-прежнему отдаёт 215 реальных стран (246 записей минус 11
+    /// с пустым регионом и 20 расформированных/нейтральных), а GUID Израиля — тот же, что
+    /// зашит константой (на нём стоит дефолт NR-отчётов). В обычном прогоне пропускается
+    /// (сеть), включается переменной SWIMM_NET_TESTS=1.
     /// </summary>
     [Fact]
-    public async Task Live_Countries_Still235()
+    public async Task Live_Countries_Still215()
     {
         if (Environment.GetEnvironmentVariable("SWIMM_NET_TESTS") != "1") return;
 
@@ -114,9 +143,12 @@ public class WorldAquaticsCountriesProviderTests(Xunit.Abstractions.ITestOutputH
 
         output.WriteLine($"стран: {countries.Count}, регионов: {countries.Select(c => c.Region).Distinct().Count()}");
 
-        Assert.Equal(235, countries.Count);
+        Assert.Equal(215, countries.Count);
         Assert.All(countries, c => Assert.Equal(3, c.Code.Length));
         Assert.Equal(countries.Count, countries.Select(c => c.Code).Distinct().Count());
+
+        // Ни одного государства, которого больше нет: источник их отдаёт, мы не берём (И-24).
+        Assert.DoesNotContain(countries, c => c.Code is "GDR" or "URS" or "TCH" or "YUG" or "SAA");
 
         // Израиль из списка не пропадает — батч 11.1.2 пропускает его сам, зная код.
         var israel = Assert.Single(countries, c => c.Code == "ISR");

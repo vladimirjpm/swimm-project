@@ -456,7 +456,7 @@ public class DashboardStatusService(
     /// <summary>
     /// Наборы рекордов для блока дашборда. Мир и Израиль — отдельными строками (их мы
     /// обновляем сами и следим за свежестью), остальные страны — одной сводной: после
-    /// Фазы 11 их 235, и плитка на каждую превратила бы блок в простыню (11.1.4).
+    /// Фазы 11 их больше двухсот, и плитка на каждую превратила бы блок в простыню (11.1.4).
     /// </summary>
     private async Task<IReadOnlyList<DashboardRecordSetStatus>> BuildRecordSetsAsync(CancellationToken ct)
     {
