@@ -20,7 +20,7 @@ public class RecordsImportController : ControllerBase
     private readonly IReadOnlyDictionary<string, IRecordSourceProvider> _providers;
     private readonly IRecordDiffService _diffService;
     private readonly IRecordQualityService _quality;
-    private readonly IRecordSourceLinksProvider _links;
+    private readonly IReadOnlyList<IRecordSourceLinksProvider> _links;
     private readonly IRecordCountriesProvider _countries;
     private readonly IRecordCountryRunQueue _runs;
 
@@ -28,14 +28,14 @@ public class RecordsImportController : ControllerBase
         IEnumerable<IRecordSourceProvider> providers,
         IRecordDiffService diffService,
         IRecordQualityService quality,
-        IRecordSourceLinksProvider links,
+        IEnumerable<IRecordSourceLinksProvider> links,
         IRecordCountriesProvider countries,
         IRecordCountryRunQueue runs)
     {
         _providers = providers.ToDictionary(p => p.Source, StringComparer.OrdinalIgnoreCase);
         _diffService = diffService;
         _quality = quality;
-        _links = links;
+        _links = links.ToList();
         _countries = countries;
         _runs = runs;
     }
@@ -45,21 +45,27 @@ public class RecordsImportController : ControllerBase
         => Ok(await _diffService.GetSourceStatusAsync());
 
     /// <summary>
-    /// Что именно скачает Fetch с isr.org.il: ссылки на PDF-справочники, найденные на
-    /// странице «שיאי ישראל». Ходит в сеть, поэтому недоступность источника — не 500,
-    /// а мягкий ответ с текстом ошибки: карточки в UI просто не покажут список файлов.
+    /// Что именно скачает Fetch у этого источника: ссылки на PDF-справочники, найденные на его
+    /// странице-оглавлении («שיאי ישראל» у isr.org.il, «Masters Records» у World Aquatics).
+    /// Ходит в сеть, поэтому недоступность источника — не 500, а мягкий ответ с текстом
+    /// ошибки: карточка в UI просто не покажет список файлов.
     /// </summary>
-    [HttpGet("isrorg-links")]
-    public async Task<IActionResult> GetIsrOrgLinks()
+    [HttpGet("links")]
+    public async Task<IActionResult> GetLinks([FromQuery] string source)
     {
+        var provider = _links.FirstOrDefault(
+            p => p.Sources.Contains(source ?? "", StringComparer.OrdinalIgnoreCase));
+        if (provider == null)
+            return NotFound(new { error = $"У источника '{source}' нет страницы-оглавления." });
+
         try
         {
-            var links = await _links.GetLinksAsync(HttpContext.RequestAborted);
-            return Ok(new { pageUrl = _links.PageUrl, links });
+            var links = await provider.GetLinksAsync(HttpContext.RequestAborted);
+            return Ok(new { pageUrl = provider.PageUrl, links });
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
         {
-            return Ok(new { pageUrl = _links.PageUrl, links = Array.Empty<object>(), error = ex.Message });
+            return Ok(new { pageUrl = provider.PageUrl, links = Array.Empty<object>(), error = ex.Message });
         }
     }
 

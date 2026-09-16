@@ -8,6 +8,14 @@ namespace Swimm.Application.Abstractions;
 /// </summary>
 public interface IRecordSourceLinksProvider
 {
+    /// <summary>
+    /// Ключи источников (<see cref="IRecordSourceProvider.Source"/>), чьи ссылки живут на этой
+    /// странице-оглавлении. Их больше одного у isr.org.il: одна страница «שיאי ישראל» кормит и
+    /// возрастной справочник, и мастерский. Страниц же теперь тоже несколько — по этим ключам
+    /// контроллер и выбирает, к какой идти.
+    /// </summary>
+    IReadOnlyCollection<string> Sources { get; }
+
     /// <summary>Адрес страницы-оглавления (её же показываем админу ссылкой).</summary>
     string PageUrl { get; }
 

@@ -433,11 +433,12 @@
         };
     }
 
-    // --- «Проверить апдейты» рекордов: синхронный dry-run fetch+дифф по трём источникам ---
+    // --- «Проверить апдейты» рекордов: синхронный dry-run fetch+дифф по всем источникам ---
     // Дифф НЕ пишется в БД (fetch только строит превью, см. RecordsImportController);
     // применение — на /Admin/Import. Состояние живёт в recCheck и переживает переключение блоков.
     const REC_SOURCES = [
         { key: 'worldrecords',   label: 'World Aquatics',   pool: '25m' },
+        { key: 'wa-masters',     label: 'Masters WR (worldaquatics)', pool: '50m' },
         { key: 'isrorg-age',     label: 'Age (isr.org.il)', pool: '25m' },
         { key: 'isrorg-masters', label: 'Masters (isr.org.il)', pool: '50m' },
     ];

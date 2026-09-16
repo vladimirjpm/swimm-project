@@ -121,6 +121,28 @@ public class RecordQualityServiceTests
         Assert.Equal(0, summary.NotChecked);
     }
 
+    /// <summary>
+    /// Мастерские МИРОВЫЕ рекорды (`world/masters`, источник `wa-masters`) — та же история,
+    /// что рекорд Ямайки: держатели на наших стартах не плавают, и все 1095 строк легли бы
+    /// в «не найдено». Израильский мастерс при этом сверять есть с чем, он остаётся.
+    /// </summary>
+    [Fact]
+    public async Task Verify_SkipsWorldMasters_ButKeepsIsraeliOnes()
+    {
+        using var db = CreateDb(nameof(Verify_SkipsWorldMasters_ButKeepsIsraeliOnes));
+        await SeedBaseAsync(db);
+
+        db.Add(Rec("21.08", regionType: "world", regionCode: "", category: "open", ageKey: ""));
+        db.Add(Rec("28.40", regionType: "world", regionCode: "", category: "masters", ageKey: "45-49"));
+        db.Add(Rec("31.20", category: "masters", ageKey: "45-49"));   // country/ISR/masters
+        await db.SaveChangesAsync();
+
+        var result = await new RecordQualityService(db).VerifyAllAsync();
+
+        Assert.Equal(2, result.Checked);                       // world/open + ISR/masters
+        Assert.Equal(2, (await new RecordQualityService(db).GetSummaryAsync()).Total);
+    }
+
     /* ───────────── ось возраста ступени (docs/data-integrity.md §13) ───────────── */
 
     [Fact]

@@ -24,16 +24,22 @@ public class RecordQualityService(SwimmDbContext db, ISettingsService? settings 
     private static readonly string[] RecordDateFormats = ["dd/MM/yyyy", "M/d/yyyy", "d/M/yyyy"];
 
     /// <summary>
-    /// Что вообще имеет смысл сверять с нашими протоколами: мировые и израильские рекорды.
+    /// Что вообще имеет смысл сверять с нашими протоколами: абсолютные мировые и все
+    /// израильские рекорды.
     ///
     /// Протоколы у нас израильские, поэтому рекорд Ямайки не найдётся никогда — это не
     /// «не подтверждён», это «сверять не с чем». После Фазы 11 таких строк 10–15 тысяч
     /// против ~1.7 тысяч своих: без этого фильтра сводка качества на дашборде превратилась
     /// бы в «не найдено 12 000», и разглядеть в ней настоящие расхождения стало бы нельзя
-    /// (план 11.1.5). Мировые оставляем: их держатели приезжают на наши старты.
+    /// (план 11.1.5). Абсолютные мировые оставляем: их держатели приезжают на наши старты.
+    ///
+    /// ⚠ А вот мастерские МИРОВЫЕ (`world/masters`, источник `wa-masters`) — не оставляем:
+    /// это 1095 строк японских и американских ветеранов, на наших стартах их нет, и все они
+    /// легли бы в «не найдено» ровно тем же образом, что рекорд Ямайки. Израильский мастерс
+    /// (`country/ISR/masters`) сверять есть с чем, он остаётся.
     /// </summary>
     private static readonly System.Linq.Expressions.Expression<Func<Record, bool>> Verifiable =
-        r => r.RegionType == "world" || r.RegionCode == "ISR";
+        r => (r.RegionType == "world" && r.Category == "open") || r.RegionCode == "ISR";
 
     public async Task<RecordVerifyResult> VerifyAllAsync(CancellationToken ct = default)
     {

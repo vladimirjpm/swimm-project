@@ -324,7 +324,7 @@
             только для информации.
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
             <div class="admin-card p-4 records-source-card" data-source="worldrecords">
                 <div class="text-2xl mb-1">🌍</div>
                 <div class="font-semibold text-admin-text mb-1">World Records</div>
@@ -333,6 +333,31 @@
                 <button class="admin-btn admin-btn-primary w-full text-sm rs-fetch-btn" data-source="worldrecords" data-pool-primary="25m">
                     ⬇ Fetch from URL
                 </button>
+            </div>
+
+            <div class="admin-card p-4 records-source-card" data-source="wa-masters">
+                <div class="text-2xl mb-1">🌍</div>
+                <div class="font-semibold text-admin-text mb-1">Masters World Records</div>
+                <div class="text-xs text-admin-text-muted mb-2">worldaquatics.com · PDF, личные дистанции (25-29…)</div>
+                <div class="text-xs text-admin-text-muted mb-1">Обновлено: <span class="rs-status" data-source="wa-masters">—</span></div>
+                <div class="text-[11px] text-admin-text-muted mb-3">Файлы: <span class="rs-links" data-source="wa-masters">ищу на сайте…</span></div>
+                <div class="flex gap-2 mb-2">
+                    <button class="admin-btn admin-btn-ghost flex-1 text-xs rs-fetch-btn" data-source="wa-masters" data-pool-primary="50m">⬇ Fetch</button>
+                    <button class="admin-btn admin-btn-ghost flex-1 text-xs rs-file-toggle" data-source="wa-masters">📁 Файл</button>
+                </div>
+                <div class="rs-file-panel hidden space-y-2 mt-2" data-source="wa-masters">
+                    <div>
+                        <label class="block text-[10px] text-admin-text-muted mb-0.5">Файл LCM (50 м)</label>
+                        <input type="file" accept=".pdf" class="admin-input w-full text-xs rs-file-primary">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-admin-text-muted mb-0.5">Файл SCM (25 м, опц.)</label>
+                        <input type="file" accept=".pdf" class="admin-input w-full text-xs rs-file-secondary">
+                    </div>
+                    <button class="admin-btn admin-btn-primary w-full text-xs rs-parse-files-btn" data-source="wa-masters" data-pool-primary="50m">
+                        Разобрать файл(ы)
+                    </button>
+                </div>
             </div>
 
             <div class="admin-card p-4 records-source-card" data-source="isrorg-age">
@@ -474,7 +499,7 @@
         if (!isCompetitions && !recordsStatusLoaded) {
             recordsStatusLoaded = true;
             loadRecordSourceStatus();
-            loadIsrOrgRecordLinks();
+            loadRecordSourceLinks();
         }
     }
     topTabCompetitions.addEventListener('click', () => setTopMode('competitions'));
@@ -1076,7 +1101,12 @@
     const recordsChangedCount = document.getElementById('records-changed-count');
     const recordsApplyBtn = document.getElementById('records-apply-btn');
 
-    const SOURCE_LABELS = { worldrecords: 'World Records', 'isrorg-age': 'Age Records', 'isrorg-masters': 'Masters Records' };
+    const SOURCE_LABELS = {
+        worldrecords: 'World Records',
+        'wa-masters': 'Masters World Records',
+        'isrorg-age': 'Age Records',
+        'isrorg-masters': 'Masters Records',
+    };
     let currentDiffId = null;
 
     function fmtDate(iso) {
@@ -1086,44 +1116,53 @@
         return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
     }
 
-    // Что подтянет Fetch: ссылки резолвятся со страницы «שיאי ישראל» — прямые URL в конфиге
-    // протухают, потому что федерация зашивает дату обновления в имя файла.
-    function loadIsrOrgRecordLinks() {
-        const cells = document.querySelectorAll('.rs-links');
+    // Что подтянет Fetch: ссылки резолвятся со страницы-оглавления источника — прямые URL в
+    // конфиге протухают, потому что и федерация, и World Aquatics зашивают дату обновления
+    // в адрес файла. Страница у isr.org.il одна на две карточки (age и masters), поэтому её
+    // ответ фильтруем по isMasters; у wa-masters страница своя и отдаёт только своё.
+    function loadRecordSourceLinks() {
+        const cells = Array.from(document.querySelectorAll('.rs-links'));
         if (!cells.length) return;
 
-        fetch('/api/admin/records/isrorg-links', { credentials: 'same-origin' })
-            .then(r => r.ok ? r.json() : null)
-            .then(data => {
-                const links = (data && data.links) || [];
-                cells.forEach(el => {
-                    const wantMasters = el.dataset.source === 'isrorg-masters';
-                    const mine = links.filter(l => !!l.isMasters === wantMasters);
+        const byPage = { 'isrorg-age': ['isrorg-age', 'isrorg-masters'], 'wa-masters': ['wa-masters'] };
 
-                    if (!mine.length) {
-                        el.textContent = data && data.error ? 'сайт недоступен — грузите файлом' : 'не найдены';
-                        el.title = (data && data.error) || '';
-                        return;
-                    }
+        Object.entries(byPage).forEach(([pageSource, cardSources]) => {
+            const mineCells = cells.filter(el => cardSources.includes(el.dataset.source));
+            if (!mineCells.length) return;
 
-                    el.innerHTML = mine
-                        .sort((a, b) => a.poolType.localeCompare(b.poolType))
-                        .map(l => {
-                            const upd = l.updatedOn ? ` <span class="opacity-70">от ${fmtDateOnly(l.updatedOn)}</span>` : '';
-                            // trusted=false — на сайте федерации подпись ссылки не сходится с файлом,
-                            // автозагрузка её не возьмёт. Молча прятать нельзя: иначе «файл не найден»
-                            // выглядит нашей поломкой (docs/data-integrity.md, И-15).
-                            const warn = l.trusted === false
-                                ? ` <span class="text-admin-danger" title="Ссылка на сайте федерации ведёт не на тот файл — автозагрузка её пропустит, грузите вручную">⚠ битая ссылка</span>`
-                                : '';
-                            return `<a href="${l.url}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">${l.poolType}</a>${upd}${warn}`;
-                        })
-                        .join(' · ');
+            fetch(`/api/admin/records/links?source=${encodeURIComponent(pageSource)}`, { credentials: 'same-origin' })
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    const links = (data && data.links) || [];
+                    mineCells.forEach(el => {
+                        const wantMasters = el.dataset.source.endsWith('masters');
+                        const mine = links.filter(l => !!l.isMasters === wantMasters);
+
+                        if (!mine.length) {
+                            el.textContent = data && data.error ? 'сайт недоступен — грузите файлом' : 'не найдены';
+                            el.title = (data && data.error) || '';
+                            return;
+                        }
+
+                        el.innerHTML = mine
+                            .sort((a, b) => a.poolType.localeCompare(b.poolType))
+                            .map(l => {
+                                const upd = l.updatedOn ? ` <span class="opacity-70">от ${fmtDateOnly(l.updatedOn)}</span>` : '';
+                                // trusted=false — на сайте федерации подпись ссылки не сходится с файлом,
+                                // автозагрузка её не возьмёт. Молча прятать нельзя: иначе «файл не найден»
+                                // выглядит нашей поломкой (docs/data-integrity.md, И-15).
+                                const warn = l.trusted === false
+                                    ? ` <span class="text-admin-danger" title="Ссылка на сайте федерации ведёт не на тот файл — автозагрузка её пропустит, грузите вручную">⚠ битая ссылка</span>`
+                                    : '';
+                                return `<a href="${l.url}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">${l.poolType}</a>${upd}${warn}`;
+                            })
+                            .join(' · ');
+                    });
+                })
+                .catch(() => {
+                    mineCells.forEach(el => { el.textContent = 'не удалось проверить'; });
                 });
-            })
-            .catch(() => {
-                cells.forEach(el => { el.textContent = 'не удалось проверить'; });
-            });
+        });
     }
 
     // «2026-08-17» → «17/08/2026»; сервер отдаёт DateOnly, без времени и таймзоны.

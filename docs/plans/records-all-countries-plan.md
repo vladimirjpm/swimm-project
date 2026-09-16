@@ -19,9 +19,16 @@
 3. Запланировать страницу **head-to-head** — сравнение двух стран по рекордам.
 
 **РЕШЕНО (Влад, 2026-07-29): для других стран только `Category='open'`** — национальные
-рекорды. `age` и `masters` остаются **исключительно израильскими** (их источник — PDF
-isr.org.il, а не worldaquatics; у остальных стран их там просто нет). `junior` в этой фазе
-не трогаем.
+рекорды. `age` и `masters` по СТРАНАМ остаются **исключительно израильскими**: их источник —
+PDF isr.org.il, а у остальных стран таких справочников у World Aquatics нет. `junior` в этой
+фазе не трогаем.
+
+⚠ **Уточнение 16.09.2026.** Про мировую ось это было неверно: мастерские МИРОВЫЕ рекорды
+World Aquatics ведёт и публикует — просто не в XLSX-отчёте (`recordCode` там принимает только
+`WR`/`NR`), а PDF-ками на worldaquatics.com/masters/records. Решением Влада заведён источник
+`wa-masters` (`world/masters`, 1095 строк, только личные дистанции) — шаг 11.1.6 в §8 и раздел
+«Мастерские мировые рекорды» в `docs/data-integrity.md`. Решение «страны — только `open`» это
+не меняет.
 
 ## 2. Что есть сейчас
 
@@ -33,6 +40,7 @@ isr.org.il, а не worldaquatics; у остальных стран их там 
 | country | ISR | masters | 726 |
 | country | ISR | open | 90 (105) |
 | world | (пусто) | open | 86 (101) |
+| world | (пусто) | masters | 0 → 1095 после 11.1.6 (источник `wa-masters`, заливка не делалась) |
 | country | USA / JAM | open | по 1 — **артефакт**, причина найдена, см. §3а |
 
 `open`-строк стало меньше из-за чистки фантомного стиля `medley` 24.08 (32 строки, у каждой был
@@ -44,15 +52,17 @@ isr.org.il, а не worldaquatics; у остальных стран их там 
 `Gender` + `PoolType` + `Style` + `Distance`; плюс `Time`, `HolderName`, `Club`,
 `HolderCountry`, `RecordDate`, `UpdatedAt`.
 
-**Импорт** (этап 2.6, работает): `IRecordSourceProvider` × 3 —
+**Импорт** (этап 2.6, работает): `IRecordSourceProvider` × 4 —
 `WorldRecordsSourceProvider` (4 XLSX с api.worldaquatics.com: WR SCM/LCM + NR SCM/LCM),
-`IsrOrgAgeRecords`, `IsrOrgMastersRecords` (PDF). Дифф по 8 осям
+`IsrOrgAgeRecords`, `IsrOrgMastersRecords` (PDF федерации) и `WaMastersRecordsSourceProvider`
+(PDF мастерских мировых, 11.1.6). Дифф по 8 осям
 (`RecordDiffService` + `DeduplicateByAxes`), превью-сессия 10 мин, Apply в транзакции +
 инвалидация кэша. Эндпоинты `/api/admin/records/fetch|apply|source-status`, UI — вкладка
 «Рекорды» на Admin/Import карточками-источниками.
 
-С 2026-08-24 есть CLI `--records-refresh` — прогон `worldrecords` → `isrorg-age` в жёстком
-порядке (И-13, см. 11.1.2). **Apply только добавляет и обновляет, удалений в нём нет**:
+С 2026-08-24 есть CLI `--records-refresh` — прогон `worldrecords` → `wa-masters` →
+`isrorg-age` → `isrorg-masters` в жёстком порядке (И-13, см. 11.1.2; `wa-masters` и
+`isrorg-masters` дописаны 2026-09-16 — до того мастерсов в прогоне не было вовсе). **Apply только добавляет и обновляет, удалений в нём нет**:
 «нет в источнике» — лишь счётчик в превью (`RecordDiffService.ApplyAsync`).
 
 **Эта фаза разблокирует 9.9** (переключатель региона рекордов), который стоял
@@ -348,3 +358,4 @@ age/masters/open до и после (шаг 6).
 | 4 | ✅ 2026-09-16 · Сузить сверку качества до `world` + `ISR`, свернуть дашборд (11.1.5, 11.1.4) | до первой заливки, иначе дашборд «сломается» |
 | 5 | Вкладка «Рекорды»: выбор стран, прогресс, дифф по странам (11.1.4) | запуск из админки |
 | 6 | Боевой прогон: сначала 3–5 стран, потом все | приёмка 11.1.2 |
+| 11.1.6 | ✅ 2026-09-16 · Источник `wa-masters`: мастерские мировые рекорды из PDF worldaquatics (личные, LCM+SCM) | ось `world/masters` считалась несуществующей; заливки (Apply) ещё не было |

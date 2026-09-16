@@ -18,6 +18,8 @@
   **кандидатами**. Решение Влада 15.09: не блокировать, а метить.
 - **Данные после боевого прогона 15.09** (локальная БД): `world` 86, `country/ISR` — open 90,
   age 781, masters 726. В реестре две записи, обе `open`: RQ-1 (34.08) и 40.11.
+  Мастерские мировые (`world/masters`, источник `wa-masters`) — источник сделан 16.09,
+  1095 строк в dry-run, **в базу не заливались**.
 - **Шаг 1 (11.1.1) сделан 16.09**, ветка `records-country-list`: провайдер списка стран
   (`WorldAquaticsCountriesProvider`, шов `IRecordCountriesProvider`), общий
   `WorldAquaticsSource` вместо копии предиката SSRF, 6 тестов. Живой прогон: 235 стран.
@@ -40,11 +42,21 @@
 
 - **Источники:** `worldrecords` (4 XLSX World Aquatics: WR SCM/LCM + NR SCM/LCM **одной**
   страны, GUID в `RecordsImport:WorldAquaticsNationalCountryId`), `isrorg-age` и
-  `isrorg-masters` (PDF федерации, ссылки резолвятся со страницы-оглавления).
+  `isrorg-masters` (PDF федерации, ссылки резолвятся со страницы-оглавления) и `wa-masters`
+  (PDF мастерских МИРОВЫХ рекордов с worldaquatics.com, тоже через страницу-оглавление).
 - **Путь:** дифф по 8 осям (`RecordDiffService`) → превью 10 мин → Apply. Apply **только
   добавляет и обновляет**, удалений нет; метки кэша запись получает сама (К4).
 - **Порядок источников — само правило** (И-13): сперва World Aquatics, потом федерация поверх.
-  Зашит списком в `--records-refresh`; перепутаешь — молча откатятся израильские рекорды.
+  Зашит списком в `--records-refresh` — с 16.09.2026 он полный:
+  `worldrecords` → `wa-masters` → `isrorg-age` → `isrorg-masters`; перепутаешь — молча
+  откатятся израильские рекорды. Федеральных источников ДВА, и оба после WA. **`isrorg-masters`
+  дописан 2026-09-16** — до того команда не трогала 726 мастерских строк из 1 683. При первом
+  же `--dry-run` вылезло два хвоста, оба ЖДУТ ВЛАДА: мастерсы **25 м не приезжают** (битая
+  ссылка у федерации, И-15 — нужен ручной `RecordsImport:IsrOrgMastersRecordsUrl25m`), и **три
+  из пяти изменившихся строк едут в худшую сторону** — сторож И-20 откаты не ловит. Сверено с
+  PDF 16.09: **парсер читает верно, это федерация потеряла два рекорда** (И-21). Правило
+  `slower-than-stored` в `RecordPlausibility` добавлено 16.09 — теперь эти строки при Apply
+  сами уйдут в реестр кандидатами, разобрать их в `/Admin/Records?tab=issues`.
 - **Сторож** (`RecordPlausibility`): мировой улучшен за раз > 3 % или рекорд страны / возраста
   быстрее мирового → строка идёт в `RecordDiffResult.Suspicious`, при Apply заводится
   `Sys_RecordIssues` со статусом `candidate`. На витрине метки нет, пока человек не переведёт
@@ -62,6 +74,12 @@
    блок «Рекорды» на дашборде свёрнут в «мир · Израиль · Другие страны · стран: N» (11.1.5, 11.1.4).
 5. Вкладка «Рекорды» на `/Admin/Import`: выбор стран, прогресс, дифф по странам.
 6. Боевой прогон: сначала 3–5 стран, потом все.
+7. ✅ 16.09.2026 · Источник `wa-masters` — мастерские МИРОВЫЕ рекорды (11.1.6): резолвер
+   страницы worldaquatics.com/masters/records, парсер PDF, карточка на `/Admin/Import`,
+   место в `--records-refresh` — сразу за `worldrecords`, до федеральных источников.
+   **Apply не делался** — `world/masters` в базе пока пусто.
+   Подробности — `docs/admin-pages/import.md` и раздел «Мастерские мировые рекорды»
+   в `docs/data-integrity.md`.
 
 **Решено Владом 16.09.2026 (§7 плана закрыт, все четыре по рекомендациям):** тянем **все 235
 реальных стран**; `RegionCode` берём **из запроса**, несовпадения — строкой в отчёт прогона;
@@ -76,6 +94,10 @@ dotnet run --project server/Swimm.API -- --records-refresh --dry-run
 
 # тесты рекордов
 dotnet test server/Swimm.Tests --filter "FullyQualifiedName~Record"
+
+# мастерские мировые на РЕАЛЬНЫХ PDF (иначе тесты скипаются): положить в папку
+# CurrentWorldRecords-Individual-LCM.pdf и …-SCM.pdf со страницы worldaquatics.com/masters/records
+SWIMM_WA_MASTERS_DIR=<папка> dotnet test server/Swimm.Tests --filter "FullyQualifiedName~WaMasters"
 
 # на РЕАЛЬНЫХ отчётах: положить WR_SCM/WR_LCM/NR_SCM/NR_LCM.xlsx в папку и задать
 SWIMM_WR_REPORTS_DIR=<папка> dotnet test server/Swimm.Tests --filter "FullyQualifiedName~WorldRecords"

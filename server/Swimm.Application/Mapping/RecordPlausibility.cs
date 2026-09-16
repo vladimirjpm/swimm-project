@@ -14,13 +14,23 @@ namespace Swimm.Application.Mapping;
 /// иначе следующий импорт молча вернёт всё назад. Находка уходит в реестр спорных рекордов
 /// КАНДИДАТОМ (<see cref="RecordIssueStatuses.Candidate"/>) — статус ставит человек.
 ///
-/// Два правила, оба без ложных срабатываний на живых данных 2026-09-15:
+/// Три правила:
 /// <list type="number">
 /// <item>мировой рекорд улучшен за раз больше чем на <see cref="WorldMaxImprovement"/>;</item>
-/// <item>не мировой рекорд (страна, возраст, мастерс) быстрее мирового той же дисциплины.</item>
+/// <item>не мировой рекорд (страна, возраст, мастерс) быстрее мирового той же дисциплины;</item>
+/// <item>строка стала МЕДЛЕННЕЕ той, что уже лежит в базе (И-21) — см. <see cref="IsContestedSlot"/>.</item>
 /// </list>
 /// Порога улучшения для национальных рекордов нет сознательно: у малых федераций скачки на
 /// 5–10 % нормальны (редкие дистанции, дырявые наборы). Подбирать его — по данным Фазы 11.
+/// Порога ЗАМЕДЛЕНИЯ нет тоже, и по другой причине: рекорд не ходит назад ни на секунду, ни
+/// на сотую — любое замедление означает, что источник переписал строку, а насколько сильно,
+/// решает уже человек в реестре.
+///
+/// Замер на живых источниках 2026-09-16: World Aquatics — 86 изменившихся строк, ОДНА
+/// находка; мастерсы — 5 изменившихся, три находки (ровно те, что разобраны в И-21);
+/// возрастные — ноль. Единственная неточность там же: правило 3 не отличает потерю рекорда
+/// от того, как источник ЧИНИТ свою же ошибку — находка на world есть откат 40.11 → 51.68,
+/// то есть World Aquatics убирает мусор из И-20. Разбирать человеку в реестре.
 /// </summary>
 public static class RecordPlausibility
 {
@@ -64,6 +74,14 @@ public static class RecordPlausibility
         {
             if (SwimTime.ParseToMs(e.NewTime) is not int newMs) continue;
 
+            // Правило 3 идёт первым, потому что оно единственное касается и мировых строк:
+            // ветка ниже уходит в continue и до правила 2 их не доводит.
+            if (SwimTime.ParseToMs(e.OldTime) is int storedMs && newMs > storedMs && !IsContestedSlot(e))
+                found.Add(Finding(e, RecordIssueReasons.SlowerThanStored,
+                    $"Рекорд стал МЕДЛЕННЕЕ: {e.OldTime} → {e.NewTime} ({Delta(newMs - storedMs)}). " +
+                    "Рекорды назад не ходят — источник либо потерял прежнего держателя, либо " +
+                    "переписал строку."));
+
             if (e.RegionType == "world")
             {
                 if (SwimTime.ParseToMs(e.OldTime) is not int oldMs || newMs >= oldMs) continue;
@@ -85,6 +103,26 @@ public static class RecordPlausibility
         }
         return found;
     }
+
+    /// <summary>
+    /// Слот, на который в цепочке <c>--records-refresh</c> пишут ДВА источника (И-13):
+    /// <c>country/*/open</c> берут и отчёт NR World Aquatics, и PDF федерации. Там откат
+    /// назад — штатная середина цепочки: шаг World Aquatics возвращает своё устаревшее
+    /// значение, а следующий шаг кладёт федеральное обратно. Правило 3 такие строки
+    /// пропускает — иначе кандидатом становился бы каждый израильский откат, а их в прогоне
+    /// World Aquatics десятки, и все до одного возвращает следующий шаг цепочки.
+    ///
+    /// Остальные слоты однохозяйные: <c>world</c> пишет только <c>worldrecords</c>,
+    /// <c>age</c> — только <c>isrorg-age</c>, <c>masters</c> — только <c>isrorg-masters</c>
+    /// (<c>RecordDiffService.SourceScopes</c>), и там замедление означает дефект источника.
+    /// </summary>
+    private static bool IsContestedSlot(RecordDiffEntry e) =>
+        e.RegionType.Equals("country", StringComparison.OrdinalIgnoreCase)
+        && e.Category.Equals("open", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Разница во времени человеческим языком: «+44.41 с».</summary>
+    private static string Delta(int ms) =>
+        "+" + (ms / 1000.0).ToString("0.##", CultureInfo.InvariantCulture) + " с";
 
     /// <summary>Пол × бассейн × стиль × дистанция — ось, на которой живёт мировой рекорд.</summary>
     public static string DisciplineKey(string gender, string poolType, string style, string distance) =>
