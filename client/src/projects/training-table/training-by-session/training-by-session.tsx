@@ -6,7 +6,9 @@ import UI_IntensityIcon from '../../components/mix/intensity-icon/intensity-icon
 import UI_ExpectedTimeDiff from '../../components/mix/expected-time-diff/expected-time-diff';
 import UI_PaddlesIcon from '../../components/mix/paddles-icon/paddles-icon';
 import UI_PullBuoyIcon from '../../components/mix/pull-buoy-icon/pull-buoy-icon';
+import UI_FinsIcon from '../../components/mix/fins-icon/fins-icon';
 import UI_NormativeLevelIcon from '../../components/mix/normative-level-icon/normative-level-icon';
+import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
 import UI_SwimmerGallery from '../../components/mix/swimmer-gallery/swimmer-gallery';
 import { GalleryItem, TrainingMediaItem } from '../../../utils/interfaces/results';
 import { HelperMedia } from '../../../utils/helpers';
@@ -125,9 +127,11 @@ function TrainingBySession({ results, selectedSource, filters, updateFilter }: P
           avgV,
           sets: Helper.groupTrainingBySet(items),
           media: first?.training?.media ?? [],
+          note: first?.training?.note ?? '',
         };
       })
-      .sort((a, b) => dateKey(a.date).localeCompare(dateKey(b.date)));
+      // Последняя тренировка сверху (просьба Влада 16.09.2026)
+      .sort((a, b) => dateKey(b.date).localeCompare(dateKey(a.date)));
   }, [results]);
 
   if (!sessions.length) {
@@ -156,6 +160,14 @@ function TrainingBySession({ results, selectedSource, filters, updateFilter }: P
             <div className="tbs-stat tbs-stat-pool"><span className="k">Pool</span><span className="v">{s.pool}</span></div>
           </div>
 
+          {/* ── Заметка тренировки (данные — язык как введён, поэтому dir="auto") ── */}
+          {s.note && (
+            <div className="tbs-note">
+              <span className="k">Note</span>
+              <span className="v" dir="auto">{s.note}</span>
+            </div>
+          )}
+
           {/* ── Медиа тренировки ── */}
           <TrainingMediaStrip media={s.media} />
 
@@ -166,21 +178,39 @@ function TrainingBySession({ results, selectedSource, filters, updateFilter }: P
             const orders = new Set(items.map((x) => x?.training?.order ?? 0)).size;
             const distance = first?.event_style_len ?? '';
             const style = first?.event_style_name ?? '';
+            // Стили в сете разные (15.09.2026: 100 вольным + баттерфляй + брасс) — «рецепт» по первой
+            // строке соврал бы, поэтому стиль уходит в каждую строку значком.
+            const mixedStyles = new Set(items.map((x) => x.event_style_name)).size > 1;
             const interval = first?.training?.interval;
             const intensity = first?.training?.intensity;
             const paddles = items.some((x) => x?.training?.isPaddles);
             const buoy = items.some((x) => x?.training?.isBuoy);
+            const fins = items.some((x) => x?.training?.isFins);
 
             return (
               <div key={si} className="tbs-set">
                 <div className="tbs-set-head">
                   <span className="tbs-setno">SET {set.set ?? si + 1}</span>
                   <span className="tbs-recipe">
-                    <span className="chip strong">{orders > 1 ? `${orders}×${distance}` : distance} {style}</span>
+                    <span className="chip strong">
+                      {orders > 1 ? `${orders}×` : null}
+                      {mixedStyles ? (
+                        // Стили в сете разные — значок соврал бы, оставляем текст (стиль в строках)
+                        `${distance} · mixed strokes`
+                      ) : (
+                        <UI_SwimmStyleIcon
+                          styleName={style}
+                          styleLen={distance}
+                          styleType="icon-len"
+                          className="src-training-by-session w-16"
+                        />
+                      )}
+                    </span>
                     {interval ? <span className="chip">start {Helper.formatSecondsToTimeString(interval)}</span> : null}
                     {intensity ? <span className="chip v"><UI_IntensityIcon intensity={intensity} /></span> : null}
                     {paddles ? <span className="chip"><UI_PaddlesIcon className="w-4 h-4" /> paddles</span> : null}
                     {buoy ? <span className="chip"><UI_PullBuoyIcon className="w-4 h-4" /> buoy</span> : null}
+                    {fins ? <span className="chip"><UI_FinsIcon className="w-4 h-4" /> fins</span> : null}
                   </span>
                   <span className="tbs-setmeta">{items.length} reps</span>
                 </div>
@@ -201,8 +231,18 @@ function TrainingBySession({ results, selectedSource, filters, updateFilter }: P
                       : null;
 
                     return (
-                      <li key={i} className={`tbs-row ${isFemale ? 'f' : 'm'}`}>
+                      <li key={i} className={`tbs-row ${isFemale ? 'f' : 'm'}${mixedStyles ? ' tbs-row--styled' : ''}`}>
                         <span className="tbs-order">{set.set ?? '·'}.{r?.training?.order ?? '·'}</span>
+                        {mixedStyles && (
+                          <span className="tbs-style" title={r.event_style_name}>
+                            <UI_SwimmStyleIcon
+                              styleName={r.event_style_name}
+                              styleLen={r.event_style_len}
+                              styleType="icon-len"
+                              className="src-training-by-session w-20"
+                            />
+                          </span>
+                        )}
                         <button
                           type="button"
                           className="tbs-who"
@@ -215,12 +255,14 @@ function TrainingBySession({ results, selectedSource, filters, updateFilter }: P
                         <span className="tbs-gear">
                           {r?.training?.isPaddles && <UI_PaddlesIcon className="w-4 h-4" />}
                           {r?.training?.isBuoy && <UI_PullBuoyIcon className="w-4 h-4" />}
+                          {r?.training?.isFins && <UI_FinsIcon className="w-4 h-4" />}
                         </span>
                         <span className="tbs-time">
                           <span className="t">{r.time}</span>
                           <UI_ExpectedTimeDiff time={r.time} expected_time={r?.training?.expected_time} />
                         </span>
-                        <span className="tbs-v"><UI_IntensityIcon intensity={r?.training?.intensity} /></span>
+                        {/* нет интенсивности — нет чипа (как в шапке сета), а не «V0» */}
+                        <span className="tbs-v">{r?.training?.intensity ? <UI_IntensityIcon intensity={r.training.intensity} /> : null}</span>
                         {showRating && levelInfo && (
                           <span className="tbs-lvl">
                             <UI_NormativeLevelIcon

@@ -6,6 +6,7 @@ import UI_NormativeLevelIcon from '../../components/mix/normative-level-icon/nor
 import UI_PaddlesIcon from '../../components/mix/paddles-icon/paddles-icon';
 import { Result, TrainingGroup } from '../../../utils/interfaces/results';
 import UI_PullBuoyIcon from '../../components/mix/pull-buoy-icon/pull-buoy-icon';
+import UI_FinsIcon from '../../components/mix/fins-icon/fins-icon';
 import UI_IntensityIcon from '../../components/mix/intensity-icon/intensity-icon';
 import TrainingSetHeader from '../training-set-header/training-set-header';
 import UI_ExpectedTimeDiff from '../../components/mix/expected-time-diff/expected-time-diff';
@@ -133,6 +134,7 @@ function TrainingTableBySet({
                         <div className="flex flex-row lg:flex-col">
                           {res.training?.isPaddles && <UI_PaddlesIcon className="w-6 h-6" />}
                           {res.training?.isBuoy && <UI_PullBuoyIcon className="w-6 h-6" />}
+                          {res.training?.isFins && <UI_FinsIcon className="w-6 h-6" />}
                         </div>
                       </div>
 

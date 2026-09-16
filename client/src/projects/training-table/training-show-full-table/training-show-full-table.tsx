@@ -4,6 +4,7 @@ import { Result } from '../../../utils/interfaces/results';
 import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
 import UI_PaddlesIcon from '../../components/mix/paddles-icon/paddles-icon';
 import UI_PullBuoyIcon from '../../components/mix/pull-buoy-icon/pull-buoy-icon';
+import UI_FinsIcon from '../../components/mix/fins-icon/fins-icon';
 import Helper from '../../../utils/helpers/data-helper';
 import UI_IntensityIcon from '../../components/mix/intensity-icon/intensity-icon';
 import TrainingSetHeader from '../training-set-header/training-set-header';
@@ -17,9 +18,10 @@ export type PivotRow = {
   // Уникальные для этой строки (set/order): если все ячейки совпадают
   len?: string;
   style?: string;
-  // Если у всех ячеек одинаковые isPaddles/isBuoy — выносим в общую колонку
+  // Если у всех ячеек одинаковые isPaddles/isBuoy/isFins — выносим в общую колонку
   isPaddles?: boolean;
   isBuoy?: boolean;
+  isFins?: boolean;
   cells: Record<
     string,
     | {
@@ -28,6 +30,7 @@ export type PivotRow = {
         len: string;
         isPaddles?: boolean;
         isBuoy?: boolean;
+        isFins?: boolean;
         expected_time?: string;
       }
     | undefined
@@ -125,6 +128,7 @@ function buildPivot(results: Result[]): PivotBlock[] {
       // Определяем, есть ли isPaddles/isBuoy у всех ячеек строки
       const allPaddles = rowItems.length > 0 && rowItems.every((rr) => rr.training?.isPaddles === true);
       const allBuoy = rowItems.length > 0 && rowItems.every((rr) => rr.training?.isBuoy === true);
+      const allFins = rowItems.length > 0 && rowItems.every((rr) => rr.training?.isFins === true);
 
       const sampleRow = rowItems[0];
       const row: PivotRow = {
@@ -135,6 +139,7 @@ function buildPivot(results: Result[]): PivotBlock[] {
         len: rowLen,
         isPaddles: allPaddles || undefined,
         isBuoy: allBuoy || undefined,
+        isFins: allFins || undefined,
         cells: {},
       };
 
@@ -147,6 +152,7 @@ function buildPivot(results: Result[]): PivotBlock[] {
             len: found.event_style_len ?? '',
             isPaddles: found.training?.isPaddles ?? false,
             isBuoy: found.training?.isBuoy ?? false,
+            isFins: found.training?.isFins ?? false,
             expected_time: found.training?.expected_time,
           };
         } else {
@@ -183,7 +189,8 @@ function buildPivot(results: Result[]): PivotBlock[] {
     });
   }
 
-  blocks.sort((a, b) => a.trainingId - b.trainingId);
+  // trainingId = yyyyMMdd, поэтому убыванием = последняя тренировка сверху
+  blocks.sort((a, b) => b.trainingId - a.trainingId);
   return blocks;
 }
 
@@ -217,7 +224,8 @@ function TrainingShowFullTable({
     styleUnique?: string,
     fallbackLenFromFirstCell?: string,
     isPaddles?: boolean,
-    isBuoy?: boolean
+    isBuoy?: boolean,
+    isFins?: boolean
   ) => (
     <div className="flex items-center gap-3">
       <div className="flex items-baseline gap-1">
@@ -249,11 +257,12 @@ function TrainingShowFullTable({
 
       <UI_IntensityIcon intensity={intensity} />
 
-      {/* Если у всей строки isPaddles/isBuoy — показываем общие иконки */}
-      {(isPaddles || isBuoy) && (
+      {/* Если у всей строки isPaddles/isBuoy/isFins — показываем общие иконки */}
+      {(isPaddles || isBuoy || isFins) && (
         <div className="flex items-center gap-1">
           {isPaddles && <UI_PaddlesIcon className="w-6 h-6" />}
           {isBuoy && <UI_PullBuoyIcon className="w-6 h-6" />}
+          {isFins && <UI_FinsIcon className="w-6 h-6" />}
         </div>
       )}
     </div>
@@ -318,7 +327,8 @@ function TrainingShowFullTable({
                       row.style,
                       row.cells[b.swimmers[0]]?.len,
                       row.isPaddles,
-                      row.isBuoy
+                      row.isBuoy,
+                      row.isFins
                     )}
                   </td>
 
@@ -343,10 +353,11 @@ function TrainingShowFullTable({
                             )}
 
                             {/* Показываем иконки только если они не вынесены в общую колонку */}
-                            {((cell.isPaddles && !row.isPaddles) || (cell.isBuoy && !row.isBuoy)) && (
+                            {((cell.isPaddles && !row.isPaddles) || (cell.isBuoy && !row.isBuoy) || (cell.isFins && !row.isFins)) && (
                               <div className="mt-1 flex items-center gap-1">
                                 {cell.isPaddles && !row.isPaddles && <UI_PaddlesIcon className="w-6 h-6" />}
                                 {cell.isBuoy && !row.isBuoy && <UI_PullBuoyIcon className="w-6 h-6" />}
+                                {cell.isFins && !row.isFins && <UI_FinsIcon className="w-6 h-6" />}
                               </div>
                             )}
                           </div>

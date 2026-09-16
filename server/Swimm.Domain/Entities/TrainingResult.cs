@@ -69,6 +69,9 @@ public class TrainingResult
     /// <summary>Плыл с колобашкой (training.isBuoy).</summary>
     public bool IsBuoy { get; set; }
 
+    /// <summary>Плыл в ластах (training.isFins).</summary>
+    public bool IsFins { get; set; }
+
     /// <summary>Плановое время, мс (training.expected_time).</summary>
     public int? ExpectedTimeMs { get; set; }
 }
