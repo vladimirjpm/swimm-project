@@ -181,6 +181,27 @@ public class RecordCountryRunTests
         Assert.Null(status.Diff);
     }
 
+    /// <summary>
+    /// Состояние прогона уходит в JSON СТРОКОЙ. По умолчанию System.Text.Json отдаёт enum
+    /// числом, и админка тогда ломается молча: «state: 2» не совпадает ни с «Completed», ни
+    /// с «Running», опрос прекращается после первого ответа, а прогон идёт и заканчивается
+    /// нормально — ни ошибки в консоли, ни записи в логе (поймано 16.09.2026 при сборке
+    /// вкладки «Рекорды»). Тест держит контракт: сломают конвертер — упадёт здесь, а не
+    /// через месяц у человека, который смотрит на застывший прогресс-бар.
+    /// </summary>
+    [Fact]
+    public void RunStatus_SerializesStateAsString_NotNumber()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(NewStatus(),
+            new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+            });
+
+        Assert.Contains("\"state\":\"Running\"", json);
+        Assert.DoesNotContain("\"state\":1", json);
+    }
+
     // ── обвязка ──────────────────────────────────────────────────────────────────────
 
     private static RecordCountryRunStatus NewStatus() => new()
