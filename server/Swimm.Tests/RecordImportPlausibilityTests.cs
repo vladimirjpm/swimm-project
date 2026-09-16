@@ -38,16 +38,17 @@ public class RecordImportPlausibilityTests
         new(db, new MemoryCache(new MemoryCacheOptions()));
 
     private static Record Rec(string regionType, string regionCode, string category, string pool,
-        string style, string distance, string time, string gender = "female") => new()
+        string style, string distance, string time, string gender = "female", string ageKey = "") => new()
     {
-        RegionType = regionType, RegionCode = regionCode, Category = category, AgeKey = "",
+        RegionType = regionType, RegionCode = regionCode, Category = category, AgeKey = ageKey,
         Gender = gender, PoolType = pool, Style = style, Distance = distance, Time = time,
         HolderName = "Holder", RecordDate = "01/01/2025", UpdatedAt = DateTime.UtcNow
     };
 
     private static ParsedRecordDto Parsed(string regionType, string regionCode, string pool,
-        string style, string distance, string time, string category = "open", string gender = "female") =>
-        new(regionType, regionCode, category, "", gender, pool, style, distance, time,
+        string style, string distance, string time, string category = "open", string gender = "female",
+        string ageKey = "") =>
+        new(regionType, regionCode, category, ageKey, gender, pool, style, distance, time,
             "Someone", null, null, "15/09/2026");
 
     // Реальные значения отчёта WR LCM за 2026-09-15 и базы до него.
@@ -99,6 +100,86 @@ public class RecordImportPlausibilityTests
         Assert.Equal(("ISR", "open", "21.90"), (s.RegionCode, s.Category, s.Time));
         Assert.Equal(RecordIssueReasons.FasterThanWorldRecord, s.Reason);
         Assert.Contains("22.83", s.Note);
+    }
+
+    // ── Правило 3: строка стала МЕДЛЕННЕЕ (И-21) ──
+
+    [Fact]
+    public async Task SlowerThanStored_IsSuspicious_NewRowIsNot()
+    {
+        // Живой случай И-21: федерация заменила рекорд 200 брасс ж 70-74 более медленным.
+        using var db = CreateDb(nameof(SlowerThanStored_IsSuspicious_NewRowIsNot));
+        db.Records.Add(Rec("country", "ISR", "masters", "50m", "breaststroke", "200m", "03:50.05",
+            ageKey: "70-74"));
+        await db.SaveChangesAsync();
+
+        var diff = await Diff(db).BuildDiffAsync("isrorg-masters",
+        [
+            Parsed("country", "ISR", "50m", "breaststroke", "200m", "04:34.46", "masters", ageKey: "70-74"),
+            // Новой строке сравнивать не с чем — правило её не касается.
+            Parsed("country", "ISR", "50m", "breaststroke", "200m", "03:19.66", "masters", ageKey: "50-54"),
+        ]);
+
+        var s = Assert.Single(diff.Suspicious!);
+        Assert.Equal(("70-74", "04:34.46"), (s.AgeKey, s.Time));
+        Assert.Equal(RecordIssueReasons.SlowerThanStored, s.Reason);
+        Assert.Contains("03:50.05", s.Note);
+        Assert.Contains("+44.41 с", s.Note);
+    }
+
+    [Fact]
+    public async Task ContestedOpenSlot_RollbackIsIgnored_ButOwnedScopeIsFlagged()
+    {
+        // country/*/open пишут ДВА источника (И-13): откат World Aquatics — штатная середина
+        // цепочки, следующий шаг вернёт федеральное значение. Такие строки правило пропускает,
+        // иначе каждый прогон заводил бы десятки кандидатов. Однохозяйные слоты — ловит.
+        using var db = CreateDb(nameof(ContestedOpenSlot_RollbackIsIgnored_ButOwnedScopeIsFlagged));
+        await SeedWorldAsync(db);
+        db.Records.AddRange(
+            Rec("country", "ISR", "open", "25m", "freestyle", "50m", "24.46"),
+            Rec("country", "ISR", "age", "25m", "freestyle", "50m", "26.10", ageKey: "15"));
+        await db.SaveChangesAsync();
+
+        var diff = await Diff(db).BuildDiffAsync("worldrecords",
+        [
+            Parsed("country", "ISR", "25m", "freestyle", "50m", "24.53"),                       // откат, ждали
+            Parsed("country", "ISR", "25m", "freestyle", "50m", "26.40", "age", ageKey: "15"),  // дефект
+        ]);
+
+        var s = Assert.Single(diff.Suspicious!);
+        Assert.Equal(("age", "26.40"), (s.Category, s.Time));
+        Assert.Equal(RecordIssueReasons.SlowerThanStored, s.Reason);
+    }
+
+    [Fact]
+    public async Task WorldSlower_IsSuspicious_EvenThoughRuleTwoNeverSeesWorldRows()
+    {
+        using var db = CreateDb(nameof(WorldSlower_IsSuspicious_EvenThoughRuleTwoNeverSeesWorldRows));
+        await SeedWorldAsync(db);
+
+        var diff = await Diff(db).BuildDiffAsync("worldrecords",
+            [Parsed("world", "", "50m", "freestyle", "100m", "52.10")]);
+
+        var s = Assert.Single(diff.Suspicious!);
+        Assert.Equal(RecordIssueReasons.SlowerThanStored, s.Reason);
+        Assert.Contains("51.68", s.Note);
+    }
+
+    [Fact]
+    public async Task SameTimeNewHolder_IsNotSuspicious()
+    {
+        // Живой случай прогона 2026-09-16: 57.40 → 57.40, сменился только держатель.
+        using var db = CreateDb(nameof(SameTimeNewHolder_IsNotSuspicious));
+        db.Records.Add(Rec("country", "ISR", "masters", "50m", "freestyle", "100m", "57.40",
+            gender: "male", ageKey: "35-39"));
+        await db.SaveChangesAsync();
+
+        var diff = await Diff(db).BuildDiffAsync("isrorg-masters",
+            [Parsed("country", "ISR", "50m", "freestyle", "100m", "57.40", "masters",
+                gender: "male", ageKey: "35-39")]);
+
+        Assert.Equal(1, diff.ChangedCount);
+        Assert.Empty(diff.Suspicious!);
     }
 
     [Fact]

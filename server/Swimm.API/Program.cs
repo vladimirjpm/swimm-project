@@ -680,6 +680,13 @@ if (args.Contains("--repull"))
 // Ровно поэтому источники перечислены списком, а не запускаются как попало из админки:
 // перепутанный порядок молча откатывает 19 национальных рекордов.
 // Подробности — docs/data-integrity.md, И-13.
+//
+// Федеральных источников ДВА, и оба идут ПОСЛЕ World Aquatics: isrorg-age (возрастные +
+// строки «National Record») и isrorg-masters (мастерские 25-29…). Между собой их порядок
+// не важен — дифф режет по Category (age / masters, RecordDiffService.SourceScopes), общего
+// ключа упсерта у них нет. Важно только, что оба поверх WA.
+// isrorg-masters добавлен 2026-09-16: с 2026-08-24 его в списке не было, и команда не
+// трогала 726 из 1 683 строк справочника вообще (пробел числился в plans/azure-deploy-plan.md).
 if (args.Contains("--records-refresh"))
 {
     var dryRun = args.Contains("--dry-run");
@@ -691,7 +698,7 @@ if (args.Contains("--records-refresh"))
     // wa-masters стоит рядом с worldrecords: это тоже World Aquatics, и он единственный
     // владелец world/masters — ни с кем ключами упсерта не спорит, поэтому его место в списке
     // определяется только здравым смыслом «сначала мир, потом федерация».
-    string[] order = ["worldrecords", "wa-masters", "isrorg-age"];
+    string[] order = ["worldrecords", "wa-masters", "isrorg-age", "isrorg-masters"];
     foreach (var sourceKey in order)
     {
         if (!providers.TryGetValue(sourceKey, out var provider))
@@ -717,11 +724,11 @@ if (args.Contains("--records-refresh"))
         Console.WriteLine($"  строк из источника: {parsed.Count}; без изменений {diff.UnchangedCount}, "
             + $"изменится {diff.ChangedCount}, новых {diff.AddedCount}, нет в источнике {diff.MissingInSourceCount}");
         foreach (var e in diff.Changed.Take(30))
-            Console.WriteLine($"    {e.RegionType,-7} {e.RegionCode,-3} {e.Gender,-6} {e.PoolType,-4} "
+            Console.WriteLine($"    {e.RegionType,-7} {e.RegionCode,-3} {e.AgeKey,-6} {e.Gender,-6} {e.PoolType,-4} "
                 + $"{e.Style,-18} {e.Distance,-7} {e.OldTime ?? "(пусто)",9} -> {e.NewTime,9}");
         if (diff.ChangedCount > 30) Console.WriteLine($"    … ещё {diff.ChangedCount - 30}");
         foreach (var e in diff.Added.Take(15))
-            Console.WriteLine($"    + {e.RegionType,-7} {e.RegionCode,-3} {e.Gender,-6} {e.PoolType,-4} "
+            Console.WriteLine($"    + {e.RegionType,-7} {e.RegionCode,-3} {e.AgeKey,-6} {e.Gender,-6} {e.PoolType,-4} "
                 + $"{e.Style,-18} {e.Distance,-7} {e.NewTime,9}");
         // Сторож правдоподобия (И-20): такие значения всё равно применяются (копия обязана
         // совпадать с источником), но уходят в реестр спорных кандидатами — их надо разобрать.
@@ -730,7 +737,7 @@ if (args.Contains("--records-refresh"))
         {
             Console.WriteLine($"  ⚠ неправдоподобно: {suspicious.Count} — после Apply кандидатами в реестр (/Admin/Records?tab=issues)");
             foreach (var s in suspicious)
-                Console.WriteLine($"    ⚠ {s.RegionType,-7} {s.RegionCode,-3} {s.Gender,-6} {s.PoolType,-4} "
+                Console.WriteLine($"    ⚠ {s.RegionType,-7} {s.RegionCode,-3} {s.AgeKey,-6} {s.Gender,-6} {s.PoolType,-4} "
                     + $"{s.Style,-18} {s.Distance,-7} {s.Time,9}  {s.Reason}");
         }
 

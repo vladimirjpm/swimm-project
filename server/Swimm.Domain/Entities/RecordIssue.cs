@@ -100,8 +100,19 @@ public static class RecordIssueReasons
     /// </summary>
     public const string ImplausibleImprovement = "implausible-improvement";
 
+    /// <summary>
+    /// Строка справочника стала МЕДЛЕННЕЕ той, что уже лежит в базе. Рекорды назад не ходят:
+    /// значит источник потерял прежнего держателя или переписал строку. Живой случай — И-21:
+    /// федерация заменила 200 брасс ж 70-74 (03:50.05, 2019) на 04:34.46 (2022), который
+    /// медленнее её же рекорда полосы 75-79.
+    /// </summary>
+    public const string SlowerThanStored = "slower-than-stored";
+
     public static readonly string[] All =
-        [Manual, LongCourseFasterThanShort, NonMonotonicLadder, FasterThanWorldRecord, ImplausibleImprovement];
+    [
+        Manual, LongCourseFasterThanShort, NonMonotonicLadder, FasterThanWorldRecord,
+        ImplausibleImprovement, SlowerThanStored,
+    ];
 }
 
 /// <summary>
