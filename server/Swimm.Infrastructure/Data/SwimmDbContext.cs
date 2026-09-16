@@ -343,6 +343,13 @@ public class SwimmDbContext : DbContext
             }).IsUnique();
             // Горячий путь клиента/кэша — выборка региона (± категории).
             entity.HasIndex(e => new { e.RegionType, e.RegionCode, e.Category });
+
+            // TimeMs считает САМА БАЗА из Time (функция swim_time_ms, миграция
+            // AddRecordTimeMs). Приложение её не пишет: рекорды заводят четыре разных места
+            // плюс psql и восстановление дампа, и вычисляемая колонка — единственный способ
+            // гарантировать, что она не разъедется с Time.
+            entity.Property(e => e.TimeMs)
+                .HasComputedColumnSql("swim_time_ms(\"Time\")", stored: true);
         });
 
         // Реестр спорных записей справочника рекордов (docs/plans/records-quality-plan.md).
