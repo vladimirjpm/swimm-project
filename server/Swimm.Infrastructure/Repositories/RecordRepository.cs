@@ -170,17 +170,21 @@ public class RecordRepository : IRecordRepository
 
         var reasons = RecordIssueSpreader.Resolve(axes, issues);
 
+        // Экран международный: держателей приводим к латинице, чтобы одна ивритская строка
+        // посреди рейтинга 212 стран не читалась как сбой кодировки (см. HolderLatinNamesAsync).
+        var latin = await HolderLatinNamesAsync();
+
         var world = worldRow == null ? null : new RecordRankingWorldDto
         {
             Time = worldRow.Time,
             TimeMs = worldRow.TimeMs,
-            HolderName = worldRow.HolderName,
+            HolderName = HolderLatinName.Resolve(worldRow.HolderName, latin),
             RecordDate = worldRow.RecordDate,
             IssueReason = reasons.TryGetValue(rows.Count, out var worldReason) ? worldReason : null,
         };
 
         var input = rows.Select((r, i) => new RecordRankingBuilder.Row(
-            r.RegionCode, r.Time, r.TimeMs, r.HolderName, r.RecordDate,
+            r.RegionCode, r.Time, r.TimeMs, HolderLatinName.Resolve(r.HolderName, latin), r.RecordDate,
             reasons.TryGetValue(i, out var reason) ? reason : null)).ToList();
 
         var ranked = RecordRankingBuilder.Build(input, world);
@@ -254,9 +258,12 @@ public class RecordRepository : IRecordRepository
             r.Gender, r.PoolType, r.Style, r.Distance, r.Time, r.HolderName, r.RecordDate)).ToList();
         var reasons = RecordIssueSpreader.Resolve(axes, issues);
 
+        // Тот же международный экран — та же латиница (см. HolderLatinNamesAsync).
+        var latin = await HolderLatinNamesAsync();
+
         var input = rows.Select((r, i) => new RecordCompareBuilder.Row(
             r.RegionCode, r.Style, r.Distance, r.Gender, r.PoolType,
-            r.Time, r.TimeMs, r.HolderName, r.RecordDate,
+            r.Time, r.TimeMs, HolderLatinName.Resolve(r.HolderName, latin), r.RecordDate,
             reasons.TryGetValue(i, out var reason) ? reason : null)).ToList();
 
         var result = RecordCompareBuilder.Build(input, query.A, query.B);
@@ -300,6 +307,52 @@ public class RecordRepository : IRecordRepository
                 r.HolderAge = y - birthYear;
         }
     }
+
+    /// <summary>
+    /// Словарь «ивритское имя → латинское» из карточек наших пловцов. Сама подстановка и
+    /// правило, зачем она нужна именно на международных экранах, — в
+    /// <see cref="HolderLatinName"/>; здесь только сбор данных, который требует БД.
+    ///
+    /// Кэшируется отдельным ключом: словарь один на все дисциплины рейтинга (их под сотню),
+    /// и собирать его заново на каждую значило бы читать таблицу пловцов сотню раз.
+    /// </summary>
+    private Task<Dictionary<string, string>> HolderLatinNamesAsync()
+        => _cache.GetOrCreateAsync("records:holder-latin-names", async () =>
+        {
+            var swimmers = await _db.Swimmers.AsNoTracking()
+                .Where(s => s.FirstNameEn != null && s.LastNameEn != null)
+                .Select(s => new { s.FirstName, s.LastName, s.FirstNameEn, s.LastNameEn })
+                .ToListAsync();
+
+            var found = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+
+            void Remember(string key, string latin)
+            {
+                if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(latin)) return;
+                if (!found.TryGetValue(key, out var set)) found[key] = set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                set.Add(latin);
+            }
+
+            foreach (var s in swimmers)
+            {
+                var first = (s.FirstName ?? "").Trim();
+                var last = (s.LastName ?? "").Trim();
+                var latin = HolderLatinName.Normalize($"{(s.FirstNameEn ?? "").Trim()} {(s.LastNameEn ?? "").Trim()}");
+
+                // Английское имя-копия ивритского нам не поможет: у части карточек в
+                // *En лежит тот же иврит (то же, что у клубов — см. clubLabel на клиенте).
+                if (latin.Length == 0 || HolderLatinName.HasHebrew(latin)) continue;
+                if (first.Length == 0 && last.Length == 0) continue;
+
+                Remember(HolderLatinName.Normalize($"{first} {last}"), latin);
+                Remember(HolderLatinName.Normalize($"{last} {first}"), latin);
+            }
+
+            // Одно латинское имя на ключ — иначе это тёзки, и угадывать мы не имеем права
+            // (то же правило, что у года рождения ниже).
+            return found.Where(kv => kv.Value.Count == 1)
+                .ToDictionary(kv => kv.Key, kv => kv.Value.First(), StringComparer.OrdinalIgnoreCase);
+        }, CacheTtl);
 
     /// <summary>
     /// «имя фамилия» → год рождения, только там, где имя однозначно. Ключи кладём в обеих
