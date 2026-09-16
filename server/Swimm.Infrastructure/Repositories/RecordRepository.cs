@@ -89,6 +89,116 @@ public class RecordRepository : IRecordRepository
     }
 
     /// <summary>
+    /// Рейтинг стран по одной дисциплине (11.2.1). Кэш — по СОСТАВУ ФИЛЬТРА, а не по региону:
+    /// у рейтинга региона нет, а дисциплин с бассейном и полом около сотни, и каждая ложится
+    /// своим ключом. Метки <c>Records</c>/<c>RecordIssues</c> запись получает сама (К3).
+    /// </summary>
+    public Task<RecordRankingDto> GetRankingAsync(RecordRankingQuery query)
+    {
+        var regionsKey = query.Regions is { Count: > 0 }
+            ? string.Join(",", query.Regions)
+            : "all";
+
+        var cacheKey = $"records:ranking:{query.Style}:{query.Distance}:{query.Gender}"
+                     + $":{query.PoolType}:{regionsKey}:{query.Limit}:{query.Offset}";
+
+        return _cache.GetOrCreateAsync(cacheKey, () => LoadRankingAsync(query), CacheTtl);
+    }
+
+    private async Task<RecordRankingDto> LoadRankingAsync(RecordRankingQuery query)
+    {
+        // Дисциплина — это ЧЕТЫРЕ оси сразу; ни одну нельзя не задать, иначе в одном рейтинге
+        // окажутся 50 и 100 метров или мужчины с женщинами.
+        var discipline = _db.Records.AsNoTracking()
+            .Where(r => r.Category == "open"
+                     && r.Gender == query.Gender
+                     && r.PoolType == query.PoolType
+                     && r.Style == query.Style
+                     && r.Distance == query.Distance);
+
+        var countries = discipline.Where(r => r.RegionType == "country");
+
+        if (query.Regions is { Count: > 0 })
+        {
+            var regions = query.Regions;
+            countries = countries.Where(r => regions.Contains(r.RegionCode));
+        }
+
+        // Строки без разобранного времени в рейтинг по времени не ставятся — но и не
+        // исчезают молча: их число едет в ответе (UnparsedSkipped).
+        var unparsed = await countries.CountAsync(r => r.TimeMs == null);
+
+        // Берём дисциплину целиком: в ней не больше одной строки на страну (~215 максимум),
+        // а места обязаны считаться по всему рейтингу — см. RecordRankingBuilder.
+        var rows = await countries
+            .Where(r => r.TimeMs != null)
+            .OrderBy(r => r.TimeMs).ThenBy(r => r.RegionCode)   // ничья — по коду, чтобы порядок был устойчивым
+            .Select(r => new
+            {
+                r.RegionType, r.RegionCode, r.Category, r.AgeKey, r.Gender,
+                r.PoolType, r.Style, r.Distance,
+                r.Time, TimeMs = r.TimeMs!.Value, r.HolderName, r.RecordDate,
+            })
+            .ToListAsync();
+
+        // Мировой тянем СО ВСЕМИ осями, а не сразу в DTO: он тоже проходит разнос претензий
+        // (инвариант И11 — показал время, покажи качество; живой случай — И-20).
+        var worldRow = await discipline
+            .Where(r => r.RegionType == "world" && r.TimeMs != null)
+            .Select(r => new
+            {
+                r.RegionType, r.RegionCode, r.Category, r.AgeKey, r.Gender,
+                r.PoolType, r.Style, r.Distance,
+                r.Time, TimeMs = r.TimeMs!.Value, r.HolderName, r.RecordDate,
+            })
+            .FirstOrDefaultAsync();
+
+        // Претензии — тем же путём, что у /api/records: словарь в памяти, а не JOIN по восьми
+        // осям плюс время (см. LoadRecordsAsync). Мировой идёт последним индексом, одним
+        // разносом со странами: лестницу претензий нельзя считать по частям.
+        var issues = await OpenIssuesAsync();
+
+        var axes = rows.Select((r, i) => new RecordAxes(
+                i, r.RegionType, r.RegionCode, r.Category, r.AgeKey,
+                r.Gender, r.PoolType, r.Style, r.Distance, r.Time, r.HolderName, r.RecordDate))
+            .ToList();
+        if (worldRow != null)
+            axes.Add(new RecordAxes(
+                rows.Count, worldRow.RegionType, worldRow.RegionCode, worldRow.Category,
+                worldRow.AgeKey, worldRow.Gender, worldRow.PoolType, worldRow.Style,
+                worldRow.Distance, worldRow.Time, worldRow.HolderName, worldRow.RecordDate));
+
+        var reasons = RecordIssueSpreader.Resolve(axes, issues);
+
+        var world = worldRow == null ? null : new RecordRankingWorldDto
+        {
+            Time = worldRow.Time,
+            TimeMs = worldRow.TimeMs,
+            HolderName = worldRow.HolderName,
+            RecordDate = worldRow.RecordDate,
+            IssueReason = reasons.TryGetValue(rows.Count, out var worldReason) ? worldReason : null,
+        };
+
+        var input = rows.Select((r, i) => new RecordRankingBuilder.Row(
+            r.RegionCode, r.Time, r.TimeMs, r.HolderName, r.RecordDate,
+            reasons.TryGetValue(i, out var reason) ? reason : null)).ToList();
+
+        var ranked = RecordRankingBuilder.Build(input, world);
+
+        return new RecordRankingDto
+        {
+            Style = query.Style,
+            Distance = query.Distance,
+            Gender = query.Gender,
+            PoolType = query.PoolType,
+            Total = ranked.Count,
+            UnparsedSkipped = unparsed,
+            World = world,
+            Rows = ranked.Skip(query.Offset).Take(query.Limit).ToList(),
+        };
+    }
+
+    /// <summary>
     /// Досыпает год рождения держателя и его возраст в год рекорда (отладочная опция
     /// ShowAgeRecordsDetails). В справочнике федерации года рождения нет — восстанавливаем
     /// по нашим пловцам, совпадением имени.

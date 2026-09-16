@@ -22,6 +22,15 @@ public interface IRecordRepository
         string region, string? category = null, bool withHolderDetails = false);
 
     /// <summary>
+    /// Рейтинг стран по одной дисциплине (этап 11.2.1) — то, чего <c>GetRecordsAsync</c> дать
+    /// не может: тот режет по региону, а рейтингу нужен срез ПОПЕРЁК регионов.
+    ///
+    /// Категория всегда <c>open</c>, тип региона всегда <c>country</c>: рейтингуются страны,
+    /// а мировой рекорд едет отдельным полем ответа как эталон, а не строкой наравне с ними.
+    /// </summary>
+    Task<RecordRankingDto> GetRankingAsync(RecordRankingQuery query);
+
+    /// <summary>
     /// Нормативы. kind: regular/masters; null — все.
     /// country: alpha-3 код системы нормативов (RUS/ISR/…); null — без фильтра (легаси).
     /// Задан — отдаёт строки с этой страной плюс универсальные (Country == "").
