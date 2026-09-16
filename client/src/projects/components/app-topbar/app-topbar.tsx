@@ -25,7 +25,7 @@ export interface AppTopbarProps {
   onLogout?: () => void;
 }
 
-/** Пункты навигации. Normatives/Records — страниц НЕ существует, рендерим span. */
+/** Пункты навигации. Normatives — страницы НЕ существует, рендерим span. */
 const NAV_LINKS: { label: string; href?: string; key?: TopbarActivePage }[] = [
   { label: 'Home', href: routes.home(), key: 'home' },
   { label: 'Competitions', href: routes.competitionsList(), key: 'competitions' },
@@ -34,7 +34,9 @@ const NAV_LINKS: { label: string; href?: string; key?: TopbarActivePage }[] = [
   // ведёт именно туда, а не требует сперва найти пловца (решение Влада 03.09.2026).
   { label: 'Head to head', href: routes.h2h(), key: 'h2h' },
   { label: 'Normatives' },
-  { label: 'Records' },
+  // Пустой `/records` — законный адрес: дисциплина выбирается на самом экране, и без
+  // параметров страница открывает 50 вольным (11.2.2).
+  { label: 'Records', href: routes.records(), key: 'records' },
   { label: 'About', href: routes.about(), key: 'about' },
 ];
 

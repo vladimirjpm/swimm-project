@@ -29,7 +29,8 @@ const cleanUrlRewrite = () => ({
       if (seg.length === 1) {
         return { results: '/results_main.html', competitions: '/competitions.html',
           groups: '/groups.html', clubs: '/results_main.html', 'my-media': '/media.html', about: '/about.html',
-          'season-best': '/season-best.html', h2h: '/h2h.html' }[seg[0]] ?? null;
+          'season-best': '/season-best.html', h2h: '/h2h.html',
+          records: '/records.html' }[seg[0]] ?? null;
       }
       if (seg.length >= 2) {
         if (seg[0] === 'competitions') return '/results_main.html';
@@ -91,6 +92,7 @@ export default defineConfig(({ command }) => ({
         club: resolve(__dirname, 'club.html'),
         season_best: resolve(__dirname, 'season-best.html'),
         h2h: resolve(__dirname, 'h2h.html'),
+        records: resolve(__dirname, 'records.html'),
       },
       output: {
         entryFileNames: '[name].js',
