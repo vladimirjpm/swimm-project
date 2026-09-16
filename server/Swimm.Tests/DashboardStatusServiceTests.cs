@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -528,6 +528,58 @@ public class DashboardStatusServiceTests
         var isr = Assert.Single(result.RecordSets, r => r.RegionType == "country" && r.RegionCode == "ISR");
         Assert.Equal(1, isr.Count);
     }
+
+    /// <summary>
+    /// После Фазы 11 в Records лежат рекорды 235 стран. Мир и Израиль остаются отдельными
+    /// строками — за их свежестью мы следим, — а остальные сворачиваются в одну сводную:
+    /// плитка на каждую страну превратила бы блок дашборда в простыню (план 11.1.4).
+    /// </summary>
+    [Fact]
+    public async Task GetStatusAsync_RecordSets_CollapsesForeignCountries()
+    {
+        await using var db = CreateDb(nameof(GetStatusAsync_RecordSets_CollapsesForeignCountries));
+
+        var older = DateTime.UtcNow.AddDays(-3);
+        var newer = DateTime.UtcNow;
+
+        db.Records.AddRange(
+            Rec("world", "", "21.08", newer),
+            Rec("country", "ISR", "22.00", newer),
+            Rec("country", "USA", "21.50", older),
+            Rec("country", "JAM", "22.50", newer),
+            Rec("country", "AGU", "26.10", older));
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).GetStatusAsync(CancellationToken.None);
+
+        Assert.Equal(3, result.RecordSets.Count);
+        // Порядок: мир, Израиль, сводка — так же читается и блок на дашборде.
+        Assert.Equal(["world", "country", DashboardRecordSetStatus.OtherCountriesType],
+            result.RecordSets.Select(r => r.RegionType).ToArray());
+
+        var others = result.RecordSets[2];
+        Assert.Equal(3, others.Countries);
+        Assert.Equal(3, others.Count);
+        Assert.Equal(newer, others.LastUpdatedAt);   // свежайшая из чужих
+
+        // У обычных наборов счётчик стран остаётся единицей — сводки из них не делаем.
+        Assert.All(result.RecordSets.Take(2), r => Assert.Equal(1, r.Countries));
+    }
+
+    private static Swimm.Domain.Entities.Record Rec(
+        string regionType, string regionCode, string time, DateTime updatedAt) => new()
+    {
+        RegionType = regionType,
+        RegionCode = regionCode,
+        Category = "open",
+        AgeKey = "",
+        Gender = "male",
+        PoolType = "50m",
+        Style = "freestyle",
+        Distance = "50m",
+        Time = time,
+        UpdatedAt = updatedAt,
+    };
 
     [Fact]
     public async Task GetStatusAsync_Media_CountsVideoPhotoAndModerationPending()

@@ -117,8 +117,21 @@ public sealed record DashboardResultStatus(
 
 /// <summary>Один набор рекордов (группировка по территории) — сколько записей и когда последний
 /// раз обновляли. Порог «устарело» сервер не считает — это фронт (T2).</summary>
+/// <param name="Countries">
+/// Сколько стран схлопнуто в этот набор. 1 — обычный набор (мир, Израиль); больше —
+/// синтетический «другие страны» (<see cref="OtherCountriesType"/>).
+/// </param>
 public sealed record DashboardRecordSetStatus(
-    string RegionType, string RegionCode, int Count, DateTime LastUpdatedAt);
+    string RegionType, string RegionCode, int Count, DateTime LastUpdatedAt, int Countries = 1)
+{
+    /// <summary>
+    /// <c>RegionType</c> синтетического набора «другие страны». После Фазы 11 в
+    /// <c>Records</c> лежат рекорды 235 стран, и плитка на каждую превратила бы блок
+    /// дашборда в простыню (11.1.4). Мир и Израиль остаются отдельными: их мы обновляем
+    /// сами и за их свежестью следим, остальные — одной строкой «N стран».
+    /// </summary>
+    public const string OtherCountriesType = "countries-other";
+}
 
 /// <summary>Здоровье ссылок UserMedia (фаза 7.5) + разбивка по типу и модерация публикаций.</summary>
 public sealed record DashboardMediaStatus(
