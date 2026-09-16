@@ -355,10 +355,13 @@
         };
     }
 
-    // Заголовок набора рекордов: world → «World», country/ISR → «Israel», иначе «type:code».
+    // Заголовок набора рекордов: world → «World», country/ISR → «Israel», сводка чужих стран
+    // → «Другие страны» (после Фазы 11 их 235, и плитка на каждую превратила бы блок в
+    // простыню — см. countries-other в DashboardRecordSetStatus), иначе «type:code».
     function recordSetTitle(rs) {
         if (rs.regionType === 'world') return 'World';
         if (rs.regionType === 'country' && rs.regionCode === 'ISR') return 'Israel';
+        if (rs.regionType === 'countries-other') return 'Другие страны';
         return `${rs.regionType}:${rs.regionCode}`;
     }
     function recordSetHref(rs) {
@@ -374,10 +377,12 @@
     function buildRecordsBlock(recordSets, quality) {
         const metrics = recordSets.map(rs => {
             const stale = isRecordSetStale(rs);
+            // «стран: N», а не «N стран»: падежи (233 стран / 2 страны) тут не за что ловить.
+            const countries = rs.countries > 1 ? `стран: ${fmtN(rs.countries)} · ` : '';
             return {
                 v: rs.count,
                 label: recordSetTitle(rs),
-                sub: `обновлено ${fmtDT(rs.lastUpdatedAt)}${stale ? ` · устарело (> ${RECORDS_STALE_MONTHS} мес)` : ''}`,
+                sub: `${countries}обновлено ${fmtDT(rs.lastUpdatedAt)}${stale ? ` · устарело (> ${RECORDS_STALE_MONTHS} мес)` : ''}`,
                 tone: stale ? 'gray' : 'info',
                 href: recordSetHref(rs),
             };

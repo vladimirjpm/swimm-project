@@ -453,6 +453,11 @@ public class DashboardStatusService(
             EmptyRelays: emptyRelays);
     }
 
+    /// <summary>
+    /// Наборы рекордов для блока дашборда. Мир и Израиль — отдельными строками (их мы
+    /// обновляем сами и следим за свежестью), остальные страны — одной сводной: после
+    /// Фазы 11 их 235, и плитка на каждую превратила бы блок в простыню (11.1.4).
+    /// </summary>
     private async Task<IReadOnlyList<DashboardRecordSetStatus>> BuildRecordSetsAsync(CancellationToken ct)
     {
         var groups = await db.Records.AsNoTracking()
@@ -460,7 +465,20 @@ public class DashboardStatusService(
             .Select(g => new DashboardRecordSetStatus(g.Key.RegionType, g.Key.RegionCode, g.Count(), g.Max(r => r.UpdatedAt)))
             .ToListAsync(ct);
 
-        return groups;
+        // «Свои» — те, за чьей свежестью следим: мировые и израильские.
+        static bool IsOwn(DashboardRecordSetStatus g) => g.RegionType == "world" || g.RegionCode == "ISR";
+
+        var own = groups.Where(IsOwn).OrderBy(g => g.RegionType == "world" ? 0 : 1).ToList();
+        var others = groups.Where(g => !IsOwn(g)).ToList();
+        if (others.Count == 0) return own;
+
+        own.Add(new DashboardRecordSetStatus(
+            DashboardRecordSetStatus.OtherCountriesType, "",
+            others.Sum(o => o.Count),
+            others.Max(o => o.LastUpdatedAt),
+            Countries: others.Count));
+
+        return own;
     }
 
     private async Task<DashboardMediaStatus> BuildMediaAsync(CancellationToken ct)

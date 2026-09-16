@@ -23,9 +23,22 @@ public class RecordQualityService(SwimmDbContext db, ISettingsService? settings 
     /// <summary>Форматы дат в источниках рекордов — смешанные, разбираем оба.</summary>
     private static readonly string[] RecordDateFormats = ["dd/MM/yyyy", "M/d/yyyy", "d/M/yyyy"];
 
+    /// <summary>
+    /// Что вообще имеет смысл сверять с нашими протоколами: мировые и израильские рекорды.
+    ///
+    /// Протоколы у нас израильские, поэтому рекорд Ямайки не найдётся никогда — это не
+    /// «не подтверждён», это «сверять не с чем». После Фазы 11 таких строк 10–15 тысяч
+    /// против ~1.7 тысяч своих: без этого фильтра сводка качества на дашборде превратилась
+    /// бы в «не найдено 12 000», и разглядеть в ней настоящие расхождения стало бы нельзя
+    /// (план 11.1.5). Мировые оставляем: их держатели приезжают на наши старты.
+    /// </summary>
+    private static readonly System.Linq.Expressions.Expression<Func<Record, bool>> Verifiable =
+        r => r.RegionType == "world" || r.RegionCode == "ISR";
+
     public async Task<RecordVerifyResult> VerifyAllAsync(CancellationToken ct = default)
     {
         var records = await db.Records.AsNoTracking()
+            .Where(Verifiable)
             .Select(r => new
             {
                 r.Id, r.Gender, r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate,
@@ -149,7 +162,9 @@ public class RecordQualityService(SwimmDbContext db, ISettingsService? settings 
 
     public async Task<RecordQualitySummary> GetSummaryAsync(int issuesLimit = 20, CancellationToken ct = default)
     {
-        var total = await db.Records.AsNoTracking().CountAsync(ct);
+        // Тем же охватом, что и сверка: иначе «не проверено» = все иностранные рекорды,
+        // которых мы и не собирались проверять (план 11.1.5).
+        var total = await db.Records.AsNoTracking().Where(Verifiable).CountAsync(ct);
         var found = await db.RecordVerifications.AsNoTracking().CountAsync(v => v.Found, ct);
         var notFound = await db.RecordVerifications.AsNoTracking().CountAsync(v => !v.Found, ct);
         var wrongDate = await db.RecordVerifications.AsNoTracking()

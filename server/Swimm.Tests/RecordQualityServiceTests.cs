@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
@@ -26,11 +26,12 @@ public class RecordQualityServiceTests
     private static Swimm.Domain.Entities.Record Rec(
         string time, string style = "backstroke", string distance = "50m",
         string poolType = "50m", string gender = "female", string? date = "20/07/2025",
-        string ageKey = "10") => new()
+        string ageKey = "10", string regionType = "country", string regionCode = "ISR",
+        string category = "age") => new()
     {
-        RegionType = "country",
-        RegionCode = "ISR",
-        Category = "age",
+        RegionType = regionType,
+        RegionCode = regionCode,
+        Category = category,
         AgeKey = ageKey,
         Gender = gender,
         PoolType = poolType,
@@ -87,6 +88,37 @@ public class RecordQualityServiceTests
         Assert.True(row.Found);
         Assert.Equal(swimmer.Id, row.SwimmerId);
         Assert.True(row.DateMatched);
+    }
+
+    /// <summary>
+    /// Иностранные рекорды (Фаза 11) сверять не с чем: протоколы у нас израильские, и
+    /// рекорд Ямайки не найдётся никогда. Это «сверять нечем», а не «не подтверждён», —
+    /// поэтому такие строки в сверку не берутся вовсе. Иначе после заливки 235 стран сводка
+    /// качества показывала бы «не найдено 12 000», и настоящие расхождения в ней утонули бы
+    /// (план 11.1.5).
+    /// </summary>
+    [Fact]
+    public async Task Verify_SkipsForeignCountries()
+    {
+        using var db = CreateDb(nameof(Verify_SkipsForeignCountries));
+        var (comp, swimmer) = await SeedBaseAsync(db);
+
+        db.Add(Rec("34.08"));                                   // country/ISR — сверяем
+        db.Add(Rec("21.08", regionType: "world", regionCode: "", category: "open", ageKey: ""));
+        db.Add(Rec("22.50", regionCode: "JAM"));                // чужая федерация — мимо
+        db.Add(Rec("26.10", regionCode: "AGU"));
+        db.Add(Swim(comp, swimmer, 34_080, new DateTime(2025, 7, 20)));
+        await db.SaveChangesAsync();
+
+        var result = await new RecordQualityService(db).VerifyAllAsync();
+
+        Assert.Equal(2, result.Checked);                        // ISR + world, без JAM и AGU
+        Assert.Equal(2, db.RecordVerifications.Count());
+
+        // И сводка считает тем же охватом: иначе «не проверено» = все иностранные рекорды.
+        var summary = await new RecordQualityService(db).GetSummaryAsync();
+        Assert.Equal(2, summary.Total);
+        Assert.Equal(0, summary.NotChecked);
     }
 
     /* ───────────── ось возраста ступени (docs/data-integrity.md §13) ───────────── */
