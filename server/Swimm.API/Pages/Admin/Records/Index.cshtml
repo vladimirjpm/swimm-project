@@ -1,4 +1,4 @@
-@page
+﻿@page
 @model Swimm.API.Pages.Admin.Records.IndexModel
 @{
     ViewData["Title"] = "Records";
@@ -148,13 +148,19 @@
                 <thead>
                     <tr>
                         <th>ID</th><th>Ось</th><th>Время</th><th>Причина</th><th>Статус</th>
-                        <th>Обоснование</th><th>Заведено</th><th></th>
+                        <th>Заведено</th><th class="col-actions"></th>
                     </tr>
                 </thead>
                 <tbody>
+                    @{ var issueRow = 0; }
                     @foreach (var i in Model.Issues.Items)
                     {
-                        <tr id="iss-row-@i.Id">
+                        @* Подсветка через одну ЗАПИСЬ, а не через строку: у претензии их две. *@
+                        var altClass = issueRow++ % 2 == 1 ? " issue-alt" : "";
+                        @* Претензия занимает ДВЕ строки: оси и статусы сверху, обоснование
+                           широким полем под ними. Одной строкой textarea растягивала таблицу
+                           так, что кнопки уезжали за правый край. *@
+                        <tr id="iss-row-@i.Id" class="issue-head@(altClass)">
                             <td class="text-admin-text-muted">@i.Id</td>
                             <td class="whitespace-nowrap text-admin-text-muted">
                                 @i.RegionType@(string.IsNullOrEmpty(i.RegionCode) ? "" : $" · {i.RegionCode}")
@@ -187,13 +193,18 @@
                                     }
                                 </select>
                             </td>
-                            <td><textarea class="admin-input w-96 h-16" data-field="note">@i.Note</textarea></td>
                             <td class="whitespace-nowrap text-admin-text-muted text-xs">
                                 @i.CreatedAt.ToString("dd/MM/yyyy")<br />@i.CreatedBy
                             </td>
-                            <td class="whitespace-nowrap text-right">
+                            <td class="whitespace-nowrap text-right col-actions">
                                 <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5" onclick="saveIssue(@i.Id)">Save</button>
                                 <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5" onclick="deleteIssue(@i.Id)">Del</button>
+                            </td>
+                        </tr>
+                        <tr id="iss-note-@i.Id" class="issue-note@(altClass)">
+                            <td colspan="7">
+                                <label class="block text-[11px] text-admin-text-muted mb-0.5">Обоснование</label>
+                                <textarea class="admin-input w-full h-16" data-field="note">@i.Note</textarea>
                             </td>
                         </tr>
                     }
@@ -596,7 +607,8 @@ else
                     body: JSON.stringify({
                         status: rowField(row, 'status').value,
                         reason: rowField(row, 'reason').value,
-                        note: rowField(row, 'note').value,
+                        // Обоснование живёт в ПАРНОЙ строке таблицы, не в той же <tr>.
+                        note: rowField('iss-note-' + id, 'note').value,
                     }),
                 });
                 toast('Сохранено');
@@ -610,7 +622,9 @@ else
             if (!ok) return;
             try {
                 await api(`/api/admin/record-issues/${id}`, { method: 'DELETE' });
+                // Строки две — обе, иначе обоснование осталось бы висеть без записи.
                 document.getElementById('iss-row-' + id)?.remove();
+                document.getElementById('iss-note-' + id)?.remove();
                 toast('Запись удалена');
             } catch (e) {
                 toast('Ошибка: ' + e.message, 4000);
