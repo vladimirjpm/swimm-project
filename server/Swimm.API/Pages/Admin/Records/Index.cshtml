@@ -1,4 +1,4 @@
-@page
+﻿@page
 @model Swimm.API.Pages.Admin.Records.IndexModel
 @{
     ViewData["Title"] = "Records";
@@ -143,63 +143,71 @@
     }
     else
     {
-        <div class="overflow-x-auto">
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>ID</th><th>Ось</th><th>Время</th><th>Причина</th><th>Статус</th>
-                        <th>Обоснование</th><th>Заведено</th><th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var i in Model.Issues.Items)
-                    {
-                        <tr id="iss-row-@i.Id">
-                            <td class="text-admin-text-muted">@i.Id</td>
-                            <td class="whitespace-nowrap text-admin-text-muted">
-                                @i.RegionType@(string.IsNullOrEmpty(i.RegionCode) ? "" : $" · {i.RegionCode}")
-                                · @i.Category@(string.IsNullOrEmpty(i.AgeKey) ? "" : $" {i.AgeKey}")
-                                · @i.Gender · @i.PoolType
-                                <br />@i.Style @i.Distance
-                            </td>
-                            <td class="whitespace-nowrap">
-                                <strong>@i.FlaggedTime</strong>
-                                @if (!i.RecordStillCurrent)
+        @* Список карточек, а НЕ таблица. Таблицей это было дважды и оба раза плохо:
+           textarea обоснования растягивала строку так, что кнопки уезжали за правый край,
+           а разделить записи не вышло ни чередованием тона, ни зазором — при
+           border-collapse у строк таблицы не работают ни отступы, ни рамка вокруг пары.
+           У карточки отступ, рамка и скругление работают как обычно, и вся претензия лежит
+           в ОДНОМ элементе — оттого saveIssue снова берёт все поля одним rowField. *@
+        <ul class="issue-list">
+            @foreach (var i in Model.Issues.Items)
+            {
+                <li class="issue-card" id="iss-row-@i.Id">
+                    <div class="issue-card-head">
+                        <span class="text-admin-text-muted text-xs">#@i.Id</span>
+
+                        <div class="text-admin-text-muted text-xs leading-snug">
+                            @i.RegionType@(string.IsNullOrEmpty(i.RegionCode) ? "" : $" · {i.RegionCode}")
+                            · @i.Category@(string.IsNullOrEmpty(i.AgeKey) ? "" : $" {i.AgeKey}")
+                            · @i.Gender · @i.PoolType
+                            <br /><span class="text-admin-text">@i.Style @i.Distance</span>
+                        </div>
+
+                        <div class="whitespace-nowrap">
+                            <strong class="text-base">@i.FlaggedTime</strong>
+                            @if (!i.RecordStillCurrent)
+                            {
+                                @* Ключ реестра включает время: рекорд с тех пор сменился,
+                                   претензия относится к истории, а не к текущей строке. *@
+                                <div class="text-[11px] text-admin-text-muted">рекорд с тех пор сменился</div>
+                            }
+                        </div>
+
+                        <label class="text-[11px] text-admin-text-muted flex flex-col gap-0.5">
+                            Причина
+                            <select class="admin-input w-full" data-field="reason">
+                                @foreach (var r in Model.IssueReasons)
                                 {
-                                    @* Ключ реестра включает время: рекорд с тех пор сменился,
-                                       претензия относится к истории, а не к текущей строке. *@
-                                    <div class="text-[11px] text-admin-text-muted">рекорд с тех пор сменился</div>
+                                    <option value="@r" selected="@(r == i.Reason)">@r</option>
                                 }
-                            </td>
-                            <td>
-                                <select class="admin-input w-44" data-field="reason">
-                                    @foreach (var r in Model.IssueReasons)
-                                    {
-                                        <option value="@r" selected="@(r == i.Reason)">@r</option>
-                                    }
-                                </select>
-                            </td>
-                            <td>
-                                <select class="admin-input w-36" data-field="status">
-                                    @foreach (var st in Model.IssueStatuses)
-                                    {
-                                        <option value="@st" selected="@(st == i.Status)">@st</option>
-                                    }
-                                </select>
-                            </td>
-                            <td><textarea class="admin-input w-96 h-16" data-field="note">@i.Note</textarea></td>
-                            <td class="whitespace-nowrap text-admin-text-muted text-xs">
-                                @i.CreatedAt.ToString("dd/MM/yyyy")<br />@i.CreatedBy
-                            </td>
-                            <td class="whitespace-nowrap text-right">
-                                <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5" onclick="saveIssue(@i.Id)">Save</button>
-                                <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5" onclick="deleteIssue(@i.Id)">Del</button>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+                            </select>
+                        </label>
+
+                        <label class="text-[11px] text-admin-text-muted flex flex-col gap-0.5">
+                            Статус
+                            <select class="admin-input w-full" data-field="status">
+                                @foreach (var st in Model.IssueStatuses)
+                                {
+                                    <option value="@st" selected="@(st == i.Status)">@st</option>
+                                }
+                            </select>
+                        </label>
+
+                        <div class="text-[11px] text-admin-text-muted whitespace-nowrap">
+                            @i.CreatedAt.ToString("dd/MM/yyyy")<br />@i.CreatedBy
+                        </div>
+
+                        <div class="flex gap-2">
+                            <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5" onclick="saveIssue(@i.Id)">Save</button>
+                            <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5" onclick="deleteIssue(@i.Id)">Del</button>
+                        </div>
+                    </div>
+
+                    <label class="block text-[11px] text-admin-text-muted mt-2 mb-0.5">Обоснование</label>
+                    <textarea class="admin-input w-full h-16" data-field="note">@i.Note</textarea>
+                </li>
+            }
+        </ul>
 
         <partial name="/Pages/Admin/Shared/_Pagination.cshtml"
                  model='new Swimm.API.Pages.Admin.Shared.PaginationModel(Model.Issues.Page, Model.Issues.TotalPages,
