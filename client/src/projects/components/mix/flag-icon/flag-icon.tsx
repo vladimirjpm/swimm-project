@@ -36,6 +36,37 @@ const ALPHA3_TO_ALPHA2: Record<string, string> = {
   ETH: 'et', HKG: 'hk', SGP: 'sg', THA: 'th', PHI: 'ph', INA: 'id', MAS: 'my',
   VIE: 'vn', UAE: 'ae', JOR: 'jo', LBN: 'lb', IRN: 'ir', IRQ: 'iq', SAU: 'sa',
   QAT: 'qa', KUW: 'kw', BRN: 'bh', OMA: 'om',
+
+  // ── Добавлено 16.09.2026 под страницу /records: после боевого прогона в справочнике
+  //    рекорды 212 стран, и без этих строк у половины рейтинга флага не было бы вовсе.
+  //    ⚠ Коды World Aquatics — не ISO: NIG это Нигер (ne), а Нигерия — NGR (ng); GUI
+  //    Гвинея (gn), GBS Гвинея-Бисау (gw), GEQ Экваториальная Гвинея (gq); CGO Конго (cg),
+  //    COD ДР Конго (cd). Обрезать код до двух букв нельзя ни в одном из этих случаев.
+  AFG: 'af', AGU: 'ai', ANG: 'ao', ANT: 'ag', ARU: 'aw', ASA: 'as', BAH: 'bs',
+  BAN: 'bd', BAR: 'bb', BDI: 'bi', BEN: 'bj', BER: 'bm', BHU: 'bt', BIZ: 'bz',
+  BOT: 'bw', BRU: 'bn', BUR: 'bf', CAF: 'cf', CAM: 'kh', CAY: 'ky', CGO: 'cg',
+  CIV: 'ci', CMR: 'cm', COD: 'cd', COK: 'ck', COM: 'km', CPV: 'cv', CUR: 'cw',
+  DJI: 'dj', DMA: 'dm', ERI: 'er', ESA: 'sv', FIJ: 'fj', FRO: 'fo', FSM: 'fm',
+  GAB: 'ga', GAM: 'gm', GBS: 'gw', GEQ: 'gq', GHA: 'gh', GIB: 'gi', GRN: 'gd',
+  GUI: 'gn', GUM: 'gu', GUY: 'gy', HAI: 'ht', HON: 'hn', ISV: 'vi', IVB: 'vg',
+  JAM: 'jm', KGZ: 'kg', LAO: 'la', LBA: 'ly', LBR: 'lr', LCA: 'lc', LES: 'ls',
+  LIE: 'li', MAC: 'mo', MAD: 'mg', MAW: 'mw', MDV: 'mv', MGL: 'mn', MHL: 'mh',
+  MLI: 'ml', MOZ: 'mz', MRI: 'mu', MTN: 'mr', MYA: 'mm', NAM: 'na', NCA: 'ni',
+  NEP: 'np', NIG: 'ne', NMA: 'mp', PAK: 'pk', PLE: 'ps', PLW: 'pw', PNG: 'pg',
+  PRK: 'kp', RWA: 'rw', SAM: 'ws', SEN: 'sn', SEY: 'sc', SHN: 'sh', SKN: 'kn',
+  SLE: 'sl', SMR: 'sm', SOL: 'sb', SOM: 'so', SRI: 'lk', STP: 'st', SUD: 'sd',
+  SUR: 'sr', SWZ: 'sz', SYR: 'sy', TAN: 'tz', TCN: 'tc', TGA: 'to', TJK: 'tj',
+  TKM: 'tm', TLS: 'tl', TOG: 'tg', TPE: 'tw', TTO: 'tt', TUV: 'tv', UGA: 'ug',
+  VAN: 'vu', VIN: 'vc', YEM: 'ye', ZAM: 'zm',
+
+  // Второй код той же страны у World Aquatics (в справочнике встречаются оба написания).
+  IRI: 'ir',   // рядом с IRN
+  KSA: 'sa',   // рядом с SAU
+
+  // Территории без собственного ISO-кода — флаг метрополии или спецкод flagcdn.
+  MAA: 'sx',   // Синт-Мартен
+  TAH: 'pf',   // Таити → Французская Полинезия: своего кода у него нет
+  KOS: 'xk',   // Косово: 'xk' — временный код, flagcdn его понимает
 };
 
 /** ISR → il; il/IL → il; неизвестный код → null (флаг не рисуем). */

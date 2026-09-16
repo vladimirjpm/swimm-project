@@ -15,6 +15,7 @@
 //   /my-media               → media.html
 //   /about                  → about.html
 //   /season-best            → season-best.html (списки лучших в сезоне; всё в query)
+//   /records                → records.html (рейтинг рекордов стран; дисциплина в query)
 //
 // ПРАВИЛО: в путь идёт только идентичность ресурса. Состояние вида
 // (tab, filter, club, swim, eventId, cat, loadMode, themes) остаётся в query —
@@ -96,6 +97,35 @@ export const routes = {
     if (q.bestPerSwimmer) params.set('best', 'true');
     if (q.swimmerId != null) params.set('swimmer', String(q.swimmerId));
     return `/season-best?${params.toString()}`;
+  },
+
+  /**
+   * Страница `/records` — рейтинг национальных рекордов: кто из стран быстрее в одной
+   * дисциплине и насколько отстаёт от мирового (этап 11.2.2).
+   *
+   * Всё в query по той же причине, что у `/season-best` и `/h2h`: идентичности в пути у
+   * рейтинга нет — адресом его делает дисциплина. Категория в адрес не пишется вовсе:
+   * у других стран, кроме `open`, рекордов не бывает (решение Влада 29.07.2026).
+   */
+  records: (q: {
+    /** Ключ стиля как на клиенте: freestyle / backstroke / individual_medley… */
+    stroke?: string | null;
+    /** Дистанция как в справочнике: «50m», «4X100m». */
+    distance?: string | null;
+    gender?: string | null;
+    /** «25m» / «50m» — времена разных бассейнов несравнимы. */
+    poolType?: string | null;
+    /** Какую страну подсветить; на состав рейтинга не влияет. */
+    highlight?: string | null;
+  } = {}) => {
+    const params = new URLSearchParams();
+    if (q.stroke) params.set('stroke', q.stroke);
+    if (q.distance) params.set('distance', q.distance);
+    if (q.gender) params.set('gender', q.gender);
+    if (q.poolType) params.set('pool', q.poolType);
+    if (q.highlight) params.set('country', q.highlight);
+    const query = params.toString();
+    return query ? `/records?${query}` : '/records';
   },
 
   /**
@@ -250,6 +280,42 @@ export function parseSeasonBestQuery(search: string = window.location.search): S
     clubId: num('club'),
     bestPerSwimmer: p.get('best') === 'true',
     swimmerId: num('swimmer'),
+  };
+}
+
+/**
+ * Фильтр страницы `/records`, разобранный из query. Живёт рядом с генератором
+ * `routes.records` по тому же правилу, что `parseSeasonBestQuery`: писать и читать один
+ * адрес в разных местах значит завести два контракта.
+ *
+ * Дефолтов здесь НЕТ — страница решает сама, что показать, когда дисциплина не задана.
+ * Иначе «пользователь выбрал 50 вольным» и «мы подставили 50 вольным» стали бы одним и тем
+ * же состоянием, и первое же изменение дефолта переписало бы чужие ссылки.
+ */
+export interface RecordsQuery {
+  stroke: string | null;
+  /** Как в справочнике: «50m», «4X100m» (заглавная X у эстафет — форма базы). */
+  distance: string | null;
+  gender: 'male' | 'female' | null;
+  poolType: '25m' | '50m' | null;
+  /** Страна для подсветки строки (alpha-3). */
+  highlight: string | null;
+}
+
+export function parseRecordsQuery(search: string = window.location.search): RecordsQuery {
+  const p = new URLSearchParams(search);
+  const gender = (p.get('gender') ?? '').toLowerCase();
+  const pool = (p.get('pool') ?? '').toLowerCase();
+  const distance = (p.get('distance') ?? '').trim();
+
+  return {
+    stroke: (p.get('stroke') || '').trim().toLowerCase() || null,
+    // Форма справочника: «4x50m» из чужой ссылки обязан найтись как «4X50m» (то же
+    // приведение, что в серверном RecordRankingQuery.Create).
+    distance: distance ? distance.toLowerCase().replace(/x/g, 'X') : null,
+    gender: gender === 'male' || gender === 'female' ? gender : null,
+    poolType: pool === '25m' || pool === '50m' ? pool : null,
+    highlight: (p.get('country') || '').trim().toUpperCase() || null,
   };
 }
 

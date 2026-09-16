@@ -1295,6 +1295,7 @@ app.Use(async (context, next) =>
                 "about" => "/about.html",
                 "season-best" => "/season-best.html",   // весь фильтр в query
                 "h2h" => "/h2h.html",                   // сравнение двух пловцов, пара в query
+                "records" => "/records.html",           // рейтинг рекордов стран, дисциплина в query
                 _ => null,
             },
             >= 2 => seg[0] switch
