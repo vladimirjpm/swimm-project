@@ -13,13 +13,11 @@ namespace Swimm.Parsing.RecordSources;
 /// Чьи NR качать, задаёт RecordsImport:WorldAquaticsNationalCountryId (внутренний GUID
 /// страны в API worldaquatics); по умолчанию — Израиль (домашний регион проекта).
 /// SSRF: URL целиком собираются из константы домена + жёстко заданных query-параметров —
-/// пользовательский ввод в URL никогда не попадает.
+/// пользовательский ввод в URL никогда не попадает; whitelist домена и HTTP-клиент —
+/// в <see cref="WorldAquaticsSource"/>, один на все источники worldaquatics.
 /// </summary>
 public class WorldRecordsSourceProvider : IRecordSourceProvider
 {
-    private const string ApiHost = "api.worldaquatics.com";
-    private const string DefaultNationalCountryId = "962f77d6-d9c0-49ad-ba93-adc831c9ec9f"; // Израиль
-
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly WorldRecordsParser _parser;
     private readonly string _nationalCountryId;
@@ -30,7 +28,7 @@ public class WorldRecordsSourceProvider : IRecordSourceProvider
         _httpClientFactory = httpClientFactory;
         _parser = parser;
         var configured = configuration?["RecordsImport:WorldAquaticsNationalCountryId"];
-        _nationalCountryId = string.IsNullOrWhiteSpace(configured) ? DefaultNationalCountryId : configured;
+        _nationalCountryId = string.IsNullOrWhiteSpace(configured) ? WorldAquaticsSource.IsraelCountryId : configured;
     }
 
     public string Source => "worldrecords";
@@ -52,28 +50,23 @@ public class WorldRecordsSourceProvider : IRecordSourceProvider
             }
             else
             {
-                var urls = new (string Url, string FileName)[]
+                var urls = new (Uri Url, string FileName)[]
                 {
-                    (BuildUrl("pool=SCM&recordCode=WR"), "WR_SCM.xlsx"),
-                    (BuildUrl("pool=LCM&recordCode=WR"), "WR_LCM.xlsx"),
-                    (BuildUrl($"recordCode=NR&pool=SCM&countryId={_nationalCountryId}"), "NR_SCM.xlsx"),
-                    (BuildUrl($"recordCode=NR&pool=LCM&countryId={_nationalCountryId}"), "NR_LCM.xlsx"),
+                    (WorldAquaticsSource.ReportUrl("pool=SCM&recordCode=WR"), "WR_SCM.xlsx"),
+                    (WorldAquaticsSource.ReportUrl("pool=LCM&recordCode=WR"), "WR_LCM.xlsx"),
+                    (WorldAquaticsSource.ReportUrl($"recordCode=NR&pool=SCM&countryId={_nationalCountryId}"), "NR_SCM.xlsx"),
+                    (WorldAquaticsSource.ReportUrl($"recordCode=NR&pool=LCM&countryId={_nationalCountryId}"), "NR_LCM.xlsx"),
                 };
 
-                var client = _httpClientFactory.CreateClient();
-                client.Timeout = TimeSpan.FromSeconds(30);
-                // Без User-Agent api.worldaquatics.com не отвечает вовсе (запрос висит до
-                // таймаута) — проверено на приёмке 2.6; конкретное значение не важно.
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("SwimmBot/1.0");
+                // 30 с — как было у этой кнопки. Замер 15.09 показал файлы до 53 с, но
+                // поднимать таймаут здесь нельзя вслепую: батч по странам (11.1.2) получит
+                // свой, с повторами, — а этот путь остаётся синхронным запросом админки.
+                var client = WorldAquaticsSource.CreateClient(_httpClientFactory, TimeSpan.FromSeconds(30));
 
                 var streams = new List<MemoryStream>();
                 foreach (var (url, _) in urls)
                 {
-                    var uri = new Uri(url);
-                    if (!string.Equals(uri.Host, ApiHost, StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidOperationException($"Домен '{uri.Host}' не в whitelist источников рекордов.");
-
-                    var response = await client.GetAsync(uri, ct);
+                    var response = await client.GetAsync(url, ct);
                     response.EnsureSuccessStatusCode();
                     var ms = new MemoryStream();
                     await response.Content.CopyToAsync(ms, ct);
@@ -131,6 +124,4 @@ public class WorldRecordsSourceProvider : IRecordSourceProvider
             foreach (var ms in owned) await ms.DisposeAsync();
         }
     }
-
-    private static string BuildUrl(string query) => $"https://{ApiHost}/fina/records/report?{query}";
 }
