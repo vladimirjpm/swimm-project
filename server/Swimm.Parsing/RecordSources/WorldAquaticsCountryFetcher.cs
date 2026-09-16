@@ -21,7 +21,8 @@ namespace Swimm.Parsing.RecordSources;
 /// <item><b>Таймаут 120 с и два повтора.</b> Замер 15.09: отчёты отдаются от 2 до 53 с — то
 /// есть прежних 30 с не хватало двум файлам из восьми. Прогон идёт час-два, и одна
 /// подвисшая страна не повод терять весь батч.</item>
-/// <item><b>Мировые рекорды не качает.</b> WR SCM/LCM — один раз на прогон (11.1.2).</item>
+/// <item><b>Мировые рекорды — отдельным методом.</b> <see cref="FetchWorldAsync"/> качает
+/// WR SCM/LCM один раз на прогон, а не на страну (11.1.2).</item>
 /// </list>
 /// </summary>
 public class WorldAquaticsCountryFetcher : IRecordCountryFetcher
@@ -83,6 +84,66 @@ public class WorldAquaticsCountryFetcher : IRecordCountryFetcher
                 PoolType: null));
 
             return MapRows(code, rows);
+        }
+        finally
+        {
+            if (scm != null) await scm.DisposeAsync();
+            if (lcm != null) await lcm.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    /// Мировые рекорды — два файла на весь прогон (11.1.2). Национальные рекорды из
+    /// WR-отчёта здесь НЕ берём: ровно так в базе и заводились одиночки
+    /// <c>country/USA/open</c> и <c>country/JAM/open</c> (data-integrity И-19). В прогоне
+    /// национальный рекорд приходит только из NR-отчёта своей страны.
+    /// </summary>
+    public async Task<IReadOnlyList<ParsedRecordDto>> FetchWorldAsync(CancellationToken ct = default)
+    {
+        var client = WorldAquaticsSource.CreateClient(_httpClientFactory, FileTimeout);
+
+        MemoryStream? scm = null, lcm = null;
+        try
+        {
+            scm = await DownloadAsync(
+                client, WorldAquaticsSource.ReportUrl("pool=SCM&recordCode=WR"), "world", "WR SCM", ct);
+            lcm = await DownloadAsync(
+                client, WorldAquaticsSource.ReportUrl("pool=LCM&recordCode=WR"), "world", "WR LCM", ct);
+
+            var rows = _parser.Parse(new ParseRequest(
+                scm, "WR_SCM.xlsx",
+                lcm, "WR_LCM.xlsx",
+                IsAward: false,
+                PoolType: null));
+
+            var world = new List<ParsedRecordDto>();
+            foreach (var r in rows)
+            {
+                if (r.EventStyleGender != "male" && r.EventStyleGender != "female")
+                    continue;
+
+                // Тип рекорда «WR» парсер ставит и повторённому «=WR» (И-19). Всё, что им не
+                // помечено, в мировые не попадает — и в страны из этого файла тоже.
+                if (!string.Equals(r.Note, "WR", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                world.Add(new ParsedRecordDto(
+                    RegionType: "world",
+                    RegionCode: "",
+                    Category: "open",
+                    AgeKey: "",
+                    Gender: r.EventStyleGender,
+                    PoolType: r.PoolType,
+                    Style: r.EventStyleName,
+                    Distance: r.EventStyleLen.EndsWith('m') ? r.EventStyleLen : r.EventStyleLen + "m",
+                    Time: r.Time,
+                    HolderName: $"{r.FirstName} {r.LastName}".Trim(),
+                    Club: null,
+                    HolderCountry: r.Country,
+                    RecordDate: r.Date));
+            }
+
+            return world;
         }
         finally
         {

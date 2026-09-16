@@ -3,7 +3,9 @@
 Файлы: `Pages/Admin/Import.cshtml`; API: `/api/admin/import` (+`/status/{id}`,
 `/clear`), `/api/admin/parse-pdf`, `/api/admin/import-parsed`,
 `/api/admin/records/fetch`, `/api/admin/records/apply`,
-`/api/admin/records/isrorg-links`, `/api/admin/clearable-tables`.
+`/api/admin/records/isrorg-links`, `/api/admin/clearable-tables`;
+прогон рекордов по странам (11.1.2, вкладка ещё не сделана — 11.1.4):
+`/api/admin/records/countries`, `/api/admin/records/countries/run` (+`/run/{id}`).
 Сервисы: `JsonImportService`, `ImportJobQueue` (+`ImportBackgroundService`),
 PDF — `Swimm.Parsing` (PdfPig).
 

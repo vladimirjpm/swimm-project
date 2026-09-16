@@ -80,6 +80,15 @@ public static class DependencyInjection
         services.AddSingleton<ImportJobQueue>();
         services.AddSingleton<IImportJobQueue>(sp => sp.GetRequiredService<ImportJobQueue>());
 
+        // Прогон рекордов по странам (11.1.2): очередь — singleton, сам ход прогона — scoped
+        // (дифф ходит в БД). Пауза между странами по умолчанию, тесты подставляют свою.
+        services.AddSingleton<RecordCountryRunQueue>();
+        services.AddSingleton<IRecordCountryRunQueue>(sp => sp.GetRequiredService<RecordCountryRunQueue>());
+        services.AddScoped(sp => new RecordCountryRunner(
+            sp.GetRequiredService<IRecordCountriesProvider>(),
+            sp.GetRequiredService<IRecordCountryFetcher>(),
+            sp.GetRequiredService<IRecordDiffService>()));
+
         // Repositories
         services.AddScoped<IResultRepository, ResultRepository>();
         services.AddScoped<IRecordRepository, RecordRepository>();

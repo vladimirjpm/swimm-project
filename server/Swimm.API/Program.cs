@@ -103,6 +103,9 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentActor, Swimm.API.Services.HttpCurrentActor>();
 builder.Services.AddHostedService<ImportBackgroundService>();
 
+// Прогон рекордов по странам (11.1.2) — 470 файлов, час-два; в HTTP-запрос не пролезет.
+builder.Services.AddHostedService<Swimm.API.BackgroundServices.RecordCountryRunBackgroundService>();
+
 // Rate limiting для чувствительных к перебору auth-эндпоинтов (login/register/forgot/reset).
 // Фиксированное окно по IP: 10 запросов в минуту, лишнее — 429.
 builder.Services.AddRateLimiter(options =>
